@@ -1,0 +1,113 @@
+# Paired Evaluation Math (log-space, token-weighted)
+
+> **Plain language:** The reported perplexity ratio is just the exponential of
+> the token-weighted mean Δlog-loss, and the confidence interval comes from
+> exponentiating the same paired bootstrap—we prove both facts here.
+
+## Claim
+
+For paired evaluation windows `i = 1..n` with token counts `t_i`, the reported
+**ratio** between two arms A and B (e.g., preview/final or edited/baseline)
+satisfies
+
+$$
+\text{ratio} = \exp\!\Big(\overline{\Delta \ell}_{\text{w}}\Big),\quad
+\Delta \ell_i = \ell^{(B)}_i - \ell^{(A)}_i,
+$$
+
+where $\ell_i$ is the **per‑token** log‑loss on window $i$, and the **weighted** mean is
+
+$$
+\overline{\Delta \ell}_{\text{w}} = \frac{\sum_i t_i \, \Delta \ell_i}{\sum_i t_i}.
+$$
+
+The **ratio confidence interval** is obtained by exponentiating the paired
+ΔlogNLL CI computed on the **same** windows with BCa bootstrap (paired,
+token‑weighted).
+
+## Derivation (sketch)
+
+For ppl-like primary metrics (perplexity), $\text{PPL} = \exp(\bar{\ell})$ where $\bar{\ell} = \sum t_i \ell_i / \sum t_i$.
+Thus the ratio:
+
+$$
+\frac{\text{PM}^{(B)}}{\text{PM}^{(A)}} \quad \text{(ratio in display space for ppl-like metrics)}
+= \exp\Big(\bar{\ell}^{(B)} - \bar{\ell}^{(A)}\Big)
+= \exp\Big(\overline{\Delta \ell}_{\text{w}}\Big).
+$$
+
+BCa applied to the paired vector $\{\Delta \ell_i\}$ (resampled with weights
+proportional to $t_i$) yields CI $[L, U]$; exponentiate to obtain
+$[\exp(L), \exp(U)]$.
+
+### Unbiasedness in log space (lemma)
+
+Let the token‑weighted mean be $\overline{\Delta \ell}_{\text{w}} = \sum_i t_i\,\Delta \ell_i / \sum_i t_i$. By linearity of expectation,
+
+$$
+\mathbb{E}\big[\overline{\Delta \ell}_{\text{w}}\big]
+= \frac{\sum_i t_i\, \mathbb{E}[\Delta \ell_i]}{\sum_i t_i}
+= \log\Bigg(\prod_i \Big(\tfrac{p_i^{(B)}}{p_i^{(A)}}\Big)^{\,t_i/\sum_j t_j}\Bigg),
+$$
+
+so the estimator is unbiased for the log of the (token‑weighted) ratio. Under mild assumptions (ergodicity across windows), the point estimator converges to the population log‑ratio.
+
+### Jensen inequality note
+
+By Jensen, $\exp\big(\overline{\Delta \ell}_{\text{w}}\big) \leq \tfrac{\sum_i t_i\, p_i^{(B)}}{\sum_i t_i\, p_i^{(A)}}$ with equality only when window logits are equal. This is why the ratio‑of‑means can be biased toward high‑perplexity windows, while the log‑space estimator respects pairing and token weighting.
+
+## Why log‑space vs ratio of means (counter‑example)
+
+The naive ratio of mean perplexities can be biased toward high‑perplexity
+windows. A simple two‑window example shows the pitfall:
+
+```python
+from math import exp, log
+
+weights = [512, 256]
+preview = [40.0, 220.0]
+final = [38.0, 260.0]  # high-perplexity window regresses strongly
+
+ratio_log = exp(
+    sum(w * (log(b) - log(a)) for w, a, b in zip(weights, preview, final))
+    / sum(weights)
+)
+
+ratio_means = (
+    sum(w * b for w, b in zip(weights, final))
+    / sum(w * a for w, a in zip(weights, preview))
+)
+
+print(ratio_log, ratio_means)  # 1.0217..., 1.12
+```
+
+InvarLock uses the exponential of the token‑weighted mean ΔlogNLL
+(`exp(weighted_mean(Δlog))`), which respects pairing and avoids the bias.
+
+## Runtime Contract
+
+- Certificates must satisfy:
+  - `ppl.logloss_delta_ci` exponentiates to `ppl.ratio_ci` (paired baseline path).
+  - `ppl.stats.paired_delta_summary` records `{mean,std,degenerate}` for the paired Δ distribution.
+  - `ppl.stats.window_match_fraction == 1.0` and `ppl.stats.window_overlap_fraction == 0.0`.
+
+- Runs **abort** in CI/Release profiles if preview/final counts differ or pairing < 1.0.
+
+## Observability
+
+- `ppl.preview_final_ratio` — final/preview perplexity ratio in linear space.
+- `ppl.ratio_ci` and `ppl.logloss_delta_ci` — paired ΔlogNLL interval (check both log and exponentiated views).
+- `ppl.stats.window_match_fraction`, `ppl.stats.window_overlap_fraction`, `ppl.stats.paired_windows`.
+- `ppl.stats.paired_delta_summary.{mean,std,degenerate}` and `ppl.stats.bootstrap.{replicates,seed}`.
+- `ppl.stats.coverage.preview/final` — confirms both arms honour window/coverage minima.
+
+## Edge cases & safeguards
+
+- If all `t_i` equal, weighting reduces to simple mean: implementation can short‑circuit.
+- Degenerate Δ (all equal): mark `degenerate=true` and use a studentized fallback CI; certificate records the fallback.
+- Label alignment & padding must not contribute to `t_i` (masked tokens excluded).
+
+## References
+
+- Jurafsky, D., & Martin, J. H. (2023). *Speech and Language Processing* (3rd ed. draft), chapters on language modeling and perplexity. <https://web.stanford.edu/~jurafsky/slp3/>
+- Manning, C. D., & Schütze, H. (1999). *Foundations of Statistical Natural Language Processing.* MIT Press.

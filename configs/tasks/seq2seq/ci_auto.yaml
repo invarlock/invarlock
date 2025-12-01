@@ -1,0 +1,21 @@
+# Task preset: Seq2Seq (synthetic), CI profile, auto device
+
+model:
+  id: "gpt2"  # any HF causal model for demo
+  adapter: "hf_gpt2"
+  device: "auto"
+
+dataset:
+  provider: "seq2seq"
+  seq_len: 64
+  stride: 64
+  preview_n: 64
+  final_n: 64
+  seed: 42
+
+eval:
+  loss:
+    type: "seq2seq"
+
+guards:
+  order: ["invariants", "spectral", "rmt", "variance", "invariants"]

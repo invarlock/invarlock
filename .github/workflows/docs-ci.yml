@@ -1,0 +1,166 @@
+name: Documentation CI
+
+on:
+  # Cost optimization: main branch docs build is already in ci.yml
+  # This workflow only runs for PRs (detailed validation) and weekly link checks
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - 'CONTRIBUTING.md'
+      - 'mkdocs.yml'
+      - '.github/workflows/docs-ci.yml'
+  schedule:
+    # Run weekly to check external links
+    - cron: '0 2 * * 1'  # Monday 2 AM UTC
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Single consolidated job for docs validation (saves ~10 min setup overhead)
+  docs-validate:
+    name: Docs Build & Validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+
+    - name: Setup Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: '3.13'
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: '18'
+
+    - name: Cache pip
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: docs-pip-${{ hashFiles('pyproject.toml') }}
+        restore-keys: docs-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        # Install core package only (no [dev] which pulls torch/bitsandbytes ~3GB)
+        pip install -e .
+        pip install mkdocs mkdocs-material mkdocs-mermaid2-plugin linkchecker
+        # docs scripts need ruff/mypy only for lint, pytest for consistency checks
+        pip install ruff mypy pytest hypothesis
+
+    - name: Build docs (strict)
+      run: mkdocs build --strict
+
+    - name: Check internal links
+      run: python scripts/docs_check.py --links
+
+    - name: Lint markdown
+      run: python scripts/docs_lint.py --markdown
+      continue-on-error: true
+
+    - name: Spell check
+      run: python scripts/docs_lint.py --spell
+      continue-on-error: true
+
+    - name: Check consistency
+      run: python scripts/docs_check.py --consistency
+
+    - name: Check for secrets
+      run: |
+        grep -r -E "sk-[a-zA-Z0-9]{48}" docs/ && exit 1 || true
+        grep -r -E "ghp_[a-zA-Z0-9]{36}" docs/ && exit 1 || true
+        grep -r -E "/home/|/Users/|C:\\\\" docs/ && exit 1 || true
+
+    - name: Validate examples
+      run: python scripts/docs_check.py --examples
+      timeout-minutes: 5
+
+    - name: Check build size
+      run: |
+        SITE_SIZE=$(du -sm site | cut -f1)
+        echo "Documentation site size: ${SITE_SIZE}MB"
+        if [ $SITE_SIZE -gt 50 ]; then echo "Warning: Site > 50MB"; exit 1; fi
+
+    - name: Ensure clean working tree
+      run: |
+        rm -rf site
+        git diff --exit-code
+
+    - name: Upload build artifacts
+      if: github.event_name == 'pull_request'
+      uses: actions/upload-artifact@v5
+      with:
+        name: docs-build
+        path: site/
+        retention-days: 3
+
+  # External links only on schedule (avoids rate limiting)
+  check-external-links:
+    name: Check External Links
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    timeout-minutes: 15
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+
+    - name: Setup Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: '3.13'
+
+    - name: Install link checker
+      run: pip install linkchecker
+
+    - name: Check external links
+      run: linkchecker --check-extern docs/
+      continue-on-error: true
+
+  # Deploy preview only on PRs when Netlify secrets are configured
+  deploy-preview:
+    name: Deploy Preview
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.repository == 'invarlock/invarlock'
+    needs: [docs-validate]
+    timeout-minutes: 10
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+
+    - name: Setup Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: '3.13'
+
+    - name: Install dependencies
+      run: pip install mkdocs mkdocs-material mkdocs-mermaid2-plugin
+
+    - name: Build documentation
+      run: mkdocs build
+
+    - name: Deploy to Netlify
+      if: env.NETLIFY_AUTH_TOKEN != ''
+      uses: nwtgck/actions-netlify@v3.0.0
+      with:
+        publish-dir: './site'
+        production-branch: main
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        deploy-message: "Deploy from GitHub Actions"
+        enable-pull-request-comment: true
+        enable-commit-comment: false
+        overwrites-pull-request-comment: true
+      env:
+        NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+        NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}

@@ -1,0 +1,25 @@
+# Task preset: Seq2Seq (T5), Release profile, auto device
+
+model:
+  id: "t5-small"
+  adapter: "hf_t5"
+  device: "auto"
+
+dataset:
+  provider:
+    kind: "hf_seq2seq"
+    dataset_name: "xsum"
+    src_field: "document"
+    tgt_field: "summary"
+  seq_len: 256
+  stride: 256
+  preview_n: 120
+  final_n: 120
+  seed: 42
+
+eval:
+  loss:
+    type: "seq2seq"
+
+guards:
+  order: ["invariants", "spectral", "rmt", "variance", "invariants"]

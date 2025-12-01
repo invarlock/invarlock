@@ -1,0 +1,153 @@
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.egg
+*.egg-info/
+dist/
+build/
+pip-wheel-metadata/
+.venv/
+.venv-invarlock/
+.venv-*/
+venv/
+env/
+ENV/
+
+# IDEs and OS
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# AutoCoder specific
+output/
+logs/
+*.sqlite
+*.sqlite-journal
+chroma_db/ # If Chroma stores data locally by default in a dir
+
+# Secrets
+*.env
+secrets.py
+.pypirc
+TODO.md
+# Test results
+htmlcov/
+.pytest_cache/
+.coverage
+.coverage.*
+*/.coverage.*
+.hypothesis/
+coverage*.xml
+coverage-metrics.xml
+coverage-thresholds.json
+
+# Certificate outputs
+certificates/
+*_certificate/
+cert-*.json
+*.cert
+
+# Pruning results and test outputs
+*_pruning_results/
+*_pruning_results_*/
+test_*/
+*_test_results.json
+*_validation_results.json
+*_run.log
+test_comprehensive_results*.json
+mps_full_stats/
+test_mps_stats/
+optuna_results/
+invarlock_comparison_results/
+
+# Model outputs
+*.pt
+*.safetensors
+final_model/
+step_*/
+
+# Demo and report outputs
+demo_*/
+reports_*/
+reports/
+runs_cfg/
+runs/
+reports_report/
+runs/
+mock_run/
+*.log
+artifacts/
+artifacts/supply-chain/
+tmp_*/
+tmp/
+.certify_tmp/
+
+# Documentation builds and staging
+site/
+obsolete/
+node_modules/
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+*.tsbuildinfo
+npm-debug.log*
+*.tsbuildinfo
+
+# Local override configs (user-specific)
+configs/overrides/*.yaml
+!configs/overrides/*.example.yaml
+!configs/overrides/README.md
+
+# Notebook checkpoints
+**/.ipynb_checkpoints/
+
+# Run artifacts
+benchmarks/results/
+
+# Datasets/cache (if any)
+.cache/
+
+# Notebooks artifacts
+notebooks/artifacts/
+notebooks/results/
+notebooks/*.csv
+
+# Misc
+*.pyc
+*.clinerules
+.mypy_cache/
+.ruff_cache/
+.clinerules
+sitecustomize.py
+fullLisk.txt
+test_config.yaml
+pip-wheel-metadata/
+
+# Environments and local configs
+.venv/
+venv/
+env/
+.env
+.envrc
+
+# Additional Python/packaging caches
+.tox/
+.nox/
+.eggs/
+sitecustomize.py
+fullLisk.txt
+test_config.yaml
+
+
+# Optional local assets (not required for code/tests)
+data/
+contracts/
+
+# Local-only CI workflows (for benchmarking, not required for core CI)
+# .github/workflows/guard-effect-benchmark.yml  # Temporarily tracked for optimization

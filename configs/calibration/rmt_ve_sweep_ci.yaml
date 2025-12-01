@@ -1,0 +1,46 @@
+# Calibration config: RTN quantization edit for RMT ε and VE min-effect calibration
+# Use this to gather guard statistics with an actual model modification.
+
+model:
+  id: "gpt2"                  # Small model for calibration sweeps
+  adapter: "hf_gpt2"
+  device: "cpu"               # Use CPU for determinism
+
+dataset:
+  provider: "wikitext2"
+  split: "validation"
+  seq_len: 512
+  stride: 512
+  preview_n: 64
+  final_n: 64
+  seed: 42                    # Override per-run for statistical sampling
+
+edit:
+  name: quant_rtn
+  plan:
+    bitwidth: 8
+    per_channel: true
+    group_size: 128
+    clamp_ratio: 0.0
+    scope: "ffn"        # Must match variance guard's default scope (ffn)
+    max_modules: 4
+    seed: 42
+
+eval:
+  metric:
+    kind: ppl_causal
+  loss:
+    type: causal
+
+auto:
+  enabled: true
+  tier: balanced
+  probes: 0
+
+guards:
+  order: ["invariants", "spectral", "rmt", "variance", "invariants"]
+
+output:
+  dir: runs/calibration_sweeps
+  save_model: false
+  save_report: true

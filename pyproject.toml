@@ -1,0 +1,331 @@
+[build-system]
+requires      = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "invarlock"
+version = "0.2.0"
+description = "Edit‑agnostic robustness certificates for weight edits (InvarLock framework)"
+authors = [{ name = "InvarLock Team", email = "oss@invarlock.dev" }]
+maintainers = [{ name = "InvarLock Maintainers", email = "support@invarlock.dev" }]
+license = "Apache-2.0"
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.12"
+keywords = [
+  "machine-learning", "deep-learning", "transformers", "pytorch", "llm",
+  "quantization", "safety", "evaluation", "certification"
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Operating System :: OS Independent",
+  "Typing :: Typed",
+]
+dependencies = [
+    "typer>=0.15",
+    "click>=8.1",
+    "shellingham>=1.5.0",
+    "pandas>=2.2",
+    "scikit-learn>=1.4",
+    "pydantic>=2.0",
+    "rich>=13.0",
+    "pyyaml>=6.0",
+    "psutil>=5.9",
+    "hypothesis>=6.98",
+    "typing_extensions>=4.7",
+    "jsonschema>=4.0",
+]
+[project.urls]
+Homepage = "https://github.com/invarlock/invarlock"
+Repository = "https://github.com/invarlock/invarlock"
+Documentation = "https://github.com/invarlock/invarlock/tree/main/docs"
+Issues = "https://github.com/invarlock/invarlock/issues"
+Changelog = "https://github.com/invarlock/invarlock/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+# Core torch dependencies for adapters
+adapters = [
+  "torch>=2.1.0",
+  "transformers>=4.53.0",
+]
+
+# Hugging Face workflow (adapters + evaluation stack)
+hf = [
+  "torch>=2.1.0",
+  "transformers>=4.53.0",
+  "datasets>=3.0",
+  "numpy>=1.24",
+  "huggingface_hub>=0.23",
+  "aiohttp>=3.12.14",
+  "h2>=4.3.0",
+  "pillow>=11.3.0",
+]
+
+# Full guards functionality
+guards = [
+  "torch>=2.1.0",
+  "numpy>=1.24",
+]
+
+# Edit functionality
+edits = [
+  "torch>=2.1.0",
+]
+
+# Evaluation functionality
+eval = [
+  "torch>=2.1.0",
+  "datasets>=3.0",
+]
+
+# External edit integrations
+gptq = [
+  "torch>=2.1.0",
+  "auto-gptq>=0.7.0; platform_system == \"Linux\"",
+  "triton>=2.3.0; platform_system == \"Linux\"",
+  "transformers>=4.53.0",
+]
+
+
+awq = [
+  "torch>=2.1.0",
+  "autoawq>=0.2.0; platform_system == \"Linux\"",
+  "transformers>=4.53.0",
+  "triton>=2.3.0; platform_system == \"Linux\"",
+]
+
+# GPU helper stack (optional extras for CUDA/MPS optimisations)
+gpu = [
+  "torch>=2.1.0",
+  "accelerate>=0.27",
+  "bitsandbytes>=0.41; platform_system == \"Linux\"",
+]
+
+
+# Complete installation with all features
+all = [
+  "torch>=2.1.0",
+  "transformers>=4.53.0",
+  "datasets>=3.0",
+  "numpy>=1.24",
+  "huggingface_hub>=0.23",
+  "accelerate>=0.27",
+  "bitsandbytes>=0.41; platform_system == \"Linux\"",
+  "auto-gptq>=0.7.0; platform_system == \"Linux\"",
+  "autoawq>=0.2.0; platform_system == \"Linux\"",
+  "triton>=2.3.0; platform_system == \"Linux\"",
+  "aiohttp>=3.12.14",
+  "h2>=4.3.0",
+  "pillow>=11.3.0",
+]
+
+# ONNX/Optimum runtime (CPU by default)
+onnx = [
+  "optimum>=1.17.0",
+  "onnxruntime>=1.17.0",
+]
+
+# Development dependencies
+dev = [
+  "pytest>=7.0",
+  "pytest-cov>=4.0",
+  "ruff>=0.1.0",
+  "black>=23.0",
+  "mypy>=1.0",
+  "hypothesis>=6.98",
+  "pre-commit>=3.0",
+  "mkdocs>=1.5",
+  "mkdocs-material>=9.5",
+  "mkdocs-mermaid2-plugin>=1.1",
+  "sphinx>=7.0",
+  "matplotlib>=3.7",
+  "bitsandbytes>=0.41",
+  "build>=0.10.0",
+  "twine>=4.0.0",
+]
+
+# Entry points for production-ready plugins
+[project.entry-points."invarlock.edits"]
+quant_rtn = "invarlock.edits:RTNQuantEdit"
+
+[project.entry-points."invarlock.guards"]
+spectral = "invarlock.guards:SpectralGuard"
+variance = "invarlock.guards:VarianceGuard"
+rmt = "invarlock.guards:RMTGuard"
+invariants = "invarlock.guards:InvariantsGuard"
+hello_guard = "invarlock.plugins:HelloGuard"
+
+[project.entry-points."invarlock.adapters"]
+hf_gpt2 = "invarlock.adapters:HF_GPT2_Adapter"
+hf_bert = "invarlock.adapters:HF_BERT_Adapter"
+hf_llama = "invarlock.adapters:HF_LLaMA_Adapter"
+hf_gptq = "invarlock.plugins.hf_gptq_adapter:HF_GPTQ_Adapter"
+hf_awq = "invarlock.plugins.hf_awq_adapter:HF_AWQ_Adapter"
+hf_bnb = "invarlock.plugins.hf_bnb_adapter:HF_BNB_Adapter"
+
+# Console scripts
+[project.scripts]
+invarlock = "invarlock.cli.app:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"*" = ["py.typed"]
+"invarlock._data.runtime" = [
+  "profiles/*.yaml",
+  "tiers.yaml",
+]
+
+# Enable namespace packages
+[tool.setuptools]
+include-package-data = true
+
+# Development tooling configuration
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501", # line too long, handled by black
+    "B008", # do not perform function calls in argument defaults
+    "C901", # too complex
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"] # imported but unused
+
+[tool.black]
+line-length = 88
+target-version = ['py312']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.mypy]
+python_version = "3.13"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false  # lenient for now
+disallow_incomplete_defs = false
+check_untyped_defs = true
+disallow_untyped_decorators = false
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "torch.*",
+    "transformers.*",
+    "auto_gptq.*",
+    "yaml",
+    "jsonschema",
+    "datasets.*",
+    "sklearn.*",
+    "matplotlib.*",
+    "tqdm.*",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "invarlock.adapters.*",
+    "invarlock.edits.*",
+    "invarlock.eval.*",
+    "invarlock.guards.*",
+    "invarlock.observability.*",
+    "invarlock.cli.*",
+    "invarlock.model_utils",
+    "invarlock.sparsity_utils",
+    "invarlock.utils",
+    "invarlock.core.runner",
+]
+ignore_errors = true
+
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q --strict-markers --strict-config"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "unit: Unit tests for individual components",
+    "integration: Integration tests for full pipelines",
+    "regression: Regression tests for stability and reproducibility",
+    "slow: Tests that take longer than 30 seconds",
+    "gpu: Tests that require GPU (CUDA/MPS)",
+    "notebook: Tests for Jupyter notebook functionality",
+    "extras: Tests requiring optional dependencies (e.g., gptq, awq)",
+    "manual: Requires manual setup; excluded from default CI runs",
+]
+filterwarnings = [
+    "ignore::UserWarning",
+    "ignore::RuntimeWarning",
+    "ignore::FutureWarning",
+    "ignore::DeprecationWarning",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__init__.py",
+    "src/*/__main__.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+precision = 2
+include = [
+    "src/invarlock/eval/*",
+    "src/invarlock/guards/*",
+    "src/invarlock/cli/*",
+    "src/invarlock/reporting/*",
+    "src/invarlock/core/*",
+]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]

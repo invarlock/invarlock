@@ -1,0 +1,78 @@
+name: release
+
+on:
+  # Only run on tags or manual workflow dispatch (saves compute)
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish to package index"
+        type: boolean
+        default: false
+      target:
+        description: "Publish target (testpypi|pypi)"
+        type: choice
+        options: [ testpypi, pypi ]
+        default: testpypi
+
+jobs:
+  build_check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+      - name: Build wheel/sdist
+        run: python -m build
+      - name: Twine check
+        run: python -m twine check dist/*
+      - name: Install smoke from wheel
+        env:
+          INVARLOCK_LIGHT_IMPORT: "1"
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          pip install dist/*.whl
+          python -c "import invarlock; import sys; print('invarlock version', getattr(invarlock, '__version__', 'n/a')); sys.exit(0)"
+
+  publish:
+    needs: build_check
+    runs-on: ubuntu-latest
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v') && inputs.publish == true }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Publish to TestPyPI/PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          user: __token__
+          password: ${{ inputs.target == 'pypi' && secrets.PYPI_API_TOKEN || secrets.TESTPYPI_API_TOKEN }}
+          repository-url: ${{ inputs.target == 'pypi' && 'https://upload.pypi.org/legacy/' || 'https://test.pypi.org/legacy/' }}
+
+  testpypi_smoke:
+    needs: publish
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true && inputs.target == 'testpypi' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Install from TestPyPI and smoke test
+        env:
+          INVARLOCK_LIGHT_IMPORT: "1"
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple invarlock
+          invarlock --help || python -c "import invarlock; import sys; print('invarlock version', getattr(invarlock,'__version__','n/a')); sys.exit(0)"

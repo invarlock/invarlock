@@ -1,0 +1,41 @@
+cff-version: 1.2.0
+title: "InvarLock: Edit-agnostic robustness certificates for weight edits"
+message: "If you use InvarLock in scientific work, please cite it using the metadata below."
+type: software
+abstract: >
+  InvarLock is an edit-agnostic safety framework (“GuardChain”) for structured compression and model edits.
+  It provides paired log-space evaluation against a baseline, layered guards (Spectral, RMT, Variance),
+  guard-overhead checks, and a machine-readable certification artifact with determinism and provenance.
+repository-code: https://github.com/invarlock/invarlock
+repository-artifact: https://github.com/invarlock/invarlock/releases
+license: Apache-2.0
+version: 0.2.0
+date-released: 2025-12-01
+authors:
+  - name: "InvarLock Maintainers"
+    affiliation: "InvarLock"
+keywords:
+  - machine learning
+  - model compression and editing
+  - quantization
+  - robustness
+  - evaluation
+  - certification
+  - safety
+  - reproducibility
+contact:
+  - email: security@invarlock.dev
+    name: "Security Response"
+preferred-citation:
+  type: software
+  title: "InvarLock: Edit-agnostic robustness certificates for weight edits"
+  authors:
+    - name: "InvarLock Maintainers"
+  repository-code: https://github.com/invarlock/invarlock
+  url: https://github.com/invarlock/invarlock
+  version: 0.2.0
+  date-released: 2025-12-01
+  license: Apache-2.0
+  # identifiers:
+  #   - type: doi
+  #     value: 10.5281/zenodo.XXXXXXX
