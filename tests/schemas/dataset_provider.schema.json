@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Dataset Provider Config",
+  "type": "object",
+  "required": ["kind"],
+  "properties": {
+    "kind": { "enum": ["wikitext2", "hf_text", "synthetic", "local_jsonl"] },
+    "text_field": { "type": "string" },
+    "file": { "type": ["string", "null"] },
+    "path": { "type": ["string", "null"] },
+    "data_files": { "type": ["string", "null"] },
+    "dataset_name": { "type": ["string", "null"] },
+    "config_name": { "type": ["string", "null"] }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "local_jsonl" } } },
+      "then": {
+        "anyOf": [
+          { "required": ["file"] },
+          { "required": ["path"] },
+          { "required": ["data_files"] }
+        ]
+      }
+    }
+  ],
+  "additionalProperties": true
+}

@@ -1,0 +1,23 @@
+# Release profile overrides for certification workflows.
+#
+# Applies denser evaluation coverage, longer bootstrap runs, and embeds
+# policy snapshot metadata so artifacts can be audited after publication.
+
+dataset:
+  preview_n: 400
+  final_n: 400
+
+guards:
+  variance:
+    max_calib: 320
+
+eval:
+  bootstrap:
+    replicates: 3200
+    alpha: 0.05
+    method: bca_paired_delta_log
+
+context:
+  policy_snapshot:
+    tiers_file: src/invarlock/_data/runtime/tiers.yaml
+    profile: release

@@ -1,0 +1,41 @@
+# Task preset: Causal LM (decoder-only), CI profile, CPU-friendly
+
+model:
+  id: "<set-your-model-id>"   # e.g., gpt2, facebook/opt-125m
+  adapter: "hf_gpt2"           # use hf_llama for LLaMA-like
+  device: "cpu"
+
+dataset:
+  provider: "wikitext2"
+  split: "validation"
+  seq_len: 512
+  stride: 512
+  preview_n: 64
+  final_n: 64
+  seed: 42
+
+edit:
+  name: quant_rtn
+  plan:
+    bitwidth: 8
+    per_channel: true
+    scope: attn
+
+eval:
+  metric:
+    kind: ppl_causal
+  loss:
+    type: causal
+
+auto:
+  enabled: true
+  tier: balanced
+  probes: 0
+
+guards:
+  order: ["invariants", "spectral", "rmt", "variance", "invariants"]
+
+output:
+  dir: runs
+  save_model: false
+  save_report: true

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "InvarLock Evidence Manifest v1",
+  "type": "object",
+  "required": ["generated_at", "files", "summary"],
+  "properties": {
+    "generated_at": {"type": "string"},
+    "files": {
+      "type": "object",
+      "required": ["certificate_json", "certificate_markdown"],
+      "properties": {
+        "certificate_json": {"type": "string", "minLength": 1},
+        "certificate_markdown": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "properties": {
+        "run_model": {"type": ["string", "null"]},
+        "device": {"type": ["string", "null"]},
+        "seed": {"type": ["integer", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "evidence": {
+      "type": "object",
+      "properties": {
+        "guards_evidence": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

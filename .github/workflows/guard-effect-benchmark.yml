@@ -1,0 +1,201 @@
+name: Guard Effect Benchmark
+
+on:
+  # Cost optimization: benchmarks are expensive (60-120 min with matrix)
+  # Only run manually or on release tags to save compute
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'Benchmark profile'
+        required: false
+        default: 'ci'
+        type: choice
+        options:
+          - ci
+          - release
+      edits:
+        description: 'Comma-separated edit types'
+        required: false
+        default: 'quant_rtn'
+        type: string
+
+env:
+  PYTHONPATH: ${{ github.workspace }}/src
+  
+jobs:
+  guard-effect-benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30  # Reduced from 60
+    
+    strategy:
+      matrix:
+        # Cost optimization: single Python version for benchmarks
+        python-version: ["3.13"]
+        
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+      
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ matrix.python-version }}
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install core dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+        
+    - name: Install optional dependencies
+      run: |
+        # Try to install GPTQ support for adapter loading (may fail on some systems)
+        pip install auto-gptq transformers || echo "GPTQ not available on this system"
+        
+    - name: Verify installation
+      run: |
+        python -c "import invarlock.eval.bench; print('Benchmark module imported successfully')"
+        python -m invarlock.eval.bench --help
+        
+    - name: Run benchmark (CI profile)
+      id: benchmark-ci
+      run: |
+        # Determine edits and profile
+        PROFILE="${{ github.event.inputs.profile || 'ci' }}"
+        EDITS="${{ github.event.inputs.edits || 'quant_rtn' }}"
+        
+        echo "Running benchmark with profile=$PROFILE, edits=$EDITS"
+        
+        # Run the benchmark
+        python -m invarlock.eval.bench \
+          --edits "$EDITS" \
+          --profile "$PROFILE" \
+          --dataset wikitext2 \
+          --model-id gpt2 \
+          --adapter hf_gpt2 \
+          --device cpu \
+          --seq-len 256 \
+          --stride 64 \
+          --seed 42 \
+          --out benchmarks/ \
+          --verbose
+          
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v5
+      if: always()  # Upload even if benchmark fails
+      with:
+        name: guard-effect-results-py${{ matrix.python-version }}
+        path: |
+          benchmarks/results/
+          benchmarks/runs/*/events.jsonl
+        retention-days: 30
+        
+    - name: Comment PR with results
+      if: github.event_name == 'pull_request' && always()
+      uses: actions/github-script@v8
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          
+          try {
+            // Read the markdown report
+            const reportPath = 'benchmarks/results/guard_effect.md';
+            if (fs.existsSync(reportPath)) {
+              const report = fs.readFileSync(reportPath, 'utf8');
+              
+              // Create comment body
+              const body = `## 🛡️ Guard Effect Benchmark Results (Python ${{ matrix.python-version }})
+              
+              <details>
+              <summary>Click to expand benchmark results</summary>
+              
+              \`\`\`markdown
+              ${report}
+              \`\`\`
+              </details>
+              
+              📊 Full results available in the [workflow artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}).
+              `;
+              
+              // Post comment
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body
+              });
+            }
+          } catch (error) {
+            console.log('Could not post benchmark results:', error.message);
+          }
+          
+    - name: Fail if benchmark thresholds not met
+      if: steps.benchmark-ci.outcome == 'failure'
+      run: |
+        echo "❌ Guard effect benchmark failed - thresholds not met"
+        echo "Check the benchmark results for details on which thresholds failed"
+        exit 1
+
+  # Separate job for release benchmark (manual only now)
+  guard-effect-benchmark-release:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.profile == 'release'
+    timeout-minutes: 60  # Reduced from 120
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+      
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v6
+      with:
+        python-version: "3.13"
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+        pip install peft transformers
+        pip install auto-gptq || echo "GPTQ not available"
+        
+    - name: Run release benchmark
+      run: |
+        python -m invarlock.eval.bench \
+          --edits quant_rtn \
+          --profile release \
+          --dataset wikitext2 \
+          --model-id gpt2 \
+          --adapter hf_gpt2 \
+          --device cpu \
+          --seq-len 512 \
+          --stride 128 \
+          --seed 42 \
+          --out benchmarks/ \
+          --verbose
+          
+    - name: Upload release benchmark results
+      uses: actions/upload-artifact@v5
+      if: always()
+      with:
+        name: guard-effect-results-release
+        path: benchmarks/results/
+        retention-days: 90  # Keep release results longer
+        
+    - name: Create release benchmark report
+      run: |
+        # Copy results to docs for inclusion in releases
+        mkdir -p docs/benchmarks/
+        cp benchmarks/results/guard_effect.md docs/benchmarks/guard_effect_latest.md
+        cp benchmarks/results/guard_effect.json docs/benchmarks/guard_effect_latest.json
+        
+        # Add timestamp and commit info
+        echo "Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> docs/benchmarks/guard_effect_latest.md
+        echo "Commit: ${{ github.sha }}" >> docs/benchmarks/guard_effect_latest.md

@@ -1,0 +1,15 @@
+# CPU-only CI profile for telemetry/edge validation runs.
+#
+# Forces CPU execution and trims window counts slightly so telemetry runs
+# finish quickly on developer machines while still exercising guards.
+
+model:
+  device: "cpu"
+
+dataset:
+  preview_n: 120
+  final_n: 120
+  stride: 512
+
+context:
+  telemetry_profile: "ci_cpu"

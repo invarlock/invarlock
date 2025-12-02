@@ -1,0 +1,85 @@
+site_name: InvarLock Documentation
+site_description: Official documentation for the InvarLock toolkit
+site_url: https://invarlock.local
+repo_url: https://github.com/invarlock/invarlock
+repo_name: invarlock
+
+nav:
+  - Overview: README.md
+  - User Guide:
+      - Getting Started: user-guide/getting-started.md
+      - Quickstart: user-guide/quickstart.md
+      - Primary Metric Smoke: user-guide/primary-metric-smoke.md
+      - Compare & Certify (BYOE): user-guide/compare-and-certify.md
+      - Bring Your Own Data: user-guide/bring-your-own-data.md
+      - Plugin Workflow: user-guide/plugins.md
+      - Configuration Gallery: user-guide/config-gallery.md
+      - Example Reports: user-guide/example-reports.md
+      - Reading a Certificate: user-guide/reading-certificate.md
+  - CLI Reference:
+      - CLI Overview: reference/cli.md
+  - Reference:
+      - API Guide: reference/api-guide.md
+      - Programmatic Quickstart: reference/programmatic-quickstart.md
+      - Guards: reference/guards.md
+      - Environment Variables: reference/env-vars.md
+      - Model Adapters: reference/model-adapters.md
+      - Exporting Certificates (HTML): reference/exporting-certificates-html.md
+      - Certificate Schema (v1): reference/certificate-schema.md
+      - Certificate Telemetry: reference/certificate_telemetry.md
+      - Configuration Schema: reference/config-schema.md
+      - Datasets: reference/datasets.md
+      - Artifact Layout: reference/artifacts.md
+  - Assurance:
+      - Safety Case: assurance/00-safety-case.md
+      # Merged into Evaluation Math
+      - Evaluation Math: assurance/01-eval-math-proof.md
+      - Coverage & Pairing Plan: assurance/02-coverage-and-pairing.md
+      - BCa Bootstrap (Paired Δlog): assurance/03-bca-bootstrap.md
+      - Guard Contracts & Primer: assurance/04-guard-contracts.md
+      - Spectral False-Positive Control: assurance/05-spectral-fpr-derivation.md
+      - RMT ε-Rule: assurance/06-rmt-epsilon-rule.md
+      - VE Predictive Gate: assurance/07-ve-gate-power.md
+      - Determinism Contracts: assurance/08-determinism-contracts.md
+      - Tier v1.0 Calibration (Pilot): assurance/09-tier-v1-calibration.md
+      - Guard Overhead Method: assurance/10-guard-overhead-method.md
+      - Policy Provenance & Digest: assurance/11-policy-provenance.md
+      - Device Drift Bands: assurance/12-device-drift-bands.md
+  - Security:
+      - Best Practices: security/best-practices.md
+      - Threat Model: security/threat-model.md
+      - Architecture: security/architecture.md
+      - Pip Audit Allowlist: security/pip-audit-allowlist.md
+
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.expand
+    - navigation.tabs
+
+markdown_extensions:
+  - admonition
+  - codehilite
+  - footnotes
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.snippets
+  - pymdownx.arithmatex:
+      generic: true
+
+plugins:
+  - search
+  # Disable mermaid2 by default to avoid network checks in strict/offline builds.
+  # Enable explicitly with: INVARLOCK_DOCS_MERMAID=1 mkdocs build --strict
+  - mermaid2:
+      enabled: !ENV [INVARLOCK_DOCS_MERMAID, false]
+
+# Gate extra JavaScript behind an environment variable to avoid network usage by default.
+# Provide a YAML/JSON list of URLs via INVARLOCK_DOCS_EXTRA_JS to include CDN scripts.
+# Example:
+#   INVARLOCK_DOCS_EXTRA_JS='["https://polyfill.io/v3/polyfill.min.js?features=es6",
+#                         "https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.js"]' \
+#   mkdocs build --strict
+extra_javascript: !ENV [INVARLOCK_DOCS_EXTRA_JS, []]

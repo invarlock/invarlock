@@ -1,0 +1,103 @@
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+
+def _write_cov_xml(path: Path, class_specs: list[tuple[str, float, float]]) -> None:
+    """Write a minimal coverage.xml with given (filename, branch_rate, line_rate)."""
+    lines = [
+        "<?xml version='1.0' encoding='UTF-8'?>",
+        "<coverage>",
+        "  <packages>",
+        "    <package name='pkg'>",
+        "      <classes>",
+    ]
+    for filename, br, lr in class_specs:
+        lines.append(
+            f"        <class name='X' filename='{filename}' branch-rate='{br}' line-rate='{lr}'/>"
+        )
+    lines += [
+        "      </classes>",
+        "    </package>",
+        "  </packages>",
+        "</coverage>",
+    ]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _run_checker(xml_path: Path, json_path: Path) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [
+            sys.executable,
+            str(Path("scripts") / "check_coverage_thresholds.py"),
+            "--coverage",
+            str(xml_path),
+            "--json",
+            str(json_path),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def test_two_tier_policy_enforced(tmp_path: Path) -> None:
+    # Create a synthetic report containing a mix of core and non-core files
+    xml = tmp_path / "cov.xml"
+    json_out = tmp_path / "out.json"
+    _write_cov_xml(
+        xml,
+        [
+            ("src/invarlock/core/runner.py", 0.84, 0.90),  # core → FAIL (needs 0.85)
+            (
+                "src/invarlock/cli/commands/run.py",
+                0.86,
+                0.90,
+            ),  # core meets floor → PASS
+            (
+                "src/invarlock/reporting/certificate.py",
+                0.86,
+                0.90,
+            ),  # override set to 0.85 → PASS
+            (
+                "src/invarlock/cli/commands/plugins.py",
+                0.81,
+                0.90,
+            ),  # non-core → not enforced (absent from THRESHOLDS)
+            (
+                "src/invarlock/eval/primary_metric.py",
+                0.79,
+                0.90,
+            ),  # non-core → not enforced
+            ("src/invarlock/eval/metrics.py", 0.85, 0.90),  # core single-file → PASS
+            ("src/invarlock/guards/spectral.py", 0.84, 0.90),  # core (guards) → FAIL
+        ],
+    )
+
+    proc = _run_checker(xml, json_out)
+
+    # Expect non-zero due to the two intentional core failures
+    assert proc.returncode != 0
+    err = proc.stderr
+    assert "src/invarlock/core/runner.py" in err
+    assert "src/invarlock/guards/spectral.py" in err
+    # Sanity: overridden core file shouldn't appear as a failure
+    assert "src/invarlock/cli/commands/run.py" not in err
+
+
+def test_overrides_take_precedence(tmp_path: Path) -> None:
+    # Only files with explicit overrides (now at 85%)
+    xml = tmp_path / "cov.xml"
+    json_out = tmp_path / "out.json"
+    _write_cov_xml(xml, [("src/invarlock/reporting/certificate.py", 0.86, 0.90)])
+    proc = _run_checker(xml, json_out)
+
+    # Should pass with explicit 85% override applied
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(json_out.read_text())
+    assert payload["status"] == "ok"
+    files = {f["path"]: f for f in payload["files"]}
+    assert (
+        abs(files["src/invarlock/reporting/certificate.py"]["threshold"] - 0.85) < 1e-9
+    )

@@ -1,0 +1,23 @@
+{
+  "provenance": {
+    "window_plan": {
+      "profile": "release",
+      "actual_preview": 203,
+      "actual_final": 203
+    }
+  },
+  "guard_overhead": {
+    "overhead_percent": 0.000011,
+    "source": "release_profile"
+  },
+  "spectral": {
+    "family_z_quantiles": {
+      "attn": {
+        "q95": 2.11,
+        "q99": 3.07,
+        "max": 3.32,
+        "count": 24
+      }
+    }
+  }
+}

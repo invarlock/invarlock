@@ -1,0 +1,26 @@
+# Task preset: Masked LM (encoder), Release profile, auto device, seq_len 512
+
+model:
+  id: "<set-your-model-id>"   # e.g., bert-base-uncased
+  adapter: "hf_bert"
+  device: "auto"
+
+dataset:
+  provider: "wikitext2"
+  split: "validation"
+  seq_len: 512
+  stride: 512
+  preview_n: 200
+  final_n: 200
+  seed: 42
+
+eval:
+  loss:
+    type: "mlm"
+    mask_prob: 0.15
+    seed: 42
+    random_token_prob: 0.10
+    original_token_prob: 0.10
+
+guards:
+  order: ["invariants", "spectral", "rmt", "variance", "invariants"]

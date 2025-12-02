@@ -1,0 +1,18 @@
+# Task preset: Causal LM (decoder-only), Release profile, auto device
+
+model:
+  id: "<set-your-model-id>"
+  adapter: "hf_gpt2"
+  device: "auto"
+
+dataset:
+  provider: "wikitext2"
+  split: "validation"
+  seq_len: 768
+  stride: 768
+  preview_n: 400
+  final_n: 400
+  seed: 42
+
+guards:
+  order: ["invariants", "spectral", "rmt", "variance", "invariants"]

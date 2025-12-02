@@ -1,0 +1,83 @@
+# Assurance Case Overview (v1.0)
+
+> **Plain language:** This overview lists every safety claim, the evidence we ship with the repo, and the runtime contracts that enforce each claim in production.
+
+This note enumerates the explicit **safety claims** the toolkit makes, the
+**evidence** shipped in-tree, and the **runtime contracts** that enforce each
+claim. Each claim must have:
+
+1) a short argument/derivation (“Evidence”), and
+2) a **test or contract** that fails fast when assumptions are violated
+   (“Runtime enforcement”).
+
+We also list **observability**—the certificate fields that let reviewers verify
+the claim.
+
+## Scope, assumptions, and non‑goals
+
+InvarLock’s assurance case is intentionally narrow. It is about **regression risk
+from weight edits relative to a chosen baseline under a specific configuration**,
+not about global model safety.
+
+### In scope
+
+- Structured or quantization‑style **weight edits** applied to an existing model
+  (baseline vs edited subject).
+- **Paired primary metrics** (ppl/accuracy) on calibrated evaluation windows,
+  with log‑space pairing and BCa bootstrap CIs.
+- **GuardChain** behavior: invariants, spectral, RMT, and variance guards that
+  detect structural breakage, unstable weights, outlier growth, and harmful
+  variance shifts introduced by the edit.
+- **Determinism and provenance** for the evaluation run: seeds, datasets,
+  tokenizers, pairing schedules, and policy configuration reflected in the
+  certificate.
+- Execution on **Linux/macOS** environments using the pinned HF/PyTorch stack
+  and profiles documented in the configs and docs.
+
+### Out of scope (non‑goals)
+
+- Preventing or detecting **content harms** (toxicity, bias, jailbreaks),
+  prompt‑level attacks, or alignment failures in general use.
+- Guaranteeing safety for **unrelated training changes**, new datasets, or new
+  architectures that fall outside the calibrated families and tiers.
+- Enforcing infrastructure or deployment hardening (authz, data governance,
+  access control); these live outside the InvarLock runtime.
+- Guaranteeing correctness on environments outside the stated support matrix
+  (e.g., native Windows, custom CUDA stacks, arbitrary dependency versions).
+
+The table below should be read with this scope in mind: each row is a claim
+about **paired evaluation and guard behavior for weight edits** under the
+documented tiers and environments, not a universal guarantee about model safety.
+
+> For the end-to-end validation protocol (Step-0 through Step-8 reproducibility and guard overhead checks), see the methodology overview in the docs.
+
+| Claim | Evidence | Runtime enforcement | Observability (certificate v1.0) | Assumptions & scope |
+|------|----------|---------------------|----------------------------------|---------------------|
+| Paired ratios are computed in **log space**, **token‑weighted**, then re‑exponentiated. | `docs/assurance/01-eval-math-proof.md` | The certificate pairs windows and enforces `ratio_ci == exp(logloss_delta_ci)` within tolerance; see tests `tests/eval/test_certificate.py::test_pm_preview_final_ratio_identity` and `tests/core/test_bootstrap.py::test_compute_paired_delta_and_ratio_ci_consistency`. | `primary_metric.{ratio_vs_baseline,display_ci}`, `dataset.windows.stats.{paired_windows,window_match_fraction,window_overlap_fraction}`. | Windows are **paired**, **non‑overlapping**; token counts are known. BCa bootstrap used on paired ΔlogNLL; if all windows equal length, weighting reduces to simple mean. |
+| Tier-specific **primary metric** gates keep edits within acceptance bands (Balanced ≤ 1.10×, Conservative ≤ 1.05× for ppl‑like). | `docs/assurance/04-guard-contracts.md` | `make_certificate` applies tier thresholds; see `tests/eval/test_assurance_contracts.py::test_ppl_ratio_gate_enforced`. | `validation.primary_metric_acceptable`, `primary_metric.{ratio_vs_baseline,display_ci}`, `auto.tier`. | Baseline/reference pairing intact; CLI tier selection propagated. |
+| Spectral family caps achieve the documented **false positive rate** (FPR). | `docs/assurance/05-spectral-fpr-derivation.md` | Property test `tests/eval/test_assurance_contracts.py::test_spectral_fpr_matches_tail_probabilities`. | `spectral.family_caps[*].kappa`, `spectral.families[*].kappa`, `spectral.multiple_testing` | z‑scores approx Gaussian under null; per‑run FPR set via Bonferroni/BH. |
+| RMT ε‑rule enforces the declared **acceptance band** on outlier growth. | `docs/assurance/06-rmt-epsilon-rule.md` | `tests/eval/test_assurance_contracts.py::test_rmt_epsilon_rule_acceptance_band`. | `rmt.{outliers_bare,outliers_guarded,epsilon,epsilon_by_family}` | ε calibrated on **null** runs; small families use slightly higher ε. |
+| Variance Equalization (VE) **enables only** when the **predictive** paired ΔlogNLL CI excludes 0 (tier‑specific sidedness) **and** effect ≥ `min_effect_lognll`. | `docs/assurance/07-ve-gate-power.md` | Certificate validates predictive A/B provenance & CI; see `tests/eval/test_assurance_contracts.py::test_predictive_gate_respects_min_effect`. | `variance.{ve_enabled,predictive_gate,ab_test,scope,proposed_scales}`, `resolved_policy.variance.min_effect_lognll` | Balanced = **one‑sided** improvement; Conservative = **two‑sided**. Calibrated on same windows. |
+| Model invariants hold before evaluation (no NaNs, correct shapes, weight‑tying, tokenizer alignment). | `docs/assurance/04-guard-contracts.md` | `invarlock.guards.invariants` aborts before eval on violation; `tests/guards/test_invariants_guard.py::test_invariants_guard_detects_non_finite_weights`. | `validation.invariants_pass`, `meta.tokenizer_hash`, `provenance.provider_digest`, `policy_digest` | Invariants checked pre‑eval; violations abort to avoid undefined behavior. |
+| Bootstrap sanity holds (paired windows, zero overlap, sufficient replicates). | `docs/assurance/04-guard-contracts.md` | Certificate builder enforces pairing/overlap/replicate counts; see `tests/core/test_runner_more_edges.py` and `tests/eval/test_assurance_contracts.py::test_seed_bundle_contract`. | `dataset.windows.stats.{paired_windows,window_match_fraction,window_overlap_fraction,coverage}`, `metrics.bootstrap.{replicates,seed}` | Abort certification when pairing < 1.0, overlap > 0, or replicates below tier minimum (CI/Release profiles). |
+| Deterministic evaluation requires **seed bundle**, dataset/tokenizer hashes, and **perfect pairing**. | `docs/assurance/08-determinism-contracts.md` | Seed propagation + pairing checks; `tests/eval/test_assurance_contracts.py::test_seed_bundle_contract`. | `meta.seeds`, `meta.tokenizer_hash`, `provenance.provider_digest`, `ppl.stats.{window_match_fraction,window_overlap_fraction,paired_windows}`, `ppl.stats.coverage`, `policy_digest` | Deterministic flags set; equal preview/final counts; reuse baseline window IDs. |
+
+| Guard Overhead stays within budget (≤ +1.0% PM). | `docs/assurance/10-guard-overhead-method.md` | Certificate gate `validation.guard_overhead_acceptable`; bare vs guarded measured on same windows/seeds with single toggle and snapshot/restore. | `guard_overhead.{bare_pm,guarded_pm,overhead_ratio,overhead_percent,overhead_threshold}`, `validation.guard_overhead_acceptable` | Same schedule and seeds; bare control is guard‑free; snapshot/restore or deterministic reload. |
+
+**Summary**
+
+- Every safety‑critical guard links to a short assurance note and an automated test.
+- The certificate verifier enforces **log‑space math** and **pairing** at runtime.
+- Observability fields make the safety case auditable in certs.
+
+> Tier scope: Balanced and Conservative are the supported safety tiers. The Aggressive tier is research‑oriented and not covered by this safety case. The `none` tier is provided only for dev/demo flows (loosest gates) and is **explicitly outside** the safety case.
+
+> 🔍 **Verify on your machine**
+>
+> ```bash
+> OMP_NUM_THREADS=1 conda run -n invarlock pytest -q
+> OMP_NUM_THREADS=1 conda run -n invarlock python scripts/check_docs_links.py
+> OMP_NUM_THREADS=1 conda run -n invarlock mkdocs build --strict
+> ```
+>
+> Running the suite above mirrors the CI guardrails: it replays the assurance tests, regenerates tier tables, validates doc links, and ensures the MkDocs build stays clean.

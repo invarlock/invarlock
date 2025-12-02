@@ -1,0 +1,13 @@
+exclude sitecustomize.py
+
+# Exclude development assets from sdist/wheels
+recursive-exclude tests *
+recursive-exclude tools *
+recursive-exclude docs *
+
+# Keep repo scripts/presets out of artifact (matrix/presets are repo-first)
+prune scripts
+prune configs
+
+# Ensure license is included in source distributions
+include LICENSE

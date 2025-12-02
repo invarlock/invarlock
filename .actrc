@@ -1,0 +1,17 @@
+# act configuration for running GitHub Actions locally
+# https://github.com/nektos/act
+
+# Use a medium-sized image that's compatible with most workflows
+# Options: ubuntu-latest=catthehacker/ubuntu:act-latest (smaller)
+#          ubuntu-latest=catthehacker/ubuntu:full-latest (larger, more tools)
+-P ubuntu-latest=catthehacker/ubuntu:act-22.04
+-P macos-latest=catthehacker/ubuntu:act-22.04
+
+# Use local .env file for secrets if it exists
+--env-file .env.local
+
+# Reuse containers for faster iteration
+--reuse
+
+# Default to running on 'push' event
+--defaultbranch main

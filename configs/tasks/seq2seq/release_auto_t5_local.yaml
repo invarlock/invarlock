@@ -1,0 +1,27 @@
+# Task preset: Seq2Seq (T5), Release profile, auto device, local JSONL pairs
+
+model:
+  id: "t5-small"
+  adapter: "hf_t5"
+  device: "auto"
+
+dataset:
+  provider:
+    kind: "local_jsonl_pairs"
+    # Provide one of: file/path/data_files; JSONL lines with keys: source,target
+    # file: "data/pairs.jsonl"
+    path: "data/seq2seq_pairs"  # directory of *.jsonl (example)
+    src_field: "source"
+    tgt_field: "target"
+  seq_len: 256
+  stride: 256
+  preview_n: 80
+  final_n: 80
+  seed: 42
+
+eval:
+  loss:
+    type: "seq2seq"
+
+guards:
+  order: ["invariants", "spectral", "rmt", "variance", "invariants"]
