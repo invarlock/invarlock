@@ -14,27 +14,27 @@ z-scores and limiting the per-run FPR.
 Per-family spectral monitoring computes z-scores
 
 $$
-z = \\frac{s - \\mu_f}{\\sigma_f}
+z = \frac{s - \mu_f}{\sigma_f}
 $$
 
 for a spectral statistic $s$ (e.g., top singular value). A WARN is issued if
-$|z| \\ge \\kappa_f$. Under a **null** where $z \\sim \\mathcal{N}(0,1)$, the
+$|z| \ge \kappa_f$. Under a **null** where $z \sim \mathcal{N}(0,1)$, the
 per-module two-sided tail probability becomes
 
 $$
-p_{\\text{tail}} \\approx 2\\big(1 - \\Phi(\\kappa_f)\\big).
+p_{\text{tail}} \approx 2\big(1 - \Phi(\kappa_f)\big).
 $$
 
 Applying **Bonferroni** across the $m_f$ modules controls the family-wise error
 rate (FWER); applying **Benjamini–Hochberg (BH)** controls the expected
 false-discovery proportion (FDR). Balanced tiers choose BH (α=0.05, m=4);
 Conservative tiers choose Bonferroni (α=0.02, m=4). Document the policy
-alongside $\\kappa_f$ so auditors can recover the expected per-run WARN rate.
+alongside $\kappa_f$ so auditors can recover the expected per-run WARN rate.
 
 ## Assumptions & Scope
 
-- Baseline runs provide $(\\mu_f, \\sigma_f)$ per family $f \\in
-  \\{\\text{ffn}, \\text{attn}, \\text{embed}, \\text{other}\\}$; when $\\sigma_f = 0$
+- Baseline runs provide $(\mu_f, \sigma_f)$ per family $f \in
+  \{\text{ffn}, \text{attn}, \text{embed}, \text{other}\}$; when $\sigma_f = 0$
   we fall back to the tier deadband δ.
 - Only 2‑D weight matrices (FFN blocks, attention projections, embeddings) are
   evaluated; **1‑D LayerNorm parameters are explicitly excluded** from spectral
@@ -57,7 +57,7 @@ alongside $\\kappa_f$ so auditors can recover the expected per-run WARN rate.
   `spectral.summary.{sigma_quantile,max_caps,deadband}`, and
   `spectral.family_caps[*].kappa`.
 - Empirical histograms of $z$ should be approximately standard normal; heavy
-  tails → raise $\\kappa_f$ or use robust $\\sigma$ (MAD-scaled).
+  tails → raise $\kappa_f$ or use robust $\sigma$ (MAD-scaled).
 
 The deadband δ is a guardrail against flicker: relative changes within ±δ are
 treated as neutral, so WARNs only fire when sustained growth exceeds both δ and
@@ -72,7 +72,7 @@ summary.
   count, violations, kappa}`. `sigma_quantile` is the calibrated baseline
   percentile used to derive the reference target. Legacy alias `contraction`
   may appear only in historical certificates.
-- Tier files document FPR targets and mapping $\\kappa_f \\rightarrow$ expected WARNs.
+- Tier files document FPR targets and mapping $\kappa_f \rightarrow$ expected WARNs.
 - Policy metadata records the multiple-testing method
   (`spectral.multiple_testing`) and the cap limit (`spectral.max_caps`).
 
