@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import time
 from concurrent.futures import ThreadPoolExecutor
-from unittest.mock import MagicMock
 
 import pytest
 
