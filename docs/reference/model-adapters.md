@@ -146,6 +146,118 @@ model:
 }
 ```
 
+## Quantized Model Adapters (Plugins)
+
+InvarLock supports quantized models through optional plugin adapters. These require
+additional dependencies and are installed via extras.
+
+### HuggingFace BitsAndBytes Adapter (`hf_bnb`)
+
+**Purpose**: Support for 8-bit and 4-bit quantized models via bitsandbytes
+
+**Installation**:
+```bash
+pip install "invarlock[gpu]"  # Includes bitsandbytes
+```
+
+**Supported Quantization**:
+- 8-bit quantization (INT8)
+- 4-bit quantization (NF4, FP4)
+- Double quantization (4-bit)
+
+**Configuration**:
+```yaml
+model:
+  id: "meta-llama/Llama-2-7b-hf"
+  adapter: "hf_bnb"
+  device: "cuda"  # BNB requires CUDA
+```
+
+**Key Features**:
+- **Pre-quantized checkpoint detection**: Automatically detects checkpoints saved with BNB
+- **No `.to()` calls**: Device placement handled via `device_map="auto"`
+- **Fresh quantization**: Can quantize FP16 models on-load with `load_in_8bit=True`
+
+**Important Notes**:
+- BNB models **cannot** be moved between devices after loading
+- Requires CUDA (not compatible with CPU or MPS)
+- Pre-quantized checkpoints must have `quantization_config` in `config.json`
+
+### HuggingFace AWQ Adapter (`hf_awq`)
+
+**Purpose**: Support for AWQ (Activation-aware Weight Quantization) models
+
+**Installation**:
+```bash
+pip install "invarlock[awq]"  # Includes autoawq
+```
+
+**Compatibility**: ✅ Python 3.12, torch 2.9
+
+**Configuration**:
+```yaml
+model:
+  id: "/path/to/awq-model"
+  adapter: "hf_awq"
+  device: "cuda"
+```
+
+**Key Features**:
+- Supports pre-quantized AWQ checkpoints
+- Typically 4-bit quantization with group size 128
+- Compatible with Python 3.12
+
+**Usage with InvarLock**:
+```bash
+invarlock certify \
+  --baseline mistralai/Mistral-7B-v0.1 \
+  --subject /path/to/awq-model \
+  --adapter hf_awq \
+  --skip-user-quant \
+  --device cuda
+```
+
+### HuggingFace GPTQ Adapter (`hf_gptq`)
+
+**Purpose**: Support for GPTQ quantized models
+
+**Installation**:
+```bash
+pip install "invarlock[gptq]"  # Includes auto-gptq
+```
+
+**⚠️ Compatibility Note**:
+- ❌ **Python 3.12**: `auto-gptq` does not currently build on Python 3.12
+- ✅ **Python 3.10/3.11**: Works correctly
+- CUDA required
+
+**Workaround**: Use a Python 3.10 or 3.11 environment for GPTQ models, or use AWQ as an
+alternative quantization method.
+
+**Configuration** (Python 3.10/3.11):
+```yaml
+model:
+  id: "/path/to/gptq-model"
+  adapter: "hf_gptq"
+  device: "cuda"
+```
+
+### Quantized Adapter Selection
+
+The `auto` adapter automatically detects quantized checkpoints and routes to the
+appropriate quantization adapter:
+
+```python
+# Auto-detection checks config.json for quantization_config
+# Routes to hf_bnb, hf_awq, or hf_gptq based on quant_method
+```
+
+Detection order:
+1. Check `quantization_config.quant_method` in `config.json`
+2. Check for `load_in_8bit` / `load_in_4bit` flags
+3. Check model attributes (`is_loaded_in_8bit`, `is_loaded_in_4bit`)
+4. Check for quantized module types (`Linear8bitLt`, `Linear4bit`)
+
 ## Adapter Selection
 
 InvarLock automatically selects the appropriate adapter based on model

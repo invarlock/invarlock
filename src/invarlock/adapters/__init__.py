@@ -20,6 +20,13 @@ from .base import (
 from .base import (
     PerformanceMetrics as BasePerformanceMetrics,
 )
+from .capabilities import (
+    ModelCapabilities,
+    QuantizationConfig,
+    QuantizationMethod,
+    detect_capabilities_from_model,
+    detect_quantization_from_config,
+)
 
 _LAZY_MAP = {
     "HF_BERT_Adapter": ".hf_bert",
@@ -99,4 +106,10 @@ __all__ = [
     "quality_label",
     "_RemovedComponent",
     "INVARLOCK_CORE_ABI",
+    # Capabilities
+    "ModelCapabilities",
+    "QuantizationConfig",
+    "QuantizationMethod",
+    "detect_capabilities_from_model",
+    "detect_quantization_from_config",
 ]

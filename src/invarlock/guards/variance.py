@@ -39,6 +39,30 @@ from .policies import VariancePolicyDict
 __all__ = ["equalise_residual_variance", "equalise_branch_variance", "VarianceGuard"]
 
 
+def _safe_mean(
+    samples: list[float] | np.ndarray, default: float | None = None
+) -> float | None:
+    """
+    Compute mean of samples, returning default if empty.
+
+    Avoids numpy RuntimeWarning "Mean of empty slice" when samples is empty
+    or contains no valid values.
+
+    Args:
+        samples: List or array of float values.
+        default: Value to return if samples is empty.
+
+    Returns:
+        Mean value or default if samples is empty.
+    """
+    if samples is None:
+        return default
+    arr = np.asarray(samples)
+    if arr.size == 0:
+        return default
+    return float(np.nanmean(arr))
+
+
 try:  # Optional dependency: tqdm (progress bars)
     from tqdm.auto import tqdm as _tqdm
 except Exception:  # pragma: no cover - exercised only when tqdm is absent
@@ -1472,7 +1496,14 @@ class VarianceGuard(Guard):
 
         if coverage >= min_coverage and not self._scales:
             ppl_no_ve_samples = ppl_no_ve_samples[:coverage]
-            ppl_no_ve_mean = float(np.mean(ppl_no_ve_samples))
+            ppl_no_ve_mean = _safe_mean(ppl_no_ve_samples)
+            if ppl_no_ve_mean is None:
+                # No valid samples - cannot compute mean
+                self._ratio_ci = None
+                predictive_state["reason"] = "no_valid_samples"
+                self._predictive_gate_state = predictive_state
+                self._stats["predictive_gate"] = predictive_state.copy()
+                return
             self.set_ab_results(
                 ppl_no_ve=ppl_no_ve_mean,
                 ppl_with_ve=ppl_no_ve_mean,
@@ -1527,8 +1558,12 @@ class VarianceGuard(Guard):
                     n_bootstrap=500,
                     seed=calib_seed,
                 )
-                ppl_no_ve_mean = float(np.mean(ppl_no_ve_samples))
-                ppl_with_ve_mean = float(np.mean(ppl_with_ve_samples))
+                ppl_no_ve_mean = _safe_mean(ppl_no_ve_samples)
+                ppl_with_ve_mean = _safe_mean(ppl_with_ve_samples)
+                if ppl_no_ve_mean is None or ppl_with_ve_mean is None:
+                    # Fallback if means couldn't be computed
+                    ppl_no_ve_mean = ppl_no_ve_mean or 0.0
+                    ppl_with_ve_mean = ppl_with_ve_mean or 0.0
                 self.set_ab_results(
                     ppl_no_ve=ppl_no_ve_mean,
                     ppl_with_ve=ppl_with_ve_mean,
@@ -2118,7 +2153,7 @@ class VarianceGuard(Guard):
 
                 if coverage >= min_coverage and not self._scales:
                     ppl_no_ve_samples = ppl_no_ve_samples[:coverage]
-                    ppl_no_ve_mean = float(np.mean(ppl_no_ve_samples))
+                    ppl_no_ve_mean = _safe_mean(ppl_no_ve_samples, default=0.0)
                     self.set_ab_results(
                         ppl_no_ve=ppl_no_ve_mean,
                         ppl_with_ve=ppl_no_ve_mean,
@@ -2158,8 +2193,8 @@ class VarianceGuard(Guard):
                             n_bootstrap=500,
                             seed=calib_seed,
                         )
-                        ppl_no_ve_mean = float(np.mean(ppl_no_ve_samples))
-                        ppl_with_ve_mean = float(np.mean(ppl_with_ve_samples))
+                        ppl_no_ve_mean = _safe_mean(ppl_no_ve_samples, default=0.0)
+                        ppl_with_ve_mean = _safe_mean(ppl_with_ve_samples, default=0.0)
                         self.set_ab_results(
                             ppl_no_ve=ppl_no_ve_mean,
                             ppl_with_ve=ppl_with_ve_mean,

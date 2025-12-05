@@ -117,14 +117,24 @@ class CoreRegistry:
             module: str,
             class_name: str,
             status: str = "Available (fallback)",
+            required_deps: list[str] | None = None,
         ) -> None:
             if name not in registry:
+                # Check runtime dependencies for optional plugins
+                actual_available = True
+                actual_status = status
+                if required_deps:
+                    missing = self._check_runtime_dependencies(required_deps)
+                    if missing:
+                        actual_available = False
+                        actual_status = f"Needs extra: {', '.join(missing)}"
+
                 registry[name] = PluginInfo(
                     name=name,
                     module=module,
                     class_name=class_name,
-                    available=True,
-                    status=status,
+                    available=actual_available,
+                    status=actual_status,
                     package="invarlock",
                     version=INVARLOCK_VERSION,
                 )
@@ -147,27 +157,30 @@ class CoreRegistry:
         _fallback(
             self._adapters, "hf_mlm_auto", "invarlock.adapters", "HF_MLM_Auto_Adapter"
         )
-        # Optional plugin adapters (available when modules present)
+        # Optional plugin adapters (verify runtime dependencies)
         _fallback(
             self._adapters,
             "hf_gptq",
             "invarlock.plugins.hf_gptq_adapter",
             "HF_GPTQ_Adapter",
-            status="Available (fallback plugin)",
+            status="Available (plugin)",
+            required_deps=["auto_gptq"],
         )
         _fallback(
             self._adapters,
             "hf_awq",
             "invarlock.plugins.hf_awq_adapter",
             "HF_AWQ_Adapter",
-            status="Available (fallback plugin)",
+            status="Available (plugin)",
+            required_deps=["autoawq"],
         )
         _fallback(
             self._adapters,
             "hf_bnb",
             "invarlock.plugins.hf_bnb_adapter",
             "HF_BNB_Adapter",
-            status="Available (fallback plugin)",
+            status="Available (plugin)",
+            required_deps=["bitsandbytes"],
         )
 
         # Register built-in edits (quant-only core) and internal no-op
@@ -180,6 +193,21 @@ class CoreRegistry:
         _fallback(self._guards, "variance", "invarlock.guards", "VarianceGuard")
         _fallback(self._guards, "rmt", "invarlock.guards", "RMTGuard")
         _fallback(self._guards, "hello_guard", "invarlock.plugins", "HelloGuard")
+
+    def _check_runtime_dependencies(self, deps: list[str]) -> list[str]:
+        """
+        Check if runtime dependencies are actually importable.
+
+        Returns:
+            List of missing dependency names.
+        """
+        missing = []
+        for dep in deps:
+            try:
+                importlib.import_module(dep)
+            except ImportError:
+                missing.append(dep)
+        return missing
 
     def _create_plugin_info(
         self, entry_point: EntryPoint, plugin_type: str

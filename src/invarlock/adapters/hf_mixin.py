@@ -4,10 +4,12 @@ Shared HuggingFace adapter mixin.
 
 Provides reusable functionality for InvarLock's HuggingFace adapters:
 - Device resolution helpers
+- Safe device movement for quantized models
 - Snapshot/restore with device awareness
 - Chunked snapshot helpers to reduce peak memory usage
 - Lightweight config serialization
 - Weight-tying detection plumbing
+- Quantization detection and capabilities
 """
 
 from __future__ import annotations
@@ -17,11 +19,14 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import torch
 
 from invarlock.security import is_secure_path
+
+if TYPE_CHECKING:
+    from .capabilities import ModelCapabilities, QuantizationConfig
 
 SCALAR_TYPES = (int, float, str, bool)
 
@@ -90,6 +95,122 @@ class HFAdapterMixin:
             return torch.device("cpu")
 
         return torch.device(device_str)
+
+    def _safe_to_device(
+        self,
+        model: torch.nn.Module,
+        device: str | torch.device | None = "auto",
+        capabilities: ModelCapabilities | None = None,
+    ) -> torch.nn.Module:
+        """
+        Safely move model to device, respecting quantization constraints.
+
+        For quantized models (BNB, AWQ, GPTQ), device movement may be
+        impossible or already handled by the loading mechanism. This
+        method checks the model's capabilities before attempting .to().
+
+        Args:
+            model: The model to move.
+            device: Target device ("auto", "cuda", "mps", "cpu").
+            capabilities: Pre-computed capabilities, or None to auto-detect.
+
+        Returns:
+            The model (possibly on the new device, or unchanged if not movable).
+        """
+        target_device = self._resolve_device(device)
+
+        # Auto-detect capabilities if not provided
+        if capabilities is None:
+            capabilities = self._detect_capabilities(model)
+
+        # Check if model can be moved
+        if capabilities is not None and not capabilities.device_movable:
+            # Model handles its own device placement (e.g., BNB, AWQ, GPTQ)
+            # Log this decision for debugging but don't attempt .to()
+            return model
+
+        # Safe to move
+        return model.to(target_device)
+
+    def _detect_capabilities(self, model: torch.nn.Module) -> ModelCapabilities | None:
+        """
+        Detect model capabilities from a loaded model instance.
+
+        Args:
+            model: Loaded model instance.
+
+        Returns:
+            ModelCapabilities if detection succeeds, None otherwise.
+        """
+        try:
+            from .capabilities import detect_capabilities_from_model
+
+            return detect_capabilities_from_model(model)
+        except ImportError:
+            return None
+
+    def _is_quantized_model(self, model: torch.nn.Module) -> bool:
+        """
+        Check if a model is quantized (BNB, AWQ, GPTQ).
+
+        This is a quick heuristic check that doesn't require full
+        capability detection.
+
+        Args:
+            model: Model to check.
+
+        Returns:
+            True if the model appears to be quantized.
+        """
+        config = getattr(model, "config", None)
+        if config is None:
+            return False
+
+        # Check for quantization_config attribute
+        quant_cfg = getattr(config, "quantization_config", None)
+        if quant_cfg is not None:
+            return True
+
+        # Check for BNB-specific attributes on the model
+        if hasattr(model, "is_loaded_in_8bit") and model.is_loaded_in_8bit:
+            return True
+        if hasattr(model, "is_loaded_in_4bit") and model.is_loaded_in_4bit:
+            return True
+
+        # Check for quantized module types in the model
+        for module in model.modules():
+            module_name = module.__class__.__name__.lower()
+            if any(
+                q in module_name
+                for q in ["linear8bit", "linear4bit", "quantlinear", "awqlinear"]
+            ):
+                return True
+
+        return False
+
+    def _detect_quantization_config(
+        self, model: torch.nn.Module
+    ) -> QuantizationConfig | None:
+        """
+        Detect quantization configuration from a model.
+
+        Args:
+            model: Model to inspect.
+
+        Returns:
+            QuantizationConfig if quantization detected, None otherwise.
+        """
+        try:
+            from .capabilities import detect_quantization_from_config
+
+            config = getattr(model, "config", None)
+            if config is not None:
+                quant_cfg = detect_quantization_from_config(config)
+                if quant_cfg.is_quantized():
+                    return quant_cfg
+        except ImportError:
+            pass
+        return None
 
     # ------------------------------------------------------------------
     # HF save/export helpers

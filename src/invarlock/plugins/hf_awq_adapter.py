@@ -4,12 +4,16 @@ HuggingFace AWQ Adapter (plugin)
 
 Optional adapter for loading AWQ-quantized causal LMs from the Hub.
 Requires the `autoawq` extra on supported platforms (typically Linux/CUDA).
+
+AWQ models are pre-quantized and typically handle device placement internally
+during loading. This adapter does NOT call .to() on the loaded model.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
+from invarlock.adapters.capabilities import ModelCapabilities
 from invarlock.adapters.hf_mixin import HFAdapterMixin
 from invarlock.core.api import ModelAdapter
 from invarlock.core.error_utils import wrap_errors
@@ -56,7 +60,24 @@ class HF_AWQ_Adapter(HFAdapterMixin, ModelAdapter):
                 trust_remote_code=True,
                 **{k: v for k, v in kwargs.items() if k != "device"},
             )
-        return model.to(self._resolve_device(device))
+
+        # AWQ models are pre-quantized; use safe device movement
+        # which respects the model's device constraints
+        return self._safe_to_device(
+            model, device, capabilities=ModelCapabilities.for_awq()
+        )
+
+    def get_capabilities(self, model: Any) -> ModelCapabilities:
+        """Return capabilities for an AWQ-quantized model."""
+        config = getattr(model, "config", None)
+        group_size = 128  # Default AWQ group size
+        if config is not None:
+            quant_cfg = getattr(config, "quantization_config", None)
+            if isinstance(quant_cfg, dict):
+                group_size = quant_cfg.get("group_size", 128)
+            elif quant_cfg is not None:
+                group_size = getattr(quant_cfg, "group_size", 128)
+        return ModelCapabilities.for_awq(group_size=group_size)
 
     def can_handle(self, model: Any) -> bool:
         cfg = getattr(model, "config", None)

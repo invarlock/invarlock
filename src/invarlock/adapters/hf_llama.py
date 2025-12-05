@@ -69,8 +69,8 @@ class HF_LLaMA_Adapter(HFAdapterMixin, ModelAdapter):
         ):
             model = AutoModelForCausalLM.from_pretrained(model_id)
 
-        target_device = self._resolve_device(device)
-        return model.to(target_device)
+        # Use safe device movement that respects quantization constraints
+        return self._safe_to_device(model, device)
 
     def can_handle(self, model: ModuleType | Any) -> bool:
         """

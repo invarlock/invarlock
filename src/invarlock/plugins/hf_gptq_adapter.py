@@ -4,12 +4,16 @@ HuggingFace GPTQ Adapter (plugin)
 
 Optional adapter for loading AutoGPTQ-quantized causal LMs from the Hub.
 Requires the `auto-gptq` extra on supported platforms (typically Linux/CUDA).
+
+GPTQ models are pre-quantized and typically handle device placement internally
+during loading. This adapter uses safe device movement to respect constraints.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
+from invarlock.adapters.capabilities import ModelCapabilities
 from invarlock.adapters.hf_mixin import HFAdapterMixin
 from invarlock.core.api import ModelAdapter
 from invarlock.core.error_utils import wrap_errors
@@ -47,7 +51,26 @@ class HF_GPTQ_Adapter(HFAdapterMixin, ModelAdapter):
                 **{k: v for k, v in kwargs.items() if k not in {"device"}},
             )
 
-        return model.to(self._resolve_device(device))
+        # GPTQ models are pre-quantized; use safe device movement
+        # which respects the model's device constraints
+        return self._safe_to_device(
+            model, device, capabilities=ModelCapabilities.for_gptq()
+        )
+
+    def get_capabilities(self, model: Any) -> ModelCapabilities:
+        """Return capabilities for a GPTQ-quantized model."""
+        config = getattr(model, "config", None)
+        bits = 4  # Default GPTQ bits
+        group_size = 128  # Default GPTQ group size
+        if config is not None:
+            quant_cfg = getattr(config, "quantization_config", None)
+            if isinstance(quant_cfg, dict):
+                bits = quant_cfg.get("bits", 4)
+                group_size = quant_cfg.get("group_size", 128)
+            elif quant_cfg is not None:
+                bits = getattr(quant_cfg, "bits", 4)
+                group_size = getattr(quant_cfg, "group_size", 128)
+        return ModelCapabilities.for_gptq(bits=bits, group_size=group_size)
 
     # ---- Introspection ----
     def can_handle(self, model: Any) -> bool:
