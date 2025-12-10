@@ -272,11 +272,6 @@ preview = edit.preview(model, adapter, calibration_data=None)
 result = edit.apply(model, adapter, preview.get('plan', {}))
 ```
 
-### Pruning (via external plugins)
-
-See the plugins user guide for mask-based pruning adapters and third‑party integrations.
-
-
 ### Custom Guard Development
 
 ```python

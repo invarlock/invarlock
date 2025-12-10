@@ -81,6 +81,137 @@ GUARD_OVERHEAD_THRESHOLD = 0.01
 SPLIT_ALIASES: tuple[str, ...] = ("validation", "val", "dev", "eval", "test")
 
 
+def _coerce_mapping(obj: object) -> dict[str, Any]:
+    """Best-effort conversion of config-like objects to plain dicts."""
+
+    if isinstance(obj, dict):
+        return obj
+    try:
+        raw = getattr(obj, "_data", None)
+        if isinstance(raw, dict):
+            return raw
+    except Exception:
+        pass
+    try:
+        dumped = obj.model_dump()  # type: ignore[attr-defined]
+        if isinstance(dumped, dict):
+            return dumped
+    except Exception:
+        pass
+    try:
+        data = vars(obj)
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+    return {}
+
+
+def _resolve_pm_acceptance_range(
+    cfg: InvarLockConfig | dict[str, Any] | None,
+) -> dict[str, float]:
+    """Resolve primary-metric acceptance bounds from config/env with safe defaults."""
+
+    base_min = 0.95
+    base_max = 1.10
+
+    cfg_min = None
+    cfg_max = None
+    try:
+        cfg_map = _coerce_mapping(cfg) if cfg is not None else {}
+        pm_section = cfg_map.get("primary_metric") if isinstance(cfg_map, dict) else {}
+        pm_map = _coerce_mapping(pm_section)
+        acceptance = (
+            pm_map.get("acceptance_range") if isinstance(pm_map, dict) else None
+        )
+        if isinstance(acceptance, dict):
+            if acceptance.get("min") is not None:
+                try:
+                    cfg_min = float(acceptance["min"])
+                except (TypeError, ValueError):
+                    cfg_min = None
+            if acceptance.get("max") is not None:
+                try:
+                    cfg_max = float(acceptance["max"])
+                except (TypeError, ValueError):
+                    cfg_max = None
+    except Exception:
+        cfg_min = None
+        cfg_max = None
+
+    def _parse_env(name: str) -> float | None:
+        try:
+            raw = os.environ.get(name, "")
+            if raw is None or str(raw).strip() == "":
+                return None
+            return float(raw)
+        except Exception:
+            return None
+
+    env_min = _parse_env("INVARLOCK_PM_ACCEPTANCE_MIN")
+    env_max = _parse_env("INVARLOCK_PM_ACCEPTANCE_MAX")
+
+    has_explicit = any(v is not None for v in (cfg_min, cfg_max, env_min, env_max))
+    if not has_explicit:
+        return {}
+
+    min_val = (
+        env_min if env_min is not None else cfg_min if cfg_min is not None else base_min
+    )
+    max_val = (
+        env_max if env_max is not None else cfg_max if cfg_max is not None else base_max
+    )
+
+    try:
+        if min_val is not None and min_val <= 0:
+            min_val = base_min
+    except Exception:
+        min_val = base_min
+    try:
+        if max_val is not None and max_val <= 0:
+            max_val = base_max
+    except Exception:
+        max_val = base_max
+
+    try:
+        if max_val is not None and min_val is not None and max_val < min_val:
+            max_val = min_val
+    except Exception:
+        max_val = base_max
+
+    return {"min": float(min_val), "max": float(max_val)}
+
+
+def _free_model_memory(model: object | None) -> None:
+    """Best-effort cleanup to release GPU memory for a model object."""
+    if model is None:
+        return
+    try:
+        import gc
+
+        del model
+        gc.collect()
+        if torch is not None and torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+    except Exception:
+        # Cleanup should never raise; fallback is to proceed without cache purge
+        pass
+
+
+def _should_measure_overhead(profile_normalized: str) -> tuple[bool, bool]:
+    """Return (measure_guard_overhead, skip_overhead) derived from env/profile."""
+
+    skip_overhead_env = (
+        os.environ.get("INVARLOCK_SKIP_OVERHEAD_CHECK", "").strip().lower()
+    )
+    skip_overhead = skip_overhead_env in {"1", "true", "yes"}
+    measure_guard_overhead = (
+        profile_normalized in {"ci", "release"} and not skip_overhead
+    )
+    return measure_guard_overhead, skip_overhead
+
+
 def _choose_dataset_split(
     *, requested: str | None, available: list[str] | None
 ) -> tuple[str, bool]:
@@ -1671,6 +1802,7 @@ def run_command(
             "edit": edit_meta,
             "guards": guard_metadata,
         }
+        pm_acceptance_range = _resolve_pm_acceptance_range(cfg)
 
         console.print(f"🔌 Adapter: {adapter.name}")
 
@@ -1746,6 +1878,10 @@ def run_command(
             "plugins": plugin_provenance,
             "run_id": run_id,
         }
+        run_context.setdefault("primary_metric", {})["acceptance_range"] = (
+            pm_acceptance_range
+        )
+        run_context["pm_acceptance_range"] = pm_acceptance_range
         run_context["model_profile"] = {
             "family": model_profile.family,
             "default_loss": model_profile.default_loss,
@@ -2756,18 +2892,26 @@ def run_command(
 
                 restore_fn = _restore2
             else:
-                # reload path
+                # reload path - properly free GPU memory before setting to None
+                _free_model_memory(model)
                 model = None
                 restore_fn = None
         except Exception:
             # On any failure, fall back to reload-per-attempt path
+            _free_model_memory(model)
             model = None
             restore_fn = None
 
         # RETRY LOOP - All report processing inside loop
         attempt = 1
         profile_normalized = (profile or "").lower()
-        measure_guard_overhead = profile_normalized in {"ci", "release"}
+        measure_guard_overhead, skip_overhead = _should_measure_overhead(
+            profile_normalized
+        )
+        if skip_overhead and profile_normalized in {"ci", "release"}:
+            console.print(
+                "[yellow]⚠️  Overhead check skipped via INVARLOCK_SKIP_OVERHEAD_CHECK[/yellow]"
+            )
 
         while True:
             # Reset RNG streams each attempt to guarantee determinism across retries
@@ -2933,6 +3077,8 @@ def run_command(
             if env_flags:
                 meta_payload["env_flags"] = env_flags
             report["meta"].update(meta_payload)
+            if pm_acceptance_range:
+                report["meta"]["pm_acceptance_range"] = pm_acceptance_range
             report["meta"]["model_profile"] = {
                 "family": model_profile.family,
                 "default_loss": model_profile.default_loss,

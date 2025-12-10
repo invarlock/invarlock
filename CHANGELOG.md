@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2025-12-10
+
+### Fixed
+- **Memory leak in run.py reload fallback** - GPU memory is now freed before reloading models, preventing OOM on 70B+ runs.
+- **B200 validation script bugs** - Fixed preset path resolution, model size detection, and error propagation in dynamic scheduling workers.
+
+### Added
+- **INVARLOCK_SKIP_OVERHEAD_CHECK env var** - Skip guard overhead measurement even with ci/release profiles for large models.
+- **Configurable PM acceptance range** - Set via preset config or `INVARLOCK_PM_ACCEPTANCE_MIN/MAX` environment variables.
+- **Comprehensive B200 validation guide** - New documentation at `docs/user-guide/b200-validation.md`.
+
+### Changed
+- B200 validation scripts updated to v2.0.1 with improved cleanup traps and progress monitoring.
+
+### Deprecated
+- `INVARLOCK_TINY_RELAX` for PM acceptance - prefer `INVARLOCK_PM_ACCEPTANCE_MAX` and presets instead.
+
 ## [0.3.0] - 2025-12-05
 
 ### Added

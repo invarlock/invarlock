@@ -11,5 +11,10 @@ dataset:
   final_n: 120
   stride: 512
 
+primary_metric:
+  acceptance_range:
+    min: 0.95
+    max: 1.15
+
 context:
   telemetry_profile: "ci_cpu"

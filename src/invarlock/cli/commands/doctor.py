@@ -326,8 +326,14 @@ def doctor_command(
     try:
         import torch
 
+        torch_version = getattr(torch, "__version__", None)
         if not json_out:
-            console.print(f"[green]✅ PyTorch {torch.__version__}[/green]")
+            if torch_version:
+                console.print(f"[green]✅ PyTorch {torch_version}[/green]")
+            else:
+                console.print(
+                    "[yellow]⚠️  PyTorch present but version unavailable[/yellow]"
+                )
 
         # Device information
         from ..device import get_device_info

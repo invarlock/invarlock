@@ -156,16 +156,19 @@ additional dependencies and are installed via extras.
 **Purpose**: Support for 8-bit and 4-bit quantized models via bitsandbytes
 
 **Installation**:
+
 ```bash
 pip install "invarlock[gpu]"  # Includes bitsandbytes
 ```
 
 **Supported Quantization**:
+
 - 8-bit quantization (INT8)
 - 4-bit quantization (NF4, FP4)
 - Double quantization (4-bit)
 
 **Configuration**:
+
 ```yaml
 model:
   id: "meta-llama/Llama-2-7b-hf"
@@ -174,11 +177,13 @@ model:
 ```
 
 **Key Features**:
+
 - **Pre-quantized checkpoint detection**: Automatically detects checkpoints saved with BNB
 - **No `.to()` calls**: Device placement handled via `device_map="auto"`
 - **Fresh quantization**: Can quantize FP16 models on-load with `load_in_8bit=True`
 
 **Important Notes**:
+
 - BNB models **cannot** be moved between devices after loading
 - Requires CUDA (not compatible with CPU or MPS)
 - Pre-quantized checkpoints must have `quantization_config` in `config.json`
@@ -188,6 +193,7 @@ model:
 **Purpose**: Support for AWQ (Activation-aware Weight Quantization) models
 
 **Installation**:
+
 ```bash
 pip install "invarlock[awq]"  # Includes autoawq
 ```
@@ -195,6 +201,7 @@ pip install "invarlock[awq]"  # Includes autoawq
 **Compatibility**: ✅ Python 3.12, torch 2.9
 
 **Configuration**:
+
 ```yaml
 model:
   id: "/path/to/awq-model"
@@ -203,11 +210,13 @@ model:
 ```
 
 **Key Features**:
+
 - Supports pre-quantized AWQ checkpoints
 - Typically 4-bit quantization with group size 128
 - Compatible with Python 3.12
 
 **Usage with InvarLock**:
+
 ```bash
 invarlock certify \
   --baseline mistralai/Mistral-7B-v0.1 \
@@ -222,11 +231,13 @@ invarlock certify \
 **Purpose**: Support for GPTQ quantized models
 
 **Installation**:
+
 ```bash
 pip install "invarlock[gptq]"  # Includes auto-gptq
 ```
 
 **⚠️ Compatibility Note**:
+
 - ❌ **Python 3.12**: `auto-gptq` does not currently build on Python 3.12
 - ✅ **Python 3.10/3.11**: Works correctly
 - CUDA required
@@ -235,6 +246,7 @@ pip install "invarlock[gptq]"  # Includes auto-gptq
 alternative quantization method.
 
 **Configuration** (Python 3.10/3.11):
+
 ```yaml
 model:
   id: "/path/to/gptq-model"
@@ -253,6 +265,7 @@ appropriate quantization adapter:
 ```
 
 Detection order:
+
 1. Check `quantization_config.quant_method` in `config.json`
 2. Check for `load_in_8bit` / `load_in_4bit` flags
 3. Check model attributes (`is_loaded_in_8bit`, `is_loaded_in_4bit`)

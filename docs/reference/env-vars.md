@@ -49,6 +49,15 @@ unset variables default to “off”.
 - `INVARLOCK_VALIDATE_LEGACY=1`
   - Enable legacy validation pathways (back-compat tolerance handling).
 
+## Guard Overhead & Primary Metric
+
+- `INVARLOCK_SKIP_OVERHEAD_CHECK=1`
+  - Skip guard-overhead measurement even in `ci`/`release` profiles to avoid double-loading large models.
+- `INVARLOCK_PM_ACCEPTANCE_MAX=<float>`
+  - Upper bound for primary-metric acceptance (default 1.10). Set to 1.15 for slight drift allowance.
+- `INVARLOCK_PM_ACCEPTANCE_MIN=<float>`
+  - Lower bound for primary-metric acceptance (default 0.95) when enforcing a symmetric ratio band.
+
 ## Documentation Build
 
 - `INVARLOCK_DOCS_MERMAID=1`

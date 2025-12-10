@@ -13,6 +13,7 @@ from __future__ import annotations
 # mypy: ignore-errors
 import copy
 import hashlib
+import inspect
 import json
 import math
 import os
@@ -1322,24 +1323,36 @@ def make_certificate(
         capacity_tokens = None
         capacity_examples = None
 
-    validation_flags = _compute_validation_flags(
-        ppl_analysis,
-        spectral,
-        rmt,
-        invariants,
-        auto.get("tier", "balanced"),
-        ppl_metrics,
-        auto.get("target_pm_ratio"),
-        guard_overhead_section,
-        report.get("metrics", {}).get("primary_metric")
+    pm_acceptance_range = _resolve_pm_acceptance_range_from_report(report)
+
+    validation_kwargs = {
+        "ppl": ppl_analysis,
+        "spectral": spectral,
+        "rmt": rmt,
+        "invariants": invariants,
+        "tier": auto.get("tier", "balanced"),
+        "_ppl_metrics": ppl_metrics,
+        "target_ratio": auto.get("target_pm_ratio"),
+        "guard_overhead": guard_overhead_section,
+        "primary_metric": report.get("metrics", {}).get("primary_metric")
         if isinstance(report.get("metrics"), dict)
         else None,
-        moe_section,
-        {
+        "moe": moe_section,
+        "dataset_capacity": {
             "tokens_available": capacity_tokens,
             "examples_available": capacity_examples,
         },
-    )
+    }
+    try:
+        if (
+            "pm_acceptance_range"
+            in inspect.signature(_compute_validation_flags).parameters
+        ):
+            validation_kwargs["pm_acceptance_range"] = pm_acceptance_range
+    except Exception:  # pragma: no cover - defensive against patched functions
+        validation_kwargs["pm_acceptance_range"] = pm_acceptance_range
+
+    validation_flags = _compute_validation_flags(**validation_kwargs)
     # Enforce validation key allow-list to prevent surface drift
     _allowed_validation = _load_validation_allowlist()
     validation_filtered = {
@@ -2537,6 +2550,103 @@ def _build_provenance_block(
     return provenance
 
 
+def _resolve_pm_acceptance_range_from_report(
+    report: dict[str, Any] | None,
+) -> dict[str, float]:
+    """Resolve primary-metric acceptance bounds from report context/meta/env."""
+
+    base_min = 0.95
+    base_max = 1.10
+
+    def _safe_float(val: Any) -> float | None:
+        try:
+            if val is None:
+                return None
+            return float(val)
+        except Exception:
+            return None
+
+    cfg_min = None
+    cfg_max = None
+    ctx = report.get("context") if isinstance(report, dict) else None
+    if isinstance(ctx, dict):
+        pm_ctx = (
+            ctx.get("primary_metric")
+            if isinstance(ctx.get("primary_metric"), dict)
+            else {}
+        )
+        if isinstance(pm_ctx, dict):
+            cfg_min = _safe_float(pm_ctx.get("acceptance_range", {}).get("min"))
+            cfg_max = _safe_float(pm_ctx.get("acceptance_range", {}).get("max"))
+        if cfg_min is None or cfg_max is None:
+            alt = ctx.get("pm_acceptance_range")
+            if isinstance(alt, dict):
+                cfg_min = (
+                    cfg_min if cfg_min is not None else _safe_float(alt.get("min"))
+                )
+                cfg_max = (
+                    cfg_max if cfg_max is not None else _safe_float(alt.get("max"))
+                )
+
+    if (cfg_min is None or cfg_max is None) and isinstance(report, dict):
+        meta = report.get("meta")
+        if isinstance(meta, dict):
+            meta_range = meta.get("pm_acceptance_range")
+            if isinstance(meta_range, dict):
+                cfg_min = (
+                    cfg_min
+                    if cfg_min is not None
+                    else _safe_float(meta_range.get("min"))
+                )
+                cfg_max = (
+                    cfg_max
+                    if cfg_max is not None
+                    else _safe_float(meta_range.get("max"))
+                )
+
+    def _parse_env(name: str) -> float | None:
+        try:
+            raw = os.environ.get(name, "")
+            if raw is None or str(raw).strip() == "":
+                return None
+            return float(raw)
+        except Exception:
+            return None
+
+    env_min = _parse_env("INVARLOCK_PM_ACCEPTANCE_MIN")
+    env_max = _parse_env("INVARLOCK_PM_ACCEPTANCE_MAX")
+
+    has_explicit = any(v is not None for v in (cfg_min, cfg_max, env_min, env_max))
+    if not has_explicit:
+        return {}
+
+    min_val = (
+        env_min if env_min is not None else cfg_min if cfg_min is not None else base_min
+    )
+    max_val = (
+        env_max if env_max is not None else cfg_max if cfg_max is not None else base_max
+    )
+
+    try:
+        if min_val is not None and min_val <= 0:
+            min_val = base_min
+    except Exception:
+        min_val = base_min
+    try:
+        if max_val is not None and max_val <= 0:
+            max_val = base_max
+    except Exception:
+        max_val = base_max
+
+    try:
+        if max_val is not None and min_val is not None and max_val < min_val:
+            max_val = min_val
+    except Exception:
+        max_val = base_max
+
+    return {"min": float(min_val), "max": float(max_val)}
+
+
 def _compute_validation_flags(
     ppl: dict[str, Any],
     spectral: dict[str, Any],
@@ -2549,6 +2659,7 @@ def _compute_validation_flags(
     primary_metric: dict[str, Any] | None = None,
     moe: dict[str, Any] | None = None,
     dataset_capacity: dict[str, Any] | None = None,
+    pm_acceptance_range: dict[str, float] | None = None,
 ) -> dict[str, bool]:
     """Compute validation flags for the certificate including canonical gates."""
     tier = (tier or "balanced").lower()
@@ -2569,7 +2680,25 @@ def _compute_validation_flags(
         "aggressive": 1.20,
         "none": 1.10,
     }
-    ratio_limit = tier_thresholds.get(tier, 1.10)
+    acceptance = pm_acceptance_range if isinstance(pm_acceptance_range, dict) else {}
+    ratio_min_bound = None
+    ratio_max_bound = None
+    try:
+        if acceptance.get("min") is not None:
+            ratio_min_bound = float(acceptance.get("min"))
+    except Exception:
+        ratio_min_bound = None
+    try:
+        if acceptance.get("max") is not None:
+            ratio_max_bound = float(acceptance.get("max"))
+    except Exception:
+        ratio_max_bound = None
+
+    ratio_limit = (
+        ratio_max_bound
+        if isinstance(ratio_max_bound, (int | float)) and math.isfinite(ratio_max_bound)
+        else tier_thresholds.get(tier, 1.10)
+    )
     if isinstance(target_ratio, int | float) and target_ratio > 0:
         ratio_limit = min(ratio_limit, float(target_ratio))
 
@@ -2636,9 +2765,18 @@ def _compute_validation_flags(
     tokens_ok_eff = tokens_ok or _tiny_relax
     # Apply hysteresis to ratio limit if needed
     ratio_limit_with_hyst = ratio_limit + max(0.0, hysteresis_ratio)
+    lower_bound_ok = True
+    if ratio_min_bound is not None and isinstance(ratio_vs_baseline, (int | float)):
+        try:
+            lower_bound_ok = math.isfinite(float(ratio_vs_baseline)) and (
+                float(ratio_vs_baseline) >= float(ratio_min_bound)
+            )
+        except Exception:
+            lower_bound_ok = True
     compression_acceptable = (
         isinstance(ratio_vs_baseline, int | float)
         and math.isfinite(ratio_vs_baseline)
+        and lower_bound_ok
         and ratio_vs_baseline <= ratio_limit_with_hyst
         and tokens_ok_eff
     )
@@ -2655,7 +2793,9 @@ def _compute_validation_flags(
         and all(isinstance(x, int | float) and math.isfinite(x) for x in ratio_ci)
     ):
         compression_acceptable = (
-            compression_acceptable and ratio_ci[1] <= ratio_limit_with_hyst
+            compression_acceptable
+            and ratio_ci[1] <= ratio_limit_with_hyst
+            and (ratio_min_bound is None or ratio_ci[0] >= ratio_min_bound)
         )
 
     # 3. RMT ε-rule compliance
