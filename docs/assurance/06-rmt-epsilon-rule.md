@@ -67,7 +67,7 @@ use a slightly larger ε to avoid spurious WARNs.
 
 - `rmt.outliers_bare`, `rmt.outliers_guarded`, and `rmt.delta_per_family[*]`.
 - `rmt.epsilon` (default) and `rmt.epsilon_by_family`.
-- `rmt.status` / `rmt.stable` and `rmt.flags` (if present) for pass/fail context.
+- `rmt.status` / `rmt.stable` and `rmt.epsilon_violations` for pass/fail context.
 - `resolved_policy.rmt.{margin,deadband,epsilon_by_family}` — resolved thresholds archived with the cert.
 
 ## Edge cases

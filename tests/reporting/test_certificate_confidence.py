@@ -83,13 +83,18 @@ def test_confidence_thresholds_can_be_overridden_by_policy(monkeypatch):
     # Override tier policy confidence widths and expect threshold to reflect it
     from invarlock.core import auto_tuning as at
 
-    orig = at.TIER_POLICIES["balanced"].get("metrics", {})
-    new_metrics = dict(orig)
-    new_metrics["confidence"] = {
+    base_policies = at.get_tier_policies()
+    balanced = dict(base_policies.get("balanced", {}))
+    metrics_obj = balanced.get("metrics", {})
+    metrics = dict(metrics_obj) if isinstance(metrics_obj, dict) else {}
+    metrics["confidence"] = {
         "ppl_ratio_width_max": 0.02,
         "accuracy_delta_pp_width_max": 0.5,
     }
-    monkeypatch.setitem(at.TIER_POLICIES["balanced"], "metrics", new_metrics)
+    balanced["metrics"] = metrics
+    patched = dict(base_policies)
+    patched["balanced"] = balanced
+    monkeypatch.setattr(at, "get_tier_policies", lambda *_a, **_k: patched)
 
     report = _mk_report(ratio=1.02, reps=500)
     baseline = _mk_report(ratio=1.0, reps=500)

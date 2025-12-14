@@ -26,6 +26,80 @@ from invarlock.core.api import Guard
 from ._contracts import guard_assert
 
 
+def _z_to_two_sided_pvalue(z: Any) -> float:
+    try:
+        zf = float(z)
+        if not math.isfinite(zf):
+            return 1.0
+        return float(math.erfc(abs(zf) / math.sqrt(2.0)))
+    except Exception:
+        return 1.0
+
+
+def _finite01(value: Any) -> bool:
+    try:
+        f = float(value)
+        return math.isfinite(f) and 0.0 <= f <= 1.0
+    except Exception:
+        return False
+
+
+def _bh_reject_families(
+    family_pvals: dict[str, float], *, alpha: float, m: int
+) -> set[str]:
+    """BH family selection with denominator `m` (conservative if m >= #families)."""
+    if not family_pvals:
+        return set()
+    try:
+        alpha_f = float(alpha)
+    except Exception:
+        alpha_f = 0.05
+    if not (0.0 < alpha_f <= 1.0):
+        return set()
+
+    names = list(family_pvals.keys())
+    pvals = [family_pvals[n] for n in names]
+    n = len(pvals)
+    m_eff = max(int(m) if isinstance(m, int) else 0, n, 1)
+
+    order = sorted(
+        range(n),
+        key=lambda idx: (float("inf") if not _finite01(pvals[idx]) else pvals[idx]),
+    )
+    max_k = 0
+    for rank, idx in enumerate(order, start=1):
+        p = pvals[idx]
+        if not _finite01(p):
+            continue
+        if p <= (alpha_f * rank) / m_eff:
+            max_k = rank
+    if max_k <= 0:
+        return set()
+    cutoff = (alpha_f * max_k) / m_eff
+    selected: set[str] = set()
+    for idx in order:
+        p = pvals[idx]
+        if _finite01(p) and p <= cutoff:
+            selected.add(names[idx])
+    return selected
+
+
+def _bonferroni_reject_families(
+    family_pvals: dict[str, float], *, alpha: float, m: int
+) -> set[str]:
+    if not family_pvals:
+        return set()
+    try:
+        alpha_f = float(alpha)
+    except Exception:
+        alpha_f = 0.05
+    if not (0.0 < alpha_f <= 1.0):
+        return set()
+    m_eff = max(int(m) if isinstance(m, int) else 0, len(family_pvals), 1)
+    cutoff = alpha_f / m_eff
+    return {fam for fam, p in family_pvals.items() if _finite01(p) and p <= cutoff}
+
+
 class SpectralPolicy(TypedDict, total=False):
     """Type definition for spectral guard policy configuration."""
 
@@ -567,6 +641,121 @@ class SpectralGuard(Guard):
 
         return family_quantiles, top_z_scores
 
+    def _select_budgeted_violations(
+        self, budgeted_violations: list[dict[str, Any]]
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """Apply BH/Bonferroni selection at the family level.
+
+        Returns:
+            (selected_violations, selection_metrics)
+        """
+        mt = self.multiple_testing if isinstance(self.multiple_testing, dict) else {}
+        method = str(mt.get("method", "bh")).lower()
+        try:
+            alpha = float(mt.get("alpha", 0.05) or 0.05)
+        except Exception:
+            alpha = 0.05
+        m_raw = mt.get("m")
+        m = None
+        try:
+            if m_raw is not None:
+                m = int(m_raw)
+        except Exception:
+            m = None
+
+        # Fill in missing family assignments deterministically.
+        for violation in budgeted_violations:
+            if violation.get("family"):
+                continue
+            module = violation.get("module")
+            if isinstance(module, str):
+                family = self.module_family_map.get(module)
+                if isinstance(family, str) and family:
+                    violation["family"] = family
+                    continue
+            violation["family"] = "other"
+
+        # Family p-values derived from the most significant (min p) module in each family.
+        family_pvals: dict[str, float] = {}
+        family_max_abs_z: dict[str, float] = {}
+        family_counts: dict[str, int] = {}
+        for violation in budgeted_violations:
+            fam = violation.get("family")
+            if fam is None:
+                continue
+            family = str(fam)
+            z_val = violation.get("z_score")
+            try:
+                zf = float(z_val)
+            except Exception:
+                continue
+            if not math.isfinite(zf):
+                continue
+            p = _z_to_two_sided_pvalue(zf)
+            family_counts[family] = family_counts.get(family, 0) + 1
+            cur = family_pvals.get(family)
+            if cur is None or p < cur:
+                family_pvals[family] = p
+                family_max_abs_z[family] = abs(zf)
+
+        families_tested = sorted(family_pvals.keys())
+        m_eff = m if isinstance(m, int) and m > 0 else len(families_tested)
+        m_eff = max(m_eff, len(families_tested), 1)
+        if isinstance(self.multiple_testing, dict):
+            self.multiple_testing.setdefault("m", m_eff)
+
+        if method in {"bh", "benjamini-hochberg", "benjamini_hochberg"}:
+            selected_families = _bh_reject_families(family_pvals, alpha=alpha, m=m_eff)
+            applied_method = "bh"
+        elif method in {"bonferroni", "bonf"}:
+            selected_families = _bonferroni_reject_families(
+                family_pvals, alpha=alpha, m=m_eff
+            )
+            applied_method = "bonferroni"
+        else:
+            selected_families = _bonferroni_reject_families(
+                family_pvals, alpha=alpha, m=m_eff
+            )
+            applied_method = "bonferroni"
+
+        selected: list[dict[str, Any]] = []
+        default_selected_without_pvalue = 0
+        for violation in budgeted_violations:
+            fam = violation.get("family")
+            family = str(fam) if fam is not None else ""
+            z_val = violation.get("z_score")
+            p_val: float | None = None
+            try:
+                zf = float(z_val)
+            except Exception:
+                zf = None
+            if zf is not None and math.isfinite(zf):
+                p_val = _z_to_two_sided_pvalue(zf)
+                is_selected = family in selected_families
+            else:
+                # If we cannot compute a p-value, fail closed: keep the violation.
+                is_selected = True
+                default_selected_without_pvalue += 1
+            violation["p_value"] = p_val
+            violation["selected"] = is_selected
+            if is_selected:
+                selected.append(violation)
+
+        selection_metrics = {
+            "method": applied_method,
+            "alpha": alpha,
+            "m": int(m_eff),
+            "families_tested": families_tested,
+            "families_selected": sorted(selected_families),
+            "family_pvalues": {k: float(family_pvals[k]) for k in families_tested},
+            "family_max_abs_z": {
+                k: float(family_max_abs_z[k]) for k in families_tested
+            },
+            "family_violation_counts": dict(family_counts),
+            "default_selected_without_pvalue": int(default_selected_without_pvalue),
+        }
+        return selected, selection_metrics
+
     def validate(
         self, model: Any, adapter: Any, context: dict[str, Any]
     ) -> dict[str, Any]:
@@ -607,7 +796,13 @@ class SpectralGuard(Guard):
                 if violation.get("type") in fatal_violation_types
             ]
 
-            caps_applied = len(budgeted_violations)
+            selected_budgeted, mt_selection = self._select_budgeted_violations(
+                budgeted_violations
+            )
+            selected_violations = [*fatal_violations, *selected_budgeted]
+            candidate_budgeted = len(budgeted_violations)
+
+            caps_applied = len(selected_budgeted)
             caps_exceeded = caps_applied > int(self.max_caps)
             passed = not fatal_violations and not caps_exceeded
             if fatal_violations or caps_exceeded:
@@ -623,8 +818,9 @@ class SpectralGuard(Guard):
             )
             metrics = {
                 "modules_checked": len(current_metrics),
-                "violations_found": len(violations),
+                "violations_found": len(selected_violations),
                 "budgeted_violations": caps_applied,
+                "candidate_budgeted_violations": candidate_budgeted,
                 "fatal_violations": len(fatal_violations),
                 "max_spectral_norm": max(current_metrics.values())
                 if current_metrics
@@ -642,6 +838,7 @@ class SpectralGuard(Guard):
                 "caps_applied": caps_applied,
                 "caps_exceeded": caps_exceeded,
                 "multiple_testing": self.multiple_testing,
+                "multiple_testing_selection": mt_selection,
             }
 
             family_quantiles, top_z_scores = self._compute_family_observability()
@@ -653,7 +850,7 @@ class SpectralGuard(Guard):
             if passed:
                 message = (
                     "Spectral validation passed with "
-                    f"{len(violations)} violations "
+                    f"{len(selected_violations)} violations "
                     f"(caps_applied={caps_applied}, max_caps={self.max_caps})"
                 )
             else:
@@ -683,7 +880,7 @@ class SpectralGuard(Guard):
                 "passed": passed,
                 "action": action,
                 "metrics": metrics,
-                "violations": violations,
+                "violations": selected_violations,
                 "message": message,
                 "policy": self._serialize_policy(),
                 "final_z_scores": self.latest_z_scores.copy(),
@@ -743,15 +940,23 @@ class SpectralGuard(Guard):
             if violation.get("type") in fatal_violation_types
         ]
 
-        caps_applied = len(budgeted_violations)
+        selected_budgeted, mt_selection = self._select_budgeted_violations(
+            budgeted_violations
+        )
+        selected_final_violations = [*fatal_violations, *selected_budgeted]
+        candidate_budgeted = len(budgeted_violations)
+
+        caps_applied = len(selected_budgeted)
         caps_exceeded = caps_applied > int(self.max_caps)
         passed = not fatal_violations and not caps_exceeded
 
         # Compute comprehensive metrics
         metrics = {
             "modules_analyzed": len(final_metrics),
-            "violations_detected": len(final_violations),
+            "violations_detected": len(selected_final_violations),
             "budgeted_violations": caps_applied,
+            "candidate_violations_detected": len(final_violations),
+            "candidate_budgeted_violations": candidate_budgeted,
             "fatal_violations": len(fatal_violations),
             "baseline_modules": len(self.baseline_metrics),
             "scope": self.scope,
@@ -764,7 +969,8 @@ class SpectralGuard(Guard):
             "spectral_stability_score": 1.0
             - min(len(final_violations) / max(len(final_metrics), 1), 1.0),
             "target_sigma": self.target_sigma,
-            "correction_applied": len(final_violations) > 0 and self.correction_enabled,
+            "correction_applied": len(selected_final_violations) > 0
+            and self.correction_enabled,
             "family_caps": self.family_caps,
             "family_z_summary": final_z_summary,
             "family_stats": final_family_stats,
@@ -774,6 +980,7 @@ class SpectralGuard(Guard):
             "caps_applied": caps_applied,
             "caps_exceeded": caps_exceeded,
             "multiple_testing": self.multiple_testing,
+            "multiple_testing_selection": mt_selection,
             "family_z_quantiles": family_quantiles,
             "top_z_scores": top_z_scores,
         }
@@ -782,7 +989,7 @@ class SpectralGuard(Guard):
         warnings = []
         errors = []
 
-        for violation in final_violations:
+        for violation in selected_final_violations:
             if violation["type"] in ["max_spectral_norm", "ill_conditioned"]:
                 errors.append(violation["message"])
             else:
@@ -793,7 +1000,7 @@ class SpectralGuard(Guard):
             "metrics": metrics,
             "warnings": warnings,
             "errors": errors,
-            "violations": final_violations,
+            "violations": selected_final_violations,
             "events": self.events,
             "baseline_metrics": self.baseline_metrics,
             "final_metrics": final_metrics,

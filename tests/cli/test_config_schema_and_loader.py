@@ -93,6 +93,19 @@ def test_load_config_with_include_and_defaults_merge(tmp_path: Path):
     )
 
 
+def test_load_config_variance_guard_default_mode_and_floor(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "guard_cfg.yaml"
+    cfg_path.write_text(
+        "guards: {variance: {clamp: [0.0, 1.0], absolute_floor_ppl: 0.1}}\n",
+        encoding="utf-8",
+    )
+    cfg = load_config(cfg_path)
+    var_cfg = cfg.data["guards"]["variance"]
+    assert isinstance(var_cfg, VarianceGuardConfig)
+    assert var_cfg.mode == "ci"
+    assert var_cfg.absolute_floor_ppl == 0.1
+
+
 def test_load_config_raises_on_bad_defaults_type(tmp_path: Path):
     cfg_path = tmp_path / "bad.yaml"
     cfg_path.write_text(

@@ -41,12 +41,9 @@ def test_metrics_stats_source_non_dict_is_ignored():
     with patch("invarlock.reporting.certificate.validate_report", return_value=True):
         cert = make_certificate(report, baseline)
     stats = (cert.get("dataset", {}).get("windows", {}) or {}).get("stats", {})
-    # Ensure none of the optional passthrough keys were copied
-    for k in (
-        "requested_preview",
-        "requested_final",
-        "actual_preview",
-        "actual_final",
-        "coverage_ok",
-    ):
-        assert k not in stats
+    # Non-dict metrics.stats is ignored, but counts are still derived for auditability.
+    assert stats.get("requested_preview") == 1
+    assert stats.get("requested_final") == 1
+    assert stats.get("actual_preview") == 1
+    assert stats.get("actual_final") == 1
+    assert stats.get("coverage_ok") is True

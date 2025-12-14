@@ -403,15 +403,18 @@ def _predictive_gate_outcome(
     ):
         return False, "ci_unavailable"
 
-    lower, upper = float(delta_ci[0]), float(delta_ci[1])
+    upper = float(delta_ci[1])
     min_effect = float(min_effect or 0.0)
 
     if one_sided:
-        if lower >= 0.0:
+        # One-sided improvement (ΔlogNLL < 0): certify a minimum effect by
+        # requiring the *upper* bound of the (two-sided) CI to clear -min_effect.
+        if upper >= 0.0:
             return False, "ci_contains_zero"
         if mean_delta >= 0.0:
             return False, "mean_not_negative"
-        if min_effect > 0.0 and (-mean_delta) < min_effect:
+        gain_lower_bound = -upper  # worst-case gain under CI
+        if gain_lower_bound < min_effect:
             return False, "gain_below_threshold"
         return True, "ci_gain_met"
 

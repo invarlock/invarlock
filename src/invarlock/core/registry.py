@@ -196,16 +196,21 @@ class CoreRegistry:
 
     def _check_runtime_dependencies(self, deps: list[str]) -> list[str]:
         """
-        Check if runtime dependencies are actually importable.
+        Check if runtime dependencies are actually present on the system.
+
+        Uses importlib.util.find_spec to avoid importing packages and triggering
+        heavy side effects (e.g., GPU-only extensions).
 
         Returns:
             List of missing dependency names.
         """
-        missing = []
+        missing: list[str] = []
         for dep in deps:
             try:
-                importlib.import_module(dep)
-            except ImportError:
+                spec = importlib.util.find_spec(dep)  # type: ignore[attr-defined]
+            except Exception:
+                spec = None
+            if spec is None:
                 missing.append(dep)
         return missing
 

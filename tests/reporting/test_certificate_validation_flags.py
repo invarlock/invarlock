@@ -27,31 +27,25 @@ def test_compute_validation_flags_tiny_relax_and_tokens_floor(monkeypatch):
     _ppl_metrics = {"preview_total_tokens": 1000, "final_total_tokens": 1000}
     dataset_capacity = {"tokens_available": 10000}
 
-    # Monkeypatch tier policy to include pm_ratio
-    saved = C.TIER_POLICIES.get(tier, {}).get("metrics", {}).get("pm_ratio")
-    C.TIER_POLICIES.setdefault(tier, {}).setdefault("metrics", {})["pm_ratio"] = (
-        pm_policy
+    fake_policies = {
+        "balanced": {"metrics": {"pm_ratio": pm_policy}},
+        # tiny_relax forces tier="aggressive"
+        "aggressive": {"metrics": {"pm_ratio": pm_policy}},
+    }
+    monkeypatch.setattr(C, "get_tier_policies", lambda *_a, **_k: dict(fake_policies))
+    flags = C._compute_validation_flags(
+        ppl,
+        spectral,
+        rmt,
+        invariants,
+        tier=tier,
+        _ppl_metrics=_ppl_metrics,
+        target_ratio=None,
+        guard_overhead=None,
+        primary_metric=primary_metric,
+        moe=None,
+        dataset_capacity=dataset_capacity,
     )
-    try:
-        flags = C._compute_validation_flags(
-            ppl,
-            spectral,
-            rmt,
-            invariants,
-            tier=tier,
-            _ppl_metrics=_ppl_metrics,
-            target_ratio=None,
-            guard_overhead=None,
-            primary_metric=primary_metric,
-            moe=None,
-            dataset_capacity=dataset_capacity,
-        )
-    finally:
-        # Restore
-        if saved is None:
-            C.TIER_POLICIES.get(tier, {}).get("metrics", {}).pop("pm_ratio", None)
-        else:
-            C.TIER_POLICIES.get(tier, {}).get("metrics", {})["pm_ratio"] = saved
 
     assert isinstance(flags, dict)
     # With tiny relax, drift is accepted and tokens floor relaxed
@@ -92,7 +86,7 @@ def test_prepare_guard_overhead_section_fallback_paths():
     assert any("unavailable" in e.lower() for e in out2.get("errors", []))
 
 
-def test_validation_flags_hysteresis_applied_and_moe_observed():
+def test_validation_flags_hysteresis_applied_and_moe_observed(monkeypatch):
     # Set ratio slightly above base ratio limit but within hysteresis to trigger hysteresis_applied
     tier = "balanced"
     ppl = {"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.11}
@@ -101,26 +95,19 @@ def test_validation_flags_hysteresis_applied_and_moe_observed():
     invariants = {"status": "pass"}
     primary_metric = {"kind": "ppl_causal", "ratio_vs_baseline": 1.11}
     pm_policy = {"min_tokens": 0, "hysteresis_ratio": 0.02}  # base 1.10 + 0.02 = 1.12
-    saved = C.TIER_POLICIES.get(tier, {}).get("metrics", {}).get("pm_ratio")
-    C.TIER_POLICIES.setdefault(tier, {}).setdefault("metrics", {})["pm_ratio"] = (
-        pm_policy
+    fake_policies = {"balanced": {"metrics": {"pm_ratio": pm_policy}}}
+    monkeypatch.setattr(C, "get_tier_policies", lambda *_a, **_k: dict(fake_policies))
+    flags = C._compute_validation_flags(
+        ppl,
+        spectral,
+        rmt,
+        invariants,
+        tier=tier,
+        _ppl_metrics={},
+        primary_metric=primary_metric,
+        dataset_capacity=None,
+        pm_acceptance_range=None,
     )
-    try:
-        flags = C._compute_validation_flags(
-            ppl,
-            spectral,
-            rmt,
-            invariants,
-            tier=tier,
-            _ppl_metrics={},
-            primary_metric=primary_metric,
-            dataset_capacity=None,
-        )
-    finally:
-        if saved is None:
-            C.TIER_POLICIES.get(tier, {}).get("metrics", {}).pop("pm_ratio", None)
-        else:
-            C.TIER_POLICIES.get(tier, {}).get("metrics", {})["pm_ratio"] = saved
     assert flags.get("primary_metric_acceptable") is True
     assert flags.get("hysteresis_applied") in {True, False}
 

@@ -14,7 +14,7 @@ insufficient.
 ## Window Selection (assumptions)
 
 - **Non‑overlap:** set `seq_len == stride` so windows do not overlap.
-- **Deterministic:** record and reuse the seed bundle (`python`, `numpy`, `torch`, `bootstrap`).
+- **Deterministic:** record and reuse the seed bundle (`python`, `numpy`, `torch`) and bootstrap seed (when applicable).
 - **Dedupe:** deduplication is allowed for pilots/probes; **release evidence uses strict non‑overlap on the full plan**.
 - **Exact pairing:** preview/final counts must match and the edited run must reuse baseline window IDs; mixing schedules voids the paired Δlog guarantees.
 
@@ -22,8 +22,8 @@ insufficient.
 
 - The edited run pins windows via the baseline report.
 - Certificate lints pairing and overlap:
-  - `ppl.stats.window_match_fraction == 1.0`
-  - `ppl.stats.window_overlap_fraction == 0.0`
+  - `dataset.windows.stats.window_match_fraction == 1.0`
+  - `dataset.windows.stats.window_overlap_fraction == 0.0`
 - CI/Release abort if counts differ, pairing < 1.0, or overlap > 0.0.
 
 ## Tier Minima (runner defaults)
@@ -42,9 +42,9 @@ dev flows surface warnings but still record coverage in the cert.
 
 ## Runtime Contract (certificate)
 
-- Window plan: `window_plan.{requested_preview,requested_final,actual_preview,actual_final}`
-- Pairing/overlap: `ppl.stats.{window_match_fraction,window_overlap_fraction,paired_windows}`
-- Bootstrap coverage: `ppl.stats.bootstrap.{replicates,seed}` meets/exceeds tier minima
+- Window plan: `dataset.windows.stats.{requested_preview,requested_final,actual_preview,actual_final}`
+- Pairing/overlap: `dataset.windows.stats.{window_match_fraction,window_overlap_fraction,paired_windows}`
+- Bootstrap coverage: `dataset.windows.stats.bootstrap.{replicates,seed}` meets/exceeds tier minima
 
 ## Observability
 

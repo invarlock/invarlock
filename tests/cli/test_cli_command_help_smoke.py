@@ -13,6 +13,7 @@ def test_cli_top_level_help_smoke(monkeypatch):
     for args in (
         ["--help"],
         ["certify", "--help"],
+        ["calibrate", "--help"],
         ["report", "--help"],
         ["run", "--help"],
         ["plugins", "--help"],
@@ -34,10 +35,12 @@ def test_command_wrappers_importable():
         run_command,
         verify_command,
     )
+    from invarlock.cli.commands.calibrate import calibrate_app
 
     # Basic type checks – they should be callables or Typer callbacks
     for obj in (
         certify_command,
+        calibrate_app,
         doctor_command,
         explain_gates_command,
         export_html_command,

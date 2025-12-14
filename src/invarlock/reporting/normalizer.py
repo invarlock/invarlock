@@ -40,15 +40,34 @@ def normalize_run_report(report: Mapping[str, Any] | RunReport) -> RunReport:
     # ---- meta ----
     meta_in = _as_mapping(src.get("meta"))
     ts = _str(meta_in.get("ts") or datetime.now().isoformat())
+    try:
+        seed_value = int(meta_in.get("seed", 42))
+    except Exception:
+        seed_value = 42
     meta_dict: dict[str, Any] = {
         "model_id": _str(meta_in.get("model_id")),
         "adapter": _str(meta_in.get("adapter")),
         "commit": _str(meta_in.get("commit")),
-        "seed": int(meta_in.get("seed", 42) or 42),
+        "seed": seed_value,
         "device": _str(meta_in.get("device", "cpu")),
         "ts": ts,
         "auto": meta_in.get("auto") if isinstance(meta_in.get("auto"), dict) else None,
     }
+    # Preserve additional provenance knobs used by certificate/digests.
+    for key in (
+        "policy_overrides",
+        "overrides",
+        "plugins",
+        "config",
+        "seeds",
+        "determinism",
+        "env_flags",
+        "cuda_flags",
+        "tokenizer_hash",
+        "model_profile",
+    ):
+        if key in meta_in:
+            meta_dict[key] = meta_in.get(key)
     meta = cast(MetaData, meta_dict)
 
     # ---- data ----
@@ -164,6 +183,7 @@ def normalize_run_report(report: Mapping[str, Any] | RunReport) -> RunReport:
         "spectral",
         "rmt",
         "invariants",
+        "logloss_delta_ci",
         "bootstrap",
         "reduction",
         "moe",

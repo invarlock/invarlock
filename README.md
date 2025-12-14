@@ -6,7 +6,7 @@ they don’t, roll back safely.
 Technical: edit‑agnostic guard pipeline (invariants → spectral → RMT →
 variance) producing a machine‑readable Safety Certificate.
 
-> **Status:** 0.3.1 (pre‑1.0). Until 1.0, **minor** releases may be
+> **Status:** 0.3.2 (pre‑1.0). Until 1.0, **minor** releases may be
 > breaking. See CLI help and the CHANGELOG for updates.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/invarlock/invarlock/ci.yml?branch=main&logo=github&label=CI)](https://github.com/invarlock/invarlock/actions/workflows/ci.yml)
@@ -183,14 +183,16 @@ pip install "invarlock[hf]"
 
 ## 💻 Support Matrix
 
-| Platform               | Status          | Notes                                      |
-| ---------------------- | --------------- | ------------------------------------------ |
-| Python 3.12+           | ✅ Required      |                                            |
-| Linux                  | ✅ Full          | Primary dev target                         |
-| macOS (Intel/M-series) | ✅ Full          | MPS supported (default on Apple Silicon)   |
-| Windows                | ❌ Not supported | Use WSL2 or a Linux container if required  |
-| CUDA                   | ✅ Recommended   | For larger models                          |
-| CPU                    | ✅ Fallback      | Slower but functional                      |
+<!-- markdownlint-disable MD060 -->
+| Platform               | Status          | Notes                                     |
+| ---------------------- | --------------- | ----------------------------------------- |
+| Python 3.12+           | ✅ Required      |                                           |
+| Linux                  | ✅ Full          | Primary dev target                        |
+| macOS (Intel/M-series) | ✅ Full          | MPS supported (default on Apple Silicon)  |
+| Windows                | ❌ Not supported | Use WSL2 or a Linux container if required |
+| CUDA                   | ✅ Recommended   | For larger models                         |
+| CPU                    | ✅ Fallback      | Slower but functional                     |
+<!-- markdownlint-enable MD060 -->
 
 **Device selection:** CUDA → MPS → CPU (auto). Override with torch env if
 needed (e.g., `CUDA_VISIBLE_DEVICES`).

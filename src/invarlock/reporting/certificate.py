@@ -29,7 +29,7 @@ try:  # pragma: no cover - exercised in integration
 except Exception:  # pragma: no cover
     jsonschema = None  # type: ignore
 
-from invarlock.core.auto_tuning import TIER_POLICIES
+from invarlock.core.auto_tuning import get_tier_policies
 from invarlock.core.bootstrap import (
     compute_paired_delta_log_ci,
     logspace_to_ratio_ci,
@@ -598,6 +598,18 @@ def make_certificate(
     except Exception:  # pragma: no cover
         pass
 
+    # Determinism preset (CI/Release provenance) when present.
+    try:
+        det = (
+            report.get("meta", {}).get("determinism")
+            if isinstance(report.get("meta"), dict)
+            else None
+        )
+        if isinstance(det, dict) and det:
+            meta["determinism"] = det
+    except Exception:  # pragma: no cover
+        pass
+
     tokenizer_hash_meta = report["meta"].get("tokenizer_hash")
     if not tokenizer_hash_meta:
         dataset_section = report.get("data", {})
@@ -627,6 +639,13 @@ def make_certificate(
 
     # Extract dataset configuration and compute hashes
     dataset_info = _extract_dataset_info(report)
+    try:
+        if isinstance(dataset_info, dict):
+            windows = dataset_info.get("windows")
+            if isinstance(windows, dict):
+                windows.setdefault("stats", {})
+    except Exception:  # pragma: no cover
+        pass
 
     # Baseline reference (PM-only). Derive a primary_metric snapshot from baseline windows.
     # Prefer explicit baseline primary_metric when provided; otherwise compute from windows
@@ -741,15 +760,17 @@ def make_certificate(
                 tier = str(auto_cfg.get("tier")).lower()
         except Exception:  # pragma: no cover
             pass
+        tier_policies = get_tier_policies()
+        tier_defaults = tier_policies.get(tier, tier_policies.get("balanced", {}))
         metrics_policy = (
-            TIER_POLICIES.get(tier, {}).get("metrics", {})
-            if isinstance(tier, str)
+            tier_defaults.get("metrics", {}) if isinstance(tier_defaults, dict) else {}
+        )
+        pm_policy = (
+            metrics_policy.get("pm_ratio", {})
+            if isinstance(metrics_policy, dict)
             else {}
         )
-        ppl_policy = (
-            metrics_policy.get("ppl", {}) if isinstance(metrics_policy, dict) else {}
-        )
-        min_tokens = int(ppl_policy.get("min_tokens", 0))
+        min_tokens = int(pm_policy.get("min_tokens", 0))
         if (
             isinstance(total_tokens, int)
             and min_tokens > 0
@@ -1053,6 +1074,109 @@ def make_certificate(
             if key in metrics_stats_source:
                 ppl_analysis["stats"][key] = metrics_stats_source[key]
 
+    # Derive requested/actual window counts for auditability when runners do not
+    # emit a metrics.stats block (normalization may also drop it).
+    try:
+        stats_obj = ppl_analysis.get("stats", {})
+        if isinstance(stats_obj, dict):
+
+            def _as_count(value: Any) -> int | None:
+                if value is None or isinstance(value, bool):
+                    return None
+                if isinstance(value, int):
+                    return int(value) if value >= 0 else None
+                if isinstance(value, float) and math.isfinite(value):
+                    if abs(value - round(value)) > 1e-9 or value < 0:
+                        return None
+                    return int(round(value))
+                return None
+
+            data_cfg = report.get("data", {}) if isinstance(report, dict) else {}
+            data_cfg = data_cfg if isinstance(data_cfg, dict) else {}
+            windows_cfg = (
+                dataset_info.get("windows", {})
+                if isinstance(dataset_info, dict)
+                else {}
+            )
+            windows_cfg = windows_cfg if isinstance(windows_cfg, dict) else {}
+
+            req_prev = _as_count(stats_obj.get("requested_preview"))
+            if req_prev is None:
+                req_prev = _as_count(data_cfg.get("preview_n"))
+            if req_prev is None:
+                req_prev = _as_count(windows_cfg.get("preview"))
+
+            req_fin = _as_count(stats_obj.get("requested_final"))
+            if req_fin is None:
+                req_fin = _as_count(data_cfg.get("final_n"))
+            if req_fin is None:
+                req_fin = _as_count(windows_cfg.get("final"))
+
+            eval_windows = (
+                report.get("evaluation_windows", {}) if isinstance(report, dict) else {}
+            )
+            eval_windows = eval_windows if isinstance(eval_windows, dict) else {}
+
+            def _len_ids(section: Any) -> int | None:
+                if not isinstance(section, dict):
+                    return None
+                ids = section.get("window_ids")
+                if isinstance(ids, list):
+                    return int(len(ids))
+                return None
+
+            act_prev = _as_count(stats_obj.get("actual_preview"))
+            if act_prev is None:
+                act_prev = _len_ids(eval_windows.get("preview"))
+            if act_prev is None:
+                cov_prev = (
+                    coverage_summary.get("preview")
+                    if isinstance(coverage_summary, dict)
+                    else None
+                )
+                if isinstance(cov_prev, dict):
+                    act_prev = _as_count(cov_prev.get("used"))
+            if act_prev is None:
+                act_prev = req_prev
+
+            act_fin = _as_count(stats_obj.get("actual_final"))
+            if act_fin is None:
+                act_fin = _len_ids(eval_windows.get("final"))
+            if act_fin is None:
+                cov_fin = (
+                    coverage_summary.get("final")
+                    if isinstance(coverage_summary, dict)
+                    else None
+                )
+                if isinstance(cov_fin, dict):
+                    act_fin = _as_count(cov_fin.get("used"))
+                elif isinstance(coverage_summary, dict):
+                    act_fin = _as_count(coverage_summary.get("used"))
+            if act_fin is None:
+                act_fin = req_fin
+
+            if req_prev is not None:
+                stats_obj.setdefault("requested_preview", req_prev)
+            if req_fin is not None:
+                stats_obj.setdefault("requested_final", req_fin)
+            if act_prev is not None:
+                stats_obj.setdefault("actual_preview", act_prev)
+            if act_fin is not None:
+                stats_obj.setdefault("actual_final", act_fin)
+
+            if "coverage_ok" not in stats_obj:
+                if (
+                    isinstance(req_prev, int)
+                    and isinstance(req_fin, int)
+                    and isinstance(act_prev, int)
+                    and isinstance(act_fin, int)
+                ):
+                    stats_obj["coverage_ok"] = (act_prev >= req_prev) and (
+                        act_fin >= req_fin
+                    )
+    except Exception:  # pragma: no cover
+        pass
+
     if isinstance(window_plan_ctx, dict):
         ppl_analysis["window_plan"] = window_plan_ctx
 
@@ -1102,17 +1226,62 @@ def make_certificate(
         if variance_policy_digest:
             policies["variance"]["policy_digest"] = variance_policy_digest
 
+    # Resolve tier/profile policy (canonical) and merge observed guard policies.
+    profile = None
+    explicit_overrides = None
+    try:
+        ctx = report.get("context") if isinstance(report, dict) else None
+        if isinstance(ctx, dict) and ctx.get("profile"):
+            profile = str(ctx.get("profile"))
+    except Exception:
+        profile = None
+    try:
+        window_plan = (
+            report.get("metrics", {}).get("window_plan")
+            if isinstance(report.get("metrics"), dict)
+            else None
+        )
+        if (
+            profile is None
+            and isinstance(window_plan, dict)
+            and window_plan.get("profile")
+        ):
+            profile = str(window_plan.get("profile"))
+    except Exception:
+        profile = None
+    try:
+        meta_cfg = (
+            report.get("meta", {}).get("config")
+            if isinstance(report.get("meta"), dict)
+            else None
+        )
+        if isinstance(meta_cfg, dict) and isinstance(meta_cfg.get("guards"), dict):
+            explicit_overrides = meta_cfg.get("guards")
+        if explicit_overrides is None and isinstance(report.get("config"), dict):
+            cfg2 = report.get("config")
+            if isinstance(cfg2.get("guards"), dict):
+                explicit_overrides = cfg2.get("guards")
+    except Exception:
+        explicit_overrides = None
+
     resolved_policy = _build_resolved_policies(
-        auto.get("tier", "balanced"), spectral, rmt, variance
+        auto.get("tier", "balanced"),
+        spectral,
+        rmt,
+        variance,
+        profile=profile,
+        explicit_overrides=explicit_overrides,
     )
-    resolved_digest = _compute_policy_digest(resolved_policy)
-    policy_digest_value = variance_policy_digest or resolved_digest
+    overrides_list = _extract_policy_overrides(report)
+    resolved_digest = _compute_policy_digest(
+        {"resolved_policy": resolved_policy, "overrides": overrides_list}
+    )
     policy_provenance = {
         "tier": auto.get("tier", "balanced"),
-        "overrides": _extract_policy_overrides(report),
-        "policy_digest": policy_digest_value,
+        "overrides": overrides_list,
+        "policy_digest": resolved_digest,
     }
-    auto["policy_digest"] = policy_digest_value
+    auto["policy_digest"] = resolved_digest
 
     for guard_name in ("spectral", "rmt", "variance"):
         if guard_name in resolved_policy:
@@ -1473,16 +1642,17 @@ def make_certificate(
         or (baseline_hash != thresholds_hash)
     )
 
-    # Hysteresis knobs snapshot
-    try:
-        metrics_policy = TIER_POLICIES.get(cur_tier, {}).get("metrics", {})
-    except Exception:  # pragma: no cover
+    # Hysteresis knobs snapshot (policy-resolved)
+    metrics_policy = (
+        resolved_policy.get("metrics", {}) if isinstance(resolved_policy, dict) else {}
+    )
+    if not isinstance(metrics_policy, dict):
         metrics_policy = {}
     ppl_hys = 0.0
     acc_hys = 0.0
     try:
         ppl_hys = float(
-            (metrics_policy.get("ppl") or {}).get("hysteresis_ratio", 0.0) or 0.0
+            (metrics_policy.get("pm_ratio") or {}).get("hysteresis_ratio", 0.0) or 0.0
         )
         acc_hys = float(
             (metrics_policy.get("accuracy") or {}).get("hysteresis_delta_pp", 0.0)
@@ -2204,11 +2374,24 @@ def _format_epsilon_map(epsilon_map: Any) -> dict[str, float]:
 
 
 def _build_resolved_policies(
-    tier: str, spectral: dict[str, Any], rmt: dict[str, Any], variance: dict[str, Any]
+    tier: str,
+    spectral: dict[str, Any],
+    rmt: dict[str, Any],
+    variance: dict[str, Any],
+    *,
+    profile: str | None = None,
+    explicit_overrides: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     from .policy_utils import _build_resolved_policies as _impl
 
-    return _impl(tier, spectral, rmt, variance)
+    return _impl(
+        tier,
+        spectral,
+        rmt,
+        variance,
+        profile=profile,
+        explicit_overrides=explicit_overrides,
+    )
 
 
 def _compute_policy_digest(policy: dict[str, Any]) -> str:
@@ -2279,6 +2462,23 @@ def _prepare_guard_overhead_section(
         "threshold_percent": threshold * 100,
         "source": str(payload.get("source", "report")),
     }
+    try:
+        mode = payload.get("mode")
+        if mode is None:
+            mode = payload.get("guard_overhead_mode")
+        if isinstance(mode, str) and mode.strip():
+            sanitized["mode"] = mode.strip()
+    except Exception:
+        pass
+    try:
+        skipped = bool(payload.get("skipped", False))
+        if skipped:
+            sanitized["skipped"] = True
+            reason = payload.get("skip_reason")
+            if isinstance(reason, str) and reason.strip():
+                sanitized["skip_reason"] = reason.strip()
+    except Exception:
+        pass
 
     # Prefer structured reports and reuse the validator when available
     bare_report = payload.pop("bare_report", None)
@@ -2449,6 +2649,12 @@ def _propagate_pairing_stats(
         coverage = pa_stats.get("coverage")
         if isinstance(coverage, dict) and coverage:
             stats["coverage"] = coverage
+        bootstrap = pa_stats.get("bootstrap")
+        if isinstance(bootstrap, dict) and bootstrap:
+            stats["bootstrap"] = bootstrap
+        paired_delta_summary = pa_stats.get("paired_delta_summary")
+        if isinstance(paired_delta_summary, dict) and paired_delta_summary:
+            stats["paired_delta_summary"] = paired_delta_summary
         wmf = pa_stats.get("window_match_fraction")
         if wmf is not None:
             stats["window_match_fraction"] = wmf
@@ -2674,12 +2880,31 @@ def _compute_validation_flags(
     }
     if _tiny_relax:
         tier = "aggressive"
+
     tier_thresholds = {
         "conservative": 1.05,
         "balanced": 1.10,
         "aggressive": 1.20,
         "none": 1.10,
     }
+    tier_policies = get_tier_policies()
+    tier_policy = tier_policies.get(tier, tier_policies.get("balanced", {}))
+    metrics_policy = (
+        tier_policy.get("metrics", {}) if isinstance(tier_policy, dict) else {}
+    )
+    pm_policy = (
+        metrics_policy.get("pm_ratio", {}) if isinstance(metrics_policy, dict) else {}
+    )
+    ratio_limit_base = pm_policy.get("ratio_limit_base")
+    try:
+        if ratio_limit_base is not None:
+            ratio_limit_base = float(ratio_limit_base)
+    except Exception:
+        ratio_limit_base = None
+    if not isinstance(ratio_limit_base, (int | float)) or not math.isfinite(
+        float(ratio_limit_base)
+    ):
+        ratio_limit_base = float(tier_thresholds.get(tier, 1.10))
     acceptance = pm_acceptance_range if isinstance(pm_acceptance_range, dict) else {}
     ratio_min_bound = None
     ratio_max_bound = None
@@ -2697,7 +2922,7 @@ def _compute_validation_flags(
     ratio_limit = (
         ratio_max_bound
         if isinstance(ratio_max_bound, (int | float)) and math.isfinite(ratio_max_bound)
-        else tier_thresholds.get(tier, 1.10)
+        else float(ratio_limit_base)
     )
     if isinstance(target_ratio, int | float) and target_ratio > 0:
         ratio_limit = min(ratio_limit, float(target_ratio))
@@ -2726,13 +2951,6 @@ def _compute_validation_flags(
         except Exception:  # pragma: no cover
             pass
     # Hysteresis and sample-size floors from tier policies
-    tier_policy = TIER_POLICIES.get(tier, {}) if isinstance(tier, str) else {}
-    metrics_policy = (
-        tier_policy.get("metrics", {}) if isinstance(tier_policy, dict) else {}
-    )
-    pm_policy = (
-        metrics_policy.get("pm_ratio", {}) if isinstance(metrics_policy, dict) else {}
-    )
     hysteresis_ratio = float(pm_policy.get("hysteresis_ratio", 0.0))
     min_tokens = int(pm_policy.get("min_tokens", 0))
     # Evaluate sample-size sufficiency
@@ -2804,7 +3022,9 @@ def _compute_validation_flags(
     summary = spectral.get("summary", {}) if isinstance(spectral, dict) else {}
     max_caps = spectral.get("max_caps") or summary.get("max_caps")
     if max_caps is None:
-        default_spectral = TIER_POLICIES.get(tier, {}).get("spectral", {})
+        default_spectral = (
+            tier_policy.get("spectral", {}) if isinstance(tier_policy, dict) else {}
+        )
         max_caps = default_spectral.get("max_caps", 5)
     spectral_stable = spectral.get("caps_applied", 0) <= int(max_caps)
     if spectral.get("caps_exceeded"):
@@ -2871,14 +3091,6 @@ def _compute_validation_flags(
                 flags["primary_metric_acceptable"] = bool(ok)
             elif kind in {"accuracy", "vqa_accuracy"}:
                 # Read thresholds from tier policy if available
-                tier_policy = (
-                    TIER_POLICIES.get(tier, {}) if isinstance(tier, str) else {}
-                )
-                metrics_policy = (
-                    tier_policy.get("metrics", {})
-                    if isinstance(tier_policy, dict)
-                    else {}
-                )
                 acc_policy = (
                     metrics_policy.get("accuracy", {})
                     if isinstance(metrics_policy, dict)

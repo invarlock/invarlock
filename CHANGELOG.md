@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] - 2025-12-14
+
+### Added
+- Calibration CLI (`invarlock calibrate`) and runtime modules for policy and guard tuning.
+- Determinism utilities and CLI flows to exercise repeatable runs and presets.
+- Bench policy regression harness and additional regression tests for guards and certificates.
+- Benchmark policy regression golden `bench-golden-2025-12-13` (`0d9ff3274d29dad16ad580b4a0cf37b4f89e4f7c2e4345ce3d30a39f146ff5a7`) tracked to guard guard-effect CI against silent gate/output shifts.
+
+### Changed
+- Guard policies and tier runtime configuration updated to support calibration and determinism flows.
+- CLI commands (`run`, `verify`, `doctor`, `explain-gates`) extended with calibration and reporting surfaces.
+
+### Fixed
+- Additional edge cases in certificate reporting, policy utilities, and guard analysis covered and hardened via new tests.
+
+### Documentation
+- Expanded assurance docs for calibration, guard contracts, determinism, and BCA/bootstrap methods.
+
 ## [0.3.1] - 2025-12-10
 
 ### Fixed

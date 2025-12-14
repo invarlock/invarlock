@@ -33,15 +33,15 @@ fi
 init_queue() {
     local output_dir="$1"
     export QUEUE_DIR="${output_dir}/queue"
-    
+
     mkdir -p "${QUEUE_DIR}"/{pending,ready,running,completed,failed}
     mkdir -p "${output_dir}/workers"
     mkdir -p "${output_dir}/logs/tasks"
     mkdir -p "${output_dir}/state"
-    
+
     # Create lock file
     touch "${QUEUE_DIR}/queue.lock"
-    
+
     # Initialize state file
     cat > "${output_dir}/state/progress.json" << EOF
 {
@@ -52,7 +52,7 @@ init_queue() {
     "status": "initializing"
 }
 EOF
-    
+
     echo "${QUEUE_DIR}"
 }
 
@@ -63,10 +63,10 @@ EOF
 acquire_queue_lock() {
     local timeout="${1:-30}"
     local lock_file="${QUEUE_DIR}/queue.lock"
-    
+
     local fd
     exec {fd}>"${lock_file}"
-    
+
     if flock -w "${timeout}" "${fd}"; then
         # Store fd in global var for later release
         export QUEUE_LOCK_FD="${fd}"
@@ -109,10 +109,10 @@ add_task() {
     local dependencies="$5"
     local params_json="$6"
     local priority="${7:-50}"
-    
+
     # Increment task sequence
     export TASK_SEQUENCE=$((${TASK_SEQUENCE:-0} + 1))
-    
+
     create_task "${QUEUE_DIR}" "${task_type}" "${model_id}" "${model_name}" \
         "${model_size_gb}" "${dependencies}" "${params_json}" "${priority}"
 }
@@ -123,7 +123,7 @@ add_task() {
 get_tasks_by_status() {
     local status="$1"
     local dir="${QUEUE_DIR}/${status}"
-    
+
     if [[ -d "${dir}" ]]; then
         find "${dir}" -name "*.task" -type f 2>/dev/null | sort
     fi
@@ -134,7 +134,7 @@ get_tasks_by_status() {
 count_tasks() {
     local status="$1"
     local dir="${QUEUE_DIR}/${status}"
-    
+
     if [[ -d "${dir}" ]]; then
         find "${dir}" -name "*.task" -type f 2>/dev/null | wc -l | tr -d ' '
     else
@@ -151,7 +151,7 @@ get_queue_stats() {
     local completed=$(count_tasks "completed")
     local failed=$(count_tasks "failed")
     local total=$((pending + ready + running + completed + failed))
-    
+
     echo "${pending}:${ready}:${running}:${completed}:${failed}:${total}"
 }
 
@@ -159,7 +159,7 @@ get_queue_stats() {
 # Usage: print_queue_stats
 print_queue_stats() {
     IFS=':' read -r pending ready running completed failed total <<< "$(get_queue_stats)"
-    
+
     echo "=== QUEUE STATUS ==="
     echo "Pending:   ${pending}"
     echo "Ready:     ${ready}"
@@ -173,7 +173,7 @@ print_queue_stats() {
 # Usage: is_queue_empty
 is_queue_empty() {
     IFS=':' read -r pending ready running completed failed total <<< "$(get_queue_stats)"
-    
+
     [[ $((pending + ready + running)) -eq 0 ]]
 }
 
@@ -181,7 +181,7 @@ is_queue_empty() {
 # Usage: is_queue_complete
 is_queue_complete() {
     IFS=':' read -r pending ready running completed failed total <<< "$(get_queue_stats)"
-    
+
     [[ $((pending + ready + running)) -eq 0 && ${failed} -eq 0 ]]
 }
 
@@ -193,7 +193,7 @@ mark_task_ready() {
     local task_id="$1"
     local src="${QUEUE_DIR}/pending/${task_id}.task"
     local dst="${QUEUE_DIR}/ready/${task_id}.task"
-    
+
     if [[ -f "${src}" ]]; then
         update_task_status "${src}" "ready"
         mv "${src}" "${dst}"
@@ -210,17 +210,17 @@ claim_task() {
     local gpu_id="$2"
     local src="${QUEUE_DIR}/ready/${task_id}.task"
     local dst="${QUEUE_DIR}/running/${task_id}.task"
-    
+
     # Use queue lock for atomic operation
     acquire_queue_lock 5 || return 1
-    
+
     if [[ -f "${src}" ]]; then
         mark_task_started "${src}" "${gpu_id}"
         mv "${src}" "${dst}"
         release_queue_lock
         return 0
     fi
-    
+
     release_queue_lock
     return 1
 }
@@ -231,14 +231,14 @@ complete_task() {
     local task_id="$1"
     local src="${QUEUE_DIR}/running/${task_id}.task"
     local dst="${QUEUE_DIR}/completed/${task_id}.task"
-    
+
     if [[ -f "${src}" ]]; then
         mark_task_completed "${src}"
         mv "${src}" "${dst}"
-        
+
         # Update progress state
         update_progress_state
-        
+
         return 0
     fi
     return 1
@@ -251,14 +251,14 @@ fail_task() {
     local error_msg="$2"
     local src="${QUEUE_DIR}/running/${task_id}.task"
     local dst="${QUEUE_DIR}/failed/${task_id}.task"
-    
+
     if [[ -f "${src}" ]]; then
         mark_task_failed "${src}" "${error_msg}"
         mv "${src}" "${dst}"
-        
+
         # Update progress state
         update_progress_state
-        
+
         return 0
     fi
     return 1
@@ -270,11 +270,11 @@ retry_task() {
     local task_id="$1"
     local src="${QUEUE_DIR}/failed/${task_id}.task"
     local dst="${QUEUE_DIR}/pending/${task_id}.task"
-    
+
     if [[ -f "${src}" ]]; then
         local retries=$(get_task_field "${src}" "retries")
         local max_retries=$(get_task_field "${src}" "max_retries")
-        
+
         if [[ ${retries} -lt ${max_retries} ]]; then
             increment_task_retries "${src}"
             update_task_status "${src}" "pending"
@@ -293,15 +293,15 @@ retry_task() {
 reclaim_orphaned_tasks() {
     local gpu_id="$1"
     local count=0
-    
+
     for task_file in "${QUEUE_DIR}/running"/*.task; do
         [[ -f "${task_file}" ]] || continue
-        
+
         local task_gpu=$(get_task_field "${task_file}" "gpu_id")
         if [[ "${task_gpu}" == "${gpu_id}" ]]; then
             local task_id=$(get_task_id "${task_file}")
             echo "Reclaiming orphaned task: ${task_id} from GPU ${gpu_id}"
-            
+
             # Move back to pending for re-execution
             update_task_status "${task_file}" "pending"
             assign_task_gpu "${task_file}" "-1"
@@ -309,7 +309,7 @@ reclaim_orphaned_tasks() {
             count=$((count + 1))
         fi
     done
-    
+
     echo "Reclaimed ${count} orphaned tasks from GPU ${gpu_id}"
 }
 
@@ -320,23 +320,23 @@ reclaim_orphaned_tasks() {
 # Returns: 0 if all deps completed, 1 otherwise
 check_dependencies_met() {
     local task_file="$1"
-    
+
     # Use mapfile for safe array population (handles special chars)
     local -a deps=()
     while IFS= read -r dep; do
         [[ -n "${dep}" ]] && deps+=("${dep}")
     done < <(get_task_dependencies "${task_file}")
-    
+
     if [[ ${#deps[@]} -eq 0 ]]; then
         return 0  # No dependencies
     fi
-    
+
     for dep_id in "${deps[@]}"; do
         if [[ ! -f "${QUEUE_DIR}/completed/${dep_id}.task" ]]; then
             return 1  # Dependency not completed
         fi
     done
-    
+
     return 0  # All dependencies completed
 }
 
@@ -345,12 +345,12 @@ check_dependencies_met() {
 # Returns: number of tasks moved to ready
 resolve_dependencies() {
     local moved=0
-    
+
     acquire_queue_lock 10 || return 0
-    
+
     for task_file in "${QUEUE_DIR}/pending"/*.task; do
         [[ -f "${task_file}" ]] || continue
-        
+
         if check_dependencies_met "${task_file}"; then
             local task_id=$(get_task_id "${task_file}")
             update_task_status "${task_file}" "ready"
@@ -358,7 +358,7 @@ resolve_dependencies() {
             moved=$((moved + 1))
         fi
     done
-    
+
     release_queue_lock
     echo "${moved}"
 }
@@ -367,11 +367,11 @@ resolve_dependencies() {
 # Usage: update_dependents <completed_task_id>
 update_dependents() {
     local completed_id="$1"
-    
+
     # Check all pending tasks for this dependency
     for task_file in "${QUEUE_DIR}/pending"/*.task; do
         [[ -f "${task_file}" ]] || continue
-        
+
         local deps=$(get_task_dependencies "${task_file}" | tr '\n' ' ')
         if [[ " ${deps} " =~ " ${completed_id} " ]]; then
             if check_dependencies_met "${task_file}"; then
@@ -388,9 +388,9 @@ update_dependents() {
 # Usage: update_progress_state
 update_progress_state() {
     local state_file="${QUEUE_DIR}/../state/progress.json"
-    
+
     IFS=':' read -r pending ready running completed failed total <<< "$(get_queue_stats)"
-    
+
     local status="running"
     if [[ $((pending + ready + running)) -eq 0 ]]; then
         if [[ ${failed} -eq 0 ]]; then
@@ -399,12 +399,12 @@ update_progress_state() {
             status="completed_with_failures"
         fi
     fi
-    
+
     local progress_pct=0
     if [[ ${total} -gt 0 ]]; then
         progress_pct=$((completed * 100 / total))
     fi
-    
+
     cat > "${state_file}" << EOF
 {
     "updated_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
@@ -427,7 +427,7 @@ EOF
 # Returns: full path to task file, or empty if not found
 find_task() {
     local task_id="$1"
-    
+
     for status in pending ready running completed failed; do
         local path="${QUEUE_DIR}/${status}/${task_id}.task"
         if [[ -f "${path}" ]]; then
@@ -435,7 +435,7 @@ find_task() {
             return 0
         fi
     done
-    
+
     return 1
 }
 
@@ -444,14 +444,14 @@ find_task() {
 find_tasks_by_model() {
     local model_name="$1"
     local status="${2:-}"
-    
+
     local search_dirs=()
     if [[ -n "${status}" ]]; then
         search_dirs=("${QUEUE_DIR}/${status}")
     else
         search_dirs=("${QUEUE_DIR}/pending" "${QUEUE_DIR}/ready" "${QUEUE_DIR}/running" "${QUEUE_DIR}/completed" "${QUEUE_DIR}/failed")
     fi
-    
+
     for dir in "${search_dirs[@]}"; do
         for task_file in "${dir}"/*.task; do
             [[ -f "${task_file}" ]] || continue
@@ -468,14 +468,14 @@ find_tasks_by_model() {
 find_tasks_by_type() {
     local task_type="$1"
     local status="${2:-}"
-    
+
     local search_dirs=()
     if [[ -n "${status}" ]]; then
         search_dirs=("${QUEUE_DIR}/${status}")
     else
         search_dirs=("${QUEUE_DIR}/pending" "${QUEUE_DIR}/ready" "${QUEUE_DIR}/running" "${QUEUE_DIR}/completed" "${QUEUE_DIR}/failed")
     fi
-    
+
     for dir in "${search_dirs[@]}"; do
         for task_file in "${dir}"/*.task; do
             [[ -f "${task_file}" ]] || continue
@@ -495,27 +495,27 @@ generate_model_tasks() {
     local model_idx="$1"
     local model_id="$2"
     local model_name="$3"
-    
+
     # Calculate model size for memory estimation
     local base_size=$(estimate_model_memory "${model_id}" "EVAL_BASELINE")
-    
+
     # Track task IDs for dependencies
     local task_ids=()
-    
+
     # 1. SETUP_BASELINE (no dependencies)
     local setup_id=$(add_task "SETUP_BASELINE" "${model_id}" "${model_name}" \
         "$(estimate_model_memory "${model_id}" "SETUP_BASELINE")" \
         "none" '{"model_idx": '"${model_idx}"'}' 90)
     task_ids+=("${setup_id}")
     echo "Created: ${setup_id}"
-    
+
     # 2. EVAL_BASELINE (depends on setup)
     local eval_base_id=$(add_task "EVAL_BASELINE" "${model_id}" "${model_name}" \
         "$(estimate_model_memory "${model_id}" "EVAL_BASELINE")" \
         "${setup_id}" '{}' 80)
     task_ids+=("${eval_base_id}")
     echo "Created: ${eval_base_id}"
-    
+
     # 3. CALIBRATION_RUN × 5 (depend on setup)
     local cal_ids=()
     for run in $(seq 1 5); do
@@ -526,28 +526,28 @@ generate_model_tasks() {
         task_ids+=("${cal_id}")
         echo "Created: ${cal_id}"
     done
-    
+
     # 4. GENERATE_PRESET (depends on all calibration runs)
     local cal_deps=$(IFS=','; echo "${cal_ids[*]}")
     local preset_id=$(add_task "GENERATE_PRESET" "${model_id}" "${model_name}" \
         5 "${cal_deps}" '{}' 75)
     task_ids+=("${preset_id}")
     echo "Created: ${preset_id}"
-    
+
     # 5. Clean edits (4 types)
     local clean_edits=("quant_rtn:8:128:ffn" "fp4_quant:e2m1:ffn" "magnitude_prune:0.1:ffn" "lowrank_svd:256:ffn")
     for edit_spec in "${clean_edits[@]}"; do
         generate_edit_tasks "${model_id}" "${model_name}" "${setup_id}" "${preset_id}" \
             "${edit_spec}" "clean" 3
     done
-    
+
     # 6. Stress edits (4 types)
     local stress_edits=("quant_rtn:4:32:all" "fp4_quant:aggressive:all" "magnitude_prune:0.5:all" "lowrank_svd:32:all")
     for edit_spec in "${stress_edits[@]}"; do
         generate_edit_tasks "${model_id}" "${model_name}" "${setup_id}" "${preset_id}" \
             "${edit_spec}" "stress" 2
     done
-    
+
     # 7. Error injection tests (5 types)
     local error_types=("nan_injection" "inf_injection" "extreme_quant" "scale_explosion" "zero_layer")
     for error_type in "${error_types[@]}"; do
@@ -556,14 +556,14 @@ generate_model_tasks() {
             "$(estimate_model_memory "${model_id}" "CREATE_ERROR")" \
             "${setup_id}" '{"error_type": "'"${error_type}"'"}' 60)
         echo "Created: ${error_create_id}"
-        
+
         # CERTIFY_ERROR
         local error_cert_id=$(add_task "CERTIFY_ERROR" "${model_id}" "${model_name}" \
             "$(estimate_model_memory "${model_id}" "CERTIFY_ERROR")" \
             "${error_create_id},${preset_id}" '{"error_type": "'"${error_type}"'"}' 55)
         echo "Created: ${error_cert_id}"
     done
-    
+
     echo "Generated tasks for model ${model_name}"
 }
 
@@ -577,19 +577,19 @@ generate_edit_tasks() {
     local edit_spec="$5"
     local version="$6"
     local cert_runs="$7"
-    
+
     # CREATE_EDIT
     local edit_id=$(add_task "CREATE_EDIT" "${model_id}" "${model_name}" \
         "$(estimate_model_memory "${model_id}" "CREATE_EDIT")" \
         "${setup_id}" '{"edit_spec": "'"${edit_spec}"'", "version": "'"${version}"'"}' 70)
     echo "Created: ${edit_id}"
-    
+
     # EVAL_EDIT
     local eval_id=$(add_task "EVAL_EDIT" "${model_id}" "${model_name}" \
         "$(estimate_model_memory "${model_id}" "EVAL_EDIT")" \
         "${edit_id}" '{"edit_spec": "'"${edit_spec}"'"}' 65)
     echo "Created: ${eval_id}"
-    
+
     # CERTIFY_EDIT × cert_runs
     for run in $(seq 1 "${cert_runs}"); do
         local cert_id=$(add_task "CERTIFY_EDIT" "${model_id}" "${model_name}" \
@@ -611,12 +611,12 @@ generate_all_tasks() {
     local model_6="$6"
     local model_7="$7"
     local model_8="$8"
-    
+
     local models=("${model_1}" "${model_2}" "${model_3}" "${model_4}" \
                   "${model_5}" "${model_6}" "${model_7}" "${model_8}")
-    
+
     export TASK_SEQUENCE=0
-    
+
     for idx in "${!models[@]}"; do
         local model_id="${models[$idx]}"
         if [[ -n "${model_id}" ]]; then
@@ -628,16 +628,16 @@ generate_all_tasks() {
             generate_model_tasks "$((idx + 1))" "${model_id}" "${model_name}"
         fi
     done
-    
+
     # Initial dependency resolution
     echo ""
     echo "=== Resolving initial dependencies ==="
     local moved=$(resolve_dependencies)
     echo "Moved ${moved} tasks to ready queue"
-    
+
     # Update state
     update_progress_state
-    
+
     echo ""
     print_queue_stats
 }

@@ -39,7 +39,16 @@ fields produced by `invarlock.assurance.make_certificate`.
     "windows": {
       "preview": 200,
       "final": 200,
-      "seed": 42
+      "seed": 42,
+      "stats": {
+        "window_match_fraction": 1.0,
+        "window_overlap_fraction": 0.0,
+        "paired_windows": 200,
+        "coverage": {
+          "preview": { "used": 200 },
+          "final": { "used": 200 }
+        }
+      }
     }
   },
   "primary_metric": {
@@ -105,10 +114,12 @@ fields while enforcing a small, stable core:
     - `seq_len`: integer ≥ 1
     - `windows.preview`: integer ≥ 0
     - `windows.final`: integer ≥ 0
+    - `windows.stats`: object (paired-window stats and coverage)
   - `artifacts` — object (paths to `report.json`, `events.jsonl`, etc.).
   - `plugins` — object listing discovered adapters/edits/guards.
+  - `primary_metric` — object (canonical primary metric snapshot).
 
-- **Primary metric block (optional but recommended)**
+- **Primary metric block (required)**
   - `primary_metric.kind`: string (e.g., `"ppl_causal"`, `"accuracy"`).
   - `primary_metric.preview` / `primary_metric.final`: numbers.
   - `primary_metric.ratio_vs_baseline`: number.

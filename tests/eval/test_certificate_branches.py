@@ -174,8 +174,8 @@ def test_make_certificate_primary_seed_defaulted_when_missing(monkeypatch):
         "ratio_vs_baseline": 1.0,
     }
     cert = make_certificate(report, baseline)
-    # Seed=0 is treated as falsy during normalization; defaults to 42
-    assert cert["meta"]["seed"] == 42
+    # Seed=0 is a valid, preserved seed value.
+    assert cert["meta"]["seed"] == 0
 
 
 def test_make_certificate_uses_tokenizer_hash_from_data(monkeypatch):

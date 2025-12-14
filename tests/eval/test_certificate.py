@@ -1485,8 +1485,12 @@ class TestMakeCertificate:
             certificate = make_certificate(report, baseline)
 
         provenance = certificate["policy_provenance"]
-        # After normalization, only meta.auto.overrides survives; config/meta-level overrides are not preserved
-        assert provenance["overrides"] == ["configs/overrides/rmt.yaml"]
+        # Policy provenance includes an ordered, de-duped override list.
+        assert provenance["overrides"] == [
+            "configs/overrides/spectral.yaml",
+            "configs/overrides/variance.yaml",
+            "configs/overrides/rmt.yaml",
+        ]
         variance_policy = certificate["policies"]["variance"]
         assert variance_policy.get("policy_digest")
         assert certificate["auto"]["policy_digest"] == provenance["policy_digest"]
@@ -1690,7 +1694,7 @@ class TestMakeCertificate:
         assert certificate["validation"]["invariants_pass"] is True
 
     def test_policy_digest_included_for_variance_guard(self):
-        """Certificate records a stable digest when variance policy exposes tier knobs."""
+        """Certificate records both full-policy + variance-policy digests."""
         report = create_mock_run_report(include_auto=True, include_guards=False)
         variance_policy = {
             "deadband": 0.02,
@@ -1715,9 +1719,15 @@ class TestMakeCertificate:
         ):
             certificate = make_certificate(report, baseline)
 
-        expected_digest = _compute_variance_policy_digest(variance_policy)
-        assert certificate["auto"]["policy_digest"] == expected_digest
-        assert certificate["policies"]["variance"]["policy_digest"] == expected_digest
+        expected_variance_digest = _compute_variance_policy_digest(variance_policy)
+        assert (
+            certificate["policies"]["variance"]["policy_digest"]
+            == expected_variance_digest
+        )
+        assert (
+            certificate["auto"]["policy_digest"]
+            == certificate["policy_provenance"]["policy_digest"]
+        )
 
     def test_certificate_captures_spectral_and_rmt_targets(self):
         """Spectral and RMT policies should surface sigma quantile and epsilon targets."""

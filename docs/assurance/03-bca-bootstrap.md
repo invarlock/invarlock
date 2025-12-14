@@ -15,7 +15,7 @@ back safely (e.g., percentile CI or a collapsed interval).
 
 - Samples: paired Δlog‑loss per window, token‑weighted (`t_i`).
 - Bootstrap: Bias‑Corrected and Accelerated (BCa), replicates `N` (α = 0.05 by default).
-- Seeding: `meta.seeds.bootstrap` recorded for reproducibility.
+- Seeding: `dataset.windows.stats.bootstrap.seed` recorded for reproducibility.
 
 Given per‑window token counts `t_i` and log‑losses `ℓ_i^A`, `ℓ_i^B`, define
 
@@ -30,13 +30,13 @@ Given per‑window token counts `t_i` and log‑losses `ℓ_i^A`, `ℓ_i^B`, def
 
 ## Runtime Contract (certificate)
 
-- `ppl.logloss_delta_ci` — Δlog‑loss CI (log space)
-- `ppl.ratio_ci` — ratio CI = `exp(ppl.logloss_delta_ci)`
+- `primary_metric.ci` — Δlog‑loss CI (log space, ppl-like kinds)
+- `primary_metric.display_ci` — ratio CI = `exp(primary_metric.ci)`
 - Identity checks:
-  - `ppl.preview_final_ratio == exp(weighted_mean(Δlog))`
-  - `ppl.logloss_delta_ci` exponentiates to `ppl.ratio_ci`
-- `ppl.stats.bootstrap.{replicates,seed,method}`
-- `ppl.stats.paired_delta_summary.{mean,std,degenerate}`
+  - `primary_metric.display_ci == exp(primary_metric.ci)`
+  - preview/final drift ratio is computed from `primary_metric.{preview,final}`
+- `dataset.windows.stats.bootstrap.{replicates,seed,method}`
+- `dataset.windows.stats.paired_delta_summary.{mean,std,degenerate}`
 
 ## Defaults & Tuning (tiers)
 

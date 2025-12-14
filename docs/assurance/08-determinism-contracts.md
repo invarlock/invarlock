@@ -16,7 +16,8 @@ are stable.
 Evaluation stays deterministic when the following preconditions hold—each item
 ties the runtime contract back to reproducible maths:
 
-1. **Seed bundle**: record `{python, numpy, torch, bootstrap}`; set framework determinism flags.
+1. **Seed bundle**: record `{python, numpy, torch}` (plus bootstrap seed under
+   `dataset.windows.stats.bootstrap.seed` when bootstrap is used); set framework determinism flags.
 2. **Dataset/tokenizer provenance**: store `dataset_hash`, `tokenizer_hash`,
    tokenizer name/version, vocab size, BOS/EOS policy.
 3. **Schedule reuse**: edited runs reuse baseline `window_ids`; enforce
@@ -39,10 +40,10 @@ ties the runtime contract back to reproducible maths:
 
 ## Observability
 
-- `meta.seeds.{python,numpy,torch}` and `meta.env_flags`.
+- `meta.seeds.{python,numpy,torch}` and `provenance.env_flags`.
 - `meta.tokenizer_hash` and `provenance.provider_digest` for dataset/tokenizer provenance.
-- `ppl.stats.{window_match_fraction,window_overlap_fraction,paired_windows}`.
-- `primary_metric.{ratio_vs_baseline,display_ci}` and `ppl.stats.coverage` for counts.
+- `dataset.windows.stats.{window_match_fraction,window_overlap_fraction,paired_windows}`.
+- `primary_metric.{ratio_vs_baseline,display_ci}` and `dataset.windows.stats.coverage` for counts.
 - `artifacts.report_path`, `provenance.{baseline,edited}.report_path`, and `policy_provenance.policy_digest` — reproducibility breadcrumbs.
 
 ## Assumptions & Scope

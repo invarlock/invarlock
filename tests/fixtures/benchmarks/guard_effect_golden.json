@@ -1,0 +1,67 @@
+{
+  "schema_version": "bench-v1",
+  "profile": "ci",
+  "seed": 42,
+  "epsilon": null,
+  "scenarios": [
+    {
+      "edit": "quant_rtn",
+      "tier": "balanced",
+      "probes": 0,
+      "probes_used": 0,
+      "skip": false,
+      "skip_reason": null,
+      "primary_metric_bare": 10.0,
+      "primary_metric_guarded": 10.09,
+      "primary_metric_overhead": 0.008999999999999985,
+      "latency_bare": 1.0,
+      "latency_guarded": 1.0,
+      "guard_overhead_time": 0.1299999999999999,
+      "mem_bare": 1000.0,
+      "mem_guarded": 1090.0,
+      "guard_overhead_mem": 0.09,
+      "rmt_outliers_bare": 2,
+      "rmt_outliers_guarded": 3,
+      "tying_violations_post": 0,
+      "epsilon": 0.1,
+      "pass": {
+        "spike": true,
+        "tying": true,
+        "rmt": true,
+        "quality": true,
+        "time": true,
+        "mem": true
+      }
+    },
+    {
+      "edit": "quant_rtn",
+      "tier": "conservative",
+      "probes": 0,
+      "probes_used": 0,
+      "skip": false,
+      "skip_reason": null,
+      "primary_metric_bare": 10.0,
+      "primary_metric_guarded": 10.08,
+      "primary_metric_overhead": 0.008000000000000007,
+      "latency_bare": 1.0,
+      "latency_guarded": 1.0,
+      "guard_overhead_time": 0.1399999999999999,
+      "mem_bare": 1000.0,
+      "mem_guarded": 1095.0,
+      "guard_overhead_mem": 0.095,
+      "rmt_outliers_bare": 2,
+      "rmt_outliers_guarded": 3,
+      "tying_violations_post": 0,
+      "epsilon": 0.1,
+      "pass": {
+        "spike": true,
+        "tying": true,
+        "rmt": true,
+        "quality": true,
+        "time": true,
+        "mem": true
+      }
+    }
+  ]
+}
+

@@ -50,11 +50,11 @@ create_task() {
     local dependencies="$6"  # Comma-separated or JSON array
     local params_json="$7"
     local priority="${8:-50}"
-    
+
     # Generate unique task_id
     local sequence="${TASK_SEQUENCE:-1}"
     local task_id="${model_name}_${task_type}_$(printf '%03d' "${sequence}")"
-    
+
     # Convert dependencies to JSON array if comma-separated
     local deps_array
     if [[ "${dependencies}" == "["* ]]; then
@@ -65,7 +65,7 @@ create_task() {
         # Convert "dep1,dep2,dep3" to ["dep1","dep2","dep3"]
         deps_array=$(echo "${dependencies}" | tr ',' '\n' | jq -R . | jq -s .)
     fi
-    
+
     # Ensure params is valid JSON
     local params
     if [[ -z "${params_json}" || "${params_json}" == "null" ]]; then
@@ -73,15 +73,15 @@ create_task() {
     else
         params="${params_json}"
     fi
-    
+
     # Validate params is valid JSON
     if ! echo "${params}" | jq . &>/dev/null; then
         echo "ERROR: Invalid params JSON: ${params}" >&2
         return 1
     fi
-    
+
     local created_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-    
+
     # Create task JSON
     # Note: started_at, completed_at, error_msg use literal null in jq, not --arg
     local task_json=$(jq -n \
@@ -117,12 +117,12 @@ create_task() {
             error_msg: null
         }'
     )
-    
+
     # Write to pending queue
     local task_file="${queue_dir}/pending/${task_id}.task"
     mkdir -p "${queue_dir}/pending"
     echo "${task_json}" > "${task_file}"
-    
+
     echo "${task_id}"
 }
 
@@ -133,12 +133,12 @@ create_task() {
 get_task_field() {
     local task_file="$1"
     local field="$2"
-    
+
     if [[ ! -f "${task_file}" ]]; then
         echo "ERROR: Task file not found: ${task_file}" >&2
         return 1
     fi
-    
+
     jq -r ".${field} // empty" "${task_file}"
 }
 
@@ -148,18 +148,18 @@ get_task_fields() {
     local task_file="$1"
     shift
     local fields=("$@")
-    
+
     if [[ ! -f "${task_file}" ]]; then
         echo "ERROR: Task file not found: ${task_file}" >&2
         return 1
     fi
-    
+
     local jq_expr=""
     for field in "${fields[@]}"; do
         jq_expr+=".${field}, "
     done
     jq_expr="${jq_expr%, }"
-    
+
     jq -r "[${jq_expr}] | @tsv" "${task_file}"
 }
 
@@ -212,20 +212,20 @@ update_task_field() {
     local field="$2"
     local value="$3"
     local is_json="${4:-false}"
-    
+
     if [[ ! -f "${task_file}" ]]; then
         echo "ERROR: Task file not found: ${task_file}" >&2
         return 1
     fi
-    
+
     local tmp_file="${task_file}.tmp.$$"
-    
+
     if [[ "${is_json}" == "true" ]]; then
         jq --argjson val "${value}" ".${field} = \$val" "${task_file}" > "${tmp_file}"
     else
         jq --arg val "${value}" ".${field} = \$val" "${task_file}" > "${tmp_file}"
     fi
-    
+
     if [[ $? -eq 0 ]]; then
         mv "${tmp_file}" "${task_file}"
     else
@@ -252,12 +252,12 @@ mark_task_started() {
     local task_file="$1"
     local gpu_id="$2"
     local now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-    
+
     local tmp_file="${task_file}.tmp.$$"
     jq --argjson gpu "${gpu_id}" --arg time "${now}" \
         '.status = "running" | .gpu_id = $gpu | .started_at = $time' \
         "${task_file}" > "${tmp_file}"
-    
+
     if [[ $? -eq 0 ]]; then
         mv "${tmp_file}" "${task_file}"
     else
@@ -271,12 +271,12 @@ mark_task_started() {
 mark_task_completed() {
     local task_file="$1"
     local now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-    
+
     local tmp_file="${task_file}.tmp.$$"
     jq --arg time "${now}" \
         '.status = "completed" | .completed_at = $time' \
         "${task_file}" > "${tmp_file}"
-    
+
     if [[ $? -eq 0 ]]; then
         mv "${tmp_file}" "${task_file}"
     else
@@ -291,12 +291,12 @@ mark_task_failed() {
     local task_file="$1"
     local error_msg="$2"
     local now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-    
+
     local tmp_file="${task_file}.tmp.$$"
     jq --arg time "${now}" --arg err "${error_msg}" \
         '.status = "failed" | .completed_at = $time | .error_msg = $err' \
         "${task_file}" > "${tmp_file}"
-    
+
     if [[ $? -eq 0 ]]; then
         mv "${tmp_file}" "${task_file}"
     else
@@ -309,10 +309,10 @@ mark_task_failed() {
 # Usage: increment_task_retries <task_file>
 increment_task_retries() {
     local task_file="$1"
-    
+
     local tmp_file="${task_file}.tmp.$$"
     jq '.retries = (.retries + 1)' "${task_file}" > "${tmp_file}"
-    
+
     if [[ $? -eq 0 ]]; then
         mv "${tmp_file}" "${task_file}"
     else
@@ -326,11 +326,11 @@ increment_task_retries() {
 update_task_params() {
     local task_file="$1"
     local new_params="$2"
-    
+
     local tmp_file="${task_file}.tmp.$$"
     jq --argjson new "${new_params}" '.params = (.params + $new)' \
         "${task_file}" > "${tmp_file}"
-    
+
     if [[ $? -eq 0 ]]; then
         mv "${tmp_file}" "${task_file}"
     else
@@ -346,18 +346,18 @@ update_task_params() {
 # Returns: 0 if valid, 1 if invalid (with error on stderr)
 validate_task() {
     local task_file="$1"
-    
+
     if [[ ! -f "${task_file}" ]]; then
         echo "ERROR: Task file not found: ${task_file}" >&2
         return 1
     fi
-    
+
     # Check if valid JSON
     if ! jq . "${task_file}" &>/dev/null; then
         echo "ERROR: Invalid JSON in task file: ${task_file}" >&2
         return 1
     fi
-    
+
     # Check required fields
     local required_fields=("task_id" "task_type" "model_id" "model_name" "status")
     for field in "${required_fields[@]}"; do
@@ -367,7 +367,7 @@ validate_task() {
             return 1
         fi
     done
-    
+
     # Validate task_type
     local task_type=$(get_task_type "${task_file}")
     local valid_types="SETUP_BASELINE EVAL_BASELINE CALIBRATION_RUN CREATE_EDIT EVAL_EDIT CERTIFY_EDIT CREATE_ERROR CERTIFY_ERROR GENERATE_PRESET"
@@ -375,7 +375,7 @@ validate_task() {
         echo "ERROR: Invalid task_type '${task_type}' in: ${task_file}" >&2
         return 1
     fi
-    
+
     # Validate status
     local status=$(get_task_field "${task_file}" "status")
     local valid_statuses="pending ready running completed failed"
@@ -383,7 +383,7 @@ validate_task() {
         echo "ERROR: Invalid status '${status}' in: ${task_file}" >&2
         return 1
     fi
-    
+
     return 0
 }
 
@@ -393,12 +393,12 @@ validate_task() {
 # Usage: print_task_summary <task_file>
 print_task_summary() {
     local task_file="$1"
-    
+
     if [[ ! -f "${task_file}" ]]; then
         echo "Task file not found: ${task_file}"
         return 1
     fi
-    
+
     jq -r '[.task_id, .task_type, .model_name, .status, (.model_size_gb | tostring) + "GB"] | join(" | ")' "${task_file}"
 }
 
@@ -408,12 +408,12 @@ print_queue_summary() {
     local queue_dir="$1"
     local status="$2"
     local dir="${queue_dir}/${status}"
-    
+
     if [[ ! -d "${dir}" ]]; then
         echo "No ${status} tasks"
         return
     fi
-    
+
     echo "=== ${status^^} TASKS ==="
     for task_file in "${dir}"/*.task; do
         [[ -f "${task_file}" ]] && print_task_summary "${task_file}"
@@ -435,11 +435,11 @@ print_queue_summary() {
 estimate_model_memory() {
     local model_id="$1"
     local task_type="${2:-EVAL_BASELINE}"
-    
+
     # Determine model size bucket
     # IMPORTANT: Initialize with empty string to avoid "unbound variable" error with set -u
     local size_bucket=""
-    
+
     # Check if this is a local path with config.json (can use accurate estimation)
     # Local paths: start with / or ./ or contain spaces, OR are directories
     if [[ -d "${model_id}" && -f "${model_id}/config.json" ]]; then
@@ -448,12 +448,12 @@ estimate_model_memory() {
             size_bucket=$(estimate_model_params "${model_id}")
         fi
     fi
-    
+
     # If size_bucket is empty or "7" (default fallback), use name-based estimation
     # This is critical for HuggingFace IDs where config.json doesn't exist yet
     if [[ -z "${size_bucket:-}" || "${size_bucket}" == "7" ]]; then
         local model_lower=$(echo "${model_id}" | tr '[:upper:]' '[:lower:]')
-        
+
         # Check for 70B+ models (need ~140-154 GB)
         if [[ "${model_lower}" =~ 70b || "${model_lower}" =~ 72b ]]; then
             size_bucket="70"
@@ -474,7 +474,7 @@ estimate_model_memory() {
             size_bucket="7"
         fi
     fi
-    
+
     # Base memory in GB
     local base_memory
     case "${size_bucket}" in
@@ -485,7 +485,7 @@ estimate_model_memory() {
         "13")      base_memory=26 ;;
         *)         base_memory=14 ;;
     esac
-    
+
     # Multiplier by task type
     local multiplier
     case "${task_type}" in
@@ -500,7 +500,7 @@ estimate_model_memory() {
         "GENERATE_PRESET") multiplier="0.1" ;;  # CPU only
         *)                multiplier="1.2" ;;
     esac
-    
+
     # Calculate using awk for floating point (avoids bc dependency)
     local result=$(awk -v base="${base_memory}" -v mult="${multiplier}" 'BEGIN { printf "%.0f", base * mult }')
     # Add 10% safety margin

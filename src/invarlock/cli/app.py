@@ -34,6 +34,7 @@ class OrderedGroup(TyperGroup):
     def list_commands(self, ctx):  # type: ignore[override]
         return [
             "certify",
+            "calibrate",
             "report",
             "verify",
             "run",
@@ -161,9 +162,23 @@ def _register_subapps() -> None:
     from .commands.plugins import plugins_app as _plugins_app
     from .commands.report import report_app as _report_app
 
+    # Always-available subapps (lightweight imports)
     app.add_typer(_report_app, name="report")
     app.add_typer(_plugins_app, name="plugins")
     app.command(name="doctor")(_doctor_cmd)
+
+    # Optional: calibration subapp. This transitively imports guards, which may
+    # depend on torch/transformers. In minimal environments (no heavy deps),
+    # skip registration so `python -m invarlock --help` stays import-safe.
+    try:
+        from .commands.calibrate import calibrate_app as _calibrate_app
+    except ModuleNotFoundError as exc:  # pragma: no cover - exercised in venv test
+        missing = getattr(exc, "name", "") or ""
+        if missing in {"torch", "transformers"}:
+            return
+        raise
+    else:
+        app.add_typer(_calibrate_app, name="calibrate")
 
 
 @app.command(

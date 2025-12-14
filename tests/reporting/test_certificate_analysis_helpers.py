@@ -186,7 +186,9 @@ def test_compute_validation_flags_accuracy_hysteresis(monkeypatch):
             "spectral": {"max_caps": 3},
         }
     }
-    monkeypatch.setattr(cert, "TIER_POLICIES", fake_policies)
+    monkeypatch.setattr(
+        cert, "get_tier_policies", lambda *_a, **_k: dict(fake_policies)
+    )
     monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
 
     ppl = {
@@ -239,7 +241,9 @@ def test_compute_validation_flags_tiny_relax_allows_unevaluated_overhead(monkeyp
             "spectral": {"max_caps": 5},
         }
     }
-    monkeypatch.setattr(cert, "TIER_POLICIES", fake_policies)
+    monkeypatch.setattr(
+        cert, "get_tier_policies", lambda *_a, **_k: dict(fake_policies)
+    )
     monkeypatch.setenv("INVARLOCK_TINY_RELAX", "1")
 
     guard_overhead = {"passed": False, "evaluated": False, "errors": ["missing"]}
@@ -376,7 +380,9 @@ def test_compute_validation_flags_guard_overhead_ratio_failure(monkeypatch):
             "spectral": {"max_caps": 3},
         }
     }
-    monkeypatch.setattr(cert, "TIER_POLICIES", fake_policies)
+    monkeypatch.setattr(
+        cert, "get_tier_policies", lambda *_a, **_k: dict(fake_policies)
+    )
 
     guard_overhead = {"overhead_ratio": 1.05, "overhead_threshold": 0.01}
     flags = cert._compute_validation_flags(
@@ -415,7 +421,9 @@ def test_compute_validation_flags_guard_overhead_ratio_passes_with_tiny_relax(
             "spectral": {"max_caps": 3},
         }
     }
-    monkeypatch.setattr(cert, "TIER_POLICIES", fake_policies)
+    monkeypatch.setattr(
+        cert, "get_tier_policies", lambda *_a, **_k: dict(fake_policies)
+    )
     monkeypatch.setenv("INVARLOCK_TINY_RELAX", "1")
 
     guard_overhead = {"overhead_ratio": 1.05, "overhead_threshold": 0.01}
@@ -454,7 +462,9 @@ def test_compute_validation_flags_guard_overhead_passes_when_ratio_missing(monke
             "spectral": {"max_caps": 3},
         }
     }
-    monkeypatch.setattr(cert, "TIER_POLICIES", fake_policies)
+    monkeypatch.setattr(
+        cert, "get_tier_policies", lambda *_a, **_k: dict(fake_policies)
+    )
 
     guard_overhead = {"overhead_threshold": 0.01}
     flags = cert._compute_validation_flags(
@@ -491,7 +501,9 @@ def test_compute_validation_flags_accuracy_fails_low_examples(monkeypatch):
             "spectral": {"max_caps": 3},
         }
     }
-    monkeypatch.setattr(cert, "TIER_POLICIES", fake_policies)
+    monkeypatch.setattr(
+        cert, "get_tier_policies", lambda *_a, **_k: dict(fake_policies)
+    )
     monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
 
     primary_metric = {"kind": "accuracy", "ratio_vs_baseline": -0.1, "n_final": 50}
@@ -529,7 +541,9 @@ def test_compute_validation_flags_accuracy_respects_dataset_fraction_floor(monke
             "spectral": {"max_caps": 3},
         }
     }
-    monkeypatch.setattr(cert, "TIER_POLICIES", fake_policies)
+    monkeypatch.setattr(
+        cert, "get_tier_policies", lambda *_a, **_k: dict(fake_policies)
+    )
     monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
 
     primary_metric = {"kind": "accuracy", "ratio_vs_baseline": -0.3, "n_final": 15}
@@ -568,7 +582,9 @@ def test_compute_validation_flags_accuracy_passes_with_hysteresis(monkeypatch):
             "spectral": {"max_caps": 3},
         }
     }
-    monkeypatch.setattr(cert, "TIER_POLICIES", fake_policies)
+    monkeypatch.setattr(
+        cert, "get_tier_policies", lambda *_a, **_k: dict(fake_policies)
+    )
     monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
 
     primary_metric = {"kind": "accuracy", "ratio_vs_baseline": -1.2, "n_final": 80}
@@ -908,7 +924,9 @@ def test_compute_validation_flags_reconciles_ppl_primary_metric_ratio(monkeypatc
             "spectral": {"max_caps": 3},
         }
     }
-    monkeypatch.setattr(cert, "TIER_POLICIES", fake_policies)
+    monkeypatch.setattr(
+        cert, "get_tier_policies", lambda *_a, **_k: dict(fake_policies)
+    )
     ppl = {"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.2}
     primary_metric = {"kind": "ppl_causal", "ratio_vs_baseline": 1.05}
     flags = cert._compute_validation_flags(

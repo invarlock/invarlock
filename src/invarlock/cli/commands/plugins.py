@@ -897,11 +897,21 @@ def _check_plugin_extras(plugin_name: str, plugin_type: str) -> str:
     if not plugin_info or not plugin_info["packages"]:
         return ""  # No extra dependencies needed
 
-    # Check each required package using import to play nice with tests that mock __import__
+    # Check each required package. For most packages we use a light import so
+    # tests can monkeypatch __import__; for GPU-only stacks like bitsandbytes
+    # we only probe presence via importlib.util.find_spec to avoid crashing on
+    # CPU-only builds during simple listing.
     missing_packages: list[str] = []
     for pkg in plugin_info["packages"]:
         try:
-            __import__(pkg)
+            if pkg == "bitsandbytes":
+                import importlib.util as _util
+
+                spec = _util.find_spec(pkg)
+                if spec is None:
+                    raise ImportError("bitsandbytes not importable")
+            else:
+                __import__(pkg)
         except Exception:
             missing_packages.append(pkg)
 

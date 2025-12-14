@@ -76,7 +76,9 @@ def test_build_resolved_policies_merges_inputs(monkeypatch):
         "variance": {"min_effect_lognll": 0.05, "max_adjusted_modules": 2},
         "metrics": {"confidence": {"ppl_ratio_width_max": 0.1}},
     }
-    monkeypatch.setattr(policy_mod, "TIER_POLICIES", {"balanced": fake_tier})
+    monkeypatch.setattr(
+        policy_mod, "resolve_tier_policies", lambda *_a, **_k: fake_tier
+    )
     spectral = {
         "policy": {"sigma_quantile": 0.9, "scope": "heads", "correction_enabled": True},
         "family_caps": {"B": {"kappa": 0.6}},
@@ -93,8 +95,10 @@ def test_build_resolved_policies_merges_inputs(monkeypatch):
 
 
 def test_build_resolved_policies_invalid_numbers(monkeypatch):
-    fake_tier = {"balanced": {"spectral": {"deadband": 0.25, "max_caps": 7}}}
-    monkeypatch.setattr(policy_mod, "TIER_POLICIES", fake_tier)
+    fake_tier = {"spectral": {"deadband": 0.25, "max_caps": 7}}
+    monkeypatch.setattr(
+        policy_mod, "resolve_tier_policies", lambda *_a, **_k: fake_tier
+    )
     spectral = {
         "deadband": "bad",
         "max_caps": "oops",
@@ -109,8 +113,10 @@ def test_build_resolved_policies_invalid_numbers(monkeypatch):
 
 
 def test_build_resolved_policies_bad_policy_object(monkeypatch):
-    fake_tier = {"balanced": {"spectral": {"sigma_quantile": 0.97, "deadband": 0.15}}}
-    monkeypatch.setattr(policy_mod, "TIER_POLICIES", fake_tier)
+    fake_tier = {"spectral": {"sigma_quantile": 0.97, "deadband": 0.15}}
+    monkeypatch.setattr(
+        policy_mod, "resolve_tier_policies", lambda *_a, **_k: fake_tier
+    )
 
     class FlakyPolicy:
         def get(self, key, default=None):
@@ -125,24 +131,26 @@ def test_build_resolved_policies_bad_policy_object(monkeypatch):
 
 def test_build_resolved_policies_confidence_invalid_numbers(monkeypatch):
     fake_tier = {
-        "balanced": {
-            "spectral": {},
-            "metrics": {
-                "confidence": {
-                    "ppl_ratio_width_max": "bad",
-                    "accuracy_delta_pp_width_max": "bad",
-                }
-            },
-        }
+        "spectral": {},
+        "metrics": {
+            "confidence": {
+                "ppl_ratio_width_max": "bad",
+                "accuracy_delta_pp_width_max": "bad",
+            }
+        },
     }
-    monkeypatch.setattr(policy_mod, "TIER_POLICIES", fake_tier)
+    monkeypatch.setattr(
+        policy_mod, "resolve_tier_policies", lambda *_a, **_k: fake_tier
+    )
     resolved = policy_mod._build_resolved_policies("balanced", {}, {}, {})
     assert "confidence" in resolved and resolved["confidence"] == {}
 
 
 def test_extract_effective_policies_populates_missing(monkeypatch):
     fake_tier = {"spectral": {"deadband": 0.2}, "rmt": {"margin": 1.5}}
-    monkeypatch.setattr(policy_mod, "TIER_POLICIES", {"balanced": fake_tier})
+    monkeypatch.setattr(
+        policy_mod, "get_tier_policies", lambda *_a, **_k: {"balanced": fake_tier}
+    )
     report = {
         "meta": {"auto": {"tier": "balanced"}},
         "guards": [
@@ -163,7 +171,9 @@ def test_extract_effective_policies_populates_missing(monkeypatch):
 
 def test_extract_effective_policies_rmt_injects_epsilon_default(monkeypatch):
     fake_tier = {"spectral": {}, "rmt": {}}
-    monkeypatch.setattr(policy_mod, "TIER_POLICIES", {"balanced": fake_tier})
+    monkeypatch.setattr(
+        policy_mod, "get_tier_policies", lambda *_a, **_k: {"balanced": fake_tier}
+    )
     report = {
         "meta": {"auto": {"tier": "balanced"}},
         "guards": [
@@ -179,8 +189,9 @@ def test_extract_effective_policies_rmt_injects_epsilon_default(monkeypatch):
 
 
 def test_extract_effective_policies_adds_default_status(monkeypatch):
-    fake_tier = {"balanced": {"misc": None}}
-    monkeypatch.setattr(policy_mod, "TIER_POLICIES", fake_tier)
+    monkeypatch.setattr(
+        policy_mod, "get_tier_policies", lambda *_a, **_k: {"balanced": {"misc": None}}
+    )
     report = {"metrics": {"spectral": {}, "rmt": {}}}
     policies = policy_mod._extract_effective_policies(report)
     assert policies["spectral"]["status"] == "default_config"

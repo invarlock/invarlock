@@ -74,13 +74,14 @@ or z = z₀.₉₇₅ for two-sided (Conservative), then set min_effect ≈ z ×
 
 ## Runtime Contract (certificate)
 
-- Certificate records `variance.predictive_gate` with `{sided,min_effect,delta_ci,mean_delta,reason,evaluated}` and `ab_test.provenance` stating window IDs and seed for A/B.
+- Certificate records `variance.predictive_gate` with `{evaluated,passed,reason,delta_ci,mean_delta}` and `variance.ab_test.provenance` stating window IDs and seed for A/B.
+- Tier knobs for sidedness and min-effect are recorded under `resolved_policy.variance.{predictive_one_sided,min_effect_lognll}`.
 - Lints reject enablement if CI contains 0 or if provenance is missing.
 
 ## Observability
 
-- `variance.{ve_enabled,target_modules,proposed_scales}` — VE decision state and adjusted modules.
-- `variance.predictive_gate.{sided,min_effect,delta_ci,mean_delta,reason}` — statistical outcome.
+- `variance.{enabled,target_modules,proposed_scales}` — VE decision state and adjusted modules.
+- `variance.predictive_gate.{delta_ci,mean_delta,reason,passed}` — statistical outcome.
 - `variance.ab_test.{seed,windows_used,provenance}` — reproducibility of the predictive A/B.
 - `resolved_policy.variance.{min_effect_lognll,predictive_one_sided,max_adjusted_modules}` — tier knobs for the proof.
 

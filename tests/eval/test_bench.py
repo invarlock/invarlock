@@ -55,6 +55,19 @@ class TestScenarioConfig:
         assert config.preview_n == 100
         assert config.final_n == 100
 
+    def test_release_profile_preserves_custom_preview_and_final(self):
+        """Custom preview_n/final_n should not be overridden in release profile."""
+        config = ScenarioConfig(
+            edit="quant_rtn",
+            tier="balanced",
+            probes=2,
+            profile="release",
+            preview_n=10,
+            final_n=20,
+        )
+        assert config.preview_n == 10
+        assert config.final_n == 20
+
     def test_invalid_profile_raises_error(self):
         """Test invalid profile raises ValueError."""
         with pytest.raises(ValueError, match="Unknown profile: invalid"):
@@ -210,6 +223,18 @@ class TestMetricsAggregator:
         assert math.isnan(metrics["primary_metric_preview"])
         assert math.isnan(metrics["primary_metric_final"])
 
+    def test_extract_core_metrics_non_dict_primary_metric_and_meta(self):
+        """When primary_metric/meta are non-dicts, fallbacks should still behave."""
+        report = {
+            "metrics": {"primary_metric": 123},  # not a dict
+            "meta": "not-a-dict",
+        }
+        metrics = MetricsAggregator.extract_core_metrics(report)
+        # No crash and all derived metrics remain NaN
+        assert math.isnan(metrics["primary_metric_preview"])
+        assert math.isnan(metrics["primary_metric_final"])
+        assert math.isnan(metrics["duration_s"])
+
     def test_extract_core_metrics_populated_report(self):
         """Test extracting metrics from populated report."""
         report = create_empty_report()
@@ -224,6 +249,18 @@ class TestMetricsAggregator:
         assert metrics["primary_metric_final"] == 46.0
         assert metrics["latency_ms_per_tok"] == 12.5
         assert metrics["memory_mb_peak"] == 2048.0
+
+    def test_extract_core_metrics_duration_from_meta_fields(self):
+        """Duration should be taken from duration_s then duration meta fields."""
+        # duration_s takes precedence
+        report = {"metrics": {}, "meta": {"duration_s": 1.5}}
+        metrics = MetricsAggregator.extract_core_metrics(report)
+        assert metrics["duration_s"] == 1.5
+
+        # Fallback to legacy duration when duration_s is absent
+        report = {"metrics": {}, "meta": {"duration": 2.0}}
+        metrics = MetricsAggregator.extract_core_metrics(report)
+        assert metrics["duration_s"] == 2.0
 
     def test_extract_guard_metrics_empty_report(self):
         """Test extracting guard metrics from empty report."""
@@ -244,6 +281,91 @@ class TestMetricsAggregator:
         assert metrics["rmt_outliers"] == 3
         assert metrics["tying_violations_post"] == 2
         assert metrics["catastrophic_spike"] is True
+
+    def test_extract_guard_metrics_prefers_structured_guard_reports(self):
+        """Structured guard reports should override metrics fallbacks when present."""
+        report = create_empty_report()
+        # Metric fallbacks that would otherwise be used
+        report["metrics"] = {
+            "rmt": {"outliers": 7},
+            "invariants": {"violations": 5},
+        }
+        # Structured guard entries should take precedence
+        report["guards"] = [
+            {
+                "name": "rmt",
+                "metrics": {"layers_flagged": 4},
+                "violations": [],
+            },
+            {
+                "name": "invariants",
+                "metrics": {"violations_found": 1},
+                "violations": [{"id": 1}, {"id": 2}],
+            },
+        ]
+
+        metrics = MetricsAggregator.extract_guard_metrics(report)
+        # rmt_outliers sourced from structured guard metrics
+        assert metrics["rmt_outliers"] == 4
+        # tying_violations_post sourced from structured guard metrics
+        assert metrics["tying_violations_post"] == 1
+
+    def test_extract_guard_metrics_non_list_guards_falls_back_to_metrics(self):
+        """When guards is not a list, fall back to metrics-based paths."""
+        report = create_empty_report()
+        report["guards"] = "not-a-list"
+        report["metrics"] = {
+            "rmt": {"outliers": 1},
+            "invariants": {"violations": 2},
+        }
+        report["meta"] = {"rollback_reason": None}
+        metrics = MetricsAggregator.extract_guard_metrics(report)
+        assert metrics["rmt_outliers"] == 1
+        assert metrics["tying_violations_post"] == 2
+        assert metrics["catastrophic_spike"] is False
+
+    def test_extract_guard_metrics_len_violations_used_when_metrics_missing(self):
+        """Structured invariants guard falls back to len(violations) when needed."""
+        report = create_empty_report()
+        report["guards"] = [
+            {
+                "name": "invariants",
+                "metrics": {"violations_found": "not-a-number"},
+                "violations": [{"id": 1}, {"id": 2}],
+            }
+        ]
+        report["metrics"] = {}
+        metrics = MetricsAggregator.extract_guard_metrics(report)
+        assert metrics["tying_violations_post"] == 2
+
+    def test_compute_comparison_metrics_full_overhead_paths(self):
+        """Exercise primary/time/mem overhead branches with finite baselines."""
+        bare_report = create_empty_report()
+        bare_report["metrics"] = {
+            "primary_metric": {"kind": "ppl_causal", "final": 10.0},
+            "latency_ms_per_tok": 1.0,
+            "memory_mb_peak": 100.0,
+        }
+        bare_report["meta"] = {"duration_s": 1.0}
+
+        guarded_report = create_empty_report()
+        guarded_report["metrics"] = {
+            "primary_metric": {"kind": "ppl_causal", "final": 11.0},
+            "latency_ms_per_tok": 1.2,
+            "memory_mb_peak": 120.0,
+        }
+        guarded_report["meta"] = {"duration_s": 1.5}
+
+        bare_result = RunResult("bare", bare_report, success=True)
+        guarded_result = RunResult("guarded", guarded_report, success=True)
+
+        comparison = MetricsAggregator.compute_comparison_metrics(
+            bare_result, guarded_result
+        )
+
+        assert comparison["primary_metric_overhead"] == pytest.approx(0.1)
+        assert comparison["guard_overhead_time"] == pytest.approx(0.5)
+        assert comparison["guard_overhead_mem"] == pytest.approx(0.2)
 
     def test_compute_comparison_metrics_invalid_inputs(self):
         """Test comparison with invalid inputs."""
@@ -379,6 +501,18 @@ class TestValidationGates:
         """Test memory overhead validation with NaN."""
         comparison = {"guard_overhead_mem": float("nan")}
         assert ValidationGates.validate_memory_overhead(comparison) is True
+
+
+class TestResolveEpsilonFromRuntimeEdgeCases:
+    """Additional epsilon resolution edge cases."""
+
+    def test_resolve_epsilon_from_runtime_rmt_without_deadband(self):
+        """RMT guard without deadband should fall back to default epsilon."""
+        report = create_empty_report()
+        report["guards"] = [{"name": "rmt", "policy": {}}]
+
+        epsilon = resolve_epsilon_from_runtime(report)
+        assert epsilon == 0.10
 
     def test_validate_primary_metric_overhead_thresholds(self):
         comparison = {"primary_metric_overhead": 0.009}
@@ -645,8 +779,105 @@ class TestCLIAndMain:
 class TestExecuteSingleRun:
     """Test execute_single_run function."""
 
-    def test_execute_single_run_success(self):
+    def test_execute_single_run_success(self, monkeypatch):
         """Test successful single run execution."""
+        from types import SimpleNamespace
+
+        from invarlock.eval.data import EvaluationWindow
+
+        class DummyProfile:
+            def make_tokenizer(self):
+                return object(), "tokhash"
+
+        class DummyProvider:
+            def windows(  # noqa: PLR0913
+                self,
+                tokenizer,  # noqa: ARG002
+                *,
+                seq_len: int,
+                stride: int,  # noqa: ARG002
+                preview_n: int,
+                final_n: int,
+                seed: int,  # noqa: ARG002
+                split: str,  # noqa: ARG002
+            ):
+                preview = EvaluationWindow(
+                    input_ids=[[1] * seq_len for _ in range(preview_n)],
+                    attention_masks=[[1] * seq_len for _ in range(preview_n)],
+                    indices=list(range(preview_n)),
+                )
+                final = EvaluationWindow(
+                    input_ids=[[2] * seq_len for _ in range(final_n)],
+                    attention_masks=[[1] * seq_len for _ in range(final_n)],
+                    indices=list(range(final_n)),
+                )
+                return preview, final
+
+        class DummyAdapter:
+            def load_model(self, model_id: str, device: str = "auto", **_kwargs):
+                return SimpleNamespace(name=f"{model_id}:{device}")
+
+            def snapshot(self, _model):
+                return b"snapshot"
+
+            def restore(self, _model, _blob):
+                return None
+
+        class DummyEdit:
+            name = "quant_rtn"
+
+        class DummyRegistry:
+            def get_adapter(self, _name: str):
+                return DummyAdapter()
+
+            def get_edit(self, _name: str):
+                return DummyEdit()
+
+            def get_guard(self, _name: str):
+                raise KeyError("no guards in stub")
+
+        class DummyCoreReport:
+            def __init__(self):
+                self.meta = {"duration": 0.01, "guard_recovered": False}
+                self.edit = {
+                    "plan_digest": "pd",
+                    "deltas": {"params_changed": 0, "layers_modified": 0},
+                }
+                self.metrics = {
+                    "primary_metric": {
+                        "kind": "ppl_causal",
+                        "preview": 1.0,
+                        "final": 1.0,
+                    },
+                    "latency_ms_per_tok": 1.0,
+                    "memory_mb_peak": 1.0,
+                }
+                self.guards = {}
+                self.evaluation_windows = {"preview": {}, "final": {}}
+                self.status = "success"
+
+        def _fake_execute(*_a, **_k):
+            return DummyCoreReport()
+
+        monkeypatch.setattr(
+            "invarlock.model_profile.detect_model_profile",
+            lambda *_a, **_k: DummyProfile(),
+        )
+        monkeypatch.setattr(
+            "invarlock.eval.data.get_provider", lambda *_a, **_k: DummyProvider()
+        )
+        monkeypatch.setattr(
+            "invarlock.core.registry.get_registry", lambda: DummyRegistry()
+        )
+        monkeypatch.setattr("invarlock.core.runner.CoreRunner.execute", _fake_execute)
+        monkeypatch.setattr(
+            "invarlock.guards.rmt.capture_baseline_mp_stats", lambda *_a, **_k: {}
+        )
+        monkeypatch.setattr(
+            "invarlock.guards.rmt.rmt_detect",
+            lambda *_a, **_k: {"n_layers_flagged": 0},
+        )
+
         scenario = ScenarioConfig(edit="quant_rtn", tier="balanced", probes=2)
         run_config = ConfigurationManager.create_bare_config(scenario)
 
@@ -658,18 +889,157 @@ class TestExecuteSingleRun:
         assert result.report["meta"]["model_id"] == "gpt2"
         assert result.report["edit"]["name"] == "quant_rtn"
 
-    def test_execute_single_run_exception_handling(self):
+    def test_execute_single_run_exception_handling(self, monkeypatch):
         """Test exception handling in single run execution."""
         scenario = ScenarioConfig(edit="quant_rtn", tier="balanced", probes=2)
-        run_config = {}  # Invalid config that will cause KeyError
+        run_config = ConfigurationManager.create_bare_config(scenario)
+
+        monkeypatch.setattr(
+            "invarlock.model_profile.detect_model_profile",
+            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("boom")),
+        )
 
         with tempfile.TemporaryDirectory() as temp_dir:
             result = execute_single_run(run_config, scenario, "bare", Path(temp_dir))
 
         assert result.success is False
         assert result.error_message is not None
-        # The error will be a KeyError from accessing missing keys in run_config
-        assert "'model'" in result.error_message or "KeyError" in result.error_message
+        assert "boom" in result.error_message
+
+    def test_execute_single_run_reuses_runtime_without_recomputing_baselines(
+        self, monkeypatch
+    ):
+        """When runtime is pre-populated, heavy setup branches are skipped."""
+        from types import SimpleNamespace
+
+        from invarlock.eval.data import EvaluationWindow
+
+        class DummyProfile:
+            def make_tokenizer(self):
+                return object(), "tokhash"
+
+        class DummyProvider:
+            def windows(  # noqa: PLR0913
+                self,
+                tokenizer,  # noqa: ARG002
+                *,
+                seq_len: int,
+                stride: int,  # noqa: ARG002
+                preview_n: int,
+                final_n: int,
+                seed: int,  # noqa: ARG002
+                split: str,  # noqa: ARG002
+            ):
+                preview = EvaluationWindow(
+                    input_ids=[[1] * seq_len for _ in range(preview_n)],
+                    attention_masks=[[1] * seq_len for _ in range(preview_n)],
+                    indices=list(range(preview_n)),
+                )
+                final = EvaluationWindow(
+                    input_ids=[[2] * seq_len for _ in range(final_n)],
+                    attention_masks=[[1] * seq_len for _ in range(final_n)],
+                    indices=list(range(final_n)),
+                )
+                return preview, final
+
+        class DummyAdapter:
+            def load_model(self, model_id: str, device: str = "auto", **_kwargs):
+                return SimpleNamespace(name=f"{model_id}:{device}")
+
+            def snapshot(self, _model):
+                return b"snapshot"
+
+            def restore(self, _model, _blob):
+                return None
+
+        class DummyEdit:
+            name = "quant_rtn"
+
+        class DummyRegistry:
+            def get_adapter(self, _name: str):
+                return DummyAdapter()
+
+            def get_edit(self, _name: str):
+                return DummyEdit()
+
+            def get_guard(self, _name: str):
+                raise KeyError("no guards in stub")
+
+        class DummyCoreReport:
+            def __init__(self):
+                self.meta = {"duration": 0.01, "guard_recovered": False}
+                self.edit = {
+                    "plan_digest": "pd",
+                    "deltas": {"params_changed": 0, "layers_modified": 0},
+                }
+                self.metrics = {
+                    "primary_metric": {
+                        "kind": "ppl_causal",
+                        "preview": 1.0,
+                        "final": 1.0,
+                    },
+                    "latency_ms_per_tok": 1.0,
+                    "memory_mb_peak": 1.0,
+                }
+                self.guards = {}
+                self.evaluation_windows = {"preview": {}, "final": {}}
+                self.status = "success"
+
+        def _fake_execute(*_a, **_k):
+            return DummyCoreReport()
+
+        calls = {"capture": 0, "provider": 0}
+
+        def _fake_capture(*_a, **_k):
+            calls["capture"] += 1
+            return {}
+
+        def _fake_provider(*_a, **_k):
+            calls["provider"] += 1
+            return DummyProvider()
+
+        monkeypatch.setattr(
+            "invarlock.model_profile.detect_model_profile",
+            lambda *_a, **_k: DummyProfile(),
+        )
+        monkeypatch.setattr("invarlock.eval.data.get_provider", _fake_provider)
+        monkeypatch.setattr(
+            "invarlock.core.registry.get_registry", lambda: DummyRegistry()
+        )
+        monkeypatch.setattr("invarlock.core.runner.CoreRunner.execute", _fake_execute)
+        monkeypatch.setattr(
+            "invarlock.guards.rmt.capture_baseline_mp_stats", _fake_capture
+        )
+        monkeypatch.setattr(
+            "invarlock.guards.rmt.rmt_detect",
+            lambda *_a, **_k: {"n_layers_flagged": 0},
+        )
+
+        scenario = ScenarioConfig(edit="quant_rtn", tier="balanced", probes=2)
+        run_config = ConfigurationManager.create_guarded_config(scenario)
+
+        runtime = {
+            "adapter": DummyAdapter(),
+            "model": SimpleNamespace(name="m"),
+            "baseline_snapshot": b"snapshot",
+            "pairing_schedule": {"preview": {}, "final": {}},
+            "calibration_data": [],
+            "tokenizer_hash": "tokhash",
+            "split": "validation",
+            "dataset_name": "wikitext2",
+            "rmt_baseline_mp_stats": {"layer": {}},
+            "rmt_baseline_sigmas": {"layer": 0.1},
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = execute_single_run(
+                run_config, scenario, "guarded", Path(temp_dir), runtime=runtime
+            )
+
+        assert result.success is True
+        # When runtime is pre-populated, provider and capture helpers are never called.
+        assert calls["provider"] == 0
+        assert calls["capture"] == 0
 
 
 class TestExecuteScenario:
@@ -724,12 +1094,73 @@ class TestExecuteScenario:
         assert pytest.approx(result.epsilon_used, rel=1e-9) == 0.10
         mock_resolve_epsilon.assert_not_called()
 
+    @patch("invarlock.eval.bench.ValidationGates.validate_all_gates")
+    @patch("invarlock.eval.bench.execute_single_run")
+    @patch("invarlock.eval.bench.DependencyChecker.check_edit_dependencies")
+    def test_execute_scenario_success_uses_validation_gates(
+        self,
+        mock_check_deps,
+        mock_execute_single_run,
+        mock_validate_all_gates,
+    ):
+        """Successful bare/guarded runs should flow through ValidationGates."""
+        mock_check_deps.return_value = (True, "ok")
+        bare = RunResult(
+            run_type="bare",
+            report=create_empty_report(),
+            success=True,
+            error_message=None,
+        )
+        guarded = RunResult(
+            run_type="guarded",
+            report=create_empty_report(),
+            success=True,
+            error_message=None,
+        )
+        mock_execute_single_run.side_effect = [bare, guarded]
+        mock_validate_all_gates.return_value = {
+            "spike": True,
+            "tying": True,
+            "rmt": True,
+            "quality": True,
+            "time": True,
+            "mem": True,
+        }
+
+        scenario = ScenarioConfig(edit="quant_rtn", tier="balanced", probes=1)
+        config = BenchmarkConfig(
+            edits=["quant_rtn"], tiers=["balanced"], probes=[1], epsilon=None
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = execute_scenario(scenario, config, Path(temp_dir))
+
+        mock_validate_all_gates.assert_called_once()
+        assert result.gates["quality"] is True
+
 
 class TestRunGuardEffectBenchmark:
     """Test the main benchmark function."""
 
-    def test_run_guard_effect_benchmark_basic(self):
+    def test_run_guard_effect_benchmark_basic(self, monkeypatch):
         """Test basic benchmark execution."""
+        monkeypatch.setattr(
+            "invarlock.eval.bench.execute_scenario",
+            lambda scenario, cfg, output_dir: ScenarioResult(
+                config=scenario,
+                metrics={"primary_metric_overhead": 0.0, "guard_overhead_time": 0.0},
+                gates={
+                    "spike": True,
+                    "tying": True,
+                    "rmt": True,
+                    "quality": True,
+                    "time": True,
+                    "mem": True,
+                },
+                probes_used=scenario.probes,
+                epsilon_used=0.1,
+            ),
+        )
         with tempfile.TemporaryDirectory() as temp_dir:
             result = run_guard_effect_benchmark(
                 edits=["quant_rtn"],
@@ -744,8 +1175,25 @@ class TestRunGuardEffectBenchmark:
         assert "scenarios" in result
         assert len(result["scenarios"]) == 1
 
-    def test_run_guard_effect_benchmark_multiple_scenarios(self):
+    def test_run_guard_effect_benchmark_multiple_scenarios(self, monkeypatch):
         """Test benchmark with multiple scenarios."""
+        monkeypatch.setattr(
+            "invarlock.eval.bench.execute_scenario",
+            lambda scenario, cfg, output_dir: ScenarioResult(
+                config=scenario,
+                metrics={"primary_metric_overhead": 0.0, "guard_overhead_time": 0.0},
+                gates={
+                    "spike": True,
+                    "tying": True,
+                    "rmt": True,
+                    "quality": True,
+                    "time": True,
+                    "mem": True,
+                },
+                probes_used=scenario.probes,
+                epsilon_used=0.1,
+            ),
+        )
         with tempfile.TemporaryDirectory() as temp_dir:
             result = run_guard_effect_benchmark(
                 edits=["quant_rtn"],

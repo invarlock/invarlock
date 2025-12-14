@@ -4,7 +4,7 @@ from __future__ import annotations
 import math
 from typing import Any, no_type_check
 
-from invarlock.core.auto_tuning import TIER_POLICIES
+from invarlock.core.auto_tuning import get_tier_policies
 
 from .policy_utils import _promote_legacy_multiple_testing_key, _resolve_policy_tier
 from .report_types import RunReport
@@ -133,7 +133,8 @@ def _extract_spectral_analysis(
     report: RunReport, baseline: dict[str, Any]
 ) -> dict[str, Any]:
     tier = _resolve_policy_tier(report)
-    tier_defaults = TIER_POLICIES.get(tier, TIER_POLICIES.get("balanced", {}))
+    tier_policies = get_tier_policies()
+    tier_defaults = tier_policies.get(tier, tier_policies.get("balanced", {}))
     spectral_defaults = tier_defaults.get("spectral", {}) if tier_defaults else {}
     default_sigma_quantile = spectral_defaults.get("sigma_quantile", 0.95)
     default_deadband = spectral_defaults.get("deadband", 0.1)
@@ -166,9 +167,15 @@ def _extract_spectral_analysis(
     caps_exceeded = (
         bool(guard_metrics.get("caps_exceeded", False)) if guard_metrics else False
     )
-    max_caps = guard_policy.get("max_caps") if guard_policy else None
+    max_caps = guard_metrics.get("max_caps") if guard_metrics else None
+    if max_caps is None and guard_policy:
+        max_caps = guard_policy.get("max_caps")
     if max_caps is None:
         max_caps = default_max_caps
+    try:
+        max_caps = int(max_caps)
+    except Exception:
+        max_caps = int(default_max_caps)
 
     try:
         max_spectral_norm = float(
@@ -618,10 +625,15 @@ def _extract_rmt_analysis(
     report: RunReport, baseline: dict[str, Any]
 ) -> dict[str, Any]:
     tier = _resolve_policy_tier(report)
-    tier_defaults = TIER_POLICIES.get(tier, TIER_POLICIES.get("balanced", {}))
+    tier_policies = get_tier_policies()
+    tier_defaults = tier_policies.get(tier, tier_policies.get("balanced", {}))
     default_epsilon_map = (
-        tier_defaults.get("rmt", {}).get("epsilon", {}) if tier_defaults else {}
+        tier_defaults.get("rmt", {}).get("epsilon_by_family")
+        if isinstance(tier_defaults, dict)
+        else {}
     )
+    if not default_epsilon_map and isinstance(tier_defaults, dict):
+        default_epsilon_map = (tier_defaults.get("rmt", {}) or {}).get("epsilon", {})
     default_epsilon_map = {
         str(family): float(value)
         for family, value in (default_epsilon_map or {}).items()
@@ -631,6 +643,16 @@ def _extract_rmt_analysis(
     outliers_guarded = 0
     outliers_bare = 0
     epsilon_default = 0.1
+    try:
+        eps_def = (
+            tier_defaults.get("rmt", {}).get("epsilon_default")
+            if isinstance(tier_defaults, dict)
+            else None
+        )
+        if isinstance(eps_def, int | float) and math.isfinite(float(eps_def)):
+            epsilon_default = float(eps_def)
+    except Exception:
+        pass
     stable = True
     explicit_stability = False
     max_ratio = 0.0
@@ -640,19 +662,54 @@ def _extract_rmt_analysis(
     baseline_outliers_per_family: dict[str, int] = {}
     outliers_per_family: dict[str, int] = {}
     epsilon_violations: list[Any] = []
+    margin_used = None
+    deadband_used = None
+    policy_out: dict[str, Any] | None = None
 
     for guard in report.get("guards", []) or []:
         if str(guard.get("name", "")).lower() == "rmt":
             guard_metrics = guard.get("metrics", {}) or {}
             guard_policy = guard.get("policy", {}) or {}
+            if isinstance(guard_policy, dict) and guard_policy:
+                policy_out = dict(guard_policy)
+                if "epsilon_by_family" not in policy_out and isinstance(
+                    policy_out.get("epsilon"), dict
+                ):
+                    policy_out["epsilon_by_family"] = dict(policy_out["epsilon"])
+                if isinstance(policy_out.get("margin"), int | float) and math.isfinite(
+                    float(policy_out.get("margin"))
+                ):
+                    margin_used = float(policy_out.get("margin"))
+                if isinstance(
+                    policy_out.get("deadband"), int | float
+                ) and math.isfinite(float(policy_out.get("deadband"))):
+                    deadband_used = float(policy_out.get("deadband"))
+                if isinstance(
+                    policy_out.get("epsilon_default"), int | float
+                ) and math.isfinite(float(policy_out.get("epsilon_default"))):
+                    epsilon_default = float(policy_out.get("epsilon_default"))
+            if isinstance(
+                guard_metrics.get("epsilon_default"), int | float
+            ) and math.isfinite(float(guard_metrics.get("epsilon_default"))):
+                epsilon_default = float(guard_metrics.get("epsilon_default"))
             outliers_guarded = guard_metrics.get(
                 "rmt_outliers", guard_metrics.get("layers_flagged", outliers_guarded)
             )
             max_ratio = guard_metrics.get("max_ratio", 0.0)
-            epsilon_default = guard_policy.get(
-                "deadband", guard_metrics.get("deadband_used", epsilon_default)
-            )
             epsilon_map = guard_metrics.get("epsilon_by_family", {}) or epsilon_map
+            if not epsilon_map and isinstance(guard_policy, dict):
+                eps_src = guard_policy.get("epsilon_by_family") or guard_policy.get(
+                    "epsilon"
+                )
+                if isinstance(eps_src, dict):
+                    try:
+                        epsilon_map = {
+                            str(k): float(v)
+                            for k, v in eps_src.items()
+                            if isinstance(v, int | float) and math.isfinite(float(v))
+                        }
+                    except Exception:
+                        pass
             baseline_outliers_per_family = (
                 guard_metrics.get("baseline_outliers_per_family", {})
                 or baseline_outliers_per_family
@@ -844,7 +901,7 @@ def _extract_rmt_analysis(
     }
     delta_per_family = {str(k): _to_int(v) for k, v in delta_per_family.items()}
 
-    return {
+    result = {
         "outliers_bare": outliers_bare,
         "outliers_guarded": outliers_guarded,
         "epsilon": epsilon_scalar,
@@ -862,6 +919,13 @@ def _extract_rmt_analysis(
         "mean_deviation_ratio": mean_deviation_ratio,
         "families": family_breakdown,
     }
+    if margin_used is not None:
+        result["margin"] = float(margin_used)
+    if deadband_used is not None:
+        result["deadband"] = float(deadband_used)
+    if policy_out:
+        result["policy"] = policy_out
+    return result
 
 
 @no_type_check
@@ -873,10 +937,14 @@ def _extract_variance_analysis(report: RunReport) -> dict[str, Any]:
     ratio_ci = None
     calibration = {}
     guard_metrics: dict[str, Any] = {}
+    guard_policy: dict[str, Any] | None = None
     for guard in report.get("guards", []) or []:
         if "variance" in str(guard.get("name", "")).lower():
             metrics = guard.get("metrics", {}) or {}
             guard_metrics = metrics
+            gp = guard.get("policy", {}) or {}
+            if isinstance(gp, dict) and gp:
+                guard_policy = dict(gp)
             ve_enabled = metrics.get("ve_enabled", bool(metrics))
             gain = metrics.get("ab_gain", metrics.get("gain", None))
             ppl_no_ve = metrics.get("ppl_no_ve", None)
@@ -932,11 +1000,41 @@ def _extract_variance_analysis(report: RunReport) -> dict[str, Any]:
     if guard_metrics.get("ab_windows_used") is not None:
         ab_section["windows_used"] = guard_metrics["ab_windows_used"]
     if guard_metrics.get("ab_provenance"):
-        ab_section["provenance"] = guard_metrics["ab_provenance"]
+        prov = guard_metrics["ab_provenance"]
+        if isinstance(prov, dict):
+            prov_out = dict(prov)
+
+            # Normalize a top-level `window_ids` list for docs + auditability.
+            if "window_ids" not in prov_out:
+                window_ids: set[int] = set()
+
+                def _collect(node: Any) -> None:
+                    if isinstance(node, dict):
+                        ids = node.get("window_ids")
+                        if isinstance(ids, list):
+                            for wid in ids:
+                                if isinstance(wid, int | float):
+                                    window_ids.add(int(wid))
+                        for v in node.values():
+                            _collect(v)
+                        return
+                    if isinstance(node, list):
+                        for v in node:
+                            _collect(v)
+
+                _collect(prov_out)
+                if window_ids:
+                    prov_out["window_ids"] = sorted(window_ids)
+
+            ab_section["provenance"] = prov_out
+        else:
+            ab_section["provenance"] = prov
     if guard_metrics.get("ab_point_estimates"):
         ab_section["point_estimates"] = guard_metrics["ab_point_estimates"]
     if ab_section:
         result["ab_test"] = ab_section
+    if guard_policy:
+        result["policy"] = guard_policy
     return result
 
 

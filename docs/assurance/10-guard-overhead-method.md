@@ -15,7 +15,7 @@ PM(bare) is computed with guards disabled; PM(guarded) with the full GuardChain 
 ## Protocol (single toggle, paired schedule)
 
 - Same window plan: identical `seq_len`, `stride`, counts, and window IDs.
-- Same seeds: reuse the seed bundle (`python`, `numpy`, `torch`, `bootstrap`).
+- Same seeds: reuse the seed bundle (`python`, `numpy`, `torch`) and bootstrap seed (when applicable).
 - Single toggle: run a bare control (guards disabled) and a guarded run on the same model snapshot.
 - Deterministic snapshot: prefer snapshot/restore between bare and guarded; otherwise reload deterministically.
 
@@ -30,8 +30,8 @@ Rationale: the budget must be small relative to sampling noise and locked to a p
 
 Fields under `/guard_overhead` and `/validation`:
 
-- `guard_overhead.bare_pm`
-- `guard_overhead.guarded_pm`
+- `guard_overhead.bare_ppl`
+- `guard_overhead.guarded_ppl`
 - `guard_overhead.overhead_ratio`
 - `guard_overhead.overhead_percent`
 - `guard_overhead.overhead_threshold` (fraction)

@@ -86,11 +86,11 @@ deltas Δ(f) = g(f)/b(f) − 1, and report quantile summaries.
 * **Balanced (one-sided)**: `min_effect_lognll ≈ 9e-4`
 * **Conservative (two-sided)**: `≈ 1.8e-3`
 
-**Runtime visibility.** Recorded in certificates under `variance.predictive_gate` (sidedness, CI, mean Δ, min_effect).
+**Runtime visibility.** Recorded in certificates under `variance.predictive_gate` (CI, mean Δ, pass/fail reason) and under `resolved_policy.variance.{predictive_one_sided,min_effect_lognll}` (tier knobs).
 
 **VE calibration provenance.** Summary stats are derived from calibration
 certificates. Local tooling can parse certificate JSON files to extract
-`variance.predictive_gate.{delta_ci, mean_delta}` and compute the paired Δ
+`variance.predictive_gate.{delta_ci,mean_delta}` and compute the paired Δ
 standard deviation across runs.
 
 ---
@@ -114,7 +114,7 @@ $$
 
 **Window sizing provenance.** Window counts are documented in preset configs
 under `configs/tasks/*/ci_*.yaml` and `configs/tasks/*/release_*.yaml`.
-**Runtime visibility.** Certificates expose window counts, coverage flags, and CI digests under `window_plan`, `dataset.windows.stats`, and `ppl.stats`.
+**Runtime visibility.** Certificates expose window counts, coverage flags, and CI digests under `dataset.windows.stats` and `primary_metric`.
 
 ---
 

@@ -794,11 +794,17 @@ def doctor_command(
                     try:
                         import math as _math
 
-                        from invarlock.core.auto_tuning import TIER_POLICIES
+                        from invarlock.core.auto_tuning import get_tier_policies
 
                         use_tier = (tier or "balanced").lower()
-                        metrics_policy = TIER_POLICIES.get(use_tier, {}).get(
-                            "metrics", {}
+                        tier_policies = get_tier_policies()
+                        tier_defaults = tier_policies.get(
+                            use_tier, tier_policies.get("balanced", {})
+                        )
+                        metrics_policy = (
+                            tier_defaults.get("metrics", {})
+                            if isinstance(tier_defaults, dict)
+                            else {}
                         )
                         pm_policy = (
                             metrics_policy.get("pm_ratio", {})

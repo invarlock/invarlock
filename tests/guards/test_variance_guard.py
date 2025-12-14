@@ -179,9 +179,9 @@ def test_variance_guard_ci_gate_enables_on_small_gain() -> None:
     ("mean_delta", "delta_ci", "min_effect", "one_sided", "expected"),
     [
         (-0.002, (-0.003, -0.001), 0.001, True, (True, "ci_gain_met")),
-        (-0.0005, (-0.002, 0.0001), 0.001, True, (False, "gain_below_threshold")),
+        (-0.0005, (-0.002, 0.0001), 0.001, True, (False, "ci_contains_zero")),
         (-0.0005, (-0.0015, -0.0002), 0.001, True, (False, "gain_below_threshold")),
-        (0.0003, (-0.001, 0.0004), 0.0, True, (False, "mean_not_negative")),
+        (0.0003, (-0.001, 0.0004), 0.0, True, (False, "ci_contains_zero")),
         (-0.002, (-0.0035, -0.0012), 0.001, False, (True, "ci_gain_met")),
         (-0.0008, (-0.0012, -0.0003), 0.001, False, (False, "gain_below_threshold")),
         (-0.0010, (-0.0015, 0.0002), 0.001, False, (False, "ci_contains_zero")),

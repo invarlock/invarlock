@@ -59,10 +59,10 @@ def test_variance_policy_digest_fallback_merges_guard_policy_keys():
     with patch("invarlock.reporting.certificate.validate_report", return_value=True):
         cert = make_certificate(report, baseline)
 
-    expected = _compute_variance_policy_digest(variance_policy)
-    # Digest should be present in auto.policy_digest and policies.variance.policy_digest
-    assert cert["auto"]["policy_digest"] == expected
-    assert cert["policies"]["variance"]["policy_digest"] == expected
+    expected_variance = _compute_variance_policy_digest(variance_policy)
+    # Full policy digest is recorded on auto/policy_provenance; variance keeps a focused digest.
+    assert cert["auto"]["policy_digest"] == cert["policy_provenance"]["policy_digest"]
+    assert cert["policies"]["variance"]["policy_digest"] == expected_variance
     # And missing keys should have been merged back into policies.variance
     for k, v in variance_policy.items():
         assert cert["policies"]["variance"].get(k) == v

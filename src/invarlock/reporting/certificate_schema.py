@@ -29,6 +29,7 @@ CERTIFICATE_JSON_SCHEMA: dict[str, Any] = {
         "plugins",
         "meta",
         "dataset",
+        "primary_metric",
     ],
     "properties": {
         "schema_version": {"const": CERTIFICATE_SCHEMA_VERSION},
@@ -64,11 +65,12 @@ CERTIFICATE_JSON_SCHEMA: dict[str, Any] = {
                 "seq_len": {"type": "integer", "minimum": 1},
                 "windows": {
                     "type": "object",
-                    "required": ["preview", "final"],
+                    "required": ["preview", "final", "stats"],
                     "properties": {
                         "preview": {"type": "integer", "minimum": 0},
                         "final": {"type": "integer", "minimum": 0},
                         "seed": {"type": "integer"},
+                        "stats": {"type": "object"},
                     },
                 },
             },
@@ -77,6 +79,7 @@ CERTIFICATE_JSON_SCHEMA: dict[str, Any] = {
         # ppl_* block removed from required schema; may appear for ppl-like tasks but is optional
         "primary_metric": {
             "type": "object",
+            "required": ["kind"],
             "properties": {
                 "kind": {"type": "string"},
                 "unit": {"type": "string"},

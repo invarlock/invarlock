@@ -100,40 +100,40 @@ error_exit() {
 # ============ DEPENDENCY CHECK ============
 check_dependencies() {
     log_section "PHASE 0: DEPENDENCY CHECK"
-    
+
     local missing=()
-    
+
     # Check Python
     command -v python3 >/dev/null 2>&1 || missing+=("python3")
-    
+
     # Check PyTorch
     python3 -c "import torch; print(f'PyTorch {torch.__version__}')" 2>/dev/null || missing+=("torch")
-    
+
     # Check transformers
     python3 -c "import transformers; print(f'Transformers {transformers.__version__}')" 2>/dev/null || missing+=("transformers")
-    
+
     # Check PyYAML
     python3 -c "import yaml; print('PyYAML available')" 2>/dev/null || {
         log "Installing PyYAML..."
         pip install pyyaml 2>&1 | tee -a "${LOG_FILE}"
     }
-    
+
     # Check lm-eval-harness
     python3 -c "import lm_eval; print(f'lm-eval {lm_eval.__version__}')" 2>/dev/null || {
         log "Installing lm-evaluation-harness..."
         pip install lm-eval 2>&1 | tee -a "${LOG_FILE}"
     }
-    
+
     # Check InvarLock
     python3 -c "import invarlock; print(f'InvarLock {invarlock.__version__}')" 2>/dev/null || missing+=("invarlock")
-    
+
     # Check GPU
     python3 -c "import torch; assert torch.cuda.is_available(), 'No CUDA'; print(f'GPU: {torch.cuda.get_device_name(0)}')" 2>/dev/null || missing+=("CUDA GPU")
-    
+
     if [[ ${#missing[@]} -gt 0 ]]; then
         error_exit "Missing dependencies: ${missing[*]}"
     fi
-    
+
     log "All dependencies satisfied"
 }
 
@@ -144,11 +144,11 @@ setup_model() {
     local model_id="$1"
     local model_name=$(basename "${model_id}" | tr '[:upper:]' '[:lower:]' | tr '/' '_')
     local model_dir="${OUTPUT_DIR}/models/${model_name}"
-    
+
     # Log to stderr (not stdout) so callers get clean path
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Setting up model: ${model_id}" >> "${LOG_FILE}"
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Setting up model: ${model_id}" >&2
-    
+
     # Check if local path
     if [[ -d "${model_id}" ]]; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')]   Using local model: ${model_id}" >> "${LOG_FILE}"
@@ -156,7 +156,7 @@ setup_model() {
         echo "${model_id}"
         return 0
     fi
-    
+
     # Check if already downloaded
     if [[ -d "${model_dir}/baseline" ]]; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')]   Model already downloaded: ${model_dir}/baseline" >> "${LOG_FILE}"
@@ -164,12 +164,12 @@ setup_model() {
         echo "${model_dir}/baseline"
         return 0
     fi
-    
+
     # Download from HuggingFace
     echo "[$(date '+%Y-%m-%d %H:%M:%S')]   Downloading from HuggingFace: ${model_id}" >> "${LOG_FILE}"
     echo "[$(date '+%Y-%m-%d %H:%M:%S')]   Downloading from HuggingFace: ${model_id}" >&2
     mkdir -p "${model_dir}"
-    
+
     # Python output goes to stderr and log file
     python3 << EOF 2>&1 | tee -a "${LOG_FILE}" >&2
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -197,7 +197,7 @@ model.save_pretrained(output_dir, safe_serialization=True)
 
 print(f"Saved to {output_dir}")
 EOF
-    
+
     # ONLY output the clean path on stdout
     echo "${model_dir}/baseline"
 }
@@ -210,14 +210,14 @@ create_edited_model() {
     local bits="$4"
     local group_size="$5"
     local scope="$6"
-    
+
     log "Creating edited model:"
     log "  Baseline: ${baseline_path}"
     log "  Output: ${output_path}"
     log "  Edit: ${edit_type} bits=${bits} group_size=${group_size} scope=${scope}"
-    
+
     mkdir -p "$(dirname "${output_path}")"
-    
+
     if [[ "${edit_type}" == "quant_rtn" ]]; then
         python3 << EOF
 import torch
@@ -300,13 +300,13 @@ create_error_model() {
     local baseline_path="$1"
     local output_path="$2"
     local error_type="$3"
-    
+
     log "Creating error model (type=${error_type}):"
     log "  Baseline: ${baseline_path}"
     log "  Output: ${output_path}"
-    
+
     mkdir -p "$(dirname "${output_path}")"
-    
+
     python3 << EOF
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -356,7 +356,7 @@ elif error_type == "extreme_quant":
         scale = torch.clamp(scale, min=1e-10)
         quantized = torch.clamp(torch.round(tensor / scale), qmin, qmax)
         return (quantized * scale).to(tensor.dtype)
-    
+
     count = 0
     for name, param in model.named_parameters():
         if 'weight' in name.lower() and param.dim() >= 2:
@@ -410,14 +410,14 @@ run_lmeval() {
     local tasks="$3"
     local batch_size="$4"
     local num_fewshot="$5"
-    
+
     log "Running lm-eval:"
     log "  Model: ${model_path}"
     log "  Tasks: ${tasks}"
     log "  Output: ${output_file}"
-    
+
     mkdir -p "$(dirname "${output_file}")"
-    
+
     python3 -m lm_eval \
         --model hf \
         --model_args "pretrained=${model_path},trust_remote_code=True,dtype=float16" \
@@ -427,7 +427,7 @@ run_lmeval() {
         --output_path "$(dirname "${output_file}")" \
         --log_samples \
         2>&1 | tee -a "${LOG_FILE}"
-    
+
     local results_file=$(find "$(dirname "${output_file}")" -name "results*.json" -type f | head -1)
     if [[ -n "${results_file}" ]]; then
         mv "${results_file}" "${output_file}"
@@ -448,15 +448,15 @@ generate_invarlock_config() {
     local preview_n="${5:-${INVARLOCK_PREVIEW_WINDOWS}}"
     local final_n="${6:-${INVARLOCK_FINAL_WINDOWS}}"
     local bootstrap_n="${7:-${INVARLOCK_BOOTSTRAP_N}}"
-    
+
     # Detect adapter based on model architecture
     # Most modern LLMs (Mistral, Qwen, LLaMA) use hf_llama adapter
     local adapter="hf_llama"
-    
+
     # InvarLock provider is used directly (wikitext2, synthetic, hf_text, etc.)
     # The provider handles HuggingFace dataset loading internally
     local dataset_provider="${INVARLOCK_DATASET}"
-    
+
     # Create the YAML config
     # Note: edit.name must be a quoted string (even "noop")
     cat > "${output_yaml}" << YAML_EOF
@@ -515,26 +515,26 @@ run_invarlock_calibration() {
     local output_dir="$3"
     local num_runs="$4"
     local preset_output_dir="$5"
-    
+
     log "Running InvarLock FULL calibration (all guards):"
     log "  Model: ${model_path}"
     log "  Runs: ${num_runs}"
     log "  Preset output: ${preset_output_dir}"
-    
+
     mkdir -p "${output_dir}"
     mkdir -p "${preset_output_dir}"
-    
+
     # Run null certifications using config files
     for run in $(seq 1 "${num_runs}"); do
         log "  Calibration run ${run}/${num_runs}..."
-        
+
         # Use different seeds for each run
         local seed=$((41 + run))
         local run_dir="${output_dir}/run_${run}"
         local config_yaml="${run_dir}/calibration_config.yaml"
-        
+
         mkdir -p "${run_dir}"
-        
+
         # Generate config YAML for this run
         generate_invarlock_config \
             "${model_path}" \
@@ -544,21 +544,21 @@ run_invarlock_calibration() {
             "${INVARLOCK_PREVIEW_WINDOWS}" \
             "${INVARLOCK_FINAL_WINDOWS}" \
             "${INVARLOCK_BOOTSTRAP_N}"
-        
+
         # Run InvarLock with the config file
         invarlock run \
             --config "${config_yaml}" \
             --profile ci \
             --out "${run_dir}" \
             2>&1 | tee -a "${LOG_FILE}" || log "  Run ${run} failed (exit code $?)"
-        
+
         # Find and copy report.json for consistent naming
         # Note: invarlock run generates report.json, not cert.json (certs are generated separately)
         local report_file=$(find "${run_dir}" -name "report*.json" -type f 2>/dev/null | head -1)
         if [[ -n "${report_file}" ]]; then
             cp "${report_file}" "${run_dir}/baseline_report.json" 2>/dev/null || true
             log "  Report saved: ${run_dir}/baseline_report.json"
-            
+
             # For calibration, we need to generate a self-certificate (baseline == subject)
             # This provides the certificate structure needed for threshold extraction
             python3 << GENERATE_CERT
@@ -568,7 +568,7 @@ try:
     from invarlock.reporting.certificate import make_certificate
     report_path = Path("${report_file}")
     cert_path = Path("${run_dir}") / "evaluation.cert.json"
-    
+
     report = json.loads(report_path.read_text())
     # For calibration, use report as both subject and baseline (null certification)
     cert = make_certificate(report, report)
@@ -582,7 +582,7 @@ GENERATE_CERT
             log "  WARNING: No report.json found for run ${run}"
         fi
     done
-    
+
     # Extract guard thresholds and generate calibrated preset
     # Note: Using unquoted heredoc delimiter to allow shell variable interpolation
     python3 << CALIBRATION_SCRIPT
@@ -616,7 +616,7 @@ print(f"DEBUG: model_name = {model_name}")
 
 def load_certificates() -> List[Dict[str, Any]]:
     """Load all valid certificates from calibration runs.
-    
+
     Tries to load evaluation.cert.json first (generated by our script).
     Falls back to loading report.json and extracting relevant data if cert doesn't exist.
     """
@@ -633,7 +633,7 @@ def load_certificates() -> List[Dict[str, Any]]:
                     continue
             except Exception as e:
                 print(f"  Error loading {cert_path}: {e}")
-        
+
         # Fall back to report.json and convert to cert-like structure
         report_path = run_dir / "baseline_report.json"
         if not report_path.exists():
@@ -641,7 +641,7 @@ def load_certificates() -> List[Dict[str, Any]]:
             report_files = list(run_dir.glob("**/report*.json"))
             if report_files:
                 report_path = report_files[0]
-        
+
         if report_path.exists():
             try:
                 report = json.loads(report_path.read_text())
@@ -652,19 +652,19 @@ def load_certificates() -> List[Dict[str, Any]]:
                     print(f"  Loaded report (as cert): {report_path.name}")
             except Exception as e:
                 print(f"  Error loading {report_path}: {e}")
-    
+
     return certs
 
 def convert_report_to_cert_structure(report: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Convert a RunReport to a certificate-like structure for calibration.
-    
+
     This extracts the key fields needed for guard calibration from a report.
     """
     if not isinstance(report, dict):
         return None
-    
+
     metrics = report.get('metrics', {}) or {}
-    
+
     # Build primary_metric block
     pm = metrics.get('primary_metric', {}) or {}
     if not pm and 'ppl_final' in metrics:
@@ -675,7 +675,7 @@ def convert_report_to_cert_structure(report: Dict[str, Any]) -> Optional[Dict[st
             'ratio_vs_baseline': 1.0,  # Self-baseline
             'drift': metrics.get('ppl_final', 1.0) / max(metrics.get('ppl_preview', 1.0), 1e-10)
         }
-    
+
     cert_structure = {
         'primary_metric': pm,
         'spectral': {},
@@ -683,7 +683,7 @@ def convert_report_to_cert_structure(report: Dict[str, Any]) -> Optional[Dict[st
         'variance': {},
         'validation': {}
     }
-    
+
     # Extract guard data from guards list
     guards = report.get('guards', []) or []
     for guard in guards:
@@ -692,7 +692,7 @@ def convert_report_to_cert_structure(report: Dict[str, Any]) -> Optional[Dict[st
         name = str(guard.get('name', '')).lower()
         guard_metrics = guard.get('metrics', {}) or {}
         guard_details = guard.get('details', {}) or {}
-        
+
         if name == 'spectral':
             cert_structure['spectral'] = {
                 'family_z_quantiles': guard_metrics.get('family_z_quantiles', {}),
@@ -717,7 +717,7 @@ def convert_report_to_cert_structure(report: Dict[str, Any]) -> Optional[Dict[st
                 'min_effect_lognll': guard_metrics.get('min_effect_lognll'),
                 'summary': guard_details
             }
-    
+
     return cert_structure
 
 # ==============================================================================
@@ -727,7 +727,7 @@ def convert_report_to_cert_structure(report: Dict[str, Any]) -> Optional[Dict[st
 def calibrate_drift(certs: List[Dict]) -> Dict[str, Any]:
     """
     Extract drift statistics from certificates.
-    
+
     From primary_metric.ratio_vs_baseline (or similar drift field), compute:
     - mean, std, min, max of drift ratios
     - suggested acceptable drift band
@@ -735,28 +735,28 @@ def calibrate_drift(certs: List[Dict]) -> Dict[str, Any]:
     """
     drifts = []
     ratios = []
-    
+
     for cert in certs:
         pm = cert.get('primary_metric', {})
-        
+
         # Try different fields that might contain drift info
         drift = pm.get('drift')
         ratio = pm.get('ratio_vs_baseline')
         preview = pm.get('preview')
         final = pm.get('final')
-        
+
         if drift is not None:
             try:
                 drifts.append(float(drift))
             except (TypeError, ValueError):
                 pass
-        
+
         if ratio is not None:
             try:
                 ratios.append(float(ratio))
             except (TypeError, ValueError):
                 pass
-        
+
         # If we have preview/final, compute ratio ourselves
         if preview is not None and final is not None:
             try:
@@ -765,10 +765,10 @@ def calibrate_drift(certs: List[Dict]) -> Dict[str, Any]:
                     ratios.append(computed_ratio)
             except (TypeError, ValueError, ZeroDivisionError):
                 pass
-    
+
     # Use ratios if available, otherwise drifts
     values = ratios if ratios else drifts
-    
+
     if len(values) < 2:
         print("  WARNING: Not enough drift data for calibration")
         return {
@@ -777,17 +777,17 @@ def calibrate_drift(certs: List[Dict]) -> Dict[str, Any]:
             'suggested_band': [0.95, 1.05],
             'band_compatible': True
         }
-    
+
     mean_val = statistics.mean(values)
     std_val = statistics.stdev(values)
-    
+
     # Suggested band: mean ± max(2*std, 0.05)
     margin = max(2 * std_val, 0.05)
     suggested_band = [round(mean_val - margin, 3), round(mean_val + margin, 3)]
-    
+
     # Check if compatible with default 0.95-1.05 band
     band_compatible = 0.95 <= mean_val <= 1.05
-    
+
     result = {
         'mean': round(mean_val, 4),
         'std': round(std_val, 4),
@@ -796,10 +796,10 @@ def calibrate_drift(certs: List[Dict]) -> Dict[str, Any]:
         'suggested_band': suggested_band,
         'band_compatible': band_compatible
     }
-    
+
     print(f"  Drift: mean={result['mean']:.4f}, std={result['std']:.4f}, " +
           f"band_compatible={'Yes' if band_compatible else 'No'}")
-    
+
     return result
 
 # ==============================================================================
@@ -809,27 +809,27 @@ def calibrate_drift(certs: List[Dict]) -> Dict[str, Any]:
 def calibrate_spectral(certs: List[Dict]) -> Tuple[Dict[str, Any], Dict[str, Dict[str, float]]]:
     """
     Extract spectral guard thresholds from certificates.
-    
+
     From spectral.family_z_quantiles.{family}.{q99, max}, derive:
     - family_caps.{family}.kappa = max(observed) * 1.05 (5% safety margin)
-    
+
     Also captures sigma_quantile, deadband, max_caps from certificates.
     """
     families_seen = set()
     q99_values: Dict[str, List[float]] = defaultdict(list)
     max_values: Dict[str, List[float]] = defaultdict(list)
     existing_caps: Dict[str, float] = {}
-    
+
     # Global settings (take from first cert that has them)
     sigma_quantile: Optional[float] = None
     deadband: Optional[float] = None
     max_caps: Optional[int] = None
-    
+
     for cert in certs:
         spectral = cert.get('spectral', {})
         if not isinstance(spectral, dict):
             continue
-        
+
         # Capture global settings
         if sigma_quantile is None:
             sq = spectral.get('sigma_quantile') or spectral.get('summary', {}).get('sigma_quantile')
@@ -838,7 +838,7 @@ def calibrate_spectral(certs: List[Dict]) -> Tuple[Dict[str, Any], Dict[str, Dic
                     sigma_quantile = float(sq)
                 except (TypeError, ValueError):
                     pass
-        
+
         if deadband is None:
             db = spectral.get('deadband') or spectral.get('summary', {}).get('deadband')
             if db is not None:
@@ -846,7 +846,7 @@ def calibrate_spectral(certs: List[Dict]) -> Tuple[Dict[str, Any], Dict[str, Dic
                     deadband = float(db)
                 except (TypeError, ValueError):
                     pass
-        
+
         if max_caps is None:
             mc = spectral.get('max_caps') or spectral.get('summary', {}).get('max_caps')
             if mc is not None:
@@ -854,7 +854,7 @@ def calibrate_spectral(certs: List[Dict]) -> Tuple[Dict[str, Any], Dict[str, Dic
                     max_caps = int(mc)
                 except (TypeError, ValueError):
                     pass
-        
+
         # Extract existing family_caps as fallback
         fam_caps = spectral.get('family_caps', {})
         if isinstance(fam_caps, dict):
@@ -865,7 +865,7 @@ def calibrate_spectral(certs: List[Dict]) -> Tuple[Dict[str, Any], Dict[str, Dic
                         existing_caps[str(fam)] = float(kappa)
                 except (TypeError, ValueError, AttributeError):
                     pass
-        
+
         # Extract family_z_quantiles → the observed z-scores per family
         fq = spectral.get('family_z_quantiles', {})
         if isinstance(fq, dict):
@@ -873,7 +873,7 @@ def calibrate_spectral(certs: List[Dict]) -> Tuple[Dict[str, Any], Dict[str, Dic
                 if not isinstance(stats, dict):
                     continue
                 families_seen.add(str(fam))
-                
+
                 # Extract q99 and max values
                 for key, collector in [('q99', q99_values), ('max', max_values)]:
                     val = stats.get(key)
@@ -882,7 +882,7 @@ def calibrate_spectral(certs: List[Dict]) -> Tuple[Dict[str, Any], Dict[str, Dic
                             collector[str(fam)].append(float(val))
                         except (TypeError, ValueError):
                             pass
-    
+
     # Build summary
     summary = {
         'families_seen': sorted(families_seen),
@@ -890,36 +890,36 @@ def calibrate_spectral(certs: List[Dict]) -> Tuple[Dict[str, Any], Dict[str, Dic
         'deadband': deadband,
         'max_caps': max_caps
     }
-    
+
     # Derive family_caps from observed z-scores
     proposed_caps: Dict[str, Dict[str, float]] = {}
-    
+
     if not families_seen:
         print("  WARNING: No spectral family_z_quantiles found; using existing caps")
         for fam, kappa in existing_caps.items():
             proposed_caps[fam] = {'kappa': kappa}
         return summary, proposed_caps
-    
+
     for fam in sorted(families_seen):
         observed = q99_values.get(fam, []) + max_values.get(fam, [])
-        
+
         if not observed or max(observed, default=0.0) <= 0.0:
             # Fall back to existing cap
             if fam in existing_caps:
                 proposed_caps[fam] = {'kappa': existing_caps[fam]}
             continue
-        
+
         # Proposed kappa = max(observed) * 1.05 (5% safety margin)
         base = max(observed)
         kappa = round(base * 1.05, 3)
         proposed_caps[fam] = {'kappa': kappa}
-        
+
         old = existing_caps.get(fam)
         if old is not None:
             print(f"  Spectral {fam}: observed max z={base:.3f} → kappa={kappa:.3f} (was {old:.3f})")
         else:
             print(f"  Spectral {fam}: observed max z={base:.3f} → kappa={kappa:.3f}")
-    
+
     return summary, proposed_caps
 
 # ==============================================================================
@@ -929,24 +929,24 @@ def calibrate_spectral(certs: List[Dict]) -> Tuple[Dict[str, Any], Dict[str, Dic
 def calibrate_rmt(certs: List[Dict]) -> Tuple[Dict[str, Any], Dict[str, float]]:
     """
     Extract RMT guard thresholds from certificates.
-    
+
     From rmt.family_stats.{family}.outlier_fraction (or similar), derive:
     - epsilon.{family} = max(observed) * 1.2 + 0.02 (20% margin + floor)
-    
+
     Also captures margin, deadband settings.
     """
     families_seen = set()
     outlier_fracs: Dict[str, List[float]] = defaultdict(list)
     existing_epsilon: Dict[str, float] = {}
-    
+
     margin: Optional[float] = None
     deadband: Optional[float] = None
-    
+
     for cert in certs:
         rmt = cert.get('rmt', {})
         if not isinstance(rmt, dict):
             continue
-        
+
         # Capture global settings
         if margin is None:
             m = rmt.get('margin') or rmt.get('summary', {}).get('margin')
@@ -955,7 +955,7 @@ def calibrate_rmt(certs: List[Dict]) -> Tuple[Dict[str, Any], Dict[str, float]]:
                     margin = float(m)
                 except (TypeError, ValueError):
                     pass
-        
+
         if deadband is None:
             db = rmt.get('deadband') or rmt.get('summary', {}).get('deadband')
             if db is not None:
@@ -963,7 +963,7 @@ def calibrate_rmt(certs: List[Dict]) -> Tuple[Dict[str, Any], Dict[str, float]]:
                     deadband = float(db)
                 except (TypeError, ValueError):
                     pass
-        
+
         # Extract existing epsilon as fallback
         eps = rmt.get('epsilon', {})
         if isinstance(eps, dict):
@@ -972,7 +972,7 @@ def calibrate_rmt(certs: List[Dict]) -> Tuple[Dict[str, Any], Dict[str, float]]:
                     existing_epsilon[str(fam)] = float(val)
                 except (TypeError, ValueError):
                     pass
-        
+
         # Extract family_stats → outlier fractions
         fstats = rmt.get('family_stats', {})
         if isinstance(fstats, dict):
@@ -980,7 +980,7 @@ def calibrate_rmt(certs: List[Dict]) -> Tuple[Dict[str, Any], Dict[str, float]]:
                 if not isinstance(stats, dict):
                     continue
                 families_seen.add(str(fam))
-                
+
                 # Try different field names
                 for key in ['outlier_fraction', 'outlier_rate', 'fraction', 'rate']:
                     val = stats.get(key)
@@ -990,7 +990,7 @@ def calibrate_rmt(certs: List[Dict]) -> Tuple[Dict[str, Any], Dict[str, float]]:
                             break
                         except (TypeError, ValueError):
                             pass
-        
+
         # Also check rmt.outliers_by_family
         obf = rmt.get('outliers_by_family', {})
         if isinstance(obf, dict):
@@ -1005,29 +1005,29 @@ def calibrate_rmt(certs: List[Dict]) -> Tuple[Dict[str, Any], Dict[str, float]]:
                                 break
                             except (TypeError, ValueError):
                                 pass
-    
+
     summary = {
         'families_seen': sorted(families_seen),
         'margin': margin,
         'deadband': deadband
     }
-    
+
     # Derive epsilon from observed outlier fractions
     proposed_epsilon: Dict[str, float] = {}
-    
+
     if not families_seen and not outlier_fracs:
         print("  WARNING: No RMT family_stats found; using existing epsilon")
         return summary, existing_epsilon if existing_epsilon else {
             'ffn': 0.10, 'attn': 0.08, 'embed': 0.12, 'other': 0.12
         }
-    
+
     # Default families if we saw families but no outlier data
     default_families = ['ffn', 'attn', 'embed', 'other']
     all_families = sorted(families_seen) if families_seen else default_families
-    
+
     for fam in all_families:
         fracs = outlier_fracs.get(fam, [])
-        
+
         if not fracs:
             # Fall back to existing or default
             if fam in existing_epsilon:
@@ -1037,18 +1037,18 @@ def calibrate_rmt(certs: List[Dict]) -> Tuple[Dict[str, Any], Dict[str, float]]:
                 defaults = {'ffn': 0.10, 'attn': 0.08, 'embed': 0.12, 'other': 0.12}
                 proposed_epsilon[fam] = defaults.get(fam, 0.10)
             continue
-        
+
         # Proposed epsilon = max(observed) * 1.2 + 0.02
         base = max(fracs)
         epsilon = round(base * 1.2 + 0.02, 3)
         proposed_epsilon[fam] = epsilon
-        
+
         old = existing_epsilon.get(fam)
         if old is not None:
             print(f"  RMT {fam}: observed max outlier_frac={base:.4f} → epsilon={epsilon:.3f} (was {old:.3f})")
         else:
             print(f"  RMT {fam}: observed max outlier_frac={base:.4f} → epsilon={epsilon:.3f}")
-    
+
     return summary, proposed_epsilon
 
 # ==============================================================================
@@ -1058,24 +1058,24 @@ def calibrate_rmt(certs: List[Dict]) -> Tuple[Dict[str, Any], Dict[str, float]]:
 def calibrate_variance(certs: List[Dict]) -> Dict[str, Any]:
     """
     Extract variance guard thresholds from certificates.
-    
+
     From variance.calibration_stats (or similar), derive:
     - deadband: max(observed_variance_change) * 1.1
     - min_effect_lognll: based on observed effect sizes
     """
     variance_changes: List[float] = []
     effect_sizes: List[float] = []
-    
+
     # Global settings
     deadband: Optional[float] = None
     min_effect: Optional[float] = None
     min_gain: Optional[float] = None
-    
+
     for cert in certs:
         var = cert.get('variance', {})
         if not isinstance(var, dict):
             continue
-        
+
         # Capture settings from cert
         if deadband is None:
             db = var.get('deadband') or var.get('summary', {}).get('deadband')
@@ -1084,7 +1084,7 @@ def calibrate_variance(certs: List[Dict]) -> Dict[str, Any]:
                     deadband = float(db)
                 except (TypeError, ValueError):
                     pass
-        
+
         if min_effect is None:
             me = var.get('min_effect_lognll') or var.get('summary', {}).get('min_effect_lognll')
             if me is not None:
@@ -1092,7 +1092,7 @@ def calibrate_variance(certs: List[Dict]) -> Dict[str, Any]:
                     min_effect = float(me)
                 except (TypeError, ValueError):
                     pass
-        
+
         if min_gain is None:
             mg = var.get('min_gain') or var.get('summary', {}).get('min_gain')
             if mg is not None:
@@ -1100,7 +1100,7 @@ def calibrate_variance(certs: List[Dict]) -> Dict[str, Any]:
                     min_gain = float(mg)
                 except (TypeError, ValueError):
                     pass
-        
+
         # Extract calibration stats
         cal_stats = var.get('calibration_stats', {})
         if isinstance(cal_stats, dict):
@@ -1110,14 +1110,14 @@ def calibrate_variance(certs: List[Dict]) -> Dict[str, Any]:
                     variance_changes.append(abs(float(var_change)))
                 except (TypeError, ValueError):
                     pass
-            
+
             effect = cal_stats.get('effect_size') or cal_stats.get('effect')
             if effect is not None:
                 try:
                     effect_sizes.append(abs(float(effect)))
                 except (TypeError, ValueError):
                     pass
-        
+
         # Also check var.summary for aggregated stats
         summary = var.get('summary', {})
         if isinstance(summary, dict):
@@ -1129,9 +1129,9 @@ def calibrate_variance(certs: List[Dict]) -> Dict[str, Any]:
                         break
                     except (TypeError, ValueError):
                         pass
-    
+
     result: Dict[str, Any] = {}
-    
+
     # Use existing settings as base, derive overrides if we have data
     if deadband is not None:
         result['deadband'] = deadband
@@ -1142,7 +1142,7 @@ def calibrate_variance(certs: List[Dict]) -> Dict[str, Any]:
         print(f"  Variance: observed max change={max(variance_changes):.4f} → deadband={proposed_db:.3f}")
     else:
         result['deadband'] = 0.02  # Conservative default
-    
+
     if min_effect is not None:
         result['min_effect_lognll'] = min_effect
     elif effect_sizes:
@@ -1152,10 +1152,10 @@ def calibrate_variance(certs: List[Dict]) -> Dict[str, Any]:
         print(f"  Variance: observed max effect={max(effect_sizes):.4f} → min_effect={result['min_effect_lognll']:.4f}")
     else:
         result['min_effect_lognll'] = 0.0009  # Default
-    
+
     if min_gain is not None:
         result['min_gain'] = min_gain
-    
+
     return result
 
 # ==============================================================================
@@ -1189,7 +1189,7 @@ def generate_calibrated_preset(
         },
         'guards': {}
     }
-    
+
     # Spectral guard
     spectral = {}
     if spectral_caps:
@@ -1202,7 +1202,7 @@ def generate_calibrated_preset(
         spectral['max_caps'] = spectral_summary['max_caps']
     if spectral:
         preset['guards']['spectral'] = spectral
-    
+
     # RMT guard
     rmt = {}
     if rmt_epsilon:
@@ -1213,11 +1213,11 @@ def generate_calibrated_preset(
         rmt['deadband'] = rmt_summary['deadband']
     if rmt:
         preset['guards']['rmt'] = rmt
-    
+
     # Variance guard
     if variance_config:
         preset['guards']['variance'] = variance_config
-    
+
     return preset
 
 # ==============================================================================
@@ -1304,15 +1304,15 @@ run_invarlock_certify() {
     local output_dir="$3"
     local run_name="$4"
     local preset_dir="$5"
-    
+
     log "Running InvarLock certification:"
     log "  Model: ${model_path}"
     log "  Baseline: ${baseline_report_path}"
     log "  Output: ${output_dir}/${run_name}"
-    
+
     local run_dir="${output_dir}/${run_name}"
     mkdir -p "${run_dir}"
-    
+
     # Find calibrated preset for this model
     # Extract model name from the calibration directory structure
     # baseline_report_path is like: .../model_name/certificates/calibration/run_1/baseline_report.json
@@ -1324,13 +1324,13 @@ run_invarlock_certify() {
     local model_output_dir=$(dirname "${certs_dir}")                        # model_name
     local model_name=$(basename "${model_output_dir}")
     local calibrated_preset=""
-    
+
     # Debug: log the extracted paths
     log "  Path extraction debug:"
     log "    baseline_report_path: ${baseline_report_path}"
     log "    model_output_dir: ${model_output_dir}"
     log "    model_name: ${model_name}"
-    
+
     # Look for YAML first, then JSON
     for ext in yaml json; do
         local preset_path="${preset_dir}/calibrated_preset_${model_name}.${ext}"
@@ -1339,11 +1339,11 @@ run_invarlock_certify() {
             break
         fi
     done
-    
+
     # Check drift compatibility from calibration stats
     local cal_stats="${calibration_dir}/calibration_stats.json"
     local use_tiny_relax="false"
-    
+
     if [[ -f "${cal_stats}" ]]; then
         local band_compatible=$(python3 -c "import json; print(json.load(open('${cal_stats}'))['drift'].get('band_compatible', True))" 2>/dev/null || echo "True")
         if [[ "${band_compatible}" == "False" ]]; then
@@ -1351,7 +1351,7 @@ run_invarlock_certify() {
             use_tiny_relax="true"
         fi
     fi
-    
+
     # Generate config YAML for this run
     local config_yaml="${run_dir}/certify_config.yaml"
     generate_invarlock_config \
@@ -1362,7 +1362,7 @@ run_invarlock_certify() {
         "${INVARLOCK_PREVIEW_WINDOWS}" \
         "${INVARLOCK_FINAL_WINDOWS}" \
         "${INVARLOCK_BOOTSTRAP_N}"
-    
+
     # Resolve the actual baseline report.json
     # The baseline_report_path should already be baseline_report.json or report.json
     local baseline_json=""
@@ -1383,7 +1383,7 @@ run_invarlock_certify() {
     else
         log "  WARNING: Baseline report not found at: ${baseline_report_path}"
     fi
-    
+
     # Log which preset/baseline we're using
     if [[ -n "${calibrated_preset}" ]]; then
         log "  Using calibrated preset: ${calibrated_preset}"
@@ -1391,7 +1391,7 @@ run_invarlock_certify() {
     if [[ -n "${baseline_json}" ]]; then
         log "  Using baseline report: ${baseline_json}"
     fi
-    
+
     # Build command - use config file-based invocation
     local cmd_args=(
         "invarlock" "run"
@@ -1399,22 +1399,22 @@ run_invarlock_certify() {
         "--profile" "ci"
         "--out" "${run_dir}"
     )
-    
+
     # Add baseline if found
     if [[ -n "${baseline_json}" && -f "${baseline_json}" ]]; then
         cmd_args+=("--baseline" "${baseline_json}")
     fi
-    
+
     # Set environment and run
     if [[ "${use_tiny_relax}" == "true" ]]; then
         INVARLOCK_TINY_RELAX=1 "${cmd_args[@]}" 2>&1 | tee -a "${LOG_FILE}" || log "  Certification failed (exit code $?, may be expected for error models)"
     else
         "${cmd_args[@]}" 2>&1 | tee -a "${LOG_FILE}" || log "  Certification failed (exit code $?, may be expected for error models)"
     fi
-    
+
     # Find the subject report that was just generated
     local subject_report=$(find "${run_dir}" -name "report*.json" -type f 2>/dev/null | head -1)
-    
+
     # Generate certificate explicitly using Python
     # Note: invarlock run does NOT auto-generate cert files unless --until-pass is used
     if [[ -n "${subject_report}" && -f "${subject_report}" && -n "${baseline_json}" && -f "${baseline_json}" ]]; then
@@ -1424,32 +1424,32 @@ import json
 from pathlib import Path
 try:
     from invarlock.reporting.certificate import make_certificate
-    
+
     subject_path = Path("${subject_report}")
     baseline_path = Path("${baseline_json}")
     cert_path = Path("${run_dir}") / "evaluation.cert.json"
-    
+
     subject = json.loads(subject_path.read_text())
     baseline = json.loads(baseline_path.read_text())
-    
+
     cert = make_certificate(subject, baseline)
-    
+
     with open(cert_path, 'w') as f:
         json.dump(cert, f, indent=2)
-    
+
     # Print validation summary
     val = cert.get('validation', {})
     pm_ok = val.get('primary_metric_acceptable', 'N/A')
     inv_ok = val.get('invariants_pass', 'N/A')
     spec_ok = val.get('spectral_stable', 'N/A')
     rmt_ok = val.get('rmt_stable', 'N/A')
-    
+
     print(f"  Certificate generated: {cert_path.name}")
     print(f"    PM acceptable: {pm_ok}")
     print(f"    Invariants pass: {inv_ok}")
     print(f"    Spectral stable: {spec_ok}")
     print(f"    RMT stable: {rmt_ok}")
-    
+
 except Exception as e:
     print(f"  WARNING: Could not generate certificate: {e}")
     import traceback
@@ -1468,15 +1468,15 @@ process_model() {
     local model_name=$(basename "${model_id}" | tr '[:upper:]' '[:lower:]' | tr '/' '_')
     local model_output_dir="${OUTPUT_DIR}/${model_name}"
     local preset_dir="${OUTPUT_DIR}/presets"
-    
+
     log_section "PROCESSING MODEL: ${model_id}"
-    
+
     mkdir -p "${model_output_dir}"/{models,evals,certificates}
-    
+
     # Step 1: Setup baseline
     log "Step 1: Setup baseline model"
     local baseline_path=$(setup_model "${model_id}")
-    
+
     # Step 2: Run baseline evals
     log "Step 2: Running baseline lm-eval"
     run_lmeval \
@@ -1485,7 +1485,7 @@ process_model() {
         "${EVAL_TASKS}" \
         "${EVAL_BATCH_SIZE}" \
         "${EVAL_NUM_FEWSHOT}"
-    
+
     # Step 3: InvarLock FULL calibration (all guards)
     log "Step 3: InvarLock FULL calibration (all guards)"
     run_invarlock_calibration \
@@ -1494,10 +1494,10 @@ process_model() {
         "${model_output_dir}/certificates/calibration" \
         "${DRIFT_CALIBRATION_RUNS}" \
         "${preset_dir}"
-    
+
     # Use the baseline report.json from calibration run 1
     local baseline_report="${model_output_dir}/certificates/calibration/run_1/baseline_report.json"
-    
+
     # Step 4: Create and evaluate clean edit
     log "Step 4: Clean edit (${EDIT_BITS}-bit ${EDIT_TYPE})"
     local clean_edit_path="${model_output_dir}/models/clean_edit"
@@ -1508,14 +1508,14 @@ process_model() {
         "${EDIT_BITS}" \
         "${EDIT_GROUP_SIZE}" \
         "${EDIT_SCOPE}"
-    
+
     run_lmeval \
         "${clean_edit_path}" \
         "${model_output_dir}/evals/clean_edit_results.json" \
         "${EVAL_TASKS}" \
         "${EVAL_BATCH_SIZE}" \
         "${EVAL_NUM_FEWSHOT}"
-    
+
     for run in $(seq 1 "${CLEAN_EDIT_RUNS}"); do
         run_invarlock_certify \
             "${clean_edit_path}" \
@@ -1524,7 +1524,7 @@ process_model() {
             "run_${run}" \
             "${preset_dir}"
     done
-    
+
     # Step 5: Stress edit (int4 aggressive)
     log "Step 5: Stress edit (4-bit aggressive)"
     local stress_edit_path="${model_output_dir}/models/stress_edit"
@@ -1535,14 +1535,14 @@ process_model() {
         "4" \
         "32" \
         "all"
-    
+
     run_lmeval \
         "${stress_edit_path}" \
         "${model_output_dir}/evals/stress_edit_results.json" \
         "${EVAL_TASKS}" \
         "${EVAL_BATCH_SIZE}" \
         "${EVAL_NUM_FEWSHOT}"
-    
+
     for run in $(seq 1 "${STRESS_EDIT_RUNS}"); do
         run_invarlock_certify \
             "${stress_edit_path}" \
@@ -1551,22 +1551,22 @@ process_model() {
             "run_${run}" \
             "${preset_dir}"
     done
-    
+
     # Step 6: Error injection tests
     if [[ "${RUN_ERROR_INJECTION}" == "true" ]]; then
         log "Step 6: Error injection tests"
-        
+
         local errors=("nan_injection" "inf_injection" "extreme_quant" "scale_explosion" "zero_layer")
-        
+
         for error_type in "${errors[@]}"; do
             log "  Testing error: ${error_type}"
             local error_path="${model_output_dir}/models/error_${error_type}"
-            
+
             create_error_model \
                 "${baseline_path}" \
                 "${error_path}" \
                 "${error_type}"
-            
+
             run_invarlock_certify \
                 "${error_path}" \
                 "${baseline_report}" \
@@ -1575,14 +1575,14 @@ process_model() {
                 "${preset_dir}"
         done
     fi
-    
+
     log "Model processing complete: ${model_name}"
 }
 
 # ============ COMPILE RESULTS ============
 compile_results() {
     log_section "COMPILING RESULTS"
-    
+
     python3 << EOF
 import json
 import csv
@@ -1598,11 +1598,11 @@ eval_rows = []
 for model_dir in output_dir.iterdir():
     if not model_dir.is_dir() or model_dir.name in ['logs', 'analysis', 'reports', 'presets']:
         continue
-    
+
     evals_dir = model_dir / "evals"
     if not evals_dir.exists():
         continue
-    
+
     for results_file in evals_dir.glob("*_results.json"):
         edit_type = results_file.stem.replace("_results", "")
         try:
@@ -1633,17 +1633,17 @@ invar_rows = []
 for model_dir in output_dir.iterdir():
     if not model_dir.is_dir() or model_dir.name in ['logs', 'analysis', 'reports', 'presets']:
         continue
-    
+
     certs_dir = model_dir / "certificates"
     if not certs_dir.exists():
         continue
-    
+
     for cert_file in certs_dir.rglob("evaluation.cert.json"):
         try:
             cert = json.loads(cert_file.read_text())
             rel_path = cert_file.relative_to(certs_dir)
             parts = list(rel_path.parts)
-            
+
             v = cert.get('validation', {})
             # Handle both boolean and string values (JSON serialization can cause issues)
             def as_bool(val):
@@ -1652,14 +1652,14 @@ for model_dir in output_dir.iterdir():
                 if isinstance(val, str):
                     return val.lower() == 'true'
                 return bool(val)
-            
+
             all_pass = all([
                 as_bool(v.get('invariants_pass', False)),
                 as_bool(v.get('primary_metric_acceptable', False)),
                 as_bool(v.get('spectral_stable', False)),
                 as_bool(v.get('rmt_stable', False))
             ])
-            
+
             invar_rows.append({
                 'model': model_dir.name,
                 'experiment': parts[0] if parts else 'unknown',
@@ -1686,7 +1686,7 @@ calibration_summary = {}
 for model_dir in output_dir.iterdir():
     if not model_dir.is_dir() or model_dir.name in ['logs', 'analysis', 'reports', 'presets']:
         continue
-    
+
     cal_stats = model_dir / "certificates" / "calibration" / "calibration_stats.json"
     if cal_stats.exists():
         try:
@@ -1705,7 +1705,7 @@ EOF
 # ============ CORRELATION ANALYSIS ============
 run_analysis() {
     log_section "CORRELATION ANALYSIS"
-    
+
     python3 << EOF
 import json
 import csv
@@ -1749,24 +1749,24 @@ categories = defaultdict(int)
 for model_dir in output_dir.iterdir():
     if not model_dir.is_dir() or model_dir.name in ['logs', 'analysis', 'reports', 'presets']:
         continue
-    
+
     model = model_dir.name
     results['models'][model] = {}
     print(f"\n### {model} ###")
-    
+
     # Report calibration status
     if model in cal_summary:
         drift_info = cal_summary[model].get('drift', {})
         print(f"  Calibration: drift_mean={drift_info.get('mean', 'N/A')}, band_compatible={drift_info.get('band_compatible', 'N/A')}")
-    
+
     # Get baseline evals
     baseline_key = (model, 'baseline')
     baseline_evals = eval_data.get(baseline_key, {})
-    
+
     for edit_type in ['clean_edit', 'stress_edit']:
         edit_key = (model, edit_type)
         edit_evals = eval_data.get(edit_key, {})
-        
+
         # Check for regression (>5% drop)
         has_regression = False
         for task in baseline_evals:
@@ -1775,12 +1775,12 @@ for model_dir in output_dir.iterdir():
                 if delta < -0.05:
                     has_regression = True
                     break
-        
+
         # Get InvarLock verdict
         invar_key = (model, edit_type)
         invar_results = invar_data.get(invar_key, [])
         invar_flagged = any(r['all_pass'] == 'False' for r in invar_results)
-        
+
         # Classify
         if has_regression and invar_flagged:
             category = "TRUE_POSITIVE"
@@ -1790,11 +1790,11 @@ for model_dir in output_dir.iterdir():
             category = "TRUE_NEGATIVE"
         else:
             category = "FALSE_NEGATIVE"
-        
+
         categories[category] += 1
         results['models'][model][edit_type] = {'category': category, 'regression': has_regression, 'flagged': invar_flagged}
         print(f"  {edit_type}: {category}")
-    
+
     # Error detection
     error_key = (model, 'errors')
     for row in invar_data.get(error_key, []):
@@ -1852,7 +1852,7 @@ EOF
 # ============ GENERATE VERDICT ============
 generate_verdict() {
     log_section "GENERATING FINAL VERDICT"
-    
+
     python3 << EOF
 import json
 from pathlib import Path
@@ -1960,36 +1960,36 @@ EOF
 # ============ MAIN ============
 main() {
     local start_time=$(date +%s)
-    
+
     echo "╔══════════════════════════════════════════════════════════════════╗"
     echo "║  InvarLock Definitive Validation Suite v${SCRIPT_VERSION}                ║"
     echo "║  With FULL Guard Calibration                                    ║"
     echo "║  Is this a TOY or PRODUCTION-READY?                             ║"
     echo "╚══════════════════════════════════════════════════════════════════╝"
     echo ""
-    
+
     log "Output directory: ${OUTPUT_DIR}"
     log "Models: ${MODEL_1}, ${MODEL_2}${MODEL_3:+, $MODEL_3}"
     log ""
-    
+
     # Phase 0: Check dependencies
     check_dependencies
-    
+
     # Process each model
     for model_id in "${MODEL_1}" "${MODEL_2}" ${MODEL_3:+"${MODEL_3}"}; do
         if [[ -n "${model_id}" ]]; then
             process_model "${model_id}"
         fi
     done
-    
+
     # Compile and analyze
     compile_results
     run_analysis
     generate_verdict
-    
+
     local end_time=$(date +%s)
     local duration=$((end_time - start_time))
-    
+
     log_section "COMPLETE"
     log "Total time: $((duration / 3600))h $(((duration % 3600) / 60))m"
     log "Report: ${OUTPUT_DIR}/reports/final_verdict.txt"
@@ -2012,10 +2012,10 @@ Options (via environment variables):
     MODEL_1               First model (default: mistralai/Mistral-7B-v0.3)
     MODEL_2               Second model (default: Qwen/Qwen2-14B)
     MODEL_3               Optional third model
-    
+
     EDIT_BITS             Quantization bits (default: 8)
     EVAL_TASKS            lm-eval tasks (default: mmlu,hellaswag,arc_challenge,winogrande)
-    
+
     DRIFT_CALIBRATION_RUNS  Number of calibration runs (default: 5)
     RUN_ERROR_INJECTION     Run error injection tests (default: true)
     OUTPUT_DIR              Output directory

@@ -16,17 +16,29 @@ from typing import Any
 
 # Explicit per-file overrides. Values are branch floors unless branch-rate is
 # unavailable, in which case line-rate is used as a fallback. These take
-# precedence over the global/core floors below. Set all to 85% now that suites
-# are in place.
+# precedence over the global/core floors below. Most are at 85%; a few newer
+# entries use phased floors (e.g., 0.75–0.80) and should be ratcheted upward
+# over time.
 THRESHOLDS = {
     # Evaluation & reporting
     "src/invarlock/eval/metrics.py": 0.85,
+    # Guard-effect benchmark harness (Step 14) + primary metric core
+    "src/invarlock/eval/bench.py": 0.85,
+    "src/invarlock/eval/primary_metric.py": 0.85,
+    # Calibration (release artifacts / tier updates)
+    "src/invarlock/calibration/spectral_null.py": 0.85,
+    "src/invarlock/calibration/variance_ve.py": 0.85,
     # Reporting
     "src/invarlock/reporting/certificate.py": 0.85,
     "src/invarlock/reporting/report.py": 0.85,
     "src/invarlock/reporting/validate.py": 0.85,
     # Reporting types
     "src/invarlock/reporting/report_types.py": 0.85,
+    "src/invarlock/reporting/dataset_hashing.py": 0.85,
+    "src/invarlock/reporting/certificate_schema.py": 0.85,
+    "src/invarlock/reporting/guards_analysis.py": 0.85,
+    "src/invarlock/reporting/primary_metric_utils.py": 0.85,
+    "src/invarlock/reporting/utils.py": 0.85,
     # Guards (safety mechanisms)
     "src/invarlock/guards/variance.py": 0.85,
     "src/invarlock/guards/invariants.py": 0.85,
@@ -46,8 +58,14 @@ THRESHOLDS = {
     "src/invarlock/core/retry.py": 0.85,
     "src/invarlock/core/types.py": 0.85,
     # CLI commands
+    "src/invarlock/cli/_json.py": 0.85,
+    "src/invarlock/cli/_evidence.py": 0.85,
+    "src/invarlock/cli/config.py": 0.85,
     "src/invarlock/cli/commands/run.py": 0.85,
     "src/invarlock/cli/commands/verify.py": 0.85,
+    "src/invarlock/cli/commands/calibrate.py": 0.85,
+    # CLI determinism preset (CI/Release provenance)
+    "src/invarlock/cli/determinism.py": 0.85,
     # Core events logger
     "src/invarlock/core/events.py": 0.85,
 }
@@ -73,15 +91,29 @@ CORE_PREFIXES = (
 CORE_FILES = (
     # Evaluation & reporting (key entry points)
     "src/invarlock/eval/metrics.py",
+    "src/invarlock/eval/bench.py",
+    "src/invarlock/eval/primary_metric.py",
+    "src/invarlock/calibration/spectral_null.py",
+    "src/invarlock/calibration/variance_ve.py",
     "src/invarlock/reporting/report.py",
     "src/invarlock/reporting/validate.py",
     "src/invarlock/reporting/report_types.py",
+    "src/invarlock/reporting/dataset_hashing.py",
+    "src/invarlock/reporting/certificate_schema.py",
+    "src/invarlock/reporting/guards_analysis.py",
+    "src/invarlock/reporting/primary_metric_utils.py",
+    "src/invarlock/reporting/utils.py",
     # Certificate is part of the reporting surface but has an explicit
     # transitional override below until tests mature
     "src/invarlock/reporting/certificate.py",
     # Critical CLI commands
     "src/invarlock/cli/commands/run.py",
     "src/invarlock/cli/commands/verify.py",
+    "src/invarlock/cli/commands/calibrate.py",
+    "src/invarlock/cli/determinism.py",
+    "src/invarlock/cli/config.py",
+    "src/invarlock/cli/_json.py",
+    "src/invarlock/cli/_evidence.py",
 )
 
 
@@ -136,6 +168,7 @@ def _collect_branch_rates(root: ET.Element) -> dict[str, float]:
         Path("src/invarlock/core"),
         Path("src/invarlock/reporting"),
         Path("src/invarlock/cli"),
+        Path("src/invarlock/calibration"),
         Path("src/invarlock/guards"),
         Path("src/invarlock/eval"),
         Path("scripts"),
@@ -176,6 +209,11 @@ def _collect_branch_rates(root: ET.Element) -> dict[str, float]:
         # Map these directly to project-relative under src/.
         if filename.startswith("invarlock/"):
             return f"src/{filename}"
+        # Coverage XML may emit bare basenames for multiple modules (e.g., both
+        # src/invarlock/core/bootstrap.py and src/invarlock/eval/bootstrap.py).
+        # In those cases, mapping is ambiguous and can mis-attribute rates.
+        if filename in {"bootstrap.py"} and "/" not in filename:
+            return None
         candidate = Path(filename)
         # Try normalizing absolute paths first
         if candidate.exists():
@@ -282,7 +320,7 @@ def main() -> int:
 
     summary = (
         f"Coverage OK: {len(THRESHOLDS)}/{len(THRESHOLDS)} files met per-file thresholds. "
-        "Project floor (65%) enforced via pytest."
+        "Project floor (75%) enforced via pytest."
     )
     print(summary)
     return 0

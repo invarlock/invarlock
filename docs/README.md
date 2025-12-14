@@ -1,10 +1,8 @@
-# InvarLock Documentation (0.3.1)
+# InvarLock Documentation (0.3.2)
 
 The OSS core is edit‑agnostic (BYOE). A small built‑in quantization demo
 (`quant_rtn`, 8‑bit) exists for CI/quickstart. See
 [Compare & Certify (BYOE)](user-guide/compare-and-certify.md).
-
-Version 0.3.1
 
 Welcome to the documentation hub for InvarLock (Edit‑agnostic robustness certificates for weight edits).
 The material below is organized so new users can ramp quickly while practitioners

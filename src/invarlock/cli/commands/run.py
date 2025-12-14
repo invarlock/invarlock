@@ -9,6 +9,7 @@ prefer Compare & Certify via `invarlock certify --baseline ... --subject ...`.
 
 import copy
 import hashlib
+import inspect
 import json
 import math
 import os
@@ -818,6 +819,51 @@ def _resolve_provider_and_split(
     return data_provider, resolved_split, used_fallback_split
 
 
+def _extract_model_load_kwargs(cfg: InvarLockConfig) -> dict[str, Any]:
+    """Return adapter.load_model kwargs from config (excluding core fields)."""
+    try:
+        data = cfg.model_dump()
+    except Exception:
+        data = {}
+    model = data.get("model") if isinstance(data, dict) else None
+    if not isinstance(model, dict):
+        return {}
+    return {
+        key: value
+        for key, value in model.items()
+        if key not in {"id", "adapter", "device"} and value is not None
+    }
+
+
+def _load_model_with_cfg(adapter: Any, cfg: InvarLockConfig, device: str) -> Any:
+    """Load a model with config-provided kwargs, filtering for strict adapters."""
+    try:
+        model_id = cfg.model.id
+    except Exception:
+        try:
+            model_id = (cfg.model_dump().get("model") or {}).get("id")
+        except Exception:
+            model_id = None
+    if not isinstance(model_id, str) or not model_id:
+        raise ValueError("Missing model.id in config")
+
+    extra = _extract_model_load_kwargs(cfg)
+    try:
+        sig = inspect.signature(adapter.load_model)
+        accepts_var_kw = any(
+            p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+        )
+        if accepts_var_kw:
+            return adapter.load_model(model_id, device=device, **extra)
+        allowed = {k: v for k, v in extra.items() if k in sig.parameters}
+        if allowed:
+            return adapter.load_model(model_id, device=device, **allowed)
+    except Exception:
+        # Fall back to the strictest call shape.
+        pass
+    return adapter.load_model(model_id, device=device)
+
+
 def _run_bare_control(
     *,
     adapter: Any,
@@ -899,6 +945,7 @@ def _run_bare_control(
         "errors": [],
         "checks": {},
         "source": f"{profile_normalized or 'ci'}_profile",
+        "mode": "bare",
     }
 
     if getattr(bare_report, "status", "").lower() not in {"success", "completed", "ok"}:
@@ -977,7 +1024,7 @@ def _postprocess_and_summarize(
     match_fraction: float | None,
     overlap_fraction: float | None,
     console: Console,
-) -> None:
+) -> dict[str, str]:
     """Finalize report windows stats and print/save summary artifacts."""
     try:
         ds = report.setdefault("dataset", {}).setdefault("windows", {})
@@ -1001,6 +1048,7 @@ def _postprocess_and_summarize(
     console.print(f"📄 Report: {saved_files['json']}")
     if run_config.event_path:
         console.print(f"📝 Events: {run_config.event_path}")
+    return saved_files
 
 
 def _compute_provider_digest(report: dict[str, Any]) -> dict[str, str] | None:
@@ -1537,6 +1585,7 @@ def run_command(
     no_cleanup = bool(_coerce_option(no_cleanup, False))
 
     # Use shared CLI coercers from invarlock.cli.utils
+    report_path_out: str | None = None
 
     def _fail_run(message: str) -> None:
         console.print(f"[red]❌ {message}[/red]")
@@ -1672,6 +1721,26 @@ def run_command(
         resolved_device, output_dir = _resolve_device_and_output(
             cfg, device=device, out=out, console=console
         )
+
+        determinism_meta: dict[str, Any] | None = None
+        try:
+            from invarlock.cli.determinism import apply_determinism_preset
+
+            preset = apply_determinism_preset(
+                profile=profile_label,
+                device=resolved_device,
+                seed=int(seed_bundle.get("python") or seed_value),
+                threads=int(os.environ.get("INVARLOCK_OMP_THREADS", 1) or 1),
+            )
+            if isinstance(preset, dict) and preset:
+                determinism_meta = preset
+                preset_seeds = preset.get("seeds")
+                if isinstance(preset_seeds, dict) and preset_seeds:
+                    for key in ("python", "numpy", "torch"):
+                        if key in preset_seeds:
+                            seed_bundle[key] = preset_seeds.get(key)
+        except Exception:
+            determinism_meta = None
 
         # Create run directory with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -2934,7 +3003,23 @@ def run_command(
                 )
 
             guard_overhead_payload: dict[str, Any] | None = None
-            if measure_guard_overhead:
+            if skip_overhead and profile_normalized in {"ci", "release"}:
+                guard_overhead_payload = {
+                    "overhead_threshold": GUARD_OVERHEAD_THRESHOLD,
+                    "evaluated": False,
+                    "passed": True,
+                    "skipped": True,
+                    "skip_reason": "INVARLOCK_SKIP_OVERHEAD_CHECK",
+                    "mode": "skipped",
+                    "source": "env:INVARLOCK_SKIP_OVERHEAD_CHECK",
+                    "messages": [
+                        "Overhead check skipped via INVARLOCK_SKIP_OVERHEAD_CHECK"
+                    ],
+                    "warnings": [],
+                    "errors": [],
+                    "checks": {},
+                }
+            elif measure_guard_overhead:
                 guard_overhead_payload = _run_bare_control(
                     adapter=adapter,
                     edit_op=edit_op,
@@ -3076,6 +3161,8 @@ def run_command(
                 meta_payload["invarlock_version"] = invarlock_version
             if env_flags:
                 meta_payload["env_flags"] = env_flags
+            if determinism_meta:
+                meta_payload["determinism"] = determinism_meta
             report["meta"].update(meta_payload)
             if pm_acceptance_range:
                 report["meta"]["pm_acceptance_range"] = pm_acceptance_range
@@ -3235,87 +3322,90 @@ def run_command(
                 report["metrics"].update(metrics_payload)
 
             if guard_overhead_payload is not None:
-                # Compute guarded primary-metric snapshot; pass structured reports into validator
-                try:
-                    # Map loss type to ppl family kind
-                    lk = str(resolved_loss_type or "causal").lower()
-                    if lk == "mlm":
-                        pm_kind_for_overhead = "ppl_mlm"
-                    elif lk in {"seq2seq", "s2s", "t5"}:
-                        pm_kind_for_overhead = "ppl_seq2seq"
-                    else:
-                        pm_kind_for_overhead = "ppl_causal"
+                if bool(guard_overhead_payload.get("skipped", False)):
+                    report["guard_overhead"] = guard_overhead_payload
+                else:
+                    # Compute guarded primary-metric snapshot; pass structured reports into validator
+                    try:
+                        # Map loss type to ppl family kind
+                        lk = str(resolved_loss_type or "causal").lower()
+                        if lk == "mlm":
+                            pm_kind_for_overhead = "ppl_mlm"
+                        elif lk in {"seq2seq", "s2s", "t5"}:
+                            pm_kind_for_overhead = "ppl_seq2seq"
+                        else:
+                            pm_kind_for_overhead = "ppl_causal"
 
-                    # Prefer computing from the in-memory core_report windows to avoid ordering issues
-                    pm_guarded = _extract_pm_snapshot_for_overhead(
-                        core_report, kind=pm_kind_for_overhead
-                    )
-                    if not isinstance(pm_guarded, dict) or not pm_guarded:
+                        # Prefer computing from the in-memory core_report windows to avoid ordering issues
                         pm_guarded = _extract_pm_snapshot_for_overhead(
-                            report, kind=pm_kind_for_overhead
+                            core_report, kind=pm_kind_for_overhead
                         )
+                        if not isinstance(pm_guarded, dict) or not pm_guarded:
+                            pm_guarded = _extract_pm_snapshot_for_overhead(
+                                report, kind=pm_kind_for_overhead
+                            )
 
-                    guard_overhead_payload["guarded_report"] = (
-                        {"metrics": {"primary_metric": pm_guarded}}
-                        if isinstance(pm_guarded, dict) and pm_guarded
-                        else None
+                        guard_overhead_payload["guarded_report"] = (
+                            {"metrics": {"primary_metric": pm_guarded}}
+                            if isinstance(pm_guarded, dict) and pm_guarded
+                            else None
+                        )
+                    except Exception:
+                        guard_overhead_payload["guarded_report"] = None
+                    bare_struct = guard_overhead_payload.get("bare_report") or {}
+                    guarded_struct = guard_overhead_payload.get("guarded_report") or {}
+                    # Be robust to mocks or minimal objects returned by validators
+                    result = validate_guard_overhead(
+                        bare_struct,
+                        guarded_struct,
+                        overhead_threshold=guard_overhead_payload.get(
+                            "overhead_threshold", GUARD_OVERHEAD_THRESHOLD
+                        ),
                     )
-                except Exception:
-                    guard_overhead_payload["guarded_report"] = None
-                bare_struct = guard_overhead_payload.get("bare_report") or {}
-                guarded_struct = guard_overhead_payload.get("guarded_report") or {}
-                # Be robust to mocks or minimal objects returned by validators
-                result = validate_guard_overhead(
-                    bare_struct,
-                    guarded_struct,
-                    overhead_threshold=guard_overhead_payload.get(
-                        "overhead_threshold", GUARD_OVERHEAD_THRESHOLD
-                    ),
-                )
-                try:
-                    messages = list(getattr(result, "messages", []))
-                except Exception:  # pragma: no cover - defensive
-                    messages = []
-                try:
-                    warnings = list(getattr(result, "warnings", []))
-                except Exception:  # pragma: no cover - defensive
-                    warnings = []
-                try:
-                    errors = list(getattr(result, "errors", []))
-                except Exception:  # pragma: no cover - defensive
-                    errors = []
-                try:
-                    checks = dict(getattr(result, "checks", {}))
-                except Exception:  # pragma: no cover - defensive
-                    checks = {}
-                metrics_obj = getattr(result, "metrics", {})
-                if not isinstance(metrics_obj, dict):
-                    metrics_obj = {}
-                overhead_ratio = metrics_obj.get("overhead_ratio")
-                if overhead_ratio is None:
-                    overhead_ratio = getattr(result, "overhead_ratio", None)
-                overhead_percent = metrics_obj.get("overhead_percent")
-                if overhead_percent is None:
-                    overhead_percent = getattr(result, "overhead_percent", None)
-                passed_flag = bool(getattr(result, "passed", False))
+                    try:
+                        messages = list(getattr(result, "messages", []))
+                    except Exception:  # pragma: no cover - defensive
+                        messages = []
+                    try:
+                        warnings = list(getattr(result, "warnings", []))
+                    except Exception:  # pragma: no cover - defensive
+                        warnings = []
+                    try:
+                        errors = list(getattr(result, "errors", []))
+                    except Exception:  # pragma: no cover - defensive
+                        errors = []
+                    try:
+                        checks = dict(getattr(result, "checks", {}))
+                    except Exception:  # pragma: no cover - defensive
+                        checks = {}
+                    metrics_obj = getattr(result, "metrics", {})
+                    if not isinstance(metrics_obj, dict):
+                        metrics_obj = {}
+                    overhead_ratio = metrics_obj.get("overhead_ratio")
+                    if overhead_ratio is None:
+                        overhead_ratio = getattr(result, "overhead_ratio", None)
+                    overhead_percent = metrics_obj.get("overhead_percent")
+                    if overhead_percent is None:
+                        overhead_percent = getattr(result, "overhead_percent", None)
+                    passed_flag = bool(getattr(result, "passed", False))
 
-                guard_overhead_payload.update(
-                    {
-                        "messages": messages,
-                        "warnings": warnings,
-                        "errors": errors,
-                        "checks": checks,
-                        "overhead_ratio": overhead_ratio,
-                        "overhead_percent": overhead_percent,
-                        "passed": passed_flag,
-                        "evaluated": True,
-                    }
-                )
-                # Normalize for non-finite/degenerate cases
-                guard_overhead_payload = _normalize_overhead_result(
-                    guard_overhead_payload, profile=profile_normalized
-                )
-                report["guard_overhead"] = guard_overhead_payload
+                    guard_overhead_payload.update(
+                        {
+                            "messages": messages,
+                            "warnings": warnings,
+                            "errors": errors,
+                            "checks": checks,
+                            "overhead_ratio": overhead_ratio,
+                            "overhead_percent": overhead_percent,
+                            "passed": passed_flag,
+                            "evaluated": True,
+                        }
+                    )
+                    # Normalize for non-finite/degenerate cases
+                    guard_overhead_payload = _normalize_overhead_result(
+                        guard_overhead_payload, profile=profile_normalized
+                    )
+                    report["guard_overhead"] = guard_overhead_payload
 
             had_baseline = bool(baseline and Path(baseline).exists())
             if (
@@ -3860,7 +3950,7 @@ def run_command(
             except Exception:
                 pass
 
-            _postprocess_and_summarize(
+            saved_files = _postprocess_and_summarize(
                 report=report,
                 run_dir=run_dir,
                 run_config=run_config,
@@ -3870,6 +3960,11 @@ def run_command(
                 overlap_fraction=overlap_fraction,
                 console=console,
             )
+            try:
+                if isinstance(saved_files, dict) and saved_files.get("json"):
+                    report_path_out = str(saved_files["json"])
+            except Exception:
+                pass
 
             # Metrics display
             pm_obj = None
@@ -4060,6 +4155,7 @@ def run_command(
             pass
 
         # Normal path falls through; cleanup handled below in finally
+        return report_path_out
 
     except FileNotFoundError as e:
         console.print(f"[red]❌ Configuration file not found: {e}[/red]")

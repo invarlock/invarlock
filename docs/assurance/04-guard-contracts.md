@@ -57,7 +57,7 @@ The chosen δ is published in certificates as `spectral.summary.deadband`.
 records a cap. Runs may continue while `caps_applied ≤ max_caps`. Once the
 limit is exceeded the guard returns `action = abort`, and the certificate
 stores both the count and the limit under
-`spectral.summary.{caps_applied,max_caps}`.
+`spectral.{caps_applied,max_caps}`.
 
 ### Quality Gates (Acceptance)
 
@@ -126,14 +126,14 @@ in certificates so reviewers can audit reproducibility.
 
 An evaluation schedule is accepted when:
 
-- `dataset.tokenizer_hash`, provider digest, and token totals are present.
+- `meta.tokenizer_hash`, provider digest, and token totals are present.
 - Preview/final windows share the same window IDs (pairing).
 - Masked-token counts are non-zero for masked-LM baselines (see
   `tests/eval/test_metrics_masked_lm.py`).
 - Window overlap = 0 and coverage ≥ requested counts; CI/Release profiles treat
   violations as hard errors during the run (see `src/invarlock/core/runner.py`).
 - Predictive VE calibration windows are drawn from the same schedule; provenance
-  appears under `variance.predictive_gate.provenance.window_ids`.
+  appears under `variance.ab_test.provenance.window_ids`.
 
 Baseline pairing schedules record the exact windows to preserve determinism.
 
@@ -146,8 +146,7 @@ To reproduce a certificate:
 3. Capture the seed bundle (`meta.seeds`) and policy digests.
 4. Use `invarlock report --format cert` with the saved baseline/report combination
    to regenerate the certificate; when seeds, config, and backend match, the
-   resulting certificate is bit-for-bit identical. Across supported backends it
-   must agree within `meta.float_tolerance`.
+   resulting certificate is bit-for-bit identical.
 
 Explainers for each field live in `docs/reference/certificate-schema.md`.
 

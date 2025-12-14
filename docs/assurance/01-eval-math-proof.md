@@ -87,19 +87,19 @@ InvarLock uses the exponential of the token‑weighted mean ΔlogNLL
 ## Runtime Contract
 
 - Certificates must satisfy:
-  - `ppl.logloss_delta_ci` exponentiates to `ppl.ratio_ci` (paired baseline path).
-  - `ppl.stats.paired_delta_summary` records `{mean,std,degenerate}` for the paired Δ distribution.
-  - `ppl.stats.window_match_fraction == 1.0` and `ppl.stats.window_overlap_fraction == 0.0`.
+  - `primary_metric.display_ci == exp(primary_metric.ci)` (paired baseline path; ppl-like kinds).
+  - `dataset.windows.stats.paired_delta_summary` records `{mean,std,degenerate}` for the paired Δ distribution.
+  - `dataset.windows.stats.window_match_fraction == 1.0` and `dataset.windows.stats.window_overlap_fraction == 0.0`.
 
 - Runs **abort** in CI/Release profiles if preview/final counts differ or pairing < 1.0.
 
 ## Observability
 
-- `ppl.preview_final_ratio` — final/preview perplexity ratio in linear space.
-- `ppl.ratio_ci` and `ppl.logloss_delta_ci` — paired ΔlogNLL interval (check both log and exponentiated views).
-- `ppl.stats.window_match_fraction`, `ppl.stats.window_overlap_fraction`, `ppl.stats.paired_windows`.
-- `ppl.stats.paired_delta_summary.{mean,std,degenerate}` and `ppl.stats.bootstrap.{replicates,seed}`.
-- `ppl.stats.coverage.preview/final` — confirms both arms honour window/coverage minima.
+- `primary_metric.{preview,final}` — supports preview→final drift checks for ppl-like kinds.
+- `primary_metric.display_ci` and `primary_metric.ci` — paired ΔlogNLL interval (check both log and exponentiated views).
+- `dataset.windows.stats.{window_match_fraction,window_overlap_fraction,paired_windows}`.
+- `dataset.windows.stats.paired_delta_summary.{mean,std,degenerate}` and `dataset.windows.stats.bootstrap.{replicates,seed}`.
+- `dataset.windows.stats.coverage.{preview,final}` — confirms both arms honour window/coverage minima.
 
 ## Edge cases & safeguards
 

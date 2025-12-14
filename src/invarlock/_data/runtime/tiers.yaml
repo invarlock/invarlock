@@ -5,6 +5,17 @@
 # embedded in certificates and referenced by automation documentation.
 
 balanced:
+  metrics:
+    pm_ratio:
+      ratio_limit_base: 1.10
+      min_tokens: 50000
+      hysteresis_ratio: 0.002
+      min_token_fraction: 0.01
+    accuracy:
+      delta_min_pp: -1.0
+      min_examples: 200
+      hysteresis_delta_pp: 0.1
+      min_examples_fraction: 0.01
   variance_guard:
     deadband: 0.02
     min_abs_adjust: 0.012
@@ -41,6 +52,17 @@ balanced:
       other: 0.12
 
 conservative:
+  metrics:
+    pm_ratio:
+      ratio_limit_base: 1.05
+      min_tokens: 20000
+      hysteresis_ratio: 0.002
+      min_token_fraction: 0.01
+    accuracy:
+      delta_min_pp: -0.5
+      min_examples: 200
+      hysteresis_delta_pp: 0.1
+      min_examples_fraction: 0.01
   variance_guard:
     deadband: 0.03
     min_abs_adjust: 0.02
@@ -74,3 +96,42 @@ conservative:
       attn: 0.05
       embed: 0.07
       other: 0.07
+
+aggressive:
+  metrics:
+    pm_ratio:
+      ratio_limit_base: 1.20
+      min_tokens: 50000
+      hysteresis_ratio: 0.002
+      min_token_fraction: 0.01
+    accuracy:
+      delta_min_pp: -2.0
+      min_examples: 200
+      hysteresis_delta_pp: 0.1
+      min_examples_fraction: 0.01
+  variance_guard:
+    deadband: 0.12
+    min_effect_lognll: 0.0005
+  spectral_guard:
+    sigma_quantile: 0.98
+    deadband: 0.15
+    scope: ffn
+    max_caps: 8
+    family_caps:
+      ffn: 3.0
+      attn: 3.5
+      embed: 2.5
+      other: 3.5
+    multiple_testing:
+      method: bh
+      alpha: 0.1
+      m: 4
+  rmt_guard:
+    deadband: 0.15
+    margin: 1.8
+    epsilon_default: 0.15
+    epsilon_by_family:
+      ffn: 0.15
+      attn: 0.15
+      embed: 0.15
+      other: 0.15

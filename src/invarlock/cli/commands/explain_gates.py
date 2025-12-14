@@ -6,7 +6,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from invarlock.core.auto_tuning import TIER_POLICIES
+from invarlock.core.auto_tuning import get_tier_policies
 from invarlock.reporting.certificate import make_certificate
 
 console = Console()
@@ -49,15 +49,38 @@ def explain_gates_command(
         "aggressive": 1.20,
         "none": 1.10,
     }
-    limit_base = tier_thresholds.get(tier, 1.10)
-    metrics_policy = (
-        TIER_POLICIES.get(tier, {}).get("metrics", {}) if isinstance(tier, str) else {}
+    resolved_policy = (
+        cert.get("resolved_policy", {})
+        if isinstance(cert.get("resolved_policy"), dict)
+        else {}
     )
+    metrics_policy = (
+        resolved_policy.get("metrics", {})
+        if isinstance(resolved_policy.get("metrics"), dict)
+        else {}
+    )
+    if not metrics_policy:
+        tier_policies = get_tier_policies()
+        tier_defaults = tier_policies.get(tier, tier_policies.get("balanced", {}))
+        metrics_policy = (
+            tier_defaults.get("metrics", {}) if isinstance(tier_defaults, dict) else {}
+        )
+        if not isinstance(metrics_policy, dict):
+            metrics_policy = {}
     pm_policy = (
-        metrics_policy.get("pm_ratio", {}) if isinstance(metrics_policy, dict) else {}
+        metrics_policy.get("pm_ratio", {})
+        if isinstance(metrics_policy.get("pm_ratio"), dict)
+        else {}
     )
     hysteresis_ratio = float(pm_policy.get("hysteresis_ratio", 0.0))
     min_tokens = int(pm_policy.get("min_tokens", 0))
+    try:
+        limit_base = float(
+            pm_policy.get("ratio_limit_base", tier_thresholds.get(tier, 1.10))
+            or tier_thresholds.get(tier, 1.10)
+        )
+    except Exception:
+        limit_base = tier_thresholds.get(tier, 1.10)
     limit_with_hyst = limit_base + max(0.0, hysteresis_ratio)
     tokens_ok = True
     telem = cert.get("telemetry", {}) if isinstance(cert.get("telemetry"), dict) else {}
@@ -70,9 +93,16 @@ def explain_gates_command(
         tokens_ok = True
 
     # Primary-metric ratio gate explanation (ppl-like kinds shown as ratios)
-    ppl = cert.get("ppl", {}) if isinstance(cert.get("ppl"), dict) else {}
-    ratio = ppl.get("ratio_vs_baseline")
-    ratio_ci = ppl.get("ratio_ci")
+    ratio = None
+    ratio_ci = None
+    if isinstance(cert.get("primary_metric"), dict):
+        pm = cert.get("primary_metric", {})
+        ratio = pm.get("ratio_vs_baseline")
+        ratio_ci = pm.get("display_ci")
+    elif isinstance(cert.get("ppl"), dict):  # legacy
+        ppl = cert.get("ppl", {})
+        ratio = ppl.get("ratio_vs_baseline")
+        ratio_ci = ppl.get("ratio_ci")
     hysteresis_applied = bool(validation.get("hysteresis_applied"))
     status = "PASS" if bool(validation.get("primary_metric_acceptable")) else "FAIL"
     console.print("[bold]Gate: Primary Metric vs Baseline[/bold]")
@@ -109,8 +139,22 @@ def explain_gates_command(
         pass
 
     # Drift gate explanation
-    drift = ppl.get("preview_final_ratio")
-    drift_ci = ppl.get("drift_ci")
+    drift = None
+    drift_ci = None
+    if isinstance(cert.get("primary_metric"), dict):
+        pm = cert.get("primary_metric", {})
+        preview = pm.get("preview")
+        final = pm.get("final")
+        if isinstance(preview, int | float) and isinstance(final, int | float):
+            try:
+                if float(preview) != 0.0:
+                    drift = float(final) / float(preview)
+            except Exception:
+                drift = None
+    if isinstance(cert.get("ppl"), dict):  # legacy
+        ppl = cert.get("ppl", {})
+        drift = ppl.get("preview_final_ratio", drift)
+        drift_ci = ppl.get("drift_ci")
     drift_status = (
         "PASS" if bool(validation.get("preview_final_drift_acceptable")) else "FAIL"
     )

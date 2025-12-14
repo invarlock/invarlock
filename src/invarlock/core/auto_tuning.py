@@ -7,9 +7,21 @@ Maps tier settings (conservative/balanced/aggressive) to specific guard paramete
 """
 
 import copy
+import os
+from functools import lru_cache
+from importlib import resources as _ires
+from pathlib import Path
 from typing import Any
 
-__all__ = ["resolve_tier_policies", "TIER_POLICIES", "EDIT_ADJUSTMENTS"]
+import yaml
+
+__all__ = [
+    "clear_tier_policies_cache",
+    "get_tier_policies",
+    "resolve_tier_policies",
+    "TIER_POLICIES",
+    "EDIT_ADJUSTMENTS",
+]
 
 
 # Base tier policy mappings
@@ -198,10 +210,183 @@ EDIT_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
 }
 
 
+def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    out = copy.deepcopy(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(out.get(key), dict):
+            out[key] = _deep_merge(out[key], value)
+        else:
+            out[key] = copy.deepcopy(value)
+    return out
+
+
+def _load_runtime_yaml(
+    config_root: str | None, *rel_parts: str
+) -> dict[str, Any] | None:
+    """Load YAML from runtime config locations.
+
+    Search order:
+      1) $INVARLOCK_CONFIG_ROOT/runtime/...
+      2) invarlock._data.runtime package resources
+    """
+    if config_root:
+        p = Path(config_root) / "runtime"
+        for part in rel_parts:
+            p = p / part
+        if p.exists():
+            data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+            if not isinstance(data, dict):
+                raise ValueError("Runtime YAML must be a mapping")
+            return data
+
+    try:
+        base = _ires.files("invarlock._data.runtime")
+        res = base
+        for part in rel_parts:
+            res = res.joinpath(part)
+        if getattr(res, "is_file", None) and res.is_file():  # type: ignore[attr-defined]
+            text = res.read_text(encoding="utf-8")  # type: ignore[assignment]
+            data = yaml.safe_load(text) or {}
+            if not isinstance(data, dict):
+                raise ValueError("Runtime YAML must be a mapping")
+            return data
+    except Exception:
+        return None
+
+    return None
+
+
+def _normalize_family_caps(caps: Any) -> dict[str, dict[str, float]]:
+    normalized: dict[str, dict[str, float]] = {}
+    if not isinstance(caps, dict):
+        return normalized
+    for family, value in caps.items():
+        family_key = str(family)
+        if isinstance(value, dict):
+            kappa = value.get("kappa")
+            if isinstance(kappa, int | float):
+                normalized[family_key] = {"kappa": float(kappa)}
+        elif isinstance(value, int | float):
+            normalized[family_key] = {"kappa": float(value)}
+    return normalized
+
+
+def _normalize_multiple_testing(mt: Any) -> dict[str, Any]:
+    if not isinstance(mt, dict):
+        return {}
+    out: dict[str, Any] = {}
+    method = mt.get("method")
+    if method is not None:
+        out["method"] = str(method).lower()
+    alpha = mt.get("alpha")
+    try:
+        if alpha is not None:
+            out["alpha"] = float(alpha)
+    except Exception:
+        pass
+    m_val = mt.get("m")
+    try:
+        if m_val is not None:
+            out["m"] = int(m_val)
+    except Exception:
+        pass
+    return out
+
+
+def _tier_entry_to_policy(tier_entry: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Map a tiers.yaml entry to the canonical policy shape."""
+    out: dict[str, dict[str, Any]] = {}
+
+    metrics = tier_entry.get("metrics")
+    if isinstance(metrics, dict):
+        out["metrics"] = copy.deepcopy(metrics)
+
+    spectral_src = tier_entry.get("spectral") or tier_entry.get("spectral_guard")
+    if isinstance(spectral_src, dict):
+        spectral = copy.deepcopy(spectral_src)
+        if "family_caps" in spectral:
+            spectral["family_caps"] = _normalize_family_caps(
+                spectral.get("family_caps")
+            )
+        if "multiple_testing" in spectral:
+            spectral["multiple_testing"] = _normalize_multiple_testing(
+                spectral.get("multiple_testing")
+            )
+        out["spectral"] = spectral
+
+    rmt_src = tier_entry.get("rmt") or tier_entry.get("rmt_guard")
+    if isinstance(rmt_src, dict):
+        rmt = copy.deepcopy(rmt_src)
+        eps = rmt.get("epsilon_by_family")
+        if isinstance(eps, dict):
+            rmt["epsilon_by_family"] = {
+                str(k): float(v) for k, v in eps.items() if isinstance(v, int | float)
+            }
+            # Backward-compat: keep epsilon alias
+            rmt["epsilon"] = dict(rmt["epsilon_by_family"])
+        out["rmt"] = rmt
+
+    variance_src = tier_entry.get("variance") or tier_entry.get("variance_guard")
+    if isinstance(variance_src, dict):
+        out["variance"] = copy.deepcopy(variance_src)
+
+    return out
+
+
+@lru_cache(maxsize=8)
+def _load_tier_policies_cached(config_root: str | None) -> dict[str, dict[str, Any]]:
+    tiers = _load_runtime_yaml(config_root, "tiers.yaml") or {}
+    merged: dict[str, dict[str, Any]] = {}
+
+    # Start from defaults, then overlay tiers.yaml per-tier.
+    for tier_name, defaults in TIER_POLICIES.items():
+        merged[str(tier_name).lower()] = copy.deepcopy(defaults)
+
+    for tier_name, entry in tiers.items():
+        if not isinstance(entry, dict):
+            continue
+        tier_key = str(tier_name).lower()
+        resolved_entry = _tier_entry_to_policy(entry)
+        if tier_key not in merged:
+            merged[tier_key] = {}
+        merged[tier_key] = _deep_merge(merged[tier_key], resolved_entry)
+
+    return merged
+
+
+def get_tier_policies(*, config_root: str | None = None) -> dict[str, dict[str, Any]]:
+    """Return tier policies loaded from runtime tiers.yaml (with safe defaults)."""
+    root = config_root
+    if root is None:
+        root = os.getenv("INVARLOCK_CONFIG_ROOT") or None
+    return _load_tier_policies_cached(root)
+
+
+def clear_tier_policies_cache() -> None:
+    _load_tier_policies_cached.cache_clear()
+
+
+def _load_profile_overrides(
+    profile: str | None, *, config_root: str | None
+) -> dict[str, Any]:
+    if not profile:
+        return {}
+    prof = str(profile).strip().lower()
+    candidate = _load_runtime_yaml(config_root, "profiles", f"{prof}.yaml")
+    if candidate is None and prof == "ci":
+        candidate = _load_runtime_yaml(config_root, "profiles", "ci_cpu.yaml") or {}
+    if not isinstance(candidate, dict):
+        return {}
+    return candidate
+
+
 def resolve_tier_policies(
     tier: str,
     edit_name: str | None = None,
     explicit_overrides: dict[str, dict[str, Any]] | None = None,
+    *,
+    profile: str | None = None,
+    config_root: str | None = None,
 ) -> dict[str, dict[str, Any]]:
     """
     Resolve tier-based guard policies with edit-specific adjustments and explicit overrides.
@@ -217,33 +402,45 @@ def resolve_tier_policies(
     Raises:
         ValueError: If tier is not recognized
     """
-    if tier not in TIER_POLICIES:
+    tier_key = str(tier).lower()
+    tier_policies = get_tier_policies(config_root=config_root)
+    if tier_key not in tier_policies:
         raise ValueError(
-            f"Unknown tier '{tier}'. Valid tiers: {list(TIER_POLICIES.keys())}"
+            f"Unknown tier '{tier}'. Valid tiers: {list(tier_policies.keys())}"
         )
 
     # Start with base tier policies
-    policies: dict[str, dict[str, Any]] = copy.deepcopy(TIER_POLICIES[tier])
+    policies: dict[str, dict[str, Any]] = copy.deepcopy(tier_policies[tier_key])
+
+    # Apply profile overrides (when available)
+    overrides = _load_profile_overrides(profile, config_root=config_root)
+    guards = overrides.get("guards") if isinstance(overrides, dict) else None
+    if isinstance(guards, dict):
+        for guard_name, guard_overrides in guards.items():
+            key = str(guard_name).lower()
+            if not isinstance(guard_overrides, dict):
+                continue
+            if key in policies and isinstance(policies[key], dict):
+                policies[key] = _deep_merge(policies[key], guard_overrides)
+            else:
+                policies[key] = copy.deepcopy(guard_overrides)
 
     # Apply edit-specific adjustments
     if edit_name and edit_name in EDIT_ADJUSTMENTS:
         edit_adjustments = EDIT_ADJUSTMENTS[edit_name]
         for guard_name, adjustments in edit_adjustments.items():
-            if guard_name in policies:
-                guard_policy = policies[guard_name]
-                assert isinstance(guard_policy, dict)
-                guard_policy.update(adjustments)
+            if guard_name in policies and isinstance(policies.get(guard_name), dict):
+                policies[guard_name] = _deep_merge(policies[guard_name], adjustments)
 
     # Apply explicit overrides (highest precedence)
     if explicit_overrides:
         for guard_name, overrides in explicit_overrides.items():
-            if guard_name in policies:
-                guard_policy = policies[guard_name]
-                assert isinstance(guard_policy, dict)
-                guard_policy.update(overrides)
-            else:
+            if guard_name in policies and isinstance(policies.get(guard_name), dict):
+                if isinstance(overrides, dict):
+                    policies[guard_name] = _deep_merge(policies[guard_name], overrides)
+            elif isinstance(overrides, dict):
                 # Create new guard policy if not in base tier
-                policies[guard_name] = overrides.copy()
+                policies[guard_name] = copy.deepcopy(overrides)
 
     return policies
 
@@ -273,7 +470,7 @@ def get_tier_summary(tier: str, edit_name: str | None = None) -> dict[str, Any]:
             "tier": tier,
             "edit_name": edit_name,
             "error": str(e),
-            "valid_tiers": list(TIER_POLICIES.keys()),
+            "valid_tiers": list(get_tier_policies().keys()),
         }
 
 
@@ -304,8 +501,9 @@ def validate_tier_config(config: Any) -> tuple[bool, str | None]:
         return False, "Missing 'tier' in auto configuration"
 
     tier = config["tier"]
-    if tier not in TIER_POLICIES:
-        valid_options = list(TIER_POLICIES.keys())
+    tier_policies = get_tier_policies()
+    if tier not in tier_policies:
+        valid_options = list(tier_policies.keys())
         return False, f"Invalid tier '{tier}'. Valid options: {valid_options}"
 
     if "enabled" in config and not isinstance(config["enabled"], bool):

@@ -6,7 +6,7 @@ import hashlib
 import json
 from typing import Any
 
-from invarlock.core.auto_tuning import TIER_POLICIES
+from invarlock.core.auto_tuning import get_tier_policies, resolve_tier_policies
 
 from .report_types import RunReport
 
@@ -38,17 +38,40 @@ def _compute_thresholds_payload(
     from .certificate import TIER_RATIO_LIMITS  # local to avoid cycles
 
     tier_lc = (tier or "balanced").lower()
-    ratio_limit_base = float(TIER_RATIO_LIMITS.get(tier_lc, 1.10))
-    tier_policy = TIER_POLICIES.get(tier_lc, {}) if isinstance(tier_lc, str) else {}
     metrics_policy = (
-        tier_policy.get("metrics", {}) if isinstance(tier_policy, dict) else {}
+        resolved_policy.get("metrics", {}) if isinstance(resolved_policy, dict) else {}
     )
-    pm_policy = (
-        metrics_policy.get("pm_ratio", {}) if isinstance(metrics_policy, dict) else {}
-    )
-    acc_policy = (
-        metrics_policy.get("accuracy", {}) if isinstance(metrics_policy, dict) else {}
-    )
+    if not isinstance(metrics_policy, dict):
+        metrics_policy = {}
+
+    pm_policy = metrics_policy.get("pm_ratio", {})
+    if not isinstance(pm_policy, dict):
+        pm_policy = {}
+
+    acc_policy = metrics_policy.get("accuracy", {})
+    if not isinstance(acc_policy, dict):
+        acc_policy = {}
+
+    ratio_limit_base = pm_policy.get("ratio_limit_base")
+    try:
+        if ratio_limit_base is not None:
+            ratio_limit_base = float(ratio_limit_base)
+    except Exception:
+        ratio_limit_base = None
+    if ratio_limit_base is None:
+        tier_defaults = get_tier_policies().get(tier_lc, {})
+        fallback_pm = (
+            (tier_defaults.get("metrics") or {}).get("pm_ratio")
+            if isinstance(tier_defaults, dict)
+            else {}
+        )
+        ratio_limit_base = float(
+            (fallback_pm or {}).get(
+                "ratio_limit_base", TIER_RATIO_LIMITS.get(tier_lc, 1.10)
+            )
+            if isinstance(fallback_pm, dict)
+            else TIER_RATIO_LIMITS.get(tier_lc, 1.10)
+        )
     variance_policy = (
         resolved_policy.get("variance", {}) if isinstance(resolved_policy, dict) else {}
     )
@@ -154,11 +177,21 @@ def _format_epsilon_map(epsilon_map: Any) -> dict[str, float]:
 
 
 def _build_resolved_policies(
-    tier: str, spectral: dict[str, Any], rmt: dict[str, Any], variance: dict[str, Any]
+    tier: str,
+    spectral: dict[str, Any],
+    rmt: dict[str, Any],
+    variance: dict[str, Any],
+    *,
+    profile: str | None = None,
+    explicit_overrides: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Merge tier defaults with observed policies to surface the resolved configuration."""
     tier_key = (tier or "balanced").lower()
-    base = copy.deepcopy(TIER_POLICIES.get(tier_key, TIER_POLICIES.get("balanced", {})))
+    if tier_key == "none":
+        tier_key = "balanced"
+    base = resolve_tier_policies(
+        tier_key, edit_name=None, explicit_overrides=explicit_overrides, profile=profile
+    )
 
     resolved: dict[str, Any] = {}
 
@@ -280,6 +313,37 @@ def _build_resolved_policies(
     variance_resolved: dict[str, Any] = {}
     if isinstance(base_variance, dict):
         variance_resolved.update(base_variance)
+
+    observed_variance_policy = (
+        variance.get("policy") if isinstance(variance, dict) else None
+    )
+    if isinstance(observed_variance_policy, dict) and observed_variance_policy:
+        for key in (
+            "deadband",
+            "min_abs_adjust",
+            "max_scale_step",
+            "min_effect_lognll",
+            "predictive_one_sided",
+            "topk_backstop",
+            "max_adjusted_modules",
+            "tap",
+            "predictive_gate",
+            "scope",
+            "clamp",
+            "min_gain",
+            "min_rel_gain",
+            "max_calib",
+            "seed",
+            "mode",
+            "alpha",
+            "tie_breaker_deadband",
+            "calibration",
+        ):
+            if (
+                key in observed_variance_policy
+                and observed_variance_policy.get(key) is not None
+            ):
+                variance_resolved[key] = observed_variance_policy.get(key)
     predictive_gate = variance.get("predictive_gate", {})
     predictive_one_sided = variance_resolved.get("predictive_one_sided")
     if isinstance(predictive_gate, dict) and "sided" in predictive_gate:
@@ -290,6 +354,10 @@ def _build_resolved_policies(
     variance_resolved["min_effect_lognll"] = _safe_float(
         variance_resolved.get("min_effect_lognll", 0.0), 0.0
     )
+    if "topk_backstop" in variance_resolved:
+        variance_resolved["topk_backstop"] = _safe_int(
+            variance_resolved.get("topk_backstop", 0), 0
+        )
     variance_resolved["max_adjusted_modules"] = _safe_int(
         variance_resolved.get("max_adjusted_modules", 0), 0
     )
@@ -307,10 +375,24 @@ def _build_resolved_policies(
         )
     resolved["variance"] = variance_resolved
 
-    # Confidence thresholds (optional policy knobs)
+    # Metric gates (PM ratio, accuracy, confidence, etc.)
     try:
         metrics = base.get("metrics", {}) if isinstance(base, dict) else {}
-        conf = metrics.get("confidence") if isinstance(metrics, dict) else None
+        if isinstance(metrics, dict) and metrics:
+            resolved["metrics"] = copy.deepcopy(metrics)
+    except Exception:
+        pass
+
+    # Confidence thresholds (optional policy knobs)
+    try:
+        conf = None
+        metrics = (
+            resolved.get("metrics")
+            if isinstance(resolved.get("metrics"), dict)
+            else None
+        )
+        if isinstance(metrics, dict):
+            conf = metrics.get("confidence")
         if isinstance(conf, dict) and conf:
             resolved["confidence"] = {}
             if "ppl_ratio_width_max" in conf:
@@ -428,7 +510,7 @@ def _extract_effective_policies(report: RunReport) -> dict[str, Any]:
                         guard_policy[key] = original_policy[key]
             policies[guard_name] = dict(guard_policy)
 
-    tier_defaults = TIER_POLICIES.get(_resolve_policy_tier(report), {})
+    tier_defaults = get_tier_policies().get(_resolve_policy_tier(report), {})
 
     def _merge_defaults(target: dict[str, Any], defaults: dict[str, Any]) -> None:
         for key, value in defaults.items():
@@ -497,7 +579,9 @@ def _extract_policy_overrides(report: RunReport) -> list[str]:
 
 
 def _compute_policy_digest(policy: dict[str, Any]) -> str:
-    canonical = json.dumps(policy, sort_keys=True, default=str)
+    canonical = json.dumps(
+        policy, sort_keys=True, default=str, separators=(",", ":"), ensure_ascii=True
+    )
     return hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
 

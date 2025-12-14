@@ -193,12 +193,8 @@ def test_seed_bundle_contract():
     report, baseline = _build_paired_run_and_baseline()
     with patch("invarlock.reporting.certificate.validate_report", return_value=True):
         certificate = make_certificate(report, baseline)
-    # Normalized reports drop per-framework seeds; all seeds default to the primary seed
-    assert certificate["meta"]["seeds"] == {
-        "python": 1337,
-        "numpy": 1337,
-        "torch": 1337,
-    }
+    # Certificate preserves the full seed bundle for auditability.
+    assert certificate["meta"]["seeds"] == {"python": 1337, "numpy": 4242, "torch": 777}
     stats = certificate.get("dataset", {}).get("windows", {}).get("stats", {})
     assert stats.get("window_match_fraction") == 1.0
     assert stats.get("window_overlap_fraction") == 0.0

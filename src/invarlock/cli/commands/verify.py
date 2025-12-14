@@ -35,6 +35,22 @@ from .run import _enforce_provider_parity, _resolve_exit_code
 console = Console()
 
 
+def _coerce_float(value: Any) -> float | None:
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return None
+    return out if math.isfinite(out) else None
+
+
+def _coerce_int(value: Any) -> int | None:
+    try:
+        out = int(value)
+    except (TypeError, ValueError):
+        return None
+    return out if out >= 0 else None
+
+
 def _load_certificate(path: Path) -> dict[str, Any]:
     """Load certificate JSON from disk."""
     with path.open("r", encoding="utf-8") as handle:
@@ -315,6 +331,30 @@ def _validate_certificate_payload(
         errors.extend(_validate_drift_band(certificate))
     errors.extend(_apply_profile_lints(certificate))
     errors.extend(_validate_tokenizer_hash(certificate))
+    # Release-only enforcement: guard overhead must be measured or explicitly skipped.
+    if prof == "release":
+        go = certificate.get("guard_overhead")
+        if not isinstance(go, dict) or not go:
+            errors.append(
+                "Release verification requires guard_overhead (missing). "
+                "Set INVARLOCK_SKIP_OVERHEAD_CHECK=1 to explicitly skip during certification."
+            )
+        else:
+            skipped = bool(go.get("skipped", False)) or (
+                str(go.get("mode", "")).strip().lower() == "skipped"
+            )
+            if not skipped:
+                evaluated = go.get("evaluated")
+                if evaluated is not True:
+                    errors.append(
+                        "Release verification requires evaluated guard_overhead (not evaluated). "
+                        "Set INVARLOCK_SKIP_OVERHEAD_CHECK=1 to explicitly skip during certification."
+                    )
+                ratio = go.get("overhead_ratio")
+                if ratio is None:
+                    errors.append(
+                        "Release verification requires guard_overhead.overhead_ratio (missing)."
+                    )
     # Legacy cross-checks removed; primary_metric is canonical
 
     return errors

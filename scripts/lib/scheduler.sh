@@ -19,16 +19,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Usage: get_gpu_available_memory <gpu_id>
 get_gpu_available_memory() {
     local gpu_id="$1"
-    
+
     # Query nvidia-smi for free memory in MiB
     local free_mib
     free_mib=$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits -i "${gpu_id}" 2>/dev/null | head -1)
-    
+
     if [[ -z "${free_mib}" ]]; then
         echo "0"
         return 1
     fi
-    
+
     # Convert MiB to GB (1024 MiB = 1 GiB ≈ 1.07 GB)
     local free_gb=$((free_mib / 1024))
     echo "${free_gb}"
@@ -38,15 +38,15 @@ get_gpu_available_memory() {
 # Usage: get_gpu_total_memory <gpu_id>
 get_gpu_total_memory() {
     local gpu_id="$1"
-    
+
     local total_mib
     total_mib=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits -i "${gpu_id}" 2>/dev/null | head -1)
-    
+
     if [[ -z "${total_mib}" ]]; then
         echo "180"  # Default to B200 size
         return 1
     fi
-    
+
     local total_gb=$((total_mib / 1024))
     echo "${total_gb}"
 }
@@ -55,7 +55,7 @@ get_gpu_total_memory() {
 # Usage: get_gpu_utilization <gpu_id>
 get_gpu_utilization() {
     local gpu_id="$1"
-    
+
     nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits -i "${gpu_id}" 2>/dev/null | head -1 || echo "0"
 }
 
@@ -63,10 +63,10 @@ get_gpu_utilization() {
 # Usage: is_gpu_idle <gpu_id>
 is_gpu_idle() {
     local gpu_id="$1"
-    
+
     local processes
     processes=$(nvidia-smi --query-compute-apps=pid --format=csv,noheader -i "${gpu_id}" 2>/dev/null | wc -l | tr -d ' ')
-    
+
     [[ "${processes}" -eq 0 ]]
 }
 
@@ -77,17 +77,17 @@ is_gpu_idle() {
 # Returns: priority score (0-100, higher = more urgent)
 calculate_task_priority() {
     local task_file="$1"
-    
+
     # Base priority from task file
     local base_priority=$(get_task_field "${task_file}" "priority")
     [[ -z "${base_priority}" ]] && base_priority=50
-    
+
     # Get model size for boosting
     local model_size=$(get_task_field "${task_file}" "model_size_gb")
     [[ -z "${model_size}" ]] && model_size=14
-    
+
     local boost=0
-    
+
     # Boost 1: Large models get priority (they're the bottleneck)
     # 70B+ models: +20 priority
     # 40B+ models: +10 priority
@@ -99,13 +99,13 @@ calculate_task_priority() {
     elif [[ ${model_size} -ge 50 ]]; then
         boost=$((boost + 5))
     fi
-    
+
     # Boost 2: Tasks blocking many others get priority
     local task_id=$(get_task_id "${task_file}")
     local blocked_count=$(count_blocked_by_task "${task_id}")
     boost=$((boost + (blocked_count * 2)))
     [[ ${boost} -gt 40 ]] && boost=40  # Cap at +40
-    
+
     # Boost 3: Older tasks get slight priority (prevent starvation)
     local created_at=$(get_task_field "${task_file}" "created_at")
     if [[ -n "${created_at}" ]]; then
@@ -119,20 +119,20 @@ calculate_task_priority() {
         [[ ${age_boost} -gt 10 ]] && age_boost=10  # Cap at +10
         boost=$((boost + age_boost))
     fi
-    
+
     # Reduce priority for models with many running tasks (fairness)
     local model_name=$(get_task_field "${task_file}" "model_name")
     local running_for_model=$(count_running_for_model "${model_name}")
     local fairness_penalty=$((running_for_model * 3))
     [[ ${fairness_penalty} -gt 15 ]] && fairness_penalty=15
-    
+
     # Final priority
     local final_priority=$((base_priority + boost - fairness_penalty))
-    
+
     # Clamp to 0-100
     [[ ${final_priority} -lt 0 ]] && final_priority=0
     [[ ${final_priority} -gt 100 ]] && final_priority=100
-    
+
     echo "${final_priority}"
 }
 
@@ -141,16 +141,16 @@ calculate_task_priority() {
 count_blocked_by_task() {
     local blocking_id="$1"
     local count=0
-    
+
     for task_file in "${QUEUE_DIR}/pending"/*.task; do
         [[ -f "${task_file}" ]] || continue
-        
+
         local deps=$(get_task_dependencies "${task_file}" | tr '\n' ' ')
         if [[ " ${deps} " =~ " ${blocking_id} " ]]; then
             count=$((count + 1))
         fi
     done
-    
+
     echo "${count}"
 }
 
@@ -159,16 +159,16 @@ count_blocked_by_task() {
 count_running_for_model() {
     local model_name="$1"
     local count=0
-    
+
     for task_file in "${QUEUE_DIR}/running"/*.task; do
         [[ -f "${task_file}" ]] || continue
-        
+
         local task_model=$(get_task_field "${task_file}" "model_name")
         if [[ "${task_model}" == "${model_name}" ]]; then
             count=$((count + 1))
         fi
     done
-    
+
     echo "${count}"
 }
 
@@ -180,7 +180,7 @@ count_running_for_model() {
 find_best_task() {
     local available_mem="$1"
     local gpu_id="$2"
-    
+
     # Adaptive safety margin based on available memory
     # For B200 (180GB GPUs):
     #   - High memory (>=160GB): 2% margin (allows 157GB for 154GB 70B models)
@@ -197,38 +197,38 @@ find_best_task() {
         # Low availability - conservative margin
         effective_mem=$((available_mem * 90 / 100))
     fi
-    
+
     local best_task=""
     local best_priority=-1
-    
+
     # Scan ready queue for suitable tasks
     for task_file in "${QUEUE_DIR}/ready"/*.task; do
         [[ -f "${task_file}" ]] || continue
-        
+
         # Check retry backoff delay (if is_retry_ready is available)
         if type is_retry_ready &>/dev/null; then
             if ! is_retry_ready "${task_file}"; then
                 continue  # Task still in backoff period
             fi
         fi
-        
+
         # Check memory requirement
         local required_mem=$(get_task_field "${task_file}" "model_size_gb")
         [[ -z "${required_mem}" ]] && required_mem=20
-        
+
         if [[ ${required_mem} -gt ${effective_mem} ]]; then
             continue  # Task doesn't fit
         fi
-        
+
         # Calculate priority
         local priority=$(calculate_task_priority "${task_file}")
-        
+
         if [[ ${priority} -gt ${best_priority} ]]; then
             best_priority=${priority}
             best_task=$(get_task_id "${task_file}")
         fi
     done
-    
+
     echo "${best_task}"
 }
 
@@ -238,20 +238,20 @@ find_best_task() {
 find_and_claim_task() {
     local available_mem="$1"
     local gpu_id="$2"
-    
+
     # Find best task
     local task_id=$(find_best_task "${available_mem}" "${gpu_id}")
-    
+
     if [[ -z "${task_id}" ]]; then
         return 1  # No suitable task
     fi
-    
+
     # Try to claim it (atomic)
     if claim_task "${task_id}" "${gpu_id}"; then
         echo "${QUEUE_DIR}/running/${task_id}.task"
         return 0
     fi
-    
+
     # Someone else claimed it, try again
     return 1
 }
@@ -264,22 +264,22 @@ apply_work_stealing_boost() {
     # Calculate completion rate per model
     declare -A model_completion
     declare -A model_total
-    
+
     for status in completed pending ready running; do
         for task_file in "${QUEUE_DIR}/${status}"/*.task; do
             [[ -f "${task_file}" ]] || continue
-            
+
             local model=$(get_task_field "${task_file}" "model_name")
             # Skip tasks with empty model names (malformed)
             [[ -z "${model}" ]] && continue
             model_total[${model}]=$((${model_total[${model}]:-0} + 1))
-            
+
             if [[ "${status}" == "completed" ]]; then
                 model_completion[${model}]=$((${model_completion[${model}]:-0} + 1))
             fi
         done
     done
-    
+
     # Find average completion rate
     local total_models=0
     local total_rate=0
@@ -292,13 +292,13 @@ apply_work_stealing_boost() {
             total_models=$((total_models + 1))
         fi
     done
-    
+
     if [[ ${total_models} -eq 0 ]]; then
         return
     fi
-    
+
     local avg_rate=$((total_rate / total_models))
-    
+
     # Boost models falling behind average
     for model in "${!model_total[@]}"; do
         # Skip empty model names
@@ -307,17 +307,17 @@ apply_work_stealing_boost() {
         local total=${model_total[${model}]}
         if [[ ${total} -gt 0 ]]; then
             local rate=$((completed * 100 / total))
-            
+
             if [[ ${rate} -lt $((avg_rate - 10)) ]]; then
                 # Model is falling behind, boost its pending/ready tasks
                 echo "Boosting priority for lagging model: ${model} (${rate}% vs ${avg_rate}% avg)"
-                
+
                 # Iterate directories separately to handle missing directories gracefully
                 for dir in "${QUEUE_DIR}/pending" "${QUEUE_DIR}/ready"; do
                     [[ -d "${dir}" ]] || continue
                     for task_file in "${dir}"/*.task; do
                         [[ -f "${task_file}" ]] || continue
-                    
+
                     local task_model=$(get_task_field "${task_file}" "model_name")
                     if [[ "${task_model}" == "${model}" ]]; then
                         local current_priority=$(get_task_field "${task_file}" "priority")
@@ -339,15 +339,15 @@ done
 get_scheduling_stats() {
     local ready_count=$(count_tasks "ready")
     local running_count=$(count_tasks "running")
-    
+
     # Calculate average wait time in ready queue
     local total_wait=0
     local wait_count=0
     local now=$(date "+%s")
-    
+
     for task_file in "${QUEUE_DIR}/ready"/*.task; do
         [[ -f "${task_file}" ]] || continue
-        
+
         local created_at=$(get_task_field "${task_file}" "created_at")
         if [[ -n "${created_at}" ]]; then
             local created_epoch
@@ -357,10 +357,10 @@ get_scheduling_stats() {
             wait_count=$((wait_count + 1))
         fi
     done
-    
+
     local avg_wait=0
     [[ ${wait_count} -gt 0 ]] && avg_wait=$((total_wait / wait_count))
-    
+
     # Get memory stats per GPU
     local gpu_mem_stats=""
     for gpu_id in $(seq 0 $((${NUM_GPUS:-8} - 1))); do
@@ -369,7 +369,7 @@ get_scheduling_stats() {
         local used=$((total - free))
         gpu_mem_stats="${gpu_mem_stats}GPU${gpu_id}:${used}/${total}GB "
     done
-    
+
     echo "Ready: ${ready_count}, Running: ${running_count}, AvgWait: ${avg_wait}s | ${gpu_mem_stats}"
 }
 
@@ -378,11 +378,11 @@ get_scheduling_stats() {
 print_scheduling_report() {
     echo "=== SCHEDULING REPORT ==="
     echo ""
-    
+
     # Queue stats
     print_queue_stats
     echo ""
-    
+
     # GPU memory
     echo "=== GPU MEMORY ==="
     for gpu_id in $(seq 0 $((${NUM_GPUS:-8} - 1))); do
@@ -392,7 +392,7 @@ print_scheduling_report() {
         echo "GPU ${gpu_id}: ${free}/${total} GB free, ${util}% utilization"
     done
     echo ""
-    
+
     # Running tasks
     echo "=== RUNNING TASKS ==="
     for task_file in "${QUEUE_DIR}/running"/*.task; do
@@ -405,7 +405,7 @@ print_scheduling_report() {
         echo "  ${task_id}: ${model}/${type} on GPU ${gpu} (${size}GB)"
     done
     echo ""
-    
+
     # Top 5 ready tasks by priority
     echo "=== TOP READY TASKS ==="
     local count=0

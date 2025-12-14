@@ -855,6 +855,13 @@ class WikiText2Provider:
             eval_device_override = os.environ.get("INVARLOCK_EVAL_DEVICE")
             device_hint = getattr(self, "_device_hint", None)
 
+            def _is_device_usable(device: torch.device) -> bool:
+                try:
+                    _ = torch.zeros((1, 1), dtype=torch.long, device=device)
+                    return True
+                except Exception:
+                    return False
+
             if self._difficulty_model is None:
                 from transformers import GPT2LMHeadModel
 
@@ -873,6 +880,13 @@ class WikiText2Provider:
                         device = self._pick_default_scorer_device()
                 else:
                     device = self._pick_default_scorer_device()
+
+                if device.type != "cpu" and not _is_device_usable(device):
+                    warnings.warn(
+                        f"Difficulty scorer device {device} unavailable; falling back to CPU",
+                        stacklevel=2,
+                    )
+                    device = torch.device("cpu")
 
                 model.to(device)
                 self._difficulty_model = model
@@ -898,16 +912,24 @@ class WikiText2Provider:
                     desired_device = device
 
             if desired_device != device:
-                try:
-                    model.to(desired_device)
-                    device = desired_device
-                    self._difficulty_device = desired_device
-                    self.__class__._MODEL_DEVICE = desired_device
-                except Exception as exc:
+                if desired_device.type != "cpu" and not _is_device_usable(
+                    desired_device
+                ):
                     warnings.warn(
-                        f"Failed to move GPT-2 difficulty scorer to {desired_device}: {exc}",
+                        f"Difficulty scorer device {desired_device} unavailable; keeping {device}",
                         stacklevel=2,
                     )
+                else:
+                    try:
+                        model.to(desired_device)
+                        device = desired_device
+                        self._difficulty_device = desired_device
+                        self.__class__._MODEL_DEVICE = desired_device
+                    except Exception as exc:
+                        warnings.warn(
+                            f"Failed to move GPT-2 difficulty scorer to {desired_device}: {exc}",
+                            stacklevel=2,
+                        )
 
             if not self._scorer_warmed:
                 with torch.no_grad():

@@ -87,6 +87,7 @@ def check_consistency() -> None:
         "scripts/check_cli_completeness.py",
         "scripts/check_config_schema_sync.py",
         "scripts/check_guard_completeness.py",
+        "scripts/lint_assurance_xrefs.py",
     ]
     for path in checks:
         code, out = run([sys.executable, path])

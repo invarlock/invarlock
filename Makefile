@@ -15,13 +15,20 @@ dev-install:  ## Install package with development dependencies
 
 ##@ Development
 test:  ## Run tests
-	pytest tests/ -v
+	PYTHONPATH=src pytest tests/ -v
 
 ##@ Coverage
 coverage:  ## Run tests with coverage and generate XML
 	coverage erase
-	pytest -q \
-		--cov=src/invarlock/eval --cov=src/invarlock/guards \
+	PYTHONPATH=src pytest -q \
+		tests/core tests/guards tests/reporting tests/cli/run tests/cli/test_run_*.py tests/calibration tests/scripts \
+		tests/cli/test_run_command_*.py tests/cli/test_config_failfast.py tests/cli/test_error_codes.py \
+		tests/cli/test_verify*.py tests/cli/test_cli_command_help_smoke.py \
+		tests/cli/test_calibrate_harness_artifacts.py tests/cli/test_determinism_preset.py tests/cli/test_json_helpers.py \
+		tests/cli/test_config.py tests/cli/test_config_more.py tests/cli/test_config_runtime_loader.py tests/cli/test_config_schema_and_loader.py \
+		tests/eval/test_metrics*.py tests/eval/test_report*.py tests/eval/test_validate_module.py tests/eval/test_baseline_artifacts.py tests/eval/test_bench.py tests/eval/test_primary_metric*.py \
+		tests/eval/test_determinism.py tests/eval/test_mask_parity_fail.py tests/eval/test_certificate*.py \
+		--cov=src/invarlock/eval --cov=src/invarlock/guards --cov=src/invarlock/calibration \
 		--cov=src/invarlock/cli --cov=src/invarlock/core --cov=src/invarlock/reporting \
 		--cov-branch \
 		--cov-report=term --cov-report=xml:reports/cov.xml
@@ -33,23 +40,23 @@ coverage-enforce:  ## Run coverage and enforce per-file thresholds
 # Grouped test targets
 .PHONY: test-core test-cli test-eval test-guards test-edits test-adapters test-plugins test-scripts test-ci
 test-core:
-	pytest -q tests/core
+	PYTHONPATH=src pytest -q tests/core
 test-cli:
-	pytest -q tests/cli
+	PYTHONPATH=src pytest -q tests/cli
 test-eval:
-	pytest -q tests/eval
+	PYTHONPATH=src pytest -q tests/eval
 test-guards:
-	pytest -q tests/guards
+	PYTHONPATH=src pytest -q tests/guards
 test-edits:
-	pytest -q tests/edits
+	PYTHONPATH=src pytest -q tests/edits
 test-adapters:
-	pytest -q tests/adapters
+	PYTHONPATH=src pytest -q tests/adapters
 test-plugins:
-	pytest -q tests/plugins
+	PYTHONPATH=src pytest -q tests/plugins
 test-scripts:
-	pytest -q tests/scripts
+	PYTHONPATH=src pytest -q tests/scripts
 test-ci:
-	pytest -q tests/ci
+	PYTHONPATH=src pytest -q tests/ci
 
 test-assurance:  ## Run assurance-related tests only
 	pytest \
@@ -70,7 +77,7 @@ format:  ## Format code
 
 verify:  ## Run verification (pytest -q, lint, format, markdownlint)
 	@echo "Running verification..."
-	pytest -q
+	PYTHONPATH=src pytest -q
 	OMP_NUM_THREADS=1 SKIP_RUFF=1 bash scripts/run_smoke_regression.sh
 	$(MAKE) ensure-ruff
 	python -m ruff check src/ tests/ scripts/
