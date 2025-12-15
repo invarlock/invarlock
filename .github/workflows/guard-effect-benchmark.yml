@@ -88,7 +88,7 @@ jobs:
           --verbose
 
     - name: Upload benchmark results
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       if: always()  # Upload even if benchmark fails
       with:
         name: guard-effect-results-py${{ matrix.python-version }}
@@ -182,7 +182,7 @@ jobs:
           --verbose
 
     - name: Upload release benchmark results
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       if: always()
       with:
         name: guard-effect-results-release
