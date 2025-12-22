@@ -403,29 +403,36 @@ def _predictive_gate_outcome(
     ):
         return False, "ci_unavailable"
 
+    lower = float(delta_ci[0])
     upper = float(delta_ci[1])
     min_effect = float(min_effect or 0.0)
 
+    # CI must clear zero (and the min-effect band when provided).
     if one_sided:
-        # One-sided improvement (ΔlogNLL < 0): certify a minimum effect by
-        # requiring the *upper* bound of the (two-sided) CI to clear -min_effect.
         if upper >= 0.0:
             return False, "ci_contains_zero"
         if mean_delta >= 0.0:
             return False, "mean_not_negative"
-        gain_lower_bound = -upper  # worst-case gain under CI
-        if gain_lower_bound < min_effect:
+        if upper > -min_effect:
+            return False, "gain_below_threshold"
+        if mean_delta > -min_effect:
             return False, "gain_below_threshold"
         return True, "ci_gain_met"
 
-    # Two-sided improvement: CI must be strictly below zero.
-    if upper >= 0.0:
+    # Two-sided: detect regressions outside the +min_effect band, but only
+    # enable VE for negative improvements.
+    if lower <= 0.0 <= upper:
         return False, "ci_contains_zero"
-
-    gain_lower_bound = -upper  # Convert ΔlogNLL CI to gain CI lower bound.
-    if gain_lower_bound < min_effect:
+    if lower > 0.0:
+        if lower >= min_effect and mean_delta >= min_effect:
+            return False, "regression_detected"
+        return False, "mean_not_negative"
+    if upper > -min_effect:
         return False, "gain_below_threshold"
-
+    if mean_delta >= 0.0:
+        return False, "mean_not_negative"
+    if mean_delta > -min_effect:
+        return False, "gain_below_threshold"
     return True, "ci_gain_met"
 
 
@@ -1441,12 +1448,17 @@ class VarianceGuard(Guard):
 
         device = next(model.parameters()).device
         torch.manual_seed(calib_seed)
-        ppl_no_ve_samples, loss_no_ve_samples = self._compute_ppl_for_batches(
-            model, calibration_batches, device
+        (
+            ppl_no_ve_samples,
+            loss_no_ve_samples,
+            token_counts,
+        ) = self._compute_ppl_for_batches(
+            model, calibration_batches, device, return_counts=True
         )
         coverage = min(len(calibration_batches), len(ppl_no_ve_samples))
         ppl_with_ve_samples: list[float] = []
         loss_with_ve_samples: list[float] = []
+        token_counts_with: list[int] = []
         ratio_ci: tuple[float, float] | None = None
 
         enable_success = False
@@ -1462,10 +1474,12 @@ class VarianceGuard(Guard):
             try:
                 torch.manual_seed(calib_seed)
                 if enable_success:
-                    ppl_with_ve_samples, loss_with_ve_samples = (
-                        self._compute_ppl_for_batches(
-                            model, calibration_batches, device
-                        )
+                    (
+                        ppl_with_ve_samples,
+                        loss_with_ve_samples,
+                        token_counts_with,
+                    ) = self._compute_ppl_for_batches(
+                        model, calibration_batches, device, return_counts=True
                     )
             finally:
                 if enable_success:
@@ -1478,6 +1492,8 @@ class VarianceGuard(Guard):
             coverage,
             len(ppl_with_ve_samples) if ppl_with_ve_samples else coverage,
             len(loss_with_ve_samples) if loss_with_ve_samples else coverage,
+            len(token_counts) if token_counts else coverage,
+            len(token_counts_with) if token_counts_with else coverage,
         )
         self._calibration_stats.update(
             {
@@ -1546,6 +1562,7 @@ class VarianceGuard(Guard):
             loss_no_ve_samples = loss_no_ve_samples[:coverage]
             ppl_with_ve_samples = ppl_with_ve_samples[:coverage]
             loss_with_ve_samples = loss_with_ve_samples[:coverage]
+            token_counts = token_counts[:coverage]
 
             ratios = [
                 with_val / no_val
@@ -1602,6 +1619,7 @@ class VarianceGuard(Guard):
                 delta_ci = compute_paired_delta_log_ci(
                     loss_with_ve_samples,
                     loss_no_ve_samples,
+                    weights=token_counts,
                     method="bca",
                     replicates=500,
                     alpha=self._policy.get("alpha", 0.05),
@@ -1617,18 +1635,31 @@ class VarianceGuard(Guard):
                 )
 
             predictive_state["evaluated"] = True
-            mean_delta = float(
-                np.mean(
-                    [
-                        with_loss - no_loss
-                        for with_loss, no_loss in zip(
-                            loss_with_ve_samples,
-                            loss_no_ve_samples,
-                            strict=False,
-                        )
-                    ]
+            if token_counts:
+                sw = 0.0
+                swx = 0.0
+                for with_loss, no_loss, weight in zip(
+                    loss_with_ve_samples,
+                    loss_no_ve_samples,
+                    token_counts,
+                    strict=False,
+                ):
+                    sw += float(weight)
+                    swx += float(weight) * (with_loss - no_loss)
+                mean_delta = float(swx / sw) if sw > 0 else float("nan")
+            else:
+                mean_delta = float(
+                    np.mean(
+                        [
+                            with_loss - no_loss
+                            for with_loss, no_loss in zip(
+                                loss_with_ve_samples,
+                                loss_no_ve_samples,
+                                strict=False,
+                            )
+                        ]
+                    )
                 )
-            )
             predictive_state["mean_delta"] = mean_delta
 
             if delta_ci is not None and all(
@@ -1875,12 +1906,19 @@ class VarianceGuard(Guard):
         model: nn.Module,
         batches: list[Any],
         device: torch.device,
-    ) -> tuple[list[float], list[float]]:
+        *,
+        return_counts: bool = False,
+    ) -> tuple[list[float], list[float]] | tuple[list[float], list[float], list[int]]:
         """Compute per-batch perplexity and log-loss values for deterministic calibration."""
         ppl_values: list[float] = []
         loss_values: list[float] = []
+        token_counts: list[int] = []
         if not batches:
-            return ppl_values, loss_values
+            return (
+                (ppl_values, loss_values, token_counts)
+                if return_counts
+                else (ppl_values, loss_values)
+            )
 
         model_was_training = model.training
         model.eval()
@@ -1919,12 +1957,29 @@ class VarianceGuard(Guard):
                     if math.isfinite(ppl):
                         ppl_values.append(ppl)
                         loss_values.append(loss)
+                        if return_counts:
+                            count = None
+                            try:
+                                if labels is not None and isinstance(
+                                    labels, torch.Tensor
+                                ):
+                                    count = int((labels != -100).sum().item())
+                            except Exception:
+                                count = None
+                            if count is None:
+                                try:
+                                    count = int(inputs.numel())
+                                except Exception:
+                                    count = 0
+                            token_counts.append(int(max(count, 0)))
                 except Exception:
                     continue
 
         if model_was_training:
             model.train()
 
+        if return_counts:
+            return ppl_values, loss_values, token_counts
         return ppl_values, loss_values
 
     def _bootstrap_mean_ci(
@@ -2111,12 +2166,17 @@ class VarianceGuard(Guard):
             if calibration_batches:
                 device = next(model.parameters()).device
                 torch.manual_seed(calib_seed)
-                ppl_no_ve_samples, loss_no_ve_samples = self._compute_ppl_for_batches(
-                    model, calibration_batches, device
+                (
+                    ppl_no_ve_samples,
+                    loss_no_ve_samples,
+                    token_counts,
+                ) = self._compute_ppl_for_batches(
+                    model, calibration_batches, device, return_counts=True
                 )
                 coverage = min(len(calibration_batches), len(ppl_no_ve_samples))
                 ppl_with_ve_samples: list[float] = []
                 loss_with_ve_samples: list[float] = []
+                token_counts_with: list[int] = []
                 ratio_ci: tuple[float, float] | None = None
 
                 enable_success = False
@@ -2135,8 +2195,9 @@ class VarianceGuard(Guard):
                             (
                                 ppl_with_ve_samples,
                                 loss_with_ve_samples,
+                                token_counts_with,
                             ) = self._compute_ppl_for_batches(
-                                model, calibration_batches, device
+                                model, calibration_batches, device, return_counts=True
                             )
                     finally:
                         if enable_success:
@@ -2149,6 +2210,8 @@ class VarianceGuard(Guard):
                     coverage,
                     len(ppl_with_ve_samples) if ppl_with_ve_samples else coverage,
                     len(loss_with_ve_samples) if loss_with_ve_samples else coverage,
+                    len(token_counts) if token_counts else coverage,
+                    len(token_counts_with) if token_counts_with else coverage,
                 )
                 self._calibration_stats.update(
                     {"coverage": coverage, "status": "insufficient"}
@@ -2181,6 +2244,8 @@ class VarianceGuard(Guard):
                     loss_no_ve_samples = loss_no_ve_samples[:coverage]
                     ppl_with_ve_samples = ppl_with_ve_samples[:coverage]
                     loss_with_ve_samples = loss_with_ve_samples[:coverage]
+                    token_counts = token_counts[:coverage]
+                    token_counts_with = token_counts_with[:coverage]
 
                     ratios = [
                         with_val / no_val
@@ -2219,6 +2284,7 @@ class VarianceGuard(Guard):
                         delta_ci = compute_paired_delta_log_ci(
                             loss_with_ve_samples,
                             loss_no_ve_samples,
+                            weights=token_counts,
                             method="bca",
                             replicates=500,
                             alpha=self._policy.get("alpha", 0.05),
@@ -2234,18 +2300,31 @@ class VarianceGuard(Guard):
                         )
 
                     predictive_state["evaluated"] = True
-                    mean_delta = float(
-                        np.mean(
-                            [
-                                with_loss - no_loss
-                                for with_loss, no_loss in zip(
-                                    loss_with_ve_samples,
-                                    loss_no_ve_samples,
-                                    strict=False,
-                                )
-                            ]
+                    if token_counts:
+                        sw = 0.0
+                        swx = 0.0
+                        for with_loss, no_loss, weight in zip(
+                            loss_with_ve_samples,
+                            loss_no_ve_samples,
+                            token_counts,
+                            strict=False,
+                        ):
+                            sw += float(weight)
+                            swx += float(weight) * (with_loss - no_loss)
+                        mean_delta = float(swx / sw) if sw > 0 else float("nan")
+                    else:
+                        mean_delta = float(
+                            np.mean(
+                                [
+                                    with_loss - no_loss
+                                    for with_loss, no_loss in zip(
+                                        loss_with_ve_samples,
+                                        loss_no_ve_samples,
+                                        strict=False,
+                                    )
+                                ]
+                            )
                         )
-                    )
                     predictive_state["mean_delta"] = mean_delta
 
                     if delta_ci is not None and all(

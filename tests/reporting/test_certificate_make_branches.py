@@ -266,8 +266,8 @@ def test_make_certificate_populates_optional_sections(monkeypatch):
     report["metrics"]["masked_tokens_preview"] = 40
     report["metrics"]["masked_tokens_final"] = 60
     report["guard_overhead"] = {
-        "bare_final": 10.0,
-        "guarded_final": 10.5,
+        "bare_ppl": 10.0,
+        "guarded_ppl": 10.5,
         "warnings": ["slow"],
         "messages": ["note"],
         "checks": {"ratio": True},

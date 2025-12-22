@@ -18,13 +18,13 @@ def test_compute_report_digest_minimal():
 
 def test_prepare_guard_overhead_threshold_boundary():
     # Ratio equals 1 + threshold should PASS
-    payload = {"bare_final": 100.0, "guarded_final": 101.5, "overhead_threshold": 0.015}
+    payload = {"bare_ppl": 100.0, "guarded_ppl": 101.5, "overhead_threshold": 0.015}
     out, passed = _prepare_guard_overhead_section(payload)
     assert out.get("evaluated") is True and passed is True
     # Messages/warnings/errors coercion should produce lists
     payload2 = {
-        "bare_final": 100.0,
-        "guarded_final": 101.5,
+        "bare_ppl": 100.0,
+        "guarded_ppl": 101.5,
         "overhead_threshold": 0.015,
         "messages": ["note"],
         "warnings": ["warn"],

@@ -98,6 +98,7 @@ def test_compute_metrics_pairing_mismatch_raises_with_ci_profile(monkeypatch, tm
     cfg = RunConfig(
         context={
             "profile": "ci",
+            "dataset": {"seq_len": 3, "stride": 3},
             # Provide baseline pairing that will not match produced window ids
             "pairing_baseline": {
                 "preview": {"window_ids": [100, 101], "input_ids": [[9, 9], [8, 8]]},
@@ -119,6 +120,52 @@ def test_compute_metrics_pairing_mismatch_raises_with_ci_profile(monkeypatch, tm
     )
     # With an incompatible baseline, match fraction should be <= 1 and pairing reason populated or None
     assert isinstance(metrics.get("window_match_fraction"), float)
+
+
+def test_window_overlap_fraction_uses_stride(monkeypatch, tmp_path):
+    runner = CoreRunner()
+    model = _toy_model_with_losses([1.0, 1.1])
+    adapter = DummyAdapter()
+    cfg = RunConfig(
+        context={
+            "dataset": {"seq_len": 8, "stride": 4},
+            "eval": {"bootstrap": {"enabled": False}},
+        }
+    )
+    metrics, _ = runner._compute_real_metrics(
+        model,
+        _minimal_calibration(2),
+        adapter,
+        preview_n=1,
+        final_n=1,
+        config=cfg,
+    )
+    assert metrics.get("window_overlap_fraction") == pytest.approx(0.5)
+
+
+def test_window_match_fraction_counts_unexpected_ids(monkeypatch, tmp_path):
+    runner = CoreRunner()
+    model = _toy_model_with_losses([1.0, 1.1, 1.2])
+    adapter = DummyAdapter()
+    cfg = RunConfig(
+        context={
+            "dataset": {"seq_len": 3, "stride": 3},
+            "pairing_baseline": {
+                "preview": {"window_ids": [0, 1], "input_ids": [[1, 2, 3], [1, 2, 3]]},
+                "final": {"window_ids": [], "input_ids": []},
+            },
+        }
+    )
+    monkeypatch.setenv("INVARLOCK_STORE_EVAL_WINDOWS", "1")
+    metrics, _ = runner._compute_real_metrics(
+        model,
+        _minimal_calibration(3),
+        adapter,
+        preview_n=3,
+        final_n=0,
+        config=cfg,
+    )
+    assert metrics.get("window_match_fraction") < 1.0
 
 
 # Intentionally avoid ratio CI mismatch raise path here, as it can expose
@@ -178,6 +225,7 @@ def test_bootstrap_coverage_warning_path(monkeypatch, tmp_path):
     cfg = RunConfig(
         context={
             "profile": "ci",
+            "dataset": {"seq_len": 3, "stride": 3},
             "eval": {"bootstrap": {"enabled": True, "replicates": 5}},
         }
     )
@@ -192,6 +240,40 @@ def test_bootstrap_coverage_warning_path(monkeypatch, tmp_path):
     # Bootstrap coverage info should be present and indicate not-ok for CI requirements
     cov = metrics.get("bootstrap", {}).get("coverage", {})
     assert cov.get("preview", {}).get("ok") in {False, True}  # path executed
+
+
+def test_bootstrap_coverage_strict_flags_when_under_floor(monkeypatch, tmp_path):
+    import invarlock.core.runner as runner_mod
+
+    monkeypatch.setattr(
+        runner_mod,
+        "BOOTSTRAP_COVERAGE_REQUIREMENTS",
+        {"balanced": {"preview": 10, "final": 10, "replicates": 5}},
+    )
+
+    runner = CoreRunner()
+    model = _toy_model_with_losses([1.0, 1.1, 0.9, 1.2])
+    adapter = DummyAdapter()
+    cfg = RunConfig(
+        context={
+            "profile": "dev",
+            "eval": {"bootstrap": {"enabled": True, "replicates": 5}},
+        }
+    )
+
+    metrics, _ = runner._compute_real_metrics(
+        model,
+        _minimal_calibration(18),
+        adapter,
+        preview_n=9,
+        final_n=9,
+        config=cfg,
+    )
+
+    cov = metrics.get("bootstrap", {}).get("coverage", {})
+    assert cov.get("preview", {}).get("ok") is False
+    assert cov.get("final", {}).get("ok") is False
+    assert cov.get("replicates", {}).get("ok") is True
 
 
 def test_eval_device_override_env(monkeypatch, tmp_path):
@@ -457,6 +539,7 @@ def test_pairing_duplication_raise_caught_ci(tmp_path):
     cfg = RunConfig(
         context={
             "profile": "ci",
+            "dataset": {"seq_len": 3, "stride": 3},
             "pairing_baseline": {
                 "preview": {"window_ids": [], "input_ids": []},
                 "final": {"window_ids": [], "input_ids": []},
@@ -488,6 +571,7 @@ def test_pairing_duplication_release_profile(tmp_path):
     cfg = RunConfig(
         context={
             "profile": "release",
+            "dataset": {"seq_len": 3, "stride": 3},
             "pairing_baseline": {
                 "preview": {"window_ids": [], "input_ids": []},
                 "final": {"window_ids": [], "input_ids": []},
@@ -507,6 +591,7 @@ def test_pairing_mismatch_release_profile(tmp_path):
     cfg = RunConfig(
         context={
             "profile": "release",
+            "dataset": {"seq_len": 3, "stride": 3},
             "pairing_baseline": {
                 "preview": {"window_ids": [0, 1], "input_ids": [[9, 9, 9], [8, 8, 8]]},
                 "final": {"window_ids": [2, 3], "input_ids": [[7, 7, 7], [6, 6, 6]]},
@@ -526,6 +611,7 @@ def test_pairing_mismatch_raise_caught_ci(tmp_path):
     cfg = RunConfig(
         context={
             "profile": "ci",
+            "dataset": {"seq_len": 3, "stride": 3},
             "pairing_baseline": {
                 "preview": {"window_ids": [0, 1], "input_ids": [[9, 9, 9], [8, 8, 8]]},
                 "final": {"window_ids": [2, 3], "input_ids": [[7, 7, 7], [6, 6, 6]]},

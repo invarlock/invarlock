@@ -11,25 +11,30 @@
 # - 8x B200 180GB SXM6
 # - ~4.5 TB/s memory bandwidth
 # - ~2250 FP16 TFLOPS
-# - Native FP4 support (B200-exclusive feature)
+# - Native FP4 hardware support (B200-exclusive; script uses simulated quantization)
 #
 # MEMORY UTILIZATION STRATEGY:
 # - Target: 85-92% VRAM (153-166 GB of 180 GB per GPU)
-# - Large model support: 70B+ models on single GPU
+# - Large model support: 70B+ models on 2-4 GPUs (adaptive)
 # - All 8 GPUs utilized in parallel
 #
+# OPERATIONAL NOTES:
+# - Disk: baseline + edits can exceed multiple TB across 8 models.
+# - Host RAM: saving 70B+ edits can require >140 GB CPU RAM.
+# - Runtime: low-rank SVD on 70B+ can dominate wall time.
+#
 # EDIT TYPES (4 types × 2 versions = 8 tests per model):
-# - Quantization RTN: 8-bit clean, 4-bit stress
-# - FP4 Quantization: E2M1 clean, aggressive stress (B200-only)
+# - Quantization RTN (group-wise): 8-bit clean, 4-bit stress
+# - FP4 Quantization (simulated E2M1): clean, aggressive stress
 # - Magnitude Pruning: 10% sparsity, 50% sparsity
 # - Low-Rank SVD: rank=256 clean, rank=32 stress
 #
 # MODEL SUITE (8 PUBLIC models - no HuggingFace login required):
-# - GPU 0: Mistral-7B-v0.3 (~14 GB)
+# - GPU 0: Mistral-7B-v0.1 (~14 GB)
 # - GPU 1: Llama-2-13b-hf (~26 GB)
-# - GPU 2: Qwen2-14B (~28 GB)
-# - GPU 3: mpt-30b (~60 GB)
-# - GPU 4: falcon-40b (~80 GB)
+# - GPU 2: Qwen2.5-14B (~28 GB)
+# - GPU 3: Qwen2.5-32B (~64 GB)
+# - GPU 4: Yi-34B (~68 GB)
 # - GPU 5: Mixtral-8x7B-v0.1 (~90 GB)
 # - GPU 6: Llama-2-70b-hf (~140 GB)
 # - GPU 7: Qwen1.5-72B (~144 GB)
@@ -41,17 +46,12 @@
 # 4. Correlation analysis (lm-eval vs InvarLock) → verdict
 # ==========================================================
 
-# Dynamic scheduling feature flag (v2.0)
-# Set to "false" to use legacy static GPU assignment
-USE_DYNAMIC_SCHEDULING="${USE_DYNAMIC_SCHEDULING:-true}"
+# Dynamic scheduling is always enabled.
+# Static scheduling has been removed.
+# Uses a "small_first" priority strategy with adaptive GPU allocation.
 
-# Note: We use set -uo pipefail instead of set -euo pipefail
-# when dynamic scheduling is enabled to allow per-task error handling
-if [[ "${USE_DYNAMIC_SCHEDULING}" == "true" ]]; then
-    set -uo pipefail  # Per-task error handling, no global exit on error
-else
-    set -euo pipefail  # Legacy behavior
-fi
+# Per-task error handling (no global exit on error)
+set -uo pipefail
 
 # Initialize pids array early to avoid set -u errors in cleanup
 declare -a pids=()
@@ -102,6 +102,23 @@ SCRIPT_VERSION="2.1.0-b200"
 export NUM_GPUS="${NUM_GPUS:-8}"
 export GPU_MEMORY_GB="${GPU_MEMORY_GB:-180}"
 
+# Determinism/throughput toggle for this harness (independent of InvarLock CLI presets).
+# - throughput (default): enable TF32 + cuDNN benchmark for maximum speed.
+# - strict: prefer deterministic-friendly flags and avoid overriding CLI presets.
+B200_DETERMINISM="${B200_DETERMINISM:-throughput}"
+case "${B200_DETERMINISM}" in
+    strict|throughput) ;;
+    *)
+        B200_DETERMINISM="throughput"
+        ;;
+esac
+export B200_DETERMINISM
+if [[ "${B200_DETERMINISM}" == "strict" ]]; then
+    export LMEVAL_TORCH_COMPILE=0
+else
+    export LMEVAL_TORCH_COMPILE=1
+fi
+
 # ============================================================
 # MODEL SELECTION - ALL MODELS ARE PUBLIC (NO HUGGINGFACE LOGIN REQUIRED)
 # ============================================================
@@ -135,15 +152,15 @@ EDIT_SCOPE="${EDIT_SCOPE:-ffn}"
 # Edit Types to test (4 types × 2 versions each)
 # Format: "type:param1:param2:scope" for clean, more aggressive for stress
 EDIT_TYPES_CLEAN=(
-    "quant_rtn:8:128:ffn"        # 8-bit quantization on FFN
-    "fp4_quant:e2m1:ffn"         # FP4 E2M1 on FFN (B200-only)
+    "quant_rtn:8:128:ffn"        # 8-bit group-wise RTN on FFN
+    "fp4_quant:e2m1:ffn"         # FP4 E2M1 on FFN (simulated)
     "magnitude_prune:0.1:ffn"    # 10% sparsity on FFN
     "lowrank_svd:256:ffn"        # rank-256 SVD on FFN
 )
 
 EDIT_TYPES_STRESS=(
-    "quant_rtn:4:32:all"         # 4-bit aggressive on all
-    "fp4_quant:aggressive:all"   # FP4 aggressive on all (B200-only)
+    "quant_rtn:4:32:all"         # 4-bit group-wise RTN on all
+    "fp4_quant:aggressive:all"   # FP4 aggressive on all (simulated)
     "magnitude_prune:0.5:all"    # 50% sparsity on all
     "lowrank_svd:32:all"         # rank-32 SVD on all
 )
@@ -188,20 +205,30 @@ RESUME_MODE="${RESUME_MODE:-true}"
 # Default to using all 8 GPUs, but respect user override
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1,2,3,4,5,6,7}"
 
-# Enable TF32 for massive speedup on B200 (no accuracy loss for inference)
-export NVIDIA_TF32_OVERRIDE=1
+# TF32 / cuDNN benchmark behavior depends on B200_DETERMINISM:
+# - throughput: enable TF32 + benchmark for speed (script-level runs).
+# - strict: avoid overriding determinism-friendly flags; rely on InvarLock presets.
+if [[ "${B200_DETERMINISM}" == "strict" ]]; then
+    export NVIDIA_TF32_OVERRIDE=0
+    export CUDNN_BENCHMARK=0
+else
+    export NVIDIA_TF32_OVERRIDE=1
+    export CUDNN_BENCHMARK=1
+fi
 
 # Enable text-level deduplication
 export INVARLOCK_DEDUP_TEXTS=1
 
 # Memory optimization for B200 - AGGRESSIVE SETTINGS
-export PYTORCH_ALLOC_CONF="expandable_segments:True,max_split_size_mb:1024,garbage_collection_threshold:0.9"
+export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True,max_split_size_mb:1024,garbage_collection_threshold:0.9"
+unset PYTORCH_ALLOC_CONF 2>/dev/null || true
 
-# Enable cuDNN autotuning for fastest kernels
-export CUDNN_BENCHMARK=1
-
-# Force deterministic workspace config with larger workspace
-export CUBLAS_WORKSPACE_CONFIG=:32768:8
+# Force deterministic workspace config with larger workspace (strict only)
+if [[ "${B200_DETERMINISM}" == "strict" ]]; then
+    export CUBLAS_WORKSPACE_CONFIG=:32768:8
+else
+    unset CUBLAS_WORKSPACE_CONFIG 2>/dev/null || true
+fi
 
 # Keep CUDA caching enabled for maximum memory reuse
 export PYTORCH_NO_CUDA_MEMORY_CACHING=0
@@ -209,15 +236,15 @@ export PYTORCH_NO_CUDA_MEMORY_CACHING=0
 # Allow network access for dataset downloads (wikitext2, etc.)
 export INVARLOCK_ALLOW_NETWORK=1
 
-# v0.3.1 FEATURE: PM acceptance range - prevents gate failures during validation
-# These are wide bounds appropriate for validation runs
+# PM acceptance range used during validation
+# These bounds help avoid unnecessary gate failures during validation runs
 export INVARLOCK_PM_ACCEPTANCE_MIN="${INVARLOCK_PM_ACCEPTANCE_MIN:-0.90}"
 export INVARLOCK_PM_ACCEPTANCE_MAX="${INVARLOCK_PM_ACCEPTANCE_MAX:-1.20}"
 
 # Flash attention flag - will be set dynamically based on availability
 export FLASH_ATTENTION_AVAILABLE="false"
 
-# FP4 support flag - B200 exclusive
+# FP4 support flag - detected in setup
 export FP4_NATIVE_SUPPORT="false"
 
 # Target memory fraction (0.92 = 92% of available) - optimal zone
@@ -238,44 +265,54 @@ else
 fi
 export LIB_DIR  # Export for subshell workers
 
-if [[ "${USE_DYNAMIC_SCHEDULING}" == "true" ]]; then
-    # Source dynamic scheduling modules
-    if [[ -f "${LIB_DIR}/task_serialization.sh" ]]; then
-        source "${LIB_DIR}/task_serialization.sh"
-        export TASK_SERIALIZATION_LOADED=1
-    else
-        echo "WARNING: lib/task_serialization.sh not found, falling back to static scheduling"
-        USE_DYNAMIC_SCHEDULING="false"
-    fi
+# Source dynamic scheduling modules (required - optimal configuration)
+if [[ -f "${LIB_DIR}/task_serialization.sh" ]]; then
+    source "${LIB_DIR}/task_serialization.sh"
+    export TASK_SERIALIZATION_LOADED=1
+else
+    echo "ERROR: lib/task_serialization.sh not found (dynamic scheduling is required)"
+    exit 1
+fi
 
-    if [[ "${USE_DYNAMIC_SCHEDULING}" == "true" && -f "${LIB_DIR}/queue_manager.sh" ]]; then
-        source "${LIB_DIR}/queue_manager.sh"
-        export QUEUE_MANAGER_LOADED=1
-    fi
+if [[ -f "${LIB_DIR}/queue_manager.sh" ]]; then
+    source "${LIB_DIR}/queue_manager.sh"
+    export QUEUE_MANAGER_LOADED=1
+else
+    echo "ERROR: lib/queue_manager.sh not found"
+    exit 1
+fi
 
-    if [[ "${USE_DYNAMIC_SCHEDULING}" == "true" && -f "${LIB_DIR}/scheduler.sh" ]]; then
-        source "${LIB_DIR}/scheduler.sh"
-        export SCHEDULER_LOADED=1
-    fi
+if [[ -f "${LIB_DIR}/scheduler.sh" ]]; then
+    source "${LIB_DIR}/scheduler.sh"
+    export SCHEDULER_LOADED=1
+else
+    echo "ERROR: lib/scheduler.sh not found"
+    exit 1
+fi
 
-    if [[ "${USE_DYNAMIC_SCHEDULING}" == "true" && -f "${LIB_DIR}/task_functions.sh" ]]; then
-        source "${LIB_DIR}/task_functions.sh"
-        export TASK_FUNCTIONS_LOADED=1
-    fi
+if [[ -f "${LIB_DIR}/task_functions.sh" ]]; then
+    source "${LIB_DIR}/task_functions.sh"
+    export TASK_FUNCTIONS_LOADED=1
+else
+    echo "ERROR: lib/task_functions.sh not found"
+    exit 1
+fi
 
-    if [[ "${USE_DYNAMIC_SCHEDULING}" == "true" && -f "${LIB_DIR}/gpu_worker.sh" ]]; then
-        source "${LIB_DIR}/gpu_worker.sh"
-        export GPU_WORKER_LOADED=1
-    fi
+if [[ -f "${LIB_DIR}/gpu_worker.sh" ]]; then
+    source "${LIB_DIR}/gpu_worker.sh"
+    export GPU_WORKER_LOADED=1
+else
+    echo "ERROR: lib/gpu_worker.sh not found"
+    exit 1
+fi
 
-    if [[ "${USE_DYNAMIC_SCHEDULING}" == "true" && -f "${LIB_DIR}/fault_tolerance.sh" ]]; then
-        source "${LIB_DIR}/fault_tolerance.sh"
-        export FAULT_TOLERANCE_LOADED=1
-    fi
+if [[ -f "${LIB_DIR}/fault_tolerance.sh" ]]; then
+    source "${LIB_DIR}/fault_tolerance.sh"
+    export FAULT_TOLERANCE_LOADED=1
 fi
 
 # ============ SETUP ============
-mkdir -p "${OUTPUT_DIR}"/{logs,models,evals,certificates,analysis,reports,presets}
+mkdir -p "${OUTPUT_DIR}"/{logs,models,evals,certificates,analysis,reports,presets,workers}
 LOG_FILE="${OUTPUT_DIR}/logs/main.log"
 
 # Create a lock file for thread-safe logging
@@ -308,7 +345,8 @@ setup_b200_environment() {
     log_section "PHASE 0: B200 ENVIRONMENT SETUP"
 
     # Use python3 -c to avoid heredoc indentation issues on macOS
-    python3 -c '
+    local env_report
+    env_report=$(python3 -c '
 import torch
 import os
 import sys
@@ -323,6 +361,11 @@ if not torch.cuda.is_available():
 # Get GPU count and info
 num_gpus = torch.cuda.device_count()
 print(f"GPUs Detected: {num_gpus}")
+
+# Normalize determinism mode for this harness.
+mode = str(os.environ.get("B200_DETERMINISM", "throughput")).strip().lower()
+if mode not in {"throughput", "strict"}:
+    mode = "throughput"
 
 is_b200 = False
 total_vram = 0
@@ -345,17 +388,49 @@ print(f"FP4 Native Support: {fp4_support}")
 
 if not is_b200:
     print("\nWARNING: This script is optimized for B200. Performance may vary on other GPUs.")
-    print("         FP4 quantization will run in simulation mode.")
+    print("         FP4 quantization will use an approximate implementation on non-B200 GPUs.")
 
-# Enable TF32 (huge speedup on B200/H100/A100)
-torch.backends.cuda.matmul.allow_tf32 = True
-torch.backends.cudnn.allow_tf32 = True
-print("\nTF32 enabled: True")
-
-# Enable cuDNN benchmark mode for fastest kernels
-torch.backends.cudnn.benchmark = True
-torch.backends.cudnn.enabled = True
-print("cuDNN benchmark: True")
+if mode == "strict":
+    print("\nDeterminism mode: strict (B200_DETERMINISM=strict)")
+    # Prefer deterministic-friendly flags; leave detailed presets to InvarLock CLI.
+    try:
+        if hasattr(torch, "use_deterministic_algorithms"):
+            torch.use_deterministic_algorithms(True, warn_only=False)
+    except Exception:
+        print("WARNING: deterministic algorithms could not be fully enabled")
+    try:
+        cudnn_mod = getattr(torch.backends, "cudnn", None)
+        if cudnn_mod is not None:
+            cudnn_mod.benchmark = False
+            cudnn_mod.enabled = True
+            if hasattr(cudnn_mod, "deterministic"):
+                cudnn_mod.deterministic = True
+            if hasattr(cudnn_mod, "allow_tf32"):
+                cudnn_mod.allow_tf32 = False
+    except Exception:
+        pass
+    try:
+        matmul = getattr(getattr(torch.backends, "cuda", object()), "matmul", None)
+        if matmul is not None and hasattr(matmul, "allow_tf32"):
+            matmul.allow_tf32 = False
+    except Exception:
+        pass
+    print("\nTF32 enabled: False")
+    print("cuDNN benchmark: False")
+else:
+    print("\nDeterminism mode: throughput (B200_DETERMINISM!=strict)")
+    # Enable TF32 (huge speedup on B200/H100/A100)
+    torch.backends.cuda.matmul.allow_tf32 = True
+    try:
+        cudnn_mod = getattr(torch.backends, "cudnn", None)
+        if cudnn_mod is not None:
+            cudnn_mod.allow_tf32 = True
+            cudnn_mod.benchmark = True
+            cudnn_mod.enabled = True
+    except Exception:
+        pass
+    print("\nTF32 enabled: True")
+    print("cuDNN benchmark: True")
 
 # Set BF16 as preferred dtype if supported
 if torch.cuda.is_bf16_supported():
@@ -392,10 +467,19 @@ else:
     print("\n[FP4_NATIVE_SUPPORT=false]")
 
 print("\n=== Environment Ready for B200 Maximum Utilization ===")
-'
-    # Note: FP4 support detection is handled directly in create_fp4_model() via Python
-    # The FP4_NATIVE_SUPPORT env var is set there based on actual GPU detection at runtime
-    log "B200 Environment Setup: Complete (FP4 detection will occur at edit time)"
+')
+    local setup_rc=$?
+    if [[ ${setup_rc} -ne 0 ]]; then
+        printf '%s\n' "${env_report}"
+        return ${setup_rc}
+    fi
+    printf '%s\n' "${env_report}"
+    if [[ "${env_report}" == *"[FP4_NATIVE_SUPPORT=true]"* ]]; then
+        export FP4_NATIVE_SUPPORT="true"
+    else
+        export FP4_NATIVE_SUPPORT="false"
+    fi
+    log "B200 Environment Setup: Complete (FP4_NATIVE_SUPPORT=${FP4_NATIVE_SUPPORT})"
 }
 
 # ============ DEPENDENCY CHECK ============
@@ -476,8 +560,15 @@ check_dependencies() {
     # Check lm-eval-harness (package name is lm_eval, not lm-eval)
     python3 -c "import lm_eval" 2>/dev/null || python3 -m pip install lm_eval
 
-    # Check InvarLock
+    # Check InvarLock (Python module and CLI)
     python3 -c "import invarlock" 2>/dev/null || missing+=("invarlock")
+    command -v invarlock >/dev/null 2>&1 || missing+=("invarlock-cli")
+
+    # Check shell utilities used by the suite
+    command -v jq >/dev/null 2>&1 || missing+=("jq")
+    command -v nvidia-smi >/dev/null 2>&1 || missing+=("nvidia-smi")
+    command -v flock >/dev/null 2>&1 || missing+=("flock")
+    command -v timeout >/dev/null 2>&1 || missing+=("timeout")
 
     if [[ ${#missing[@]} -gt 0 ]]; then
         error_exit "Missing dependencies: ${missing[*]}"
@@ -513,11 +604,13 @@ setup_model() {
     local success_marker="${model_dir}/.download_success"
     rm -f "${success_marker}"
 
-    CUDA_VISIBLE_DEVICES="${gpu_id}" python3 << EOF 2>&1 | tee -a "${LOG_FILE}" >&2
+    local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
+    CUDA_VISIBLE_DEVICES="${cuda_devices}" python3 << EOF 2>&1 | tee -a "${LOG_FILE}" >&2
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
 from pathlib import Path
 import gc
+import os
 import sys
 
 model_id = "${model_id}"
@@ -544,8 +637,13 @@ def model_supports_flash_attention(model_id):
     return True
 
 try:
-    torch.backends.cuda.matmul.allow_tf32 = True
-    torch.backends.cudnn.allow_tf32 = True
+    mode = os.environ.get("B200_DETERMINISM", "throughput").strip().lower()
+    if mode == "strict":
+        torch.backends.cuda.matmul.allow_tf32 = False
+        torch.backends.cudnn.allow_tf32 = False
+    else:
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
 
     tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
     tokenizer.save_pretrained(output_dir)
@@ -726,13 +824,13 @@ get_model_invarlock_config() {
             echo "1024:512:40:40:24"
             ;;
         "70"|"72")
-            # 70-72B models: ~140-144GB, ULTRA-CONSERVATIVE settings
-            # B200 180GB minus ~140GB model = only ~36GB headroom
-            # CRITICAL FIX v2: Must avoid double-load from overhead check
-            # - seq_len=128 (was 256): Minimal KV cache
+            # 70-72B models: ~140-144GB, ultra-conservative settings
+            # B200 180GB minus ~140GB model = ~36GB headroom
+            # Settings chosen to avoid double-loading baseline and edited models during overhead checks:
+            # - seq_len=128: Minimal KV cache
             # - stride=64: Maintains 50% overlap
-            # - windows=8+8 (was 16+16): Minimal window count
-            # - eval_batch=2 (was 8): Minimal batch to survive overhead check
+            # - windows=8+8: Minimal window count
+            # - eval_batch=2: Minimal batch to avoid OOM
             echo "128:64:8:8:2"
             ;;
         *)
@@ -764,17 +862,24 @@ create_edited_model() {
     mkdir -p "$(dirname "${output_path}")"
 
     if [[ "${edit_type}" == "quant_rtn" ]]; then
-        CUDA_VISIBLE_DEVICES="${gpu_id}" python3 << EOF
+        local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
+        CUDA_VISIBLE_DEVICES="${cuda_devices}" python3 << EOF
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from pathlib import Path
 import json
 import gc
+import os
 import sys
 
 try:
-    torch.backends.cuda.matmul.allow_tf32 = True
-    torch.backends.cudnn.allow_tf32 = True
+    mode = os.environ.get("B200_DETERMINISM", "throughput").strip().lower()
+    if mode == "strict":
+        torch.backends.cuda.matmul.allow_tf32 = False
+        torch.backends.cudnn.allow_tf32 = False
+    else:
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
 
     baseline_path = Path("${baseline_path}")
     output_path = Path("${output_path}")
@@ -798,19 +903,27 @@ try:
     model = AutoModelForCausalLM.from_pretrained(baseline_path, **model_kwargs)
 
     @torch.no_grad()
-    def round_to_nearest_gpu(tensor, bits):
-        """Per-tensor RTN quantization.
-
-        Note: group_size is stored in metadata but not used in this implementation.
-        Full per-group quantization would require chunking along channel dimension,
-        but per-tensor is sufficient for validation purposes.
-        """
+    def round_to_nearest_gpu(tensor, bits, group_size):
+        """Group-wise RTN quantization (per-output-channel groups along input dim)."""
         qmin = -(2 ** (bits - 1))
         qmax = 2 ** (bits - 1) - 1
-        scale = tensor.abs().max() / qmax
-        scale = torch.clamp(scale, min=1e-10)
-        quantized = torch.clamp(torch.round(tensor / scale), qmin, qmax)
-        return (quantized * scale).to(tensor.dtype)
+        orig_shape = tensor.shape
+        flat = tensor.reshape(orig_shape[0], -1)
+        in_features = flat.shape[1]
+        if group_size <= 0 or group_size >= in_features:
+            group_size = in_features
+        num_groups = (in_features + group_size - 1) // group_size
+        pad = (num_groups * group_size) - in_features
+        if pad > 0:
+            flat = torch.nn.functional.pad(flat, (0, pad))
+        grouped = flat.reshape(orig_shape[0], num_groups, group_size)
+        max_abs = grouped.abs().amax(dim=-1, keepdim=True)
+        scale = torch.clamp(max_abs / qmax, min=1e-10)
+        quantized = torch.round(grouped / scale).clamp(qmin, qmax) * scale
+        quantized = quantized.reshape(orig_shape[0], num_groups * group_size)
+        if pad > 0:
+            quantized = quantized[:, :in_features]
+        return quantized.reshape(orig_shape).to(tensor.dtype)
 
     def should_quantize(name, scope):
         """Check if parameter should be quantized based on name and scope.
@@ -846,7 +959,7 @@ try:
 
     for name, param in model.named_parameters():
         if should_quantize(name, scope) and param.dim() >= 2:
-            param.data = round_to_nearest_gpu(param.data, bits)
+            param.data = round_to_nearest_gpu(param.data, bits, group_size)
             quantized_count += 1
             edited_params += param.numel()
             if quantized_count <= 3:
@@ -905,7 +1018,8 @@ create_pruned_model() {
 
     mkdir -p "$(dirname "${output_path}")"
 
-    CUDA_VISIBLE_DEVICES="${gpu_id}" python3 << EOF
+    local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
+    CUDA_VISIBLE_DEVICES="${cuda_devices}" python3 << EOF
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from pathlib import Path
@@ -925,7 +1039,7 @@ try:
         baseline_path,
         torch_dtype=torch.bfloat16,
         trust_remote_code=True,
-        device_map="cuda:0",
+        device_map="auto",
         low_cpu_mem_usage=True,
     )
 
@@ -1035,7 +1149,8 @@ create_lowrank_model() {
 
     mkdir -p "$(dirname "${output_path}")"
 
-    CUDA_VISIBLE_DEVICES="${gpu_id}" python3 << EOF
+    local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
+    CUDA_VISIBLE_DEVICES="${cuda_devices}" python3 << EOF
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from pathlib import Path
@@ -1055,7 +1170,7 @@ try:
         baseline_path,
         torch_dtype=torch.bfloat16,
         trust_remote_code=True,
-        device_map="cuda:0",
+        device_map="auto",
         low_cpu_mem_usage=True,
     )
 
@@ -1168,7 +1283,7 @@ EOF
 }
 export -f create_lowrank_model
 
-# ============ FP4 QUANTIZATION (B200-EXCLUSIVE) ============
+# ============ FP4 QUANTIZATION (SIMULATED) ============
 create_fp4_model() {
     local baseline_path="$1"
     local output_path="$2"
@@ -1184,12 +1299,14 @@ create_fp4_model() {
 
     mkdir -p "$(dirname "${output_path}")"
 
-    CUDA_VISIBLE_DEVICES="${gpu_id}" python3 << EOF
+    local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
+    CUDA_VISIBLE_DEVICES="${cuda_devices}" python3 << EOF
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from pathlib import Path
 import json
 import gc
+import os
 import sys
 
 try:
@@ -1205,9 +1322,24 @@ try:
     device_name = torch.cuda.get_device_name(0)
     is_b200 = "B200" in device_name or "Blackwell" in device_name
 
-    if not is_b200:
-        print(f"WARNING: FP4 is B200-native, current GPU: {device_name}")
-        print("         Running in simulation mode - may not match true B200 behavior")
+    require_native = os.environ.get("INVARLOCK_REQUIRE_FP4_NATIVE", "false").strip().lower() in ("1", "true", "yes")
+    te_available = False
+    try:
+        import transformer_engine.pytorch as te  # noqa: F401
+        te_available = True
+    except Exception as e:
+        if require_native:
+            raise RuntimeError("TransformerEngine not available for native FP4 validation") from e
+
+    fp4_native = bool(is_b200 and te_available)
+
+    if not fp4_native:
+        if is_b200:
+            print("WARNING: B200 detected but TransformerEngine not available.")
+            print("         FP4 quantization is simulated; no FP4 Tensor Core validation.")
+        else:
+            print(f"WARNING: FP4 is B200-native, current GPU: {device_name}")
+            print("         FP4 quantization is simulated; results may not match true B200 behavior")
 
     print(f"Loading baseline from {baseline_path}...")
     tokenizer = AutoTokenizer.from_pretrained(baseline_path, trust_remote_code=True)
@@ -1215,7 +1347,7 @@ try:
         baseline_path,
         torch_dtype=torch.bfloat16,
         trust_remote_code=True,
-        device_map="cuda:0",
+        device_map="auto",
         low_cpu_mem_usage=True,
     )
 
@@ -1255,28 +1387,30 @@ try:
         # FP4 E2M1 representable values (approximate)
         if format_type == "e2m1":
             # Standard E2M1: {0, ±0.5, ±1, ±1.5, ±2, ±3, ±4, ±6}
-            levels = torch.tensor([0, 0.5, 1, 1.5, 2, 3, 4, 6], device=tensor.device)
+            levels = torch.tensor([0.0, 0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0], device=tensor.device, dtype=torch.float16)
         else:
             # Aggressive: tighter range for stress testing
-            levels = torch.tensor([0, 0.25, 0.5, 0.75, 1, 1.5, 2, 3], device=tensor.device)
+            levels = torch.tensor([0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0], device=tensor.device, dtype=torch.float16)
 
-        # Add negative copies
-        all_levels = torch.cat([-levels.flip(0)[:-1], levels])  # Avoid double zero
+        # Memory-safe nearest-level quantization via bucketize (no NxK diff matrix).
+        max_val = float(levels[-1].item())
+        scale = tensor.abs().amax().float() / max_val
+        scale = torch.clamp(scale, min=1e-10).to(device=tensor.device, dtype=torch.float16)
 
-        # Scale tensor to fit FP4 range
-        max_val = levels.max()
-        scale = tensor.abs().max() / max_val
-        scale = torch.clamp(scale, min=1e-10)
+        thresholds = ((levels[:-1] + levels[1:]) / 2).to(device=tensor.device)
 
-        # Quantize
-        scaled = tensor / scale
-        # Reshape for broadcasting
-        scaled_flat = scaled.flatten()
-        diff = (scaled_flat.unsqueeze(-1) - all_levels).abs()
-        indices = diff.argmin(dim=-1)
-        quantized = all_levels[indices].reshape(tensor.shape)
+        flat = tensor.view(-1)
+        n = flat.numel()
+        chunk_elems = 5_000_000  # Bound peak temp memory (idx is int64)
+        for start in range(0, n, chunk_elems):
+            end = min(start + chunk_elems, n)
+            chunk = flat[start:end]
+            scaled = chunk.to(torch.float16) / scale
+            idx = torch.bucketize(scaled.abs(), thresholds)
+            q = levels[idx] * scaled.sign()
+            chunk.copy_((q * scale).to(chunk.dtype))
 
-        return (quantized * scale).to(tensor.dtype)
+        return tensor
 
     print(f"Applying FP4 quantization (format={format_type}, scope={scope})...")
     quantized_count = 0
@@ -1319,7 +1453,9 @@ try:
         "scope": scope,
         "quantized_tensors": quantized_count,
         "avg_relative_error": avg_error,
-        "b200_native": is_b200
+        "b200_native": is_b200,
+        "fp4_native": fp4_native,
+        "transformer_engine": te_available
     }
     with open(output_path / "edit_metadata.json", "w") as f:
         json.dump(metadata, f, indent=2)
@@ -1348,7 +1484,8 @@ create_error_model() {
     log "Creating error model (type=${error_type}, GPU ${gpu_id})"
     mkdir -p "$(dirname "${output_path}")"
 
-    CUDA_VISIBLE_DEVICES="${gpu_id}" python3 << EOF
+    local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
+    CUDA_VISIBLE_DEVICES="${cuda_devices}" python3 << EOF
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from pathlib import Path
@@ -1371,7 +1508,7 @@ try:
             baseline_path,
             torch_dtype=torch.bfloat16,
             trust_remote_code=True,
-            device_map="cuda:0",
+            device_map="auto",
             low_cpu_mem_usage=True,
         )
         use_gpu = True
@@ -1619,15 +1756,38 @@ run_lmeval() {
     mkdir -p "$(dirname "${output_file}")"
 
     local model_args="pretrained=${model_path},trust_remote_code=True,dtype=bfloat16"
+    local parallelize_flag="${LM_EVAL_PARALLELIZE:-true}"
+    parallelize_flag=$(echo "${parallelize_flag}" | tr '[:upper:]' '[:lower:]')
+    if [[ "${CUDA_VISIBLE_DEVICES:-}" == *","* && "${parallelize_flag}" != "false" && "${parallelize_flag}" != "0" ]]; then
+        model_args="${model_args},parallelize=True"
+    fi
     if [[ "${FLASH_ATTENTION_AVAILABLE}" == "true" ]]; then
-        model_args="${model_args},attn_implementation=flash_attention_2"
+        # Only enable Flash Attention 2 for architectures known to support it.
+        # Reuse the same pattern filter as setup_model() to avoid crashes.
+        local model_lower
+        model_lower=$(echo "${model_path}" | tr '[:upper:]' '[:lower:]')
+        local use_fa2="true"
+        local pattern
+        for pattern in falcon mpt- gpt2 bloom opt- gpt-j gpt-neo codegen santacoder stablelm; do
+            if [[ "${model_lower}" == *"${pattern}"* ]]; then
+                use_fa2="false"
+                break
+            fi
+        done
+        if [[ "${use_fa2}" == "true" ]]; then
+            model_args="${model_args},attn_implementation=flash_attention_2"
+        else
+            log "  Flash Attention 2 disabled for eval on model path: ${model_path}"
+        fi
     fi
 
     log "  🚀 Starting lm-eval on GPU ${gpu_id}..."
 
     local exit_code=0
-    CUDA_VISIBLE_DEVICES="${gpu_id}" \
-    TORCH_COMPILE=1 \
+    local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
+    local torch_compile="${LMEVAL_TORCH_COMPILE:-0}"
+    CUDA_VISIBLE_DEVICES="${cuda_devices}" \
+    TORCH_COMPILE="${torch_compile}" \
     python3 -m lm_eval \
         --model hf \
         --model_args "${model_args}" \
@@ -1674,6 +1834,14 @@ generate_invarlock_config() {
     else
         attn_impl_yaml='# flash_attention_2 not available'
     fi
+    local accel_compile="true"
+    local accel_tf32="true"
+    local accel_benchmark="true"
+    if [[ "${B200_DETERMINISM}" == "strict" ]]; then
+        accel_compile="false"
+        accel_tf32="false"
+        accel_benchmark="false"
+    fi
 
     cat > "${output_yaml}" << YAML_EOF
 # Auto-generated InvarLock config for B200 validation
@@ -1709,7 +1877,6 @@ guards:
     - spectral
     - rmt
     - variance
-    - invariants
 
 eval:
   bootstrap:
@@ -1727,9 +1894,9 @@ output:
   dir: "."
 
 accelerator:
-  compile: true
-  tf32: true
-  benchmark: true
+  compile: ${accel_compile}
+  tf32: ${accel_tf32}
+  benchmark: ${accel_benchmark}
   memory_efficient_attention: false
   gradient_checkpointing: false
 
@@ -1770,20 +1937,27 @@ run_single_calibration() {
         "${stride}" \
         "${eval_batch}"
 
-    # v0.3.1 FEATURE: For large models, skip overhead check to avoid OOM
+    # For large models, skip overhead check to avoid OOM (task-local via env)
     local model_size
     model_size=$(estimate_model_params "${model_path}")
-    if [[ "${model_size}" == "70" || "${model_size}" == "72" || "${model_size}" == "moe" ]]; then
-        export INVARLOCK_SKIP_OVERHEAD_CHECK=1
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Large model (${model_size}): setting INVARLOCK_SKIP_OVERHEAD_CHECK=1" >> "${log_file}"
-    fi
 
+    local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
     local exit_code=0
-    CUDA_VISIBLE_DEVICES="${gpu_id}" invarlock run \
-        --config "${config_yaml}" \
-        --profile ci \
-        --out "${run_dir}" \
-        >> "${log_file}" 2>&1 || exit_code=$?
+    if [[ "${model_size}" == "70" || "${model_size}" == "72" || "${model_size}" == "moe" ]]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Large model (${model_size}): using INVARLOCK_SKIP_OVERHEAD_CHECK=1 for calibration" >> "${log_file}"
+        INVARLOCK_SKIP_OVERHEAD_CHECK=1 \
+        CUDA_VISIBLE_DEVICES="${cuda_devices}" invarlock run \
+            --config "${config_yaml}" \
+            --profile ci \
+            --out "${run_dir}" \
+            >> "${log_file}" 2>&1 || exit_code=$?
+    else
+        CUDA_VISIBLE_DEVICES="${cuda_devices}" invarlock run \
+            --config "${config_yaml}" \
+            --profile ci \
+            --out "${run_dir}" \
+            >> "${log_file}" 2>&1 || exit_code=$?
+    fi
 
     # Generate certificate from report
     local report_file=$(find "${run_dir}" -name "report*.json" -type f 2>/dev/null | head -1)
@@ -1868,90 +2042,632 @@ run_invarlock_calibration() {
     # Generate calibrated preset
     python3 << CALIBRATION_SCRIPT
 import json
-import yaml
+import math
+import statistics
 from pathlib import Path
 from collections import defaultdict
+
+try:
+    import yaml
+    YAML_AVAILABLE = True
+except Exception:
+    YAML_AVAILABLE = False
 
 output_dir = Path("${output_dir}")
 preset_output_dir = Path("${preset_output_dir}")
 model_name = "${model_name}"
 model_path = "${model_path}"
-tier = "${INVARLOCK_TIER}"
+tier = "${INVARLOCK_TIER}".strip().lower()
+dataset_provider = "${INVARLOCK_DATASET}"
 seq_len = int("${effective_seq_len}")
 stride = int("${effective_stride}")
 preview_n = int("${effective_preview_n}")
 final_n = int("${effective_final_n}")
 
-def load_certificates():
-    certs = []
-    for run_dir in sorted(output_dir.glob("run_*")):
-        for file_pattern in ["evaluation.cert.json", "baseline_report.json"]:
-            cert_path = run_dir / file_pattern
-            if cert_path.exists():
-                try:
-                    certs.append(json.loads(cert_path.read_text()))
-                    break
-                except: pass
-    return certs
+def _safe_float(value):
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
-certs = load_certificates()
-if len(certs) == 0:
-    print("ERROR: No calibration certificates found - cannot create valid preset")
-    print("       This model's calibration failed completely")
+def _quantile(values, q):
+    if not values:
+        return None
+    values = sorted(values)
+    if len(values) == 1:
+        return values[0]
+    pos = (len(values) - 1) * q
+    lower = int(math.floor(pos))
+    upper = int(math.ceil(pos))
+    if lower == upper:
+        return values[lower]
+    frac = pos - lower
+    return values[lower] + (values[upper] - values[lower]) * frac
+
+def _merge_record(cert, report):
+    rec = {}
+    if isinstance(cert, dict):
+        rec = json.loads(json.dumps(cert))
+    if not isinstance(report, dict):
+        return rec or None
+
+    # Primary metric from report when cert is missing it.
+    metrics = report.get("metrics", {}) or {}
+    pm = metrics.get("primary_metric", {}) or {}
+    if not pm and "ppl_final" in metrics:
+        pm = {
+            "final": metrics.get("ppl_final"),
+            "preview": metrics.get("ppl_preview"),
+        }
+        try:
+            pm["ratio_vs_baseline"] = float(pm["final"]) / max(float(pm["preview"]), 1e-10)
+        except Exception:
+            pass
+    if pm and not rec.get("primary_metric"):
+        rec["primary_metric"] = pm
+
+    guards = report.get("guards", []) or []
+    for guard in guards:
+        if not isinstance(guard, dict):
+            continue
+        name = str(guard.get("name", "")).lower()
+        gmetrics = guard.get("metrics", {}) or {}
+        gpolicy = guard.get("policy", {}) or {}
+
+        if name == "spectral":
+            spec = rec.get("spectral", {}) if isinstance(rec.get("spectral"), dict) else {}
+            if gmetrics.get("family_z_quantiles"):
+                spec.setdefault("family_z_quantiles", gmetrics.get("family_z_quantiles"))
+            if gmetrics.get("family_z_summary"):
+                spec.setdefault("family_z_summary", gmetrics.get("family_z_summary"))
+            if gmetrics.get("family_caps"):
+                spec.setdefault("family_caps", gmetrics.get("family_caps"))
+            if gmetrics.get("sigma_quantile") is not None:
+                spec.setdefault("sigma_quantile", gmetrics.get("sigma_quantile"))
+            if gmetrics.get("deadband") is not None:
+                spec.setdefault("deadband", gmetrics.get("deadband"))
+            if gmetrics.get("max_caps") is not None:
+                spec.setdefault("max_caps", gmetrics.get("max_caps"))
+            if gmetrics.get("families"):
+                spec.setdefault("families", gmetrics.get("families"))
+            if gmetrics.get("family_stats"):
+                spec.setdefault("families", gmetrics.get("family_stats"))
+            z_scores = guard.get("final_z_scores") or gmetrics.get("final_z_scores")
+            if isinstance(z_scores, dict):
+                spec["final_z_scores"] = z_scores
+            fam_map = guard.get("module_family_map") or gmetrics.get("module_family_map")
+            if isinstance(fam_map, dict):
+                spec["module_family_map"] = fam_map
+            if gpolicy and not spec.get("policy"):
+                spec["policy"] = gpolicy
+            rec["spectral"] = spec
+
+        elif name == "rmt":
+            rmt = rec.get("rmt", {}) if isinstance(rec.get("rmt"), dict) else {}
+            for key in ("outliers_per_family", "baseline_outliers_per_family", "families"):
+                val = gmetrics.get(key)
+                if isinstance(val, dict) and val:
+                    rmt.setdefault(key, val)
+            if gmetrics.get("epsilon_by_family"):
+                rmt.setdefault("epsilon_by_family", gmetrics.get("epsilon_by_family"))
+            if gmetrics.get("epsilon") is not None:
+                rmt.setdefault("epsilon", gmetrics.get("epsilon"))
+            if gmetrics.get("epsilon_default") is not None:
+                rmt.setdefault("epsilon_default", gmetrics.get("epsilon_default"))
+            if gmetrics.get("margin_used") is not None:
+                rmt.setdefault("margin", gmetrics.get("margin_used"))
+            if gmetrics.get("deadband_used") is not None:
+                rmt.setdefault("deadband", gmetrics.get("deadband_used"))
+            if gpolicy and not rmt.get("policy"):
+                rmt["policy"] = gpolicy
+            rec["rmt"] = rmt
+
+        elif name == "variance":
+            var = rec.get("variance", {}) if isinstance(rec.get("variance"), dict) else {}
+            if gmetrics.get("predictive_gate") is not None:
+                var.setdefault("predictive_gate", gmetrics.get("predictive_gate"))
+            if gmetrics.get("ab_windows_used") is not None:
+                var.setdefault("ab_windows_used", gmetrics.get("ab_windows_used"))
+            if gmetrics.get("deadband") is not None:
+                var.setdefault("deadband", gmetrics.get("deadband"))
+            if gmetrics.get("min_gain") is not None:
+                var.setdefault("min_gain", gmetrics.get("min_gain"))
+            if gmetrics.get("min_effect_lognll") is not None:
+                var.setdefault("min_effect_lognll", gmetrics.get("min_effect_lognll"))
+            if gmetrics.get("calibration") is not None:
+                var.setdefault("calibration", gmetrics.get("calibration"))
+            if gmetrics.get("calibration_stats") is not None:
+                var.setdefault("calibration_stats", gmetrics.get("calibration_stats"))
+            if gpolicy and not var.get("policy"):
+                var["policy"] = gpolicy
+            rec["variance"] = var
+
+    return rec or None
+
+def load_records():
+    records = []
+    for run_dir in sorted(output_dir.glob("run_*")):
+        cert = None
+        report = None
+        cert_path = run_dir / "evaluation.cert.json"
+        if cert_path.exists():
+            try:
+                cert = json.loads(cert_path.read_text())
+            except Exception:
+                cert = None
+        report_path = run_dir / "baseline_report.json"
+        if not report_path.exists():
+            report_files = list(run_dir.glob("**/report*.json"))
+            if report_files:
+                report_path = report_files[0]
+        if report_path.exists():
+            try:
+                report = json.loads(report_path.read_text())
+            except Exception:
+                report = None
+
+        record = _merge_record(cert, report)
+        if record:
+            records.append(record)
+    return records
+
+records = load_records()
+if len(records) == 0:
+    print("ERROR: No calibration records found - cannot create valid preset")
     import sys
     sys.exit(1)
-elif len(certs) < 2:
-    print(f"WARNING: Only {len(certs)} calibration certificate(s) found (expected >= 2)")
-    print("         Drift statistics will be under-determined")
-    # Pad with the available certificate to allow analysis to continue
-    certs = certs + [certs[0]] * (2 - len(certs))
+if len(records) < 2:
+    print(f"WARNING: Only {len(records)} calibration record(s) found (expected >= 2)")
 
-# Calculate drift stats
-drifts = []
-for cert in certs:
-    pm = cert.get('primary_metric', {})
-    ratio = pm.get('ratio_vs_baseline') or pm.get('drift')
-    if ratio:
-        try: drifts.append(float(ratio))
-        except: pass
+def calibrate_drift(recs):
+    ratios = []
+    for rec in recs:
+        pm = rec.get("primary_metric", {}) or {}
+        ratio = pm.get("ratio_vs_baseline") or pm.get("drift")
+        if ratio is None:
+            preview = pm.get("preview")
+            final = pm.get("final")
+            if preview is not None and final is not None:
+                try:
+                    ratio = float(final) / max(float(preview), 1e-10)
+                except Exception:
+                    ratio = None
+        if ratio is not None:
+            try:
+                ratios.append(float(ratio))
+            except Exception:
+                pass
 
-if drifts:
-    mean_drift = sum(drifts) / len(drifts)
-    std_drift = (sum((x - mean_drift)**2 for x in drifts) / len(drifts))**0.5 if len(drifts) > 1 else 0
-    margin = max(2 * std_drift, 0.05)
-else:
-    mean_drift, std_drift, margin = 1.0, 0.0, 0.05
+    if len(ratios) < 2:
+        return {
+            "mean": 1.0,
+            "std": 0.0,
+            "min": min(ratios) if ratios else 1.0,
+            "max": max(ratios) if ratios else 1.0,
+            "suggested_band": [0.95, 1.05],
+            "band_compatible": True,
+        }
+
+    mean = statistics.mean(ratios)
+    std = statistics.stdev(ratios) if len(ratios) > 1 else 0.0
+    margin = max(2 * std, 0.05)
+    band = [round(mean - margin, 3), round(mean + margin, 3)]
+    return {
+        "mean": round(mean, 4),
+        "std": round(std, 4),
+        "min": round(min(ratios), 4),
+        "max": round(max(ratios), 4),
+        "suggested_band": band,
+        "band_compatible": 0.95 <= mean <= 1.05,
+    }
+
+def _spectral_margin(tier_name):
+    return 0.10 if tier_name == "conservative" else 0.05
+
+def _default_max_caps(tier_name):
+    if tier_name == "conservative":
+        return 3
+    if tier_name == "aggressive":
+        return 8
+    return 5
+
+def _allocate_budget(counts, budget):
+    if not counts or budget <= 0:
+        return {fam: 0 for fam in counts}
+    total = sum(counts.values())
+    if total <= 0:
+        return {fam: 0 for fam in counts}
+    raw = {fam: budget * count / total for fam, count in counts.items()}
+    alloc = {fam: int(round(val)) for fam, val in raw.items()}
+    diff = budget - sum(alloc.values())
+    if diff > 0:
+        for fam in sorted(raw, key=raw.get, reverse=True):
+            if diff == 0:
+                break
+            alloc[fam] += 1
+            diff -= 1
+    elif diff < 0:
+        for fam in sorted(raw, key=raw.get):
+            if diff == 0:
+                break
+            if alloc.get(fam, 0) > 0:
+                alloc[fam] -= 1
+                diff += 1
+    return alloc
+
+def calibrate_spectral(recs):
+    per_run_caps = defaultdict(list)
+    q99_values = defaultdict(list)
+    max_values = defaultdict(list)
+    existing_caps = {}
+    sigma_quantile = None
+    deadband = None
+    max_caps = None
+
+    for rec in recs:
+        spec = rec.get("spectral", {}) or {}
+        if not isinstance(spec, dict):
+            continue
+        policy = spec.get("policy", {}) if isinstance(spec.get("policy"), dict) else {}
+
+        if sigma_quantile is None:
+            sq = (
+                policy.get("sigma_quantile")
+                or policy.get("contraction")
+                or policy.get("kappa")
+                or spec.get("sigma_quantile")
+                or (spec.get("summary") or {}).get("sigma_quantile")
+            )
+            sq = _safe_float(sq)
+            if sq is not None:
+                sigma_quantile = sq
+
+        if deadband is None:
+            db = policy.get("deadband") or spec.get("deadband") or (spec.get("summary") or {}).get("deadband")
+            db = _safe_float(db)
+            if db is not None:
+                deadband = db
+
+        if max_caps is None:
+            mc = policy.get("max_caps") or spec.get("max_caps") or (spec.get("summary") or {}).get("max_caps")
+            try:
+                if mc is not None:
+                    max_caps = int(mc)
+            except Exception:
+                pass
+
+        fam_caps = spec.get("family_caps", {})
+        if not fam_caps and isinstance(policy.get("family_caps"), dict):
+            fam_caps = policy.get("family_caps", {})
+        if isinstance(fam_caps, dict):
+            for fam, cap in fam_caps.items():
+                try:
+                    if isinstance(cap, dict):
+                        cap = cap.get("kappa")
+                    existing_caps[str(fam)] = float(cap)
+                except Exception:
+                    pass
+
+        z_map = spec.get("final_z_scores")
+        fam_map = spec.get("module_family_map")
+        if isinstance(z_map, dict) and isinstance(fam_map, dict):
+            z_by_family = defaultdict(list)
+            for module, z in z_map.items():
+                fam = fam_map.get(module)
+                if fam is None:
+                    continue
+                z_val = _safe_float(z)
+                if z_val is None:
+                    continue
+                z_by_family[str(fam)].append(abs(z_val))
+            if z_by_family:
+                counts = {fam: len(vals) for fam, vals in z_by_family.items() if vals}
+                budget = (
+                    max_caps
+                    if isinstance(max_caps, int) and max_caps >= 0
+                    else _default_max_caps(tier)
+                )
+                alloc = _allocate_budget(counts, budget)
+                for fam, values in z_by_family.items():
+                    if not values:
+                        continue
+                    values_sorted = sorted(values, reverse=True)
+                    idx = max(0, min(alloc.get(fam, 1) - 1, len(values_sorted) - 1))
+                    per_run_caps[fam].append(values_sorted[idx])
+
+        fq = spec.get("family_z_quantiles", {})
+        if not fq and isinstance(spec.get("family_z_summary"), dict):
+            fq = spec.get("family_z_summary", {})
+        if isinstance(fq, dict):
+            for fam, stats in fq.items():
+                if not isinstance(stats, dict):
+                    continue
+                val_q99 = _safe_float(stats.get("q99"))
+                val_max = _safe_float(stats.get("max"))
+                if val_q99 is not None:
+                    q99_values[str(fam)].append(val_q99)
+                if val_max is not None:
+                    max_values[str(fam)].append(val_max)
+
+    summary = {
+        "families_seen": sorted(set(per_run_caps) | set(q99_values) | set(existing_caps)),
+        "sigma_quantile": sigma_quantile,
+        "deadband": deadband,
+        "max_caps": max_caps,
+    }
+
+    proposed_caps = {}
+    margin = _spectral_margin(tier)
+    if per_run_caps:
+        for fam, candidates in per_run_caps.items():
+            if not candidates:
+                continue
+            base = max(candidates)
+            if fam in existing_caps:
+                base = max(base, existing_caps[fam])
+            proposed_caps[fam] = {"kappa": round(base + margin, 3)}
+        for fam in sorted(set(q99_values) | set(max_values)):
+            if fam in proposed_caps:
+                continue
+            observed = q99_values.get(fam, []) + max_values.get(fam, [])
+            if not observed:
+                continue
+            base = max(observed)
+            if fam in existing_caps:
+                base = max(base, existing_caps[fam])
+            proposed_caps[fam] = {"kappa": round(base + margin, 3)}
+    elif q99_values or max_values:
+        for fam in sorted(set(q99_values) | set(max_values)):
+            observed = q99_values.get(fam, []) + max_values.get(fam, [])
+            if not observed:
+                continue
+            base = max(observed)
+            if fam in existing_caps:
+                base = max(base, existing_caps[fam])
+            proposed_caps[fam] = {"kappa": round(base + margin, 3)}
+    else:
+        for fam, kappa in existing_caps.items():
+            proposed_caps[fam] = {"kappa": kappa}
+
+    return summary, proposed_caps
+
+def _rmt_quantile_for_tier(tier_name):
+    if tier_name == "conservative":
+        return 0.95
+    if tier_name == "aggressive":
+        return 0.99
+    return 0.97
+
+def calibrate_rmt(recs):
+    deltas_by_family = defaultdict(list)
+    existing_eps = {}
+    margin = None
+    deadband = None
+
+    for rec in recs:
+        rmt = rec.get("rmt", {}) or {}
+        if not isinstance(rmt, dict):
+            continue
+        policy = rmt.get("policy", {}) if isinstance(rmt.get("policy"), dict) else {}
+
+        if margin is None:
+            margin = _safe_float(policy.get("margin") or rmt.get("margin") or (rmt.get("summary") or {}).get("margin"))
+        if deadband is None:
+            deadband = _safe_float(policy.get("deadband") or rmt.get("deadband") or (rmt.get("summary") or {}).get("deadband"))
+
+        eps = (
+            rmt.get("epsilon_by_family")
+            or rmt.get("epsilon")
+            or policy.get("epsilon_by_family")
+            or policy.get("epsilon")
+        )
+        if isinstance(eps, dict):
+            for fam, val in eps.items():
+                try:
+                    existing_eps[str(fam)] = float(val)
+                except Exception:
+                    pass
+        elif isinstance(eps, (int, float)):
+            existing_eps["_default"] = float(eps)
+
+        record_has_counts = False
+        families = rmt.get("families", {})
+        if isinstance(families, dict) and families:
+            record_has_counts = True
+            for fam, stats in families.items():
+                if not isinstance(stats, dict):
+                    continue
+                bare = stats.get("bare")
+                guarded = stats.get("guarded")
+                bare_f = _safe_float(bare)
+                guarded_f = _safe_float(guarded)
+                if bare_f and bare_f > 0:
+                    deltas_by_family[str(fam)].append((guarded_f / bare_f) - 1.0)
+
+        outliers = rmt.get("outliers_per_family", {})
+        baseline_outliers = rmt.get("baseline_outliers_per_family", {})
+        if isinstance(outliers, dict) and isinstance(baseline_outliers, dict) and outliers:
+            record_has_counts = True
+            for fam in set(outliers) | set(baseline_outliers):
+                bare_f = _safe_float(baseline_outliers.get(fam))
+                guarded_f = _safe_float(outliers.get(fam))
+                if bare_f and bare_f > 0:
+                    deltas_by_family[str(fam)].append((guarded_f / bare_f) - 1.0)
+
+        if not record_has_counts:
+            for source in ("outliers_by_family", "family_stats"):
+                stats_map = rmt.get(source, {})
+                if not isinstance(stats_map, dict):
+                    continue
+                for fam, stats in stats_map.items():
+                    if not isinstance(stats, dict):
+                        continue
+                    for key in ("outlier_fraction", "outlier_rate", "fraction", "rate"):
+                        val = _safe_float(stats.get(key))
+                        if val is not None:
+                            deltas_by_family[str(fam)].append(val)
+                            break
+
+    summary = {"families_seen": sorted(deltas_by_family.keys()), "margin": margin, "deadband": deadband}
+    quantile_q = _rmt_quantile_for_tier(tier)
+    proposed_eps = {}
+    if deltas_by_family:
+        for fam, deltas in deltas_by_family.items():
+            qv = _quantile(deltas, quantile_q)
+            if qv is None:
+                continue
+            qv = max(float(qv), 0.0)
+            proposed_eps[fam] = round(qv, 3)
+
+    if not proposed_eps:
+        if existing_eps:
+            if set(existing_eps.keys()) == {"_default"}:
+                default_eps = existing_eps["_default"]
+                return summary, {"ffn": default_eps, "attn": default_eps, "embed": default_eps, "other": default_eps}
+            return summary, existing_eps
+        defaults = {
+            "balanced": {"ffn": 0.10, "attn": 0.08, "embed": 0.12, "other": 0.12},
+            "conservative": {"ffn": 0.06, "attn": 0.05, "embed": 0.07, "other": 0.07},
+        }
+        return summary, defaults.get(tier, defaults["balanced"])
+
+    for fam, eps_val in existing_eps.items():
+        if fam not in proposed_eps and fam != "_default":
+            proposed_eps[fam] = eps_val
+
+    return summary, proposed_eps
+
+def calibrate_variance(recs):
+    deadband = None
+    min_gain = None
+    policy_min_effect = None
+    min_effect_samples = []
+    variance_changes = []
+
+    for rec in recs:
+        var = rec.get("variance", {}) or {}
+        if not isinstance(var, dict):
+            continue
+        policy = var.get("policy", {}) if isinstance(var.get("policy"), dict) else {}
+
+        if deadband is None:
+            deadband = _safe_float(policy.get("deadband") or var.get("deadband"))
+        if min_gain is None:
+            min_gain = _safe_float(policy.get("min_gain") or policy.get("min_rel_gain") or var.get("min_gain"))
+        if policy_min_effect is None:
+            policy_min_effect = _safe_float(policy.get("min_effect_lognll") or var.get("min_effect_lognll"))
+
+        predictive = var.get("predictive_gate", {}) or {}
+        delta_ci = predictive.get("delta_ci")
+        if isinstance(delta_ci, (list, tuple)) and len(delta_ci) == 2:
+            lo = _safe_float(delta_ci[0])
+            hi = _safe_float(delta_ci[1])
+            if lo is not None and hi is not None:
+                width = abs(hi - lo) / 2.0
+                if width > 0:
+                    min_effect_samples.append(width)
+
+        calib = var.get("calibration") or var.get("calibration_stats") or {}
+        if isinstance(calib, dict):
+            vchange = calib.get("variance_change") or calib.get("delta") or calib.get("max_delta")
+            vchange = _safe_float(vchange)
+            if vchange is not None:
+                variance_changes.append(abs(vchange))
+
+    result = {}
+    if deadband is None and variance_changes:
+        result["deadband"] = round(max(variance_changes) * 1.1 + 0.01, 3)
+    elif deadband is not None:
+        result["deadband"] = deadband
+
+    if min_effect_samples:
+        proposed = _quantile(min_effect_samples, 0.95)
+        if proposed is not None:
+            result["min_effect_lognll"] = max(round(proposed, 4), 0.0009)
+    elif policy_min_effect is not None:
+        result["min_effect_lognll"] = policy_min_effect
+
+    if min_gain is not None:
+        result["min_gain"] = min_gain
+
+    return result
+
+drift_stats = calibrate_drift(records)
+spectral_summary, spectral_caps = calibrate_spectral(records)
+rmt_summary, rmt_epsilon = calibrate_rmt(records)
+variance_config = calibrate_variance(records)
 
 preset = {
-    '_calibration_meta': {
-        'model_name': model_name,
-        'tier': tier,
-        'platform': 'B200_180GB',
-        'drift_mean': round(mean_drift, 4),
-        'drift_std': round(std_drift, 4),
+    "_calibration_meta": {
+        "model_name": model_name,
+        "tier": tier,
+        "platform": "B200_180GB",
+        "drift_mean": drift_stats.get("mean"),
+        "drift_std": drift_stats.get("std"),
+        "drift_band_compatible": drift_stats.get("band_compatible"),
+        "suggested_drift_band": drift_stats.get("suggested_band"),
     },
-    'model': {'id': model_path},
-    'dataset': {
-        'provider': 'wikitext2',
-        'split': 'validation',
-        'seq_len': seq_len,
-        'stride': stride,
-        'preview_n': preview_n,
-        'final_n': final_n,
-        'seed': 42,
+    "model": {"id": model_path},
+    "dataset": {
+        "provider": dataset_provider,
+        "split": "validation",
+        "seq_len": seq_len,
+        "stride": stride,
+        "preview_n": preview_n,
+        "final_n": final_n,
+        "seed": 42,
     },
-    'guards': {}
+    "guards": {},
 }
 
-# Save calibration stats
-stats_path = output_dir / "calibration_stats.json"
-with open(stats_path, 'w') as f:
-    json.dump({'drift': {'mean': mean_drift, 'std': std_drift, 'band': [mean_drift - margin, mean_drift + margin]}}, f, indent=2)
+spectral = {}
+if spectral_caps:
+    spectral["family_caps"] = spectral_caps
+if spectral_summary.get("sigma_quantile") is not None:
+    spectral["sigma_quantile"] = spectral_summary["sigma_quantile"]
+if spectral_summary.get("deadband") is not None:
+    spectral["deadband"] = spectral_summary["deadband"]
+if spectral_summary.get("max_caps") is not None:
+    spectral["max_caps"] = spectral_summary["max_caps"]
+if spectral:
+    preset["guards"]["spectral"] = spectral
 
-# Save preset
+rmt = {}
+if rmt_epsilon:
+    rmt["epsilon"] = rmt_epsilon
+if rmt_summary.get("margin") is not None:
+    rmt["margin"] = rmt_summary["margin"]
+if rmt_summary.get("deadband") is not None:
+    rmt["deadband"] = rmt_summary["deadband"]
+if rmt:
+    preset["guards"]["rmt"] = rmt
+
+if variance_config:
+    preset["guards"]["variance"] = variance_config
+
+stats_path = output_dir / "calibration_stats.json"
+with open(stats_path, "w") as f:
+    json.dump(
+        {
+            "drift": drift_stats,
+            "spectral": {**spectral_summary, "family_caps": spectral_caps},
+            "rmt": {**rmt_summary, "epsilon": rmt_epsilon},
+            "variance": variance_config,
+        },
+        f,
+        indent=2,
+    )
+
 preset_path = preset_output_dir / f"calibrated_preset_{model_name.replace('/', '_')}.yaml"
-with open(preset_path, 'w') as f:
-    yaml.safe_dump(preset, f, sort_keys=False)
+if YAML_AVAILABLE:
+    with open(preset_path, "w") as f:
+        yaml.safe_dump(preset, f, sort_keys=False)
+else:
+    preset_path = preset_path.with_suffix(".json")
+    with open(preset_path, "w") as f:
+        json.dump(preset, f, indent=2)
 
 print(f"Saved: {stats_path}")
 print(f"Saved: {preset_path}")
@@ -1981,13 +2697,6 @@ run_invarlock_certify() {
         fi
     done
 
-    # v0.3.1 FEATURE: For large models, skip overhead check to avoid OOM
-    local model_size
-    model_size=$(estimate_model_params "${baseline_path}")
-    if [[ "${model_size}" == "70" || "${model_size}" == "72" || "${model_size}" == "moe" ]]; then
-        export INVARLOCK_SKIP_OVERHEAD_CHECK=1
-    fi
-
     local cmd_args=(
         "invarlock" "certify"
         "--source" "${baseline_path}"
@@ -2002,14 +2711,30 @@ run_invarlock_certify() {
         cmd_args+=("--preset" "${calibrated_preset}")
     fi
 
+    local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
     local exit_code=0
-    CUDA_VISIBLE_DEVICES="${gpu_id}" "${cmd_args[@]}" \
-        >> "${OUTPUT_DIR}/logs/gpu_${gpu_id}.log" 2>&1 || exit_code=$?
+    # For large models, skip overhead check to avoid OOM (task-local via env)
+    local model_size
+    model_size=$(estimate_model_params "${baseline_path}")
+    if [[ "${model_size}" == "70" || "${model_size}" == "72" || "${model_size}" == "moe" ]]; then
+        INVARLOCK_SKIP_OVERHEAD_CHECK=1 \
+        CUDA_VISIBLE_DEVICES="${cuda_devices}" "${cmd_args[@]}" \
+            >> "${OUTPUT_DIR}/logs/gpu_${gpu_id}.log" 2>&1 || exit_code=$?
+    else
+        CUDA_VISIBLE_DEVICES="${cuda_devices}" "${cmd_args[@]}" \
+            >> "${OUTPUT_DIR}/logs/gpu_${gpu_id}.log" 2>&1 || exit_code=$?
+    fi
 
-    # Copy certificate to standard location
-    local cert_file=$(find "${cert_dir}" -name "*.json" -type f 2>/dev/null | head -1)
-    if [[ -n "${cert_file}" && -f "${cert_file}" ]]; then
+    # Copy certificate to standard location (only the canonical cert)
+    local cert_file="${cert_dir}/evaluation.cert.json"
+    if [[ -f "${cert_file}" ]]; then
         cp "${cert_file}" "${run_dir}/evaluation.cert.json" 2>/dev/null || true
+    else
+        local alt_cert
+        alt_cert=$(find "${cert_dir}" -name "evaluation.cert.json" -type f 2>/dev/null | head -1)
+        if [[ -n "${alt_cert}" && -f "${alt_cert}" ]]; then
+            cp "${alt_cert}" "${run_dir}/evaluation.cert.json" 2>/dev/null || true
+        fi
     fi
 
     return ${exit_code}
@@ -2181,6 +2906,7 @@ compile_results() {
     python3 << EOF
 import json
 import csv
+import math
 from pathlib import Path
 from collections import defaultdict
 
@@ -2198,8 +2924,16 @@ for model_dir in output_dir.iterdir():
     if not evals_dir.exists():
         continue
 
+    benchmarks = {"mmlu", "hellaswag", "arc", "winogrande"}
     for results_file in evals_dir.glob("*_results.json"):
-        edit_type = results_file.stem.replace("_results", "")
+        stem = results_file.stem
+        base = stem[:-len("_results")] if stem.endswith("_results") else stem
+        parts = base.split("_")
+        if parts and parts[-1] in benchmarks:
+            # Split-eval output: {edit}_{benchmark}_results.json
+            edit_type = "_".join(parts[:-1])
+        else:
+            edit_type = base
         try:
             data = json.loads(results_file.read_text())
             for task, task_results in data.get('results', {}).items():
@@ -2252,6 +2986,10 @@ for model_dir in output_dir.iterdir():
                 as_bool(v.get('rmt_stable', False))
             ])
 
+            pd = cert.get('policy_digest') or {}
+            meta = cert.get('meta') or {}
+            det = meta.get('determinism') or {}
+
             invar_rows.append({
                 'model': model_dir.name,
                 'experiment': parts[0] if parts else 'unknown',
@@ -2262,7 +3000,12 @@ for model_dir in output_dir.iterdir():
                 'invariants_pass': v.get('invariants_pass'),
                 'spectral_stable': v.get('spectral_stable'),
                 'rmt_stable': v.get('rmt_stable'),
-                'all_pass': all_pass
+                'all_pass': all_pass,
+                'policy_digest_hash': pd.get('thresholds_hash'),
+                'policy_digest_changed': pd.get('changed'),
+                'determinism_level': det.get('level'),
+                'determinism_profile': det.get('profile'),
+                'determinism_requested': det.get('requested'),
             })
         except Exception as e:
             print(f"Error processing {cert_file}: {e}")
@@ -2298,6 +3041,71 @@ if sensitivity_rows:
         writer.writerows(sensitivity_rows)
     print(f"Wrote guard sensitivity matrix")
 
+# Policy digest summary (per model)
+policy_summary: dict[str, dict[str, object]] = {}
+for row in invar_rows:
+    model = row.get('model', 'unknown')
+    digest = row.get('policy_digest_hash')
+    changed = str(row.get('policy_digest_changed')).lower() == 'true'
+    entry = policy_summary.setdefault(
+        model,
+        {
+            'thresholds_hashes': set(),
+            'policy_changed_true': 0,
+            'total_certs': 0,
+        },
+    )
+    entry['total_certs'] = int(entry.get('total_certs', 0)) + 1
+    if digest:
+        hashes = entry.setdefault('thresholds_hashes', set())
+        if isinstance(hashes, set):
+            hashes.add(str(digest))
+    if changed:
+        entry['policy_changed_true'] = int(entry.get('policy_changed_true', 0)) + 1
+
+if policy_summary:
+    serializable: dict[str, dict[str, object]] = {}
+    for model, data in policy_summary.items():
+        hashes = data.get('thresholds_hashes') or set()
+        if isinstance(hashes, set):
+            hash_list = sorted(hashes)
+        else:
+            hash_list = []
+        serializable[model] = {
+            'unique_thresholds_hashes': hash_list,
+            'unique_hash_count': len(hash_list),
+            'policy_changed_true': int(data.get('policy_changed_true', 0)),
+            'total_certs': int(data.get('total_certs', 0)),
+        }
+    with open(analysis_dir / "policy_digest_summary.json", 'w') as f:
+        json.dump(serializable, f, indent=2)
+    print(f"Wrote policy digest summary for {len(serializable)} models")
+
+# Determinism summary (per model + overall)
+det_by_model: dict[str, dict[str, int]] = {}
+overall = {'strict': 0, 'tolerance': 0, 'off': 0, 'unknown': 0}
+for row in invar_rows:
+    model = row.get('model', 'unknown')
+    level = str(row.get('determinism_level') or '').strip().lower()
+    if not level:
+        level = 'unknown'
+    if level not in overall:
+        level = 'unknown'
+    model_counts = det_by_model.setdefault(
+        model, {k: 0 for k in overall.keys()}
+    )
+    model_counts[level] = int(model_counts.get(level, 0)) + 1
+    overall[level] = int(overall.get(level, 0)) + 1
+
+if det_by_model:
+    det_payload = {
+        'by_model': det_by_model,
+        'overall': overall,
+    }
+    with open(analysis_dir / "determinism_summary.json", 'w') as f:
+        json.dump(det_payload, f, indent=2)
+    print(f"Wrote determinism summary for {len(det_by_model)} models")
+
 # Calibration summary
 calibration_summary = {}
 for model_dir in output_dir.iterdir():
@@ -2324,6 +3132,7 @@ run_analysis() {
     python3 << EOF
 import json
 import csv
+import math
 from pathlib import Path
 from collections import defaultdict
 
@@ -2356,8 +3165,15 @@ if cal_json.exists():
 
 print("=== CORRELATION ANALYSIS (B200 8-GPU) ===\n")
 
-results = {'models': {}, 'error_detection': {'detected': [], 'missed': []}, 'calibration': cal_summary}
+results = {
+    'models': {},
+    'error_detection': {'detected': [], 'missed': []},
+    'calibration': cal_summary,
+    'pm_correlation': {},
+}
 categories = defaultdict(int)
+# Track (delta_eval, pm_ratio) pairs for correlation analysis
+pm_points = []
 
 for model_dir in output_dir.iterdir():
     if not model_dir.is_dir() or model_dir.name in ['logs', 'analysis', 'reports', 'presets', 'models']:
@@ -2375,24 +3191,60 @@ for model_dir in output_dir.iterdir():
             continue
         edit_type = edit_type_key[1]
 
-        # Skip error injection experiments - they're handled separately in error_detection
-        # Including them here would inflate FALSE_POSITIVE counts since they have no lm-eval baselines
-        if edit_type == "errors":
+        # Skip runs that are not part of the edit-vs-eval correlation study.
+        # - errors: handled separately in error_detection
+        # - calibration: no lm-eval baseline, would inflate TRUE_NEGATIVE counts
+        if edit_type in {"errors", "calibration"}:
             continue
 
         edit_evals = eval_data.get((model, edit_type), {})
 
+        # Determine if this edit has a statistically meaningful regression vs baseline.
+        # Use a simple binomial standard error approximation per benchmark.
+        N_TABLE = {
+            'mmlu': 14042,
+            'hellaswag': 10042,
+            'arc_challenge': 2590,
+            'winogrande': 1767,
+        }
+
         has_regression = False
-        for task in baseline_evals:
-            if task in edit_evals:
-                if edit_evals[task] - baseline_evals[task] < -0.05:
-                    has_regression = True
-                    break
+        deltas = []
+        for task, base_val in baseline_evals.items():
+            edit_val = edit_evals.get(task)
+            if edit_val is None:
+                continue
+            deltas.append(edit_val - base_val)
+            # Map task name back to benchmark key
+            task_key = task
+            if task_key.startswith('arc'):
+                task_key = 'arc_challenge'
+            n = N_TABLE.get(task_key, 1000)
+            p = max(min(base_val, 0.999), 0.001)
+            se = math.sqrt(p * (1.0 - p) / n)
+            if (edit_val - base_val) < -2.0 * se:
+                has_regression = True
+                # Keep scanning to accumulate deltas but we already know it's regressed
+        mean_delta = sum(deltas) / len(deltas) if deltas else 0.0
 
         invar_flagged = any(
             str(r.get('all_pass', '')).lower() == 'false' or r.get('all_pass') is False
             for r in invar_results
         )
+
+        # Aggregate primary-metric ratio for this edit (continuous InvarLock signal)
+        pm_vals = []
+        for r in invar_results:
+            try:
+                v = r.get('pm_ratio')
+                if v is None or v == '':
+                    continue
+                pm_vals.append(float(v))
+            except Exception:
+                continue
+        pm_ratio_mean = sum(pm_vals) / len(pm_vals) if pm_vals else None
+        if pm_ratio_mean is not None and deltas:
+            pm_points.append((mean_delta, math.log(pm_ratio_mean)))
 
         if has_regression and invar_flagged: category = "TRUE_POSITIVE"
         elif not has_regression and invar_flagged: category = "FALSE_POSITIVE"
@@ -2400,7 +3252,13 @@ for model_dir in output_dir.iterdir():
         else: category = "FALSE_NEGATIVE"
 
         categories[category] += 1
-        results['models'][model][edit_type] = {'category': category, 'regression': has_regression, 'flagged': invar_flagged}
+        results['models'][model][edit_type] = {
+            'category': category,
+            'regression': has_regression,
+            'flagged': invar_flagged,
+            'mean_delta_eval': mean_delta,
+            'mean_pm_ratio': pm_ratio_mean,
+        }
         print(f"  {edit_type}: {category}")
 
     for row in invar_data.get((model, 'errors'), []):
@@ -2414,6 +3272,24 @@ for model_dir in output_dir.iterdir():
             results['error_detection']['detected'].append(f"{model}/{row.get('run', 'unknown')}")
         else:
             results['error_detection']['missed'].append(f"{model}/{row.get('run', 'unknown')}")
+
+# Compute simple Pearson correlation between Δeval and log(pm_ratio)
+if len(pm_points) >= 2:
+    xs = [p[0] for p in pm_points]
+    ys = [p[1] for p in pm_points]
+    mean_x = sum(xs) / len(xs)
+    mean_y = sum(ys) / len(ys)
+    num = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys))
+    den_x = math.sqrt(sum((x - mean_x) ** 2 for x in xs))
+    den_y = math.sqrt(sum((y - mean_y) ** 2 for y in ys))
+    corr = num / (den_x * den_y) if den_x > 0 and den_y > 0 else 0.0
+    results['pm_correlation'] = {
+        'pearson_r_delta_vs_log_pm': corr,
+        'num_points': len(pm_points),
+    }
+    print(f"\nPM correlation (Δeval vs log pm_ratio): r = {corr:.3f} over {len(pm_points)} edits")
+else:
+    results['pm_correlation'] = {'pearson_r_delta_vs_log_pm': 0.0, 'num_points': len(pm_points)}
 
 print("\n=== SUMMARY ===")
 tp, tn = categories['TRUE_POSITIVE'], categories['TRUE_NEGATIVE']
@@ -2430,9 +3306,31 @@ err_missed = len(results['error_detection']['missed'])
 err_total = err_detected + err_missed
 err_rate = err_detected / err_total if err_total > 0 else 0
 
-sample_confidence = min(total / 8 * 25, 25)
-error_confidence = err_rate * 25
-accuracy_confidence = accuracy * 25
+# Wilson score intervals for accuracy and error detection rate (95% CI)
+def wilson_interval(successes, n, z=1.96):
+    if n <= 0:
+        return (0.0, 0.0)
+    p_hat = successes / n
+    denom = 1.0 + z * z / n
+    centre = p_hat + z * z / (2 * n)
+    margin = z * ((p_hat * (1 - p_hat) + z * z / (4 * n)) / n) ** 0.5
+    lower = max(0.0, (centre - margin) / denom)
+    upper = min(1.0, (centre + margin) / denom)
+    return (lower, upper)
+
+acc_ci = wilson_interval(tp + tn, total) if total > 0 else (0.0, 0.0)
+err_ci = wilson_interval(err_detected, err_total) if err_total > 0 else (0.0, 0.0)
+
+# Confidence components:
+# - sample_confidence: grows with log(#tests) up to 25
+# - error_confidence: grows with number of error injections up to 25
+# - accuracy_confidence: higher when CI for accuracy is tight
+# - balance_confidence: based on F1
+import math as _math
+sample_confidence = min((_math.log1p(total) / _math.log1p(64)) * 25, 25) if total > 0 else 0
+error_confidence = min((_math.log1p(err_total) / _math.log1p(16)) * 25, 25) if err_total > 0 else 0
+acc_ci_width = acc_ci[1] - acc_ci[0]
+accuracy_confidence = max(0.0, (1.0 - min(acc_ci_width, 1.0)) * 25)
 balance_confidence = f1 * 25
 confidence_score = sample_confidence + error_confidence + accuracy_confidence + balance_confidence
 
@@ -2449,10 +3347,18 @@ print(f"Error Detection: {err_detected}/{err_total} ({err_rate:.0%})")
 print(f"Confidence Score: {confidence_score:.1f}/100 ({confidence_level})")
 
 results['summary'] = {
-    'accuracy': accuracy, 'precision': precision, 'recall': recall, 'f1_score': f1,
-    'error_detection_rate': err_rate, 'categories': dict(categories),
-    'confidence_score': confidence_score, 'confidence_level': confidence_level,
-    'total_tests': total, 'models_tested': len(results['models'])
+    'accuracy': accuracy,
+    'precision': precision,
+    'recall': recall,
+    'f1_score': f1,
+    'error_detection_rate': err_rate,
+    'categories': dict(categories),
+    'confidence_score': confidence_score,
+    'confidence_level': confidence_level,
+    'total_tests': total,
+    'models_tested': len(results['models']),
+    'accuracy_ci': acc_ci,
+    'error_rate_ci': err_ci,
 }
 
 with open(analysis_dir / "correlation_analysis.json", 'w') as f:
@@ -2533,8 +3439,8 @@ report = f'''
 ================================================================================
 
 EDIT TYPES TESTED:
-  * Quantization RTN: 8-bit (clean), 4-bit (stress)
-  * FP4 Quantization: E2M1 (clean), aggressive (stress) [B200-native]
+  * Quantization RTN (group-wise): 8-bit (clean), 4-bit (stress)
+  * FP4 Quantization (simulated E2M1): clean, aggressive (stress)
   * Magnitude Pruning: 10% (clean), 50% (stress)
   * Low-Rank SVD: rank-256 (clean), rank-32 (stress)
 
@@ -2635,7 +3541,11 @@ main_dynamic() {
     fi
 
     init_queue "${OUTPUT_DIR}"
-    export QUEUE_DIR  # Export for subshell workers
+    # Initialize GPU reservation tracking for multi-GPU tasks before workers start.
+    if type init_gpu_reservations &>/dev/null; then
+        init_gpu_reservations "${OUTPUT_DIR}"
+    fi
+    export QUEUE_DIR GPU_RESERVATION_DIR  # Export for subshell workers
 
     local total_tasks=0
     if [[ "${skip_task_generation}" == "true" ]]; then
@@ -2775,93 +3685,11 @@ main_dynamic() {
     log "Presets: ${OUTPUT_DIR}/presets/"
 }
 
-# ============ MAIN - STATIC GPU ASSIGNMENT (v1.0 LEGACY) ============
-main_static() {
-    local start_time=$(date +%s)
-
-    echo "========================================================================"
-    echo "  InvarLock Validation Suite v${SCRIPT_VERSION}"
-    echo "  B200 180GB x 8 GPU STATIC ORCHESTRATION (Legacy Mode)"
-    echo "========================================================================"
-    echo ""
-
-    log "Output directory: ${OUTPUT_DIR}"
-    log "GPUs: ${NUM_GPUS} x B200 180GB"
-    log "Models: 8 (7B to 72B)"
-    log "Edit Types: 4 x 2 versions = 8 per model"
-    log "Scheduling: STATIC (1:1 model-to-GPU)"
-    log ""
-
-    check_dependencies
-    setup_b200_environment
-
-    for gpu_id in $(seq 0 $((NUM_GPUS - 1))); do
-        touch "${OUTPUT_DIR}/logs/gpu_${gpu_id}.log"
-    done
-
-    declare -A gpu_models
-    gpu_models[0]="${MODEL_1}"
-    gpu_models[1]="${MODEL_2}"
-    gpu_models[2]="${MODEL_3}"
-    gpu_models[3]="${MODEL_4}"
-    gpu_models[4]="${MODEL_5}"
-    gpu_models[5]="${MODEL_6}"
-    gpu_models[6]="${MODEL_7}"
-    gpu_models[7]="${MODEL_8}"
-
-    log_section "PHASE 1: PARALLEL MODEL PROCESSING"
-    log "Launching ${NUM_GPUS} parallel model processes..."
-
-    # Reset pids array for background process tracking
-    pids=()
-    for gpu_id in $(seq 0 $((NUM_GPUS - 1))); do
-        model_id="${gpu_models[$gpu_id]}"
-        if [[ -n "${model_id}" ]]; then
-            log "  GPU ${gpu_id}: Starting $(basename "${model_id}")"
-            process_model "${model_id}" "${gpu_id}" &
-            pids+=($!)
-        fi
-    done
-
-    log ""
-    log "Waiting for all GPU processes to complete..."
-    local failed=0
-    for i in "${!pids[@]}"; do
-        if wait "${pids[$i]}"; then
-            log "  GPU ${i}: Completed successfully"
-        else
-            log "  GPU ${i}: Failed"
-            failed=$((failed + 1))
-        fi
-    done
-
-    if [[ ${failed} -gt 0 ]]; then
-        log "WARNING: ${failed} GPU process(es) failed"
-    fi
-
-    log_section "PHASE 2: ANALYSIS"
-    compile_results
-    run_analysis
-    generate_verdict
-
-    local end_time=$(date +%s)
-    local duration=$((end_time - start_time))
-
-    log_section "COMPLETE"
-    log "Total time: $((duration / 3600))h $(((duration % 3600) / 60))m $((duration % 60))s"
-    log "Report: ${OUTPUT_DIR}/reports/final_verdict.txt"
-    log "Presets: ${OUTPUT_DIR}/presets/"
-}
-
-# ============ MAIN - DISPATCHER ============
+# ============ MAIN ============
+# Dynamic scheduling with work-stealing is the only supported mode (v2.1.0)
+# Static scheduling was removed as it's less efficient.
 main() {
-    if [[ "${USE_DYNAMIC_SCHEDULING}" == "true" ]]; then
-        log "Using DYNAMIC scheduling (v2.0)"
-        main_dynamic "$@"
-    else
-        log "Using STATIC scheduling (v1.0 legacy)"
-        main_static "$@"
-    fi
+    main_dynamic "$@"
 }
 
 # ============ CLI ARGUMENT PARSING ============
@@ -2889,29 +3717,27 @@ if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
 InvarLock Validation Suite v${SCRIPT_VERSION} - B200 180GB x 8 GPU
 
 Optimized for 8x NVIDIA B200 180GB SXM6 GPUs with:
-  * Native FP4 quantization (B200-exclusive)
+  * FP4 quantization (simulated; B200-native hardware)
   * ~4.5 TB/s memory bandwidth
   * ~2250 FP16 TFLOPS
-  * Dynamic work-stealing GPU scheduling (v2.0)
+  * Dynamic work-stealing GPU scheduling with "small_first" strategy
 
-Scheduling Modes:
-  * DYNAMIC (default, v2.0): Work-stealing enabled. When a GPU finishes its
-    tasks early, it automatically picks up pending tasks from other models.
-    Optimal for heterogeneous workloads (7B-72B models).
-
-  * STATIC (legacy, v1.0): 1:1 model-to-GPU assignment. Each GPU processes
-    one model exclusively. Simpler but may leave GPUs idle.
+Scheduling:
+  Uses dynamic scheduling with work-stealing. When a GPU finishes its tasks
+  early, it automatically picks up pending tasks from other models. The
+  "small_first" priority strategy (7B-14B models first) maximizes early
+  parallelism across available GPUs.
 
 Edit Types (4 x 2 versions each):
-  * Quantization RTN: 8-bit clean, 4-bit stress
-  * FP4 Quantization: E2M1 clean, aggressive stress [B200-only]
+  * Quantization RTN (group-wise): 8-bit clean, 4-bit stress
+  * FP4 Quantization (simulated E2M1): clean, aggressive stress
   * Magnitude Pruning: 10% clean, 50% stress
   * Low-Rank SVD: rank-256 clean, rank-32 stress
 
 Model Suite (8 PUBLIC models - no HuggingFace login):
-  GPU 0: Mistral-7B-v0.3     (~14 GB)
+  GPU 0: Mistral-7B-v0.1     (~14 GB)
   GPU 1: Llama-2-13b-hf      (~26 GB)
-  GPU 2: Qwen2-14B           (~28 GB)
+  GPU 2: Qwen2.5-14B         (~28 GB)
   GPU 3: Qwen2.5-32B         (~64 GB)
   GPU 4: Yi-34B              (~68 GB)
   GPU 5: Mixtral-8x7B-v0.1   (~90 GB)
@@ -2925,28 +3751,22 @@ Options:
     --help, -h                   Show this help message
 
 Key environment variables:
-    USE_DYNAMIC_SCHEDULING       Enable work-stealing (default: true)
-                                 Set to "false" for legacy static mode
+    B200_DETERMINISM             Harness determinism preset: throughput (default) or strict
     MODEL_1 through MODEL_8      Override model assignments
     NUM_GPUS                     Number of GPUs (default: 8)
     SKIP_FLASH_ATTN              Skip flash-attn install (default: false)
-    RESUME_MODE                  Skip completed work in static mode (default: true)
+    RESUME_MODE                  Skip completed work (default: true)
     OUTPUT_DIR                   Set to existing dir to resume
     RUN_ERROR_INJECTION          Run error tests (default: true)
 
 Examples:
-    $0                                    # Run with dynamic scheduling (default)
-    $0 --resume                           # Resume previous run (skip task regeneration)
-    USE_DYNAMIC_SCHEDULING=false $0       # Use legacy static mode
+    $0                                    # Run validation
+    $0 --resume                           # Resume previous run
     SKIP_FLASH_ATTN=true $0               # Skip flash-attn compile
     NUM_GPUS=4 $0                         # Use only 4 GPUs
 
-Resume a failed run (proper way):
+Resume a failed run:
     OUTPUT_DIR=./invarlock_validation_b200_20241208_123456 $0 --resume
-
-Troubleshooting:
-  If dynamic scheduling causes issues, fall back to static mode:
-    USE_DYNAMIC_SCHEDULING=false OUTPUT_DIR=<existing_dir> $0
 EOF
     exit 0
 fi

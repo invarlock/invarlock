@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 import pytest
 
 from invarlock.reporting.primary_metric_utils import attach_primary_metric
@@ -33,7 +35,10 @@ def test_attach_primary_metric_from_report_with_ppl_analysis():
     assert pm["analysis_point_preview"] == pytest.approx(1.5)
     assert pm["analysis_point_final"] == pytest.approx(2.0)
     assert pm["ratio_vs_baseline"] == pytest.approx(2.0)
-    assert pm["display_ci"] == [4.0, 4.0]
+    assert pm["display_ci"] == [
+        pytest.approx(math.exp(0.1)),
+        pytest.approx(math.exp(0.2)),
+    ]
     assert pm["ci"] == (0.1, 0.2)
     assert pm["unstable"] is True
 

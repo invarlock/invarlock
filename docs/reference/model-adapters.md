@@ -222,7 +222,6 @@ invarlock certify \
   --baseline mistralai/Mistral-7B-v0.1 \
   --subject /path/to/awq-model \
   --adapter hf_awq \
-  --skip-user-quant \
   --device cuda
 ```
 

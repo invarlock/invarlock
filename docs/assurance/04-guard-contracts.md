@@ -15,7 +15,7 @@ calibration data that accompany the InvarLock assurance notes.
 | **Invariants** | Model weights, adapter metadata | Structural invariants (non-finite scan, weight tying, embedding dims, layer norms) | Abort edit if violated before evaluation | `invarlock.guards.invariants` |
 | **Spectral** | 2‑D layer weights (FFN, attention proj, embeddings) | Compute $z = \frac{s - \mu_f}{\sigma_f}$; baseline percentile `sigma_quantile` selects the reference sigma; require `abs(z) ≤ κ_f` calibrated for ≤5% WARN FPR | WARN when cap applied; abort if cap would exceed `max_caps` | `invarlock.guards.spectral` |
 | **RMT** | Bare vs guarded activations | Outlier growth ≤ $\lceil\text{outliers}_{\text{bare}} \cdot (1+\varepsilon)\rceil$ | WARN when bound exceeded; certificate fails on ε‑rule violations. Detection uses `policies.rmt.{margin,deadband}`; catastrophic spikes in the primary metric are gated separately (`spike_threshold` = 2.0× for ppl‑like metrics). | `invarlock.guards.rmt` |
-| **Variance (VE)** | Paired ΔlogNLL with calibration windows | Enable VE only if the predictive CI upper bound ≤ −`min_effect_lognll` (balanced) or straddles neither side of ±`min_effect_lognll` (conservative) **and** the absolute mean Δ is ≥ `min_effect_lognll` | VE disabled, guard records reason; edit continues | `invarlock.guards.variance` |
+| **Variance (VE)** | Paired ΔlogNLL with calibration windows | Enable VE only if the predictive CI upper bound ≤ −`min_effect_lognll` **and** mean Δ ≤ −`min_effect_lognll` (Balanced uses one‑sided CI; Conservative uses two‑sided CI). A CI entirely above +`min_effect_lognll` is treated as regression and VE stays off. | VE disabled, guard records reason; edit continues | `invarlock.guards.variance` |
 | **Bootstrap sanity** | Evaluation windows, token counts | Matching window IDs, zero overlap; BCa replicates ≥ requested | Abort certification and surface reason | `invarlock.assurance.make_certificate` |
 
 Each guard logs its policy digest and metrics; certificates mirror those fields
@@ -71,7 +71,9 @@ stores both the count and the limit under
     - Balanced: Δ ≥ −1.0 pp and `n_final ≥ 200`
     - Conservative: Δ ≥ −0.5 pp and `n_final ≥ 200`
     - Aggressive: Δ ≥ −2.0 pp and `n_final ≥ 200`
-    Thresholds are resolved from `TIER_POLICIES.<tier>.metrics.accuracy`.
+    Thresholds come from the calibrated tier configuration in the packaged
+    `tiers.yaml` (see `metrics.accuracy` for each tier) and are surfaced at
+    runtime under `resolved_policy.metrics.accuracy`.
 - Preview→final drift: require 0.95–1.05 for the guarded run’s final/preview
   ratio. Gate flag: `validation.preview_final_drift_acceptable`.
 - Spectral stability: caps applied must not exceed the tier’s `max_caps`
@@ -88,8 +90,11 @@ other gates. See also `src/invarlock/core/runner.py:1816`.
 
 **Sigma quantile (qσ)** controls the target sigma used for spectral monitoring.
 Balanced uses `sigma_quantile = 0.95`, Conservative `0.90` (see
-`TIER_POLICIES`). Certificates expose this under `spectral.sigma_quantile`.
-Per‑family z‑caps use $\kappa_f$; default caps are `ffn=2.5, attn=2.8, embed=3.0`.
+the packaged tiers configuration at
+`invarlock._data.runtime/tiers.yaml`). Certificates expose this under
+`spectral.sigma_quantile`.
+Per-family z-caps use $\kappa_f$; defaults are defined in the packaged tiers
+configuration and summarized in the Threshold Rationale table below.
 
 ## 2. Statistical Method Primer
 
@@ -109,15 +114,17 @@ Perplexity (PPL = exp(mean NLL)) uses the standard language-model
 definition—see the
 Transformers perplexity guide.
 
-Confidence intervals use the **BCa bootstrap** (1.2–3k replicates, α=0.05). The
+Confidence intervals use the **BCa bootstrap** (1.2k to 3.2k replicates, α=0.05). The
 half-width approximation for planning is `half_width ≈ z · σ̂ / √n` with
-`z = 1.96` for two-sided 95% (balanced tiers use one-sided for VE gating).
+`z = 1.96` for two-sided 95% (balanced tiers use one-sided CI for VE gating; conservative uses two-sided).
 
 **Bootstrap defaults**
 
-- **Replicates:** 2,000 by default (packaged profiles under
-CI/Release). For tiny smoke profiles, 800–1,200 replicates are typical.
-- **Paired windows:** 180/180 (Balanced), 220/220 (Conservative), 140/140 (Aggressive) by default (subject to change in tiers.yaml).
+- **Replicates:** floors are 1,200 (Balanced), 1,500 (Conservative), and 800
+  (Aggressive). Release profile uses 3,200; tiny smoke profiles often use
+  800-1,200.
+- **Paired windows:** floors are 180/180 (Balanced), 220/220 (Conservative),
+  140/140 (Aggressive); profiles may request higher counts.
 
 These values are linted by `tests/eval/test_assurance_contracts.py` and surfaced
 in certificates so reviewers can audit reproducibility.
@@ -181,7 +188,7 @@ If drift exceeds these bands, re-tune VE thresholds or increase window counts.
 | PM ratio gate (Balanced) | PM_final ≤ 1.10 × PM_preview | Tier acceptance; exceeding the gate fails the run |
 | PM ratio gate (Conservative) | PM_final ≤ 1.05 × PM_preview | Stricter release acceptance; exceeding the gate fails the run |
 | Bootstrap α | 0.05 | 95 % CI for ΔlogNLL |
-| Spectral κ | Balanced caps `{ffn: 2.5, attn: 2.8, embed: 3.0, other: 3.0}`; Conservative `{ffn: 2.3, attn: 2.6, embed: 2.8, other: 2.8}` (from `TIER_POLICIES`) | Keeps WARN FPR ≤5% (balanced) and ≈2% (conservative) on null runs |
+| Spectral κ | Balanced caps `{ffn: 3.834, attn: 3.423, embed: 3.1, other: 3.1}`; Conservative `{ffn: 2.3, attn: 2.6, embed: 2.8, other: 2.8}` (from `tiers.yaml`) | Keeps WARN FPR ≤5% (balanced) and ≈2% (conservative) on null runs |
 | RMT ε | Balanced `{ffn: 0.10, attn: 0.08, embed: 0.12, other: 0.12}`; Conservative `{ffn: 0.06, attn: 0.05, embed: 0.07, other: 0.07}` | q95–q97 of null ratio |
 | VE min_effect | 9e−4 (balanced), 1.8e−3 (conservative) | `z·σ̂/√n` from pilot data |
 

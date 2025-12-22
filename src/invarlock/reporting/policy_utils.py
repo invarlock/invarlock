@@ -579,9 +579,7 @@ def _extract_policy_overrides(report: RunReport) -> list[str]:
 
 
 def _compute_policy_digest(policy: dict[str, Any]) -> str:
-    canonical = json.dumps(
-        policy, sort_keys=True, default=str, separators=(",", ":"), ensure_ascii=True
-    )
+    canonical = json.dumps(policy, sort_keys=True, default=str)
     return hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
 

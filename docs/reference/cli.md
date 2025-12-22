@@ -550,6 +550,8 @@ For automation loops see the
 
 - Outbound network access is disabled by default. Set `INVARLOCK_ALLOW_NETWORK=1`
   when a run needs to download models or datasets.
+- YAML `!include` is restricted to files under the config directory by default.
+  Set `INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE=1` to permit out-of-tree includes.
 - Use `invarlock.security.secure_tempdir()` for scratch space with 0o700 permissions and automatic cleanup.
 - JSONL event logs redact sensitive keys (tokens, secrets, passwords) and attach the run ID for auditability.
 - Memory/perf levers:

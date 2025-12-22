@@ -54,7 +54,12 @@ so the estimator is unbiased for the log of the (token‑weighted) ratio. Under 
 
 ### Jensen inequality note
 
-By Jensen, $\exp\big(\overline{\Delta \ell}_{\text{w}}\big) \leq \tfrac{\sum_i t_i\, p_i^{(B)}}{\sum_i t_i\, p_i^{(A)}}$ with equality only when window logits are equal. This is why the ratio‑of‑means can be biased toward high‑perplexity windows, while the log‑space estimator respects pairing and token weighting.
+Let $r_i = \exp(\Delta \ell_i) = \mathrm{PPL}^{(B)}_i / \mathrm{PPL}^{(A)}_i$. Then
+$\exp\big(\overline{\Delta \ell}_{\text{w}}\big)$ is the weighted geometric mean
+of $r_i$. By AM-GM (equivalently Jensen on $\log$), the weighted geometric mean
+is $\le$ the weighted arithmetic mean of $r_i$. The ratio of mean perplexities
+is a different quantity and can be larger or smaller; see the counter-example
+below.
 
 ## Why log‑space vs ratio of means (counter‑example)
 
@@ -104,7 +109,7 @@ InvarLock uses the exponential of the token‑weighted mean ΔlogNLL
 ## Edge cases & safeguards
 
 - If all `t_i` equal, weighting reduces to simple mean: implementation can short‑circuit.
-- Degenerate Δ (all equal): mark `degenerate=true` and use a studentized fallback CI; certificate records the fallback.
+- Degenerate Δ (all equal): mark `degenerate=true` and collapse the CI to `[μ, μ]` with `μ = mean(Δ)`; certificate records the fallback.
 - Label alignment & padding must not contribute to `t_i` (masked tokens excluded).
 
 ## References

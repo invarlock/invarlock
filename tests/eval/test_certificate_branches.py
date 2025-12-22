@@ -79,6 +79,8 @@ def test_resolve_policy_tier_exception_path():
 
 def test_make_certificate_raises_on_drift_vs_delta_mismatch(monkeypatch):
     # Minimal report with preview/final and paired windows
+    window_ids = list(range(1, 181))
+    logloss_vals = [0.1] * len(window_ids)
     report = {
         "meta": {"model_id": "m", "seed": 123},
         "metrics": {
@@ -91,12 +93,14 @@ def test_make_certificate_raises_on_drift_vs_delta_mismatch(monkeypatch):
             "dataset": "dummy",
             "split": "train",
             "seq_len": 8,
-            "stride": 1,
-            "preview_n": 1,
-            "final_n": 1,
+            "stride": 8,
+            "preview_n": 180,
+            "final_n": 180,
             "tokenizer_name": "tok",
         },
-        "evaluation_windows": {"final": {"window_ids": [1, 2], "logloss": [0.1, 0.2]}},
+        "evaluation_windows": {
+            "final": {"window_ids": window_ids, "logloss": logloss_vals}
+        },
         "guards": [],
         "edit": {
             "name": "mock",
@@ -113,16 +117,56 @@ def test_make_certificate_raises_on_drift_vs_delta_mismatch(monkeypatch):
         "run_id": "r0",
         "meta": {"model_id": "m"},
         "metrics": {"ppl_final": 9.5, "ppl_preview": 9.4},
-        "evaluation_windows": {"final": {"window_ids": [1, 2], "logloss": [0.1, 0.2]}},
+        "evaluation_windows": {
+            "final": {"window_ids": window_ids, "logloss": logloss_vals}
+        },
     }
+    report["metrics"].update(
+        {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 11.0,
+                "ratio_vs_baseline": 11.0 / 9.5,
+                "ci": (-0.01, 0.01),
+                "display_ci": (math.exp(-0.01), math.exp(0.01)),
+            },
+            "logloss_delta_ci": (-0.01, 0.01),
+            "bootstrap": {
+                "method": "percentile",
+                "replicates": 1200,
+                "alpha": 0.05,
+                "seed": 0,
+                "coverage": {
+                    "preview": {"used": 180},
+                    "final": {"used": 180},
+                    "replicates": {"used": 1200},
+                },
+            },
+            "window_match_fraction": 1.0,
+            "window_overlap_fraction": 0.0,
+            "stats": {
+                "requested_preview": 180,
+                "requested_final": 180,
+                "actual_preview": 180,
+                "actual_final": 180,
+            },
+        }
+    )
 
     # Bypass full schema validation to focus on drift consistency branch
     monkeypatch.setattr(
         "invarlock.reporting.certificate.validate_report", lambda _: True
     )
+    monkeypatch.setattr(
+        "invarlock.reporting.certificate.compute_paired_delta_log_ci",
+        lambda *_a, **_k: (-0.01, 0.01),
+    )
 
     # After normalization, this inconsistency no longer raises here; proceed and return a certificate
-    report.setdefault("metrics", {}).setdefault("window_plan", {})["profile"] = "ci"
+    report.setdefault("metrics", {}).setdefault("window_plan", {}).update(
+        {"profile": "ci", "preview_n": 180, "final_n": 180}
+    )
     cert = make_certificate(report, baseline)
     assert isinstance(cert, dict)
 

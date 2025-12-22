@@ -538,6 +538,175 @@ def _enforce_ratio_ci_alignment(
             )
 
 
+def _enforce_display_ci_alignment(
+    ratio_ci_source: str,
+    primary_metric: Any,
+    logloss_delta_ci: Any,
+    window_plan_profile: str | None,
+) -> None:
+    """Ensure display_ci matches exp(ci) for ppl-like metrics when paired."""
+    if ratio_ci_source != "paired_baseline":
+        return
+    if not isinstance(primary_metric, dict) or not primary_metric:
+        return
+    try:
+        kind = str(primary_metric.get("kind", "")).lower()
+    except Exception:
+        return
+    if not kind.startswith("ppl"):
+        return
+
+    def _finite_bounds(bounds: Any) -> bool:
+        return (
+            isinstance(bounds, tuple | list)
+            and len(bounds) == 2
+            and all(isinstance(v, int | float) and math.isfinite(v) for v in bounds)
+        )
+
+    ci = primary_metric.get("ci")
+    if not _finite_bounds(ci):
+        if _finite_bounds(logloss_delta_ci):
+            primary_metric["ci"] = (
+                float(logloss_delta_ci[0]),
+                float(logloss_delta_ci[1]),
+            )
+            ci = primary_metric["ci"]
+        else:
+            profile = (window_plan_profile or "dev").lower()
+            if profile in {"ci", "release"}:
+                raise ValueError(
+                    "primary_metric.ci missing for ppl-like metric under paired baseline."
+                )
+            return
+
+    expected = tuple(math.exp(float(bound)) for bound in ci)
+    display_ci = primary_metric.get("display_ci")
+    if not _finite_bounds(display_ci):
+        profile = (window_plan_profile or "dev").lower()
+        if profile in {"ci", "release"}:
+            raise ValueError(
+                "primary_metric.display_ci missing for ppl-like metric under paired baseline."
+            )
+        primary_metric["display_ci"] = [expected[0], expected[1]]
+        return
+
+    for observed, exp_val in zip(display_ci, expected, strict=False):
+        tolerance = 5e-4 * max(1.0, abs(exp_val))
+        if abs(float(observed) - float(exp_val)) > tolerance:
+            profile = (window_plan_profile or "dev").lower()
+            if profile in {"ci", "release"}:
+                raise ValueError(
+                    "primary_metric.display_ci mismatch: bounds do not match exp(ci)."
+                )
+            primary_metric["display_ci"] = [expected[0], expected[1]]
+            break
+
+
+def _enforce_pairing_and_coverage(
+    stats: dict[str, Any] | None,
+    window_plan_profile: str | None,
+    tier: str | None,
+) -> None:
+    """Enforce pairing and coverage contracts for CI/Release profiles."""
+    profile = (window_plan_profile or "dev").lower()
+    if profile not in {"ci", "release"}:
+        return
+    if not isinstance(stats, dict):
+        raise ValueError("Missing dataset window stats for CI/Release enforcement.")
+
+    match_fraction = stats.get("window_match_fraction")
+    overlap_fraction = stats.get("window_overlap_fraction")
+    if not (
+        isinstance(match_fraction, (int | float))
+        and math.isfinite(float(match_fraction))
+    ):
+        raise ValueError("CI/Release requires window_match_fraction.")
+    if float(match_fraction) < 0.999999:
+        raise ValueError(
+            f"CI/Release requires perfect pairing (window_match_fraction={float(match_fraction):.6f})."
+        )
+
+    if not (
+        isinstance(overlap_fraction, (int | float))
+        and math.isfinite(float(overlap_fraction))
+    ):
+        raise ValueError("CI/Release requires window_overlap_fraction.")
+    if float(overlap_fraction) > 1e-9:
+        raise ValueError(
+            f"CI/Release requires non-overlapping windows (window_overlap_fraction={float(overlap_fraction):.6f})."
+        )
+
+    def _coerce_count(value: Any) -> int | None:
+        if value is None or isinstance(value, bool):
+            return None
+        try:
+            val = float(value)
+        except (TypeError, ValueError):
+            return None
+        if not math.isfinite(val) or val < 0:
+            return None
+        if abs(val - round(val)) > 1e-9:
+            return None
+        return int(round(val))
+
+    actual_preview = _coerce_count(stats.get("actual_preview"))
+    actual_final = _coerce_count(stats.get("actual_final"))
+    if actual_preview is None or actual_final is None:
+        coverage = stats.get("coverage")
+        if isinstance(coverage, dict):
+            if actual_preview is None:
+                actual_preview = _coerce_count(coverage.get("preview", {}).get("used"))
+            if actual_final is None:
+                actual_final = _coerce_count(coverage.get("final", {}).get("used"))
+
+    if actual_preview is None or actual_final is None:
+        raise ValueError("CI/Release requires preview/final window counts.")
+    if actual_preview != actual_final:
+        raise ValueError(
+            f"CI/Release requires matching preview/final counts "
+            f"(preview={actual_preview}, final={actual_final})."
+        )
+
+    from invarlock.core.runner import BOOTSTRAP_COVERAGE_REQUIREMENTS
+
+    tier_key = str(tier or "balanced").lower()
+    floors = BOOTSTRAP_COVERAGE_REQUIREMENTS.get(
+        tier_key, BOOTSTRAP_COVERAGE_REQUIREMENTS["balanced"]
+    )
+    preview_floor = int(floors.get("preview", 0))
+    final_floor = int(floors.get("final", 0))
+    replicates_floor = int(floors.get("replicates", 0))
+
+    coverage = stats.get("coverage")
+    if not isinstance(coverage, dict):
+        raise ValueError("CI/Release requires bootstrap coverage stats.")
+
+    preview_used = _coerce_count(coverage.get("preview", {}).get("used"))
+    final_used = _coerce_count(coverage.get("final", {}).get("used"))
+    replicates_used = _coerce_count(coverage.get("replicates", {}).get("used"))
+
+    if replicates_used is None:
+        bootstrap = stats.get("bootstrap")
+        if isinstance(bootstrap, dict):
+            replicates_used = _coerce_count(
+                bootstrap.get("replicates", bootstrap.get("n"))
+            )
+
+    if preview_used is None or final_used is None or replicates_used is None:
+        raise ValueError("CI/Release requires preview/final/replicates coverage stats.")
+
+    if preview_used < preview_floor or final_used < final_floor:
+        raise ValueError(
+            "CI/Release requires preview/final coverage at or above tier floors "
+            f"(preview={preview_used}/{preview_floor}, final={final_used}/{final_floor})."
+        )
+    if replicates_used < replicates_floor:
+        raise ValueError(
+            "CI/Release requires bootstrap replicates at or above tier floors "
+            f"(replicates={replicates_used}/{replicates_floor})."
+        )
+
+
 def _fallback_paired_windows(
     paired_windows: int, coverage_summary: dict[str, Any]
 ) -> int:
@@ -807,6 +976,47 @@ def make_certificate(
     if paired:
         paired_run, paired_base = paired
         paired_windows = len(paired_run)
+        paired_weights: list[float] | None = None
+        try:
+            run_ids = (
+                run_windows.get("window_ids") if isinstance(run_windows, dict) else None
+            )
+            run_w = (
+                run_windows.get("token_counts")
+                if isinstance(run_windows, dict)
+                else None
+            )
+            base_ids = (
+                baseline_windows.get("window_ids")
+                if isinstance(baseline_windows, dict)
+                else None
+            )
+            if (
+                isinstance(run_ids, list)
+                and isinstance(run_w, list)
+                and isinstance(base_ids, list)
+            ):
+                base_set = {
+                    int(b_id) for b_id in base_ids if isinstance(b_id, int | float)
+                }
+                weights: list[float] = []
+                for r_id, w in zip(run_ids, run_w, strict=False):
+                    if not isinstance(r_id, int | float):
+                        continue
+                    key = int(r_id)
+                    if key not in base_set:
+                        continue
+                    try:
+                        wv = float(w)
+                    except Exception:
+                        continue
+                    if not math.isfinite(wv):
+                        continue
+                    weights.append(float(max(wv, 0.0)))
+                if weights:
+                    paired_weights = weights
+        except Exception:  # pragma: no cover
+            paired_weights = None
         method = str(metrics_bootstrap.get("method", "percentile")).lower()
         replicates = int(
             metrics_bootstrap.get(
@@ -834,6 +1044,7 @@ def make_certificate(
                 delta_ci = compute_paired_delta_log_ci(
                     paired_run,
                     paired_base,
+                    weights=paired_weights,
                     method=ci_method,
                     replicates=replicates,
                     alpha=alpha,
@@ -1156,13 +1367,13 @@ def make_certificate(
                 act_fin = req_fin
 
             if req_prev is not None:
-                stats_obj.setdefault("requested_preview", req_prev)
+                stats_obj["requested_preview"] = req_prev
             if req_fin is not None:
-                stats_obj.setdefault("requested_final", req_fin)
+                stats_obj["requested_final"] = req_fin
             if act_prev is not None:
-                stats_obj.setdefault("actual_preview", act_prev)
+                stats_obj["actual_preview"] = act_prev
             if act_fin is not None:
-                stats_obj.setdefault("actual_final", act_fin)
+                stats_obj["actual_final"] = act_fin
 
             if "coverage_ok" not in stats_obj:
                 if (
@@ -1176,6 +1387,12 @@ def make_certificate(
                     )
     except Exception:  # pragma: no cover
         pass
+
+    _enforce_pairing_and_coverage(
+        ppl_analysis.get("stats", {}),
+        window_plan_profile,
+        auto.get("tier", "balanced"),
+    )
 
     if isinstance(window_plan_ctx, dict):
         ppl_analysis["window_plan"] = window_plan_ctx
@@ -1895,6 +2112,12 @@ def make_certificate(
     from .primary_metric_utils import attach_primary_metric as _attach_pm
 
     _attach_pm(certificate, report, baseline_raw, baseline_ref, ppl_analysis)
+    _enforce_display_ci_alignment(
+        ratio_ci_source,
+        certificate.get("primary_metric"),
+        logloss_delta_ci,
+        window_plan_profile,
+    )
 
     # Ensure primary_metric has display_ci populated for schema invariants
     try:
@@ -2492,8 +2715,8 @@ def _prepare_guard_overhead_section(
             {
                 "overhead_ratio": metrics.get("overhead_ratio"),
                 "overhead_percent": metrics.get("overhead_percent"),
-                "bare_final": metrics.get("bare_final"),
-                "guarded_final": metrics.get("guarded_final"),
+                "bare_ppl": metrics.get("bare_ppl"),
+                "guarded_ppl": metrics.get("guarded_ppl"),
                 "messages": list(result.messages),
                 "warnings": list(result.warnings),
                 "errors": list(result.errors),
@@ -2505,12 +2728,8 @@ def _prepare_guard_overhead_section(
         return sanitized, bool(result.passed)
 
     # Fall back to direct ratio computation when reports are not provided
-    bare_ppl = _coerce_float(payload.get("bare_final")) or _coerce_float(
-        payload.get("bare_ppl")
-    )
-    guarded_ppl = _coerce_float(payload.get("guarded_final")) or _coerce_float(
-        payload.get("guarded_ppl")
-    )
+    bare_ppl = _coerce_float(payload.get("bare_ppl"))
+    guarded_ppl = _coerce_float(payload.get("guarded_ppl"))
     ratio = _coerce_float(payload.get("overhead_ratio"))
 
     if ratio is None and bare_ppl is not None and guarded_ppl is not None:

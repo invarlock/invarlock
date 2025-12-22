@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # task_serialization.sh - Task JSON handling for dynamic GPU scheduling
-# Version: v2.0.1 (InvarLock B200 Validation Suite)
+# Version: v2.1.0-b200 (InvarLock B200 Validation Suite)
 # Dependencies: jq
 # Usage: sourced by queue_manager.sh/gpu_worker.sh to read/write queue task files
 #
@@ -8,6 +8,7 @@
 # - Create task records as JSON files
 # - Parse task fields from JSON
 # - Validate task structure
+# - Calculate required GPU count for multi-GPU model distribution
 
 # Ensure jq is available (required for JSON handling)
 if ! command -v jq &>/dev/null; then
@@ -17,15 +18,17 @@ fi
 
 # ============ TASK FIELD DEFINITIONS ============
 # Task record format (stored as JSON):
-#   task_id:         Unique identifier (e.g., "model0_SETUP_BASELINE_001")
+#   task_id:         Unique identifier (e.g., "model0_SETUP_BASELINE_001_abcd")
 #   task_type:       One of: SETUP_BASELINE, EVAL_BASELINE, CALIBRATION_RUN,
 #                    CREATE_EDIT, EVAL_EDIT, CERTIFY_EDIT, CREATE_ERROR,
 #                    CERTIFY_ERROR, GENERATE_PRESET
 #   model_id:        Full HuggingFace model ID (e.g., "mistralai/Mistral-7B-v0.1")
 #   model_name:      Sanitized name for paths (e.g., "mistral-7b-v0.1")
 #   model_size_gb:   Estimated GPU memory requirement in GB
+#   required_gpus:   Number of GPUs needed (1=small, 2=medium/MoE, 4=large 70B+)
+#   assigned_gpus:   Comma-separated list of assigned GPU IDs (set at runtime)
 #   status:          One of: pending, ready, running, completed, failed
-#   gpu_id:          Assigned GPU (-1 if unassigned)
+#   gpu_id:          Assigned GPU (-1 if unassigned) - legacy, use assigned_gpus
 #   dependencies:    Array of task_ids that must complete first
 #   params:          Task-specific parameters object
 #   priority:        Scheduling priority (0-100, higher = more urgent)
@@ -35,6 +38,26 @@ fi
 #   started_at:      ISO 8601 timestamp (null if not started)
 #   completed_at:    ISO 8601 timestamp (null if not completed)
 #   error_msg:       Error message if failed (null otherwise)
+
+# ============ MULTI-GPU CALCULATION ============
+
+# Calculate required GPUs based on model memory size
+# Usage: calculate_required_gpus <model_size_gb>
+# Returns: 1, 2, or 4
+calculate_required_gpus() {
+    local model_size_gb="$1"
+
+    # Large models (70B+): ~140GB+ → need 4 GPUs for tensor parallelism
+    if [[ ${model_size_gb} -ge 120 ]]; then
+        echo "4"
+    # Medium models (30B-40B) and MoE (~90GB): benefit from 2 GPUs
+    elif [[ ${model_size_gb} -ge 60 ]]; then
+        echo "2"
+    # Small models (7B-14B): single GPU is sufficient
+    else
+        echo "1"
+    fi
+}
 
 # ============ TASK CREATION ============
 
@@ -53,7 +76,12 @@ create_task() {
 
     # Generate unique task_id
     local sequence="${TASK_SEQUENCE:-1}"
-    local task_id="${model_name}_${task_type}_$(printf '%03d' "${sequence}")"
+    local rand_suffix
+    rand_suffix=$(printf '%04x' "$((RANDOM % 65536))")
+    local task_id="${model_name}_${task_type}_$(printf '%03d' "${sequence}")_${rand_suffix}"
+
+    # Calculate required GPUs based on model size
+    local required_gpus=$(calculate_required_gpus "${model_size_gb}")
 
     # Convert dependencies to JSON array if comma-separated
     local deps_array
@@ -82,7 +110,7 @@ create_task() {
 
     local created_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-    # Create task JSON
+    # Create task JSON with multi-GPU fields
     # Note: started_at, completed_at, error_msg use literal null in jq, not --arg
     local task_json=$(jq -n \
         --arg task_id "${task_id}" \
@@ -90,6 +118,7 @@ create_task() {
         --arg model_id "${model_id}" \
         --arg model_name "${model_name}" \
         --argjson model_size_gb "${model_size_gb}" \
+        --argjson required_gpus "${required_gpus}" \
         --arg status "pending" \
         --argjson gpu_id "-1" \
         --argjson dependencies "${deps_array}" \
@@ -104,6 +133,8 @@ create_task() {
             model_id: $model_id,
             model_name: $model_name,
             model_size_gb: $model_size_gb,
+            required_gpus: $required_gpus,
+            assigned_gpus: null,
             status: $status,
             gpu_id: $gpu_id,
             dependencies: $dependencies,
@@ -181,6 +212,20 @@ get_task_model_size() {
     get_task_field "$1" "model_size_gb"
 }
 
+# Get required GPUs from a task file
+# Usage: get_task_required_gpus <task_file>
+get_task_required_gpus() {
+    local val=$(get_task_field "$1" "required_gpus")
+    # Default to 1 if not set (backward compatibility)
+    echo "${val:-1}"
+}
+
+# Get assigned GPUs from a task file (comma-separated list)
+# Usage: get_task_assigned_gpus <task_file>
+get_task_assigned_gpus() {
+    get_task_field "$1" "assigned_gpus"
+}
+
 # Get task dependencies as newline-separated list
 # Usage: get_task_dependencies <task_file>
 get_task_dependencies() {
@@ -256,6 +301,30 @@ mark_task_started() {
     local tmp_file="${task_file}.tmp.$$"
     jq --argjson gpu "${gpu_id}" --arg time "${now}" \
         '.status = "running" | .gpu_id = $gpu | .started_at = $time' \
+        "${task_file}" > "${tmp_file}"
+
+    if [[ $? -eq 0 ]]; then
+        mv "${tmp_file}" "${task_file}"
+    else
+        rm -f "${tmp_file}"
+        return 1
+    fi
+}
+
+# Mark task as started with multiple GPUs
+# Usage: mark_task_started_multi <task_file> <gpu_ids_csv>
+# Example: mark_task_started_multi task.json "0,1,2,3"
+mark_task_started_multi() {
+    local task_file="$1"
+    local gpu_ids="$2"  # Comma-separated GPU IDs
+    local now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+    # Extract first GPU as primary gpu_id for backward compatibility
+    local primary_gpu="${gpu_ids%%,*}"
+
+    local tmp_file="${task_file}.tmp.$$"
+    jq --argjson gpu "${primary_gpu}" --arg gpus "${gpu_ids}" --arg time "${now}" \
+        '.status = "running" | .gpu_id = $gpu | .assigned_gpus = $gpus | .started_at = $time' \
         "${task_file}" > "${tmp_file}"
 
     if [[ $? -eq 0 ]]; then
@@ -370,7 +439,8 @@ validate_task() {
 
     # Validate task_type
     local task_type=$(get_task_type "${task_file}")
-    local valid_types="SETUP_BASELINE EVAL_BASELINE CALIBRATION_RUN CREATE_EDIT EVAL_EDIT CERTIFY_EDIT CREATE_ERROR CERTIFY_ERROR GENERATE_PRESET"
+    # v2.1.0-b200: Added CREATE_EDITS_BATCH and split eval benchmarks (EVAL_MMLU, etc.)
+    local valid_types="SETUP_BASELINE EVAL_BASELINE CALIBRATION_RUN CREATE_EDIT CREATE_EDITS_BATCH EVAL_EDIT EVAL_MMLU EVAL_HELLASWAG EVAL_ARC EVAL_WINOGRANDE CERTIFY_EDIT CREATE_ERROR CERTIFY_ERROR GENERATE_PRESET"
     if [[ ! " ${valid_types} " =~ " ${task_type} " ]]; then
         echo "ERROR: Invalid task_type '${task_type}' in: ${task_file}" >&2
         return 1

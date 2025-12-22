@@ -91,29 +91,29 @@ def test_bench_policy_regression_against_golden(tmp_path: Path, monkeypatch) -> 
         report["edit"].update({"name": scenario.edit, "plan_digest": "pd"})
 
         if scenario.tier == "balanced":
-            guarded_final = 10.09
+            guarded_ppl = 10.09
             guarded_duration = 1.13
             guarded_mem = 1090.0
         elif scenario.tier == "conservative":
-            guarded_final = 10.08
+            guarded_ppl = 10.08
             guarded_duration = 1.14
             guarded_mem = 1095.0
         else:  # pragma: no cover
-            guarded_final = 10.10
+            guarded_ppl = 10.10
             guarded_duration = 1.10
             guarded_mem = 1080.0
 
-        bare_final = 10.0
+        bare_ppl = 10.0
         bare_duration = 1.0
         bare_mem = 1000.0
 
         if run_type == "bare":
-            pm_final = bare_final
+            pm_final = bare_ppl
             duration_s = bare_duration
             mem = bare_mem
             outliers = 2
         else:
-            pm_final = guarded_final
+            pm_final = guarded_ppl
             duration_s = guarded_duration
             mem = guarded_mem
             outliers = 3

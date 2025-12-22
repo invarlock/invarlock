@@ -6,9 +6,11 @@ from typing import Any
 from unittest.mock import patch
 
 import numpy as np
+import pytest
 
 # NOTE: import VarianceGuard only if it's part of the public surface;
 # otherwise, drive it via certificate inputs in an integration test.
+from invarlock.core.runner import BOOTSTRAP_COVERAGE_REQUIREMENTS
 from invarlock.guards.variance import VarianceGuard
 from invarlock.reporting.certificate import make_certificate
 from invarlock.reporting.guards_analysis import _extract_rmt_analysis
@@ -40,6 +42,11 @@ def _build_paired_run_and_baseline(
             "commit": "deadbeefcafebabe",
             "seed": 1337,
             "seeds": {"python": 1337, "numpy": 4242, "torch": 777},
+            "auto": {
+                "tier": "balanced",
+                "probes_used": 0,
+                "target_pm_ratio": None,
+            },
         },
         "data": {
             "dataset": "wikitext2",
@@ -108,6 +115,14 @@ def _build_paired_run_and_baseline(
     return report, baseline
 
 
+def test_bootstrap_coverage_floors_match_assurance_docs():
+    assert BOOTSTRAP_COVERAGE_REQUIREMENTS == {
+        "conservative": {"preview": 220, "final": 220, "replicates": 1500},
+        "balanced": {"preview": 180, "final": 180, "replicates": 1200},
+        "aggressive": {"preview": 140, "final": 140, "replicates": 800},
+    }
+
+
 def test_certificate_enforces_paired_ratio_identity():
     report, baseline = _build_paired_run_and_baseline()
     with patch("invarlock.reporting.certificate.validate_report", return_value=True):
@@ -127,8 +142,10 @@ def test_certificate_rejects_inconsistent_ratio():
     report, baseline = _build_paired_run_and_baseline()
     report["metrics"]["paired_delta_summary"]["mean"] += 0.1  # Break consistency
     with patch("invarlock.reporting.certificate.validate_report", return_value=True):
-        # Mark as CI profile to enforce hard-fail on inconsistency
-        report.setdefault("metrics", {}).setdefault("window_plan", {})["profile"] = "ci"
+        # Use dev profile to avoid strict pairing enforcement; inconsistency should not raise
+        report.setdefault("metrics", {}).setdefault("window_plan", {})["profile"] = (
+            "dev"
+        )
         # Normalized certificate generation now degrades this inconsistency without raising
         cert = make_certificate(report, baseline)
         assert isinstance(cert, dict)
@@ -198,7 +215,74 @@ def test_seed_bundle_contract():
     stats = certificate.get("dataset", {}).get("windows", {}).get("stats", {})
     assert stats.get("window_match_fraction") == 1.0
     assert stats.get("window_overlap_fraction") == 0.0
-    assert stats.get("paired_windows") == 2
+
+
+def test_certificate_rejects_ci_runs_below_bootstrap_floor():
+    report, baseline = _build_paired_run_and_baseline()
+    report["data"]["preview_n"] = 180
+    report["data"]["final_n"] = 180
+    report["metrics"]["window_plan"] = {
+        "profile": "ci",
+        "preview_n": 180,
+        "final_n": 180,
+    }
+    report["metrics"]["stats"] = {
+        "requested_preview": 180,
+        "requested_final": 180,
+        "actual_preview": 10,
+        "actual_final": 10,
+    }
+    report["metrics"]["bootstrap"]["coverage"] = {
+        "preview": {"used": 10},
+        "final": {"used": 10},
+        "replicates": {"used": 100},
+    }
+    report["metrics"]["bootstrap"]["replicates"] = 100
+    with patch("invarlock.reporting.certificate.validate_report", return_value=True):
+        with pytest.raises(ValueError):
+            make_certificate(deepcopy(report), deepcopy(baseline))
+
+
+def _apply_ci_pairing_requirements(report: dict[str, Any]) -> None:
+    report["data"]["preview_n"] = 180
+    report["data"]["final_n"] = 180
+    report.setdefault("metrics", {}).setdefault("window_plan", {}).update(
+        {"profile": "ci", "preview_n": 180, "final_n": 180}
+    )
+    report["metrics"]["stats"] = {
+        "requested_preview": 180,
+        "requested_final": 180,
+        "actual_preview": 180,
+        "actual_final": 180,
+    }
+    report["metrics"].setdefault("bootstrap", {}).update(
+        {
+            "replicates": 1200,
+            "coverage": {
+                "preview": {"used": 180},
+                "final": {"used": 180},
+                "replicates": {"used": 1200},
+            },
+        }
+    )
+
+
+def test_certificate_rejects_ci_overlap():
+    report, baseline = _build_paired_run_and_baseline()
+    _apply_ci_pairing_requirements(report)
+    report["metrics"]["window_overlap_fraction"] = 0.25
+    with patch("invarlock.reporting.certificate.validate_report", return_value=True):
+        with pytest.raises(ValueError):
+            make_certificate(deepcopy(report), deepcopy(baseline))
+
+
+def test_certificate_rejects_ci_pairing_mismatch():
+    report, baseline = _build_paired_run_and_baseline()
+    _apply_ci_pairing_requirements(report)
+    report["metrics"]["window_match_fraction"] = 0.98
+    with patch("invarlock.reporting.certificate.validate_report", return_value=True):
+        with pytest.raises(ValueError):
+            make_certificate(deepcopy(report), deepcopy(baseline))
 
 
 def test_infeasible_lowrank_cap_rejected():

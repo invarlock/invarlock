@@ -103,8 +103,8 @@ def test_make_certificate_guard_overhead_integration():
     rep = _mk_min_report_pm()
     # Provide direct ratio path for overhead section
     rep["guard_overhead"] = {
-        "bare_final": 100.0,
-        "guarded_final": 101.0,
+        "bare_ppl": 100.0,
+        "guarded_ppl": 101.0,
         "overhead_threshold": 0.02,
     }
     base = {"metrics": {"primary_metric": {"kind": "ppl_causal", "final": 4.0}}}

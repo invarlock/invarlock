@@ -83,8 +83,23 @@ def apply_determinism_preset(
 
     # CUDA determinism: cuBLAS workspace config.
     if requested == "strict" and dev.startswith("cuda"):
-        os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":16:8")
+        preferred = ":4096:8"
+        fallback = ":16:8"
+        if "CUBLAS_WORKSPACE_CONFIG" not in os.environ:
+            selected = preferred
+            if torch is not None:
+                try:
+                    mem_bytes = int(torch.cuda.get_device_properties(0).total_memory)
+                    if mem_bytes and mem_bytes < 8 * 1024**3:
+                        selected = fallback
+                except Exception:
+                    selected = preferred
+            os.environ["CUBLAS_WORKSPACE_CONFIG"] = selected
         env_set["CUBLAS_WORKSPACE_CONFIG"] = os.environ.get("CUBLAS_WORKSPACE_CONFIG")
+
+    if requested == "strict":
+        os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+        env_set["TOKENIZERS_PARALLELISM"] = os.environ.get("TOKENIZERS_PARALLELISM")
 
     # Seed all RNGs (python/numpy/torch) using the existing helper for parity.
     set_seed(int(seed))

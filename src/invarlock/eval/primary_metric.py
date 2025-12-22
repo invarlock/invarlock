@@ -214,9 +214,15 @@ class _PPLCausal(PrimaryMetric):
     ) -> dict[str, Any]:
         subj = self._coerce_contrib_array(subject)
         base = self._coerce_contrib_array(baseline)
-        # Compute simple (unweighted) per-example arrays in log space; weights ignored for bootstrap here
+        # Compute per-example arrays in log space; use weights for paired bootstrap
         subj_vals = [v for (v, _w) in subj]
         base_vals = [v for (v, _w) in base]
+        pair_weights = []
+        for (_sv, sw), (_bv, bw) in zip(subj, base, strict=False):
+            weight = bw if math.isfinite(bw) and bw > 0 else sw
+            if not math.isfinite(weight) or weight <= 0:
+                weight = 1.0
+            pair_weights.append(float(weight))
 
         # Points in display space
         def _point(
@@ -249,15 +255,24 @@ class _PPLCausal(PrimaryMetric):
         dlog_lo, dlog_hi = compute_paired_delta_log_ci(
             subj_vals,
             base_vals,
+            weights=pair_weights,
             method="bca",
             replicates=reps_eff,
             alpha=alpha,
             seed=seed_eff,
         )
-        delta_log = float(
-            sum((s - b) for s, b in zip(subj_vals, base_vals, strict=False))
-            / max(1, min(len(subj_vals), len(base_vals)))
-        )
+        if pair_weights and len(pair_weights) >= min(len(subj_vals), len(base_vals)):
+            sw = 0.0
+            swx = 0.0
+            for s, b, w in zip(subj_vals, base_vals, pair_weights, strict=False):
+                sw += w
+                swx += w * (s - b)
+            delta_log = float(swx / sw) if sw > 0 else float("nan")
+        else:
+            delta_log = float(
+                sum((s - b) for s, b in zip(subj_vals, base_vals, strict=False))
+                / max(1, min(len(subj_vals), len(base_vals)))
+            )
         ratio = self.display_transform(delta_log)
         return {
             "kind": self.kind,

@@ -60,7 +60,7 @@ enforce minima strictly when pairing is established.
 
 ## References
 
-- Efron, B. (1987). “Better Bootstrap Confidence Intervals.” *Journal of the American Statistical Association*, 82(397), 171–185. <https://www.jstor.org/stable/2289144>
+- Efron, B. (1987). “Better Bootstrap Confidence Intervals.” *Journal of the American Statistical Association*, 82(397), 171–185. <https://doi.org/10.1080/01621459.1987.10478410>
 - DiCiccio, T. J., & Efron, B. (1996). “Bootstrap Confidence Intervals.” *Statistical Science*, 11(3), 189–228. <https://projecteuclid.org/journals/statistical-science/volume-11/issue-3/Bootstrap-Confidence-Intervals/10.1214/ss/1032280214.full>
-- Canty, A., & Davison, A. C. (2021). “bcaboot: Bias Corrected Bootstrap Confidence Intervals.” R package vignette. <https://cran.r-project.org/web/packages/bcaboot/bcaboot.pdf>
+- Efron, B., & Narasimhan, B. (2021). “bcaboot: Bias Corrected Bootstrap Confidence Intervals.” R package vignette. <https://cran.r-project.org/web/packages/bcaboot/bcaboot.pdf>
 - Efron, B., & Tibshirani, R. J. (1993). *An Introduction to the Bootstrap.* Chapman & Hall/CRC.

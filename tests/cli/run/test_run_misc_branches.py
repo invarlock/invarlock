@@ -159,6 +159,7 @@ def _compute_seq_hash(seqs: list[list[int]]) -> str:
 
     h = hashlib.blake2s(digest_size=16)
     for seq in seqs:
+        h.update(len(seq).to_bytes(4, "little", signed=False))
         arr = array("I", (int(tok) & 0xFFFFFFFF for tok in seq))
         h.update(arr.tobytes())
     return h.hexdigest()

@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
 from invarlock.core.api import Guard, ModelAdapter, ModelEdit, RunConfig
-from invarlock.core.runner import CoreRunner, _collect_cuda_flags
+from invarlock.core.runner import (
+    CoreRunner,
+    _coerce_bool,
+    _collect_cuda_flags,
+    _env_flag,
+)
 
 
 class DummyModel:
@@ -549,6 +555,7 @@ def test_runner_resolve_policies_error(monkeypatch, tmp_path):
             calibration_data=None,
             report=RunReport(),
             auto_config=None,
+            config=cfg,
         )
     except (
         Exception
@@ -675,7 +682,7 @@ def test_prepare_guards_prepare_error(monkeypatch, tmp_path):
     report = runner.execute(
         model, adapter, DummyEdit(), [ErrPrepareGuard()], cfg, calibration_data=None
     )
-    assert report.status in {"success", "rollback"}
+    assert report.status == "failed"
 
 
 def test_latency_with_token_type_ids_and_success(tmp_path):
@@ -1535,3 +1542,199 @@ def test_handle_error_paths(monkeypatch):
     monkeypatch.setattr(CoreRunner, "_log_event", staticmethod(patched_log))
     r._handle_error(RuntimeError("y"), report)  # Should not raise
     assert any(op == "rollback_failed" for _, op in calls)
+
+
+def test_coerce_bool_and_env_flag(monkeypatch):
+    assert _coerce_bool(True) is True
+    assert _coerce_bool(False) is False
+    assert _coerce_bool(1) is True
+    assert _coerce_bool(0) is False
+    assert _coerce_bool(" yes ") is True
+    assert _coerce_bool("off") is False
+    assert _coerce_bool("maybe") is None
+
+    monkeypatch.delenv("INVARLOCK_TEST_FLAG", raising=False)
+    assert _env_flag("INVARLOCK_TEST_FLAG") is None
+    monkeypatch.setenv("INVARLOCK_TEST_FLAG", "0")
+    assert _env_flag("INVARLOCK_TEST_FLAG") is False
+
+
+def test_resolve_policy_flags_precedence(monkeypatch, tmp_path):
+    runner = CoreRunner()
+    cfg = make_config(tmp_path)
+    cfg.context.setdefault("run", {})["strict_eval"] = None
+    cfg.context.setdefault("eval", {})["strict"] = "false"
+    cfg.context.setdefault("run", {})["strict_guard_prepare"] = "0"
+    cfg.context.setdefault("run", {})["allow_calibration_materialize"] = "1"
+    monkeypatch.setenv("INVARLOCK_EVAL_STRICT", "1")
+
+    flags = runner._resolve_policy_flags(cfg)
+
+    assert flags["strict_eval"] is True  # env overrides eval/run
+    assert flags["strict_guard_prepare"] is False
+    assert flags["allow_calibration_materialize"] is True
+
+
+def test_prepare_guards_phase_non_strict_allows_failure(tmp_path):
+    from invarlock.core.api import RunReport
+
+    runner = CoreRunner()
+    cfg = make_config(tmp_path)
+    cfg.context.setdefault("run", {})["strict_guard_prepare"] = False
+    report = RunReport()
+
+    runner._prepare_guards_phase(
+        DummyModel(),
+        DummyAdapter(),
+        [ErrPrepareGuard()],
+        calibration_data=None,
+        report=report,
+        auto_config=None,
+        config=cfg,
+    )
+
+    failures = report.meta.get("guard_prepare_failures", [])
+    assert failures and failures[0]["guard"] == ErrPrepareGuard.name
+
+
+def test_eval_phase_strict_eval_raises(monkeypatch, tmp_path):
+    runner = CoreRunner()
+    cfg = make_config(tmp_path)
+    cfg.context.setdefault("run", {})["strict_eval"] = True
+
+    def fake_compute(*_args, **_kwargs):
+        return (
+            {
+                "eval_error": {"message": "boom", "type": "fail"},
+                "primary_metric": {"kind": "ppl_causal", "preview": 1.0, "final": 1.0},
+            },
+            {"preview": {}, "final": {}},
+        )
+
+    monkeypatch.setattr(CoreRunner, "_compute_real_metrics", staticmethod(fake_compute))
+    with pytest.raises(RuntimeError, match="Evaluation failed"):
+        runner._eval_phase(
+            DummyModel(),
+            DummyAdapter(),
+            calibration_data=[{"input_ids": [1, 2, 3]}],
+            report=SimpleNamespace(),
+            preview_n=1,
+            final_n=1,
+            config=cfg,
+        )
+
+
+def test_eval_phase_soft_fail_sets_metrics_on_plain_report(monkeypatch, tmp_path):
+    runner = CoreRunner()
+    cfg = make_config(tmp_path)
+    cfg.context.setdefault("run", {})["strict_eval"] = False
+
+    def fake_compute(*_args, **_kwargs):
+        return (
+            {
+                "eval_error": {"message": "soft", "type": "fail"},
+                "primary_metric": {"kind": "ppl_causal", "preview": 1.0, "final": 1.0},
+            },
+            {"preview": {}, "final": {}},
+        )
+
+    monkeypatch.setattr(CoreRunner, "_compute_real_metrics", staticmethod(fake_compute))
+    report = SimpleNamespace()
+    metrics = runner._eval_phase(
+        DummyModel(),
+        DummyAdapter(),
+        calibration_data=[{"input_ids": [1, 2, 3]}],
+        report=report,
+        preview_n=1,
+        final_n=1,
+        config=cfg,
+    )
+
+    assert metrics["eval_error"]["message"] == "soft"
+    assert report.metrics["primary_metric"]["kind"] == "ppl_causal"
+
+
+def test_compute_real_metrics_materialize_iterable(tmp_path):
+    import torch
+
+    class Toy(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.lin = torch.nn.Linear(3, 3, bias=False)
+
+        def forward(self, *a, **k):
+            class Obj:
+                def __init__(self):
+                    self.loss = type("L", (), {"item": lambda self: 1.0})()
+
+            return Obj()
+
+    class IterableCalib:
+        def __init__(self, items):
+            self._items = list(items)
+
+        def __iter__(self):
+            return iter(self._items)
+
+    runner = CoreRunner()
+    cfg = make_config(tmp_path)
+    cfg.context.setdefault("run", {})["allow_calibration_materialize"] = True
+    cfg.context.setdefault("eval", {}).update({"bootstrap": {"enabled": False}})
+    calibration = IterableCalib(
+        [
+            {"input_ids": [1, 2, 3], "attention_mask": [1, 1, 1]},
+            {"input_ids": [4, 5, 6], "attention_mask": [1, 1, 1]},
+        ]
+    )
+
+    metrics, _ = runner._compute_real_metrics(
+        Toy(), calibration, DummyAdapter(), preview_n=1, final_n=1, config=cfg
+    )
+    pm = metrics.get("primary_metric", {})
+    assert pm.get("final") and pm.get("preview")
+
+
+def test_compute_real_metrics_slice_fallback_materializes(tmp_path):
+    import torch
+
+    class Toy(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.lin = torch.nn.Linear(3, 3, bias=False)
+
+        def forward(self, *a, **k):
+            class Obj:
+                def __init__(self):
+                    self.loss = type("L", (), {"item": lambda self: 1.0})()
+
+            return Obj()
+
+    class BadIndexCalib:
+        def __init__(self, items):
+            self._items = list(items)
+
+        def __len__(self):
+            return len(self._items)
+
+        def __iter__(self):
+            return iter(self._items)
+
+        def __getitem__(self, idx):
+            raise TypeError("indexing disabled")
+
+    runner = CoreRunner()
+    cfg = make_config(tmp_path)
+    cfg.context.setdefault("run", {})["allow_calibration_materialize"] = True
+    cfg.context.setdefault("eval", {}).update({"bootstrap": {"enabled": False}})
+    calibration = BadIndexCalib(
+        [
+            {"input_ids": [1, 2, 3], "attention_mask": [1, 1, 1]},
+            {"input_ids": [4, 5, 6], "attention_mask": [1, 1, 1]},
+        ]
+    )
+
+    metrics, _ = runner._compute_real_metrics(
+        Toy(), calibration, DummyAdapter(), preview_n=1, final_n=1, config=cfg
+    )
+    pm = metrics.get("primary_metric", {})
+    assert pm.get("final") and pm.get("preview")

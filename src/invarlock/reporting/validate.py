@@ -407,25 +407,25 @@ def validate_guard_overhead(
             else None
         )
 
-        bare_final = None
-        guarded_final = None
+        bare_ppl = None
+        guarded_ppl = None
         if isinstance(bare_pm, dict):
-            bare_final = bare_pm.get("final")
+            bare_ppl = bare_pm.get("final")
         if isinstance(guarded_pm, dict):
-            guarded_final = guarded_pm.get("final")
+            guarded_ppl = guarded_pm.get("final")
 
         if (
-            isinstance(bare_final, (int | float))
-            and bare_final > 0
-            and isinstance(guarded_final, (int | float))
+            isinstance(bare_ppl, (int | float))
+            and bare_ppl > 0
+            and isinstance(guarded_ppl, (int | float))
         ):
-            overhead_ratio = float(guarded_final) / float(bare_final)
+            overhead_ratio = float(guarded_ppl) / float(bare_ppl)
             overhead_percent = (overhead_ratio - 1.0) * 100
 
             metrics["overhead_ratio"] = overhead_ratio
             metrics["overhead_percent"] = overhead_percent
-            metrics["bare_final"] = float(bare_final)
-            metrics["guarded_final"] = float(guarded_final)
+            metrics["bare_ppl"] = float(bare_ppl)
+            metrics["guarded_ppl"] = float(guarded_ppl)
 
             # Apply overhead gate
             checks["guard_overhead"] = overhead_ratio <= (1.0 + overhead_threshold)

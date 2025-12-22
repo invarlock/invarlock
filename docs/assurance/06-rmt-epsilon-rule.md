@@ -30,7 +30,9 @@ with $\epsilon_f$ calibrated from **null** runs (e.g., 95th–99th percentile of
 ## Assumptions & Scope
 
 - Null calibration must cover each family `{ffn, attn, embed, other}`; default ε values are exposed whenever data is sparse.
-- Bare and guarded counts use identical evaluation windows and token weighting.
+- Bare and guarded counts use identical evaluation windows and **token‑weighted outlier totals**
+  (per window, weight = token count; summed across windows).
+- CI/Release evidence requires activation-based outlier counting; if activation batches are missing, the RMT guard fails closed.
 - Small baselines rely on the ceiling operator; embeddings therefore use slightly larger ε to avoid spurious WARNs.
 
 ## Calibration (pilot-derived)

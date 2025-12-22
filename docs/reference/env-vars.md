@@ -15,12 +15,18 @@ unset variables default to “off”.
 
 - `INVARLOCK_BOOTSTRAP_BCA=1`
   - Prefer BCa bootstrap for paired Δlog confidence intervals (when sample size allows).
+- `INVARLOCK_EVAL_STRICT=0`
+  - Allow evaluation failures to soft-fail and emit `metrics.eval_error` instead of aborting.
+  - Default: strict (fail-closed).
 - `INVARLOCK_TINY_RELAX=1`
   - Relax some gates/thresholds in tiny dev demos; used by `doctor` and certificate heuristics.
 - `INVARLOCK_EVAL_DEVICE=<device>`
   - Override evaluation device for the main model and the WikiText‑2 difficulty scorer.
     Accepts `cpu`, `cuda`, `cuda:0`, or `mps`. When unset, evaluation uses the model’s
     loaded device (resolved from `model.device` / `--device`).
+- `INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE=1`
+  - Allow iterables without `__len__`/slicing to be materialized for evaluation.
+  - Default: disabled to preserve deterministic, indexable windowing.
 
 ## Dataset Preparation
 
@@ -44,6 +50,9 @@ unset variables default to “off”.
 
 - `INVARLOCK_ASSERT_GUARDS=1`
   - Enable lightweight guard runtime assertions (`guard_assert`).
+- `INVARLOCK_GUARD_PREPARE_STRICT=0`
+  - Allow guard `prepare()` failures to log and continue instead of aborting.
+  - Default: strict (fail-closed).
 - `INVARLOCK_EVIDENCE_DEBUG=1`
   - Emit a small `guards_evidence.json` next to reports for audit.
 - `INVARLOCK_VALIDATE_LEGACY=1`
@@ -57,6 +66,12 @@ unset variables default to “off”.
   - Upper bound for primary-metric acceptance (default 1.10). Set to 1.15 for slight drift allowance.
 - `INVARLOCK_PM_ACCEPTANCE_MIN=<float>`
   - Lower bound for primary-metric acceptance (default 0.95) when enforcing a symmetric ratio band.
+
+## Config Loading
+
+- `INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE=1`
+  - Allow YAML `!include` to reference files outside the config directory.
+  - Default: disabled to prevent accidental reads of unrelated local files.
 
 ## Documentation Build
 

@@ -38,11 +38,13 @@ alongside $\kappa_f$ so auditors can recover the expected per-run WARN rate.
   we fall back to the tier deadband δ.
 - Only 2‑D weight matrices (FFN blocks, attention projections, embeddings) are
   evaluated; **1‑D LayerNorm parameters are explicitly excluded** from spectral
-  monitoring and are instead covered by the RMT and variance guards.
+  monitoring. LayerNorm coverage is provided by invariants (presence checks)
+  and activation‑based RMT (CI/Release); VE captures any aggregate performance shift.
 - Balanced tier uses the **Benjamini–Hochberg** procedure (`method = "bh"`, α =
-  0.05, m = 4 families) with per-family caps `{ffn: 2.5, attn: 2.8, embed: 3.0,
-  other: 3.0}`, `sigma_quantile = 0.95`, and `max_caps = 5`, yielding ≤5% WARN
-  rate on null runs. Scope is `all`, so FFN, attention, embeddings, and other 2‑D
+  0.05, m = 4 families) with per-family caps `{ffn: 3.834, attn: 3.423, embed: 3.1,
+  other: 3.1}`, `sigma_quantile = 0.95`, and `max_caps = 5`, yielding ≤5% WARN
+  rate on null runs (calibrated from the November 2025 pilot and stored in
+  `tiers.yaml`). Scope is `all`, so FFN, attention, embeddings, and other 2‑D
   weights are all monitored.
 - Conservative tier applies **Bonferroni** (`method = "bonferroni"`, α = 0.02,
   m = 4) with caps `{ffn: 2.3, attn: 2.6, embed: 2.8, other: 2.8}`,
@@ -84,7 +86,7 @@ summary.
 
 ### Worked example (Balanced tier)
 
-- For FFN modules, `family_caps.ffn.kappa = 2.5`. Suppose a layer reports $z = 2.62$.
+- For FFN modules, `family_caps.ffn.kappa = 3.834`. Suppose a layer reports $z = 3.90$.
 - Certificate records a WARN in `spectral.families.ffn.violations += 1`; `spectral.caps_applied` increments.
 - Balanced `max_caps = 5`. After the fifth WARN the guard continues to WARN;
   the sixth triggers `spectral.caps_exceeded=true` and the run aborts.
@@ -111,4 +113,4 @@ parametric inversion of the tail probability. Add a small safety margin
 
 ## References
 
-- Benjamini, Y., & Hochberg, Y. (1995). “Controlling the False Discovery Rate: A Practical and Powerful Approach to Multiple Testing.” *Journal of the Royal Statistical Society: Series B (Methodological)*, 57(1), 289–300. <https://rss.onlinelibrary.wiley.com/doi/10.1111/j.2517-6161.1995.tb02031.x>
+- Benjamini, Y., & Hochberg, Y. (1995). “Controlling the False Discovery Rate: A Practical and Powerful Approach to Multiple Testing.” *Journal of the Royal Statistical Society: Series B (Methodological)*, 57(1), 289–300. <https://doi.org/10.1111/j.2517-6161.1995.tb02031.x>

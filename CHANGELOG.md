@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.3] - 2025-12-21
+
+### Added
+- Token-weighted paired Δlog-loss bootstrap support (core bootstrap + primary metric + variance guard).
+- New strictness/override toggles: `INVARLOCK_EVAL_STRICT`, `INVARLOCK_GUARD_PREPARE_STRICT`,
+  `INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE`, `INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE`.
+- RMT activation helper paths for outlier collection and activation-required guard flows.
+- Report metadata for guard prepare failures and evaluation soft-fail context (`metrics.eval_error`).
+
+### Changed
+- Window pairing enforcement now tracks overlap vs duplicate fractions and detects count mismatches;
+  CI/Release certificates require perfect pairing, non-overlapping windows, and coverage floors.
+- Determinism preset chooses `CUBLAS_WORKSPACE_CONFIG` based on GPU memory and disables
+  `TOKENIZERS_PARALLELISM` under strict settings.
+- Guard overhead metric fields standardized to `bare_ppl`/`guarded_ppl`; primary metric `display_ci`
+  is aligned with log-space CI for ppl-like metrics.
+- B200 validation workflow upgraded to v2.1.0 with dynamic scheduling, GPU lock management,
+  and expanded task orchestration scripts.
+
+### Fixed
+- Calibration data slicing now supports iterables with optional materialization and clearer errors.
+- Sequence hashing now includes per-sequence lengths to avoid ambiguous digests.
+- Variance guard predictive gating improves min-effect and regression reasoning.
+
+### Documentation
+- Expanded B200 validation guide with v2.1.0 workflow details and scheduler/queue notes.
+- Assurance docs, CLI guidance, and environment variable references refreshed for new behavior.
+
 ## [0.3.2] - 2025-12-14
 
 ### Added

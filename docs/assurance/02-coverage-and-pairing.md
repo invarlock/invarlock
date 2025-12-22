@@ -28,7 +28,8 @@ insufficient.
 
 ## Tier Minima (runner defaults)
 
-Sane defaults enforced by the runner per tier (subject to change in tiers.yaml):
+Sane defaults enforced by the runner per tier (guard-rail floors; profiles may
+request higher counts):
 
 | Tier         | Preview Windows | Final Windows | Bootstrap Replicates |
 |--------------|------------------|---------------|----------------------|
@@ -44,7 +45,7 @@ dev flows surface warnings but still record coverage in the cert.
 
 - Window plan: `dataset.windows.stats.{requested_preview,requested_final,actual_preview,actual_final}`
 - Pairing/overlap: `dataset.windows.stats.{window_match_fraction,window_overlap_fraction,paired_windows}`
-- Bootstrap coverage: `dataset.windows.stats.bootstrap.{replicates,seed}` meets/exceeds tier minima
+- Bootstrap coverage: `dataset.windows.stats.bootstrap.{replicates,seed}` meets/exceeds the tier floor (profiles may request higher counts)
 
 ## Observability
 

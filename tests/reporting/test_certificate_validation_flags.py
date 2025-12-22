@@ -75,7 +75,7 @@ def test_tiny_relax_relaxes_tokens_floor_for_ppl(monkeypatch):
 
 def test_prepare_guard_overhead_section_fallback_paths():
     # Direct ratio computation path
-    payload = {"bare_final": 100.0, "guarded_final": 101.0, "overhead_threshold": 0.02}
+    payload = {"bare_ppl": 100.0, "guarded_ppl": 101.0, "overhead_threshold": 0.02}
     out, passed = C._prepare_guard_overhead_section(payload)
     assert out.get("evaluated") is True and out.get("overhead_ratio") == 1.01
     assert passed is True

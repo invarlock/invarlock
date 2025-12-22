@@ -12,7 +12,7 @@
 ### What the tier ships with (pilot)
 
 - **Balanced** per-family κ caps:
-  `ffn: 2.5`, `attn: 2.8`, `embed: 3.0`, `other: 3.0`
+  `ffn: 3.834`, `attn: 3.423`, `embed: 3.1`, `other: 3.1`
   with **Benjamini–Hochberg (BH)** FDR control (`α=0.05`, `m=4` families), **deadband** `δ=0.10`, **scope: all** 2-D weight matrices (LayerNorm excluded), **no absolute clamp**, and **per-run WARN budget** `max_caps = 5`.
 - **Conservative** tightens caps and budget:
   `ffn: 2.3`, `attn: 2.6`, `embed: 2.8`, `other: 2.8`, **Bonferroni** (`α=0.02`), and `max_caps = 3`.
@@ -83,8 +83,8 @@ deltas Δ(f) = g(f)/b(f) − 1, and report quantile summaries.
 
 ### What the tier ships with (pilot)
 
-* **Balanced (one-sided)**: `min_effect_lognll ≈ 9e-4`
-* **Conservative (two-sided)**: `≈ 1.8e-3`
+* **Balanced (one-sided, improvement-only)**: `min_effect_lognll ≈ 9e-4`
+* **Conservative (two-sided, improvement-only)**: `≈ 1.8e-3`
 
 **Runtime visibility.** Recorded in certificates under `variance.predictive_gate` (CI, mean Δ, pass/fail reason) and under `resolved_policy.variance.{predictive_one_sided,min_effect_lognll}` (tier knobs).
 
@@ -97,7 +97,7 @@ standard deviation across runs.
 
 ### How to recalibrate min-effect
 
-For paired ΔlogNLL with stdev $\hat{\sigma}$ over $n$ windows, $\text{min effect (logNLL)} \approx z \cdot \frac{\hat{\sigma}}{\sqrt{n}}$ with **Balanced** using one-sided $z = z_{0.95}$ and **Conservative** two-sided $z = z_{0.975}$. VE enables only if the predictive CI excludes 0 under the tier sidedness.
+For paired ΔlogNLL with stdev $\hat{\sigma}$ over $n$ windows, $\text{min effect (logNLL)} \approx z \cdot \frac{\hat{\sigma}}{\sqrt{n}}$ with **Balanced** using one-sided $z = z_{0.95}$ and **Conservative** two-sided $z = z_{0.975}$. VE enables only if the predictive CI upper bound ≤ −`min_effect_lognll` and the mean Δ ≤ −`min_effect_lognll`; a CI entirely above +`min_effect_lognll` is treated as regression (VE stays off).
 
 ---
 
@@ -125,7 +125,7 @@ under `configs/tasks/*/ci_*.yaml` and `configs/tasks/*/release_*.yaml`.
 3. **RMT ε.** From null runs, set $\varepsilon(f)$ to the q95–q99 quantile of $\big(g(f)/b(f) - 1\big)$ per family (adjust for small $b(f)$).
 4. **VE min-effect.** ($\approx z\,\hat{\sigma}/\sqrt{n}$) with tier-appropriate sidedness.
 5. **Windows.** Size $n$ to hit the half-width target; enforce non-overlap and pairing.
-6. **Trial via override.** Write calibrated values to a local override YAML (e.g., `configs/overrides/spectral_balanced_local.yaml`) and pass it via `--overrides` instead of editing the global tier. Re-run baseline + edits; pre-screen gates; then build certificates.
+6. **Trial via override.** Write calibrated values to a local override YAML (e.g., `configs/overrides/spectral_balanced_local.yaml`) and merge it into a local run preset under `guards:` instead of editing the global tier. Re-run baseline + edits; pre-screen gates; then build certificates.
 
 ---
 
@@ -136,4 +136,4 @@ under `configs/tasks/*/ci_*.yaml` and `configs/tasks/*/release_*.yaml`.
 
 ## References
 
-- Benjamini, Y., & Hochberg, Y. (1995). “Controlling the False Discovery Rate: A Practical and Powerful Approach to Multiple Testing.” *Journal of the Royal Statistical Society: Series B (Methodological)*, 57(1), 289–300. <https://rss.onlinelibrary.wiley.com/doi/10.1111/j.2517-6161.1995.tb02031.x>
+- Benjamini, Y., & Hochberg, Y. (1995). “Controlling the False Discovery Rate: A Practical and Powerful Approach to Multiple Testing.” *Journal of the Royal Statistical Society: Series B (Methodological)*, 57(1), 289–300. <https://doi.org/10.1111/j.2517-6161.1995.tb02031.x>

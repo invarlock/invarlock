@@ -10,8 +10,8 @@ from invarlock.reporting import certificate as cert
 
 
 def _rich_run_report() -> tuple[dict, dict]:
-    window_ids = [1, 2]
-    token_counts = [10, 12]
+    window_ids = list(range(1, 181))
+    token_counts = [10] * len(window_ids)
     report = {
         "meta": {
             "model_id": "demo-model",
@@ -30,10 +30,10 @@ def _rich_run_report() -> tuple[dict, dict]:
             "dataset": "demo-ds",
             "split": "eval",
             "seq_len": 8,
-            "stride": 4,
-            "preview_n": 2,
-            "final_n": 2,
-            "windows": {"preview": 2, "final": 2, "seed": 7},
+            "stride": 8,
+            "preview_n": 180,
+            "final_n": 180,
+            "windows": {"preview": 180, "final": 180, "seed": 7},
         },
         "edit": {
             "name": "quant_rtn",
@@ -76,8 +76,17 @@ def _rich_run_report() -> tuple[dict, dict]:
             "logloss_final": 0.05,
             "logloss_delta_ci": (-0.01, 0.02),
             "paired_delta_summary": {"mean": math.log(1.04), "degenerate": False},
-            "window_plan": {"profile": "ci", "preview_n": 2, "final_n": 2},
-            "bootstrap": {"replicates": 300, "coverage": {"used": 2}},
+            "window_plan": {"profile": "ci", "preview_n": 180, "final_n": 180},
+            "bootstrap": {
+                "replicates": 1200,
+                "coverage": {
+                    "preview": {"used": 180},
+                    "final": {"used": 180},
+                    "replicates": {"used": 1200},
+                },
+            },
+            "window_match_fraction": 1.0,
+            "window_overlap_fraction": 0.0,
             "spectral": {
                 "caps_applied": 1,
                 "max_caps": 3,
@@ -112,12 +121,12 @@ def _rich_run_report() -> tuple[dict, dict]:
         "evaluation_windows": {
             "preview": {
                 "window_ids": window_ids,
-                "logloss": [0.1, 0.12],
+                "logloss": [0.1] * len(window_ids),
                 "token_counts": token_counts,
             },
             "final": {
                 "window_ids": window_ids,
-                "logloss": [0.2, 0.22],
+                "logloss": [0.2] * len(window_ids),
                 "token_counts": token_counts,
             },
         },
@@ -211,6 +220,7 @@ def test_make_certificate_end_to_end_populates_optional_sections_and_validations
     report["metrics"]["window_match_fraction"] = 0.92
     report["metrics"]["window_overlap_fraction"] = 0.4
     report["metrics"]["window_pairing_reason"] = "id_match"
+    report["metrics"]["window_plan"]["profile"] = "dev"
 
     report["metrics"]["latency_ms_p50"] = 12.0
     report["metrics"]["latency_ms_p95"] = 20.0
@@ -303,8 +313,8 @@ def test_make_certificate_end_to_end_populates_optional_sections_and_validations
     guard = certificate["guard_overhead"]
     assert guard["evaluated"] is True
     assert guard["passed"] is True
-    assert guard["bare_final"] == pytest.approx(10.0)
-    assert guard["guarded_final"] == pytest.approx(10.05)
+    assert guard["bare_ppl"] == pytest.approx(10.0)
+    assert guard["guarded_ppl"] == pytest.approx(10.05)
 
 
 def test_make_certificate_policy_digest_changes_when_policy_override_differs(
@@ -339,6 +349,7 @@ def test_make_certificate_provenance_and_guard_schedule_fallback(monkeypatch):
     report["provenance"] = {}
     report["evaluation_windows"]["final"]["window_ids"] = [11, 12, 13]
     report["guard_overhead"] = {}
+    report["metrics"]["window_plan"]["profile"] = "dev"
 
     certificate = cert.make_certificate(report, baseline)
 

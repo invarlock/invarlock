@@ -219,6 +219,8 @@ def _sample_certificates() -> list[dict[str, Any]]:
             "auto": {"enabled": True, "tier": "balanced"},
             "tokenizer_hash": "tok",
             "seeds": {"python": 1, "numpy": None, "torch": None},
+            "env_flags": {"CUBLAS_WORKSPACE_CONFIG": ":4096:8"},
+            "determinism": {"requested": "strict", "level": "strict"},
         },
         "data": {
             "dataset": "ds",
@@ -288,8 +290,8 @@ def _sample_certificates() -> list[dict[str, Any]]:
             },
         ],
         "guard_overhead": {
-            "bare_final": 10.0,
-            "guarded_final": 10.1,
+            "bare_ppl": 10.0,
+            "guarded_ppl": 10.1,
             "overhead_threshold": 0.01,
         },
         "metrics": {

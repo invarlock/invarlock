@@ -117,23 +117,23 @@ guards:
     min_effect_lognll: 0.0009
 ```
 
-Use this baseline and trial calibrated κ shifts via small overrides rather than
-editing shared tier files. Preferred flow: auto‑emit a local override during
-calibration with `--emit-override configs/overrides/spectral_balanced_local.yaml`
-and pass it via `--overrides`. If you prefer to keep a hand‑edited example
-under version control, use a pattern like
+Use this baseline and trial calibrated κ shifts via small local overrides rather than
+editing shared tier files. Preferred flow: emit a local guard-override YAML during
+calibration (or copy the calibrated values into a local preset) and apply it by
+adding a `guards:` override block to your run config. If you prefer to keep a
+hand‑edited example under version control, use a pattern like
 `configs/overrides/spectral_balanced_local.example.yaml` and copy it locally
 before editing.
 
 Prefer calibrating κ via the budget-aware recipe and keep `multiple_testing`,
 `deadband = 0.10`, `max_caps = 5`, and `max_spectral_norm: null` unchanged
 unless policy review explicitly approves a change. To exercise a local override
-during release evidence:
+during release evidence, use a local preset that includes the guard overrides:
 
 ```bash
-invarlock run -c configs/edits/quant_rtn/8bit_full.yaml \
+# configs/local/quant8_calibrated.yaml = base preset + guards overrides
+invarlock run -c configs/local/quant8_calibrated.yaml \
   --profile release --tier balanced \
-  --overrides configs/overrides/spectral_balanced_local.yaml \
   --baseline runs/.../baseline/report.json \
   --out runs/.../quant8_calibrated
 ```
@@ -698,10 +698,10 @@ print(f"Variance equalization decision: {should_enable} ({reason})")
 ### CLI Integration
 
 ```bash
-# Run with custom guard configuration
-invarlock run --config my_config.yaml --guards-config guards.yaml
+# Run with custom guard configuration embedded in the config YAML
+invarlock run --config my_config.yaml --out runs/guard_demo
 
-# Override specific guard settings by editing the guard config (e.g., guards.yaml)
+# Override specific guard settings by editing the `guards:` block in the config
 ```
 
 ### Programmatic Integration

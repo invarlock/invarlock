@@ -420,8 +420,8 @@ class TestCertificateHelpers:
 
     def test_prepare_guard_overhead_ratio_fallback(self):
         raw = {
-            "bare_final": 100,
-            "guarded_final": 103,
+            "bare_ppl": 100,
+            "guarded_ppl": 103,
             "overhead_threshold": 0.02,
         }
         section, passed = _prepare_guard_overhead_section(raw)
@@ -430,7 +430,7 @@ class TestCertificateHelpers:
         assert section["threshold_percent"] == pytest.approx(2.0)
 
     def test_prepare_guard_overhead_missing_ratio_records_error(self):
-        raw = {"bare_final": "nan", "guarded_final": None}
+        raw = {"bare_ppl": "nan", "guarded_ppl": None}
         section, passed = _prepare_guard_overhead_section(raw)
         # Missing/invalid inputs: mark not evaluated and soft-pass
         assert passed is True
@@ -450,8 +450,8 @@ class TestCertificateHelpers:
                 self.metrics = {
                     "overhead_ratio": 1.015,
                     "overhead_percent": 1.5,
-                    "bare_final": 98.0,
-                    "guarded_final": 99.0,
+                    "bare_ppl": 98.0,
+                    "guarded_ppl": 99.0,
                 }
                 self.messages = ["ok"]
                 self.warnings = []
@@ -1329,6 +1329,9 @@ class TestMakeCertificate:
     def test_make_certificate_invalid_preview_no_longer_raises(self):
         report = create_mock_run_report()
         report["metrics"]["ppl_preview"] = 0.5
+        report["data"]["stride"] = report["data"]["seq_len"]
+        report["data"]["preview_n"] = 180
+        report["data"]["final_n"] = 180
         baseline = create_mock_baseline()
         with patch(
             "invarlock.reporting.certificate.validate_report", return_value=True
@@ -1337,6 +1340,23 @@ class TestMakeCertificate:
             report.setdefault("metrics", {}).setdefault("window_plan", {})[
                 "profile"
             ] = "ci"
+            report["metrics"]["window_plan"].update({"preview_n": 180, "final_n": 180})
+            report["metrics"]["window_match_fraction"] = 1.0
+            report["metrics"]["window_overlap_fraction"] = 0.0
+            report["metrics"]["bootstrap"] = {
+                "replicates": 1200,
+                "coverage": {
+                    "preview": {"used": 180},
+                    "final": {"used": 180},
+                    "replicates": {"used": 1200},
+                },
+            }
+            report["metrics"]["stats"] = {
+                "requested_preview": 180,
+                "requested_final": 180,
+                "actual_preview": 180,
+                "actual_final": 180,
+            }
             certificate = make_certificate(report, baseline)
         assert isinstance(certificate, dict)
 
@@ -1404,6 +1424,28 @@ class TestMakeCertificate:
                 report.setdefault("metrics", {}).setdefault("window_plan", {})[
                     "profile"
                 ] = "ci"
+                report["data"]["stride"] = report["data"]["seq_len"]
+                report["data"]["preview_n"] = 180
+                report["data"]["final_n"] = 180
+                report["metrics"]["window_plan"].update(
+                    {"preview_n": 180, "final_n": 180}
+                )
+                report["metrics"]["window_match_fraction"] = 1.0
+                report["metrics"]["window_overlap_fraction"] = 0.0
+                report["metrics"]["bootstrap"] = {
+                    "replicates": 1200,
+                    "coverage": {
+                        "preview": {"used": 180},
+                        "final": {"used": 180},
+                        "replicates": {"used": 1200},
+                    },
+                }
+                report["metrics"]["stats"] = {
+                    "requested_preview": 180,
+                    "requested_final": 180,
+                    "actual_preview": 180,
+                    "actual_final": 180,
+                }
                 cert = make_certificate(report, baseline)
                 assert isinstance(cert, dict)
 

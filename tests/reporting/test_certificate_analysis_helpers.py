@@ -66,6 +66,104 @@ def test_enforce_ratio_ci_alignment_skips_non_finite_bounds():
     cert._enforce_ratio_ci_alignment("paired_baseline", (math.nan, 1.0), (0.0, 0.0))
 
 
+def test_enforce_display_ci_alignment_backfills_ci_and_display_ci_in_dev():
+    pm = {"kind": "ppl_causal"}
+    cert._enforce_display_ci_alignment(
+        "paired_baseline", pm, (0.0, 0.1), window_plan_profile="dev"
+    )
+    assert pm["ci"] == (0.0, 0.1)
+    assert pm["display_ci"] == [
+        pytest.approx(math.exp(0.0)),
+        pytest.approx(math.exp(0.1)),
+    ]
+
+
+def test_enforce_display_ci_alignment_raises_on_missing_ci_in_ci_profile():
+    pm = {"kind": "ppl_causal", "display_ci": (1.0, 1.1)}
+    with pytest.raises(ValueError, match="primary_metric.ci missing"):
+        cert._enforce_display_ci_alignment(
+            "paired_baseline", pm, (math.nan, math.nan), window_plan_profile="ci"
+        )
+
+
+def test_enforce_display_ci_alignment_raises_on_mismatch_in_ci_profile():
+    pm = {"kind": "ppl_causal", "ci": (0.0, 0.1), "display_ci": (1.5, 1.6)}
+    with pytest.raises(ValueError, match="display_ci mismatch"):
+        cert._enforce_display_ci_alignment(
+            "paired_baseline", pm, (0.0, 0.1), window_plan_profile="ci"
+        )
+
+
+def test_enforce_display_ci_alignment_noop_for_non_paired():
+    pm = {"kind": "ppl_causal", "ci": (0.0, 0.1)}
+    cert._enforce_display_ci_alignment("manual", pm, (0.0, 0.1), "dev")
+    assert pm["ci"] == (0.0, 0.1)
+
+
+def test_enforce_display_ci_alignment_noop_for_non_ppl_metric():
+    pm = {"kind": "accuracy"}
+    cert._enforce_display_ci_alignment("paired_baseline", pm, (0.0, 0.1), "dev")
+    assert pm["kind"] == "accuracy"
+
+
+def test_enforce_display_ci_alignment_returns_on_empty_metric():
+    cert._enforce_display_ci_alignment("paired_baseline", {}, (0.0, 0.1), "dev")
+
+
+def test_enforce_display_ci_alignment_dev_missing_ci_no_logloss_ci():
+    pm = {"kind": "ppl_causal"}
+    cert._enforce_display_ci_alignment(
+        "paired_baseline", pm, (math.nan, math.nan), window_plan_profile="dev"
+    )
+    assert "ci" not in pm
+
+
+def test_enforce_display_ci_alignment_raises_on_missing_display_ci_in_ci_profile():
+    pm = {"kind": "ppl_causal", "ci": (0.0, 0.1)}
+    with pytest.raises(ValueError, match="primary_metric.display_ci missing"):
+        cert._enforce_display_ci_alignment(
+            "paired_baseline", pm, (0.0, 0.1), window_plan_profile="ci"
+        )
+
+
+def test_enforce_display_ci_alignment_dev_overwrites_mismatch():
+    pm = {"kind": "ppl_causal", "ci": (0.0, 0.1), "display_ci": [1.5, 1.6]}
+    cert._enforce_display_ci_alignment(
+        "paired_baseline", pm, (0.0, 0.1), window_plan_profile="dev"
+    )
+    assert pm["display_ci"] == [
+        pytest.approx(math.exp(0.0)),
+        pytest.approx(math.exp(0.1)),
+    ]
+
+
+def test_enforce_pairing_and_coverage_uses_fallback_counts():
+    stats = {
+        "window_match_fraction": 1.0,
+        "window_overlap_fraction": 0.0,
+        "actual_preview": None,
+        "actual_final": None,
+        "coverage": {
+            "preview": {"used": 200},
+            "final": {"used": 200},
+            "replicates": {"used": None},
+        },
+        "bootstrap": {"replicates": 1200},
+    }
+    cert._enforce_pairing_and_coverage(stats, window_plan_profile="ci", tier="balanced")
+
+
+def test_enforce_pairing_and_coverage_returns_on_dev_profile():
+    cert._enforce_pairing_and_coverage({}, window_plan_profile="dev", tier="balanced")
+
+
+def test_enforce_pairing_and_coverage_raises_on_missing_stats():
+    with pytest.raises(ValueError, match="Missing dataset window stats"):
+        cert._enforce_pairing_and_coverage(
+            None, window_plan_profile="ci", tier="balanced"
+        )
+
+
 def test_fallback_paired_windows_uses_coverage_preview():
     coverage = {"preview": {"used": 7}}
     assert cert._fallback_paired_windows(0, coverage) == 7
@@ -74,8 +172,8 @@ def test_fallback_paired_windows_uses_coverage_preview():
 
 def test_prepare_guard_overhead_section_ratio_threshold():
     payload = {
-        "bare_final": 10.0,
-        "guarded_final": 10.5,
+        "bare_ppl": 10.0,
+        "guarded_ppl": 10.5,
         "warnings": ["slow"],
         "messages": ["note"],
         "checks": {"ratio": True},

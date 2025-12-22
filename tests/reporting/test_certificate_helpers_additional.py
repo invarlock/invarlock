@@ -70,7 +70,7 @@ def test_prepare_guard_overhead_section_with_reports():
 
 def test_prepare_guard_overhead_section_ratio_fallback():
     payload, passed = cert._prepare_guard_overhead_section(
-        {"bare_final": 10.0, "guarded_final": 11.0, "messages": ["note"]}
+        {"bare_ppl": 10.0, "guarded_ppl": 11.0, "messages": ["note"]}
     )
     assert passed is False
     assert payload["guarded_ppl"] == 11.0

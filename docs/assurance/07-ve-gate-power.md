@@ -7,15 +7,16 @@
 ## Claim
 
 VE proposes scales only when the **predictive** paired ΔlogNLL CI excludes 0
-with the tier's sidedness and the absolute mean effect exceeds
-`min_effect_lognll`.
+with the tier's sidedness and the mean effect exceeds `min_effect_lognll`
+in the **improvement** direction (negative ΔlogNLL).
 
 - **Balanced**: **one‑sided improvement** test. VE enables only when the
   predictive CI **upper bound** ≤ −`min_effect_lognll` and the mean Δ ≤
   −`min_effect_lognll`.
-- **Conservative**: **two‑sided** test; VE enables only when the predictive CI
-  lies strictly outside ±`min_effect_lognll` and the absolute mean Δ is at least
-  `min_effect_lognll`.
+- **Conservative**: **two‑sided** CI (z₀.₉₇₅) with **improvement‑only** gating.
+  VE enables only when the predictive CI **upper bound** ≤ −`min_effect_lognll`
+  and the mean Δ ≤ −`min_effect_lognll`. If the CI lies entirely above
+  +`min_effect_lognll`, VE stays off and the gate records a regression.
 
 Example (Balanced): with `min_effect_lognll = 9e-4`, a predictive estimate
 Δ̄ = −0.002 with CI [−0.003, −0.001] enables VE because both the mean and the
@@ -43,8 +44,8 @@ stricter tiers.
 | balanced      | 0.02     | 0.012          | 0.03           | 0.0009            | ✅ (one-sided)          | 1                      |
 | conservative  | 0.03     | 0.02           | 0.015          | 0.0018            | ❌ (two-sided)          | 0                      |
 
-Values come from the November 2025 pilot (see packaged `tiers.yaml`,
-`TIER_POLICIES`) and maintain VE responsiveness without triggering false
+Values come from the November 2025 pilot (see packaged `tiers.yaml`) and
+maintain VE responsiveness without triggering false
 positives.
 
 > **Source of truth:** tier thresholds are drawn from the packaged `tiers.yaml`.

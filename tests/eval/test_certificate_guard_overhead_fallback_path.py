@@ -33,10 +33,10 @@ def test_guard_overhead_direct_values_and_unavailable_ratio_path(monkeypatch):
         },
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
         "plugins": {"adapter": {}, "edit": {}, "guards": []},
-        # Inject a guard_overhead block with bare/guarded values but invalid (bare_final <= 0) → ratio unavailable path
+        # Inject a guard_overhead block with bare/guarded values but invalid (bare_ppl <= 0) → ratio unavailable path
         "guard_overhead": {
-            "bare_final": 0.0,
-            "guarded_final": 10.0,
+            "bare_ppl": 0.0,
+            "guarded_ppl": 10.0,
             "overhead_threshold": 0.01,
         },
     }

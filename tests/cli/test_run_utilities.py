@@ -29,6 +29,12 @@ def test_hash_sequences_stability():
     assert isinstance(h, str) and len(h) == 32  # blake2s 16-byte digest
 
 
+def test_hash_sequences_respects_boundaries():
+    a = [[1, 2], [3]]
+    b = [[1], [2, 3]]
+    assert _hash_sequences(a) != _hash_sequences(b)
+
+
 def test_compute_mask_positions_digest_roundtrip():
     win = {
         "preview": {"labels": [np.array([-100, 2, -100], dtype=np.int32)]},

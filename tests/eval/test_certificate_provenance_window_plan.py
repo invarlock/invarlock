@@ -10,7 +10,7 @@ def test_provenance_window_plan_propagates_from_metrics():
             "ppl_preview": 10.0,
             "ppl_final": 10.0,
             # Ensure ppl_analysis['window_plan'] is populated
-            "window_plan": {"profile": "ci", "preview": 2, "final": 4},
+            "window_plan": {"profile": "dev", "preview": 2, "final": 4},
         },
         "data": {
             "dataset": "d",

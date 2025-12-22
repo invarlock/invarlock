@@ -16,6 +16,7 @@ from invarlock.core.exceptions import ValidationError
 def paired_delta_mean_ci(
     subject: Iterable[float],
     baseline: Iterable[float],
+    weights: Iterable[float] | None = None,
     *,
     reps: int = 2000,
     seed: int = 0,
@@ -27,7 +28,7 @@ def paired_delta_mean_ci(
 
     Notes:
     - When `method == 'bca'`, this dispatches to the core BCa implementation.
-    - `weights` are currently not supported; pass pre-aggregated per-example values.
+    - Optional `weights` apply token-weighted resampling when provided.
     """
     alpha = 1.0 - float(ci_level)
     if method not in {"bca", "percentile"}:
@@ -43,6 +44,7 @@ def paired_delta_mean_ci(
     return _paired_delta_bca(
         list(subject),
         list(baseline),
+        weights=list(weights) if weights is not None else None,
         method="bca" if method == "bca" else "percentile",
         replicates=int(reps),
         alpha=alpha,

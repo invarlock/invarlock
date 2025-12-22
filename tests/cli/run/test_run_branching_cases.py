@@ -256,6 +256,7 @@ def test_invariants_profile_checks_merged(tmp_path: Path):
                 ),
             )
         )
+        stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner_min))
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
 
 

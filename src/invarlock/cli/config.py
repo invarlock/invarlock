@@ -207,11 +207,21 @@ def _create_loader(base_dir: Path):
     class Loader(yaml.SafeLoader):
         pass
 
-    Loader._base_dir = Path(base_dir)
+    Loader._base_dir = Path(base_dir).resolve()
 
     def _construct_include(loader: yaml.SafeLoader, node: yaml.Node):
         rel = loader.construct_scalar(node)
         path = (loader._base_dir / rel).resolve()
+        allow_outside = os.environ.get("INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE", "")
+        allow_outside = allow_outside.strip().lower() in {"1", "true", "yes", "on"}
+        if not allow_outside:
+            try:
+                path.relative_to(loader._base_dir)
+            except ValueError as exc:
+                raise ValueError(
+                    "Config !include must stay within the config directory. "
+                    "Set INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE=1 to override."
+                ) from exc
         with path.open(encoding="utf-8") as fh:
             inc_loader = _create_loader(path.parent)
             return yaml.load(fh, Loader=inc_loader)

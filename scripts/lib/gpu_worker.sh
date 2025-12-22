@@ -1,20 +1,22 @@
 #!/usr/bin/env bash
 # gpu_worker.sh - GPU worker loop for dynamic task execution
-# Version: v2.0.1 (InvarLock B200 Validation Suite)
+# Version: v2.2.0 (InvarLock B200 Validation Suite)
 # Dependencies: scheduler.sh, task_functions.sh, queue_manager.sh
 # Usage: spawned by invarlock_definitive_validation_b200.sh for each GPU worker
 #
 # Each worker runs on a dedicated GPU and continuously:
 # 1. Checks available GPU memory
-# 2. Finds a suitable task from the ready queue
-# 3. Executes the task
-# 4. Reports completion/failure
-# 5. Repeats until queue is empty
+# 2. Finds a suitable task from the ready queue (with multi-GPU awareness)
+# 3. Pre-checks OOM risk before execution
+# 4. Executes the task (may use multiple GPUs for large models)
+# 5. Reports completion/failure, releases GPU reservations, purges memory
+# 6. Repeats until queue is empty
 
 # Source dependencies
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [[ -z "${SCHEDULER_LOADED:-}" ]] && source "${SCRIPT_DIR}/scheduler.sh" && export SCHEDULER_LOADED=1
 [[ -z "${TASK_FUNCTIONS_LOADED:-}" ]] && source "${SCRIPT_DIR}/task_functions.sh" && export TASK_FUNCTIONS_LOADED=1
+[[ -z "${TASK_SERIALIZATION_LOADED:-}" ]] && source "${SCRIPT_DIR}/task_serialization.sh" && export TASK_SERIALIZATION_LOADED=1
 # Fault tolerance is optional - use subshell to handle source failure
 if [[ -z "${FAULT_TOLERANCE_LOADED:-}" ]]; then
     source "${SCRIPT_DIR}/fault_tolerance.sh" 2>/dev/null || true
@@ -124,6 +126,10 @@ gpu_worker() {
 
     # Initialize
     init_worker "${gpu_id}" "${output_dir}"
+    # Ensure GPU reservation tracking directory is initialized for this run.
+    if type init_gpu_reservations &>/dev/null; then
+        init_gpu_reservations "${output_dir}"
+    fi
 
     local consecutive_failures=0
     local tasks_completed=0
@@ -195,19 +201,55 @@ gpu_worker() {
         local task_id=$(get_task_id "${task_file}")
         local task_type=$(get_task_type "${task_file}")
         local model_name=$(get_task_field "${task_file}" "model_name")
+        local assigned_gpus=$(get_task_assigned_gpus "${task_file}")
+        [[ -z "${assigned_gpus}" || "${assigned_gpus}" == "null" ]] && assigned_gpus="${gpu_id}"
 
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Starting task ${task_id} (${task_type})"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Starting task ${task_id} (${task_type}) on GPUs: ${assigned_gpus}"
         update_worker_status "${gpu_id}" "${output_dir}" "running" "${task_id}"
 
-        # Execute task
+        # OOM Pre-check: Verify we have enough memory before running
+        if type check_oom_safe &>/dev/null; then
+            if ! check_oom_safe "${task_file}" "${assigned_gpus}"; then
+                local risk_level="unknown"
+                if type get_oom_risk_level &>/dev/null; then
+                    risk_level=$(get_oom_risk_level "${task_file}" "${assigned_gpus}")
+                fi
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: OOM RISK (${risk_level}) for ${task_id}, attempting memory cleanup first..."
+
+                # Try to purge GPU memory before running
+                if type purge_multi_gpu_memory &>/dev/null; then
+                    purge_multi_gpu_memory "${assigned_gpus}"
+                    sleep 2  # Wait for memory to be freed
+                fi
+
+                # Re-check after cleanup
+                if ! check_oom_safe "${task_file}" "${assigned_gpus}"; then
+                    echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: WARNING - Memory still tight after cleanup, proceeding with caution"
+                fi
+            fi
+        fi
+
+        # Execute task with CUDA_VISIBLE_DEVICES set to assigned GPUs
         local exit_code=0
-        execute_task "${task_file}" "${gpu_id}" "${output_dir}" || exit_code=$?
+        CUDA_VISIBLE_DEVICES="${assigned_gpus}" execute_task "${task_file}" "${gpu_id}" "${output_dir}" || exit_code=$?
 
         # Handle result
         if [[ ${exit_code} -eq 0 ]]; then
             echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Task ${task_id} completed successfully"
 
             complete_task "${task_id}"
+
+            # Release GPU reservations for multi-GPU tasks
+            if type release_task_gpus &>/dev/null; then
+                release_task_gpus "${task_id}"
+            fi
+
+            # Purge GPU memory immediately after task completion
+            if type purge_multi_gpu_memory &>/dev/null; then
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Purging GPU memory after task completion"
+                purge_multi_gpu_memory "${assigned_gpus}"
+            fi
+
             update_dependents "${task_id}"
 
             consecutive_failures=0
@@ -223,6 +265,12 @@ gpu_worker() {
                 # Check for OOM
                 if grep -q "CUDA out of memory" "${task_log}" 2>/dev/null; then
                     error_msg="OOM: CUDA out of memory"
+                    echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: OOM detected - attempting aggressive memory cleanup"
+
+                    # Aggressive memory cleanup after OOM
+                    if type purge_multi_gpu_memory &>/dev/null; then
+                        purge_multi_gpu_memory "${assigned_gpus}"
+                    fi
 
                     # Try OOM recovery if available
                     if type handle_oom_task &>/dev/null; then
@@ -232,6 +280,16 @@ gpu_worker() {
             fi
 
             fail_task "${task_id}" "${error_msg}"
+
+            # Release GPU reservations for multi-GPU tasks
+            if type release_task_gpus &>/dev/null; then
+                release_task_gpus "${task_id}"
+            fi
+
+            # Purge GPU memory after failure (especially important after OOM)
+            if type purge_multi_gpu_memory &>/dev/null; then
+                purge_multi_gpu_memory "${assigned_gpus}"
+            fi
 
             # Check if we should retry
             if type maybe_retry_task &>/dev/null; then

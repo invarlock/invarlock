@@ -67,7 +67,7 @@ def test_resolve_exit_code_cases():
 
 def test_hash_and_mask_digests():
     digest = run_mod._hash_sequences([[1, 2, 3], [4, 5]])
-    assert digest == "4dcd7d8ddfa39d1e66e07e9a1eeedc14"
+    assert digest == "e08215eb1a73f6d493dfb9f17c0de613"
     windows = {
         "preview": {"labels": [[-100, 42, -100], [3, -100]]},
         "final": {"labels": [[-100, -100]]},

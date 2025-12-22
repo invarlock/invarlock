@@ -40,7 +40,9 @@ ties the runtime contract back to reproducible maths:
 
 ## Observability
 
-- `meta.seeds.{python,numpy,torch}` and `provenance.env_flags`.
+- `meta.seeds.{python,numpy,torch}`, `meta.env_flags`, and `meta.determinism`
+  (determinism preset + TF32/determinism flags). `provenance.env_flags` records
+  backend/library versions for auditability.
 - `meta.tokenizer_hash` and `provenance.provider_digest` for dataset/tokenizer provenance.
 - `dataset.windows.stats.{window_match_fraction,window_overlap_fraction,paired_windows}`.
 - `primary_metric.{ratio_vs_baseline,display_ci}` and `dataset.windows.stats.coverage` for counts.

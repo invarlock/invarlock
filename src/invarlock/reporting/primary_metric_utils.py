@@ -102,6 +102,23 @@ def attach_primary_metric(
                     and float(base_final) > 0
                 ):
                     pm_copy["ratio_vs_baseline"] = float(fin) / float(base_final)
+                # Ensure display_ci aligns with log-space CI for ppl-like metrics
+                try:
+                    kind = str(pm_copy.get("kind", "")).lower()
+                except Exception:
+                    kind = ""
+                ci = pm_copy.get("ci")
+                if (
+                    kind.startswith("ppl")
+                    and isinstance(ci, list | tuple)
+                    and len(ci) == 2
+                ):
+                    try:
+                        lo, hi = float(ci[0]), float(ci[1])
+                        if math.isfinite(lo) and math.isfinite(hi):
+                            pm_copy["display_ci"] = [math.exp(lo), math.exp(hi)]
+                    except Exception:
+                        pass
                 # Provide a degenerate display CI if missing
                 if not isinstance(
                     pm_copy.get("display_ci"), list | tuple

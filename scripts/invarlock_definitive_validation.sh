@@ -9,27 +9,26 @@
 # EXECUTION ORDER (per model):
 # 1. Downloads model from HuggingFace (or uses local path)
 # 2. Runs baseline lm-eval (MMLU, HellaSwag, ARC, Winogrande)
-# 3. Calibrates InvarLock guards + drift gate:
+# 3. Calibrates InvarLock guards + drift gate and writes a preset:
 #    - Runs 5 null certifications (noop edit, baseline == subject)
 #    - Guards: invariants, spectral, rmt, variance, invariants
 #      (invariants runs twice: pre-edit structural + post-edit verification)
 #    - Gate: drift (preview→final ratio)
 #    - Extracts model-specific thresholds
-#    - Generates calibrated_preset_{model}.yaml
+#    - Generates calibrated_preset_{model}.yaml (used by `invarlock certify`)
 # 4. Creates clean edit (8-bit quantization) + runs lm-eval + InvarLock certify
 # 5. Creates stress edit (4-bit quantization) + runs lm-eval + InvarLock certify
 # 6. Creates error models (NaN, Inf, extreme quant, etc.) + InvarLock certify
 #    (no lm-eval for error models - they may crash or produce garbage)
 # 7. Compiles results, correlates lm-eval vs InvarLock, generates verdict
 #
-# Hardware: H100 80GB (or A100 80GB with fp16)
-# Runtime: ~15-20 hours for full suite (2 models)
+# Hardware: H100/A100-class CUDA GPU (bf16/fp16)
 # ==========================================================
 
 set -euo pipefail
 
 # ============ VERSION ============
-SCRIPT_VERSION="2.0.0"
+SCRIPT_VERSION="2.1.0"
 
 # ============ USER CONFIGURATION ============
 # These can be overridden by environment variables
@@ -53,11 +52,20 @@ EDIT_SCOPE="${EDIT_SCOPE:-ffn}"
 EVAL_TASKS="${EVAL_TASKS:-mmlu,hellaswag,arc_challenge,winogrande}"
 EVAL_NUM_FEWSHOT="${EVAL_NUM_FEWSHOT:-5}"
 EVAL_BATCH_SIZE="${EVAL_BATCH_SIZE:-4}"
+LMEVAL_DTYPE="${LMEVAL_DTYPE:-auto}"
+LMEVAL_PARALLELIZE="${LMEVAL_PARALLELIZE:-true}"
 
 # InvarLock Configuration
 INVARLOCK_PREVIEW_WINDOWS="${INVARLOCK_PREVIEW_WINDOWS:-64}"
 INVARLOCK_FINAL_WINDOWS="${INVARLOCK_FINAL_WINDOWS:-64}"
 INVARLOCK_BOOTSTRAP_N="${INVARLOCK_BOOTSTRAP_N:-2000}"
+# Dataset windowing for InvarLock runs
+INVARLOCK_SEQ_LEN="${INVARLOCK_SEQ_LEN:-512}"
+INVARLOCK_STRIDE="${INVARLOCK_STRIDE:-256}"
+INVARLOCK_EVAL_BATCH="${INVARLOCK_EVAL_BATCH:-${EVAL_BATCH_SIZE}}"
+INVARLOCK_MODEL_DTYPE="${INVARLOCK_MODEL_DTYPE:-auto}"
+INVARLOCK_ADAPTER="${INVARLOCK_ADAPTER:-hf_causal_auto}"
+INVARLOCK_SEED="${INVARLOCK_SEED:-42}"
 # InvarLock provider names: wikitext2, synthetic, hf_text, local_jsonl, seq2seq, hf_seq2seq
 # Note: "wikitext2" is the InvarLock provider that internally loads HuggingFace wikitext/wikitext-2-raw-v1
 INVARLOCK_DATASET="${INVARLOCK_DATASET:-wikitext2}"
@@ -76,6 +84,7 @@ OUTPUT_DIR="${OUTPUT_DIR:-./invarlock_validation_$(date +%Y%m%d_%H%M%S)}"
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
 export CUBLAS_WORKSPACE_CONFIG=:4096:8
 export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+FLASH_ATTENTION_AVAILABLE="false"
 
 # ============ SETUP ============
 mkdir -p "${OUTPUT_DIR}"/{logs,models,evals,certificates,analysis,reports,presets}
@@ -115,17 +124,18 @@ check_dependencies() {
     # Check PyYAML
     python3 -c "import yaml; print('PyYAML available')" 2>/dev/null || {
         log "Installing PyYAML..."
-        pip install pyyaml 2>&1 | tee -a "${LOG_FILE}"
+        python3 -m pip install pyyaml 2>&1 | tee -a "${LOG_FILE}" || missing+=("pyyaml")
     }
 
-    # Check lm-eval-harness
+    # Check lm-eval-harness (package name is lm_eval)
     python3 -c "import lm_eval; print(f'lm-eval {lm_eval.__version__}')" 2>/dev/null || {
-        log "Installing lm-evaluation-harness..."
-        pip install lm-eval 2>&1 | tee -a "${LOG_FILE}"
+        log "Installing lm-eval-harness..."
+        python3 -m pip install lm_eval 2>&1 | tee -a "${LOG_FILE}" || missing+=("lm_eval")
     }
 
     # Check InvarLock
     python3 -c "import invarlock; print(f'InvarLock {invarlock.__version__}')" 2>/dev/null || missing+=("invarlock")
+    command -v invarlock >/dev/null 2>&1 || missing+=("invarlock-cli")
 
     # Check GPU
     python3 -c "import torch; assert torch.cuda.is_available(), 'No CUDA'; print(f'GPU: {torch.cuda.get_device_name(0)}')" 2>/dev/null || missing+=("CUDA GPU")
@@ -135,6 +145,54 @@ check_dependencies() {
     fi
 
     log "All dependencies satisfied"
+}
+
+# ============ HELPER: RUNTIME SETTINGS ============
+resolve_model_dtype() {
+    local dtype="${INVARLOCK_MODEL_DTYPE}"
+    if [[ "${dtype}" == "auto" ]]; then
+        dtype=$(python3 - << 'PY'
+import torch
+use_bf16 = bool(torch.cuda.is_available()) and bool(getattr(torch.cuda, "is_bf16_supported", lambda: False)())
+print("bfloat16" if use_bf16 else "float16")
+PY
+)
+    fi
+    if [[ -z "${dtype}" ]]; then
+        dtype="float16"
+    fi
+    RESOLVED_MODEL_DTYPE="${dtype}"
+    if [[ "${LMEVAL_DTYPE}" == "auto" ]]; then
+        LMEVAL_DTYPE="${RESOLVED_MODEL_DTYPE}"
+    fi
+}
+
+detect_flash_attention() {
+    local skip_flag="${SKIP_FLASH_ATTN:-${SKIP_FLASH_ATTENTION:-}}"
+    skip_flag=$(echo "${skip_flag}" | tr '[:upper:]' '[:lower:]')
+    if [[ "${skip_flag}" == "1" || "${skip_flag}" == "true" || "${skip_flag}" == "yes" ]]; then
+        FLASH_ATTENTION_AVAILABLE="false"
+        return
+    fi
+    FLASH_ATTENTION_AVAILABLE=$(python3 - << 'PY'
+import importlib.util
+spec = importlib.util.find_spec("flash_attn")
+print("true" if spec is not None else "false")
+PY
+)
+}
+
+supports_flash_attention() {
+    local model_path="$1"
+    local model_lower
+    model_lower=$(echo "${model_path}" | tr '[:upper:]' '[:lower:]')
+    local pattern
+    for pattern in falcon mpt- gpt2 bloom opt- gpt-j gpt-neo codegen santacoder stablelm; do
+        if [[ "${model_lower}" == *"${pattern}"* ]]; then
+            return 1
+        fi
+    done
+    return 0
 }
 
 # ============ HELPER: MODEL DOWNLOAD/SETUP ============
@@ -170,30 +228,77 @@ setup_model() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')]   Downloading from HuggingFace: ${model_id}" >&2
     mkdir -p "${model_dir}"
 
+    local use_flash="false"
+    if [[ "${FLASH_ATTENTION_AVAILABLE}" == "true" ]] && supports_flash_attention "${model_id}"; then
+        use_flash="true"
+    fi
+
     # Python output goes to stderr and log file
     python3 << EOF 2>&1 | tee -a "${LOG_FILE}" >&2
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 from pathlib import Path
+import gc
 
 model_id = "${model_id}"
 output_dir = Path("${model_dir}/baseline")
 output_dir.mkdir(parents=True, exist_ok=True)
 
+dtype_name = "${RESOLVED_MODEL_DTYPE}".strip().lower()
+if not dtype_name or dtype_name == "auto":
+    use_bf16 = torch.cuda.is_available() and getattr(torch.cuda, "is_bf16_supported", lambda: False)()
+    dtype_name = "bfloat16" if use_bf16 else "float16"
+try:
+    torch_dtype = getattr(torch, dtype_name)
+except AttributeError:
+    torch_dtype = torch.float16
+
+use_flash = "${use_flash}" == "true"
+
 print(f"Downloading {model_id}...")
+print(f"Using dtype: {dtype_name}")
+print(f"Flash Attention 2: {'enabled' if use_flash else 'disabled'}")
 
 # Download tokenizer
 tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
 tokenizer.save_pretrained(output_dir)
 
-# Download model (fp16 for efficiency)
-model = AutoModelForCausalLM.from_pretrained(
-    model_id,
-    torch_dtype=torch.float16,
-    trust_remote_code=True,
-    device_map="auto"
-)
+model_kwargs = {
+    "torch_dtype": torch_dtype,
+    "trust_remote_code": True,
+    "device_map": "auto",
+    "low_cpu_mem_usage": True,
+}
+if use_flash:
+    model_kwargs["attn_implementation"] = "flash_attention_2"
+
+try:
+    model = AutoModelForCausalLM.from_pretrained(model_id, **model_kwargs)
+except Exception as err:
+    if use_flash and "flash" in str(err).lower():
+        print(f"Flash Attention failed, retrying with eager attention: {err}")
+        model_kwargs.pop("attn_implementation", None)
+        model = AutoModelForCausalLM.from_pretrained(model_id, **model_kwargs)
+    else:
+        raise
+
+# Fix invalid generation config before saving
+if hasattr(model, "generation_config"):
+    gen_config = model.generation_config
+    if hasattr(gen_config, "do_sample") and not gen_config.do_sample:
+        if getattr(gen_config, "temperature", None) not in (None, 1.0):
+            print(f"Clearing temperature={gen_config.temperature} (do_sample=False)")
+            gen_config.temperature = None
+        if getattr(gen_config, "top_p", None) not in (None, 1.0):
+            print(f"Clearing top_p={gen_config.top_p} (do_sample=False)")
+            gen_config.top_p = None
+
 model.save_pretrained(output_dir, safe_serialization=True)
+
+del model
+gc.collect()
+if torch.cuda.is_available():
+    torch.cuda.empty_cache()
 
 print(f"Saved to {output_dir}")
 EOF
@@ -219,58 +324,119 @@ create_edited_model() {
     mkdir -p "$(dirname "${output_path}")"
 
     if [[ "${edit_type}" == "quant_rtn" ]]; then
+        local use_flash="false"
+        if [[ "${FLASH_ATTENTION_AVAILABLE}" == "true" ]] && supports_flash_attention "${baseline_path}"; then
+            use_flash="true"
+        fi
         python3 << EOF
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from pathlib import Path
 import json
+import gc
+import sys
 
 baseline_path = Path("${baseline_path}")
 output_path = Path("${output_path}")
-bits = ${bits}
-group_size = ${group_size}
+bits = int("${bits}")
+group_size = int("${group_size}")
 scope = "${scope}"
+
+dtype_name = "${RESOLVED_MODEL_DTYPE}".strip().lower()
+if not dtype_name or dtype_name == "auto":
+    use_bf16 = torch.cuda.is_available() and getattr(torch.cuda, "is_bf16_supported", lambda: False)()
+    dtype_name = "bfloat16" if use_bf16 else "float16"
+try:
+    torch_dtype = getattr(torch, dtype_name)
+except AttributeError:
+    torch_dtype = torch.float16
+
+use_flash = "${use_flash}" == "true"
 
 print(f"Loading baseline from {baseline_path}...")
 tokenizer = AutoTokenizer.from_pretrained(baseline_path, trust_remote_code=True)
-model = AutoModelForCausalLM.from_pretrained(
-    baseline_path,
-    torch_dtype=torch.float16,
-    trust_remote_code=True,
-    device_map="cpu"  # Quantize on CPU for memory efficiency
-)
+model_kwargs = {
+    "torch_dtype": torch_dtype,
+    "trust_remote_code": True,
+    "device_map": "auto" if torch.cuda.is_available() else "cpu",
+    "low_cpu_mem_usage": True,
+}
+if use_flash:
+    model_kwargs["attn_implementation"] = "flash_attention_2"
 
-def round_to_nearest(tensor, bits):
-    """Simple RTN quantization."""
+try:
+    model = AutoModelForCausalLM.from_pretrained(baseline_path, **model_kwargs)
+except Exception as err:
+    if use_flash and "flash" in str(err).lower():
+        print(f"Flash Attention failed, retrying with eager attention: {err}")
+        model_kwargs.pop("attn_implementation", None)
+        model = AutoModelForCausalLM.from_pretrained(baseline_path, **model_kwargs)
+    else:
+        raise
+
+@torch.no_grad()
+def round_to_nearest(tensor, bits, group_size):
+    """Group-wise RTN quantization (per-output-channel groups along input dim)."""
     qmin = -(2 ** (bits - 1))
     qmax = 2 ** (bits - 1) - 1
-    scale = tensor.abs().max() / qmax
-    scale = torch.clamp(scale, min=1e-10)
-    quantized = torch.clamp(torch.round(tensor / scale), qmin, qmax)
-    return (quantized * scale).to(tensor.dtype)
+    orig_shape = tensor.shape
+    flat = tensor.reshape(orig_shape[0], -1)
+    in_features = flat.shape[1]
+    if group_size <= 0 or group_size >= in_features:
+        group_size = in_features
+    num_groups = (in_features + group_size - 1) // group_size
+    pad = (num_groups * group_size) - in_features
+    if pad > 0:
+        flat = torch.nn.functional.pad(flat, (0, pad))
+    grouped = flat.reshape(orig_shape[0], num_groups, group_size)
+    max_abs = grouped.abs().amax(dim=-1, keepdim=True)
+    scale = torch.clamp(max_abs / qmax, min=1e-10)
+    quantized = torch.round(grouped / scale).clamp(qmin, qmax) * scale
+    quantized = quantized.reshape(orig_shape[0], num_groups * group_size)
+    if pad > 0:
+        quantized = quantized[:, :in_features]
+    return quantized.reshape(orig_shape).to(tensor.dtype)
 
 def should_quantize(name, scope):
-    """Determine if a module should be quantized based on scope."""
+    """Check if parameter should be quantized based on name and scope."""
     name_lower = name.lower()
     if scope == "all":
-        return "weight" in name_lower and any(x in name_lower for x in ["linear", "dense", "proj", "fc", "mlp", "attn"])
+        return "weight" in name_lower and any(x in name_lower for x in [
+            "linear", "dense", "proj", "fc", "mlp", "attn",
+            "wqkv", "query_key_value"
+        ])
     elif scope == "ffn":
-        return "weight" in name_lower and any(x in name_lower for x in ["mlp", "fc", "dense", "gate", "up_proj", "down_proj"])
+        return "weight" in name_lower and any(x in name_lower for x in [
+            "mlp", "fc", "dense", "gate", "up_proj", "down_proj",
+            "dense_h_to_4h", "dense_4h_to_h"
+        ])
     elif scope == "attn":
-        return "weight" in name_lower and any(x in name_lower for x in ["attn", "q_proj", "k_proj", "v_proj", "o_proj"])
+        return "weight" in name_lower and any(x in name_lower for x in [
+            "attn", "q_proj", "k_proj", "v_proj", "o_proj",
+            "wqkv", "out_proj", "query_key_value"
+        ])
     return False
 
 print(f"Quantizing to {bits}-bit (scope={scope})...")
 quantized_count = 0
+total_model_params = sum(p.numel() for p in model.parameters())
+edited_params = 0
+
 for name, param in model.named_parameters():
     if should_quantize(name, scope) and param.dim() >= 2:
-        with torch.no_grad():
-            param.data = round_to_nearest(param.data, bits)
-            quantized_count += 1
-            if quantized_count <= 3:
-                print(f"  Quantized: {name} ({param.shape})")
+        param.data = round_to_nearest(param.data, bits, group_size)
+        quantized_count += 1
+        edited_params += param.numel()
+        if quantized_count <= 3:
+            print(f"  Quantized: {name} ({param.shape})")
 
-print(f"Quantized {quantized_count} parameters")
+coverage_pct = 100.0 * edited_params / total_model_params if total_model_params > 0 else 0
+print(f"Quantized {quantized_count} parameters ({edited_params:,} / {total_model_params:,} = {coverage_pct:.1f}% coverage)")
+
+model = model.cpu()
+gc.collect()
+if torch.cuda.is_available():
+    torch.cuda.empty_cache()
 
 # Save
 output_path.mkdir(parents=True, exist_ok=True)
@@ -283,7 +449,9 @@ metadata = {
     "bits": bits,
     "group_size": group_size,
     "scope": scope,
-    "quantized_params": quantized_count
+    "quantized_params": quantized_count,
+    "coverage_pct": round(coverage_pct, 2),
+    "dtype": dtype_name,
 }
 with open(output_path / "edit_metadata.json", "w") as f:
     json.dump(metadata, f, indent=2)
@@ -319,12 +487,22 @@ output_path = Path("${output_path}")
 error_type = "${error_type}"
 
 print(f"Loading baseline from {baseline_path}...")
+dtype_name = "${RESOLVED_MODEL_DTYPE}".strip().lower()
+if not dtype_name or dtype_name == "auto":
+    use_bf16 = torch.cuda.is_available() and getattr(torch.cuda, "is_bf16_supported", lambda: False)()
+    dtype_name = "bfloat16" if use_bf16 else "float16"
+try:
+    torch_dtype = getattr(torch, dtype_name)
+except AttributeError:
+    torch_dtype = torch.float16
+
 tokenizer = AutoTokenizer.from_pretrained(baseline_path, trust_remote_code=True)
 model = AutoModelForCausalLM.from_pretrained(
     baseline_path,
-    torch_dtype=torch.float16,
+    torch_dtype=torch_dtype,
     trust_remote_code=True,
-    device_map="cpu"
+    device_map="cpu",
+    low_cpu_mem_usage=True,
 )
 
 error_info = {"error_type": error_type, "injected": False}
@@ -418,9 +596,20 @@ run_lmeval() {
 
     mkdir -p "$(dirname "${output_file}")"
 
+    local model_args="pretrained=${model_path},trust_remote_code=True,dtype=${LMEVAL_DTYPE},device_map=auto"
+    local parallelize_flag
+    parallelize_flag=$(echo "${LMEVAL_PARALLELIZE}" | tr '[:upper:]' '[:lower:]')
+    if [[ "${CUDA_VISIBLE_DEVICES:-}" == *","* && "${parallelize_flag}" != "false" && "${parallelize_flag}" != "0" ]]; then
+        model_args="${model_args},parallelize=True"
+    fi
+    if [[ "${FLASH_ATTENTION_AVAILABLE}" == "true" ]] && supports_flash_attention "${model_path}"; then
+        model_args="${model_args},attn_implementation=flash_attention_2"
+    fi
+
+    TORCH_COMPILE="${LMEVAL_TORCH_COMPILE:-0}" \
     python3 -m lm_eval \
         --model hf \
-        --model_args "pretrained=${model_path},trust_remote_code=True,dtype=float16" \
+        --model_args "${model_args}" \
         --tasks "${tasks}" \
         --batch_size "${batch_size}" \
         --num_fewshot "${num_fewshot}" \
@@ -444,18 +633,27 @@ generate_invarlock_config() {
     local model_path="$1"
     local output_yaml="$2"
     local edit_name="${3:-noop}"
-    local seed="${4:-42}"
+    local seed="${4:-${INVARLOCK_SEED}}"
     local preview_n="${5:-${INVARLOCK_PREVIEW_WINDOWS}}"
     local final_n="${6:-${INVARLOCK_FINAL_WINDOWS}}"
     local bootstrap_n="${7:-${INVARLOCK_BOOTSTRAP_N}}"
+    local seq_len="${8:-${INVARLOCK_SEQ_LEN}}"
+    local stride="${9:-${INVARLOCK_STRIDE}}"
+    local eval_batch="${10:-${INVARLOCK_EVAL_BATCH}}"
 
     # Detect adapter based on model architecture
-    # Most modern LLMs (Mistral, Qwen, LLaMA) use hf_llama adapter
-    local adapter="hf_llama"
+    # Use auto adapter for general causal LM support
+    local adapter="${INVARLOCK_ADAPTER}"
 
     # InvarLock provider is used directly (wikitext2, synthetic, hf_text, etc.)
     # The provider handles HuggingFace dataset loading internally
     local dataset_provider="${INVARLOCK_DATASET}"
+    local attn_impl_yaml=""
+    if [[ "${FLASH_ATTENTION_AVAILABLE}" == "true" ]] && supports_flash_attention "${model_path}"; then
+        attn_impl_yaml='attn_implementation: "flash_attention_2"'
+    else
+        attn_impl_yaml='# flash_attention_2 not available'
+    fi
 
     # Create the YAML config
     # Note: edit.name must be a quoted string (even "noop")
@@ -469,13 +667,16 @@ model:
   id: "${model_path}"
   adapter: "${adapter}"
   device: "auto"
+  dtype: "${RESOLVED_MODEL_DTYPE}"
+  ${attn_impl_yaml}
 
 dataset:
   provider: "${dataset_provider}"
+  split: "validation"
   preview_n: ${preview_n}
   final_n: ${final_n}
-  seq_len: 512
-  stride: 256
+  seq_len: ${seq_len}
+  stride: ${stride}
   seed: ${seed}
 
 edit:
@@ -492,7 +693,9 @@ guards:
 eval:
   bootstrap:
     replicates: ${bootstrap_n}
+    parallel: true
   max_pm_ratio: 2.0
+  batch_size: ${eval_batch}
 
 auto:
   enabled: true
@@ -543,7 +746,10 @@ run_invarlock_calibration() {
             "${seed}" \
             "${INVARLOCK_PREVIEW_WINDOWS}" \
             "${INVARLOCK_FINAL_WINDOWS}" \
-            "${INVARLOCK_BOOTSTRAP_N}"
+            "${INVARLOCK_BOOTSTRAP_N}" \
+            "${INVARLOCK_SEQ_LEN}" \
+            "${INVARLOCK_STRIDE}" \
+            "${INVARLOCK_EVAL_BATCH}"
 
         # Run InvarLock with the config file
         invarlock run \
@@ -587,6 +793,7 @@ GENERATE_CERT
     # Note: Using unquoted heredoc delimiter to allow shell variable interpolation
     python3 << CALIBRATION_SCRIPT
 import json
+import math
 import statistics
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -604,7 +811,13 @@ output_dir = Path("${output_dir}")
 preset_output_dir = Path("${preset_output_dir}")
 model_name = "${model_name}"
 model_path = "${model_path}"
-tier = "${INVARLOCK_TIER}"
+tier = "${INVARLOCK_TIER}".strip().lower()
+dataset_provider = "${INVARLOCK_DATASET}"
+seq_len = int("${INVARLOCK_SEQ_LEN}")
+stride = int("${INVARLOCK_STRIDE}")
+preview_n = int("${INVARLOCK_PREVIEW_WINDOWS}")
+final_n = int("${INVARLOCK_FINAL_WINDOWS}")
+seed = int("${INVARLOCK_SEED}")
 
 print(f"DEBUG: output_dir = {output_dir}")
 print(f"DEBUG: preset_output_dir = {preset_output_dir}")
@@ -622,22 +835,18 @@ def load_certificates() -> List[Dict[str, Any]]:
     """
     certs = []
     for run_dir in sorted(output_dir.glob("run_*")):
-        # Try certificate first
+        cert = None
+        report = None
+
         cert_path = run_dir / "evaluation.cert.json"
         if cert_path.exists():
             try:
                 cert = json.loads(cert_path.read_text())
-                if isinstance(cert, dict):
-                    certs.append(cert)
-                    print(f"  Loaded cert: {run_dir.name}/evaluation.cert.json")
-                    continue
             except Exception as e:
                 print(f"  Error loading {cert_path}: {e}")
 
-        # Fall back to report.json and convert to cert-like structure
         report_path = run_dir / "baseline_report.json"
         if not report_path.exists():
-            # Try to find any report file
             report_files = list(run_dir.glob("**/report*.json"))
             if report_files:
                 report_path = report_files[0]
@@ -645,15 +854,123 @@ def load_certificates() -> List[Dict[str, Any]]:
         if report_path.exists():
             try:
                 report = json.loads(report_path.read_text())
-                # Convert report to cert-like structure for calibration
-                cert_like = convert_report_to_cert_structure(report)
-                if cert_like:
-                    certs.append(cert_like)
-                    print(f"  Loaded report (as cert): {report_path.name}")
             except Exception as e:
                 print(f"  Error loading {report_path}: {e}")
 
+        record = _merge_record(cert, report)
+        if record:
+            certs.append(record)
+            if cert is not None:
+                print(f"  Loaded cert: {run_dir.name}/evaluation.cert.json")
+            elif report is not None:
+                print(f"  Loaded report: {report_path.name}")
+
     return certs
+
+def _merge_record(cert: Optional[Dict[str, Any]], report: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    rec: Dict[str, Any] = {}
+    if isinstance(cert, dict):
+        rec = json.loads(json.dumps(cert))
+    if not isinstance(report, dict):
+        return rec or None
+
+    metrics = report.get('metrics', {}) or {}
+    pm = metrics.get('primary_metric', {}) or {}
+    if not pm and 'ppl_final' in metrics:
+        pm = {
+            'final': metrics.get('ppl_final'),
+            'preview': metrics.get('ppl_preview'),
+            'ratio_vs_baseline': 1.0,
+            'drift': metrics.get('ppl_final', 1.0) / max(metrics.get('ppl_preview', 1.0), 1e-10)
+        }
+    if pm and not rec.get('primary_metric'):
+        rec['primary_metric'] = pm
+
+    guards = report.get('guards', []) or []
+    for guard in guards:
+        if not isinstance(guard, dict):
+            continue
+        name = str(guard.get('name', '')).lower()
+        gmetrics = guard.get('metrics', {}) or {}
+        gpolicy = guard.get('policy', {}) or {}
+
+        if name == 'spectral':
+            spec = rec.get('spectral', {}) if isinstance(rec.get('spectral'), dict) else {}
+            if gmetrics.get('family_z_quantiles'):
+                spec.setdefault('family_z_quantiles', gmetrics.get('family_z_quantiles'))
+            if gmetrics.get('family_z_summary'):
+                spec.setdefault('family_z_summary', gmetrics.get('family_z_summary'))
+            if gmetrics.get('family_caps'):
+                spec.setdefault('family_caps', gmetrics.get('family_caps'))
+            if gmetrics.get('sigma_quantile') is not None:
+                spec.setdefault('sigma_quantile', gmetrics.get('sigma_quantile'))
+            if gmetrics.get('deadband') is not None:
+                spec.setdefault('deadband', gmetrics.get('deadband'))
+            if gmetrics.get('max_caps') is not None:
+                spec.setdefault('max_caps', gmetrics.get('max_caps'))
+            if gmetrics.get('families'):
+                spec.setdefault('families', gmetrics.get('families'))
+            if gmetrics.get('family_stats'):
+                spec.setdefault('families', gmetrics.get('family_stats'))
+            z_scores = guard.get('final_z_scores') or gmetrics.get('final_z_scores')
+            if isinstance(z_scores, dict):
+                spec['final_z_scores'] = z_scores
+            fam_map = guard.get('module_family_map') or gmetrics.get('module_family_map')
+            if isinstance(fam_map, dict):
+                spec['module_family_map'] = fam_map
+            if gpolicy and not spec.get('policy'):
+                spec['policy'] = gpolicy
+            rec['spectral'] = spec
+        elif name == 'rmt':
+            rmt = rec.get('rmt', {}) if isinstance(rec.get('rmt'), dict) else {}
+            if gmetrics.get('family_stats'):
+                rmt.setdefault('family_stats', gmetrics.get('family_stats'))
+            if gmetrics.get('epsilon'):
+                rmt.setdefault('epsilon', gmetrics.get('epsilon'))
+            if gmetrics.get('epsilon_default') is not None:
+                rmt.setdefault('epsilon_default', gmetrics.get('epsilon_default'))
+            if gmetrics.get('epsilon_by_family'):
+                rmt.setdefault('epsilon_by_family', gmetrics.get('epsilon_by_family'))
+            if gmetrics.get('margin') is not None:
+                rmt.setdefault('margin', gmetrics.get('margin'))
+            if gmetrics.get('margin_used') is not None:
+                rmt.setdefault('margin', gmetrics.get('margin_used'))
+            if gmetrics.get('deadband') is not None:
+                rmt.setdefault('deadband', gmetrics.get('deadband'))
+            if gmetrics.get('deadband_used') is not None:
+                rmt.setdefault('deadband', gmetrics.get('deadband_used'))
+            if gmetrics.get('outliers_by_family'):
+                rmt.setdefault('outliers_by_family', gmetrics.get('outliers_by_family'))
+            if gmetrics.get('outliers_per_family'):
+                rmt.setdefault('outliers_per_family', gmetrics.get('outliers_per_family'))
+            if gmetrics.get('baseline_outliers_per_family'):
+                rmt.setdefault('baseline_outliers_per_family', gmetrics.get('baseline_outliers_per_family'))
+            if gmetrics.get('families'):
+                rmt.setdefault('families', gmetrics.get('families'))
+            if gpolicy and not rmt.get('policy'):
+                rmt['policy'] = gpolicy
+            rec['rmt'] = rmt
+        elif name == 'variance':
+            var = rec.get('variance', {}) if isinstance(rec.get('variance'), dict) else {}
+            if gmetrics.get('predictive_gate') is not None:
+                var.setdefault('predictive_gate', gmetrics.get('predictive_gate'))
+            if gmetrics.get('ab_windows_used') is not None:
+                var.setdefault('ab_windows_used', gmetrics.get('ab_windows_used'))
+            if gmetrics.get('calibration_stats'):
+                var.setdefault('calibration_stats', gmetrics.get('calibration_stats'))
+            if gmetrics.get('calibration'):
+                var.setdefault('calibration', gmetrics.get('calibration'))
+            if gmetrics.get('deadband') is not None:
+                var.setdefault('deadband', gmetrics.get('deadband'))
+            if gmetrics.get('min_gain') is not None:
+                var.setdefault('min_gain', gmetrics.get('min_gain'))
+            if gmetrics.get('min_effect_lognll') is not None:
+                var.setdefault('min_effect_lognll', gmetrics.get('min_effect_lognll'))
+            if gpolicy and not var.get('policy'):
+                var['policy'] = gpolicy
+            rec['variance'] = var
+
+    return rec or None
 
 def convert_report_to_cert_structure(report: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Convert a RunReport to a certificate-like structure for calibration.
@@ -692,33 +1009,130 @@ def convert_report_to_cert_structure(report: Dict[str, Any]) -> Optional[Dict[st
         name = str(guard.get('name', '')).lower()
         guard_metrics = guard.get('metrics', {}) or {}
         guard_details = guard.get('details', {}) or {}
+        guard_policy = guard.get('policy', {}) or {}
 
         if name == 'spectral':
-            cert_structure['spectral'] = {
+            spec = {
                 'family_z_quantiles': guard_metrics.get('family_z_quantiles', {}),
+                'family_z_summary': guard_metrics.get('family_z_summary', {}),
                 'family_caps': guard_metrics.get('family_caps', {}),
                 'sigma_quantile': guard_metrics.get('sigma_quantile'),
                 'deadband': guard_metrics.get('deadband'),
-                'summary': guard_details
+                'max_caps': guard_metrics.get('max_caps'),
+                'families': guard_metrics.get('families', {}),
+                'summary': guard_details,
+                'policy': guard_policy
             }
+            if guard_metrics.get('family_stats'):
+                spec.setdefault('families', guard_metrics.get('family_stats', {}))
+            z_scores = guard.get('final_z_scores') or guard_metrics.get('final_z_scores')
+            if isinstance(z_scores, dict):
+                spec['final_z_scores'] = z_scores
+            fam_map = guard.get('module_family_map') or guard_metrics.get('module_family_map')
+            if isinstance(fam_map, dict):
+                spec['module_family_map'] = fam_map
+            cert_structure['spectral'] = spec
         elif name == 'rmt':
-            cert_structure['rmt'] = {
+            rmt = {
                 'family_stats': guard_metrics.get('family_stats', {}),
                 'epsilon': guard_metrics.get('epsilon', {}),
+                'epsilon_by_family': guard_metrics.get('epsilon_by_family', {}),
+                'epsilon_default': guard_metrics.get('epsilon_default'),
                 'margin': guard_metrics.get('margin'),
                 'deadband': guard_metrics.get('deadband'),
                 'outliers_by_family': guard_metrics.get('outliers_by_family', {}),
-                'summary': guard_details
+                'outliers_per_family': guard_metrics.get('outliers_per_family', {}),
+                'baseline_outliers_per_family': guard_metrics.get('baseline_outliers_per_family', {}),
+                'families': guard_metrics.get('families', {}),
+                'summary': guard_details,
+                'policy': guard_policy
             }
+            if rmt.get('margin') is None and guard_metrics.get('margin_used') is not None:
+                rmt['margin'] = guard_metrics.get('margin_used')
+            if rmt.get('deadband') is None and guard_metrics.get('deadband_used') is not None:
+                rmt['deadband'] = guard_metrics.get('deadband_used')
+            cert_structure['rmt'] = rmt
         elif name == 'variance':
             cert_structure['variance'] = {
                 'calibration_stats': guard_metrics.get('calibration_stats', {}),
+                'calibration': guard_metrics.get('calibration', {}),
+                'predictive_gate': guard_metrics.get('predictive_gate'),
+                'ab_windows_used': guard_metrics.get('ab_windows_used'),
                 'deadband': guard_metrics.get('deadband'),
+                'min_gain': guard_metrics.get('min_gain'),
                 'min_effect_lognll': guard_metrics.get('min_effect_lognll'),
-                'summary': guard_details
+                'summary': guard_details,
+                'policy': guard_policy
             }
 
     return cert_structure
+
+# ==============================================================================
+# CALIBRATION HELPERS
+# ==============================================================================
+
+def _safe_float(value):
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+def _quantile(values, q):
+    if not values:
+        return None
+    values = sorted(values)
+    if len(values) == 1:
+        return values[0]
+    pos = (len(values) - 1) * q
+    lower = int(math.floor(pos))
+    upper = int(math.ceil(pos))
+    if lower == upper:
+        return values[lower]
+    frac = pos - lower
+    return values[lower] + (values[upper] - values[lower]) * frac
+
+def _spectral_margin(tier_name):
+    return 0.10 if tier_name == "conservative" else 0.05
+
+def _default_max_caps(tier_name):
+    if tier_name == "conservative":
+        return 3
+    if tier_name == "aggressive":
+        return 8
+    return 5
+
+def _allocate_budget(counts, budget):
+    if not counts or budget <= 0:
+        return {fam: 0 for fam in counts}
+    total = sum(counts.values())
+    if total <= 0:
+        return {fam: 0 for fam in counts}
+    raw = {fam: budget * count / total for fam, count in counts.items()}
+    alloc = {fam: int(round(val)) for fam, val in raw.items()}
+    diff = budget - sum(alloc.values())
+    if diff > 0:
+        for fam in sorted(raw, key=raw.get, reverse=True):
+            if diff == 0:
+                break
+            alloc[fam] += 1
+            diff -= 1
+    elif diff < 0:
+        for fam in sorted(raw, key=raw.get):
+            if diff == 0:
+                break
+            if alloc.get(fam, 0) > 0:
+                alloc[fam] -= 1
+                diff += 1
+    return alloc
+
+def _rmt_quantile_for_tier(tier_name):
+    if tier_name == "conservative":
+        return 0.95
+    if tier_name == "aggressive":
+        return 0.99
+    return 0.97
 
 # ==============================================================================
 # DRIFT CALIBRATION
@@ -810,17 +1224,15 @@ def calibrate_spectral(certs: List[Dict]) -> Tuple[Dict[str, Any], Dict[str, Dic
     """
     Extract spectral guard thresholds from certificates.
 
-    From spectral.family_z_quantiles.{family}.{q99, max}, derive:
-    - family_caps.{family}.kappa = max(observed) * 1.05 (5% safety margin)
-
-    Also captures sigma_quantile, deadband, max_caps from certificates.
+    Uses per-run order-statistic calibration on module-level z-scores with a
+    tier-specific margin, keeping max_caps as a per-run budget. Falls back to
+    family_z_quantiles when module-level scores are missing.
     """
-    families_seen = set()
+    per_run_caps = defaultdict(list)
     q99_values: Dict[str, List[float]] = defaultdict(list)
     max_values: Dict[str, List[float]] = defaultdict(list)
     existing_caps: Dict[str, float] = {}
 
-    # Global settings (take from first cert that has them)
     sigma_quantile: Optional[float] = None
     deadband: Optional[float] = None
     max_caps: Optional[int] = None
@@ -829,34 +1241,37 @@ def calibrate_spectral(certs: List[Dict]) -> Tuple[Dict[str, Any], Dict[str, Dic
         spectral = cert.get('spectral', {})
         if not isinstance(spectral, dict):
             continue
+        policy = spectral.get('policy', {}) if isinstance(spectral.get('policy'), dict) else {}
 
-        # Capture global settings
         if sigma_quantile is None:
-            sq = spectral.get('sigma_quantile') or spectral.get('summary', {}).get('sigma_quantile')
+            sq = (
+                policy.get('sigma_quantile')
+                or policy.get('contraction')
+                or policy.get('kappa')
+                or spectral.get('sigma_quantile')
+                or spectral.get('summary', {}).get('sigma_quantile')
+            )
+            sq = _safe_float(sq)
             if sq is not None:
-                try:
-                    sigma_quantile = float(sq)
-                except (TypeError, ValueError):
-                    pass
+                sigma_quantile = sq
 
         if deadband is None:
-            db = spectral.get('deadband') or spectral.get('summary', {}).get('deadband')
+            db = policy.get('deadband') or spectral.get('deadband') or spectral.get('summary', {}).get('deadband')
+            db = _safe_float(db)
             if db is not None:
-                try:
-                    deadband = float(db)
-                except (TypeError, ValueError):
-                    pass
+                deadband = db
 
         if max_caps is None:
-            mc = spectral.get('max_caps') or spectral.get('summary', {}).get('max_caps')
-            if mc is not None:
-                try:
+            mc = policy.get('max_caps') or spectral.get('max_caps') or spectral.get('summary', {}).get('max_caps')
+            try:
+                if mc is not None:
                     max_caps = int(mc)
-                except (TypeError, ValueError):
-                    pass
+            except (TypeError, ValueError):
+                pass
 
-        # Extract existing family_caps as fallback
         fam_caps = spectral.get('family_caps', {})
+        if not fam_caps and isinstance(policy.get('family_caps'), dict):
+            fam_caps = policy.get('family_caps', {})
         if isinstance(fam_caps, dict):
             for fam, caps in fam_caps.items():
                 try:
@@ -866,59 +1281,87 @@ def calibrate_spectral(certs: List[Dict]) -> Tuple[Dict[str, Any], Dict[str, Dic
                 except (TypeError, ValueError, AttributeError):
                     pass
 
-        # Extract family_z_quantiles → the observed z-scores per family
+        z_map = spectral.get('final_z_scores')
+        fam_map = spectral.get('module_family_map')
+        if isinstance(z_map, dict) and isinstance(fam_map, dict):
+            z_by_family = defaultdict(list)
+            for module, z in z_map.items():
+                fam = fam_map.get(module)
+                if fam is None:
+                    continue
+                z_val = _safe_float(z)
+                if z_val is None:
+                    continue
+                z_by_family[str(fam)].append(abs(z_val))
+            if z_by_family:
+                counts = {fam: len(vals) for fam, vals in z_by_family.items() if vals}
+                budget = (
+                    max_caps
+                    if isinstance(max_caps, int) and max_caps >= 0
+                    else _default_max_caps(tier)
+                )
+                alloc = _allocate_budget(counts, budget)
+                for fam, values in z_by_family.items():
+                    if not values:
+                        continue
+                    values_sorted = sorted(values, reverse=True)
+                    idx = max(0, min(alloc.get(fam, 1) - 1, len(values_sorted) - 1))
+                    per_run_caps[fam].append(values_sorted[idx])
+
         fq = spectral.get('family_z_quantiles', {})
+        if not fq and isinstance(spectral.get('family_z_summary'), dict):
+            fq = spectral.get('family_z_summary', {})
         if isinstance(fq, dict):
             for fam, stats in fq.items():
                 if not isinstance(stats, dict):
                     continue
-                families_seen.add(str(fam))
+                val_q99 = _safe_float(stats.get('q99'))
+                val_max = _safe_float(stats.get('max'))
+                if val_q99 is not None:
+                    q99_values[str(fam)].append(val_q99)
+                if val_max is not None:
+                    max_values[str(fam)].append(val_max)
 
-                # Extract q99 and max values
-                for key, collector in [('q99', q99_values), ('max', max_values)]:
-                    val = stats.get(key)
-                    if val is not None:
-                        try:
-                            collector[str(fam)].append(float(val))
-                        except (TypeError, ValueError):
-                            pass
-
-    # Build summary
     summary = {
-        'families_seen': sorted(families_seen),
+        'families_seen': sorted(set(per_run_caps) | set(q99_values) | set(existing_caps)),
         'sigma_quantile': sigma_quantile,
         'deadband': deadband,
         'max_caps': max_caps
     }
 
-    # Derive family_caps from observed z-scores
     proposed_caps: Dict[str, Dict[str, float]] = {}
+    margin = _spectral_margin(tier)
 
-    if not families_seen:
-        print("  WARNING: No spectral family_z_quantiles found; using existing caps")
+    if per_run_caps:
+        for fam, candidates in per_run_caps.items():
+            if not candidates:
+                continue
+            base = max(candidates)
+            if fam in existing_caps:
+                base = max(base, existing_caps[fam])
+            proposed_caps[fam] = {'kappa': round(base + margin, 3)}
+        for fam in sorted(set(q99_values) | set(max_values)):
+            if fam in proposed_caps:
+                continue
+            observed = q99_values.get(fam, []) + max_values.get(fam, [])
+            if not observed:
+                continue
+            base = max(observed)
+            if fam in existing_caps:
+                base = max(base, existing_caps[fam])
+            proposed_caps[fam] = {'kappa': round(base + margin, 3)}
+    elif q99_values or max_values:
+        for fam in sorted(set(q99_values) | set(max_values)):
+            observed = q99_values.get(fam, []) + max_values.get(fam, [])
+            if not observed:
+                continue
+            base = max(observed)
+            if fam in existing_caps:
+                base = max(base, existing_caps[fam])
+            proposed_caps[fam] = {'kappa': round(base + margin, 3)}
+    else:
         for fam, kappa in existing_caps.items():
             proposed_caps[fam] = {'kappa': kappa}
-        return summary, proposed_caps
-
-    for fam in sorted(families_seen):
-        observed = q99_values.get(fam, []) + max_values.get(fam, [])
-
-        if not observed or max(observed, default=0.0) <= 0.0:
-            # Fall back to existing cap
-            if fam in existing_caps:
-                proposed_caps[fam] = {'kappa': existing_caps[fam]}
-            continue
-
-        # Proposed kappa = max(observed) * 1.05 (5% safety margin)
-        base = max(observed)
-        kappa = round(base * 1.05, 3)
-        proposed_caps[fam] = {'kappa': kappa}
-
-        old = existing_caps.get(fam)
-        if old is not None:
-            print(f"  Spectral {fam}: observed max z={base:.3f} → kappa={kappa:.3f} (was {old:.3f})")
-        else:
-            print(f"  Spectral {fam}: observed max z={base:.3f} → kappa={kappa:.3f}")
 
     return summary, proposed_caps
 
@@ -930,126 +1373,118 @@ def calibrate_rmt(certs: List[Dict]) -> Tuple[Dict[str, Any], Dict[str, float]]:
     """
     Extract RMT guard thresholds from certificates.
 
-    From rmt.family_stats.{family}.outlier_fraction (or similar), derive:
-    - epsilon.{family} = max(observed) * 1.2 + 0.02 (20% margin + floor)
-
-    Also captures margin, deadband settings.
+    Uses per-family quantiles of null deltas to set epsilon.
     """
-    families_seen = set()
-    outlier_fracs: Dict[str, List[float]] = defaultdict(list)
-    existing_epsilon: Dict[str, float] = {}
-
-    margin: Optional[float] = None
-    deadband: Optional[float] = None
+    deltas_by_family = defaultdict(list)
+    existing_eps = {}
+    margin = None
+    deadband = None
 
     for cert in certs:
-        rmt = cert.get('rmt', {})
+        rmt = cert.get('rmt', {}) or {}
         if not isinstance(rmt, dict):
             continue
+        policy = rmt.get('policy', {}) if isinstance(rmt.get('policy'), dict) else {}
 
-        # Capture global settings
         if margin is None:
-            m = rmt.get('margin') or rmt.get('summary', {}).get('margin')
-            if m is not None:
-                try:
-                    margin = float(m)
-                except (TypeError, ValueError):
-                    pass
-
+            margin = _safe_float(policy.get('margin') or rmt.get('margin') or (rmt.get('summary') or {}).get('margin'))
         if deadband is None:
-            db = rmt.get('deadband') or rmt.get('summary', {}).get('deadband')
-            if db is not None:
-                try:
-                    deadband = float(db)
-                except (TypeError, ValueError):
-                    pass
+            deadband = _safe_float(policy.get('deadband') or rmt.get('deadband') or (rmt.get('summary') or {}).get('deadband'))
 
-        # Extract existing epsilon as fallback
-        eps = rmt.get('epsilon', {})
+        eps = (
+            rmt.get('epsilon_by_family')
+            or rmt.get('epsilon')
+            or policy.get('epsilon_by_family')
+            or policy.get('epsilon')
+        )
         if isinstance(eps, dict):
             for fam, val in eps.items():
                 try:
-                    existing_epsilon[str(fam)] = float(val)
+                    existing_eps[str(fam)] = float(val)
                 except (TypeError, ValueError):
                     pass
+        elif isinstance(eps, (int, float)):
+            try:
+                existing_eps["_default"] = float(eps)
+            except (TypeError, ValueError):
+                pass
 
-        # Extract family_stats → outlier fractions
-        fstats = rmt.get('family_stats', {})
-        if isinstance(fstats, dict):
-            for fam, stats in fstats.items():
+        record_has_counts = False
+        families = rmt.get('families', {})
+        if isinstance(families, dict) and families:
+            record_has_counts = True
+            for fam, stats in families.items():
                 if not isinstance(stats, dict):
                     continue
-                families_seen.add(str(fam))
+                bare = stats.get('bare')
+                guarded = stats.get('guarded')
+                bare_f = _safe_float(bare)
+                guarded_f = _safe_float(guarded)
+                if bare_f and bare_f > 0:
+                    deltas_by_family[str(fam)].append((guarded_f / bare_f) - 1.0)
 
-                # Try different field names
-                for key in ['outlier_fraction', 'outlier_rate', 'fraction', 'rate']:
-                    val = stats.get(key)
-                    if val is not None:
-                        try:
-                            outlier_fracs[str(fam)].append(float(val))
-                            break
-                        except (TypeError, ValueError):
-                            pass
+        outliers = rmt.get('outliers_per_family', {})
+        baseline_outliers = rmt.get('baseline_outliers_per_family', {})
+        if isinstance(outliers, dict) and isinstance(baseline_outliers, dict) and outliers:
+            record_has_counts = True
+            for fam in set(outliers) | set(baseline_outliers):
+                bare_f = _safe_float(baseline_outliers.get(fam))
+                guarded_f = _safe_float(outliers.get(fam))
+                if bare_f and bare_f > 0:
+                    deltas_by_family[str(fam)].append((guarded_f / bare_f) - 1.0)
 
-        # Also check rmt.outliers_by_family
-        obf = rmt.get('outliers_by_family', {})
-        if isinstance(obf, dict):
-            for fam, stats in obf.items():
-                families_seen.add(str(fam))
-                if isinstance(stats, dict):
-                    for key in ['fraction', 'rate', 'count']:
-                        val = stats.get(key)
+        if not record_has_counts:
+            for source in ('outliers_by_family', 'family_stats'):
+                stats_map = rmt.get(source, {})
+                if not isinstance(stats_map, dict):
+                    continue
+                for fam, stats in stats_map.items():
+                    if not isinstance(stats, dict):
+                        continue
+                    for key in ('outlier_fraction', 'outlier_rate', 'fraction', 'rate'):
+                        val = _safe_float(stats.get(key))
                         if val is not None:
-                            try:
-                                outlier_fracs[str(fam)].append(float(val))
-                                break
-                            except (TypeError, ValueError):
-                                pass
+                            deltas_by_family[str(fam)].append(val)
+                            break
 
     summary = {
-        'families_seen': sorted(families_seen),
+        'families_seen': sorted(deltas_by_family.keys()),
         'margin': margin,
         'deadband': deadband
     }
+    quantile_q = _rmt_quantile_for_tier(tier)
+    proposed_eps: Dict[str, float] = {}
 
-    # Derive epsilon from observed outlier fractions
-    proposed_epsilon: Dict[str, float] = {}
+    if deltas_by_family:
+        for fam, deltas in deltas_by_family.items():
+            qv = _quantile(deltas, quantile_q)
+            if qv is None:
+                continue
+            qv = max(float(qv), 0.0)
+            proposed_eps[fam] = round(qv, 3)
 
-    if not families_seen and not outlier_fracs:
-        print("  WARNING: No RMT family_stats found; using existing epsilon")
-        return summary, existing_epsilon if existing_epsilon else {
-            'ffn': 0.10, 'attn': 0.08, 'embed': 0.12, 'other': 0.12
+    if not proposed_eps:
+        if existing_eps:
+            if set(existing_eps.keys()) == {"_default"}:
+                default_eps = existing_eps["_default"]
+                return summary, {
+                    "ffn": default_eps,
+                    "attn": default_eps,
+                    "embed": default_eps,
+                    "other": default_eps,
+                }
+            return summary, existing_eps
+        defaults = {
+            "balanced": {"ffn": 0.10, "attn": 0.08, "embed": 0.12, "other": 0.12},
+            "conservative": {"ffn": 0.06, "attn": 0.05, "embed": 0.07, "other": 0.07},
         }
+        return summary, defaults.get(tier, defaults["balanced"])
 
-    # Default families if we saw families but no outlier data
-    default_families = ['ffn', 'attn', 'embed', 'other']
-    all_families = sorted(families_seen) if families_seen else default_families
+    for fam, eps_val in existing_eps.items():
+        if fam not in proposed_eps and fam != "_default":
+            proposed_eps[fam] = eps_val
 
-    for fam in all_families:
-        fracs = outlier_fracs.get(fam, [])
-
-        if not fracs:
-            # Fall back to existing or default
-            if fam in existing_epsilon:
-                proposed_epsilon[fam] = existing_epsilon[fam]
-            else:
-                # Conservative defaults
-                defaults = {'ffn': 0.10, 'attn': 0.08, 'embed': 0.12, 'other': 0.12}
-                proposed_epsilon[fam] = defaults.get(fam, 0.10)
-            continue
-
-        # Proposed epsilon = max(observed) * 1.2 + 0.02
-        base = max(fracs)
-        epsilon = round(base * 1.2 + 0.02, 3)
-        proposed_epsilon[fam] = epsilon
-
-        old = existing_epsilon.get(fam)
-        if old is not None:
-            print(f"  RMT {fam}: observed max outlier_frac={base:.4f} → epsilon={epsilon:.3f} (was {old:.3f})")
-        else:
-            print(f"  RMT {fam}: observed max outlier_frac={base:.4f} → epsilon={epsilon:.3f}")
-
-    return summary, proposed_epsilon
+    return summary, proposed_eps
 
 # ==============================================================================
 # VARIANCE CALIBRATION
@@ -1059,99 +1494,56 @@ def calibrate_variance(certs: List[Dict]) -> Dict[str, Any]:
     """
     Extract variance guard thresholds from certificates.
 
-    From variance.calibration_stats (or similar), derive:
-    - deadband: max(observed_variance_change) * 1.1
-    - min_effect_lognll: based on observed effect sizes
+    Uses predictive CI half-widths to set min_effect_lognll.
     """
-    variance_changes: List[float] = []
-    effect_sizes: List[float] = []
-
-    # Global settings
-    deadband: Optional[float] = None
-    min_effect: Optional[float] = None
-    min_gain: Optional[float] = None
+    deadband = None
+    min_gain = None
+    policy_min_effect = None
+    min_effect_samples = []
+    variance_changes = []
 
     for cert in certs:
-        var = cert.get('variance', {})
+        var = cert.get('variance', {}) or {}
         if not isinstance(var, dict):
             continue
+        policy = var.get('policy', {}) if isinstance(var.get('policy'), dict) else {}
 
-        # Capture settings from cert
         if deadband is None:
-            db = var.get('deadband') or var.get('summary', {}).get('deadband')
-            if db is not None:
-                try:
-                    deadband = float(db)
-                except (TypeError, ValueError):
-                    pass
-
-        if min_effect is None:
-            me = var.get('min_effect_lognll') or var.get('summary', {}).get('min_effect_lognll')
-            if me is not None:
-                try:
-                    min_effect = float(me)
-                except (TypeError, ValueError):
-                    pass
-
+            deadband = _safe_float(policy.get('deadband') or var.get('deadband'))
         if min_gain is None:
-            mg = var.get('min_gain') or var.get('summary', {}).get('min_gain')
-            if mg is not None:
-                try:
-                    min_gain = float(mg)
-                except (TypeError, ValueError):
-                    pass
+            min_gain = _safe_float(policy.get('min_gain') or policy.get('min_rel_gain') or var.get('min_gain'))
+        if policy_min_effect is None:
+            policy_min_effect = _safe_float(policy.get('min_effect_lognll') or var.get('min_effect_lognll'))
 
-        # Extract calibration stats
-        cal_stats = var.get('calibration_stats', {})
-        if isinstance(cal_stats, dict):
-            var_change = cal_stats.get('variance_change') or cal_stats.get('delta')
-            if var_change is not None:
-                try:
-                    variance_changes.append(abs(float(var_change)))
-                except (TypeError, ValueError):
-                    pass
+        predictive = var.get('predictive_gate', {}) or {}
+        delta_ci = predictive.get('delta_ci')
+        if isinstance(delta_ci, (list, tuple)) and len(delta_ci) == 2:
+            lo = _safe_float(delta_ci[0])
+            hi = _safe_float(delta_ci[1])
+            if lo is not None and hi is not None:
+                width = abs(hi - lo) / 2.0
+                if width > 0:
+                    min_effect_samples.append(width)
 
-            effect = cal_stats.get('effect_size') or cal_stats.get('effect')
-            if effect is not None:
-                try:
-                    effect_sizes.append(abs(float(effect)))
-                except (TypeError, ValueError):
-                    pass
+        calib = var.get('calibration') or var.get('calibration_stats') or {}
+        if isinstance(calib, dict):
+            vchange = calib.get('variance_change') or calib.get('delta') or calib.get('max_delta')
+            vchange = _safe_float(vchange)
+            if vchange is not None:
+                variance_changes.append(abs(vchange))
 
-        # Also check var.summary for aggregated stats
-        summary = var.get('summary', {})
-        if isinstance(summary, dict):
-            for key in ['variance_change', 'delta', 'max_delta']:
-                val = summary.get(key)
-                if val is not None:
-                    try:
-                        variance_changes.append(abs(float(val)))
-                        break
-                    except (TypeError, ValueError):
-                        pass
-
-    result: Dict[str, Any] = {}
-
-    # Use existing settings as base, derive overrides if we have data
-    if deadband is not None:
+    result = {}
+    if deadband is None and variance_changes:
+        result['deadband'] = round(max(variance_changes) * 1.1 + 0.01, 3)
+    elif deadband is not None:
         result['deadband'] = deadband
-    elif variance_changes:
-        # Proposed deadband = max observed * 1.1 + 0.01
-        proposed_db = round(max(variance_changes) * 1.1 + 0.01, 3)
-        result['deadband'] = proposed_db
-        print(f"  Variance: observed max change={max(variance_changes):.4f} → deadband={proposed_db:.3f}")
-    else:
-        result['deadband'] = 0.02  # Conservative default
 
-    if min_effect is not None:
-        result['min_effect_lognll'] = min_effect
-    elif effect_sizes:
-        # Proposed min_effect = max observed * 0.5 (allow some margin)
-        proposed_me = round(max(effect_sizes) * 0.5, 4)
-        result['min_effect_lognll'] = max(proposed_me, 0.0009)  # Floor
-        print(f"  Variance: observed max effect={max(effect_sizes):.4f} → min_effect={result['min_effect_lognll']:.4f}")
-    else:
-        result['min_effect_lognll'] = 0.0009  # Default
+    if min_effect_samples:
+        proposed = _quantile(min_effect_samples, 0.95)
+        if proposed is not None:
+            result['min_effect_lognll'] = max(round(proposed, 4), 0.0009)
+    elif policy_min_effect is not None:
+        result['min_effect_lognll'] = policy_min_effect
 
     if min_gain is not None:
         result['min_gain'] = min_gain
@@ -1186,6 +1578,15 @@ def generate_calibrated_preset(
         },
         'model': {
             'id': model_path
+        },
+        'dataset': {
+            'provider': dataset_provider,
+            'split': 'validation',
+            'seq_len': seq_len,
+            'stride': stride,
+            'preview_n': preview_n,
+            'final_n': final_n,
+            'seed': seed,
         },
         'guards': {}
     }
@@ -1299,39 +1700,24 @@ CALIBRATION_SCRIPT
 
 # ============ HELPER: RUN INVARLOCK CERTIFY WITH CALIBRATED PRESET ============
 run_invarlock_certify() {
-    local model_path="$1"
-    local baseline_report_path="$2"
+    local subject_path="$1"
+    local baseline_path="$2"
     local output_dir="$3"
     local run_name="$4"
     local preset_dir="$5"
+    local model_name="$6"
 
     log "Running InvarLock certification:"
-    log "  Model: ${model_path}"
-    log "  Baseline: ${baseline_report_path}"
+    log "  Subject: ${subject_path}"
+    log "  Baseline: ${baseline_path}"
     log "  Output: ${output_dir}/${run_name}"
 
     local run_dir="${output_dir}/${run_name}"
-    mkdir -p "${run_dir}"
+    local cert_dir="${run_dir}/cert"
+    mkdir -p "${run_dir}" "${cert_dir}"
 
-    # Find calibrated preset for this model
-    # Extract model name from the calibration directory structure
-    # baseline_report_path is like: .../model_name/certificates/calibration/run_1/baseline_report.json
-    # Path structure: model_name/certificates/calibration/run_1/baseline_report.json
-    #                 ↑ we want this
-    local calibration_run_dir=$(dirname "${baseline_report_path}")          # run_1
-    local calibration_dir=$(dirname "${calibration_run_dir}")               # calibration
-    local certs_dir=$(dirname "${calibration_dir}")                         # certificates
-    local model_output_dir=$(dirname "${certs_dir}")                        # model_name
-    local model_name=$(basename "${model_output_dir}")
+    # Look for calibrated preset (YAML preferred)
     local calibrated_preset=""
-
-    # Debug: log the extracted paths
-    log "  Path extraction debug:"
-    log "    baseline_report_path: ${baseline_report_path}"
-    log "    model_output_dir: ${model_output_dir}"
-    log "    model_name: ${model_name}"
-
-    # Look for YAML first, then JSON
     for ext in yaml json; do
         local preset_path="${preset_dir}/calibrated_preset_${model_name}.${ext}"
         if [[ -f "${preset_path}" ]]; then
@@ -1340,125 +1726,61 @@ run_invarlock_certify() {
         fi
     done
 
-    # Check drift compatibility from calibration stats
-    local cal_stats="${calibration_dir}/calibration_stats.json"
-    local use_tiny_relax="false"
+    if [[ -n "${calibrated_preset}" ]]; then
+        log "  Using calibrated preset: ${calibrated_preset}"
+    fi
 
+    local model_output_dir
+    model_output_dir=$(dirname "$(dirname "${output_dir}")")
+    local cal_stats="${model_output_dir}/certificates/calibration/calibration_stats.json"
+    local use_tiny_relax="false"
     if [[ -f "${cal_stats}" ]]; then
-        local band_compatible=$(python3 -c "import json; print(json.load(open('${cal_stats}'))['drift'].get('band_compatible', True))" 2>/dev/null || echo "True")
+        local band_compatible
+        band_compatible=$(python3 -c "import json; print(json.load(open('${cal_stats}'))['drift'].get('band_compatible', True))" 2>/dev/null || echo "True")
         if [[ "${band_compatible}" == "False" ]]; then
             log "  Note: Model drift outside default band, using TINY_RELAX"
             use_tiny_relax="true"
         fi
     fi
 
-    # Generate config YAML for this run
-    local config_yaml="${run_dir}/certify_config.yaml"
-    generate_invarlock_config \
-        "${model_path}" \
-        "${config_yaml}" \
-        "noop" \
-        "42" \
-        "${INVARLOCK_PREVIEW_WINDOWS}" \
-        "${INVARLOCK_FINAL_WINDOWS}" \
-        "${INVARLOCK_BOOTSTRAP_N}"
-
-    # Resolve the actual baseline report.json
-    # The baseline_report_path should already be baseline_report.json or report.json
-    local baseline_json=""
-    if [[ -f "${baseline_report_path}" ]]; then
-        # Check if it's already a report.json (direct or our canonical copy)
-        if [[ "${baseline_report_path}" == *report*.json ]]; then
-            baseline_json="${baseline_report_path}"
-        else
-            # Unexpected file type, try to find report.json in same directory
-            local report_dir=$(dirname "${baseline_report_path}")
-            for candidate in "${report_dir}/baseline_report.json" "${report_dir}/report.json" "${report_dir}/"*/report.json; do
-                if [[ -f "${candidate}" ]]; then
-                    baseline_json="${candidate}"
-                    break
-                fi
-            done
-        fi
-    else
-        log "  WARNING: Baseline report not found at: ${baseline_report_path}"
-    fi
-
-    # Log which preset/baseline we're using
-    if [[ -n "${calibrated_preset}" ]]; then
-        log "  Using calibrated preset: ${calibrated_preset}"
-    fi
-    if [[ -n "${baseline_json}" ]]; then
-        log "  Using baseline report: ${baseline_json}"
-    fi
-
-    # Build command - use config file-based invocation
     local cmd_args=(
-        "invarlock" "run"
-        "--config" "${config_yaml}"
+        "invarlock" "certify"
+        "--source" "${baseline_path}"
+        "--edited" "${subject_path}"
+        "--adapter" "${INVARLOCK_ADAPTER}"
         "--profile" "ci"
+        "--tier" "${INVARLOCK_TIER}"
         "--out" "${run_dir}"
+        "--cert-out" "${cert_dir}"
     )
-
-    # Add baseline if found
-    if [[ -n "${baseline_json}" && -f "${baseline_json}" ]]; then
-        cmd_args+=("--baseline" "${baseline_json}")
+    if [[ -n "${calibrated_preset}" ]]; then
+        cmd_args+=("--preset" "${calibrated_preset}")
     fi
 
-    # Set environment and run
+    local env_prefix=()
     if [[ "${use_tiny_relax}" == "true" ]]; then
-        INVARLOCK_TINY_RELAX=1 "${cmd_args[@]}" 2>&1 | tee -a "${LOG_FILE}" || log "  Certification failed (exit code $?, may be expected for error models)"
+        env_prefix+=("INVARLOCK_TINY_RELAX=1")
+    fi
+    if [[ -n "${INVARLOCK_SKIP_OVERHEAD_CHECK:-}" ]]; then
+        env_prefix+=("INVARLOCK_SKIP_OVERHEAD_CHECK=${INVARLOCK_SKIP_OVERHEAD_CHECK}")
+    fi
+
+    if [[ ${#env_prefix[@]} -gt 0 ]]; then
+        "${env_prefix[@]}" "${cmd_args[@]}" 2>&1 | tee -a "${LOG_FILE}" || log "  Certification failed (exit code $?, may be expected for error models)"
     else
         "${cmd_args[@]}" 2>&1 | tee -a "${LOG_FILE}" || log "  Certification failed (exit code $?, may be expected for error models)"
     fi
 
-    # Find the subject report that was just generated
-    local subject_report=$(find "${run_dir}" -name "report*.json" -type f 2>/dev/null | head -1)
-
-    # Generate certificate explicitly using Python
-    # Note: invarlock run does NOT auto-generate cert files unless --until-pass is used
-    if [[ -n "${subject_report}" && -f "${subject_report}" && -n "${baseline_json}" && -f "${baseline_json}" ]]; then
-        log "  Generating certificate from report..."
-        python3 << GENERATE_CERT_PY
-import json
-from pathlib import Path
-try:
-    from invarlock.reporting.certificate import make_certificate
-
-    subject_path = Path("${subject_report}")
-    baseline_path = Path("${baseline_json}")
-    cert_path = Path("${run_dir}") / "evaluation.cert.json"
-
-    subject = json.loads(subject_path.read_text())
-    baseline = json.loads(baseline_path.read_text())
-
-    cert = make_certificate(subject, baseline)
-
-    with open(cert_path, 'w') as f:
-        json.dump(cert, f, indent=2)
-
-    # Print validation summary
-    val = cert.get('validation', {})
-    pm_ok = val.get('primary_metric_acceptable', 'N/A')
-    inv_ok = val.get('invariants_pass', 'N/A')
-    spec_ok = val.get('spectral_stable', 'N/A')
-    rmt_ok = val.get('rmt_stable', 'N/A')
-
-    print(f"  Certificate generated: {cert_path.name}")
-    print(f"    PM acceptable: {pm_ok}")
-    print(f"    Invariants pass: {inv_ok}")
-    print(f"    Spectral stable: {spec_ok}")
-    print(f"    RMT stable: {rmt_ok}")
-
-except Exception as e:
-    print(f"  WARNING: Could not generate certificate: {e}")
-    import traceback
-    traceback.print_exc()
-GENERATE_CERT_PY
-    elif [[ -n "${subject_report}" ]]; then
-        log "  Report found but no baseline for certificate: ${subject_report}"
+    # Copy certificate to standard location
+    local cert_file="${cert_dir}/evaluation.cert.json"
+    if [[ -f "${cert_file}" ]]; then
+        cp "${cert_file}" "${run_dir}/evaluation.cert.json" 2>/dev/null || true
     else
-        log "  WARNING: No report found in ${run_dir}"
+        local alt_cert
+        alt_cert=$(find "${cert_dir}" -name "evaluation.cert.json" -type f 2>/dev/null | head -1)
+        if [[ -n "${alt_cert}" && -f "${alt_cert}" ]]; then
+            cp "${alt_cert}" "${run_dir}/evaluation.cert.json" 2>/dev/null || true
+        fi
     fi
 }
 
@@ -1495,9 +1817,6 @@ process_model() {
         "${DRIFT_CALIBRATION_RUNS}" \
         "${preset_dir}"
 
-    # Use the baseline report.json from calibration run 1
-    local baseline_report="${model_output_dir}/certificates/calibration/run_1/baseline_report.json"
-
     # Step 4: Create and evaluate clean edit
     log "Step 4: Clean edit (${EDIT_BITS}-bit ${EDIT_TYPE})"
     local clean_edit_path="${model_output_dir}/models/clean_edit"
@@ -1519,10 +1838,11 @@ process_model() {
     for run in $(seq 1 "${CLEAN_EDIT_RUNS}"); do
         run_invarlock_certify \
             "${clean_edit_path}" \
-            "${baseline_report}" \
+            "${baseline_path}" \
             "${model_output_dir}/certificates/clean_edit" \
             "run_${run}" \
-            "${preset_dir}"
+            "${preset_dir}" \
+            "${model_name}"
     done
 
     # Step 5: Stress edit (int4 aggressive)
@@ -1546,10 +1866,11 @@ process_model() {
     for run in $(seq 1 "${STRESS_EDIT_RUNS}"); do
         run_invarlock_certify \
             "${stress_edit_path}" \
-            "${baseline_report}" \
+            "${baseline_path}" \
             "${model_output_dir}/certificates/stress_edit" \
             "run_${run}" \
-            "${preset_dir}"
+            "${preset_dir}" \
+            "${model_name}"
     done
 
     # Step 6: Error injection tests
@@ -1569,10 +1890,11 @@ process_model() {
 
             run_invarlock_certify \
                 "${error_path}" \
-                "${baseline_report}" \
+                "${baseline_path}" \
                 "${model_output_dir}/certificates/errors" \
                 "${error_type}" \
-                "${preset_dir}"
+                "${preset_dir}" \
+                "${model_name}"
         done
     fi
 
@@ -1974,6 +2296,8 @@ main() {
 
     # Phase 0: Check dependencies
     check_dependencies
+    resolve_model_dtype
+    detect_flash_attention
 
     # Process each model
     for model_id in "${MODEL_1}" "${MODEL_2}" ${MODEL_3:+"${MODEL_3}"}; do
@@ -2015,15 +2339,25 @@ Options (via environment variables):
 
     EDIT_BITS             Quantization bits (default: 8)
     EVAL_TASKS            lm-eval tasks (default: mmlu,hellaswag,arc_challenge,winogrande)
+    LMEVAL_DTYPE          lm-eval dtype (auto|bfloat16|float16)
+    LMEVAL_PARALLELIZE    lm-eval parallelize on multi-GPU (default: true)
 
     DRIFT_CALIBRATION_RUNS  Number of calibration runs (default: 5)
     RUN_ERROR_INJECTION     Run error injection tests (default: true)
     OUTPUT_DIR              Output directory
+    SKIP_FLASH_ATTN         Disable Flash Attention 2 if installed (default: false)
+
+    INVARLOCK_SEQ_LEN       InvarLock sequence length (default: 512)
+    INVARLOCK_STRIDE        InvarLock stride (default: 256)
+    INVARLOCK_EVAL_BATCH    InvarLock eval batch size (default: 4)
+    INVARLOCK_MODEL_DTYPE   InvarLock dtype (auto|bfloat16|float16)
+    INVARLOCK_ADAPTER       InvarLock adapter (default: hf_causal_auto)
+    INVARLOCK_DATASET       InvarLock dataset provider (default: wikitext2)
 
 Calibration extracts:
-    • Spectral: family_caps.{family}.kappa from family_z_quantiles
-    • RMT: epsilon.{family} from family_stats.outlier_fraction
-    • Variance: deadband, min_effect_lognll from calibration_stats
+    • Spectral: family_caps.{family}.kappa from per-run order-statistic on final_z_scores
+    • RMT: epsilon.{family} from per-family delta quantiles
+    • Variance: deadband from calibration_stats, min_effect_lognll from predictive_gate.delta_ci
     • Drift: suggested_band from primary_metric ratios
 
 Example:

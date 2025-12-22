@@ -10,12 +10,18 @@ Additionally, a compact `policy_digest` object captures threshold floors and hys
 
 - Canonicalization: JSON serialize with sorted keys (standard JSON booleans and numbers; no locale‑specific formatting).
 - Digest: `sha256(canonical)[0:16]` → `policy_digest`.
+- The canonical payload includes `resolved_policy` plus the ordered `overrides` list, so
+  reordering overrides changes the digest.
 
 Pseudocode to recompute the digest locally:
 
 ```python
 import json, hashlib
-canonical = json.dumps(resolved_policy, sort_keys=True, default=str)
+canonical = json.dumps(
+    {"resolved_policy": resolved_policy, "overrides": overrides},
+    sort_keys=True,
+    default=str,
+)
 digest = hashlib.sha256(canonical.encode()).hexdigest()[:16]
 ```
 
@@ -32,7 +38,7 @@ digest = hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
 ## Auditor Checklist
 
-1) Extract `resolved_policy` from the certificate.
+1) Extract `resolved_policy` and the ordered `policy_provenance.overrides` list.
 2) Recompute the digest locally (see pseudocode).
 3) Confirm it matches `policy_provenance.policy_digest` and `auto.policy_digest`.
 

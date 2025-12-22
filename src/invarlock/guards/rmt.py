@@ -11,6 +11,7 @@ to training instability.
 
 from __future__ import annotations
 
+import itertools
 import math
 from dataclasses import dataclass
 from datetime import datetime
@@ -1117,8 +1118,9 @@ class RMTGuard(Guard):
     """
     Standalone RMT Guard for baseline-aware outlier detection and correction.
 
-    Implements Marchenko-Pastur theory-based spectral health checking with:
-    - Baseline capture of MP bulk edges for linear layers
+    Implements Marchenko-Pastur theory-based outlier tracking with:
+    - Activation-based outlier counts from calibration batches
+    - Baseline capture of MP bulk edges for linear layers (correction/fallback)
     - Conservative outlier detection with deadband support
     - Optional in-place correction preserving weight tying
     - Comprehensive event logging and metrics
@@ -1129,7 +1131,7 @@ class RMTGuard(Guard):
     - margin: RMT threshold ratio (default 1.5)
     - correct: Enable automatic correction (default True)
 
-    Linear Layer Scope (enforced):
+    Linear Layer Scope (correction/fallback):
     - attn.c_attn, attn.c_proj, mlp.c_fc, mlp.c_proj
     - Excludes: embeddings, LM head, layer norms, biases
     """
@@ -1164,6 +1166,13 @@ class RMTGuard(Guard):
             self.epsilon_by_family.setdefault(family_key, self.epsilon_default)
 
         # Internal state
+        self._calibration_batches: list[Any] = []
+        self._activation_ready = False
+        self._require_activation = False
+        self._activation_required_failed = False
+        self._activation_required_reason: str | None = None
+        self._run_profile: str | None = None
+        self._run_tier: str | None = None
         self.baseline_mp_stats: dict[str, dict[str, float]] | None = None
         self.baseline_sigmas: dict[str, float] | None = None
         self.prepared = False
@@ -1197,6 +1206,22 @@ class RMTGuard(Guard):
             "data": data,
         }
         self.events.append(event)
+
+    def set_run_context(self, report: Any) -> None:
+        """Capture tier/profile context for activation requirements."""
+        ctx = getattr(report, "context", {}) or {}
+        profile = ""
+        tier = "balanced"
+        if isinstance(ctx, dict):
+            profile = str(ctx.get("profile", "") or "").strip().lower()
+            auto = ctx.get("auto")
+            if isinstance(auto, dict):
+                tier = str(auto.get("tier", tier) or tier).strip().lower()
+        self._run_profile = profile or None
+        self._run_tier = tier or None
+        self._require_activation = bool(
+            profile in {"ci", "release"} and tier in {"balanced", "conservative"}
+        )
 
     def _set_epsilon(self, epsilon: float | dict[str, float] | None) -> None:
         """Configure epsilon defaults and per-family overrides."""
@@ -1244,11 +1269,21 @@ class RMTGuard(Guard):
         """Count outliers grouped by family."""
         counts: dict[str, int] = {}
         for layer_info in per_layer:
-            if not layer_info.get("has_outlier"):
-                continue
+            outlier_count = layer_info.get("outlier_count")
+            if outlier_count is None:
+                if not layer_info.get("has_outlier"):
+                    continue
+                increment = 1
+            else:
+                try:
+                    increment = int(outlier_count)
+                except (TypeError, ValueError):
+                    continue
+                if increment <= 0:
+                    continue
             module_name = layer_info.get("module_name", "")
             family = self._classify_family(module_name)
-            counts[family] = counts.get(family, 0) + 1
+            counts[family] = counts.get(family, 0) + increment
         return counts
 
     def _compute_epsilon_violations(self) -> list[dict[str, Any]]:
@@ -1311,6 +1346,295 @@ class RMTGuard(Guard):
                     modules.append((name, module))
 
         return modules
+
+    def _collect_calibration_batches(self, calib: Any, max_windows: int) -> list[Any]:
+        """Collect a deterministic slice of calibration batches."""
+        if calib is None or max_windows <= 0:
+            return []
+        source = getattr(calib, "dataloader", None) or calib
+        try:
+            iterator = iter(source)
+        except TypeError:
+            return []
+        return list(itertools.islice(iterator, max_windows))
+
+    def _prepare_activation_inputs(
+        self, batch: Any, device: torch.device
+    ) -> tuple[torch.Tensor | None, torch.Tensor | None]:
+        """Normalize batch inputs to tensors on the target device."""
+        if isinstance(batch, dict):
+            input_ids = batch.get("input_ids", batch.get("inputs"))
+            attention_mask = batch.get("attention_mask")
+        elif isinstance(batch, tuple | list) and batch:
+            input_ids = batch[0]
+            attention_mask = batch[1] if len(batch) > 1 else None
+        else:
+            input_ids = batch
+            attention_mask = None
+
+        if input_ids is None:
+            return None, None
+
+        if not isinstance(input_ids, torch.Tensor):
+            input_ids = torch.as_tensor(input_ids)
+        if input_ids.dim() == 1:
+            input_ids = input_ids.unsqueeze(0)
+        try:
+            input_ids = input_ids.to(device)
+        except Exception:
+            input_ids = input_ids.clone()
+
+        if attention_mask is not None:
+            if not isinstance(attention_mask, torch.Tensor):
+                attention_mask = torch.as_tensor(attention_mask)
+            if attention_mask.dim() == 1:
+                attention_mask = attention_mask.unsqueeze(0)
+            try:
+                attention_mask = attention_mask.to(device)
+            except Exception:
+                attention_mask = attention_mask.clone()
+
+        return input_ids, attention_mask
+
+    @staticmethod
+    def _batch_token_weight(
+        input_ids: torch.Tensor | None, attention_mask: torch.Tensor | None
+    ) -> int:
+        """Compute token-weight for a batch (used for activation outlier weighting)."""
+        weight = 0
+        if isinstance(attention_mask, torch.Tensor):
+            try:
+                weight = int(attention_mask.sum().item())
+            except Exception:
+                weight = 0
+        if weight <= 0 and isinstance(input_ids, torch.Tensor):
+            try:
+                weight = int(input_ids.numel())
+            except Exception:
+                weight = 0
+        return max(weight, 1)
+
+    def _get_activation_modules(self, model: nn.Module) -> list[tuple[str, nn.Module]]:
+        """Return modules to analyze for activation-based RMT."""
+        modules: list[tuple[str, nn.Module]] = []
+        try:
+            from transformers.pytorch_utils import Conv1D
+
+            module_types_with_conv1d: tuple[
+                type[nn.Linear], type[nn.Conv1d], type[Conv1D]
+            ] = (nn.Linear, nn.Conv1d, Conv1D)
+            module_types = module_types_with_conv1d
+        except ImportError:
+            module_types_without_conv1d: tuple[type[nn.Linear], type[nn.Conv1d]] = (
+                nn.Linear,
+                nn.Conv1d,
+            )
+            module_types = module_types_without_conv1d
+
+        for name, module in model.named_modules():
+            if isinstance(module, nn.Embedding):
+                modules.append((name, module))
+                continue
+            if isinstance(module, nn.LayerNorm):
+                modules.append((name, module))
+                continue
+            if isinstance(module, module_types) and hasattr(module, "weight"):
+                name_lower = name.lower()
+                if any(
+                    name.endswith(suffix) for suffix in self.allowed_suffixes
+                ) or any(
+                    tok in name_lower
+                    for tok in (
+                        "attn",
+                        "attention",
+                        "mlp",
+                        "ffn",
+                        "router",
+                        "expert",
+                        "moe",
+                        "gate",
+                        "gating",
+                        "switch",
+                    )
+                ):
+                    modules.append((name, module))
+
+        return modules
+
+    def _activation_svd_outliers(
+        self, activations: Any, margin: float, deadband: float
+    ) -> tuple[int, float, float]:
+        """Count activation singular values beyond the MP edge."""
+        if isinstance(activations, tuple | list):
+            activations = activations[0] if activations else None
+        if not isinstance(activations, torch.Tensor):
+            return 0, 0.0, 0.0
+
+        if activations.dim() < 2:
+            return 0, 0.0, 0.0
+
+        if activations.dim() > 2:
+            activations = activations.reshape(-1, activations.shape[-1])
+
+        if activations.numel() == 0:
+            return 0, 0.0, 0.0
+
+        try:
+            mat = activations.detach().float().cpu()
+        except Exception:
+            return 0, 0.0, 0.0
+
+        if not torch.isfinite(mat).all():
+            return 0, 0.0, 0.0
+
+        mat = mat - mat.mean()
+        std = float(mat.std().item())
+        if not math.isfinite(std) or std <= 0.0:
+            return 0, 0.0, 0.0
+
+        mat = mat / std
+        m, n = mat.shape
+        mp_edge_val = mp_bulk_edge(m, n, whitened=False)
+        threshold = mp_edge_val * (1.0 + deadband) * margin
+
+        try:
+            s_vals = torch.linalg.svdvals(mat)
+        except (RuntimeError, torch.linalg.LinAlgError):
+            return 0, 0.0, 0.0
+
+        if s_vals.numel() == 0:
+            return 0, 0.0, 0.0
+
+        sigma_max = float(s_vals.max().item())
+        max_ratio = sigma_max / max(mp_edge_val, 1e-12)
+        outlier_count = int((s_vals > threshold).sum().item())
+        return outlier_count, float(max_ratio), sigma_max
+
+    def _compute_activation_outliers(
+        self, model: nn.Module, batches: list[Any]
+    ) -> dict[str, Any] | None:
+        """Compute activation-based RMT outlier counts."""
+        if not batches:
+            return None
+
+        modules = self._get_activation_modules(model)
+        if not modules:
+            return None
+
+        per_layer_map: dict[str, dict[str, Any]] = {}
+        batch_weight_holder = {"weight": 1}
+        for idx, (module_name, _module) in enumerate(modules):
+            per_layer_map[module_name] = {
+                "layer": idx,
+                "module_name": module_name,
+                "sigma_max": 0.0,
+                "worst_ratio": 0.0,
+                "outlier_count": 0,
+                "has_outlier": False,
+            }
+
+        handles: list[Any] = []
+
+        def _make_hook(name: str):
+            def _hook(_module: nn.Module, _inputs: tuple[Any, ...], output: Any):
+                try:
+                    outliers, max_ratio, sigma_max = self._activation_svd_outliers(
+                        output, self.margin, self.deadband
+                    )
+                except Exception:
+                    return
+                stats = per_layer_map.get(name)
+                if stats is None:
+                    return
+                weight = int(batch_weight_holder.get("weight", 1) or 1)
+                if outliers > 0:
+                    increment = int(outliers) * weight
+                    stats["outlier_count"] = (
+                        int(stats.get("outlier_count", 0)) + increment
+                    )
+                    stats["has_outlier"] = True
+                stats["worst_ratio"] = max(
+                    float(stats.get("worst_ratio", 0.0)), float(max_ratio)
+                )
+                stats["sigma_max"] = max(
+                    float(stats.get("sigma_max", 0.0)), float(sigma_max)
+                )
+
+            return _hook
+
+        for name, module in modules:
+            try:
+                handles.append(module.register_forward_hook(_make_hook(name)))
+            except Exception:
+                continue
+
+        model_was_training = model.training
+        model.eval()
+        device = next(model.parameters()).device
+        batches_used = 0
+        token_weight_total = 0
+
+        try:
+            with torch.no_grad():
+                for batch in batches:
+                    inputs, attention_mask = self._prepare_activation_inputs(
+                        batch, device
+                    )
+                    if inputs is None:
+                        continue
+                    batch_weight = self._batch_token_weight(inputs, attention_mask)
+                    batch_weight_holder["weight"] = batch_weight
+                    try:
+                        if attention_mask is not None:
+                            model(inputs, attention_mask=attention_mask)
+                        else:
+                            model(inputs)
+                        batches_used += 1
+                        token_weight_total += batch_weight
+                    except TypeError:
+                        try:
+                            model(inputs)
+                            batches_used += 1
+                            token_weight_total += batch_weight
+                        except Exception:
+                            continue
+                    except Exception:
+                        continue
+        finally:
+            for handle in handles:
+                try:
+                    handle.remove()
+                except Exception:
+                    pass
+            if model_was_training:
+                model.train()
+
+        if batches_used == 0:
+            return None
+
+        per_layer = [per_layer_map[name] for name, _module in modules]
+        flagged_layers = [
+            info["layer"] for info in per_layer if info.get("has_outlier")
+        ]
+        outlier_total = sum(
+            int(info.get("outlier_count", 0) or 0) for info in per_layer
+        )
+        max_ratio = max(
+            (float(info.get("worst_ratio", 0.0)) for info in per_layer), default=0.0
+        )
+
+        return {
+            "has_outliers": bool(flagged_layers),
+            "n_layers_flagged": len(flagged_layers),
+            "outlier_count": outlier_total,
+            "max_ratio": max_ratio,
+            "threshold": (1.0 + self.deadband) * self.margin,
+            "per_layer": per_layer,
+            "flagged_layers": flagged_layers,
+            "analysis_source": "activations",
+            "token_weight_total": int(token_weight_total),
+            "token_weighted": True,
+        }
 
     def _apply_rmt_detection_and_correction(self, model: nn.Module) -> dict[str, Any]:
         """
@@ -1462,7 +1786,7 @@ class RMTGuard(Guard):
         Args:
             model: The model that will be edited
             adapter: ModelAdapter (optional, for tying map access)
-            calib: Calibration data (unused for RMT)
+            calib: Calibration data for activation-based outlier counting
             policy: Guard policy parameters (optional)
 
         Returns:
@@ -1471,6 +1795,8 @@ class RMTGuard(Guard):
         import time
 
         start_time = time.time()
+        self._activation_required_failed = False
+        self._activation_required_reason = None
 
         # Store adapter for tying map access during correction
         self.adapter = adapter
@@ -1485,6 +1811,8 @@ class RMTGuard(Guard):
                 self._set_epsilon(policy["epsilon"])
             if "epsilon_by_family" in policy:
                 self._set_epsilon(policy["epsilon_by_family"])
+            if "activation_required" in policy:
+                self._require_activation = bool(policy.get("activation_required"))
 
         self._log_event(
             "prepare",
@@ -1502,19 +1830,59 @@ class RMTGuard(Guard):
 
             # Get linear modules in scope
             linear_modules = self._get_linear_modules(model)
+            self._activation_ready = False
+            self._calibration_batches = []
+            max_windows = 0
+            if calib is not None:
+                source = getattr(calib, "dataloader", None) or calib
+                if hasattr(source, "__len__"):
+                    try:
+                        max_windows = int(len(source))
+                    except Exception:
+                        max_windows = 0
+                self._calibration_batches = self._collect_calibration_batches(
+                    calib, max_windows
+                )
 
-            baseline_detection = rmt_detect(
-                model=model,
-                threshold=self.margin,
-                detect_only=True,
-                baseline_sigmas=self.baseline_sigmas,
-                baseline_mp_stats=self.baseline_mp_stats,
-                deadband=self.deadband,
-            )
-            self.baseline_total_outliers = baseline_detection.get("n_layers_flagged", 0)
-            self.baseline_outliers_per_family = self._count_outliers_per_family(
-                baseline_detection.get("per_layer", [])
-            )
+            activation_baseline = None
+            if self._calibration_batches:
+                activation_baseline = self._compute_activation_outliers(
+                    model, self._calibration_batches
+                )
+
+            if activation_baseline:
+                self._activation_ready = True
+                self.baseline_total_outliers = int(
+                    activation_baseline.get("outlier_count", 0) or 0
+                )
+                self.baseline_outliers_per_family = self._count_outliers_per_family(
+                    activation_baseline.get("per_layer", [])
+                )
+            else:
+                if self._require_activation:
+                    self._activation_required_failed = True
+                    self._activation_required_reason = "activation_baseline_unavailable"
+                    self._log_event(
+                        "activation_required_missing",
+                        level="ERROR",
+                        message="Activation baseline unavailable for RMT",
+                        profile=self._run_profile,
+                        tier=self._run_tier,
+                    )
+                baseline_detection = rmt_detect(
+                    model=model,
+                    threshold=self.margin,
+                    detect_only=True,
+                    baseline_sigmas=self.baseline_sigmas,
+                    baseline_mp_stats=self.baseline_mp_stats,
+                    deadband=self.deadband,
+                )
+                self.baseline_total_outliers = baseline_detection.get(
+                    "n_layers_flagged", 0
+                )
+                self.baseline_outliers_per_family = self._count_outliers_per_family(
+                    baseline_detection.get("per_layer", [])
+                )
             for family_key in ("attn", "ffn", "embed", "other"):
                 self.baseline_outliers_per_family.setdefault(family_key, 0)
             self.outliers_per_family = {}
@@ -1595,7 +1963,7 @@ class RMTGuard(Guard):
         Args:
             model: The model that was just edited
         """
-        if not self.prepared or not self.baseline_mp_stats:
+        if not self.prepared:
             self._log_event(
                 "after_edit_skipped",
                 level="WARN",
@@ -1606,22 +1974,87 @@ class RMTGuard(Guard):
         self._log_event("after_edit", message="Applying RMT detection and correction")
 
         try:
-            # Perform RMT detection with baseline awareness
-            # Create custom detection with proper adapter support
-            if self.correct:
-                # Apply correction using enhanced logic with adapter support
-                detection_result = self._apply_rmt_detection_and_correction(model)
-            else:
-                # Detection only
-                detection_result = rmt_detect(
-                    model=model,
-                    threshold=self.margin,  # Use margin as threshold
-                    detect_only=True,
-                    verbose=False,
-                    baseline_sigmas=self.baseline_sigmas,
-                    baseline_mp_stats=self.baseline_mp_stats,
-                    deadband=self.deadband,
+            detection_result: dict[str, Any] | None = None
+            corrected_layers = 0
+            correction_iterations = 0
+            use_activation = bool(self._activation_ready and self._calibration_batches)
+
+            if self._require_activation and not use_activation:
+                self._activation_required_failed = True
+                self._activation_required_reason = "activation_unavailable"
+                self._last_result = {
+                    "has_outliers": False,
+                    "n_layers_flagged": 0,
+                    "per_layer": [],
+                    "max_ratio": 0.0,
+                    "analysis_source": "activations",
+                }
+                self._log_event(
+                    "activation_required_missing",
+                    level="ERROR",
+                    message="Activation outlier analysis required but unavailable",
+                    profile=self._run_profile,
+                    tier=self._run_tier,
                 )
+                return
+
+            if use_activation:
+                if self.correct:
+                    correction_result = self._apply_rmt_detection_and_correction(model)
+                    correction_iterations = int(
+                        correction_result.get("correction_iterations", 0) or 0
+                    )
+                    corrected_layers = int(
+                        correction_result.get("corrected_layers", 0) or 0
+                    )
+                detection_result = self._compute_activation_outliers(
+                    model, self._calibration_batches
+                )
+                if not detection_result:
+                    if self._require_activation:
+                        self._activation_required_failed = True
+                        self._activation_required_reason = (
+                            "activation_outliers_unavailable"
+                        )
+                        self._last_result = {
+                            "has_outliers": False,
+                            "n_layers_flagged": 0,
+                            "per_layer": [],
+                            "max_ratio": 0.0,
+                            "analysis_source": "activations",
+                        }
+                        self._log_event(
+                            "activation_required_missing",
+                            level="ERROR",
+                            message="Activation outlier analysis failed",
+                            profile=self._run_profile,
+                            tier=self._run_tier,
+                        )
+                        return
+                    use_activation = False
+
+            if not use_activation:
+                if self.correct:
+                    # Apply correction using enhanced logic with adapter support
+                    detection_result = self._apply_rmt_detection_and_correction(model)
+                else:
+                    # Detection only
+                    detection_result = rmt_detect(
+                        model=model,
+                        threshold=self.margin,  # Use margin as threshold
+                        detect_only=True,
+                        verbose=False,
+                        baseline_sigmas=self.baseline_sigmas,
+                        baseline_mp_stats=self.baseline_mp_stats,
+                        deadband=self.deadband,
+                    )
+
+            if detection_result is None:
+                raise RuntimeError("RMT detection failed to produce results")
+
+            if use_activation:
+                detection_result["correction_iterations"] = correction_iterations
+                detection_result["corrected_layers"] = corrected_layers
 
             # Store results
             self._last_result = detection_result
@@ -1630,9 +2063,12 @@ class RMTGuard(Guard):
             )
             for family_key in ("attn", "ffn", "embed", "other"):
                 self.outliers_per_family.setdefault(family_key, 0)
-            self.outliers_total = detection_result.get(
-                "n_layers_flagged", len(self.outliers_per_family)
-            )
+            outlier_total = detection_result.get("outlier_count")
+            if outlier_total is None:
+                outlier_total = detection_result.get(
+                    "n_layers_flagged", len(self.outliers_per_family)
+                )
+            self.outliers_total = int(outlier_total or 0)
             self.epsilon_violations = self._compute_epsilon_violations()
 
             flagged_layers = detection_result.get("n_layers_flagged", 0)
@@ -1779,6 +2215,49 @@ class RMTGuard(Guard):
                 }
 
         # Get results from after_edit
+        if self._require_activation and (
+            self._activation_required_failed or not self._activation_ready
+        ):
+            reason = self._activation_required_reason or "activation_required"
+            message = "Activation outlier analysis required but unavailable"
+            finalize_time = time.time() - start_time
+            if HAS_GUARD_OUTCOME:
+                return GuardOutcome(
+                    name=self.name,
+                    passed=False,
+                    action="rollback",
+                    violations=[
+                        {
+                            "type": "activation_required",
+                            "severity": "error",
+                            "message": message,
+                            "module_name": None,
+                            "reason": reason,
+                        }
+                    ],
+                    metrics={
+                        "prepared": True,
+                        "activation_required": True,
+                        "activation_ready": False,
+                        "activation_reason": reason,
+                        "finalize_time": finalize_time,
+                    },
+                )
+            return {
+                "passed": False,
+                "metrics": {
+                    "prepared": True,
+                    "activation_required": True,
+                    "activation_ready": False,
+                    "activation_reason": reason,
+                    "finalize_time": finalize_time,
+                },
+                "warnings": [],
+                "errors": [message],
+                "violations": [],
+                "events": self.events,
+            }
+
         result = self._last_result or {
             "has_outliers": False,
             "n_layers_flagged": 0,
@@ -1793,7 +2272,10 @@ class RMTGuard(Guard):
         for family_key in ("attn", "ffn", "embed", "other"):
             self.outliers_per_family.setdefault(family_key, 0)
             self.baseline_outliers_per_family.setdefault(family_key, 0)
-        self.outliers_total = result.get("n_layers_flagged", self.outliers_total or 0)
+        outlier_total = result.get("outlier_count")
+        if outlier_total is None:
+            outlier_total = result.get("n_layers_flagged", self.outliers_total or 0)
+        self.outliers_total = int(outlier_total or 0)
         self.epsilon_violations = self._compute_epsilon_violations()
         # Contracts: epsilon non-negative, counts non-negative
         for fam, eps in self.epsilon_by_family.items():
@@ -1812,12 +2294,17 @@ class RMTGuard(Guard):
 
         # Calculate metrics
         flagged_layers = result.get("n_layers_flagged", 0)
-        total_layers = len(self.baseline_mp_stats) if self.baseline_mp_stats else 0
+        total_layers = (
+            len(result.get("per_layer", []))
+            if result.get("per_layer")
+            else len(self.baseline_mp_stats)
+            if self.baseline_mp_stats
+            else 0
+        )
         flagged_rate = flagged_layers / total_layers if total_layers > 0 else 0.0
 
-        # Step 5 validation gate: no increase in outliers vs bare edit, ≤1% primary-metric cost
-        # For now, use flagged rate as proxy (will be enhanced with PM checking)
-        passed = flagged_rate <= 0.5  # Allow up to 50% flagged for conservative gate
+        # Acceptance gate: pass when epsilon-rule holds per family.
+        passed = not bool(self.epsilon_violations)
 
         # Generate violations for GuardOutcome
         violations = []
@@ -1844,11 +2331,10 @@ class RMTGuard(Guard):
                 f"High RMT outlier rate: {flagged_layers}/{total_layers} layers flagged ({flagged_rate:.1%})"
             )
 
-        if flagged_rate > 0.7:  # Error threshold at 70%
-            errors.append(
+        if flagged_rate > 0.7:  # Escalate to warning for unusually high rates
+            warnings.append(
                 f"Excessive RMT outliers: {flagged_layers}/{total_layers} layers flagged"
             )
-            passed = False
 
         if self.epsilon_violations:
             passed = False
@@ -1879,6 +2365,10 @@ class RMTGuard(Guard):
             if self.baseline_mp_stats
             else 0,
             "finalize_time": finalize_time,
+            "activation_required": bool(self._require_activation),
+            "activation_ready": bool(self._activation_ready),
+            "analysis_source": result.get("analysis_source"),
+            "token_weight_total": result.get("token_weight_total"),
             "baseline_outliers_per_family": {
                 k: int(v) for k, v in self.baseline_outliers_per_family.items()
             },

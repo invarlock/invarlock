@@ -41,6 +41,31 @@ BOOTSTRAP_COVERAGE_REQUIREMENTS = {
 __all__ = ["CoreRunner"]
 
 
+_BOOL_TRUE = {"1", "true", "yes", "on"}
+_BOOL_FALSE = {"0", "false", "no", "off"}
+
+
+def _coerce_bool(value: Any) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int) and value in {0, 1}:
+        return bool(value)
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in _BOOL_TRUE:
+            return True
+        if lowered in _BOOL_FALSE:
+            return False
+    return None
+
+
+def _env_flag(name: str) -> bool | None:
+    raw = os.environ.get(name)
+    if raw is None:
+        return None
+    return _coerce_bool(raw)
+
+
 def _collect_cuda_flags() -> dict[str, Any]:
     """Capture deterministic CUDA configuration for provenance."""
     flags: dict[str, Any] = {}
@@ -80,6 +105,8 @@ class CoreRunner:
     def __init__(self):
         self.event_logger: EventLogger | None = None
         self.checkpoint_manager: CheckpointManager | None = None
+        self._active_model: Any | None = None
+        self._active_adapter: ModelAdapter | None = None
 
     def execute(
         self,
@@ -111,6 +138,8 @@ class CoreRunner:
         """
         # Initialize services
         self._initialize_services(config)
+        self._active_model = model
+        self._active_adapter = adapter
 
         # Create report
         report = RunReport()
@@ -135,6 +164,19 @@ class CoreRunner:
         # Store auto configuration for tier resolution
         if auto_config:
             report.meta["auto"] = auto_config
+            # Ensure tier/profile context is available to guards + evaluation code.
+            if isinstance(config.context, dict):
+                existing_auto = config.context.get("auto")
+                if isinstance(existing_auto, dict):
+                    merged_auto = dict(existing_auto)
+                    merged_auto.update(auto_config)
+                    config.context["auto"] = merged_auto
+                else:
+                    config.context["auto"] = dict(auto_config)
+                try:
+                    report.context["auto"] = config.context["auto"]
+                except Exception:
+                    pass
 
         report.status = RunStatus.RUNNING.value
 
@@ -156,7 +198,13 @@ class CoreRunner:
 
             # Phase 2: Prepare guards (must happen before edit)
             self._prepare_guards_phase(
-                model, adapter, guards, calibration_data, report, auto_config
+                model,
+                adapter,
+                guards,
+                calibration_data,
+                report,
+                auto_config,
+                config,
             )
 
             # Phase 3: Apply edit
@@ -197,10 +245,12 @@ class CoreRunner:
             return report
 
         except Exception as e:
-            self._handle_error(e, report)
+            self._handle_error(e, report, model=model, adapter=adapter)
             return report
 
         finally:
+            self._active_model = None
+            self._active_adapter = None
             self._cleanup_services()
 
     def _initialize_services(self, config: RunConfig) -> None:
@@ -307,11 +357,15 @@ class CoreRunner:
         calibration_data: Any,
         report: RunReport,
         auto_config: dict[str, Any] | None = None,
+        config: RunConfig | None = None,
     ) -> None:
         """Phase 2: Prepare safety guards with tier-resolved policies."""
         self._log_event(
             "guards_prepare", "start", LogLevel.INFO, {"count": len(guards)}
         )
+
+        policy_flags = self._resolve_policy_flags(config)
+        strict_guard_prepare = policy_flags["strict_guard_prepare"]
 
         # Resolve tier policies before guard preparation
         tier_policies = self._resolve_guard_policies(report, auto_config)
@@ -374,6 +428,13 @@ class CoreRunner:
                     LogLevel.ERROR,
                     {"guard": guard.name, "error": str(e)},
                 )
+                report.meta.setdefault("guard_prepare_failures", []).append(
+                    {"guard": guard.name, "error": str(e)}
+                )
+                if strict_guard_prepare:
+                    raise RuntimeError(
+                        f"Guard '{guard.name}' prepare failed: {e}"
+                    ) from e
 
         # Store resolved policies in report for certificate
         report.meta["tier_policies"] = tier_policies
@@ -522,6 +583,20 @@ class CoreRunner:
             }
             eval_windows = {"preview": {}, "final": {}}
 
+        policy_flags = self._resolve_policy_flags(config)
+        eval_error = metrics.get("eval_error") if isinstance(metrics, dict) else None
+        if eval_error:
+            if policy_flags["strict_eval"]:
+                raise RuntimeError(
+                    f"Evaluation failed: {eval_error.get('message', 'unknown error')}"
+                )
+            self._log_event(
+                "eval",
+                "soft_fail",
+                LogLevel.WARNING,
+                {"message": eval_error.get("message"), "type": eval_error.get("type")},
+            )
+
         # Store metrics in report
         if hasattr(report, "metrics"):
             report.metrics.update(metrics)
@@ -568,6 +643,18 @@ class CoreRunner:
 
         process = psutil.Process(os.getpid())
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB
+
+        policy_flags = self._resolve_policy_flags(config)
+        allow_materialize = policy_flags["allow_calibration_materialize"]
+
+        if not hasattr(calibration_data, "__len__"):
+            if allow_materialize and hasattr(calibration_data, "__iter__"):
+                calibration_data = list(calibration_data)
+            else:
+                raise ValueError(
+                    "Calibration data must define __len__ (or enable materialization "
+                    "via INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE or context.run.allow_calibration_materialize)."
+                )
 
         total_available = (
             len(calibration_data) if hasattr(calibration_data, "__len__") else 0
@@ -635,8 +722,34 @@ class CoreRunner:
             )
             final_n = remaining
 
-        preview_data = calibration_data[:preview_n]
-        final_data = calibration_data[final_start : final_start + final_n]
+        def _slice_calibration(start: int, count: int) -> list[Any]:
+            nonlocal calibration_data
+            end = start + count
+            try:
+                sliced = calibration_data[start:end]
+                return sliced if isinstance(sliced, list) else list(sliced)
+            except Exception as err:
+                if hasattr(calibration_data, "__getitem__") and hasattr(
+                    calibration_data, "__len__"
+                ):
+                    try:
+                        return [calibration_data[i] for i in range(start, end)]
+                    except Exception:
+                        pass
+                if allow_materialize and hasattr(calibration_data, "__iter__"):
+                    calibration_data = (
+                        calibration_data
+                        if isinstance(calibration_data, list)
+                        else list(calibration_data)
+                    )
+                    return calibration_data[start:end]
+                raise TypeError(
+                    "Calibration data must support slicing or random access. "
+                    "Provide a list/sequence or enable materialization."
+                ) from err
+
+        preview_data = _slice_calibration(0, preview_n)
+        final_data = _slice_calibration(final_start, final_n)
 
         eval_context: dict[str, Any] = {}
         if config and isinstance(config.context, dict):
@@ -685,6 +798,7 @@ class CoreRunner:
         bootstrap_seed = (
             bootstrap_seed_cfg if bootstrap_seed_cfg is not None else dataset_seed
         )
+        eval_error: dict[str, Any] | None = None
         try:
             bootstrap_seed = int(bootstrap_seed) if bootstrap_seed is not None else 0
         except (TypeError, ValueError):
@@ -1156,6 +1270,12 @@ class CoreRunner:
 
             # primary_metric consumers use log-space intervals; skip ppl-space tuple here
 
+            paired_weights: list[float] | None = None
+            if preview_token_counts:
+                paired_weights = [float(max(w, 0)) for w in preview_token_counts]
+            elif final_token_counts:
+                paired_weights = [float(max(w, 0)) for w in final_token_counts]
+
             if (
                 bootstrap_enabled
                 and final_log_losses
@@ -1166,6 +1286,7 @@ class CoreRunner:
                 delta_log_ci = compute_paired_delta_log_ci(
                     final_log_losses,
                     preview_log_losses,
+                    weights=paired_weights,
                     method=delta_method,
                     replicates=bootstrap_replicates,
                     alpha=bootstrap_alpha,
@@ -1194,6 +1315,10 @@ class CoreRunner:
                     if preview_token_counts and len(preview_token_counts) >= limit:
                         delta_weights = [
                             float(max(preview_token_counts[i], 1)) for i in range(limit)
+                        ]
+                    elif final_token_counts and len(final_token_counts) >= limit:
+                        delta_weights = [
+                            float(max(final_token_counts[i], 1)) for i in range(limit)
                         ]
 
             degenerate_delta = False
@@ -1238,6 +1363,26 @@ class CoreRunner:
                 if not hashes:
                     return 0.0
                 return max(0.0, (len(hashes) - unique) / len(hashes))
+
+            def _overlap_fraction_from_config(cfg: RunConfig | None) -> float | None:
+                if not cfg or not isinstance(cfg.context, dict):
+                    return None
+                dataset_cfg = cfg.context.get("dataset", {})
+                if not isinstance(dataset_cfg, dict):
+                    return None
+                seq_len_val = dataset_cfg.get("seq_len")
+                stride_val = dataset_cfg.get("stride", seq_len_val)
+                try:
+                    seq_len_f = float(seq_len_val)
+                    stride_f = float(stride_val)
+                except (TypeError, ValueError):
+                    return None
+                if not math.isfinite(seq_len_f) or seq_len_f <= 0:
+                    return None
+                if not math.isfinite(stride_f) or stride_f < 0:
+                    return None
+                overlap = (seq_len_f - stride_f) / seq_len_f
+                return max(0.0, min(1.0, float(overlap)))
 
             def _compare_with_baseline(
                 run_ids: list[int],
@@ -1344,10 +1489,23 @@ class CoreRunner:
                 preview_pair_stats["expected"] + final_pair_stats["expected"]
             )
             total_matched = preview_pair_stats["matched"] + final_pair_stats["matched"]
-            window_match_fraction = (
-                float(total_matched / total_expected) if total_expected > 0 else 1.0
+            total_unexpected = len(preview_pair_stats["unexpected_ids"]) + len(
+                final_pair_stats["unexpected_ids"]
             )
-            window_overlap_fraction = _duplicate_fraction(preview_tokens + final_tokens)
+            match_denominator = total_expected + total_unexpected
+            window_match_fraction = (
+                float(total_matched / match_denominator)
+                if match_denominator > 0
+                else 1.0
+            )
+            duplicate_fraction = _duplicate_fraction(preview_tokens + final_tokens)
+            overlap_fraction = _overlap_fraction_from_config(config)
+            overlap_unknown = False
+            if overlap_fraction is None:
+                overlap_unknown = True
+                overlap_fraction = 1.0
+            window_overlap_fraction = float(overlap_fraction)
+            count_mismatch = preview_batches_ct != final_batches_ct
 
             pairing_reason = None
             if total_expected > 0:
@@ -1362,8 +1520,14 @@ class CoreRunner:
                         pairing_reason = stats_dict.get("reason") or f"{label}_mismatch"
                         break
             if pairing_reason is None:
-                if window_overlap_fraction > 0.0:
+                if overlap_unknown:
+                    pairing_reason = "overlap_unknown"
+                elif window_overlap_fraction > 0.0:
+                    pairing_reason = "overlapping_windows"
+                elif duplicate_fraction > 0.0:
                     pairing_reason = "duplicate_windows"
+                elif count_mismatch:
+                    pairing_reason = "count_mismatch"
                 elif not pairing_context:
                     pairing_reason = preview_pair_stats.get(
                         "reason"
@@ -1389,7 +1553,8 @@ class CoreRunner:
                     "window_overlap_warning",
                     LogLevel.WARNING,
                     {
-                        "duplicate_fraction": window_overlap_fraction,
+                        "overlap_fraction": window_overlap_fraction,
+                        "duplicate_fraction": duplicate_fraction,
                         "match_fraction": window_match_fraction,
                         "preview": preview_pair_stats,
                         "final": final_pair_stats,
@@ -1403,7 +1568,11 @@ class CoreRunner:
                     )
                 if window_overlap_fraction > 0.0:
                     raise RuntimeError(
-                        f"Window duplication detected (overlap_fraction={window_overlap_fraction:.3f})"
+                        f"Window overlap detected (overlap_fraction={window_overlap_fraction:.3f})"
+                    )
+                if count_mismatch:
+                    raise RuntimeError(
+                        f"Window count mismatch detected (preview={preview_batches_ct}, final={final_batches_ct})"
                     )
 
             tier = "balanced"
@@ -1419,8 +1588,7 @@ class CoreRunner:
             def _meets_requirement(actual: int, required: int) -> bool:
                 if required <= 0:
                     return True
-                slack = max(1, int(required * 0.95))
-                return actual >= slack
+                return actual >= required
 
             preview_required = int(coverage_requirements.get("preview", 0))
             final_required = int(coverage_requirements.get("final", 0))
@@ -1468,7 +1636,7 @@ class CoreRunner:
                     "replicates": int(bootstrap_replicates),
                     "seed": int(bootstrap_seed),
                     "ci_band": float(ci_band),
-                    "window_duplicate_fraction": float(window_overlap_fraction),
+                    "window_duplicate_fraction": float(duplicate_fraction),
                     "window_match_fraction": float(window_match_fraction),
                     "coverage": {
                         "tier": tier,
@@ -1498,6 +1666,7 @@ class CoreRunner:
                 LogLevel.ERROR,
                 {"message": f"Primary-metric computation failed: {exc}"},
             )
+            eval_error = {"type": type(exc).__name__, "message": str(exc)}
 
         pm_ratio = pm_final / pm_preview if pm_preview > 0 else 1.0
 
@@ -1598,6 +1767,8 @@ class CoreRunner:
                 "degenerate_reason": degenerate_reason,
             },
         }
+        if eval_error:
+            metrics["eval_error"] = eval_error
 
         eval_windows = {
             "preview": {
@@ -1669,6 +1840,18 @@ class CoreRunner:
         except Exception:
             pass
 
+        def _maybe_sync() -> None:
+            try:
+                is_cuda = False
+                if hasattr(device, "type"):
+                    is_cuda = device.type == "cuda"
+                elif isinstance(device, str):
+                    is_cuda = device.startswith("cuda")
+                if is_cuda and torch.cuda.is_available():
+                    torch.cuda.synchronize()
+            except Exception:
+                pass
+
         # Simple timing measurement
         with torch.no_grad():
             try:
@@ -1707,21 +1890,22 @@ class CoreRunner:
                             labels=labels_t,
                             token_type_ids=token_type_t,
                         )
-                    else:
-                        return model(
-                            input_ids,
-                            labels=labels_t,
-                            token_type_ids=token_type_t,
-                        )
+                    return model(
+                        input_ids,
+                        labels=labels_t,
+                        token_type_ids=token_type_t,
+                    )
 
                 # Warmup
                 for _ in range(3):
                     _ = _call_model()
 
                 # Measure
+                _maybe_sync()
                 start_time = time.time()
                 for _ in range(10):
                     _ = _call_model()
+                _maybe_sync()
                 end_time = time.time()
 
                 total_time = (end_time - start_time) * 1000  # Convert to ms
@@ -1826,21 +2010,34 @@ class CoreRunner:
         pm = metrics.get("primary_metric", {}) if isinstance(metrics, dict) else {}
         pm_prev = pm.get("preview") if isinstance(pm, dict) else None
         pm_fin = pm.get("final") if isinstance(pm, dict) else None
-        try:
-            drift_ratio = (
-                float(pm_fin) / float(pm_prev)
-                if isinstance(pm_fin, (int | float))
-                and isinstance(pm_prev, (int | float))
-                and float(pm_prev) > 0.0
-                else float("inf")
-            )
-        except Exception:
-            drift_ratio = float("inf")
-        spike_threshold = getattr(config, "spike_threshold", 2.0)
-        is_catastrophic_spike = drift_ratio > spike_threshold
+        pm_kind = str(pm.get("kind", "")).lower() if isinstance(pm, dict) else ""
+        is_ppl_metric = pm_kind.startswith("ppl")
 
-        # Check if standard metrics are acceptable against configured max ratio
-        metrics_acceptable = drift_ratio <= getattr(config, "max_pm_ratio", 2.0)
+        drift_ratio: float | None = None
+        if is_ppl_metric:
+            try:
+                if isinstance(pm_fin, (int | float)) and isinstance(
+                    pm_prev, (int | float)
+                ):
+                    pm_prev_val = float(pm_prev)
+                    pm_fin_val = float(pm_fin)
+                    if (
+                        pm_prev_val > 0.0
+                        and math.isfinite(pm_prev_val)
+                        and math.isfinite(pm_fin_val)
+                    ):
+                        drift_ratio = pm_fin_val / pm_prev_val
+            except Exception:
+                drift_ratio = None
+
+        if drift_ratio is None:
+            is_catastrophic_spike = False
+            metrics_acceptable = True
+        else:
+            spike_threshold = getattr(config, "spike_threshold", 2.0)
+            is_catastrophic_spike = drift_ratio > spike_threshold
+            # Check if standard metrics are acceptable against configured max ratio
+            metrics_acceptable = drift_ratio <= getattr(config, "max_pm_ratio", 2.0)
 
         # Determine rollback reason and status
         rollback_reason = None
@@ -1907,7 +2104,13 @@ class CoreRunner:
 
         return status
 
-    def _handle_error(self, error: Exception, report: RunReport) -> None:
+    def _handle_error(
+        self,
+        error: Exception,
+        report: RunReport,
+        model: Any | None = None,
+        adapter: ModelAdapter | None = None,
+    ) -> None:
         """Handle pipeline errors."""
         report.status = RunStatus.FAILED.value
         report.error = str(error)
@@ -1924,13 +2127,26 @@ class CoreRunner:
         if self.checkpoint_manager and "initial_checkpoint" in report.meta:
             try:
                 checkpoint_id = report.meta["initial_checkpoint"]
-                # Would need model and adapter here for actual rollback
+                effective_model = model or self._active_model
+                effective_adapter = adapter or self._active_adapter
+                restored = False
+                if effective_model is not None and effective_adapter is not None:
+                    restored = self.checkpoint_manager.restore_checkpoint(
+                        effective_model, effective_adapter, checkpoint_id
+                    )
                 self._log_event(
                     "runner",
                     "emergency_rollback",
                     LogLevel.WARNING,
-                    {"checkpoint": checkpoint_id},
+                    {"checkpoint": checkpoint_id, "restored": restored},
                 )
+                if not restored:
+                    self._log_event(
+                        "runner",
+                        "rollback_failed",
+                        LogLevel.CRITICAL,
+                        {"checkpoint": checkpoint_id, "error": "restore_failed"},
+                    )
             except Exception as rollback_error:
                 self._log_event(
                     "runner",
@@ -2038,4 +2254,58 @@ class CoreRunner:
             "dry_run": config.dry_run,
             "verbose": config.verbose,
             "guards": config.context.get("guards", {}) if config.context else {},
+        }
+
+    def _resolve_policy_flags(self, config: RunConfig | None) -> dict[str, bool]:
+        run_ctx: dict[str, Any] = {}
+        eval_ctx: dict[str, Any] = {}
+        if config and isinstance(config.context, dict):
+            run_ctx = (
+                config.context.get("run", {})
+                if isinstance(config.context.get("run"), dict)
+                else {}
+            )
+            eval_ctx = (
+                config.context.get("eval", {})
+                if isinstance(config.context.get("eval"), dict)
+                else {}
+            )
+
+        def _resolve_flag(
+            *,
+            run_key: str,
+            eval_keys: tuple[str, ...],
+            env_key: str,
+            default: bool,
+        ) -> bool:
+            val = _coerce_bool(run_ctx.get(run_key))
+            if val is None:
+                for key in eval_keys:
+                    val = _coerce_bool(eval_ctx.get(key))
+                    if val is not None:
+                        break
+            env_val = _env_flag(env_key)
+            if env_val is not None:
+                val = env_val
+            return default if val is None else bool(val)
+
+        return {
+            "strict_eval": _resolve_flag(
+                run_key="strict_eval",
+                eval_keys=("strict_errors", "strict"),
+                env_key="INVARLOCK_EVAL_STRICT",
+                default=True,
+            ),
+            "strict_guard_prepare": _resolve_flag(
+                run_key="strict_guard_prepare",
+                eval_keys=(),
+                env_key="INVARLOCK_GUARD_PREPARE_STRICT",
+                default=True,
+            ),
+            "allow_calibration_materialize": _resolve_flag(
+                run_key="allow_calibration_materialize",
+                eval_keys=("materialize_calibration", "allow_iterable_calibration"),
+                env_key="INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE",
+                default=False,
+            ),
         }

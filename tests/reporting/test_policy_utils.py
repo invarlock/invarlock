@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import json
+
 import invarlock.reporting.policy_utils as policy_mod
 
 
@@ -216,3 +219,10 @@ def test_compute_policy_digest_stable():
     digest1 = policy_mod._compute_policy_digest({"a": 1, "b": 2})
     digest2 = policy_mod._compute_policy_digest({"b": 2, "a": 1})
     assert digest1 == digest2
+
+
+def test_compute_policy_digest_matches_assurance_spec():
+    policy = {"b": 2, "a": 1, "nested": {"c": 3}}
+    canonical = json.dumps(policy, sort_keys=True, default=str)
+    expected = hashlib.sha256(canonical.encode()).hexdigest()[:16]
+    assert policy_mod._compute_policy_digest(policy) == expected

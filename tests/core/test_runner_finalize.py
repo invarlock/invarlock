@@ -47,6 +47,32 @@ def test_finalize_success_when_all_good():
     assert status == RunStatus.SUCCESS.value
 
 
+def test_finalize_skips_ratio_gate_for_non_ppl_metric():
+    runner = CoreRunner()
+    report = RunReport()
+    metrics = {"primary_metric": {"kind": "accuracy", "final": 0.9}}
+    guard_results = {"spectral": {"passed": True}}
+    cfg = RunConfig(max_pm_ratio=1.01, spike_threshold=1.05)
+
+    status = runner._finalize_phase(
+        object(), object(), guard_results, metrics, cfg, report
+    )
+    assert status == RunStatus.SUCCESS.value
+
+
+def test_finalize_skips_ratio_gate_when_preview_missing():
+    runner = CoreRunner()
+    report = RunReport()
+    metrics = {"primary_metric": {"kind": "ppl_causal", "preview": 0.0, "final": 2.0}}
+    guard_results = {"spectral": {"passed": True}}
+    cfg = RunConfig(max_pm_ratio=1.01, spike_threshold=1.05)
+
+    status = runner._finalize_phase(
+        object(), object(), guard_results, metrics, cfg, report
+    )
+    assert status == RunStatus.SUCCESS.value
+
+
 class DummyOutput:
     def __init__(self, loss: float) -> None:
         self.loss = torch.tensor(loss, dtype=torch.float32)

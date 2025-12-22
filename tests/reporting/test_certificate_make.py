@@ -24,8 +24,8 @@ def test_make_certificate_with_secondary_and_subgroups():
             "split": "validation",
             "seq_len": 2,
             "stride": 2,
-            "preview_n": 2,
-            "final_n": 2,
+            "preview_n": 180,
+            "final_n": 180,
         }
     )
     report["metrics"].update(
@@ -38,12 +38,21 @@ def test_make_certificate_with_secondary_and_subgroups():
                 "analysis_basis": "mean_logloss",
                 "analysis_point_final": 0.0,
             },
-            "bootstrap": {"replicates": 200},
+            "bootstrap": {
+                "replicates": 1200,
+                "coverage": {
+                    "preview": {"used": 180},
+                    "final": {"used": 180},
+                    "replicates": {"used": 1200},
+                },
+            },
             "paired_windows": 2,
             "logloss_delta_ci": (-0.1, 0.0),
-            "window_plan": {"profile": "ci"},
+            "window_plan": {"profile": "ci", "preview_n": 180, "final_n": 180},
             "preview_total_tokens": 10,
             "final_total_tokens": 10,
+            "window_match_fraction": 1.0,
+            "window_overlap_fraction": 0.0,
             "secondary_metrics": [
                 {
                     "kind": "accuracy",

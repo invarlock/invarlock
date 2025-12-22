@@ -6,8 +6,8 @@ from invarlock.reporting import certificate as C
 def test_prepare_guard_overhead_section_direct_ratio_and_lists() -> None:
     raw = {
         "overhead_threshold": "0.02",
-        "bare_final": 10.0,
-        "guarded_final": 10.5,
+        "bare_ppl": 10.0,
+        "guarded_ppl": 10.5,
         "messages": ["ok", 123],
         "warnings": ["warn"],
         "errors": [],

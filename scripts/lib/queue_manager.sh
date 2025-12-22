@@ -235,6 +235,7 @@ complete_task() {
     if [[ -f "${src}" ]]; then
         mark_task_completed "${src}"
         mv "${src}" "${dst}"
+        rm -f "${QUEUE_DIR}/running/${task_id}.pid"
 
         # Update progress state
         update_progress_state
@@ -255,6 +256,7 @@ fail_task() {
     if [[ -f "${src}" ]]; then
         mark_task_failed "${src}" "${error_msg}"
         mv "${src}" "${dst}"
+        rm -f "${QUEUE_DIR}/running/${task_id}.pid"
 
         # Update progress state
         update_progress_state
@@ -293,8 +295,9 @@ retry_task() {
 reclaim_orphaned_tasks() {
     local gpu_id="$1"
     local count=0
+    local running_dir="${QUEUE_DIR}/running"
 
-    for task_file in "${QUEUE_DIR}/running"/*.task; do
+    for task_file in "${running_dir}"/*.task; do
         [[ -f "${task_file}" ]] || continue
 
         local task_gpu=$(get_task_field "${task_file}" "gpu_id")
@@ -302,9 +305,59 @@ reclaim_orphaned_tasks() {
             local task_id=$(get_task_id "${task_file}")
             echo "Reclaiming orphaned task: ${task_id} from GPU ${gpu_id}"
 
+            local assigned_gpus
+            assigned_gpus=$(get_task_field "${task_file}" "assigned_gpus")
+            [[ -z "${assigned_gpus}" || "${assigned_gpus}" == "null" ]] && assigned_gpus="${gpu_id}"
+
+            local pid_file="${running_dir}/${task_id}.pid"
+            local pid_killed="false"
+
+            if [[ -f "${pid_file}" ]]; then
+                local pid
+                pid=$(cat "${pid_file}" 2>/dev/null || true)
+                if [[ -n "${pid}" && "${pid}" =~ ^[0-9]+$ ]]; then
+                    if kill -0 "${pid}" 2>/dev/null; then
+                        echo "  Killing task process group for ${task_id} (PID ${pid})"
+                        kill -TERM "-${pid}" 2>/dev/null || kill -TERM "${pid}" 2>/dev/null || true
+                        sleep 2
+                        kill -KILL "-${pid}" 2>/dev/null || kill -KILL "${pid}" 2>/dev/null || true
+                        pid_killed="true"
+                    fi
+                fi
+                rm -f "${pid_file}"
+            fi
+
+            if [[ "${pid_killed}" != "true" && -n "${assigned_gpus}" ]]; then
+                local can_kill="true"
+                if [[ -n "${GPU_RESERVATION_DIR:-}" ]]; then
+                    IFS=',' read -ra gpus <<< "${assigned_gpus}"
+                    for gid in "${gpus[@]}"; do
+                        local lock_file="${GPU_RESERVATION_DIR}/gpu_${gid}.lock"
+                        local owner
+                        owner=$(cat "${lock_file}" 2>/dev/null || true)
+                        if [[ -z "${owner}" || "${owner}" != "${task_id}" ]]; then
+                            can_kill="false"
+                            break
+                        fi
+                    done
+                fi
+
+                if [[ "${can_kill}" == "true" ]]; then
+                    if type kill_gpu_processes &>/dev/null; then
+                        echo "  Killing GPU processes on ${assigned_gpus} for ${task_id}"
+                        kill_gpu_processes "${assigned_gpus}"
+                    fi
+                fi
+            fi
+
+            if type release_gpus &>/dev/null; then
+                release_gpus "${task_id}"
+            fi
+
             # Move back to pending for re-execution
             update_task_status "${task_file}" "pending"
             assign_task_gpu "${task_file}" "-1"
+            update_task_field "${task_file}" "assigned_gpus" "null" "true" 2>/dev/null || true
             mv "${task_file}" "${QUEUE_DIR}/pending/"
             count=$((count + 1))
         fi
@@ -499,6 +552,19 @@ generate_model_tasks() {
     # Calculate model size for memory estimation
     local base_size=$(estimate_model_memory "${model_id}" "EVAL_BASELINE")
 
+    # Decide whether to use batch edit creation or per-edit tasks.
+    # Deep-copying a 70B+ model for batch edits can exceed per-GPU memory,
+    # so we disable CREATE_EDITS_BATCH for very large models and fall back
+    # to legacy per-edit CREATE_EDIT tasks in that case.
+    local use_batch="true"
+    if [[ -n "${base_size}" ]]; then
+        # For 70B+ models, EVAL_BASELINE estimate is ~180GB+ including margin.
+        # Treat anything >=170GB as "large" and avoid batch edits.
+        if [[ "${base_size}" -ge 170 ]]; then
+            use_batch="false"
+        fi
+    fi
+
     # Track task IDs for dependencies
     local task_ids=()
 
@@ -516,9 +582,10 @@ generate_model_tasks() {
     task_ids+=("${eval_base_id}")
     echo "Created: ${eval_base_id}"
 
-    # 3. CALIBRATION_RUN × 5 (depend on setup)
+    # 3. CALIBRATION_RUN × N (depend on setup)
     local cal_ids=()
-    for run in $(seq 1 5); do
+    local calibration_runs="${DRIFT_CALIBRATION_RUNS:-5}"
+    for run in $(seq 1 "${calibration_runs}"); do
         local cal_id=$(add_task "CALIBRATION_RUN" "${model_id}" "${model_name}" \
             "$(estimate_model_memory "${model_id}" "CALIBRATION_RUN")" \
             "${setup_id}" '{"run": '"${run}"', "seed": '"$((41 + run))"'}' 85)
@@ -534,19 +601,54 @@ generate_model_tasks() {
     task_ids+=("${preset_id}")
     echo "Created: ${preset_id}"
 
-    # 5. Clean edits (4 types)
+    # 5/6. Edit creation + eval/certify
+    # Clean edits (3 certify runs each)
     local clean_edits=("quant_rtn:8:128:ffn" "fp4_quant:e2m1:ffn" "magnitude_prune:0.1:ffn" "lowrank_svd:256:ffn")
-    for edit_spec in "${clean_edits[@]}"; do
-        generate_edit_tasks "${model_id}" "${model_name}" "${setup_id}" "${preset_id}" \
-            "${edit_spec}" "clean" 3
-    done
-
-    # 6. Stress edits (4 types)
+    # Stress edits (2 certify runs each)
     local stress_edits=("quant_rtn:4:32:all" "fp4_quant:aggressive:all" "magnitude_prune:0.5:all" "lowrank_svd:32:all")
-    for edit_spec in "${stress_edits[@]}"; do
-        generate_edit_tasks "${model_id}" "${model_name}" "${setup_id}" "${preset_id}" \
-            "${edit_spec}" "stress" 2
-    done
+
+    if [[ "${use_batch}" == "true" ]]; then
+        # CREATE_EDITS_BATCH - Create all 8 edits with a single model load (Batch optimization)
+        # This replaces 8 separate CREATE_EDIT tasks, reducing model load overhead from 8× to 1×.
+        local all_edit_specs='[
+            {"spec": "quant_rtn:8:128:ffn", "version": "clean"},
+            {"spec": "fp4_quant:e2m1:ffn", "version": "clean"},
+            {"spec": "magnitude_prune:0.1:ffn", "version": "clean"},
+            {"spec": "lowrank_svd:256:ffn", "version": "clean"},
+            {"spec": "quant_rtn:4:32:all", "version": "stress"},
+            {"spec": "fp4_quant:aggressive:all", "version": "stress"},
+            {"spec": "magnitude_prune:0.5:all", "version": "stress"},
+            {"spec": "lowrank_svd:32:all", "version": "stress"}
+        ]'
+        local batch_edit_id=$(add_task "CREATE_EDITS_BATCH" "${model_id}" "${model_name}" \
+            "$(estimate_model_memory "${model_id}" "CREATE_EDIT")" \
+            "${setup_id}" '{"edit_specs": '"${all_edit_specs}"'}' 70)
+        task_ids+=("${batch_edit_id}")
+        echo "Created: ${batch_edit_id} (batch creates 8 edits with single model load)"
+
+        # Eval and Certify tasks for each edit (depend on batch creation)
+        for edit_spec in "${clean_edits[@]}"; do
+            generate_eval_certify_tasks "${model_id}" "${model_name}" "${batch_edit_id}" "${preset_id}" \
+                "${edit_spec}" "clean" 3
+        done
+        for edit_spec in "${stress_edits[@]}"; do
+            generate_eval_certify_tasks "${model_id}" "${model_name}" "${batch_edit_id}" "${preset_id}" \
+                "${edit_spec}" "stress" 2
+        done
+    else
+        # For very large models (70B+), avoid batch edit creation to prevent OOM from deep copies.
+        # Fall back to legacy per-edit CREATE_EDIT + EVAL_EDIT + CERTIFY_EDIT tasks.
+        echo "Model ${model_name}: estimated ${base_size}GB for eval - disabling CREATE_EDITS_BATCH, using per-edit tasks"
+
+        for edit_spec in "${clean_edits[@]}"; do
+            generate_edit_tasks "${model_id}" "${model_name}" "${setup_id}" "${preset_id}" \
+                "${edit_spec}" "clean" 3
+        done
+        for edit_spec in "${stress_edits[@]}"; do
+            generate_edit_tasks "${model_id}" "${model_name}" "${setup_id}" "${preset_id}" \
+                "${edit_spec}" "stress" 2
+        done
+    fi
 
     # 7. Error injection tests (5 types)
     local error_types=("nan_injection" "inf_injection" "extreme_quant" "scale_explosion" "zero_layer")
@@ -567,7 +669,44 @@ generate_model_tasks() {
     echo "Generated tasks for model ${model_name}"
 }
 
-# Generate tasks for an edit type
+# Generate eval and certify tasks for an edit (Split Eval optimization)
+# Usage: generate_eval_certify_tasks <model_id> <model_name> <batch_edit_id> <preset_id> <edit_spec> <version> <cert_runs>
+# Note: Edit creation is handled by CREATE_EDITS_BATCH; this function creates eval+certify tasks
+generate_eval_certify_tasks() {
+    local model_id="$1"
+    local model_name="$2"
+    local batch_edit_id="$3"
+    local preset_id="$4"
+    local edit_spec="$5"
+    local version="$6"
+    local cert_runs="$7"
+
+    # Split Eval: 4 parallel benchmark tasks instead of 1 monolithic EVAL_EDIT
+    # This enables better parallelization across GPUs (4× parallelism opportunity)
+    local benchmarks=("mmlu" "hellaswag" "arc" "winogrande")
+    local eval_ids=()
+
+    for benchmark in "${benchmarks[@]}"; do
+        local task_type="EVAL_${benchmark^^}"  # uppercase: EVAL_MMLU, EVAL_HELLASWAG, etc.
+        local eval_id=$(add_task "${task_type}" "${model_id}" "${model_name}" \
+            "$(estimate_model_memory "${model_id}" "EVAL_EDIT")" \
+            "${batch_edit_id}" '{"edit_spec": "'"${edit_spec}"'", "benchmark": "'"${benchmark}"'"}' 65)
+        eval_ids+=("${eval_id}")
+        echo "Created: ${eval_id} (${benchmark} eval)"
+    done
+
+    # CERTIFY_EDIT depends on batch edit creation + preset (not on evals - they run in parallel)
+    # Certification uses pre-computed reference values, not eval results
+    for run in $(seq 1 "${cert_runs}"); do
+        local cert_id=$(add_task "CERTIFY_EDIT" "${model_id}" "${model_name}" \
+            "$(estimate_model_memory "${model_id}" "CERTIFY_EDIT")" \
+            "${batch_edit_id},${preset_id}" '{"edit_spec": "'"${edit_spec}"'", "version": "'"${version}"'", "run": '"${run}"'}' 65)
+        echo "Created: ${cert_id}"
+    done
+}
+
+# Legacy: Generate tasks for an edit type (deprecated - use generate_eval_certify_tasks)
+# Kept for backwards compatibility with external scripts
 # Usage: generate_edit_tasks <model_id> <model_name> <setup_id> <preset_id> <edit_spec> <version> <cert_runs>
 generate_edit_tasks() {
     local model_id="$1"
@@ -578,13 +717,15 @@ generate_edit_tasks() {
     local version="$6"
     local cert_runs="$7"
 
-    # CREATE_EDIT
+    echo "WARNING: generate_edit_tasks is deprecated; use CREATE_EDITS_BATCH + generate_eval_certify_tasks" >&2
+
+    # CREATE_EDIT (legacy single edit)
     local edit_id=$(add_task "CREATE_EDIT" "${model_id}" "${model_name}" \
         "$(estimate_model_memory "${model_id}" "CREATE_EDIT")" \
         "${setup_id}" '{"edit_spec": "'"${edit_spec}"'", "version": "'"${version}"'"}' 70)
     echo "Created: ${edit_id}"
 
-    # EVAL_EDIT
+    # EVAL_EDIT (legacy monolithic eval)
     local eval_id=$(add_task "EVAL_EDIT" "${model_id}" "${model_name}" \
         "$(estimate_model_memory "${model_id}" "EVAL_EDIT")" \
         "${edit_id}" '{"edit_spec": "'"${edit_spec}"'"}' 65)
@@ -620,9 +761,14 @@ generate_all_tasks() {
     for idx in "${!models[@]}"; do
         local model_id="${models[$idx]}"
         if [[ -n "${model_id}" ]]; then
-            # basename already strips directory, so tr '/' is unnecessary
-            # Use tr to make names filesystem-safe (lowercase, replace special chars)
-            local model_name=$(basename "${model_id}" | tr '[:upper:]' '[:lower:]' | tr ' ' '_' | tr -cd '[:alnum:]_-')
+            # Use full model id (including org) for filesystem-safe name to avoid collisions
+            # Example: meta-llama/Llama-2-7b-hf -> meta-llama__llama-2-7b-hf
+            local model_name
+            model_name=$(echo "${model_id}" \
+                | tr '[:upper:]' '[:lower:]' \
+                | sed 's#/#__#g' \
+                | tr ' ' '_' \
+                | tr -cd '[:alnum:]_-')
             echo ""
             echo "=== Generating tasks for model $((idx + 1)): ${model_name} ==="
             generate_model_tasks "$((idx + 1))" "${model_id}" "${model_name}"

@@ -47,3 +47,26 @@ def test_compute_paired_delta_log_ci_and_ratio():
     # Convert to ratio space
     rlo, rhi = B.logspace_to_ratio_ci((lo, hi))
     assert rlo <= rhi and rlo > 0
+
+
+def test_compute_paired_delta_log_ci_uses_weights_for_resampling():
+    final = [0.2, 0.4, 0.6]
+    base = [0.1, 0.1, 0.1]
+    weights = [1.0, 10.0, 1.0]
+    seed = 123
+    lo, hi = B.compute_paired_delta_log_ci(
+        final,
+        base,
+        weights=weights,
+        method="percentile",
+        replicates=1,
+        alpha=0.1,
+        seed=seed,
+    )
+    delta = np.array([f - b for f, b in zip(final, base, strict=False)], dtype=float)
+    prob = np.array(weights, dtype=float) / float(sum(weights))
+    rng = np.random.default_rng(seed)
+    idx = rng.choice(len(delta), size=len(delta), replace=True, p=prob)
+    expected = float(np.mean(delta[idx]))
+    assert lo == pytest.approx(expected)
+    assert hi == pytest.approx(expected)

@@ -500,7 +500,7 @@ class SpectralGuard(Guard):
                     if self.ignore_preview_inflation and phase == "after_edit":
                         continue
 
-                    if z_score > kappa_cap:
+                    if abs(z_score) > kappa_cap:
                         violations.append(
                             {
                                 "type": "family_z_cap",

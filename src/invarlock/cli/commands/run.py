@@ -301,6 +301,12 @@ def _hash_sequences(seqs: Sequence[Sequence[int]] | Iterable[Sequence[int]]) -> 
     """Compute a stable digest for a sequence of integer token sequences."""
     hasher = hashlib.blake2s(digest_size=16)
     for seq in seqs:
+        try:
+            seq_len = len(seq)
+        except TypeError:
+            seq = list(seq)
+            seq_len = len(seq)
+        hasher.update(seq_len.to_bytes(4, "little", signed=False))
         arr = array("I", (int(token) & 0xFFFFFFFF for token in seq))
         hasher.update(arr.tobytes())
     return hasher.hexdigest()
