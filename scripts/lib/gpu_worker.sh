@@ -2,7 +2,7 @@
 # gpu_worker.sh - GPU worker loop for dynamic task execution
 # Version: v2.2.0 (InvarLock B200 Validation Suite)
 # Dependencies: scheduler.sh, task_functions.sh, queue_manager.sh
-# Usage: spawned by invarlock_definitive_validation_b200.sh for each GPU worker
+# Usage: spawned by b200_validation_suite.sh for each GPU worker
 #
 # Each worker runs on a dedicated GPU and continuously:
 # 1. Checks available GPU memory
@@ -16,6 +16,10 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [[ -z "${SCHEDULER_LOADED:-}" ]] && source "${SCRIPT_DIR}/scheduler.sh" && export SCHEDULER_LOADED=1
 [[ -z "${TASK_FUNCTIONS_LOADED:-}" ]] && source "${SCRIPT_DIR}/task_functions.sh" && export TASK_FUNCTIONS_LOADED=1
+if [[ -z "${MODEL_CREATION_LOADED:-}" && -f "${SCRIPT_DIR}/model_creation.sh" ]]; then
+    source "${SCRIPT_DIR}/model_creation.sh"
+    export MODEL_CREATION_LOADED=1
+fi
 [[ -z "${TASK_SERIALIZATION_LOADED:-}" ]] && source "${SCRIPT_DIR}/task_serialization.sh" && export TASK_SERIALIZATION_LOADED=1
 # Fault tolerance is optional - use subshell to handle source failure
 if [[ -z "${FAULT_TOLERANCE_LOADED:-}" ]]; then
@@ -45,7 +49,10 @@ init_worker() {
     mkdir -p "${workers_dir}"
 
     # Write PID file
-    echo "$$" > "${workers_dir}/gpu_${gpu_id}.pid"
+    # IMPORTANT: Use BASHPID not $$ because $$ doesn't change in subshells
+    # BASHPID gives the actual PID of the current bash process
+    local worker_pid="${BASHPID:-$$}"
+    echo "${worker_pid}" > "${workers_dir}/gpu_${gpu_id}.pid"
 
     # Initialize status
     echo "starting" > "${workers_dir}/gpu_${gpu_id}.status"
@@ -57,13 +64,13 @@ init_worker() {
     cat > "${workers_dir}/gpu_${gpu_id}.info" << EOF
 {
     "gpu_id": ${gpu_id},
-    "pid": $$,
+    "pid": ${worker_pid},
     "started_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
     "status": "running"
 }
 EOF
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Worker initialized (PID $$)"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Worker initialized (PID ${worker_pid})"
 }
 
 # Update worker status
@@ -90,6 +97,34 @@ update_heartbeat() {
     local output_dir="$2"
 
     touch "${output_dir}/workers/gpu_${gpu_id}.heartbeat"
+}
+
+# Start background heartbeat process
+# Usage: start_heartbeat_thread <gpu_id> <output_dir> <interval>
+# Returns: PID of heartbeat process (store in _HEARTBEAT_PID)
+start_heartbeat_thread() {
+    local gpu_id="$1"
+    local output_dir="$2"
+    local interval="${3:-30}"
+
+    (
+        while true; do
+            touch "${output_dir}/workers/gpu_${gpu_id}.heartbeat" 2>/dev/null || break
+            sleep "${interval}"
+        done
+    ) &
+    echo $!
+}
+
+# Stop background heartbeat process
+# Usage: stop_heartbeat_thread <pid>
+stop_heartbeat_thread() {
+    local hb_pid="$1"
+
+    if [[ -n "${hb_pid}" ]] && kill -0 "${hb_pid}" 2>/dev/null; then
+        kill "${hb_pid}" 2>/dev/null || true
+        wait "${hb_pid}" 2>/dev/null || true
+    fi
 }
 
 # Check if shutdown requested
@@ -155,8 +190,9 @@ gpu_worker() {
             last_heartbeat=${now}
         fi
 
-        # Resolve any newly ready dependencies
-        resolve_dependencies >/dev/null 2>&1
+        # NOTE: resolve_dependencies() removed from worker loop to reduce queue lock contention.
+        # Dependency resolution is now centralized in the main script's monitor loop.
+        # Workers only claim tasks from the ready queue; the monitor promotes pending->ready.
 
         # Get available GPU memory
         local available_mem=$(get_gpu_available_memory "${gpu_id}")
@@ -229,9 +265,17 @@ gpu_worker() {
             fi
         fi
 
+        # Start background heartbeat thread during task execution
+        # This ensures heartbeat stays fresh even during long model loads (Yi-34B: 20+ min)
+        local heartbeat_pid
+        heartbeat_pid=$(start_heartbeat_thread "${gpu_id}" "${output_dir}" "${WORKER_HEARTBEAT_INTERVAL}")
+
         # Execute task with CUDA_VISIBLE_DEVICES set to assigned GPUs
         local exit_code=0
         CUDA_VISIBLE_DEVICES="${assigned_gpus}" execute_task "${task_file}" "${gpu_id}" "${output_dir}" || exit_code=$?
+
+        # Stop heartbeat thread now that task is complete
+        stop_heartbeat_thread "${heartbeat_pid}"
 
         # Handle result
         if [[ ${exit_code} -eq 0 ]]; then
@@ -250,7 +294,8 @@ gpu_worker() {
                 purge_multi_gpu_memory "${assigned_gpus}"
             fi
 
-            update_dependents "${task_id}"
+            # Dependency promotion is centralized in the main script's monitor loop
+            # (resolve_dependencies) to avoid lock contention across workers.
 
             consecutive_failures=0
             tasks_completed=$((tasks_completed + 1))
@@ -261,7 +306,9 @@ gpu_worker() {
             local task_log="${output_dir}/logs/tasks/${task_id}.log"
             local error_msg="Exit code ${exit_code}"
 
-            if [[ -f "${task_log}" ]]; then
+            if [[ ${exit_code} -eq 124 ]]; then
+                error_msg="Timeout: task exceeded limit"
+            elif [[ -f "${task_log}" ]]; then
                 # Check for OOM
                 if grep -q "CUDA out of memory" "${task_log}" 2>/dev/null; then
                     error_msg="OOM: CUDA out of memory"
@@ -277,6 +324,16 @@ gpu_worker() {
                         handle_oom_task "${task_file}" "${gpu_id}" "${task_log}"
                     fi
                 fi
+            fi
+
+            # If CUDA context is poisoned by device-side assert, fail the task and exit
+            if [[ -f "${task_log}" ]] && grep -qE "device-side assert|vectorized_gather_kernel" "${task_log}" 2>/dev/null; then
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: CUDA context may be poisoned, exiting for restart"
+                fail_task "${task_id}" "CUDA device-side assert - context poisoned"
+                if type release_task_gpus &>/dev/null; then
+                    release_task_gpus "${task_id}"
+                fi
+                exit 1
             fi
 
             fail_task "${task_id}" "${error_msg}"
@@ -323,10 +380,12 @@ gpu_worker() {
     fi
     [[ -z "${original_started_at}" ]] && original_started_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
+    # Use BASHPID for accurate PID in subshells (same as init_worker)
+    local final_pid="${BASHPID:-$$}"
     cat > "${output_dir}/workers/gpu_${gpu_id}.info" << EOF
 {
     "gpu_id": ${gpu_id},
-    "pid": $$,
+    "pid": ${final_pid},
     "started_at": "${original_started_at}",
     "stopped_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
     "status": "stopped",
@@ -349,7 +408,17 @@ launch_worker_pool() {
 
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Launching ${num_gpus} GPU workers..."
 
-    for gpu_id in $(seq 0 $((num_gpus - 1))); do
+    local -a gpu_ids=()
+    if [[ -n "${GPU_ID_LIST:-}" ]]; then
+        IFS=',' read -ra gpu_ids <<< "${GPU_ID_LIST}"
+        gpu_ids=("${gpu_ids[@]:0:${num_gpus}}")
+    else
+        for gpu_id in $(seq 0 $((num_gpus - 1))); do
+            gpu_ids+=("${gpu_id}")
+        done
+    fi
+
+    for gpu_id in "${gpu_ids[@]}"; do
         gpu_worker "${gpu_id}" "${output_dir}" &
         local pid=$!
         worker_pids+=("${pid}")
@@ -399,7 +468,9 @@ monitor_workers() {
     local output_dir="$1"
     local num_gpus="$2"
     local check_interval="${3:-30}"
-    local worker_timeout="${4:-300}"  # 5 minutes
+    # Default timeout increased from 5 min to 45 min to accommodate large model loads
+    # (Yi-34B takes 20+ min to load 15 checkpoint shards)
+    local worker_timeout="${4:-2700}"  # 45 minutes
 
     while true; do
         # Check if all work is done
@@ -410,7 +481,17 @@ monitor_workers() {
         fi
 
         # Check each worker
-        for gpu_id in $(seq 0 $((num_gpus - 1))); do
+        local -a gpu_ids=()
+        if [[ -n "${GPU_ID_LIST:-}" ]]; then
+            IFS=',' read -ra gpu_ids <<< "${GPU_ID_LIST}"
+            gpu_ids=("${gpu_ids[@]:0:${num_gpus}}")
+        else
+            for gpu_id in $(seq 0 $((num_gpus - 1))); do
+                gpu_ids+=("${gpu_id}")
+            done
+        fi
+
+        for gpu_id in "${gpu_ids[@]}"; do
             local pid_file="${output_dir}/workers/gpu_${gpu_id}.pid"
             local heartbeat_file="${output_dir}/workers/gpu_${gpu_id}.heartbeat"
             local status_file="${output_dir}/workers/gpu_${gpu_id}.status"
@@ -475,7 +556,17 @@ get_worker_summary() {
 
     echo "=== WORKER STATUS ==="
 
-    for gpu_id in $(seq 0 $((num_gpus - 1))); do
+    local -a gpu_ids=()
+    if [[ -n "${GPU_ID_LIST:-}" ]]; then
+        IFS=',' read -ra gpu_ids <<< "${GPU_ID_LIST}"
+        gpu_ids=("${gpu_ids[@]:0:${num_gpus}}")
+    else
+        for gpu_id in $(seq 0 $((num_gpus - 1))); do
+            gpu_ids+=("${gpu_id}")
+        done
+    fi
+
+    for gpu_id in "${gpu_ids[@]}"; do
         local status_file="${output_dir}/workers/gpu_${gpu_id}.status"
         local pid_file="${output_dir}/workers/gpu_${gpu_id}.pid"
 

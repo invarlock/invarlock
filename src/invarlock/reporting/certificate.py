@@ -614,6 +614,13 @@ def _enforce_pairing_and_coverage(
     if not isinstance(stats, dict):
         raise ValueError("Missing dataset window stats for CI/Release enforcement.")
 
+    pairing_reason = stats.get("window_pairing_reason")
+    if pairing_reason is not None:
+        raise ValueError(
+            "CI/Release requires paired baseline evidence "
+            f"(window_pairing_reason={pairing_reason!r})."
+        )
+
     match_fraction = stats.get("window_match_fraction")
     overlap_fraction = stats.get("window_overlap_fraction")
     if not (
@@ -648,6 +655,12 @@ def _enforce_pairing_and_coverage(
         if abs(val - round(val)) > 1e-9:
             return None
         return int(round(val))
+
+    paired_windows = _coerce_count(stats.get("paired_windows"))
+    if paired_windows is None:
+        raise ValueError("CI/Release requires paired_windows metric.")
+    if paired_windows == 0:
+        raise ValueError("CI/Release requires paired_windows > 0.")
 
     actual_preview = _coerce_count(stats.get("actual_preview"))
     actual_final = _coerce_count(stats.get("actual_final"))
@@ -1188,6 +1201,20 @@ def make_certificate(
     _enforce_ratio_ci_alignment(ratio_ci_source, ratio_ci, logloss_delta_ci)
 
     paired_windows = _fallback_paired_windows(paired_windows, coverage_summary)
+    # Prefer runner-reported paired window count when available (signal used for
+    # CI/Release enforcement); fall back to evidence-based pairing or coverage
+    # heuristics when the metric is missing.
+    try:
+        paired_windows_signal = (
+            report.get("metrics", {}).get("paired_windows")
+            if isinstance(report.get("metrics"), dict)
+            else None
+        )
+    except Exception:  # pragma: no cover
+        paired_windows_signal = None
+    paired_windows_signal_int = _coerce_int(paired_windows_signal)
+    if paired_windows_signal_int is not None and paired_windows_signal_int >= 0:
+        paired_windows = paired_windows_signal_int
 
     # Primary-metric stats for gating/summary (PM-only)
     try:

@@ -6,7 +6,7 @@ they don’t, roll back safely.
 Technical: edit‑agnostic guard pipeline (invariants → spectral → RMT →
 variance) producing a machine‑readable Safety Certificate.
 
-> **Status:** 0.3.3 (pre‑1.0). Until 1.0, **minor** releases may be
+> **Status:** 0.3.4 (pre‑1.0). Until 1.0, **minor** releases may be
 > breaking. See CLI help and the CHANGELOG for updates.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/invarlock/invarlock/ci.yml?branch=main&logo=github&label=CI)](https://github.com/invarlock/invarlock/actions/workflows/ci.yml)

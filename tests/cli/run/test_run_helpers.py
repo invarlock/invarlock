@@ -233,6 +233,7 @@ output:
                     "ppl_ratio": 1.0,
                     "window_overlap_fraction": 0.0,
                     "window_match_fraction": 1.0,
+                    "paired_windows": 1,
                     "loss_type": "mlm",
                 },
                 guards={},

@@ -159,8 +159,9 @@ def test_finalize_phase_catastrophic_spike_triggers_guard_recovery():
         def __init__(self) -> None:
             self.calls: list[tuple[object, object, str]] = []
 
-        def restore_checkpoint(self, model, adapter, checkpoint_id) -> None:
+        def restore_checkpoint(self, model, adapter, checkpoint_id) -> bool:
             self.calls.append((model, adapter, checkpoint_id))
+            return True
 
     runner.checkpoint_manager = DummyCheckpointManager()
 

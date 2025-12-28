@@ -117,6 +117,18 @@ def _validate_pairing(certificate: dict[str, Any]) -> list[str]:
 
     match_fraction = stats.get("window_match_fraction")
     overlap_fraction = stats.get("window_overlap_fraction")
+    pairing_reason = stats.get("window_pairing_reason")
+    paired_windows = _coerce_int(stats.get("paired_windows"))
+
+    if pairing_reason is not None:
+        errors.append(
+            "window_pairing_reason must be null/None for paired certificates "
+            f"(found {pairing_reason!r})."
+        )
+    if paired_windows is None:
+        errors.append("Certificate missing paired_windows metric.")
+    elif paired_windows == 0:
+        errors.append("paired_windows must be > 0 for paired certificates (found 0).")
 
     if match_fraction is None:
         errors.append("Certificate missing window_match_fraction metric.")

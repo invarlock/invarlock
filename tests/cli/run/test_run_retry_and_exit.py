@@ -229,7 +229,16 @@ output:
 
     baseline = tmp_path / "baseline.json"
     baseline.write_text(
-        json.dumps({"meta": {}, "metrics": {"ppl_preview": 10.0, "ppl_final": 10.0}})
+        json.dumps(
+            {
+                "meta": {"tokenizer_hash": "tokhash123"},
+                "metrics": {"ppl_preview": 10.0, "ppl_final": 10.0},
+                "evaluation_windows": {
+                    "preview": {"window_ids": [0], "input_ids": [[1, 2]]},
+                    "final": {"window_ids": [1], "input_ids": [[3, 4]]},
+                },
+            }
+        )
     )
 
     class DummyRegistry:
@@ -250,12 +259,29 @@ output:
     def _runner_exec(**kwargs):
         return SimpleNamespace(
             edit={"deltas": {"params_changed": 0}},
-            metrics={"loss_type": "ce"},
+            metrics={
+                "loss_type": "ce",
+                "window_overlap_fraction": 0.0,
+                "window_match_fraction": 1.0,
+                "paired_windows": 1,
+            },
             guards={},
             context={"dataset_meta": {}},
             evaluation_windows={
-                "preview": {"logloss": [3.0, 3.2], "token_counts": [10, 10]},
-                "final": {"logloss": [3.1, 3.3], "token_counts": [10, 10]},
+                "preview": {
+                    "window_ids": [0],
+                    "input_ids": [[1, 2]],
+                    "attention_masks": [[1, 1]],
+                    "logloss": [3.0],
+                    "token_counts": [2],
+                },
+                "final": {
+                    "window_ids": [1],
+                    "input_ids": [[3, 4]],
+                    "attention_masks": [[1, 1]],
+                    "logloss": [3.1],
+                    "token_counts": [2],
+                },
             },
             status="success",
         )
@@ -353,7 +379,17 @@ def test_until_pass_retry_summary_printed(tmp_path: Path):
         )
     )
     baseline = tmp_path / "baseline.json"
-    baseline.write_text(json.dumps({"meta": {"tokenizer_hash": "tokhash123"}}))
+    baseline.write_text(
+        json.dumps(
+            {
+                "meta": {"tokenizer_hash": "tokhash123"},
+                "evaluation_windows": {
+                    "preview": {"window_ids": [0], "input_ids": [[1, 2]]},
+                    "final": {"window_ids": [1], "input_ids": [[3, 4]]},
+                },
+            }
+        )
+    )
 
     summary_called = {"ok": False}
 
@@ -390,9 +426,28 @@ def test_until_pass_retry_summary_printed(tmp_path: Path):
         def execute(self, **kwargs):  # noqa: ARG002
             return SimpleNamespace(
                 edit={},
-                metrics={"ppl_preview": 1.0, "ppl_final": 1.0, "ppl_ratio": 1.0},
+                metrics={
+                    "ppl_preview": 1.0,
+                    "ppl_final": 1.0,
+                    "ppl_ratio": 1.0,
+                    "window_overlap_fraction": 0.0,
+                    "window_match_fraction": 1.0,
+                    "paired_windows": 1,
+                },
                 guards={},
                 context={"dataset_meta": {}},
+                evaluation_windows={
+                    "preview": {
+                        "window_ids": [0],
+                        "input_ids": [[1, 2]],
+                        "attention_masks": [[1, 1]],
+                    },
+                    "final": {
+                        "window_ids": [1],
+                        "input_ids": [[3, 4]],
+                        "attention_masks": [[1, 1]],
+                    },
+                },
                 status="success",
             )
 

@@ -48,7 +48,9 @@ class HF_GPT2_Adapter(HFAdapterMixin, ModelAdapter):
 
     name = "hf_gpt2"
 
-    def load_model(self, model_id: str, device: str = "auto") -> ModuleType | Any:
+    def load_model(
+        self, model_id: str, device: str = "auto", **kwargs: Any
+    ) -> ModuleType | Any:
         """
         Load a HuggingFace GPT-2 model.
 
@@ -75,10 +77,9 @@ class HF_GPT2_Adapter(HFAdapterMixin, ModelAdapter):
                 "MODEL-LOAD-FAILED: transformers AutoModelForCausalLM",
                 lambda e: {"model_id": model_id},
             ):
-                model = AutoModelForCausalLM.from_pretrained(model_id)
+                model = AutoModelForCausalLM.from_pretrained(model_id, **kwargs)
 
-            target_device = self._resolve_device(device)
-            return model.to(target_device)
+            return self._safe_to_device(model, device)
         except DependencyError:
             if LIGHT_IMPORT:
                 # Minimal stand-in that satisfies downstream interface requirements

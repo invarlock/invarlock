@@ -44,6 +44,7 @@ reports/
 
 - Use deterministic directory names (e.g., `quant8_balanced_20251010T1509Z.json`) when archiving multiple attempts.
 - Certificates reference the baseline report path, policy tier, policy digest, seeds, dataset/tokenizer hashes, and variance tap/targets. Keep baseline `report.json` next to edited certs so `invarlock verify` can resolve them without editing paths.
+- Preserve `evaluation_windows` inside the baseline `report.json`. CI/Release baseline pairing is fail-closed: `invarlock run --baseline ...` refuses to proceed if the baseline window evidence is missing/invalid, and `invarlock verify` rejects certificates that are not provably paired.
 - For a field-by-field description of the certificate bundle consult [Certificate Schema (v1)](certificate-schema.md).
 - Do **not** commit raw model checkpoints or `events.jsonl`; they can contain large payloads and operational metadata. Store them in your artifact store if required.
 

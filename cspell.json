@@ -104,6 +104,11 @@
     "bitsandbytes",
     "mistralai",
     "Mixtral",
-    "subshells"
+    "subshells",
+    "BLAS",
+    "Hella",
+    "MMLU",
+    "Narasimhan",
+    "TFLOPS"
   ]
 }

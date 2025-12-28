@@ -200,6 +200,10 @@ def _free_model_memory(model: object | None) -> None:
         pass
 
 
+class _SnapshotRestoreFailed(RuntimeError):
+    """Internal signal for snapshot restore failures during retries."""
+
+
 def _should_measure_overhead(profile_normalized: str) -> tuple[bool, bool]:
     """Return (measure_guard_overhead, skip_overhead) derived from env/profile."""
 
@@ -366,6 +370,8 @@ def _tensor_or_list_to_ints(values: Any) -> list[int]:
                 return _to_int_list(raw)
             try:
                 return _to_int_list(list(raw))
+            except (typer.Exit, SystemExit, click.exceptions.Exit):
+                raise
             except Exception:
                 pass
         # Numpy arrays: treat as list-like
@@ -553,30 +559,69 @@ def _extract_pairing_schedule(report: dict[str, Any] | None) -> dict[str, Any] |
     if not isinstance(windows, dict):
         return None
 
-    def _sanitize(section_key: str) -> dict[str, Any] | None:
+    def _wrap_single_row(raw: Any, *, expected_rows: int) -> list | None:
+        if not isinstance(raw, list):
+            return None
+        if expected_rows == 1 and raw and not isinstance(raw[0], list):
+            return [raw]
+        return raw
+
+    def _sanitize(section_key: str, *, start_id: int) -> dict[str, Any] | None:
         section = windows.get(section_key)
         if not isinstance(section, dict):
             return None
-        window_ids = list(section.get("window_ids", []))
-        input_ids_raw = section.get("input_ids", [])
+        input_ids_raw = section.get("input_ids")
         if not isinstance(input_ids_raw, list):
             return None
-        input_ids = [list(seq) for seq in input_ids_raw]
+        input_ids = [_tensor_or_list_to_ints(seq) for seq in input_ids_raw]
+        if not input_ids:
+            return None
+
+        window_ids_raw = section.get("window_ids")
+        window_ids: list[int] = []
+        if isinstance(window_ids_raw, list):
+            if len(window_ids_raw) != len(input_ids):
+                return None
+            for wid in window_ids_raw:
+                try:
+                    window_ids.append(int(wid))
+                except Exception:
+                    return None
+        else:
+            window_ids = list(range(int(start_id), int(start_id) + len(input_ids)))
+
         attention_raw = section.get("attention_masks")
-        if isinstance(attention_raw, list) and all(
-            isinstance(mask, list) for mask in attention_raw
-        ):
-            attention_masks = [list(mask) for mask in attention_raw]
+        attention_masks: list[list[int]]
+        if isinstance(attention_raw, list):
+            maybe = _wrap_single_row(attention_raw, expected_rows=len(input_ids))
+            if isinstance(maybe, list) and all(
+                isinstance(mask, list) for mask in maybe
+            ):
+                attention_masks = [_tensor_or_list_to_ints(mask) for mask in maybe]
+            else:
+                attention_masks = [
+                    [1 if int(token) != 0 else 0 for token in seq] for seq in input_ids
+                ]
         else:
             attention_masks = [
-                [1 if token != 0 else 0 for token in seq] for seq in input_ids
+                [1 if int(token) != 0 else 0 for token in seq] for seq in input_ids
             ]
+        if len(attention_masks) != len(input_ids):
+            return None
+        for seq, mask in zip(input_ids, attention_masks, strict=False):
+            if len(mask) != len(seq):
+                return None
 
         labels_raw = section.get("labels")
         labels: list[list[int]] | None = None
         if isinstance(labels_raw, list) and labels_raw:
+            maybe_labels = _wrap_single_row(labels_raw, expected_rows=len(input_ids))
+            if not isinstance(maybe_labels, list) or len(maybe_labels) != len(
+                input_ids
+            ):
+                return None
             labels = []
-            for idx, raw_label in enumerate(labels_raw):
+            for idx, raw_label in enumerate(maybe_labels):
                 label_list = _tensor_or_list_to_ints(raw_label)
                 if idx < len(input_ids):
                     target_len = len(input_ids[idx])
@@ -588,12 +633,22 @@ def _extract_pairing_schedule(report: dict[str, Any] | None) -> dict[str, Any] |
                         label_list = label_list[:target_len]
                 labels.append(label_list)
 
-        masked_counts = None
-        if isinstance(section.get("masked_token_counts"), list):
-            masked_counts = [int(v) for v in section["masked_token_counts"]]
-        actual_counts = None
-        if isinstance(section.get("actual_token_counts"), list):
-            actual_counts = [int(v) for v in section["actual_token_counts"]]
+        masked_counts: list[int] | None = None
+        if section.get("masked_token_counts") is not None:
+            raw = section.get("masked_token_counts")
+            if isinstance(raw, int) and len(input_ids) == 1:
+                raw = [raw]
+            if not isinstance(raw, list) or len(raw) != len(input_ids):
+                return None
+            masked_counts = [int(v) for v in raw]
+        actual_counts: list[int] | None = None
+        if section.get("actual_token_counts") is not None:
+            raw = section.get("actual_token_counts")
+            if isinstance(raw, int) and len(input_ids) == 1:
+                raw = [raw]
+            if not isinstance(raw, list) or len(raw) != len(input_ids):
+                return None
+            actual_counts = [int(v) for v in raw]
 
         payload: dict[str, Any] = {
             "window_ids": window_ids,
@@ -608,8 +663,10 @@ def _extract_pairing_schedule(report: dict[str, Any] | None) -> dict[str, Any] |
             payload["actual_token_counts"] = actual_counts
         return payload
 
-    preview = _sanitize("preview")
-    final = _sanitize("final")
+    preview = _sanitize("preview", start_id=0)
+    if not preview:
+        return None
+    final = _sanitize("final", start_id=len(preview.get("input_ids") or []))
     if preview and final:
         return {"preview": preview, "final": final}
     return None
@@ -834,11 +891,30 @@ def _extract_model_load_kwargs(cfg: InvarLockConfig) -> dict[str, Any]:
     model = data.get("model") if isinstance(data, dict) else None
     if not isinstance(model, dict):
         return {}
-    return {
+    extra = {
         key: value
         for key, value in model.items()
         if key not in {"id", "adapter", "device"} and value is not None
     }
+    # Backwards-compatible aliasing: config `dtype` → HF `torch_dtype`.
+    if "dtype" in extra and "torch_dtype" not in extra:
+        extra["torch_dtype"] = extra.pop("dtype")
+
+    # Normalize torch_dtype when present (keep as string for JSON-ability).
+    if "torch_dtype" in extra and isinstance(extra.get("torch_dtype"), str):
+        dtype_str = str(extra.get("torch_dtype") or "").strip().lower()
+        aliases = {
+            "fp16": "float16",
+            "half": "float16",
+            "bf16": "bfloat16",
+            "fp32": "float32",
+        }
+        if dtype_str in aliases:
+            extra["torch_dtype"] = aliases[dtype_str]
+        elif dtype_str:
+            extra["torch_dtype"] = dtype_str
+
+    return extra
 
 
 def _load_model_with_cfg(adapter: Any, cfg: InvarLockConfig, device: str) -> Any:
@@ -888,6 +964,7 @@ def _run_bare_control(
     console: Console,
     resolved_loss_type: str,
     profile_normalized: str | None,
+    snapshot_provenance: dict[str, bool] | None = None,
     skip_model_load: bool = False,
 ) -> dict[str, Any] | None:
     """Execute the bare-control run for overhead estimation and return payload."""
@@ -903,26 +980,38 @@ def _run_bare_control(
     bare_context.setdefault("validation", {})["guard_overhead_mode"] = "bare"
     bare_config.context = bare_context
 
-    if restore_fn and model is not None:
-        restore_fn()
-        bare_target_model = model
-    elif skip_model_load:
-        bare_target_model = model or SimpleNamespace(name="bare_stub_model")
-    else:
-        bare_target_model = adapter.load_model(cfg.model.id, device=resolved_device)
+    private_model_loaded = False
+    bare_target_model = None
+    try:
+        if restore_fn and model is not None:
+            try:
+                restore_fn()
+            except Exception as exc:
+                raise _SnapshotRestoreFailed(str(exc)) from exc
+            bare_target_model = model
+        elif skip_model_load:
+            bare_target_model = model or SimpleNamespace(name="bare_stub_model")
+        else:
+            bare_target_model = _load_model_with_cfg(adapter, cfg, resolved_device)
+            private_model_loaded = True
+            if snapshot_provenance is not None:
+                snapshot_provenance["reload_path_used"] = True
 
-    bare_report = bare_runner.execute(
-        model=bare_target_model,
-        adapter=adapter,
-        edit=edit_op,
-        guards=[],
-        config=bare_config,
-        calibration_data=calibration_data,
-        auto_config=auto_config,
-        edit_config=edit_config,
-        preview_n=preview_count,
-        final_n=final_count,
-    )
+        bare_report = bare_runner.execute(
+            model=bare_target_model,
+            adapter=adapter,
+            edit=edit_op,
+            guards=[],
+            config=bare_config,
+            calibration_data=calibration_data,
+            auto_config=auto_config,
+            edit_config=edit_config,
+            preview_n=preview_count,
+            final_n=final_count,
+        )
+    finally:
+        if private_model_loaded:
+            _free_model_memory(bare_target_model)
 
     bare_ppl_final = None
     bare_ppl_preview = None
@@ -994,16 +1083,22 @@ def _execute_guarded_run(
     restore_fn: Any | None,
     resolved_device: str,
     console: Console,
+    snapshot_provenance: dict[str, bool] | None = None,
     skip_model_load: bool = False,
 ) -> tuple[Any, Any]:
     """Restore or load model and execute the guarded CoreRunner."""
     if restore_fn and model is not None:
-        restore_fn()
+        try:
+            restore_fn()
+        except Exception as exc:
+            raise _SnapshotRestoreFailed(str(exc)) from exc
     elif skip_model_load:
         model = model or SimpleNamespace(name="guarded_stub_model")
     else:
         console.print(f"🔧 Loading model: {cfg.model.id} (attempt 1)")
-        model = adapter.load_model(cfg.model.id, device=resolved_device)
+        model = _load_model_with_cfg(adapter, cfg, resolved_device)
+        if snapshot_provenance is not None:
+            snapshot_provenance["reload_path_used"] = True
 
     core_report = runner.execute(
         model=model,
@@ -1077,7 +1172,22 @@ def _compute_provider_digest(report: dict[str, Any]) -> dict[str, str] | None:
         wids = sec.get("window_ids")
         if isinstance(wids, list):
             all_ids.extend(list(wids))
-    ids_sha = _hash_json(sorted(all_ids)) if all_ids else None
+    ids_sha = None
+    if all_ids:
+        # Prefer ints when possible; fall back to strings to avoid mixed-type sorting.
+        ids_int: list[int] = []
+        use_ints = True
+        for raw in all_ids:
+            try:
+                ids_int.append(int(raw))
+            except Exception:
+                use_ints = False
+                break
+        if use_ints:
+            ids_sha = _hash_json(sorted(ids_int))
+        else:
+            ids_str = [str(v) for v in all_ids]
+            ids_sha = _hash_json(sorted(ids_str))
 
     # tokenizer hash: prefer meta.tokenizer_hash then data.tokenizer_hash
     tok_hash = None
@@ -1107,6 +1217,7 @@ def _validate_and_harvest_baseline_schedule(
     *,
     tokenizer_hash: str | None,
     resolved_loss_type: str,
+    profile: str | None = None,
     baseline_path_str: str | None = None,
     console: Console | None = None,
 ) -> dict[str, Any]:
@@ -1123,6 +1234,10 @@ def _validate_and_harvest_baseline_schedule(
 
     def _fail_schedule(reason: str) -> None:
         path = baseline_path_str or "baseline"
+        prof = (profile or "dev").strip().lower()
+        message = f"PAIRING-EVIDENCE-MISSING: {path}: {reason}"
+        if prof in {"ci", "release"}:
+            raise InvarlockError(code="E001", message=message)
         _print(
             f"[red]❌ Baseline pairing schedule '{path}' is incompatible: {reason}[/red]"
         )
@@ -1139,6 +1254,178 @@ def _validate_and_harvest_baseline_schedule(
     def _extract_meta(field: str, default: Any = None) -> Any:
         value = baseline_meta.get(field)
         return value if value is not None else default
+
+    # Structural integrity checks (fail closed in CI/Release)
+    try:
+        prev = (
+            pairing_schedule.get("preview")
+            if isinstance(pairing_schedule, dict)
+            else None
+        )
+        fin = (
+            pairing_schedule.get("final")
+            if isinstance(pairing_schedule, dict)
+            else None
+        )
+        if not isinstance(prev, dict) or not isinstance(fin, dict):
+            _fail_schedule("missing preview/final evaluation_windows sections")
+
+        def _arm_check(
+            label: str, section: dict[str, Any]
+        ) -> tuple[list[int], list[list[int]]]:
+            wids = section.get("window_ids")
+            toks = section.get("input_ids")
+            masks = section.get("attention_masks")
+            if not isinstance(wids, list) or not isinstance(toks, list):
+                _fail_schedule(f"invalid {label} section: missing window_ids/input_ids")
+            if len(wids) != len(toks):
+                _fail_schedule(
+                    f"{label} coherence error: len(window_ids)={len(wids)} len(input_ids)={len(toks)}"
+                )
+            ids_int: list[int] = []
+            seqs: list[list[int]] = []
+            for idx, (wid, seq) in enumerate(zip(wids, toks, strict=False)):
+                try:
+                    wid_int = int(wid)
+                except Exception:
+                    _fail_schedule(
+                        f"{label} window_ids contains non-int at index {idx}"
+                    )
+                ids_int.append(wid_int)
+                seq_ints = _tensor_or_list_to_ints(seq)
+                if not seq_ints:
+                    _fail_schedule(f"{label} input_ids empty at index {idx}")
+                seqs.append(seq_ints)
+
+            # attention_masks are required for pairing, but legacy baselines may omit them.
+            # When absent, default to all-ones masks (cannot infer padding reliably).
+            masks_rows: list[list[int]] = []
+            masks_missing = masks is None or masks == []
+            if (
+                isinstance(masks, list)
+                and masks
+                and len(seqs) == 1
+                and not isinstance(masks[0], list)
+            ):  # type: ignore[index]
+                masks = [masks]
+
+            if isinstance(masks, list) and masks:
+                if len(masks) != len(seqs):
+                    _fail_schedule(
+                        f"{label} coherence error: len(attention_masks)={len(masks)} len(input_ids)={len(seqs)}"
+                    )
+                for j, (seq_ints, mask) in enumerate(zip(seqs, masks, strict=False)):
+                    if not isinstance(mask, list):
+                        _fail_schedule(
+                            f"{label} attention_masks row is not a list at index {j}"
+                        )
+                    mask_ints = _tensor_or_list_to_ints(mask)
+                    if len(mask_ints) != len(seq_ints):
+                        _fail_schedule(
+                            f"{label} attention_masks length mismatch at index {j}"
+                        )
+                    masks_rows.append(mask_ints)
+            else:
+                masks_missing = True
+                masks_rows = [[1] * len(seq) for seq in seqs]
+
+            if masks_missing:
+                try:
+                    section["attention_masks"] = masks_rows
+                except Exception:
+                    pass
+
+            # Optional MLM fields must align when present.
+            labels = section.get("labels")
+            if isinstance(labels, list) and labels:
+                if len(labels) != len(seqs):
+                    _fail_schedule(f"{label} labels length mismatch")
+                for j, row in enumerate(labels):
+                    row_ints = _tensor_or_list_to_ints(row)
+                    if len(row_ints) != len(seqs[j]):
+                        _fail_schedule(f"{label} labels length mismatch at index {j}")
+
+            for key in ("masked_token_counts", "actual_token_counts"):
+                if section.get(key) is not None:
+                    raw_counts = section.get(key)
+                    if not isinstance(raw_counts, list) or len(raw_counts) != len(seqs):
+                        _fail_schedule(f"{label} {key} length mismatch")
+            return ids_int, seqs
+
+        prev_ids, prev_seqs = _arm_check("preview", prev)
+        fin_ids, fin_seqs = _arm_check("final", fin)
+
+        if len(set(prev_ids)) != len(prev_ids):
+            _fail_schedule("duplicate window_ids detected in preview arm")
+        if len(set(fin_ids)) != len(fin_ids):
+            _fail_schedule("duplicate window_ids detected in final arm")
+        if set(prev_ids) & set(fin_ids):
+            _fail_schedule("window_ids overlap between preview and final arms")
+
+        def _hash_tokens(tokens: list[int]) -> bytes:
+            if not tokens:
+                return b""
+            token_array = array("I", (int(token) & 0xFFFFFFFF for token in tokens))
+            return hashlib.blake2b(token_array.tobytes(), digest_size=16).digest()
+
+        prev_hashes = [_hash_tokens(seq) for seq in prev_seqs]
+        fin_hashes = [_hash_tokens(seq) for seq in fin_seqs]
+        if len(set(prev_hashes)) != len(prev_hashes):
+            _fail_schedule("duplicate token sequences detected in preview arm")
+        if len(set(fin_hashes)) != len(fin_hashes):
+            _fail_schedule("duplicate token sequences detected in final arm")
+        if set(prev_hashes) & set(fin_hashes):
+            _fail_schedule("preview/final token sequence overlap detected")
+
+        # Optional: validate baseline hashes when present in baseline report data
+        expected_preview_hash = _hash_sequences(prev_seqs)
+        expected_final_hash = _hash_sequences(fin_seqs)
+        expected_dataset_hash = hashlib.blake2s(
+            (expected_preview_hash + expected_final_hash).encode("utf-8"),
+            digest_size=16,
+        ).hexdigest()
+        baseline_preview_hash = baseline_meta.get("preview_hash")
+        baseline_final_hash = baseline_meta.get("final_hash")
+        baseline_dataset_hash = baseline_meta.get("dataset_hash")
+        if (
+            isinstance(baseline_preview_hash, str)
+            and baseline_preview_hash
+            and baseline_preview_hash != expected_preview_hash
+        ):
+            prof = (profile or "dev").strip().lower()
+            if prof in {"ci", "release"}:
+                _fail_schedule("preview_hash mismatch vs baseline report data")
+            _print(
+                "[yellow]⚠️  Baseline preview_hash mismatch; continuing in dev profile.[/yellow]"
+            )
+        if (
+            isinstance(baseline_final_hash, str)
+            and baseline_final_hash
+            and baseline_final_hash != expected_final_hash
+        ):
+            prof = (profile or "dev").strip().lower()
+            if prof in {"ci", "release"}:
+                _fail_schedule("final_hash mismatch vs baseline report data")
+            _print(
+                "[yellow]⚠️  Baseline final_hash mismatch; continuing in dev profile.[/yellow]"
+            )
+        if (
+            isinstance(baseline_dataset_hash, str)
+            and baseline_dataset_hash
+            and baseline_dataset_hash != expected_dataset_hash
+        ):
+            prof = (profile or "dev").strip().lower()
+            if prof in {"ci", "release"}:
+                _fail_schedule("dataset_hash mismatch vs baseline report data")
+            _print(
+                "[yellow]⚠️  Baseline dataset_hash mismatch; continuing in dev profile.[/yellow]"
+            )
+    except InvarlockError:
+        raise
+    except typer.Exit:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        _fail_schedule(f"failed to validate baseline schedule integrity ({exc})")
 
     # Adopt counts from the schedule, warning if they differ from cfg
     baseline_preview = len(pairing_schedule["preview"].get("input_ids") or [])
@@ -1268,20 +1555,32 @@ def _enforce_provider_parity(
         return
     sd = subject_digest or {}
     bd = baseline_digest or {}
+    subj_ids = sd.get("ids_sha256")
+    base_ids = bd.get("ids_sha256")
     subj_tok = sd.get("tokenizer_sha256")
     base_tok = bd.get("tokenizer_sha256")
     subj_mask = sd.get("masking_sha256")
     base_mask = bd.get("masking_sha256")
     # Missing digest information in CI/Release → abort
     if not (
-        isinstance(subj_tok, str)
+        isinstance(subj_ids, str)
+        and isinstance(base_ids, str)
+        and subj_ids
+        and base_ids
+        and isinstance(subj_tok, str)
         and isinstance(base_tok, str)
         and subj_tok
         and base_tok
     ):
         raise InvarlockError(
             code="E004",
-            message="PROVIDER-DIGEST-MISSING: subject or baseline missing tokenizer digest",
+            message="PROVIDER-DIGEST-MISSING: subject or baseline missing ids/tokenizer digest",
+        )
+    # Window-ids mismatch → abort
+    if subj_ids != base_ids:
+        raise InvarlockError(
+            code="E006",
+            message="IDS-DIGEST-MISMATCH: subject and baseline window IDs differ",
         )
     # Tokenizer mismatch → abort with code
     if subj_tok != base_tok:
@@ -1771,38 +2070,83 @@ def run_command(
         pairing_schedule: dict[str, Any] | None = None
         if baseline:
             baseline_path = Path(baseline)
-            if baseline_path.exists():
+            profile_normalized = (profile or "").strip().lower()
+            strict_baseline = profile_normalized in {"ci", "release"}
+            if not baseline_path.exists():
+                msg = (
+                    "PAIRING-EVIDENCE-MISSING: baseline report path does not exist "
+                    f"({baseline})"
+                )
+                if strict_baseline:
+                    raise InvarlockError(code="E001", message=msg)
+                console.print(
+                    f"[yellow]⚠️  {msg}. Falling back to dataset schedule.[/yellow]"
+                )
+            else:
                 try:
                     with baseline_path.open(encoding="utf-8") as f:
                         baseline_report_data = json.load(f)
+                except Exception as exc:  # noqa: BLE001
+                    msg = f"PAIRING-EVIDENCE-MISSING: baseline report JSON parse failed ({exc})"
+                    if strict_baseline:
+                        raise InvarlockError(code="E001", message=msg) from exc
+                    console.print(
+                        f"[yellow]⚠️  {msg}. Falling back to dataset schedule.[/yellow]"
+                    )
+                    baseline_report_data = None
+                if isinstance(baseline_report_data, dict):
                     pairing_schedule = _extract_pairing_schedule(baseline_report_data)
                     if pairing_schedule:
+                        # Normalize baseline report in-memory so downstream digest/parity
+                        # computations see a consistent window_id + mask shape even for
+                        # legacy baselines missing some fields.
+                        try:
+                            baseline_report_data["evaluation_windows"] = (
+                                pairing_schedule
+                            )
+                        except Exception:
+                            pass
+                        # Harvest tokenizer hash provenance from baseline when present.
+                        try:
+                            if not tokenizer_hash:
+                                tok = None
+                                meta = (
+                                    baseline_report_data.get("meta")
+                                    if isinstance(
+                                        baseline_report_data.get("meta"), dict
+                                    )
+                                    else {}
+                                )
+                                data = (
+                                    baseline_report_data.get("data")
+                                    if isinstance(
+                                        baseline_report_data.get("data"), dict
+                                    )
+                                    else {}
+                                )
+                                if isinstance(meta, dict):
+                                    tok = meta.get("tokenizer_hash")
+                                if not tok and isinstance(data, dict):
+                                    tok = data.get("tokenizer_hash")
+                                if isinstance(tok, str) and tok:
+                                    tokenizer_hash = tok
+                        except Exception:
+                            pass
                         console.print(
                             "🧬 Loaded baseline evaluation schedule for pairing"
                         )
-                    elif (profile or "").lower() == "release":
-                        console.print(
-                            f"[red]❌ Baseline report '{baseline}' does not contain evaluation_windows required for pairing.[/red]"
-                        )
-                        raise typer.Exit(1)
                     else:
+                        msg = (
+                            "PAIRING-EVIDENCE-MISSING: baseline report missing or invalid "
+                            f"evaluation_windows ({baseline})"
+                        )
+                        if strict_baseline:
+                            raise InvarlockError(code="E001", message=msg)
                         console.print(
-                            f"[yellow]⚠️  Baseline report '{baseline}' lacks evaluation_windows; falling back to dataset schedule.[/yellow]"
+                            f"[yellow]⚠️  {msg}. Falling back to dataset schedule.[/yellow]"
                         )
                         baseline_report_data = None
                         pairing_schedule = None
-                except typer.Exit:
-                    raise
-                except Exception as exc:  # noqa: BLE001
-                    console.print(
-                        f"[yellow]⚠️  Failed to load baseline report '{baseline}': {exc}. Falling back to dataset schedule.[/yellow]"
-                    )
-                    baseline_report_data = None
-                    pairing_schedule = None
-            else:
-                console.print(
-                    f"[yellow]⚠️  Baseline report '{baseline}' not found. Falling back to dataset schedule.[/yellow]"
-                )
 
         requested_preview = int(getattr(cfg.dataset, "preview_n", 0))
         requested_final = int(getattr(cfg.dataset, "final_n", 0))
@@ -1994,6 +2338,7 @@ def run_command(
                 baseline_report_data,
                 tokenizer_hash=tokenizer_hash,
                 resolved_loss_type=resolved_loss_type,
+                profile=profile,
                 baseline_path_str=str(baseline) if baseline else None,
                 console=console,
             )
@@ -2787,12 +3132,16 @@ def run_command(
         model = None
         restore_fn = None
         snapshot_tmpdir: str | None = None
+        snapshot_provenance: dict[str, bool] = {
+            "restore_failed": False,
+            "reload_path_used": False,
+        }
 
         # Try single-load with snapshot/restore if adapter supports it; fallback to reload per attempt
         try:
             # Load once
             console.print(f"🔧 Loading model once: {cfg.model.id}")
-            model = adapter.load_model(cfg.model.id, device=resolved_device)
+            model = _load_model_with_cfg(adapter, cfg, resolved_device)
 
             # No edit-specific bootstrap logic
 
@@ -2960,12 +3309,26 @@ def run_command(
 
                 restore_fn = _restore
             elif mode == "bytes":
-                base_blob = adapter.snapshot(model)  # type: ignore[attr-defined]
+                supports_chunked = hasattr(adapter, "snapshot_chunked") and hasattr(
+                    adapter, "restore_chunked"
+                )
+                try:
+                    base_blob = adapter.snapshot(model)  # type: ignore[attr-defined]
+                except Exception:
+                    if not supports_chunked:
+                        raise
+                    snapshot_tmpdir = adapter.snapshot_chunked(model)  # type: ignore[attr-defined]
 
-                def _restore2():
-                    adapter.restore(model, base_blob)  # type: ignore[attr-defined]
+                    def _restore_fallback_chunked():
+                        adapter.restore_chunked(model, snapshot_tmpdir)  # type: ignore[attr-defined]
 
-                restore_fn = _restore2
+                    restore_fn = _restore_fallback_chunked
+                else:
+
+                    def _restore2():
+                        adapter.restore(model, base_blob)  # type: ignore[attr-defined]
+
+                    restore_fn = _restore2
             else:
                 # reload path - properly free GPU memory before setting to None
                 _free_model_memory(model)
@@ -3009,62 +3372,88 @@ def run_command(
                 )
 
             guard_overhead_payload: dict[str, Any] | None = None
-            if skip_overhead and profile_normalized in {"ci", "release"}:
-                guard_overhead_payload = {
-                    "overhead_threshold": GUARD_OVERHEAD_THRESHOLD,
-                    "evaluated": False,
-                    "passed": True,
-                    "skipped": True,
-                    "skip_reason": "INVARLOCK_SKIP_OVERHEAD_CHECK",
-                    "mode": "skipped",
-                    "source": "env:INVARLOCK_SKIP_OVERHEAD_CHECK",
-                    "messages": [
-                        "Overhead check skipped via INVARLOCK_SKIP_OVERHEAD_CHECK"
-                    ],
-                    "warnings": [],
-                    "errors": [],
-                    "checks": {},
-                }
-            elif measure_guard_overhead:
-                guard_overhead_payload = _run_bare_control(
+            try:
+                if skip_overhead and profile_normalized in {"ci", "release"}:
+                    guard_overhead_payload = {
+                        "overhead_threshold": GUARD_OVERHEAD_THRESHOLD,
+                        "evaluated": False,
+                        "passed": True,
+                        "skipped": True,
+                        "skip_reason": "INVARLOCK_SKIP_OVERHEAD_CHECK",
+                        "mode": "skipped",
+                        "source": "env:INVARLOCK_SKIP_OVERHEAD_CHECK",
+                        "messages": [
+                            "Overhead check skipped via INVARLOCK_SKIP_OVERHEAD_CHECK"
+                        ],
+                        "warnings": [],
+                        "errors": [],
+                        "checks": {},
+                    }
+                elif measure_guard_overhead:
+                    guard_overhead_payload = _run_bare_control(
+                        adapter=adapter,
+                        edit_op=edit_op,
+                        cfg=cfg,
+                        model=model,
+                        run_config=run_config,
+                        calibration_data=calibration_data,
+                        auto_config=auto_config,
+                        edit_config=edit_config,
+                        preview_count=preview_count,
+                        final_count=final_count,
+                        seed_bundle=seed_bundle,
+                        resolved_device=resolved_device,
+                        restore_fn=restore_fn,
+                        console=console,
+                        resolved_loss_type=resolved_loss_type,
+                        profile_normalized=profile_normalized,
+                        snapshot_provenance=snapshot_provenance,
+                        skip_model_load=skip_model_load,
+                    )
+
+                # Ensure clean state for guarded run
+                core_report, model = _execute_guarded_run(
+                    runner=runner,
                     adapter=adapter,
-                    edit_op=edit_op,
-                    cfg=cfg,
                     model=model,
+                    cfg=cfg,
+                    edit_op=edit_op,
                     run_config=run_config,
+                    guards=guards,
                     calibration_data=calibration_data,
                     auto_config=auto_config,
                     edit_config=edit_config,
                     preview_count=preview_count,
                     final_count=final_count,
-                    seed_bundle=seed_bundle,
-                    resolved_device=resolved_device,
                     restore_fn=restore_fn,
+                    resolved_device=resolved_device,
                     console=console,
-                    resolved_loss_type=resolved_loss_type,
-                    profile_normalized=profile_normalized,
+                    snapshot_provenance=snapshot_provenance,
                     skip_model_load=skip_model_load,
                 )
-
-            # Ensure clean state for guarded run
-            core_report, model = _execute_guarded_run(
-                runner=runner,
-                adapter=adapter,
-                model=model,
-                cfg=cfg,
-                edit_op=edit_op,
-                run_config=run_config,
-                guards=guards,
-                calibration_data=calibration_data,
-                auto_config=auto_config,
-                edit_config=edit_config,
-                preview_count=preview_count,
-                final_count=final_count,
-                restore_fn=restore_fn,
-                resolved_device=resolved_device,
-                console=console,
-                skip_model_load=skip_model_load,
-            )
+            except _SnapshotRestoreFailed as exc:
+                snapshot_provenance["restore_failed"] = True
+                _free_model_memory(model)
+                model = None
+                restore_fn = None
+                console.print(
+                    "[yellow]⚠️  Snapshot restore failed; switching to reload-per-attempt.[/yellow]"
+                )
+                console.print(f"[yellow]↳ {exc}[/yellow]")
+                if retry_controller:
+                    retry_controller.record_attempt(
+                        attempt,
+                        {
+                            "passed": False,
+                            "failures": ["restore_failed"],
+                            "validation": {},
+                        },
+                        edit_config,
+                    )
+                    if retry_controller.should_retry(False):
+                        attempt += 1
+                        continue
+                raise typer.Exit(1) from exc
 
             if not hasattr(core_report, "context") or core_report.context is None:
                 core_report.context = {}
@@ -3204,6 +3593,16 @@ def run_command(
 
             if tokenizer_hash:
                 report["meta"]["tokenizer_hash"] = tokenizer_hash
+
+            # Snapshot/restore provenance (survives retries).
+            try:
+                prov = report.setdefault("provenance", {})
+                prov["restore_failed"] = bool(snapshot_provenance.get("restore_failed"))
+                prov["reload_path_used"] = bool(
+                    snapshot_provenance.get("reload_path_used")
+                )
+            except Exception:
+                pass
 
             # Transfer edit information
             if hasattr(core_report, "edit") and core_report.edit:
@@ -3464,7 +3863,7 @@ def run_command(
                         ],
                     },
                 }
-            elif had_baseline and (profile or "").lower() == "release":
+            elif had_baseline and (profile or "").lower() in {"ci", "release"}:
                 console.print(
                     "[red]❌ [INVARLOCK:E001] PAIRING-SCHEDULE-MISMATCH: baseline pairing requested but evaluation windows were not produced. Check capacity/pairing config.[/red]"
                 )
@@ -3482,11 +3881,12 @@ def run_command(
                         except Exception:
                             return 0
 
+                    preview_window_count = len(preview_records)
+                    final_window_count = len(final_records)
+
                     report["evaluation_windows"] = {
                         "preview": {
-                            "window_ids": [
-                                f"preview::{i}" for i in range(len(preview_records))
-                            ],
+                            "window_ids": list(range(preview_window_count)),
                             "input_ids": [
                                 list(r["input_ids"]) for r in preview_records
                             ],
@@ -3507,9 +3907,12 @@ def run_command(
                             ),
                         },
                         "final": {
-                            "window_ids": [
-                                f"final::{i}" for i in range(len(final_records))
-                            ],
+                            "window_ids": list(
+                                range(
+                                    preview_window_count,
+                                    preview_window_count + final_window_count,
+                                )
+                            ),
                             "input_ids": [list(r["input_ids"]) for r in final_records],
                             "attention_masks": [
                                 list(r["attention_mask"]) for r in final_records
@@ -3549,18 +3952,16 @@ def run_command(
                     # Strict parity checks in CI/Release when baseline present
                     try:
                         if isinstance(baseline_report_data, dict):
-                            base_prov = (
-                                baseline_report_data.get("provenance", {})
-                                if isinstance(
-                                    baseline_report_data.get("provenance"), dict
+                            base_digest = None
+                            base_prov = baseline_report_data.get("provenance")
+                            if isinstance(base_prov, dict):
+                                base_pd = base_prov.get("provider_digest")
+                                if isinstance(base_pd, dict):
+                                    base_digest = base_pd
+                            if base_digest is None:
+                                base_digest = _compute_provider_digest(
+                                    baseline_report_data
                                 )
-                                else {}
-                            )
-                            base_digest = (
-                                base_prov.get("provider_digest")
-                                if isinstance(base_prov, dict)
-                                else None
-                            )
                             _enforce_provider_parity(
                                 provider_digest,
                                 base_digest,
@@ -3576,6 +3977,8 @@ def run_command(
                         _fail_run(str(_e))
                     except Exception:
                         pass
+            except (typer.Exit, SystemExit, click.exceptions.Exit):
+                raise
             except Exception:
                 pass
 
@@ -3823,30 +4226,46 @@ def run_command(
                 console.print(f"[red]{err}[/red]")
                 raise typer.Exit(code)
 
-            # Additional guard: paired_windows collapse (0) in CI/Release
-            try:
-                paired_windows_val = metrics_section.get("paired_windows")
-                if (
-                    profile_normalized in {"ci", "release"}
-                    and isinstance(paired_windows_val, (int | float))
-                    and int(paired_windows_val) == 0
-                ):
+            # Paired-run enforcement: baseline provided must be truly paired in CI/Release.
+            if baseline and profile_normalized in {"ci", "release"}:
+                pairing_reason = metrics_section.get("window_pairing_reason")
+                if pairing_reason is not None:
                     err = InvarlockError(
                         code="E001",
                         message=(
-                            "PAIRED-WINDOWS-COLLAPSED: paired_windows=0 under paired schedule. "
+                            "PAIRING-SCHEDULE-MISMATCH: baseline pairing requested but run was not paired "
+                            f"(window_pairing_reason={pairing_reason})"
+                        ),
+                        details={"window_pairing_reason": pairing_reason},
+                    )
+                    code = _resolve_exit_code(err, profile=profile_normalized)
+                    console.print(f"[red]{err}[/red]")
+                    raise typer.Exit(code)
+
+                paired_windows_val = metrics_section.get("paired_windows")
+                paired_windows_int = None
+                try:
+                    if paired_windows_val is not None and not isinstance(
+                        paired_windows_val, bool
+                    ):
+                        paired_windows_int = int(paired_windows_val)
+                except Exception:
+                    paired_windows_int = None
+                if paired_windows_int is None or paired_windows_int <= 0:
+                    err = InvarlockError(
+                        code="E001",
+                        message=(
+                            "PAIRED-WINDOWS-COLLAPSED: paired_windows<=0 under paired baseline. "
                             "Check device stability, dataset windows, or edit scope."
                         ),
                         details={
-                            "paired_windows": int(paired_windows_val),
+                            "paired_windows": paired_windows_val,
                             "profile": profile_normalized,
                         },
                     )
                     code = _resolve_exit_code(err, profile=profile_normalized)
                     console.print(f"[red]{err}[/red]")
                     raise typer.Exit(code)
-            except Exception:
-                pass
 
             expected_preview = effective_preview or getattr(
                 cfg.dataset, "preview_n", preview_count_report

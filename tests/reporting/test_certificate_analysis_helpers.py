@@ -141,6 +141,7 @@ def test_enforce_pairing_and_coverage_uses_fallback_counts():
     stats = {
         "window_match_fraction": 1.0,
         "window_overlap_fraction": 0.0,
+        "paired_windows": 200,
         "actual_preview": None,
         "actual_final": None,
         "coverage": {

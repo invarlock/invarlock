@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# invarlock_definitive_validation_b200.sh
+# b200_validation_suite.sh
 # ==========================================================
 # InvarLock Definitive Validation Suite - B200 180GB Optimized
 # ==========================================================
-# Version: v2.1.0
+# Version: v2.1.0-b200
 # Dependencies: bash 4+, jq, python3, invarlock CLI, nvidia-smi
 # Optimized for 8x NVIDIA B200 180GB SXM6 GPUs with parallel orchestration.
 #
@@ -15,7 +15,8 @@
 #
 # MEMORY UTILIZATION STRATEGY:
 # - Target: 85-92% VRAM (153-166 GB of 180 GB per GPU)
-# - Large model support: 70B+ models on 2-4 GPUs (adaptive)
+# - Large models auto-scale to multi-GPU only when profile exceeds per-GPU memory
+# - Adaptive under-allocation is disabled by default to avoid OOM
 # - All 8 GPUs utilized in parallel
 #
 # OPERATIONAL NOTES:
@@ -30,14 +31,14 @@
 # - Low-Rank SVD: rank=256 clean, rank=32 stress
 #
 # MODEL SUITE (8 PUBLIC models - no HuggingFace login required):
-# - GPU 0: Mistral-7B-v0.1 (~14 GB)
-# - GPU 1: Llama-2-13b-hf (~26 GB)
-# - GPU 2: Qwen2.5-14B (~28 GB)
-# - GPU 3: Qwen2.5-32B (~64 GB)
-# - GPU 4: Yi-34B (~68 GB)
-# - GPU 5: Mixtral-8x7B-v0.1 (~90 GB)
-# - GPU 6: Llama-2-70b-hf (~140 GB)
-# - GPU 7: Qwen1.5-72B (~144 GB)
+# - Mistral-7B-v0.1 (~14 GB)
+# - Llama-2-13b-hf (~26 GB)
+# - Qwen2.5-14B (~28 GB)
+# - Qwen2.5-32B (~64 GB)
+# - Yi-34B (~68 GB)
+# - Mixtral-8x7B-v0.1 (~90 GB)
+# - Llama-2-70b-hf (~140 GB)
+# - Qwen1.5-72B (~144 GB)
 #
 # EXECUTION FLOW:
 # 1. Launch all 8 models in parallel across 8 GPUs
@@ -48,14 +49,15 @@
 
 # Dynamic scheduling is always enabled.
 # Static scheduling has been removed.
-# Uses a "small_first" priority strategy with adaptive GPU allocation.
+# Uses a "small_first" priority strategy. Multi-GPU is used only when the
+# per-task profile exceeds per-GPU memory; adaptive under-allocation is disabled
+# by default to avoid OOM.
 
 # Per-task error handling (no global exit on error)
 set -uo pipefail
 
 # Initialize pids array early to avoid set -u errors in cleanup
 declare -a pids=()
-MONITOR_PID=""
 
 # ============ CLEANUP TRAP ============
 cleanup() {
@@ -72,10 +74,6 @@ cleanup() {
             fi
         done
     fi
-    if [[ -n "${MONITOR_PID:-}" ]]; then
-        kill "${MONITOR_PID}" 2>/dev/null || true
-    fi
-
     # Clean up lock file
     rm -f "${LOG_LOCK:-}" 2>/dev/null || true
 
@@ -98,8 +96,8 @@ SCRIPT_VERSION="2.1.0-b200"
 # ============ B200-SPECIFIC CONFIGURATION ============
 # These settings are tuned for 8x B200 180GB maximum utilization
 
-# GPU Configuration
-export NUM_GPUS="${NUM_GPUS:-8}"
+# GPU Configuration (auto-detected at runtime unless explicitly set)
+NUM_GPUS="${NUM_GPUS:-}"
 export GPU_MEMORY_GB="${GPU_MEMORY_GB:-180}"
 
 # Determinism/throughput toggle for this harness (independent of InvarLock CLI presets).
@@ -120,26 +118,24 @@ else
 fi
 
 # ============================================================
-# MODEL SELECTION - ALL MODELS ARE PUBLIC (NO HUGGINGFACE LOGIN REQUIRED)
-# ============================================================
-
-# ============================================================
 # MODEL SELECTION - ALL PUBLIC (NO HUGGINGFACE LOGIN REQUIRED)
 # ============================================================
 # All models below are confirmed public and do not require gated access.
 # Using NousResearch versions of LLaMA-2 to avoid Meta's gated repos.
+# Approx VRAM below is weights-only; exact per-task memory is computed from
+# `model_profile.json` after download.
 
-# Small models (GPU 0-2) - ~14-28 GB each
+# Small models (fit on a single B200 under typical settings)
 MODEL_1="${MODEL_1:-mistralai/Mistral-7B-v0.1}"           # ~14 GB - Mistral (PUBLIC, FA2 compatible)
 MODEL_2="${MODEL_2:-NousResearch/Llama-2-13b-hf}"         # ~26 GB - LLaMA-2 13B (PUBLIC via NousResearch)
 MODEL_3="${MODEL_3:-Qwen/Qwen2.5-14B}"                    # ~28 GB - Qwen2.5 (PUBLIC, FA2 compatible)
 
-# Medium models (GPU 3-5) - ~60-90 GB each
+# Medium/MoE models (fit on a single B200 under typical settings)
 MODEL_4="${MODEL_4:-Qwen/Qwen2.5-32B}"                    # ~64 GB - Qwen2.5 32B (PUBLIC, FA2 compatible)
 MODEL_5="${MODEL_5:-01-ai/Yi-34B}"                        # ~68 GB - Yi 34B (PUBLIC, FA2 compatible)
 MODEL_6="${MODEL_6:-mistralai/Mixtral-8x7B-v0.1}"         # ~90 GB - Mixtral MoE (PUBLIC, FA2 compatible)
 
-# Large models (GPU 6-7) - B200-exclusive! ~140 GB each
+# Large models (weights ~140+ GB; may scale to multi-GPU if overheads exceed 180GB)
 MODEL_7="${MODEL_7:-NousResearch/Llama-2-70b-hf}"         # ~140 GB - LLaMA-2 70B (PUBLIC via NousResearch)
 MODEL_8="${MODEL_8:-Qwen/Qwen1.5-72B}"                    # ~144 GB - Qwen 72B (PUBLIC, FA2 compatible)
 
@@ -175,6 +171,7 @@ EVAL_BATCH_SIZE_SMALL="${EVAL_BATCH_SIZE_SMALL:-auto:16}"   # 7B-14B models - au
 EVAL_BATCH_SIZE_MEDIUM="${EVAL_BATCH_SIZE_MEDIUM:-auto:8}"  # 30B-40B models - auto with max 8
 EVAL_BATCH_SIZE_LARGE="${EVAL_BATCH_SIZE_LARGE:-auto:4}"    # 70B+ models - auto with max 4
 EVAL_BATCH_SIZE_MOE="${EVAL_BATCH_SIZE_MOE:-auto:6}"        # MoE models (Mixtral) - auto with max 6
+EVAL_CONTEXT_LEN="${EVAL_CONTEXT_LEN:-2048}"
 
 # InvarLock Configuration - BASE DEFAULTS (will be overridden per-model)
 # WikiText-2 validation has ~1174 usable samples
@@ -182,7 +179,6 @@ EVAL_BATCH_SIZE_MOE="${EVAL_BATCH_SIZE_MOE:-auto:6}"        # MoE models (Mixtra
 # Smaller models will get more generous settings via get_model_invarlock_config()
 INVARLOCK_PREVIEW_WINDOWS="${INVARLOCK_PREVIEW_WINDOWS:-32}"
 INVARLOCK_FINAL_WINDOWS="${INVARLOCK_FINAL_WINDOWS:-32}"
-INVARLOCK_BOOTSTRAP_N="${INVARLOCK_BOOTSTRAP_N:-10000}"
 INVARLOCK_DATASET="${INVARLOCK_DATASET:-wikitext2}"
 INVARLOCK_TIER="${INVARLOCK_TIER:-balanced}"
 INVARLOCK_SEQ_LEN="${INVARLOCK_SEQ_LEN:-512}"
@@ -195,6 +191,16 @@ CLEAN_EDIT_RUNS="${CLEAN_EDIT_RUNS:-3}"
 STRESS_EDIT_RUNS="${STRESS_EDIT_RUNS:-2}"
 RUN_ERROR_INJECTION="${RUN_ERROR_INJECTION:-true}"
 
+# Memory planning overheads (GB) for task budgeting.
+MODEL_LOAD_OVERHEAD_GB="${MODEL_LOAD_OVERHEAD_GB:-4}"
+EDIT_OVERHEAD_GB="${EDIT_OVERHEAD_GB:-8}"
+BATCH_EDIT_OVERHEAD_GB="${BATCH_EDIT_OVERHEAD_GB:-8}"
+EVAL_OVERHEAD_GB="${EVAL_OVERHEAD_GB:-6}"
+INVARLOCK_OVERHEAD_GB="${INVARLOCK_OVERHEAD_GB:-6}"
+
+# Task timeout (seconds). Set to 0 or empty to disable.
+export TASK_TIMEOUT_DEFAULT="${TASK_TIMEOUT_DEFAULT:-21600}"
+
 # Output - supports resume by specifying existing directory
 OUTPUT_DIR="${OUTPUT_DIR:-./invarlock_validation_b200_$(date +%Y%m%d_%H%M%S)}"
 
@@ -202,8 +208,10 @@ OUTPUT_DIR="${OUTPUT_DIR:-./invarlock_validation_b200_$(date +%Y%m%d_%H%M%S)}"
 RESUME_MODE="${RESUME_MODE:-true}"
 
 # ============ B200 GPU OPTIMIZATION FLAGS - MAXIMUM MEMORY ============
-# Default to using all 8 GPUs, but respect user override
-export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1,2,3,4,5,6,7}"
+# GPU selection is configured at runtime:
+# - If `CUDA_VISIBLE_DEVICES` is explicitly set (e.g., by Slurm or the user), it is respected.
+# - Otherwise, the harness detects available GPUs and uses all of them.
+# The selected pool is exported as `GPU_ID_LIST` (physical GPU indices) for scheduler/workers.
 
 # TF32 / cuDNN benchmark behavior depends on B200_DETERMINISM:
 # - throughput: enable TF32 + benchmark for speed (script-level runs).
@@ -338,6 +346,162 @@ error_exit() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >> "${LOG_FILE}"
     exit 1
+}
+
+sanitize_model_name() {
+    local model_id="$1"
+    echo "${model_id}" \
+        | tr '[:upper:]' '[:lower:]' \
+        | sed 's#/#__#g' \
+        | tr ' ' '_' \
+        | tr -cd '[:alnum:]_-'
+}
+
+# ============ GPU SELECTION / TOPOLOGY ============
+# Stable pool of physical GPU indices used by this run.
+# - If CUDA_VISIBLE_DEVICES is set, it is treated as an explicit physical GPU list.
+# - Otherwise, we detect all GPUs via nvidia-smi and use them.
+#
+# NOTE: Workers/tasks will override CUDA_VISIBLE_DEVICES per-task (single- or multi-GPU),
+# so we keep the pool in GPU_ID_LIST for scheduler enumeration.
+GPU_ID_LIST="${GPU_ID_LIST:-}"
+
+# Print newline-separated GPU IDs for this run.
+# Falls back to legacy 0..NUM_GPUS-1 when GPU_ID_LIST isn't set yet.
+list_run_gpu_ids() {
+    if [[ -n "${GPU_ID_LIST:-}" ]]; then
+        echo "${GPU_ID_LIST}" | tr ',' '\n' | sed '/^$/d'
+    else
+        local total="${NUM_GPUS:-8}"
+        if ! [[ "${total}" =~ ^[0-9]+$ ]]; then
+            total=8
+        fi
+        [[ ${total} -lt 1 ]] && total=1
+        seq 0 $((total - 1))
+    fi
+}
+
+configure_gpu_pool() {
+    # Identify candidate GPU IDs
+    local source="nvidia-smi"
+    local raw_list=""
+    local -a candidates=()
+
+    # Prefer CUDA_VISIBLE_DEVICES if set (Slurm/Ray commonly set this).
+    if [[ -n "${CUDA_VISIBLE_DEVICES:-}" ]]; then
+        source="CUDA_VISIBLE_DEVICES"
+        raw_list="${CUDA_VISIBLE_DEVICES}"
+    elif [[ -n "${GPU_ID_LIST:-}" ]]; then
+        # Fallback: allow callers to set GPU_ID_LIST directly.
+        source="GPU_ID_LIST"
+        raw_list="${GPU_ID_LIST}"
+    fi
+
+    if [[ -n "${raw_list}" ]]; then
+        IFS=',' read -ra candidates <<< "${raw_list}"
+    else
+        mapfile -t candidates < <(nvidia-smi --query-gpu=index --format=csv,noheader,nounits 2>/dev/null | tr -d ' ')
+    fi
+
+    # Sanitize and validate IDs
+    local -a cleaned=()
+    local id
+    for id in "${candidates[@]}"; do
+        id=$(echo "${id}" | tr -d ' ')
+        [[ -z "${id}" ]] && continue
+        if ! [[ "${id}" =~ ^[0-9]+$ ]]; then
+            error_exit "Non-numeric GPU id in ${source}: '${id}'. Set CUDA_VISIBLE_DEVICES to numeric indices."
+        fi
+        if ! nvidia-smi -i "${id}" &>/dev/null; then
+            error_exit "GPU id '${id}' from ${source} is not valid on this host."
+        fi
+        cleaned+=("${id}")
+    done
+
+    if [[ ${#cleaned[@]} -eq 0 ]]; then
+        error_exit "No usable GPU ids found (${source})."
+    fi
+
+    # Determine how many GPUs to use.
+    local requested="${NUM_GPUS:-}"
+    if [[ -z "${requested}" ]]; then
+        requested="${#cleaned[@]}"
+    fi
+    if ! [[ "${requested}" =~ ^[0-9]+$ ]]; then
+        requested="${#cleaned[@]}"
+    fi
+    if [[ ${requested} -lt 1 ]]; then
+        requested=1
+    fi
+    if [[ ${requested} -gt ${#cleaned[@]} ]]; then
+        log "WARNING: NUM_GPUS=${requested} > available ${#cleaned[@]} from ${source}; clamping"
+        requested=${#cleaned[@]}
+    fi
+
+    local -a selected=("${cleaned[@]:0:${requested}}")
+    GPU_ID_LIST=$(IFS=','; echo "${selected[*]}")
+    export GPU_ID_LIST
+    export NUM_GPUS="${#selected[@]}"
+
+    # Normalize CUDA_VISIBLE_DEVICES so torch + subprocesses see the same pool.
+    export CUDA_VISIBLE_DEVICES="${GPU_ID_LIST}"
+
+    log "GPU pool configured from ${source}: NUM_GPUS=${NUM_GPUS}, GPU_ID_LIST=${GPU_ID_LIST}"
+}
+
+# ============ DISK PRESSURE HARDENING ============
+# Abort early under low disk to avoid half-written artifacts and cascading failures.
+MIN_FREE_DISK_GB="${MIN_FREE_DISK_GB:-200}"
+
+get_free_disk_gb() {
+    local path="$1"
+    local free_disk
+    free_disk=$(df -BG "${path}" 2>/dev/null | awk 'NR==2 {gsub(/G/,""); print $4}')
+    [[ -z "${free_disk}" || ! "${free_disk}" =~ ^[0-9]+$ ]] && return 1
+    echo "${free_disk}"
+}
+
+write_disk_pressure_state() {
+    local free_gb="$1"
+    local min_gb="$2"
+    mkdir -p "${OUTPUT_DIR}/state" 2>/dev/null || true
+    cat > "${OUTPUT_DIR}/state/disk_pressure.json" << EOF
+{
+  "detected_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "free_gb": ${free_gb},
+  "min_free_gb": ${min_gb},
+  "output_dir": "${OUTPUT_DIR}"
+}
+EOF
+}
+
+handle_disk_pressure() {
+    local free_gb="$1"
+    local min_gb="$2"
+
+    log_section "ABORTING: DISK PRESSURE"
+    log "ERROR: Low disk space in output filesystem: ${free_gb}GB free (< ${min_gb}GB)."
+    log "       Free disk space and resume with: OUTPUT_DIR=${OUTPUT_DIR} $0 --resume"
+
+    write_disk_pressure_state "${free_gb}" "${min_gb}"
+
+    # Stop workers and aggressively stop running tasks so they don't keep writing.
+    if type signal_shutdown &>/dev/null; then
+        signal_shutdown "${OUTPUT_DIR}"
+    else
+        touch "${OUTPUT_DIR}/workers/SHUTDOWN"
+    fi
+
+    # Kill task process groups and move running tasks back to pending for resume.
+    # Guard for early failures before the queue is initialized.
+    if [[ -n "${QUEUE_DIR:-}" && -d "${QUEUE_DIR}" ]]; then
+        local gpu_id
+        for gpu_id in $(list_run_gpu_ids); do
+            reclaim_orphaned_tasks "${gpu_id}" >> "${LOG_FILE}" 2>&1 || true
+        done
+    fi
+
+    error_exit "Aborted due to disk pressure (free ${free_gb}GB < ${min_gb}GB)."
 }
 
 # ============ B200 ENVIRONMENT SETUP ============
@@ -581,8 +745,12 @@ check_dependencies() {
 setup_model() {
     local model_id="$1"
     local gpu_id="${2:-0}"
-    local model_name=$(basename "${model_id}" | tr '[:upper:]' '[:lower:]' | tr '/' '_')
+    local model_name
+    model_name=$(sanitize_model_name "${model_id}")
+    local legacy_name
+    legacy_name=$(basename "${model_id}" | tr '[:upper:]' '[:lower:]' | tr '/' '_')
     local model_dir="${OUTPUT_DIR}/models/${model_name}"
+    local legacy_dir="${OUTPUT_DIR}/models/${legacy_name}"
 
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Setting up model (B200 GPU ${gpu_id}): ${model_id}" >> "${LOG_FILE}"
 
@@ -592,9 +760,13 @@ setup_model() {
         return 0
     fi
 
-    # Check if already downloaded
+    # Check if already downloaded (prefer sanitized path, but honor legacy basename)
     if [[ -d "${model_dir}/baseline" ]]; then
         echo "${model_dir}/baseline"
+        return 0
+    fi
+    if [[ -d "${legacy_dir}/baseline" ]]; then
+        echo "${legacy_dir}/baseline"
         return 0
     fi
 
@@ -610,6 +782,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
 from pathlib import Path
 import gc
+import json
 import os
 import sys
 
@@ -688,6 +861,25 @@ try:
                 gen_config.top_p = None
 
     model.save_pretrained(output_dir, safe_serialization=True)
+
+    # Write model profile for precise memory planning (weights + config)
+    weights_bytes = 0
+    for pat in ("*.safetensors", "*.bin"):
+        for fp in output_dir.glob(pat):
+            weights_bytes += fp.stat().st_size
+    profile = {
+        "model_id": model_id,
+        "weights_bytes": weights_bytes,
+        "weights_gb": round(weights_bytes / (1024 ** 3), 3),
+        "hidden_size": getattr(model.config, "hidden_size", None),
+        "num_layers": getattr(model.config, "num_hidden_layers", None),
+        "num_heads": getattr(model.config, "num_attention_heads", None),
+        "num_kv_heads": getattr(model.config, "num_key_value_heads", None),
+        "max_position_embeddings": getattr(model.config, "max_position_embeddings", None),
+        "dtype_bytes": 2,
+    }
+    with open(output_dir / "model_profile.json", "w") as f:
+        json.dump(profile, f, indent=2)
 
     # Aggressive memory cleanup before lm-eval starts
     del model
@@ -841,8 +1033,8 @@ get_model_invarlock_config() {
 }
 export -f get_model_invarlock_config
 
-# Note: GPU assignment is done statically via gpu_models associative array in main()
-# The assign_gpu_to_model() function was removed as unused dead code.
+# GPU placement is handled by the dynamic scheduler (required_gpus + reservations).
+# There is no fixed GPU→model mapping.
 
 # ============ EDITED MODEL WITH GPU QUANTIZATION ============
 create_edited_model() {
@@ -1222,8 +1414,8 @@ try:
         # q parameter is the target rank
         U, S, V = torch.svd_lowrank(weight_2d, q=effective_rank, niter=2)
 
-        # Reconstruct: U @ diag(S) @ V^T
-        lowrank = U @ torch.diag(S) @ V.T
+        # Reconstruct: (U * S) @ V^T (avoid materializing diag(S))
+        lowrank = (U * S) @ V.T
         return lowrank.to(weight.dtype).view(original_shape)
 
     print(f"Applying low-rank SVD with rank={rank} (scope={scope})...")
@@ -1819,7 +2011,7 @@ generate_invarlock_config() {
     local seed="${4:-42}"
     local preview_n="${5:-${INVARLOCK_PREVIEW_WINDOWS}}"
     local final_n="${6:-${INVARLOCK_FINAL_WINDOWS}}"
-    local bootstrap_n="${7:-${INVARLOCK_BOOTSTRAP_N}}"
+    local bootstrap_n="${7:-${INVARLOCK_BOOTSTRAP_N:-2000}}"
     local seq_len="${8:-${INVARLOCK_SEQ_LEN}}"
     local stride="${9:-${INVARLOCK_STRIDE}}"
     local eval_batch="${10:-${INVARLOCK_EVAL_BATCH}}"
@@ -1854,7 +2046,10 @@ model:
   id: "${model_path}"
   adapter: "${adapter}"
   device: "auto"
-  dtype: "bfloat16"
+  device_map: "auto"
+  torch_dtype: "bfloat16"
+  trust_remote_code: true
+  low_cpu_mem_usage: true
   ${attn_impl_yaml}
 
 dataset:
@@ -1995,6 +2190,7 @@ run_invarlock_calibration() {
     local gpu_id="${6:-0}"
 
     local model_size=$(estimate_model_params "${model_path}")
+    local bootstrap_n="${INVARLOCK_BOOTSTRAP_N:-2000}"
 
     # Get model-size-aware configuration
     local config=$(get_model_invarlock_config "${model_size}")
@@ -2022,7 +2218,7 @@ run_invarlock_calibration() {
             "${seed}" \
             "${effective_preview_n}" \
             "${effective_final_n}" \
-            "${INVARLOCK_BOOTSTRAP_N}" \
+            "${bootstrap_n}" \
             "${run_log}" \
             "${gpu_id}" \
             "${effective_seq_len}" \
@@ -2746,7 +2942,8 @@ process_model() {
     local model_id="$1"
     local gpu_id="${2:-0}"
 
-    local model_name=$(basename "${model_id}" | tr '[:upper:]' '[:lower:]' | tr '/' '_')
+    local model_name
+    model_name=$(sanitize_model_name "${model_id}")
     local model_output_dir="${OUTPUT_DIR}/${model_name}"
     local preset_dir="${OUTPUT_DIR}/presets"
     local gpu_log="${OUTPUT_DIR}/logs/gpu_${gpu_id}.log"
@@ -3483,15 +3680,29 @@ main_dynamic() {
     echo "========================================================================"
     echo ""
 
+    check_dependencies
+    configure_gpu_pool
+
+    # Disk pressure preflight (Slurm/Ray-style node health gate).
+    # Abort before starting work to avoid half-written artifacts when storage is nearly full.
+    local min_free="${MIN_FREE_DISK_GB:-200}"
+    if ! [[ "${min_free}" =~ ^[0-9]+$ ]]; then
+        min_free=200
+    fi
+    local free_gb=""
+    free_gb=$(get_free_disk_gb "${OUTPUT_DIR}" 2>/dev/null || echo "")
+    if [[ -n "${free_gb}" && ${free_gb} -lt ${min_free} ]]; then
+        handle_disk_pressure "${free_gb}" "${min_free}"
+    fi
+
+    setup_b200_environment
+
     log "Output directory: ${OUTPUT_DIR}"
-    log "GPUs: ${NUM_GPUS} x B200 180GB"
+    log "GPU pool: ${NUM_GPUS} GPU(s) [${GPU_ID_LIST}]"
     log "Models: 8 (7B to 72B)"
     log "Edit Types: 4 x 2 versions = 8 per model"
     log "Scheduling: DYNAMIC (work-stealing enabled)"
     log ""
-
-    check_dependencies
-    setup_b200_environment
 
     # Initialize queue
     log_section "PHASE 1: INITIALIZING TASK QUEUE"
@@ -3562,6 +3773,13 @@ main_dynamic() {
                            "${MODEL_5}" "${MODEL_6}" "${MODEL_7}" "${MODEL_8}"
     fi
 
+    if type refresh_task_memory_from_profiles &>/dev/null; then
+        refresh_task_memory_from_profiles "${OUTPUT_DIR}"
+    fi
+    if type export_memory_plan &>/dev/null; then
+        export_memory_plan "${OUTPUT_DIR}"
+    fi
+
     total_tasks=$(count_tasks "pending")
     total_tasks=$((total_tasks + $(count_tasks "ready")))
     total_tasks=$((total_tasks + $(count_tasks "completed")))
@@ -3572,15 +3790,14 @@ main_dynamic() {
     log "Starting ${NUM_GPUS} GPU workers with dynamic task scheduling..."
 
     # Initialize log files
-    for gpu_id in $(seq 0 $((NUM_GPUS - 1))); do
+    for gpu_id in $(list_run_gpu_ids); do
         touch "${OUTPUT_DIR}/logs/gpu_${gpu_id}.log"
     done
 
-    # Store worker PIDs for cleanup
-    pids=()
-
-    for gpu_id in $(seq 0 $((NUM_GPUS - 1))); do
-        log "  GPU ${gpu_id}: Starting worker"
+    start_worker() {
+        local gpu_id="$1"
+        local action="${2:-Starting}"
+        log "  GPU ${gpu_id}: ${action} worker"
         # Run in subshell that sources libraries (bash functions don't inherit to background processes)
         # Note: SCRIPT_DIR, LIB_DIR, QUEUE_DIR, OUTPUT_DIR must all be exported before this point
         (
@@ -3593,62 +3810,136 @@ main_dynamic() {
             [[ -f "${LIB_DIR}/fault_tolerance.sh" ]] && source "${LIB_DIR}/fault_tolerance.sh"
             gpu_worker "${gpu_id}" "${OUTPUT_DIR}"
         ) >> "${OUTPUT_DIR}/logs/gpu_${gpu_id}.log" 2>&1 &
-        pids+=($!)
-        echo "${pids[-1]}" > "${OUTPUT_DIR}/workers/gpu_${gpu_id}.pid"
-    done
+        pids[${gpu_id}]=$!
+        echo "${pids[${gpu_id}]}" > "${OUTPUT_DIR}/workers/gpu_${gpu_id}.pid"
+    }
 
-    # Start progress monitor in background
+    # Unified monitor loop: progress + dependency resolution + worker health
     log_section "PHASE 3: MONITORING PROGRESS"
-    (
-        while true; do
-            sleep 60
+    local check_interval=60
+    local worker_timeout="${WORKER_TIMEOUT:-2700}"
+    local workers_started=0
+    while true; do
+        if [[ ${workers_started} -eq 0 ]]; then
+            for gpu_id in $(list_run_gpu_ids); do
+                start_worker "${gpu_id}" "Starting"
+            done
+            workers_started=1
+        fi
 
-            # Check if done
-            if is_queue_empty; then
-                break
+        sleep "${check_interval}"
+
+        # Disk pressure check (Slurm/Ray-style node health gate).
+        # Abort early to avoid corrupting artifacts when storage is nearly full.
+        local min_free="${MIN_FREE_DISK_GB:-200}"
+        if ! [[ "${min_free}" =~ ^[0-9]+$ ]]; then
+            min_free=200
+        fi
+        local free_gb=""
+        free_gb=$(get_free_disk_gb "${OUTPUT_DIR}" 2>/dev/null || echo "")
+        if [[ -n "${free_gb}" && ${free_gb} -lt ${min_free} ]]; then
+            handle_disk_pressure "${free_gb}" "${min_free}"
+        fi
+
+        # Check if done
+        if is_queue_empty; then
+            if type signal_shutdown &>/dev/null; then
+                signal_shutdown "${OUTPUT_DIR}"
+            else
+                touch "${OUTPUT_DIR}/workers/SHUTDOWN"
             fi
+            break
+        fi
 
-            # Print progress
-            local_stats="$(get_queue_stats 2>/dev/null || true)"
-            if [[ -z "${local_stats}" ]]; then
-                log "Progress: queue stats unavailable"
+        # Check each worker for liveness and heartbeat
+        for gpu_id in $(list_run_gpu_ids); do
+            local pid_file="${OUTPUT_DIR}/workers/gpu_${gpu_id}.pid"
+            local heartbeat_file="${OUTPUT_DIR}/workers/gpu_${gpu_id}.heartbeat"
+            local status_file="${OUTPUT_DIR}/workers/gpu_${gpu_id}.status"
+
+            [[ -f "${pid_file}" ]] || continue
+            local pid
+            pid=$(cat "${pid_file}" 2>/dev/null || true)
+            [[ -z "${pid}" ]] && continue
+
+            if ! kill -0 "${pid}" 2>/dev/null; then
+                log "WARNING: Worker GPU ${gpu_id} (PID ${pid}) died"
+                wait "${pid}" 2>/dev/null || true
+                reclaim_orphaned_tasks "${gpu_id}"
+                start_worker "${gpu_id}" "Restarting"
                 continue
             fi
-            IFS=':' read -r pending ready running completed failed total <<< "${local_stats}"
-            pending=${pending:-0}
-            ready=${ready:-0}
-            running=${running:-0}
-            completed=${completed:-0}
-            failed=${failed:-0}
-            total=${total:-0}
 
-            pct=0
-            [[ ${total} -gt 0 ]] && pct=$((completed * 100 / total))
-
-            log "Progress: ${completed}/${total} tasks (${pct}%) | Running: ${running} | Ready: ${ready} | Failed: ${failed}"
-
-            # Apply work-stealing boost if needed
-            apply_work_stealing_boost 2>/dev/null || true
+            if [[ -f "${heartbeat_file}" ]]; then
+                local heartbeat_mtime
+                heartbeat_mtime=$(stat -c %Y "${heartbeat_file}" 2>/dev/null || stat -f %m "${heartbeat_file}" 2>/dev/null || echo "")
+                if [[ -n "${heartbeat_mtime}" ]]; then
+                    local heartbeat_age=$(( $(date +%s) - heartbeat_mtime ))
+                    if [[ ${heartbeat_age} -gt ${worker_timeout} ]]; then
+                        local status
+                        status=$(cat "${status_file}" 2>/dev/null || echo "unknown")
+                        log "WARNING: Worker GPU ${gpu_id} stuck (no heartbeat for ${heartbeat_age}s, status: ${status})"
+                        kill -9 "${pid}" 2>/dev/null || true
+                        wait "${pid}" 2>/dev/null || true
+                        reclaim_orphaned_tasks "${gpu_id}"
+                        start_worker "${gpu_id}" "Restarting stuck"
+                    fi
+                fi
+            fi
         done
-    ) &
-    MONITOR_PID=$!
+
+        # Centralized dependency resolution - moved from worker loops to reduce lock contention.
+        # Only the monitor (single process) calls this, avoiding 8 workers competing for queue lock.
+        local deps_moved=0
+        deps_moved=$(resolve_dependencies 2>/dev/null) || deps_moved=0
+        if [[ ${deps_moved} -gt 0 ]]; then
+            log "Monitor: Promoted ${deps_moved} task(s) from pending to ready queue"
+        fi
+        local deps_canceled=0
+        if type cancel_tasks_with_failed_dependencies &>/dev/null; then
+            deps_canceled=$(cancel_tasks_with_failed_dependencies "${CANCEL_BLOCKED_TASKS_GRACE_SECONDS:-90}" 2>/dev/null) || deps_canceled=0
+            if [[ ${deps_canceled} -gt 0 ]]; then
+                log "Monitor: Marked ${deps_canceled} task(s) failed due to failed dependencies"
+            fi
+        fi
+
+        # Print progress
+        local_stats="$(get_queue_stats 2>/dev/null || true)"
+        if [[ -z "${local_stats}" ]]; then
+            log "Progress: queue stats unavailable"
+            continue
+        fi
+        IFS=':' read -r pending ready running completed failed total <<< "${local_stats}"
+        pending=${pending:-0}
+        ready=${ready:-0}
+        running=${running:-0}
+        completed=${completed:-0}
+        failed=${failed:-0}
+        total=${total:-0}
+
+        pct=0
+        [[ ${total} -gt 0 ]] && pct=$((completed * 100 / total))
+
+        log "Progress: ${completed}/${total} tasks (${pct}%) | Running: ${running} | Ready: ${ready} | Failed: ${failed}"
+
+        # Apply work-stealing boost if needed
+        apply_work_stealing_boost 2>/dev/null || true
+    done
 
     # Wait for all workers
     log "Waiting for all workers to complete..."
     local failed=0
-    for i in "${!pids[@]}"; do
-        if wait "${pids[$i]}"; then
-            log "  GPU ${i}: Worker completed successfully"
-        else
-            log "  GPU ${i}: Worker failed"
-            failed=$((failed + 1))
+    for gpu_id in $(list_run_gpu_ids); do
+        local pid="${pids[${gpu_id}]:-}"
+        if [[ -n "${pid}" ]]; then
+            if wait "${pid}"; then
+                log "  GPU ${gpu_id}: Worker completed successfully"
+            else
+                log "  GPU ${gpu_id}: Worker failed"
+                failed=$((failed + 1))
+            fi
         fi
     done
-
-    # Stop monitor
-    if [[ -n "${MONITOR_PID}" ]]; then
-        kill "${MONITOR_PID}" 2>/dev/null || true
-    fi
 
     # Print final queue stats
     print_queue_stats
@@ -3735,14 +4026,16 @@ Edit Types (4 x 2 versions each):
   * Low-Rank SVD: rank-256 clean, rank-32 stress
 
 Model Suite (8 PUBLIC models - no HuggingFace login):
-  GPU 0: Mistral-7B-v0.1     (~14 GB)
-  GPU 1: Llama-2-13b-hf      (~26 GB)
-  GPU 2: Qwen2.5-14B         (~28 GB)
-  GPU 3: Qwen2.5-32B         (~64 GB)
-  GPU 4: Yi-34B              (~68 GB)
-  GPU 5: Mixtral-8x7B-v0.1   (~90 GB)
-  GPU 6: Llama-2-70b-hf      (~140 GB)
-  GPU 7: Qwen1.5-72B         (~144 GB)
+  - Mistral-7B-v0.1     (~14 GB weights)
+  - Llama-2-13b-hf      (~26 GB weights)
+  - Qwen2.5-14B         (~28 GB weights)
+  - Qwen2.5-32B         (~64 GB weights)
+  - Yi-34B              (~68 GB weights)
+  - Mixtral-8x7B-v0.1   (~90 GB weights)
+  - Llama-2-70b-hf      (~140 GB weights)
+  - Qwen1.5-72B         (~144 GB weights)
+
+Note: GPUs are assigned dynamically; this is not a fixed mapping.
 
 Usage: $0 [options]
 
@@ -3753,11 +4046,13 @@ Options:
 Key environment variables:
     B200_DETERMINISM             Harness determinism preset: throughput (default) or strict
     MODEL_1 through MODEL_8      Override model assignments
-    NUM_GPUS                     Number of GPUs (default: 8)
+    CUDA_VISIBLE_DEVICES         Explicit GPU IDs to use (default: auto-detect all)
+    NUM_GPUS                     Number of GPUs to use (default: auto-detect all)
     SKIP_FLASH_ATTN              Skip flash-attn install (default: false)
     RESUME_MODE                  Skip completed work (default: true)
     OUTPUT_DIR                   Set to existing dir to resume
     RUN_ERROR_INJECTION          Run error tests (default: true)
+    MIN_FREE_DISK_GB             Abort if free disk below this (default: 200)
 
 Examples:
     $0                                    # Run validation

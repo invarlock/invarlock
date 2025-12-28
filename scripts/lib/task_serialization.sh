@@ -25,7 +25,7 @@ fi
 #   model_id:        Full HuggingFace model ID (e.g., "mistralai/Mistral-7B-v0.1")
 #   model_name:      Sanitized name for paths (e.g., "mistral-7b-v0.1")
 #   model_size_gb:   Estimated GPU memory requirement in GB
-#   required_gpus:   Number of GPUs needed (1=small, 2=medium/MoE, 4=large 70B+)
+#   required_gpus:   Number of GPUs needed based on per-device memory planning
 #   assigned_gpus:   Comma-separated list of assigned GPU IDs (set at runtime)
 #   status:          One of: pending, ready, running, completed, failed
 #   gpu_id:          Assigned GPU (-1 if unassigned) - legacy, use assigned_gpus
@@ -41,22 +41,46 @@ fi
 
 # ============ MULTI-GPU CALCULATION ============
 
-# Calculate required GPUs based on model memory size
+# GPU memory per device (B200 has 180GB)
+# Set via environment variable for other GPU types
+GPU_MEMORY_PER_DEVICE="${GPU_MEMORY_PER_DEVICE:-${GPU_MEMORY_GB:-180}}"
+
+# Calculate required GPUs based on model memory size.
 # Usage: calculate_required_gpus <model_size_gb>
-# Returns: 1, 2, or 4
+# Returns: integer GPU count (min 1).
+#
+# B200 OPTIMIZATION (v2.2.3): Dynamic sizing based on per-GPU memory.
+# - Prefer single GPU when model fits within GPU_MEMORY_PER_DEVICE.
+# - Scale to multiple GPUs when required memory exceeds per-GPU capacity.
+#
 calculate_required_gpus() {
     local model_size_gb="$1"
+    local per_device="${GPU_MEMORY_PER_DEVICE:-180}"
+    local max_gpus="${NUM_GPUS:-8}"
 
-    # Large models (70B+): ~140GB+ → need 4 GPUs for tensor parallelism
-    if [[ ${model_size_gb} -ge 120 ]]; then
-        echo "4"
-    # Medium models (30B-40B) and MoE (~90GB): benefit from 2 GPUs
-    elif [[ ${model_size_gb} -ge 60 ]]; then
-        echo "2"
-    # Small models (7B-14B): single GPU is sufficient
-    else
+    if ! [[ "${model_size_gb}" =~ ^[0-9]+$ ]]; then
         echo "1"
+        return
     fi
+    if ! [[ "${per_device}" =~ ^[0-9]+$ ]]; then
+        per_device=180
+    fi
+    if ! [[ "${max_gpus}" =~ ^[0-9]+$ ]]; then
+        max_gpus=8
+    fi
+    if [[ ${model_size_gb} -le ${per_device} ]]; then
+        echo "1"
+        return
+    fi
+
+    local required=$(( (model_size_gb + per_device - 1) / per_device ))
+    if [[ ${required} -lt 1 ]]; then
+        required=1
+    fi
+    if [[ ${required} -gt ${max_gpus} ]]; then
+        required=${max_gpus}
+    fi
+    echo "${required}"
 }
 
 # ============ TASK CREATION ============
@@ -263,7 +287,7 @@ update_task_field() {
         return 1
     fi
 
-    local tmp_file="${task_file}.tmp.$$"
+    local tmp_file="${task_file}.tmp.${BASHPID:-$$}"
 
     if [[ "${is_json}" == "true" ]]; then
         jq --argjson val "${value}" ".${field} = \$val" "${task_file}" > "${tmp_file}"
@@ -298,9 +322,9 @@ mark_task_started() {
     local gpu_id="$2"
     local now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-    local tmp_file="${task_file}.tmp.$$"
+    local tmp_file="${task_file}.tmp.${BASHPID:-$$}"
     jq --argjson gpu "${gpu_id}" --arg time "${now}" \
-        '.status = "running" | .gpu_id = $gpu | .started_at = $time' \
+        '.status = "running" | .gpu_id = $gpu | .started_at = $time | .completed_at = null | .error_msg = null' \
         "${task_file}" > "${tmp_file}"
 
     if [[ $? -eq 0 ]]; then
@@ -322,9 +346,9 @@ mark_task_started_multi() {
     # Extract first GPU as primary gpu_id for backward compatibility
     local primary_gpu="${gpu_ids%%,*}"
 
-    local tmp_file="${task_file}.tmp.$$"
+    local tmp_file="${task_file}.tmp.${BASHPID:-$$}"
     jq --argjson gpu "${primary_gpu}" --arg gpus "${gpu_ids}" --arg time "${now}" \
-        '.status = "running" | .gpu_id = $gpu | .assigned_gpus = $gpus | .started_at = $time' \
+        '.status = "running" | .gpu_id = $gpu | .assigned_gpus = $gpus | .started_at = $time | .completed_at = null | .error_msg = null' \
         "${task_file}" > "${tmp_file}"
 
     if [[ $? -eq 0 ]]; then
@@ -341,9 +365,9 @@ mark_task_completed() {
     local task_file="$1"
     local now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-    local tmp_file="${task_file}.tmp.$$"
+    local tmp_file="${task_file}.tmp.${BASHPID:-$$}"
     jq --arg time "${now}" \
-        '.status = "completed" | .completed_at = $time' \
+        '.status = "completed" | .completed_at = $time | .error_msg = null' \
         "${task_file}" > "${tmp_file}"
 
     if [[ $? -eq 0 ]]; then
@@ -361,7 +385,7 @@ mark_task_failed() {
     local error_msg="$2"
     local now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-    local tmp_file="${task_file}.tmp.$$"
+    local tmp_file="${task_file}.tmp.${BASHPID:-$$}"
     jq --arg time "${now}" --arg err "${error_msg}" \
         '.status = "failed" | .completed_at = $time | .error_msg = $err' \
         "${task_file}" > "${tmp_file}"
@@ -379,7 +403,7 @@ mark_task_failed() {
 increment_task_retries() {
     local task_file="$1"
 
-    local tmp_file="${task_file}.tmp.$$"
+    local tmp_file="${task_file}.tmp.${BASHPID:-$$}"
     jq '.retries = (.retries + 1)' "${task_file}" > "${tmp_file}"
 
     if [[ $? -eq 0 ]]; then
@@ -396,7 +420,7 @@ update_task_params() {
     local task_file="$1"
     local new_params="$2"
 
-    local tmp_file="${task_file}.tmp.$$"
+    local tmp_file="${task_file}.tmp.${BASHPID:-$$}"
     jq --argjson new "${new_params}" '.params = (.params + $new)' \
         "${task_file}" > "${tmp_file}"
 
@@ -525,7 +549,7 @@ estimate_model_memory() {
         local model_lower=$(echo "${model_id}" | tr '[:upper:]' '[:lower:]')
 
         # Check for 70B+ models (need ~140-154 GB)
-        if [[ "${model_lower}" =~ 70b || "${model_lower}" =~ 72b ]]; then
+        if [[ "${model_lower}" =~ 70b || "${model_lower}" =~ 72b || "${model_lower}" =~ 65b ]]; then
             size_bucket="70"
         # Check for 40B models (need ~80 GB)
         elif [[ "${model_lower}" =~ 40b ]]; then
@@ -556,24 +580,49 @@ estimate_model_memory() {
         *)         base_memory=14 ;;
     esac
 
+    local is_large="false"
+    if [[ "${size_bucket}" =~ ^[0-9]+$ && ${size_bucket} -ge 70 ]]; then
+        is_large="true"
+    fi
+
     # Multiplier by task type
     local multiplier
-    case "${task_type}" in
-        "SETUP_BASELINE") multiplier="1.0" ;;
-        "EVAL_BASELINE")  multiplier="1.2" ;;
-        "CALIBRATION_RUN") multiplier="1.1" ;;
-        "CREATE_EDIT")    multiplier="1.5" ;;
-        "EVAL_EDIT")      multiplier="1.2" ;;
-        "CERTIFY_EDIT")   multiplier="1.1" ;;
-        "CREATE_ERROR")   multiplier="1.3" ;;
-        "CERTIFY_ERROR")  multiplier="1.1" ;;
-        "GENERATE_PRESET") multiplier="0.1" ;;  # CPU only
-        *)                multiplier="1.2" ;;
-    esac
+    if [[ "${is_large}" == "true" ]]; then
+        case "${task_type}" in
+            "SETUP_BASELINE")  multiplier="1.0" ;;
+            "EVAL_BASELINE")   multiplier="1.1" ;;
+            "CALIBRATION_RUN") multiplier="1.05" ;;
+            "CREATE_EDIT")     multiplier="1.2" ;;
+            "EVAL_EDIT")       multiplier="1.1" ;;
+            "CERTIFY_EDIT")    multiplier="1.05" ;;
+            "CREATE_ERROR")    multiplier="1.15" ;;
+            "CERTIFY_ERROR")   multiplier="1.05" ;;
+            "GENERATE_PRESET") multiplier="0.1" ;;  # CPU only
+            *)                 multiplier="1.1" ;;
+        esac
+    else
+        case "${task_type}" in
+            "SETUP_BASELINE")  multiplier="1.0" ;;
+            "EVAL_BASELINE")   multiplier="1.2" ;;
+            "CALIBRATION_RUN") multiplier="1.1" ;;
+            "CREATE_EDIT")     multiplier="1.5" ;;
+            "EVAL_EDIT")       multiplier="1.2" ;;
+            "CERTIFY_EDIT")    multiplier="1.1" ;;
+            "CREATE_ERROR")    multiplier="1.3" ;;
+            "CERTIFY_ERROR")   multiplier="1.1" ;;
+            "GENERATE_PRESET") multiplier="0.1" ;;  # CPU only
+            *)                 multiplier="1.2" ;;
+        esac
+    fi
 
     # Calculate using awk for floating point (avoids bc dependency)
-    local result=$(awk -v base="${base_memory}" -v mult="${multiplier}" 'BEGIN { printf "%.0f", base * mult }')
-    # Add 10% safety margin
-    result=$((result * 11 / 10))
+    local result
+    result=$(awk -v base="${base_memory}" -v mult="${multiplier}" 'BEGIN { printf "%.0f", base * mult }')
+    # Add safety margin (smaller for large models to avoid false "does not fit" skips)
+    local safety_pct=10
+    if [[ "${is_large}" == "true" ]]; then
+        safety_pct=5
+    fi
+    result=$((result * (100 + safety_pct) / 100))
     echo "${result}"
 }

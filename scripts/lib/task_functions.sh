@@ -2,7 +2,7 @@
 # task_functions.sh - Atomic task implementations for dynamic scheduling
 # Version: v2.1.0-b200 (InvarLock B200 Validation Suite)
 # Dependencies: jq, python3, invarlock CLI, lm_eval, task_serialization.sh
-# Usage: sourced by gpu_worker.sh/invarlock_definitive_validation_b200.sh for per-task execution
+# Usage: sourced by gpu_worker.sh/b200_validation_suite.sh for per-task execution
 #
 # Each function executes a single atomic task type with explicit parameters.
 # These are extracted from the original monolithic process_model() function
@@ -67,9 +67,10 @@ _get_model_invarlock_config_fallback() {
             echo "1024:512:40:40:24"
             ;;
         "70"|"72")
-            # ULTRA-CONSERVATIVE for 70B+ models
-            # 140GB model + ~36GB headroom = MUST avoid double model loading
-            # Using INVARLOCK_SKIP_OVERHEAD_CHECK=1 is REQUIRED alongside this
+            # ULTRA-CONSERVATIVE for 70B+ models.
+            # These settings minimize KV cache; the harness also sets
+            # INVARLOCK_SKIP_OVERHEAD_CHECK=1 for large models to avoid double-loading
+            # baseline+edited models during overhead measurement.
             echo "128:64:8:8:2"
             ;;
         *)
@@ -113,25 +114,148 @@ _get_lmeval_model_args() {
     local model_args="pretrained=${model_path},trust_remote_code=True,dtype=bfloat16"
     local parallelize_flag="${LM_EVAL_PARALLELIZE:-true}"
     parallelize_flag=$(echo "${parallelize_flag}" | tr '[:upper:]' '[:lower:]')
+    local multi_gpu="false"
+    if [[ "${CUDA_VISIBLE_DEVICES:-}" == *","* ]]; then
+        multi_gpu="true"
+    fi
 
-    if [[ "${CUDA_VISIBLE_DEVICES:-}" == *","* && "${parallelize_flag}" != "false" && "${parallelize_flag}" != "0" ]]; then
-        model_args="${model_args},parallelize=True"
+    if [[ "${multi_gpu}" == "true" ]]; then
+        model_args="${model_args},device_map=auto"
+        if [[ "${parallelize_flag}" != "false" && "${parallelize_flag}" != "0" ]]; then
+            model_args="${model_args},parallelize=True"
+        fi
     fi
 
     echo "${model_args}"
 }
 
-# Check if model is large (70B+) and needs special handling
+# Check if model is large (30B+) and needs special handling.
+# Changed threshold from 70 to 30 to fix hang on 30-40B models:
+# - Skips overhead check (avoids loading model twice, which can exceed 180GB)
 _is_large_model() {
     local model_size="$1"
     if [[ "${model_size}" == "moe" ]]; then
         return 0
     fi
     if [[ "${model_size}" =~ ^[0-9]+$ ]]; then
-        [[ ${model_size} -ge 70 ]]
+        [[ ${model_size} -ge 30 ]]
         return
     fi
-    [[ "${model_size}" =~ 70 || "${model_size}" =~ 72 || "${model_size}" =~ 65 || "${model_size}" =~ 80 || "${model_size}" =~ 90 ]]
+    [[ "${model_size}" =~ 30 || "${model_size}" =~ 32 || "${model_size}" =~ 34 || "${model_size}" =~ 40 || "${model_size}" =~ 70 || "${model_size}" =~ 72 || "${model_size}" =~ 65 || "${model_size}" =~ 80 || "${model_size}" =~ 90 ]]
+}
+
+# Select lm-eval batch size caps based on model size.
+_get_eval_batch_size() {
+    local model_size="$1"
+
+    case "${model_size}" in
+        moe|MoE|MOE)
+            echo "${EVAL_BATCH_SIZE_MOE:-auto:6}"
+            return
+            ;;
+    esac
+
+    if [[ "${model_size}" =~ ^[0-9]+$ ]]; then
+        if [[ ${model_size} -ge 70 ]]; then
+            echo "${EVAL_BATCH_SIZE_LARGE:-auto:4}"
+        elif [[ ${model_size} -ge 30 ]]; then
+            echo "${EVAL_BATCH_SIZE_MEDIUM:-auto:8}"
+        else
+            echo "${EVAL_BATCH_SIZE_SMALL:-auto:16}"
+        fi
+    else
+        echo "${EVAL_BATCH_SIZE_SMALL:-auto:16}"
+    fi
+}
+
+# Resolve task timeout in seconds (empty/0 disables).
+_get_task_timeout() {
+    local task_type="$1"
+    local default_timeout="${TASK_TIMEOUT_DEFAULT:-}"
+    local override_var="TASK_TIMEOUT_${task_type}"
+    local override="${!override_var:-}"
+    local timeout="${override:-${default_timeout}}"
+
+    if [[ -z "${timeout}" || "${timeout}" == "0" || "${timeout}" == "none" ]]; then
+        return
+    fi
+    if [[ "${timeout}" =~ ^[0-9]+$ ]]; then
+        echo "${timeout}"
+    fi
+}
+
+_kill_task_process_group() {
+    local pid="$1"
+    local pgid=""
+    local self_pgid=""
+
+    pgid=$(ps -o pgid= -p "${pid}" 2>/dev/null | tr -d ' ')
+    self_pgid=$(ps -o pgid= -p "$$" 2>/dev/null | tr -d ' ')
+
+    if [[ -n "${pgid}" && -n "${self_pgid}" && "${pgid}" != "${self_pgid}" ]]; then
+        kill -TERM -- "-${pgid}" 2>/dev/null || true
+        sleep 5
+        kill -KILL -- "-${pgid}" 2>/dev/null || true
+    else
+        kill -TERM "${pid}" 2>/dev/null || true
+        sleep 5
+        kill -KILL "${pid}" 2>/dev/null || true
+    fi
+}
+
+_write_model_profile() {
+    local baseline_dir="$1"
+    local model_id="$2"
+    local profile_path="${baseline_dir}/model_profile.json"
+
+    [[ -f "${profile_path}" ]] && return 0
+    [[ -d "${baseline_dir}" ]] || return 1
+
+    python3 << PROFILE_EOF >/dev/null 2>&1
+import json
+from pathlib import Path
+
+baseline_dir = Path("${baseline_dir}")
+model_id = "${model_id}"
+config_path = baseline_dir / "config.json"
+
+if not config_path.exists():
+    raise SystemExit(0)
+
+try:
+    cfg = json.loads(config_path.read_text())
+except Exception:
+    raise SystemExit(0)
+
+def _get(key, *fallbacks):
+    val = cfg.get(key)
+    if val is not None:
+        return val
+    for fb in fallbacks:
+        val = cfg.get(fb)
+        if val is not None:
+            return val
+    return None
+
+weights_bytes = 0
+for pat in ("*.safetensors", "*.bin"):
+    for fp in baseline_dir.glob(pat):
+        weights_bytes += fp.stat().st_size
+
+profile = {
+    "model_id": model_id,
+    "weights_bytes": weights_bytes,
+    "weights_gb": round(weights_bytes / (1024 ** 3), 3),
+    "hidden_size": _get("hidden_size", "n_embd", "d_model"),
+    "num_layers": _get("num_hidden_layers", "n_layer"),
+    "num_heads": _get("num_attention_heads", "n_head"),
+    "num_kv_heads": _get("num_key_value_heads", "num_key_value_groups"),
+    "max_position_embeddings": _get("max_position_embeddings", "max_seq_len", "seq_length"),
+    "dtype_bytes": 2,
+}
+
+(baseline_dir / "model_profile.json").write_text(json.dumps(profile, indent=2))
+PROFILE_EOF
 }
 
 # ============ TASK EXECUTOR ============
@@ -186,6 +310,16 @@ execute_task() {
     fi
 
     local exit_code=0
+    local task_timeout=""
+    task_timeout=$(_get_task_timeout "${task_type}")
+
+    local job_control_enabled=0
+    case $- in
+        *m*) job_control_enabled=1 ;;
+    esac
+    if [[ ${job_control_enabled} -eq 0 ]]; then
+        set -m
+    fi
 
     (
         local exit_code=0
@@ -248,12 +382,41 @@ execute_task() {
     ) &
 
     local task_pid=$!
+    if [[ ${job_control_enabled} -eq 0 ]]; then
+        set +m
+    fi
     if [[ -n "${task_pid_file}" ]]; then
         echo "${task_pid}" > "${task_pid_file}"
     fi
 
+    local timeout_marker=""
+    local timeout_pid=""
+    if [[ -n "${task_timeout}" ]]; then
+        timeout_marker="${output_dir}/logs/tasks/${task_id}.timeout"
+        rm -f "${timeout_marker}"
+        (
+            sleep "${task_timeout}"
+            if kill -0 "${task_pid}" 2>/dev/null; then
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] Task ${task_id} exceeded timeout (${task_timeout}s), terminating" >> "${task_log}"
+                echo "${task_timeout}" > "${timeout_marker}"
+                _kill_task_process_group "${task_pid}"
+            fi
+        ) &
+        timeout_pid=$!
+    fi
+
     wait "${task_pid}"
     exit_code=$?
+
+    if [[ -n "${timeout_pid}" ]]; then
+        kill "${timeout_pid}" 2>/dev/null || true
+        wait "${timeout_pid}" 2>/dev/null || true
+    fi
+
+    if [[ -n "${timeout_marker}" && -f "${timeout_marker}" ]]; then
+        exit_code=124
+        rm -f "${timeout_marker}"
+    fi
 
     if [[ -n "${task_pid_file}" ]]; then
         rm -f "${task_pid_file}"
@@ -287,6 +450,10 @@ task_setup_baseline() {
         echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
         # Also store original model_id for model size detection in other tasks
         echo "${model_id}" > "${model_output_dir}/.model_id"
+        _write_model_profile "${baseline_dir}" "${model_id}"
+        if type update_model_task_memory &>/dev/null; then
+            update_model_task_memory "${model_name}" "${output_dir}" "${model_id}"
+        fi
         return 0
     fi
 
@@ -303,6 +470,10 @@ task_setup_baseline() {
             echo "${baseline_path}" > "${model_output_dir}/.baseline_path"
             # Store original model_id for model size detection
             echo "${model_id}" > "${model_output_dir}/.model_id"
+            _write_model_profile "${baseline_path}" "${model_id}"
+            if type update_model_task_memory &>/dev/null; then
+                update_model_task_memory "${model_name}" "${output_dir}" "${model_id}"
+            fi
             return 0
         else
             echo "  ERROR: Failed to setup baseline" >> "${log_file}"
@@ -364,6 +535,10 @@ SETUP_EOF
             echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
             # Store original model_id for model size detection
             echo "${model_id}" > "${model_output_dir}/.model_id"
+            _write_model_profile "${baseline_dir}" "${model_id}"
+            if type update_model_task_memory &>/dev/null; then
+                update_model_task_memory "${model_name}" "${output_dir}" "${model_id}"
+            fi
             return 0
         fi
         return 1
@@ -382,6 +557,7 @@ task_eval_baseline() {
 
     local model_output_dir="${output_dir}/${model_name}"
     local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null)
+    local model_id=$(cat "${model_output_dir}/.model_id" 2>/dev/null)
     local result_file="${model_output_dir}/evals/baseline_results.json"
 
     if [[ -z "${baseline_path}" || ! -d "${baseline_path}" ]]; then
@@ -398,8 +574,14 @@ task_eval_baseline() {
 
     mkdir -p "$(dirname "${result_file}")"
 
-    # Determine batch size based on model
-    local batch_size="${EVAL_BATCH_SIZE:-auto:16}"
+    # Determine batch size based on model size
+    local model_size
+    model_size=$(_estimate_model_size "${baseline_path}")
+    if [[ -z "${model_size}" || "${model_size}" == "7" ]] && [[ -n "${model_id}" ]]; then
+        model_size=$(_get_model_size_from_name "${model_id}")
+    fi
+    local batch_size
+    batch_size=$(_get_eval_batch_size "${model_size}")
     local params_json="${TASK_PARAMS:-}"
     if [[ -n "${params_json}" && "${params_json}" != "null" ]]; then
         local override_batch
@@ -520,6 +702,40 @@ task_calibration_run() {
         echo "  OOM override applied: seq=${seq_len}, stride=${stride}, batch=${eval_batch}" >> "${log_file}"
     fi
 
+    # For large models, use INVARLOCK_SKIP_OVERHEAD_CHECK to avoid loading
+    # both baseline and edited models simultaneously (which would exceed 180GB).
+    local bootstrap_replicates=2000
+    if _is_large_model "${model_size}"; then
+        bootstrap_replicates=1000
+    fi
+    if [[ -n "${INVARLOCK_BOOTSTRAP_N:-}" ]]; then
+        bootstrap_replicates="${INVARLOCK_BOOTSTRAP_N}"
+    fi
+
+    local -a extra_env=()
+    if _is_large_model "${model_size}"; then
+        extra_env+=(INVARLOCK_SKIP_OVERHEAD_CHECK=1)
+        echo "  Large model (${model_size}): SKIP_OVERHEAD_CHECK=1" >> "${log_file}"
+    fi
+
+    local config_root_base
+    config_root_base="$(cd "${run_dir}" && pwd)"
+    local config_root="${config_root_base}/config_root"
+    mkdir -p "${config_root}/runtime/profiles"
+    cat > "${config_root}/runtime/profiles/ci.yaml" << YAML
+model:
+  device_map: "auto"
+dataset:
+  preview_n: ${preview_n}
+  final_n: ${final_n}
+eval:
+  bootstrap:
+    replicates: ${bootstrap_replicates}
+    alpha: 0.05
+YAML
+
+    extra_env+=("INVARLOCK_CONFIG_ROOT=${config_root}")
+
     # Generate config YAML
     local config_yaml="${run_dir}/calibration_config.yaml"
     cat > "${config_yaml}" << YAML_EOF
@@ -527,7 +743,10 @@ model:
   id: "${baseline_path}"
   adapter: "hf_causal_auto"
   device: "auto"
-  dtype: "bfloat16"
+  device_map: "auto"
+  torch_dtype: "bfloat16"
+  trust_remote_code: true
+  low_cpu_mem_usage: true
 
 dataset:
   provider: "${INVARLOCK_DATASET:-wikitext2}"
@@ -549,7 +768,7 @@ guards:
 
 eval:
   bootstrap:
-    replicates: ${INVARLOCK_BOOTSTRAP_N:-10000}
+    replicates: ${bootstrap_replicates}
     parallel: true
   batch_size: ${eval_batch}
 
@@ -559,15 +778,7 @@ auto:
   probes: 0
 YAML_EOF
 
-    # For large models, use INVARLOCK_SKIP_OVERHEAD_CHECK to avoid loading
-    # both baseline and edited models simultaneously (which would exceed 180GB)
     local profile_flag="ci"
-    local -a extra_env=()
-    if _is_large_model "${model_size}"; then
-        # Override CI profile window counts to prevent OOM (CI defaults to 200/200)
-        extra_env+=(INVARLOCK_SKIP_OVERHEAD_CHECK=1 "INVARLOCK_CI_PREVIEW=${preview_n}" "INVARLOCK_CI_FINAL=${final_n}")
-        echo "  Large model (${model_size}): using INVARLOCK_SKIP_OVERHEAD_CHECK=1, CI windows=${preview_n}/${final_n}" >> "${log_file}"
-    fi
 
     # CUDA_VISIBLE_DEVICES is inherited from execute_task() for multi-GPU support
     env "${extra_env[@]}" invarlock run \
@@ -1719,7 +1930,15 @@ task_eval_edit() {
 
     mkdir -p "$(dirname "${result_file}")"
 
-    local batch_size="${EVAL_BATCH_SIZE:-auto:16}"
+    local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null)
+    local model_id=$(cat "${model_output_dir}/.model_id" 2>/dev/null)
+    local model_size
+    model_size=$(_estimate_model_size "${baseline_path}")
+    if [[ -z "${model_size}" || "${model_size}" == "7" ]] && [[ -n "${model_id}" ]]; then
+        model_size=$(_get_model_size_from_name "${model_id}")
+    fi
+    local batch_size
+    batch_size=$(_get_eval_batch_size "${model_size}")
     local params_json="${TASK_PARAMS:-}"
     if [[ -n "${params_json}" && "${params_json}" != "null" ]]; then
         local override_batch
@@ -1823,7 +2042,15 @@ task_eval_single_benchmark() {
 
     mkdir -p "$(dirname "${result_file}")"
 
-    local batch_size="${EVAL_BATCH_SIZE:-auto:16}"
+    local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null)
+    local model_id=$(cat "${model_output_dir}/.model_id" 2>/dev/null)
+    local model_size
+    model_size=$(_estimate_model_size "${baseline_path}")
+    if [[ -z "${model_size}" || "${model_size}" == "7" ]] && [[ -n "${model_id}" ]]; then
+        model_size=$(_get_model_size_from_name "${model_id}")
+    fi
+    local batch_size
+    batch_size=$(_get_eval_batch_size "${model_size}")
     local params_json="${TASK_PARAMS:-}"
     if [[ -n "${params_json}" && "${params_json}" != "null" ]]; then
         local override_batch
@@ -1982,14 +2209,39 @@ task_certify_edit() {
         fi
     fi
     # For large models, use INVARLOCK_SKIP_OVERHEAD_CHECK to avoid loading
-    # both baseline and edited models simultaneously (which would exceed 180GB)
+    # both baseline and edited models simultaneously (which would exceed 180GB).
     local profile_flag="ci"
+    local bootstrap_replicates=2000
+    if _is_large_model "${model_size}"; then
+        bootstrap_replicates=1000
+    fi
+    if [[ -n "${INVARLOCK_BOOTSTRAP_N:-}" ]]; then
+        bootstrap_replicates="${INVARLOCK_BOOTSTRAP_N}"
+    fi
+
     local -a extra_env=()
     if _is_large_model "${model_size}"; then
-        # Override CI profile window counts to prevent OOM (CI defaults to 200/200)
-        extra_env+=(INVARLOCK_SKIP_OVERHEAD_CHECK=1 "INVARLOCK_CI_PREVIEW=${preview_n}" "INVARLOCK_CI_FINAL=${final_n}")
-        echo "  Large model (${model_size}): using INVARLOCK_SKIP_OVERHEAD_CHECK=1, CI windows=${preview_n}/${final_n}" >> "${log_file}"
+        extra_env+=(INVARLOCK_SKIP_OVERHEAD_CHECK=1)
+        echo "  Large model (${model_size}): SKIP_OVERHEAD_CHECK=1" >> "${log_file}"
     fi
+
+    local config_root_base
+    config_root_base="$(cd "${cert_dir}" && pwd)"
+    local config_root="${config_root_base}/config_root"
+    mkdir -p "${config_root}/runtime/profiles"
+    cat > "${config_root}/runtime/profiles/ci.yaml" << YAML
+model:
+  device_map: "auto"
+dataset:
+  preview_n: ${preview_n}
+  final_n: ${final_n}
+eval:
+  bootstrap:
+    replicates: ${bootstrap_replicates}
+    alpha: 0.05
+YAML
+
+    extra_env+=("INVARLOCK_CONFIG_ROOT=${config_root}")
 
     # Find calibrated preset (must have seq_len/stride embedded)
     local preset_file=""
@@ -2189,14 +2441,39 @@ task_certify_error() {
     fi
 
     # For large models, use INVARLOCK_SKIP_OVERHEAD_CHECK to avoid loading
-    # both baseline and edited models simultaneously (which would exceed 180GB)
+    # both baseline and edited models simultaneously (which would exceed 180GB).
     local profile_flag="ci"
+    local bootstrap_replicates=2000
+    if _is_large_model "${model_size}"; then
+        bootstrap_replicates=1000
+    fi
+    if [[ -n "${INVARLOCK_BOOTSTRAP_N:-}" ]]; then
+        bootstrap_replicates="${INVARLOCK_BOOTSTRAP_N}"
+    fi
+
     local -a extra_env=()
     if _is_large_model "${model_size}"; then
-        # Override CI profile window counts to prevent OOM (CI defaults to 200/200)
-        extra_env+=(INVARLOCK_SKIP_OVERHEAD_CHECK=1 "INVARLOCK_CI_PREVIEW=${preview_n}" "INVARLOCK_CI_FINAL=${final_n}")
-        echo "  Large model (${model_size}): using INVARLOCK_SKIP_OVERHEAD_CHECK=1, CI windows=${preview_n}/${final_n}" >> "${log_file}"
+        extra_env+=(INVARLOCK_SKIP_OVERHEAD_CHECK=1)
+        echo "  Large model (${model_size}): SKIP_OVERHEAD_CHECK=1" >> "${log_file}"
     fi
+
+    local config_root_base
+    config_root_base="$(cd "${cert_dir}" && pwd)"
+    local config_root="${config_root_base}/config_root"
+    mkdir -p "${config_root}/runtime/profiles"
+    cat > "${config_root}/runtime/profiles/ci.yaml" << YAML
+model:
+  device_map: "auto"
+dataset:
+  preview_n: ${preview_n}
+  final_n: ${final_n}
+eval:
+  bootstrap:
+    replicates: ${bootstrap_replicates}
+    alpha: 0.05
+YAML
+
+    extra_env+=("INVARLOCK_CONFIG_ROOT=${config_root}")
 
     # Find calibrated preset (must have seq_len/stride embedded)
     local preset_file=""

@@ -422,7 +422,8 @@ finally:
 
 > The CLI automatically reuses a single loaded model across retries and chooses
 > between bytes or chunked snapshots based on the estimated snapshot size vs
-> available RAM and disk. You can override this behavior via
+> available RAM and disk. If bytes snapshotting fails, the CLI will attempt
+> chunked snapshotting when supported. You can override this behavior via
 > `context.snapshot.*` config or `INVARLOCK_SNAPSHOT_MODE`.
 
 ### Device Management

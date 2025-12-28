@@ -109,7 +109,7 @@ deepclean: ## Remove all generated artifacts, caches, and run outputs (destructi
 		runs/ runs_cfg/ run1/ run2/ \
 		pip-wheel-metadata/ \
 		__pycache__/ */__pycache__/ \
-		.pytest_cache/ .mypy_cache/ .ruff_cache/ \
+		.pytest_cache/ .mypy_cache/ .ruff_cache/ .pre-commit-cache/ .npm-cache/ .npm-prefix/ \
 		.hypothesis/ .certify_tmp/ tmp/ tmp_*/ \
 		.tox/ .nox/ \
 		.coverage coverage.xml htmlcov/ \

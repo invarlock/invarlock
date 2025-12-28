@@ -950,6 +950,9 @@ class WikiText2Provider:
             if override_size is not None:
                 batch_size = max(1, min(override_size, len(candidates)))
 
+            config = getattr(model, "config", None)
+            scorer_vocab_size = getattr(config, "vocab_size", None)
+
             input_batch: list[list[int]] = []
             attention_batch: list[list[int]] = []
             candidate_batch: list[dict[str, Any]] = []
@@ -969,6 +972,14 @@ class WikiText2Provider:
                         attention_tensor = torch.tensor(
                             attention_batch, dtype=torch.long, device=device
                         )
+
+                        # Guard against out-of-range token IDs when scoring with GPT-2.
+                        # Some model tokenizers emit IDs beyond GPT-2 vocab, which can
+                        # trigger device-side asserts in embedding/gather kernels.
+                        if scorer_vocab_size and scorer_vocab_size > 0:
+                            input_tensor = input_tensor.clamp(
+                                min=0, max=scorer_vocab_size - 1
+                            )
 
                         outputs = model(input_tensor, attention_mask=attention_tensor)
                         shift_logits = outputs.logits[:, :-1, :].contiguous()

@@ -1,5 +1,6 @@
 from unittest.mock import Mock
 
+import pytest
 import torch
 import torch.nn as nn
 
@@ -128,6 +129,7 @@ def test_finalize_rollback_with_checkpoint_restore_called():
     class StubCM:
         def restore_checkpoint(self, model, adapter, checkpoint_id):
             called["id"] = checkpoint_id
+            return True
 
     runner.checkpoint_manager = StubCM()
 
@@ -135,3 +137,34 @@ def test_finalize_rollback_with_checkpoint_restore_called():
         object(), object(), guard_results, metrics, cfg, report
     )
     assert status == RunStatus.ROLLBACK.value and called.get("id") == "cp-1"
+
+
+def test_finalize_phase_records_rollback_failed_when_restore_returns_false(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runner = CoreRunner()
+    report = RunReport()
+    report.meta["initial_checkpoint"] = "cp-1"
+    metrics = {"primary_metric": {"kind": "ppl_causal", "preview": 1.0, "final": 3.0}}
+    guard_results = {"spectral": {"passed": False}}
+    cfg = RunConfig(max_pm_ratio=1.5)
+
+    events: list[tuple[str, str, dict | None]] = []
+
+    def patched_log(component, operation, level, data=None):  # type: ignore[no-untyped-def]
+        events.append((component, operation, data))
+
+    monkeypatch.setattr(CoreRunner, "_log_event", staticmethod(patched_log))
+
+    class StubCM:
+        def restore_checkpoint(self, model, adapter, checkpoint_id):  # type: ignore[no-untyped-def]
+            return False
+
+    runner.checkpoint_manager = StubCM()
+
+    status = runner._finalize_phase(
+        object(), object(), guard_results, metrics, cfg, report
+    )
+    assert status == RunStatus.ROLLBACK.value
+    assert report.meta.get("rollback_failed") is True
+    assert any(op == "rollback_failed" for _, op, _ in events)

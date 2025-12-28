@@ -41,6 +41,7 @@ unset variables default to “off”.
 
 - `INVARLOCK_SNAPSHOT_MODE={auto|bytes|chunked}`
   - Control snapshot mode (used by CLI `run` and checkpoint utilities).
+  - If `bytes` snapshotting fails, the CLI will attempt `chunked` snapshotting when supported; otherwise it falls back to reload-per-attempt.
 - `INVARLOCK_SNAPSHOT_AUTO_RAM_FRACTION=<float>`
   - Tune `auto` mode RAM fraction (default 0.4).
 - `INVARLOCK_SNAPSHOT_THRESHOLD_MB=<int>`

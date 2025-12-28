@@ -325,6 +325,97 @@ def test_snapshot_mode_bytes_restore_called(tmp_path: Path, monkeypatch):
     assert adapter.restored >= 2
 
 
+def test_snapshot_mode_bytes_falls_back_to_chunked_on_failure(
+    tmp_path: Path, monkeypatch
+):
+    cfg = _base_cfg(tmp_path, 1, 1)
+
+    class Adapter:
+        name = "hf_gpt2"
+
+        def __init__(self):
+            self.loaded = 0
+            self.snapshot_calls = 0
+            self.snapshot_chunked_calls = 0
+            self.restore_calls = 0
+            self.restore_chunked_calls = 0
+
+        def load_model(self, model_id, device=None):  # noqa: D401
+            self.loaded += 1
+            return object()
+
+        def snapshot(self, model):  # noqa: D401
+            self.snapshot_calls += 1
+            raise RuntimeError("oom")
+
+        def restore(self, model, blob):  # noqa: D401
+            self.restore_calls += 1
+
+        def snapshot_chunked(self, model):  # noqa: D401
+            self.snapshot_chunked_calls += 1
+            return "tmpdir"
+
+        def restore_chunked(self, model, path):  # noqa: D401
+            self.restore_chunked_calls += 1
+
+    adapter = Adapter()
+
+    class DummyRegistry:
+        def get_adapter(self, name):
+            return adapter
+
+        def get_edit(self, name):
+            return SimpleNamespace(name=name)
+
+        def get_guard(self, name):
+            raise KeyError("no guards")
+
+        def get_plugin_metadata(self, name, plugin_type):
+            return {"name": name, "module": f"{plugin_type}.{name}", "version": "test"}
+
+    with ExitStack() as stack:
+        for ctx in _common_ce():
+            stack.enter_context(ctx)
+        stack.enter_context(
+            patch("invarlock.eval.data.get_provider", lambda *a, **k: _provider_min())
+        )
+        stack.enter_context(
+            patch(
+                "invarlock.core.runner.CoreRunner",
+                lambda: SimpleNamespace(
+                    execute=lambda **k: SimpleNamespace(
+                        edit={},
+                        metrics={
+                            "ppl_preview": 1.0,
+                            "ppl_final": 1.0,
+                            "ppl_ratio": 1.0,
+                        },
+                        guards={},
+                        context={"dataset_meta": {}},
+                        status="success",
+                    )
+                ),
+            )
+        )
+        stack.enter_context(
+            patch("invarlock.core.registry.get_registry", lambda: DummyRegistry())
+        )
+        monkeypatch.setenv("INVARLOCK_SNAPSHOT_MODE", "bytes")
+        run_command(
+            config=str(cfg),
+            device="cpu",
+            profile="ci",
+            out=str(tmp_path / "runs"),
+            until_pass=False,
+        )
+
+    assert adapter.loaded == 1
+    assert adapter.snapshot_calls == 1
+    assert adapter.snapshot_chunked_calls == 1
+    assert adapter.restore_calls == 0
+    assert adapter.restore_chunked_calls >= 2
+
+
 def test_snapshot_mode_chunked_restore_called(tmp_path: Path, monkeypatch):
     cfg = _base_cfg(tmp_path, 1, 1)
 

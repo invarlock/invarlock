@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.4] - 2025-12-28
+
+### Added
+- Chunked snapshot/restore support for HF adapters to reduce peak memory during retries.
+- B200 validation workflow helpers (bootstrap + scheduler/queue utilities + model creation tooling).
+
+### Changed
+- CI/Release baseline pairing is fail-closed: `invarlock run --baseline ...` now requires valid `evaluation_windows` evidence and enforces dataset/tokenizer/masking parity.
+- CI/Release certificate generation now requires `paired_windows` evidence and rejects non-perfect window pairing.
+
+### Documentation
+- Updated artifacts, CLI, and environment variable references for snapshot fallback and baseline pairing requirements.
+
 ## [0.3.3] - 2025-12-21
 
 ### Added
@@ -41,7 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Calibration CLI (`invarlock calibrate`) and runtime modules for policy and guard tuning.
 - Determinism utilities and CLI flows to exercise repeatable runs and presets.
 - Bench policy regression harness and additional regression tests for guards and certificates.
-- Benchmark policy regression golden `bench-golden-2025-12-13` (`0d9ff3274d29dad16ad580b4a0cf37b4f89e4f7c2e4345ce3d30a39f146ff5a7`) tracked to guard guard-effect CI against silent gate/output shifts.
+- Benchmark policy regression golden `bench-golden-2025-12-13` (`2627b8872cd6bfc37bda31fbc11b78ed814751cbf2a9ad1396e173f1f4e5383a`) tracked to guard guard-effect CI against silent gate/output shifts.
 
 ### Changed
 - Guard policies and tier runtime configuration updated to support calibration and determinism flows.

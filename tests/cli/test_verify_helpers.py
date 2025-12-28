@@ -87,6 +87,39 @@ def test_pairing_counts_and_drift_band() -> None:
     assert errs and "out of band" in errs[0]
 
 
+def test_pairing_rejects_pairing_reason_and_zero_pairs() -> None:
+    verify_mod = _import_verify_module()
+    cert_reason = {
+        "dataset": {
+            "windows": {
+                "stats": {
+                    "window_match_fraction": 1.0,
+                    "window_overlap_fraction": 0.0,
+                    "window_pairing_reason": "no_baseline_reference",
+                    "paired_windows": 1,
+                }
+            }
+        }
+    }
+    errs = verify_mod._validate_pairing(cert_reason)
+    assert errs and any("window_pairing_reason" in e for e in errs)
+
+    cert_zero = {
+        "dataset": {
+            "windows": {
+                "stats": {
+                    "window_match_fraction": 1.0,
+                    "window_overlap_fraction": 0.0,
+                    "window_pairing_reason": None,
+                    "paired_windows": 0,
+                }
+            }
+        }
+    }
+    errs2 = verify_mod._validate_pairing(cert_zero)
+    assert errs2 and any("paired_windows" in e for e in errs2)
+
+
 def test_tokenizer_hash_and_profile_lints(tmp_path: Path) -> None:
     verify_mod = _import_verify_module()
     cert = {

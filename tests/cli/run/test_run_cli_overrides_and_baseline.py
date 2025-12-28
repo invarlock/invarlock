@@ -125,7 +125,14 @@ def _runner_echo_context_with_eval(pre_ids, fin_ids):
         cfg_ctx = getattr(kwargs.get("config"), "context", {})
         return SimpleNamespace(
             edit={},
-            metrics={"ppl_preview": 1.0, "ppl_final": 1.0, "ppl_ratio": 1.0},
+            metrics={
+                "ppl_preview": 1.0,
+                "ppl_final": 1.0,
+                "ppl_ratio": 1.0,
+                "window_overlap_fraction": 0.0,
+                "window_match_fraction": 1.0,
+                "paired_windows": min(len(pre_ids or []), len(fin_ids or [])) or 1,
+            },
             guards={},
             context=cfg_ctx,
             evaluation_windows={

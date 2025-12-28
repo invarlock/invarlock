@@ -910,9 +910,28 @@ def test_retry_controller_until_pass_two_attempts(tmp_path: Path):
             cfg_ctx = getattr(kwargs.get("config"), "context", {})
             return SimpleNamespace(
                 edit={},
-                metrics={"ppl_preview": 1.0, "ppl_final": 1.0, "ppl_ratio": 1.0},
+                metrics={
+                    "ppl_preview": 1.0,
+                    "ppl_final": 1.0,
+                    "ppl_ratio": 1.0,
+                    "window_overlap_fraction": 0.0,
+                    "window_match_fraction": 1.0,
+                    "paired_windows": 1,
+                },
                 guards={},
                 context=cfg_ctx,
+                evaluation_windows={
+                    "preview": {
+                        "window_ids": [0],
+                        "input_ids": [[1, 2, 3]],
+                        "attention_masks": [[1, 1, 1]],
+                    },
+                    "final": {
+                        "window_ids": [1],
+                        "input_ids": [[4, 5, 6]],
+                        "attention_masks": [[1, 1, 1]],
+                    },
+                },
                 status="success",
             )
 
@@ -1070,7 +1089,14 @@ def test_dataset_hash_constructed_when_missing(tmp_path: Path):
             cfg_ctx = getattr(kwargs.get("config"), "context", {})
             return SimpleNamespace(
                 edit={},
-                metrics={"ppl_preview": 1.0, "ppl_final": 1.0, "ppl_ratio": 1.0},
+                metrics={
+                    "ppl_preview": 1.0,
+                    "ppl_final": 1.0,
+                    "ppl_ratio": 1.0,
+                    "window_overlap_fraction": 0.0,
+                    "window_match_fraction": 1.0,
+                    "paired_windows": 1,
+                },
                 guards={},
                 context=cfg_ctx,
                 evaluation_windows={

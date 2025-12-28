@@ -41,7 +41,9 @@ class HF_LLaMA_Adapter(HFAdapterMixin, ModelAdapter):
 
     name = "hf_llama"
 
-    def load_model(self, model_id: str, device: str = "auto") -> ModuleType | Any:
+    def load_model(
+        self, model_id: str, device: str = "auto", **kwargs: Any
+    ) -> ModuleType | Any:
         """
         Load a HuggingFace LLaMA model.
 
@@ -67,7 +69,7 @@ class HF_LLaMA_Adapter(HFAdapterMixin, ModelAdapter):
             "MODEL-LOAD-FAILED: transformers AutoModelForCausalLM",
             lambda e: {"model_id": model_id},
         ):
-            model = AutoModelForCausalLM.from_pretrained(model_id)
+            model = AutoModelForCausalLM.from_pretrained(model_id, **kwargs)
 
         # Use safe device movement that respects quantization constraints
         return self._safe_to_device(model, device)

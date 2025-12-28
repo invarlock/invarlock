@@ -100,6 +100,9 @@ detect_permanent_error() {
         "AssertionError"
         "Invalid configuration"
         "Architecture not supported"
+        "device-side assert"
+        "vectorized_gather_kernel"
+        "CUDA error: device-side assert triggered"
     )
 
     for pattern in "${permanent_patterns[@]}"; do
@@ -227,7 +230,7 @@ maybe_retry_task() {
     # Update task with retry_after timestamp
     update_task_params "${task_file}" '{"retry_after": "'"${retry_after}"'", "last_error_type": "'"${error_type}"'"}'
 
-    # Retry the task immediately (dependency resolution will check retry_after)
+    # Retry the task immediately (scheduler enforces retry_after backoff).
     retry_task "${task_id}"
 
     return $?

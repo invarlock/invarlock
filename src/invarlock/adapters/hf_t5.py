@@ -30,7 +30,9 @@ class HF_T5_Adapter(HFAdapterMixin, ModelAdapter):
 
     name = "hf_t5"
 
-    def load_model(self, model_id: str, device: str = "auto") -> ModuleType | Any:  # type: ignore[override]
+    def load_model(  # type: ignore[override]
+        self, model_id: str, device: str = "auto", **kwargs: Any
+    ) -> ModuleType | Any:
         with wrap_errors(
             DependencyError,
             "E203",
@@ -45,8 +47,8 @@ class HF_T5_Adapter(HFAdapterMixin, ModelAdapter):
             "MODEL-LOAD-FAILED: transformers AutoModelForSeq2SeqLM",
             lambda e: {"model_id": model_id},
         ):
-            model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
-        return model.to(self._resolve_device(device))
+            model = AutoModelForSeq2SeqLM.from_pretrained(model_id, **kwargs)
+        return self._safe_to_device(model, device)
 
     def can_handle(self, model: ModuleType | Any) -> bool:  # type: ignore[override]
         cfg = getattr(model, "config", None)

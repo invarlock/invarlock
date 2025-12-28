@@ -280,7 +280,14 @@ def test_baseline_pairing_computes_hashes_and_tokens_in_dataset_meta(tmp_path: P
                 ctx = getattr(run_cfg, "context", {}) if run_cfg is not None else {}
                 return SimpleNamespace(
                     edit={},
-                    metrics={"ppl_preview": 1.0, "ppl_final": 1.0, "ppl_ratio": 1.0},
+                    metrics={
+                        "ppl_preview": 1.0,
+                        "ppl_final": 1.0,
+                        "ppl_ratio": 1.0,
+                        "window_overlap_fraction": 0.0,
+                        "window_match_fraction": 1.0,
+                        "paired_windows": 2,
+                    },
                     guards={},
                     context=ctx,
                     evaluation_windows={
@@ -405,7 +412,14 @@ def test_baseline_pairing_propagates_window_plan_capacity(tmp_path: Path):
                 ctx = getattr(run_cfg, "context", {}) if run_cfg is not None else {}
                 return SimpleNamespace(
                     edit={},
-                    metrics={"ppl_preview": 1.0, "ppl_final": 1.0, "ppl_ratio": 1.0},
+                    metrics={
+                        "ppl_preview": 1.0,
+                        "ppl_final": 1.0,
+                        "ppl_ratio": 1.0,
+                        "window_overlap_fraction": 0.0,
+                        "window_match_fraction": 1.0,
+                        "paired_windows": 2,
+                    },
                     guards={},
                     context=ctx,
                     evaluation_windows={
@@ -1161,18 +1175,27 @@ output:
 def test_baseline_pairing_respects_existing_hashes_in_meta(tmp_path: Path):
     cfg = _write_base_cfg(tmp_path)
     baseline = tmp_path / "baseline.json"
+    preview_ids = [[1, 2, 3]]
+    final_ids = [[4, 5, 6]]
+    pre_hash = _compute_seq_hash(preview_ids)
+    fin_hash = _compute_seq_hash(final_ids)
+    import hashlib
+
+    ds_hash = hashlib.blake2s(
+        (pre_hash + fin_hash).encode("utf-8"), digest_size=16
+    ).hexdigest()
     baseline.write_text(
         json.dumps(
             {
                 "meta": {"tokenizer_hash": "tokhash123"},
                 "data": {
-                    "preview_hash": "pre_hash_known",
-                    "final_hash": "fin_hash_known",
-                    "dataset_hash": "ds_hash_known",
+                    "preview_hash": pre_hash,
+                    "final_hash": fin_hash,
+                    "dataset_hash": ds_hash,
                 },
                 "evaluation_windows": {
-                    "preview": {"window_ids": [0], "input_ids": [[1, 2, 3]]},
-                    "final": {"window_ids": [1], "input_ids": [[4, 5, 6]]},
+                    "preview": {"window_ids": [0], "input_ids": preview_ids},
+                    "final": {"window_ids": [1], "input_ids": final_ids},
                 },
             }
         )
@@ -1195,18 +1218,25 @@ def test_baseline_pairing_respects_existing_hashes_in_meta(tmp_path: Path):
                 ctx = getattr(run_cfg, "context", {}) if run_cfg is not None else {}
                 return SimpleNamespace(
                     edit={},
-                    metrics={"ppl_preview": 1.0, "ppl_final": 1.0, "ppl_ratio": 1.0},
+                    metrics={
+                        "ppl_preview": 1.0,
+                        "ppl_final": 1.0,
+                        "ppl_ratio": 1.0,
+                        "window_overlap_fraction": 0.0,
+                        "window_match_fraction": 1.0,
+                        "paired_windows": 1,
+                    },
                     guards={},
                     context=ctx,
                     evaluation_windows={
                         "preview": {
                             "window_ids": [0],
-                            "input_ids": [[1, 2, 3]],
+                            "input_ids": preview_ids,
                             "attention_masks": [[1, 1, 1]],
                         },
                         "final": {
                             "window_ids": [1],
-                            "input_ids": [[4, 5, 6]],
+                            "input_ids": final_ids,
                             "attention_masks": [[1, 1, 1]],
                         },
                     },
@@ -1242,9 +1272,9 @@ def test_baseline_pairing_respects_existing_hashes_in_meta(tmp_path: Path):
         )
 
     data = captured["report"]["data"]
-    assert data["preview_hash"] == "pre_hash_known"
-    assert data["final_hash"] == "fin_hash_known"
-    assert data["dataset_hash"] == "ds_hash_known"
+    assert data["preview_hash"] == pre_hash
+    assert data["final_hash"] == fin_hash
+    assert data["dataset_hash"] == ds_hash
 
 
 def test_metrics_inherits_masked_token_counts_from_dataset_meta_context(tmp_path: Path):

@@ -92,6 +92,9 @@ tmp/
 site/
 obsolete/
 node_modules/
+.npm-cache/
+.npm-prefix/
+.pre-commit-cache/
 npm-debug.log*
 pnpm-debug.log*
 yarn-error.log*

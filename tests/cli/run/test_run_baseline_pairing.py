@@ -116,6 +116,8 @@ output:
                     "ppl_ratio": 1.0,
                     "window_overlap_fraction": 0.0,
                     "window_match_fraction": 1.0,
+                    "window_pairing_reason": None,
+                    "paired_windows": 2,
                     "loss_type": "ce",
                 },
                 guards={},

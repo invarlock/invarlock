@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # scheduler.sh - Memory-aware task scheduling and priority management
-# Version: v2.2.0 (InvarLock B200 Validation Suite)
+# Version: v2.2.1 (InvarLock B200 Validation Suite)
 # Dependencies: queue_manager.sh, task_serialization.sh, nvidia-smi
 # Usage: sourced by gpu_worker.sh to select tasks per GPU memory headroom
 #
@@ -8,11 +8,11 @@
 # - Calculate task priorities dynamically
 # - Find tasks that fit in available GPU memory
 # - Implement work-stealing priority boosting
-# - Multi-GPU model distribution (4 GPUs for 70B+, 2 for medium/MoE, 1 for small)
+# - Multi-GPU task distribution based on per-GPU memory (profile-driven)
 # - GPU reservation protection to prevent double-booking large model GPUs
 # - OOM protection with pre-allocation memory checks
 # - Non-sequential GPU allocation (any available GPUs, not just 0,1,2,3)
-# - Adaptive GPU allocation when optimal GPU count unavailable
+# - Adaptive under-allocation logic (disabled by default via get_minimum_gpus)
 
 # Source dependencies
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,6 +28,124 @@ GPU_RESERVATION_DIR="${GPU_RESERVATION_DIR:-}"
 GPU_MIN_FREE_GB="${GPU_MIN_FREE_GB:-10}"
 GPU_REQUIRE_IDLE="${GPU_REQUIRE_IDLE:-true}"
 
+# ============ GPU STATE CACHE ============
+# Cache nvidia-smi results to reduce latency under scheduler lock
+# TTL in seconds (default 5s - balance freshness vs performance)
+GPU_CACHE_TTL="${GPU_CACHE_TTL:-5}"
+
+# Reservation TTL in seconds (default 60s - how long a ready-queue reservation is valid)
+# This handles the case where a worker dies after reserving but before claiming.
+GPU_RESERVATION_TTL="${GPU_RESERVATION_TTL:-60}"
+# Per-task reservation lock timeout (seconds) to serialize reservations per task.
+GPU_RESERVATION_LOCK_TIMEOUT="${GPU_RESERVATION_LOCK_TIMEOUT:-5}"
+
+# ============ GPU ID LIST HELPERS ============
+# GPU_ID_LIST is the comma-separated set of *physical* GPU indices to use for this run.
+# It is set/exported by the main harness. If unset, fall back to legacy 0..NUM_GPUS-1.
+list_gpu_ids() {
+    if [[ -n "${GPU_ID_LIST:-}" ]]; then
+        echo "${GPU_ID_LIST}" | tr ',' '\n' | sed '/^$/d'
+    else
+        local total_gpus="${NUM_GPUS:-8}"
+        if ! [[ "${total_gpus}" =~ ^[0-9]+$ ]]; then
+            total_gpus=8
+        fi
+        if [[ ${total_gpus} -lt 1 ]]; then
+            total_gpus=1
+        fi
+        seq 0 $((total_gpus - 1))
+    fi
+}
+
+# Get cache file path for GPU state
+# Usage: _gpu_cache_file <gpu_id>
+_gpu_cache_file() {
+    local gpu_id="$1"
+    if [[ -n "${GPU_RESERVATION_DIR:-}" ]]; then
+        echo "${GPU_RESERVATION_DIR}/.gpu_cache_${gpu_id}"
+    else
+        echo ""
+    fi
+}
+
+# Read cached GPU state if valid (within TTL)
+# Usage: _read_gpu_cache <gpu_id> <field>
+# Returns: cached value or empty if cache miss/stale
+_read_gpu_cache() {
+    local gpu_id="$1"
+    local field="$2"
+    local cache_file
+    cache_file=$(_gpu_cache_file "${gpu_id}")
+    [[ -z "${cache_file}" || ! -f "${cache_file}" ]] && return 1
+
+    local cache_time
+    cache_time=$(stat -c %Y "${cache_file}" 2>/dev/null || stat -f %m "${cache_file}" 2>/dev/null)
+    [[ -z "${cache_time}" ]] && return 1
+
+    local now=$(date +%s)
+    local age=$((now - cache_time))
+    if [[ ${age} -gt ${GPU_CACHE_TTL} ]]; then
+        return 1  # Cache expired
+    fi
+
+    # Read field from cache (format: field=value per line)
+    grep "^${field}=" "${cache_file}" 2>/dev/null | cut -d'=' -f2
+}
+
+# Write GPU state to cache
+# Usage: _write_gpu_cache <gpu_id> <free_mem> <is_idle>
+_write_gpu_cache() {
+    local gpu_id="$1"
+    local free_mem="$2"
+    local is_idle="$3"
+    local cache_file
+    cache_file=$(_gpu_cache_file "${gpu_id}")
+    [[ -z "${cache_file}" ]] && return 0
+
+    cat > "${cache_file}" 2>/dev/null << EOF
+free_mem=${free_mem}
+is_idle=${is_idle}
+EOF
+}
+
+# Refresh GPU cache for a single GPU (call nvidia-smi once for both values)
+# Usage: _refresh_gpu_cache <gpu_id>
+_refresh_gpu_cache() {
+    local gpu_id="$1"
+
+    # Query nvidia-smi once for free memory
+    local free_mib
+    free_mib=$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits -i "${gpu_id}" 2>/dev/null | head -1)
+    local free_gb=0
+    if [[ -n "${free_mib}" ]]; then
+        free_gb=$((free_mib / 1024))
+    fi
+
+    # Query nvidia-smi once for running processes
+    # Note: When no processes are running, nvidia-smi returns empty output.
+    # Count only actual PID lines (numbers) to avoid empty line issues.
+    local raw_output
+    raw_output=$(nvidia-smi --query-compute-apps=pid --format=csv,noheader -i "${gpu_id}" 2>/dev/null)
+    local processes=0
+    if [[ -n "${raw_output}" ]]; then
+        processes=$(echo "${raw_output}" | grep -cE '^[0-9]+' 2>/dev/null || echo "0")
+    fi
+    local is_idle="false"
+    [[ "${processes}" -eq 0 ]] && is_idle="true"
+
+    # Write to cache
+    _write_gpu_cache "${gpu_id}" "${free_gb}" "${is_idle}"
+}
+
+# Refresh GPU cache for all GPUs (batch nvidia-smi call for efficiency)
+# Usage: refresh_all_gpu_cache
+refresh_all_gpu_cache() {
+    local gpu_id
+    for gpu_id in $(list_gpu_ids); do
+        _refresh_gpu_cache "${gpu_id}" 2>/dev/null || true
+    done
+}
+
 # Initialize GPU reservation tracking
 # Usage: init_gpu_reservations <output_dir>
 init_gpu_reservations() {
@@ -35,6 +153,9 @@ init_gpu_reservations() {
     GPU_RESERVATION_DIR="${output_dir}/workers/gpu_reservations"
     mkdir -p "${GPU_RESERVATION_DIR}"
     export GPU_RESERVATION_DIR
+
+    # Pre-populate GPU cache
+    refresh_all_gpu_cache 2>/dev/null || true
 }
 
 # ============ SCHEDULER LOCKING ============
@@ -55,71 +176,101 @@ scheduler_lock_file() {
 
 # Acquire scheduler lock (serialize task selection/reservation)
 # Usage: acquire_scheduler_lock [timeout_seconds]
+#
+# IMPORTANT: Uses a mkdir-based lock which is atomic on POSIX filesystems and
+# avoids file descriptor inheritance issues when workers are spawned as subshells.
+#
+# For subshell workers (spawned with ( ... ) &), FD-based flock approaches can
+# be problematic because:
+# 1. $$ doesn't change in subshells, only BASHPID does
+# 2. File descriptors can be inherited/shared across subshells
+# 3. shared FDs can cause contention and surprises
 acquire_scheduler_lock() {
     local timeout="${1:-10}"
     local lock_file
     lock_file="$(scheduler_lock_file)"
     [[ -z "${lock_file}" ]] && return 0
 
-    touch "${lock_file}" 2>/dev/null || true
-    local fd
-    exec {fd}>"${lock_file}"
+    local lock_dir="${lock_file}.d"
+    local my_pid="${BASHPID:-$$}"
+    local deadline=$(($(date +%s) + timeout))
 
-    if flock -w "${timeout}" "${fd}"; then
-        export SCHEDULER_LOCK_FD="${fd}"
-        return 0
-    fi
+    while true; do
+        # Try to create lock directory (atomic operation)
+        if mkdir "${lock_dir}" 2>/dev/null; then
+            # Successfully acquired lock - record owner
+            echo "${my_pid}" > "${lock_dir}/owner" 2>/dev/null || true
+            export SCHEDULER_LOCK_DIR="${lock_dir}"
+            return 0
+        fi
 
-    exec {fd}>&-
-    echo "ERROR: Failed to acquire scheduler lock after ${timeout}s" >&2
-    return 1
+        # Check if we've exceeded timeout
+        local now=$(date +%s)
+        if [[ ${now} -ge ${deadline} ]]; then
+            echo "ERROR: Failed to acquire scheduler lock after ${timeout}s" >&2
+            return 1
+        fi
+
+        # Check for stale lock (owner process no longer exists)
+        local owner_pid=""
+        if [[ -f "${lock_dir}/owner" ]]; then
+            owner_pid=$(cat "${lock_dir}/owner" 2>/dev/null)
+        fi
+        if [[ -n "${owner_pid}" && ! -d "/proc/${owner_pid}" ]]; then
+            # Owner process is gone - remove stale lock
+            rm -rf "${lock_dir}" 2>/dev/null || true
+            continue
+        fi
+
+        # Brief sleep before retry (100ms)
+        sleep 0.1
+    done
 }
 
 # Release scheduler lock
 # Usage: release_scheduler_lock
 release_scheduler_lock() {
-    if [[ -n "${SCHEDULER_LOCK_FD:-}" ]]; then
-        exec {SCHEDULER_LOCK_FD}>&-
-        unset SCHEDULER_LOCK_FD
+    if [[ -n "${SCHEDULER_LOCK_DIR:-}" && -d "${SCHEDULER_LOCK_DIR}" ]]; then
+        # Verify we own the lock before releasing
+        local my_pid="${BASHPID:-$$}"
+        local owner_pid=""
+        if [[ -f "${SCHEDULER_LOCK_DIR}/owner" ]]; then
+            owner_pid=$(cat "${SCHEDULER_LOCK_DIR}/owner" 2>/dev/null)
+        fi
+        if [[ -z "${owner_pid}" || "${owner_pid}" == "${my_pid}" ]]; then
+            rm -rf "${SCHEDULER_LOCK_DIR}" 2>/dev/null || true
+        fi
+        unset SCHEDULER_LOCK_DIR
     fi
 }
 
 # Get the number of GPUs required for a model size
 # Usage: get_required_gpus <model_size_gb>
-# Returns: 1, 2, or 4
+# Returns: integer GPU count (>=1)
+#
+# B200 OPTIMIZATION (v2.2.1): Uses calculate_required_gpus from task_serialization.sh
+# which accounts for per-device memory (defaults to 180GB on B200).
 get_required_gpus() {
     local model_size_gb="$1"
 
-    # Large models (70B+): ~140GB+ → need 4 GPUs for tensor parallelism
-    # Note: Even on B200 180GB, having headroom for edits/evals benefits from multi-GPU
-    if [[ ${model_size_gb} -ge 120 ]]; then
-        echo "4"
-    # Medium models (30B-40B) and MoE (~90GB): benefit from 2 GPUs
-    elif [[ ${model_size_gb} -ge 60 ]]; then
-        echo "2"
-    # Small models (7B-14B): single GPU is sufficient
-    else
-        echo "1"
-    fi
+    # Delegate to task_serialization.sh which has the B200-optimized logic
+    calculate_required_gpus "${model_size_gb}"
 }
 
-# Get minimum viable GPUs for a model (can run with reduced parallelism)
+# Get minimum viable GPUs for a model.
 # Usage: get_minimum_gpus <model_size_gb>
-# Returns: minimum GPUs (1 for most, 2 for 70B+ on B200 180GB)
+# Returns: minimum GPUs (defaults to required_gpus to disable under-allocation)
 get_minimum_gpus() {
     local model_size_gb="$1"
 
-    # 70B+ models need at least 2 GPUs (can't fit on single B200)
-    if [[ ${model_size_gb} -ge 120 ]]; then
-        echo "2"
-    # All other models can run on 1 GPU if needed
-    else
-        echo "1"
-    fi
+    calculate_required_gpus "${model_size_gb}"
 }
 
-# Check if adaptive GPU allocation should be used
-# Returns 0 if we should try fewer GPUs, 1 otherwise
+# Check if adaptive GPU under-allocation should be used.
+# Returns 0 if we should try fewer GPUs, 1 otherwise.
+#
+# NOTE: With get_minimum_gpus() == get_required_gpus(), adaptive allocation is
+# effectively disabled by default (prevents OOM from under-reserving).
 should_use_adaptive_gpus() {
     local available_gpu_count="$1"
     local required_gpus="$2"
@@ -148,68 +299,237 @@ should_use_adaptive_gpus() {
     return 1
 }
 
-# Get required GPUs from model size category string
+# Legacy GPU sizing by category (kept for backwards compatibility; unused by the
+# current profile-based planner).
 # Usage: get_required_gpus_from_category <model_size_category>
-# model_size_category: 7, 13, 30, 40, 70, moe
 get_required_gpus_from_category() {
     local category="$1"
 
     case "${category}" in
         "70"|"72")
-            echo "4"
+            # Conservative: reserve a single GPU to match single-GPU loading behavior.
+            echo "1"
             ;;
-        "40"|"moe"|"30")
-            echo "2"
+        "moe")
+            # Mixtral-8x7B needs ~90GB - fits on single B200 (180GB)
+            echo "1"
+            ;;
+        "40"|"30")
+            # 30-40B models need ~60-80GB - fit on single B200
+            echo "1"
             ;;
         *)
+            # 7B-14B models - single GPU
             echo "1"
             ;;
     esac
+}
+
+# Task-level reservation lock (serialize reservations per task)
+# Usage: _acquire_task_reservation_lock <task_id> [timeout_seconds]
+_acquire_task_reservation_lock() {
+    local task_id="$1"
+    local timeout="${2:-${GPU_RESERVATION_LOCK_TIMEOUT}}"
+    local lock_dir="${GPU_RESERVATION_DIR}/task_${task_id}.lock.d"
+    local my_pid="${BASHPID:-$$}"
+    local deadline=$(($(date +%s) + timeout))
+
+    while true; do
+        if mkdir "${lock_dir}" 2>/dev/null; then
+            echo "${my_pid}" > "${lock_dir}/owner" 2>/dev/null || true
+            return 0
+        fi
+
+        local now=$(date +%s)
+        if [[ ${now} -ge ${deadline} ]]; then
+            return 1
+        fi
+
+        local owner_pid=""
+        if [[ -f "${lock_dir}/owner" ]]; then
+            owner_pid=$(cat "${lock_dir}/owner" 2>/dev/null)
+        fi
+        if [[ -n "${owner_pid}" && ! -d "/proc/${owner_pid}" ]]; then
+            rm -rf "${lock_dir}" 2>/dev/null || true
+            continue
+        fi
+
+        sleep 0.05
+    done
+}
+
+# Usage: _release_task_reservation_lock <task_id>
+_release_task_reservation_lock() {
+    local task_id="$1"
+    local lock_dir="${GPU_RESERVATION_DIR}/task_${task_id}.lock.d"
+    local my_pid="${BASHPID:-$$}"
+
+    if [[ -d "${lock_dir}" ]]; then
+        local owner_pid=""
+        if [[ -f "${lock_dir}/owner" ]]; then
+            owner_pid=$(cat "${lock_dir}/owner" 2>/dev/null)
+        fi
+        if [[ -z "${owner_pid}" || "${owner_pid}" == "${my_pid}" ]]; then
+            rm -rf "${lock_dir}" 2>/dev/null || true
+        fi
+    fi
+}
+
+# Cleanup all reservation files for a task id.
+# Usage: _cleanup_task_reservation <task_id>
+_cleanup_task_reservation() {
+    local task_id="$1"
+
+    [[ -z "${GPU_RESERVATION_DIR}" ]] && return 0
+
+    for lock_file in "${GPU_RESERVATION_DIR}"/gpu_*.lock; do
+        [[ -f "${lock_file}" ]] || continue
+        local owner=$(cat "${lock_file}" 2>/dev/null | head -1)
+        if [[ "${owner}" == "${task_id}" ]]; then
+            rm -f "${lock_file}"
+        fi
+    done
+    rm -f "${GPU_RESERVATION_DIR}/task_${task_id}.gpus" "${GPU_RESERVATION_DIR}/task_${task_id}.meta"
 }
 
 # Reserve GPUs for a task
 # Usage: reserve_gpus <task_id> <gpu_list>
 # gpu_list: comma-separated GPU IDs (e.g., "0,1,2,3")
 # Returns: 0 on success, 1 on failure
+#
+# RACE CONDITION PROTECTION:
+# 1. Check if task is already reserved elsewhere (prevent double-reservation)
+# 2. Check if any requested GPU is already reserved by a valid task
+# 3. Store owner PID and timestamp for TTL-based cleanup
+# 4. Use per-task lock file for atomic reservation
+#
+# NOTE: Reservations are considered valid if the task exists in ready OR running queue
+# AND the reservation is within TTL (or running). This prevents stale reservations from
+# dead workers blocking GPUs indefinitely.
 reserve_gpus() {
     local task_id="$1"
     local gpu_list="$2"
+    local my_pid="${BASHPID:-$$}"
 
     [[ -z "${GPU_RESERVATION_DIR}" ]] && return 1
 
-    # Check if any GPU is already reserved
+    if ! _acquire_task_reservation_lock "${task_id}"; then
+        return 1
+    fi
+
+    local result=1
+
+    # STEP 1: Check if this task is already reserved elsewhere
+    # This prevents two workers from reserving the same task on different GPUs
+    if _is_reservation_valid "${task_id}"; then
+        _release_task_reservation_lock "${task_id}"
+        return 1
+    fi
+    _cleanup_task_reservation "${task_id}"
+
+    # STEP 2: Check if any requested GPU is already reserved by a valid task
     IFS=',' read -ra gpus <<< "${gpu_list}"
     for gpu_id in "${gpus[@]}"; do
         local lock_file="${GPU_RESERVATION_DIR}/gpu_${gpu_id}.lock"
         if [[ -f "${lock_file}" ]]; then
-            local existing_task=$(cat "${lock_file}" 2>/dev/null)
-            # Check if the reservation is stale (task no longer running)
-            if [[ -n "${existing_task}" ]]; then
-                local task_file="${QUEUE_DIR}/running/${existing_task}.task"
-                if [[ -f "${task_file}" ]]; then
-                    # GPU is legitimately reserved
+            local existing_task=$(cat "${lock_file}" 2>/dev/null | head -1)
+            if [[ -n "${existing_task}" && "${existing_task}" != "${task_id}" ]]; then
+                # Check if the existing reservation is valid
+                if _is_reservation_valid "${existing_task}"; then
+                    # GPU is reserved by a valid task
+                    _release_task_reservation_lock "${task_id}"
                     return 1
                 fi
                 # Stale reservation - clean it up
-                rm -f "${lock_file}"
+                _cleanup_task_reservation "${existing_task}"
             fi
         fi
     done
 
-    # Create reservations atomically
+    # STEP 3: Create reservations with metadata
+    local now=$(date +%s)
+
+    # Write metadata file first (atomically via temp file)
+    local meta_file="${GPU_RESERVATION_DIR}/task_${task_id}.meta"
+    local meta_tmp="${meta_file}.${my_pid}.tmp"
+    cat > "${meta_tmp}" << EOF
+timestamp=${now}
+owner_pid=${my_pid}
+gpu_list=${gpu_list}
+EOF
+    mv -f "${meta_tmp}" "${meta_file}" 2>/dev/null || {
+        rm -f "${meta_tmp}"
+        _release_task_reservation_lock "${task_id}"
+        return 1
+    }
+
+    # Write GPU lock files
     for gpu_id in "${gpus[@]}"; do
         local lock_file="${GPU_RESERVATION_DIR}/gpu_${gpu_id}.lock"
         echo "${task_id}" > "${lock_file}"
     done
 
-    # Record which GPUs this task is using
+    # Write GPU list file
     echo "${gpu_list}" > "${GPU_RESERVATION_DIR}/task_${task_id}.gpus"
+
+    result=0
+    _release_task_reservation_lock "${task_id}"
+    return ${result}
+}
+
+# Helper: Check if a reservation is valid
+# Usage: _is_reservation_valid <task_id>
+# Returns: 0 if valid, 1 if stale
+_is_reservation_valid() {
+    local task_id="$1"
+
+    # Check if task is in running queue - always valid
+    local running_file="${QUEUE_DIR}/running/${task_id}.task"
+    if [[ -f "${running_file}" ]]; then
+        return 0
+    fi
+
+    # Check if task is in ready queue
+    local ready_file="${QUEUE_DIR}/ready/${task_id}.task"
+    if [[ ! -f "${ready_file}" ]]; then
+        return 1  # Task not in ready or running - stale
+    fi
+
+    # Task is in ready queue - check metadata for TTL
+    local meta_file="${GPU_RESERVATION_DIR}/task_${task_id}.meta"
+    local res_time=""
+    local res_pid=""
+    if [[ -f "${meta_file}" ]]; then
+        res_time=$(grep "^timestamp=" "${meta_file}" 2>/dev/null | cut -d'=' -f2)
+        res_pid=$(grep "^owner_pid=" "${meta_file}" 2>/dev/null | cut -d'=' -f2)
+    else
+        # Fallback to file mtime if metadata is missing
+        local gpus_file="${GPU_RESERVATION_DIR}/task_${task_id}.gpus"
+        if [[ -f "${gpus_file}" ]]; then
+            res_time=$(stat -c %Y "${gpus_file}" 2>/dev/null || stat -f %m "${gpus_file}" 2>/dev/null)
+        fi
+    fi
+
+    [[ -z "${res_time}" ]] && return 1
+
+    local now=$(date +%s)
+    local age=$((now - ${res_time:-0}))
+    if [[ ${age} -ge ${GPU_RESERVATION_TTL} ]]; then
+        return 1
+    fi
+
+    if [[ -n "${res_pid}" && ! -d "/proc/${res_pid}" ]]; then
+        return 1
+    fi
 
     return 0
 }
 
 # Release GPUs for a task
 # Usage: release_gpus <task_id>
+#
+# NOTE: This function only releases GPU locks owned by the specified task.
+# It also cleans up the metadata file created during reservation.
 release_gpus() {
     local task_id="$1"
 
@@ -222,17 +542,25 @@ release_gpus() {
         for gpu_id in "${gpus[@]}"; do
             local lock_file="${GPU_RESERVATION_DIR}/gpu_${gpu_id}.lock"
             # Only remove if we own the lock
-            local owner=$(cat "${lock_file}" 2>/dev/null)
+            local owner=$(cat "${lock_file}" 2>/dev/null | head -1)
             if [[ "${owner}" == "${task_id}" ]]; then
                 rm -f "${lock_file}"
             fi
         done
         rm -f "${gpu_file}"
     fi
+
+    # Also clean up metadata file
+    local meta_file="${GPU_RESERVATION_DIR}/task_${task_id}.meta"
+    rm -f "${meta_file}" 2>/dev/null || true
 }
 
 # Check if a GPU is available (not reserved)
 # Usage: is_gpu_available <gpu_id>
+#
+# NOTE: Uses _is_reservation_valid which checks:
+# 1. Task is in ready OR running queue
+# 2. For ready-queue tasks: reservation is within TTL and owner is alive
 is_gpu_available() {
     local gpu_id="$1"
 
@@ -240,15 +568,14 @@ is_gpu_available() {
 
     local lock_file="${GPU_RESERVATION_DIR}/gpu_${gpu_id}.lock"
     if [[ -f "${lock_file}" ]]; then
-        local task_id=$(cat "${lock_file}" 2>/dev/null)
+        local task_id=$(cat "${lock_file}" 2>/dev/null | head -1)
         if [[ -n "${task_id}" ]]; then
-            # Verify the task is still running
-            local task_file="${QUEUE_DIR}/running/${task_id}.task"
-            if [[ -f "${task_file}" ]]; then
-                return 1  # GPU is reserved
+            # Check if reservation is still valid (uses TTL + owner PID for ready-queue tasks)
+            if _is_reservation_valid "${task_id}"; then
+                return 1  # GPU is reserved by a valid task
             fi
-            # Stale reservation - clean up
-            rm -f "${lock_file}"
+            # Stale reservation - clean up all related files
+            _cleanup_task_reservation "${task_id}"
         fi
     fi
     return 0
@@ -277,7 +604,7 @@ is_gpu_usable() {
 }
 
 # Get list of available GPUs (non-sequential - any available GPUs)
-# Usage: get_available_gpus <num_gpus> [prefer_spread] [must_include]
+# Usage: get_available_gpus <num_gpus> [prefer_spread] [must_include] [min_free_gb]
 # Returns: comma-separated list of available GPU IDs, or empty if not enough available
 # Note: Does NOT require sequential GPUs - can return "0,3,5,7" instead of "0,1,2,3"
 # If prefer_spread=true, tries to spread across GPU pairs for better memory bandwidth
@@ -286,11 +613,16 @@ get_available_gpus() {
     local num_needed="$1"
     local prefer_spread="${2:-false}"
     local must_include="${3:-}"
-    local total_gpus="${NUM_GPUS:-8}"
+    local min_free_gb="${4:-}"
 
     local available=()
-    for gpu_id in $(seq 0 $((total_gpus - 1))); do
+    for gpu_id in $(list_gpu_ids); do
         if is_gpu_usable "${gpu_id}"; then
+            if [[ -n "${min_free_gb}" && "${min_free_gb}" =~ ^[0-9]+$ ]]; then
+                local free_mem
+                free_mem=$(get_gpu_available_memory "${gpu_id}")
+                [[ -n "${free_mem}" && "${free_mem}" -lt ${min_free_gb} ]] && continue
+            fi
             available+=("${gpu_id}")
         fi
     done
@@ -351,10 +683,9 @@ get_available_gpus() {
 # Count currently available GPUs
 # Usage: count_available_gpus
 count_available_gpus() {
-    local total_gpus="${NUM_GPUS:-8}"
     local count=0
 
-    for gpu_id in $(seq 0 $((total_gpus - 1))); do
+    for gpu_id in $(list_gpu_ids); do
         is_gpu_usable "${gpu_id}" && count=$((count + 1))
     done
 
@@ -378,20 +709,24 @@ get_task_gpus() {
 
 # Clean up stale GPU reservations (call periodically)
 # Usage: cleanup_stale_reservations
+#
+# Uses _is_reservation_valid which checks:
+# 1. Task is in ready OR running queue
+# 2. For ready-queue tasks: reservation is within TTL and owner PID is alive
 cleanup_stale_reservations() {
     [[ -z "${GPU_RESERVATION_DIR}" ]] && return 0
 
     for lock_file in "${GPU_RESERVATION_DIR}"/gpu_*.lock; do
         [[ -f "${lock_file}" ]] || continue
 
-        local task_id=$(cat "${lock_file}" 2>/dev/null)
+        local task_id=$(cat "${lock_file}" 2>/dev/null | head -1)
         if [[ -n "${task_id}" ]]; then
-            local task_file="${QUEUE_DIR}/running/${task_id}.task"
-            if [[ ! -f "${task_file}" ]]; then
-                # Task is no longer running - clean up
-                rm -f "${lock_file}"
-                rm -f "${GPU_RESERVATION_DIR}/task_${task_id}.gpus"
+            # Check if reservation is still valid (uses TTL + owner PID for ready-queue tasks)
+            if _is_reservation_valid "${task_id}"; then
+                continue  # Valid reservation
             fi
+            # Stale reservation - clean up all related files
+            _cleanup_task_reservation "${task_id}"
         fi
     done
 }
@@ -413,13 +748,13 @@ check_oom_safe() {
 
     [[ -z "${model_size}" ]] && model_size=20
 
-    # Use the actually assigned GPU list, not the nominal required_gpus field.
-    local assigned_gpu_count=1
-    IFS=',' read -ra _assigned_gpus <<< "${gpu_ids}"
-    [[ ${#_assigned_gpus[@]} -gt 0 ]] && assigned_gpu_count=${#_assigned_gpus[@]}
+    local gpu_count=1
+    IFS=',' read -ra gpus <<< "${gpu_ids}"
+    gpu_count=${#gpus[@]}
+    [[ ${gpu_count} -lt 1 ]] && gpu_count=1
 
-    # Calculate memory per GPU (distributed across GPUs)
-    local mem_per_gpu=$((model_size / assigned_gpu_count))
+    # For multi-GPU tasks, assume sharded load across assigned GPUs.
+    local mem_per_gpu=$(( (model_size + gpu_count - 1) / gpu_count ))
 
     # model_size_gb already includes task multipliers + safety margin.
     # Apply only a small extra headroom for fragmentation.
@@ -449,13 +784,13 @@ get_oom_risk_level() {
 
     [[ -z "${model_size}" ]] && model_size=20
 
-    # Use actual assigned GPU count (may differ from required_gpus in adaptive mode).
-    local assigned_gpu_count=1
-    IFS=',' read -ra _assigned_gpus <<< "${gpu_ids}"
-    [[ ${#_assigned_gpus[@]} -gt 0 ]] && assigned_gpu_count=${#_assigned_gpus[@]}
+    local gpu_count=1
+    IFS=',' read -ra gpus <<< "${gpu_ids}"
+    gpu_count=${#gpus[@]}
+    [[ ${gpu_count} -lt 1 ]] && gpu_count=1
 
-    # Calculate memory per GPU
-    local mem_per_gpu=$((model_size / assigned_gpu_count))
+    # For multi-GPU tasks, assume sharded load across assigned GPUs.
+    local mem_per_gpu=$(( (model_size + gpu_count - 1) / gpu_count ))
 
     # Get minimum available memory across assigned GPUs
     local min_available=999999
@@ -535,12 +870,20 @@ kill_gpu_processes() {
 
 # ============ GPU MEMORY MANAGEMENT ============
 
-# Get available GPU memory in GB
+# Get available GPU memory in GB (with caching to reduce nvidia-smi calls)
 # Usage: get_gpu_available_memory <gpu_id>
 get_gpu_available_memory() {
     local gpu_id="$1"
 
-    # Query nvidia-smi for free memory in MiB
+    # Try to read from cache first
+    local cached_val
+    cached_val=$(_read_gpu_cache "${gpu_id}" "free_mem")
+    if [[ -n "${cached_val}" ]]; then
+        echo "${cached_val}"
+        return 0
+    fi
+
+    # Cache miss - query nvidia-smi for free memory in MiB
     local free_mib
     free_mib=$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits -i "${gpu_id}" 2>/dev/null | head -1)
 
@@ -551,6 +894,19 @@ get_gpu_available_memory() {
 
     # Convert MiB to GB (1024 MiB = 1 GiB ≈ 1.07 GB)
     local free_gb=$((free_mib / 1024))
+
+    # Update cache (also refresh idle status since we're querying)
+    # Count only actual PID lines (numbers) to avoid empty line issues
+    local raw_output
+    raw_output=$(nvidia-smi --query-compute-apps=pid --format=csv,noheader -i "${gpu_id}" 2>/dev/null)
+    local processes=0
+    if [[ -n "${raw_output}" ]]; then
+        processes=$(echo "${raw_output}" | grep -cE '^[0-9]+' 2>/dev/null || echo "0")
+    fi
+    local is_idle="false"
+    [[ "${processes}" -eq 0 ]] && is_idle="true"
+    _write_gpu_cache "${gpu_id}" "${free_gb}" "${is_idle}"
+
     echo "${free_gb}"
 }
 
@@ -579,15 +935,43 @@ get_gpu_utilization() {
     nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits -i "${gpu_id}" 2>/dev/null | head -1 || echo "0"
 }
 
-# Check if GPU is idle (no processes)
+# Check if GPU is idle (no processes) - with caching to reduce nvidia-smi calls
 # Usage: is_gpu_idle <gpu_id>
 is_gpu_idle() {
     local gpu_id="$1"
 
-    local processes
-    processes=$(nvidia-smi --query-compute-apps=pid --format=csv,noheader -i "${gpu_id}" 2>/dev/null | wc -l | tr -d ' ')
+    # Try to read from cache first
+    local cached_idle
+    cached_idle=$(_read_gpu_cache "${gpu_id}" "is_idle")
+    if [[ -n "${cached_idle}" ]]; then
+        [[ "${cached_idle}" == "true" ]]
+        return $?
+    fi
 
-    [[ "${processes}" -eq 0 ]]
+    # Cache miss - query nvidia-smi
+    # Note: When no processes are running, nvidia-smi returns empty output.
+    # We use grep -c to count actual PID lines (numbers only) to avoid
+    # counting empty lines or error messages.
+    local raw_output
+    raw_output=$(nvidia-smi --query-compute-apps=pid --format=csv,noheader -i "${gpu_id}" 2>/dev/null)
+
+    local processes=0
+    if [[ -n "${raw_output}" ]]; then
+        # Count only lines that contain actual PIDs (numeric values)
+        processes=$(echo "${raw_output}" | grep -cE '^[0-9]+' 2>/dev/null || echo "0")
+    fi
+
+    local is_idle="false"
+    [[ "${processes}" -eq 0 ]] && is_idle="true"
+
+    # Update cache (also refresh free memory since we're querying)
+    local free_mib
+    free_mib=$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits -i "${gpu_id}" 2>/dev/null | head -1)
+    local free_gb=0
+    [[ -n "${free_mib}" ]] && free_gb=$((free_mib / 1024))
+    _write_gpu_cache "${gpu_id}" "${free_gb}" "${is_idle}"
+
+    [[ "${is_idle}" == "true" ]]
 }
 
 # ============ PRIORITY CALCULATION ============
@@ -598,10 +982,10 @@ is_gpu_idle() {
 # Usage: calculate_task_priority <task_file>
 # Returns: priority score (0-100, higher = more urgent)
 #
-# Strategy: "small_first" + adaptive GPU allocation
-#   - Small models (7B-14B) get highest priority
-#   - Maximizes parallelism when all 8 GPUs can run small tasks
-#   - Large models (70B+) run later with adaptive GPU count
+# Strategy: "small_first"
+#   - Lower-memory tasks get higher priority to maximize early parallelism
+#   - Multi-GPU scaling is based on per-task memory; adaptive under-allocation is
+#     intentionally disabled by default to avoid OOM.
 calculate_task_priority() {
     local task_file="$1"
 
@@ -740,7 +1124,7 @@ find_best_task() {
 
     # Count available GPUs for adaptive allocation decisions
     local total_available=0
-    for gid in $(seq 0 $((${NUM_GPUS:-8} - 1))); do
+    for gid in $(list_gpu_ids); do
         is_gpu_usable "${gid}" && total_available=$((total_available + 1))
     done
 
@@ -759,6 +1143,10 @@ find_best_task() {
     else
         # Low availability - conservative margin
         effective_mem=$((available_mem * 90 / 100))
+    fi
+    local mem_tolerance="${SCHEDULER_MEM_TOLERANCE_GB:-8}"
+    if ! [[ "${mem_tolerance}" =~ ^[0-9]+$ ]]; then
+        mem_tolerance=0
     fi
 
     local best_task=""
@@ -795,12 +1183,20 @@ find_best_task() {
 
         # For single-GPU tasks, check memory fit
         if [[ ${required_gpus} -eq 1 ]]; then
-            if [[ ${required_mem} -gt ${effective_mem} ]]; then
+            local max_allowed=${effective_mem}
+            if [[ ${required_mem} -ge 140 ]]; then
+                max_allowed=$((effective_mem + mem_tolerance))
+            fi
+            if [[ ${required_mem} -gt ${max_allowed} ]]; then
                 continue  # Task doesn't fit
             fi
         else
             # For multi-GPU tasks, check if enough GPUs are available
-            local available_gpu_list=$(get_available_gpus "${required_gpus}" "false" "${gpu_id}")
+            local per_gpu_required=0
+            if [[ "${required_mem}" =~ ^[0-9]+$ && ${required_gpus} -gt 0 ]]; then
+                per_gpu_required=$(( (required_mem + required_gpus - 1) / required_gpus ))
+            fi
+            local available_gpu_list=$(get_available_gpus "${required_gpus}" "false" "${gpu_id}" "${per_gpu_required}")
             if [[ -z "${available_gpu_list}" ]]; then
                 # Not enough GPUs for optimal allocation
                 # Try adaptive allocation if no other work is available
@@ -809,7 +1205,10 @@ find_best_task() {
                     actual_gpus=${total_available}
                     [[ ${actual_gpus} -gt ${required_gpus} ]] && actual_gpus=${required_gpus}
                     [[ ${actual_gpus} -lt ${min_gpus} ]] && continue
-                    available_gpu_list=$(get_available_gpus "${actual_gpus}" "false" "${gpu_id}")
+                    if [[ ${actual_gpus} -gt 0 ]]; then
+                        per_gpu_required=$(( (required_mem + actual_gpus - 1) / actual_gpus ))
+                    fi
+                    available_gpu_list=$(get_available_gpus "${actual_gpus}" "false" "${gpu_id}" "${per_gpu_required}")
                     [[ -z "${available_gpu_list}" ]] && continue
                 else
                     continue  # Not enough GPUs available and shouldn't adapt
@@ -843,6 +1242,12 @@ find_best_task() {
 # IMPORTANT: ALL tasks (single and multi-GPU) reserve their GPUs to prevent
 # concurrent task conflicts where multi-GPU tasks might try to use a GPU
 # that already has a single-GPU task running on it.
+#
+# LOCK OPTIMIZATION (v2.2.1): This function uses optimistic concurrency to
+# reduce lock contention. The task selection (find_best_task) is done WITHOUT
+# holding the scheduler lock. Only the actual claim + reserve operation holds
+# the lock, then immediately releases it. This prevents the nested lock pattern
+# where scheduler lock was held while waiting for queue lock in claim_task().
 find_and_claim_task() {
     local available_mem="$1"
     local gpu_id="$2"
@@ -850,101 +1255,123 @@ find_and_claim_task() {
     local result=1
     local claimed_file=""
 
+    # PHASE 1: Task selection WITHOUT scheduler lock (optimistic)
+    # This allows multiple workers to scan in parallel
+    local task_id
+    task_id=$(find_best_task "${available_mem}" "${gpu_id}")
+
+    if [[ -z "${task_id}" ]]; then
+        return 1  # No suitable task found
+    fi
+
+    # Pre-compute GPU allocation info before acquiring lock
+    local task_file="${QUEUE_DIR}/ready/${task_id}.task"
+    if [[ ! -f "${task_file}" ]]; then
+        return 1  # Task was already claimed
+    fi
+
+    local required_mem=$(get_task_field "${task_file}" "model_size_gb")
+    [[ -z "${required_mem}" ]] && required_mem=20
+
+    local required_gpus=$(get_task_field "${task_file}" "required_gpus")
+    if [[ -z "${required_gpus}" || "${required_gpus}" == "null" ]]; then
+        required_gpus=$(get_required_gpus "${required_mem}")
+    fi
+
+    local min_gpus
+    min_gpus=$(get_minimum_gpus "${required_mem}")
+
+    # PHASE 2: Short-lived lock for claim + reserve
+    # Only hold lock during the actual atomic operations
     acquire_scheduler_lock 10 || return 1
 
-    while true; do
-        # Find best task
-        local task_id
-        task_id=$(find_best_task "${available_mem}" "${gpu_id}")
+    # Revalidate - task may have been claimed while we prepared
+    task_file="${QUEUE_DIR}/ready/${task_id}.task"
+    if [[ ! -f "${task_file}" ]]; then
+        release_scheduler_lock
+        return 1  # Task was claimed by another worker
+    fi
 
-        if [[ -z "${task_id}" ]]; then
-            break  # No suitable task
-        fi
+    # Revalidate GPU availability under lock
+    if ! is_gpu_usable "${gpu_id}"; then
+        release_scheduler_lock
+        return 1  # GPU became unavailable
+    fi
 
-        # Get the task file to check GPU requirements
-        local task_file="${QUEUE_DIR}/ready/${task_id}.task"
-        if [[ ! -f "${task_file}" ]]; then
-            break  # Task was claimed by someone else
-        fi
-
-        # Get required GPUs
-        local required_mem=$(get_task_field "${task_file}" "model_size_gb")
-        [[ -z "${required_mem}" ]] && required_mem=20
-
-        local required_gpus=$(get_task_field "${task_file}" "required_gpus")
-        if [[ -z "${required_gpus}" || "${required_gpus}" == "null" ]]; then
-            required_gpus=$(get_required_gpus "${required_mem}")
-        fi
-
-        # Get minimum viable GPUs for adaptive allocation
-        local min_gpus
-        min_gpus=$(get_minimum_gpus "${required_mem}")
-
-        # Count available GPUs
-        local total_available=0
-        for gid in $(seq 0 $((${NUM_GPUS:-8} - 1))); do
-            is_gpu_usable "${gid}" && total_available=$((total_available + 1))
-        done
-
-        # Determine GPU list and reserve GPUs
-        # ALL tasks reserve their GPUs to prevent conflicts
-        local gpu_list=""
-        local actual_gpus=${required_gpus}
-
-        if [[ ${required_gpus} -gt 1 ]]; then
-            gpu_list=$(get_available_gpus "${required_gpus}" "false" "${gpu_id}")
-
-            if [[ -z "${gpu_list}" ]]; then
-                # Try adaptive allocation if not enough optimal GPUs
-                if should_use_adaptive_gpus "${total_available}" "${required_gpus}" "${min_gpus}"; then
-                    actual_gpus=${total_available}
-                    [[ ${actual_gpus} -gt ${required_gpus} ]] && actual_gpus=${required_gpus}
-                    [[ ${actual_gpus} -lt ${min_gpus} ]] && break
-                    gpu_list=$(get_available_gpus "${actual_gpus}" "false" "${gpu_id}")
-                    [[ -z "${gpu_list}" ]] && break
-
-                    echo "[ADAPTIVE] Running ${task_id} with ${actual_gpus} GPUs instead of optimal ${required_gpus}" >&2
-                else
-                    break  # Not enough GPUs available
-                fi
-            fi
-        else
-            # Single-GPU task - use the worker's assigned GPU
-            gpu_list="${gpu_id}"
-            actual_gpus=1
-        fi
-
-        # Reserve GPUs for ALL tasks (both single and multi-GPU)
-        # This prevents multi-GPU tasks from trying to use a GPU
-        # that already has a single-GPU task running on it
-        if ! reserve_gpus "${task_id}" "${gpu_list}"; then
-            break  # Failed to reserve GPUs (GPU already in use)
-        fi
-
-        # Try to claim the task (atomic)
-        # IMPORTANT: claim_task expects a single GPU/worker id (integer), not a CSV list.
-        if claim_task "${task_id}" "${gpu_id}"; then
-            # Update task with assigned GPUs
-            local running_file="${QUEUE_DIR}/running/${task_id}.task"
-            if [[ -f "${running_file}" ]]; then
-                update_task_field "${running_file}" "assigned_gpus" "${gpu_list}"
-                update_task_field "${running_file}" "required_gpus" "${required_gpus}" "true"
-                # Track if we used adaptive allocation
-                if [[ ${actual_gpus} -lt ${required_gpus} ]]; then
-                    update_task_field "${running_file}" "adaptive_gpus" "${actual_gpus}" "true"
-                fi
-            fi
-            claimed_file="${running_file}"
-            result=0
-            break
-        fi
-
-        # Failed to claim - release reserved GPUs
-        release_gpus "${task_id}"
-        break
+    # Count available GPUs (under lock for consistency)
+    local total_available=0
+    for gid in $(list_gpu_ids); do
+        is_gpu_usable "${gid}" && total_available=$((total_available + 1))
     done
 
+    # Determine GPU list and reserve GPUs
+    local gpu_list=""
+    local actual_gpus=${required_gpus}
+
+    if [[ ${required_gpus} -gt 1 ]]; then
+        local per_gpu_required=0
+        if [[ "${required_mem}" =~ ^[0-9]+$ && ${required_gpus} -gt 0 ]]; then
+            per_gpu_required=$(( (required_mem + required_gpus - 1) / required_gpus ))
+        fi
+        gpu_list=$(get_available_gpus "${required_gpus}" "false" "${gpu_id}" "${per_gpu_required}")
+
+        if [[ -z "${gpu_list}" ]]; then
+            # Try adaptive allocation if not enough optimal GPUs
+            if should_use_adaptive_gpus "${total_available}" "${required_gpus}" "${min_gpus}"; then
+                actual_gpus=${total_available}
+                [[ ${actual_gpus} -gt ${required_gpus} ]] && actual_gpus=${required_gpus}
+                if [[ ${actual_gpus} -lt ${min_gpus} ]]; then
+                    release_scheduler_lock
+                    return 1
+                fi
+                if [[ ${actual_gpus} -gt 0 ]]; then
+                    per_gpu_required=$(( (required_mem + actual_gpus - 1) / actual_gpus ))
+                fi
+                gpu_list=$(get_available_gpus "${actual_gpus}" "false" "${gpu_id}" "${per_gpu_required}")
+                if [[ -z "${gpu_list}" ]]; then
+                    release_scheduler_lock
+                    return 1
+                fi
+                echo "[ADAPTIVE] Running ${task_id} with ${actual_gpus} GPUs instead of optimal ${required_gpus}" >&2
+            else
+                release_scheduler_lock
+                return 1  # Not enough GPUs available
+            fi
+        fi
+    else
+        # Single-GPU task - use the worker's assigned GPU
+        gpu_list="${gpu_id}"
+        actual_gpus=1
+    fi
+
+    # Reserve GPUs BEFORE releasing scheduler lock
+    if ! reserve_gpus "${task_id}" "${gpu_list}"; then
+        release_scheduler_lock
+        return 1  # Failed to reserve GPUs (GPU already in use)
+    fi
+
+    # Release scheduler lock BEFORE calling claim_task
+    # This breaks the nested lock pattern (scheduler lock → queue lock)
     release_scheduler_lock
+
+    # PHASE 3: Claim task (uses queue lock internally, but we no longer hold scheduler lock)
+    if claim_task "${task_id}" "${gpu_id}"; then
+        # Update task with assigned GPUs
+        local running_file="${QUEUE_DIR}/running/${task_id}.task"
+        if [[ -f "${running_file}" ]]; then
+            update_task_field "${running_file}" "assigned_gpus" "${gpu_list}"
+            update_task_field "${running_file}" "required_gpus" "${required_gpus}" "true"
+            # Track if we used adaptive allocation
+            if [[ ${actual_gpus} -lt ${required_gpus} ]]; then
+                update_task_field "${running_file}" "adaptive_gpus" "${actual_gpus}" "true"
+            fi
+        fi
+        claimed_file="${running_file}"
+        result=0
+    else
+        # Failed to claim - release reserved GPUs
+        release_gpus "${task_id}"
+    fi
 
     if [[ ${result} -eq 0 ]]; then
         echo "${claimed_file}"
@@ -975,10 +1402,10 @@ apply_work_stealing_boost() {
             local model=$(get_task_field "${task_file}" "model_name")
             # Skip tasks with empty model names (malformed)
             [[ -z "${model}" ]] && continue
-            model_total[${model}]=$((${model_total[${model}]:-0} + 1))
+            model_total["${model}"]=$((${model_total["${model}"]:-0} + 1))
 
             if [[ "${status}" == "completed" ]]; then
-                model_completion[${model}]=$((${model_completion[${model}]:-0} + 1))
+                model_completion["${model}"]=$((${model_completion["${model}"]:-0} + 1))
             fi
         done
     done
@@ -987,8 +1414,8 @@ apply_work_stealing_boost() {
     local total_models=0
     local total_rate=0
     for model in "${!model_total[@]}"; do
-        local completed=${model_completion[${model}]:-0}
-        local total=${model_total[${model}]}
+        local completed=${model_completion["${model}"]:-0}
+        local total=${model_total["${model}"]}
         if [[ ${total} -gt 0 ]]; then
             local rate=$((completed * 100 / total))
             total_rate=$((total_rate + rate))
@@ -1002,44 +1429,69 @@ apply_work_stealing_boost() {
 
     local avg_rate=$((total_rate / total_models))
 
-    # Boost models falling behind average
+    # Identify lagging models without holding the queue lock.
+    local -a lagging_models=()
     for model in "${!model_total[@]}"; do
         # Skip empty model names
         [[ -z "${model}" ]] && continue
-        local completed=${model_completion[${model}]:-0}
-        local total=${model_total[${model}]}
+        local completed=${model_completion["${model}"]:-0}
+        local total=${model_total["${model}"]}
         if [[ ${total} -gt 0 ]]; then
             local rate=$((completed * 100 / total))
-
             if [[ ${rate} -lt $((avg_rate - 10)) ]]; then
-                # Model is falling behind, boost its pending/ready tasks
-                echo "Boosting priority for lagging model: ${model} (${rate}% vs ${avg_rate}% avg)"
-
-                # Iterate directories separately to handle missing directories gracefully
-                for dir in "${QUEUE_DIR}/pending" "${QUEUE_DIR}/ready"; do
-                    [[ -d "${dir}" ]] || continue
-                    for task_file in "${dir}"/*.task; do
-                        [[ -f "${task_file}" ]] || continue
-
-                    local task_model=$(get_task_field "${task_file}" "model_name")
-                    if [[ "${task_model}" == "${model}" ]]; then
-                        local model_size=$(get_task_field "${task_file}" "model_size_gb")
-                        if [[ -n "${model_size}" && "${model_size}" -ge 120 ]]; then
-                            continue
-                        fi
-                        local current_priority=$(get_task_field "${task_file}" "priority")
-                        if [[ ${current_priority} -ge 95 ]]; then
-                            continue
-                        fi
-                        local boosted=$((current_priority + 15))
-                        [[ ${boosted} -gt 100 ]] && boosted=100
-                        update_task_field "${task_file}" "priority" "${boosted}" "true"
-                    fi
-                done
-            done
+                lagging_models+=("${model}")
+            fi
         fi
+    done
+
+    [[ ${#lagging_models[@]} -eq 0 ]] && return 0
+
+    # IMPORTANT: Acquire the queue lock while updating priorities to avoid racing
+    # with claim_task() moving ready->running. Without this lock, we could
+    # re-create a task file in ready/ after it was moved, causing double execution.
+    if ! acquire_queue_lock 1; then
+        return 0
     fi
-done
+
+    for model in "${lagging_models[@]}"; do
+        local completed=${model_completion["${model}"]:-0}
+        local total=${model_total["${model}"]:-0}
+        local rate=0
+        [[ ${total} -gt 0 ]] && rate=$((completed * 100 / total))
+
+        echo "Boosting priority for lagging model: ${model} (${rate}% vs ${avg_rate}% avg)"
+
+        for dir in "${QUEUE_DIR}/pending" "${QUEUE_DIR}/ready"; do
+            [[ -d "${dir}" ]] || continue
+            for task_file in "${dir}"/*.task; do
+                [[ -f "${task_file}" ]] || continue
+
+                local task_model
+                task_model=$(get_task_field "${task_file}" "model_name")
+                [[ "${task_model}" == "${model}" ]] || continue
+
+                # Don't boost very large tasks; they can monopolize GPUs.
+                local model_size
+                model_size=$(get_task_field "${task_file}" "model_size_gb")
+                if [[ -n "${model_size}" && "${model_size}" -ge 120 ]]; then
+                    continue
+                fi
+
+                local current_priority
+                current_priority=$(get_task_field "${task_file}" "priority")
+                [[ -z "${current_priority}" || "${current_priority}" == "null" ]] && current_priority=50
+                if [[ ${current_priority} -ge 95 ]]; then
+                    continue
+                fi
+
+                local boosted=$((current_priority + 15))
+                [[ ${boosted} -gt 100 ]] && boosted=100
+                update_task_field "${task_file}" "priority" "${boosted}" "true"
+            done
+        done
+    done
+
+    release_queue_lock
 }
 
 # ============ SCHEDULING METRICS ============
@@ -1073,7 +1525,7 @@ get_scheduling_stats() {
 
     # Get memory stats per GPU
     local gpu_mem_stats=""
-    for gpu_id in $(seq 0 $((${NUM_GPUS:-8} - 1))); do
+    for gpu_id in $(list_gpu_ids); do
         local free=$(get_gpu_available_memory "${gpu_id}")
         local total=$(get_gpu_total_memory "${gpu_id}")
         local used=$((total - free))
@@ -1095,7 +1547,7 @@ print_scheduling_report() {
 
     # GPU memory
     echo "=== GPU MEMORY ==="
-    for gpu_id in $(seq 0 $((${NUM_GPUS:-8} - 1))); do
+    for gpu_id in $(list_gpu_ids); do
         local free=$(get_gpu_available_memory "${gpu_id}")
         local total=$(get_gpu_total_memory "${gpu_id}")
         local util=$(get_gpu_utilization "${gpu_id}")

@@ -41,7 +41,9 @@ class HF_BERT_Adapter(HFAdapterMixin, ModelAdapter):
 
     name = "hf_bert"
 
-    def load_model(self, model_id: str, device: str = "auto") -> ModuleType | Any:
+    def load_model(
+        self, model_id: str, device: str = "auto", **kwargs: Any
+    ) -> ModuleType | Any:
         """
         Load a HuggingFace BERT model.
 
@@ -68,7 +70,7 @@ class HF_BERT_Adapter(HFAdapterMixin, ModelAdapter):
                 "MODEL-LOAD-FAILED: transformers AutoModelForMaskedLM",
                 lambda e: {"model_id": model_id},
             ):
-                model = AutoModelForMaskedLM.from_pretrained(model_id)
+                model = AutoModelForMaskedLM.from_pretrained(model_id, **kwargs)
         except Exception:
             with wrap_errors(
                 ModelLoadError,
@@ -76,10 +78,9 @@ class HF_BERT_Adapter(HFAdapterMixin, ModelAdapter):
                 "MODEL-LOAD-FAILED: transformers AutoModel",
                 lambda e: {"model_id": model_id},
             ):
-                model = AutoModel.from_pretrained(model_id)
+                model = AutoModel.from_pretrained(model_id, **kwargs)
 
-        target_device = self._resolve_device(device)
-        return model.to(target_device)
+        return self._safe_to_device(model, device)
 
     def can_handle(self, model: ModuleType | Any) -> bool:
         """

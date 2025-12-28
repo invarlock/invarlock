@@ -559,7 +559,9 @@ For automation loops see the
     is taken for retries. In `auto` (default), InvarLock estimates snapshot size and
     chooses bytes or chunked based on available RAM and disk. `bytes` keeps the
     snapshot in memory; `chunked` writes per-parameter files to disk to minimize
-    peak RAM.
+    peak RAM. If `bytes` snapshotting fails (e.g., due to memory pressure), the
+    CLI will attempt `chunked` snapshotting when the adapter supports it; otherwise
+    it falls back to reload-per-attempt.
   - `INVARLOCK_SNAPSHOT_AUTO_RAM_FRACTION` tunes the auto mode (default `0.4` →
     choose chunked when snapshot size ≥ 40% of available RAM).
   - `INVARLOCK_STORE_EVAL_WINDOWS=0` disables token/attention caching during eval,

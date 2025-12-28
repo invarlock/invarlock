@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # queue_manager.sh - File-based task queue with atomic operations
 # Version: v2.0.1 (InvarLock B200 Validation Suite)
-# Dependencies: task_serialization.sh, flock
+# Dependencies: task_serialization.sh, jq
 # Usage: sourced by gpu_worker.sh and scheduler to manage task lifecycle
 #
 # Provides functions to:
@@ -60,30 +60,62 @@ EOF
 
 # Acquire queue lock (blocking with timeout)
 # Usage: acquire_queue_lock [timeout_seconds]
+#
+# Uses mkdir-based locking which is atomic and avoids file descriptor
+# inheritance issues when workers are spawned as subshells.
 acquire_queue_lock() {
     local timeout="${1:-30}"
     local lock_file="${QUEUE_DIR}/queue.lock"
+    local lock_dir="${lock_file}.d"
+    local my_pid="${BASHPID:-$$}"
+    local deadline=$(($(date +%s) + timeout))
 
-    local fd
-    exec {fd}>"${lock_file}"
+    while true; do
+        # Try to create lock directory (atomic operation)
+        if mkdir "${lock_dir}" 2>/dev/null; then
+            # Successfully acquired lock - record owner
+            echo "${my_pid}" > "${lock_dir}/owner" 2>/dev/null || true
+            export QUEUE_LOCK_DIR="${lock_dir}"
+            return 0
+        fi
 
-    if flock -w "${timeout}" "${fd}"; then
-        # Store fd in global var for later release
-        export QUEUE_LOCK_FD="${fd}"
-        return 0
-    else
-        exec {fd}>&-
-        echo "ERROR: Failed to acquire queue lock after ${timeout}s" >&2
-        return 1
-    fi
+        # Check if we've exceeded timeout
+        local now=$(date +%s)
+        if [[ ${now} -ge ${deadline} ]]; then
+            echo "ERROR: Failed to acquire queue lock after ${timeout}s" >&2
+            return 1
+        fi
+
+        # Check for stale lock (owner process no longer exists)
+        local owner_pid=""
+        if [[ -f "${lock_dir}/owner" ]]; then
+            owner_pid=$(cat "${lock_dir}/owner" 2>/dev/null)
+        fi
+        if [[ -n "${owner_pid}" && ! -d "/proc/${owner_pid}" ]]; then
+            # Owner process is gone - remove stale lock
+            rm -rf "${lock_dir}" 2>/dev/null || true
+            continue
+        fi
+
+        # Brief sleep before retry (100ms)
+        sleep 0.1
+    done
 }
 
 # Release queue lock
 # Usage: release_queue_lock
 release_queue_lock() {
-    if [[ -n "${QUEUE_LOCK_FD:-}" ]]; then
-        exec {QUEUE_LOCK_FD}>&-
-        unset QUEUE_LOCK_FD
+    if [[ -n "${QUEUE_LOCK_DIR:-}" && -d "${QUEUE_LOCK_DIR}" ]]; then
+        # Verify we own the lock before releasing
+        local my_pid="${BASHPID:-$$}"
+        local owner_pid=""
+        if [[ -f "${QUEUE_LOCK_DIR}/owner" ]]; then
+            owner_pid=$(cat "${QUEUE_LOCK_DIR}/owner" 2>/dev/null)
+        fi
+        if [[ -z "${owner_pid}" || "${owner_pid}" == "${my_pid}" ]]; then
+            rm -rf "${QUEUE_LOCK_DIR}" 2>/dev/null || true
+        fi
+        unset QUEUE_LOCK_DIR
     fi
 }
 
@@ -393,6 +425,68 @@ check_dependencies_met() {
     return 0  # All dependencies completed
 }
 
+# Cancel tasks whose dependencies have permanently failed.
+# This prevents the queue from stalling forever when an upstream task fails.
+# Inspired by Slurm dependency semantics (dependent jobs do not start if parent fails).
+#
+# Usage: cancel_tasks_with_failed_dependencies [grace_seconds]
+# Returns: number of tasks moved pending->failed.
+cancel_tasks_with_failed_dependencies() {
+    local grace="${1:-${CANCEL_BLOCKED_TASKS_GRACE_SECONDS:-90}}"
+    local canceled=0
+
+    if ! [[ "${grace}" =~ ^[0-9]+$ ]]; then
+        grace=90
+    fi
+
+    acquire_queue_lock 10 || { echo "0"; return 0; }
+
+    for task_file in "${QUEUE_DIR}/pending"/*.task; do
+        [[ -f "${task_file}" ]] || continue
+
+        local -a deps=()
+        while IFS= read -r dep; do
+            [[ -n "${dep}" ]] && deps+=("${dep}")
+        done < <(get_task_dependencies "${task_file}")
+
+        [[ ${#deps[@]} -eq 0 ]] && continue
+
+        local -a failed_deps=()
+        for dep_id in "${deps[@]}"; do
+            local dep_file="${QUEUE_DIR}/failed/${dep_id}.task"
+            [[ -f "${dep_file}" ]] || continue
+
+            # Use mtime as the failure timestamp to avoid GNU date parsing assumptions.
+            local dep_mtime=""
+            dep_mtime=$(stat -c %Y "${dep_file}" 2>/dev/null || stat -f %m "${dep_file}" 2>/dev/null || echo "")
+            if [[ -z "${dep_mtime}" ]]; then
+                failed_deps+=("${dep_id}")
+                continue
+            fi
+            local dep_age=$(( $(date +%s) - dep_mtime ))
+            if [[ ${dep_age} -ge ${grace} ]]; then
+                failed_deps+=("${dep_id}")
+            fi
+        done
+
+        if [[ ${#failed_deps[@]} -gt 0 ]]; then
+            local msg
+            msg="Dependency failed: $(IFS=','; echo "${failed_deps[*]}")"
+            mark_task_failed "${task_file}" "${msg}" 2>/dev/null || true
+            mv "${task_file}" "${QUEUE_DIR}/failed/"
+            canceled=$((canceled + 1))
+        fi
+    done
+
+    release_queue_lock
+
+    if [[ ${canceled} -gt 0 ]]; then
+        update_progress_state 2>/dev/null || true
+    fi
+
+    echo "${canceled}"
+}
+
 # Resolve dependencies and move ready tasks from pending to ready
 # Usage: resolve_dependencies
 # Returns: number of tasks moved to ready
@@ -516,6 +610,75 @@ find_tasks_by_model() {
     done
 }
 
+# Refresh task memory estimates for any models with existing profiles.
+# Usage: refresh_task_memory_from_profiles <output_dir>
+refresh_task_memory_from_profiles() {
+    local output_dir="$1"
+
+    for model_dir in "${output_dir}"/*; do
+        [[ -d "${model_dir}" ]] || continue
+
+        local model_name
+        model_name=$(basename "${model_dir}")
+        local model_id=""
+        if [[ -f "${model_dir}/.model_id" ]]; then
+            model_id=$(cat "${model_dir}/.model_id" 2>/dev/null || true)
+        fi
+
+        update_model_task_memory "${model_name}" "${output_dir}" "${model_id}"
+    done
+}
+
+export_memory_plan() {
+    local output_dir="$1"
+    local plan_dir="${output_dir}/analysis"
+    local plan_file="${plan_dir}/memory_plan.csv"
+    local tmp_file="${plan_file}.tmp.$$"
+
+    mkdir -p "${plan_dir}"
+
+    local csv_escape
+    csv_escape() {
+        local val="$1"
+        val="${val//\"/\"\"}"
+        printf "\"%s\"" "${val}"
+    }
+
+    echo "task_id,status,task_type,model_name,model_id,model_size_gb,required_gpus,adaptive_gpus,assigned_gpus,priority" > "${tmp_file}"
+
+    local status
+    for status in pending ready running completed failed; do
+        [[ -d "${QUEUE_DIR}/${status}" ]] || continue
+        for task_file in "${QUEUE_DIR}/${status}"/*.task; do
+            [[ -f "${task_file}" ]] || continue
+
+            local task_id
+            local task_type
+            local model_name
+            local model_id
+            local model_size_gb
+            local required_gpus
+            local adaptive_gpus
+            local assigned_gpus
+            local priority
+
+            task_id=$(get_task_id "${task_file}")
+            task_type=$(get_task_type "${task_file}")
+            model_name=$(get_task_field "${task_file}" "model_name")
+            model_id=$(get_task_field "${task_file}" "model_id")
+            model_size_gb=$(get_task_field "${task_file}" "model_size_gb")
+            required_gpus=$(get_task_field "${task_file}" "required_gpus")
+            adaptive_gpus=$(get_task_field "${task_file}" "adaptive_gpus")
+            assigned_gpus=$(get_task_field "${task_file}" "assigned_gpus")
+            priority=$(get_task_field "${task_file}" "priority")
+
+            echo "$(csv_escape "${task_id}"),$(csv_escape "${status}"),$(csv_escape "${task_type}"),$(csv_escape "${model_name}"),$(csv_escape "${model_id}"),$(csv_escape "${model_size_gb}"),$(csv_escape "${required_gpus}"),$(csv_escape "${adaptive_gpus}"),$(csv_escape "${assigned_gpus}"),$(csv_escape "${priority}")" >> "${tmp_file}"
+        done
+    done
+
+    mv "${tmp_file}" "${plan_file}"
+}
+
 # Find tasks by type
 # Usage: find_tasks_by_type <task_type> [status]
 find_tasks_by_type() {
@@ -557,8 +720,12 @@ generate_model_tasks() {
     # so we disable CREATE_EDITS_BATCH for very large models and fall back
     # to legacy per-edit CREATE_EDIT tasks in that case.
     local use_batch="true"
-    if [[ -n "${base_size}" ]]; then
-        # For 70B+ models, EVAL_BASELINE estimate is ~180GB+ including margin.
+    local model_lower
+    model_lower=$(echo "${model_id}" | tr '[:upper:]' '[:lower:]')
+    if [[ "${model_lower}" =~ 70b || "${model_lower}" =~ 72b || "${model_lower}" =~ 65b || "${model_lower}" =~ mixtral || "${model_lower}" =~ 8x7b || "${model_lower}" =~ moe ]]; then
+        use_batch="false"
+    elif [[ -n "${base_size}" ]]; then
+        # For very large models, EVAL_BASELINE estimates can still be high.
         # Treat anything >=170GB as "large" and avoid batch edits.
         if [[ "${base_size}" -ge 170 ]]; then
             use_batch="false"
@@ -786,4 +953,217 @@ generate_all_tasks() {
 
     echo ""
     print_queue_stats
+}
+
+# Update task memory estimates for a model based on its on-disk profile.
+# Usage: update_model_task_memory <model_name> <output_dir> [model_id]
+update_model_task_memory() {
+    local model_name="$1"
+    local output_dir="$2"
+    local model_id="${3:-}"
+    local profile_path=""
+    local baseline_path_file="${output_dir}/${model_name}/.baseline_path"
+    local baseline_path=""
+
+    if [[ -f "${baseline_path_file}" ]]; then
+        baseline_path=$(cat "${baseline_path_file}" 2>/dev/null || true)
+        if [[ -n "${baseline_path}" ]]; then
+            profile_path="${baseline_path}/model_profile.json"
+        fi
+    fi
+
+    if [[ -z "${profile_path}" || ! -f "${profile_path}" ]]; then
+        profile_path="${output_dir}/${model_name}/models/baseline/model_profile.json"
+    fi
+
+    if [[ -n "${model_id}" && ( -z "${profile_path}" || ! -f "${profile_path}" ) ]]; then
+        local model_basename
+        model_basename=$(basename "${model_id}" | tr '[:upper:]' '[:lower:]' | tr '/' '_')
+        local model_sanitized
+        model_sanitized=$(echo "${model_id}" \
+            | tr '[:upper:]' '[:lower:]' \
+            | sed 's#/#__#g' \
+            | tr ' ' '_' \
+            | tr -cd '[:alnum:]_-')
+        local candidate
+        for candidate in \
+            "${output_dir}/models/${model_sanitized}/baseline/model_profile.json" \
+            "${output_dir}/models/${model_basename}/baseline/model_profile.json"; do
+            if [[ -f "${candidate}" ]]; then
+                profile_path="${candidate}"
+                break
+            fi
+        done
+    fi
+
+    [[ -f "${profile_path}" ]] || return 0
+
+    local queue_dirs=("${QUEUE_DIR}/pending" "${QUEUE_DIR}/ready")
+    for dir in "${queue_dirs[@]}"; do
+        for task_file in "${dir}"/*.task; do
+            [[ -f "${task_file}" ]] || continue
+            local task_model
+            task_model=$(get_task_field "${task_file}" "model_name")
+            [[ "${task_model}" == "${model_name}" ]] || continue
+
+            local task_type
+            task_type=$(get_task_type "${task_file}")
+
+            local result
+            result=$(TASK_TYPE="${task_type}" MODEL_ID="${model_id}" PROFILE_PATH="${profile_path}" \
+                EVAL_BATCH_SIZE_SMALL="${EVAL_BATCH_SIZE_SMALL:-auto:16}" \
+                EVAL_BATCH_SIZE_MEDIUM="${EVAL_BATCH_SIZE_MEDIUM:-auto:8}" \
+                EVAL_BATCH_SIZE_LARGE="${EVAL_BATCH_SIZE_LARGE:-auto:4}" \
+                EVAL_BATCH_SIZE_MOE="${EVAL_BATCH_SIZE_MOE:-auto:6}" \
+                EVAL_CONTEXT_LEN="${EVAL_CONTEXT_LEN:-2048}" \
+                MODEL_LOAD_OVERHEAD_GB="${MODEL_LOAD_OVERHEAD_GB:-4}" \
+                EDIT_OVERHEAD_GB="${EDIT_OVERHEAD_GB:-8}" \
+                BATCH_EDIT_OVERHEAD_GB="${BATCH_EDIT_OVERHEAD_GB:-8}" \
+                EVAL_OVERHEAD_GB="${EVAL_OVERHEAD_GB:-6}" \
+                INVARLOCK_OVERHEAD_GB="${INVARLOCK_OVERHEAD_GB:-6}" \
+                GPU_MEMORY_PER_DEVICE="${GPU_MEMORY_PER_DEVICE:-${GPU_MEMORY_GB:-180}}" \
+                NUM_GPUS="${NUM_GPUS:-8}" \
+                python3 - <<'PY'
+import json
+import math
+import os
+import re
+from pathlib import Path
+
+profile_path = Path(os.environ["PROFILE_PATH"])
+task_type = os.environ.get("TASK_TYPE", "")
+model_id = (os.environ.get("MODEL_ID") or "").lower()
+
+try:
+    profile = json.loads(profile_path.read_text())
+except Exception:
+    raise SystemExit(0)
+
+if not model_id:
+    model_id = str(profile.get("model_id", "")).lower()
+
+weights_gb = profile.get("weights_gb") or 0.0
+if not weights_gb:
+    weights_bytes = profile.get("weights_bytes") or 0
+    weights_gb = weights_bytes / (1024 ** 3) if weights_bytes else 0.0
+
+hidden_size = profile.get("hidden_size")
+num_layers = profile.get("num_layers")
+num_heads = profile.get("num_heads")
+num_kv_heads = profile.get("num_kv_heads") or num_heads
+max_pos = profile.get("max_position_embeddings")
+dtype_bytes = profile.get("dtype_bytes") or 2
+
+def parse_batch(val, default):
+    if not val:
+        return default
+    val = str(val).strip()
+    if val.startswith("auto:"):
+        try:
+            return int(val.split(":", 1)[1])
+        except Exception:
+            return default
+    try:
+        return int(val)
+    except Exception:
+        return default
+
+def size_category():
+    if any(t in model_id for t in ("mixtral", "moe", "8x7b")):
+        return "moe"
+    if weights_gb >= 120:
+        return "70"
+    if weights_gb >= 80:
+        return "40"
+    if weights_gb >= 60:
+        return "30"
+    if weights_gb >= 24:
+        return "13"
+    return "7"
+
+category = size_category()
+
+invarlock_cfg = {
+    "7":  (2048, 96),
+    "13": (1536, 64),
+    "30": (1024, 48),
+    "40": (1024, 32),
+    "moe": (1024, 24),
+    "70": (128, 2),
+}
+
+seq_len_invarlock, batch_invarlock = invarlock_cfg.get(category, (1024, 32))
+
+eval_batch = {
+    "moe": parse_batch(os.environ.get("EVAL_BATCH_SIZE_MOE"), 6),
+    "70": parse_batch(os.environ.get("EVAL_BATCH_SIZE_LARGE"), 4),
+    "40": parse_batch(os.environ.get("EVAL_BATCH_SIZE_MEDIUM"), 8),
+    "30": parse_batch(os.environ.get("EVAL_BATCH_SIZE_MEDIUM"), 8),
+    "13": parse_batch(os.environ.get("EVAL_BATCH_SIZE_SMALL"), 16),
+    "7":  parse_batch(os.environ.get("EVAL_BATCH_SIZE_SMALL"), 16),
+}.get(category, parse_batch(os.environ.get("EVAL_BATCH_SIZE_SMALL"), 16))
+
+eval_context = int(os.environ.get("EVAL_CONTEXT_LEN", "2048"))
+seq_len_eval = eval_context
+if isinstance(max_pos, int) and max_pos > 0:
+    seq_len_eval = min(eval_context, max_pos)
+
+def kv_cache_gb(batch, seq_len):
+    if not all(isinstance(x, int) and x > 0 for x in (hidden_size, num_layers, num_heads)):
+        return 0.0
+    kv_heads = num_kv_heads if isinstance(num_kv_heads, int) and num_kv_heads > 0 else num_heads
+    head_dim = hidden_size // num_heads if num_heads else 0
+    if head_dim == 0:
+        return 0.0
+    elems = 2 * num_layers * batch * seq_len * kv_heads * head_dim
+    return elems * dtype_bytes / (1024 ** 3)
+
+load_overhead = float(os.environ.get("MODEL_LOAD_OVERHEAD_GB", "4"))
+edit_overhead = float(os.environ.get("EDIT_OVERHEAD_GB", "8"))
+batch_overhead = float(os.environ.get("BATCH_EDIT_OVERHEAD_GB", "8"))
+eval_overhead = float(os.environ.get("EVAL_OVERHEAD_GB", "6"))
+inv_overhead = float(os.environ.get("INVARLOCK_OVERHEAD_GB", "6"))
+
+if task_type == "GENERATE_PRESET":
+    required = 5.0
+elif task_type == "SETUP_BASELINE":
+    required = weights_gb + load_overhead
+elif task_type == "CREATE_EDITS_BATCH":
+    required = (weights_gb * 2.0) + batch_overhead
+elif task_type in ("CREATE_EDIT", "CREATE_ERROR"):
+    required = weights_gb + edit_overhead
+elif task_type in ("EVAL_BASELINE", "EVAL_EDIT", "EVAL_MMLU", "EVAL_HELLASWAG", "EVAL_ARC", "EVAL_WINOGRANDE"):
+    required = weights_gb + kv_cache_gb(eval_batch, seq_len_eval) + eval_overhead
+elif task_type in ("CALIBRATION_RUN", "CERTIFY_EDIT", "CERTIFY_ERROR"):
+    required = weights_gb + kv_cache_gb(batch_invarlock, seq_len_invarlock) + inv_overhead
+else:
+    required = weights_gb + eval_overhead
+
+per_device = int(os.environ.get("GPU_MEMORY_PER_DEVICE", "180"))
+max_gpus = int(os.environ.get("NUM_GPUS", "8"))
+required_mem = int(math.ceil(required))
+required_gpus = max(1, int(math.ceil(required_mem / per_device)))
+if max_gpus > 0:
+    required_gpus = min(required_gpus, max_gpus)
+
+print(f"{required_mem} {required_gpus}")
+PY
+            )
+
+            local required_mem=""
+            local required_gpus=""
+            read -r required_mem required_gpus <<< "${result}"
+
+            if [[ -n "${required_mem}" && "${required_mem}" =~ ^[0-9]+$ ]]; then
+                update_task_field "${task_file}" "model_size_gb" "${required_mem}" "true" 2>/dev/null || true
+            fi
+            if [[ -n "${required_gpus}" && "${required_gpus}" =~ ^[0-9]+$ ]]; then
+                update_task_field "${task_file}" "required_gpus" "${required_gpus}" "true" 2>/dev/null || true
+            fi
+        done
+    done
+
+    if type export_memory_plan &>/dev/null; then
+        export_memory_plan "${output_dir}"
+    fi
 }

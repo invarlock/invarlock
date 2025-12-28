@@ -250,6 +250,7 @@ def test_retry_summary_prints_and_snapshot_cleanup(tmp_path: Path, monkeypatch):
                 "ppl_ratio": 1.0,
                 "window_overlap_fraction": 0.0,
                 "window_match_fraction": 1.0,
+                "paired_windows": 1,
             },
             guards={},
             context={"dataset_meta": {}},
@@ -272,7 +273,7 @@ def test_retry_summary_prints_and_snapshot_cleanup(tmp_path: Path, monkeypatch):
     baseline.write_text(
         json.dumps(
             {
-                "meta": {},
+                "meta": {"tokenizer_hash": "tokhash123"},
                 "metrics": {},
                 "evaluation_windows": {
                     "preview": {"input_ids": [[1, 2]]},

@@ -44,6 +44,13 @@ dataset:
 
 > Use the same `dataset` section for both baseline and edited runs; pass
 > `--baseline <baseline report.json>` on the edit run to pair windows.
+>
+> Baseline pairing is evidence-based: the baseline `report.json` must preserve
+> `evaluation_windows` (tokenized window inputs/masks + stable window IDs). In
+> `--profile ci` / `--profile release`, `--baseline` fails closed with
+> `[INVARLOCK:E001]` if the baseline is missing or has invalid window evidence.
+> In dev profile, InvarLock may fall back to an unpaired schedule with a loud
+> warning.
 
 Inspect providers through the library API:
 
@@ -112,6 +119,7 @@ Then move the HF cache directory to your offline machine (or set
 
 - INVARLOCK_CAPACITY_FAST=1 — approximate capacity estimator that skips the full
   capacity/dedupe pass to speed up pilots and smoke tests.
+  This is intended for experiments and quick checks, not certification runs.
 
   Example:
 

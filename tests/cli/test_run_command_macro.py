@@ -164,7 +164,7 @@ def _write_baseline(path: Path, preview: int = 1, final: int = 1) -> Path:
             },
             "final": {
                 "input_ids": [[1] * 4 for _ in range(final)],
-                "window_ids": list(range(final)),
+                "window_ids": list(range(preview, preview + final)),
             },
         },
         "data": {

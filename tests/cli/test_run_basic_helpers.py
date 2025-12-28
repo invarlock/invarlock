@@ -31,6 +31,26 @@ def test_choose_dataset_split_variants():
     )
 
 
+def test_resolve_pm_acceptance_range_missing_min_uses_default(monkeypatch):
+    monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MIN", raising=False)
+    monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MAX", raising=False)
+
+    out = run_mod._resolve_pm_acceptance_range(
+        {"primary_metric": {"acceptance_range": {"max": 1.2}}}
+    )
+    assert out == {"min": 0.95, "max": 1.2}
+
+
+def test_resolve_pm_acceptance_range_missing_max_uses_default(monkeypatch):
+    monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MIN", raising=False)
+    monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MAX", raising=False)
+
+    out = run_mod._resolve_pm_acceptance_range(
+        {"primary_metric": {"acceptance_range": {"min": 0.9}}}
+    )
+    assert out == {"min": 0.9, "max": 1.1}
+
+
 def test_persist_ref_masks_roundtrip(tmp_path):
     assert run_mod._persist_ref_masks({}, tmp_path) is None
     payload = {
@@ -544,8 +564,16 @@ def test_validate_and_harvest_baseline_schedule_counts_adjust():
         dataset=SimpleNamespace(seq_len=128, stride=64, preview_n=5, final_n=5)
     )
     pairing = {
-        "preview": {"input_ids": [[1, 2], [3, 4]]},
-        "final": {"input_ids": [[5, 6]]},
+        "preview": {
+            "window_ids": [0, 1],
+            "input_ids": [[1, 2], [3, 4]],
+            "attention_masks": [[1, 1], [1, 1]],
+        },
+        "final": {
+            "window_ids": [2],
+            "input_ids": [[5, 6]],
+            "attention_masks": [[1, 1]],
+        },
     }
     baseline = {"data": {"seq_len": 128, "stride": 64, "dataset": "wikitext2"}}
 
@@ -593,15 +621,15 @@ def test_extract_pairing_schedule_success():
     report = {
         "evaluation_windows": {
             "preview": {
-                "window_ids": ["p1"],
+                "window_ids": [0],
                 "input_ids": [[1, 2, 3]],
-                "attention_masks": [[1, 1]],
+                "attention_masks": [[1, 1, 1]],
                 "labels": [[9, 9]],
                 "masked_token_counts": [2],
                 "actual_token_counts": [3],
             },
             "final": {
-                "window_ids": ["f1"],
+                "window_ids": [1],
                 "input_ids": [[4, 5]],
                 "attention_masks": [[1, 0]],
             },
@@ -609,7 +637,7 @@ def test_extract_pairing_schedule_success():
     }
     schedule = run_mod._extract_pairing_schedule(report)
     assert schedule is not None
-    assert schedule["preview"]["window_ids"] == ["p1"]
+    assert schedule["preview"]["window_ids"] == [0]
     assert schedule["preview"]["masked_token_counts"] == [2]
     assert schedule["preview"]["actual_token_counts"] == [3]
     # Labels padded to match input length
@@ -626,12 +654,12 @@ def test_extract_pairing_schedule_defaults_and_truncation():
     report = {
         "evaluation_windows": {
             "preview": {
-                "window_ids": ["p"],
+                "window_ids": [0],
                 "input_ids": [[1, 0]],
                 "labels": [[9, 8, 7]],
             },
             "final": {
-                "window_ids": ["f"],
+                "window_ids": [1],
                 "input_ids": [[4, 5]],
             },
         }
@@ -640,6 +668,145 @@ def test_extract_pairing_schedule_defaults_and_truncation():
     assert schedule is not None
     assert schedule["final"]["attention_masks"][0] == [1, 1]
     assert schedule["preview"]["labels"][0] == [9, 8]
+
+
+def test_extract_pairing_schedule_autofills_ids_masks_and_wraps_scalars():
+    report = {
+        "evaluation_windows": {
+            "preview": {
+                "input_ids": [[1, 2, 0]],
+                "labels": [100, -100, -100],
+                "masked_token_counts": 2,
+                "actual_token_counts": 3,
+            },
+            "final": {
+                "input_ids": [[3, 4]],
+                "attention_masks": [1, 1],
+            },
+        }
+    }
+
+    schedule = run_mod._extract_pairing_schedule(report)
+    assert schedule is not None
+    assert schedule["preview"]["window_ids"] == [0]
+    assert schedule["final"]["window_ids"] == [1]
+    assert schedule["preview"]["attention_masks"] == [[1, 1, 0]]
+    assert schedule["final"]["attention_masks"] == [[1, 1]]
+    assert schedule["preview"]["labels"] == [[100, -100, -100]]
+    assert schedule["preview"]["masked_token_counts"] == [2]
+    assert schedule["preview"]["actual_token_counts"] == [3]
+
+
+def test_extract_pairing_schedule_rejects_window_id_length_mismatch():
+    report = {
+        "evaluation_windows": {
+            "preview": {"window_ids": [0, 1], "input_ids": [[1, 2, 3]]},
+            "final": {"window_ids": [2], "input_ids": [[4, 5, 6]]},
+        }
+    }
+    assert run_mod._extract_pairing_schedule(report) is None
+
+
+def test_extract_pairing_schedule_rejects_empty_input_ids():
+    report = {
+        "evaluation_windows": {
+            "preview": {"input_ids": []},
+            "final": {"input_ids": [[1, 2, 3]]},
+        }
+    }
+    assert run_mod._extract_pairing_schedule(report) is None
+
+
+def test_extract_pairing_schedule_falls_back_for_non_2d_attention_masks():
+    report = {
+        "evaluation_windows": {
+            "preview": {
+                "input_ids": [[1, 0], [2, 3]],
+                "attention_masks": [1, 1],
+            },
+            "final": {"input_ids": [[4, 0]]},
+        }
+    }
+
+    schedule = run_mod._extract_pairing_schedule(report)
+    assert schedule is not None
+    assert schedule["preview"]["attention_masks"] == [[1, 0], [1, 1]]
+    assert schedule["final"]["attention_masks"] == [[1, 0]]
+
+
+def test_extract_pairing_schedule_rejects_attention_mask_row_count_mismatch():
+    report = {
+        "evaluation_windows": {
+            "preview": {
+                "input_ids": [[1, 2], [3, 4]],
+                "attention_masks": [[1, 1]],
+            },
+            "final": {"input_ids": [[5, 6]]},
+        }
+    }
+    assert run_mod._extract_pairing_schedule(report) is None
+
+
+def test_extract_pairing_schedule_rejects_attention_mask_token_length_mismatch():
+    report = {
+        "evaluation_windows": {
+            "preview": {
+                "input_ids": [[1, 2], [3, 4]],
+                "attention_masks": [[1, 1], [1]],
+            },
+            "final": {"input_ids": [[5, 6]]},
+        }
+    }
+    assert run_mod._extract_pairing_schedule(report) is None
+
+
+def test_extract_pairing_schedule_rejects_labels_row_count_mismatch():
+    report = {
+        "evaluation_windows": {
+            "preview": {
+                "input_ids": [[1, 2], [3, 4]],
+                "labels": [[-100, -100]],
+            },
+            "final": {"input_ids": [[5, 6]]},
+        }
+    }
+    assert run_mod._extract_pairing_schedule(report) is None
+
+
+def test_extract_pairing_schedule_rejects_masked_token_counts_row_count_mismatch():
+    report = {
+        "evaluation_windows": {
+            "preview": {
+                "input_ids": [[1, 2], [3, 4]],
+                "masked_token_counts": [0],
+            },
+            "final": {"input_ids": [[5, 6]]},
+        }
+    }
+    assert run_mod._extract_pairing_schedule(report) is None
+
+
+def test_extract_pairing_schedule_rejects_actual_token_counts_row_count_mismatch():
+    report = {
+        "evaluation_windows": {
+            "preview": {
+                "input_ids": [[1, 2], [3, 4]],
+                "actual_token_counts": [2],
+            },
+            "final": {"input_ids": [[5, 6]]},
+        }
+    }
+    assert run_mod._extract_pairing_schedule(report) is None
+
+
+def test_extract_pairing_schedule_rejects_missing_final_section():
+    report = {
+        "evaluation_windows": {
+            "preview": {"input_ids": [[1, 2, 3]]},
+            "final": {},
+        }
+    }
+    assert run_mod._extract_pairing_schedule(report) is None
 
 
 def test_resolve_device_invalid(monkeypatch):
@@ -806,16 +973,16 @@ def test_enforce_provider_parity_missing_digest_raises():
 
 
 def test_enforce_provider_parity_tokenizer_mismatch():
-    subject = {"tokenizer_sha256": "abc"}
-    baseline = {"tokenizer_sha256": "xyz"}
+    subject = {"ids_sha256": "ids", "tokenizer_sha256": "abc"}
+    baseline = {"ids_sha256": "ids", "tokenizer_sha256": "xyz"}
     with pytest.raises(run_mod.InvarlockError) as exc:
         run_mod._enforce_provider_parity(subject, baseline, profile="release")
     assert exc.value.code == "E002"
 
 
 def test_enforce_provider_parity_mask_mismatch():
-    subject = {"tokenizer_sha256": "abc", "masking_sha256": "mask1"}
-    baseline = {"tokenizer_sha256": "abc", "masking_sha256": "mask2"}
+    subject = {"ids_sha256": "ids", "tokenizer_sha256": "abc", "masking_sha256": "m1"}
+    baseline = {"ids_sha256": "ids", "tokenizer_sha256": "abc", "masking_sha256": "m2"}
     with pytest.raises(run_mod.InvarlockError) as exc:
         run_mod._enforce_provider_parity(subject, baseline, profile="ci")
     assert exc.value.code == "E003"
@@ -833,8 +1000,16 @@ def test_validate_harvest_schedule_seq_stride_mismatch(monkeypatch):
         )
     )
     pairing = {
-        "preview": {"input_ids": [[0, 1]], "window_ids": [0]},
-        "final": {"input_ids": [[2, 3]], "window_ids": [1]},
+        "preview": {
+            "input_ids": [[0, 1]],
+            "window_ids": [0],
+            "attention_masks": [[1, 1]],
+        },
+        "final": {
+            "input_ids": [[2, 3]],
+            "window_ids": [1],
+            "attention_masks": [[1, 1]],
+        },
     }
     baseline = {
         "data": {
@@ -869,8 +1044,16 @@ def test_validate_harvest_schedule_count_adjust(monkeypatch):
         )
     )
     pairing = {
-        "preview": {"input_ids": [[0, 1]], "window_ids": [0]},
-        "final": {"input_ids": [[2, 3]], "window_ids": [1]},
+        "preview": {
+            "input_ids": [[0, 1]],
+            "window_ids": [0],
+            "attention_masks": [[1, 1]],
+        },
+        "final": {
+            "input_ids": [[2, 3]],
+            "window_ids": [1],
+            "attention_masks": [[1, 1]],
+        },
     }
     baseline = {
         "data": {
@@ -999,6 +1182,87 @@ def test_run_bare_control_mlm_branch(monkeypatch):
     assert isinstance(payload, dict) and payload.get("source") == "dev_profile"
 
 
+def test_run_bare_control_frees_private_reload_model(monkeypatch):
+    events: list[tuple[str, object | None]] = []
+    private_model = object()
+    shared_model = object()
+
+    class DummyRunner:
+        def execute(self, **kwargs):  # noqa: D401, ARG002
+            events.append(("execute", kwargs.get("model")))
+            return {
+                "status": "ok",
+                "metrics": {"primary_metric": {"preview": 1.0, "final": 1.0}},
+            }
+
+    monkeypatch.setattr(
+        "invarlock.core.runner.CoreRunner", lambda: DummyRunner(), raising=False
+    )
+    monkeypatch.setattr(
+        run_mod, "_extract_pm_snapshot_for_overhead", lambda *a, **k: {}
+    )
+
+    def _load_model_with_cfg(adapter, cfg, device):  # noqa: ARG001
+        events.append(("load", None))
+        return private_model
+
+    monkeypatch.setattr(run_mod, "_load_model_with_cfg", _load_model_with_cfg)
+    monkeypatch.setattr(
+        run_mod, "_free_model_memory", lambda m: events.append(("free", m))
+    )
+
+    run_mod._run_bare_control(
+        adapter=SimpleNamespace(),
+        edit_op=SimpleNamespace(name="noop"),
+        cfg=SimpleNamespace(model=SimpleNamespace(id="dummy")),
+        model=None,
+        run_config=SimpleNamespace(context={}),
+        calibration_data=[],
+        auto_config={},
+        edit_config={},
+        preview_count=1,
+        final_count=1,
+        seed_bundle={"python": 0, "numpy": 0, "torch": None},
+        resolved_device="cpu",
+        restore_fn=None,
+        console=Console(file=io.StringIO()),
+        resolved_loss_type="causal",
+        profile_normalized="ci",
+    )
+
+    assert [e[0] for e in events].count("free") == 1
+    assert events.index(("execute", private_model)) < events.index(
+        ("free", private_model)
+    )
+
+    events.clear()
+    monkeypatch.setattr(
+        run_mod,
+        "_load_model_with_cfg",
+        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("unexpected load")),
+    )
+    run_mod._run_bare_control(
+        adapter=SimpleNamespace(),
+        edit_op=SimpleNamespace(name="noop"),
+        cfg=SimpleNamespace(model=SimpleNamespace(id="dummy")),
+        model=shared_model,
+        run_config=SimpleNamespace(context={}),
+        calibration_data=[],
+        auto_config={},
+        edit_config={},
+        preview_count=1,
+        final_count=1,
+        seed_bundle={"python": 0, "numpy": 0, "torch": None},
+        resolved_device="cpu",
+        restore_fn=lambda: events.append(("restore", None)),
+        console=Console(file=io.StringIO()),
+        resolved_loss_type="causal",
+        profile_normalized="ci",
+    )
+    assert ("execute", shared_model) in events
+    assert not any(kind == "free" for kind, _ in events)
+
+
 def test_compute_provider_digest_paths():
     # None cases: missing windows or wrong types
     assert run_mod._compute_provider_digest({}) is None
@@ -1026,6 +1290,35 @@ def test_compute_provider_digest_data_tokenizer_fallback():
     }
     digest = run_mod._compute_provider_digest(report)
     assert digest and digest.get("tokenizer_sha256") == "xyz"
+
+
+def test_compute_provider_digest_int_ids_no_masking():
+    from invarlock.utils.digest import hash_json
+
+    report = {
+        "evaluation_windows": {
+            "preview": {"window_ids": [0, 1]},
+            "final": {"window_ids": [2]},
+        },
+        "meta": {"tokenizer_hash": "tok"},
+    }
+    digest = run_mod._compute_provider_digest(report)
+    assert digest is not None
+    assert digest.get("ids_sha256") == hash_json([0, 1, 2])
+    assert digest.get("tokenizer_sha256") == "tok"
+    assert "masking_sha256" not in digest
+
+
+def test_compute_provider_digest_no_window_ids_returns_tokenizer_only():
+    report = {
+        "evaluation_windows": {
+            "preview": {"labels": [[-100, -100]]},
+            "final": {"labels": [[-100]]},
+        },
+        "data": {"tokenizer_hash": "tok"},
+    }
+    digest = run_mod._compute_provider_digest(report)
+    assert digest == {"tokenizer_sha256": "tok"}
 
 
 def test_run_bare_control_passes_edit_op_to_core_runner(monkeypatch):

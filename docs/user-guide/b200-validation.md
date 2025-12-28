@@ -1,6 +1,6 @@
 # B200 Validation Suite
 
-The InvarLock B200 Validation Suite (`scripts/invarlock_definitive_validation_b200.sh`) is a comprehensive validation harness optimized for 8x NVIDIA B200 180GB SXM6 GPUs. It validates InvarLock's edit detection capabilities across a diverse model suite spanning 7B to 72B parameters.
+The InvarLock B200 Validation Suite (`scripts/b200_validation_suite.sh`) is a comprehensive validation harness optimized for 8x NVIDIA B200 180GB SXM6 GPUs. It validates InvarLock's edit detection capabilities across a diverse model suite spanning 7B to 72B parameters.
 
 ## Overview
 
@@ -10,20 +10,22 @@ The InvarLock B200 Validation Suite (`scripts/invarlock_definitive_validation_b2
 | **Hardware** | 8× NVIDIA B200 180GB SXM6 (~4.5 TB/s bandwidth, ~2250 FP16 TFLOPS) |
 | **Models** | 8 public models (7B–72B), no HuggingFace login required |
 | **Edit Types** | 4 types × 2 versions (clean + stress) = 8 edits per model |
-| **Scheduling** | Dynamic work-stealing with multi-GPU model distribution |
-| **Multi-GPU** | 4 GPUs for 70B+, 2 GPUs for medium/MoE, 1 GPU for small models |
+| **Scheduling** | Dynamic work-stealing with profile-based multi-GPU reservations |
+| **Multi-GPU** | Profile-based planning; tasks scale to 2+ GPUs only when required memory exceeds per-GPU capacity |
 | **Version** | v2.1.0-b200 |
 
 ## Quick Start
 
 ```bash
 # Run validation suite
-./scripts/invarlock_definitive_validation_b200.sh
+./scripts/b200_validation_suite.sh
 
 # Resume a failed or interrupted run
 OUTPUT_DIR=./invarlock_validation_b200_20241208_123456 \
-  ./scripts/invarlock_definitive_validation_b200.sh --resume
+  ./scripts/b200_validation_suite.sh --resume
 ```
+
+On a fresh B200 node, you can bootstrap dependencies and run the suite via `scripts/b200_bootstrap_and_validate.sh`.
 
 ## Hardware Target
 
@@ -134,8 +136,8 @@ Priority Queue (higher = runs first)
 
 **Why small_first works**:
 - Small tasks (1 GPU) complete quickly → GPUs free up → more parallelism
-- When only large tasks remain, GPUs group up to run 70B+ models
-- Prevents deadlock where 70B tasks wait for 4 GPUs while small tasks wait
+- Large tasks scale to multiple GPUs only when the profile-based planner says they cannot fit
+- Scheduler avoids nested lock contention and cleans stale GPU reservations automatically
 Note: Priority values are illustrative; dynamic boosts and caps apply in `scheduler.sh`.
 
 ### Dynamic Scheduling
@@ -152,7 +154,7 @@ Work-stealing enabled scheduler that maximizes GPU utilization:
            ▼                   ▼                   ▼
     ┌─────────────┐    ┌──────────────┐    ┌─────────────┐
     │ init_queue  │    │generate_tasks│    │launch_workers
-    │ (dirs)      │    │(~54-71/model)│    │ (8 GPUs)    │
+    │ (dirs)      │    │(~54-71/model)│    │ (N GPUs)    │
     └──────┬──────┘    └──────┬───────┘    └──────┬──────┘
            │                  │                   │
            └────────┬─────────┘                   │
@@ -169,7 +171,7 @@ Work-stealing enabled scheduler that maximizes GPU utilization:
     ┌───────────────┼───────────────────────────────┐
     ▼               ▼               ▼               ▼
 ┌───────┐       ┌───────┐       ┌───────┐       ┌───────┐
-│GPU 0  │       │GPU 1  │  ...  │GPU 6  │       │GPU 7  │
+│GPU id │       │GPU id │  ...  │GPU id │       │GPU id │
 │Worker │       │Worker │       │Worker │       │Worker │
 └───────┘       └───────┘       └───────┘       └───────┘
 ```
@@ -179,73 +181,53 @@ Work-stealing enabled scheduler that maximizes GPU utilization:
 - Idle GPUs automatically grab pending work
 - Memory-aware task selection (tasks only claimed if they fit in GPU memory)
 - Automatic dependency resolution (calibration must complete before certify)
+- Dependency-failure propagation (dependents fail instead of stalling the queue)
+- Worker heartbeat monitoring with automatic restart and orphan reclaim
 - Priority boosting to prevent task starvation
 
 ## Multi-GPU Model Distribution
 
-Large models benefit from tensor parallelism across multiple GPUs. The scheduler automatically assigns GPUs based on model memory requirements:
+The B200 suite uses **profile-based memory planning**. After each baseline download,
+it writes `model_profile.json` (weights + config) and recalculates per-task memory.
+Tasks reserve a single GPU when the computed peak fits within `GPU_MEMORY_PER_DEVICE`;
+they automatically scale to 2+ GPUs only when the profile says they cannot fit.
 
-| Model Size | Optimal GPUs | Min GPUs | Memory Range | Examples |
-|------------|--------------|----------|--------------|----------|
-| Small (7B-14B) | 1 | 1 | <60 GB | Mistral-7B, Llama-2-13B, Qwen2.5-14B |
-| Medium (30B-40B) | 2 | 1 | 60-120 GB | Qwen2.5-32B, Yi-34B |
-| MoE | 2 | 1 | ~90 GB | Mixtral-8x7B |
-| Large (70B+) | 4 | 2 | ≥120 GB | Llama-2-70B, Qwen1.5-72B |
+| Model Size | Auto GPUs | When It Scales | Examples |
+|------------|-----------|----------------|----------|
+| Small (7B-14B) | 1 | Rare (only if overheads push >180GB) | Mistral-7B, Llama-2-13B, Qwen2.5-14B |
+| Medium (30B-40B) | 1 | If edits/evaluations exceed 180GB | Qwen2.5-32B, Yi-34B |
+| MoE | 1 | If deep-copy edits or large overheads exceed 180GB | Mixtral-8x7B |
+| Large (70B+) | 1 | If profile + task overhead exceed 180GB | Llama-2-70B, Qwen1.5-72B |
 
 ### GPU-to-Model Mapping Visualization
 
-```
-8× B200 GPUs (180GB each) → Model Category Assignment
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Small Models (1 GPU each):          Can run independently
-┌──────┐ ┌──────┐ ┌──────┐
-│ GPU  │ │ GPU  │ │ GPU  │         3 small tasks
-│ 7B   │ │ 13B  │ │ 14B  │         can run in parallel
-└──────┘ └──────┘ └──────┘
-
-Medium/MoE Models (2 GPUs each):    Paired execution
-┌──────┬──────┐ ┌──────┬──────┐
-│ GPU  │ GPU  │ │ GPU  │ GPU  │   2 medium tasks
-│  32B model  │ │  34B or MoE │   can run in parallel
-└──────┴──────┘ └──────┴──────┘
-
-Large Models (4 GPUs each):         Grouped execution
-┌──────┬──────┬──────┬──────┐
-│ GPU  │ GPU  │ GPU  │ GPU  │     1 large task
-│       70B or 72B model    │     occupies half the GPUs
-└──────┴──────┴──────┴──────┘
-
-Maximum Parallelism Scenarios:
-• 8 small tasks (1 GPU × 8)
-• 4 medium tasks (2 GPUs × 4)
-• 2 large tasks (4 GPUs × 2)
-• 1 large + 2 medium tasks (4 + 2 + 2 = 8 GPUs)
-• 1 large + 4 small tasks (4 + 1 + 1 + 1 + 1 = 8 GPUs)
-```
+With profile-based reservations, any available GPU can run tasks that fit.
+When a task needs more memory, the scheduler reserves multiple GPUs and relies
+on `device_map="auto"` sharding in adapters.
 
 ### GPU Reservation Protection
 
-When a large model task is claimed, the scheduler reserves all required GPUs to prevent conflicts:
+When a task is claimed, the scheduler reserves the required GPUs to prevent conflicts:
 
 ```
-Task: llama-2-70b_EVAL_BASELINE requires 4 GPUs
+Task: llama-2-70b_EVAL_BASELINE requires 1 GPU
+Example shown for an 8-GPU node (GPU_ID_LIST=0,1,2,3,4,5,6,7)
 
   ┌─────────────────────────────────────────────────────────┐
   │                GPU Reservation State                     │
   ├───────┬───────┬───────┬───────┬───────┬───────┬───────┬───────┤
   │ GPU 0 │ GPU 1 │ GPU 2 │ GPU 3 │ GPU 4 │ GPU 5 │ GPU 6 │ GPU 7 │
   ├───────┼───────┼───────┼───────┼───────┼───────┼───────┼───────┤
-  │ FREE  │ FREE  │ RSVD  │ RSVD  │ RSVD  │ RSVD  │ FREE  │ FREE  │
-  │       │       │  ▲    │  ▲    │  ▲    │  ▲    │       │       │
-  └───────┴───────┴───┼───┴───┼───┴───┼───┴───┼───┴───────┴───────┘
-                      └───────┴───────┴───────┘
-                        Reserved for llama-2-70b task
+  │ FREE  │ RSVD  │ FREE  │ FREE  │ FREE  │ FREE  │ FREE  │ FREE  │
+  │       │  ▲    │       │       │       │       │       │       │
+  └───────┴───┼───┴───────┴───────┴───────┴───────┴───────┴───────┘
+              └───────┘
+        Reserved for llama-2-70b task
 ```
 
 **Reservation Flow**:
 
-1. Task enters READY queue with `required_gpus` field set (1, 2, or 4)
+1. Task enters READY queue with `required_gpus` field set (default 1; higher when the memory plan requires it)
 2. Worker acquires the scheduler lock and calls `find_and_claim_task()` to select + reserve GPUs
 3. `reserve_gpus()` writes per-GPU lock files (serialized by the scheduler lock)
 4. Task executes with `CUDA_VISIBLE_DEVICES` set to all assigned GPUs
@@ -256,11 +238,8 @@ Task: llama-2-70b_EVAL_BASELINE requires 4 GPUs
 ```
 queue/scheduler.lock
 workers/gpu_reservations/
-├── gpu_2.lock          # Contains: "llama-2-70b_EVAL_BASELINE_001"
-├── gpu_3.lock          # Contains: "llama-2-70b_EVAL_BASELINE_001"
-├── gpu_4.lock          # Contains: "llama-2-70b_EVAL_BASELINE_001"
-├── gpu_5.lock          # Contains: "llama-2-70b_EVAL_BASELINE_001"
-└── task_llama-2-70b_EVAL_BASELINE_001.gpus  # Contains: "2,3,4,5"
+├── gpu_1.lock          # Contains: "llama-2-70b_EVAL_BASELINE_001"
+└── task_llama-2-70b_EVAL_BASELINE_001.gpus  # Contains: "1"
 queue/running/llama-2-70b_EVAL_BASELINE_001.pid
 ```
 
@@ -274,42 +253,10 @@ Reservations are automatically cleaned up when:
 
 ### Adaptive GPU Allocation
 
-When small model tasks complete and only large model tasks remain, GPUs may sit idle if the exact number of required GPUs isn't available. **Adaptive allocation** solves this by allowing large models to run on fewer GPUs when no other work is pending:
-
-```
-Scenario: 3 GPUs free, only 70B model tasks (normally need 4 GPUs) remaining
-
-Without adaptive allocation:
-  GPU 0: IDLE (waiting for 4th GPU)
-  GPU 1: IDLE (waiting for 4th GPU)
-  GPU 2: IDLE (waiting for 4th GPU)
-  GPU 3: BUSY (running other task)
-  → 3 GPUs wasted waiting
-
-With adaptive allocation:
-  GPU 0: llama-2-70b_CERTIFY_001 ─┐
-  GPU 1: llama-2-70b_CERTIFY_001 ─┼─ 3-GPU tensor parallel
-  GPU 2: llama-2-70b_CERTIFY_001 ─┘
-  GPU 3: BUSY (other task)
-  → Zero idle time
-```
-
-**When adaptive allocation triggers**:
-
-1. No single-GPU tasks remain in the ready queue
-2. Available GPUs ≥ minimum required (2 GPUs minimum for 70B+)
-3. Available GPUs < optimal required (e.g., 3 available but 4 optimal)
-
-**Tradeoffs**:
-
-- Less parallelism = slower execution
-- Closer to memory limits = higher OOM risk
-- Tasks running with adaptive allocation have 5-point priority penalty
-
-The scheduler logs adaptive allocation decisions:
-```
-[ADAPTIVE] Running llama-2-70b_CERTIFY_001 with 3 GPUs instead of optimal 4
-```
+Adaptive allocation is currently disabled for multi-GPU tasks to avoid
+under-allocation and OOM. If you intentionally want to allow tasks to run with
+fewer GPUs than the plan, you can lower the minimum GPU requirement in
+`get_minimum_gpus()` and accept the `[ADAPTIVE]` trade-offs.
 
 ## Task Lifecycle
 
@@ -357,11 +304,11 @@ After (Batch + Split):
 Result: Estimated ~62% faster execution on 8× B200 cluster
 ```
 
-**Large models (70B+)** skip batch edits and use legacy per-edit tasks (CREATE_EDIT → EVAL_EDIT → CERTIFY_EDIT), so split eval is not used there.
+**Large or MoE models (70B+ or Mixtral-class)** skip batch edits and use legacy per-edit tasks (CREATE_EDIT → EVAL_EDIT → CERTIFY_EDIT), so split eval is not used there.
 
 ### Task Breakdown Per Model
 
-Each model generates approximately 71 tasks with Batch + Split optimization. Large models (70B+) use per-edit tasks and generate fewer total tasks.
+Each model generates approximately 71 tasks with Batch + Split optimization. Large or MoE models use per-edit tasks and generate fewer total tasks.
 
 ```
 Tasks Per Model (~71 total, batch enabled)
@@ -580,14 +527,16 @@ Each GPU runs a continuous worker loop:
         │              │          │          │         │
         │              │          ▼          ▼         │
         │              │    ┌────────────────────┐     │
-        │              │    │ update_dependents()│     │
-        │              │    │ (unblock waiting)  │     │
+        │              │    │ release_task_gpus()│     │
+        │              │    │ (free GPU locks)   │     │
         │              │    └─────────┬──────────┘     │
         │              │              │                │
         └──────────────┴──────────────┘                │
                                                        │
         ◄──────────────────────────────────────────────┘
 ```
+
+Note: Dependency promotion (pending→ready) is handled by the main monitor loop via `resolve_dependencies()`, not by individual GPU workers.
 
 ### Memory-Aware Task Selection
 
@@ -614,6 +563,8 @@ GPU 6: 180GB total, 35GB free (70B model loaded)
 
 With dynamic scheduling, any GPU can claim any task. Small model tasks complete quickly, freeing GPUs to help with remaining large model tasks:
 
+Example shown for an 8-GPU node (GPU_ID_LIST=0,1,2,3,4,5,6,7).
+
 ```
 Time→   T=0                    T=50%                  T=100%
 
@@ -632,42 +583,55 @@ Result: No GPU sits idle while work remains in the queue
 
 ## Library Modules
 
-The dynamic scheduling system is implemented across six library modules in `scripts/lib/`:
+The dynamic scheduling system is implemented across the following library modules in `scripts/lib/`:
 
 ### [`task_serialization.sh`](https://github.com/invarlock/invarlock/blob/main/scripts/lib/task_serialization.sh)
 
 JSON schema for tasks and safe read/write helpers:
 
-- `create_task()` - Create task with all required fields including `required_gpus`
-- `calculate_required_gpus()` - Determine GPU count from model size (1, 2, or 4)
-- `get_task_field()` / `update_task_field()` - Safe JSON field access
-- `get_task_required_gpus()` - Get number of GPUs needed for task
-- `get_task_assigned_gpus()` - Get comma-separated list of assigned GPU IDs
-- `mark_task_started_multi()` - Mark task started with multiple GPU assignment
+- **Task Schema & Creation**:
+  - `create_task()` - Create a task file with required fields (including `required_gpus`)
+  - `validate_task()` - Validate required fields and task type
+- **GPU Planning**:
+  - `calculate_required_gpus()` - Compute GPUs needed from `model_size_gb` and per-device capacity
+- **Task Field Access**:
+  - `get_task_field()` / `update_task_field()` - Safe JSON field access
+  - `get_task_required_gpus()` - Read required GPU count
+  - `get_task_assigned_gpus()` - Read assigned GPU IDs
+- **Lifecycle Helpers**:
+  - `mark_task_started_multi()` - Mark task started with multi-GPU assignment
+- **Memory Estimation**:
+  - `estimate_model_memory()` - Estimate per-task memory (includes task-type multipliers + safety margin)
 
 ### [`queue_manager.sh`](https://github.com/invarlock/invarlock/blob/main/scripts/lib/queue_manager.sh)
 
 File-backed queue operations and dependency tracking:
 
-- `init_queue()` - Initialize queue directories
-- `add_task()` - Add task to pending queue
-- `claim_task()` - Atomically claim task for execution
-- `complete_task()` / `fail_task()` - Mark task completion status
-- `retry_task()` - Move failed task back to pending for retry
-- `resolve_dependencies()` - Auto-promote pending→ready
-- `count_tasks()` / `is_queue_empty()` - Status queries
-- `get_queue_stats()` - Summary statistics
+- **Queue Operations**:
+  - `init_queue()` - Initialize queue directories
+  - `add_task()` - Add task to pending queue
+  - `claim_task()` - Atomically claim task for execution
+  - `complete_task()` / `fail_task()` - Mark task completion status
+  - `retry_task()` - Move failed task back to pending for retry
+- **Dependency Handling**:
+  - `resolve_dependencies()` - Auto-promote pending→ready when deps complete
+  - `cancel_tasks_with_failed_dependencies()` - Fail dependents instead of stalling the queue
+- **Monitoring & Inspection**:
+  - `count_tasks()` / `is_queue_empty()` - Status queries
+  - `get_queue_stats()` - Summary statistics
+  - `find_task()` - Locate a task by ID across queue states
 
 ### [`scheduler.sh`](https://github.com/invarlock/invarlock/blob/main/scripts/lib/scheduler.sh)
 
 GPU memory probes, multi-GPU reservation, adaptive allocation, and intelligent task selection:
 
 - **Memory Management**:
-  - `get_gpu_available_memory()` - Query available VRAM
-  - Adaptive memory margin: 2% for ≥160GB, 5% for ≥80GB, 10% for <80GB
-  - Task type multipliers for OOM prevention (CREATE_EDIT: 1.5x, etc.)
+  - `get_gpu_available_memory()` - Query available VRAM (cached)
+  - `is_gpu_idle()` - Check for active compute processes (cached)
+  - Uses adaptive safety margin: 2% for ≥160GB, 5% for ≥80GB, 10% for <80GB
+  - Treats per-task `model_size_gb` as already safety-adjusted (see `estimate_model_memory()`)
 - **Multi-GPU Distribution**:
-  - `get_required_gpus()` - Calculate optimal GPUs from model size (1, 2, or 4)
+  - `get_required_gpus()` - Calculate optimal GPUs from model size (default 1; scales up when required memory exceeds per-GPU capacity)
   - `get_minimum_gpus()` - Calculate minimum viable GPUs (fallback allocation)
   - `get_required_gpus_from_category()` - Calculate from model category (7b, 70b, moe)
 - **GPU Reservation Protection**:
@@ -692,40 +656,79 @@ GPU memory probes, multi-GPU reservation, adaptive allocation, and intelligent t
 
 Worker lifecycle, heartbeat management, and multi-GPU task execution:
 
-- `gpu_worker()` - Main worker loop with multi-GPU support
-- `release_task_gpus()` - Called on task completion/failure to free reserved GPUs
-- Heartbeat files for liveness detection
-- Per-GPU logging to `logs/gpu_N.log`
-- Graceful shutdown on signal
+- **Worker Lifecycle**:
+  - `gpu_worker()` - Main worker loop (claims tasks and executes them)
+  - `init_worker()` - Initialize per-worker directories and state
+  - `should_shutdown()` / `signal_shutdown()` - Cooperative shutdown control
+- **Heartbeat & Status**:
+  - `update_heartbeat()` - Touch heartbeat file for liveness monitoring
+  - `start_heartbeat_thread()` / `stop_heartbeat_thread()` - Background heartbeat loop
+  - `update_worker_status()` - Write worker status to disk
+- **Orchestration & Monitoring**:
+  - `launch_worker_pool()` - Spawn one worker per selected GPU
+  - `monitor_workers()` - Monitor heartbeats and reclaim orphaned tasks
+  - `wait_for_workers()` - Wait for workers to exit
+  - `get_worker_summary()` - Summarize worker status
+- **GPU Reservations**:
+  - Calls `release_task_gpus()` (from `scheduler.sh`) on task completion/failure
 
 ### [`task_functions.sh`](https://github.com/invarlock/invarlock/blob/main/scripts/lib/task_functions.sh)
 
 Atomic task implementations for each task type:
 
-- `task_setup_baseline()` - Download and prepare model
-- `task_generate_preset()` - Create calibration preset
-- `task_calibration_run()` - Run drift calibration
-- `task_eval_baseline()` / `task_eval_edit()` - lm-eval runs (all benchmarks)
-- `task_eval_single_benchmark()` - Single benchmark eval (MMLU, HellaSwag, ARC, WinoGrande)
-- `task_create_edit()` - Apply single quantization/pruning/SVD edit (legacy)
-- `task_create_edits_batch()` - Create all 8 edits with a single model load for small/medium models (v2.1.0)
-- `task_create_error()` - Inject deliberate errors
-- `task_certify_edit()` / `task_certify_error()` - InvarLock certification
-- Per-task logs and outputs are namespaced under model/task IDs; shared model directories are reused
+- **Task Dispatch**:
+  - `execute_task()` - Run a task by type with standard logging and timeouts
+- **Setup & Calibration**:
+  - `task_setup_baseline()` - Download and prepare model
+  - `task_calibration_run()` - Run drift calibration
+  - `task_generate_preset()` - Create calibration preset
+- **lm-eval**:
+  - `task_eval_baseline()` - Baseline lm-eval
+  - `task_eval_edit()` - Edited-model lm-eval (legacy: all benchmarks in one task)
+  - `task_eval_single_benchmark()` - Split eval for one benchmark (MMLU, HellaSwag, ARC, WinoGrande)
+- **Edit Creation**:
+  - `task_create_edit()` - Apply a single quantization/pruning/SVD edit (legacy)
+  - `task_create_edits_batch()` - Create all 8 edits with a single model load (batch optimization)
+- **Certification & Errors**:
+  - `task_certify_edit()` - InvarLock certify for an edit
+  - `task_create_error()` / `task_certify_error()` - Error injection variants + certification
 
-**v2.1.0 Optimization Tasks**:
+### [`model_creation.sh`](https://github.com/invarlock/invarlock/blob/main/scripts/lib/model_creation.sh)
 
-- `CREATE_EDITS_BATCH` - Batch creates all 8 edits with single model load for small/medium models (~87% faster); large 70B+ models fall back to per-edit tasks to avoid OOM.
-- `EVAL_MMLU`, `EVAL_HELLASWAG`, `EVAL_ARC`, `EVAL_WINOGRANDE` - Split benchmark evaluation (4× parallelism)
+Shared model creation helpers used by workers:
+
+- **Model Edits**:
+  - `create_edited_model()` - RTN quantization edits
+  - `create_pruned_model()` - Magnitude pruning edits
+  - `create_lowrank_model()` - Low-rank SVD edits
+  - `create_fp4_model()` - FP4 quantization edits (simulated)
+- **Error Injection**:
+  - `create_error_model()` - Error injection variants
 
 ### [`fault_tolerance.sh`](https://github.com/invarlock/invarlock/blob/main/scripts/lib/fault_tolerance.sh)
 
 Retry policies and recovery hooks:
 
-- Configurable retry counts per task type
-- Exponential backoff between retries
-- OOM detection and recovery strategies
-- Failed task quarantine
+- **Error Detection**:
+  - `detect_oom()` - Detect OOM signatures in task logs
+  - `detect_transient_error()` - Detect transient failures eligible for retry
+  - `detect_permanent_error()` - Detect fatal errors that should not be retried
+  - `classify_error()` - Classify as `oom` / `transient` / `permanent` / `unknown`
+- **Retry & Backoff**:
+  - `calculate_backoff()` - Exponential backoff with jitter (capped)
+  - `should_retry_task()` - Apply per-task retry limits (OOM gets fewer attempts)
+  - `maybe_retry_task()` - Schedule a retry by setting `retry_after` and re-queueing
+  - `is_retry_ready()` - Check whether the `retry_after` delay has elapsed
+- **OOM Recovery**:
+  - `handle_oom_task()` - Reduce batch size/sequence length and clear GPU memory before retry
+- **Error Reporting**:
+  - `record_error()` - Append to `state/errors.json` for summary statistics
+  - `get_error_stats()` - Summarize total and recent errors
+  - `print_error_summary()` - Print a concise error summary for the run
+- **Health & Cleanup**:
+  - `health_check()` - Preflight GPU/disk/PyTorch readiness
+  - `cleanup_failed_task()` - Remove incomplete artifacts for a failed task
+  - `cleanup_all_failed()` - Sweep failed queue and clean incomplete artifacts
 
 ## Execution Flow
 
@@ -748,7 +751,7 @@ The validation suite executes in these phases:
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │  PHASE 2: GPU Worker Launch                                 │
-│  - Start 8 parallel workers (one per GPU)                   │
+│  - Start N parallel workers (one per selected GPU)          │
 │  - Workers claim tasks dynamically                          │
 │  - Progress monitoring every 60 seconds                     │
 └─────────────────────────────────────────────────────────────┘
@@ -775,6 +778,9 @@ The suite automatically adjusts InvarLock parameters based on model size:
 | 70-72B | 128 | 64 | 8+8 | 2 |
 
 The conservative 70B settings prevent OOM during overhead checks where models may be loaded twice.
+Per-task CI profile overrides are written under each task's `config_root/runtime/profiles/ci.yaml`
+via `INVARLOCK_CONFIG_ROOT`, so window counts and bootstrap replicates always match the model size.
+Bootstrap defaults are 2000 for small/medium models and 1000 for >=30B.
 
 ## Environment Variables
 
@@ -782,8 +788,9 @@ The conservative 70B settings prevent OOM during overhead checks where models ma
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `NUM_GPUS` | `8` | Number of GPUs to use |
-| `GPU_MEMORY_GB` | `180` | Expected GPU memory (informational; scheduling uses nvidia-smi) |
+| `CUDA_VISIBLE_DEVICES` | unset | Explicit GPU IDs to use (comma-separated numeric indices); if unset, uses all GPUs detected by `nvidia-smi` |
+| `NUM_GPUS` | unset | Number of GPUs to use; if set, clamps to the first N GPUs from `CUDA_VISIBLE_DEVICES`/auto-detected GPUs |
+| `GPU_MEMORY_GB` | `180` | Expected per-GPU memory for planning (live scheduling still uses `nvidia-smi`) |
 | `OUTPUT_DIR` | auto-generated | Output directory path |
 | `RESUME_MODE` | `true` | Skip completed work |
 
@@ -811,8 +818,9 @@ The conservative 70B settings prevent OOM during overhead checks where models ma
 | `EVAL_BATCH_SIZE_MEDIUM` | `auto:8` | 30B-40B models |
 | `EVAL_BATCH_SIZE_LARGE` | `auto:4` | 70B+ models |
 | `EVAL_BATCH_SIZE_MOE` | `auto:6` | MoE models |
+| `EVAL_CONTEXT_LEN` | `2048` | Context length cap used for memory planning |
 | `LM_EVAL_PARALLELIZE` | `true` | Enable lm-eval `parallelize=True` when multiple GPUs are assigned |
-| `LMEVAL_TORCH_COMPILE` | auto | Enable `torch.compile` in lm-eval (set by `B200_DETERMINISM`, overrideable) |
+| `LMEVAL_TORCH_COMPILE` | auto | Enable `torch.compile` in lm-eval (set by `B200_DETERMINISM`, overridable) |
 
 ### InvarLock Settings
 
@@ -820,10 +828,11 @@ The conservative 70B settings prevent OOM during overhead checks where models ma
 |----------|---------|-------------|
 | `INVARLOCK_DATASET` | `wikitext2` | Evaluation dataset |
 | `INVARLOCK_TIER` | `balanced` | Guard tier preset |
-| `INVARLOCK_BOOTSTRAP_N` | `10000` | Bootstrap replicates |
+| `INVARLOCK_BOOTSTRAP_N` | unset | Bootstrap replicates override (defaults: 2000, 1000 for ≥30B) |
 | `INVARLOCK_PM_ACCEPTANCE_MIN` | `0.90` | Primary metric lower bound |
 | `INVARLOCK_PM_ACCEPTANCE_MAX` | `1.20` | Primary metric upper bound |
 | `INVARLOCK_SKIP_OVERHEAD_CHECK` | unset | Skip guard overhead measurement |
+| `INVARLOCK_CONFIG_ROOT` | unset | Per-task runtime profile root (set automatically by the suite) |
 | `INVARLOCK_ALLOW_NETWORK` | `1` | Allow dataset downloads |
 | `INVARLOCK_REQUIRE_FP4_NATIVE` | `false` | Require TransformerEngine for native FP4 validation |
 
@@ -841,6 +850,21 @@ The conservative 70B settings prevent OOM during overhead checks where models ma
 | `STRESS_EDIT_RUNS` | `2` | Stress edit repetitions |
 | `RUN_ERROR_INJECTION` | `true` | Enable error injection tests |
 
+### Reliability Controls
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SCHEDULER_MEM_TOLERANCE_GB` | `8` | Allow large-model tasks within this many GB of available GPU memory |
+| `CANCEL_BLOCKED_TASKS_GRACE_SECONDS` | `90` | Grace period before failing tasks whose dependencies are in FAILED (prevents queue stall) |
+| `MIN_FREE_DISK_GB` | `200` | Abort early if free disk space in `OUTPUT_DIR` filesystem drops below this threshold |
+| `TASK_TIMEOUT_DEFAULT` | `21600` | Task timeout in seconds (0/empty disables) |
+| `TASK_TIMEOUT_<TASKTYPE>` | unset | Per-task timeout override in seconds |
+| `MODEL_LOAD_OVERHEAD_GB` | `4` | Added headroom (GB) for model load planning |
+| `EDIT_OVERHEAD_GB` | `8` | Added headroom (GB) for per-edit tasks |
+| `BATCH_EDIT_OVERHEAD_GB` | `8` | Added headroom (GB) for batch edit tasks |
+| `EVAL_OVERHEAD_GB` | `6` | Added headroom (GB) for lm-eval tasks |
+| `INVARLOCK_OVERHEAD_GB` | `6` | Added headroom (GB) for InvarLock run/certify tasks |
+
 ## Determinism vs Throughput
 
 The suite supports two determinism modes:
@@ -848,7 +872,7 @@ The suite supports two determinism modes:
 ### Throughput Mode (Default)
 
 ```bash
-B200_DETERMINISM=throughput ./scripts/invarlock_definitive_validation_b200.sh
+B200_DETERMINISM=throughput ./scripts/b200_validation_suite.sh
 ```
 
 - Enables TF32 for faster matrix operations
@@ -860,7 +884,7 @@ B200_DETERMINISM=throughput ./scripts/invarlock_definitive_validation_b200.sh
 ### Strict Mode
 
 ```bash
-B200_DETERMINISM=strict ./scripts/invarlock_definitive_validation_b200.sh
+B200_DETERMINISM=strict ./scripts/b200_validation_suite.sh
 ```
 
 - Disables TF32 and cuDNN benchmark at harness level
@@ -875,9 +899,11 @@ B200_DETERMINISM=strict ./scripts/invarlock_definitive_validation_b200.sh
 invarlock_validation_b200_20241208_123456/
 ├── logs/
 │   ├── main.log                    # Overall execution log
-│   └── gpu_{0-7}.log               # Per-GPU worker logs
+│   └── gpu_{id}.log                # Per-GPU worker logs (id = physical GPU index in the pool)
 ├── models/
 │   └── {model_name}/               # Downloaded model weights
+│       └── baseline/
+│           └── model_profile.json  # Weights + config used for memory planning
 ├── presets/
 │   └── calibrated_preset_{model}.yaml  # Calibration presets
 ├── queue/
@@ -886,9 +912,12 @@ invarlock_validation_b200_20241208_123456/
 │   ├── running/                    # Currently executing tasks
 │   ├── completed/                  # Successfully finished tasks
 │   └── failed/                     # Failed tasks
+├── state/
+│   ├── progress.json               # Queue progress snapshots
+│   └── disk_pressure.json          # Present if aborted due to low disk space
 ├── workers/
-│   ├── gpu_{0-7}.pid               # Worker process IDs
-│   └── gpu_{0-7}.heartbeat         # Worker liveness files
+│   ├── gpu_{id}.pid                # Worker process IDs
+│   └── gpu_{id}.heartbeat          # Worker liveness files
 ├── {model_name}/
 │   ├── models/                     # Edited model variants
 │   │   ├── quant_8bit_clean/
@@ -916,6 +945,7 @@ invarlock_validation_b200_20241208_123456/
 │   ├── calibration_summary.json
 │   ├── policy_digest_summary.json
 │   ├── determinism_summary.json
+│   ├── memory_plan.csv             # Per-task memory + GPU plan
 │   └── correlation_analysis.json
 └── reports/
     ├── final_verdict.txt           # Human-readable summary
@@ -932,7 +962,7 @@ invarlock_validation_b200_20241208_123456/
 
 1. Skip overhead check:
    ```bash
-   INVARLOCK_SKIP_OVERHEAD_CHECK=1 ./scripts/invarlock_definitive_validation_b200.sh
+   INVARLOCK_SKIP_OVERHEAD_CHECK=1 ./scripts/b200_validation_suite.sh
    ```
 
 2. Ensure single model per GPU - check no other processes are using GPU memory:
@@ -943,6 +973,32 @@ invarlock_validation_b200_20241208_123456/
 3. Use a lighter guard tier for reduced overhead:
    ```bash
    INVARLOCK_TIER=dev
+   ```
+
+4. Reduce eval batch caps for large models:
+   ```bash
+   EVAL_BATCH_SIZE_LARGE=auto:2 ./scripts/b200_validation_suite.sh
+   ```
+
+5. Multi-GPU sharding is supported automatically when the post-download memory plan
+   says a task cannot fit within `GPU_MEMORY_PER_DEVICE`. If you still see OOMs,
+   increase the overhead knobs (e.g., `INVARLOCK_OVERHEAD_GB`, `EDIT_OVERHEAD_GB`)
+   or lower `GPU_MEMORY_PER_DEVICE` so the planner requests more GPUs.
+
+### Task Timeouts
+
+**Symptom**: Task fails with `Exit code 124` or `Timeout: task exceeded limit`.
+
+**Solutions**:
+
+1. Increase the default timeout:
+   ```bash
+   TASK_TIMEOUT_DEFAULT=28800 ./scripts/b200_validation_suite.sh
+   ```
+
+2. Override a specific task type:
+   ```bash
+   TASK_TIMEOUT_CREATE_EDIT=28800 ./scripts/b200_validation_suite.sh
    ```
 
 ### Preset Not Found
@@ -956,7 +1012,7 @@ invarlock_validation_b200_20241208_123456/
    # Remove existing calibration
    rm -rf ${OUTPUT_DIR}/{model_name}/certificates/calibration
    # Re-run with resume
-   ./scripts/invarlock_definitive_validation_b200.sh --resume
+   ./scripts/b200_validation_suite.sh --resume
    ```
 
 2. Check preset directory exists and contains YAML files:
@@ -970,7 +1026,7 @@ invarlock_validation_b200_20241208_123456/
 
 ```bash
 OUTPUT_DIR=./invarlock_validation_b200_20241208_123456 \
-  ./scripts/invarlock_definitive_validation_b200.sh --resume
+  ./scripts/b200_validation_suite.sh --resume
 ```
 
 **What happens**:
@@ -1019,7 +1075,7 @@ grep -i error ${OUTPUT_DIR}/logs/*.log
 
 1. Skip Flash Attention entirely:
    ```bash
-   SKIP_FLASH_ATTN=true ./scripts/invarlock_definitive_validation_b200.sh
+   SKIP_FLASH_ATTN=true ./scripts/b200_validation_suite.sh
    ```
 
 2. Install Python development headers:
@@ -1087,7 +1143,7 @@ DRIFT_CALIBRATION_RUNS=2 \
 CLEAN_EDIT_RUNS=1 \
 STRESS_EDIT_RUNS=1 \
 RUN_ERROR_INJECTION=false \
-./scripts/invarlock_definitive_validation_b200.sh
+./scripts/b200_validation_suite.sh
 ```
 
 ## Related Documentation

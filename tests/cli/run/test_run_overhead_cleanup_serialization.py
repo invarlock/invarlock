@@ -383,7 +383,7 @@ def test_until_pass_baseline_disappears_between_attempts(tmp_path: Path):
         run_command(
             config=str(cfg),
             device="cpu",
-            profile="ci",
+            profile="dev",
             baseline=str(baseline),
             until_pass=True,
             max_attempts=2,

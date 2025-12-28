@@ -60,6 +60,8 @@ context:
 
 Environment overrides (lower precedence): `INVARLOCK_SNAPSHOT_MODE`, `INVARLOCK_SNAPSHOT_AUTO_RAM_FRACTION`, `INVARLOCK_SNAPSHOT_THRESHOLD_MB`.
 
+Note: if you force `mode: bytes` and the adapter's in-memory snapshot fails, the CLI will attempt `chunked` snapshotting when supported; otherwise it falls back to reload-per-attempt.
+
 ---
 
 ## Dataset (provider-specific keys)

@@ -271,7 +271,17 @@ def test_until_pass_materialize_sets_flags_and_retries_once(
 ):
     cfg = _cfg(tmp_path, 1, 1)
     baseline = tmp_path / "baseline.json"
-    baseline.write_text(json.dumps({"meta": {"tokenizer_hash": "tokhash123"}}))
+    baseline.write_text(
+        json.dumps(
+            {
+                "meta": {"tokenizer_hash": "tokhash123"},
+                "evaluation_windows": {
+                    "preview": {"window_ids": [0], "input_ids": [[1, 2]]},
+                    "final": {"window_ids": [1], "input_ids": [[3, 4]]},
+                },
+            }
+        )
+    )
 
     calls = {"exec": 0, "edit_configs": []}
 
@@ -316,9 +326,28 @@ def test_until_pass_materialize_sets_flags_and_retries_once(
         # Provide edit deltas with heads_pruned above threshold
         return SimpleNamespace(
             edit={"deltas": {"heads_pruned": 10}},
-            metrics={"ppl_preview": 1.0, "ppl_final": 1.0, "ppl_ratio": 1.0},
+            metrics={
+                "ppl_preview": 1.0,
+                "ppl_final": 1.0,
+                "ppl_ratio": 1.0,
+                "window_overlap_fraction": 0.0,
+                "window_match_fraction": 1.0,
+                "paired_windows": 1,
+            },
             guards={},
             context={"dataset_meta": {}},
+            evaluation_windows={
+                "preview": {
+                    "window_ids": [0],
+                    "input_ids": [[1, 2]],
+                    "attention_masks": [[1, 1]],
+                },
+                "final": {
+                    "window_ids": [1],
+                    "input_ids": [[3, 4]],
+                    "attention_masks": [[1, 1]],
+                },
+            },
             status="success",
         )
 

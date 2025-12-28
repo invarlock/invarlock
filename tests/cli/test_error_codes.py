@@ -13,8 +13,8 @@ from invarlock.cli.errors import InvarlockError
 
 
 def test_enforce_provider_parity_mask_mismatch_raises_invarlock_error():
-    subj = {"tokenizer_sha256": "abc", "masking_sha256": "mask-A"}
-    base = {"tokenizer_sha256": "abc", "masking_sha256": "mask-B"}
+    subj = {"ids_sha256": "ids", "tokenizer_sha256": "abc", "masking_sha256": "mask-A"}
+    base = {"ids_sha256": "ids", "tokenizer_sha256": "abc", "masking_sha256": "mask-B"}
     with pytest.raises(InvarlockError) as ei:
         _enforce_provider_parity(subj, base, profile="ci")
     s = str(ei.value)
@@ -23,13 +23,23 @@ def test_enforce_provider_parity_mask_mismatch_raises_invarlock_error():
 
 
 def test_enforce_provider_parity_tokenizer_mismatch_raises_invarlock_error():
-    subj = {"tokenizer_sha256": "abc"}
-    base = {"tokenizer_sha256": "def"}
+    subj = {"ids_sha256": "ids", "tokenizer_sha256": "abc"}
+    base = {"ids_sha256": "ids", "tokenizer_sha256": "def"}
     with pytest.raises(InvarlockError) as ei:
         _enforce_provider_parity(subj, base, profile="release")
     s = str(ei.value)
     assert s.startswith("[INVARLOCK:E002]")
     assert "TOKENIZER-DIGEST-MISMATCH" in s
+
+
+def test_enforce_provider_parity_ids_mismatch_raises_invarlock_error():
+    subj = {"ids_sha256": "ids-a", "tokenizer_sha256": "tok"}
+    base = {"ids_sha256": "ids-b", "tokenizer_sha256": "tok"}
+    with pytest.raises(InvarlockError) as ei:
+        _enforce_provider_parity(subj, base, profile="ci")
+    s = str(ei.value)
+    assert s.startswith("[INVARLOCK:E006]")
+    assert "IDS-DIGEST-MISMATCH" in s
 
 
 def test_enforce_provider_parity_missing_digest_raises_invarlock_error():

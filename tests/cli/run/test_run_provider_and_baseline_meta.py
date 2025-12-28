@@ -584,7 +584,16 @@ def test_baseline_adjust_counts_success(tmp_path: Path):
         def execute(self, **kwargs):
             return SimpleNamespace(
                 edit={},
-                metrics={"ppl_preview": 1.0, "ppl_final": 1.0, "ppl_ratio": 1.0},
+                metrics={
+                    "ppl_preview": 1.0,
+                    "ppl_final": 1.0,
+                    "ppl_ratio": 1.0,
+                    "window_overlap_fraction": 0.0,
+                    "window_match_fraction": 1.0,
+                    "window_pairing_reason": None,
+                    "paired_windows": 1,
+                    "loss_type": "ce",
+                },
                 guards={},
                 context={"dataset_meta": {}},
                 evaluation_windows={
@@ -749,6 +758,11 @@ def test_preview_final_tokens_computed_when_missing_in_baseline_meta(tmp_path: P
                             "ppl_preview": 1.0,
                             "ppl_final": 1.0,
                             "ppl_ratio": 1.0,
+                            "window_overlap_fraction": 0.0,
+                            "window_match_fraction": 1.0,
+                            "window_pairing_reason": None,
+                            "paired_windows": 1,
+                            "loss_type": "ce",
                         },
                         guards={},
                         context=cfg_ctx,

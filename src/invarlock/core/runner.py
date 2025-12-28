@@ -1528,7 +1528,7 @@ class CoreRunner:
                     pairing_reason = "duplicate_windows"
                 elif count_mismatch:
                     pairing_reason = "count_mismatch"
-                elif not pairing_context:
+                else:
                     pairing_reason = preview_pair_stats.get(
                         "reason"
                     ) or final_pair_stats.get("reason")
@@ -2079,24 +2079,49 @@ class CoreRunner:
             # Perform rollback if checkpoint available
             if self.checkpoint_manager and "initial_checkpoint" in report.meta:
                 checkpoint_id = report.meta["initial_checkpoint"]
-                self.checkpoint_manager.restore_checkpoint(
-                    model, adapter, checkpoint_id
-                )
-                # Match test expectation: only include checkpoint and reason
-                self._log_event(
-                    "finalize",
-                    "rollback",
-                    LogLevel.WARNING,
-                    {
-                        "checkpoint": checkpoint_id,
-                        "reason": rollback_reason,
-                    },
-                )
+                restored = False
+                restore_error: str | None = None
+                try:
+                    restored = bool(
+                        self.checkpoint_manager.restore_checkpoint(
+                            model, adapter, checkpoint_id
+                        )
+                    )
+                except Exception as exc:
+                    restored = False
+                    restore_error = str(exc)
+
+                if restored:
+                    # Match test expectation: only include checkpoint and reason
+                    self._log_event(
+                        "finalize",
+                        "rollback",
+                        LogLevel.WARNING,
+                        {
+                            "checkpoint": checkpoint_id,
+                            "reason": rollback_reason,
+                        },
+                    )
+                else:
+                    self._log_event(
+                        "finalize",
+                        "rollback_failed",
+                        LogLevel.CRITICAL,
+                        {
+                            "mode": "finalize",
+                            "checkpoint": checkpoint_id,
+                            "reason": rollback_reason,
+                            "error": restore_error or "restore_failed",
+                        },
+                    )
 
                 # Store rollback metadata in report
                 report.meta["rollback_reason"] = rollback_reason
                 report.meta["rollback_checkpoint"] = checkpoint_id
-                report.meta["guard_recovered"] = True
+                report.meta["guard_recovered"] = bool(restored)
+                report.meta["rollback_failed"] = not bool(restored)
+                if not restored:
+                    report.meta["rollback_error"] = restore_error or "restore_failed"
 
             else:
                 # Match test expectation: log without additional data payload

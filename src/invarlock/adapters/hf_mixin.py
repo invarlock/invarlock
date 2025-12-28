@@ -119,6 +119,10 @@ class HFAdapterMixin:
         """
         target_device = self._resolve_device(device)
 
+        # If transformers already sharded/placed the model, skip explicit .to().
+        if getattr(model, "hf_device_map", None):
+            return model
+
         # Auto-detect capabilities if not provided
         if capabilities is None:
             capabilities = self._detect_capabilities(model)
@@ -334,7 +338,9 @@ class HFAdapterMixin:
             if hasattr(model, "config")
             else {},
             "params": {},
+            "params_meta": {},
             "buffers": {},
+            "buffers_meta": {},
             "device_map": {},
             "weight_tying": self._extract_weight_tying_info(model),
         }
@@ -344,6 +350,10 @@ class HFAdapterMixin:
             file_path = snapshot_dir / filename
             torch.save(param.detach().cpu(), file_path)
             manifest["params"][name] = filename
+            manifest["params_meta"][name] = {
+                "shape": [int(x) for x in param.shape],
+                "dtype": str(param.dtype),
+            }
             manifest["device_map"][name] = str(param.device)
 
         for name, buffer in model.named_buffers():
@@ -351,6 +361,10 @@ class HFAdapterMixin:
             file_path = snapshot_dir / filename
             torch.save(buffer.detach().cpu(), file_path)
             manifest["buffers"][name] = filename
+            manifest["buffers_meta"][name] = {
+                "shape": [int(x) for x in buffer.shape],
+                "dtype": str(buffer.dtype),
+            }
             manifest["device_map"][f"buffer::{name}"] = str(buffer.device)
 
         manifest_path = snapshot_dir / "manifest.json"
@@ -377,24 +391,89 @@ class HFAdapterMixin:
 
         device_map = manifest.get("device_map", {})
 
-        for name, filename in manifest.get("params", {}).items():
+        params_manifest = manifest.get("params", {})
+        if not isinstance(params_manifest, dict):
+            raise TypeError("Invalid snapshot manifest: params must be a mapping")
+        buffers_manifest = manifest.get("buffers", {})
+        if not isinstance(buffers_manifest, dict):
+            raise TypeError("Invalid snapshot manifest: buffers must be a mapping")
+        params_meta = manifest.get("params_meta", {})
+        buffers_meta = manifest.get("buffers_meta", {})
+
+        # Preflight: ensure manifest/model agreement and tensor readability before copying.
+        for name, filename in params_manifest.items():
+            if name not in param_map:
+                raise KeyError(f"Snapshot parameter missing in target model: {name}")
+            if not isinstance(filename, str) or not filename:
+                raise TypeError(f"Invalid snapshot manifest filename for param: {name}")
             file_path = snapshot_dir / filename
-            if name not in param_map or not file_path.exists():
-                continue
+            if not file_path.exists():
+                raise FileNotFoundError(
+                    f"Missing snapshot tensor for param: {file_path}"
+                )
+            tensor = torch.load(file_path, map_location="cpu")
+            if not isinstance(tensor, torch.Tensor):
+                raise TypeError(f"Invalid snapshot tensor payload for param: {name}")
+            meta = params_meta.get(name) if isinstance(params_meta, dict) else None
+            if isinstance(meta, dict):
+                expected_shape = meta.get("shape")
+                expected_dtype = meta.get("dtype")
+                if isinstance(expected_shape, list) and list(tensor.shape) != list(
+                    expected_shape
+                ):
+                    raise ValueError(
+                        f"Snapshot tensor shape mismatch for param: {name}"
+                    )
+                if isinstance(expected_dtype, str) and expected_dtype:
+                    if str(tensor.dtype) != expected_dtype:
+                        raise ValueError(
+                            f"Snapshot tensor dtype mismatch for param: {name}"
+                        )
+
+        for name, filename in buffers_manifest.items():
+            if name not in buffer_map:
+                raise KeyError(f"Snapshot buffer missing in target model: {name}")
+            if not isinstance(filename, str) or not filename:
+                raise TypeError(
+                    f"Invalid snapshot manifest filename for buffer: {name}"
+                )
+            file_path = snapshot_dir / filename
+            if not file_path.exists():
+                raise FileNotFoundError(
+                    f"Missing snapshot tensor for buffer: {file_path}"
+                )
+            tensor = torch.load(file_path, map_location="cpu")
+            if not isinstance(tensor, torch.Tensor):
+                raise TypeError(f"Invalid snapshot tensor payload for buffer: {name}")
+            meta = buffers_meta.get(name) if isinstance(buffers_meta, dict) else None
+            if isinstance(meta, dict):
+                expected_shape = meta.get("shape")
+                expected_dtype = meta.get("dtype")
+                if isinstance(expected_shape, list) and list(tensor.shape) != list(
+                    expected_shape
+                ):
+                    raise ValueError(
+                        f"Snapshot tensor shape mismatch for buffer: {name}"
+                    )
+                if isinstance(expected_dtype, str) and expected_dtype:
+                    if str(tensor.dtype) != expected_dtype:
+                        raise ValueError(
+                            f"Snapshot tensor dtype mismatch for buffer: {name}"
+                        )
+
+        # Restore parameters/buffers (second pass) after successful preflight.
+        for name, filename in params_manifest.items():
             target = param_map[name]
             target_device = torch.device(device_map.get(name, str(target.device)))
-            tensor = torch.load(file_path, map_location="cpu")
+            tensor = torch.load(snapshot_dir / filename, map_location="cpu")
             with torch.no_grad():
                 target.copy_(tensor.to(target_device))
 
-        for name, filename in manifest.get("buffers", {}).items():
-            file_path = snapshot_dir / filename
-            if name not in buffer_map or not file_path.exists():
-                continue
+        for name, filename in buffers_manifest.items():
             target = buffer_map[name]
             key = f"buffer::{name}"
             target_device = torch.device(device_map.get(key, str(target.device)))
-            tensor = torch.load(file_path, map_location="cpu")
+            tensor = torch.load(snapshot_dir / filename, map_location="cpu")
             target.copy_(tensor.to(target_device))
 
         original_tying = manifest.get("weight_tying", {})

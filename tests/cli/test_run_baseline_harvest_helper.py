@@ -6,6 +6,7 @@ import pytest
 import typer
 
 from invarlock.cli.commands.run import _validate_and_harvest_baseline_schedule
+from invarlock.cli.errors import InvarlockError
 
 
 class _Cfg:
@@ -169,6 +170,236 @@ def test_baseline_tokenizer_hash_mismatch():
             pairing,
             baseline,
             tokenizer_hash="tokB",
+            resolved_loss_type="causal",
+            baseline_path_str="baseline.json",
+            console=None,
+        )
+    assert exc.value.exit_code == 1
+
+
+def test_baseline_harvest_preview_hash_mismatch_warns_in_dev_profile() -> None:
+    cfg = _Cfg()
+    pairing = {
+        "preview": {"input_ids": [[0, 1, 2]], "window_ids": [0]},
+        "final": {"input_ids": [[3, 4, 5]], "window_ids": [1]},
+    }
+    baseline = {
+        "data": {
+            "seq_len": 8,
+            "stride": 8,
+            "dataset": "wikitext2",
+            "split": "validation",
+            "preview_hash": "deadbeef",
+        }
+    }
+
+    out = _validate_and_harvest_baseline_schedule(
+        cfg,
+        pairing,
+        baseline,
+        tokenizer_hash=None,
+        resolved_loss_type="causal",
+        profile="dev",
+        baseline_path_str="baseline.json",
+        console=None,
+    )
+    assert out["effective_preview"] == 1
+
+
+def test_baseline_harvest_preview_hash_mismatch_fails_in_ci() -> None:
+    cfg = _Cfg()
+    pairing = {
+        "preview": {"input_ids": [[0, 1, 2]], "window_ids": [0]},
+        "final": {"input_ids": [[3, 4, 5]], "window_ids": [1]},
+    }
+    baseline = {
+        "data": {
+            "seq_len": 8,
+            "stride": 8,
+            "dataset": "wikitext2",
+            "split": "validation",
+            "preview_hash": "deadbeef",
+        }
+    }
+
+    with pytest.raises(InvarlockError) as ei:
+        _validate_and_harvest_baseline_schedule(
+            cfg,
+            pairing,
+            baseline,
+            tokenizer_hash=None,
+            resolved_loss_type="causal",
+            profile="ci",
+            baseline_path_str="baseline.json",
+            console=None,
+        )
+    assert str(ei.value).startswith("[INVARLOCK:E001]")
+
+
+def test_baseline_harvest_final_hash_mismatch_warns_in_dev_profile() -> None:
+    cfg = _Cfg()
+    pairing = {
+        "preview": {"input_ids": [[0, 1, 2]], "window_ids": [0]},
+        "final": {"input_ids": [[3, 4, 5]], "window_ids": [1]},
+    }
+    baseline = {
+        "data": {
+            "seq_len": 8,
+            "stride": 8,
+            "dataset": "wikitext2",
+            "split": "validation",
+            "final_hash": "deadbeef",
+        }
+    }
+
+    out = _validate_and_harvest_baseline_schedule(
+        cfg,
+        pairing,
+        baseline,
+        tokenizer_hash=None,
+        resolved_loss_type="causal",
+        profile="dev",
+        baseline_path_str="baseline.json",
+        console=None,
+    )
+    assert out["effective_final"] == 1
+
+
+def test_baseline_harvest_final_hash_mismatch_fails_in_ci() -> None:
+    cfg = _Cfg()
+    pairing = {
+        "preview": {"input_ids": [[0, 1, 2]], "window_ids": [0]},
+        "final": {"input_ids": [[3, 4, 5]], "window_ids": [1]},
+    }
+    baseline = {
+        "data": {
+            "seq_len": 8,
+            "stride": 8,
+            "dataset": "wikitext2",
+            "split": "validation",
+            "final_hash": "deadbeef",
+        }
+    }
+
+    with pytest.raises(InvarlockError) as ei:
+        _validate_and_harvest_baseline_schedule(
+            cfg,
+            pairing,
+            baseline,
+            tokenizer_hash=None,
+            resolved_loss_type="causal",
+            profile="ci",
+            baseline_path_str="baseline.json",
+            console=None,
+        )
+    assert str(ei.value).startswith("[INVARLOCK:E001]")
+
+
+def test_baseline_harvest_dataset_hash_mismatch_warns_in_dev_profile() -> None:
+    cfg = _Cfg()
+    pairing = {
+        "preview": {"input_ids": [[0, 1, 2]], "window_ids": [0]},
+        "final": {"input_ids": [[3, 4, 5]], "window_ids": [1]},
+    }
+    baseline = {
+        "data": {
+            "seq_len": 8,
+            "stride": 8,
+            "dataset": "wikitext2",
+            "split": "validation",
+            "dataset_hash": "deadbeef",
+        }
+    }
+
+    out = _validate_and_harvest_baseline_schedule(
+        cfg,
+        pairing,
+        baseline,
+        tokenizer_hash=None,
+        resolved_loss_type="causal",
+        profile="dev",
+        baseline_path_str="baseline.json",
+        console=None,
+    )
+    assert out["effective_preview"] == 1
+
+
+def test_baseline_harvest_dataset_hash_mismatch_fails_in_ci() -> None:
+    cfg = _Cfg()
+    pairing = {
+        "preview": {"input_ids": [[0, 1, 2]], "window_ids": [0]},
+        "final": {"input_ids": [[3, 4, 5]], "window_ids": [1]},
+    }
+    baseline = {
+        "data": {
+            "seq_len": 8,
+            "stride": 8,
+            "dataset": "wikitext2",
+            "split": "validation",
+            "dataset_hash": "deadbeef",
+        }
+    }
+
+    with pytest.raises(InvarlockError) as ei:
+        _validate_and_harvest_baseline_schedule(
+            cfg,
+            pairing,
+            baseline,
+            tokenizer_hash=None,
+            resolved_loss_type="causal",
+            profile="ci",
+            baseline_path_str="baseline.json",
+            console=None,
+        )
+    assert str(ei.value).startswith("[INVARLOCK:E001]")
+
+
+def test_baseline_harvest_missing_final_section_fails() -> None:
+    cfg = _Cfg()
+    pairing = {"preview": {"input_ids": [[0, 1, 2]], "window_ids": [0]}}
+    baseline = {
+        "data": {
+            "seq_len": 8,
+            "stride": 8,
+            "dataset": "wikitext2",
+            "split": "validation",
+        }
+    }
+
+    with pytest.raises(typer.Exit) as exc:
+        _validate_and_harvest_baseline_schedule(
+            cfg,
+            pairing,
+            baseline,
+            tokenizer_hash=None,
+            resolved_loss_type="causal",
+            baseline_path_str="baseline.json",
+            console=None,
+        )
+    assert exc.value.exit_code == 1
+
+
+def test_baseline_harvest_empty_input_ids_fails() -> None:
+    cfg = _Cfg()
+    pairing = {
+        "preview": {"input_ids": [[]], "window_ids": [0]},
+        "final": {"input_ids": [[1, 2, 3]], "window_ids": [1]},
+    }
+    baseline = {
+        "data": {
+            "seq_len": 8,
+            "stride": 8,
+            "dataset": "wikitext2",
+            "split": "validation",
+        }
+    }
+
+    with pytest.raises(typer.Exit) as exc:
+        _validate_and_harvest_baseline_schedule(
+            cfg,
+            pairing,
+            baseline,
+            tokenizer_hash=None,
             resolved_loss_type="causal",
             baseline_path_str="baseline.json",
             console=None,
