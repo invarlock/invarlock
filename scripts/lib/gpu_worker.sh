@@ -14,6 +14,8 @@
 
 # Source dependencies
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=runtime.sh
+source "${SCRIPT_DIR}/runtime.sh"
 [[ -z "${SCHEDULER_LOADED:-}" ]] && source "${SCRIPT_DIR}/scheduler.sh" && export SCHEDULER_LOADED=1
 [[ -z "${TASK_FUNCTIONS_LOADED:-}" ]] && source "${SCRIPT_DIR}/task_functions.sh" && export TASK_FUNCTIONS_LOADED=1
 if [[ -z "${MODEL_CREATION_LOADED:-}" && -f "${SCRIPT_DIR}/model_creation.sh" ]]; then
@@ -65,12 +67,12 @@ init_worker() {
 {
     "gpu_id": ${gpu_id},
     "pid": ${worker_pid},
-    "started_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+    "started_at": "$(_now_iso)",
     "status": "running"
 }
 EOF
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Worker initialized (PID ${worker_pid})"
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Worker initialized (PID ${worker_pid})"
 }
 
 # Update worker status
@@ -110,7 +112,7 @@ start_heartbeat_thread() {
     (
         while true; do
             touch "${output_dir}/workers/gpu_${gpu_id}.heartbeat" 2>/dev/null || break
-            sleep "${interval}"
+            _sleep "${interval}"
         done
     ) &
     echo $!
@@ -121,8 +123,8 @@ start_heartbeat_thread() {
 stop_heartbeat_thread() {
     local hb_pid="$1"
 
-    if [[ -n "${hb_pid}" ]] && kill -0 "${hb_pid}" 2>/dev/null; then
-        kill "${hb_pid}" 2>/dev/null || true
+    if [[ -n "${hb_pid}" ]] && _cmd_kill -0 "${hb_pid}" 2>/dev/null; then
+        _cmd_kill "${hb_pid}" 2>/dev/null || true
         wait "${hb_pid}" 2>/dev/null || true
     fi
 }
@@ -148,7 +150,7 @@ signal_shutdown() {
     local output_dir="$1"
 
     touch "${output_dir}/workers/SHUTDOWN"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Shutdown signal sent to all workers"
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Shutdown signal sent to all workers"
 }
 
 # ============ MAIN WORKER LOOP ============
@@ -162,30 +164,47 @@ gpu_worker() {
     # Initialize
     init_worker "${gpu_id}" "${output_dir}"
     # Ensure GPU reservation tracking directory is initialized for this run.
-    if type init_gpu_reservations &>/dev/null; then
+    # The main harness calls init_gpu_reservations() once and exports GPU_RESERVATION_DIR.
+    # Avoid an nvidia-smi "thundering herd" by not re-initializing from every worker.
+    if [[ -z "${GPU_RESERVATION_DIR:-}" ]] && type init_gpu_reservations &>/dev/null; then
         init_gpu_reservations "${output_dir}"
+    fi
+
+    local heartbeat_interval="${WORKER_HEARTBEAT_INTERVAL:-30}"
+    if ! [[ "${heartbeat_interval}" =~ ^[0-9]+$ ]]; then
+        heartbeat_interval=30
+    fi
+    local idle_sleep="${WORKER_IDLE_SLEEP:-5}"
+    if ! [[ "${idle_sleep}" =~ ^[0-9]+$ ]]; then
+        idle_sleep=5
+    fi
+    local max_failures="${WORKER_MAX_FAILURES:-10}"
+    if ! [[ "${max_failures}" =~ ^[0-9]+$ ]]; then
+        max_failures=10
     fi
 
     local consecutive_failures=0
     local tasks_completed=0
-    local last_heartbeat=$(date +%s)
+    local last_heartbeat
+    last_heartbeat=$(_now_epoch)
 
     # Set GPU for this worker
     export CUDA_VISIBLE_DEVICES="${gpu_id}"
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Worker started"
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Worker started"
     update_worker_status "${gpu_id}" "${output_dir}" "idle"
 
     while true; do
         # Check for shutdown signal
         if should_shutdown "${gpu_id}" "${output_dir}"; then
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Shutdown signal received"
+            echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Shutdown signal received"
             break
         fi
 
         # Heartbeat update
-        local now=$(date +%s)
-        if [[ $((now - last_heartbeat)) -ge ${WORKER_HEARTBEAT_INTERVAL} ]]; then
+        local now
+        now=$(_now_epoch)
+        if [[ $((now - last_heartbeat)) -ge ${heartbeat_interval} ]]; then
             update_heartbeat "${gpu_id}" "${output_dir}"
             last_heartbeat=${now}
         fi
@@ -195,25 +214,25 @@ gpu_worker() {
         # Workers only claim tasks from the ready queue; the monitor promotes pending->ready.
 
         # Get available GPU memory
-        local available_mem=$(get_gpu_available_memory "${gpu_id}")
+        local available_mem="$(get_gpu_available_memory "${gpu_id}" 2>/dev/null || true)"
 
-        if [[ -z "${available_mem}" || "${available_mem}" -le 0 ]]; then
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Cannot query GPU memory, retrying..."
-            sleep "${WORKER_IDLE_SLEEP}"
+        if ! [[ "${available_mem}" =~ ^[0-9]+$ ]] || [[ "${available_mem}" -le 0 ]]; then
+            echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Cannot query GPU memory, retrying..."
+            _sleep "${idle_sleep}"
             continue
         fi
 
         # Find and claim a task
         update_worker_status "${gpu_id}" "${output_dir}" "searching"
 
-        local task_file=$(find_and_claim_task "${available_mem}" "${gpu_id}")
+        local task_file="$(find_and_claim_task "${available_mem}" "${gpu_id}" 2>/dev/null || true)"
 
         if [[ -z "${task_file}" || ! -f "${task_file}" ]]; then
             # No suitable task found
 
             # Check if queue is completely empty
             if is_queue_empty; then
-                echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Queue empty, worker shutting down"
+                echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Queue empty, worker shutting down"
                 break
             fi
 
@@ -229,18 +248,19 @@ gpu_worker() {
                 update_worker_status "${gpu_id}" "${output_dir}" "idle"
             fi
 
-            sleep "${WORKER_IDLE_SLEEP}"
+            _sleep "${idle_sleep}"
             continue
         fi
 
         # Got a task - execute it
-        local task_id=$(get_task_id "${task_file}")
-        local task_type=$(get_task_type "${task_file}")
-        local model_name=$(get_task_field "${task_file}" "model_name")
-        local assigned_gpus=$(get_task_assigned_gpus "${task_file}")
+        local task_id="$(get_task_id "${task_file}" 2>/dev/null || basename "${task_file}" .task || true)"
+        local task_type="$(get_task_type "${task_file}" 2>/dev/null || true)"
+        local model_name="$(get_task_field "${task_file}" "model_name" 2>/dev/null || true)"
+        local assigned_gpus="$(get_task_assigned_gpus "${task_file}" 2>/dev/null || true)"
+        assigned_gpus="${assigned_gpus// /}"
         [[ -z "${assigned_gpus}" || "${assigned_gpus}" == "null" ]] && assigned_gpus="${gpu_id}"
 
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Starting task ${task_id} (${task_type}) on GPUs: ${assigned_gpus}"
+        echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Starting task ${task_id} (${task_type}) on GPUs: ${assigned_gpus}"
         update_worker_status "${gpu_id}" "${output_dir}" "running" "${task_id}"
 
         # OOM Pre-check: Verify we have enough memory before running
@@ -248,27 +268,31 @@ gpu_worker() {
             if ! check_oom_safe "${task_file}" "${assigned_gpus}"; then
                 local risk_level="unknown"
                 if type get_oom_risk_level &>/dev/null; then
-                    risk_level=$(get_oom_risk_level "${task_file}" "${assigned_gpus}")
+                    risk_level="$(get_oom_risk_level "${task_file}" "${assigned_gpus}" 2>/dev/null || echo "unknown")"
                 fi
-                echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: OOM RISK (${risk_level}) for ${task_id}, attempting memory cleanup first..."
+                echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: OOM RISK (${risk_level}) for ${task_id}, attempting memory cleanup first..."
 
                 # Try to purge GPU memory before running
                 if type purge_multi_gpu_memory &>/dev/null; then
                     purge_multi_gpu_memory "${assigned_gpus}"
-                    sleep 2  # Wait for memory to be freed
+                    _sleep 2  # Wait for memory to be freed
                 fi
 
                 # Re-check after cleanup
                 if ! check_oom_safe "${task_file}" "${assigned_gpus}"; then
-                    echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: WARNING - Memory still tight after cleanup, proceeding with caution"
+                    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: WARNING - Memory still tight after cleanup, proceeding with caution"
                 fi
             fi
         fi
 
         # Start background heartbeat thread during task execution
         # This ensures heartbeat stays fresh even during long model loads (Yi-34B: 20+ min)
-        local heartbeat_pid
-        heartbeat_pid=$(start_heartbeat_thread "${gpu_id}" "${output_dir}" "${WORKER_HEARTBEAT_INTERVAL}")
+        # IMPORTANT: Do NOT capture start_heartbeat_thread output via command substitution.
+        # In bash, command substitution runs in a subshell that waits for background jobs,
+        # which would deadlock here because the heartbeat loop is intentionally long-lived.
+        local heartbeat_pid=""
+        start_heartbeat_thread "${gpu_id}" "${output_dir}" "${heartbeat_interval}" >/dev/null
+        heartbeat_pid=$!
 
         # Execute task with CUDA_VISIBLE_DEVICES set to assigned GPUs
         local exit_code=0
@@ -279,19 +303,19 @@ gpu_worker() {
 
         # Handle result
         if [[ ${exit_code} -eq 0 ]]; then
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Task ${task_id} completed successfully"
+            echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Task ${task_id} completed successfully"
 
-            complete_task "${task_id}"
+            complete_task "${task_id}" 2>/dev/null || true
 
             # Release GPU reservations for multi-GPU tasks
             if type release_task_gpus &>/dev/null; then
-                release_task_gpus "${task_id}"
+                release_task_gpus "${task_id}" 2>/dev/null || true
             fi
 
             # Purge GPU memory immediately after task completion
             if type purge_multi_gpu_memory &>/dev/null; then
-                echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Purging GPU memory after task completion"
-                purge_multi_gpu_memory "${assigned_gpus}"
+                echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Purging GPU memory after task completion"
+                purge_multi_gpu_memory "${assigned_gpus}" 2>/dev/null || true
             fi
 
             # Dependency promotion is centralized in the main script's monitor loop
@@ -300,7 +324,7 @@ gpu_worker() {
             consecutive_failures=0
             tasks_completed=$((tasks_completed + 1))
         else
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Task ${task_id} FAILED (exit code: ${exit_code})"
+            echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Task ${task_id} FAILED (exit code: ${exit_code})"
 
             # Extract error from task log
             local task_log="${output_dir}/logs/tasks/${task_id}.log"
@@ -312,7 +336,7 @@ gpu_worker() {
                 # Check for OOM
                 if grep -q "CUDA out of memory" "${task_log}" 2>/dev/null; then
                     error_msg="OOM: CUDA out of memory"
-                    echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: OOM detected - attempting aggressive memory cleanup"
+                    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: OOM detected - attempting aggressive memory cleanup"
 
                     # Aggressive memory cleanup after OOM
                     if type purge_multi_gpu_memory &>/dev/null; then
@@ -328,36 +352,36 @@ gpu_worker() {
 
             # If CUDA context is poisoned by device-side assert, fail the task and exit
             if [[ -f "${task_log}" ]] && grep -qE "device-side assert|vectorized_gather_kernel" "${task_log}" 2>/dev/null; then
-                echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: CUDA context may be poisoned, exiting for restart"
+                echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: CUDA context may be poisoned, exiting for restart"
                 fail_task "${task_id}" "CUDA device-side assert - context poisoned"
                 if type release_task_gpus &>/dev/null; then
-                    release_task_gpus "${task_id}"
+                    release_task_gpus "${task_id}" 2>/dev/null || true
                 fi
                 exit 1
             fi
 
-            fail_task "${task_id}" "${error_msg}"
+            fail_task "${task_id}" "${error_msg}" 2>/dev/null || true
 
             # Release GPU reservations for multi-GPU tasks
             if type release_task_gpus &>/dev/null; then
-                release_task_gpus "${task_id}"
+                release_task_gpus "${task_id}" 2>/dev/null || true
             fi
 
             # Purge GPU memory after failure (especially important after OOM)
             if type purge_multi_gpu_memory &>/dev/null; then
-                purge_multi_gpu_memory "${assigned_gpus}"
+                purge_multi_gpu_memory "${assigned_gpus}" 2>/dev/null || true
             fi
 
             # Check if we should retry
             if type maybe_retry_task &>/dev/null; then
-                maybe_retry_task "${task_id}"
+                maybe_retry_task "${task_id}" 2>/dev/null || true
             fi
 
             consecutive_failures=$((consecutive_failures + 1))
 
             # Check for too many consecutive failures
-            if [[ ${consecutive_failures} -ge ${WORKER_MAX_FAILURES} ]]; then
-                echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Too many consecutive failures (${consecutive_failures}), shutting down"
+            if [[ ${consecutive_failures} -ge ${max_failures} ]]; then
+                echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Too many consecutive failures (${consecutive_failures}), shutting down"
                 break
             fi
         fi
@@ -365,20 +389,20 @@ gpu_worker() {
         update_worker_status "${gpu_id}" "${output_dir}" "idle"
 
         # Brief pause between tasks to allow memory cleanup
-        sleep 1
+        _sleep 1
     done
 
     # Cleanup
     update_worker_status "${gpu_id}" "${output_dir}" "stopped"
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Worker stopped (completed ${tasks_completed} tasks)"
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Worker stopped (completed ${tasks_completed} tasks)"
 
     # Update worker info - read existing started_at if available
     local original_started_at
     if [[ -f "${output_dir}/workers/gpu_${gpu_id}.info" ]]; then
-        original_started_at=$(jq -r '.started_at // empty' "${output_dir}/workers/gpu_${gpu_id}.info" 2>/dev/null)
+        original_started_at="$(jq -r '.started_at // empty' "${output_dir}/workers/gpu_${gpu_id}.info" 2>/dev/null || true)"
     fi
-    [[ -z "${original_started_at}" ]] && original_started_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+    [[ -z "${original_started_at}" ]] && original_started_at="$(_now_iso)"
 
     # Use BASHPID for accurate PID in subshells (same as init_worker)
     local final_pid="${BASHPID:-$$}"
@@ -387,7 +411,7 @@ gpu_worker() {
     "gpu_id": ${gpu_id},
     "pid": ${final_pid},
     "started_at": "${original_started_at}",
-    "stopped_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+    "stopped_at": "$(_now_iso)",
     "status": "stopped",
     "tasks_completed": ${tasks_completed},
     "consecutive_failures": ${consecutive_failures}
@@ -403,10 +427,15 @@ EOF
 launch_worker_pool() {
     local output_dir="$1"
     local num_gpus="${2:-8}"
+    local gpu_id
+
+    if ! [[ "${num_gpus}" =~ ^[0-9]+$ ]] || [[ ${num_gpus} -lt 1 ]]; then
+        num_gpus=1
+    fi
 
     declare -a worker_pids=()
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Launching ${num_gpus} GPU workers..."
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Launching ${num_gpus} GPU workers..."
 
     local -a gpu_ids=()
     if [[ -n "${GPU_ID_LIST:-}" ]]; then
@@ -426,7 +455,7 @@ launch_worker_pool() {
         # Write PID to file
         echo "${pid}" > "${output_dir}/workers/gpu_${gpu_id}.pid"
 
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Launched worker for GPU ${gpu_id} (PID ${pid})"
+        echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Launched worker for GPU ${gpu_id} (PID ${pid})"
     done
 
     # Return PIDs
@@ -439,21 +468,21 @@ wait_for_workers() {
     local pids=("$@")
     local failed=0
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for ${#pids[@]} workers to complete..."
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Waiting for ${#pids[@]} workers to complete..."
 
     for i in "${!pids[@]}"; do
         local pid="${pids[$i]}"
 
         if wait "${pid}"; then
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Worker ${i} (PID ${pid}) completed successfully"
+            echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Worker ${i} (PID ${pid}) completed successfully"
         else
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Worker ${i} (PID ${pid}) FAILED"
+            echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Worker ${i} (PID ${pid}) FAILED"
             failed=$((failed + 1))
         fi
     done
 
     if [[ ${failed} -gt 0 ]]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: ${failed} worker(s) failed"
+        echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] WARNING: ${failed} worker(s) failed"
         return 1
     fi
 
@@ -471,11 +500,23 @@ monitor_workers() {
     # Default timeout increased from 5 min to 45 min to accommodate large model loads
     # (Yi-34B takes 20+ min to load 15 checkpoint shards)
     local worker_timeout="${4:-2700}"  # 45 minutes
+    local gpu_id
+
+    if ! [[ "${check_interval}" =~ ^[0-9]+$ ]]; then
+        check_interval=30
+    fi
+    if ! [[ "${worker_timeout}" =~ ^[0-9]+$ ]]; then
+        worker_timeout=2700
+    fi
+
+    if ! [[ "${num_gpus}" =~ ^[0-9]+$ ]] || [[ ${num_gpus} -lt 1 ]]; then
+        num_gpus=1
+    fi
 
     while true; do
         # Check if all work is done
-        if is_queue_empty && is_queue_complete; then
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] All tasks complete, stopping monitor"
+        if is_queue_empty; then
+            echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Queue empty, stopping monitor"
             signal_shutdown "${output_dir}"
             break
         fi
@@ -503,40 +544,44 @@ monitor_workers() {
             local pid=$(cat "${pid_file}")
 
             # Check if process is alive
-            if ! kill -0 "${pid}" 2>/dev/null; then
-                echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: Worker GPU ${gpu_id} (PID ${pid}) died"
+            if ! _cmd_kill -0 "${pid}" 2>/dev/null; then
+                echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] WARNING: Worker GPU ${gpu_id} (PID ${pid}) died"
 
                 # Reclaim orphaned tasks
                 reclaim_orphaned_tasks "${gpu_id}"
 
                 # Restart worker
-                echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restarting worker for GPU ${gpu_id}"
+                echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Restarting worker for GPU ${gpu_id}"
                 gpu_worker "${gpu_id}" "${output_dir}" &
                 local new_pid=$!
                 echo "${new_pid}" > "${pid_file}"
 
-                echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restarted GPU ${gpu_id} worker (new PID ${new_pid})"
+                echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Restarted GPU ${gpu_id} worker (new PID ${new_pid})"
                 continue
             fi
 
             # Check for stale heartbeat (stuck worker)
             if [[ -f "${heartbeat_file}" ]]; then
                 local heartbeat_age
-                heartbeat_age=$(( $(date +%s) - $(stat -c %Y "${heartbeat_file}") ))
+                local now_epoch
+                now_epoch=$(_now_epoch)
+                local hb_mtime
+                hb_mtime=$(_file_mtime_epoch "${heartbeat_file}" 2>/dev/null || echo "0")
+                heartbeat_age=$((now_epoch - hb_mtime))
 
                 if [[ ${heartbeat_age} -gt ${worker_timeout} ]]; then
                     local status=$(cat "${status_file}" 2>/dev/null || echo "unknown")
 
-                    echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: Worker GPU ${gpu_id} stuck (no heartbeat for ${heartbeat_age}s, status: ${status})"
+                    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] WARNING: Worker GPU ${gpu_id} stuck (no heartbeat for ${heartbeat_age}s, status: ${status})"
 
                     # Kill stuck worker
-                    kill -9 "${pid}" 2>/dev/null || true
+                    _cmd_kill -9 "${pid}" 2>/dev/null || true
 
                     # Reclaim tasks
                     reclaim_orphaned_tasks "${gpu_id}"
 
                     # Restart
-                    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restarting stuck worker for GPU ${gpu_id}"
+                    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Restarting stuck worker for GPU ${gpu_id}"
                     gpu_worker "${gpu_id}" "${output_dir}" &
                     local new_pid=$!
                     echo "${new_pid}" > "${pid_file}"
@@ -544,7 +589,7 @@ monitor_workers() {
             fi
         done
 
-        sleep "${check_interval}"
+        _sleep "${check_interval}"
     done
 }
 
@@ -553,6 +598,11 @@ monitor_workers() {
 get_worker_summary() {
     local output_dir="$1"
     local num_gpus="$2"
+    local gpu_id
+
+    if ! [[ "${num_gpus}" =~ ^[0-9]+$ ]] || [[ ${num_gpus} -lt 1 ]]; then
+        num_gpus=1
+    fi
 
     echo "=== WORKER STATUS ==="
 
@@ -577,7 +627,7 @@ get_worker_summary() {
         [[ -f "${status_file}" ]] && status=$(cat "${status_file}")
         [[ -f "${pid_file}" ]] && pid=$(cat "${pid_file}")
 
-        if [[ "${pid}" != "N/A" ]] && kill -0 "${pid}" 2>/dev/null; then
+        if [[ "${pid}" != "N/A" ]] && _cmd_kill -0 "${pid}" 2>/dev/null; then
             alive="yes"
         fi
 

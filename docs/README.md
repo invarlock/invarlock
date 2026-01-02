@@ -1,4 +1,4 @@
-# InvarLock Documentation (0.3.4)
+# InvarLock Documentation (0.3.5)
 
 The OSS core is edit‑agnostic (BYOE). A small built‑in quantization demo
 (`quant_rtn`, 8‑bit) exists for CI/quickstart. See

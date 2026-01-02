@@ -10,7 +10,9 @@
 # 4. Environment validation
 # 5. Running the B200 validation suite with optimized settings
 
-set -euo pipefail
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    set -euo pipefail
+fi
 
 # ============ CONFIGURATION ============
 # Modify these as needed
@@ -22,8 +24,17 @@ LOG_FILE="${LOG_FILE:-${WORK_DIR}/setup.log}"
 # PyTorch nightly with CUDA 12.8 support (includes sm_100 for B200)
 TORCH_INDEX_URL="https://download.pytorch.org/whl/nightly/cu128"
 
-# Ensure log directory exists before first log call
-mkdir -p "$(dirname "${LOG_FILE}")"
+# HuggingFace caches (models + datasets). Defaulting to /root/.cache often fails
+# on GPU nodes with small / partitions; keep caches under WORK_DIR by default.
+export HF_HOME="${HF_HOME:-${WORK_DIR}/hf_home}"
+export HF_HUB_CACHE="${HF_HUB_CACHE:-${HF_HOME}/hub}"
+export HF_DATASETS_CACHE="${HF_DATASETS_CACHE:-${HF_HOME}/datasets}"
+export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-${HF_HOME}/transformers}"
+
+# Ensure log directory exists before first log call (execution only)
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    mkdir -p "$(dirname "${LOG_FILE}")"
+fi
 
 # Validation script settings (optimized for lock contention reduction)
 # GPU selection is auto-detected at runtime unless explicitly set:
@@ -52,10 +63,28 @@ log_section() {
     log "============================================"
 }
 
+if ! declare -F _bootstrap_is_root >/dev/null 2>&1; then
+    :
+    _bootstrap_is_root() { [[ ${EUID} -eq 0 ]]; }
+fi
+
 check_root() {
-    if [[ $EUID -eq 0 ]]; then
+    if _bootstrap_is_root; then
         log "WARNING: Running as root. Consider running as regular user."
     fi
+}
+
+_bootstrap_run_pkg() {
+    if _bootstrap_is_root; then
+        "$@"
+        return $?
+    fi
+    if command -v sudo >/dev/null 2>&1; then
+        sudo "$@"
+        return $?
+    fi
+    log "ERROR: sudo is required to install system dependencies"
+    return 1
 }
 
 # ============ PHASE 1: SYSTEM DEPENDENCIES ============
@@ -65,8 +94,7 @@ install_system_deps() {
 
     if command -v apt-get &>/dev/null; then
         log "Detected Debian/Ubuntu system"
-        sudo apt-get update
-        sudo apt-get install -y \
+        if ! _bootstrap_run_pkg apt-get update || ! _bootstrap_run_pkg apt-get install -y \
             tmux \
             jq \
             python3.12 \
@@ -76,10 +104,12 @@ install_system_deps() {
             ninja-build \
             git \
             curl \
-            wget
+            wget; then
+            return 1
+        fi
     elif command -v yum &>/dev/null; then
         log "Detected RHEL/CentOS system"
-        sudo yum install -y \
+        if ! _bootstrap_run_pkg yum install -y \
             tmux \
             jq \
             python3.12 \
@@ -90,11 +120,13 @@ install_system_deps() {
             ninja-build \
             git \
             curl \
-            wget
+            wget; then
+            return 1
+        fi
     else
         log "ERROR: Unknown package manager. Please install dependencies manually."
         log "Required: tmux, jq, python3.12, python3.12-venv/devel, build-essential, ninja-build"
-        exit 1
+        return 1
     fi
 
     log "System dependencies installed successfully"
@@ -204,9 +236,11 @@ install_invarlock_deps() {
     if [[ -f "${req_file}" ]]; then
         log "Found requirements.txt, installing (excluding torch/flash_attn pins)..."
         # grep -v returns exit code 1 when it filters out all lines; don't treat that as fatal.
-        grep -vE '^(torch|torchvision|torchaudio|flash_attn)==' "${req_file}" > /tmp/req_filtered.txt || true
-        python -m pip install -r /tmp/req_filtered.txt || true
-        rm -f /tmp/req_filtered.txt
+        local tmp_req=""
+        tmp_req="$(mktemp "${TMPDIR:-/tmp}/req_filtered.XXXXXX" 2>/dev/null || printf '%s' "/tmp/req_filtered.$$")"
+        grep -vE '^(torch|torchvision|torchaudio|flash_attn)==' "${req_file}" > "${tmp_req}" || true
+        python -m pip install -r "${tmp_req}" || true
+        rm -f "${tmp_req}"
     fi
 
     # Verify invarlock
@@ -226,81 +260,85 @@ install_invarlock_deps() {
     log "Dependencies installation complete"
 
     # Apply runtime patches for known issues
-    patch_invarlock_scorer
+    patch_invarlock_metrics_gather
 }
 
-# ============ PATCH: GPT-2 SCORER VOCAB CLAMP ============
+# ============ PATCH: METRICS GATHER CLAMP (DEVICE-SIDE ASSERT GUARD) ============
 
-patch_invarlock_scorer() {
-    log "Checking for GPT-2 scorer vocabulary fix..."
+patch_invarlock_metrics_gather() {
+    log "Checking for metrics gather clamp fix..."
 
-    # This patch fixes a CUDA device-side assertion failure that occurs when
-    # scoring text difficulty using GPT-2 on models with larger vocabularies
-    # (e.g., Yi-34B vocab=64000, Mistral vocab=32000 > GPT-2 vocab=50257).
-    # Without this fix, out-of-range token IDs cause CUDA assertion failures
-    # that poison the GPU context and fail all subsequent operations.
+    # This patch prevents CUDA "device-side assert triggered" errors that can occur
+    # when token IDs exceed the model's logits vocab dimension during perplexity
+    # computation (gather). Those asserts poison the CUDA context for the process.
 
-    python - <<'PATCH_SCORER'
+    local patch_rc=0
+    python - <<'PATCH_METRICS' || patch_rc=$?
+import importlib.util
 import sys
 from pathlib import Path
 
-try:
-    import invarlock.eval.data as d
-except ImportError:
-    print("InvarLock not installed, skipping scorer patch")
+def _resolve_metrics_path():
+    try:
+        import invarlock.eval.metrics as m
+        return Path(m.__file__)
+    except Exception:
+        spec = importlib.util.find_spec("invarlock.eval.metrics")
+        if spec and spec.origin:
+            return Path(spec.origin)
+    return None
+
+path = _resolve_metrics_path()
+if not path:
+    print("InvarLock not installed, skipping metrics patch")
     sys.exit(0)
 
-path = Path(d.__file__)
 try:
     text = path.read_text()
 except Exception as e:
     print(f"Could not read {path}: {e}")
     sys.exit(0)
 
-# Check if already patched
-if "scorer_vocab_size = getattr(model.config, \"vocab_size\", None)" in text:
-    print(f"GPT-2 scorer already patched: {path}")
+# Fix accidental literal "\n" sequences from older patch logic.
+if "\\n        tgt = shift_labels.clamp(" in text or "shift_logits.size(-1)\\n" in text:
+    text = text.replace("shift_logits.size(-1)\\n", "shift_logits.size(-1)\n")
+    text = text.replace("\\n        tgt = shift_labels.clamp(", "\n        tgt = shift_labels.clamp(")
+    try:
+        path.write_text(text)
+        print(f"Metrics gather de-escaped newline fix applied: {path}")
+    except Exception as e:
+        print(f"Could not write patch to {path}: {e}")
+        print("You may need to run this with appropriate permissions or apply the patch manually.")
+        sys.exit(1)
+    # Re-read for patched checks below.
+    text = path.read_text()
+
+# Skip if a fixed implementation is already present (either upstream or patched).
+if "clamp(min=0, max=vocab_size - 1)" in text or "_sanitize_token_ids_for_model" in text:
+    print(f"Metrics gather already patched: {path}")
     sys.exit(0)
 
-# Apply patch: add vocab size extraction after batch_size line
-needle = "            batch_size = min(32, max(4, len(candidates)))"
+needle = "tgt = shift_labels.clamp_min(0).unsqueeze(-1)"
 if needle not in text:
-    print(f"Could not find patch point in {path}, may need manual patching")
+    print(f"Could not find gather clamp point in {path}, may need manual patching")
     sys.exit(0)
 
-text = text.replace(
-    needle,
-    needle + "\n            scorer_vocab_size = getattr(model.config, \"vocab_size\", None)"
-)
-
-# Apply patch: add input clamping before model forward pass
-old = "                        outputs = model(input_tensor, attention_mask=attention_tensor)"
-if old not in text:
-    print(f"Could not find model forward call in {path}, may need manual patching")
-    sys.exit(0)
-
-new = """                        # Guard against out-of-range token IDs when scoring with GPT-2.
-                        # Some model tokenizers emit IDs beyond GPT-2 vocab, which can
-                        # trigger device-side asserts in embedding/gather kernels.
-                        if scorer_vocab_size and scorer_vocab_size > 0:
-                            input_tensor = input_tensor.clamp(min=0, max=scorer_vocab_size - 1)
-
-                        outputs = model(input_tensor, attention_mask=attention_tensor)"""
-text = text.replace(old, new)
+replacement = "vocab_size = shift_logits.size(-1)\n        tgt = shift_labels.clamp(min=0, max=vocab_size - 1).unsqueeze(-1)"
+text = text.replace(needle, replacement)
 
 try:
     path.write_text(text)
-    print(f"GPT-2 scorer patched successfully: {path}")
+    print(f"Metrics gather patched successfully: {path}")
 except Exception as e:
     print(f"Could not write patch to {path}: {e}")
     print("You may need to run this with appropriate permissions or apply the patch manually.")
     sys.exit(1)
-PATCH_SCORER
+PATCH_METRICS
 
-    if [[ $? -eq 0 ]]; then
-        log "GPT-2 scorer patch check complete"
+    if [[ ${patch_rc} -eq 0 ]]; then
+        log "Metrics gather patch check complete"
     else
-        log "WARNING: GPT-2 scorer patch could not be applied. Manual patching may be required."
+        log "WARNING: Metrics gather patch could not be applied. Manual patching may be required."
     fi
 }
 
@@ -316,24 +354,29 @@ configure_gpu_env() {
         source="CUDA_VISIBLE_DEVICES"
         IFS=',' read -ra candidates <<< "${raw_list}"
     else
-        mapfile -t candidates < <(nvidia-smi --query-gpu=index --format=csv,noheader,nounits 2>/dev/null | tr -d ' ')
+        while IFS= read -r id; do
+            [[ -n "${id}" ]] && candidates+=("${id}")
+        done < <(nvidia-smi --query-gpu=index --format=csv,noheader,nounits 2>/dev/null | tr -d ' ')
     fi
 
     local -a cleaned=()
     local id
-    for id in "${candidates[@]}"; do
-        id=$(echo "${id}" | tr -d ' ')
-        [[ -z "${id}" ]] && continue
-        if ! [[ "${id}" =~ ^[0-9]+$ ]]; then
-            log "ERROR: Non-numeric GPU id in ${source}: '${id}'"
-            exit 1
-        fi
-        if ! nvidia-smi -i "${id}" &>/dev/null; then
-            log "ERROR: GPU id '${id}' from ${source} is not valid on this host"
-            exit 1
-        fi
-        cleaned+=("${id}")
-    done
+    # Bash 3.2 + `set -u` treats `"${arr[@]}"` as unbound when empty; guard it.
+    if [[ ${#candidates[@]} -gt 0 ]]; then
+        for id in "${candidates[@]}"; do
+            id=$(echo "${id}" | tr -d ' ')
+            [[ -z "${id}" ]] && continue
+            if ! [[ "${id}" =~ ^[0-9]+$ ]]; then
+                log "ERROR: Non-numeric GPU id in ${source}: '${id}'"
+                exit 1
+            fi
+            if ! nvidia-smi -i "${id}" &>/dev/null; then
+                log "ERROR: GPU id '${id}' from ${source} is not valid on this host"
+                exit 1
+            fi
+            cleaned+=("${id}")
+        done
+    fi
 
     if [[ ${#cleaned[@]} -eq 0 ]]; then
         log "ERROR: No GPUs detected (source=${source})"
@@ -424,19 +467,18 @@ run_validation() {
     source "${VENV_DIR}/bin/activate"
     cd "${WORK_DIR}"
 
-    # Ensure GPT-2 scorer patch is applied (idempotent)
-    patch_invarlock_scorer
+    patch_invarlock_metrics_gather
     if ! python - <<'PY'
-import invarlock.eval.data as d
+import invarlock.eval.metrics as m
 from pathlib import Path
 
-text = Path(d.__file__).read_text()
-if "scorer_vocab_size" not in text:
-    raise SystemExit("GPT-2 scorer patch NOT applied")
-print("GPT-2 scorer patch verified")
+text = Path(m.__file__).read_text()
+if "clamp(min=0, max=vocab_size - 1)" not in text and "_sanitize_token_ids_for_model" not in text:
+    raise SystemExit("metrics gather patch NOT applied")
+print("metrics gather patch verified")
 PY
     then
-        log "ERROR: GPT-2 scorer patch verification failed"
+        log "ERROR: metrics gather patch verification failed"
         exit 1
     fi
 
@@ -453,6 +495,9 @@ PY
         chmod +x "${validation_script}"
     fi
 
+    # Ensure HuggingFace caches are on a large filesystem (models + datasets).
+    mkdir -p "${HF_HOME}" "${HF_HUB_CACHE}" "${HF_DATASETS_CACHE}" "${TRANSFORMERS_CACHE}"
+
     log "Starting validation with optimized settings:"
     log "  NUM_GPUS=${NUM_GPUS}"
     log "  CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}"
@@ -460,6 +505,10 @@ PY
     log "  SKIP_FLASH_ATTN=${SKIP_FLASH_ATTN}"
     log "  WORKER_IDLE_SLEEP=${WORKER_IDLE_SLEEP}"
     log "  WORKER_HEARTBEAT_INTERVAL=${WORKER_HEARTBEAT_INTERVAL}"
+    log "  HF_HOME=${HF_HOME}"
+    log "  HF_HUB_CACHE=${HF_HUB_CACHE}"
+    log "  HF_DATASETS_CACHE=${HF_DATASETS_CACHE}"
+    log "  TRANSFORMERS_CACHE=${TRANSFORMERS_CACHE}"
 
     # Run with tee to capture output
     local run_log="${WORK_DIR}/run_b200_$(date +%Y%m%d_%H%M%S).log"
@@ -494,7 +543,7 @@ post_run_diagnostics() {
 
     # Find latest output directory
     local latest_output
-    latest_output=$(ls -td invarlock_validation_b200_* 2>/dev/null | head -1)
+    latest_output="$(ls -td invarlock_validation_b200_* 2>/dev/null | head -1 || true)"
 
     if [[ -z "${latest_output}" ]]; then
         log "No output directory found"
@@ -512,7 +561,7 @@ post_run_diagnostics() {
         done
 
         local unique_pids
-        unique_pids=$(cat "${latest_output}/workers"/gpu_*.pid 2>/dev/null | sort -u | wc -l)
+        unique_pids="$(cat "${latest_output}/workers"/gpu_*.pid 2>/dev/null | sort -u | wc -l | tr -d ' ' || echo "0")"
         log "  Unique PIDs: ${unique_pids}"
     fi
 
@@ -525,10 +574,14 @@ post_run_diagnostics() {
     # Check task completion
     log "Task Completion Summary:"
     if [[ -d "${latest_output}/queue" ]]; then
-        local completed=$(ls "${latest_output}/queue/completed/"*.task 2>/dev/null | wc -l)
-        local failed=$(ls "${latest_output}/queue/failed/"*.task 2>/dev/null | wc -l)
-        local pending=$(ls "${latest_output}/queue/pending/"*.task 2>/dev/null | wc -l)
-        local ready=$(ls "${latest_output}/queue/ready/"*.task 2>/dev/null | wc -l)
+        local completed
+        completed="$(ls "${latest_output}/queue/completed/"*.task 2>/dev/null | wc -l | tr -d ' ' || echo "0")"
+        local failed
+        failed="$(ls "${latest_output}/queue/failed/"*.task 2>/dev/null | wc -l | tr -d ' ' || echo "0")"
+        local pending
+        pending="$(ls "${latest_output}/queue/pending/"*.task 2>/dev/null | wc -l | tr -d ' ' || echo "0")"
+        local ready
+        ready="$(ls "${latest_output}/queue/ready/"*.task 2>/dev/null | wc -l | tr -d ' ' || echo "0")"
         log "  Completed: ${completed}"
         log "  Failed: ${failed}"
         log "  Pending: ${pending}"
@@ -604,9 +657,10 @@ main() {
 
 # ============ SCRIPT ENTRY POINT ============
 
-# Show usage if --help
-if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-    cat << USAGE
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    # Show usage if --help
+    if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+        cat << USAGE
 B200 Setup and Validation Runner
 
 Usage: $0 [mode]
@@ -641,8 +695,9 @@ Examples:
   # Check results
   ./b200_bootstrap_and_validate.sh diagnostics
 USAGE
-    exit 0
-fi
+        exit 0
+    fi
 
-# Run main
-main "${1:-full}"
+    # Run main
+    main "${1:-full}"
+fi

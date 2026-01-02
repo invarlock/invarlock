@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+fixtures_dir="${TEST_TMPDIR:-}/fixtures/nvidia-smi"
+gpu_id=""
+query=""
+
+args=("$@")
+for ((i=0; i<${#args[@]}; i++)); do
+    case "${args[$i]}" in
+        -i)
+            gpu_id="${args[$((i+1))]:-}"
+            ;;
+        --query-gpu=*)
+            query="${args[$i]#--query-gpu=}"
+            ;;
+        --query-compute-apps=*)
+            query="${args[$i]#--query-compute-apps=}"
+            ;;
+    esac
+done
+
+[[ -n "${gpu_id}" ]] || gpu_id="0"
+
+# Validity probe mode: `nvidia-smi -i <id>` should fail for fixture-listed invalid IDs.
+if [[ -z "${query}" && -n "${TEST_TMPDIR:-}" && -f "${fixtures_dir}/invalid_ids" ]]; then
+    if grep -q -E "^${gpu_id}$" "${fixtures_dir}/invalid_ids" 2>/dev/null; then
+        exit 1
+    fi
+fi
+
+case "${query}" in
+    index)
+        cat "${fixtures_dir}/indices" 2>/dev/null || echo "0"
+        ;;
+    memory.free)
+        cat "${fixtures_dir}/memory_free.${gpu_id}" 2>/dev/null || echo "0"
+        ;;
+    memory.total)
+        cat "${fixtures_dir}/memory_total.${gpu_id}" 2>/dev/null || echo "184320"
+        ;;
+    utilization.gpu)
+        cat "${fixtures_dir}/utilization.${gpu_id}" 2>/dev/null || echo "0"
+        ;;
+    pid)
+        cat "${fixtures_dir}/compute_pids.${gpu_id}" 2>/dev/null || true
+        ;;
+    *)
+        # Default: succeed with no output.
+        ;;
+esac

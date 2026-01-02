@@ -7,7 +7,6 @@ Pluggable data loading system with deterministic windowing for reproducible eval
 
 from __future__ import annotations
 
-import atexit
 import hashlib
 import json
 import math
@@ -51,7 +50,6 @@ except ImportError:
 
 try:
     import torch
-    import torch.nn.functional as F
 
     HAS_TORCH = True
 except ImportError:
@@ -160,9 +158,9 @@ class WikiText2Provider:
     """
 
     name = "wikitext2"
-    _MODEL_CACHE: Any | None | bool = None
-    _MODEL_DEVICE: Any | None = None
-    _CLEANUP_REGISTERED: bool = False
+    _BYTE_NGRAM_ORDER = 4
+    _BYTE_NGRAM_PAD = 256
+    _BYTE_NGRAM_ALPHA = 1.0
 
     def __init__(
         self,
@@ -178,56 +176,15 @@ class WikiText2Provider:
         """
         self.cache_dir = cache_dir
         self._validate_dependencies()
-        self._register_cleanup()
-        self._difficulty_model = self.__class__._MODEL_CACHE
-        self._difficulty_device = self.__class__._MODEL_DEVICE
         self._last_stratification_stats: dict[str, Any] | None = None
         self._last_batch_size_used: int = 0
         self._last_scorer_profile: dict[str, Any] | None = None
-        self._scorer_warmed: bool = False
         # In-process cache for loaded/filtered texts to avoid repeated
         # load_dataset() calls across stratification retries.
         self._texts_cache: dict[str, list[str]] = {}
         # Optional device hint from CLI/resolved run device (e.g. "cpu", "cuda", "mps", "auto")
         normalized_hint = (device_hint or "").strip().lower()
         self._device_hint: str | None = normalized_hint or None
-
-    @classmethod
-    def _register_cleanup(cls) -> None:
-        """Register an atexit hook once per process to release cached models."""
-        if cls._CLEANUP_REGISTERED or not HAS_TORCH:
-            return
-
-        def _cleanup() -> None:
-            cls._cleanup_model_cache()
-
-        atexit.register(_cleanup)
-        cls._CLEANUP_REGISTERED = True
-
-    @classmethod
-    def _cleanup_model_cache(cls) -> None:
-        """Release cached models to avoid leaking multiprocessing semaphores."""
-        cache = cls._MODEL_CACHE
-        if cache is not None and cache is not False and HAS_TORCH:
-            try:
-                cache.to("cpu")
-            except Exception:
-                pass
-        cls._MODEL_CACHE = None
-        cls._MODEL_DEVICE = None
-
-    @staticmethod
-    def _pick_default_scorer_device() -> torch.device:
-        """
-        Choose a default device for the difficulty scorer model.
-
-        Prefers CUDA → MPS → CPU when available.
-        """
-        if torch.cuda.is_available():
-            return torch.device("cuda")
-        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-            return torch.device("mps")
-        return torch.device("cpu")
 
     def _validate_dependencies(self) -> None:
         """Check that required dependencies are available."""
@@ -513,9 +470,11 @@ class WikiText2Provider:
                 candidates.append(
                     {
                         "dataset_index": idx,
+                        "text": texts[idx],
                         "input_ids": input_ids_list,
                         "attention_mask": attention_mask_list,
                         "token_count": real_tokens,
+                        "seq_len": len(input_ids_list),
                     }
                 )
 
@@ -531,32 +490,7 @@ class WikiText2Provider:
                 details={"needed": int(total_required), "got": int(len(candidates))},
             )
 
-        if not self._score_candidates_with_model(candidates):
-            token_counter: Counter[int] = Counter()
-            for candidate in candidates:
-                for token_id, mask in zip(
-                    candidate["input_ids"], candidate["attention_mask"], strict=False
-                ):
-                    if mask:
-                        token_counter[int(token_id)] += 1
-
-            total_tokens = sum(token_counter.values()) or 1
-            vocab_size = max(len(token_counter), 1)
-
-            for candidate in candidates:
-                difficulty = 0.0
-                real_tokens = 0
-                for token_id, mask in zip(
-                    candidate["input_ids"], candidate["attention_mask"], strict=False
-                ):
-                    if not mask:
-                        continue
-                    freq = (token_counter[int(token_id)] + 1.0) / (
-                        total_tokens + vocab_size
-                    )
-                    difficulty -= math.log(freq)
-                    real_tokens += 1
-                candidate["difficulty"] = difficulty / max(real_tokens, 1)
+        self._score_candidates_byte_ngram(candidates)
 
         sorted_candidates = sorted(
             candidates, key=lambda item: (item["difficulty"], item["dataset_index"])
@@ -843,192 +777,62 @@ class WikiText2Provider:
 
         return results
 
-    def _score_candidates_with_model(self, candidates: list[dict[str, Any]]) -> bool:
-        """Score candidate windows using a pretrained GPT-2 model if available."""
-        if not HAS_TORCH:
-            return False
-
-        if self._difficulty_model is False:
-            return False
-
-        try:
-            eval_device_override = os.environ.get("INVARLOCK_EVAL_DEVICE")
-            device_hint = getattr(self, "_device_hint", None)
-
-            def _is_device_usable(device: torch.device) -> bool:
-                try:
-                    _ = torch.zeros((1, 1), dtype=torch.long, device=device)
-                    return True
-                except Exception:
-                    return False
-
-            if self._difficulty_model is None:
-                from transformers import GPT2LMHeadModel
-
-                model = GPT2LMHeadModel.from_pretrained("gpt2")
-                model.eval()
-                # Decide initial scorer device: env override → provider hint → heuristic
-                if eval_device_override:
-                    try:
-                        device = torch.device(eval_device_override)
-                    except Exception:
-                        device = self._pick_default_scorer_device()
-                elif device_hint and device_hint != "auto":
-                    try:
-                        device = torch.device(device_hint)
-                    except Exception:
-                        device = self._pick_default_scorer_device()
-                else:
-                    device = self._pick_default_scorer_device()
-
-                if device.type != "cpu" and not _is_device_usable(device):
-                    warnings.warn(
-                        f"Difficulty scorer device {device} unavailable; falling back to CPU",
-                        stacklevel=2,
-                    )
-                    device = torch.device("cpu")
-
-                model.to(device)
-                self._difficulty_model = model
-                self._difficulty_device = device
-                self.__class__._MODEL_CACHE = model
-                self.__class__._MODEL_DEVICE = device
-
-            assert self._difficulty_model is not None
-            model = self._difficulty_model
-            device = self._difficulty_device or torch.device("cpu")
-
-            # If a new override/hint is provided, move the cached model if needed.
-            desired_device = device
-            if eval_device_override:
-                try:
-                    desired_device = torch.device(eval_device_override)
-                except Exception:
-                    desired_device = device
-            elif device_hint and device_hint != "auto":
-                try:
-                    desired_device = torch.device(device_hint)
-                except Exception:
-                    desired_device = device
-
-            if desired_device != device:
-                if desired_device.type != "cpu" and not _is_device_usable(
-                    desired_device
-                ):
-                    warnings.warn(
-                        f"Difficulty scorer device {desired_device} unavailable; keeping {device}",
-                        stacklevel=2,
-                    )
-                else:
-                    try:
-                        model.to(desired_device)
-                        device = desired_device
-                        self._difficulty_device = desired_device
-                        self.__class__._MODEL_DEVICE = desired_device
-                    except Exception as exc:
-                        warnings.warn(
-                            f"Failed to move GPT-2 difficulty scorer to {desired_device}: {exc}",
-                            stacklevel=2,
-                        )
-
-            if not self._scorer_warmed:
-                with torch.no_grad():
-                    dummy_input = torch.zeros((1, 8), dtype=torch.long, device=device)
-                    dummy_attention = torch.ones_like(dummy_input)
-                    model(dummy_input, attention_mask=dummy_attention)
-                self._scorer_warmed = True
-
-            batch_override = os.environ.get("INVARLOCK_SCORES_BATCH_SIZE")
-            override_size = None
-            if batch_override:
-                try:
-                    override_size = max(1, int(batch_override))
-                except ValueError:
-                    override_size = None
-
-            batch_size = min(32, max(4, len(candidates)))
-            if override_size is not None:
-                batch_size = max(1, min(override_size, len(candidates)))
-
-            config = getattr(model, "config", None)
-            scorer_vocab_size = getattr(config, "vocab_size", None)
-
-            input_batch: list[list[int]] = []
-            attention_batch: list[list[int]] = []
-            candidate_batch: list[dict[str, Any]] = []
-            total_tokens = 0
-            start_time = time.perf_counter()
-
-            with torch.no_grad():
-                for candidate in candidates:
-                    input_batch.append(candidate["input_ids"])
-                    attention_batch.append(candidate["attention_mask"])
-                    candidate_batch.append(candidate)
-
-                    if len(input_batch) == batch_size or candidate is candidates[-1]:
-                        input_tensor = torch.tensor(
-                            input_batch, dtype=torch.long, device=device
-                        )
-                        attention_tensor = torch.tensor(
-                            attention_batch, dtype=torch.long, device=device
-                        )
-
-                        # Guard against out-of-range token IDs when scoring with GPT-2.
-                        # Some model tokenizers emit IDs beyond GPT-2 vocab, which can
-                        # trigger device-side asserts in embedding/gather kernels.
-                        if scorer_vocab_size and scorer_vocab_size > 0:
-                            input_tensor = input_tensor.clamp(
-                                min=0, max=scorer_vocab_size - 1
-                            )
-
-                        outputs = model(input_tensor, attention_mask=attention_tensor)
-                        shift_logits = outputs.logits[:, :-1, :].contiguous()
-                        shift_labels = input_tensor[:, 1:].contiguous()
-                        shift_mask = attention_tensor[:, 1:].contiguous()
-                        shift_labels = shift_labels.masked_fill(shift_mask == 0, 0)
-
-                        vocab_size = shift_logits.size(-1)
-                        losses = F.cross_entropy(
-                            shift_logits.view(-1, vocab_size),
-                            shift_labels.view(-1),
-                            reduction="none",
-                        )
-                        losses = losses.view(shift_labels.size()) * shift_mask
-                        token_counts = shift_mask.sum(dim=1).clamp(min=1)
-                        loss_per_example = (
-                            (losses.sum(dim=1) / token_counts).cpu().tolist()
-                        )
-
-                        for cand_obj, loss_value in zip(
-                            candidate_batch, loss_per_example, strict=False
-                        ):
-                            cand_obj["difficulty"] = float(loss_value)
-                        total_tokens += int(token_counts.sum().item())
-
-                        input_batch.clear()
-                        attention_batch.clear()
-                        candidate_batch.clear()
-            self._last_batch_size_used = batch_size
-            elapsed = max(time.perf_counter() - start_time, 1e-9)
-            tokens_per_sec = total_tokens / elapsed if total_tokens else 0.0
-            self._last_scorer_profile = {
-                "batch_size": batch_size,
-                "tokens_processed": total_tokens,
-                "elapsed_seconds": elapsed,
-                "tokens_per_second": tokens_per_sec,
-            }
-            return True
-        except Exception as exc:  # pragma: no cover - defensive
-            warnings.warn(
-                f"Failed to compute GPT-2 difficulty scores: {exc}", stacklevel=2
-            )
-            self._difficulty_model = False
-            self._difficulty_device = None
-            self.__class__._MODEL_CACHE = False
-            self.__class__._MODEL_DEVICE = None
+    def _score_candidates_byte_ngram(self, candidates: list[dict[str, Any]]) -> bool:
+        if not candidates:
             self._last_batch_size_used = 0
             self._last_scorer_profile = None
             return False
+
+        order = max(1, int(self._BYTE_NGRAM_ORDER))
+        pad_token = int(self._BYTE_NGRAM_PAD)
+        alpha = float(self._BYTE_NGRAM_ALPHA)
+        vocab_size = pad_token + 1
+
+        context_counts: Counter[tuple[int, ...]] = Counter()
+        ngram_counts: Counter[tuple[int, ...]] = Counter()
+        sequences: list[list[int]] = []
+        start_time = time.perf_counter()
+
+        for candidate in candidates:
+            text = candidate.get("text")
+            if not isinstance(text, str):
+                text = ""
+            byte_values = list(text.encode("utf-8", errors="replace"))
+            tokens = ([pad_token] * (order - 1)) + byte_values
+            sequences.append(tokens)
+            for idx in range(order - 1, len(tokens)):
+                context = tuple(tokens[idx - order + 1 : idx])
+                ngram = context + (tokens[idx],)
+                context_counts[context] += 1
+                ngram_counts[ngram] += 1
+
+        total_tokens = 0
+        for candidate, tokens in zip(candidates, sequences, strict=False):
+            loss_sum = 0.0
+            token_count = 0
+            for idx in range(order - 1, len(tokens)):
+                context = tuple(tokens[idx - order + 1 : idx])
+                ngram = context + (tokens[idx],)
+                context_count = context_counts.get(context, 0)
+                ngram_count = ngram_counts.get(ngram, 0)
+                prob = (ngram_count + alpha) / (context_count + alpha * vocab_size)
+                loss_sum += -math.log(prob)
+                token_count += 1
+            candidate["difficulty"] = loss_sum / max(token_count, 1)
+            total_tokens += token_count
+
+        self._last_batch_size_used = len(candidates)
+        elapsed = max(time.perf_counter() - start_time, 1e-9)
+        tokens_per_sec = total_tokens / elapsed if total_tokens else 0.0
+        self._last_scorer_profile = {
+            "mode": "byte_ngram",
+            "order": order,
+            "vocab_size": vocab_size,
+            "tokens_processed": total_tokens,
+            "elapsed_seconds": elapsed,
+            "tokens_per_second": tokens_per_sec,
+        }
+        return True
 
     def _tokenize_samples(
         self,

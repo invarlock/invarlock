@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# NOTE: bash has a kill builtin; this executable is only used if tests disable it.
+
+if [[ -n "${TEST_TMPDIR:-}" ]]; then
+    mkdir -p "${TEST_TMPDIR}/fixtures"
+    echo "kill $*" >> "${TEST_TMPDIR}/fixtures/kill.calls" 2>/dev/null || true
+fi
+
+# Support: kill -0 <pid> should reflect liveness fixtures.
+if [[ "${1:-}" == "-0" && -n "${2:-}" ]]; then
+    pid="${2}"
+    if [[ -f "${TEST_TMPDIR:-}/fixtures/kill/alive" ]] && grep -q -E "^${pid}$" "${TEST_TMPDIR}/fixtures/kill/alive" 2>/dev/null; then
+        exit 0
+    fi
+    exit 1
+fi
+
+exit 0

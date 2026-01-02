@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Minimal flock stub for offline tests (macOS lacks flock by default).
+# Always succeeds.
+exit 0

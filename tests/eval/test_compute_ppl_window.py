@@ -36,3 +36,14 @@ def test_compute_ppl_window_degenerate_raises():
     window = SimpleNamespace(input_ids=[], attention_masks=[])
     with pytest.raises(MValidationError):
         compute_ppl(model, adapter=None, window=window, device="cpu")
+
+
+def test_compute_ppl_window_masks_out_of_range_tokens():
+    model = TinyCausal(vocab=16)
+    # Include a token id beyond vocab; should be treated as padding and not crash.
+    window = SimpleNamespace(
+        input_ids=[[1, 2, 999, 3]],
+        attention_masks=[[1, 1, 1, 1]],
+    )
+    ppl = compute_ppl(model, adapter=None, window=window, device="cpu")
+    assert isinstance(ppl, float) and math.isfinite(ppl) and ppl >= 1.0

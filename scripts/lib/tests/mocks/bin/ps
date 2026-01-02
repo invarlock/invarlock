@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+fixtures_dir="${TEST_TMPDIR:-}/fixtures/ps"
+
+want_pgid="false"
+pid=""
+
+args=("$@")
+for ((i=0; i<${#args[@]}; i++)); do
+    case "${args[$i]}" in
+        -o)
+            if [[ "${args[$((i+1))]:-}" == "pgid=" ]]; then
+                want_pgid="true"
+            fi
+            ;;
+        -p)
+            pid="${args[$((i+1))]:-}"
+            ;;
+    esac
+done
+
+is_alive() {
+    local check_pid="$1"
+    [[ -n "${check_pid}" ]] || return 1
+    [[ -f "${fixtures_dir}/alive" ]] || return 1
+    grep -q -E "^${check_pid}$" "${fixtures_dir}/alive" 2>/dev/null
+}
+
+if [[ -z "${pid}" ]]; then
+    exit 1
+fi
+
+if ! is_alive "${pid}"; then
+    exit 1
+fi
+
+if [[ "${want_pgid}" == "true" ]]; then
+    if [[ -f "${fixtures_dir}/pgid.${pid}" ]]; then
+        cat "${fixtures_dir}/pgid.${pid}"
+    else
+        echo "${pid}"
+    fi
+fi
+
+exit 0

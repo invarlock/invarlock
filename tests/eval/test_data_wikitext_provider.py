@@ -57,12 +57,6 @@ def test_wikitext2_windows_with_stubbed_tokenizer(monkeypatch):
         fake_collect,
         raising=False,
     )
-    monkeypatch.setattr(
-        data_mod.WikiText2Provider,
-        "_score_candidates_with_model",
-        lambda self, candidates: False,
-        raising=False,
-    )
     provider = data_mod.WikiText2Provider()
     preview, final = provider.windows(
         tokenizer=_EncodeTokenizer(), preview_n=3, final_n=3, seq_len=6, seed=7

@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-01-02
+
+### Added
+- B200 validation bash test suite (`scripts/lib/tests/*`, `scripts/lib/tests/run.sh`) with deterministic command mocks and optional branch/line coverage checks.
+- B200 runtime helpers (`scripts/lib/runtime.sh`) plus a snapshot/diagnostics helper (`scripts/invarlock_snapshot.sh`) to capture queue/worker/GPU state during long runs.
+- Perplexity token-id sanitization to mask out-of-range IDs (and ignore them in labels) instead of triggering device-side asserts.
+
+### Changed
+- WikiText-2 window stratification now uses a deterministic offline byte-level n-gram scorer (replaces the GPT‑2 scorer) to keep window selection stable across model families and avoid implicit model downloads.
+- B200 validation suite is dynamic-scheduling only; dependency promotion is centralized to reduce queue lock contention and improve throughput.
+- B200 generated configs default to `guards.order: [invariants, rmt, variance]` to avoid slow CPU SVD during calibration; spectral caps are not produced unless you re-enable spectral calibration separately.
+- B200 bootstrap defaults HuggingFace caches under `${WORK_DIR}/hf_home` to avoid small `/root` partitions on GPU nodes.
+
+### Fixed
+- B200 harness: treat 30B+ models as “large” for overhead-skip heuristics to avoid double-loading stalls.
+
+### Removed
+- `INVARLOCK_SCORES_BATCH_SIZE` (the WikiText‑2 difficulty scorer no longer batches on device).
+
+### Documentation
+- Updated CLI/dataset/env-var references for the new difficulty scorer and removal of `INVARLOCK_SCORES_BATCH_SIZE`.
+
 ## [0.3.4] - 2025-12-28
 
 ### Added

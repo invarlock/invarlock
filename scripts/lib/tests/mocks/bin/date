@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+fixtures_dir="${TEST_TMPDIR:-}/fixtures/date"
+mkdir -p "${fixtures_dir}" 2>/dev/null || true
+
+for arg in "$@"; do
+    case "${arg}" in
+        -d|-j|-v*)
+            # Force callers to exercise portable fallbacks.
+            exit 1
+            ;;
+    esac
+done
+
+fmt="${*: -1}"
+case "${fmt}" in
+    +%s)
+        base="$(cat "${fixtures_dir}/epoch" 2>/dev/null || echo "1700000000")"
+        counter_file="${fixtures_dir}/epoch.counter"
+        if [[ -f "${counter_file}" ]]; then
+            cur="$(cat "${counter_file}" 2>/dev/null || echo "${base}")"
+        else
+            cur="${base}"
+        fi
+        echo "${cur}"
+        echo "$((cur + 1))" > "${counter_file}" 2>/dev/null || true
+        ;;
+    +%Y%m%d_%H%M%S)
+        cat "${fixtures_dir}/compact" 2>/dev/null || echo "20250101_000000"
+        ;;
+    +%Y-%m-%d\ %H:%M:%S)
+        cat "${fixtures_dir}/pretty" 2>/dev/null || echo "2025-01-01 00:00:00"
+        ;;
+    +%Y-%m-%dT%H:%M:%SZ)
+        cat "${fixtures_dir}/iso" 2>/dev/null || echo "2025-01-01T00:00:00Z"
+        ;;
+    *)
+        # Best-effort: stable output.
+        echo "2025-01-01T00:00:00Z"
+        ;;
+esac

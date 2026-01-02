@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+fixtures_dir="${TEST_TMPDIR:-}/fixtures"
+
+mode=""
+path=""
+
+args=("$@")
+for arg in "${args[@]}"; do
+    case "${arg}" in
+        -P) mode="P" ;;
+        -BG) mode="BG" ;;
+    esac
+done
+
+path="${args[$(( ${#args[@]} - 1 ))]}"
+base="$(basename "${path}" 2>/dev/null || echo "")"
+
+if [[ -n "${TEST_TMPDIR:-}" && -n "${mode}" && -n "${base}" ]]; then
+    if [[ -f "${fixtures_dir}/df.${mode}.${base}" ]]; then
+        cat "${fixtures_dir}/df.${mode}.${base}"
+        exit 0
+    fi
+fi
+
+if [[ -n "${TEST_TMPDIR:-}" && -f "${fixtures_dir}/df.out" ]]; then
+    cat "${fixtures_dir}/df.out"
+    exit 0
+fi
+
+# Default: plenty of free space.
+cat <<'EOF'
+Filesystem  1G-blocks  Used Available Use% Mounted on
+/dev/mock      1000    10       990   1% /
+EOF

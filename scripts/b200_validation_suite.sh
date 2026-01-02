@@ -53,10 +53,7 @@
 # per-task profile exceeds per-GPU memory; adaptive under-allocation is disabled
 # by default to avoid OOM.
 
-# Per-task error handling (no global exit on error)
-set -uo pipefail
-
-# Initialize pids array early to avoid set -u errors in cleanup
+# Initialize pids array early (used by cleanup trap when executed)
 declare -a pids=()
 
 # ============ CLEANUP TRAP ============
@@ -80,15 +77,22 @@ cleanup() {
     exit ${exit_code}
 }
 
-trap cleanup EXIT INT TERM HUP QUIT
+# Trap + strict mode are enabled only when executed as a script (not when sourced).
 
-# ============ BASH VERSION CHECK ============
-# Associative arrays require bash 4.0+
-if [[ "${BASH_VERSINFO[0]}" -lt 4 ]]; then
-    echo "ERROR: This script requires bash 4.0 or later (have ${BASH_VERSION})"
-    echo "       Associative arrays are not supported in bash ${BASH_VERSION}"
-    exit 1
-fi
+b200_require_bash4() {
+    # Associative arrays require bash 4.0+
+    if ! b200_is_bash4; then
+        echo "ERROR: This script requires bash 4.0 or later (have ${BASH_VERSION})" >&2
+        echo "       Associative arrays are not supported in bash ${BASH_VERSION}" >&2
+        return 1
+    fi
+    return 0
+}
+
+# Overrideable hook for tests (simulate bash4 on bash3 without env vars).
+b200_is_bash4() {
+    [[ "${BASH_VERSINFO[0]}" -ge 4 ]]
+}
 
 # ============ VERSION ============
 SCRIPT_VERSION="2.1.0-b200"
@@ -105,7 +109,7 @@ export GPU_MEMORY_GB="${GPU_MEMORY_GB:-180}"
 # - strict: prefer deterministic-friendly flags and avoid overriding CLI presets.
 B200_DETERMINISM="${B200_DETERMINISM:-throughput}"
 case "${B200_DETERMINISM}" in
-    strict|throughput) ;;
+    strict|throughput) : ;;
     *)
         B200_DETERMINISM="throughput"
         ;;
@@ -201,8 +205,33 @@ INVARLOCK_OVERHEAD_GB="${INVARLOCK_OVERHEAD_GB:-6}"
 # Task timeout (seconds). Set to 0 or empty to disable.
 export TASK_TIMEOUT_DEFAULT="${TASK_TIMEOUT_DEFAULT:-21600}"
 
-# Output - supports resume by specifying existing directory
-OUTPUT_DIR="${OUTPUT_DIR:-./invarlock_validation_b200_$(date +%Y%m%d_%H%M%S)}"
+# Output - supports resume by specifying existing directory.
+# When executed, the entrypoint populates a date-stamped default.
+OUTPUT_DIR="${OUTPUT_DIR:-}"
+
+# ============================================================
+# HUGGINGFACE CACHE LOCATION (CRITICAL ON GPU NODES)
+# ============================================================
+# HuggingFace defaults to writing caches under ~/.cache (e.g., /root/.cache when
+# running as root). On many GPU nodes, / or /root is small, causing silent ENOSPC
+# failures during dataset/model downloads while GPUs sit idle.
+#
+# Default behavior for this suite: co-locate caches under OUTPUT_DIR so they land
+# on the same (usually large) filesystem as the run artifacts.
+#
+# Override by exporting HF_HOME / HF_HUB_CACHE / HF_DATASETS_CACHE /
+# TRANSFORMERS_CACHE before running this script.
+b200_setup_hf_cache_dirs() {
+    export HF_HOME="${HF_HOME:-${OUTPUT_DIR}/.hf}"
+    export HF_HUB_CACHE="${HF_HUB_CACHE:-${HF_HOME}/hub}"
+    export HF_DATASETS_CACHE="${HF_DATASETS_CACHE:-${HF_HOME}/datasets}"
+    export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-${HF_HOME}/transformers}"
+    if ! mkdir -p "${HF_HOME}" "${HF_HUB_CACHE}" "${HF_DATASETS_CACHE}" "${TRANSFORMERS_CACHE}"; then
+        echo "ERROR: Failed to create HuggingFace cache directories under: ${HF_HOME}" >&2
+        return 1
+    fi
+    return 0
+}
 
 # Resume support - skip completed steps if output files exist
 RESUME_MODE="${RESUME_MODE:-true}"
@@ -258,73 +287,86 @@ export FP4_NATIVE_SUPPORT="false"
 # Target memory fraction (0.92 = 92% of available) - optimal zone
 export CUDA_MEMORY_FRACTION=0.92
 
-# ============ LIB MODULES FOR DYNAMIC SCHEDULING ============
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export SCRIPT_DIR  # Export for subshell workers
-
-# Determine lib directory - support both nested (scripts/lib/) and flat (scripts/) layouts
-if [[ -d "${SCRIPT_DIR}/lib" && -f "${SCRIPT_DIR}/lib/task_serialization.sh" ]]; then
-    LIB_DIR="${SCRIPT_DIR}/lib"
-elif [[ -f "${SCRIPT_DIR}/task_serialization.sh" ]]; then
-    # Flat directory structure (all files in same dir)
-    LIB_DIR="${SCRIPT_DIR}"
-else
-    LIB_DIR="${SCRIPT_DIR}/lib"  # Default, will error if missing
-fi
-export LIB_DIR  # Export for subshell workers
-
-# Source dynamic scheduling modules (required - optimal configuration)
-if [[ -f "${LIB_DIR}/task_serialization.sh" ]]; then
-    source "${LIB_DIR}/task_serialization.sh"
-    export TASK_SERIALIZATION_LOADED=1
-else
-    echo "ERROR: lib/task_serialization.sh not found (dynamic scheduling is required)"
-    exit 1
+if ! declare -F _b200_script_dir >/dev/null 2>&1; then
+    _b200_script_dir() {
+        cd "$(dirname "${BASH_SOURCE[0]}")" && pwd
+    }
 fi
 
-if [[ -f "${LIB_DIR}/queue_manager.sh" ]]; then
-    source "${LIB_DIR}/queue_manager.sh"
-    export QUEUE_MANAGER_LOADED=1
-else
-    echo "ERROR: lib/queue_manager.sh not found"
-    exit 1
-fi
+b200_source_libs() {
+    # ============ LIB MODULES FOR DYNAMIC SCHEDULING ============
+    SCRIPT_DIR="$(_b200_script_dir)"
+    export SCRIPT_DIR  # Export for subshell workers
 
-if [[ -f "${LIB_DIR}/scheduler.sh" ]]; then
-    source "${LIB_DIR}/scheduler.sh"
-    export SCHEDULER_LOADED=1
-else
-    echo "ERROR: lib/scheduler.sh not found"
-    exit 1
-fi
+    # Determine lib directory - support both nested (scripts/lib/) and flat (scripts/) layouts
+    if [[ -d "${SCRIPT_DIR}/lib" && -f "${SCRIPT_DIR}/lib/task_serialization.sh" ]]; then
+        LIB_DIR="${SCRIPT_DIR}/lib"
+    elif [[ -f "${SCRIPT_DIR}/task_serialization.sh" ]]; then
+        # Flat directory structure (all files in same dir)
+        LIB_DIR="${SCRIPT_DIR}"
+    else
+        LIB_DIR="${SCRIPT_DIR}/lib"
+    fi
+    export LIB_DIR  # Export for subshell workers
 
-if [[ -f "${LIB_DIR}/task_functions.sh" ]]; then
-    source "${LIB_DIR}/task_functions.sh"
-    export TASK_FUNCTIONS_LOADED=1
-else
-    echo "ERROR: lib/task_functions.sh not found"
-    exit 1
-fi
+    # Source dynamic scheduling modules (required - optimal configuration)
+    if [[ -f "${LIB_DIR}/task_serialization.sh" ]]; then
+        source "${LIB_DIR}/task_serialization.sh"
+        export TASK_SERIALIZATION_LOADED=1
+    else
+        echo "ERROR: lib/task_serialization.sh not found (dynamic scheduling is required)" >&2
+        return 1
+    fi
 
-if [[ -f "${LIB_DIR}/gpu_worker.sh" ]]; then
-    source "${LIB_DIR}/gpu_worker.sh"
-    export GPU_WORKER_LOADED=1
-else
-    echo "ERROR: lib/gpu_worker.sh not found"
-    exit 1
-fi
+    if [[ -f "${LIB_DIR}/queue_manager.sh" ]]; then
+        source "${LIB_DIR}/queue_manager.sh"
+        export QUEUE_MANAGER_LOADED=1
+    else
+        echo "ERROR: lib/queue_manager.sh not found" >&2
+        return 1
+    fi
 
-if [[ -f "${LIB_DIR}/fault_tolerance.sh" ]]; then
-    source "${LIB_DIR}/fault_tolerance.sh"
-    export FAULT_TOLERANCE_LOADED=1
-fi
+    if [[ -f "${LIB_DIR}/scheduler.sh" ]]; then
+        source "${LIB_DIR}/scheduler.sh"
+        export SCHEDULER_LOADED=1
+    else
+        echo "ERROR: lib/scheduler.sh not found" >&2
+        return 1
+    fi
 
-# ============ SETUP ============
-mkdir -p "${OUTPUT_DIR}"/{logs,models,evals,certificates,analysis,reports,presets,workers}
-LOG_FILE="${OUTPUT_DIR}/logs/main.log"
+    if [[ -f "${LIB_DIR}/task_functions.sh" ]]; then
+        source "${LIB_DIR}/task_functions.sh"
+        export TASK_FUNCTIONS_LOADED=1
+    else
+        echo "ERROR: lib/task_functions.sh not found" >&2
+        return 1
+    fi
 
-# Create a lock file for thread-safe logging
-LOG_LOCK="${OUTPUT_DIR}/logs/.log_lock"
+    if [[ -f "${LIB_DIR}/gpu_worker.sh" ]]; then
+        source "${LIB_DIR}/gpu_worker.sh"
+        export GPU_WORKER_LOADED=1
+    else
+        echo "ERROR: lib/gpu_worker.sh not found" >&2
+        return 1
+    fi
+
+    if [[ -f "${LIB_DIR}/fault_tolerance.sh" ]]; then
+        source "${LIB_DIR}/fault_tolerance.sh"
+        export FAULT_TOLERANCE_LOADED=1
+    fi
+
+    return 0
+}
+
+b200_setup_output_dirs() {
+    # ============ SETUP ============
+    mkdir -p "${OUTPUT_DIR}"/{logs,models,evals,certificates,analysis,reports,presets,workers} || return 1
+    LOG_FILE="${OUTPUT_DIR}/logs/main.log"
+
+    # Create a lock file for thread-safe logging
+    LOG_LOCK="${OUTPUT_DIR}/logs/.log_lock"
+    return 0
+}
 
 log() {
     # Thread-safe logging using flock for parallel processes
@@ -370,7 +412,7 @@ GPU_ID_LIST="${GPU_ID_LIST:-}"
 # Falls back to legacy 0..NUM_GPUS-1 when GPU_ID_LIST isn't set yet.
 list_run_gpu_ids() {
     if [[ -n "${GPU_ID_LIST:-}" ]]; then
-        echo "${GPU_ID_LIST}" | tr ',' '\n' | sed '/^$/d'
+        echo "${GPU_ID_LIST}" | tr -d ' ' | tr ',' '\n' | sed '/^$/d'
     else
         local total="${NUM_GPUS:-8}"
         if ! [[ "${total}" =~ ^[0-9]+$ ]]; then
@@ -400,7 +442,9 @@ configure_gpu_pool() {
     if [[ -n "${raw_list}" ]]; then
         IFS=',' read -ra candidates <<< "${raw_list}"
     else
-        mapfile -t candidates < <(nvidia-smi --query-gpu=index --format=csv,noheader,nounits 2>/dev/null | tr -d ' ')
+        while IFS= read -r id; do
+            [[ -n "${id}" ]] && candidates+=("${id}")
+        done < <(nvidia-smi --query-gpu=index --format=csv,noheader,nounits 2>/dev/null | tr -d ' ')
     fi
 
     # Sanitize and validate IDs
@@ -453,12 +497,144 @@ configure_gpu_pool() {
 # Abort early under low disk to avoid half-written artifacts and cascading failures.
 MIN_FREE_DISK_GB="${MIN_FREE_DISK_GB:-200}"
 
+format_gb_as_tb() {
+    local gb="$1"
+    if [[ -z "${gb}" || ! "${gb}" =~ ^[0-9]+$ ]]; then
+        echo ""
+        return 0
+    fi
+    awk -v gb="${gb}" 'BEGIN { printf "%.1f", gb / 1024.0 }'
+}
+
 get_free_disk_gb() {
     local path="$1"
     local free_disk
     free_disk=$(df -BG "${path}" 2>/dev/null | awk 'NR==2 {gsub(/G/,""); print $4}')
     [[ -z "${free_disk}" || ! "${free_disk}" =~ ^[0-9]+$ ]] && return 1
     echo "${free_disk}"
+}
+
+estimate_model_weights_gb() {
+    local model_id="$1"
+    [[ -z "${model_id}" ]] && return 1
+    if [[ -d "${model_id}" ]]; then
+        return 1  # Unknown for local paths without a profile.
+    fi
+    local lower
+    lower="$(echo "${model_id}" | tr '[:upper:]' '[:lower:]')"
+
+    # Special-case MoE naming.
+    if [[ "${lower}" == *"mixtral"* || "${lower}" == *"8x7b"* ]]; then
+        echo 90
+        return 0
+    fi
+
+    case "${lower}" in
+        *"72b"*) echo 144 ;;
+        *"70b"*) echo 140 ;;
+        *"34b"*) echo 68 ;;
+        *"32b"*) echo 64 ;;
+        *"14b"*) echo 28 ;;
+        *"13b"*) echo 26 ;;
+        *"7b"*) echo 14 ;;
+        *) return 1 ;;
+    esac
+}
+
+estimate_planned_model_storage_gb() {
+    local -a models=("${MODEL_1}" "${MODEL_2}" "${MODEL_3}" "${MODEL_4}" "${MODEL_5}" "${MODEL_6}" "${MODEL_7}" "${MODEL_8}")
+
+    local edits_total=$(( ${#EDIT_TYPES_CLEAN[@]} + ${#EDIT_TYPES_STRESS[@]} ))
+    local errors_total=0
+    if [[ "${RUN_ERROR_INJECTION}" == "true" ]]; then
+        errors_total=5  # nan_injection, inf_injection, extreme_quant, scale_explosion, zero_layer
+    fi
+
+    local baseline_mode="${B200_BASELINE_STORAGE_MODE:-snapshot_symlink}"
+    local baseline_copy=1
+    if [[ "${baseline_mode}" == "snapshot_symlink" ]]; then
+        baseline_copy=0  # baseline files are symlinks to HF hub cache blobs
+    fi
+
+    local hub_cache_on_output_fs=1
+    if [[ -n "${HF_HUB_CACHE:-}" ]]; then
+        local out_dev=""
+        local hub_dev=""
+        out_dev=$(df -P "${OUTPUT_DIR}" 2>/dev/null | awk 'NR==2 {print $1}' || true)
+        hub_dev=$(df -P "${HF_HUB_CACHE}" 2>/dev/null | awk 'NR==2 {print $1}' || true)
+        if [[ -n "${out_dev}" && -n "${hub_dev}" && "${out_dev}" != "${hub_dev}" ]]; then
+            hub_cache_on_output_fs=0
+        fi
+    fi
+
+    local total_gb=0
+    local unknown=0
+    local model_id
+    for model_id in "${models[@]}"; do
+        [[ -n "${model_id}" ]] || continue
+
+        local w_gb=""
+        w_gb="$(estimate_model_weights_gb "${model_id}" 2>/dev/null || true)"
+        if [[ -z "${w_gb}" || ! "${w_gb}" =~ ^[0-9]+$ ]]; then
+            unknown=$((unknown + 1))
+            continue
+        fi
+
+        # Storage copies:
+        # - 1× HF hub cache download (when model_id is remote)
+        # - 1× baseline saved under OUTPUT_DIR (unless snapshot_symlink mode)
+        # - N× edits (currently saved as full bf16 copies)
+        # - M× error models (also full copies) when enabled
+        local hub_copy=1
+        [[ -d "${model_id}" ]] && hub_copy=0
+        [[ ${hub_cache_on_output_fs} -eq 0 ]] && hub_copy=0
+        local effective_baseline_copy=${baseline_copy}
+        [[ -d "${model_id}" ]] && effective_baseline_copy=0
+        local copies=$((hub_copy + effective_baseline_copy + edits_total + errors_total))
+
+        total_gb=$((total_gb + (w_gb * copies)))
+    done
+
+    [[ ${unknown} -gt 0 ]] && return 1
+    echo "${total_gb}"
+}
+
+disk_preflight() {
+    [[ "${B200_SKIP_DISK_PREFLIGHT:-0}" == "1" ]] && return 0
+
+    local free_gb=""
+    free_gb=$(get_free_disk_gb "${OUTPUT_DIR}" 2>/dev/null || echo "")
+    [[ -z "${free_gb}" ]] && return 0
+
+    local planned_gb=""
+    planned_gb=$(estimate_planned_model_storage_gb 2>/dev/null || echo "")
+    [[ -z "${planned_gb}" ]] && return 0
+
+    local min_free="${MIN_FREE_DISK_GB:-200}"
+    if ! [[ "${min_free}" =~ ^[0-9]+$ ]]; then
+        min_free=200
+    fi
+
+    local required_gb=$((planned_gb + min_free))
+    if [[ ${free_gb} -ge ${required_gb} ]]; then
+        return 0
+    fi
+
+    log_section "ABORTING: DISK PREFLIGHT"
+    log "ERROR: Estimated storage for this configuration: ~${planned_gb}GB (~$(format_gb_as_tb "${planned_gb}")TB) for model weights alone."
+    log "       Free disk on output filesystem: ${free_gb}GB (~$(format_gb_as_tb "${free_gb}")TB)."
+    log "       This suite saves full bf16 copies of edits (+ error models if enabled)."
+    log "       Baseline storage mode: ${B200_BASELINE_STORAGE_MODE:-snapshot_symlink} (snapshot_symlink avoids a full extra baseline copy)."
+    log "       Fix: mount a larger volume and set OUTPUT_DIR, or run fewer models (unset MODEL_4..MODEL_8), or set RUN_ERROR_INJECTION=false."
+    log "       Override (not recommended): B200_SKIP_DISK_PREFLIGHT=1"
+
+    # Resume mode may already have artifacts; allow user to proceed if explicitly resuming.
+    if [[ "${RESUME_FLAG:-false}" == "true" ]]; then
+        log "WARNING: --resume mode enabled; continuing despite preflight estimate."
+        return 0
+    fi
+
+    error_exit "Insufficient disk for planned run (need >= ${required_gb}GB incl MIN_FREE_DISK_GB=${min_free})."
 }
 
 write_disk_pressure_state() {
@@ -482,6 +658,7 @@ handle_disk_pressure() {
     log_section "ABORTING: DISK PRESSURE"
     log "ERROR: Low disk space in output filesystem: ${free_gb}GB free (< ${min_gb}GB)."
     log "       Free disk space and resume with: OUTPUT_DIR=${OUTPUT_DIR} $0 --resume"
+    log "       (Override threshold: MIN_FREE_DISK_GB=0 to disable, or set a smaller value)"
 
     write_disk_pressure_state "${free_gb}" "${min_gb}"
 
@@ -778,38 +955,134 @@ setup_model() {
 
     local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
     CUDA_VISIBLE_DEVICES="${cuda_devices}" python3 << EOF 2>&1 | tee -a "${LOG_FILE}" >&2
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
-from pathlib import Path
-import gc
 import json
 import os
 import sys
+from pathlib import Path
 
 model_id = "${model_id}"
 output_dir = Path("${model_dir}/baseline")
 success_marker = Path("${success_marker}")
 flash_available = "${FLASH_ATTENTION_AVAILABLE}" == "true"
 
+# Storage strategy for the baseline directory:
+# - snapshot_symlink (default): create baseline/ as symlinks to HF hub cache blobs (saves ~1× weights on disk)
+# - snapshot_copy: copy snapshot files into baseline/ (duplicates hub cache)
+# - save_pretrained: load with transformers and write a full baseline copy (also duplicates hub cache)
+baseline_mode = os.environ.get("B200_BASELINE_STORAGE_MODE", "snapshot_symlink").strip().lower()
+
 output_dir.mkdir(parents=True, exist_ok=True)
 
 print(f"Downloading {model_id} (B200 optimized)...")
+print(f"Baseline storage mode: {baseline_mode}")
+if os.environ.get("HF_HUB_CACHE"):
+    print(f"HF_HUB_CACHE: {os.environ.get('HF_HUB_CACHE')}")
 print(f"Flash Attention 2: {'enabled' if flash_available else 'disabled'}")
 
-def model_supports_flash_attention(model_id):
-    """Check if model architecture supports Flash Attention 2."""
-    # Models known to NOT support FA2
+
+def model_supports_flash_attention(model_id: str) -> bool:
     no_fa2_models = [
-        "falcon", "mpt-", "gpt2", "bloom", "opt-", "gpt-j", "gpt-neo",
-        "codegen", "santacoder", "stablelm"
+        "falcon",
+        "mpt-",
+        "gpt2",
+        "bloom",
+        "opt-",
+        "gpt-j",
+        "gpt-neo",
+        "codegen",
+        "santacoder",
+        "stablelm",
     ]
     model_lower = model_id.lower()
-    for pattern in no_fa2_models:
-        if pattern in model_lower:
-            return False
-    return True
+    return not any(pattern in model_lower for pattern in no_fa2_models)
+
+
+def sanitize_generation_config(model_dir: Path) -> None:
+    gen_path = model_dir / "generation_config.json"
+    if not gen_path.is_file():
+        return
+    try:
+        gen = json.loads(gen_path.read_text())
+    except Exception:
+        return
+
+    if gen.get("do_sample") is False:
+        temp = gen.get("temperature", None)
+        if temp not in (None, 1.0):
+            print(f"Fixing generation_config.json: clearing temperature={temp} (do_sample=False)")
+            gen["temperature"] = None
+        top_p = gen.get("top_p", None)
+        if top_p not in (None, 1.0):
+            print(f"Fixing generation_config.json: clearing top_p={top_p} (do_sample=False)")
+            gen["top_p"] = None
+        try:
+            gen_path.write_text(json.dumps(gen, indent=2) + "\n")
+        except Exception:
+            pass
+
+
+def write_model_profile(model_dir: Path, model_id: str) -> None:
+    weights_bytes = 0
+    for pat in ("*.safetensors", "*.bin"):
+        for fp in model_dir.glob(pat):
+            try:
+                weights_bytes += fp.stat().st_size
+            except OSError:
+                pass
+
+    cfg_path = model_dir / "config.json"
+    config = {}
+    if cfg_path.is_file():
+        try:
+            config = json.loads(cfg_path.read_text())
+        except Exception:
+            config = {}
+
+    profile = {
+        "model_id": model_id,
+        "weights_bytes": weights_bytes,
+        "weights_gb": round(weights_bytes / (1024**3), 3),
+        "hidden_size": config.get("hidden_size"),
+        "num_layers": config.get("num_hidden_layers"),
+        "num_heads": config.get("num_attention_heads"),
+        "num_kv_heads": config.get("num_key_value_heads") or config.get("num_attention_heads"),
+        "max_position_embeddings": config.get("max_position_embeddings"),
+        "dtype_bytes": 2,
+    }
+    (model_dir / "model_profile.json").write_text(json.dumps(profile, indent=2) + "\n")
+
+
+def download_snapshot(repo_id: str, model_dir: Path, mode: str) -> None:
+    from huggingface_hub import snapshot_download
+
+    local_dir_use_symlinks = mode == "snapshot_symlink"
+    snapshot_download(
+        repo_id=repo_id,
+        local_dir=str(model_dir),
+        local_dir_use_symlinks=local_dir_use_symlinks,
+        cache_dir=os.environ.get("HF_HUB_CACHE"),
+        resume_download=True,
+    )
+
 
 try:
+    if baseline_mode in ("snapshot_symlink", "snapshot_copy"):
+        try:
+            download_snapshot(model_id, output_dir, baseline_mode)
+            sanitize_generation_config(output_dir)
+            write_model_profile(output_dir, model_id)
+            success_marker.touch()
+            print(f"Saved to {output_dir} (snapshot)")
+            sys.exit(0)
+        except Exception as snap_err:
+            print(f"WARNING: snapshot_download failed, falling back to save_pretrained: {snap_err}", file=sys.stderr)
+            baseline_mode = "save_pretrained"
+
+    # Fallback: create a full baseline copy via transformers (duplicates HF hub cache).
+    import gc
+    import torch
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
     mode = os.environ.get("B200_DETERMINISM", "throughput").strip().lower()
     if mode == "strict":
         torch.backends.cuda.matmul.allow_tf32 = False
@@ -818,26 +1091,24 @@ try:
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32 = True
 
-    tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
+    cache_dir = os.environ.get("HF_HUB_CACHE")
+    tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True, cache_dir=cache_dir)
     tokenizer.save_pretrained(output_dir)
 
-    # Determine if we can use Flash Attention 2 for this model
     use_fa2 = flash_available and model_supports_flash_attention(model_id)
-
     model_kwargs = {
         "torch_dtype": torch.bfloat16,
         "trust_remote_code": True,
         "device_map": "auto",
         "low_cpu_mem_usage": True,
+        "cache_dir": cache_dir,
     }
-
     if use_fa2:
         model_kwargs["attn_implementation"] = "flash_attention_2"
         print(f"Using Flash Attention 2 for {model_id}")
     else:
         print(f"Using eager attention for {model_id} (FA2 not supported or unavailable)")
 
-    # Try to load with FA2, fall back to eager if it fails
     try:
         model = AutoModelForCausalLM.from_pretrained(model_id, **model_kwargs)
     except Exception as fa2_err:
@@ -849,66 +1120,47 @@ try:
             raise
 
     # Fix invalid generation config before saving (some models have temperature/top_p without do_sample)
-    if hasattr(model, 'generation_config'):
+    if hasattr(model, "generation_config"):
         gen_config = model.generation_config
-        # If do_sample is False but temperature/top_p are set, clear them to avoid validation errors
-        if hasattr(gen_config, 'do_sample') and not gen_config.do_sample:
-            if hasattr(gen_config, 'temperature') and gen_config.temperature != 1.0:
+        if getattr(gen_config, "do_sample", True) is False:
+            if getattr(gen_config, "temperature", 1.0) not in (None, 1.0):
                 print(f"Fixing generation_config: clearing temperature={gen_config.temperature} (do_sample=False)")
                 gen_config.temperature = None
-            if hasattr(gen_config, 'top_p') and gen_config.top_p != 1.0:
+            if getattr(gen_config, "top_p", 1.0) not in (None, 1.0):
                 print(f"Fixing generation_config: clearing top_p={gen_config.top_p} (do_sample=False)")
                 gen_config.top_p = None
 
     model.save_pretrained(output_dir, safe_serialization=True)
 
-    # Write model profile for precise memory planning (weights + config)
-    weights_bytes = 0
-    for pat in ("*.safetensors", "*.bin"):
-        for fp in output_dir.glob(pat):
-            weights_bytes += fp.stat().st_size
-    profile = {
-        "model_id": model_id,
-        "weights_bytes": weights_bytes,
-        "weights_gb": round(weights_bytes / (1024 ** 3), 3),
-        "hidden_size": getattr(model.config, "hidden_size", None),
-        "num_layers": getattr(model.config, "num_hidden_layers", None),
-        "num_heads": getattr(model.config, "num_attention_heads", None),
-        "num_kv_heads": getattr(model.config, "num_key_value_heads", None),
-        "max_position_embeddings": getattr(model.config, "max_position_embeddings", None),
-        "dtype_bytes": 2,
-    }
-    with open(output_dir / "model_profile.json", "w") as f:
-        json.dump(profile, f, indent=2)
-
-    # Aggressive memory cleanup before lm-eval starts
     del model
     gc.collect()
     torch.cuda.empty_cache()
-
-    # Force synchronize to ensure memory is freed
     if torch.cuda.is_available():
         torch.cuda.synchronize()
         torch.cuda.reset_peak_memory_stats()
-        # Additional cleanup - clear all cached allocators
         torch.cuda.memory.empty_cache()
 
-    print(f"Saved to {output_dir}")
-    print(f"GPU memory freed: {torch.cuda.memory_allocated() / 1e9:.2f} GB allocated, {torch.cuda.memory_reserved() / 1e9:.2f} GB reserved")
+    sanitize_generation_config(output_dir)
+    write_model_profile(output_dir, model_id)
     success_marker.touch()
+    print(f"Saved to {output_dir} (save_pretrained)")
 
 except Exception as e:
     print(f"ERROR: Model download failed: {e}", file=sys.stderr)
     sys.exit(1)
 EOF
 
-    if [[ ! -f "${success_marker}" ]]; then
-        # Output error to stderr (not stdout) and return empty string
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: Failed to download model: ${model_id}" >&2
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: Failed to download model: ${model_id}" >> "${LOG_FILE}"
-        echo ""  # Return empty string so caller can detect failure
-        return 1
-    fi
+	    if [[ ! -f "${success_marker}" ]]; then
+	        # Output error to stderr (not stdout) and return empty string
+	        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: Failed to download model: ${model_id}" >&2
+	        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: Failed to download model: ${model_id}" >> "${LOG_FILE}"
+	        # The Python downloader creates the baseline directory before downloading.
+	        # If the download fails, remove the incomplete baseline dir so future runs
+	        # don't treat it as a cached success.
+	        rm -rf "${model_dir}/baseline" 2>/dev/null || true
+	        echo ""  # Return empty string so caller can detect failure
+	        return 1
+	    fi
     rm -f "${success_marker}"
 
     echo "${model_dir}/baseline"
@@ -1993,13 +2245,21 @@ run_lmeval() {
     local end_time=$(date +%s)
     local duration=$((end_time - start_time))
 
-    local results_file=$(find "$(dirname "${output_file}")" -name "results*.json" -type f | head -1)
+    local results_file
+    results_file=$(find "$(dirname "${output_file}")" -name "results*.json" -type f 2>/dev/null | head -1)
     if [[ -n "${results_file}" ]]; then
-        mv "${results_file}" "${output_file}"
-        log "  ✅ Results saved: ${output_file} (${duration}s)"
+        if mv "${results_file}" "${output_file}"; then
+            log "  ✅ Results saved: ${output_file} (${duration}s)"
+        else
+            log "  ⚠️  Failed to move results to: ${output_file}"
+            exit_code=1
+        fi
     else
         log "  ⚠️  No results file found"
+        [[ ${exit_code} -eq 0 ]] && exit_code=1
     fi
+
+    return ${exit_code}
 }
 export -f run_lmeval
 
@@ -2069,7 +2329,6 @@ edit:
 guards:
   order:
     - invariants
-    - spectral
     - rmt
     - variance
 
@@ -3100,7 +3359,7 @@ process_model() {
 compile_results() {
     log_section "COMPILING RESULTS"
 
-    python3 << EOF
+	    python3 <<- EOF
 import json
 import csv
 import math
@@ -3164,45 +3423,163 @@ for model_dir in output_dir.iterdir():
     if not certs_dir.exists():
         continue
 
-    for cert_file in certs_dir.rglob("evaluation.cert.json"):
-        try:
-            cert = json.loads(cert_file.read_text())
-            rel_path = cert_file.relative_to(certs_dir)
-            parts = list(rel_path.parts)
+	    for cert_file in certs_dir.rglob("evaluation.cert.json"):
+	        try:
+	            cert = json.loads(cert_file.read_text())
+	            rel_path = cert_file.relative_to(certs_dir)
+	            parts = list(rel_path.parts)
 
-            v = cert.get('validation', {})
-            def as_bool(val):
-                if isinstance(val, bool): return val
-                if isinstance(val, str): return val.lower() == 'true'
-                return bool(val)
+	            v = cert.get('validation', {}) or {}
+	            def as_bool(val):
+	                if val is None:
+	                    return False
+	                if isinstance(val, bool):
+	                    return val
+	                if isinstance(val, str):
+	                    return val.strip().lower() in ('true', '1', 'yes', 'on')
+	                return bool(val)
 
-            all_pass = all([
-                as_bool(v.get('invariants_pass', False)),
-                as_bool(v.get('primary_metric_acceptable', False)),
-                as_bool(v.get('spectral_stable', False)),
-                as_bool(v.get('rmt_stable', False))
-            ])
+	            invariants_ok = as_bool(v.get('invariants_pass', False))
+	            pm_ok = as_bool(v.get('primary_metric_acceptable', False))
+	            spectral_ok = as_bool(v.get('spectral_stable', False))
+	            rmt_ok = as_bool(v.get('rmt_stable', False))
+	            drift_ok = as_bool(v.get('preview_final_drift_acceptable', True))
+	            hyst_applied = as_bool(v.get('hysteresis_applied', False))
 
-            pd = cert.get('policy_digest') or {}
-            meta = cert.get('meta') or {}
-            det = meta.get('determinism') or {}
+	            guard_overhead = cert.get('guard_overhead') or {}
+	            guard_evaluated = bool(guard_overhead.get('evaluated')) if isinstance(guard_overhead, dict) else False
+	            overhead_ok = as_bool(v.get('guard_overhead_acceptable', True))
 
-            invar_rows.append({
-                'model': model_dir.name,
-                'experiment': parts[0] if parts else 'unknown',
-                'run': parts[1] if len(parts) > 1 else '',
-                'edit_type': parts[0] if parts else 'unknown',
-                'pm_ratio': cert.get('primary_metric', {}).get('ratio_vs_baseline'),
-                'pm_acceptable': v.get('primary_metric_acceptable'),
-                'invariants_pass': v.get('invariants_pass'),
-                'spectral_stable': v.get('spectral_stable'),
-                'rmt_stable': v.get('rmt_stable'),
-                'all_pass': all_pass,
-                'policy_digest_hash': pd.get('thresholds_hash'),
-                'policy_digest_changed': pd.get('changed'),
-                'determinism_level': det.get('level'),
-                'determinism_profile': det.get('profile'),
-                'determinism_requested': det.get('requested'),
+	            # Backwards-compatible "all_pass" used by existing analysis logic.
+	            all_pass = all([invariants_ok, pm_ok, spectral_ok, rmt_ok])
+
+	            # Canonical overall pass aligned with InvarLock console validation block.
+	            overall_pass = all([invariants_ok, pm_ok, spectral_ok, rmt_ok, drift_ok])
+	            if guard_evaluated:
+	                overall_pass = overall_pass and overhead_ok
+
+	            conf = cert.get('confidence') or {}
+	            conf_label = conf.get('label') if isinstance(conf, dict) else None
+	            conf_label = str(conf_label).strip() if conf_label is not None else ''
+	            conf_label = conf_label if conf_label else 'Unknown'
+
+	            pm = cert.get('primary_metric') or {}
+	            pm_ratio = pm.get('ratio_vs_baseline') if isinstance(pm, dict) else None
+	            pm_ci_lo = None
+	            pm_ci_hi = None
+	            try:
+	                dci = pm.get('display_ci') if isinstance(pm, dict) else None
+	                if isinstance(dci, (list, tuple)) and len(dci) == 2:
+	                    pm_ci_lo = float(dci[0])
+	                    pm_ci_hi = float(dci[1])
+	                    if not (math.isfinite(pm_ci_lo) and math.isfinite(pm_ci_hi)):
+	                        pm_ci_lo = None
+	                        pm_ci_hi = None
+	            except Exception:
+	                pm_ci_lo = None
+	                pm_ci_hi = None
+
+	            # Estimate the effective PM threshold used by the tier policy.
+	            tier = ''
+	            try:
+	                pd_try = cert.get('policy_digest') or {}
+	                auto_try = cert.get('auto') or {}
+	                tier = str(pd_try.get('tier_policy_name') or auto_try.get('tier') or '').strip().lower()
+	            except Exception:
+	                tier = ''
+
+	            pm_threshold = None
+	            try:
+	                pol = cert.get('resolved_policy') or {}
+	                metrics_pol = pol.get('metrics', {}) if isinstance(pol, dict) else {}
+	                pm_pol = metrics_pol.get('pm_ratio', {}) if isinstance(metrics_pol, dict) else {}
+	                base = pm_pol.get('ratio_limit_base')
+	                hyst = pm_pol.get('hysteresis_ratio', 0.0)
+	                if base is not None:
+	                    pm_threshold = float(base) + float(hyst or 0.0)
+	            except Exception:
+	                pm_threshold = None
+	            if pm_threshold is None:
+	                tier_thresholds = {'conservative': 1.05, 'balanced': 1.10, 'aggressive': 1.20}
+	                base = tier_thresholds.get(tier, 1.10)
+	                pm_threshold = float(base) + 0.002
+
+	            # "Clear" PM failure if CI lower bound is above threshold, or ratio is far above.
+	            pm_clear_fail = False
+	            pm_far_fail = False
+	            pm_far_margin = 0.03  # absolute ratio margin above threshold
+	            try:
+	                if pm_ci_lo is not None and pm_threshold is not None:
+	                    pm_clear_fail = float(pm_ci_lo) > float(pm_threshold)
+	            except Exception:
+	                pm_clear_fail = False
+	            try:
+	                if isinstance(pm_ratio, (int, float)) and math.isfinite(float(pm_ratio)):
+	                    pm_far_fail = float(pm_ratio) > (float(pm_threshold) + float(pm_far_margin))
+	            except Exception:
+	                pm_far_fail = False
+
+	            # Triage layer (PASS/REVIEW/FAIL) for shadow-mode style workflows.
+	            triage_reasons = []
+	            if not invariants_ok:
+	                triage_reasons.append('invariants_fail')
+	            if not spectral_ok:
+	                triage_reasons.append('spectral_fail')
+	            if not rmt_ok:
+	                triage_reasons.append('rmt_fail')
+	            if not pm_ok:
+	                triage_reasons.append('primary_metric_fail')
+	            if not drift_ok:
+	                triage_reasons.append('drift_fail')
+	            if guard_evaluated and not overhead_ok:
+	                triage_reasons.append('overhead_fail')
+	            if hyst_applied:
+	                triage_reasons.append('hysteresis_applied')
+	            if conf_label != 'High':
+	                triage_reasons.append(f'confidence_{conf_label.lower()}')
+
+	            triage = 'REVIEW'
+	            if (not invariants_ok) or (not spectral_ok) or (not rmt_ok):
+	                triage = 'FAIL'
+	            elif (not pm_ok) and (pm_clear_fail or pm_far_fail):
+	                triage = 'FAIL'
+	                triage_reasons.append('primary_metric_clear' if pm_clear_fail else 'primary_metric_far')
+	            elif overall_pass and conf_label == 'High' and not hyst_applied:
+	                triage = 'PASS'
+	                triage_reasons = []
+
+	            triage_reason = 'strict_pass' if triage == 'PASS' else ('|'.join(triage_reasons) if triage_reasons else 'unspecified')
+
+	            pd = cert.get('policy_digest') or {}
+	            meta = cert.get('meta') or {}
+	            det = meta.get('determinism') or {}
+
+	            invar_rows.append({
+	                'model': model_dir.name,
+	                'experiment': parts[0] if parts else 'unknown',
+	                'run': parts[1] if len(parts) > 1 else '',
+	                'edit_type': parts[0] if parts else 'unknown',
+	                'pm_ratio': pm_ratio,
+	                'pm_ci_low': pm_ci_lo,
+	                'pm_ci_high': pm_ci_hi,
+	                'pm_threshold': pm_threshold,
+	                'pm_acceptable': v.get('primary_metric_acceptable'),
+	                'preview_final_drift_acceptable': v.get('preview_final_drift_acceptable'),
+	                'invariants_pass': v.get('invariants_pass'),
+	                'spectral_stable': v.get('spectral_stable'),
+	                'rmt_stable': v.get('rmt_stable'),
+	                'all_pass': all_pass,
+	                'overall_pass': overall_pass,
+	                'hysteresis_applied': v.get('hysteresis_applied'),
+	                'guard_overhead_acceptable': v.get('guard_overhead_acceptable'),
+	                'confidence_label': conf_label,
+	                'triage': triage,
+	                'triage_reason': triage_reason,
+	                'policy_digest_hash': pd.get('thresholds_hash'),
+	                'policy_digest_changed': pd.get('changed'),
+	                'determinism_level': det.get('level'),
+	                'determinism_profile': det.get('profile'),
+	                'determinism_requested': det.get('requested'),
             })
         except Exception as e:
             print(f"Error processing {cert_file}: {e}")
@@ -3326,7 +3703,7 @@ EOF
 run_analysis() {
     log_section "CORRELATION ANALYSIS"
 
-    python3 << EOF
+	    python3 <<- EOF
 import json
 import csv
 import math
@@ -3370,11 +3747,12 @@ results = {
 }
 categories = defaultdict(int)
 # Track (delta_eval, pm_ratio) pairs for correlation analysis
-pm_points = []
+	pm_points = []
+	triage_counts = defaultdict(int)
 
-for model_dir in output_dir.iterdir():
-    if not model_dir.is_dir() or model_dir.name in ['logs', 'analysis', 'reports', 'presets', 'models']:
-        continue
+	for model_dir in output_dir.iterdir():
+	    if not model_dir.is_dir() or model_dir.name in ['logs', 'analysis', 'reports', 'presets', 'models']:
+	        continue
 
     model = model_dir.name
     results['models'][model] = {}
@@ -3439,24 +3817,39 @@ for model_dir in output_dir.iterdir():
                 pm_vals.append(float(v))
             except Exception:
                 continue
-        pm_ratio_mean = sum(pm_vals) / len(pm_vals) if pm_vals else None
-        if pm_ratio_mean is not None and deltas:
-            pm_points.append((mean_delta, math.log(pm_ratio_mean)))
+	        pm_ratio_mean = sum(pm_vals) / len(pm_vals) if pm_vals else None
+	        if pm_ratio_mean is not None and deltas:
+	            pm_points.append((mean_delta, math.log(pm_ratio_mean)))
 
-        if has_regression and invar_flagged: category = "TRUE_POSITIVE"
-        elif not has_regression and invar_flagged: category = "FALSE_POSITIVE"
-        elif not has_regression and not invar_flagged: category = "TRUE_NEGATIVE"
-        else: category = "FALSE_NEGATIVE"
+	        # Aggregate triage across replicates: FAIL if any fail, PASS if all pass.
+	        triage_votes = []
+	        for r in invar_results:
+	            t = str(r.get('triage', '') or '').strip().upper()
+	            if t:
+	                triage_votes.append(t)
+	        if any(t == 'FAIL' for t in triage_votes):
+	            triage = 'FAIL'
+	        elif triage_votes and all(t == 'PASS' for t in triage_votes):
+	            triage = 'PASS'
+	        else:
+	            triage = 'REVIEW'
+	        triage_counts[triage] += 1
+
+	        if has_regression and invar_flagged: category = "TRUE_POSITIVE"
+	        elif not has_regression and invar_flagged: category = "FALSE_POSITIVE"
+	        elif not has_regression and not invar_flagged: category = "TRUE_NEGATIVE"
+	        else: category = "FALSE_NEGATIVE"
 
         categories[category] += 1
-        results['models'][model][edit_type] = {
-            'category': category,
-            'regression': has_regression,
-            'flagged': invar_flagged,
-            'mean_delta_eval': mean_delta,
-            'mean_pm_ratio': pm_ratio_mean,
-        }
-        print(f"  {edit_type}: {category}")
+	        results['models'][model][edit_type] = {
+	            'category': category,
+	            'regression': has_regression,
+	            'flagged': invar_flagged,
+	            'triage': triage,
+	            'mean_delta_eval': mean_delta,
+	            'mean_pm_ratio': pm_ratio_mean,
+	        }
+	        print(f"  {edit_type}: {category}")
 
     for row in invar_data.get((model, 'errors'), []):
         def is_false(val):
@@ -3540,23 +3933,25 @@ print(f"Accuracy: {accuracy:.0%}")
 print(f"Precision: {precision:.0%}")
 print(f"Recall: {recall:.0%}")
 print(f"F1 Score: {f1:.0%}")
-print(f"Error Detection: {err_detected}/{err_total} ({err_rate:.0%})")
-print(f"Confidence Score: {confidence_score:.1f}/100 ({confidence_level})")
+	print(f"Error Detection: {err_detected}/{err_total} ({err_rate:.0%})")
+	print(f"Triage (edits): PASS={triage_counts.get('PASS', 0)} REVIEW={triage_counts.get('REVIEW', 0)} FAIL={triage_counts.get('FAIL', 0)}")
+	print(f"Confidence Score: {confidence_score:.1f}/100 ({confidence_level})")
 
-results['summary'] = {
-    'accuracy': accuracy,
+	results['summary'] = {
+	    'accuracy': accuracy,
     'precision': precision,
     'recall': recall,
     'f1_score': f1,
     'error_detection_rate': err_rate,
     'categories': dict(categories),
-    'confidence_score': confidence_score,
-    'confidence_level': confidence_level,
-    'total_tests': total,
-    'models_tested': len(results['models']),
-    'accuracy_ci': acc_ci,
-    'error_rate_ci': err_ci,
-}
+	    'confidence_score': confidence_score,
+	    'confidence_level': confidence_level,
+	    'triage_counts': dict(triage_counts),
+	    'total_tests': total,
+	    'models_tested': len(results['models']),
+	    'accuracy_ci': acc_ci,
+	    'error_rate_ci': err_ci,
+	}
 
 with open(analysis_dir / "correlation_analysis.json", 'w') as f:
     json.dump(results, f, indent=2)
@@ -3567,7 +3962,7 @@ EOF
 generate_verdict() {
     log_section "GENERATING FINAL VERDICT"
 
-    python3 << EOF
+	    python3 <<- EOF
 import json
 from pathlib import Path
 from datetime import datetime
@@ -3598,7 +3993,11 @@ err_rate = summary.get('error_detection_rate', 0)
 confidence_score = summary.get('confidence_score', 0)
 confidence_level = summary.get('confidence_level', 'UNKNOWN')
 total_tests = summary.get('total_tests', 0)
-models_tested = summary.get('models_tested', 0)
+	models_tested = summary.get('models_tested', 0)
+	triage_counts = summary.get('triage_counts', {}) or {}
+	triage_pass = triage_counts.get('PASS', 0)
+	triage_review = triage_counts.get('REVIEW', 0)
+	triage_fail = triage_counts.get('FAIL', 0)
 
 phase0_pass = accuracy >= 0.6 and err_rate >= 0.8
 
@@ -3628,12 +4027,13 @@ report = f'''
      Recall:            {recall:.0%}
      F1 Score:          {f1:.0%}
      Error Detection:   {err_rate:.0%}
---------------------------------------------------------------------------------
-     CONFIDENCE SCORE:  {confidence_score:.1f}/100 ({confidence_level})
---------------------------------------------------------------------------------
-     VERDICT: {verdict}
-     VERDICT CONFIDENCE: {verdict_confidence}
-================================================================================
+	--------------------------------------------------------------------------------
+	     CONFIDENCE SCORE:  {confidence_score:.1f}/100 ({confidence_level})
+	     TRIAGE (edits):    PASS={triage_pass} REVIEW={triage_review} FAIL={triage_fail}
+	--------------------------------------------------------------------------------
+	     VERDICT: {verdict}
+	     VERDICT CONFIDENCE: {verdict_confidence}
+	================================================================================
 
 EDIT TYPES TESTED:
   * Quantization RTN (group-wise): 8-bit (clean), 4-bit (stress)
@@ -3655,16 +4055,17 @@ print(report)
 with open(reports_dir / "final_verdict.txt", 'w') as f:
     f.write(report)
 
-with open(reports_dir / "final_verdict.json", 'w') as f:
-    json.dump({
-        'verdict': verdict,
-        'verdict_confidence': verdict_confidence,
-        'metrics': {'accuracy': accuracy, 'precision': precision, 'recall': recall, 'f1_score': f1, 'error_detection_rate': err_rate},
-        'confidence': {'score': confidence_score, 'level': confidence_level},
-        'phase0_pass': phase0_pass,
-        'platform': 'B200_180GB_x8',
-        'models_tested': models_tested,
-        'total_tests': total_tests,
+	with open(reports_dir / "final_verdict.json", 'w') as f:
+	    json.dump({
+	        'verdict': verdict,
+	        'verdict_confidence': verdict_confidence,
+	        'metrics': {'accuracy': accuracy, 'precision': precision, 'recall': recall, 'f1_score': f1, 'error_detection_rate': err_rate},
+	        'confidence': {'score': confidence_score, 'level': confidence_level},
+	        'triage': {'pass': triage_pass, 'review': triage_review, 'fail': triage_fail},
+	        'phase0_pass': phase0_pass,
+	        'platform': 'B200_180GB_x8',
+	        'models_tested': models_tested,
+	        'total_tests': total_tests,
         'timestamp': datetime.now().isoformat()
     }, f, indent=2)
 EOF
@@ -3695,6 +4096,10 @@ main_dynamic() {
         handle_disk_pressure "${free_gb}" "${min_free}"
     fi
 
+    # Disk capacity preflight based on planned model/edit storage.
+    # This prevents expensive GPU time from being spent only to later hit ENOSPC.
+    disk_preflight
+
     setup_b200_environment
 
     log "Output directory: ${OUTPUT_DIR}"
@@ -3710,6 +4115,9 @@ main_dynamic() {
     # Check for --resume mode: skip task generation if queue already exists with tasks
     local existing_queue="${OUTPUT_DIR}/queue"
     local skip_task_generation="false"
+    local resume_total_tasks=0
+    local resume_existing_running=0
+    local resume_existing_failed=0
 
     if [[ "${RESUME_FLAG}" == "true" && -d "${existing_queue}" ]]; then
         # Count existing tasks across all queues
@@ -3722,36 +4130,18 @@ main_dynamic() {
 
         if [[ ${existing_total} -gt 0 ]]; then
             skip_task_generation="true"
+            resume_total_tasks="${existing_total}"
+            resume_existing_running="${existing_running}"
+            resume_existing_failed="${existing_failed}"
             log "RESUME MODE: Found existing queue with ${existing_total} tasks"
             log "  Pending: ${existing_pending}, Ready: ${existing_ready}, Running: ${existing_running}"
             log "  Completed: ${existing_completed}, Failed: ${existing_failed}"
-
-            # Move any stuck "running" tasks back to pending (orphaned from previous run)
-            if [[ ${existing_running} -gt 0 ]]; then
-                log "  Moving ${existing_running} orphaned running tasks back to pending..."
-                for task_file in "${existing_queue}/running"/*.task; do
-                    [[ -f "${task_file}" ]] || continue
-                    mv "${task_file}" "${existing_queue}/pending/"
-                done
-            fi
-
-            # Move failed tasks back to pending for retry
-            if [[ ${existing_failed} -gt 0 ]]; then
-                log "  Moving ${existing_failed} failed tasks back to pending for retry..."
-                for task_file in "${existing_queue}/failed"/*.task; do
-                    [[ -f "${task_file}" ]] || continue
-                    # Reset retry count
-                    if type update_task_field &>/dev/null; then
-                        update_task_field "${task_file}" "retries" "0" 2>/dev/null || true
-                        update_task_field "${task_file}" "status" "pending" 2>/dev/null || true
-                    fi
-                    mv "${task_file}" "${existing_queue}/pending/"
-                done
-            fi
         fi
     fi
 
     init_queue "${OUTPUT_DIR}"
+    # Clear any previous shutdown markers so new workers can start cleanly (important for --resume).
+    rm -f "${OUTPUT_DIR}/workers/SHUTDOWN" "${OUTPUT_DIR}/workers"/gpu_*.shutdown 2>/dev/null || true
     # Initialize GPU reservation tracking for multi-GPU tasks before workers start.
     if type init_gpu_reservations &>/dev/null; then
         init_gpu_reservations "${OUTPUT_DIR}"
@@ -3761,7 +4151,38 @@ main_dynamic() {
     local total_tasks=0
     if [[ "${skip_task_generation}" == "true" ]]; then
         log "Skipping task generation (--resume mode)"
-        # Re-resolve dependencies after moving tasks
+        # Reclaim any stuck running tasks from a previous run (kills stray procs, releases GPU reservations).
+        if [[ ${resume_existing_running} -gt 0 ]]; then
+            log "Reclaiming ${resume_existing_running} orphaned running task(s) for resume..."
+            local gpu_id
+            for gpu_id in $(list_run_gpu_ids); do
+                reclaim_orphaned_tasks "${gpu_id}" >> "${LOG_FILE}" 2>&1 || true
+            done
+        fi
+
+        # Move failed tasks back to pending for retry, clearing retry/backoff state for immediate resume.
+        if [[ ${resume_existing_failed} -gt 0 ]]; then
+            log "Resetting ${resume_existing_failed} failed task(s) back to pending for resume..."
+            local task_file
+            for task_file in "${QUEUE_DIR}/failed"/*.task; do
+                [[ -f "${task_file}" ]] || continue
+                local tmp_file="${task_file}.resume.$$"
+                jq '(.params // {}) as $p
+                    | .status="pending"
+                    | .retries=0
+                    | .gpu_id=-1
+                    | .assigned_gpus=null
+                    | .started_at=null
+                    | .completed_at=null
+                    | .error_msg=null
+                    | .params=($p + {retry_after:null,last_error_type:null})' "${task_file}" > "${tmp_file}" 2>/dev/null \
+                    && mv "${tmp_file}" "${task_file}" 2>/dev/null \
+                    || { rm -f "${tmp_file}" 2>/dev/null || true; }
+                mv "${task_file}" "${QUEUE_DIR}/pending/" 2>/dev/null || true
+            done
+        fi
+
+        # Re-resolve dependencies after reclaim/reset.
         if type resolve_dependencies &>/dev/null; then
             local moved=$(resolve_dependencies)
             log "Re-resolved dependencies: moved ${moved} tasks to ready queue"
@@ -3778,6 +4199,13 @@ main_dynamic() {
     fi
     if type export_memory_plan &>/dev/null; then
         export_memory_plan "${OUTPUT_DIR}"
+    fi
+
+    # Resolve initial dependencies on fresh runs so workers can start immediately (avoid idle GPUs).
+    if [[ "${skip_task_generation}" != "true" ]] && type resolve_dependencies &>/dev/null; then
+        local moved_initial=0
+        moved_initial=$(resolve_dependencies 2>/dev/null) || moved_initial=0
+        log "Resolved initial dependencies: moved ${moved_initial} task(s) to ready queue"
     fi
 
     total_tasks=$(count_tasks "pending")
@@ -3983,28 +4411,21 @@ main() {
     main_dynamic "$@"
 }
 
-# ============ CLI ARGUMENT PARSING ============
-RESUME_FLAG="false"
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --resume|-r)
-            RESUME_FLAG="true"
-            shift
-            ;;
-        --help|-h)
-            # Handled below
-            break
-            ;;
-        *)
-            shift
-            ;;
-    esac
-done
-export RESUME_FLAG
+b200_entrypoint() {
+    # ============ CLI ARGUMENT PARSING (no strict mode; help should work everywhere) ============
+    RESUME_FLAG="false"
+    local arg
+    for arg in "$@"; do
+        case "${arg}" in
+            --resume|-r) RESUME_FLAG="true" ;;
+            --help|-h) break ;;
+        esac
+    done
+    export RESUME_FLAG
 
-# ============ HELP ============
-if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
-    cat << EOF
+    # ============ HELP ============
+    if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
+        cat << EOF
 InvarLock Validation Suite v${SCRIPT_VERSION} - B200 180GB x 8 GPU
 
 Optimized for 8x NVIDIA B200 180GB SXM6 GPUs with:
@@ -4063,7 +4484,26 @@ Examples:
 Resume a failed run:
     OUTPUT_DIR=./invarlock_validation_b200_20241208_123456 $0 --resume
 EOF
-    exit 0
-fi
+        exit 0
+    fi
 
-main "$@"
+    # Enable strict mode only for actual script execution (tests may source this file).
+    set -uo pipefail
+    trap cleanup EXIT INT TERM HUP QUIT
+
+    b200_require_bash4 || exit 1
+
+    if [[ -z "${OUTPUT_DIR:-}" ]]; then
+        OUTPUT_DIR="./invarlock_validation_b200_$(date +%Y%m%d_%H%M%S)"
+    fi
+
+    b200_source_libs || exit 1
+    b200_setup_output_dirs || exit 1
+    b200_setup_hf_cache_dirs || exit 1
+
+    main "$@"
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    b200_entrypoint "$@"
+fi

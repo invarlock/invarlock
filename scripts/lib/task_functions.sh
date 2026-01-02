@@ -10,6 +10,8 @@
 
 # Source dependencies
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=runtime.sh
+source "${SCRIPT_DIR}/runtime.sh"
 [[ -z "${QUEUE_MANAGER_LOADED:-}" ]] && source "${SCRIPT_DIR}/queue_manager.sh" && export QUEUE_MANAGER_LOADED=1
 
 # ============ FALLBACK FUNCTIONS ============
@@ -20,7 +22,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Returns: 7, 13, 30, 40, 70, moe
 _get_model_size_from_name() {
     local model_id="$1"
-    local model_lower=$(echo "${model_id}" | tr '[:upper:]' '[:lower:]')
+    local model_lower=$(printf '%s' "${model_id}" | tr '[:upper:]' '[:lower:]')
 
     # Check for MoE architecture first
     if [[ "${model_lower}" =~ mixtral || "${model_lower}" =~ 8x7b || "${model_lower}" =~ moe ]]; then
@@ -113,7 +115,7 @@ _get_lmeval_model_args() {
     local model_path="$1"
     local model_args="pretrained=${model_path},trust_remote_code=True,dtype=bfloat16"
     local parallelize_flag="${LM_EVAL_PARALLELIZE:-true}"
-    parallelize_flag=$(echo "${parallelize_flag}" | tr '[:upper:]' '[:lower:]')
+    parallelize_flag=$(printf '%s' "${parallelize_flag}" | tr '[:upper:]' '[:lower:]')
     local multi_gpu="false"
     if [[ "${CUDA_VISIBLE_DEVICES:-}" == *","* ]]; then
         multi_gpu="true"
@@ -189,17 +191,17 @@ _kill_task_process_group() {
     local pgid=""
     local self_pgid=""
 
-    pgid=$(ps -o pgid= -p "${pid}" 2>/dev/null | tr -d ' ')
-    self_pgid=$(ps -o pgid= -p "$$" 2>/dev/null | tr -d ' ')
+    pgid=$(_cmd_ps -o pgid= -p "${pid}" 2>/dev/null | tr -d ' ')
+    self_pgid=$(_cmd_ps -o pgid= -p "$$" 2>/dev/null | tr -d ' ')
 
     if [[ -n "${pgid}" && -n "${self_pgid}" && "${pgid}" != "${self_pgid}" ]]; then
-        kill -TERM -- "-${pgid}" 2>/dev/null || true
-        sleep 5
-        kill -KILL -- "-${pgid}" 2>/dev/null || true
+        _cmd_kill -TERM -- "-${pgid}" 2>/dev/null || true
+        _sleep 5
+        _cmd_kill -KILL -- "-${pgid}" 2>/dev/null || true
     else
-        kill -TERM "${pid}" 2>/dev/null || true
-        sleep 5
-        kill -KILL "${pid}" 2>/dev/null || true
+        _cmd_kill -TERM "${pid}" 2>/dev/null || true
+        _sleep 5
+        _cmd_kill -KILL "${pid}" 2>/dev/null || true
     fi
 }
 
@@ -211,7 +213,7 @@ _write_model_profile() {
     [[ -f "${profile_path}" ]] && return 0
     [[ -d "${baseline_dir}" ]] || return 1
 
-    python3 << PROFILE_EOF >/dev/null 2>&1
+    _cmd_python << PROFILE_EOF >/dev/null 2>&1 || true
 import json
 from pathlib import Path
 
@@ -277,6 +279,7 @@ execute_task() {
     # If assigned_gpus is set (e.g., "2,3,4,5" for 4-GPU tasks), use that
     # Otherwise fall back to the single gpu_id parameter
     local assigned_gpus=$(get_task_assigned_gpus "${task_file}")
+    assigned_gpus="${assigned_gpus// /}"
     if [[ -z "${assigned_gpus}" || "${assigned_gpus}" == "null" ]]; then
         assigned_gpus="${gpu_id}"
     fi
@@ -285,7 +288,7 @@ execute_task() {
     local task_log="${output_dir}/logs/tasks/${task_id}.log"
     mkdir -p "$(dirname "${task_log}")"
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting task: ${task_id}" >> "${task_log}"
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Starting task: ${task_id}" >> "${task_log}"
     echo "  Type: ${task_type}" >> "${task_log}"
     echo "  Model: ${model_id}" >> "${task_log}"
     echo "  GPU(s): ${assigned_gpus}" >> "${task_log}"
@@ -395,9 +398,9 @@ execute_task() {
         timeout_marker="${output_dir}/logs/tasks/${task_id}.timeout"
         rm -f "${timeout_marker}"
         (
-            sleep "${task_timeout}"
-            if kill -0 "${task_pid}" 2>/dev/null; then
-                echo "[$(date '+%Y-%m-%d %H:%M:%S')] Task ${task_id} exceeded timeout (${task_timeout}s), terminating" >> "${task_log}"
+            _sleep "${task_timeout}"
+            if _cmd_kill -0 "${task_pid}" 2>/dev/null; then
+                echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Task ${task_id} exceeded timeout (${task_timeout}s), terminating" >> "${task_log}"
                 echo "${task_timeout}" > "${timeout_marker}"
                 _kill_task_process_group "${task_pid}"
             fi
@@ -405,11 +408,11 @@ execute_task() {
         timeout_pid=$!
     fi
 
-    wait "${task_pid}"
-    exit_code=$?
+    exit_code=0
+    wait "${task_pid}" || exit_code=$?
 
     if [[ -n "${timeout_pid}" ]]; then
-        kill "${timeout_pid}" 2>/dev/null || true
+        _cmd_kill "${timeout_pid}" 2>/dev/null || true
         wait "${timeout_pid}" 2>/dev/null || true
     fi
 
@@ -422,7 +425,7 @@ execute_task() {
         rm -f "${task_pid_file}"
     fi
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Task ${task_id} finished with exit code: ${exit_code}" >> "${task_log}"
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Task ${task_id} finished with exit code: ${exit_code}" >> "${task_log}"
 
     return ${exit_code}
 }
@@ -441,7 +444,7 @@ task_setup_baseline() {
     local model_output_dir="${output_dir}/${model_name}"
     local baseline_dir="${model_output_dir}/models/baseline"
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Setting up baseline: ${model_id}" >> "${log_file}"
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Setting up baseline: ${model_id}" >> "${log_file}"
 
     # Check if already exists (resume mode)
     if [[ -d "${baseline_dir}" && -f "${baseline_dir}/config.json" ]]; then
@@ -462,8 +465,8 @@ task_setup_baseline() {
     # Use the main script's setup_model function if available
     if type setup_model &>/dev/null; then
         local baseline_path
-        baseline_path=$(setup_model "${model_id}" "${gpu_id}")
-        local exit_code=$?
+        local exit_code=0
+        baseline_path=$(setup_model "${model_id}" "${gpu_id}") || exit_code=$?
 
         if [[ ${exit_code} -eq 0 && -n "${baseline_path}" && -d "${baseline_path}" ]]; then
             echo "  Baseline ready at: ${baseline_path}" >> "${log_file}"
@@ -484,7 +487,8 @@ task_setup_baseline() {
         echo "  Downloading model ${model_id}..." >> "${log_file}"
 
         # CUDA_VISIBLE_DEVICES is inherited from execute_task() for multi-GPU support
-        python3 << SETUP_EOF >> "${log_file}" 2>&1
+        local exit_code=0
+        _cmd_python << SETUP_EOF >> "${log_file}" 2>&1 || exit_code=$?
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from pathlib import Path
@@ -531,7 +535,7 @@ except Exception as e:
     sys.exit(1)
 SETUP_EOF
 
-        if [[ $? -eq 0 && -f "${baseline_dir}/config.json" ]]; then
+        if [[ ${exit_code} -eq 0 && -f "${baseline_dir}/config.json" ]]; then
             echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
             # Store original model_id for model size detection
             echo "${model_id}" > "${model_output_dir}/.model_id"
@@ -556,8 +560,8 @@ task_eval_baseline() {
     local log_file="$4"
 
     local model_output_dir="${output_dir}/${model_name}"
-    local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null)
-    local model_id=$(cat "${model_output_dir}/.model_id" 2>/dev/null)
+    local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null || true)
+    local model_id=$(cat "${model_output_dir}/.model_id" 2>/dev/null || true)
     local result_file="${model_output_dir}/evals/baseline_results.json"
 
     if [[ -z "${baseline_path}" || ! -d "${baseline_path}" ]]; then
@@ -570,7 +574,7 @@ task_eval_baseline() {
         return 0
     fi
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Running baseline lm-eval" >> "${log_file}"
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Running baseline lm-eval" >> "${log_file}"
 
     mkdir -p "$(dirname "${result_file}")"
 
@@ -600,7 +604,8 @@ task_eval_baseline() {
     mkdir -p "${tmp_eval_dir}"
 
     # CUDA_VISIBLE_DEVICES is inherited from execute_task() for multi-GPU support
-    TORCH_COMPILE="${torch_compile}" python3 -m lm_eval \
+    local exit_code=0
+    TORCH_COMPILE="${torch_compile}" _cmd_python -m lm_eval \
         --model hf \
         --model_args "${model_args}" \
         --tasks "${EVAL_TASKS:-mmlu,hellaswag,arc_challenge,winogrande}" \
@@ -608,18 +613,20 @@ task_eval_baseline() {
         --num_fewshot "${EVAL_NUM_FEWSHOT:-5}" \
         --output_path "${tmp_eval_dir}" \
         --log_samples \
-        >> "${log_file}" 2>&1
-
-    local exit_code=$?
+        >> "${log_file}" 2>&1 || exit_code=$?
 
     # Move results file to expected location
     local found_results=$(find "${tmp_eval_dir}" -name "results*.json" -type f 2>/dev/null | head -1)
     if [[ -n "${found_results}" && -f "${found_results}" ]]; then
-        mv "${found_results}" "${result_file}"
+        mv "${found_results}" "${result_file}" 2>/dev/null || {
+            echo "  ERROR: Failed to move results to: ${result_file}" >> "${log_file}"
+            return 1
+        }
         rm -rf "${tmp_eval_dir}" 2>/dev/null || true
         echo "  Results saved to: ${result_file}" >> "${log_file}"
     else
-        echo "  WARNING: No results found in ${tmp_eval_dir}" >> "${log_file}"
+        echo "  ERROR: No results found in ${tmp_eval_dir}" >> "${log_file}"
+        [[ ${exit_code} -eq 0 ]] && exit_code=1
     fi
 
     return ${exit_code}
@@ -638,8 +645,8 @@ task_calibration_run() {
     local log_file="$6"
 
     local model_output_dir="${output_dir}/${model_name}"
-    local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null)
-    local model_id=$(cat "${model_output_dir}/.model_id" 2>/dev/null)
+    local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null || true)
+    local model_id=$(cat "${model_output_dir}/.model_id" 2>/dev/null || true)
     local run_dir="${model_output_dir}/certificates/calibration/run_${run_num}"
 
     if [[ -z "${baseline_path}" || ! -d "${baseline_path}" ]]; then
@@ -653,7 +660,7 @@ task_calibration_run() {
         return 0
     fi
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Running calibration run ${run_num} (seed=${seed})" >> "${log_file}"
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Running calibration run ${run_num} (seed=${seed})" >> "${log_file}"
 
     mkdir -p "${run_dir}"
 
@@ -762,7 +769,6 @@ edit:
 guards:
   order:
     - invariants
-    - spectral
     - rmt
     - variance
 
@@ -781,19 +787,18 @@ YAML_EOF
     local profile_flag="ci"
 
     # CUDA_VISIBLE_DEVICES is inherited from execute_task() for multi-GPU support
+    local exit_code=0
     env "${extra_env[@]}" invarlock run \
         --config "${config_yaml}" \
         --profile "${profile_flag}" \
         --out "${run_dir}" \
-        >> "${log_file}" 2>&1
-
-    local exit_code=$?
+        >> "${log_file}" 2>&1 || exit_code=$?
 
     # Copy report to standard location
     local report_file=$(find "${run_dir}" -name "report*.json" -type f 2>/dev/null | head -1)
     if [[ -n "${report_file}" ]]; then
         cp "${report_file}" "${run_dir}/baseline_report.json" 2>/dev/null || true
-        python3 << CERT_EOF >> "${log_file}" 2>&1
+        _cmd_python << CERT_EOF >> "${log_file}" 2>&1 || true
 import json
 from pathlib import Path
 try:
@@ -831,13 +836,13 @@ task_generate_preset() {
         return 0
     fi
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Generating calibrated preset" >> "${log_file}"
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Generating calibrated preset" >> "${log_file}"
 
     mkdir -p "${preset_dir}"
 
     # Get baseline path and model_id to estimate model size
-    local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null)
-    local model_id=$(cat "${model_output_dir}/.model_id" 2>/dev/null)
+    local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null || true)
+    local model_id=$(cat "${model_output_dir}/.model_id" 2>/dev/null || true)
 
     # Get model-aware config for seq_len/stride using wrapper functions
     # (these handle fallback when main script functions aren't available)
@@ -860,7 +865,8 @@ task_generate_preset() {
     export PRESET_PREVIEW_N="${preview_n}"
     export PRESET_FINAL_N="${final_n}"
 
-    python3 << PRESET_EOF >> "${log_file}" 2>&1
+    local exit_code=0
+    _cmd_python << PRESET_EOF >> "${log_file}" 2>&1 || exit_code=$?
 import json
 import math
 import os
@@ -1488,7 +1494,7 @@ print(f"Saved preset to {preset_file}")
 print(f"Saved stats to {stats_path}")
 PRESET_EOF
 
-    return $?
+    return ${exit_code}
 }
 
 # ============ TASK: CREATE_EDIT ============
@@ -1504,7 +1510,7 @@ task_create_edit() {
     local log_file="$6"
 
     local model_output_dir="${output_dir}/${model_name}"
-    local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null)
+    local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null || true)
 
     if [[ -z "${baseline_path}" || ! -d "${baseline_path}" ]]; then
         echo "ERROR: Baseline path not found for ${model_name}" >> "${log_file}"
@@ -1547,13 +1553,13 @@ task_create_edit() {
         return 0
     fi
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating edit: ${edit_dir_name}" >> "${log_file}"
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Creating edit: ${edit_dir_name}" >> "${log_file}"
 
     # Use main script's functions if available
     case "${edit_type}" in
         "quant_rtn")
             if type create_edited_model &>/dev/null; then
-                create_edited_model "${baseline_path}" "${edit_path}" "quant_rtn" "${param1}" "${param2}" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1
+                create_edited_model "${baseline_path}" "${edit_path}" "quant_rtn" "${param1}" "${param2}" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1 || true
             else
                 echo "ERROR: create_edited_model not available" >> "${log_file}"
                 return 1
@@ -1561,7 +1567,7 @@ task_create_edit() {
             ;;
         "fp4_quant")
             if type create_fp4_model &>/dev/null; then
-                create_fp4_model "${baseline_path}" "${edit_path}" "${param1}" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1
+                create_fp4_model "${baseline_path}" "${edit_path}" "${param1}" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1 || true
             else
                 echo "ERROR: create_fp4_model not available" >> "${log_file}"
                 return 1
@@ -1569,7 +1575,7 @@ task_create_edit() {
             ;;
         "magnitude_prune")
             if type create_pruned_model &>/dev/null; then
-                create_pruned_model "${baseline_path}" "${edit_path}" "${param1}" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1
+                create_pruned_model "${baseline_path}" "${edit_path}" "${param1}" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1 || true
             else
                 echo "ERROR: create_pruned_model not available" >> "${log_file}"
                 return 1
@@ -1577,7 +1583,7 @@ task_create_edit() {
             ;;
         "lowrank_svd")
             if type create_lowrank_model &>/dev/null; then
-                create_lowrank_model "${baseline_path}" "${edit_path}" "${param1}" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1
+                create_lowrank_model "${baseline_path}" "${edit_path}" "${param1}" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1 || true
             else
                 echo "ERROR: create_lowrank_model not available" >> "${log_file}"
                 return 1
@@ -1612,19 +1618,20 @@ task_create_edits_batch() {
     local log_file="$5"
 
     local model_output_dir="${output_dir}/${model_name}"
-    local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null)
+    local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null || true)
 
     if [[ -z "${baseline_path}" || ! -d "${baseline_path}" ]]; then
         echo "ERROR: Baseline path not found for ${model_name}" >> "${log_file}"
         return 1
     fi
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating batch edits (8 edits with single model load)" >> "${log_file}"
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Creating batch edits (8 edits with single model load)" >> "${log_file}"
     echo "  Baseline: ${baseline_path}" >> "${log_file}"
 
     # Process each edit spec using Python for efficient batch creation
     # CUDA_VISIBLE_DEVICES is inherited from execute_task() for multi-GPU support
-    python3 << BATCH_EDIT_EOF >> "${log_file}" 2>&1
+    local exit_code=0
+    _cmd_python << BATCH_EDIT_EOF >> "${log_file}" 2>&1 || exit_code=$?
 import gc
 import json
 import os
@@ -1859,8 +1866,6 @@ if failed_count > 0:
     sys.exit(1)
 BATCH_EDIT_EOF
 
-    local exit_code=$?
-
     if [[ ${exit_code} -eq 0 ]]; then
         echo "  Batch edit creation complete" >> "${log_file}"
     else
@@ -1926,12 +1931,12 @@ task_eval_edit() {
         return 0
     fi
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Running lm-eval on: ${edit_name}" >> "${log_file}"
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Running lm-eval on: ${edit_name}" >> "${log_file}"
 
     mkdir -p "$(dirname "${result_file}")"
 
-    local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null)
-    local model_id=$(cat "${model_output_dir}/.model_id" 2>/dev/null)
+    local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null || true)
+    local model_id=$(cat "${model_output_dir}/.model_id" 2>/dev/null || true)
     local model_size
     model_size=$(_estimate_model_size "${baseline_path}")
     if [[ -z "${model_size}" || "${model_size}" == "7" ]] && [[ -n "${model_id}" ]]; then
@@ -1955,7 +1960,8 @@ task_eval_edit() {
     mkdir -p "${tmp_eval_dir}"
 
     # CUDA_VISIBLE_DEVICES is inherited from execute_task() for multi-GPU support
-    TORCH_COMPILE="${torch_compile}" python3 -m lm_eval \
+    local exit_code=0
+    TORCH_COMPILE="${torch_compile}" _cmd_python -m lm_eval \
         --model hf \
         --model_args "${model_args}" \
         --tasks "${EVAL_TASKS:-mmlu,hellaswag,arc_challenge,winogrande}" \
@@ -1963,17 +1969,19 @@ task_eval_edit() {
         --num_fewshot "${EVAL_NUM_FEWSHOT:-5}" \
         --output_path "${tmp_eval_dir}" \
         --log_samples \
-        >> "${log_file}" 2>&1
-
-    local exit_code=$?
+        >> "${log_file}" 2>&1 || exit_code=$?
 
     local found_results=$(find "${tmp_eval_dir}" -name "results*.json" -type f 2>/dev/null | head -1)
     if [[ -n "${found_results}" && -f "${found_results}" ]]; then
-        mv "${found_results}" "${result_file}"
+        mv "${found_results}" "${result_file}" 2>/dev/null || {
+            echo "  ERROR: Failed to move results to: ${result_file}" >> "${log_file}"
+            return 1
+        }
         rm -rf "${tmp_eval_dir}" 2>/dev/null || true
         echo "  Results saved to: ${result_file}" >> "${log_file}"
     else
-        echo "  WARNING: No results found in ${tmp_eval_dir}" >> "${log_file}"
+        echo "  ERROR: No results found in ${tmp_eval_dir}" >> "${log_file}"
+        [[ ${exit_code} -eq 0 ]] && exit_code=1
     fi
 
     return ${exit_code}
@@ -2038,12 +2046,12 @@ task_eval_single_benchmark() {
         return 0
     fi
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Running lm-eval ${benchmark} on: ${edit_name}" >> "${log_file}"
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Running lm-eval ${benchmark} on: ${edit_name}" >> "${log_file}"
 
     mkdir -p "$(dirname "${result_file}")"
 
-    local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null)
-    local model_id=$(cat "${model_output_dir}/.model_id" 2>/dev/null)
+    local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null || true)
+    local model_id=$(cat "${model_output_dir}/.model_id" 2>/dev/null || true)
     local model_size
     model_size=$(_estimate_model_size "${baseline_path}")
     if [[ -z "${model_size}" || "${model_size}" == "7" ]] && [[ -n "${model_id}" ]]; then
@@ -2087,7 +2095,8 @@ task_eval_single_benchmark() {
     esac
 
     # CUDA_VISIBLE_DEVICES is inherited from execute_task() for multi-GPU support
-    TORCH_COMPILE="${torch_compile}" python3 -m lm_eval \
+    local exit_code=0
+    TORCH_COMPILE="${torch_compile}" _cmd_python -m lm_eval \
         --model hf \
         --model_args "${model_args}" \
         --tasks "${task_name}" \
@@ -2095,18 +2104,20 @@ task_eval_single_benchmark() {
         --num_fewshot "${EVAL_NUM_FEWSHOT:-5}" \
         --output_path "${tmp_eval_dir}" \
         --log_samples \
-        >> "${log_file}" 2>&1
-
-    local exit_code=$?
+        >> "${log_file}" 2>&1 || exit_code=$?
 
     # Move results file to expected location
     local found_results=$(find "${tmp_eval_dir}" -name "results*.json" -type f 2>/dev/null | head -1)
     if [[ -n "${found_results}" && -f "${found_results}" ]]; then
-        mv "${found_results}" "${result_file}"
+        mv "${found_results}" "${result_file}" 2>/dev/null || {
+            echo "  ERROR: Failed to move results to: ${result_file}" >> "${log_file}"
+            return 1
+        }
         rm -rf "${tmp_eval_dir}" 2>/dev/null || true
         echo "  Results saved to: ${result_file}" >> "${log_file}"
     else
-        echo "  WARNING: No results found in ${tmp_eval_dir}" >> "${log_file}"
+        echo "  ERROR: No results found in ${tmp_eval_dir}" >> "${log_file}"
+        [[ ${exit_code} -eq 0 ]] && exit_code=1
     fi
 
     return ${exit_code}
@@ -2126,8 +2137,8 @@ task_certify_edit() {
     local log_file="$7"
 
     local model_output_dir="${output_dir}/${model_name}"
-    local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null)
-    local model_id=$(cat "${model_output_dir}/.model_id" 2>/dev/null)
+    local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null || true)
+    local model_id=$(cat "${model_output_dir}/.model_id" 2>/dev/null || true)
     local preset_dir="${output_dir}/presets"
 
     if [[ -z "${baseline_path}" || ! -d "${baseline_path}" ]]; then
@@ -2170,7 +2181,7 @@ task_certify_edit() {
         return 0
     fi
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Certifying: ${edit_dir_name} run ${run_num}" >> "${log_file}"
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Certifying: ${edit_dir_name} run ${run_num}" >> "${log_file}"
 
     mkdir -p "${cert_dir}"
 
@@ -2298,6 +2309,7 @@ PRESET_YAML
     abs_preset_file="$(cd "$(dirname "${preset_file}")" && pwd)/$(basename "${preset_file}")"
 
     # CUDA_VISIBLE_DEVICES is inherited from execute_task() for multi-GPU support
+    local exit_code=0
     (
         cd "${work_dir}" || exit 1
         env "${extra_env[@]}" invarlock certify \
@@ -2307,10 +2319,8 @@ PRESET_YAML
             --tier "${INVARLOCK_TIER:-balanced}" \
             --out "${cert_dir}" \
             --cert-out "${cert_dir}" \
-            --preset "${abs_preset_file}"
-    ) >> "${log_file}" 2>&1
-
-    local exit_code=$?
+            --preset "${abs_preset_file}" >> "${log_file}" 2>&1
+    ) || exit_code=$?
 
     # Find and copy certificate (only the canonical cert)
     if [[ ! -f "${cert_file}" ]]; then
@@ -2336,7 +2346,7 @@ task_create_error() {
     local log_file="$5"
 
     local model_output_dir="${output_dir}/${model_name}"
-    local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null)
+    local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null || true)
     local error_path="${model_output_dir}/models/error_${error_type}"
 
     if [[ -z "${baseline_path}" || ! -d "${baseline_path}" ]]; then
@@ -2349,7 +2359,7 @@ task_create_error() {
         return 0
     fi
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating error model: ${error_type}" >> "${log_file}"
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Creating error model: ${error_type}" >> "${log_file}"
 
     if type create_error_model &>/dev/null; then
         create_error_model "${baseline_path}" "${error_path}" "${error_type}" "${gpu_id}" >> "${log_file}" 2>&1
@@ -2379,8 +2389,8 @@ task_certify_error() {
     local log_file="$5"
 
     local model_output_dir="${output_dir}/${model_name}"
-    local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null)
-    local model_id=$(cat "${model_output_dir}/.model_id" 2>/dev/null)
+    local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null || true)
+    local model_id=$(cat "${model_output_dir}/.model_id" 2>/dev/null || true)
     local error_path="${model_output_dir}/models/error_${error_type}"
     local cert_dir="${model_output_dir}/certificates/errors/${error_type}"
     local cert_file="${cert_dir}/evaluation.cert.json"
@@ -2401,7 +2411,7 @@ task_certify_error() {
         return 0
     fi
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Certifying error model: ${error_type}" >> "${log_file}"
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Certifying error model: ${error_type}" >> "${log_file}"
 
     mkdir -p "${cert_dir}"
 
@@ -2530,6 +2540,7 @@ PRESET_YAML
     abs_preset_file="$(cd "$(dirname "${preset_file}")" && pwd)/$(basename "${preset_file}")"
 
     # CUDA_VISIBLE_DEVICES is inherited from execute_task() for multi-GPU support
+    local exit_code=0
     (
         cd "${work_dir}" || exit 1
         env "${extra_env[@]}" invarlock certify \
@@ -2539,10 +2550,8 @@ PRESET_YAML
             --tier "${INVARLOCK_TIER:-balanced}" \
             --out "${cert_dir}" \
             --cert-out "${cert_dir}" \
-            --preset "${abs_preset_file}"
-    ) >> "${log_file}" 2>&1
-
-    local exit_code=$?
+            --preset "${abs_preset_file}" >> "${log_file}" 2>&1
+    ) || exit_code=$?
 
     # Find and copy certificate (only the canonical cert)
     if [[ ! -f "${cert_file}" ]]; then

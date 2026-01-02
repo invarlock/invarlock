@@ -12,6 +12,8 @@
 
 # Source dependencies
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=runtime.sh
+source "${SCRIPT_DIR}/runtime.sh"
 [[ -z "${QUEUE_MANAGER_LOADED:-}" ]] && source "${SCRIPT_DIR}/queue_manager.sh" && export QUEUE_MANAGER_LOADED=1
 [[ -z "${SCHEDULER_LOADED:-}" ]] && source "${SCRIPT_DIR}/scheduler.sh" && export SCHEDULER_LOADED=1
 
@@ -50,6 +52,7 @@ detect_oom() {
 # Usage: detect_transient_error <log_file>
 detect_transient_error() {
     local log_file="$1"
+    local pattern
 
     if [[ ! -f "${log_file}" ]]; then
         return 1
@@ -65,7 +68,6 @@ detect_transient_error() {
         "Network is unreachable"
         "Resource temporarily unavailable"
         "Permission denied.*tmp"
-        "No space left on device"  # Temporary, might resolve
         "rate limit"
         "503"  # Service unavailable
         "502"  # Bad gateway
@@ -84,6 +86,7 @@ detect_transient_error() {
 # Usage: detect_permanent_error <log_file>
 detect_permanent_error() {
     local log_file="$1"
+    local pattern
 
     if [[ ! -f "${log_file}" ]]; then
         return 1
@@ -100,6 +103,9 @@ detect_permanent_error() {
         "AssertionError"
         "Invalid configuration"
         "Architecture not supported"
+        "No space left on device"
+        "Disk quota exceeded"
+        "Read-only file system"
         "device-side assert"
         "vectorized_gather_kernel"
         "CUDA error: device-side assert triggered"
@@ -138,16 +144,37 @@ classify_error() {
 calculate_backoff() {
     local retry_count="$1"
 
-    # Exponential backoff: base * 2^retry
-    local backoff=$((RETRY_BACKOFF_BASE * (2 ** retry_count)))
+    if ! [[ "${retry_count}" =~ ^[0-9]+$ ]]; then
+        retry_count=0
+    fi
 
-    # Add jitter (±20%)
-    local jitter=$((backoff * (RANDOM % 40 - 20) / 100))
-    backoff=$((backoff + jitter))
+    local base="${RETRY_BACKOFF_BASE}"
+    if ! [[ "${base}" =~ ^[0-9]+$ ]]; then
+        base=30
+    fi
+
+    # Exponential backoff: base * 2^retry
+    local backoff=$((base * (2 ** retry_count)))
+
+    # Add jitter (±20%) using an overrideable jitter hook.
+    local base_ms=$((backoff * 1000))
+    local jitter_ms_max=$((base_ms * 20 / 100))
+    local jitter_ms
+    jitter_ms=$(_rand_jitter_ms "${jitter_ms_max}")
+    if ! [[ "${jitter_ms}" =~ ^-?[0-9]+$ ]]; then
+        jitter_ms=0
+    fi
+    local backoff_ms=$((base_ms + jitter_ms))
+    [[ ${backoff_ms} -lt 0 ]] && backoff_ms=0
+    backoff=$((backoff_ms / 1000))
 
     # Cap at maximum
-    if [[ ${backoff} -gt ${RETRY_BACKOFF_MAX} ]]; then
-        backoff=${RETRY_BACKOFF_MAX}
+    local max_backoff="${RETRY_BACKOFF_MAX}"
+    if ! [[ "${max_backoff}" =~ ^[0-9]+$ ]]; then
+        max_backoff=300
+    fi
+    if [[ ${backoff} -gt ${max_backoff} ]]; then
+        backoff=${max_backoff}
     fi
 
     echo "${backoff}"
@@ -163,9 +190,17 @@ should_retry_task() {
     # Get current retry count
     local retries=$(get_task_field "${task_file}" "retries")
     local max_retries=$(get_task_field "${task_file}" "max_retries")
+    local default_max="${MAX_RETRIES:-3}"
 
-    [[ -z "${retries}" ]] && retries=0
-    [[ -z "${max_retries}" ]] && max_retries=${MAX_RETRIES}
+    if ! [[ "${retries}" =~ ^[0-9]+$ ]]; then
+        retries=0
+    fi
+    if ! [[ "${default_max}" =~ ^[0-9]+$ ]]; then
+        default_max=3
+    fi
+    if ! [[ "${max_retries}" =~ ^[0-9]+$ ]]; then
+        max_retries=${default_max}
+    fi
 
     # Don't retry permanent errors
     if [[ "${error_type}" == "permanent" ]]; then
@@ -220,15 +255,19 @@ maybe_retry_task() {
 
     # Calculate backoff
     local retries=$(get_task_field "${task_file}" "retries")
+    if ! [[ "${retries}" =~ ^[0-9]+$ ]]; then
+        retries=0
+    fi
     local backoff=$(calculate_backoff "${retries}")
 
     # Calculate retry timestamp (non-blocking: set a "not before" time)
-    local retry_after=$(date -u -d "+${backoff} seconds" +"%Y-%m-%dT%H:%M:%SZ")
+    local retry_after
+    retry_after=$(_now_iso_plus_seconds "${backoff}")
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Scheduling retry for ${task_id} at ${retry_after} (attempt $((retries + 1)), error: ${error_type})"
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Scheduling retry for ${task_id} at ${retry_after} (attempt $((retries + 1)), error: ${error_type})"
 
     # Update task with retry_after timestamp
-    update_task_params "${task_file}" '{"retry_after": "'"${retry_after}"'", "last_error_type": "'"${error_type}"'"}'
+    update_task_params "${task_file}" '{"retry_after": "'"${retry_after}"'", "last_error_type": "'"${error_type}"'"}' || return 1
 
     # Retry the task immediately (scheduler enforces retry_after backoff).
     retry_task "${task_id}"
@@ -250,8 +289,9 @@ is_retry_ready() {
 
     # Compare retry_after with current time
     local retry_epoch
-    local now_epoch=$(date +%s)
-    retry_epoch=$(date -d "${retry_after}" "+%s" 2>/dev/null || echo "0")
+    local now_epoch
+    now_epoch=$(_now_epoch)
+    retry_epoch=$(_iso_to_epoch "${retry_after}")
 
     if [[ ${now_epoch} -ge ${retry_epoch} ]]; then
         return 0  # Past retry time, ready
@@ -269,17 +309,17 @@ handle_oom_task() {
     local gpu_id="$2"
     local log_file="$3"
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Handling OOM for task $(get_task_id "${task_file}")"
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Handling OOM for task $(get_task_id "${task_file}")"
 
     # 1. Clear GPU memory
-    CUDA_VISIBLE_DEVICES="${gpu_id}" python3 -c "
-import torch
-import gc
-if torch.cuda.is_available():
-    torch.cuda.empty_cache()
-    torch.cuda.synchronize()
-    gc.collect()
-    print(f'Cleared GPU {torch.cuda.current_device()} memory')
+    CUDA_VISIBLE_DEVICES="${gpu_id}" _cmd_python -c "
+	import torch
+	import gc
+	if torch.cuda.is_available():
+	    torch.cuda.empty_cache()
+	    torch.cuda.synchronize()
+	    gc.collect()
+	    print(f'Cleared GPU {torch.cuda.current_device()} memory')
 " 2>/dev/null || true
 
     # 2. Get current params
@@ -287,7 +327,11 @@ if torch.cuda.is_available():
     local task_type=$(get_task_type "${task_file}")
 
     # 3. Reduce batch size or other memory params
-    local current_batch=$(echo "${params}" | jq -r '.batch_size // 32')
+    local current_batch
+    current_batch=$(echo "${params}" | jq -r '.batch_size // 32')
+    if ! [[ "${current_batch}" =~ ^[0-9]+$ ]]; then
+        current_batch=32
+    fi
     local new_batch=$((current_batch / 2))
 
     if [[ ${new_batch} -lt 1 ]]; then
@@ -295,7 +339,11 @@ if torch.cuda.is_available():
     fi
 
     # 4. Reduce sequence length if applicable
-    local current_seq=$(echo "${params}" | jq -r '.seq_len // 512')
+    local current_seq
+    current_seq=$(echo "${params}" | jq -r '.seq_len // 512')
+    if ! [[ "${current_seq}" =~ ^[0-9]+$ ]]; then
+        current_seq=512
+    fi
     local new_seq=$((current_seq / 2))
 
     if [[ ${new_seq} -lt 128 ]]; then
@@ -308,7 +356,7 @@ if torch.cuda.is_available():
 
     update_task_params "${task_file}" "${new_params}"
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] OOM recovery: reduced batch_size ${current_batch} → ${new_batch}, seq_len ${current_seq} → ${new_seq}"
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] OOM recovery: reduced batch_size ${current_batch} → ${new_batch}, seq_len ${current_seq} → ${new_seq}"
 
     return 0
 }
@@ -324,23 +372,31 @@ record_error() {
     local output_dir="$4"
 
     local error_log="${output_dir}/state/errors.json"
+    local tmp_file="${error_log}.tmp.${BASHPID:-$$}"
+    mkdir -p "$(dirname "${error_log}")" 2>/dev/null || true
 
     # Create error entry
     local error_entry=$(jq -n \
         --arg task_id "${task_id}" \
         --arg error_type "${error_type}" \
         --arg error_msg "${error_msg}" \
-        --arg timestamp "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+        --arg timestamp "$(_now_iso)" \
         '{task_id: $task_id, error_type: $error_type, error_msg: $error_msg, timestamp: $timestamp}'
     )
 
     # Append to log
     if [[ -f "${error_log}" ]]; then
-        jq --argjson entry "${error_entry}" '. + [$entry]' "${error_log}" > "${error_log}.tmp"
-        mv "${error_log}.tmp" "${error_log}"
+        if ! jq --argjson entry "${error_entry}" '. + [$entry]' "${error_log}" > "${tmp_file}" 2>/dev/null; then
+            rm -f "${tmp_file}" 2>/dev/null || true
+            return 1
+        fi
     else
-        echo "[${error_entry}]" > "${error_log}"
+        printf '[%s]\n' "${error_entry}" > "${tmp_file}" 2>/dev/null
     fi
+    mv -f "${tmp_file}" "${error_log}" 2>/dev/null || {
+        rm -f "${tmp_file}" 2>/dev/null || true
+        return 1
+    }
 }
 
 # Get error statistics
@@ -350,7 +406,7 @@ get_error_stats() {
     local error_log="${output_dir}/state/errors.json"
 
     if [[ ! -f "${error_log}" ]]; then
-        echo '{"total": 0, "by_type": {}}'
+        echo '{"total": 0, "by_type": {}, "recent": []}'
         return
     fi
 
@@ -358,7 +414,7 @@ get_error_stats() {
         total: length,
         by_type: (group_by(.error_type) | map({key: .[0].error_type, value: length}) | from_entries),
         recent: (sort_by(.timestamp) | reverse | .[0:5])
-    }' "${error_log}"
+    }' "${error_log}" 2>/dev/null || echo '{"total": 0, "by_type": {}, "recent": []}'
 }
 
 # Print error summary
@@ -391,28 +447,28 @@ health_check() {
     local gpu_id="$1"
 
     # Check GPU is accessible
-    if ! nvidia-smi -i "${gpu_id}" &>/dev/null; then
+    if ! _cmd_nvidia_smi -i "${gpu_id}" &>/dev/null; then
         echo "GPU ${gpu_id} not accessible"
         return 1
     fi
 
     # Check GPU has enough free memory (at least 1GB)
     local free_mem=$(get_gpu_available_memory "${gpu_id}" 2>/dev/null)
-    if [[ -z "${free_mem}" || "${free_mem}" -lt 1 ]]; then
+    if [[ -z "${free_mem}" || ! "${free_mem}" =~ ^[0-9]+$ || "${free_mem}" -lt 1 ]]; then
         echo "GPU ${gpu_id} has insufficient memory (${free_mem:-0} GB free)"
         return 1
     fi
 
     # Check disk space (at least 10GB)
     local free_disk
-    free_disk=$(df -BG . 2>/dev/null | awk 'NR==2 {gsub(/G/,""); print $4}')
-    if [[ -z "${free_disk}" || ${free_disk} -lt 10 ]]; then
+    free_disk=$(_cmd_df -BG . 2>/dev/null | awk 'NR==2 {gsub(/G/,""); print $4}')
+    if [[ -z "${free_disk}" || ! "${free_disk}" =~ ^[0-9]+$ || ${free_disk} -lt 10 ]]; then
         echo "Low disk space (${free_disk:-unknown} GB free)"
         return 1
     fi
 
     # Check Python is available
-    if ! python3 -c "import torch" &>/dev/null; then
+    if ! _cmd_python -c "import torch" &>/dev/null; then
         echo "PyTorch not available"
         return 1
     fi

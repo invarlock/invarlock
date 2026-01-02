@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+fixtures_file="${TEST_TMPDIR:-}/fixtures/stat/mtime"
+
+fmt=""
+path=""
+
+args=("$@")
+for ((i=0; i<${#args[@]}; i++)); do
+    case "${args[$i]}" in
+        -c|-f)
+            fmt="${args[$((i+1))]:-}"
+            ;;
+    esac
+done
+
+path="${args[$(( ${#args[@]} - 1 ))]}"
+
+if [[ -f "${fixtures_file}" ]]; then
+    value="$(awk -v p="${path}" 'BEGIN{found=0} $1==p {print $2; found=1; exit} END{if(!found) exit 1}' "${fixtures_file}" 2>/dev/null || true)"
+    if [[ -n "${value:-}" ]]; then
+        echo "${value}"
+        exit 0
+    fi
+fi
+
+# Fallback: return a stable epoch.
+echo "1700000000"

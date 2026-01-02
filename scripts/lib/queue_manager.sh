@@ -12,6 +12,8 @@
 
 # Source task serialization if not already sourced
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=runtime.sh
+source "${SCRIPT_DIR}/runtime.sh"
 if [[ -z "${TASK_SERIALIZATION_LOADED:-}" ]]; then
     source "${SCRIPT_DIR}/task_serialization.sh"
     export TASK_SERIALIZATION_LOADED=1
@@ -45,7 +47,7 @@ init_queue() {
     # Initialize state file
     cat > "${output_dir}/state/progress.json" << EOF
 {
-    "initialized_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+    "initialized_at": "$(_now_iso)",
     "total_tasks": 0,
     "completed_tasks": 0,
     "failed_tasks": 0,
@@ -68,7 +70,9 @@ acquire_queue_lock() {
     local lock_file="${QUEUE_DIR}/queue.lock"
     local lock_dir="${lock_file}.d"
     local my_pid="${BASHPID:-$$}"
-    local deadline=$(($(date +%s) + timeout))
+    local now
+    now=$(_now_epoch)
+    local deadline=$((now + timeout))
 
     while true; do
         # Try to create lock directory (atomic operation)
@@ -80,25 +84,47 @@ acquire_queue_lock() {
         fi
 
         # Check if we've exceeded timeout
-        local now=$(date +%s)
+        now=$(_now_epoch)
         if [[ ${now} -ge ${deadline} ]]; then
-            echo "ERROR: Failed to acquire queue lock after ${timeout}s" >&2
+            local owner_pid=""
+            if [[ -f "${lock_dir}/owner" ]]; then
+                owner_pid=$(cat "${lock_dir}/owner" 2>/dev/null || true)
+            fi
+            echo "WARN: Failed to acquire queue lock after ${timeout}s (owner_pid=${owner_pid:-unknown})" >&2
             return 1
         fi
 
         # Check for stale lock (owner process no longer exists)
         local owner_pid=""
         if [[ -f "${lock_dir}/owner" ]]; then
-            owner_pid=$(cat "${lock_dir}/owner" 2>/dev/null)
+            owner_pid=$(cat "${lock_dir}/owner" 2>/dev/null || true)
         fi
-        if [[ -n "${owner_pid}" && ! -d "/proc/${owner_pid}" ]]; then
-            # Owner process is gone - remove stale lock
-            rm -rf "${lock_dir}" 2>/dev/null || true
-            continue
+        if [[ -n "${owner_pid}" ]]; then
+            if ! _pid_is_alive "${owner_pid}"; then
+                # Owner process is gone - remove stale lock
+                rm -rf "${lock_dir}" 2>/dev/null || true
+                continue
+            fi
+        else
+            # Owner file missing/empty: likely a crash between mkdir and writing owner.
+            # Treat as stale if it persists beyond a short grace period.
+            local no_owner_grace="${QUEUE_LOCK_NOOWNER_STALE_SECONDS:-30}"
+            if ! [[ "${no_owner_grace}" =~ ^[0-9]+$ ]]; then
+                no_owner_grace=30
+            fi
+            local lock_mtime=""
+            lock_mtime=$(_file_mtime_epoch "${lock_dir}" 2>/dev/null || echo "")
+            if [[ -n "${lock_mtime}" ]]; then
+                local lock_age=$((now - lock_mtime))
+                if [[ ${lock_age} -ge ${no_owner_grace} ]]; then
+                    rm -rf "${lock_dir}" 2>/dev/null || true
+                    continue
+                fi
+            fi
         fi
 
         # Brief sleep before retry (100ms)
-        sleep 0.1
+        _sleep 0.1
     done
 }
 
@@ -110,7 +136,7 @@ release_queue_lock() {
         local my_pid="${BASHPID:-$$}"
         local owner_pid=""
         if [[ -f "${QUEUE_LOCK_DIR}/owner" ]]; then
-            owner_pid=$(cat "${QUEUE_LOCK_DIR}/owner" 2>/dev/null)
+            owner_pid=$(cat "${QUEUE_LOCK_DIR}/owner" 2>/dev/null || true)
         fi
         if [[ -z "${owner_pid}" || "${owner_pid}" == "${my_pid}" ]]; then
             rm -rf "${QUEUE_LOCK_DIR}" 2>/dev/null || true
@@ -227,8 +253,9 @@ mark_task_ready() {
     local dst="${QUEUE_DIR}/ready/${task_id}.task"
 
     if [[ -f "${src}" ]]; then
-        update_task_status "${src}" "ready"
-        mv "${src}" "${dst}"
+        update_task_status "${src}" "ready" \
+            && mv "${src}" "${dst}" 2>/dev/null \
+            || return 1
         return 0
     fi
     return 1
@@ -244,11 +271,16 @@ claim_task() {
     local dst="${QUEUE_DIR}/running/${task_id}.task"
 
     # Use queue lock for atomic operation
-    acquire_queue_lock 5 || return 1
+    local lock_timeout="${QUEUE_CLAIM_LOCK_TIMEOUT:-5}"
+    if ! [[ "${lock_timeout}" =~ ^[0-9]+$ ]]; then
+        lock_timeout=5
+    fi
+    acquire_queue_lock "${lock_timeout}" || return 1
 
     if [[ -f "${src}" ]]; then
-        mark_task_started "${src}" "${gpu_id}"
-        mv "${src}" "${dst}"
+        mark_task_started "${src}" "${gpu_id}" \
+            && mv "${src}" "${dst}" 2>/dev/null \
+            || { release_queue_lock; return 1; }
         release_queue_lock
         return 0
     fi
@@ -264,17 +296,22 @@ complete_task() {
     local src="${QUEUE_DIR}/running/${task_id}.task"
     local dst="${QUEUE_DIR}/completed/${task_id}.task"
 
-    if [[ -f "${src}" ]]; then
-        mark_task_completed "${src}"
-        mv "${src}" "${dst}"
-        rm -f "${QUEUE_DIR}/running/${task_id}.pid"
+    acquire_queue_lock 10 || return 1
 
-        # Update progress state
-        update_progress_state
-
-        return 0
+    if [[ ! -f "${src}" ]]; then
+        release_queue_lock
+        return 1
     fi
-    return 1
+
+    mark_task_completed "${src}" \
+        && mv "${src}" "${dst}" 2>/dev/null \
+        || { release_queue_lock; return 1; }
+    rm -f "${QUEUE_DIR}/running/${task_id}.pid"
+    release_queue_lock
+
+    # Update progress state outside the queue lock (derived from filesystem state).
+    update_progress_state 2>/dev/null || true
+    return 0
 }
 
 # Fail a task (move from running to failed)
@@ -285,17 +322,21 @@ fail_task() {
     local src="${QUEUE_DIR}/running/${task_id}.task"
     local dst="${QUEUE_DIR}/failed/${task_id}.task"
 
-    if [[ -f "${src}" ]]; then
-        mark_task_failed "${src}" "${error_msg}"
-        mv "${src}" "${dst}"
-        rm -f "${QUEUE_DIR}/running/${task_id}.pid"
+    acquire_queue_lock 10 || return 1
 
-        # Update progress state
-        update_progress_state
-
-        return 0
+    if [[ ! -f "${src}" ]]; then
+        release_queue_lock
+        return 1
     fi
-    return 1
+
+    mark_task_failed "${src}" "${error_msg}" \
+        && mv "${src}" "${dst}" 2>/dev/null \
+        || { release_queue_lock; return 1; }
+    rm -f "${QUEUE_DIR}/running/${task_id}.pid"
+    release_queue_lock
+
+    update_progress_state 2>/dev/null || true
+    return 0
 }
 
 # Retry a failed task (move from failed to pending)
@@ -303,21 +344,57 @@ fail_task() {
 retry_task() {
     local task_id="$1"
     local src="${QUEUE_DIR}/failed/${task_id}.task"
-    local dst="${QUEUE_DIR}/pending/${task_id}.task"
 
     if [[ -f "${src}" ]]; then
-        local retries=$(get_task_field "${src}" "retries")
-        local max_retries=$(get_task_field "${src}" "max_retries")
-
-        if [[ ${retries} -lt ${max_retries} ]]; then
-            increment_task_retries "${src}"
-            update_task_status "${src}" "pending"
-            mv "${src}" "${dst}"
-            return 0
-        else
-            echo "Task ${task_id} has exceeded max retries (${max_retries})" >&2
+        acquire_queue_lock 10 || return 1
+        # Re-check under lock
+        if [[ ! -f "${src}" ]]; then
+            release_queue_lock
             return 1
         fi
+
+        local retries
+        retries=$(get_task_field "${src}" "retries")
+        local max_retries
+        max_retries=$(get_task_field "${src}" "max_retries")
+
+        if ! [[ "${retries}" =~ ^[0-9]+$ ]]; then
+            retries=0
+        fi
+        if ! [[ "${max_retries}" =~ ^[0-9]+$ ]]; then
+            max_retries=3
+        fi
+
+        if [[ ${retries} -lt ${max_retries} ]]; then
+            # On retry, clear assignment fields so the scheduler can pick fresh GPUs.
+            local target_status="pending"
+            local target_dir="${QUEUE_DIR}/pending"
+            if check_dependencies_met "${src}"; then
+                target_status="ready"
+                target_dir="${QUEUE_DIR}/ready"
+            fi
+
+            local tmp_file="${src}.tmp.${BASHPID:-$$}"
+            jq --arg status "${target_status}" '
+                .retries = ((.retries // 0) + 1)
+                | .status = $status
+                | .gpu_id = -1
+                | .assigned_gpus = null
+                | .started_at = null
+                | .completed_at = null
+                | .error_msg = null
+            ' "${src}" > "${tmp_file}" 2>/dev/null \
+                && mv "${tmp_file}" "${src}" 2>/dev/null \
+                || { rm -f "${tmp_file}" 2>/dev/null || true; release_queue_lock; return 1; }
+
+            mv "${src}" "${target_dir}/" 2>/dev/null || { release_queue_lock; return 1; }
+            release_queue_lock
+            return 0
+        fi
+
+        release_queue_lock
+        echo "Task ${task_id} has exceeded max retries (${max_retries})" >&2
+        return 1
     fi
     return 1
 }
@@ -328,72 +405,104 @@ reclaim_orphaned_tasks() {
     local gpu_id="$1"
     local count=0
     local running_dir="${QUEUE_DIR}/running"
+    local task_file
+    local -a task_ids=()
+    local -a task_assigned=()
+    local -a task_pids=()
 
+    # Collect candidates under the queue lock, but do not kill processes while holding it.
+    acquire_queue_lock 10 || { echo "Reclaimed 0 orphaned tasks from GPU ${gpu_id}"; return 0; }
     for task_file in "${running_dir}"/*.task; do
         [[ -f "${task_file}" ]] || continue
 
-        local task_gpu=$(get_task_field "${task_file}" "gpu_id")
+        local task_gpu
+        task_gpu=$(get_task_field "${task_file}" "gpu_id")
         if [[ "${task_gpu}" == "${gpu_id}" ]]; then
-            local task_id=$(get_task_id "${task_file}")
-            echo "Reclaiming orphaned task: ${task_id} from GPU ${gpu_id}"
+            local task_id
+            task_id=$(get_task_id "${task_file}")
 
             local assigned_gpus
             assigned_gpus=$(get_task_field "${task_file}" "assigned_gpus")
             [[ -z "${assigned_gpus}" || "${assigned_gpus}" == "null" ]] && assigned_gpus="${gpu_id}"
 
             local pid_file="${running_dir}/${task_id}.pid"
-            local pid_killed="false"
-
+            local pid=""
             if [[ -f "${pid_file}" ]]; then
-                local pid
                 pid=$(cat "${pid_file}" 2>/dev/null || true)
-                if [[ -n "${pid}" && "${pid}" =~ ^[0-9]+$ ]]; then
-                    if kill -0 "${pid}" 2>/dev/null; then
-                        echo "  Killing task process group for ${task_id} (PID ${pid})"
-                        kill -TERM "-${pid}" 2>/dev/null || kill -TERM "${pid}" 2>/dev/null || true
-                        sleep 2
-                        kill -KILL "-${pid}" 2>/dev/null || kill -KILL "${pid}" 2>/dev/null || true
-                        pid_killed="true"
-                    fi
-                fi
-                rm -f "${pid_file}"
             fi
 
-            if [[ "${pid_killed}" != "true" && -n "${assigned_gpus}" ]]; then
-                local can_kill="true"
-                if [[ -n "${GPU_RESERVATION_DIR:-}" ]]; then
-                    IFS=',' read -ra gpus <<< "${assigned_gpus}"
-                    for gid in "${gpus[@]}"; do
-                        local lock_file="${GPU_RESERVATION_DIR}/gpu_${gid}.lock"
-                        local owner
-                        owner=$(cat "${lock_file}" 2>/dev/null || true)
-                        if [[ -z "${owner}" || "${owner}" != "${task_id}" ]]; then
-                            can_kill="false"
-                            break
-                        fi
-                    done
-                fi
-
-                if [[ "${can_kill}" == "true" ]]; then
-                    if type kill_gpu_processes &>/dev/null; then
-                        echo "  Killing GPU processes on ${assigned_gpus} for ${task_id}"
-                        kill_gpu_processes "${assigned_gpus}"
-                    fi
-                fi
-            fi
-
-            if type release_gpus &>/dev/null; then
-                release_gpus "${task_id}"
-            fi
-
-            # Move back to pending for re-execution
-            update_task_status "${task_file}" "pending"
-            assign_task_gpu "${task_file}" "-1"
-            update_task_field "${task_file}" "assigned_gpus" "null" "true" 2>/dev/null || true
-            mv "${task_file}" "${QUEUE_DIR}/pending/"
-            count=$((count + 1))
+            task_ids+=("${task_id}")
+            task_assigned+=("${assigned_gpus}")
+            task_pids+=("${pid}")
         fi
     done
+    release_queue_lock
+
+    local idx
+    for idx in "${!task_ids[@]}"; do
+        local task_id="${task_ids[$idx]}"
+        local assigned_gpus="${task_assigned[$idx]}"
+        local pid="${task_pids[$idx]}"
+        local pid_killed="false"
+
+        echo "Reclaiming orphaned task: ${task_id} from GPU ${gpu_id}"
+
+        if [[ -n "${pid}" && "${pid}" =~ ^[0-9]+$ ]]; then
+            if _cmd_kill -0 "${pid}" 2>/dev/null; then
+                echo "  Killing task process group for ${task_id} (PID ${pid})"
+                _cmd_kill -TERM "-${pid}" 2>/dev/null || _cmd_kill -TERM "${pid}" 2>/dev/null || true
+                _sleep 2
+                _cmd_kill -KILL "-${pid}" 2>/dev/null || _cmd_kill -KILL "${pid}" 2>/dev/null || true
+                pid_killed="true"
+            fi
+        fi
+
+        if [[ "${pid_killed}" != "true" && -n "${assigned_gpus}" ]]; then
+            local can_kill="true"
+            local gid
+            local -a gpus=()
+            if [[ -n "${GPU_RESERVATION_DIR:-}" ]]; then
+                assigned_gpus="${assigned_gpus// /}"
+                IFS=',' read -ra gpus <<< "${assigned_gpus}"
+                for gid in "${gpus[@]}"; do
+                    local lock_file="${GPU_RESERVATION_DIR}/gpu_${gid}.lock"
+                    local owner
+                    owner=$(cat "${lock_file}" 2>/dev/null || true)
+                    if [[ -z "${owner}" || "${owner}" != "${task_id}" ]]; then
+                        can_kill="false"
+                        break
+                    fi
+                done
+            fi
+
+            if [[ "${can_kill}" == "true" ]]; then
+                if type kill_gpu_processes &>/dev/null; then
+                    echo "  Killing GPU processes on ${assigned_gpus} for ${task_id}"
+                    kill_gpu_processes "${assigned_gpus}"
+                fi
+            fi
+        fi
+
+        if type release_gpus &>/dev/null; then
+            release_gpus "${task_id}"
+        fi
+    done
+
+    # Move tasks back to pending under the queue lock.
+    acquire_queue_lock 10 || { echo "Reclaimed ${count} orphaned tasks from GPU ${gpu_id}"; return 0; }
+    for idx in "${!task_ids[@]}"; do
+        local task_id="${task_ids[$idx]}"
+        local task_path="${running_dir}/${task_id}.task"
+        [[ -f "${task_path}" ]] || continue
+
+        update_task_status "${task_path}" "pending" || continue
+        assign_task_gpu "${task_path}" "-1" || continue
+        update_task_field "${task_path}" "assigned_gpus" "null" "true" 2>/dev/null || true
+        rm -f "${running_dir}/${task_id}.pid" 2>/dev/null || true
+        mv "${task_path}" "${QUEUE_DIR}/pending/" 2>/dev/null || continue
+        count=$((count + 1))
+    done
+    release_queue_lock
 
     echo "Reclaimed ${count} orphaned tasks from GPU ${gpu_id}"
 }
@@ -405,12 +514,18 @@ reclaim_orphaned_tasks() {
 # Returns: 0 if all deps completed, 1 otherwise
 check_dependencies_met() {
     local task_file="$1"
+    local dep_id
 
-    # Use mapfile for safe array population (handles special chars)
+    [[ -f "${task_file}" ]] || return 1
+
+    local deps_output=""
+    deps_output="$(get_task_dependencies "${task_file}")" || return 1
+
+    local dep=""
     local -a deps=()
     while IFS= read -r dep; do
         [[ -n "${dep}" ]] && deps+=("${dep}")
-    done < <(get_task_dependencies "${task_file}")
+    done < <(printf '%s\n' "${deps_output}")
 
     if [[ ${#deps[@]} -eq 0 ]]; then
         return 0  # No dependencies
@@ -439,8 +554,16 @@ cancel_tasks_with_failed_dependencies() {
         grace=90
     fi
 
-    acquire_queue_lock 10 || { echo "0"; return 0; }
+    local -a candidate_task_ids=()
+    local -a candidate_failed_deps_csv=()
+    local task_file
+    local dep_id
+    local dep
 
+    local now=""
+    now=$(_now_epoch)
+
+    # Scan WITHOUT holding the queue lock to avoid starving workers trying to claim tasks.
     for task_file in "${QUEUE_DIR}/pending"/*.task; do
         [[ -f "${task_file}" ]] || continue
 
@@ -458,22 +581,65 @@ cancel_tasks_with_failed_dependencies() {
 
             # Use mtime as the failure timestamp to avoid GNU date parsing assumptions.
             local dep_mtime=""
-            dep_mtime=$(stat -c %Y "${dep_file}" 2>/dev/null || stat -f %m "${dep_file}" 2>/dev/null || echo "")
+            dep_mtime=$(_file_mtime_epoch "${dep_file}" 2>/dev/null || echo "")
             if [[ -z "${dep_mtime}" ]]; then
                 failed_deps+=("${dep_id}")
                 continue
             fi
-            local dep_age=$(( $(date +%s) - dep_mtime ))
+            local dep_age=$(( now - dep_mtime ))
             if [[ ${dep_age} -ge ${grace} ]]; then
                 failed_deps+=("${dep_id}")
             fi
         done
 
         if [[ ${#failed_deps[@]} -gt 0 ]]; then
+            local task_id
+            task_id=$(get_task_id "${task_file}")
+            candidate_task_ids+=("${task_id}")
+            candidate_failed_deps_csv+=("$(IFS=','; echo "${failed_deps[*]}")")
+        fi
+    done
+
+    [[ ${#candidate_task_ids[@]} -eq 0 ]] && { echo "0"; return 0; }
+
+    # Apply cancellations under the queue lock, re-checking that deps are still failed.
+    acquire_queue_lock 10 || { echo "0"; return 0; }
+
+    local idx
+    local now_apply
+    now_apply=$(_now_epoch)
+    for idx in "${!candidate_task_ids[@]}"; do
+        local task_id="${candidate_task_ids[$idx]}"
+        local task_file="${QUEUE_DIR}/pending/${task_id}.task"
+        [[ -f "${task_file}" ]] || continue
+
+        local deps_csv="${candidate_failed_deps_csv[$idx]}"
+        local -a still_failed=()
+        local -a deps=()
+
+        IFS=',' read -ra deps <<< "${deps_csv}"
+        for dep_id in "${deps[@]}"; do
+            [[ -n "${dep_id}" ]] || continue
+            local dep_file="${QUEUE_DIR}/failed/${dep_id}.task"
+            [[ -f "${dep_file}" ]] || continue
+
+            local dep_mtime=""
+            dep_mtime=$(_file_mtime_epoch "${dep_file}" 2>/dev/null || echo "")
+            if [[ -z "${dep_mtime}" ]]; then
+                still_failed+=("${dep_id}")
+                continue
+            fi
+            local dep_age=$(( now_apply - dep_mtime ))
+            if [[ ${dep_age} -ge ${grace} ]]; then
+                still_failed+=("${dep_id}")
+            fi
+        done
+
+        if [[ ${#still_failed[@]} -gt 0 ]]; then
             local msg
-            msg="Dependency failed: $(IFS=','; echo "${failed_deps[*]}")"
+            msg="Dependency failed: $(IFS=','; echo "${still_failed[*]}")"
             mark_task_failed "${task_file}" "${msg}" 2>/dev/null || true
-            mv "${task_file}" "${QUEUE_DIR}/failed/"
+            mv "${task_file}" "${QUEUE_DIR}/failed/" 2>/dev/null || continue
             canceled=$((canceled + 1))
         fi
     done
@@ -493,16 +659,32 @@ cancel_tasks_with_failed_dependencies() {
 resolve_dependencies() {
     local moved=0
 
-    acquire_queue_lock 10 || return 0
+    local -a candidate_task_ids=()
+    local task_file
+    local task_id
 
+    # Scan WITHOUT holding the queue lock to avoid starving workers trying to claim tasks.
     for task_file in "${QUEUE_DIR}/pending"/*.task; do
         [[ -f "${task_file}" ]] || continue
 
         if check_dependencies_met "${task_file}"; then
-            local task_id=$(get_task_id "${task_file}")
-            update_task_status "${task_file}" "ready"
-            mv "${task_file}" "${QUEUE_DIR}/ready/"
-            moved=$((moved + 1))
+            task_id="$(get_task_id "${task_file}")" || continue
+            candidate_task_ids+=("${task_id}")
+        fi
+    done
+
+    [[ ${#candidate_task_ids[@]} -eq 0 ]] && { echo "0"; return 0; }
+
+    acquire_queue_lock 10 || return 0
+
+    for task_id in "${candidate_task_ids[@]}"; do
+        local task_file="${QUEUE_DIR}/pending/${task_id}.task"
+        [[ -f "${task_file}" ]] || continue
+        if check_dependencies_met "${task_file}"; then
+            update_task_status "${task_file}" "ready" \
+                && mv "${task_file}" "${QUEUE_DIR}/ready/" 2>/dev/null \
+                && moved=$((moved + 1)) \
+                || true
         fi
     done
 
@@ -514,16 +696,19 @@ resolve_dependencies() {
 # Usage: update_dependents <completed_task_id>
 update_dependents() {
     local completed_id="$1"
+    local task_file
 
     # Check all pending tasks for this dependency
     for task_file in "${QUEUE_DIR}/pending"/*.task; do
         [[ -f "${task_file}" ]] || continue
 
-        local deps=$(get_task_dependencies "${task_file}" | tr '\n' ' ')
+        local deps=""
+        deps="$(get_task_dependencies "${task_file}" 2>/dev/null | tr '\n' ' ' || true)"
         if [[ " ${deps} " =~ " ${completed_id} " ]]; then
             if check_dependencies_met "${task_file}"; then
-                local task_id=$(get_task_id "${task_file}")
-                mark_task_ready "${task_id}"
+                local task_id=""
+                task_id="$(get_task_id "${task_file}")" || continue
+                mark_task_ready "${task_id}" 2>/dev/null || true
             fi
         fi
     done
@@ -535,6 +720,7 @@ update_dependents() {
 # Usage: update_progress_state
 update_progress_state() {
     local state_file="${QUEUE_DIR}/../state/progress.json"
+    local tmp_file="${state_file}.tmp.${BASHPID:-$$}"
 
     IFS=':' read -r pending ready running completed failed total <<< "$(get_queue_stats)"
 
@@ -552,9 +738,10 @@ update_progress_state() {
         progress_pct=$((completed * 100 / total))
     fi
 
-    cat > "${state_file}" << EOF
+    mkdir -p "$(dirname "${state_file}")" 2>/dev/null || true
+    cat > "${tmp_file}" << EOF
 {
-    "updated_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+    "updated_at": "$(_now_iso)",
     "total_tasks": ${total},
     "pending_tasks": ${pending},
     "ready_tasks": ${ready},
@@ -565,6 +752,10 @@ update_progress_state() {
     "status": "${status}"
 }
 EOF
+    mv -f "${tmp_file}" "${state_file}" 2>/dev/null || {
+        rm -f "${tmp_file}" 2>/dev/null || true
+        return 1
+    }
 }
 
 # ============ TASK SEARCH ============
@@ -574,6 +765,7 @@ EOF
 # Returns: full path to task file, or empty if not found
 find_task() {
     local task_id="$1"
+    local status
 
     for status in pending ready running completed failed; do
         local path="${QUEUE_DIR}/${status}/${task_id}.task"
@@ -591,6 +783,8 @@ find_task() {
 find_tasks_by_model() {
     local model_name="$1"
     local status="${2:-}"
+    local dir
+    local task_file
 
     local search_dirs=()
     if [[ -n "${status}" ]]; then
@@ -614,6 +808,7 @@ find_tasks_by_model() {
 # Usage: refresh_task_memory_from_profiles <output_dir>
 refresh_task_memory_from_profiles() {
     local output_dir="$1"
+    local model_dir
 
     for model_dir in "${output_dir}"/*; do
         [[ -d "${model_dir}" ]] || continue
@@ -633,7 +828,8 @@ export_memory_plan() {
     local output_dir="$1"
     local plan_dir="${output_dir}/analysis"
     local plan_file="${plan_dir}/memory_plan.csv"
-    local tmp_file="${plan_file}.tmp.$$"
+    local tmp_file="${plan_file}.tmp.${BASHPID:-$$}"
+    local task_file
 
     mkdir -p "${plan_dir}"
 
@@ -684,6 +880,8 @@ export_memory_plan() {
 find_tasks_by_type() {
     local task_type="$1"
     local status="${2:-}"
+    local dir
+    local task_file
 
     local search_dirs=()
     if [[ -n "${status}" ]]; then
@@ -721,7 +919,7 @@ generate_model_tasks() {
     # to legacy per-edit CREATE_EDIT tasks in that case.
     local use_batch="true"
     local model_lower
-    model_lower=$(echo "${model_id}" | tr '[:upper:]' '[:lower:]')
+    model_lower=$(printf '%s' "${model_id}" | tr '[:upper:]' '[:lower:]')
     if [[ "${model_lower}" =~ 70b || "${model_lower}" =~ 72b || "${model_lower}" =~ 65b || "${model_lower}" =~ mixtral || "${model_lower}" =~ 8x7b || "${model_lower}" =~ moe ]]; then
         use_batch="false"
     elif [[ -n "${base_size}" ]]; then
@@ -752,14 +950,19 @@ generate_model_tasks() {
     # 3. CALIBRATION_RUN × N (depend on setup)
     local cal_ids=()
     local calibration_runs="${DRIFT_CALIBRATION_RUNS:-5}"
-    for run in $(seq 1 "${calibration_runs}"); do
-        local cal_id=$(add_task "CALIBRATION_RUN" "${model_id}" "${model_name}" \
-            "$(estimate_model_memory "${model_id}" "CALIBRATION_RUN")" \
-            "${setup_id}" '{"run": '"${run}"', "seed": '"$((41 + run))"'}' 85)
-        cal_ids+=("${cal_id}")
-        task_ids+=("${cal_id}")
-        echo "Created: ${cal_id}"
-    done
+    if ! [[ "${calibration_runs}" =~ ^[0-9]+$ ]]; then
+        calibration_runs=5
+    fi
+    if [[ ${calibration_runs} -gt 0 ]]; then
+        for run in $(seq 1 "${calibration_runs}"); do
+            local cal_id=$(add_task "CALIBRATION_RUN" "${model_id}" "${model_name}" \
+                "$(estimate_model_memory "${model_id}" "CALIBRATION_RUN")" \
+                "${setup_id}" '{"run": '"${run}"', "seed": '"$((41 + run))"'}' 85)
+            cal_ids+=("${cal_id}")
+            task_ids+=("${cal_id}")
+            echo "Created: ${cal_id}"
+        done
+    fi
 
     # 4. GENERATE_PRESET (depends on all calibration runs)
     local cal_deps=$(IFS=','; echo "${cal_ids[*]}")
@@ -775,6 +978,7 @@ generate_model_tasks() {
     local stress_edits=("quant_rtn:4:32:all" "fp4_quant:aggressive:all" "magnitude_prune:0.5:all" "lowrank_svd:32:all")
 
     if [[ "${use_batch}" == "true" ]]; then
+        :
         # CREATE_EDITS_BATCH - Create all 8 edits with a single model load (Batch optimization)
         # This replaces 8 separate CREATE_EDIT tasks, reducing model load overhead from 8× to 1×.
         local all_edit_specs='[
@@ -847,6 +1051,12 @@ generate_eval_certify_tasks() {
     local edit_spec="$5"
     local version="$6"
     local cert_runs="$7"
+    if ! [[ "${cert_runs}" =~ ^-?[0-9]+$ ]]; then
+        cert_runs=1
+    fi
+    if [[ ${cert_runs} -lt 0 ]]; then
+        cert_runs=0
+    fi
 
     # Split Eval: 4 parallel benchmark tasks instead of 1 monolithic EVAL_EDIT
     # This enables better parallelization across GPUs (4× parallelism opportunity)
@@ -854,7 +1064,7 @@ generate_eval_certify_tasks() {
     local eval_ids=()
 
     for benchmark in "${benchmarks[@]}"; do
-        local task_type="EVAL_${benchmark^^}"  # uppercase: EVAL_MMLU, EVAL_HELLASWAG, etc.
+        local task_type="EVAL_$(printf '%s' "${benchmark}" | tr '[:lower:]' '[:upper:]')"  # uppercase: EVAL_MMLU, EVAL_HELLASWAG, etc.
         local eval_id=$(add_task "${task_type}" "${model_id}" "${model_name}" \
             "$(estimate_model_memory "${model_id}" "EVAL_EDIT")" \
             "${batch_edit_id}" '{"edit_spec": "'"${edit_spec}"'", "benchmark": "'"${benchmark}"'"}' 65)
@@ -864,12 +1074,14 @@ generate_eval_certify_tasks() {
 
     # CERTIFY_EDIT depends on batch edit creation + preset (not on evals - they run in parallel)
     # Certification uses pre-computed reference values, not eval results
-    for run in $(seq 1 "${cert_runs}"); do
-        local cert_id=$(add_task "CERTIFY_EDIT" "${model_id}" "${model_name}" \
-            "$(estimate_model_memory "${model_id}" "CERTIFY_EDIT")" \
-            "${batch_edit_id},${preset_id}" '{"edit_spec": "'"${edit_spec}"'", "version": "'"${version}"'", "run": '"${run}"'}' 65)
-        echo "Created: ${cert_id}"
-    done
+    if [[ ${cert_runs} -gt 0 ]]; then
+        for run in $(seq 1 "${cert_runs}"); do
+            local cert_id=$(add_task "CERTIFY_EDIT" "${model_id}" "${model_name}" \
+                "$(estimate_model_memory "${model_id}" "CERTIFY_EDIT")" \
+                "${batch_edit_id},${preset_id}" '{"edit_spec": "'"${edit_spec}"'", "version": "'"${version}"'", "run": '"${run}"'}' 65)
+            echo "Created: ${cert_id}"
+        done
+    fi
 }
 
 # Legacy: Generate tasks for an edit type (deprecated - use generate_eval_certify_tasks)
@@ -883,6 +1095,12 @@ generate_edit_tasks() {
     local edit_spec="$5"
     local version="$6"
     local cert_runs="$7"
+    if ! [[ "${cert_runs}" =~ ^-?[0-9]+$ ]]; then
+        cert_runs=1
+    fi
+    if [[ ${cert_runs} -lt 0 ]]; then
+        cert_runs=0
+    fi
 
     echo "WARNING: generate_edit_tasks is deprecated; use CREATE_EDITS_BATCH + generate_eval_certify_tasks" >&2
 
@@ -899,12 +1117,14 @@ generate_edit_tasks() {
     echo "Created: ${eval_id}"
 
     # CERTIFY_EDIT × cert_runs
-    for run in $(seq 1 "${cert_runs}"); do
-        local cert_id=$(add_task "CERTIFY_EDIT" "${model_id}" "${model_name}" \
-            "$(estimate_model_memory "${model_id}" "CERTIFY_EDIT")" \
-            "${edit_id},${preset_id}" '{"edit_spec": "'"${edit_spec}"'", "version": "'"${version}"'", "run": '"${run}"'}' 65)
-        echo "Created: ${cert_id}"
-    done
+    if [[ ${cert_runs} -gt 0 ]]; then
+        for run in $(seq 1 "${cert_runs}"); do
+            local cert_id=$(add_task "CERTIFY_EDIT" "${model_id}" "${model_name}" \
+                "$(estimate_model_memory "${model_id}" "CERTIFY_EDIT")" \
+                "${edit_id},${preset_id}" '{"edit_spec": "'"${edit_spec}"'", "version": "'"${version}"'", "run": '"${run}"'}' 65)
+            echo "Created: ${cert_id}"
+        done
+    fi
 }
 
 # Generate all tasks for all models
@@ -931,7 +1151,7 @@ generate_all_tasks() {
             # Use full model id (including org) for filesystem-safe name to avoid collisions
             # Example: meta-llama/Llama-2-7b-hf -> meta-llama__llama-2-7b-hf
             local model_name
-            model_name=$(echo "${model_id}" \
+            model_name=$(printf '%s' "${model_id}" \
                 | tr '[:upper:]' '[:lower:]' \
                 | sed 's#/#__#g' \
                 | tr ' ' '_' \
@@ -980,7 +1200,7 @@ update_model_task_memory() {
         local model_basename
         model_basename=$(basename "${model_id}" | tr '[:upper:]' '[:lower:]' | tr '/' '_')
         local model_sanitized
-        model_sanitized=$(echo "${model_id}" \
+        model_sanitized=$(printf '%s' "${model_id}" \
             | tr '[:upper:]' '[:lower:]' \
             | sed 's#/#__#g' \
             | tr ' ' '_' \
@@ -1023,7 +1243,7 @@ update_model_task_memory() {
                 INVARLOCK_OVERHEAD_GB="${INVARLOCK_OVERHEAD_GB:-6}" \
                 GPU_MEMORY_PER_DEVICE="${GPU_MEMORY_PER_DEVICE:-${GPU_MEMORY_GB:-180}}" \
                 NUM_GPUS="${NUM_GPUS:-8}" \
-                python3 - <<'PY'
+                _cmd_python - <<'PY'
 import json
 import math
 import os

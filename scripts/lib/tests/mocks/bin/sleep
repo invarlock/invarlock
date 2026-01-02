@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Deterministic tests should not actually sleep. Record calls for debugging.
+if [[ -n "${TEST_TMPDIR:-}" ]]; then
+    mkdir -p "${TEST_TMPDIR}/fixtures"
+    echo "sleep $*" >> "${TEST_TMPDIR}/fixtures/sleep.calls" 2>/dev/null || true
+fi
+
+exit 0

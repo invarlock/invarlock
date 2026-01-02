@@ -378,7 +378,7 @@ def certify_command(
                         f"Context: device={device}, adapter={adapter_name}, edit={edit_name}. "
                         "Baseline ok; edited failed to compute ppl. "
                         "Try: use an accelerator (mps/cuda), force float32, reduce max_modules, "
-                        "or lower batch size (INVARLOCK_SCORES_BATCH_SIZE)."
+                        "or lower the evaluation batch size."
                     ),
                     details={
                         "device": device,

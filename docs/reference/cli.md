@@ -37,7 +37,7 @@ completion (or exit with `1`) to aid debugging.
   - Where: after bare control in `invarlock run`; after edited run in `invarlock certify`.
   - Error: `[INVARLOCK:E111] Primary metric computation failed (NaN/inf).`
   - Action: try an accelerator (mps/cuda), force float32, reduce
-    `plan.max_modules`, lower `INVARLOCK_SCORES_BATCH_SIZE`.
+    `plan.max_modules`, lower the evaluation batch size.
 
 - Pairing schedule mismatch
   - window_match_fraction != 1.0 → `[INVARLOCK:E001]`
@@ -565,8 +565,9 @@ For automation loops see the
   - `INVARLOCK_SNAPSHOT_AUTO_RAM_FRACTION` tunes the auto mode (default `0.4` →
     choose chunked when snapshot size ≥ 40% of available RAM).
   - `INVARLOCK_STORE_EVAL_WINDOWS=0` disables token/attention caching during eval,
-    and `INVARLOCK_EVAL_DEVICE=cpu` forces evaluation (and the WikiText‑2 difficulty
-    scorer) to run on CPU if needed.
+    and `INVARLOCK_EVAL_DEVICE=cpu` forces evaluation to run on CPU if needed.
+  - Window difficulty stratification uses a byte‑level n‑gram scorer by default
+    and runs fully offline.
 
 ### Snapshot Mode Controls (Config)
 

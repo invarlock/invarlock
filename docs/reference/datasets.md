@@ -8,14 +8,9 @@ InvarLock uses pluggable dataset providers with deterministic windowing:
 | `synthetic`| Minimal random-text provider for smoke tests and offline CI flows.                                                                           |
 | `hf_text`  | Generic HuggingFace text dataset provider (set `dataset_name`, optional `config_name`, and `text_field`).                                    |
 
-The `wikitext2` provider also uses a small GPT‑2 “difficulty scorer” model to
-stratify candidate windows. Its device policy follows:
-
-- `INVARLOCK_EVAL_DEVICE` if set (e.g., `INVARLOCK_EVAL_DEVICE=cpu` pins scorer and
-  evaluation to CPU),
-- otherwise the resolved run device (`--device` / `model.device`), when it is a
-  concrete choice like `cpu`, `cuda`, or `mps`,
-- otherwise a heuristic preference `cuda → mps → cpu` when no hint is available.
+The `wikitext2` provider uses a fixed byte‑level n‑gram difficulty scorer to
+stratify candidate windows. It is deterministic, offline, and tokenizer‑agnostic
+to keep window selection consistent across model families.
 
 ## Online vs Offline
 
@@ -136,13 +131,4 @@ Then move the HF cache directory to your offline machine (or set
 
   ```bash
   INVARLOCK_DEDUP_TEXTS=1 invarlock run -c configs/tasks/causal_lm/ci_cpu.yaml --profile ci
-  ```
-
-- INVARLOCK_SCORES_BATCH_SIZE=<int> — bound the candidate scoring batch size when
-  the difficulty scorer is active (reduces peak GPU/CPU memory). Typical values: 4–16.
-
-  Example:
-
-  ```bash
-  INVARLOCK_SCORES_BATCH_SIZE=8 invarlock run -c configs/tasks/causal_lm/ci_cpu.yaml --profile ci
   ```

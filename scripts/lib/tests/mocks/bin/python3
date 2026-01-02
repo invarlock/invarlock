@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# By default, delegate to the real python3 (captured by the test runner before PATH mocking).
+real_python3="${TEST_REAL_PYTHON3:-}"
+
+if [[ -n "${TEST_TMPDIR:-}" && -f "${TEST_TMPDIR}/fixtures/python3.stub" ]]; then
+    # Simple fixture-driven stub:
+    # - fixtures/python3.stdout (optional)
+    # - fixtures/python3.stderr (optional)
+    # - fixtures/python3.rc (optional, default 0)
+    [[ -f "${TEST_TMPDIR}/fixtures/python3.stdout" ]] && cat "${TEST_TMPDIR}/fixtures/python3.stdout"
+    [[ -f "${TEST_TMPDIR}/fixtures/python3.stderr" ]] && cat "${TEST_TMPDIR}/fixtures/python3.stderr" >&2
+    if [[ -f "${TEST_TMPDIR}/fixtures/python3.rc" ]]; then
+        rc="$(cat "${TEST_TMPDIR}/fixtures/python3.rc" 2>/dev/null || echo "0")"
+        exit "${rc}"
+    fi
+    exit 0
+fi
+
+if [[ -z "${real_python3}" || ! -x "${real_python3}" ]]; then
+    echo "ERROR: TEST_REAL_PYTHON3 is not set to an executable path" >&2
+    exit 127
+fi
+
+exec "${real_python3}" "$@"

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ -n "${TEST_TMPDIR:-}" && -f "${TEST_TMPDIR}/fixtures/du.out" ]]; then
+    cat "${TEST_TMPDIR}/fixtures/du.out"
+    exit 0
+fi
+
+echo "0\t."

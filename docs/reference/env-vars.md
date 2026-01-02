@@ -21,7 +21,7 @@ unset variables default to “off”.
 - `INVARLOCK_TINY_RELAX=1`
   - Relax some gates/thresholds in tiny dev demos; used by `doctor` and certificate heuristics.
 - `INVARLOCK_EVAL_DEVICE=<device>`
-  - Override evaluation device for the main model and the WikiText‑2 difficulty scorer.
+  - Override evaluation device for the main model.
     Accepts `cpu`, `cuda`, `cuda:0`, or `mps`. When unset, evaluation uses the model’s
     loaded device (resolved from `model.device` / `--device`).
 - `INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE=1`
@@ -34,8 +34,6 @@ unset variables default to “off”.
   - Faster capacity estimation in dataset provider (approximate).
 - `INVARLOCK_DEDUP_TEXTS=1`
   - Exact-text deduplication before tokenization to reduce duplicates.
-- `INVARLOCK_SCORES_BATCH_SIZE=<int>`
-  - Bound candidate scoring batch size for capacity probing.
 
 ## Checkpointing & Snapshots
 

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ -n "${TEST_TMPDIR:-}" && -f "${TEST_TMPDIR}/fixtures/hostname" ]]; then
+    cat "${TEST_TMPDIR}/fixtures/hostname"
+    exit 0
+fi
+
+echo "test-host"

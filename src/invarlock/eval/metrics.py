@@ -1379,6 +1379,88 @@ def _resolve_eval_device(
     return resolved
 
 
+def _infer_model_vocab_size(model: nn.Module) -> int | None:
+    """Best-effort vocab size for guarding against invalid token IDs.
+
+    Prefer the actual embedding size (more reliable than config.vocab_size when
+    tokenizers have added tokens), and fall back to config when embeddings are
+    unavailable (e.g., stub models in tests).
+    """
+    try:
+        get_emb = getattr(model, "get_input_embeddings", None)
+        if callable(get_emb):
+            emb = get_emb()
+            weight = getattr(emb, "weight", None)
+            if weight is not None and hasattr(weight, "shape"):
+                size = int(weight.shape[0])
+                if size > 0:
+                    return size
+    except Exception:
+        pass
+
+    # Fallback for lightweight/stub models: pick the largest nn.Embedding module.
+    # This is not guaranteed to be the token embedding, but is a good heuristic
+    # when get_input_embeddings/config.vocab_size are unavailable.
+    try:
+        max_embeddings = 0
+        for module in model.modules():
+            if isinstance(module, nn.Embedding):
+                max_embeddings = max(max_embeddings, int(module.num_embeddings))
+        if max_embeddings > 0:
+            return max_embeddings
+    except Exception:
+        pass
+
+    config = getattr(model, "config", None)
+    vocab_size = getattr(config, "vocab_size", None)
+    if isinstance(vocab_size, int) and vocab_size > 0:
+        return vocab_size
+    return None
+
+
+def _resolve_pad_token_id(model: nn.Module, vocab_size: int | None) -> int:
+    """Pick a safe pad token id for sanitizing invalid token IDs."""
+    config = getattr(model, "config", None)
+    pad_token_id = getattr(config, "pad_token_id", None)
+    if isinstance(pad_token_id, int) and pad_token_id >= 0:
+        if vocab_size is None or pad_token_id < vocab_size:
+            return pad_token_id
+    return 0
+
+
+def _sanitize_token_ids_for_model(
+    input_ids: torch.Tensor,
+    attention_mask: torch.Tensor | None,
+    labels: torch.Tensor | None,
+    *,
+    vocab_size: int,
+    pad_token_id: int,
+) -> tuple[torch.Tensor, torch.Tensor | None, torch.Tensor | None]:
+    """Prevent device-side asserts from out-of-range token IDs.
+
+    Out-of-range token IDs can trigger CUDA device-side asserts in embedding and
+    gather kernels, poisoning the CUDA context for the entire process. Instead,
+    mask them out as padding and ignore them in labels.
+    """
+    if vocab_size <= 0:
+        return input_ids, attention_mask, labels
+
+    invalid_inputs = (input_ids < 0) | (input_ids >= vocab_size)
+    if invalid_inputs.any():
+        input_ids = input_ids.masked_fill(invalid_inputs, pad_token_id)
+        if attention_mask is not None:
+            attention_mask = attention_mask.masked_fill(invalid_inputs, 0)
+        if labels is not None:
+            labels = labels.masked_fill(invalid_inputs, -100)
+
+    if labels is not None:
+        invalid_labels = (labels != -100) & ((labels < 0) | (labels >= vocab_size))
+        if invalid_labels.any():
+            labels = labels.masked_fill(invalid_labels, -100)
+
+    return input_ids, attention_mask, labels
+
+
 # ── Perplexity calculation ─────────────────────────────────────────────────
 @torch.no_grad()
 def calculate_perplexity(
@@ -1415,6 +1497,8 @@ def compute_perplexity_strict(
     device = _resolve_eval_device(model, device)
 
     model.eval()
+    model_vocab_size = _infer_model_vocab_size(model)
+    pad_token_id = _resolve_pad_token_id(model, model_vocab_size)
     nll_sum = 0.0
     tok_count = 0
 
@@ -1452,6 +1536,15 @@ def compute_perplexity_strict(
                 labels[attn == 0] = -100
         else:
             labels = labels.to(device)
+
+        if model_vocab_size is not None:
+            input_ids, attn, labels = _sanitize_token_ids_for_model(
+                input_ids,
+                attn,
+                labels,
+                vocab_size=model_vocab_size,
+                pad_token_id=pad_token_id,
+            )
 
         # Skip if sequence too short
         if input_ids.size(1) < 2:
@@ -1507,7 +1600,11 @@ def compute_perplexity_strict(
             continue
 
         log_probs = shift_logits.log_softmax(dim=-1)  # [B,T-1,V]
-        tgt = shift_labels.clamp_min(0).unsqueeze(-1)  # [B,T-1,1]
+        vocab_size = int(shift_logits.size(-1))
+        valid = valid & (shift_labels >= 0) & (shift_labels < vocab_size)
+        if not valid.any():
+            continue
+        tgt = shift_labels.clamp(min=0, max=vocab_size - 1).unsqueeze(-1)  # [B,T-1,1]
         nll = -log_probs.gather(-1, tgt).squeeze(-1)  # [B,T-1]
 
         nll_sum += nll[valid].sum().item()
@@ -1552,6 +1649,8 @@ def compute_perplexity(
     device = _resolve_eval_device(model, device)
 
     model.eval()
+    model_vocab_size = _infer_model_vocab_size(model)
+    pad_token_id = _resolve_pad_token_id(model, model_vocab_size)
     nll_sum = 0.0
     tok_count = 0
     batch_count = 0
@@ -1589,6 +1688,15 @@ def compute_perplexity(
         else:
             labels = labels.to(device)
 
+        if model_vocab_size is not None:
+            input_ids, attn, labels = _sanitize_token_ids_for_model(
+                input_ids,
+                attn,
+                labels,
+                vocab_size=model_vocab_size,
+                pad_token_id=pad_token_id,
+            )
+
         # Skip if sequence too short
         if input_ids.size(1) < 2:
             continue
@@ -1620,7 +1728,11 @@ def compute_perplexity(
 
         # Compute negative log-likelihood
         log_probs = shift_logits.log_softmax(dim=-1)  # [B,T-1,V]
-        tgt = shift_labels.clamp_min(0).unsqueeze(-1)  # [B,T-1,1]
+        vocab_size = int(shift_logits.size(-1))
+        valid = valid & (shift_labels >= 0) & (shift_labels < vocab_size)
+        if not valid.any():
+            continue
+        tgt = shift_labels.clamp(min=0, max=vocab_size - 1).unsqueeze(-1)  # [B,T-1,1]
 
         # MPS workaround: gather operation can fail on MPS, use CPU fallback
         if str(device).startswith("mps"):
@@ -1694,6 +1806,8 @@ def compute_ppl(
     device = _resolve_eval_device(model, device)
 
     model.eval()
+    model_vocab_size = _infer_model_vocab_size(model)
+    pad_token_id = _resolve_pad_token_id(model, model_vocab_size)
     nll_sum = 0.0
     tok_count = 0
 
@@ -1711,6 +1825,15 @@ def compute_ppl(
         attention_mask_tensor = (
             torch.tensor(attention_mask, dtype=torch.long).unsqueeze(0).to(device)
         )
+
+        if model_vocab_size is not None:
+            input_ids_tensor, attention_mask_tensor, _ = _sanitize_token_ids_for_model(
+                input_ids_tensor,
+                attention_mask_tensor,
+                labels=None,
+                vocab_size=model_vocab_size,
+                pad_token_id=pad_token_id,
+            )
 
         # Skip sequences that are too short
         if input_ids_tensor.size(1) < 2:
@@ -1747,7 +1870,11 @@ def compute_ppl(
 
         # Compute negative log-likelihood
         log_probs = shift_logits.log_softmax(dim=-1)  # [B,T-1,V]
-        tgt = shift_labels.clamp_min(0).unsqueeze(-1)  # [B,T-1,1]
+        vocab_size = int(shift_logits.size(-1))
+        valid = valid & (shift_labels >= 0) & (shift_labels < vocab_size)
+        if not valid.any():
+            continue
+        tgt = shift_labels.clamp(min=0, max=vocab_size - 1).unsqueeze(-1)  # [B,T-1,1]
 
         # Handle MPS device issues with gather
         if str(device).startswith("mps"):

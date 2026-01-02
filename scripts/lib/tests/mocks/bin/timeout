@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Minimal timeout stub for offline tests (macOS lacks GNU timeout by default).
+# Usage: timeout SECONDS CMD...
+fixtures="${TEST_TMPDIR:-}/fixtures"
+if [[ -n "${TEST_TMPDIR:-}" && -f "${fixtures}/timeout.stub" ]]; then
+    echo "timeout $*" >> "${fixtures}/timeout.calls" 2>/dev/null || true
+    if [[ -f "${fixtures}/timeout.rc" ]]; then
+        rc="$(cat "${fixtures}/timeout.rc" 2>/dev/null || echo "0")"
+        exit "${rc}"
+    fi
+    exit 0
+fi
+
+if [[ $# -lt 2 ]]; then
+    exit 1
+fi
+
+shift
+exec "$@"

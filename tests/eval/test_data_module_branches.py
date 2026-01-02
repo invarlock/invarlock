@@ -1,7 +1,6 @@
 import builtins
 import importlib.util
 import sys
-import types
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -64,25 +63,6 @@ def test_eval_data_module_reimport_without_dependencies(monkeypatch):
         sys.modules.pop("invarlock.eval.data_nodeps", None)
     assert module.HAS_DATASETS is False
     assert module.HAS_TORCH is False
-
-
-def test_wikitext2_cleanup_model_cache_handles_errors(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_TORCH", True)
-    provider_cls = data_mod.WikiText2Provider
-
-    class BrokenCache:
-        def __init__(self):
-            self.calls = 0
-
-        def to(self, device):  # noqa: ARG002
-            self.calls += 1
-            raise RuntimeError("move failed")
-
-    provider_cls._MODEL_CACHE = BrokenCache()
-    provider_cls._MODEL_DEVICE = "cuda"
-    provider_cls._cleanup_model_cache()
-    assert provider_cls._MODEL_CACHE is None
-    assert provider_cls._MODEL_DEVICE is None
 
 
 def test_wikitext2_estimate_capacity_slow_without_target_total(monkeypatch):
@@ -167,13 +147,6 @@ def test_hf_text_provider_requires_datasets(monkeypatch):
 
     with pytest.raises(DependencyError):
         HFTextProvider(dataset_name="dummy")
-
-
-def test_wikitext2_register_cleanup_without_torch(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_TORCH", False)
-    monkeypatch.setattr(WikiText2Provider, "_CLEANUP_REGISTERED", False, raising=False)
-    WikiText2Provider._register_cleanup()
-    assert WikiText2Provider._CLEANUP_REGISTERED is False
 
 
 def test_wikitext2_windows_insufficient_and_nonpositive(monkeypatch):
@@ -304,43 +277,10 @@ def test_collect_tokenized_samples_paths(monkeypatch):
         pytest.skip("torch-like squeeze path not available")
 
 
-def test_register_cleanup_branches(monkeypatch):
-    # When HAS_TORCH is False, early return
-    monkeypatch.setattr(data_mod, "HAS_TORCH", False)
-    WikiText2Provider._CLEANUP_REGISTERED = False
-    WikiText2Provider._register_cleanup()
-    assert WikiText2Provider._CLEANUP_REGISTERED is False
-    # When HAS_TORCH True, it should register
-    monkeypatch.setattr(data_mod, "HAS_TORCH", True)
-    WikiText2Provider._CLEANUP_REGISTERED = False
-    WikiText2Provider._register_cleanup()
-    assert WikiText2Provider._CLEANUP_REGISTERED is True
-    # Info path
+def test_byte_ngram_scoring_empty_returns_false(monkeypatch):
+    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
     pt = WikiText2Provider()
-    info = pt.info()
-    assert info.get("dataset")
-
-    # Exercise _cleanup_model_cache with object raising in to()
-    class Bad:
-        def to(self, device):  # noqa: ARG002
-            raise RuntimeError("fail")
-
-    WikiText2Provider._MODEL_CACHE = Bad()
-    WikiText2Provider._MODEL_DEVICE = "cpu"
-    WikiText2Provider._cleanup_model_cache()
-    assert (
-        WikiText2Provider._MODEL_CACHE is None
-        and WikiText2Provider._MODEL_DEVICE is None
-    )
-
-
-def test_score_candidates_short_circuits(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_TORCH", False)
-    pt = WikiText2Provider()
-    assert pt._score_candidates_with_model([]) is False
-    monkeypatch.setattr(data_mod, "HAS_TORCH", True)
-    pt._difficulty_model = False
-    assert pt._score_candidates_with_model([]) is False
+    assert pt._score_candidates_byte_ngram([]) is False
 
 
 def test_wikitext2_windows_success(monkeypatch):
@@ -388,7 +328,7 @@ def test_wikitext2_windows_full_path_scored(monkeypatch):
         return True
 
     # Patch into instance method name used internally
-    monkeypatch.setattr(pt, "_score_candidates_with_model", lambda c: scorer(c))
+    monkeypatch.setattr(pt, "_score_candidates_byte_ngram", lambda c: scorer(c))
 
     prev, final = pt.windows(
         tokenizer=SimpleNamespace(), seq_len=4, preview_n=5, final_n=4
@@ -413,7 +353,6 @@ def test_wikitext2_windows_frequency_fallback(monkeypatch):
         return out
 
     monkeypatch.setattr(pt, "_collect_tokenized_samples", fake_collect)
-    monkeypatch.setattr(pt, "_score_candidates_with_model", lambda c: False)
     preview, final = pt.windows(
         tokenizer=SimpleNamespace(), seq_len=4, preview_n=2, final_n=1
     )
@@ -438,7 +377,6 @@ def test_wikitext2_frequency_lone_and_remaining(monkeypatch):
         return out
 
     monkeypatch.setattr(pt, "_collect_tokenized_samples", collector)
-    monkeypatch.setattr(pt, "_score_candidates_with_model", lambda c: False)
     preview, final = pt.windows(
         tokenizer=SimpleNamespace(), seq_len=4, preview_n=3, final_n=2
     )
@@ -459,7 +397,6 @@ def test_wikitext2_selection_collision_rounding(monkeypatch):
         return [(idx, [idx + 1, 0, 0, 0], [1, 0, 0, 0], 1) for idx in indices]
 
     monkeypatch.setattr(provider, "_collect_tokenized_samples", collector)
-    monkeypatch.setattr(provider, "_score_candidates_with_model", lambda c: False)
     preview, final = provider.windows(
         SimpleNamespace(), seq_len=4, preview_n=2, final_n=2, seed=0
     )
@@ -800,23 +737,9 @@ def test_seq2seq_provider_capacity(monkeypatch):
     assert cap["tokens_available"] >= 4
 
 
-def test_wikitext2_score_candidates_disabled(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_TORCH", True)
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
-    provider = WikiText2Provider()
-    provider._difficulty_model = False
-    assert (
-        provider._score_candidates_with_model(
-            [{"input_ids": [1, 2], "attention_mask": [1, 1]}]
-        )
-        is False
-    )
-
-
 def test_wt2_frequency_fallback_lone_candidate(monkeypatch):
-    # Force datasets present and disable torch/model scoring paths
+    # Force datasets present
     monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
-    monkeypatch.setattr(data_mod, "HAS_TORCH", False)
     pt = WikiText2Provider()
     # Provide enough long texts
     monkeypatch.setattr(pt, "load", lambda **kw: ["z" * 30] * 21)
@@ -829,55 +752,6 @@ def test_wt2_frequency_fallback_lone_candidate(monkeypatch):
     # Odd total to exercise lone-candidate branch
     prev, fin = pt.windows(Tok(), seq_len=4, preview_n=3, final_n=2, seed=7)
     assert len(prev) == 3 and len(fin) == 2
-
-
-def test_wikitext2_scorer_batches_with_mock_model(monkeypatch):
-    """Run GPT-2 scorer path with a lightweight mocked transformers module."""
-    torch = pytest.importorskip("torch")
-    monkeypatch.setattr(data_mod, "HAS_TORCH", True)
-    # Force CPU execution for deterministic behavior
-    monkeypatch.setattr(data_mod.torch.cuda, "is_available", lambda: False)
-    if hasattr(data_mod.torch, "backends") and hasattr(data_mod.torch.backends, "mps"):
-        monkeypatch.setattr(data_mod.torch.backends.mps, "is_available", lambda: False)
-    provider = WikiText2Provider()
-    provider._difficulty_model = None
-    provider._difficulty_device = None
-
-    class FakeModel:
-        def eval(self):
-            return self
-
-        def to(self, device):
-            self.device = device
-            return self
-
-        def __call__(self, input_tensor, attention_mask=None):  # noqa: ARG002
-            batch, seq_len = input_tensor.shape
-            vocab = 4
-            base = torch.arange(batch * seq_len * vocab, dtype=torch.float32)
-            logits = base.reshape(batch, seq_len, vocab)
-            return SimpleNamespace(logits=logits)
-
-    class FakeGPT2:
-        @classmethod
-        def from_pretrained(cls, name):  # noqa: ARG003
-            return FakeModel()
-
-    fake_transformers = types.SimpleNamespace(GPT2LMHeadModel=FakeGPT2)
-    monkeypatch.setitem(sys.modules, "transformers", fake_transformers)
-    monkeypatch.setenv("INVARLOCK_SCORES_BATCH_SIZE", "8")
-
-    candidates = [
-        {"input_ids": [1, 2, 3], "attention_mask": [1, 1, 1]} for _ in range(10)
-    ]
-    assert provider._score_candidates_with_model(candidates) is True
-    assert provider._last_batch_size_used == 8
-    assert provider.scorer_profile and provider.scorer_profile["tokens_processed"] > 0
-    assert all("difficulty" in c for c in candidates)
-    # Clean up class-level caches for other tests
-    provider.__class__._MODEL_CACHE = None
-    provider.__class__._MODEL_DEVICE = None
-    monkeypatch.delenv("INVARLOCK_SCORES_BATCH_SIZE", raising=False)
 
 
 def test_wikitext2_balancing_swap_reverted(monkeypatch):
@@ -897,7 +771,7 @@ def test_wikitext2_balancing_swap_reverted(monkeypatch):
         return True
 
     monkeypatch.setattr(provider, "_collect_tokenized_samples", collector)
-    monkeypatch.setattr(provider, "_score_candidates_with_model", difficulty_scorer)
+    monkeypatch.setattr(provider, "_score_candidates_byte_ngram", difficulty_scorer)
     preview, final = provider.windows(
         SimpleNamespace(), seq_len=4, preview_n=3, final_n=3, seed=42
     )
@@ -923,7 +797,6 @@ def test_wikitext2_duplicate_indices_skipped(monkeypatch):
         return out
 
     monkeypatch.setattr(pt, "_collect_tokenized_samples", collector)
-    monkeypatch.setattr(pt, "_score_candidates_with_model", lambda c: False)
     prev, final = pt.windows(
         SimpleNamespace(), seq_len=4, preview_n=4, final_n=3, seed=11
     )

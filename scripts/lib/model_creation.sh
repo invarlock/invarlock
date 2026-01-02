@@ -1,19 +1,37 @@
 #!/usr/bin/env bash
 # model_creation.sh - Shared model creation helpers for workers and main script
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=runtime.sh
+source "${SCRIPT_DIR}/runtime.sh"
+
 # Provide basic logging helpers when not sourced from the main script.
-if ! type log &>/dev/null; then
+if ! declare -F log >/dev/null 2>&1; then
+    :
     log() {
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+        echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] $*"
     }
 fi
 
-if ! type error_exit &>/dev/null; then
+if ! declare -F error_exit >/dev/null 2>&1; then
+    :
     error_exit() {
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
+        echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
         exit 1
     }
 fi
+
+_model_creation_run_python() {
+    local parent_dir="$1"
+    local cuda_devices="$2"
+    shift 2
+
+    if ! mkdir -p "${parent_dir}"; then
+        return 1
+    fi
+
+    CUDA_VISIBLE_DEVICES="${cuda_devices}" _cmd_python "$@"
+}
 
 create_edited_model() {
     local baseline_path="$1"
@@ -29,11 +47,11 @@ create_edited_model() {
     log "  Output: ${output_path}"
     log "  Edit: ${edit_type} bits=${bits} group_size=${group_size} scope=${scope}"
 
-    mkdir -p "$(dirname "${output_path}")"
-
     if [[ "${edit_type}" == "quant_rtn" ]]; then
+        local parent_dir
+        parent_dir="$(dirname "${output_path}")"
         local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
-        CUDA_VISIBLE_DEVICES="${cuda_devices}" python3 << EOF
+        _model_creation_run_python "${parent_dir}" "${cuda_devices}" - "${baseline_path}" "${output_path}" "${bits}" "${group_size}" "${scope}" <<'PY'
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from pathlib import Path
@@ -51,15 +69,15 @@ try:
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32 = True
 
-    baseline_path = Path("${baseline_path}")
-    output_path = Path("${output_path}")
-    bits = int("${bits}")
-    group_size = int("${group_size}")
-    scope = "${scope}"
+    baseline_path = Path(sys.argv[1])
+    output_path = Path(sys.argv[2])
+    bits = int(sys.argv[3])
+    group_size = int(sys.argv[4])
+    scope = sys.argv[5]
 
     print(f"Loading baseline from {baseline_path}...")
     tokenizer = AutoTokenizer.from_pretrained(baseline_path, trust_remote_code=True)
-    flash_available = "${FLASH_ATTENTION_AVAILABLE}" == "true"
+    flash_available = os.environ.get("FLASH_ATTENTION_AVAILABLE", "false") == "true"
 
     model_kwargs = {
         "torch_dtype": torch.bfloat16,
@@ -166,7 +184,7 @@ except Exception as e:
     import traceback
     traceback.print_exc()
     sys.exit(1)
-EOF
+PY
     else
         error_exit "Unknown edit type: ${edit_type}"
     fi
@@ -186,10 +204,10 @@ create_pruned_model() {
     log "  Output: ${output_path}"
     log "  Sparsity: ${sparsity}, Scope: ${scope}"
 
-    mkdir -p "$(dirname "${output_path}")"
-
+    local parent_dir
+    parent_dir="$(dirname "${output_path}")"
     local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
-    CUDA_VISIBLE_DEVICES="${cuda_devices}" python3 << EOF
+    _model_creation_run_python "${parent_dir}" "${cuda_devices}" - "${baseline_path}" "${output_path}" "${sparsity}" "${scope}" <<'PY'
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from pathlib import Path
@@ -198,10 +216,10 @@ import gc
 import sys
 
 try:
-    baseline_path = Path("${baseline_path}")
-    output_path = Path("${output_path}")
-    sparsity = float("${sparsity}")
-    scope = "${scope}"
+    baseline_path = Path(sys.argv[1])
+    output_path = Path(sys.argv[2])
+    sparsity = float(sys.argv[3])
+    scope = sys.argv[4]
 
     print(f"Loading baseline from {baseline_path}...")
     tokenizer = AutoTokenizer.from_pretrained(baseline_path, trust_remote_code=True)
@@ -300,7 +318,7 @@ except Exception as e:
     import traceback
     traceback.print_exc()
     sys.exit(1)
-EOF
+PY
 }
 export -f create_pruned_model
 
@@ -317,10 +335,10 @@ create_lowrank_model() {
     log "  Output: ${output_path}"
     log "  Rank: ${rank}, Scope: ${scope}"
 
-    mkdir -p "$(dirname "${output_path}")"
-
+    local parent_dir
+    parent_dir="$(dirname "${output_path}")"
     local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
-    CUDA_VISIBLE_DEVICES="${cuda_devices}" python3 << EOF
+    _model_creation_run_python "${parent_dir}" "${cuda_devices}" - "${baseline_path}" "${output_path}" "${rank}" "${scope}" <<'PY'
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from pathlib import Path
@@ -329,10 +347,10 @@ import gc
 import sys
 
 try:
-    baseline_path = Path("${baseline_path}")
-    output_path = Path("${output_path}")
-    rank = int("${rank}")
-    scope = "${scope}"
+    baseline_path = Path(sys.argv[1])
+    output_path = Path(sys.argv[2])
+    rank = int(sys.argv[3])
+    scope = sys.argv[4]
 
     print(f"Loading baseline from {baseline_path}...")
     tokenizer = AutoTokenizer.from_pretrained(baseline_path, trust_remote_code=True)
@@ -449,7 +467,7 @@ except Exception as e:
     import traceback
     traceback.print_exc()
     sys.exit(1)
-EOF
+PY
 }
 export -f create_lowrank_model
 
@@ -465,12 +483,12 @@ create_fp4_model() {
     log "  Baseline: ${baseline_path}"
     log "  Output: ${output_path}"
     log "  Format: ${format}, Scope: ${scope}"
-    log "  FP4 Native Support: ${FP4_NATIVE_SUPPORT}"
+    log "  FP4 Native Support: ${FP4_NATIVE_SUPPORT:-unknown}"
 
-    mkdir -p "$(dirname "${output_path}")"
-
+    local parent_dir
+    parent_dir="$(dirname "${output_path}")"
     local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
-    CUDA_VISIBLE_DEVICES="${cuda_devices}" python3 << EOF
+    _model_creation_run_python "${parent_dir}" "${cuda_devices}" - "${baseline_path}" "${output_path}" "${format}" "${scope}" <<'PY'
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from pathlib import Path
@@ -480,10 +498,10 @@ import os
 import sys
 
 try:
-    baseline_path = Path("${baseline_path}")
-    output_path = Path("${output_path}")
-    format_type = "${format}"
-    scope = "${scope}"
+    baseline_path = Path(sys.argv[1])
+    output_path = Path(sys.argv[2])
+    format_type = sys.argv[3]
+    scope = sys.argv[4]
 
     # Check for B200 FP4 support
     if not torch.cuda.is_available():
@@ -640,7 +658,7 @@ except Exception as e:
     import traceback
     traceback.print_exc()
     sys.exit(1)
-EOF
+PY
 }
 export -f create_fp4_model
 
@@ -652,10 +670,10 @@ create_error_model() {
     local gpu_id="${4:-0}"
 
     log "Creating error model (type=${error_type}, GPU ${gpu_id})"
-    mkdir -p "$(dirname "${output_path}")"
-
+    local parent_dir
+    parent_dir="$(dirname "${output_path}")"
     local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
-    CUDA_VISIBLE_DEVICES="${cuda_devices}" python3 << EOF
+    _model_creation_run_python "${parent_dir}" "${cuda_devices}" - "${baseline_path}" "${output_path}" "${error_type}" <<'PY'
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from pathlib import Path
@@ -664,9 +682,9 @@ import gc
 import sys
 
 try:
-    baseline_path = Path("${baseline_path}")
-    output_path = Path("${output_path}")
-    error_type = "${error_type}"
+    baseline_path = Path(sys.argv[1])
+    output_path = Path(sys.argv[2])
+    error_type = sys.argv[3]
 
     print(f"Loading baseline from {baseline_path}...")
     tokenizer = AutoTokenizer.from_pretrained(baseline_path, trust_remote_code=True)
@@ -804,6 +822,6 @@ except Exception as e:
     import traceback
     traceback.print_exc()
     sys.exit(1)
-EOF
+PY
 }
 export -f create_error_model
