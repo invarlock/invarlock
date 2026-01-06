@@ -401,7 +401,7 @@ def _generate_single_markdown(report: RunReport) -> list[str]:
             parts.append(f"ratio_vs_baseline={ratio:.3f}")
         lines.append(" — ".join(parts) if len(parts) > 1 else parts[0])
     else:
-        # When primary_metric is absent, do not attempt legacy fallbacks
+        # When primary_metric is absent, do not attempt fallbacks
         lines.append("- **Primary Metric**: unavailable")
     lines.append(
         f"- **Parameters Changed**: {report['edit']['deltas']['params_changed']:,}"

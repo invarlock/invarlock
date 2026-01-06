@@ -43,7 +43,7 @@ GPU_RESERVATION_LOCK_TIMEOUT="${GPU_RESERVATION_LOCK_TIMEOUT:-5}"
 
 # ============ GPU ID LIST HELPERS ============
 # GPU_ID_LIST is the comma-separated set of *physical* GPU indices to use for this run.
-# It is set/exported by the main harness. If unset, fall back to legacy 0..NUM_GPUS-1.
+# It is set/exported by the main harness. If unset, fall back to 0..NUM_GPUS-1.
 list_gpu_ids() {
     if [[ -n "${GPU_ID_LIST:-}" ]]; then
         echo "${GPU_ID_LIST}" | tr -d ' ' | tr ',' '\n' | sed '/^$/d'

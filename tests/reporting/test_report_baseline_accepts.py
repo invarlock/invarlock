@@ -35,16 +35,16 @@ def test_to_certificate_accepts_baseline_v1() -> None:
     obj1 = json.loads(js1)
     assert obj1.get("schema_version") == "v1"
 
-    # Legacy baseline no longer accepted; ensure rejection
+    # Unsupported baseline version; ensure rejection
     import pytest
 
-    base_legacy = {
+    base_v2 = {
         "schema_version": "baseline-v2",
         "meta": {"model_id": "m"},
         "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
     }
     with pytest.raises(ValueError):
-        to_certificate(rp, base_legacy, format="json")
+        to_certificate(rp, base_v2, format="json")
 
 
 def test_to_certificate_rejects_invalid_baseline() -> None:

@@ -59,6 +59,22 @@ For details on windowing, pairing, and tier minima, see
 `docs/assurance/02-coverage-and-pairing.md` and
 `docs/assurance/09-tier-v1-calibration.md`.
 
+## Measurement Contracts (GPU/MPS-first)
+
+InvarLock’s guards are approximation-only and accelerator-first (CUDA/MPS).
+Each certificate records the measurement contract (estimator + sampling policy)
+used to produce guard statistics.
+
+- Recorded under:
+  - `resolved_policy.spectral.measurement_contract` / `resolved_policy.rmt.measurement_contract`
+  - `spectral.measurement_contract_hash` / `rmt.measurement_contract_hash`
+- In CI/Release, `invarlock verify --profile ci|release` enforces:
+  - measurement contract present, and
+  - baseline/subject pairing (`*_measurement_contract_match = true`).
+
+Legacy `assurance.mode` and per-guard `guards.{spectral,rmt}.mode` were removed;
+configs containing them are rejected.
+
 ## Quickstart Commands
 
 ```bash

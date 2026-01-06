@@ -662,12 +662,23 @@ resolve_dependencies() {
     local -a candidate_task_ids=()
     local task_file
     local task_id
+    local suite_mode="${B200_SUITE_MODE:-full}"
 
     # Scan WITHOUT holding the queue lock to avoid starving workers trying to claim tasks.
     for task_file in "${QUEUE_DIR}/pending"/*.task; do
         [[ -f "${task_file}" ]] || continue
 
         if check_dependencies_met "${task_file}"; then
+            if [[ "${suite_mode}" == "calibrate-only" ]]; then
+                local task_type=""
+                task_type="$(get_task_type "${task_file}" 2>/dev/null || true)"
+                case "${task_type}" in
+                    SETUP_BASELINE|CALIBRATION_RUN|GENERATE_PRESET) : ;;
+                    *)
+                        continue
+                        ;;
+                esac
+            fi
             task_id="$(get_task_id "${task_file}")" || continue
             candidate_task_ids+=("${task_id}")
         fi
@@ -681,6 +692,16 @@ resolve_dependencies() {
         local task_file="${QUEUE_DIR}/pending/${task_id}.task"
         [[ -f "${task_file}" ]] || continue
         if check_dependencies_met "${task_file}"; then
+            if [[ "${suite_mode}" == "calibrate-only" ]]; then
+                local task_type=""
+                task_type="$(get_task_type "${task_file}" 2>/dev/null || true)"
+                case "${task_type}" in
+                    SETUP_BASELINE|CALIBRATION_RUN|GENERATE_PRESET) : ;;
+                    *)
+                        continue
+                        ;;
+                esac
+            fi
             update_task_status "${task_file}" "ready" \
                 && mv "${task_file}" "${QUEUE_DIR}/ready/" 2>/dev/null \
                 && moved=$((moved + 1)) \
@@ -690,6 +711,33 @@ resolve_dependencies() {
 
     release_queue_lock
     echo "${moved}"
+}
+
+# Demote any "ready" tasks that are disallowed under a calibration-only run.
+# This is a safety net for resumed queues where non-calibration tasks might
+# already be in the ready queue when switching into calibrate-only mode.
+demote_ready_tasks_for_calibration_only() {
+    local suite_mode="${B200_SUITE_MODE:-full}"
+    [[ "${suite_mode}" == "calibrate-only" ]] || return 0
+
+    acquire_queue_lock 10 || return 0
+
+    local task_file
+    for task_file in "${QUEUE_DIR}/ready"/*.task; do
+        [[ -f "${task_file}" ]] || continue
+        local task_type=""
+        task_type="$(get_task_type "${task_file}" 2>/dev/null || true)"
+        case "${task_type}" in
+            SETUP_BASELINE|CALIBRATION_RUN|GENERATE_PRESET) : ;;
+            *)
+                update_task_status "${task_file}" "pending" 2>/dev/null || true
+                mv "${task_file}" "${QUEUE_DIR}/pending/" 2>/dev/null || true
+                ;;
+        esac
+    done
+
+    release_queue_lock
+    return 0
 }
 
 # Update dependents after task completion
@@ -916,7 +964,7 @@ generate_model_tasks() {
     # Decide whether to use batch edit creation or per-edit tasks.
     # Deep-copying a 70B+ model for batch edits can exceed per-GPU memory,
     # so we disable CREATE_EDITS_BATCH for very large models and fall back
-    # to legacy per-edit CREATE_EDIT tasks in that case.
+    # to per-edit CREATE_EDIT tasks in that case.
     local use_batch="true"
     local model_lower
     model_lower=$(printf '%s' "${model_id}" | tr '[:upper:]' '[:lower:]')
@@ -1008,7 +1056,7 @@ generate_model_tasks() {
         done
     else
         # For very large models (70B+), avoid batch edit creation to prevent OOM from deep copies.
-        # Fall back to legacy per-edit CREATE_EDIT + EVAL_EDIT + CERTIFY_EDIT tasks.
+        # Fall back to per-edit CREATE_EDIT + EVAL_EDIT + CERTIFY_EDIT tasks.
         echo "Model ${model_name}: estimated ${base_size}GB for eval - disabling CREATE_EDITS_BATCH, using per-edit tasks"
 
         for edit_spec in "${clean_edits[@]}"; do
@@ -1104,13 +1152,13 @@ generate_edit_tasks() {
 
     echo "WARNING: generate_edit_tasks is deprecated; use CREATE_EDITS_BATCH + generate_eval_certify_tasks" >&2
 
-    # CREATE_EDIT (legacy single edit)
+    # CREATE_EDIT (single edit)
     local edit_id=$(add_task "CREATE_EDIT" "${model_id}" "${model_name}" \
         "$(estimate_model_memory "${model_id}" "CREATE_EDIT")" \
         "${setup_id}" '{"edit_spec": "'"${edit_spec}"'", "version": "'"${version}"'"}' 70)
     echo "Created: ${edit_id}"
 
-    # EVAL_EDIT (legacy monolithic eval)
+    # EVAL_EDIT (monolithic eval)
     local eval_id=$(add_task "EVAL_EDIT" "${model_id}" "${model_name}" \
         "$(estimate_model_memory "${model_id}" "EVAL_EDIT")" \
         "${edit_id}" '{"edit_spec": "'"${edit_spec}"'"}' 65)

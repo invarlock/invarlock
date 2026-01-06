@@ -60,10 +60,8 @@ def test_rmt_context_and_family_counts():
         {"module_name": "misc3", "outlier_count": None, "has_outlier": False},
     ]
     counts = guard._count_outliers_per_family(per_layer)
-    assert counts["router"] == 1
-    assert counts["expert_ffn"] == 2
+    assert counts["ffn"] == 4
     assert counts["attn"] == 1
-    assert counts["ffn"] == 1
     assert counts["embed"] == 1
 
 
@@ -110,7 +108,7 @@ def test_rmt_get_activation_modules_and_collect_batches():
     assert "linear" not in names
 
     assert guard._collect_calibration_batches(None, 1) == []
-    assert guard._collect_calibration_batches([1, 2, 3], 2) == [1, 2]
+    assert guard._collect_calibration_batches([1, 2, 3], 2) == [1, 3]
 
 
 def test_rmt_activation_svd_outliers_cases():
@@ -179,7 +177,7 @@ def test_rmt_after_edit_activation_required_missing():
 
     guard.after_edit(NoMaskModel())
     assert guard._activation_required_failed is True
-    assert guard._last_result["analysis_source"] == "activations"
+    assert guard._last_result["analysis_source"] == "activations_edge_risk"
 
 
 def test_rmt_after_edit_activation_outliers_unavailable(monkeypatch):
@@ -189,16 +187,11 @@ def test_rmt_after_edit_activation_outliers_unavailable(monkeypatch):
     guard._activation_ready = True
     guard._calibration_batches = [{"input_ids": [1, 2, 3]}]
 
-    monkeypatch.setattr(
-        guard,
-        "_apply_rmt_detection_and_correction",
-        lambda _model: {"correction_iterations": 1, "corrected_layers": 0},
-    )
-    monkeypatch.setattr(guard, "_compute_activation_outliers", lambda *_a, **_k: None)
+    monkeypatch.setattr(guard, "_compute_activation_edge_risk", lambda *_a, **_k: None)
 
     guard.after_edit(NoMaskModel())
     assert guard._activation_required_failed is True
-    assert guard._activation_required_reason == "activation_outliers_unavailable"
+    assert guard._activation_required_reason == "activation_edge_risk_unavailable"
 
 
 def test_rmt_finalize_activation_required_failure():

@@ -77,7 +77,11 @@ Tip: enable Hub downloads per command when fetching models/datasets:
 - [RMT ε-Rule](assurance/06-rmt-epsilon-rule.md)
 - [VE Predictive Gate](assurance/07-ve-gate-power.md)
 - [Determinism Contracts](assurance/08-determinism-contracts.md)
- - [Tier v1.0 Calibration](assurance/09-tier-v1-calibration.md)
+- [Tier v1.0 Calibration](assurance/09-tier-v1-calibration.md)
+- [Guard Overhead Method](assurance/10-guard-overhead-method.md)
+- [Policy Provenance & Digest](assurance/11-policy-provenance.md)
+- [Device Drift Bands](assurance/12-device-drift-bands.md)
+- [GPU/MPS-First Guards (Decision Memo)](assurance/13-gpu-first-guards-decision.md)
 
 Note: Every safety claim is backed by automated tests and cross-referenced in
 the docs. See Guard Contracts → Coverage Reference

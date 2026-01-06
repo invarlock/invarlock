@@ -110,12 +110,12 @@ def _compute_thresholds_hash(payload: dict[str, Any]) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
 
 
-def _promote_legacy_multiple_testing_key(payload: dict[str, Any]) -> None:
-    """Promote legacy 'multipletesting' to 'multiple_testing' in-place if present."""
+def _promote_multiple_testing_alias_key(payload: dict[str, Any]) -> None:
+    """Promote 'multipletesting' to 'multiple_testing' in-place if present."""
     try:
-        legacy_mt = payload.pop("multipletesting", None)
-        if legacy_mt is not None and "multiple_testing" not in payload:
-            payload["multiple_testing"] = legacy_mt
+        mt_alias = payload.pop("multipletesting", None)
+        if mt_alias is not None and "multiple_testing" not in payload:
+            payload["multiple_testing"] = mt_alias
     except Exception:
         pass
 
@@ -218,15 +218,9 @@ def _build_resolved_policies(
     from .policy_utils import _format_family_caps as _ffc  # self import safe
 
     spectral_resolved["family_caps"] = _ffc(spectral_caps)
-    # Prefer observed policy sigma_quantile (accepting legacy aliases), then fallback
     pol_sq = None
     try:
         pol_sq = (spectral.get("policy", {}) or {}).get("sigma_quantile")
-        if pol_sq is None:
-            # Legacy aliases
-            pol_sq = (spectral.get("policy", {}) or {}).get("contraction") or (
-                spectral.get("policy", {}) or {}
-            ).get("kappa")
     except Exception:
         pol_sq = None
     spectral_resolved["sigma_quantile"] = _safe_float(
@@ -276,6 +270,9 @@ def _build_resolved_policies(
         spectral_resolved["max_spectral_norm"] = spectral.get("policy", {}).get(
             "max_spectral_norm", spectral_resolved.get("max_spectral_norm")
         )
+    mc = spectral.get("measurement_contract")
+    if isinstance(mc, dict) and mc:
+        spectral_resolved["measurement_contract"] = copy.deepcopy(mc)
     resolved["spectral"] = spectral_resolved
 
     # RMT guard
@@ -304,6 +301,9 @@ def _build_resolved_policies(
         rmt_resolved.pop("epsilon", None)
     if "correct" in rmt_resolved:
         rmt_resolved["correct"] = bool(rmt_resolved["correct"])
+    mc = rmt.get("measurement_contract")
+    if isinstance(mc, dict) and mc:
+        rmt_resolved["measurement_contract"] = copy.deepcopy(mc)
     resolved["rmt"] = rmt_resolved
 
     # Variance guard
@@ -441,7 +441,7 @@ def _extract_effective_policies(report: RunReport) -> dict[str, Any]:
             elif guard_name == "spectral":
                 sigma_quantile = guard_metrics.get(
                     "sigma_quantile",
-                    guard_metrics.get("contraction", guard_metrics.get("kappa", 0.95)),
+                    0.95,
                 )
                 multiple_testing = guard_metrics.get("multiple_testing") or (
                     guard_metrics.get("multipletesting")
@@ -473,20 +473,14 @@ def _extract_effective_policies(report: RunReport) -> dict[str, Any]:
 
         if guard_policy:
             if guard_name == "spectral":
-                sigma_quantile = guard_policy.get("sigma_quantile")
-                if sigma_quantile is None:
-                    sigma_quantile = guard_policy.get("contraction")
-                if sigma_quantile is None and "kappa" in guard_policy:
-                    sigma_quantile = guard_policy["kappa"]
                 sanitized_policy = dict(guard_policy)
+                sigma_quantile = sanitized_policy.get("sigma_quantile")
                 if sigma_quantile is not None:
                     try:
                         sanitized_policy["sigma_quantile"] = float(sigma_quantile)
                     except (TypeError, ValueError):
                         pass
-                _promote_legacy_multiple_testing_key(sanitized_policy)
-                sanitized_policy.pop("contraction", None)
-                sanitized_policy.pop("kappa", None)
+                _promote_multiple_testing_alias_key(sanitized_policy)
                 if sanitized_policy.get("max_spectral_norm") in (None, 0):
                     sanitized_policy["max_spectral_norm"] = None
                 guard_policy = sanitized_policy
@@ -587,7 +581,7 @@ __all__ = [
     "_compute_variance_policy_digest",
     "_compute_thresholds_payload",
     "_compute_thresholds_hash",
-    "_promote_legacy_multiple_testing_key",
+    "_promote_multiple_testing_alias_key",
     "_resolve_policy_tier",
     "_build_resolved_policies",
     "_extract_effective_policies",

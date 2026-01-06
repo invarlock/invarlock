@@ -33,6 +33,15 @@ auto:                 # Auto-tuning surface
 
 guards:               # Guard chain and per-guard overrides
   order: ["invariants", "spectral", "rmt", "variance", "invariants"]
+  # Optional per-guard measurement knobs (recorded into the certificate):
+  # spectral:
+  #   estimator: {type: power_iter, iters: 4, init: ones}
+  # rmt:
+  #   epsilon_by_family: {ffn: 0.10, attn: 0.08, embed: 0.12, other: 0.12}
+  #   estimator: {type: power_iter, iters: 3, init: ones}
+  #   activation:
+  #     sampling:
+  #       windows: {count: 8, indices_policy: evenly_spaced}
 
 output:               # Artifact destinations
   dir: runs/examples/quant_rtn

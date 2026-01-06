@@ -74,7 +74,7 @@ def _mock_baseline() -> dict[str, Any]:
 
 
 def test_schema_version_bumped_and_ci_arrays_guarded():
-    # schema_version is a stable constant; just ensure it's a non-empty string and not legacy placeholder
+    # schema_version is a stable constant; just ensure it's a non-empty string
     assert isinstance(CERTIFICATE_SCHEMA_VERSION, str)
     assert len(CERTIFICATE_SCHEMA_VERSION) > 0
 

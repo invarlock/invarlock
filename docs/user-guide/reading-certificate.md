@@ -15,6 +15,13 @@ interpret them.
   - Provider/environment/policy digests: `provider_digest`
     (ids/tokenizer/masking), `env_flags`, and `policy_digest` with thresholds
     snapshot.
+- Measurement contract
+  - `resolved_policy.spectral.measurement_contract` /
+    `resolved_policy.rmt.measurement_contract` pin the estimator + sampling
+    procedure used by guards.
+  - `spectral.measurement_contract_hash` / `rmt.measurement_contract_hash` are
+    compact digests for audit and baseline pairing.
+  - In CI/Release, `invarlock verify` enforces baseline/subject pairing (`*_measurement_contract_match = true`).
 - Confidence label
   - High/Medium/Low based on CI width and stability; see thresholds and `unstable` flag.
 

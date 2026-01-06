@@ -93,7 +93,7 @@ Notes
 - `run_id` is a short, opaque identifier; certificates treat it as a stable
   string key.
 - `primary_metric` is the **canonical** place for PM values; ppl‑like
-  legacy blocks are no longer required.
+  top-level `ppl` blocks are no longer required.
 - The `validation` object holds boolean flags; only a small allow‑list of
   keys is recognized by the validator (see below).
 
@@ -176,7 +176,7 @@ PM‑only schema:
 For existing integrations:
 
 - Prefer `primary_metric.{preview,final,ratio_vs_baseline,display_ci}` over
-  legacy `ppl_*` fields.
+  older `ppl_*` fields.
 - Read gates from `validation.*` and thresholds from `policy_digest` /
   `resolved_policy`.
 - Treat additional sections (MoE, system overhead, telemetry, etc.) as

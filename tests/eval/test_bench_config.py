@@ -20,12 +20,12 @@ def test_scenario_config_profiles_and_validation():
         )
 
 
-def test_benchmark_config_strict_mode_sets_epsilon():
+def test_benchmark_config_epsilon_override_sets_epsilon():
     cfg = bench_mod.BenchmarkConfig(
         edits=["quant_rtn"],
         tiers=["balanced"],
         probes=[0],
-        strict=True,
+        epsilon=0.0,
         output_dir="bench-out",
     )
     assert cfg.epsilon == 0.0

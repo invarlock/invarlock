@@ -409,7 +409,7 @@ sanitize_model_name() {
 GPU_ID_LIST="${GPU_ID_LIST:-}"
 
 # Print newline-separated GPU IDs for this run.
-# Falls back to legacy 0..NUM_GPUS-1 when GPU_ID_LIST isn't set yet.
+# Defaults to 0..NUM_GPUS-1 when GPU_ID_LIST isn't set yet.
 list_run_gpu_ids() {
     if [[ -n "${GPU_ID_LIST:-}" ]]; then
         echo "${GPU_ID_LIST}" | tr -d ' ' | tr ',' '\n' | sed '/^$/d'
@@ -924,10 +924,10 @@ setup_model() {
     local gpu_id="${2:-0}"
     local model_name
     model_name=$(sanitize_model_name "${model_id}")
-    local legacy_name
-    legacy_name=$(basename "${model_id}" | tr '[:upper:]' '[:lower:]' | tr '/' '_')
+    local basename_name
+    basename_name=$(basename "${model_id}" | tr '[:upper:]' '[:lower:]' | tr '/' '_')
     local model_dir="${OUTPUT_DIR}/models/${model_name}"
-    local legacy_dir="${OUTPUT_DIR}/models/${legacy_name}"
+    local basename_dir="${OUTPUT_DIR}/models/${basename_name}"
 
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Setting up model (B200 GPU ${gpu_id}): ${model_id}" >> "${LOG_FILE}"
 
@@ -937,13 +937,13 @@ setup_model() {
         return 0
     fi
 
-    # Check if already downloaded (prefer sanitized path, but honor legacy basename)
+    # Check if already downloaded (prefer sanitized path, but honor basename fallback)
     if [[ -d "${model_dir}/baseline" ]]; then
         echo "${model_dir}/baseline"
         return 0
     fi
-    if [[ -d "${legacy_dir}/baseline" ]]; then
-        echo "${legacy_dir}/baseline"
+    if [[ -d "${basename_dir}/baseline" ]]; then
+        echo "${basename_dir}/baseline"
         return 0
     fi
 
@@ -2295,6 +2295,26 @@ generate_invarlock_config() {
         accel_benchmark="false"
     fi
 
+    # Optional: override guard order for the suite (comma-separated list).
+    # Default is a lightweight chain to keep calibration tractable on 70B+.
+    local guards_order_csv="${B200_GUARDS_ORDER:-}"
+    local -a guards_order=()
+    if [[ -n "${guards_order_csv}" ]]; then
+        IFS=',' read -ra guards_order <<< "${guards_order_csv}"
+    else
+        guards_order=("invariants" "variance" "invariants")
+    fi
+    local guards_order_yaml=""
+    local g
+    for g in "${guards_order[@]}"; do
+        g="$(echo "${g}" | xargs)"
+        [[ -z "${g}" ]] && continue
+        guards_order_yaml+=$'    - '"${g}"$'\n'
+    done
+    if [[ -z "${guards_order_yaml}" ]]; then
+        guards_order_yaml=$'    - invariants\n    - variance\n    - invariants\n'
+    fi
+
     cat > "${output_yaml}" << YAML_EOF
 # Auto-generated InvarLock config for B200 validation
 # Model: ${model_path}
@@ -2328,9 +2348,7 @@ edit:
 
 guards:
   order:
-    - invariants
-    - rmt
-    - variance
+${guards_order_yaml}
 
 eval:
   bootstrap:
@@ -2396,6 +2414,7 @@ run_single_calibration() {
     model_size=$(estimate_model_params "${model_path}")
 
     local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
+
     local exit_code=0
     if [[ "${model_size}" == "70" || "${model_size}" == "72" || "${model_size}" == "moe" ]]; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Large model (${model_size}): using INVARLOCK_SKIP_OVERHEAD_CHECK=1 for calibration" >> "${log_file}"
@@ -2518,6 +2537,33 @@ seq_len = int("${effective_seq_len}")
 stride = int("${effective_stride}")
 preview_n = int("${effective_preview_n}")
 final_n = int("${effective_final_n}")
+
+guards_order = None
+assurance_cfg = None
+if YAML_AVAILABLE:
+    cfg_path = None
+    for candidate in sorted(output_dir.glob("run_*/calibration_config.yaml")):
+        cfg_path = candidate
+        break
+    if cfg_path is not None:
+        try:
+            cfg = yaml.safe_load(cfg_path.read_text())
+            if isinstance(cfg, dict):
+                guards_block = cfg.get("guards") or {}
+                if isinstance(guards_block, dict):
+                    order = guards_block.get("order")
+                    if isinstance(order, list) and order:
+                        guards_order = [str(item) for item in order]
+                ab = cfg.get("assurance")
+                if isinstance(ab, dict) and ab:
+                    assurance_cfg = ab
+        except Exception:
+            guards_order = None
+
+if guards_order is None:
+    guards_order = ["invariants", "variance", "invariants"]
+
+enabled_guards = set(guards_order)
 
 def _safe_float(value):
     try:
@@ -3074,8 +3120,11 @@ preset = {
         "final_n": final_n,
         "seed": 42,
     },
-    "guards": {},
+    "guards": {"order": guards_order},
 }
+
+if isinstance(assurance_cfg, dict) and assurance_cfg:
+    preset["assurance"] = assurance_cfg
 
 spectral = {}
 if spectral_caps:
@@ -3086,7 +3135,7 @@ if spectral_summary.get("deadband") is not None:
     spectral["deadband"] = spectral_summary["deadband"]
 if spectral_summary.get("max_caps") is not None:
     spectral["max_caps"] = spectral_summary["max_caps"]
-if spectral:
+if "spectral" in enabled_guards and spectral:
     preset["guards"]["spectral"] = spectral
 
 rmt = {}
@@ -3096,16 +3145,18 @@ if rmt_summary.get("margin") is not None:
     rmt["margin"] = rmt_summary["margin"]
 if rmt_summary.get("deadband") is not None:
     rmt["deadband"] = rmt_summary["deadband"]
-if rmt:
+if "rmt" in enabled_guards and rmt:
     preset["guards"]["rmt"] = rmt
 
-if variance_config:
+if "variance" in enabled_guards and variance_config:
     preset["guards"]["variance"] = variance_config
 
 stats_path = output_dir / "calibration_stats.json"
 with open(stats_path, "w") as f:
     json.dump(
         {
+            "guards_order": guards_order,
+            "assurance": assurance_cfg,
             "drift": drift_stats,
             "spectral": {**spectral_summary, "family_caps": spectral_caps},
             "rmt": {**rmt_summary, "epsilon": rmt_epsilon},
@@ -3167,6 +3218,7 @@ run_invarlock_certify() {
     fi
 
     local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
+
     local exit_code=0
     # For large models, skip overhead check to avoid OOM (task-local via env)
     local model_size
@@ -4207,6 +4259,9 @@ main_dynamic() {
         moved_initial=$(resolve_dependencies 2>/dev/null) || moved_initial=0
         log "Resolved initial dependencies: moved ${moved_initial} task(s) to ready queue"
     fi
+    if type demote_ready_tasks_for_calibration_only &>/dev/null; then
+        demote_ready_tasks_for_calibration_only 2>/dev/null || true
+    fi
 
     total_tasks=$(count_tasks "pending")
     total_tasks=$((total_tasks + $(count_tasks "ready")))
@@ -4270,6 +4325,21 @@ main_dynamic() {
         fi
 
         # Check if done
+        if [[ "${B200_SUITE_MODE:-full}" == "calibrate-only" ]]; then
+            local preset_total=0
+            local preset_completed=0
+            preset_total=$(find "${QUEUE_DIR}" -type f -name "*_GENERATE_PRESET_*.task" 2>/dev/null | wc -l | tr -d ' ')
+            preset_completed=$(find "${QUEUE_DIR}/completed" -type f -name "*_GENERATE_PRESET_*.task" 2>/dev/null | wc -l | tr -d ' ')
+            if [[ ${preset_total} -gt 0 && ${preset_completed} -eq ${preset_total} ]]; then
+                log "Calibration-only: generated ${preset_completed}/${preset_total} calibrated preset(s); stopping early"
+                if type signal_shutdown &>/dev/null; then
+                    signal_shutdown "${OUTPUT_DIR}"
+                else
+                    touch "${OUTPUT_DIR}/workers/SHUTDOWN"
+                fi
+                break
+            fi
+        fi
         if is_queue_empty; then
             if type signal_shutdown &>/dev/null; then
                 signal_shutdown "${OUTPUT_DIR}"
@@ -4389,6 +4459,14 @@ main_dynamic() {
         done
     fi
 
+    if [[ "${B200_SUITE_MODE:-full}" == "calibrate-only" ]]; then
+        log_section "CALIBRATION CHECKPOINT"
+        log "Calibration-only run stopped after preset generation."
+        log "Presets: ${OUTPUT_DIR}/presets/"
+        log "To continue: OUTPUT_DIR=${OUTPUT_DIR} $0 --run-only"
+        return 0
+    fi
+
     log_section "PHASE 4: ANALYSIS"
     compile_results
     run_analysis
@@ -4414,19 +4492,48 @@ main() {
 b200_entrypoint() {
     # ============ CLI ARGUMENT PARSING (no strict mode; help should work everywhere) ============
     RESUME_FLAG="false"
-    local arg
-    for arg in "$@"; do
-        case "${arg}" in
-            --resume|-r) RESUME_FLAG="true" ;;
-            --help|-h) break ;;
+    B200_SUITE_MODE="${B200_SUITE_MODE:-full}"
+
+    while [[ $# -gt 0 ]]; do
+        case "${1}" in
+            --resume|-r)
+                RESUME_FLAG="true"
+                shift
+                ;;
+            --calibrate-only)
+                if [[ "${B200_SUITE_MODE}" != "full" ]]; then
+                    echo "ERROR: --calibrate-only conflicts with mode=${B200_SUITE_MODE}" >&2
+                    exit 2
+                fi
+                B200_SUITE_MODE="calibrate-only"
+                shift
+                ;;
+            --run-only)
+                if [[ "${B200_SUITE_MODE}" != "full" ]]; then
+                    echo "ERROR: --run-only conflicts with mode=${B200_SUITE_MODE}" >&2
+                    exit 2
+                fi
+                # Run-only implies resume semantics when a queue already exists.
+                RESUME_FLAG="true"
+                B200_SUITE_MODE="run-only"
+                shift
+                ;;
+            --help|-h)
+                break
+                ;;
+            *)
+                echo "Unknown arg: ${1}" >&2
+                echo "Run with --help for usage." >&2
+                exit 2
+                ;;
         esac
     done
-    export RESUME_FLAG
+    export RESUME_FLAG B200_SUITE_MODE
 
     # ============ HELP ============
     if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
         cat << EOF
-InvarLock Validation Suite v${SCRIPT_VERSION} - B200 180GB x 8 GPU
+	InvarLock Validation Suite v${SCRIPT_VERSION} - B200 180GB x 8 GPU
 
 Optimized for 8x NVIDIA B200 180GB SXM6 GPUs with:
   * FP4 quantization (simulated; B200-native hardware)
@@ -4458,14 +4565,17 @@ Model Suite (8 PUBLIC models - no HuggingFace login):
 
 Note: GPUs are assigned dynamically; this is not a fixed mapping.
 
-Usage: $0 [options]
+	Usage: $0 [options]
 
-Options:
-    --resume, -r                 Resume from existing queue (skip task generation)
-    --help, -h                   Show this help message
+	Options:
+	    --resume, -r                 Resume from existing queue (skip task generation)
+	    --calibrate-only             Run only baseline calibration + preset generation, then stop
+	    --run-only                   Run remaining tasks (implies --resume when queue exists)
+	    --help, -h                   Show this help message
 
 Key environment variables:
     B200_DETERMINISM             Harness determinism preset: throughput (default) or strict
+    B200_GUARDS_ORDER            Override InvarLock guard order (comma-separated); default: invariants,variance,invariants
     MODEL_1 through MODEL_8      Override model assignments
     CUDA_VISIBLE_DEVICES         Explicit GPU IDs to use (default: auto-detect all)
     NUM_GPUS                     Number of GPUs to use (default: auto-detect all)
@@ -4475,14 +4585,17 @@ Key environment variables:
     RUN_ERROR_INJECTION          Run error tests (default: true)
     MIN_FREE_DISK_GB             Abort if free disk below this (default: 200)
 
-Examples:
-    $0                                    # Run validation
-    $0 --resume                           # Resume previous run
-    SKIP_FLASH_ATTN=true $0               # Skip flash-attn compile
-    NUM_GPUS=4 $0                         # Use only 4 GPUs
+	Examples:
+	    $0                                    # Run validation
+	    $0 --resume                           # Resume previous run
+	    $0 --calibrate-only                   # Run calibration only (presets only)
+	    OUTPUT_DIR=./run $0 --calibrate-only  # Calibration checkpoint run
+	    OUTPUT_DIR=./run $0 --run-only        # Continue from checkpoint
+	    SKIP_FLASH_ATTN=true $0               # Skip flash-attn compile
+	    NUM_GPUS=4 $0                         # Use only 4 GPUs
 
-Resume a failed run:
-    OUTPUT_DIR=./invarlock_validation_b200_20241208_123456 $0 --resume
+	Resume a failed run:
+	    OUTPUT_DIR=./invarlock_validation_b200_20241208_123456 $0 --resume
 EOF
         exit 0
     fi

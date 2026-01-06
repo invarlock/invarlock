@@ -81,7 +81,7 @@ TIER_RATIO_LIMITS: dict[str, float] = {
 def _is_ppl_kind(name: Any) -> bool:
     """Return True if a primary_metric kind denotes a ppl-like metric.
 
-    Supports legacy and alternate names to stay resilient across schema variants.
+    Supports alternate names to stay resilient across schema variants.
     """
     try:
         n = str(name or "").lower()
@@ -100,7 +100,7 @@ def _is_ppl_kind(name: Any) -> bool:
     }
 
 
-## NOTE: Deprecated legacy helper `_get_ppl_final` was removed; callers should
+## NOTE: Deprecated helper `_get_ppl_final` was removed; callers should
 ## use the normalized primary_metric block directly via make_certificate or
 ## report processing utilities.
 
@@ -789,6 +789,19 @@ def make_certificate(
         )
         if isinstance(det, dict) and det:
             meta["determinism"] = det
+    except Exception:  # pragma: no cover
+        pass
+
+    # Execution profile provenance when available via run context.
+    try:
+        ctx = report.get("context") if isinstance(report, dict) else None
+        ctx_profile = (
+            str(ctx.get("profile") or "").strip().lower()
+            if isinstance(ctx, dict)
+            else ""
+        )
+        if ctx_profile:
+            meta["profile"] = ctx_profile
     except Exception:  # pragma: no cover
         pass
 
@@ -1518,7 +1531,10 @@ def make_certificate(
     )
     overrides_list = _extract_policy_overrides(report)
     resolved_digest = _compute_policy_digest(
-        {"resolved_policy": resolved_policy, "overrides": overrides_list}
+        {
+            "resolved_policy": resolved_policy,
+            "overrides": overrides_list,
+        }
     )
     policy_provenance = {
         "tier": auto.get("tier", "balanced"),
@@ -1766,6 +1782,7 @@ def make_certificate(
         validation_kwargs["pm_acceptance_range"] = pm_acceptance_range
 
     validation_flags = _compute_validation_flags(**validation_kwargs)
+
     # Enforce validation key allow-list to prevent surface drift
     _allowed_validation = _load_validation_allowlist()
     validation_filtered = {
@@ -2208,7 +2225,7 @@ def _normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
             }
         # Check if it's a RunReport structure
         elif "meta" in baseline and "metrics" in baseline and "edit" in baseline:
-            # Accept both legacy ppl_* metrics and PM-first reports
+            # Accept both ppl_* metrics and PM-first reports
             metrics_blk = baseline.get("metrics", {}) or {}
             ppl_final = metrics_blk.get("ppl_final")
             ppl_preview = metrics_blk.get("ppl_preview")
@@ -2483,7 +2500,7 @@ def _extract_edit_metadata(
     algorithm = edit_section.get("algorithm")
     if not algorithm:
         algorithm = edit_name or ""
-    # Sanitize algorithm identifiers to purge legacy/unsupported edit labels
+    # Sanitize algorithm identifiers to purge unsupported edit labels
     try:
         alg_lower = str(algorithm).strip().lower()
     except Exception:  # pragma: no cover

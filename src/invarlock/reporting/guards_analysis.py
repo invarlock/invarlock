@@ -1,18 +1,30 @@
 # mypy: ignore-errors
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 from typing import Any, no_type_check
 
 from invarlock.core.auto_tuning import get_tier_policies
 
-from .policy_utils import _promote_legacy_multiple_testing_key, _resolve_policy_tier
+from .policy_utils import _promote_multiple_testing_alias_key, _resolve_policy_tier
 from .report_types import RunReport
+
+
+def _measurement_contract_digest(contract: Any) -> str | None:
+    if not isinstance(contract, dict) or not contract:
+        return None
+    try:
+        canonical = json.dumps(contract, sort_keys=True, default=str)
+    except Exception:
+        return None
+    return hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
 
 @no_type_check
 def _extract_invariants(report: RunReport) -> dict[str, Any]:
-    """Extract invariant check results (matches legacy shape used in tests)."""
+    """Extract invariant check results (matches the shape used in tests)."""
     invariants_data = (report.get("metrics", {}) or {}).get("invariants", {})
     failures: list[dict[str, Any]] = []
     summary: dict[str, Any] = {}
@@ -314,16 +326,12 @@ def _extract_spectral_analysis(
         except Exception:
             deadband_used = None
 
-        # Resolve sigma_quantile for summary (policy aliases supported)
+        # Resolve sigma_quantile for summary
         sigma_q_used: float | None = None
         try:
             pol_sq = None
             if isinstance(guard_policy, dict):
-                pol_sq = (
-                    guard_policy.get("sigma_quantile")
-                    or guard_policy.get("contraction")
-                    or guard_policy.get("kappa")
-                )
+                pol_sq = guard_policy.get("sigma_quantile")
             if pol_sq is None:
                 pol_sq = default_sigma_quantile
             if pol_sq is not None:
@@ -371,7 +379,7 @@ def _extract_spectral_analysis(
             else {}
         )
         if not families:
-            # Prefer z-summary when available; accept legacy 'family_stats' too
+            # Prefer z-summary when available; accept 'family_stats' too
             fzs = guard_metrics.get("family_z_summary")
             if not isinstance(fzs, dict) or not fzs:
                 fzs = guard_metrics.get("family_stats")
@@ -505,20 +513,14 @@ def _extract_spectral_analysis(
     policy_out: dict[str, Any] | None = None
     if isinstance(guard_policy, dict) and guard_policy:
         policy_out = dict(guard_policy)
-        _promote_legacy_multiple_testing_key(policy_out)
+        _promote_multiple_testing_alias_key(policy_out)
         if default_sigma_quantile is not None:
-            sq = (
-                policy_out.get("sigma_quantile")
-                or policy_out.get("contraction")
-                or policy_out.get("kappa")
-            )
+            sq = policy_out.get("sigma_quantile")
             if sq is not None:
                 try:
                     policy_out["sigma_quantile"] = float(sq)
                 except Exception:
                     pass
-        policy_out.pop("contraction", None)
-        policy_out.pop("kappa", None)
         if tier == "balanced":
             policy_out["correction_enabled"] = False
             policy_out["max_spectral_norm"] = None
@@ -594,6 +596,40 @@ def _extract_spectral_analysis(
             result["top_violations"] = top_violations
     if family_quantiles:
         result["family_z_quantiles"] = family_quantiles
+    result["evaluated"] = bool(spectral_guard)
+
+    measurement_contract = None
+    try:
+        mc = (
+            guard_metrics.get("measurement_contract")
+            if isinstance(guard_metrics, dict)
+            else None
+        )
+        if isinstance(mc, dict) and mc:
+            measurement_contract = mc
+    except Exception:
+        measurement_contract = None
+    baseline_contract = None
+    try:
+        bc = (
+            baseline_spectral.get("measurement_contract")
+            if isinstance(baseline_spectral, dict)
+            else None
+        )
+        if isinstance(bc, dict) and bc:
+            baseline_contract = bc
+    except Exception:
+        baseline_contract = None
+    mc_hash = _measurement_contract_digest(measurement_contract)
+    baseline_hash = _measurement_contract_digest(baseline_contract)
+    if measurement_contract is not None:
+        result["measurement_contract"] = measurement_contract
+    if mc_hash:
+        result["measurement_contract_hash"] = mc_hash
+    if baseline_hash:
+        result["baseline_measurement_contract_hash"] = baseline_hash
+    if mc_hash and baseline_hash:
+        result["measurement_contract_match"] = bool(mc_hash == baseline_hash)
     result["caps_exceeded"] = bool(caps_exceeded)
     try:
         summary["caps_exceeded"] = bool(caps_exceeded)
@@ -622,6 +658,210 @@ def _extract_spectral_analysis(
 
 @no_type_check
 def _extract_rmt_analysis(
+    report: RunReport, baseline: dict[str, Any]
+) -> dict[str, Any]:
+    """Extract RMT analysis using activation edge-risk ε-band semantics."""
+    tier = _resolve_policy_tier(report)
+    tier_policies = get_tier_policies()
+    tier_defaults = tier_policies.get(tier, tier_policies.get("balanced", {}))
+
+    default_epsilon_map = (
+        tier_defaults.get("rmt", {}).get("epsilon_by_family")
+        if isinstance(tier_defaults, dict)
+        else {}
+    )
+    if not default_epsilon_map and isinstance(tier_defaults, dict):
+        default_epsilon_map = (tier_defaults.get("rmt", {}) or {}).get("epsilon", {})
+    default_epsilon_map = {
+        str(family): float(value)
+        for family, value in (default_epsilon_map or {}).items()
+        if isinstance(value, int | float) and math.isfinite(float(value))
+    }
+
+    epsilon_default = 0.1
+    try:
+        eps_def = (
+            tier_defaults.get("rmt", {}).get("epsilon_default")
+            if isinstance(tier_defaults, dict)
+            else None
+        )
+        if isinstance(eps_def, int | float) and math.isfinite(float(eps_def)):
+            epsilon_default = float(eps_def)
+    except Exception:
+        pass
+
+    baseline_rmt = baseline.get("rmt", {}) if isinstance(baseline, dict) else {}
+    baseline_edge_by_family: dict[str, float] = {}
+    baseline_contract = None
+    if isinstance(baseline_rmt, dict) and baseline_rmt:
+        bc = baseline_rmt.get("measurement_contract")
+        if isinstance(bc, dict) and bc:
+            baseline_contract = bc
+        base = baseline_rmt.get("edge_risk_by_family") or baseline_rmt.get(
+            "edge_risk_by_family_base"
+        )
+        if isinstance(base, dict):
+            for k, v in base.items():
+                if isinstance(v, int | float) and math.isfinite(float(v)):
+                    baseline_edge_by_family[str(k)] = float(v)
+
+    rmt_guard = None
+    guard_metrics: dict[str, Any] = {}
+    guard_policy: dict[str, Any] = {}
+    for guard in report.get("guards", []) or []:
+        if str(guard.get("name", "")).lower() == "rmt":
+            rmt_guard = guard
+            guard_metrics = guard.get("metrics", {}) or {}
+            guard_policy = guard.get("policy", {}) or {}
+            break
+
+    policy_out: dict[str, Any] | None = None
+    if isinstance(guard_policy, dict) and guard_policy:
+        policy_out = dict(guard_policy)
+        if "epsilon_by_family" not in policy_out and isinstance(
+            policy_out.get("epsilon"), dict
+        ):
+            policy_out["epsilon_by_family"] = dict(policy_out["epsilon"])
+        if isinstance(policy_out.get("epsilon_default"), int | float) and math.isfinite(
+            float(policy_out.get("epsilon_default"))
+        ):
+            epsilon_default = float(policy_out.get("epsilon_default"))
+
+    if isinstance(guard_metrics.get("epsilon_default"), int | float) and math.isfinite(
+        float(guard_metrics.get("epsilon_default"))
+    ):
+        epsilon_default = float(guard_metrics.get("epsilon_default"))
+
+    edge_base: dict[str, float] = {}
+    edge_cur: dict[str, float] = {}
+    if isinstance(guard_metrics, dict) and guard_metrics:
+        base = guard_metrics.get("edge_risk_by_family_base") or {}
+        cur = guard_metrics.get("edge_risk_by_family") or {}
+        if isinstance(base, dict):
+            for k, v in base.items():
+                if isinstance(v, int | float) and math.isfinite(float(v)):
+                    edge_base[str(k)] = float(v)
+        if isinstance(cur, dict):
+            for k, v in cur.items():
+                if isinstance(v, int | float) and math.isfinite(float(v)):
+                    edge_cur[str(k)] = float(v)
+    if not edge_base and baseline_edge_by_family:
+        edge_base = dict(baseline_edge_by_family)
+
+    epsilon_map: dict[str, float] = {}
+    eps_src = guard_metrics.get("epsilon_by_family") or {}
+    if not eps_src and isinstance(guard_policy, dict):
+        eps_src = (
+            guard_policy.get("epsilon_by_family") or guard_policy.get("epsilon") or {}
+        )
+    if isinstance(eps_src, dict):
+        for k, v in eps_src.items():
+            if isinstance(v, int | float) and math.isfinite(float(v)):
+                epsilon_map[str(k)] = float(v)
+
+    epsilon_violations = guard_metrics.get("epsilon_violations") or []
+    if not (isinstance(epsilon_violations, list) and epsilon_violations):
+        epsilon_violations = []
+        families = set(edge_cur) | set(edge_base)
+        for family in families:
+            base = float(edge_base.get(family, 0.0) or 0.0)
+            cur = float(edge_cur.get(family, 0.0) or 0.0)
+            if base <= 0.0:
+                continue
+            eps = float(
+                epsilon_map.get(
+                    family, default_epsilon_map.get(family, epsilon_default)
+                )
+            )
+            allowed = (1.0 + eps) * base
+            if cur > allowed:
+                delta = (cur / base) - 1.0 if base > 0 else float("inf")
+                epsilon_violations.append(
+                    {
+                        "family": family,
+                        "edge_base": base,
+                        "edge_cur": cur,
+                        "delta": float(delta),
+                        "allowed": allowed,
+                        "epsilon": eps,
+                    }
+                )
+
+    stable = bool(guard_metrics.get("stable", not epsilon_violations))
+
+    families_all = sorted(
+        set(edge_base) | set(edge_cur) | set(epsilon_map) | set(default_epsilon_map)
+    )
+    family_breakdown: dict[str, dict[str, Any]] = {}
+    ratios: list[float] = []
+    deltas: list[float] = []
+    for family in families_all:
+        base = float(edge_base.get(family, 0.0) or 0.0)
+        cur = float(edge_cur.get(family, 0.0) or 0.0)
+        eps = float(
+            epsilon_map.get(family, default_epsilon_map.get(family, epsilon_default))
+        )
+        allowed = (1.0 + eps) * base if base > 0.0 else None
+        ratio = (cur / base) if base > 0.0 else None
+        delta = ((cur / base) - 1.0) if base > 0.0 else None
+        if isinstance(ratio, float) and math.isfinite(ratio):
+            ratios.append(ratio)
+        if isinstance(delta, float) and math.isfinite(delta):
+            deltas.append(delta)
+        family_breakdown[family] = {
+            "edge_base": base,
+            "edge_cur": cur,
+            "epsilon": eps,
+            "allowed": allowed,
+            "ratio": ratio,
+            "delta": delta,
+        }
+
+    measurement_contract = None
+    try:
+        mc = (
+            guard_metrics.get("measurement_contract")
+            if isinstance(guard_metrics, dict)
+            else None
+        )
+        if isinstance(mc, dict) and mc:
+            measurement_contract = mc
+    except Exception:
+        measurement_contract = None
+
+    mc_hash = _measurement_contract_digest(measurement_contract)
+    baseline_hash = _measurement_contract_digest(baseline_contract)
+
+    result: dict[str, Any] = {
+        "tier": tier,
+        "edge_risk_by_family_base": dict(edge_base),
+        "edge_risk_by_family": dict(edge_cur),
+        "epsilon_default": float(epsilon_default),
+        "epsilon_by_family": dict(epsilon_map),
+        "epsilon_violations": list(epsilon_violations),
+        "stable": stable,
+        "status": "stable" if stable else "unstable",
+        "max_edge_ratio": max(ratios) if ratios else None,
+        "max_edge_delta": max(deltas) if deltas else None,
+        "mean_edge_delta": (sum(deltas) / len(deltas)) if deltas else None,
+        "families": family_breakdown,
+        "evaluated": bool(rmt_guard),
+    }
+    if policy_out:
+        result["policy"] = policy_out
+    if measurement_contract is not None:
+        result["measurement_contract"] = measurement_contract
+    if mc_hash:
+        result["measurement_contract_hash"] = mc_hash
+    if baseline_hash:
+        result["baseline_measurement_contract_hash"] = baseline_hash
+    if mc_hash and baseline_hash:
+        result["measurement_contract_match"] = bool(mc_hash == baseline_hash)
+    return result
+
+
+@no_type_check
+def _extract_rmt_analysis_legacy(
     report: RunReport, baseline: dict[str, Any]
 ) -> dict[str, Any]:
     tier = _resolve_policy_tier(report)
@@ -665,9 +905,11 @@ def _extract_rmt_analysis(
     margin_used = None
     deadband_used = None
     policy_out: dict[str, Any] | None = None
+    rmt_guard = None
 
     for guard in report.get("guards", []) or []:
         if str(guard.get("name", "")).lower() == "rmt":
+            rmt_guard = guard
             guard_metrics = guard.get("metrics", {}) or {}
             guard_policy = guard.get("policy", {}) or {}
             if isinstance(guard_policy, dict) and guard_policy:
@@ -925,6 +1167,7 @@ def _extract_rmt_analysis(
         result["deadband"] = float(deadband_used)
     if policy_out:
         result["policy"] = policy_out
+    result["evaluated"] = bool(rmt_guard)
     return result
 
 

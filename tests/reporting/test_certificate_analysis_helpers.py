@@ -840,7 +840,7 @@ def test_normalize_baseline_falls_back_for_invalid_ppl():
 
 def test_normalize_baseline_extracts_runreport_payload():
     baseline = {
-        "meta": {"model_id": "legacy", "auto": {"tier": "balanced"}},
+        "meta": {"model_id": "demo", "auto": {"tier": "balanced"}},
         "edit": {
             "name": "baseline",
             "plan": {"target_sparsity": 0.0},
