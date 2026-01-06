@@ -25,4 +25,4 @@ def test_schedule_digest_is_deterministic_for_same_seed():
     assert ha == hb
 
 
-# Removed legacy pairability helper coverage; pairing is enforced via guard digests during runs.
+# Removed deprecated pairability helper coverage; pairing is enforced via guard digests during runs.

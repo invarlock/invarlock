@@ -80,3 +80,20 @@ def test_validation_schema_rejects_unknown_keys():
     except Exception:
         # Fallback to helper which uses jsonschema when present
         assert validate_certificate(cert) is False
+
+
+@pytest.mark.unit
+def test_validation_schema_accepts_allowlisted_keys():
+    report = _mock_report_with_windows()
+    baseline = _mock_baseline(report)
+    cert = make_certificate(report, baseline)
+    cert.setdefault("validation", {})["hysteresis_applied"] = False
+    # Helper should accept allow-listed keys.
+    assert validate_certificate(cert) is True
+    try:
+        import jsonschema  # type: ignore
+
+        jsonschema.validate(instance=cert, schema=CERTIFICATE_JSON_SCHEMA)
+    except Exception:
+        # jsonschema optional; validate_certificate already checked above
+        pass

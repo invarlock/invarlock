@@ -296,7 +296,7 @@ def _resolve_exit_code(exc: Exception, *, profile: str | None) -> int:
     return 1
 
 
-## NOTE: Deprecated legacy helper `_check_pairability_or_abort` was removed.
+## NOTE: Deprecated helper `_check_pairability_or_abort` was removed.
 ## Provider parity and pairing guarantees are enforced via guard digests and
 ## invariant checks during run execution.
 
@@ -814,17 +814,14 @@ def _resolve_device_and_output(
         console.print(f"[red]❌ Device validation failed: {error_msg}[/red]")
         raise typer.Exit(1)
 
-    # Determine output directory (support both 'output.dir' and legacy 'out.dir')
+    # Determine output directory
     if out:
         output_dir = Path(out)
     else:
         try:
             output_dir = Path(cfg.output.dir)
         except Exception:
-            try:
-                output_dir = Path(cfg.out.dir)  # type: ignore[attr-defined]
-            except Exception:
-                output_dir = Path("runs")
+            output_dir = Path("runs")
     output_dir.mkdir(parents=True, exist_ok=True)
     return str(resolved_device), output_dir
 
@@ -1297,7 +1294,7 @@ def _validate_and_harvest_baseline_schedule(
                     _fail_schedule(f"{label} input_ids empty at index {idx}")
                 seqs.append(seq_ints)
 
-            # attention_masks are required for pairing, but legacy baselines may omit them.
+            # attention_masks are required for pairing, but some baselines may omit them.
             # When absent, default to all-ones masks (cannot infer padding reliably).
             masks_rows: list[list[int]] = []
             masks_missing = masks is None or masks == []
@@ -1610,7 +1607,7 @@ def _resolve_metric_and_provider(
 ) -> tuple[str, str, dict[str, float]]:
     """Resolve metric kind, provider kind, and metric options from config with precedence.
 
-    Precedence: CLI args (not handled here) → config → ModelProfile defaults → legacy fallback.
+    Precedence: CLI args (not handled here) → config → ModelProfile defaults → fallback.
     Primary metric (metric‑v1) is canonical in dev‑phase; no env flag toggles.
     """
     # Provider kind
@@ -1684,11 +1681,11 @@ def _resolve_metric_and_provider(
     else:
         metric_kind = None
 
-    # Fallback to model profile default or legacy resolution by loss type
+    # Fallback to model profile default or loss-type mapping
     if not metric_kind and hasattr(model_profile, "default_metric"):
         metric_kind = model_profile.default_metric
     if not metric_kind:
-        # Legacy: map from loss kind
+        # Map from loss kind
         lk = (resolved_loss_type or "causal").lower()
         if lk == "mlm":
             metric_kind = "ppl_mlm"
@@ -2099,7 +2096,7 @@ def run_command(
                     if pairing_schedule:
                         # Normalize baseline report in-memory so downstream digest/parity
                         # computations see a consistent window_id + mask shape even for
-                        # legacy baselines missing some fields.
+                        # baselines missing some fields.
                         try:
                             baseline_report_data["evaluation_windows"] = (
                                 pairing_schedule
@@ -3461,6 +3458,16 @@ def run_command(
             # Convert CoreRunner report to evaluation report
             report = create_empty_report()
 
+            # Persist minimal run context for certificate/report provenance.
+            try:
+                report["context"] = {
+                    "profile": profile_normalized,
+                    "auto": dict(auto_config),
+                    "assurance": dict(run_context.get("assurance") or {}),
+                }
+            except Exception:
+                pass
+
             # Code provenance: commit hash and InvarLock version
             commit_value = (
                 getattr(cfg.meta, "commit", "") if hasattr(cfg, "meta") else ""
@@ -4327,7 +4334,7 @@ def run_command(
                                 )  # type: ignore[index]
                         except Exception:
                             pass
-                # Shadow parity check against legacy ppl fields (best-effort)
+                # Shadow parity check against ppl_* fields (best-effort)
                 try:
                     pm_blk = report.get("metrics", {}).get("primary_metric", {})
                     ppl_final_v1 = float(pm_blk.get("final"))
@@ -4631,7 +4638,7 @@ def _format_debug_metric_diffs(
     metrics: dict[str, float] | None,
     baseline_report_data: dict | None,
 ) -> str:
-    """Build a compact DEBUG_METRIC_DIFFS line comparing current snapshot vs legacy ppl_*.
+    """Build a compact DEBUG_METRIC_DIFFS line comparing current snapshot vs ppl_*.
 
     Returns a semicolon-separated string of deltas like
     "final: v1-v1 = +0.000000000; Δlog(final): +0.000000000; ...". Safe to call with

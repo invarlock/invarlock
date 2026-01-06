@@ -207,7 +207,7 @@ class CoreRegistry:
         missing: list[str] = []
         for dep in deps:
             try:
-                spec = importlib.util.find_spec(dep)  # type: ignore[attr-defined]
+                spec = importlib.util.find_spec(dep)
             except Exception:
                 spec = None
             if spec is None:
@@ -430,7 +430,7 @@ class CoreRegistry:
         )
         return metadata
 
-    # Typed-error wrappers that preserve existing behavior for legacy methods
+    # Typed-error wrappers that preserve existing behavior for existing methods
     def get_adapter_typed(self, name: str) -> ModelAdapter:
         try:
             return self.get_adapter(name)

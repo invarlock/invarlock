@@ -60,20 +60,22 @@ attach calibration certificates to change proposals.
 * **Balanced** ε per family: `{ffn: 0.10, attn: 0.08, embed: 0.12, other: 0.12}`
 * **Conservative** tightened: `{ffn: 0.06, attn: 0.05, embed: 0.07, other: 0.07}`
 
-Acceptance rule per family $f$: with bare outliers $b(f)$ and guarded outliers $g(f)$, $g(f) \le \left\lceil \big(1+\varepsilon(f)\big)\, b(f) \right\rceil$
+Acceptance rule per family $f$: with baseline edge‑risk $r_f^{\text{base}}$ and current edge‑risk $r_f^{\text{cur}}$,
+$r_f^{\text{cur}} \le \left(1+\varepsilon(f)\right)\, r_f^{\text{base}}$.
 
-**Runtime visibility.** Certificate fields under `rmt.*` report bare/guarded counts, ε (default and by family), status, and `validation.rmt_stable`.
+**Runtime visibility.** Certificate fields under `rmt.*` report baseline/current edge‑risk, ε (default and by family), status, and `validation.rmt_stable`.
 
 **RMT calibration provenance.** Aggregated null-run stats are derived from
 calibration certificates. Local tooling can parse certificate JSON files to
-extract `rmt.outliers_bare` and `rmt.outliers_guarded` per family, compute
-deltas Δ(f) = g(f)/b(f) − 1, and report quantile summaries.
+extract `rmt.families.*.{edge_base,edge_cur,delta}` per family, and report
+quantile summaries of Δ(f) = r_cur(f)/r_base(f) − 1 (skip cases with missing or
+zero baseline).
 
 ---
 
 ### How to recalibrate ε
 
-1. Run **null** baselines (no edit) and compute per-family deltas $\Delta(f) = g(f)/b(f) - 1$ (skip cases with $b(f)=0$).
+1. Run **null** baselines (no edit) and compute per-family deltas $\Delta(f) = r_{\text{cur}}(f)/r_{\text{base}}(f) - 1$ (skip cases with $r_{\text{base}}(f)=0$).
 2. Set $\varepsilon(f) = \mathrm{Quantile}\big(\Delta(f);\ q\big)$ with $q \in [0.95, 0.99]$.
 3. Use a slightly larger ε for tiny families (discreteness: $b(f)\in\{0,1\}$ matters).
 

@@ -13,13 +13,13 @@ calibration data that accompany the InvarLock assurance notes.
 | Guard | Inputs | Check & Threshold | Failure behavior | Code reference |
 |-------|--------|-------------------|-------------------|----------------|
 | **Invariants** | Model weights, adapter metadata | Structural invariants (non-finite scan, weight tying, embedding dims, layer norms) | Abort edit if violated before evaluation | `invarlock.guards.invariants` |
-| **Spectral** | 2‑D layer weights (FFN, attention proj, embeddings) | Compute $z = \frac{s - \mu_f}{\sigma_f}$; baseline percentile `sigma_quantile` selects the reference sigma; require `abs(z) ≤ κ_f` calibrated for ≤5% WARN FPR | WARN when cap applied; abort if cap would exceed `max_caps` | `invarlock.guards.spectral` |
-| **RMT** | Bare vs guarded activations | Outlier growth ≤ $\lceil\text{outliers}_{\text{bare}} \cdot (1+\varepsilon)\rceil$ | WARN when bound exceeded; certificate fails on ε‑rule violations. Detection uses `policies.rmt.{margin,deadband}`; catastrophic spikes in the primary metric are gated separately (`spike_threshold` = 2.0× for ppl‑like metrics). | `invarlock.guards.rmt` |
+| **Spectral** | 2‑D layer weights (FFN, attention proj, embeddings) | Compute $z = \frac{\hat{s} - \mu_f}{\sigma_f}$ where $\hat{s}$ is an **iterative estimate** of $\sigma_{\max}$ under a fixed measurement contract; require `abs(z) ≤ κ_f` calibrated for ≤5% WARN FPR. Optional degeneracy proxies (stable-rank drift, norm collapse) may add WARN/ABORT depending on policy. | WARN when cap applied; abort if cap would exceed `max_caps` (and for configured fatal degeneracy thresholds). | `invarlock.guards.spectral` |
+| **RMT** | Token‑weighted activations (sampled) | Compute a per‑module **edge risk score** $r = \hat{\sigma}_{\max}(A') / \sigma_{\mathrm{MP}}(m,n)$ on whitened activations $A'$ under a fixed measurement contract; accept when baseline‑relative growth stays within the calibrated ε-band per family. | Certificate fails on ε‑band violations; catastrophic spikes in the primary metric are gated separately (`spike_threshold` = 2.0× for ppl‑like metrics). | `invarlock.guards.rmt` |
 | **Variance (VE)** | Paired ΔlogNLL with calibration windows | Enable VE only if the predictive CI upper bound ≤ −`min_effect_lognll` **and** mean Δ ≤ −`min_effect_lognll` (Balanced uses one‑sided CI; Conservative uses two‑sided CI). A CI entirely above +`min_effect_lognll` is treated as regression and VE stays off. | VE disabled, guard records reason; edit continues | `invarlock.guards.variance` |
-| **Bootstrap sanity** | Evaluation windows, token counts | Matching window IDs, zero overlap; BCa replicates ≥ requested | Abort certification and surface reason | `invarlock.assurance.make_certificate` |
+| **Bootstrap sanity** | Evaluation windows, token counts | Matching window IDs, zero overlap; BCa replicates ≥ requested | Abort certification and surface reason | `invarlock.reporting.certificate` |
 
-Each guard logs its policy digest and metrics; certificates mirror those fields
-under `resolved_policy.*` and `spectral`/`rmt`/`variance` blocks.
+Each guard logs its policy digest, metrics, and **measurement contract**; certificates
+mirror those fields under `resolved_policy.*` and `spectral`/`rmt`/`variance` blocks.
 
 ### Invariants: what is checked
 
@@ -78,8 +78,9 @@ stores both the count and the limit under
   ratio. Gate flag: `validation.preview_final_drift_acceptable`.
 - Spectral stability: caps applied must not exceed the tier’s `max_caps`
   (default 5 for Balanced; 3 for Conservative). Gate flag: `validation.spectral_stable`.
-- RMT ε‑rule stability: per‑family outliers must satisfy
-  `guarded ≤ ceil(bare · (1+ε))`. Gate flag: `validation.rmt_stable`.
+- RMT ε‑band stability: per‑family activation edge risk must satisfy
+  `edge_cur ≤ edge_base · (1+ε_f)` for each family with a non-zero baseline.
+  Gate flag: `validation.rmt_stable`.
 - Guard overhead: guard/bare runtime overhead must stay within budget when
   evaluated. Gate flag: `validation.guard_overhead_acceptable`.
 
@@ -196,8 +197,9 @@ Detailed derivations are in the calibration appendix (`09-tier-v1-calibration.md
 
 **Examples**
 
-- **ε-band corner case:** if `outliers_bare = 1` and ε = 0.10, the guard
-  allows `outliers_guarded = ceil(1.10 × 1) = 2`; one extra outlier is tolerated before a WARN fires.
+- **ε-band corner case:** if `rmt.families.attn.edge_base = 1.20` and
+  `rmt.families.attn.epsilon = 0.10`, the guard allows
+  `rmt.families.attn.edge_cur ≤ (1+0.10) × 1.20 = 1.32`.
 - **Predictive gate:** on Balanced, if Δ̄ = −0.002 and the one-sided CI is
   [−0.003, −0.001], VE enables (`mean_delta` and the CI upper bound both beat
   −`min_effect_lognll`).

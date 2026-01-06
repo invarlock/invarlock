@@ -831,10 +831,10 @@ def test_resolve_device_invalid(monkeypatch):
 
 
 def test_resolve_device_output_fallback(monkeypatch, tmp_path):
-    class CfgLegacy:
+    class CfgOutIgnored:
         model = SimpleNamespace(device=None)
         output = SimpleNamespace(dir=None)
-        out = SimpleNamespace(dir=str(tmp_path / "legacy"))
+        out = SimpleNamespace(dir=str(tmp_path / "ignored"))
 
     console = Console(file=io.StringIO())
     monkeypatch.setattr(
@@ -845,11 +845,12 @@ def test_resolve_device_output_fallback(monkeypatch, tmp_path):
         lambda device: (True, ""),
         raising=False,
     )
+    monkeypatch.chdir(tmp_path)
     resolved, out_dir = run_mod._resolve_device_and_output(
-        CfgLegacy(), device=None, out=None, console=console
+        CfgOutIgnored(), device=None, out=None, console=console
     )
     assert resolved == "cpu"
-    assert out_dir == tmp_path / "legacy"
+    assert out_dir == Path("runs")
 
     class CfgFallback:
         model = SimpleNamespace(device=None)

@@ -2,7 +2,6 @@ import pytest
 import torch
 import torch.nn as nn
 
-from invarlock.guards import rmt
 from invarlock.guards.rmt import (
     RMTGuard,
     _apply_rmt_correction,
@@ -86,40 +85,18 @@ def test_rmt_detect_with_names_fallback_path():
 
 
 def test_rmt_guard_validate_uses_detection(monkeypatch):
-    guard = RMTGuard(deadband=0.0)
+    _ = monkeypatch
+    guard = RMTGuard()
     guard.prepared = True
-    guard.baseline_mp_stats = {"layer0": {"sigma_base": 1.0}}
-    guard.baseline_sigmas = {"layer0.attn.weight": 1.0}
-    guard.scope = "all"
-    guard.config = {"deadband": 0.0, "margin": 1.5}
-    guard.policy = guard.config
-    guard.epsilon_by_family = {"attn": 0.1}
-    guard.outliers_per_family = {"attn": 2}
-    guard.baseline_outliers_per_family = {"attn": 1}
-    guard.outliers_total = 2
-    guard.baseline_total_outliers = 1
-
-    def fake_detect(model, threshold=1.5, verbose=False):
-        return {
-            "has_outliers": True,
-            "n_layers_flagged": 1,
-            "outlier_count": 1,
-            "max_ratio": 2.0,
-            "threshold": 1.5,
-            "flagged_layers": ["layer0"],
-            "per_layer": [],
-            "outliers": [],
-            "epsilon_by_family": {"attn": 0.1},
-            "families": {"attn": {"bare": 1, "guarded": 2}},
-        }
-
-    monkeypatch.setattr(rmt, "rmt_detect_with_names", fake_detect)
+    guard.baseline_edge_risk_by_family = {"attn": 1.0}
+    guard.edge_risk_by_family = {"attn": 2.0}
+    guard.epsilon_by_family = {"attn": 0.0}
 
     model = DummyModel(DummyLayer())
     result = guard.validate(model, adapter=None, context={})
 
-    assert "outliers_per_family" in result["metrics"]
-    assert result["metrics"]["outliers_per_family"]["attn"] == 2
+    assert "edge_risk_by_family" in result["metrics"]
+    assert result["metrics"]["epsilon_violations"]
 
 
 def test_rmt_guard_set_epsilon_from_dict_and_scalar():
@@ -135,21 +112,21 @@ def test_rmt_guard_set_epsilon_from_dict_and_scalar():
 
 def test_rmt_guard_compute_epsilon_violations_detects_overages():
     guard = RMTGuard(epsilon=0.0)
-    guard.baseline_outliers_per_family = {"attn": 1, "embed": 0}
-    guard.outliers_per_family = {"attn": 2, "embed": 1}
+    guard.baseline_edge_risk_by_family = {"attn": 1.0, "embed": 1.0}
+    guard.edge_risk_by_family = {"attn": 2.0, "embed": 1.2}
     guard.epsilon_by_family["embed"] = 0.05
 
     violations = guard._compute_epsilon_violations()
     violation_families = {v["family"] for v in violations}
     assert violation_families == {"attn", "embed"}
     embed_violation = next(v for v in violations if v["family"] == "embed")
-    assert embed_violation["allowed"] == 0  # Bare = 0 → allowed 0
+    assert embed_violation["allowed"] == pytest.approx(1.05)
 
 
 def test_rmt_guard_compute_epsilon_violations_respects_allowed_threshold():
     guard = RMTGuard(epsilon={"attn": 0.5})
-    guard.baseline_outliers_per_family = {"attn": 2}
-    guard.outliers_per_family = {"attn": 3}
+    guard.baseline_edge_risk_by_family = {"attn": 2.0}
+    guard.edge_risk_by_family = {"attn": 3.0}
 
     violations = guard._compute_epsilon_violations()
-    assert violations == []  # allowed = ceil(2 * 1.5) = 3, so within limit
+    assert violations == []  # allowed = 2.0 * (1 + 0.5) = 3.0, so within limit

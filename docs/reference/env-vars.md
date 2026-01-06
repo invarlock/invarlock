@@ -54,8 +54,6 @@ unset variables default to “off”.
   - Default: strict (fail-closed).
 - `INVARLOCK_EVIDENCE_DEBUG=1`
   - Emit a small `guards_evidence.json` next to reports for audit.
-- `INVARLOCK_VALIDATE_LEGACY=1`
-  - Enable legacy validation pathways (back-compat tolerance handling).
 
 ## Guard Overhead & Primary Metric
 

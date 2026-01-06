@@ -102,7 +102,7 @@ class EvalMetrics(TypedDict, total=False):
     # Canonical primary metric snapshot
     primary_metric: dict[str, Any]
 
-    # Optional legacy/aux fields retained for guard telemetry and debug
+    # Optional aux fields retained for guard telemetry and debug
     latency_ms_per_tok: float  # Average latency per token in milliseconds
     memory_mb_peak: float  # Peak memory usage in MB
     spectral: dict[str, Any]  # Spectral norm summaries
@@ -164,6 +164,7 @@ class RunReport(TypedDict):
     # Optional extras kept for richer downstream processing
     guard_overhead: NotRequired[dict[str, Any]]
     provenance: NotRequired[dict[str, Any]]
+    context: NotRequired[dict[str, Any]]
 
 
 # Utility functions for creating reports
@@ -247,7 +248,7 @@ def validate_report(report: RunReport) -> bool:
             if pm_final is not None and not isinstance(pm_final, int | float):
                 return False
         else:
-            # PM-only: legacy ppl_* acceptance removed
+            # PM-only: ppl_* acceptance removed
             return False
 
         meta = report.get("meta", {})

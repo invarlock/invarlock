@@ -53,9 +53,8 @@ def test_resolve_device_and_output_uses_cfg_output_dir(
     assert out_dir == tmp_path / "cfg_runs"
 
 
-def test_resolve_device_and_output_uses_legacy_out_dir(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_resolve_device_and_output_ignores_out_dir(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("invarlock.cli.device.resolve_device", lambda _d: "cpu")
     monkeypatch.setattr(
         "invarlock.cli.device.validate_device_for_config", lambda _d: (True, "")
@@ -63,12 +62,12 @@ def test_resolve_device_and_output_uses_legacy_out_dir(
 
     cfg = SimpleNamespace(
         model=SimpleNamespace(device="cpu"),
-        out=SimpleNamespace(dir=str(tmp_path / "legacy_runs")),
+        out=SimpleNamespace(dir=str(tmp_path / "ignored_runs")),
     )
     _, out_dir = run_mod._resolve_device_and_output(
         cfg, device=None, out=None, console=Console()
     )
-    assert out_dir == tmp_path / "legacy_runs"
+    assert out_dir == Path("runs")
 
 
 def test_resolve_device_and_output_falls_back_to_runs(

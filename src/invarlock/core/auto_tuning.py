@@ -244,8 +244,8 @@ def _load_runtime_yaml(
         res = base
         for part in rel_parts:
             res = res.joinpath(part)
-        if getattr(res, "is_file", None) and res.is_file():  # type: ignore[attr-defined]
-            text = res.read_text(encoding="utf-8")  # type: ignore[assignment]
+        if getattr(res, "is_file", None) and res.is_file():
+            text = res.read_text(encoding="utf-8")
             data = yaml.safe_load(text) or {}
             if not isinstance(data, dict):
                 raise ValueError("Runtime YAML must be a mapping")

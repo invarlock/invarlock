@@ -87,7 +87,7 @@ def test_policy_provenance_digest_moves_for_each_guard_knob() -> None:
     assert _digest(spectral) != d0
 
     rmt = deepcopy(base)
-    rmt["guards"][1]["policy"]["margin"] = 1.7
+    rmt["guards"][1]["policy"]["epsilon_default"] = 0.12
     assert _digest(rmt) != d0
 
     variance = deepcopy(base)
@@ -97,14 +97,31 @@ def test_policy_provenance_digest_moves_for_each_guard_knob() -> None:
 
 def test_policy_provenance_digest_includes_override_list_order() -> None:
     base = _base_report()
-    base["meta"]["policy_overrides"] = ["guards.spectral.deadband", "guards.rmt.margin"]
+    base["meta"]["policy_overrides"] = [
+        "guards.spectral.deadband",
+        "guards.rmt.epsilon_default",
+    ]
     d1 = _digest(base)
 
     swapped = _base_report()
     swapped["meta"]["policy_overrides"] = [
-        "guards.rmt.margin",
+        "guards.rmt.epsilon_default",
         "guards.spectral.deadband",
     ]
     d2 = _digest(swapped)
 
     assert d1 != d2
+
+
+def test_policy_provenance_digest_ignores_context_metadata() -> None:
+    base = _base_report()
+    base["context"] = {"profile": "ci", "notes": "x"}
+    d0 = _digest(base)
+
+    variant = deepcopy(base)
+    variant["context"] = {"profile": "ci", "notes": "y"}
+    assert _digest(variant) == d0
+
+    profile_change = deepcopy(base)
+    profile_change["context"] = {"profile": "release", "notes": "x"}
+    assert _digest(profile_change) != d0

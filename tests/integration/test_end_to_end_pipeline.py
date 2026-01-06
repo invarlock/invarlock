@@ -219,7 +219,7 @@ class TestEndToEndPipeline:
     def test_guard_chain_integration(self):
         """Test integration with guard chain."""
         # Create guard instances
-        spectral_guard = SpectralGuard(kappa=0.95, deadband=0.1)
+        spectral_guard = SpectralGuard(sigma_quantile=0.95, deadband=0.1)
         rmt_guard = RMTGuard(margin=1.5, deadband=0.1)
         invariants_guard = InvariantsGuard(strict_mode=False)
 
@@ -621,7 +621,7 @@ class TestPipelineErrorScenarios:
     def test_guard_failure_scenarios(self):
         """Test various guard failure scenarios."""
         # Test spectral guard failure
-        spectral_guard = SpectralGuard(kappa=0.95)
+        spectral_guard = SpectralGuard(sigma_quantile=0.95)
 
         with patch.object(spectral_guard, "validate") as mock_validate:
             mock_validate.return_value = {

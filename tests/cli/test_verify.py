@@ -221,7 +221,7 @@ def _write_certificate(tmp_path: Path) -> Path:
 
 
 def test_verify_uses_dataset_windows_stats(tmp_path: Path):
-    # Cert with pairing/coverage under dataset.windows.stats should verify without using legacy ppl stats
+    # Cert with pairing/coverage under dataset.windows.stats should verify without using ppl fallbacks
     cert = _build_sample_certificate()
     # ensure present
     assert isinstance(cert.get("dataset", {}).get("windows", {}).get("stats", {}), dict)

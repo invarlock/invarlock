@@ -41,10 +41,9 @@ def test_invarlock_config_merges_data_and_sections() -> None:
         _ = cfg.missing  # noqa: F841
 
 
-def test_guard_configs_family_caps_and_contraction_alias():
-    # SpectralGuardConfig handles contraction alias → sigma_quantile
-    sg = SpectralGuardConfig(contraction=0.2)
-    assert sg.sigma_quantile == 0.2 and sg.contraction is None
+def test_guard_configs_family_caps_and_sigma_quantile():
+    sg = SpectralGuardConfig(sigma_quantile=0.2)
+    assert sg.sigma_quantile == 0.2
     # SpectralGuardConfig normalizes family_caps
     sg2 = SpectralGuardConfig(family_caps={"fam": 3.0, "x": {"kappa": 1.5}})
     assert sg2.family_caps == {"fam": {"kappa": 3.0}, "x": {"kappa": 1.5}}

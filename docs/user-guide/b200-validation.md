@@ -23,6 +23,15 @@ The InvarLock B200 Validation Suite (`scripts/b200_validation_suite.sh`) is a co
 # Resume a failed or interrupted run
 OUTPUT_DIR=./invarlock_validation_b200_20241208_123456 \
   ./scripts/b200_validation_suite.sh --resume
+
+# Optional: split calibration from the rest of the suite
+# 1) Run calibration + preset generation only (checkpoint)
+OUTPUT_DIR=./invarlock_validation_b200_20241208_123456 \
+  ./scripts/b200_validation_suite.sh --calibrate-only
+
+# 2) Continue from the calibration checkpoint (implies --resume when a queue exists)
+OUTPUT_DIR=./invarlock_validation_b200_20241208_123456 \
+  ./scripts/b200_validation_suite.sh --run-only
 ```
 
 On a fresh B200 node, you can bootstrap dependencies and run the suite via `scripts/b200_bootstrap_and_validate.sh`.
@@ -291,7 +300,7 @@ The scheduler uses two key optimizations to maximize GPU utilization (batch path
 Optimization Impact:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Before (Legacy):
+Before (Per-edit):
   8× CREATE_EDIT tasks (model load each time)  ─┐
   8× EVAL_EDIT tasks (all 4 benchmarks)         ├─ Sequential bottleneck
                                                ─┘
@@ -304,7 +313,7 @@ After (Batch + Split):
 Result: Estimated ~62% faster execution on 8× B200 cluster
 ```
 
-**Large or MoE models (70B+ or Mixtral-class)** skip batch edits and use legacy per-edit tasks (CREATE_EDIT → EVAL_EDIT → CERTIFY_EDIT), so split eval is not used there.
+**Large or MoE models (70B+ or Mixtral-class)** skip batch edits and use per-edit tasks (CREATE_EDIT → EVAL_EDIT → CERTIFY_EDIT), so split eval is not used there.
 
 ### Task Breakdown Per Model
 
@@ -456,7 +465,7 @@ The following shows the per-edit dependency graph for 70B+ models:
         ▼                       ▼                       ▼
  ┌─────────────┐      ┌────────────────┐      ┌─────────────────────┐
  │EVAL_BASELINE│      │CALIBRATION_RUN │      │    CREATE_EDIT      │
- │ (lm-eval)   │      │    × 5 runs    │      │ (per-edit, legacy)  │
+ │ (lm-eval)   │      │    × 5 runs    │      │ (per-edit)          │
  │ pri:80      │      │    pri:85      │      │ pri:70              │
  └─────────────┘      └────────┬───────┘      └─────────┬───────────┘
                                │                        │
@@ -684,10 +693,10 @@ Atomic task implementations for each task type:
   - `task_generate_preset()` - Create calibration preset
 - **lm-eval**:
   - `task_eval_baseline()` - Baseline lm-eval
-  - `task_eval_edit()` - Edited-model lm-eval (legacy: all benchmarks in one task)
+  - `task_eval_edit()` - Edited-model lm-eval (monolithic: all benchmarks in one task)
   - `task_eval_single_benchmark()` - Split eval for one benchmark (MMLU, HellaSwag, ARC, WinoGrande)
 - **Edit Creation**:
-  - `task_create_edit()` - Apply a single quantization/pruning/SVD edit (legacy)
+  - `task_create_edit()` - Apply a single quantization/pruning/SVD edit (per-edit)
   - `task_create_edits_batch()` - Create all 8 edits with a single model load (batch optimization)
 - **Certification & Errors**:
   - `task_certify_edit()` - InvarLock certify for an edit
@@ -828,6 +837,7 @@ Bootstrap defaults are 2000 for small/medium models and 1000 for >=30B.
 |----------|---------|-------------|
 | `INVARLOCK_DATASET` | `wikitext2` | Evaluation dataset |
 | `INVARLOCK_TIER` | `balanced` | Guard tier preset |
+| `B200_GUARDS_ORDER` | unset | Override InvarLock guard order for generated configs/presets (comma-separated; e.g. `invariants,spectral,rmt,variance,invariants`) |
 | `INVARLOCK_BOOTSTRAP_N` | unset | Bootstrap replicates override (defaults: 2000, 1000 for ≥30B) |
 | `INVARLOCK_PM_ACCEPTANCE_MIN` | `0.90` | Primary metric lower bound |
 | `INVARLOCK_PM_ACCEPTANCE_MAX` | `1.20` | Primary metric upper bound |

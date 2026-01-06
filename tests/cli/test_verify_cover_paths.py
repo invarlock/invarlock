@@ -20,6 +20,17 @@ def _minimal_ppl_certificate(
     *, ratio: float = 1.0, final: float = 10.0, baseline_final: float = 10.0
 ) -> dict:
     # Minimal schema-valid certificate for ppl-like metric
+    spectral_contract = {
+        "estimator": {"type": "power_iter", "iters": 4, "init": "ones"}
+    }
+    rmt_contract = {
+        "estimator": {"type": "power_iter", "iters": 3, "init": "ones"},
+        "activation_sampling": {
+            "windows": {"count": 8, "indices_policy": "evenly_spaced"}
+        },
+    }
+    spectral_hash = verify_mod._measurement_contract_digest(spectral_contract)
+    rmt_hash = verify_mod._measurement_contract_digest(rmt_contract)
     return {
         "schema_version": "v1",
         "run_id": "run-xyz",
@@ -46,6 +57,22 @@ def _minimal_ppl_certificate(
             "final": final,
             "ratio_vs_baseline": ratio,
             "display_ci": [ratio, ratio],
+        },
+        "spectral": {
+            "evaluated": True,
+            "measurement_contract": spectral_contract,
+            "measurement_contract_hash": spectral_hash,
+            "measurement_contract_match": True,
+        },
+        "rmt": {
+            "evaluated": True,
+            "measurement_contract": rmt_contract,
+            "measurement_contract_hash": rmt_hash,
+            "measurement_contract_match": True,
+        },
+        "resolved_policy": {
+            "spectral": {"measurement_contract": spectral_contract},
+            "rmt": {"measurement_contract": rmt_contract},
         },
         "baseline_ref": {
             "run_id": "base-xyz",

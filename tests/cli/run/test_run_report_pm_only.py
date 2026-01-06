@@ -49,7 +49,7 @@ output:
 """
     )
 
-    # Dummy runner returns legacy ppl metrics internally; runner must not write them out
+    # Dummy runner returns ppl_* metrics internally; runner must not write them out
     class DummyRunner:
         def execute(self, **kwargs):
             return SimpleNamespace(
@@ -152,7 +152,7 @@ output:
     assert "preview" in pm and "final" in pm and "ratio_vs_baseline" in pm
     # No ppl_* writes in run report metrics
     for key in (report.get("metrics", {}) or {}).keys():
-        assert not key.startswith("ppl_"), f"unexpected legacy key {key}"
+        assert not key.startswith("ppl_"), f"unexpected ppl_* key {key}"
     # Provider digest and dataset split present
     prov = report.get("provenance", {})
     assert isinstance(prov.get("dataset_split"), str)

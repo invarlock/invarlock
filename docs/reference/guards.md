@@ -10,7 +10,7 @@ The guard system implements a multi-layered approach to model safety:
 
 1. **Invariants Guard**: Validates structural integrity and parameter sanity
 2. **Spectral Guard**: Controls weight matrix spectral properties for stability
-3. **RMT Guard**: Detects outliers using Random Matrix Theory
+3. **RMT Guard**: Enforces baseline-relative activation edge-risk ε-bands
 4. **Variance Guard**: Equalizes activation variances for improved performance
 
 Guards operate in a pipeline with configurable policies and automatic intervention capabilities.
@@ -86,7 +86,7 @@ if not outcome.passed:
 > `sigma_quantile: 0.95`, `deadband: 0.10`, `max_caps: 5`,
 > `max_spectral_norm: null`,
 > `multiple_testing: {method: bh, alpha: 0.05, m: 4}` with κ
-> `{ffn: 2.5, attn: 2.8, embed: 3.0, other: 3.0}`.
+> `{ffn: 3.834, attn: 3.423, embed: 3.1, other: 3.1}`.
 >
 > **Conservative note:** Bonferroni (`alpha = 0.02`), `max_caps = 3`, κ
 > `{ffn: 2.3, attn: 2.6, embed: 2.8, other: 2.8}`.
@@ -108,7 +108,7 @@ guards:
     scope: all
     max_caps: 5
     multiple_testing: { method: bh, alpha: 0.05, m: 4 }
-    family_caps: { ffn: {kappa: 2.5}, attn: {kappa: 2.8}, embed: {kappa: 3.0}, other: {kappa: 3.0} }
+    family_caps: { ffn: {kappa: 3.834}, attn: {kappa: 3.423}, embed: {kappa: 3.1}, other: {kappa: 3.1} }
     max_spectral_norm: null
   rmt:
     epsilon_by_family: { ffn: 0.10, attn: 0.08, embed: 0.12, other: 0.12 }
@@ -138,8 +138,8 @@ invarlock run -c configs/local/quant8_calibrated.yaml \
   --out runs/.../quant8_calibrated
 ```
 
-**Naming.** Standardise on `sigma_quantile` (legacy alias `contraction` is
-deprecated) and `multiple_testing` (with underscore) to keep
+**Naming.** Standardise on `sigma_quantile` (not `contraction`) and
+`multiple_testing` (with underscore) to keep
 reports/overrides schema-aligned.
 
 **Spectral is weight-based.** |z| distributions depend solely on weights;
@@ -217,64 +217,68 @@ gains = scan_model_gains(model)
 
 ### RMT Guard
 
-**Purpose**: Detects weight matrix outliers using Random Matrix Theory
+**Purpose**: Enforces baseline-relative activation edge-risk stability (ε-band).
 
 **Key Features**:
 
-
-
-- **Outlier Detection**: Identifies layers with abnormal spectral properties
-- **Baseline-Aware Analysis**: Compares against pre-edit statistics
-- **Optional Correction**: Conservative tiers can clip outlier singular values
-- **Bulk Edge Analysis**: Uses Marchenko-Pastur distribution analysis
+- **Activation edge-risk scoring** on sampled, token-weighted activations under a fixed
+  measurement contract.
+- **Per-family ε thresholds** via `epsilon_by_family` (accept when each family stays within
+  `(1 + ε_family) × baseline`).
+- **Fail-closed in CI/Release** when activation evidence is required but unavailable.
+- **Evidence emission**: `edge_risk_by_family_base`, `edge_risk_by_family`, `epsilon_violations`,
+  and `measurement_contract`.
 
 **Configuration**:
 
 ```yaml
 guards:
   rmt:
-    q: "auto"                  # Aspect ratio (auto-detected)
-    deadband: 0.10             # Tolerance before flagging outliers
-    margin: 1.5                # RMT threshold ratio for outliers
-    correct: true              # Enable correction (balanced/conservative tiers)
+    # ε-band thresholds (primary acceptance rule)
     epsilon_by_family: { ffn: 0.10, attn: 0.08, embed: 0.12, other: 0.12 }
+
+    # Optional: pin the measurement contract for reproducibility
+    estimator: { iters: 3, init: ones }
+    activation:
+      sampling:
+        windows: { count: 8, indices_policy: evenly_spaced }
+
+    # Legacy knobs (weight-RMT diagnostics/correction helpers)
+    q: auto
+    deadband: 0.10
+    margin: 1.5
+    correct: false
 ```
 
 **Usage Example**:
 
 ```python
-from invarlock.guards.rmt import RMTGuard, rmt_detect, capture_baseline_mp_stats
+from invarlock.guards.rmt import RMTGuard
 
-# Create RMT guard (balanced-style policy)
-guard = RMTGuard(margin=1.5, deadband=0.10, correct=True)
-
-# Prepare with baseline statistics
-result = guard.prepare(model, adapter, calib_data, policy)
-
-# Apply detection and correction
-result = rmt_detect(
+guard = RMTGuard(
+    epsilon={"ffn": 0.10, "attn": 0.08, "embed": 0.12, "other": 0.12}
+)
+guard.prepare(
     model,
-    threshold=1.5,
-    detect_only=True,           # Monitor-only run; set False to apply correction
-    correction_factor=0.9,
-    verbose=True
+    adapter,
+    calib_data,
+    policy={
+        "estimator": {"iters": 3, "init": "ones"},
+        "activation": {
+            "sampling": {"windows": {"count": 8, "indices_policy": "evenly_spaced"}}
+        },
+    },
 )
 
-print(f"Outliers detected: {result['has_outliers']}")
-print(f"Layers flagged: {result['n_layers_flagged']}")
+# ...perform edit...
 
-# Enable automatic correction (e.g., conservative tier)
-guard_with_correction = RMTGuard(margin=1.3, deadband=0.05, correct=True)
-result_with_fix = rmt_detect(
-    model,
-    threshold=1.3,
-    detect_only=False,
-    correction_factor=0.9,
-    verbose=True
-)
+guard.after_edit(model)
+outcome = guard.finalize(model)
+print(f"RMT passed: {outcome.passed}")
+print(f"ε violations: {outcome.metrics['epsilon_violations']}")
 ```
 
-**RMT Analysis Functions**:
+**Weight-RMT utilities (diagnostics / correction)**:
 
 ```python
 from invarlock.guards.rmt import (
@@ -285,7 +289,7 @@ from invarlock.guards.rmt import (
 )
 
 # Compute Marchenko-Pastur bulk edge
-edge = mp_bulk_edge(n_features=768, n_samples=512, whitened=True)
+edge = mp_bulk_edge(m=768, n=512, whitened=True)
 
 # Analyze layer statistics
 stats = layer_svd_stats(layer, baseline_sigmas, baseline_mp_stats, layer_name)
@@ -377,9 +381,8 @@ guards:
     deadband: 0.05               # Small tolerance
     correction_enabled: true     # Conservative tier enables correction
   rmt:
-    margin: 1.40                 # Conservative outlier threshold
-    deadband: 0.05
-    correct: true                 # Conservative tier enables correction
+    epsilon_by_family: { ffn: 0.06, attn: 0.05, embed: 0.07, other: 0.07 }
+    # activation_required defaults to true in CI/Release profiles
   variance:
     min_gain: 0.01               # High improvement requirement
 ```
@@ -393,9 +396,7 @@ guards:
     deadband: 0.10               # Standard deadband
     correction_enabled: false    # Monitor-only spectral caps
   rmt:
-    margin: 1.50                 # Balanced outlier threshold
-    deadband: 0.10
-    correct: true                # Enable correction under Balanced tier
+    epsilon_by_family: { ffn: 0.10, attn: 0.08, embed: 0.12, other: 0.12 }
   variance:
     min_gain: 0.0                # VE gain floor (paired with min_effect_lognll)
 ```
@@ -408,8 +409,7 @@ guards:
     sigma_quantile: 0.98         # Loose spectral percentile
     deadband: 0.15            # Large tolerance
   rmt:
-    margin: 1.8               # Permissive outlier threshold
-    deadband: 0.15
+    epsilon_by_family: { ffn: 0.15, attn: 0.15, embed: 0.15, other: 0.15 }
   variance:
     min_gain: 0.0             # Lower improvement requirement
 ```
@@ -450,6 +450,7 @@ rmt_policy = create_custom_rmt_policy(
     margin=1.6,
     correct=True
 )
+rmt_policy["epsilon"] = {"ffn": 0.10, "attn": 0.08, "embed": 0.12, "other": 0.12}
 
 # Create custom variance policy
 variance_policy = create_custom_variance_policy(
@@ -474,7 +475,7 @@ guards:
   spectral:
     sigma_quantile: 0.95
   rmt:
-    margin: 1.5
+    epsilon_by_family: { ffn: 0.10, attn: 0.08, embed: 0.12, other: 0.12 }
   variance:
     min_gain: 0.20
 ```
@@ -665,15 +666,19 @@ for layer, gain in gains.items():
         print(f"High spectral norm in {layer}: {gain:.3f}")
 ```
 
-**3. RMT Outlier Detection**
+**3. RMT ε‑Band Violations**
 
 ```python
-# Analyze RMT outliers in detail
-result = rmt_detect(model, threshold=1.5, verbose=True)
-for layer_info in result['per_layer']:
-    if layer_info['has_outlier']:
-        print(f"Outlier in {layer_info['module_name']}: "
-              f"ratio={layer_info['worst_ratio']:.3f}")
+# Inspect ε-band violations (activation edge-risk)
+guard.after_edit(model)
+outcome = guard.finalize(model)
+for violation in outcome.metrics["epsilon_violations"]:
+    print(
+        f"{violation['family']}: "
+        f"edge_cur={violation['edge_cur']:.3f} "
+        f"> allowed={violation['allowed']:.3f} "
+        f"(ε={violation['epsilon']:.3f})"
+    )
 ```
 
 **4. Variance Guard Issues**
@@ -716,7 +721,7 @@ from invarlock.guards.policies import get_variance_policy
 guard_chain = GuardChain([
     InvariantsGuard(strict_mode=True),
     SpectralGuard(sigma_quantile=0.95, deadband=0.10),
-    RMTGuard(margin=1.5, deadband=0.10, correct=True),
+    RMTGuard(epsilon={"ffn": 0.10, "attn": 0.08, "embed": 0.12, "other": 0.12}),
     VarianceGuard(get_variance_policy("balanced")),
 ])
 

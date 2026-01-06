@@ -51,14 +51,16 @@ def test_explain_gates_hysteresis_and_overhead_rendering(monkeypatch, tmp_path):
             "validation": {
                 "hysteresis_applied": True,
                 "primary_metric_acceptable": True,
+                "preview_final_drift_acceptable": True,
                 "guard_overhead_acceptable": True,
             },
             "telemetry": {"preview_total_tokens": 30000, "final_total_tokens": 30000},
-            "ppl": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
                 "ratio_vs_baseline": 1.01,
-                "ratio_ci": [0.99, 1.02],
-                "drift_ci": [0.98, 1.02],
-                "preview_final_ratio": 1.0,
+                "display_ci": [0.99, 1.02],
             },
             "guard_overhead": {"overhead_ratio": 1.015, "overhead_threshold": 0.02},
         }

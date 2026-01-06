@@ -83,3 +83,32 @@ def test_iter_layers_fallback():
     layers = list(_iter_transformer_layers(f))
     # Fallback yields modules having attn/mlp
     assert layers
+
+
+def test_iter_transformer_layers_handles_iteration_error() -> None:
+    class _BadIterable:
+        def __len__(self) -> int:
+            return 1
+
+        def __iter__(self):
+            raise TypeError("boom")
+
+    class _Model(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.transformer = nn.Module()
+            self.transformer.h = _BadIterable()
+
+    layers = list(_iter_transformer_layers(_Model()))
+    assert layers == []
+
+
+def test_iter_transformer_layers_transformer_h_without_iter_len() -> None:
+    class _Model(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.transformer = nn.Module()
+            self.transformer.h = object()
+
+    layers = list(_iter_transformer_layers(_Model()))
+    assert layers == []

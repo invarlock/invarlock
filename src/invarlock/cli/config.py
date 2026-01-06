@@ -131,14 +131,9 @@ class EvalBootstrapConfig:
 @dataclass
 class SpectralGuardConfig:
     sigma_quantile: float | None = None
-    contraction: float | None = None
     family_caps: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        # contraction is an alias for sigma_quantile
-        if self.contraction is not None and self.sigma_quantile is None:
-            self.sigma_quantile = float(self.contraction)
-            self.contraction = None
         # normalize family_caps: scalar → {"kappa": value}
         caps = {}
         for k, v in (self.family_caps or {}).items():
@@ -244,6 +239,27 @@ def load_config(path: str | Path) -> InvarLockConfig:
         raise ValueError("defaults must be a mapping when present")
     if isinstance(defaults, dict):
         raw = _deep_merge(defaults, raw)
+
+    # "assurance" (strict/fast) was removed in the GPU/MPS-first measurement-contract
+    # world. Fail closed so outdated configs are updated explicitly.
+    if raw.get("assurance") is not None:
+        raise ValueError(
+            "assurance.* is deprecated; configure measurement contracts under guards.* "
+            "(e.g., guards.spectral.estimator, guards.rmt.activation.sampling)."
+        )
+
+    # Per-guard strict/fast mode overrides were also removed. Fail closed to avoid
+    # silently accepting configs that no longer apply.
+    guards_block = raw.get("guards")
+    if isinstance(guards_block, dict):
+        for guard_name in ("spectral", "rmt"):
+            node = guards_block.get(guard_name)
+            if isinstance(node, dict) and "mode" in node:
+                raise ValueError(
+                    f"guards.{guard_name}.mode is deprecated; remove it and configure "
+                    "measurement-contract knobs under guard policy fields instead."
+                )
+
     # Coerce known guard configs for friendlier attribute access
     guards = raw.get("guards")
     if isinstance(guards, dict):

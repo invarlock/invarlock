@@ -92,10 +92,10 @@ class TestScenarioConfig:
 class TestBenchmarkConfig:
     """Test BenchmarkConfig class and its post-init logic."""
 
-    def test_strict_mode_sets_epsilon_zero(self):
-        """Test strict mode sets epsilon to 0."""
+    def test_epsilon_override_preserved(self):
+        """Explicit epsilon override is preserved."""
         config = BenchmarkConfig(
-            edits=["quant_rtn"], tiers=["balanced"], probes=[0], strict=True
+            edits=["quant_rtn"], tiers=["balanced"], probes=[0], epsilon=0.0
         )
         assert config.epsilon == 0.0
 
@@ -257,7 +257,7 @@ class TestMetricsAggregator:
         metrics = MetricsAggregator.extract_core_metrics(report)
         assert metrics["duration_s"] == 1.5
 
-        # Fallback to legacy duration when duration_s is absent
+        # Fallback to duration when duration_s is absent
         report = {"metrics": {}, "meta": {"duration": 2.0}}
         metrics = MetricsAggregator.extract_core_metrics(report)
         assert metrics["duration_s"] == 2.0
@@ -657,15 +657,13 @@ class TestOutputGeneration:
             tiers=["balanced"],
             probes=[0],
             epsilon=0.05,
-            strict=True,
         )
 
         config_dict = _config_to_dict(config)
 
         assert config_dict["edits"] == ["structured"]
-        # strict=True overrides epsilon to 0.0 in post_init
-        assert config_dict["epsilon"] == 0.0
-        assert config_dict["strict"] is True
+        assert config_dict["epsilon"] == pytest.approx(0.05)
+        assert "strict" not in config_dict
 
     def test_summary_to_step14_json_skipped_scenario(self):
         """Test JSON generation with skipped scenario."""

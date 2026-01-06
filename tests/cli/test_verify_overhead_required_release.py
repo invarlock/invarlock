@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 import typer
 
+from invarlock.cli.commands import verify as verify_mod
 from invarlock.cli.commands.verify import verify_command
 
 
@@ -16,6 +17,17 @@ def _write_cert(tmp_path: Path, payload: dict, name: str) -> Path:
 
 
 def _release_ready_cert(*, include_guard_overhead: bool) -> dict:
+    spectral_contract = {
+        "estimator": {"type": "power_iter", "iters": 4, "init": "ones"}
+    }
+    rmt_contract = {
+        "estimator": {"type": "power_iter", "iters": 3, "init": "ones"},
+        "activation_sampling": {
+            "windows": {"count": 8, "indices_policy": "evenly_spaced"}
+        },
+    }
+    spectral_hash = verify_mod._measurement_contract_digest(spectral_contract)
+    rmt_hash = verify_mod._measurement_contract_digest(rmt_contract)
     cert: dict = {
         "schema_version": "v1",
         "run_id": "run-xyz",
@@ -42,6 +54,22 @@ def _release_ready_cert(*, include_guard_overhead: bool) -> dict:
             "final": 10.0,
             "ratio_vs_baseline": 1.0,
             "display_ci": [1.0, 1.0],
+        },
+        "spectral": {
+            "evaluated": True,
+            "measurement_contract": spectral_contract,
+            "measurement_contract_hash": spectral_hash,
+            "measurement_contract_match": True,
+        },
+        "rmt": {
+            "evaluated": True,
+            "measurement_contract": rmt_contract,
+            "measurement_contract_hash": rmt_hash,
+            "measurement_contract_match": True,
+        },
+        "resolved_policy": {
+            "spectral": {"measurement_contract": spectral_contract},
+            "rmt": {"measurement_contract": rmt_contract},
         },
         "baseline_ref": {
             "run_id": "base-xyz",

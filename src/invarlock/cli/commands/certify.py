@@ -185,6 +185,20 @@ def certify_command(
             model_block.pop("device", None)
             preset_data["model"] = model_block
 
+    default_guards_order = ["invariants", "spectral", "rmt", "variance", "invariants"]
+    guards_order = None
+    preset_guards = preset_data.get("guards")
+    if isinstance(preset_guards, dict):
+        preset_order = preset_guards.get("order")
+        if (
+            isinstance(preset_order, list)
+            and preset_order
+            and all(isinstance(item, str) for item in preset_order)
+        ):
+            guards_order = list(preset_order)
+    if guards_order is None:
+        guards_order = list(default_guards_order)
+
     # Create temp baseline config (no-op edit)
     # Normalize possible "hf:" prefixes for HF adapters
     norm_src_id = _normalize_model_id(src_id, eff_adapter)
@@ -199,9 +213,7 @@ def certify_command(
             },
             "edit": {"name": "noop", "plan": {}},
             "eval": {},
-            "guards": {
-                "order": ["invariants", "spectral", "rmt", "variance", "invariants"]
-            },
+            "guards": {"order": guards_order},
             "output": {"dir": str(Path(out) / "source")},
             "context": {"profile": profile, "tier": tier},
         },
@@ -292,15 +304,7 @@ def certify_command(
                 "model": {"id": norm_edt_id, "adapter": eff_adapter},
                 "edit": {"name": "noop", "plan": {}},
                 "eval": {},
-                "guards": {
-                    "order": [
-                        "invariants",
-                        "spectral",
-                        "rmt",
-                        "variance",
-                        "invariants",
-                    ]
-                },
+                "guards": {"order": guards_order},
                 "output": {"dir": str(Path(out) / "edited")},
                 "context": {"profile": profile, "tier": tier},
             },
@@ -325,7 +329,6 @@ def certify_command(
         raise typer.Exit(1)
 
     # CI/Release hard‑abort: fail fast when primary metric is not computable.
-    # Fall back to legacy ppl_* keys when primary_metric block is absent.
     try:
         prof = str(profile or "").strip().lower()
     except Exception:
@@ -368,8 +371,8 @@ def certify_command(
         # Enforce only when a primary_metric block is present
         has_metric_block = isinstance(pm, dict) and bool(pm)
         if has_metric_block:
-            # Treat non‑finite PM as hard error in CI/Release (after legacy fallback).
-            # Require a finite final value; preview is optional for legacy reports.
+            # Treat non‑finite PM as hard error in CI/Release.
+            # Require a finite final value; preview is optional.
             if not _finite(pm_final):
                 err = InvarlockError(
                     code="E111",

@@ -237,6 +237,11 @@ def normalize_run_report(report: Mapping[str, Any] | RunReport) -> RunReport:
         flags=flags,
     )
 
+    # keep context when provided (profile/assurance provenance)
+    ctx = src.get("context")
+    if isinstance(ctx, Mapping):
+        out["context"] = dict(ctx)
+
     # keep evaluation_windows if provided (for deeper pairing-based features)
     ew = src.get("evaluation_windows")
     if isinstance(ew, dict):

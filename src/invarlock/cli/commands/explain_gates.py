@@ -99,10 +99,6 @@ def explain_gates_command(
         pm = cert.get("primary_metric", {})
         ratio = pm.get("ratio_vs_baseline")
         ratio_ci = pm.get("display_ci")
-    elif isinstance(cert.get("ppl"), dict):  # legacy
-        ppl = cert.get("ppl", {})
-        ratio = ppl.get("ratio_vs_baseline")
-        ratio_ci = ppl.get("ratio_ci")
     hysteresis_applied = bool(validation.get("hysteresis_applied"))
     status = "PASS" if bool(validation.get("primary_metric_acceptable")) else "FAIL"
     console.print("[bold]Gate: Primary Metric vs Baseline[/bold]")
@@ -151,10 +147,6 @@ def explain_gates_command(
                     drift = float(final) / float(preview)
             except Exception:
                 drift = None
-    if isinstance(cert.get("ppl"), dict):  # legacy
-        ppl = cert.get("ppl", {})
-        drift = ppl.get("preview_final_ratio", drift)
-        drift_ci = ppl.get("drift_ci")
     drift_status = (
         "PASS" if bool(validation.get("preview_final_drift_acceptable")) else "FAIL"
     )

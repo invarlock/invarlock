@@ -32,9 +32,9 @@ def test_dataset_eval_spectral_variance_configs():
         EvalBootstrapConfig(alpha=0.0)
     # Spectral alias + caps normalization
     s = SpectralGuardConfig(
-        contraction=0.9, family_caps={"attn": 1.2, "mlp": {"kappa": 0.8}}
+        sigma_quantile=0.9, family_caps={"attn": 1.2, "mlp": {"kappa": 0.8}}
     )
-    assert s.sigma_quantile == 0.9 and s.contraction is None
+    assert s.sigma_quantile == 0.9
     assert s.family_caps == {"attn": {"kappa": 1.2}, "mlp": {"kappa": 0.8}}
     # Variance clamp validation and default floor
     with pytest.raises(ValueError):

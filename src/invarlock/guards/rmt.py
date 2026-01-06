@@ -22,7 +22,6 @@ import torch
 import torch.linalg as tla
 import torch.nn as nn
 
-from invarlock.cli._evidence import maybe_dump_guard_evidence
 from invarlock.core.api import Guard
 
 from ._contracts import guard_assert
@@ -278,7 +277,9 @@ def layer_svd_stats(
     return result
 
 
-def capture_baseline_mp_stats(model: nn.Module) -> dict[str, dict[str, float]]:
+def capture_baseline_mp_stats(
+    model: nn.Module, *, allowed_module_names: list[str] | None = None
+) -> dict[str, dict[str, float]]:
     """
     Capture baseline MP statistics for linear layers only.
 
@@ -321,9 +322,14 @@ def capture_baseline_mp_stats(model: nn.Module) -> dict[str, dict[str, float]]:
 
     # Define allowlist for RMT analysis - only linear layers where MP makes sense
     allowed_suffixes = [".attn.c_attn", ".attn.c_proj", ".mlp.c_fc", ".mlp.c_proj"]
+    allowed_set = None
+    if isinstance(allowed_module_names, list) and allowed_module_names:
+        allowed_set = {str(name).strip() for name in allowed_module_names if name}
 
     for name, module in model.named_modules():
         if isinstance(module, module_types) and hasattr(module, "weight"):
+            if allowed_set is not None and name not in allowed_set:
+                continue
             # CRITICAL: Restrict to only linear layers where MP analysis is meaningful
             # Skip embeddings, LM head, layer norms - MP heuristics don't apply there
             if any(name.endswith(suffix) for suffix in allowed_suffixes):
@@ -412,6 +418,7 @@ def rmt_detect(
     correction_factor: float | None = None,
     layer_indices: list[int] | None = None,
     target_layers: list[str] | None = None,  # Alternative layer specification
+    allowed_module_names: list[str] | None = None,  # Exact module allowlist
     verbose: bool = False,
     max_iterations: int = 2,  # Add iteration guard
     baseline_sigmas: dict[str, float]
@@ -431,6 +438,7 @@ def rmt_detect(
         correction_factor: Factor to apply for correction (if not detect_only)
         layer_indices: Specific layers to analyze by index (None = all)
         target_layers: Specific layers to analyze by name (None = all)
+        allowed_module_names: Exact module names to analyze (None = derived default scope)
         verbose: Whether to print warnings and details
         max_iterations: Maximum iterations for correction (default 2)
         baseline_sigmas: Baseline sigmas for baseline-aware checking
@@ -473,9 +481,14 @@ def rmt_detect(
     else:
         # CRITICAL: Only analyze modules where MP analysis makes sense
         # Exclude embeddings, LM head, layer norms - they have different spectral properties
+        allowed_set = None
+        if isinstance(allowed_module_names, list) and allowed_module_names:
+            allowed_set = {str(name).strip() for name in allowed_module_names if name}
         for name, module in model.named_modules():
             # Check if this is an allowed module type with 2D weights
             if any(name.endswith(suffix) for suffix in allowed_suffixes):
+                if allowed_set is not None and name not in allowed_set:
+                    continue
                 has_2d_weights = any(
                     param.ndim == 2 and "weight" in param_name
                     for param_name, param in module.named_parameters(recurse=False)
@@ -1165,7 +1178,17 @@ class RMTGuard(Guard):
         for family_key in ("attn", "ffn", "embed", "other"):
             self.epsilon_by_family.setdefault(family_key, self.epsilon_default)
 
-        # Internal state
+        # Measurement contract knobs (vNext)
+        self.estimator: dict[str, Any] = {
+            "type": "power_iter",
+            "iters": 3,
+            "init": "ones",
+        }
+        self.activation_sampling: dict[str, Any] = {
+            "windows": {"count": 8, "indices_policy": "evenly_spaced"}
+        }
+
+        # Internal state (activation edge-risk scoring)
         self._calibration_batches: list[Any] = []
         self._activation_ready = False
         self._require_activation = False
@@ -1173,8 +1196,6 @@ class RMTGuard(Guard):
         self._activation_required_reason: str | None = None
         self._run_profile: str | None = None
         self._run_tier: str | None = None
-        self.baseline_mp_stats: dict[str, dict[str, float]] | None = None
-        self.baseline_sigmas: dict[str, float] | None = None
         self.prepared = False
         self.events: list[dict[str, Any]] = []
         self._last_result: dict[str, Any] | None = None
@@ -1187,10 +1208,10 @@ class RMTGuard(Guard):
             ".mlp.c_fc",
             ".mlp.c_proj",
         ]
-        self.baseline_outliers_per_family: dict[str, int] = {}
-        self.baseline_total_outliers: int = 0
-        self.outliers_per_family: dict[str, int] = {}
-        self.outliers_total: int = 0
+        self.baseline_edge_risk_by_family: dict[str, float] = {}
+        self.baseline_edge_risk_by_module: dict[str, float] = {}
+        self.edge_risk_by_family: dict[str, float] = {}
+        self.edge_risk_by_module: dict[str, float] = {}
         self.epsilon_violations: list[dict[str, Any]] = []
 
     def _log_event(
@@ -1219,9 +1240,7 @@ class RMTGuard(Guard):
                 tier = str(auto.get("tier", tier) or tier).strip().lower()
         self._run_profile = profile or None
         self._run_tier = tier or None
-        self._require_activation = bool(
-            profile in {"ci", "release"} and tier in {"balanced", "conservative"}
-        )
+        self._require_activation = bool(profile in {"ci", "release"})
 
     def _set_epsilon(self, epsilon: float | dict[str, float] | None) -> None:
         """Configure epsilon defaults and per-family overrides."""
@@ -1243,21 +1262,20 @@ class RMTGuard(Guard):
 
     @staticmethod
     def _classify_family(module_name: str) -> str:
-        """Classify module name into a guard family."""
+        """Classify module name into a guard family (vNext: {attn, ffn, embed, other})."""
         lower = module_name.lower()
-        # MoE
+        if any(tok in lower for tok in ("attn", "attention", "self_attn")):
+            return "attn"
         if any(
             tok in lower
             for tok in ("router", "routing", "gate", "gating", "dispatch", "switch")
         ):
-            return "router"
+            return "ffn"
         if any(
             tok in lower for tok in ("experts", "expert", "moe", "mixture_of_experts")
         ):
-            return "expert_ffn"
-        if ".attn." in lower or "attention" in lower:
-            return "attn"
-        if ".mlp." in lower or "ffn" in lower or ".c_fc" in lower:
+            return "ffn"
+        if any(tok in lower for tok in ("mlp", "ffn", "c_fc", "feed_forward")):
             return "ffn"
         if "embed" in lower or "wte" in lower or "wpe" in lower:
             return "embed"
@@ -1287,24 +1305,28 @@ class RMTGuard(Guard):
         return counts
 
     def _compute_epsilon_violations(self) -> list[dict[str, Any]]:
-        """Compute epsilon-rule violations per family."""
+        """Compute ε-band violations per family on activation edge-risk scores."""
         violations: list[dict[str, Any]] = []
-        families = set(self.outliers_per_family) | set(
-            self.baseline_outliers_per_family
+        families = set(self.edge_risk_by_family) | set(
+            self.baseline_edge_risk_by_family
         )
         for family in families:
-            bare = int(self.baseline_outliers_per_family.get(family, 0) or 0)
-            guarded = int(self.outliers_per_family.get(family, 0) or 0)
+            base = float(self.baseline_edge_risk_by_family.get(family, 0.0) or 0.0)
+            cur = float(self.edge_risk_by_family.get(family, 0.0) or 0.0)
+            if base <= 0.0:
+                continue
             epsilon_val = float(
                 self.epsilon_by_family.get(family, self.epsilon_default)
             )
-            allowed = math.ceil(bare * (1 + epsilon_val))
-            if guarded > allowed:
+            allowed = (1.0 + epsilon_val) * base
+            if cur > allowed:
+                delta = (cur / base) - 1.0 if base > 0 else float("inf")
                 violations.append(
                     {
                         "family": family,
-                        "bare": bare,
-                        "guarded": guarded,
+                        "edge_base": base,
+                        "edge_cur": cur,
+                        "delta": float(delta),
                         "allowed": allowed,
                         "epsilon": epsilon_val,
                     }
@@ -1321,8 +1343,6 @@ class RMTGuard(Guard):
         Returns:
             List of (name, module) tuples for linear layers in scope
         """
-        modules = []
-
         # Get module types
         try:
             from transformers.pytorch_utils import Conv1D
@@ -1338,20 +1358,61 @@ class RMTGuard(Guard):
             )
             module_types = module_types_without_conv1d_2
 
-        modules: list[tuple[str, nn.Module]] = []
+        candidates: list[tuple[str, nn.Module]] = []
         for name, module in model.named_modules():
-            if isinstance(module, module_types) and hasattr(module, "weight"):
-                # Strict scope enforcement - only allowed linear layers
-                if any(name.endswith(suffix) for suffix in self.allowed_suffixes):
-                    modules.append((name, module))
-
-        return modules
+            if not (isinstance(module, module_types) and hasattr(module, "weight")):
+                continue
+            # Strict scope enforcement - only allowed linear layers
+            if any(name.endswith(suffix) for suffix in self.allowed_suffixes):
+                candidates.append((name, module))
+        candidates.sort(key=lambda t: t[0])
+        return candidates
 
     def _collect_calibration_batches(self, calib: Any, max_windows: int) -> list[Any]:
         """Collect a deterministic slice of calibration batches."""
         if calib is None or max_windows <= 0:
             return []
         source = getattr(calib, "dataloader", None) or calib
+        # Prefer index-based selection when possible so we can support simple
+        # deterministic policies (first/last/evenly_spaced) without consuming
+        # the entire iterator.
+        try:
+            if hasattr(source, "__len__") and hasattr(source, "__getitem__"):
+                n = int(len(source))  # type: ignore[arg-type]
+                if n <= 0:
+                    return []
+                count = min(int(max_windows), n)
+                policy = (
+                    (self.activation_sampling.get("windows") or {}).get(
+                        "indices_policy", "evenly_spaced"
+                    )
+                    if isinstance(self.activation_sampling, dict)
+                    else "evenly_spaced"
+                )
+                policy = str(policy or "evenly_spaced").strip().lower()
+                if policy == "last":
+                    idxs = list(range(max(0, n - count), n))
+                elif policy == "evenly_spaced":
+                    if count <= 1:
+                        idxs = [0]
+                    else:
+                        idxs = [
+                            int(round(i * (n - 1) / float(count - 1)))
+                            for i in range(count)
+                        ]
+                else:
+                    idxs = list(range(count))
+                batches: list[Any] = []
+                for idx in idxs:
+                    try:
+                        batches.append(source[idx])  # type: ignore[index]
+                    except Exception:
+                        continue
+                return batches
+        except Exception:
+            pass
+
+        # Iterable fallback: first-N only.
         try:
             iterator = iter(source)
         except TypeError:
@@ -1459,7 +1520,209 @@ class RMTGuard(Guard):
                 ):
                     modules.append((name, module))
 
+        modules.sort(key=lambda t: t[0])
         return modules
+
+    def _activation_edge_risk(
+        self, activations: Any
+    ) -> tuple[float, float, float] | None:
+        """Compute activation edge-risk score r = σ̂max(A') / σ_MP(m,n).
+
+        A' is a centered + standardised view of the activation matrix. The σ̂max
+        estimator is matvec-based and avoids full SVD.
+        """
+        if isinstance(activations, tuple | list):
+            activations = activations[0] if activations else None
+        if not isinstance(activations, torch.Tensor):
+            return None
+        if activations.dim() < 2:
+            return None
+        if activations.dim() > 2:
+            activations = activations.reshape(-1, activations.shape[-1])
+        if activations.numel() == 0:
+            return None
+
+        mat = activations.detach()
+        if mat.shape[0] <= 0 or mat.shape[1] <= 0:
+            return None
+        if not torch.isfinite(mat).all():
+            return None
+
+        eps = 1e-12
+        try:
+            mu = mat.mean(dtype=torch.float32)
+            norm = torch.linalg.vector_norm(mat.reshape(-1), ord=2, dtype=torch.float32)
+            mean_sq = (norm * norm) / float(mat.numel())
+            var = mean_sq - (mu * mu)
+            std = torch.sqrt(var.clamp_min(eps))
+        except Exception:
+            return None
+        if not torch.isfinite(mu) or not torch.isfinite(std):
+            return None
+        std_val = float(std.item())
+        if not math.isfinite(std_val) or std_val <= 0.0:
+            return None
+
+        m, n = int(mat.shape[0]), int(mat.shape[1])
+        mp_edge_val = mp_bulk_edge(m, n, whitened=False)
+        if not (math.isfinite(mp_edge_val) and mp_edge_val > 0.0):
+            return None
+
+        try:
+            iters = int((self.estimator or {}).get("iters", 3) or 3)
+        except Exception:
+            iters = 3
+        if iters < 1:
+            iters = 1
+        init = str((self.estimator or {}).get("init", "ones") or "ones").strip().lower()
+        if init not in {"ones", "e0"}:
+            init = "ones"
+
+        device = mat.device
+        dtype = mat.dtype
+
+        with torch.no_grad():
+            if init == "ones":
+                v = torch.ones((n,), device=device, dtype=dtype)
+            else:
+                v = torch.zeros((n,), device=device, dtype=dtype)
+                v[0] = 1
+            v = v / torch.linalg.vector_norm(v.float()).clamp_min(eps).to(dtype)
+
+            mu_d = mu.to(dtype)
+            inv_std_d = (1.0 / std.clamp_min(eps)).to(dtype)
+            ones_n = torch.ones((n,), device=device, dtype=dtype)
+
+            sigma = 0.0
+            for _ in range(iters):
+                v_sum = torch.sum(v.float())
+                u = mat @ v
+                u = (u - (mu_d * v_sum.to(dtype))) * inv_std_d
+                u_norm = torch.linalg.vector_norm(u.float()).clamp_min(eps)
+                sigma_val = float(u_norm.item())
+                if not math.isfinite(sigma_val):
+                    return None
+                u = u / u_norm.to(dtype)
+
+                u_sum = torch.sum(u.float())
+                v = mat.T @ u
+                v = (v - (mu_d * u_sum.to(dtype) * ones_n)) * inv_std_d
+                v_norm = torch.linalg.vector_norm(v.float()).clamp_min(eps)
+                v = v / v_norm.to(dtype)
+                sigma = sigma_val
+
+        risk = float(sigma) / max(float(mp_edge_val), eps)
+        return float(risk), float(sigma), float(mp_edge_val)
+
+    def _compute_activation_edge_risk(
+        self, model: nn.Module, batches: list[Any]
+    ) -> dict[str, Any] | None:
+        """Compute token-weighted activation edge-risk scores per module/family."""
+        if not batches:
+            return None
+
+        modules = self._get_activation_modules(model)
+        if not modules:
+            return None
+
+        acc: dict[str, dict[str, float]] = {}
+        for name, _module in modules:
+            acc[name] = {"weighted_sum": 0.0, "weight": 0.0, "max_risk": 0.0}
+
+        batch_weight_holder = {"weight": 1}
+        handles: list[Any] = []
+
+        def _make_hook(name: str):
+            def _hook(_module: nn.Module, _inputs: tuple[Any, ...], output: Any):
+                out = self._activation_edge_risk(output)
+                if out is None:
+                    return
+                risk, _sigma, _edge = out
+                try:
+                    weight = int(batch_weight_holder.get("weight", 1) or 1)
+                except Exception:
+                    weight = 1
+                row = acc.get(name)
+                if row is None:
+                    return
+                row["weighted_sum"] = float(row.get("weighted_sum", 0.0)) + float(
+                    risk
+                ) * float(weight)
+                row["weight"] = float(row.get("weight", 0.0)) + float(weight)
+                row["max_risk"] = max(float(row.get("max_risk", 0.0)), float(risk))
+
+            return _hook
+
+        for name, module in modules:
+            try:
+                handles.append(module.register_forward_hook(_make_hook(name)))
+            except Exception:
+                continue
+
+        model_was_training = model.training
+        model.eval()
+        device = next(model.parameters()).device
+        batches_used = 0
+        token_weight_total = 0
+
+        try:
+            with torch.no_grad():
+                for batch in batches:
+                    inputs, attention_mask = self._prepare_activation_inputs(
+                        batch, device
+                    )
+                    if inputs is None:
+                        continue
+                    batch_weight = self._batch_token_weight(inputs, attention_mask)
+                    batch_weight_holder["weight"] = batch_weight
+                    try:
+                        if attention_mask is not None:
+                            model(inputs, attention_mask=attention_mask)
+                        else:
+                            model(inputs)
+                    except TypeError:
+                        model(inputs)
+                    batches_used += 1
+                    token_weight_total += batch_weight
+        finally:
+            for handle in handles:
+                try:
+                    handle.remove()
+                except Exception:
+                    pass
+            if model_was_training:
+                model.train()
+
+        if batches_used <= 0:
+            return None
+
+        edge_risk_by_module: dict[str, float] = {}
+        for name, row in acc.items():
+            w = float(row.get("weight", 0.0) or 0.0)
+            if w <= 0.0:
+                continue
+            edge_risk_by_module[name] = float(row.get("weighted_sum", 0.0) or 0.0) / w
+
+        if not edge_risk_by_module:
+            return None
+
+        edge_risk_by_family: dict[str, float] = {}
+        for name, risk in edge_risk_by_module.items():
+            family = self._classify_family(name)
+            edge_risk_by_family[family] = max(
+                float(edge_risk_by_family.get(family, 0.0)), float(risk)
+            )
+
+        for family_key in ("attn", "ffn", "embed", "other"):
+            edge_risk_by_family.setdefault(family_key, 0.0)
+
+        return {
+            "analysis_source": "activations_edge_risk",
+            "edge_risk_by_module": edge_risk_by_module,
+            "edge_risk_by_family": edge_risk_by_family,
+            "token_weight_total": int(token_weight_total),
+            "batches_used": int(batches_used),
+        }
 
     def _activation_svd_outliers(
         self, activations: Any, margin: float, deadband: float
@@ -1780,33 +2043,36 @@ class RMTGuard(Guard):
         calib=None,
         policy: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """
-        Prepare RMT guard by capturing baseline MP statistics.
-
-        Args:
-            model: The model that will be edited
-            adapter: ModelAdapter (optional, for tying map access)
-            calib: Calibration data for activation-based outlier counting
-            policy: Guard policy parameters (optional)
-
-        Returns:
-            Dictionary with preparation results and baseline metrics
-        """
+        """Prepare RMT guard by capturing baseline activation edge-risk scores."""
         import time
 
         start_time = time.time()
         self._activation_required_failed = False
         self._activation_required_reason = None
 
-        # Store adapter for tying map access during correction
+        # Store adapter for tying map access (if used by downstream code)
         self.adapter = adapter
 
-        # Update parameters from policy if provided
-        if policy:
-            self.q = policy.get("q", self.q)
-            self.deadband = policy.get("deadband", self.deadband)
-            self.margin = policy.get("margin", self.margin)
-            self.correct = policy.get("correct", self.correct)
+        # Policy overrides (vNext contract)
+        if isinstance(policy, dict) and policy:
+            if "q" in policy:
+                q_val = policy.get("q")
+                if q_val == "auto":
+                    self.q = "auto"
+                else:
+                    try:
+                        self.q = float(q_val)
+                    except (TypeError, ValueError):
+                        self.q = "auto"
+            if "deadband" in policy:
+                self.deadband = float(policy.get("deadband", self.deadband))
+            if "margin" in policy:
+                try:
+                    self.margin = float(policy.get("margin", self.margin))
+                except (TypeError, ValueError):
+                    pass
+            if "correct" in policy:
+                self.correct = bool(policy.get("correct"))
             if "epsilon" in policy:
                 self._set_epsilon(policy["epsilon"])
             if "epsilon_by_family" in policy:
@@ -1814,116 +2080,125 @@ class RMTGuard(Guard):
             if "activation_required" in policy:
                 self._require_activation = bool(policy.get("activation_required"))
 
+            estimator_policy = policy.get("estimator")
+            if isinstance(estimator_policy, dict):
+                try:
+                    iters = int(estimator_policy.get("iters", 3) or 3)
+                except Exception:
+                    iters = 3
+                if iters < 1:
+                    iters = 1
+                init = (
+                    str(estimator_policy.get("init", "ones") or "ones").strip().lower()
+                )
+                if init not in {"ones", "e0"}:
+                    init = "ones"
+                self.estimator = {"type": "power_iter", "iters": iters, "init": init}
+
+            activation_policy = policy.get("activation")
+            if isinstance(activation_policy, dict):
+                sampling = activation_policy.get("sampling")
+                if isinstance(sampling, dict):
+                    windows = sampling.get("windows")
+                    if isinstance(windows, dict):
+                        cfg = dict(self.activation_sampling.get("windows") or {})
+                        if windows.get("count") is not None:
+                            try:
+                                cfg["count"] = int(windows.get("count") or 0)
+                            except Exception:
+                                pass
+                        if windows.get("indices_policy") is not None:
+                            cfg["indices_policy"] = str(
+                                windows.get("indices_policy")
+                                or cfg.get("indices_policy")
+                            )
+                        self.activation_sampling["windows"] = cfg
+
         self._log_event(
             "prepare",
-            message=f"Preparing RMT guard with q={self.q}, deadband={self.deadband}, margin={self.margin}, correct={self.correct}",
+            message="Preparing RMT guard baseline activation edge-risk metrics",
         )
 
         try:
-            # Capture baseline MP statistics for linear layers
-            self.baseline_mp_stats = capture_baseline_mp_stats(model)
+            windows_cfg = self.activation_sampling.get("windows") or {}
+            try:
+                window_count = int(windows_cfg.get("count", 0) or 0)
+            except Exception:
+                window_count = 0
+            self._calibration_batches = (
+                self._collect_calibration_batches(calib, window_count)
+                if calib is not None and window_count > 0
+                else []
+            )
 
-            # Extract baseline sigmas for compatibility with existing detection
-            self.baseline_sigmas = {}
-            for name, stats in self.baseline_mp_stats.items():
-                self.baseline_sigmas[name] = stats.get("sigma_base", 0.0)
+            self.baseline_edge_risk_by_family = {}
+            self.baseline_edge_risk_by_module = {}
+            self.edge_risk_by_family = {}
+            self.edge_risk_by_module = {}
+            self.epsilon_violations = []
 
-            # Get linear modules in scope
-            linear_modules = self._get_linear_modules(model)
-            self._activation_ready = False
-            self._calibration_batches = []
-            max_windows = 0
-            if calib is not None:
-                source = getattr(calib, "dataloader", None) or calib
-                if hasattr(source, "__len__"):
-                    try:
-                        max_windows = int(len(source))
-                    except Exception:
-                        max_windows = 0
-                self._calibration_batches = self._collect_calibration_batches(
-                    calib, max_windows
-                )
+            if self._require_activation and not self._calibration_batches:
+                self._activation_required_failed = True
+                self._activation_required_reason = "activation_required"
+                self._activation_ready = False
+                self.prepared = False
+                return {
+                    "ready": False,
+                    "baseline_metrics": {},
+                    "policy_applied": policy or {},
+                    "preparation_time": time.time() - start_time,
+                    "error": "Activation batches required but unavailable",
+                }
 
-            activation_baseline = None
-            if self._calibration_batches:
-                activation_baseline = self._compute_activation_outliers(
-                    model, self._calibration_batches
-                )
-
-            if activation_baseline:
-                self._activation_ready = True
-                self.baseline_total_outliers = int(
-                    activation_baseline.get("outlier_count", 0) or 0
-                )
-                self.baseline_outliers_per_family = self._count_outliers_per_family(
-                    activation_baseline.get("per_layer", [])
-                )
-            else:
+            baseline = (
+                self._compute_activation_edge_risk(model, self._calibration_batches)
+                if self._calibration_batches
+                else None
+            )
+            if baseline is None:
                 if self._require_activation:
                     self._activation_required_failed = True
                     self._activation_required_reason = "activation_baseline_unavailable"
-                    self._log_event(
-                        "activation_required_missing",
-                        level="ERROR",
-                        message="Activation baseline unavailable for RMT",
-                        profile=self._run_profile,
-                        tier=self._run_tier,
-                    )
-                baseline_detection = rmt_detect(
-                    model=model,
-                    threshold=self.margin,
-                    detect_only=True,
-                    baseline_sigmas=self.baseline_sigmas,
-                    baseline_mp_stats=self.baseline_mp_stats,
-                    deadband=self.deadband,
-                )
-                self.baseline_total_outliers = baseline_detection.get(
-                    "n_layers_flagged", 0
-                )
-                self.baseline_outliers_per_family = self._count_outliers_per_family(
-                    baseline_detection.get("per_layer", [])
-                )
-            for family_key in ("attn", "ffn", "embed", "other"):
-                self.baseline_outliers_per_family.setdefault(family_key, 0)
-            self.outliers_per_family = {}
-            self.outliers_total = 0
-            self.epsilon_violations = []
+                    self._activation_ready = False
+                    self.prepared = False
+                    return {
+                        "ready": False,
+                        "baseline_metrics": {},
+                        "policy_applied": policy or {},
+                        "preparation_time": time.time() - start_time,
+                        "error": "Activation baseline unavailable",
+                    }
+                # Non-required: treat as not ready and allow pipeline to continue.
+                self._activation_ready = False
+                self.prepared = True
+                return {
+                    "ready": True,
+                    "baseline_metrics": {},
+                    "policy_applied": policy or {},
+                    "preparation_time": time.time() - start_time,
+                }
 
-            self.prepared = True
-            preparation_time = time.time() - start_time
-
-            self._log_event(
-                "prepare_success",
-                message=f"Captured {len(self.baseline_mp_stats)} baseline MP statistics",
-                baseline_count=len(self.baseline_mp_stats),
-                linear_modules_count=len(linear_modules),
-                preparation_time=preparation_time,
+            self.baseline_edge_risk_by_module = dict(
+                baseline.get("edge_risk_by_module") or {}
             )
+            self.baseline_edge_risk_by_family = dict(
+                baseline.get("edge_risk_by_family") or {}
+            )
+            self._activation_ready = True
+            self.prepared = True
 
+            preparation_time = time.time() - start_time
             return {
-                "baseline_metrics": {
-                    "mp_stats_sample": dict(list(self.baseline_mp_stats.items())[:3]),
-                    "total_layers": len(self.baseline_mp_stats),
-                    "linear_modules_in_scope": len(linear_modules),
-                    "scope_suffixes": self.allowed_suffixes,
-                    "average_baseline_sigma": np.mean(
-                        list(self.baseline_sigmas.values())
-                    ),
-                    "max_baseline_sigma": max(self.baseline_sigmas.values())
-                    if self.baseline_sigmas
-                    else 0.0,
-                    "min_baseline_sigma": min(self.baseline_sigmas.values())
-                    if self.baseline_sigmas
-                    else 0.0,
-                },
-                "policy_applied": {
-                    "q": self.q,
-                    "deadband": self.deadband,
-                    "margin": self.margin,
-                    "correct": self.correct,
-                },
-                "preparation_time": preparation_time,
                 "ready": True,
+                "baseline_metrics": {
+                    "edge_risk_by_family": dict(self.baseline_edge_risk_by_family),
+                    "measurement_contract": {
+                        "estimator": self.estimator,
+                        "activation_sampling": self.activation_sampling,
+                    },
+                },
+                "policy_applied": policy or {},
+                "preparation_time": preparation_time,
             }
 
         except Exception as e:
@@ -1957,12 +2232,7 @@ class RMTGuard(Guard):
             )
 
     def after_edit(self, model: nn.Module) -> None:
-        """
-        Execute after edit - perform RMT detection and optional correction.
-
-        Args:
-            model: The model that was just edited
-        """
+        """Execute after edit: compute activation edge-risk on sampled batches."""
         if not self.prepared:
             self._log_event(
                 "after_edit_skipped",
@@ -1971,136 +2241,39 @@ class RMTGuard(Guard):
             )
             return
 
-        self._log_event("after_edit", message="Applying RMT detection and correction")
-
         try:
-            detection_result: dict[str, Any] | None = None
-            corrected_layers = 0
-            correction_iterations = 0
-            use_activation = bool(self._activation_ready and self._calibration_batches)
-
-            if self._require_activation and not use_activation:
+            if self._require_activation and not self._calibration_batches:
                 self._activation_required_failed = True
                 self._activation_required_reason = "activation_unavailable"
                 self._last_result = {
-                    "has_outliers": False,
-                    "n_layers_flagged": 0,
-                    "per_layer": [],
-                    "max_ratio": 0.0,
-                    "analysis_source": "activations",
+                    "analysis_source": "activations_edge_risk",
+                    "edge_risk_by_module": {},
+                    "edge_risk_by_family": {},
                 }
-                self._log_event(
-                    "activation_required_missing",
-                    level="ERROR",
-                    message="Activation outlier analysis required but unavailable",
-                    profile=self._run_profile,
-                    tier=self._run_tier,
-                )
                 return
 
-            if use_activation:
-                if self.correct:
-                    correction_result = self._apply_rmt_detection_and_correction(model)
-                    correction_iterations = int(
-                        correction_result.get("correction_iterations", 0) or 0
-                    )
-                    corrected_layers = int(
-                        correction_result.get("corrected_layers", 0) or 0
-                    )
-                detection_result = self._compute_activation_outliers(
-                    model, self._calibration_batches
-                )
-                if not detection_result:
-                    if self._require_activation:
-                        self._activation_required_failed = True
-                        self._activation_required_reason = (
-                            "activation_outliers_unavailable"
-                        )
-                        self._last_result = {
-                            "has_outliers": False,
-                            "n_layers_flagged": 0,
-                            "per_layer": [],
-                            "max_ratio": 0.0,
-                            "analysis_source": "activations",
-                        }
-                        self._log_event(
-                            "activation_required_missing",
-                            level="ERROR",
-                            message="Activation outlier analysis failed",
-                            profile=self._run_profile,
-                            tier=self._run_tier,
-                        )
-                        return
-                    use_activation = False
-
-            if not use_activation:
-                if self.correct:
-                    # Apply correction using enhanced logic with adapter support
-                    detection_result = self._apply_rmt_detection_and_correction(model)
-                else:
-                    # Detection only
-                    detection_result = rmt_detect(
-                        model=model,
-                        threshold=self.margin,  # Use margin as threshold
-                        detect_only=True,
-                        verbose=False,
-                        baseline_sigmas=self.baseline_sigmas,
-                        baseline_mp_stats=self.baseline_mp_stats,
-                        deadband=self.deadband,
-                    )
-
-            if detection_result is None:
-                raise RuntimeError("RMT detection failed to produce results")
-
-            if use_activation:
-                detection_result["correction_iterations"] = correction_iterations
-                detection_result["corrected_layers"] = corrected_layers
-
-            # Store results
-            self._last_result = detection_result
-            self.outliers_per_family = self._count_outliers_per_family(
-                detection_result.get("per_layer", [])
+            current = (
+                self._compute_activation_edge_risk(model, self._calibration_batches)
+                if self._calibration_batches
+                else None
             )
-            for family_key in ("attn", "ffn", "embed", "other"):
-                self.outliers_per_family.setdefault(family_key, 0)
-            outlier_total = detection_result.get("outlier_count")
-            if outlier_total is None:
-                outlier_total = detection_result.get(
-                    "n_layers_flagged", len(self.outliers_per_family)
-                )
-            self.outliers_total = int(outlier_total or 0)
+            if current is None:
+                if self._require_activation:
+                    self._activation_required_failed = True
+                    self._activation_required_reason = (
+                        "activation_edge_risk_unavailable"
+                    )
+                self._last_result = {
+                    "analysis_source": "activations_edge_risk",
+                    "edge_risk_by_module": {},
+                    "edge_risk_by_family": {},
+                }
+                return
+
+            self.edge_risk_by_module = dict(current.get("edge_risk_by_module") or {})
+            self.edge_risk_by_family = dict(current.get("edge_risk_by_family") or {})
+            self._last_result = dict(current)
             self.epsilon_violations = self._compute_epsilon_violations()
-
-            flagged_layers = detection_result.get("n_layers_flagged", 0)
-            corrected_layers = detection_result.get("correction_iterations", 0)
-
-            self._log_event(
-                "rmt_detection_complete",
-                message=f"Detected {flagged_layers} outlier layers, correction enabled: {self.correct}",
-                layers_flagged=flagged_layers,
-                correction_iterations=corrected_layers,
-                has_outliers=detection_result.get("has_outliers", False),
-                max_ratio=detection_result.get("max_ratio", 0.0),
-            )
-
-            # Log individual layer results
-            for layer_info in detection_result.get("per_layer", []):
-                if layer_info.get("has_outlier", False):
-                    self._log_event(
-                        "outlier_detected",
-                        message=f"Outlier detected in {layer_info.get('module_name', 'unknown')}",
-                        layer_name=layer_info.get("module_name"),
-                        ratio=layer_info.get("worst_ratio", 0.0),
-                        sigma_max=layer_info.get("sigma_max", 0.0),
-                        corrected=self.correct,
-                    )
-                elif layer_info.get("skip_reason"):
-                    self._log_event(
-                        "layer_skipped",
-                        message=f"Layer {layer_info.get('module_name', 'unknown')} skipped: {layer_info.get('skip_reason')}",
-                        layer_name=layer_info.get("module_name"),
-                        skip_reason=layer_info.get("skip_reason"),
-                    )
 
         except Exception as e:
             self._log_event(
@@ -2109,15 +2282,11 @@ class RMTGuard(Guard):
                 message=f"RMT detection failed: {str(e)}",
                 error=str(e),
             )
-            # Store empty result for finalize
             self._last_result = {
-                "has_outliers": False,
-                "n_layers_flagged": 0,
-                "per_layer": [],
-                "max_ratio": 0.0,
+                "analysis_source": "activations_edge_risk",
+                "edge_risk_by_module": {},
+                "edge_risk_by_family": {},
             }
-            self.outliers_per_family = {}
-            self.outliers_total = 0
             self.epsilon_violations = []
 
     def validate(
@@ -2163,27 +2332,13 @@ class RMTGuard(Guard):
             }
 
     def finalize(self, model: nn.Module, adapter=None) -> GuardOutcome | dict[str, Any]:
-        """
-        Finalize RMT guard and return comprehensive results.
-
-        Args:
-            model: The final edited model
-            adapter: Optional adapter for tying map access
-
-        Returns:
-            GuardOutcome or dict with RMT detection and correction results
-        """
+        """Finalize RMT guard and return activation edge-risk ε-band outcome."""
         import time
 
         start_time = time.time()
+        _ = adapter
 
         if not self.prepared:
-            self._log_event(
-                "finalize_failed",
-                level="ERROR",
-                message="RMT guard not properly prepared",
-            )
-
             if HAS_GUARD_OUTCOME:
                 return GuardOutcome(
                     name=self.name,
@@ -2202,35 +2357,28 @@ class RMTGuard(Guard):
                         "finalize_time": time.time() - start_time,
                     },
                 )
-            else:
-                return {
-                    "passed": False,
-                    "metrics": {
-                        "prepared": False,
-                        "finalize_time": time.time() - start_time,
-                    },
-                    "warnings": ["RMT guard not properly prepared"],
-                    "errors": ["Preparation failed or baseline MP stats not captured"],
-                    "events": self.events,
-                }
+            return {
+                "passed": False,
+                "metrics": {
+                    "prepared": False,
+                    "finalize_time": time.time() - start_time,
+                },
+                "errors": ["RMT guard not properly prepared"],
+            }
 
-        # Get results from after_edit
-        if self._require_activation and (
-            self._activation_required_failed or not self._activation_ready
-        ):
+        if self._require_activation and self._activation_required_failed:
             reason = self._activation_required_reason or "activation_required"
-            message = "Activation outlier analysis required but unavailable"
             finalize_time = time.time() - start_time
             if HAS_GUARD_OUTCOME:
                 return GuardOutcome(
                     name=self.name,
                     passed=False,
-                    action="rollback",
+                    action="abort",
                     violations=[
                         {
                             "type": "activation_required",
                             "severity": "error",
-                            "message": message,
+                            "message": "Activation edge-risk analysis required but unavailable",
                             "module_name": None,
                             "reason": reason,
                         }
@@ -2252,218 +2400,74 @@ class RMTGuard(Guard):
                     "activation_reason": reason,
                     "finalize_time": finalize_time,
                 },
-                "warnings": [],
-                "errors": [message],
-                "violations": [],
-                "events": self.events,
+                "errors": ["Activation edge-risk analysis required but unavailable"],
             }
 
-        result = self._last_result or {
-            "has_outliers": False,
-            "n_layers_flagged": 0,
-            "per_layer": [],
-            "max_ratio": 0.0,
-        }
-
-        if result and not self.outliers_per_family:
-            self.outliers_per_family = self._count_outliers_per_family(
-                result.get("per_layer", [])
+        if not self.edge_risk_by_family and self._calibration_batches:
+            current = self._compute_activation_edge_risk(
+                model, self._calibration_batches
             )
-        for family_key in ("attn", "ffn", "embed", "other"):
-            self.outliers_per_family.setdefault(family_key, 0)
-            self.baseline_outliers_per_family.setdefault(family_key, 0)
-        outlier_total = result.get("outlier_count")
-        if outlier_total is None:
-            outlier_total = result.get("n_layers_flagged", self.outliers_total or 0)
-        self.outliers_total = int(outlier_total or 0)
+            if current is not None:
+                self.edge_risk_by_family = dict(
+                    current.get("edge_risk_by_family") or {}
+                )
+                self.edge_risk_by_module = dict(
+                    current.get("edge_risk_by_module") or {}
+                )
+                self._last_result = dict(current)
+
         self.epsilon_violations = self._compute_epsilon_violations()
-        # Contracts: epsilon non-negative, counts non-negative
         for fam, eps in self.epsilon_by_family.items():
             guard_assert(eps >= 0.0, f"rmt.epsilon[{fam}] must be >= 0")
-        for fam in set(self.outliers_per_family) | set(
-            self.baseline_outliers_per_family
-        ):
-            guard_assert(
-                self.outliers_per_family.get(fam, 0) >= 0,
-                "rmt.outliers_per_family negative",
-            )
-            guard_assert(
-                self.baseline_outliers_per_family.get(fam, 0) >= 0,
-                "rmt.baseline_outliers negative",
-            )
 
-        # Calculate metrics
-        flagged_layers = result.get("n_layers_flagged", 0)
-        total_layers = (
-            len(result.get("per_layer", []))
-            if result.get("per_layer")
-            else len(self.baseline_mp_stats)
-            if self.baseline_mp_stats
-            else 0
-        )
-        flagged_rate = flagged_layers / total_layers if total_layers > 0 else 0.0
-
-        # Acceptance gate: pass when epsilon-rule holds per family.
-        passed = not bool(self.epsilon_violations)
-
-        # Generate violations for GuardOutcome
-        violations = []
-        warnings = []
-        errors = []
-
-        # Create violations for each flagged layer
-        for layer_info in result.get("per_layer", []):
-            if layer_info.get("has_outlier", False):
-                violations.append(
-                    {
-                        "type": "rmt_outlier",
-                        "severity": "warning" if self.correct else "error",
-                        "message": f"RMT outlier detected: ratio={layer_info.get('worst_ratio', 0.0):.2f}",
-                        "module_name": layer_info.get("module_name"),
-                        "ratio": layer_info.get("worst_ratio", 0.0),
-                        "threshold": (1.0 + self.deadband) * self.margin,
-                        "corrected": self.correct,
-                    }
-                )
-
-        if flagged_rate > 0.3:  # Warning threshold at 30%
-            warnings.append(
-                f"High RMT outlier rate: {flagged_layers}/{total_layers} layers flagged ({flagged_rate:.1%})"
-            )
-
-        if flagged_rate > 0.7:  # Escalate to warning for unusually high rates
-            warnings.append(
-                f"Excessive RMT outliers: {flagged_layers}/{total_layers} layers flagged"
-            )
-
-        if self.epsilon_violations:
-            passed = False
-            for failure in self.epsilon_violations:
-                errors.append(
-                    "RMT ε-rule violation: "
-                    f"{failure['family']} bare={failure['bare']} "
-                    f"guarded={failure['guarded']} allowed={failure['allowed']} "
-                    f"(ε={failure['epsilon']:.3f})"
-                )
-
+        stable = not self.epsilon_violations
+        action = "continue" if stable else "abort"
         finalize_time = time.time() - start_time
 
-        # Final metrics
-        final_metrics = {
-            "layers_flagged": flagged_layers,
-            "total_layers": total_layers,
-            "flagged_rate": flagged_rate,
-            "rmt_outliers": flagged_layers,
-            "max_ratio": result.get("max_ratio", 0.0),
-            "correction_enabled": self.correct,
-            "correction_iterations": result.get("correction_iterations", 0),
-            "q_used": self.q,
-            "deadband_used": self.deadband,
-            "margin_used": self.margin,
-            "detection_threshold": (1.0 + self.deadband) * self.margin,
-            "baseline_layers_captured": len(self.baseline_mp_stats)
-            if self.baseline_mp_stats
-            else 0,
+        metrics: dict[str, Any] = {
+            "prepared": True,
+            "stable": stable,
+            "edge_risk_by_family_base": dict(self.baseline_edge_risk_by_family),
+            "edge_risk_by_family": dict(self.edge_risk_by_family),
+            "epsilon_by_family": dict(self.epsilon_by_family),
+            "epsilon_violations": list(self.epsilon_violations),
+            "measurement_contract": {
+                "estimator": self.estimator,
+                "activation_sampling": self.activation_sampling,
+            },
             "finalize_time": finalize_time,
-            "activation_required": bool(self._require_activation),
-            "activation_ready": bool(self._activation_ready),
-            "analysis_source": result.get("analysis_source"),
-            "token_weight_total": result.get("token_weight_total"),
-            "baseline_outliers_per_family": {
-                k: int(v) for k, v in self.baseline_outliers_per_family.items()
-            },
-            "outliers_per_family": {
-                k: int(v) for k, v in self.outliers_per_family.items()
-            },
-            "baseline_outliers_total": int(self.baseline_total_outliers),
-            "outliers_total": int(self.outliers_total),
-            "epsilon_by_family": {
-                k: float(v) for k, v in self.epsilon_by_family.items()
-            },
-            "epsilon_default": float(self.epsilon_default),
-            "epsilon_violations": self.epsilon_violations,
         }
 
-        self._log_event(
-            "finalize_complete",
-            message=f"RMT guard finalized - {'PASSED' if passed else 'FAILED'}",
-            passed=passed,
-            flagged_rate=flagged_rate,
-            finalize_time=finalize_time,
-        )
-
-        # Return GuardOutcome if available, otherwise legacy dict
-        # Env-gated tiny evidence dump for auditors
-        try:
-            payload = {
-                "rmt": {
-                    "epsilon_by_family": {
-                        k: float(v) for k, v in self.epsilon_by_family.items()
-                    },
-                    "deadband": float(self.deadband),
-                    "margin": float(self.margin),
-                    "evaluated": True,
+        violations: list[dict[str, Any]] = []
+        for v in self.epsilon_violations:
+            violations.append(
+                {
+                    "type": "epsilon_band",
+                    "severity": "error",
+                    "family": v.get("family"),
+                    "edge_base": v.get("edge_base"),
+                    "edge_cur": v.get("edge_cur"),
+                    "allowed": v.get("allowed"),
+                    "epsilon": v.get("epsilon"),
+                    "delta": v.get("delta"),
+                    "message": f"ε-band violation in {v.get('family')}",
                 }
-            }
-            maybe_dump_guard_evidence(".", payload)
-        except Exception:
-            pass
+            )
 
         if HAS_GUARD_OUTCOME:
-            # Add details to metrics since GuardOutcome doesn't have a details field
-            final_metrics.update(
-                {
-                    "guard_type": "rmt",
-                    "baseline_captured": self.baseline_mp_stats is not None,
-                    "baseline_count": len(self.baseline_mp_stats)
-                    if self.baseline_mp_stats
-                    else 0,
-                    "flagged_layer_names": [v["module_name"] for v in violations],
-                    "per_layer_results": result.get("per_layer", []),
-                    "policy": {
-                        "q": self.q,
-                        "deadband": self.deadband,
-                        "margin": self.margin,
-                        "correct": self.correct,
-                        "epsilon": self.epsilon_by_family.copy(),
-                    },
-                    "scope_suffixes": self.allowed_suffixes,
-                }
-            )
-
             return GuardOutcome(
                 name=self.name,
-                passed=passed,
-                action="none" if passed else "rollback",
+                passed=stable,
+                action=action,
                 violations=violations,
-                metrics=final_metrics,
+                metrics=metrics,
             )
-        else:
-            return {
-                "passed": passed,
-                "metrics": final_metrics,
-                "warnings": warnings,
-                "errors": errors,
-                "violations": violations,
-                "events": self.events,
-                "details": {
-                    "guard_type": "rmt",
-                    "baseline_captured": self.baseline_mp_stats is not None,
-                    "baseline_count": len(self.baseline_mp_stats)
-                    if self.baseline_mp_stats
-                    else 0,
-                    "flagged_layer_names": [v["module_name"] for v in violations],
-                    "per_layer_results": result.get("per_layer", []),
-                    "policy": {
-                        "q": self.q,
-                        "deadband": self.deadband,
-                        "margin": self.margin,
-                        "correct": self.correct,
-                        "epsilon": self.epsilon_by_family.copy(),
-                    },
-                    "scope_suffixes": self.allowed_suffixes,
-                },
-            }
+        return {
+            "passed": stable,
+            "action": action,
+            "metrics": metrics,
+            "violations": violations,
+        }
 
     def policy(self) -> RMTPolicyDict:
         """

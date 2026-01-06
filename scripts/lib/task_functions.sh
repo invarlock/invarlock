@@ -745,6 +745,24 @@ YAML
 
     # Generate config YAML
     local config_yaml="${run_dir}/calibration_config.yaml"
+    local guards_order_csv="${B200_GUARDS_ORDER:-}"
+    local -a guards_order=()
+    if [[ -n "${guards_order_csv}" ]]; then
+        IFS=',' read -ra guards_order <<< "${guards_order_csv}"
+    else
+        guards_order=("invariants" "variance" "invariants")
+    fi
+    local guards_order_yaml=""
+    local g
+    for g in "${guards_order[@]}"; do
+        g="$(echo "${g}" | xargs)"
+        [[ -z "${g}" ]] && continue
+        guards_order_yaml+=$'    - '"${g}"$'\n'
+    done
+    if [[ -z "${guards_order_yaml}" ]]; then
+        guards_order_yaml=$'    - invariants\n    - variance\n    - invariants\n'
+    fi
+
     cat > "${config_yaml}" << YAML_EOF
 model:
   id: "${baseline_path}"
@@ -768,9 +786,7 @@ edit:
 
 guards:
   order:
-    - invariants
-    - rmt
-    - variance
+${guards_order_yaml}
 
 eval:
   bootstrap:
@@ -891,6 +907,33 @@ preset_seq_len = int(os.environ.get("PRESET_SEQ_LEN", 1024))
 preset_stride = int(os.environ.get("PRESET_STRIDE", 512))
 preset_preview_n = int(os.environ.get("PRESET_PREVIEW_N", 40))
 preset_final_n = int(os.environ.get("PRESET_FINAL_N", 40))
+
+guards_order = None
+assurance_cfg = None
+if YAML_AVAILABLE:
+    cfg_path = None
+    for candidate in sorted(cal_dir.glob("run_*/calibration_config.yaml")):
+        cfg_path = candidate
+        break
+    if cfg_path is not None:
+        try:
+            cfg = yaml.safe_load(cfg_path.read_text())
+            if isinstance(cfg, dict):
+                guards_block = cfg.get("guards") or {}
+                if isinstance(guards_block, dict):
+                    order = guards_block.get("order")
+                    if isinstance(order, list) and order:
+                        guards_order = [str(item) for item in order]
+                ab = cfg.get("assurance")
+                if isinstance(ab, dict) and ab:
+                    assurance_cfg = ab
+        except Exception:
+            guards_order = None
+
+if guards_order is None:
+    guards_order = ["invariants", "variance", "invariants"]
+
+enabled_guards = set(guards_order)
 
 def _safe_float(value):
     try:
@@ -1441,8 +1484,11 @@ preset = {
         "final_n": preset_final_n,
         "seed": 42,
     },
-    "guards": {},
+    "guards": {"order": guards_order},
 }
+
+if isinstance(assurance_cfg, dict) and assurance_cfg:
+    preset["assurance"] = assurance_cfg
 
 spectral = {}
 if spectral_caps:
@@ -1453,7 +1499,7 @@ if spectral_summary.get("deadband") is not None:
     spectral["deadband"] = spectral_summary["deadband"]
 if spectral_summary.get("max_caps") is not None:
     spectral["max_caps"] = spectral_summary["max_caps"]
-if spectral:
+if "spectral" in enabled_guards and spectral:
     preset["guards"]["spectral"] = spectral
 
 rmt = {}
@@ -1463,16 +1509,18 @@ if rmt_summary.get("margin") is not None:
     rmt["margin"] = rmt_summary["margin"]
 if rmt_summary.get("deadband") is not None:
     rmt["deadband"] = rmt_summary["deadband"]
-if rmt:
+if "rmt" in enabled_guards and rmt:
     preset["guards"]["rmt"] = rmt
 
-if variance_config:
+if "variance" in enabled_guards and variance_config:
     preset["guards"]["variance"] = variance_config
 
 stats_path = cal_dir / "calibration_stats.json"
 with open(stats_path, "w") as f:
     json.dump(
         {
+            "guards_order": guards_order,
+            "assurance": assurance_cfg,
             "drift": drift_stats,
             "spectral": {**spectral_summary, "family_caps": spectral_caps},
             "rmt": {**rmt_summary, "epsilon": rmt_epsilon},

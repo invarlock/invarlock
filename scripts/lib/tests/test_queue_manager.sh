@@ -70,6 +70,61 @@ test_claim_complete_fail_and_retry_transitions() {
     assert_eq "null" "$(jq -r '.assigned_gpus' "${QUEUE_DIR}/ready/${t2}.task")" "assigned_gpus reset"
 }
 
+test_resolve_dependencies_filters_non_calibration_tasks_in_calibration_only_mode() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+
+    export B200_SUITE_MODE="calibrate-only"
+
+    local out_dir="${TEST_TMPDIR}/out"
+    init_queue "${out_dir}" >/dev/null
+
+    local setup_id
+    setup_id="$(add_task "SETUP_BASELINE" "org/model" "model" "14" "none" '{}' "50")"
+    local eval_id
+    eval_id="$(add_task "EVAL_BASELINE" "org/model" "model" "14" "${setup_id}" '{}' "50")"
+
+    assert_eq "1" "$(resolve_dependencies)" "setup task promoted"
+    assert_file_exists "${QUEUE_DIR}/ready/${setup_id}.task" "setup ready"
+    assert_file_exists "${QUEUE_DIR}/pending/${eval_id}.task" "eval remains pending until deps met"
+
+    claim_task "${setup_id}" "0" >/dev/null
+    complete_task "${setup_id}" >/dev/null
+
+    assert_eq "0" "$(resolve_dependencies)" "eval not promoted under calibration-only"
+    assert_file_exists "${QUEUE_DIR}/pending/${eval_id}.task" "eval still pending"
+    [[ ! -f "${QUEUE_DIR}/ready/${eval_id}.task" ]] || t_fail "eval should not be ready under calibration-only"
+}
+
+test_demote_ready_tasks_for_calibration_only_moves_disallowed_ready_to_pending() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+
+    export B200_SUITE_MODE="calibrate-only"
+
+    local out_dir="${TEST_TMPDIR}/out"
+    init_queue "${out_dir}" >/dev/null
+
+    local allowed_id
+    allowed_id="$(add_task "SETUP_BASELINE" "org/model" "model" "14" "none" '{}' "50")"
+    local disallowed_id
+    disallowed_id="$(add_task "EVAL_BASELINE" "org/model" "model" "14" "none" '{}' "50")"
+
+    update_task_status "${QUEUE_DIR}/pending/${allowed_id}.task" "ready"
+    mv "${QUEUE_DIR}/pending/${allowed_id}.task" "${QUEUE_DIR}/ready/${allowed_id}.task"
+
+    update_task_status "${QUEUE_DIR}/pending/${disallowed_id}.task" "ready"
+    mv "${QUEUE_DIR}/pending/${disallowed_id}.task" "${QUEUE_DIR}/ready/${disallowed_id}.task"
+
+    demote_ready_tasks_for_calibration_only
+
+    assert_file_exists "${QUEUE_DIR}/ready/${allowed_id}.task" "allowed task stays ready"
+    assert_file_exists "${QUEUE_DIR}/pending/${disallowed_id}.task" "disallowed task demoted"
+    assert_eq "pending" "$(jq -r '.status' "${QUEUE_DIR}/pending/${disallowed_id}.task")" "status updated to pending"
+}
+
 test_claim_task_returns_nonzero_when_mark_task_started_fails() {
     mock_reset
     # shellcheck source=../queue_manager.sh
@@ -527,7 +582,7 @@ test_generate_edit_tasks_sanitizes_cert_runs() {
     local create_count
     create_count="$(awk '/^CREATE_EDIT$/ {c++} END {print c+0}' "${calls}")"
     assert_eq "1" "${create_count}" "create_edit task still created"
-    assert_eq "1" "${eval_count}" "legacy eval_edit created"
+    assert_eq "1" "${eval_count}" "eval_edit created"
     assert_eq "1" "${cert_count}" "invalid cert_runs defaults to 1"
 
     : > "${calls}"
@@ -725,7 +780,7 @@ test_check_dependencies_met_returns_nonzero_when_task_file_missing() {
     assert_rc "1" "${RUN_RC}" "missing task file treated as unmet dependencies"
 }
 
-test_generate_eval_certify_tasks_and_legacy_generate_edit_tasks_create_expected_tasks() {
+test_generate_eval_certify_tasks_and_generate_edit_tasks_create_expected_tasks() {
     mock_reset
     # shellcheck source=../queue_manager.sh
     source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
@@ -745,7 +800,7 @@ test_generate_eval_certify_tasks_and_legacy_generate_edit_tasks_create_expected_
     assert_eq "5" "${pending_count}" "4 split eval + 1 certify task"
 
     run generate_edit_tasks "org/model" "m" "setup1" "preset1" "quant_rtn:8:128:ffn" "clean" "1"
-    assert_match 'deprecated' "${RUN_ERR}" "legacy generate_edit_tasks warns"
+    assert_match 'deprecated' "${RUN_ERR}" "generate_edit_tasks warns"
 }
 
 test_task_ops_short_circuit_when_lock_acquire_fails() {

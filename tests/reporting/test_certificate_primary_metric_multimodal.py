@@ -49,7 +49,7 @@ def test_primary_metric_vqa_accuracy_gating_and_render():
             "windows": {"preview": 1, "final": 1, "seed": 42},
             "hash": {"preview_tokens": None, "final_tokens": None, "total_tokens": 0},
         },
-        # PM-only certificate: no legacy ppl block
+        # PM-only certificate: no top-level ppl block
         "invariants": {"status": "pass"},
         "spectral": {"caps_applied": 0, "max_caps": 5},
         "rmt": {"stable": True},
