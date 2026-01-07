@@ -101,14 +101,17 @@ def test_rmt_guard_validate_uses_detection(monkeypatch):
 
 def test_rmt_guard_set_epsilon_from_dict_and_scalar():
     guard = RMTGuard(
-        epsilon_default=0.08, epsilon_by_family={"attn": 0.05, "ffn": "0.08", "invalid": "x"}  # type: ignore[arg-type]
+        epsilon_default=0.08,
+        epsilon_by_family={"attn": 0.05, "ffn": "0.08", "invalid": "x"},  # type: ignore[arg-type]
     )
     assert guard.epsilon_by_family["attn"] == pytest.approx(0.05)
     assert guard.epsilon_by_family["ffn"] == pytest.approx(0.08)
     assert guard.epsilon_default == pytest.approx(0.08)
     # Scalar update should overwrite per-family defaults
     guard._set_epsilon_default(0.12)
-    guard._set_epsilon_by_family({"attn": 0.12, "ffn": 0.12, "embed": 0.12, "other": 0.12})
+    guard._set_epsilon_by_family(
+        {"attn": 0.12, "ffn": 0.12, "embed": 0.12, "other": 0.12}
+    )
     assert all(val == pytest.approx(0.12) for val in guard.epsilon_by_family.values())
     assert guard.epsilon_default == pytest.approx(0.12)
 

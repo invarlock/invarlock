@@ -2,6 +2,7 @@ import pytest
 import torch.nn as nn
 
 from invarlock.guards.rmt import (
+    _iter_transformer_layers,
     create_custom_rmt_policy,
     get_rmt_policy,
     layer_svd_stats,
@@ -72,7 +73,9 @@ def test_rmt_policy_utils():
     assert custom["q"] == 0.5 and custom["correct"] is False
     assert custom["epsilon_by_family"] == {"attn": 0.1}
     # epsilon_default as float allowed
-    custom2 = create_custom_rmt_policy(q=0.5, deadband=0.2, margin=1.1, epsilon_default=0.1)
+    custom2 = create_custom_rmt_policy(
+        q=0.5, deadband=0.2, margin=1.1, epsilon_default=0.1
+    )
     assert custom2["epsilon_default"] == 0.1
     # Invalid args
     with pytest.raises(ValidationError):
@@ -81,3 +84,56 @@ def test_rmt_policy_utils():
         create_custom_rmt_policy(deadband=0.9)
     with pytest.raises(ValidationError):
         create_custom_rmt_policy(margin=0.9)
+
+
+def test_create_custom_rmt_policy_rejects_invalid_epsilon_inputs():
+    from invarlock.core.exceptions import ValidationError
+
+    with pytest.raises(ValidationError):
+        create_custom_rmt_policy(epsilon_default="nope")  # type: ignore[arg-type]
+
+    with pytest.raises(ValidationError):
+        create_custom_rmt_policy(epsilon_default=-0.1)
+
+    with pytest.raises(ValidationError):
+        create_custom_rmt_policy(epsilon_by_family="nope")  # type: ignore[arg-type]
+
+    with pytest.raises(ValidationError):
+        create_custom_rmt_policy(epsilon_by_family={"ffn": "bad"})  # type: ignore[dict-item]
+
+    with pytest.raises(ValidationError):
+        create_custom_rmt_policy(epsilon_by_family={"ffn": -0.01})
+
+
+def test_iter_transformer_layers_covers_common_model_layouts():
+    gpt_layers = [object(), object()]
+    gpt2_style = type(
+        "_GPT2Style",
+        (),
+        {"transformer": type("_T", (), {"h": gpt_layers})()},
+    )()
+    assert list(_iter_transformer_layers(gpt2_style)) == gpt_layers
+
+    llama_layers = [object()]
+    llama_style = type(
+        "_LlamaStyle",
+        (),
+        {"model": type("_M", (), {"layers": llama_layers})()},
+    )()
+    assert list(_iter_transformer_layers(llama_style)) == llama_layers
+
+    bert_layers = [object(), object(), object()]
+    bert_style = type(
+        "_BertStyle",
+        (),
+        {"encoder": type("_E", (), {"layer": bert_layers})()},
+    )()
+    assert list(_iter_transformer_layers(bert_style)) == bert_layers
+
+    marker = type("_Layer", (), {"attn": object(), "mlp": object()})()
+
+    class _Fallback:
+        def modules(self):  # noqa: ANN001
+            return [marker]
+
+    assert list(_iter_transformer_layers(_Fallback())) == [marker]

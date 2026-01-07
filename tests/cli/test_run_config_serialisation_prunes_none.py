@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from invarlock.cli.commands import run
 from invarlock.cli.config import load_config
 
@@ -42,3 +44,41 @@ guards:
     ):
         assert key not in as_dict
 
+
+def test_prune_none_values_drops_list_and_tuple_entries():
+    payload = {"a": None, "b": [1, None, {"c": None, "d": 2}], "e": (None, 3)}
+    assert run._prune_none_values(payload) == {"b": [1, {"d": 2}], "e": (3,)}
+
+
+def test_to_serialisable_dict_falls_back_when_dict_method_raises():
+    class ExplodingDict:
+        def __init__(self):
+            self._data = {"x": 1}
+
+        def dict(self):
+            raise RuntimeError("boom")
+
+    assert run._to_serialisable_dict(ExplodingDict()) == {"x": 1}
+
+
+def test_to_serialisable_dict_uses_vars_when_data_getattr_raises():
+    class Weird:
+        def __init__(self):
+            object.__setattr__(self, "_data", {"y": 2})
+
+        def __getattribute__(self, name):
+            if name == "_data":
+                raise RuntimeError("boom")
+            return object.__getattribute__(self, name)
+
+    assert run._to_serialisable_dict(Weird()) == {"y": 2}
+
+
+def test_to_serialisable_dict_returns_empty_dict_when_vars_fails():
+    class NoVars:
+        __slots__ = ("a",)
+
+        def __init__(self):
+            self.a = 1
+
+    assert run._to_serialisable_dict(NoVars()) == {}

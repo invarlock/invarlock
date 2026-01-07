@@ -27,6 +27,19 @@ def test_capture_baseline_mp_stats_allowed_module_names_filters() -> None:
     assert list(stats.keys()) == allowed
 
 
+def test_rmt_detect_respects_allowed_module_names() -> None:
+    model = _TinyModel()
+    out = R.rmt_detect(
+        model,
+        threshold=10.0,
+        allowed_module_names=["block.attn.c_attn"],
+        verbose=False,
+    )
+    per_layer = out.get("per_layer", [])
+    assert isinstance(per_layer, list)
+    assert any(item.get("module_name") == "block.attn.c_attn" for item in per_layer)
+
+
 def test_capture_baseline_mp_stats_svd_failure_is_skipped(monkeypatch) -> None:
     monkeypatch.setattr(
         torch.linalg,
