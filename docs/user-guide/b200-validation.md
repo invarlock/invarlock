@@ -382,7 +382,7 @@ Edit Creation (Per-Edit):
   └── 8× CREATE_EDIT
                                               Total: 8
 
-Edit Evaluation (Legacy):
+Edit Evaluation (Benchmarking):
   └── 8× EVAL_EDIT (all benchmarks per edit)
                                               Total: 8
 

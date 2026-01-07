@@ -82,6 +82,7 @@ Tip: enable Hub downloads per command when fetching models/datasets:
 - [Policy Provenance & Digest](assurance/11-policy-provenance.md)
 - [Device Drift Bands](assurance/12-device-drift-bands.md)
 - [GPU/MPS-First Guards (Decision Memo)](assurance/13-gpu-first-guards-decision.md)
+- [Tier Policy Catalog (runtime tiers.yaml)](assurance/14-tier-policy-catalog.md)
 
 Note: Every safety claim is backed by automated tests and cross-referenced in
 the docs. See Guard Contracts → Coverage Reference

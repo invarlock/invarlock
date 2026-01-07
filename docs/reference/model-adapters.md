@@ -625,10 +625,10 @@ guards:
   spectral:
     sigma_quantile: 0.95
     family_caps:
-      ffn: 2.5
-      attn: 2.8
-      embed: 3.0
-      other: 3.0
+      ffn: 3.834
+      attn: 3.423
+      embed: 3.1
+      other: 3.1
   rmt:
     margin: 1.5
 
