@@ -299,7 +299,10 @@ def _sample_certificates() -> list[dict[str, Any]]:
                 "kind": "ppl_causal",
                 "preview": 10.0,
                 "final": 10.5,
-                "ratio_vs_baseline": 1.05,
+                # Intentionally set just above the base tier limit so the sample
+                # certificate exercises `validation.hysteresis_applied`.
+                # Balanced: ratio_limit_base=1.10, hysteresis_ratio=0.002 → 1.102
+                "ratio_vs_baseline": 1.101,
                 "display_ci": [1.01, 1.09],
                 "reps": 200,
                 "ci_level": 0.95,

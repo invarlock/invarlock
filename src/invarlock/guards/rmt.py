@@ -2612,12 +2612,12 @@ def create_custom_rmt_policy(
 
     try:
         eps_default_val = float(epsilon_default)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError) as exc:
         raise ValidationError(
             code="E501",
             message="POLICY-PARAM-INVALID",
             details={"param": "epsilon_default", "value": epsilon_default},
-        )
+        ) from exc
     if not (math.isfinite(eps_default_val) and eps_default_val >= 0.0):
         raise ValidationError(
             code="E501",
@@ -2636,7 +2636,7 @@ def create_custom_rmt_policy(
         for family, value in epsilon_by_family.items():
             try:
                 eps_val = float(value)
-            except (TypeError, ValueError):
+            except (TypeError, ValueError) as exc:
                 raise ValidationError(
                     code="E501",
                     message="POLICY-PARAM-INVALID",
@@ -2645,7 +2645,7 @@ def create_custom_rmt_policy(
                         "family": str(family),
                         "value": value,
                     },
-                )
+                ) from exc
             if not (math.isfinite(eps_val) and eps_val >= 0.0):
                 raise ValidationError(
                     code="E501",

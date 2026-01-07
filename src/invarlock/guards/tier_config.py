@@ -43,10 +43,10 @@ _FALLBACK_CONFIG: dict[str, dict[str, Any]] = {
             "max_caps": 5,
             "max_spectral_norm": None,
             "family_caps": {
-                "ffn": 2.5,
-                "attn": 2.8,
-                "embed": 3.0,
-                "other": 3.0,
+                "ffn": 3.834,
+                "attn": 3.423,
+                "embed": 3.1,
+                "other": 3.1,
             },
             "multiple_testing": {
                 "method": "bh",
@@ -113,12 +113,12 @@ _FALLBACK_CONFIG: dict[str, dict[str, Any]] = {
         "spectral_guard": {
             "sigma_quantile": 0.98,
             "deadband": 0.15,
-            "scope": "all",
+            "scope": "ffn",
             "max_caps": 8,
             "family_caps": {
                 "ffn": 3.0,
-                "attn": 3.2,
-                "embed": 3.5,
+                "attn": 3.5,
+                "embed": 2.5,
                 "other": 3.5,
             },
             "multiple_testing": {
