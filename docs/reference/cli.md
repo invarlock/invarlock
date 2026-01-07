@@ -72,8 +72,8 @@ used to produce guard statistics.
   - measurement contract present, and
   - baseline/subject pairing (`*_measurement_contract_match = true`).
 
-Legacy `assurance.mode` and per-guard `guards.{spectral,rmt}.mode` were removed;
-configs containing them are rejected.
+Removed: `assurance.mode` and per-guard `guards.{spectral,rmt}.mode`.
+Configs containing them are rejected.
 
 ## Quickstart Commands
 

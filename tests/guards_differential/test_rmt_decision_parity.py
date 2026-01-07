@@ -11,7 +11,7 @@ def test_rmt_decision_parity_simple():
 
     ref = rmt_decide(bare, guarded, eps)
 
-    g = RMTGuard(epsilon=eps)
+    g = RMTGuard(epsilon_by_family=eps)
     g.baseline_edge_risk_by_family = dict(bare)
     g.edge_risk_by_family = dict(guarded)
     violations = g._compute_epsilon_violations()

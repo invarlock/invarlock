@@ -4,6 +4,9 @@
 > (1) the **pilot numbers** we measured for GPT-2 small, BERT base, and TinyLLaMA (Nov 2025) that underpin the **Balanced** and **Conservative** tiers; and
 > (2) the **exact recipe** to recalibrate from scratch on your setup (weight-based Spectral κ, activation-based RMT ε, VE min-effect, and window sizing).
 > Every knob is surfaced in run reports and certificates so reviewers can audit or recompute.
+>
+> For a key-by-key explanation of every value in the packaged tier file
+> (`runtime/tiers.yaml`), see [Tier Policy Catalog](14-tier-policy-catalog.md).
 
 ---
 

@@ -1,8 +1,12 @@
-# Tier guard policy knobs for variance correction (balanced vs conservative)
+# Tier policy defaults (metrics gates + guard knobs) used at runtime.
 #
-# These values mirror the settings validated during the December 2025
-# calibration runs. They should be kept in sync with the policy digest
-# embedded in certificates and referenced by automation documentation.
+# Balanced and Conservative values are calibrated/validated against pilot/null
+# runs (Nov/Dec 2025) where applicable; Aggressive is research-oriented (not in
+# the safety case).
+#
+# Rationale by key: docs/assurance/14-tier-policy-catalog.md
+# Calibration method: docs/assurance/09-tier-v1-calibration.md
+# Provenance/digest: docs/assurance/11-policy-provenance.md
 
 balanced:
   metrics:

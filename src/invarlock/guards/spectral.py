@@ -17,6 +17,7 @@ import torch
 
 from invarlock.cli._evidence import maybe_dump_guard_evidence
 from invarlock.core.api import Guard
+from invarlock.core.exceptions import ValidationError
 
 from ._contracts import guard_assert
 from ._estimators import frobenius_norm_sq, power_iter_sigma_max, row_col_norm_extrema
@@ -353,14 +354,20 @@ class SpectralGuard(Guard):
                     if isinstance(stats, dict)
                 }
                 self.config["baseline_family_stats"] = self.baseline_family_stats
+            if "multipletesting" in policy:
+                raise ValidationError(
+                    code="E501",
+                    message="POLICY-PARAM-INVALID",
+                    details={
+                        "param": "multipletesting",
+                        "hint": "Use spectral.multiple_testing instead.",
+                    },
+                )
             mt_policy = policy.get("multiple_testing")
-            if mt_policy is None:
-                mt_policy = policy.get("multipletesting")
             if isinstance(mt_policy, dict):
                 self.multiple_testing = mt_policy.copy()
                 policy["multiple_testing"] = self.multiple_testing
                 self.config["multiple_testing"] = self.multiple_testing
-            policy.pop("multipletesting", None)
 
             estimator_policy = policy.get("estimator")
             if isinstance(estimator_policy, dict):

@@ -138,8 +138,8 @@ invarlock run -c configs/local/quant8_calibrated.yaml \
   --out runs/.../quant8_calibrated
 ```
 
-**Naming.** Standardise on `sigma_quantile` (not `contraction`) and
-`multiple_testing` (with underscore) to keep
+**Naming.** Standardise on `sigma_quantile` and `multiple_testing` (with
+underscore) to keep
 reports/overrides schema-aligned.
 
 **Spectral is weight-based.** |z| distributions depend solely on weights;
@@ -151,7 +151,7 @@ steady the estimate.
 
 - `/.guards[] | select(.name=="spectral") | .policy`
 - `/.guards[] | select(.name=="spectral") | .metrics | {caps_applied,caps_exceeded,max_caps}`
-- `/spectral.{summary,families,policy,multipletesting}` in certificates
+- `/spectral.{summary,families,policy,multiple_testing}` in certificates
 - `/.guards[] | select(.name=="spectral") | .final_z_scores` (emitted when calibration logging is enabled)
 - **Checkpoints.**
 
@@ -243,7 +243,7 @@ guards:
       sampling:
         windows: { count: 8, indices_policy: evenly_spaced }
 
-    # Legacy knobs (weight-RMT diagnostics/correction helpers)
+    # Weight-RMT knobs (diagnostics/correction helpers)
     q: auto
     deadband: 0.10
     margin: 1.5
@@ -256,7 +256,8 @@ guards:
 from invarlock.guards.rmt import RMTGuard
 
 guard = RMTGuard(
-    epsilon={"ffn": 0.10, "attn": 0.08, "embed": 0.12, "other": 0.12}
+    epsilon_default=0.10,
+    epsilon_by_family={"ffn": 0.10, "attn": 0.08, "embed": 0.12, "other": 0.12},
 )
 guard.prepare(
     model,
@@ -448,9 +449,10 @@ rmt_policy = create_custom_rmt_policy(
     q=2.0,
     deadband=0.12,
     margin=1.6,
-    correct=True
+    correct=True,
+    epsilon_default=0.10,
+    epsilon_by_family={"ffn": 0.10, "attn": 0.08, "embed": 0.12, "other": 0.12},
 )
-rmt_policy["epsilon"] = {"ffn": 0.10, "attn": 0.08, "embed": 0.12, "other": 0.12}
 
 # Create custom variance policy
 variance_policy = create_custom_variance_policy(
@@ -721,7 +723,10 @@ from invarlock.guards.policies import get_variance_policy
 guard_chain = GuardChain([
     InvariantsGuard(strict_mode=True),
     SpectralGuard(sigma_quantile=0.95, deadband=0.10),
-    RMTGuard(epsilon={"ffn": 0.10, "attn": 0.08, "embed": 0.12, "other": 0.12}),
+    RMTGuard(
+        epsilon_default=0.10,
+        epsilon_by_family={"ffn": 0.10, "attn": 0.08, "embed": 0.12, "other": 0.12},
+    ),
     VarianceGuard(get_variance_policy("balanced")),
 ])
 

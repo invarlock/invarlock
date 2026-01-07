@@ -72,8 +72,7 @@ summary.
   `spectral.summary.{sigma_quantile,deadband,modules_checked,max_caps,caps_exceeded}`,
   `spectral.family_caps`, and `spectral.families[family]` with `{max, mean,
   count, violations, kappa}`. `sigma_quantile` is the calibrated baseline
-  percentile used to derive the reference target. Legacy alias `contraction`
-  may appear only in historical certificates.
+  percentile used to derive the reference target.
 - Tier files document FPR targets and mapping $\kappa_f \rightarrow$ expected WARNs.
 - Policy metadata records the multiple-testing method
   (`spectral.multiple_testing`) and the cap limit (`spectral.max_caps`).

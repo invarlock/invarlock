@@ -55,7 +55,7 @@ def test_normalize_family_caps_and_multiple_testing_variants() -> None:
     )
 
 
-def test_tier_entry_to_policy_maps_aliases_and_skips_bad_sections() -> None:
+def test_tier_entry_to_policy_maps_sections_and_skips_bad_sections() -> None:
     out = at._tier_entry_to_policy(
         {
             "metrics": {"pm_ratio": {"ratio_limit_base": 1.2}},
@@ -74,7 +74,6 @@ def test_tier_entry_to_policy_maps_aliases_and_skips_bad_sections() -> None:
     }
     assert out["spectral"]["multiple_testing"]["method"] == "bh"
     assert out["rmt"]["epsilon_by_family"] == {"ffn": 0.1}
-    assert out["rmt"]["epsilon"] == {"ffn": 0.1}
     assert out["variance"]["deadband"] == pytest.approx(0.1)
 
     assert (

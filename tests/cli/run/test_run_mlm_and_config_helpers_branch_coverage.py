@@ -72,6 +72,31 @@ def test_resolve_pm_acceptance_range_parses_cfg_and_env(monkeypatch) -> None:
     assert out4["max"] == 1.2
 
 
+def test_resolve_pm_acceptance_range_ignores_invalid_cfg_max(monkeypatch) -> None:
+    monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MIN", raising=False)
+    monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MAX", raising=False)
+
+    cfg = {"primary_metric": {"acceptance_range": {"min": "1.0", "max": "bad"}}}
+    out = run_mod._resolve_pm_acceptance_range(cfg)
+    assert out == {"min": 1.0, "max": 1.1}
+
+
+def test_resolve_pm_acceptance_range_covers_outer_exception(monkeypatch) -> None:
+    monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MIN", raising=False)
+    monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MAX", raising=False)
+
+    def _boom(_cfg):  # noqa: ANN001
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(run_mod, "_coerce_mapping", _boom)
+    assert (
+        run_mod._resolve_pm_acceptance_range(
+            {"primary_metric": {"acceptance_range": {"min": 0.9, "max": 1.1}}}
+        )
+        == {}
+    )
+
+
 def test_choose_dataset_split_covers_fallback_and_exception_branch() -> None:
     split, used = run_mod._choose_dataset_split(
         requested="train", available=["validation"]

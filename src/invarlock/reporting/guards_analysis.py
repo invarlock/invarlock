@@ -8,7 +8,7 @@ from typing import Any, no_type_check
 
 from invarlock.core.auto_tuning import get_tier_policies
 
-from .policy_utils import _promote_multiple_testing_alias_key, _resolve_policy_tier
+from .policy_utils import _resolve_policy_tier
 from .report_types import RunReport
 
 
@@ -501,7 +501,7 @@ def _extract_spectral_analysis(
         for source in sources:
             if not isinstance(source, dict):
                 continue
-            candidate = source.get("multiple_testing") or source.get("multipletesting")
+            candidate = source.get("multiple_testing")
             if isinstance(candidate, dict) and candidate:
                 return candidate
         return None
@@ -513,7 +513,6 @@ def _extract_spectral_analysis(
     policy_out: dict[str, Any] | None = None
     if isinstance(guard_policy, dict) and guard_policy:
         policy_out = dict(guard_policy)
-        _promote_multiple_testing_alias_key(policy_out)
         if default_sigma_quantile is not None:
             sq = policy_out.get("sigma_quantile")
             if sq is not None:
@@ -534,7 +533,7 @@ def _extract_spectral_analysis(
         "families": families,
         "family_caps": family_caps,
     }
-    # Attach status to summary for backward-compatibility in tests
+    # Surface a stable/capped status on the summary for schema parity.
     try:
         summary["status"] = "stable" if int(caps_applied) == 0 else "capped"
     except Exception:
@@ -670,8 +669,6 @@ def _extract_rmt_analysis(
         if isinstance(tier_defaults, dict)
         else {}
     )
-    if not default_epsilon_map and isinstance(tier_defaults, dict):
-        default_epsilon_map = (tier_defaults.get("rmt", {}) or {}).get("epsilon", {})
     default_epsilon_map = {
         str(family): float(value)
         for family, value in (default_epsilon_map or {}).items()
@@ -718,10 +715,6 @@ def _extract_rmt_analysis(
     policy_out: dict[str, Any] | None = None
     if isinstance(guard_policy, dict) and guard_policy:
         policy_out = dict(guard_policy)
-        if "epsilon_by_family" not in policy_out and isinstance(
-            policy_out.get("epsilon"), dict
-        ):
-            policy_out["epsilon_by_family"] = dict(policy_out["epsilon"])
         if isinstance(policy_out.get("epsilon_default"), int | float) and math.isfinite(
             float(policy_out.get("epsilon_default"))
         ):
@@ -751,9 +744,7 @@ def _extract_rmt_analysis(
     epsilon_map: dict[str, float] = {}
     eps_src = guard_metrics.get("epsilon_by_family") or {}
     if not eps_src and isinstance(guard_policy, dict):
-        eps_src = (
-            guard_policy.get("epsilon_by_family") or guard_policy.get("epsilon") or {}
-        )
+        eps_src = guard_policy.get("epsilon_by_family") or {}
     if isinstance(eps_src, dict):
         for k, v in eps_src.items():
             if isinstance(v, int | float) and math.isfinite(float(v)):
@@ -857,317 +848,6 @@ def _extract_rmt_analysis(
         result["baseline_measurement_contract_hash"] = baseline_hash
     if mc_hash and baseline_hash:
         result["measurement_contract_match"] = bool(mc_hash == baseline_hash)
-    return result
-
-
-@no_type_check
-def _extract_rmt_analysis_legacy(
-    report: RunReport, baseline: dict[str, Any]
-) -> dict[str, Any]:
-    tier = _resolve_policy_tier(report)
-    tier_policies = get_tier_policies()
-    tier_defaults = tier_policies.get(tier, tier_policies.get("balanced", {}))
-    default_epsilon_map = (
-        tier_defaults.get("rmt", {}).get("epsilon_by_family")
-        if isinstance(tier_defaults, dict)
-        else {}
-    )
-    if not default_epsilon_map and isinstance(tier_defaults, dict):
-        default_epsilon_map = (tier_defaults.get("rmt", {}) or {}).get("epsilon", {})
-    default_epsilon_map = {
-        str(family): float(value)
-        for family, value in (default_epsilon_map or {}).items()
-        if isinstance(value, int | float)
-    }
-
-    outliers_guarded = 0
-    outliers_bare = 0
-    epsilon_default = 0.1
-    try:
-        eps_def = (
-            tier_defaults.get("rmt", {}).get("epsilon_default")
-            if isinstance(tier_defaults, dict)
-            else None
-        )
-        if isinstance(eps_def, int | float) and math.isfinite(float(eps_def)):
-            epsilon_default = float(eps_def)
-    except Exception:
-        pass
-    stable = True
-    explicit_stability = False
-    max_ratio = 0.0
-    max_deviation_ratio = 1.0
-    mean_deviation_ratio = 1.0
-    epsilon_map: dict[str, float] = {}
-    baseline_outliers_per_family: dict[str, int] = {}
-    outliers_per_family: dict[str, int] = {}
-    epsilon_violations: list[Any] = []
-    margin_used = None
-    deadband_used = None
-    policy_out: dict[str, Any] | None = None
-    rmt_guard = None
-
-    for guard in report.get("guards", []) or []:
-        if str(guard.get("name", "")).lower() == "rmt":
-            rmt_guard = guard
-            guard_metrics = guard.get("metrics", {}) or {}
-            guard_policy = guard.get("policy", {}) or {}
-            if isinstance(guard_policy, dict) and guard_policy:
-                policy_out = dict(guard_policy)
-                if "epsilon_by_family" not in policy_out and isinstance(
-                    policy_out.get("epsilon"), dict
-                ):
-                    policy_out["epsilon_by_family"] = dict(policy_out["epsilon"])
-                if isinstance(policy_out.get("margin"), int | float) and math.isfinite(
-                    float(policy_out.get("margin"))
-                ):
-                    margin_used = float(policy_out.get("margin"))
-                if isinstance(
-                    policy_out.get("deadband"), int | float
-                ) and math.isfinite(float(policy_out.get("deadband"))):
-                    deadband_used = float(policy_out.get("deadband"))
-                if isinstance(
-                    policy_out.get("epsilon_default"), int | float
-                ) and math.isfinite(float(policy_out.get("epsilon_default"))):
-                    epsilon_default = float(policy_out.get("epsilon_default"))
-            if isinstance(
-                guard_metrics.get("epsilon_default"), int | float
-            ) and math.isfinite(float(guard_metrics.get("epsilon_default"))):
-                epsilon_default = float(guard_metrics.get("epsilon_default"))
-            outliers_guarded = guard_metrics.get(
-                "rmt_outliers", guard_metrics.get("layers_flagged", outliers_guarded)
-            )
-            max_ratio = guard_metrics.get("max_ratio", 0.0)
-            epsilon_map = guard_metrics.get("epsilon_by_family", {}) or epsilon_map
-            if not epsilon_map and isinstance(guard_policy, dict):
-                eps_src = guard_policy.get("epsilon_by_family") or guard_policy.get(
-                    "epsilon"
-                )
-                if isinstance(eps_src, dict):
-                    try:
-                        epsilon_map = {
-                            str(k): float(v)
-                            for k, v in eps_src.items()
-                            if isinstance(v, int | float) and math.isfinite(float(v))
-                        }
-                    except Exception:
-                        pass
-            baseline_outliers_per_family = (
-                guard_metrics.get("baseline_outliers_per_family", {})
-                or baseline_outliers_per_family
-            )
-            outliers_per_family = (
-                guard_metrics.get("outliers_per_family", {}) or outliers_per_family
-            )
-            epsilon_violations = guard_metrics.get(
-                "epsilon_violations", epsilon_violations
-            )
-            if outliers_per_family:
-                outliers_guarded = sum(
-                    int(v)
-                    for v in outliers_per_family.values()
-                    if isinstance(v, int | float)
-                )
-            if baseline_outliers_per_family:
-                outliers_bare = sum(
-                    int(v)
-                    for v in baseline_outliers_per_family.values()
-                    if isinstance(v, int | float)
-                )
-            flagged_rate = guard_metrics.get("flagged_rate", 0.0)
-            stable = flagged_rate <= 0.5
-            max_mp_ratio = guard_metrics.get("max_mp_ratio_final", 0.0)
-            mean_mp_ratio = guard_metrics.get("mean_mp_ratio_final", 0.0)
-
-            baseline_max = None
-            baseline_mean = None
-            baseline_rmt = baseline.get("rmt", {}) if isinstance(baseline, dict) else {}
-            if baseline_rmt:
-                baseline_max = baseline_rmt.get(
-                    "max_mp_ratio", baseline_rmt.get("max_mp_ratio_final")
-                )
-                baseline_mean = baseline_rmt.get(
-                    "mean_mp_ratio", baseline_rmt.get("mean_mp_ratio_final")
-                )
-                outliers_bare = baseline_rmt.get(
-                    "outliers", baseline_rmt.get("rmt_outliers", 0)
-                )
-            if baseline_max is None:
-                baseline_metrics = (
-                    baseline.get("metrics", {}) if isinstance(baseline, dict) else {}
-                )
-                if "rmt" in baseline_metrics:
-                    baseline_rmt_metrics = baseline_metrics["rmt"]
-                    baseline_max = baseline_rmt_metrics.get("max_mp_ratio_final")
-                    baseline_mean = baseline_rmt_metrics.get("mean_mp_ratio_final")
-            if baseline_max is None and isinstance(guard.get("baseline_metrics"), dict):
-                gb = guard.get("baseline_metrics")
-                baseline_max = gb.get("max_mp_ratio")
-                baseline_mean = gb.get("mean_mp_ratio")
-            if baseline_max is not None and baseline_max > 0:
-                max_deviation_ratio = max_mp_ratio / baseline_max
-            else:
-                max_deviation_ratio = 1.0
-            if baseline_mean is not None and baseline_mean > 0:
-                mean_deviation_ratio = mean_mp_ratio / baseline_mean
-            else:
-                mean_deviation_ratio = 1.0
-            if isinstance(guard_metrics.get("stable"), bool):
-                stable = bool(guard_metrics.get("stable"))
-                explicit_stability = True
-            break
-
-    # Fallback: use metrics.rmt and/or top-level rmt section when guard is absent
-    if outliers_guarded == 0:
-        rmt_metrics = (report.get("metrics", {}) or {}).get("rmt", {})
-        if isinstance(rmt_metrics, dict):
-            try:
-                outliers_guarded = int(rmt_metrics.get("outliers", 0) or 0)
-            except Exception:
-                outliers_guarded = 0
-            if isinstance(rmt_metrics.get("stable"), bool):
-                stable = bool(rmt_metrics.get("stable"))
-                explicit_stability = True
-        rmt_top = report.get("rmt", {}) if isinstance(report.get("rmt"), dict) else {}
-        if isinstance(rmt_top, dict):
-            fams = rmt_top.get("families", {})
-            if isinstance(fams, dict) and fams:
-                for fam, rec in fams.items():
-                    if not isinstance(rec, dict):
-                        continue
-                    try:
-                        outliers_per_family[str(fam)] = int(
-                            rec.get("outliers_guarded", 0) or 0
-                        )
-                        baseline_outliers_per_family[str(fam)] = int(
-                            rec.get("outliers_bare", 0) or 0
-                        )
-                        if rec.get("epsilon") is not None:
-                            try:
-                                epsilon_map[str(fam)] = float(rec.get("epsilon"))
-                            except Exception:
-                                pass
-                    except Exception:
-                        continue
-            try:
-                if outliers_bare == 0:
-                    outliers_bare = int(rmt_top.get("outliers", 0) or 0)
-            except Exception:
-                pass
-
-    # If stability not explicitly provided, derive from outlier behavior
-    if not explicit_stability:
-        try:
-            if outliers_guarded == 0 and outliers_bare == 0:
-                stable = True
-            elif outliers_guarded <= outliers_bare:
-                stable = True
-            else:
-                stable = (outliers_guarded - outliers_bare) / max(
-                    outliers_bare, 1
-                ) <= 0.5
-        except Exception:
-            pass
-
-    delta_per_family = {
-        k: int(outliers_per_family.get(k, 0))
-        - int(baseline_outliers_per_family.get(k, 0))
-        for k in set(outliers_per_family) | set(baseline_outliers_per_family)
-    }
-    delta_total = int(outliers_guarded) - int(outliers_bare)
-    # Conservative baseline fallback when not available
-    if outliers_bare == 0 and outliers_guarded > 0:
-        # Assume baseline had fewer outliers to make acceptance harder
-        outliers_bare = max(0, outliers_guarded - 1)
-
-    # Recompute stability from epsilon rule when not explicitly provided
-    if not explicit_stability:
-        try:
-            if outliers_per_family and baseline_outliers_per_family:
-                families_union = set(outliers_per_family) | set(
-                    baseline_outliers_per_family
-                )
-                checks: list[bool] = []
-                for fam in families_union:
-                    guarded = int(outliers_per_family.get(fam, 0) or 0)
-                    bare = int(baseline_outliers_per_family.get(fam, 0) or 0)
-                    eps_val = float(epsilon_map.get(fam, epsilon_default))
-                    allowed = math.ceil(bare * (1.0 + eps_val))
-                    checks.append(guarded <= allowed)
-                if checks:
-                    stable = all(checks)
-            elif outliers_bare > 0:
-                stable = outliers_guarded <= (
-                    outliers_bare * (1.0 + float(epsilon_default))
-                )
-        except Exception:
-            pass
-
-    # Compute epsilon scalar (fallback) and detailed family breakdown
-    if epsilon_map:
-        epsilon_scalar = max(float(v) for v in epsilon_map.values())
-    elif default_epsilon_map:
-        try:
-            epsilon_scalar = max(float(v) for v in default_epsilon_map.values())
-        except Exception:
-            epsilon_scalar = float(epsilon_default)
-    else:
-        epsilon_scalar = float(epsilon_default)
-    try:
-        epsilon_scalar = round(float(epsilon_scalar), 3)
-    except Exception:
-        epsilon_scalar = float(epsilon_default)
-
-    def _to_int(v: Any) -> int:
-        try:
-            return int(v)
-        except (TypeError, ValueError):
-            return 0
-
-    families = (
-        set(outliers_per_family) | set(baseline_outliers_per_family) | set(epsilon_map)
-    )
-    family_breakdown = {
-        family: {
-            "bare": _to_int(baseline_outliers_per_family.get(family, 0)),
-            "guarded": _to_int(outliers_per_family.get(family, 0)),
-            "epsilon": float(epsilon_map.get(family, epsilon_scalar)),
-        }
-        for family in sorted(families)
-    }
-
-    # Stringify per-family dict keys for stability
-    outliers_per_family = {str(k): _to_int(v) for k, v in outliers_per_family.items()}
-    baseline_outliers_per_family = {
-        str(k): _to_int(v) for k, v in baseline_outliers_per_family.items()
-    }
-    delta_per_family = {str(k): _to_int(v) for k, v in delta_per_family.items()}
-
-    result = {
-        "outliers_bare": outliers_bare,
-        "outliers_guarded": outliers_guarded,
-        "epsilon": epsilon_scalar,
-        "epsilon_default": float(epsilon_default),
-        "epsilon_by_family": epsilon_map,
-        "outliers_per_family": outliers_per_family,
-        "baseline_outliers_per_family": baseline_outliers_per_family,
-        "delta_per_family": delta_per_family,
-        "delta_total": delta_total,
-        "epsilon_violations": epsilon_violations,
-        "stable": stable,
-        "status": "stable" if stable else "unstable",
-        "max_ratio": max_ratio,
-        "max_deviation_ratio": max_deviation_ratio,
-        "mean_deviation_ratio": mean_deviation_ratio,
-        "families": family_breakdown,
-    }
-    if margin_used is not None:
-        result["margin"] = float(margin_used)
-    if deadband_used is not None:
-        result["deadband"] = float(deadband_used)
-    if policy_out:
-        result["policy"] = policy_out
-    result["evaluated"] = bool(rmt_guard)
     return result
 
 

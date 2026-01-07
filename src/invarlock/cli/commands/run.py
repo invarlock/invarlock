@@ -108,6 +108,64 @@ def _coerce_mapping(obj: object) -> dict[str, Any]:
     return {}
 
 
+def _prune_none_values(value: Any) -> Any:
+    """Recursively drop keys/items whose value is None.
+
+    Used when serializing dataclass-style config sections that define many optional
+    fields defaulting to None; those should behave as "unset" rather than explicit
+    policy overrides.
+    """
+
+    if isinstance(value, dict):
+        return {
+            key: _prune_none_values(val)
+            for key, val in value.items()
+            if val is not None
+        }
+    if isinstance(value, list):
+        return [_prune_none_values(item) for item in value if item is not None]
+    if isinstance(value, tuple):
+        return tuple(_prune_none_values(item) for item in value if item is not None)
+    return value
+
+
+def _to_serialisable_dict(section: object) -> dict[str, Any]:
+    """Coerce config fragments to plain dicts.
+
+    Handles InvarLockConfig sections (which wrap dicts in a private `_Obj` with
+    `_data`) so downstream components (core.runner) see canonical mappings,
+    e.g. `eval.bootstrap.replicates`.
+    """
+
+    # Prefer native dump methods
+    if hasattr(section, "model_dump"):
+        return section.model_dump()  # type: ignore[return-value]
+    if hasattr(section, "dict"):
+        try:
+            return section.dict()  # type: ignore[return-value]
+        except Exception:
+            pass
+    # Unwrap CLI _Obj wrapper used by InvarLockConfig for attribute access
+    try:
+        raw = getattr(section, "_data", None)
+        if isinstance(raw, dict):
+            return raw
+    except Exception:
+        pass
+    # Already a mapping
+    if isinstance(section, dict):
+        return section
+    # Best-effort attribute dump (prune None so "unset" does not override tier defaults)
+    try:
+        data = vars(section)
+        # Common case: {'_data': {...}}
+        if isinstance(data, dict) and isinstance(data.get("_data"), dict):
+            return data["_data"]
+        return _prune_none_values(data)  # type: ignore[return-value]
+    except TypeError:
+        return {}
+
+
 def _resolve_pm_acceptance_range(
     cfg: InvarLockConfig | dict[str, Any] | None,
 ) -> dict[str, float]:
@@ -2223,50 +2281,11 @@ def run_command(
         console.print(f"🔌 Adapter: {adapter.name}")
 
         # Create run configuration
-        def _to_serialisable_dict(section: object) -> dict[str, Any]:
-            """Coerce config fragments to plain dicts.
-
-            Handles InvarLockConfig sections (which wrap dicts in a private `_Obj` with
-            `_data`) so downstream components (core.runner) see canonical mappings,
-            e.g. `eval.bootstrap.replicates`.
-            """
-            # Prefer native dump methods
-            if hasattr(section, "model_dump"):
-                return section.model_dump()  # type: ignore[return-value]
-            if hasattr(section, "dict"):
-                try:
-                    return section.dict()  # type: ignore[return-value]
-                except Exception:
-                    pass
-            # Unwrap CLI _Obj wrapper used by InvarLockConfig for attribute access
-            try:
-                raw = getattr(section, "_data", None)
-                if isinstance(raw, dict):
-                    return raw
-            except Exception:
-                pass
-            # Already a mapping
-            if isinstance(section, dict):
-                return section
-            # Best-effort attribute dump
-            try:
-                data = vars(section)
-                # Common case: {'_data': {...}}
-                if isinstance(data, dict) and isinstance(data.get("_data"), dict):
-                    return data["_data"]
-                return data  # type: ignore[return-value]
-            except TypeError:
-                return {}
-
-        def _dump_guard(section: object) -> dict[str, Any]:
-            data = _to_serialisable_dict(section)
-            return data if isinstance(data, dict) else {}
-
         guard_overrides = {
-            "spectral": _dump_guard(getattr(cfg.guards, "spectral", {})),
-            "rmt": _dump_guard(getattr(cfg.guards, "rmt", {})),
-            "variance": _dump_guard(getattr(cfg.guards, "variance", {})),
-            "invariants": _dump_guard(getattr(cfg.guards, "invariants", {})),
+            "spectral": _to_serialisable_dict(getattr(cfg.guards, "spectral", {})),
+            "rmt": _to_serialisable_dict(getattr(cfg.guards, "rmt", {})),
+            "variance": _to_serialisable_dict(getattr(cfg.guards, "variance", {})),
+            "invariants": _to_serialisable_dict(getattr(cfg.guards, "invariants", {})),
         }
 
         if model_profile.invariants:

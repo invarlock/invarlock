@@ -54,5 +54,5 @@ they are intended to catch collapse/rank loss in a scalable way.
 
 ## Non-goals
 
-- Backward compatibility with strict/fast certificates or policies.
+- Support for removed strict/fast certificates or policies.
 - Full-spectrum or exact SVD computations in guard code paths.

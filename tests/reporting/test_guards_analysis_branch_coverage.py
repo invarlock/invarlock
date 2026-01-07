@@ -122,7 +122,7 @@ def test_extract_rmt_analysis_edge_risk_paths_and_contract_hashes() -> None:
         "guards": [
             {
                 "name": "rmt",
-                "policy": {"epsilon": {"attn": 0.1}, "epsilon_default": 0.2},
+                "policy": {"epsilon_by_family": {"attn": 0.1}, "epsilon_default": 0.2},
                 "metrics": {
                     # Leave base empty so we fall back to baseline_edge_by_family.
                     "edge_risk_by_family_base": {},
@@ -143,72 +143,6 @@ def test_extract_rmt_analysis_edge_risk_paths_and_contract_hashes() -> None:
     assert out["measurement_contract_match"] is True
     assert out["epsilon_violations"]
     assert out["families"]["attn"]["ratio"] == 2.0
-
-
-def test_extract_rmt_analysis_legacy_covers_guard_and_fallback_paths() -> None:
-    report_guard = {
-        "guards": [
-            {
-                "name": "rmt",
-                "policy": {
-                    "epsilon": {"attn": 0.1, "ffn": 0.2, "bad": "x"},
-                    "margin": 1.5,
-                    "deadband": 0.1,
-                    "epsilon_default": 0.15,
-                },
-                "metrics": {
-                    "epsilon_default": 0.12,
-                    "outliers_per_family": {"attn": 3, "ffn": 1},
-                    "baseline_outliers_per_family": {"attn": 2, "ffn": 1},
-                    "max_mp_ratio_final": 3.0,
-                    "mean_mp_ratio_final": 2.0,
-                    "flagged_rate": 0.9,
-                },
-            }
-        ]
-    }
-    baseline_with_rmt = {
-        "rmt": {
-            "outliers": 3,
-            "max_mp_ratio_final": 2.0,
-            "mean_mp_ratio_final": 1.5,
-        }
-    }
-    out_guard = GA._extract_rmt_analysis_legacy(report_guard, baseline_with_rmt)
-    assert out_guard["evaluated"] is True
-    assert out_guard["families"]
-    assert out_guard["status"] in {"stable", "unstable"}
-    assert out_guard["margin"] == 1.5
-    assert out_guard["deadband"] == 0.1
-
-    # Baseline-less path: triggers conservative baseline fallback when bare==0.
-    report_conservative = {
-        "guards": [
-            {
-                "name": "rmt",
-                "metrics": {"outliers_per_family": {"attn": 2}, "max_ratio": 1.0},
-                "policy": {"epsilon_by_family": {"attn": 0.1}},
-            }
-        ]
-    }
-    out_conservative = GA._extract_rmt_analysis_legacy(report_conservative, {})
-    assert out_conservative["outliers_bare"] == max(
-        0, out_conservative["outliers_guarded"] - 1
-    )
-
-    # Guard-absent fallback path: pulls from metrics.rmt + top-level rmt.families.
-    report_fallback = {
-        "guards": [],
-        "metrics": {"rmt": {"outliers": 2, "stable": True}},
-        "rmt": {
-            "families": {
-                "attn": {"outliers_guarded": 1, "outliers_bare": 1, "epsilon": 0.1}
-            }
-        },
-    }
-    out_fallback = GA._extract_rmt_analysis_legacy(report_fallback, {})
-    assert out_fallback["stable"] is True
-    assert out_fallback["outliers_guarded"] == 2
 
 
 def test_extract_variance_analysis_provenance_window_ids_and_ratio_ci_fail() -> None:
