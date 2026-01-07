@@ -287,7 +287,7 @@ def _build_spectral_guard_with_z_scores() -> dict[str, Any]:
             "deadband": 0.1,
             "scope": "all",
             "max_caps": 5,
-            "multipletesting": {"method": "bh", "alpha": 0.05, "m": 4},
+            "multiple_testing": {"method": "bh", "alpha": 0.05, "m": 4},
             "max_spectral_norm": 9.9,
         },
         "metrics": {

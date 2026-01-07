@@ -100,18 +100,21 @@ def test_rmt_guard_validate_uses_detection(monkeypatch):
 
 
 def test_rmt_guard_set_epsilon_from_dict_and_scalar():
-    guard = RMTGuard(epsilon={"attn": 0.05, "ffn": "0.08", "invalid": "x"})
+    guard = RMTGuard(
+        epsilon_default=0.08, epsilon_by_family={"attn": 0.05, "ffn": "0.08", "invalid": "x"}  # type: ignore[arg-type]
+    )
     assert guard.epsilon_by_family["attn"] == pytest.approx(0.05)
     assert guard.epsilon_by_family["ffn"] == pytest.approx(0.08)
     assert guard.epsilon_default == pytest.approx(0.08)
     # Scalar update should overwrite per-family defaults
-    guard._set_epsilon(0.12)
+    guard._set_epsilon_default(0.12)
+    guard._set_epsilon_by_family({"attn": 0.12, "ffn": 0.12, "embed": 0.12, "other": 0.12})
     assert all(val == pytest.approx(0.12) for val in guard.epsilon_by_family.values())
     assert guard.epsilon_default == pytest.approx(0.12)
 
 
 def test_rmt_guard_compute_epsilon_violations_detects_overages():
-    guard = RMTGuard(epsilon=0.0)
+    guard = RMTGuard(epsilon_default=0.0)
     guard.baseline_edge_risk_by_family = {"attn": 1.0, "embed": 1.0}
     guard.edge_risk_by_family = {"attn": 2.0, "embed": 1.2}
     guard.epsilon_by_family["embed"] = 0.05
@@ -124,7 +127,7 @@ def test_rmt_guard_compute_epsilon_violations_detects_overages():
 
 
 def test_rmt_guard_compute_epsilon_violations_respects_allowed_threshold():
-    guard = RMTGuard(epsilon={"attn": 0.5})
+    guard = RMTGuard(epsilon_by_family={"attn": 0.5})
     guard.baseline_edge_risk_by_family = {"attn": 2.0}
     guard.edge_risk_by_family = {"attn": 3.0}
 

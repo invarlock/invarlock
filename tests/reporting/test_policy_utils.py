@@ -29,20 +29,6 @@ def test_compute_thresholds_payload_uses_tier_defaults(monkeypatch):
     assert payload["variance"]["min_effect_lognll"] == 0.2
 
 
-def test_promote_multiple_testing_alias_key():
-    payload = {"multipletesting": {"method": "holm"}}
-    policy_mod._promote_multiple_testing_alias_key(payload)
-    assert "multiple_testing" in payload and "multipletesting" not in payload
-
-
-def test_promote_multiple_testing_alias_non_mapping():
-    class BadMapping:
-        def pop(self, *_args, **_kwargs):
-            raise RuntimeError("boom")
-
-    policy_mod._promote_multiple_testing_alias_key(BadMapping())  # should not raise
-
-
 def test_resolve_policy_tier_checks_multiple_sources():
     report = {
         "meta": {"auto": {"tier": "Aggressive"}},

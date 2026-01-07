@@ -598,8 +598,19 @@ class TestRMTGuardComprehensive:
     def test_epsilon_rule_enforced_per_family(self):
         """Finalize flags epsilon-rule violations when edge-risk exceeds allowance."""
 
-        guard = RMTGuard(epsilon={"attn": 0.0, "ffn": 0.0, "embed": 0.0, "other": 0.0})
-        policy = {"epsilon": {"attn": 0.0, "ffn": 0.0, "embed": 0.0, "other": 0.0}}
+        guard = RMTGuard(
+            epsilon_default=0.0,
+            epsilon_by_family={"attn": 0.0, "ffn": 0.0, "embed": 0.0, "other": 0.0},
+        )
+        policy = {
+            "epsilon_default": 0.0,
+            "epsilon_by_family": {
+                "attn": 0.0,
+                "ffn": 0.0,
+                "embed": 0.0,
+                "other": 0.0,
+            },
+        }
         guard.prepare(
             self.model,
             Mock(),
@@ -1863,7 +1874,7 @@ class TestRMTGuardCoverageBoost:
         assert isinstance(summary, dict)
         assert isinstance(per_layer, list)
         assert "has_outliers" in summary
-        assert "rmt_max_ratio" in summary
+        assert "max_ratio" in summary
 
     def test_layer_svd_stats_comprehensive(self):
         """Test layer_svd_stats with various parameters."""
@@ -2839,8 +2850,7 @@ class TestRMTEnhancedCoverage:
         assert isinstance(summary, dict)
         assert isinstance(per_layer, list)
         assert "has_outliers" in summary
-        assert "rmt_max_ratio" in summary
-        assert "rmt_has_outliers" in summary
+        assert "max_ratio" in summary
 
     def test_apply_rmt_correction_comprehensive(self):
         """Test _apply_rmt_correction function (lines 744-834)."""

@@ -684,7 +684,6 @@ def rmt_detect(
     return {
         "has_outliers": has_outliers,
         "n_layers_flagged": n_outliers,
-        "outlier_count": n_outliers,  # Alias for compatibility
         "max_ratio": max_ratio,
         "threshold": threshold,
         "correction_iterations": correction_iterations,
@@ -715,8 +714,6 @@ def rmt_detect_report(
         "has_outliers": result["has_outliers"],
         "n_layers_flagged": result["n_layers_flagged"],
         "max_ratio": result["max_ratio"],
-        "rmt_max_ratio": result["max_ratio"],  # Alias for compatibility
-        "rmt_has_outliers": result["has_outliers"],  # Alias
     }
 
     return summary, result["per_layer"]
@@ -832,7 +829,6 @@ def rmt_detect_with_names(
     return {
         "has_outliers": has_outliers,
         "n_layers_flagged": n_outliers,
-        "outlier_count": n_outliers,
         "max_ratio": max_ratio,
         "threshold": threshold,
         "per_layer": per_layer,
@@ -1117,14 +1113,18 @@ class RMTPolicy:
     correct: bool = True  # Enable automatic correction
 
 
-class RMTPolicyDict(TypedDict):
-    """TypedDict version of RMTPolicy for compatibility."""
+class RMTPolicyDict(TypedDict, total=False):
+    """TypedDict version of the RMT guard policy."""
 
     q: float | Literal["auto"]
     deadband: float
     margin: float
     correct: bool
-    epsilon: float | dict[str, float] | None
+    epsilon_default: float
+    epsilon_by_family: dict[str, float]
+    activation_required: bool
+    estimator: dict[str, Any]
+    activation: dict[str, Any]
 
 
 class RMTGuard(Guard):
@@ -1157,7 +1157,9 @@ class RMTGuard(Guard):
         deadband: float = 0.10,
         margin: float = 1.5,
         correct: bool = True,
-        epsilon: float | dict[str, float] | None = None,
+        *,
+        epsilon_default: float = 0.10,
+        epsilon_by_family: dict[str, float] | None = None,
     ):
         """
         Initialize RMT Guard.
@@ -1172,9 +1174,9 @@ class RMTGuard(Guard):
         self.deadband = deadband
         self.margin = margin
         self.correct = correct
-        self.epsilon_default = 0.10
+        self.epsilon_default = float(epsilon_default)
         self.epsilon_by_family: dict[str, float] = {}
-        self._set_epsilon(epsilon)
+        self._set_epsilon_by_family(epsilon_by_family)
         for family_key in ("attn", "ffn", "embed", "other"):
             self.epsilon_by_family.setdefault(family_key, self.epsilon_default)
 
@@ -1242,23 +1244,28 @@ class RMTGuard(Guard):
         self._run_tier = tier or None
         self._require_activation = bool(profile in {"ci", "release"})
 
-    def _set_epsilon(self, epsilon: float | dict[str, float] | None) -> None:
-        """Configure epsilon defaults and per-family overrides."""
-        if isinstance(epsilon, dict):
-            mapped: dict[str, float] = {}
-            for family, value in epsilon.items():
-                try:
-                    mapped[str(family)] = float(value)
-                except (TypeError, ValueError):
-                    continue
-            if mapped:
-                self.epsilon_by_family.update(mapped)
-                self.epsilon_default = max(mapped.values())
-        elif isinstance(epsilon, int | float):
-            self.epsilon_default = float(epsilon)
-            if self.epsilon_by_family:
-                for family in list(self.epsilon_by_family):
-                    self.epsilon_by_family[family] = self.epsilon_default
+    def _set_epsilon_default(self, epsilon: Any) -> None:
+        """Set the default ε used when a family value is missing."""
+        if epsilon is None:
+            return
+        try:
+            eps = float(epsilon)
+        except (TypeError, ValueError):
+            return
+        if eps >= 0.0 and math.isfinite(eps):
+            self.epsilon_default = eps
+
+    def _set_epsilon_by_family(self, epsilon: Any) -> None:
+        """Set per-family ε values."""
+        if not isinstance(epsilon, dict):
+            return
+        for family, value in epsilon.items():
+            try:
+                eps = float(value)
+            except (TypeError, ValueError):
+                continue
+            if eps >= 0.0 and math.isfinite(eps):
+                self.epsilon_by_family[str(family)] = eps
 
     @staticmethod
     def _classify_family(module_name: str) -> str:
@@ -2055,6 +2062,17 @@ class RMTGuard(Guard):
 
         # Policy overrides (vNext contract)
         if isinstance(policy, dict) and policy:
+            if "epsilon" in policy:
+                from invarlock.core.exceptions import ValidationError
+
+                raise ValidationError(
+                    code="E501",
+                    message="POLICY-PARAM-INVALID",
+                    details={
+                        "param": "epsilon",
+                        "hint": "Use rmt.epsilon_default and rmt.epsilon_by_family instead.",
+                    },
+                )
             if "q" in policy:
                 q_val = policy.get("q")
                 if q_val == "auto":
@@ -2073,10 +2091,12 @@ class RMTGuard(Guard):
                     pass
             if "correct" in policy:
                 self.correct = bool(policy.get("correct"))
-            if "epsilon" in policy:
-                self._set_epsilon(policy["epsilon"])
             if "epsilon_by_family" in policy:
-                self._set_epsilon(policy["epsilon_by_family"])
+                self._set_epsilon_by_family(policy["epsilon_by_family"])
+            if "epsilon_default" in policy:
+                self._set_epsilon_default(policy["epsilon_default"])
+            for family_key in ("attn", "ffn", "embed", "other"):
+                self.epsilon_by_family.setdefault(family_key, self.epsilon_default)
             if "activation_required" in policy:
                 self._require_activation = bool(policy.get("activation_required"))
 
@@ -2481,7 +2501,8 @@ class RMTGuard(Guard):
             deadband=self.deadband,
             margin=self.margin,
             correct=self.correct,
-            epsilon=self.epsilon_by_family.copy(),
+            epsilon_default=float(self.epsilon_default),
+            epsilon_by_family=self.epsilon_by_family.copy(),
         )
 
 
@@ -2498,28 +2519,31 @@ def get_rmt_policy(name: str = "balanced") -> RMTPolicyDict:
     Returns:
         RMTPolicyDict configuration
     """
-    # Per-family ε values match tiers.yaml (November 2025 calibration)
+    # Per-family ε values match runtime tiers.yaml.
     policies = {
         "conservative": RMTPolicyDict(
             q="auto",
             deadband=0.05,
             margin=1.3,
             correct=True,
-            epsilon={"ffn": 0.06, "attn": 0.05, "embed": 0.07, "other": 0.07},
+            epsilon_default=0.06,
+            epsilon_by_family={"ffn": 0.06, "attn": 0.05, "embed": 0.07, "other": 0.07},
         ),
         "balanced": RMTPolicyDict(
             q="auto",
             deadband=0.10,
             margin=1.5,
             correct=True,
-            epsilon={"ffn": 0.10, "attn": 0.08, "embed": 0.12, "other": 0.12},
+            epsilon_default=0.10,
+            epsilon_by_family={"ffn": 0.10, "attn": 0.08, "embed": 0.12, "other": 0.12},
         ),
         "aggressive": RMTPolicyDict(
             q="auto",
             deadband=0.15,
             margin=1.8,
             correct=True,
-            epsilon={"ffn": 0.14, "attn": 0.12, "embed": 0.18, "other": 0.18},
+            epsilon_default=0.15,
+            epsilon_by_family={"ffn": 0.15, "attn": 0.15, "embed": 0.15, "other": 0.15},
         ),
     }
 
@@ -2541,7 +2565,9 @@ def create_custom_rmt_policy(
     deadband: float = 0.10,
     margin: float = 1.5,
     correct: bool = True,
-    epsilon: float | dict[str, float] | None = None,
+    *,
+    epsilon_default: float = 0.1,
+    epsilon_by_family: dict[str, float] | None = None,
 ) -> RMTPolicyDict:
     """
     Create a custom RMT policy.
@@ -2582,10 +2608,61 @@ def create_custom_rmt_policy(
             details={"param": "margin", "value": margin},
         )
 
+    from invarlock.core.exceptions import ValidationError
+
+    try:
+        eps_default_val = float(epsilon_default)
+    except (TypeError, ValueError):
+        raise ValidationError(
+            code="E501",
+            message="POLICY-PARAM-INVALID",
+            details={"param": "epsilon_default", "value": epsilon_default},
+        )
+    if not (math.isfinite(eps_default_val) and eps_default_val >= 0.0):
+        raise ValidationError(
+            code="E501",
+            message="POLICY-PARAM-INVALID",
+            details={"param": "epsilon_default", "value": epsilon_default},
+        )
+
+    eps_by_family: dict[str, float] = {}
+    if epsilon_by_family is not None:
+        if not isinstance(epsilon_by_family, dict):
+            raise ValidationError(
+                code="E501",
+                message="POLICY-PARAM-INVALID",
+                details={"param": "epsilon_by_family", "value": epsilon_by_family},
+            )
+        for family, value in epsilon_by_family.items():
+            try:
+                eps_val = float(value)
+            except (TypeError, ValueError):
+                raise ValidationError(
+                    code="E501",
+                    message="POLICY-PARAM-INVALID",
+                    details={
+                        "param": "epsilon_by_family",
+                        "family": str(family),
+                        "value": value,
+                    },
+                )
+            if not (math.isfinite(eps_val) and eps_val >= 0.0):
+                raise ValidationError(
+                    code="E501",
+                    message="POLICY-PARAM-INVALID",
+                    details={
+                        "param": "epsilon_by_family",
+                        "family": str(family),
+                        "value": value,
+                    },
+                )
+            eps_by_family[str(family)] = eps_val
+
     return RMTPolicyDict(
         q=q,
         deadband=deadband,
         margin=margin,
         correct=correct,
-        epsilon=epsilon,
+        epsilon_default=eps_default_val,
+        epsilon_by_family=eps_by_family,
     )

@@ -60,7 +60,13 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
             "margin": 1.40,  # Lower spike allowance
             "deadband": 0.10,  # Standard deadband
             "correct": True,
-            "epsilon": {"attn": 0.05, "ffn": 0.06, "embed": 0.07, "other": 0.07},
+            "epsilon_default": 0.07,
+            "epsilon_by_family": {
+                "attn": 0.05,
+                "ffn": 0.06,
+                "embed": 0.07,
+                "other": 0.07,
+            },
         },
         "variance": {
             "min_gain": 0.01,
@@ -121,7 +127,13 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
             "margin": 1.50,  # Default spike allowance
             "deadband": 0.10,  # Standard deadband
             "correct": True,
-            "epsilon": {"attn": 0.08, "ffn": 0.10, "embed": 0.12, "other": 0.12},
+            "epsilon_default": 0.12,
+            "epsilon_by_family": {
+                "attn": 0.08,
+                "ffn": 0.10,
+                "embed": 0.12,
+                "other": 0.12,
+            },
         },
         "variance": {
             "min_gain": 0.0,
@@ -179,7 +191,13 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
             "margin": 1.70,  # Higher spike allowance
             "deadband": 0.15,  # Larger deadband
             "correct": True,
-            "epsilon": {"attn": 0.15, "ffn": 0.15, "embed": 0.15, "other": 0.15},
+            "epsilon_default": 0.15,
+            "epsilon_by_family": {
+                "attn": 0.15,
+                "ffn": 0.15,
+                "embed": 0.15,
+                "other": 0.15,
+            },
         },
         "variance": {
             "min_gain": 0.0,
@@ -301,7 +319,7 @@ def _tier_entry_to_policy(tier_entry: dict[str, Any]) -> dict[str, dict[str, Any
     if isinstance(metrics, dict):
         out["metrics"] = copy.deepcopy(metrics)
 
-    spectral_src = tier_entry.get("spectral") or tier_entry.get("spectral_guard")
+    spectral_src = tier_entry.get("spectral_guard")
     if isinstance(spectral_src, dict):
         spectral = copy.deepcopy(spectral_src)
         if "family_caps" in spectral:
@@ -314,7 +332,7 @@ def _tier_entry_to_policy(tier_entry: dict[str, Any]) -> dict[str, dict[str, Any
             )
         out["spectral"] = spectral
 
-    rmt_src = tier_entry.get("rmt") or tier_entry.get("rmt_guard")
+    rmt_src = tier_entry.get("rmt_guard")
     if isinstance(rmt_src, dict):
         rmt = copy.deepcopy(rmt_src)
         eps = rmt.get("epsilon_by_family")
@@ -322,11 +340,9 @@ def _tier_entry_to_policy(tier_entry: dict[str, Any]) -> dict[str, dict[str, Any
             rmt["epsilon_by_family"] = {
                 str(k): float(v) for k, v in eps.items() if isinstance(v, int | float)
             }
-            # Backward-compat: keep epsilon alias
-            rmt["epsilon"] = dict(rmt["epsilon_by_family"])
         out["rmt"] = rmt
 
-    variance_src = tier_entry.get("variance") or tier_entry.get("variance_guard")
+    variance_src = tier_entry.get("variance_guard")
     if isinstance(variance_src, dict):
         out["variance"] = copy.deepcopy(variance_src)
 

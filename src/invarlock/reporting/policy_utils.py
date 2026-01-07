@@ -110,16 +110,6 @@ def _compute_thresholds_hash(payload: dict[str, Any]) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
 
 
-def _promote_multiple_testing_alias_key(payload: dict[str, Any]) -> None:
-    """Promote 'multipletesting' to 'multiple_testing' in-place if present."""
-    try:
-        mt_alias = payload.pop("multipletesting", None)
-        if mt_alias is not None and "multiple_testing" not in payload:
-            payload["multiple_testing"] = mt_alias
-    except Exception:
-        pass
-
-
 def _resolve_policy_tier(report: RunReport) -> str:
     """Resolve the policy tier from report metadata or context."""
     tier: Any = None
@@ -292,13 +282,11 @@ def _build_resolved_policies(
     rmt_resolved["epsilon_default"] = _safe_float(epsilon_default_val, 0.1)
     from .policy_utils import _format_epsilon_map as _fem
 
-    epsilon_map = _fem(rmt.get("epsilon_by_family") or rmt_resolved.pop("epsilon", {}))
+    epsilon_map = _fem(
+        rmt.get("epsilon_by_family") or rmt_resolved.get("epsilon_by_family") or {}
+    )
     if epsilon_map:
         rmt_resolved["epsilon_by_family"] = epsilon_map
-    else:
-        rmt_resolved.pop("epsilon", None)
-    if "epsilon" in rmt_resolved:
-        rmt_resolved.pop("epsilon", None)
     if "correct" in rmt_resolved:
         rmt_resolved["correct"] = bool(rmt_resolved["correct"])
     mc = rmt.get("measurement_contract")
@@ -443,11 +431,7 @@ def _extract_effective_policies(report: RunReport) -> dict[str, Any]:
                     "sigma_quantile",
                     0.95,
                 )
-                multiple_testing = guard_metrics.get("multiple_testing") or (
-                    guard_metrics.get("multipletesting")
-                    if isinstance(guard_metrics.get("multipletesting"), dict)
-                    else None
-                )
+                multiple_testing = guard_metrics.get("multiple_testing")
                 guard_policy = {
                     "max_spectral_norm": guard_metrics.get("max_spectral_norm"),
                     "stability_score": guard_metrics.get("stability_score", 0.95),
@@ -480,7 +464,6 @@ def _extract_effective_policies(report: RunReport) -> dict[str, Any]:
                         sanitized_policy["sigma_quantile"] = float(sigma_quantile)
                     except (TypeError, ValueError):
                         pass
-                _promote_multiple_testing_alias_key(sanitized_policy)
                 if sanitized_policy.get("max_spectral_norm") in (None, 0):
                     sanitized_policy["max_spectral_norm"] = None
                 guard_policy = sanitized_policy
@@ -581,7 +564,6 @@ __all__ = [
     "_compute_variance_policy_digest",
     "_compute_thresholds_payload",
     "_compute_thresholds_hash",
-    "_promote_multiple_testing_alias_key",
     "_resolve_policy_tier",
     "_build_resolved_policies",
     "_extract_effective_policies",

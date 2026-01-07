@@ -15,7 +15,7 @@ from typing import Any, Literal
 
 try:  # Python 3.12+
     from typing import NotRequired, TypedDict
-except ImportError:  # Legacy fallback
+except ImportError:  # Python <3.12 fallback
     from typing import NotRequired
 
     from typing_extensions import TypedDict
@@ -81,7 +81,8 @@ RMT_CONSERVATIVE: RMTPolicyDict = {
     "deadband": 0.05,  # 5% deadband - strict threshold
     "margin": 1.3,  # Lower margin for conservative detection
     "correct": True,  # Enable automatic correction
-    "epsilon": {"attn": 0.05, "ffn": 0.06, "embed": 0.07, "other": 0.07},
+    "epsilon_default": 0.06,
+    "epsilon_by_family": {"attn": 0.05, "ffn": 0.06, "embed": 0.07, "other": 0.07},
 }
 
 # Balanced RMT policy - good for most use cases
@@ -90,7 +91,8 @@ RMT_BALANCED: RMTPolicyDict = {
     "deadband": 0.10,  # 10% deadband - reasonable tolerance
     "margin": 1.5,  # Standard margin for outlier detection
     "correct": False,  # Monitor-only by default
-    "epsilon": {"attn": 0.08, "ffn": 0.10, "embed": 0.12, "other": 0.12},
+    "epsilon_default": 0.10,
+    "epsilon_by_family": {"attn": 0.08, "ffn": 0.10, "embed": 0.12, "other": 0.12},
 }
 
 # Aggressive RMT policy - for research/experimental use
@@ -99,7 +101,8 @@ RMT_AGGRESSIVE: RMTPolicyDict = {
     "deadband": 0.15,  # 15% deadband - more permissive
     "margin": 1.8,  # Higher margin allows more deviation
     "correct": True,  # Enable automatic correction
-    "epsilon": {"attn": 0.15, "ffn": 0.15, "embed": 0.15, "other": 0.15},
+    "epsilon_default": 0.15,
+    "epsilon_by_family": {"attn": 0.15, "ffn": 0.15, "embed": 0.15, "other": 0.15},
 }
 
 # === Variance Guard Policies ===
@@ -390,9 +393,10 @@ def get_rmt_policy(name: str = "balanced", *, use_yaml: bool = True) -> RMTPolic
                     policy["deadband"] = tier_config["deadband"]
                 if "margin" in tier_config:
                     policy["margin"] = tier_config["margin"]
-                # Use epsilon_by_family as the epsilon dict
+                if "epsilon_default" in tier_config:
+                    policy["epsilon_default"] = tier_config["epsilon_default"]
                 if "epsilon_by_family" in tier_config:
-                    policy["epsilon"] = tier_config["epsilon_by_family"]
+                    policy["epsilon_by_family"] = tier_config["epsilon_by_family"]
         except Exception:
             # Fallback to hardcoded values on any error
             pass

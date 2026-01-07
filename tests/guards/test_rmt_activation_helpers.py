@@ -47,7 +47,7 @@ def test_rmt_context_and_family_counts():
     guard.set_run_context(report)
     assert guard._run_profile is None
 
-    guard._set_epsilon({"bad": "nope"})
+    guard._set_epsilon_by_family({"bad": "nope"})
 
     per_layer = [
         {"module_name": "router.gate", "outlier_count": None, "has_outlier": True},

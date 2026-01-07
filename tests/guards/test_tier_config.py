@@ -144,8 +144,9 @@ class TestPolicyIntegration:
     def test_get_rmt_policy_uses_yaml(self) -> None:
         """get_rmt_policy loads epsilon values from tiers.yaml."""
         policy = get_rmt_policy("balanced", use_yaml=True)
-        epsilon = policy.get("epsilon", {})
+        epsilon = policy.get("epsilon_by_family", {})
         # Should have per-family epsilon from tiers.yaml
+        assert policy.get("epsilon_default") == 0.10
         assert epsilon.get("ffn") == 0.10
         assert epsilon.get("attn") == 0.08
         assert epsilon.get("embed") == 0.12
@@ -153,8 +154,9 @@ class TestPolicyIntegration:
     def test_get_rmt_policy_conservative_uses_yaml(self) -> None:
         """get_rmt_policy conservative tier uses tighter epsilon."""
         policy = get_rmt_policy("conservative", use_yaml=True)
-        epsilon = policy.get("epsilon", {})
+        epsilon = policy.get("epsilon_by_family", {})
         # Conservative has tighter values
+        assert policy.get("epsilon_default") == 0.06
         assert epsilon.get("ffn") == 0.06
         assert epsilon.get("attn") == 0.05
 

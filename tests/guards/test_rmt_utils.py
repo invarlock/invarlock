@@ -67,12 +67,13 @@ def test_rmt_policy_utils():
 
     # Valid custom
     custom = create_custom_rmt_policy(
-        q=0.5, deadband=0.2, margin=1.1, correct=False, epsilon={"attn": 0.1}
+        q=0.5, deadband=0.2, margin=1.1, correct=False, epsilon_by_family={"attn": 0.1}
     )
     assert custom["q"] == 0.5 and custom["correct"] is False
-    # epsilon as float allowed
-    custom2 = create_custom_rmt_policy(q=0.5, deadband=0.2, margin=1.1, epsilon=0.1)
-    assert custom2["epsilon"] == 0.1
+    assert custom["epsilon_by_family"] == {"attn": 0.1}
+    # epsilon_default as float allowed
+    custom2 = create_custom_rmt_policy(q=0.5, deadband=0.2, margin=1.1, epsilon_default=0.1)
+    assert custom2["epsilon_default"] == 0.1
     # Invalid args
     with pytest.raises(ValidationError):
         create_custom_rmt_policy(q=100.0)
