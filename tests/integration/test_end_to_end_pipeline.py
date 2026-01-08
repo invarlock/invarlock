@@ -482,7 +482,9 @@ class TestEndToEndPipeline:
     def test_sample_cli_config_uses_validation_split(self):
         """Sample task preset should exist and target the validation split."""
         project_root = Path(__file__).resolve().parents[2]
-        config_path = project_root / "configs" / "tasks" / "causal_lm" / "ci_cpu.yaml"
+        config_path = (
+            project_root / "configs" / "presets" / "causal_lm" / "wikitext2_512.yaml"
+        )
 
         assert config_path.exists()
 
