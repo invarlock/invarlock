@@ -147,7 +147,8 @@ Exhaustive command map with brief descriptions and notable options.
     - `invarlock report verify` — recompute/verify metrics for report/cert.
       - Args: `CERTIFICATES...`
       - Options: `--baseline`, `--tolerance`, `--profile`, `--json`.
-    - `invarlock report explain` — explain gates for report vs baseline.
+    - `invarlock report explain` — explain gates for report vs baseline (primary metric ratio,
+      Primary Metric Tail (ΔlogNLL), drift, and guard overhead when available).
     - `invarlock report html` — render certificate JSON to HTML.
       - Options: `-i/--input`, `-o/--output`, `--embed-css/--no-embed-css`, `--force`.
     - `invarlock report validate` — validate certificate JSON against current schema (v1).

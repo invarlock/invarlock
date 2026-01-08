@@ -60,8 +60,33 @@ fields produced by `invarlock.assurance.make_certificate`.
     "ratio_vs_baseline": 1.02,
     "display_ci": [1.00, 1.05]
   },
+  "primary_metric_tail": {
+    "mode": "warn",
+    "evaluated": true,
+    "passed": true,
+    "warned": false,
+    "violations": [],
+    "policy": {
+      "mode": "warn",
+      "min_windows": 50,
+      "quantile": 0.95,
+      "quantile_max": 0.20,
+      "epsilon": 0.0001,
+      "mass_max": 1.0
+    },
+    "stats": {
+      "n": 200,
+      "epsilon": 0.0001,
+      "q95": 0.02,
+      "q99": 0.04,
+      "max": 0.06,
+      "tail_mass": 0.03
+    },
+    "source": "paired_baseline.final"
+  },
   "validation": {
     "primary_metric_acceptable": true,
+    "primary_metric_tail_acceptable": true,
     "preview_final_drift_acceptable": true,
     "guard_overhead_acceptable": true
   },
@@ -133,6 +158,7 @@ fields while enforcing a small, stable core:
     set in code.
   - Common flags:
     - `primary_metric_acceptable`
+    - `primary_metric_tail_acceptable`
     - `preview_final_drift_acceptable`
     - `guard_overhead_acceptable`
     - `invariants_pass`
@@ -179,5 +205,19 @@ For existing integrations:
   older `ppl_*` fields.
 - Read gates from `validation.*` and thresholds from `policy_digest` /
   `resolved_policy`.
-- Treat additional sections (MoE, system overhead, telemetry, etc.) as
-  optional extensions that may appear in future minor releases.
+- Treat additional sections (MoE, system overhead, telemetry, etc.) as optional
+  extensions that may appear in future minor releases.
+
+## Primary Metric Tail gate (optional)
+
+For ppl-like metrics with paired per-window logloss, certificates may include
+`primary_metric_tail`, which records tail summaries of per-window ΔlogNLL vs the
+baseline and the tail-gate evaluation outcome:
+
+- `primary_metric_tail.stats` — deterministic quantiles (`q50/q90/q95/q99`),
+  `max`, and `tail_mass = Pr[ΔlogNLL > ε]`.
+- `primary_metric_tail.policy` — resolved `metrics.pm_tail` policy (mode,
+  quantile, thresholds, floors).
+- `primary_metric_tail.violations` — structured reasons when thresholds are exceeded.
+- `validation.primary_metric_tail_acceptable` — remains `true` in `warn` mode;
+  flips `false` only when `mode=fail` and a violation is evaluated.

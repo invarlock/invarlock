@@ -6,6 +6,11 @@ interpret them.
 - Primary Metric row
   - Shows the task‑appropriate metric (ppl_* or accuracy), its point estimates,
     and paired CI. The ratio/Δpp vs baseline drives the gate.
+- Primary Metric Tail row (when present)
+  - Shows tail regression vs baseline for ppl-like metrics using per-window
+    ΔlogNLL (e.g., P95 and tail mass above ε). Default policy is `mode: warn`
+    (does not fail the certificate); `mode: fail` sets
+    `validation.primary_metric_tail_acceptable = false`.
 - System Overhead row (when available)
   - Latency and throughput stats appear separate from quality and reflect the guarded run.
 - pPL identity (ppl families)
