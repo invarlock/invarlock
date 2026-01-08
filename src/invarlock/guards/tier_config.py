@@ -81,6 +81,7 @@ _FALLBACK_CONFIG: dict[str, dict[str, Any]] = {
             "deadband": 0.05,
             "scope": "ffn",
             "max_caps": 3,
+            "max_spectral_norm": None,
             "family_caps": {
                 "ffn": 2.3,
                 "attn": 2.6,
@@ -115,6 +116,7 @@ _FALLBACK_CONFIG: dict[str, dict[str, Any]] = {
             "deadband": 0.15,
             "scope": "ffn",
             "max_caps": 8,
+            "max_spectral_norm": None,
             "family_caps": {
                 "ffn": 3.0,
                 "attn": 3.5,

@@ -40,6 +40,7 @@ SPECTRAL_CONSERVATIVE: SpectralPolicy = {
     "scope": "ffn",  # FFN layers only (safest)
     "correction_enabled": True,
     "max_caps": 3,
+    "max_spectral_norm": None,
     "multiple_testing": {"method": "bonferroni", "alpha": 0.02, "m": 4},
 }
 
@@ -50,6 +51,7 @@ SPECTRAL_BALANCED: SpectralPolicy = {
     "scope": "ffn",  # FFN layers only
     "correction_enabled": False,
     "max_caps": 5,
+    "max_spectral_norm": None,
     "multiple_testing": {"method": "bh", "alpha": 0.05, "m": 4},
 }
 
@@ -60,6 +62,7 @@ SPECTRAL_AGGRESSIVE: SpectralPolicy = {
     "scope": "all",  # All layers including attention
     "correction_enabled": True,
     "max_caps": 8,
+    "max_spectral_norm": None,
     "multiple_testing": {"method": "bh", "alpha": 0.1, "m": 4},
 }
 
@@ -70,6 +73,7 @@ SPECTRAL_ATTN_AWARE: SpectralPolicy = {
     "scope": "attn",  # Attention layers only
     "correction_enabled": False,
     "max_caps": 5,
+    "max_spectral_norm": None,
     "multiple_testing": {"method": "bh", "alpha": 0.05, "m": 4},
 }
 
@@ -279,6 +283,8 @@ def get_spectral_policy(
                     policy["scope"] = tier_config["scope"]
                 if "max_caps" in tier_config:
                     policy["max_caps"] = tier_config["max_caps"]
+                if "max_spectral_norm" in tier_config:
+                    policy["max_spectral_norm"] = tier_config["max_spectral_norm"]
                 if "family_caps" in tier_config:
                     policy["family_caps"] = tier_config["family_caps"]
                 if "multiple_testing" in tier_config:

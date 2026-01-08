@@ -175,7 +175,7 @@ class SpectralGuard(Guard):
         self.config["sigma_quantile"] = self.sigma_quantile
         self.deadband = kwargs.get("deadband", 0.10)
         self.scope = kwargs.get("scope", "all")  # 'all', 'ffn', 'attn'
-        self.max_spectral_norm = kwargs.get("max_spectral_norm", 10.0)
+        self.max_spectral_norm = kwargs.get("max_spectral_norm", None)
         if self.max_spectral_norm is not None:
             self.max_spectral_norm = float(self.max_spectral_norm)
         self.config["max_spectral_norm"] = self.max_spectral_norm
