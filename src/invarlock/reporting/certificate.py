@@ -35,6 +35,7 @@ from invarlock.core.bootstrap import (
     logspace_to_ratio_ci,
 )
 from invarlock.eval.primary_metric import compute_primary_metric_from_report, get_metric
+from invarlock.eval.tail_stats import evaluate_metric_tail
 from invarlock.utils.digest import hash_json
 
 from . import certificate_schema as _cert_schema
@@ -391,6 +392,7 @@ def _compute_thresholds_hash(payload: dict[str, Any]) -> str:
 # Allow-list loader with safe defaults for validation keys
 _VALIDATION_ALLOWLIST_DEFAULT = {
     "primary_metric_acceptable",
+    "primary_metric_tail_acceptable",
     "preview_final_drift_acceptable",
     "guard_overhead_acceptable",
     "invariants_pass",
@@ -1754,6 +1756,104 @@ def make_certificate(
 
     pm_acceptance_range = _resolve_pm_acceptance_range_from_report(report)
 
+    # Primary metric tail evidence and gate evaluation (ΔlogNLL vs baseline, per-window).
+    pm_tail_result: dict[str, Any] = {}
+    try:
+        pm_kind = None
+        try:
+            pm_block = (
+                report.get("metrics", {}).get("primary_metric")
+                if isinstance(report.get("metrics"), dict)
+                else None
+            )
+            if isinstance(pm_block, dict):
+                pm_kind = pm_block.get("kind")
+        except Exception:  # pragma: no cover
+            pm_kind = None
+
+        pm_tail_policy: dict[str, Any] = {}
+        try:
+            metrics_pol = (
+                resolved_policy.get("metrics", {})
+                if isinstance(resolved_policy, dict)
+                else {}
+            )
+            if isinstance(metrics_pol, dict) and isinstance(
+                metrics_pol.get("pm_tail"), dict
+            ):
+                pm_tail_policy = dict(metrics_pol.get("pm_tail") or {})
+        except Exception:  # pragma: no cover
+            pm_tail_policy = {}
+
+        deltas: list[float] = []
+        weights: list[float] = []
+        if _is_ppl_kind(pm_kind):
+            run_windows = (
+                report.get("evaluation_windows", {}).get("final", {})
+                if isinstance(report.get("evaluation_windows"), dict)
+                else {}
+            )
+            base_windows = (
+                baseline_normalized.get("evaluation_windows", {}).get("final", {})
+                if isinstance(baseline_normalized.get("evaluation_windows"), dict)
+                else {}
+            )
+            run_ids = (
+                run_windows.get("window_ids") if isinstance(run_windows, dict) else None
+            )
+            run_ll = (
+                run_windows.get("logloss") if isinstance(run_windows, dict) else None
+            )
+            run_tc = (
+                run_windows.get("token_counts")
+                if isinstance(run_windows, dict)
+                else None
+            )
+            base_ids = (
+                base_windows.get("window_ids")
+                if isinstance(base_windows, dict)
+                else None
+            )
+            base_ll = (
+                base_windows.get("logloss") if isinstance(base_windows, dict) else None
+            )
+            if (
+                isinstance(run_ids, list)
+                and isinstance(run_ll, list)
+                and isinstance(base_ids, list)
+                and isinstance(base_ll, list)
+            ):
+                base_map: dict[int, float] = {}
+                for b_id, b_val in zip(base_ids, base_ll, strict=False):
+                    if isinstance(b_id, int | float) and isinstance(b_val, int | float):
+                        base_map[int(b_id)] = float(b_val)
+                for idx, (r_id, r_val) in enumerate(zip(run_ids, run_ll, strict=False)):
+                    if not (
+                        isinstance(r_id, int | float) and isinstance(r_val, int | float)
+                    ):
+                        continue
+                    key = int(r_id)
+                    if key not in base_map:
+                        continue
+                    dv = float(r_val) - base_map[key]
+                    if math.isfinite(dv):
+                        deltas.append(float(dv))
+                        if isinstance(run_tc, list) and idx < len(run_tc):
+                            try:
+                                wv = float(run_tc[idx])
+                            except Exception:
+                                wv = 0.0
+                            weights.append(float(max(wv, 0.0)))
+
+        pm_tail_result = evaluate_metric_tail(
+            deltas=deltas,
+            weights=weights if (weights and len(weights) == len(deltas)) else None,
+            policy=pm_tail_policy,
+        )
+        pm_tail_result["source"] = "paired_baseline.final"
+    except Exception:  # pragma: no cover
+        pm_tail_result = {"mode": "warn", "evaluated": False, "passed": True}
+
     validation_kwargs = {
         "ppl": ppl_analysis,
         "spectral": spectral,
@@ -1771,6 +1871,7 @@ def make_certificate(
             "tokens_available": capacity_tokens,
             "examples_available": capacity_examples,
         },
+        "pm_tail": pm_tail_result,
     }
     try:
         if (
@@ -1814,6 +1915,7 @@ def make_certificate(
         "artifacts": artifacts_payload,
         "validation": validation_filtered,
         "guard_overhead": guard_overhead_section,
+        "primary_metric_tail": pm_tail_result,
     }
 
     # Record tiny-relax provenance explicitly when active (dev-only demos)
@@ -3129,6 +3231,7 @@ def _compute_validation_flags(
     moe: dict[str, Any] | None = None,
     dataset_capacity: dict[str, Any] | None = None,
     pm_acceptance_range: dict[str, float] | None = None,
+    pm_tail: dict[str, Any] | None = None,
 ) -> dict[str, bool]:
     """Compute validation flags for the certificate including canonical gates."""
     tier = (tier or "balanced").lower()
@@ -3432,6 +3535,19 @@ def _compute_validation_flags(
             flags["moe_identity_ok"] = True
     except Exception:  # pragma: no cover
         pass
+
+    # Primary metric tail gate (warn/fail; default non-blocking)
+    try:
+        tail_ok = True
+        if isinstance(pm_tail, dict) and pm_tail:
+            mode = str(pm_tail.get("mode", "warn") or "warn").strip().lower()
+            evaluated = bool(pm_tail.get("evaluated", False))
+            passed = bool(pm_tail.get("passed", True))
+            if mode == "fail" and evaluated and (not passed):
+                tail_ok = False
+        flags["primary_metric_tail_acceptable"] = bool(tail_ok)
+    except Exception:  # pragma: no cover
+        flags["primary_metric_tail_acceptable"] = True
 
     return flags
 

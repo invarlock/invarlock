@@ -35,6 +35,16 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
                 "hysteresis_ratio": 0.002,
                 "min_token_fraction": 0.01,
             },
+            "pm_tail": {
+                # Always-computed tail evidence; warn-only by default.
+                "mode": "warn",
+                "min_windows": 50,
+                "quantile": 0.95,
+                "quantile_max": 0.12,
+                "epsilon": 1e-4,
+                # Default to non-binding tail-mass checks until calibrated.
+                "mass_max": 1.0,
+            },
             "accuracy": {
                 "delta_min_pp": -0.5,
                 "min_examples": 200,
@@ -100,6 +110,14 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
                 "min_tokens": 50000,
                 "hysteresis_ratio": 0.002,
                 "min_token_fraction": 0.01,
+            },
+            "pm_tail": {
+                "mode": "warn",
+                "min_windows": 50,
+                "quantile": 0.95,
+                "quantile_max": 0.20,
+                "epsilon": 1e-4,
+                "mass_max": 1.0,
             },
             "accuracy": {
                 "delta_min_pp": -1.0,
@@ -167,6 +185,14 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
                 "min_tokens": 50000,
                 "hysteresis_ratio": 0.002,
                 "min_token_fraction": 0.01,
+            },
+            "pm_tail": {
+                "mode": "warn",
+                "min_windows": 50,
+                "quantile": 0.95,
+                "quantile_max": 0.30,
+                "epsilon": 1e-4,
+                "mass_max": 1.0,
             },
             "accuracy": {
                 "delta_min_pp": -2.0,

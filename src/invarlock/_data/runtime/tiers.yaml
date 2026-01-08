@@ -15,6 +15,13 @@ balanced:
       min_tokens: 50000
       hysteresis_ratio: 0.002
       min_token_fraction: 0.01
+    pm_tail:
+      mode: warn
+      min_windows: 50
+      quantile: 0.95
+      quantile_max: 0.20
+      epsilon: 0.0001
+      mass_max: 1.0
     accuracy:
       delta_min_pp: -1.0
       min_examples: 200
@@ -62,6 +69,13 @@ conservative:
       min_tokens: 20000
       hysteresis_ratio: 0.002
       min_token_fraction: 0.01
+    pm_tail:
+      mode: warn
+      min_windows: 50
+      quantile: 0.95
+      quantile_max: 0.12
+      epsilon: 0.0001
+      mass_max: 1.0
     accuracy:
       delta_min_pp: -0.5
       min_examples: 200
@@ -109,6 +123,13 @@ aggressive:
       min_tokens: 50000
       hysteresis_ratio: 0.002
       min_token_fraction: 0.01
+    pm_tail:
+      mode: warn
+      min_windows: 50
+      quantile: 0.95
+      quantile_max: 0.30
+      epsilon: 0.0001
+      mass_max: 1.0
     accuracy:
       delta_min_pp: -2.0
       min_examples: 200
