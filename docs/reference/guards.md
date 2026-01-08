@@ -131,7 +131,8 @@ unless policy review explicitly approves a change. To exercise a local override
 during release evidence, use a local preset that includes the guard overrides:
 
 ```bash
-# configs/local/quant8_calibrated.yaml = base preset + guards overrides
+# Copy `configs/local/quant8_calibrated.example.yaml` → `configs/local/quant8_calibrated.yaml`
+# then edit (repo ignores `configs/local/*.yaml` by default).
 invarlock run -c configs/local/quant8_calibrated.yaml \
   --profile release --tier balanced \
   --baseline runs/.../baseline/report.json \

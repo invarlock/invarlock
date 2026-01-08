@@ -141,17 +141,15 @@ docs-ci:  ## Build documentation and run link checker
 ##@ Certification
 cert-loop:  ## Run automated certification loop (baseline + quant8)
 	@echo "Running automated certification workflow..."
-	@rm -rf runs/baseline runs/quant
-	@invarlock run -c configs/tasks/causal_lm/ci_cpu.yaml --profile ci --out runs/baseline
-	@latest_report=$$(ls -t runs/baseline/*/report.json | head -n1); \
-	if [ -z "$$latest_report" ]; then \
-		echo "Baseline run did not produce a report.json" >&2; \
-		exit 1; \
-	fi; \
-	cp "$$latest_report" runs/baseline/report.json
-	@invarlock run -c configs/edits/quant_rtn/8bit_attn.yaml --until-pass \
-		--baseline runs/baseline/report.json --out runs/quant
-	@echo "Certification loop complete. Check runs/ for results."
+	@rm -rf runs/cert_loop reports/cert/cert_loop
+	@INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
+		--baseline sshleifer/tiny-gpt2 --subject sshleifer/tiny-gpt2 --adapter auto \
+		--profile ci --tier balanced \
+		--preset configs/presets/causal_lm/wikitext2_512.yaml \
+		--edit-config configs/overlays/edits/quant_rtn/8bit_attn.yaml \
+		--out runs/cert_loop \
+		--cert-out reports/cert/cert_loop
+	@echo "Certification complete. Artifacts: runs/cert_loop/, reports/cert/cert_loop/"
 
 ##@ Utilities
 ci-matrix:  ## Verify CI matrix

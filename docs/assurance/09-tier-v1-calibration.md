@@ -117,8 +117,10 @@ $$
 * **Balanced pilot target:** ±0.001 on GPT-2/TinyLLaMA release profile (CI profile uses fewer windows).
 * Sweep $n$ to find the “coverage vs cost” knee; enforce **non-overlap** (`stride = seq_len`) and reuse baseline window IDs for perfect pairing.
 
-**Window sizing provenance.** Window counts are documented in preset configs
-under `configs/tasks/*/ci_*.yaml` and `configs/tasks/*/release_*.yaml`.
+**Window sizing provenance.** Window counts are controlled by the selected runtime
+profile (`--profile ...`), defined under `src/invarlock/_data/runtime/profiles/`.
+Repo-only runnable presets under `configs/presets/` set small defaults for
+unprofiled runs.
 **Runtime visibility.** Certificates expose window counts, coverage flags, and CI digests under `dataset.windows.stats` and `primary_metric`.
 
 ---
@@ -130,7 +132,7 @@ under `configs/tasks/*/ci_*.yaml` and `configs/tasks/*/release_*.yaml`.
 3. **RMT ε.** From null runs, set $\varepsilon(f)$ to the q95–q99 quantile of $\big(g(f)/b(f) - 1\big)$ per family (adjust for small $b(f)$).
 4. **VE min-effect.** ($\approx z\,\hat{\sigma}/\sqrt{n}$) with tier-appropriate sidedness.
 5. **Windows.** Size $n$ to hit the half-width target; enforce non-overlap and pairing.
-6. **Trial via override.** Write calibrated values to a local override YAML (e.g., `configs/overrides/spectral_balanced_local.yaml`) and merge it into a local run preset under `guards:` instead of editing the global tier. Re-run baseline + edits; pre-screen gates; then build certificates.
+6. **Trial via override.** Write calibrated values to a local override YAML (e.g., `configs/overrides/spectral_balanced_local.example.yaml`, copied locally and edited) and merge it into a local run preset under `guards:` instead of editing the global tier. Re-run baseline + edits; pre-screen gates; then build certificates.
 
 ---
 

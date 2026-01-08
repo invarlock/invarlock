@@ -9,8 +9,8 @@ echo "🧪 Verifying CI matrix configurations..."
 # Check that preset configs exist
 echo "📋 Checking preset and workflow configurations..."
 for config in \
-    configs/tasks/causal_lm/ci_cpu.yaml \
-    configs/edits/quant_rtn/8bit_attn.yaml; do
+    configs/presets/causal_lm/wikitext2_512.yaml \
+    configs/overlays/edits/quant_rtn/8bit_attn.yaml; do
     if [ -f "$config" ]; then
         echo "  ✅ $config"
     else
@@ -24,10 +24,10 @@ echo "📝 Validating YAML syntax..."
 if command -v python3 &> /dev/null; then
     if python3 -c "import yaml" &> /dev/null; then
         for config in \
-            configs/tasks/**/*.yaml \
-            configs/edits/**/*.yaml \
-            configs/models/*.yaml \
-            configs/datasets/*.yaml \
+            configs/presets/**/*.yaml \
+            configs/overlays/**/*.yaml \
+            configs/calibration/*.yaml \
+            configs/overrides/*.yaml \
             src/invarlock/_data/runtime/tiers.yaml \
             src/invarlock/_data/runtime/profiles/*.yaml; do
             if [ -f "$config" ]; then
