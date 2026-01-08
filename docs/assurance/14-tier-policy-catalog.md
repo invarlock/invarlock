@@ -47,6 +47,37 @@ token/example floors, and whether hysteresis applied.
   when results hover near the boundary; certificates mark when hysteresis was
   needed (`validation.hysteresis_applied`).
 
+#### `metrics.pm_tail.*` (Primary Metric Tail gate; ppl-like kinds)
+
+This is a **tail-regression backstop** computed on paired **per-window**
+ΔlogNLL samples vs the baseline (window-by-window `logloss_subject - logloss_baseline`,
+matched by `window_id` on the **final** schedule). It is additive to the mean/CI
+primary-metric gate: it catches “localized” heavy-tail regressions that can be
+hidden by an acceptable mean ratio.
+
+- `mode` *(policy)* — `off|warn|fail`.
+  - `warn` (default): violations are recorded in the certificate but do **not**
+    fail validation (`validation.primary_metric_tail_acceptable` stays true).
+  - `fail`: violations fail validation and can trigger rollback in `invarlock run`
+    (`rollback_reason = primary_metric_tail_failed`).
+- `min_windows` *(policy)* — minimum paired windows required before evaluating
+  thresholds. Underpowered runs set `primary_metric_tail.evaluated = false` and
+  do not warn/fail.
+- `quantile` *(policy)* — which percentile to monitor (default 0.95 → P95).
+  Quantiles are computed **unweighted** with deterministic linear interpolation
+  on sorted ΔlogNLL values.
+- `quantile_max` *(policy/calibration target)* — maximum allowed ΔlogNLL at the
+  selected quantile (e.g., `P95 ≤ 0.20`).
+- `epsilon` *(policy)* — deadband for “tail mass”: `tail_mass = Pr[ΔlogNLL > ε]`.
+- `mass_max` *(policy/calibration target)* — maximum allowed tail mass. Defaults
+  to 1.0 (non-binding) until calibrated.
+
+Visibility:
+
+- Certificate evidence: `primary_metric_tail.{stats,policy,violations}`.
+- Validation flag: `validation.primary_metric_tail_acceptable` (false only in `fail` mode).
+- CLI: `invarlock report explain` prints “Gate: Primary Metric Tail (ΔlogNLL)”.
+
 #### `metrics.accuracy.*` (accuracy kinds)
 
 - `delta_min_pp` *(policy)* — minimum allowed Δaccuracy vs baseline (percentage
@@ -138,4 +169,3 @@ Keys:
 - `tap` *(policy)* — module-name pattern(s) that define where VE is allowed to
   attach. Rationale: the tap must match the edited sublayer for provenance and
   reproducibility; see “Provenance & tap” in `docs/assurance/07-ve-gate-power.md`.
-

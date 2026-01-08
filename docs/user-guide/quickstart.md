@@ -60,7 +60,7 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
   --profile ci \
   --preset configs/presets/causal_lm/wikitext2_512.yaml
 
-# Explain decisions and render HTML
+# Explain decisions and render HTML (includes Primary Metric Tail gate details)
 invarlock report explain --report runs/edited/report.json --baseline runs/source/report.json
 invarlock report html -i reports/cert/evaluation.cert.json -o reports/cert/evaluation.html
 ```

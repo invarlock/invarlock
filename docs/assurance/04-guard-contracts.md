@@ -74,6 +74,11 @@ stores both the count and the limit under
     Thresholds come from the calibrated tier configuration in the packaged
     `tiers.yaml` (see `metrics.accuracy` for each tier) and are surfaced at
     runtime under `resolved_policy.metrics.accuracy`.
+- Primary metric tail (ppl-like kinds): a warn/fail gate on **per-window**
+  ΔlogNLL vs the paired baseline. The tail statistic (default P95) must stay
+  under `metrics.pm_tail.quantile_max`, and (optionally) the mass above ε must
+  stay under `metrics.pm_tail.mass_max`. Gate flag: `validation.primary_metric_tail_acceptable`
+  (only flips false when `metrics.pm_tail.mode = fail`).
 - Preview→final drift: require 0.95–1.05 for the guarded run’s final/preview
   ratio. Gate flag: `validation.preview_final_drift_acceptable`.
 - Spectral stability: caps applied must not exceed the tier’s `max_caps`
@@ -85,9 +90,12 @@ stores both the count and the limit under
   evaluated. Gate flag: `validation.guard_overhead_acceptable`.
 
 Exceeding any gate flips the corresponding `validation.*` flag to false and the
-certificate fails overall. Catastrophic spikes are handled during the run: the
-`spike_threshold` (default 2.0× PPL) triggers immediate rollback regardless of
-other gates. See also `src/invarlock/core/runner.py:1816`.
+certificate fails overall, **except** that the Primary Metric Tail gate can run
+in `mode: warn` (staged rollout) where it emits a warning but keeps
+`validation.primary_metric_tail_acceptable = true`. Catastrophic spikes are
+handled during the run: the `spike_threshold` (default 2.0× PPL) triggers
+immediate rollback regardless of other gates. See also
+`src/invarlock/core/runner.py:1816`.
 
 **Sigma quantile (qσ)** controls the target sigma used for spectral monitoring.
 Balanced uses `sigma_quantile = 0.95`, Conservative `0.90` (see
