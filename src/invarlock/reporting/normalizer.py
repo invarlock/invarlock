@@ -183,6 +183,7 @@ def normalize_run_report(report: Mapping[str, Any] | RunReport) -> RunReport:
         "spectral",
         "rmt",
         "invariants",
+        "primary_metric_tail",
         "logloss_delta_ci",
         "bootstrap",
         "reduction",

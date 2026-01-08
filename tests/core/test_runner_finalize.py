@@ -35,6 +35,34 @@ def test_finalize_rollback_on_metrics_unacceptable():
     assert status == RunStatus.ROLLBACK.value
 
 
+def test_finalize_rollback_on_tail_gate_fail_mode():
+    runner = CoreRunner()
+    report = RunReport()
+    report.meta["initial_checkpoint"] = "cp-1"
+
+    called = {}
+
+    class StubCM:
+        def restore_checkpoint(self, model, adapter, checkpoint_id):  # type: ignore[no-untyped-def]
+            called["id"] = checkpoint_id
+            return True
+
+    runner.checkpoint_manager = StubCM()
+    metrics = {
+        "primary_metric": {"kind": "ppl_causal", "preview": 1.0, "final": 1.02},
+        "primary_metric_tail": {"mode": "fail", "evaluated": True, "passed": False},
+    }
+    guard_results = {"spectral": {"passed": True}}
+    cfg = RunConfig(max_pm_ratio=10.0, spike_threshold=2.0)
+
+    status = runner._finalize_phase(
+        object(), object(), guard_results, metrics, cfg, report
+    )
+    assert status == RunStatus.ROLLBACK.value
+    assert called.get("id") == "cp-1"
+    assert report.meta.get("rollback_reason") == "primary_metric_tail_failed"
+
+
 def test_finalize_success_when_all_good():
     runner = CoreRunner()
     report = RunReport()

@@ -18,6 +18,8 @@ from typing import Any
 
 import numpy as np
 
+from invarlock.eval.tail_stats import evaluate_metric_tail
+
 from .api import Guard, ModelAdapter, ModelEdit, RunConfig, RunReport
 from .auto_tuning import resolve_tier_policies
 from .bootstrap import (
@@ -582,6 +584,98 @@ class CoreRunner:
                 "memory_mb_peak": 1024.0,
             }
             eval_windows = {"preview": {}, "final": {}}
+
+        # Optional: compute primary metric tail evidence vs baseline when provided.
+        try:
+            pm = metrics.get("primary_metric", {}) if isinstance(metrics, dict) else {}
+            pm_kind = str(pm.get("kind", "")).lower() if isinstance(pm, dict) else ""
+            is_ppl_metric = pm_kind.startswith("ppl")
+
+            baseline_eval = {}
+            if (
+                is_ppl_metric
+                and config
+                and isinstance(config.context, dict)
+                and isinstance(config.context.get("baseline_eval_windows"), dict)
+            ):
+                baseline_eval = config.context.get("baseline_eval_windows") or {}
+
+            if is_ppl_metric and baseline_eval:
+                tier_policies = (
+                    report.meta.get("tier_policies", {})
+                    if isinstance(getattr(report, "meta", None), dict)
+                    else {}
+                )
+                metrics_policy = (
+                    tier_policies.get("metrics", {})
+                    if isinstance(tier_policies, dict)
+                    else {}
+                )
+                pm_tail_policy = (
+                    metrics_policy.get("pm_tail", {})
+                    if isinstance(metrics_policy, dict)
+                    else {}
+                )
+
+                run_final = (
+                    eval_windows.get("final", {}) if isinstance(eval_windows, dict) else {}
+                )
+                base_final = (
+                    baseline_eval.get("final", {})
+                    if isinstance(baseline_eval, dict)
+                    else {}
+                )
+
+                deltas: list[float] = []
+                weights: list[float] = []
+                run_ids = run_final.get("window_ids") if isinstance(run_final, dict) else None
+                run_ll = run_final.get("logloss") if isinstance(run_final, dict) else None
+                run_tc = run_final.get("token_counts") if isinstance(run_final, dict) else None
+                base_ids = base_final.get("window_ids") if isinstance(base_final, dict) else None
+                base_ll = base_final.get("logloss") if isinstance(base_final, dict) else None
+
+                if (
+                    isinstance(run_ids, list)
+                    and isinstance(run_ll, list)
+                    and isinstance(base_ids, list)
+                    and isinstance(base_ll, list)
+                ):
+                    base_map: dict[int, float] = {}
+                    for b_id, b_val in zip(base_ids, base_ll, strict=False):
+                        if isinstance(b_id, int | float) and isinstance(
+                            b_val, int | float
+                        ):
+                            base_map[int(b_id)] = float(b_val)
+                    for idx, (r_id, r_val) in enumerate(
+                        zip(run_ids, run_ll, strict=False)
+                    ):
+                        if not (
+                            isinstance(r_id, int | float)
+                            and isinstance(r_val, int | float)
+                        ):
+                            continue
+                        key = int(r_id)
+                        if key not in base_map:
+                            continue
+                        dv = float(r_val) - base_map[key]
+                        if math.isfinite(dv):
+                            deltas.append(float(dv))
+                            if isinstance(run_tc, list) and idx < len(run_tc):
+                                try:
+                                    wv = float(run_tc[idx])
+                                except Exception:
+                                    wv = 0.0
+                                weights.append(float(max(wv, 0.0)))
+
+                tail_result = evaluate_metric_tail(
+                    deltas=deltas,
+                    weights=weights if (weights and len(weights) == len(deltas)) else None,
+                    policy=pm_tail_policy if isinstance(pm_tail_policy, dict) else None,
+                )
+                tail_result["source"] = "paired_baseline.final"
+                metrics["primary_metric_tail"] = tail_result
+        except Exception:  # pragma: no cover - best effort
+            pass
 
         policy_flags = self._resolve_policy_flags(config)
         eval_error = metrics.get("eval_error") if isinstance(metrics, dict) else None
@@ -2041,6 +2135,16 @@ class CoreRunner:
 
         # Determine rollback reason and status
         rollback_reason = None
+        tail_failed = False
+        try:
+            pm_tail = metrics.get("primary_metric_tail", {})
+            if isinstance(pm_tail, dict) and pm_tail:
+                mode = str(pm_tail.get("mode", "warn") or "warn").strip().lower()
+                evaluated = bool(pm_tail.get("evaluated", False))
+                passed = bool(pm_tail.get("passed", True))
+                tail_failed = bool(mode == "fail" and evaluated and (not passed))
+        except Exception:  # pragma: no cover
+            tail_failed = False
         if is_catastrophic_spike:
             rollback_reason = (
                 f"catastrophic_ppl_spike (ratio: {drift_ratio:.3f} > {spike_threshold})"
@@ -2057,6 +2161,9 @@ class CoreRunner:
                     "immediate_rollback": True,
                 },
             )
+        elif tail_failed:
+            rollback_reason = "primary_metric_tail_failed"
+            status = RunStatus.ROLLBACK.value
         elif (not all_guards_passed) or (not metrics_acceptable):
             # Match historical/test expectation string exactly
             rollback_reason = "guards_failed or metrics_unacceptable"

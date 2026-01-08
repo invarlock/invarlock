@@ -2158,9 +2158,22 @@ def run_command(
                         # computations see a consistent window_id + mask shape even for
                         # baselines missing some fields.
                         try:
-                            baseline_report_data["evaluation_windows"] = (
-                                pairing_schedule
-                            )
+                            ew = baseline_report_data.get("evaluation_windows")
+                            if not isinstance(ew, dict):
+                                ew = {}
+                                baseline_report_data["evaluation_windows"] = ew
+                            # Merge the sanitized pairing schedule into existing
+                            # evaluation_windows without discarding logloss/token_counts.
+                            for arm in ("preview", "final"):
+                                src = pairing_schedule.get(arm) if isinstance(pairing_schedule, dict) else None
+                                if not isinstance(src, dict):
+                                    continue
+                                dst = ew.get(arm)
+                                if not isinstance(dst, dict):
+                                    ew[arm] = dict(src)
+                                    continue
+                                for key, value in src.items():
+                                    dst[key] = value
                         except Exception:
                             pass
                         # Harvest tokenizer hash provenance from baseline when present.
@@ -2315,6 +2328,31 @@ def run_command(
             "plugins": plugin_provenance,
             "run_id": run_id,
         }
+        # Provide baseline per-window logloss to the CoreRunner for paired tail
+        # evidence and (optionally) fail/rollback enforcement.
+        try:
+            if isinstance(baseline_report_data, dict):
+                ew = baseline_report_data.get("evaluation_windows")
+                if isinstance(ew, dict):
+                    final = ew.get("final")
+                    if (
+                        isinstance(final, dict)
+                        and isinstance(final.get("window_ids"), list)
+                        and isinstance(final.get("logloss"), list)
+                    ):
+                        base_eval: dict[str, Any] = {
+                            "final": {
+                                "window_ids": list(final.get("window_ids") or []),
+                                "logloss": list(final.get("logloss") or []),
+                            }
+                        }
+                        if isinstance(final.get("token_counts"), list):
+                            base_eval["final"]["token_counts"] = list(
+                                final.get("token_counts") or []
+                            )
+                        run_context["baseline_eval_windows"] = base_eval
+        except Exception:
+            pass
         run_context.setdefault("primary_metric", {})["acceptance_range"] = (
             pm_acceptance_range
         )
@@ -3724,6 +3762,7 @@ def run_command(
                     "window_pairing_final",
                     "paired_windows",
                     "paired_delta_summary",
+                    "primary_metric_tail",
                     "preview_total_tokens",
                     "final_total_tokens",
                     "masked_tokens_total",

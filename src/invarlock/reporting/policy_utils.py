@@ -48,6 +48,10 @@ def _compute_thresholds_payload(
     if not isinstance(pm_policy, dict):
         pm_policy = {}
 
+    pm_tail_policy = metrics_policy.get("pm_tail", {})
+    if not isinstance(pm_tail_policy, dict):
+        pm_tail_policy = {}
+
     acc_policy = metrics_policy.get("accuracy", {})
     if not isinstance(acc_policy, dict):
         acc_policy = {}
@@ -76,6 +80,12 @@ def _compute_thresholds_payload(
         resolved_policy.get("variance", {}) if isinstance(resolved_policy, dict) else {}
     )
 
+    def _safe_float_any(value: Any, default: float) -> float:
+        try:
+            return float(value)
+        except Exception:
+            return float(default)
+
     payload = {
         "tier": tier_lc,
         "pm_ratio": {
@@ -85,6 +95,22 @@ def _compute_thresholds_payload(
                 pm_policy.get("min_token_fraction", 0.0) or 0.0
             ),
             "hysteresis_ratio": float(pm_policy.get("hysteresis_ratio", 0.0) or 0.0),
+        },
+        "pm_tail": {
+            "mode": str(pm_tail_policy.get("mode", "warn") or "warn").strip().lower(),
+            "min_windows": int(pm_tail_policy.get("min_windows", 0) or 0),
+            "quantile": _safe_float_any(pm_tail_policy.get("quantile", 0.95), 0.95),
+            "quantile_max": (
+                float(pm_tail_policy.get("quantile_max"))
+                if isinstance(pm_tail_policy.get("quantile_max"), int | float)
+                else None
+            ),
+            "epsilon": _safe_float_any(pm_tail_policy.get("epsilon", 0.0), 0.0),
+            "mass_max": (
+                float(pm_tail_policy.get("mass_max"))
+                if isinstance(pm_tail_policy.get("mass_max"), int | float)
+                else None
+            ),
         },
         "accuracy": {
             "delta_min_pp": float(acc_policy.get("delta_min_pp", -1.0) or -1.0),

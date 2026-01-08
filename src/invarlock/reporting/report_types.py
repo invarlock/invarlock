@@ -101,6 +101,8 @@ class EvalMetrics(TypedDict, total=False):
 
     # Canonical primary metric snapshot
     primary_metric: dict[str, Any]
+    # Always-computed tail evidence/gate for ppl-like primary metrics
+    primary_metric_tail: dict[str, Any]
 
     # Optional aux fields retained for guard telemetry and debug
     latency_ms_per_tok: float  # Average latency per token in milliseconds
