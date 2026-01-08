@@ -4,7 +4,7 @@ title: GPU/MPS-First Guards (Decision Memo)
 
 # GPU/MPS-First Guards (Decision Memo)
 
-This memo records the **vNext** decisions for making InvarLock guards usable on
+This memo records the decisions for making InvarLock guards usable on
 large models (30B+ and beyond) where full-matrix SVD is operationally
 impractical.
 
@@ -16,13 +16,12 @@ impractical.
 - Bind guard semantics to certificates via a **measurement contract** that is
   verify-time enforced.
 
-## Decisions (vNext)
+## Decisions
 
-### 1) Remove strict/fast evidence modes
+### 1) Single evidence mode
 
 - There is a single canonical guard contract.
-- Certificates and verification no longer use “strict vs fast” as an evidence
-  class; they instead require a complete measurement contract.
+- Certificates and verification require a complete measurement contract.
 
 ### 2) Spectral contract: $\hat{\sigma}_{\max}$ + degeneracy proxies
 
@@ -54,5 +53,5 @@ they are intended to catch collapse/rank loss in a scalable way.
 
 ## Non-goals
 
-- Support for removed strict/fast certificates or policies.
+- Support for certificates or policies without a complete measurement contract.
 - Full-spectrum or exact SVD computations in guard code paths.

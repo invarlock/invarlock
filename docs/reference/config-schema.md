@@ -94,7 +94,7 @@ Online mode requires `INVARLOCK_ALLOW_NETWORK=1` for the first run to populate t
 
 ## Metric and Provider Selection
 
-Configure task-agnostic evaluation via `eval.metric.*` and pick the dataset provider kind explicitly. Config takes precedence over env flags; if both are set, config wins and a deprecation notice is logged for `INVARLOCK_METRIC_V1`.
+Configure task-agnostic evaluation via `eval.metric.*` and pick the dataset provider kind explicitly. Config takes precedence over env flags; if both are set, config wins.
 
 ```yaml
 eval:
