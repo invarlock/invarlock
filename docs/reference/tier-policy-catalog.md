@@ -7,7 +7,7 @@
 > map”: for every key in `tiers.yaml`, it explains what it controls and where to
 > point for the rationale.
 
-## Where the tier file lives
+## Location
 
 - Packaged default: `src/invarlock/_data/runtime/tiers.yaml`
 - Override: set `INVARLOCK_CONFIG_ROOT` and provide `runtime/tiers.yaml` under it
@@ -19,16 +19,34 @@ Balanced and Conservative are the supported safety tiers; Aggressive is
 research‑oriented and explicitly outside the safety case (see
 `docs/assurance/00-safety-case.md`).
 
-## Key-by-key rationale (what + why)
+## Catalog (what + why)
+
+This page documents the tier keys grouped by section. Each section follows the
+same structure:
+
+- **What it controls** (runtime behavior)
+- **Where documented** (assurance notes / method writeups)
+- **Keys** (key-by-key meaning)
+- **Observability** (where it appears in reports/certificates)
 
 ### Primary-metric gates (`metrics.*`)
 
-These are run-level acceptance gates applied when generating/verifying a
-certificate (see “Quality Gates” in `docs/assurance/04-guard-contracts.md`).
-For a concrete run, `invarlock report explain` prints the resolved thresholds,
-token/example floors, and whether hysteresis applied.
+**What it controls.** Run-level acceptance gates applied when generating/verifying
+a certificate (see “Quality Gates” in `docs/assurance/04-guard-contracts.md`).
+
+**Where documented.**
+
+- `docs/assurance/04-guard-contracts.md` (gate definitions + flags)
+
+**Observability.**
+
+- Resolved thresholds: `resolved_policy.metrics.*`
+- Gate flags: `validation.primary_metric_acceptable`, `validation.primary_metric_tail_acceptable`
+- CLI: `invarlock report explain` prints the resolved thresholds, floors, and outcomes.
 
 #### `metrics.pm_ratio.*` (ppl-like kinds)
+
+**Keys.**
 
 - `ratio_limit_base` *(policy)* — the baseline-relative gate for ppl-like
   primary metrics (`ratio_vs_baseline ≤ ratio_limit_base`, and when a CI exists,
@@ -47,13 +65,20 @@ token/example floors, and whether hysteresis applied.
   when results hover near the boundary; certificates mark when hysteresis was
   needed (`validation.hysteresis_applied`).
 
+**Observability.**
+
+- Resolved policy: `resolved_policy.metrics.pm_ratio`
+- Evidence: `primary_metric.{ratio_vs_baseline,display_ci}`
+- Gate flag: `validation.primary_metric_acceptable`
+
 #### `metrics.pm_tail.*` (Primary Metric Tail gate; ppl-like kinds)
 
-This is a **tail-regression backstop** computed on paired **per-window**
-ΔlogNLL samples vs the baseline (window-by-window `logloss_subject - logloss_baseline`,
-matched by `window_id` on the **final** schedule). It is additive to the mean/CI
-primary-metric gate: it catches “localized” heavy-tail regressions that can be
-hidden by an acceptable mean ratio.
+**What it controls.** A **tail-regression backstop** computed on paired
+**per-window** ΔlogNLL samples vs the baseline (window-by-window
+`logloss_subject - logloss_baseline`, matched by `window_id` on the **final**
+schedule). It is additive to the mean/CI primary-metric gate.
+
+**Keys.**
 
 - `mode` *(policy)* — `off|warn|fail`.
   - `warn` (default): violations are recorded in the certificate but do **not**
@@ -72,13 +97,15 @@ hidden by an acceptable mean ratio.
 - `mass_max` *(policy/calibration target)* — maximum allowed tail mass. Defaults
   to 1.0 (non-binding) until calibrated.
 
-Visibility:
+**Observability.**
 
 - Certificate evidence: `primary_metric_tail.{stats,policy,violations}`.
 - Validation flag: `validation.primary_metric_tail_acceptable` (false only in `fail` mode).
 - CLI: `invarlock report explain` prints “Gate: Primary Metric Tail (ΔlogNLL)”.
 
 #### `metrics.accuracy.*` (accuracy kinds)
+
+**Keys.**
 
 - `delta_min_pp` *(policy)* — minimum allowed Δaccuracy vs baseline (percentage
   points). Defaults per tier are stated in `docs/assurance/04-guard-contracts.md`
@@ -92,15 +119,23 @@ Visibility:
   (`delta_min_pp - hysteresis_delta_pp`). Rationale: avoids flapping near the
   boundary; marked in certificates via `validation.hysteresis_applied`.
 
+**Observability.**
+
+- Resolved policy: `resolved_policy.metrics.accuracy`
+- Evidence: `primary_metric.{ratio_vs_baseline,display_ci}`
+- Gate flag: `validation.primary_metric_acceptable`
+
 ### Spectral guard (`spectral_guard.*`)
 
-These are the weight-based stability thresholds. Calibrated values and the
-multiple-testing procedure are documented in:
+**What it controls.** Weight-based stability thresholds for per-family spectral
+monitoring.
+
+**Where documented.**
 
 - `docs/assurance/05-spectral-fpr-derivation.md` (policy + FPR control)
 - `docs/assurance/09-tier-v1-calibration.md` (pilot numbers + recalibration)
 
-Keys:
+**Keys.**
 
 - `sigma_quantile` *(calibrated)* — which baseline percentile defines the
   reference sigma target used for z-scoring.
@@ -119,14 +154,23 @@ Keys:
   κ across families (`bh`/`bonferroni`, α, m); see
   `docs/assurance/05-spectral-fpr-derivation.md`.
 
+**Observability.**
+
+- Evidence: `spectral.{summary,families,family_caps,multiple_testing}`
+- Resolved policy: `resolved_policy.spectral`
+- Gate flag: `validation.spectral_stable`
+
 ### RMT guard (`rmt_guard.*`)
 
-The acceptance gate for activation edge-risk is the ε-band rule, documented in:
+**What it controls.** Activation edge-risk stability via the ε-band acceptance
+rule.
+
+**Where documented.**
 
 - `docs/assurance/06-rmt-epsilon-rule.md` (acceptance rule + calibration)
 - `docs/assurance/09-tier-v1-calibration.md` (recalibration recipe)
 
-Keys:
+**Keys.**
 
 - `epsilon_by_family` *(calibrated)* — ε(f) per family for the acceptance band:
   `edge_cur(f) ≤ (1 + ε(f)) · edge_base(f)`.
@@ -139,14 +183,23 @@ Keys:
   diagnostics/correction path; higher margins tolerate more deviation before
   flagging.
 
+**Observability.**
+
+- Evidence: `rmt.{status,stable,families,epsilon_by_family,epsilon_violations}`
+- Resolved policy: `resolved_policy.rmt`
+- Gate flag: `validation.rmt_stable`
+
 ### Variance guard (`variance_guard.*`)
 
-The predictive gate and min-effect semantics are documented in:
+**What it controls.** VE enablement/correction knobs including the predictive
+gate and min-effect semantics.
+
+**Where documented.**
 
 - `docs/assurance/07-ve-gate-power.md` (power + sidedness + tier knobs)
 - `docs/assurance/09-tier-v1-calibration.md` (min-effect recalibration)
 
-Keys:
+**Keys.**
 
 - `predictive_gate` *(policy)* — when true, VE only enables if the predictive
   A/B gate passes (certificate records `variance.predictive_gate.*`).
@@ -169,3 +222,8 @@ Keys:
 - `tap` *(policy)* — module-name pattern(s) that define where VE is allowed to
   attach. Rationale: the tap must match the edited sublayer for provenance and
   reproducibility; see “Provenance & tap” in `docs/assurance/07-ve-gate-power.md`.
+
+**Observability.**
+
+- Evidence: `variance.{enabled,predictive_gate,ab_test,scope,proposed_scales}`
+- Resolved policy: `resolved_policy.variance`

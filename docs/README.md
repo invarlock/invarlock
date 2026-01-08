@@ -55,10 +55,12 @@ Tip: enable Hub downloads per command when fetching models/datasets:
 - [CLI Reference](reference/cli.md)
 - [Configuration Schema](reference/config-schema.md)
 - [Guards](reference/guards.md)
+- [GPU/MPS-First Guards (Decision Memo)](reference/gpu-mps-first-guards.md)
 - [Model Adapters](reference/model-adapters.md)
 - [Exporting Certificates (HTML)](reference/exporting-certificates-html.md)
 - [Certificate Schema (v1)](reference/certificate-schema.md)
 - [Certificate Telemetry](reference/certificate_telemetry.md)
+- [Tier Policy Catalog (runtime tiers.yaml)](reference/tier-policy-catalog.md)
 - [Datasets](reference/datasets.md)
 - [Artifact Layout](reference/artifacts.md)
 
@@ -81,8 +83,6 @@ Tip: enable Hub downloads per command when fetching models/datasets:
 - [Guard Overhead Method](assurance/10-guard-overhead-method.md)
 - [Policy Provenance & Digest](assurance/11-policy-provenance.md)
 - [Device Drift Bands](assurance/12-device-drift-bands.md)
-- [GPU/MPS-First Guards (Decision Memo)](assurance/13-gpu-first-guards-decision.md)
-- [Tier Policy Catalog (runtime tiers.yaml)](assurance/14-tier-policy-catalog.md)
 
 Note: Every safety claim is backed by automated tests and cross-referenced in
 the docs. See Guard Contracts → Coverage Reference

@@ -6,7 +6,7 @@
 > Every knob is surfaced in run reports and certificates so reviewers can audit or recompute.
 >
 > For a key-by-key explanation of every value in the packaged tier file
-> (`runtime/tiers.yaml`), see [Tier Policy Catalog](14-tier-policy-catalog.md).
+> (`runtime/tiers.yaml`), see [Tier Policy Catalog](../reference/tier-policy-catalog.md).
 
 ---
 
