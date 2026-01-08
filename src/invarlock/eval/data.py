@@ -189,8 +189,6 @@ class WikiText2Provider:
     def _validate_dependencies(self) -> None:
         """Check that required dependencies are available."""
         if not HAS_DATASETS:
-            if _LIGHT_IMPORT:
-                return
             raise _DepErr(
                 code="E301",
                 message=(
@@ -327,13 +325,6 @@ class WikiText2Provider:
         cached = self._texts_cache.get(split)
         if cached is not None and len(cached) >= max_samples:
             return cached[:max_samples]
-
-        if not HAS_DATASETS and _LIGHT_IMPORT:
-            texts = ["hello world", "invarlock synthetic text"] * max(
-                1, max_samples // 2
-            )
-            self._texts_cache[split] = texts
-            return texts[:max_samples]
 
         # Load dataset with size limit for efficiency
         dataset_slice = f"{split}[:{max_samples}]" if max_samples > 0 else split
@@ -1062,14 +1053,13 @@ class HFTextProvider:
         max_samples: int = 2000,
     ):
         if not HAS_DATASETS:
-            if not _LIGHT_IMPORT:
-                raise _DepErr(
-                    code="E301",
-                    message=(
-                        "DEPENDENCY-MISSING: datasets library required for hf_text provider"
-                    ),
-                    details={"dependency": "datasets"},
-                )
+            raise _DepErr(
+                code="E301",
+                message=(
+                    "DEPENDENCY-MISSING: datasets library required for hf_text provider"
+                ),
+                details={"dependency": "datasets"},
+            )
         self.dataset_name = dataset_name or "wikitext"
         self.config_name = config_name or None
         self.text_field = text_field
@@ -1077,9 +1067,6 @@ class HFTextProvider:
         self.max_samples = int(max_samples)
 
     def load(self, split: str = "validation", **kwargs) -> list[str]:
-        if not HAS_DATASETS and _LIGHT_IMPORT:
-            return ["synthetic dataset text"] * int(self.max_samples or 1)
-
         ds = load_dataset(
             path=self.dataset_name,
             name=self.config_name,
@@ -1204,14 +1191,13 @@ class HFSeq2SeqProvider:
         max_samples: int = 2000,
     ) -> None:
         if not HAS_DATASETS:
-            if not _LIGHT_IMPORT:
-                raise _DepErr(
-                    code="E301",
-                    message=(
-                        "DEPENDENCY-MISSING: datasets library required for hf_seq2seq provider"
-                    ),
-                    details={"dependency": "datasets"},
-                )
+            raise _DepErr(
+                code="E301",
+                message=(
+                    "DEPENDENCY-MISSING: datasets library required for hf_seq2seq provider"
+                ),
+                details={"dependency": "datasets"},
+            )
         self.dataset_name = dataset_name
         self.config_name = config_name
         self.src_field = src_field
