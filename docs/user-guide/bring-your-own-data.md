@@ -68,7 +68,7 @@ eval:
 # 1) Create a small JSONL
 printf '{"text":"hello world"}\n{"text":"custom data"}\n' > /tmp/byod.jsonl
 
-# 2) Write config (start from configs/tasks/causal_lm/ci_cpu.yaml and adjust dataset to your BYOD)
+# 2) Write config (start from configs/presets/causal_lm/wikitext2_512.yaml and adjust dataset to your BYOD)
 # 3) Run baseline and subject
 invarlock run -c byod.yaml --profile dev --out runs/base
 invarlock run -c byod.yaml --profile dev --out runs/subj

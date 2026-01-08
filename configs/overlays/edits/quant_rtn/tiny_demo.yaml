@@ -1,7 +1,7 @@
-# Edit plan: RTN quantization, tiny demo (quick CI smokes)
+# Edit overlay: RTN quantization, tiny demo (quick smokes).
 
 edit:
-  name: quant_rtn
+  name: "quant_rtn"
   plan:
     bitwidth: 8
     per_channel: true
@@ -10,8 +10,3 @@ edit:
     scope: "attn"
     max_modules: 4
     seed: 42
-
-auto:
-  enabled: true
-  tier: balanced
-  probes: 0

@@ -24,7 +24,7 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
   --subject /path/to/your/edited-model \
   --adapter auto \
   --profile ci \
-  --preset configs/tasks/causal_lm/ci_cpu.yaml \
+  --preset configs/presets/causal_lm/wikitext2_512.yaml \
   --out runs/cert_smoke \
   --cert-out reports/cert_smoke
 ```

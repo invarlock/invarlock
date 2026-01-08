@@ -6,9 +6,9 @@ import pytest
 from invarlock.cli.config import load_config
 
 EXPECTED_CONFIGS = [
-    ("tasks/causal_lm", "ci_cpu.yaml", None),
-    ("edits/quant_rtn", "8bit_attn.yaml", None),
-    ("edits/quant_rtn", "8bit_full.yaml", None),
+    ("presets/causal_lm", "wikitext2_512.yaml", None),
+    ("overlays/edits/quant_rtn", "8bit_attn.yaml", None),
+    ("overlays/edits/quant_rtn", "8bit_full.yaml", None),
 ]
 
 

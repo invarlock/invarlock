@@ -162,13 +162,13 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
   --subject /path/to/edited \
   --adapter auto \
   --profile ci \
-  --preset configs/tasks/causal_lm/ci_cpu.yaml
+  --preset configs/presets/causal_lm/wikitext2_512.yaml
 ```
 
 ### Development
 
 ```bash
-invarlock run -c configs/edits/quant_rtn/8bit_attn.yaml --profile ci --tier balanced
+invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --tier balanced
 invarlock plugins adapters
 python scripts/verify_ci_matrix.sh
 ```
@@ -181,7 +181,7 @@ INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
   --subject  /path/to/edited \
   --adapter auto \
   --profile release \
-  --preset configs/tasks/causal_lm/release_cpu.yaml
+  --preset configs/presets/causal_lm/wikitext2_512.yaml
 invarlock verify reports/cert/evaluation.cert.json
 ```
 

@@ -758,7 +758,7 @@ def _prepare_config_for_run(
     cfg = _load_config(config_path)
 
     # Apply profile if specified (dev is a no-op)
-    if profile and str(profile).lower() in {"ci", "release"}:
+    if profile and str(profile).lower() not in {"dev"}:
         console.print(f"🎯 Applying profile: {profile}")
         try:
             cfg = _apply_profile(cfg, profile)
@@ -1887,7 +1887,9 @@ def run_command(
         None, "--device", help="Device override (auto|cuda|mps|cpu)"
     ),
     profile: str | None = typer.Option(
-        None, "--profile", help="Profile to apply (ci|release)"
+        None,
+        "--profile",
+        help="Profile to apply (e.g. ci, release, ci_cpu; dev is a no-op)",
     ),
     out: str | None = typer.Option(None, "--out", help="Output directory override"),
     edit: str | None = typer.Option(None, "--edit", help="Edit kind (quant|mixed)"),

@@ -98,7 +98,9 @@ def certify_command(
         "--device",
         help="Device override for runs (auto|cuda|mps|cpu)",
     ),
-    profile: str = typer.Option("ci", "--profile", help="Profile (ci|release)"),
+    profile: str = typer.Option(
+        "ci", "--profile", help="Profile (ci|release|ci_cpu|dev)"
+    ),
     tier: str = typer.Option("balanced", "--tier", help="Tier label for context"),
     preset: str | None = typer.Option(
         None,
@@ -152,9 +154,9 @@ def certify_command(
     # scenario), fall back to a minimal built-in universal preset so the
     # flag-only quick start works without cloning the repo.
     default_universal = (
-        Path("configs/tasks/masked_lm/ci_cpu.yaml")
+        Path("configs/presets/masked_lm/wikitext2_128.yaml")
         if eff_adapter == "hf_bert"
-        else Path("configs/tasks/causal_lm/ci_cpu.yaml")
+        else Path("configs/presets/causal_lm/wikitext2_512.yaml")
     )
     preset_path = Path(preset) if preset is not None else default_universal
 
@@ -333,7 +335,7 @@ def certify_command(
         prof = str(profile or "").strip().lower()
     except Exception:
         prof = ""
-    if prof in {"ci", "release"}:
+    if prof in {"ci", "ci_cpu", "release"}:
         try:
             with Path(edited_report).open("r", encoding="utf-8") as fh:
                 edited_payload = json.load(fh)

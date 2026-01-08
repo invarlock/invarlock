@@ -42,8 +42,15 @@ you promote results.
 Use the built‑in RTN quantization preset (demo), or prefer Compare & Certify (BYOE):
 
 ```bash
-# RTN quantization (smoke)
-invarlock run --config configs/edits/quant_rtn/8bit_attn.yaml --profile ci --tier balanced
+# RTN quantization (smoke, demo edit overlay)
+INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
+  --baseline gpt2 \
+  --subject gpt2 \
+  --adapter auto \
+  --profile ci \
+  --tier balanced \
+  --preset configs/presets/causal_lm/wikitext2_512.yaml \
+  --edit-config configs/overlays/edits/quant_rtn/8bit_attn.yaml
 
 # Compare & Certify (recommended)
 INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
@@ -51,7 +58,7 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
   --subject /path/to/edited \
   --adapter auto \
   --profile ci \
-  --preset configs/tasks/causal_lm/ci_cpu.yaml
+  --preset configs/presets/causal_lm/wikitext2_512.yaml
 
 # Explain decisions and render HTML
 invarlock report explain --report runs/edited/report.json --baseline runs/source/report.json

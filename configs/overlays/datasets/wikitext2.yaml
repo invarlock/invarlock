@@ -5,6 +5,4 @@ dataset:
   split: "validation"
   seq_len: 512
   stride: 512
-  preview_n: 100
-  final_n: 100
   seed: 42

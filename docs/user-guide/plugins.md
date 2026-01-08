@@ -26,7 +26,7 @@ INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
   --subject  /path/to/subject \
   --adapter hf_gptq \
   --profile ci \
-  --preset configs/tasks/causal_lm/ci_cpu.yaml
+  --preset configs/presets/causal_lm/wikitext2_512.yaml
 ```
 
 ## Author a Guard Plugin
@@ -75,7 +75,7 @@ guards:
 Then invoke your config as usual:
 
 ```bash
-invarlock run -c configs/tasks/causal_lm/release_cpu.yaml --profile ci
+invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci
 ```
 
 > Retries reuse a single loaded model; the runner snapshot/restores state
