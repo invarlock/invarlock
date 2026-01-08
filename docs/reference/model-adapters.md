@@ -625,7 +625,7 @@ guards:
   spectral:
     sigma_quantile: 0.95
     family_caps:
-      ffn: 3.834
+      ffn: 3.849
       attn: 3.423
       embed: 3.1
       other: 3.1

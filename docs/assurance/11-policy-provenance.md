@@ -54,7 +54,7 @@ If the digest does not match, treat the evidence as stale or tampered and rerun 
 ```json
 {
   "auto": {"policy_digest": "4676d5d572e3b69c"},
-  "resolved_policy": {"spectral": {"family_caps": {"ffn": 3.834, "attn": 3.423, "embed": 3.1, "other": 3.1}}},
+  "resolved_policy": {"spectral": {"family_caps": {"ffn": 3.849, "attn": 3.423, "embed": 3.1, "other": 3.1}}},
   "policy_provenance": {
     "tier": "balanced",
     "overrides": ["configs/overrides/spectral_balanced_local.yaml"],

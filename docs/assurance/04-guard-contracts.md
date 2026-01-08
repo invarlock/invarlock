@@ -189,17 +189,17 @@ If drift exceeds these bands, re-tune VE thresholds or increase window counts.
 | PM ratio gate (Balanced) | PM_final ≤ 1.10 × PM_preview | Tier acceptance; exceeding the gate fails the run |
 | PM ratio gate (Conservative) | PM_final ≤ 1.05 × PM_preview | Stricter release acceptance; exceeding the gate fails the run |
 | Bootstrap α | 0.05 | 95 % CI for ΔlogNLL |
-| Spectral κ | Balanced caps `{ffn: 3.834, attn: 3.423, embed: 3.1, other: 3.1}`; Conservative `{ffn: 2.3, attn: 2.6, embed: 2.8, other: 2.8}` (from `tiers.yaml`) | Keeps WARN FPR ≤5% (balanced) and ≈2% (conservative) on null runs |
-| RMT ε | Balanced `{ffn: 0.10, attn: 0.08, embed: 0.12, other: 0.12}`; Conservative `{ffn: 0.06, attn: 0.05, embed: 0.07, other: 0.07}` | q95–q97 of null ratio |
-| VE min_effect | 9e−4 (balanced), 1.8e−3 (conservative) | `z·σ̂/√n` from pilot data |
+| Spectral κ | Balanced caps `{ffn: 3.849, attn: 3.423, embed: 3.1, other: 3.1}`; Conservative `{ffn: 3.849, attn: 2.6, embed: 2.8, other: 2.8}` (from `tiers.yaml`) | Keeps WARN rate within the calibrated null budget |
+| RMT ε | `{ffn: 0.01, attn: 0.01, embed: 0.01, other: 0.01}` | q95–q97 of null ratio (+ margin) |
+| VE min_effect | 0.0 (balanced), 0.016 (conservative) | Calibrated from paired ΔlogNLL window sweeps |
 
 Detailed derivations are in the calibration appendix (`09-tier-v1-calibration.md`).
 
 **Examples**
 
 - **ε-band corner case:** if `rmt.families.attn.edge_base = 1.20` and
-  `rmt.families.attn.epsilon = 0.10`, the guard allows
-  `rmt.families.attn.edge_cur ≤ (1+0.10) × 1.20 = 1.32`.
+  `rmt.families.attn.epsilon = 0.01`, the guard allows
+  `rmt.families.attn.edge_cur ≤ (1+0.01) × 1.20 = 1.212`.
 - **Predictive gate:** on Balanced, if Δ̄ = −0.002 and the one-sided CI is
   [−0.003, −0.001], VE enables (`mean_delta` and the CI upper bound both beat
   −`min_effect_lognll`).
