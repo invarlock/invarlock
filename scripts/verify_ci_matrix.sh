@@ -27,8 +27,9 @@ if command -v python3 &> /dev/null; then
             configs/tasks/**/*.yaml \
             configs/edits/**/*.yaml \
             configs/models/*.yaml \
-            configs/profiles/*.yaml \
-            configs/datasets/*.yaml; do
+            configs/datasets/*.yaml \
+            src/invarlock/_data/runtime/tiers.yaml \
+            src/invarlock/_data/runtime/profiles/*.yaml; do
             if [ -f "$config" ]; then
                 python3 -c "import yaml; yaml.safe_load(open('$config'))" || {
                     echo "❌ Invalid YAML: $config"

@@ -7,7 +7,6 @@ This repo ships example presets (not included in the wheel) organized by:
 - edits/ … what you change (quant_rtn variants)
 - models/ … optional overlays for adapter/id
 - datasets/ … optional overlays for provider/seq len
-- profiles/ … CI/release knobs (still live under `configs/profiles/`)
 
 Pick one from each axis when needed. Typical flows use a task preset + edit plan:
 
@@ -64,5 +63,9 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
   --out runs/release_s2s_t5_local --cert-out reports/cert/release_s2s_t5_local
 ```
 
-Runtime configs (in‑package) remain under `src/invarlock/_data/runtime/` (profiles
-and tiers). The CLI loads them via `importlib.resources` when no repo preset is provided.
+Runtime configs (canonical, in‑package) live under `src/invarlock/_data/runtime/`:
+- `src/invarlock/_data/runtime/tiers.yaml` (published tier defaults)
+- `src/invarlock/_data/runtime/profiles/` (profile overlays; e.g. `--profile release`)
+
+The CLI loads runtime configs via `importlib.resources` (or `$INVARLOCK_CONFIG_ROOT/runtime/...`
+if you override the runtime location). The `configs/` tree is repo-only examples.
