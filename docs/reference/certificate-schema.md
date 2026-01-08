@@ -5,7 +5,6 @@ This page anchors the certificate contract that InvarLock emits in the
 
 1. A **minimal example certificate** that matches the current validator.
 2. A **schema summary** describing required top‑level fields and key sections.
-3. A short **evolution note** for readers migrating from older, ppl‑centric layouts.
 
 > Certificates are versioned. The material below describes
 > `schema_version = "v1"`. Any change that alters required fields or semantics
@@ -117,8 +116,7 @@ Notes
 - `schema_version` is a string and must be `"v1"` for the current format.
 - `run_id` is a short, opaque identifier; certificates treat it as a stable
   string key.
-- `primary_metric` is the **canonical** place for PM values; ppl‑like
-  top-level `ppl` blocks are no longer required.
+- `primary_metric` is the **canonical** place for PM values.
 - The `validation` object holds boolean flags; only a small allow‑list of
   keys is recognized by the validator (see below).
 
@@ -185,28 +183,6 @@ fields while enforcing a small, stable core:
 The full machine‑readable schema is available at runtime via
 `invarlock.reporting.certificate_schema.CERTIFICATE_JSON_SCHEMA`. Use that
 dict directly for tooling that needs strict validation.
-
----
-
-## Evolution from ppl‑centric schemas
-
-Earlier experimental schemas exposed top‑level `ppl`, `spectral`, `rmt`, and
-`variance` blocks and treated ppl as the only primary metric. The v1
-PM‑only schema:
-
-- moves primary metric details under `primary_metric`,
-- relies on `validation` flags and `policy_digest` for gates and policies,
-- keeps guard‑specific blocks (`spectral`, `rmt`, `variance`) available but
-  **optional** from the validator’s perspective.
-
-For existing integrations:
-
-- Prefer `primary_metric.{preview,final,ratio_vs_baseline,display_ci}` over
-  older `ppl_*` fields.
-- Read gates from `validation.*` and thresholds from `policy_digest` /
-  `resolved_policy`.
-- Treat additional sections (MoE, system overhead, telemetry, etc.) as optional
-  extensions that may appear in future minor releases.
 
 ## Primary Metric Tail gate (optional)
 

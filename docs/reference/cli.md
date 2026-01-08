@@ -72,8 +72,8 @@ used to produce guard statistics.
   - measurement contract present, and
   - baseline/subject pairing (`*_measurement_contract_match = true`).
 
-Removed: `assurance.mode` and per-guard `guards.{spectral,rmt}.mode`.
-Configs containing them are rejected.
+`assurance.mode` and per-guard `guards.{spectral,rmt}.mode` are not supported;
+configs containing them are rejected.
 
 ## Quickstart Commands
 
@@ -327,8 +327,7 @@ derived from the embedded inputs. Common causes and quick fixes:
     recomputed vs displayed values.
 
 If recompute is `"skipped"`, the certificate doesn’t include the inputs needed for
-this quick check; that’s OK for older artifacts. The verifier still checks schema
-and pairing math.
+this quick check. The verifier still checks schema and pairing math.
 
 #### plugins list --json (format: plugins-v1)
 
