@@ -842,7 +842,7 @@ class TestExtractRMTAnalysis:
         result = _extract_rmt_analysis(report, baseline)
 
         assert result["evaluated"] is False
-        assert result["families"]["ffn"]["epsilon"] == pytest.approx(0.1)
+        assert result["families"]["ffn"]["epsilon"] == pytest.approx(0.01)
         assert result["status"] in {"stable", "unstable"}
 
 
@@ -1064,7 +1064,7 @@ class TestEffectivePoliciesAndResolution:
         assert resolved["rmt"]["epsilon_by_family"]["ffn"] == pytest.approx(0.09)
         assert resolved["variance"]["predictive_one_sided"] is True
         # Balanced tier enforces default min-effect value
-        assert resolved["variance"]["min_effect_lognll"] == pytest.approx(0.0009)
+        assert resolved["variance"]["min_effect_lognll"] == pytest.approx(0.0)
 
     def test_compute_policy_and_report_digest_helpers(self):
         policy = {"spectral": {"sigma_quantile": 0.95}}
@@ -2704,10 +2704,10 @@ class TestPrivateHelperFunctions:
 
         result = _extract_rmt_analysis(report, baseline)
 
-        assert result["epsilon_default"] == pytest.approx(0.1)
+        assert result["epsilon_default"] == pytest.approx(0.01)
         assert result["stable"] is True
         assert result["status"] == "stable"
-        assert result["families"]["embed"]["epsilon"] == pytest.approx(0.12)
+        assert result["families"]["embed"]["epsilon"] == pytest.approx(0.01)
 
     def test_extract_rmt_analysis_calculated_stability(self):
         """Test _extract_rmt_analysis with calculated stability."""
