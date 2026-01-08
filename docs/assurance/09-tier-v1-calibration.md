@@ -15,10 +15,10 @@
 ### What the tier ships with (pilot)
 
 - **Balanced** per-family κ caps:
-  `ffn: 3.834`, `attn: 3.423`, `embed: 3.1`, `other: 3.1`
+  `ffn: 3.849`, `attn: 3.018`, `embed: 1.05`, `other: 0.0`
   with **Benjamini–Hochberg (BH)** FDR control (`α=0.05`, `m=4` families), **deadband** `δ=0.10`, **scope: all** 2-D weight matrices (LayerNorm excluded), **no absolute clamp**, and **per-run WARN budget** `max_caps = 5`.
 - **Conservative** tightens caps and budget:
-  `ffn: 2.3`, `attn: 2.6`, `embed: 2.8`, `other: 2.8`, **Bonferroni** (`α=0.02`), and `max_caps = 3`.
+  `ffn: 3.849`, `attn: 2.6`, `embed: 2.8`, `other: 2.8`, **Bonferroni** (`α=0.000625`), and `max_caps = 3`.
 
 **Runtime visibility.** Certificates record per-family WARNs and effective caps under `spectral.*` (summary, multiple_testing, families, family_caps) and the resolved policy under `resolved_policy.spectral`.
 
@@ -60,8 +60,8 @@ attach calibration certificates to change proposals.
 
 ### What the tier ships with (pilot)
 
-* **Balanced** ε per family: `{ffn: 0.10, attn: 0.08, embed: 0.12, other: 0.12}`
-* **Conservative** tightened: `{ffn: 0.06, attn: 0.05, embed: 0.07, other: 0.07}`
+* **Balanced** ε per family: `{ffn: 0.01, attn: 0.01, embed: 0.01, other: 0.01}`
+* **Conservative**: `{ffn: 0.01, attn: 0.01, embed: 0.01, other: 0.01}`
 
 Acceptance rule per family $f$: with baseline edge‑risk $r_f^{\text{base}}$ and current edge‑risk $r_f^{\text{cur}}$,
 $r_f^{\text{cur}} \le \left(1+\varepsilon(f)\right)\, r_f^{\text{base}}$.
@@ -88,8 +88,8 @@ zero baseline).
 
 ### What the tier ships with (pilot)
 
-* **Balanced (one-sided, improvement-only)**: `min_effect_lognll ≈ 9e-4`
-* **Conservative (two-sided, improvement-only)**: `≈ 1.8e-3`
+* **Balanced (one-sided, improvement-only)**: `min_effect_lognll = 0.0`
+* **Conservative (two-sided, improvement-only)**: `min_effect_lognll = 0.016`
 
 **Runtime visibility.** Recorded in certificates under `variance.predictive_gate` (CI, mean Δ, pass/fail reason) and under `resolved_policy.variance.{predictive_one_sided,min_effect_lognll}` (tier knobs).
 

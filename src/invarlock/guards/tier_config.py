@@ -31,7 +31,7 @@ _FALLBACK_CONFIG: dict[str, dict[str, Any]] = {
             "deadband": 0.02,
             "min_abs_adjust": 0.012,
             "max_scale_step": 0.03,
-            "min_effect_lognll": 0.0009,
+            "min_effect_lognll": 0.0,
             "predictive_one_sided": True,
             "topk_backstop": 1,
             "max_adjusted_modules": 1,
@@ -43,10 +43,10 @@ _FALLBACK_CONFIG: dict[str, dict[str, Any]] = {
             "max_caps": 5,
             "max_spectral_norm": None,
             "family_caps": {
-                "ffn": 3.834,
-                "attn": 3.423,
-                "embed": 3.1,
-                "other": 3.1,
+                "ffn": 3.849,
+                "attn": 3.018,
+                "embed": 1.05,
+                "other": 0.0,
             },
             "multiple_testing": {
                 "method": "bh",
@@ -57,12 +57,12 @@ _FALLBACK_CONFIG: dict[str, dict[str, Any]] = {
         "rmt_guard": {
             "deadband": 0.10,
             "margin": 1.5,
-            "epsilon_default": 0.10,
+            "epsilon_default": 0.01,
             "epsilon_by_family": {
-                "ffn": 0.10,
-                "attn": 0.08,
-                "embed": 0.12,
-                "other": 0.12,
+                "ffn": 0.01,
+                "attn": 0.01,
+                "embed": 0.01,
+                "other": 0.01,
             },
         },
     },
@@ -71,7 +71,7 @@ _FALLBACK_CONFIG: dict[str, dict[str, Any]] = {
             "deadband": 0.03,
             "min_abs_adjust": 0.02,
             "max_scale_step": 0.015,
-            "min_effect_lognll": 0.0018,
+            "min_effect_lognll": 0.016,
             "predictive_one_sided": False,
             "topk_backstop": 0,
             "max_adjusted_modules": 0,
@@ -81,61 +81,63 @@ _FALLBACK_CONFIG: dict[str, dict[str, Any]] = {
             "deadband": 0.05,
             "scope": "ffn",
             "max_caps": 3,
+            "max_spectral_norm": None,
             "family_caps": {
-                "ffn": 2.3,
+                "ffn": 3.849,
                 "attn": 2.6,
                 "embed": 2.8,
                 "other": 2.8,
             },
             "multiple_testing": {
                 "method": "bonferroni",
-                "alpha": 0.02,
+                "alpha": 0.000625,
                 "m": 4,
             },
         },
         "rmt_guard": {
             "deadband": 0.05,
             "margin": 1.3,
-            "epsilon_default": 0.06,
+            "epsilon_default": 0.01,
             "epsilon_by_family": {
-                "ffn": 0.06,
-                "attn": 0.05,
-                "embed": 0.07,
-                "other": 0.07,
+                "ffn": 0.01,
+                "attn": 0.01,
+                "embed": 0.01,
+                "other": 0.01,
             },
         },
     },
     "aggressive": {
         "variance_guard": {
             "deadband": 0.12,
-            "min_effect_lognll": 0.0005,
+            "min_effect_lognll": 0.033,
         },
         "spectral_guard": {
             "sigma_quantile": 0.98,
             "deadband": 0.15,
             "scope": "ffn",
             "max_caps": 8,
+            "max_spectral_norm": None,
             "family_caps": {
-                "ffn": 3.0,
+                "ffn": 3.849,
                 "attn": 3.5,
                 "embed": 2.5,
                 "other": 3.5,
             },
             "multiple_testing": {
                 "method": "bh",
-                "alpha": 0.1,
+                "alpha": 0.00078125,
                 "m": 4,
             },
         },
         "rmt_guard": {
             "deadband": 0.15,
             "margin": 1.8,
-            "epsilon_default": 0.15,
+            "epsilon_default": 0.01,
             "epsilon_by_family": {
-                "ffn": 0.15,
-                "attn": 0.15,
-                "embed": 0.15,
-                "other": 0.15,
+                "ffn": 0.01,
+                "attn": 0.01,
+                "embed": 0.01,
+                "other": 0.01,
             },
         },
     },
@@ -257,7 +259,7 @@ def get_rmt_epsilon(tier: TierName = "balanced") -> dict[str, float]:
 def get_variance_min_effect(tier: TierName = "balanced") -> float:
     """Get VE min_effect_lognll for a tier."""
     config = get_tier_guard_config(tier, "variance_guard")
-    return config.get("min_effect_lognll", 0.0009)
+    return config.get("min_effect_lognll", 0.0)
 
 
 def check_drift(

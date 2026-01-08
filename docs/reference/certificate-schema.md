@@ -72,7 +72,7 @@ fields produced by `invarlock.assurance.make_certificate`.
     "hysteresis": {
       "ppl": 0.002
     },
-    "min_effective": 0.0009,
+    "min_effective": 0.0,
     "changed": false
   },
   "artifacts": {

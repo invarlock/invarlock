@@ -37,7 +37,7 @@ guards:               # Guard chain and per-guard overrides
   # spectral:
   #   estimator: {type: power_iter, iters: 4, init: ones}
   # rmt:
-  #   epsilon_by_family: {ffn: 0.10, attn: 0.08, embed: 0.12, other: 0.12}
+  #   epsilon_by_family: {ffn: 0.01, attn: 0.01, embed: 0.01, other: 0.01}
   #   estimator: {type: power_iter, iters: 3, init: ones}
   #   activation:
   #     sampling:

@@ -86,10 +86,10 @@ if not outcome.passed:
 > `sigma_quantile: 0.95`, `deadband: 0.10`, `max_caps: 5`,
 > `max_spectral_norm: null`,
 > `multiple_testing: {method: bh, alpha: 0.05, m: 4}` with κ
-> `{ffn: 3.834, attn: 3.423, embed: 3.1, other: 3.1}`.
+> `{ffn: 3.849, attn: 3.018, embed: 1.05, other: 0.0}`.
 >
-> **Conservative note:** Bonferroni (`alpha = 0.02`), `max_caps = 3`, κ
-> `{ffn: 2.3, attn: 2.6, embed: 2.8, other: 2.8}`.
+> **Conservative note:** Bonferroni (`alpha = 0.000625`), `max_caps = 3`, κ
+> `{ffn: 3.849, attn: 2.6, embed: 2.8, other: 2.8}`.
 
 **Key features**
 
@@ -108,13 +108,13 @@ guards:
     scope: all
     max_caps: 5
     multiple_testing: { method: bh, alpha: 0.05, m: 4 }
-    family_caps: { ffn: {kappa: 3.834}, attn: {kappa: 3.423}, embed: {kappa: 3.1}, other: {kappa: 3.1} }
+    family_caps: { ffn: {kappa: 3.849}, attn: {kappa: 3.018}, embed: {kappa: 1.05}, other: {kappa: 0.0} }
     max_spectral_norm: null
   rmt:
-    epsilon_by_family: { ffn: 0.10, attn: 0.08, embed: 0.12, other: 0.12 }
+    epsilon_by_family: { ffn: 0.01, attn: 0.01, embed: 0.01, other: 0.01 }
   variance:
     predictive_one_sided: true
-    min_effect_lognll: 0.0009
+    min_effect_lognll: 0.0
 ```
 
 Use this baseline and trial calibrated κ shifts via small local overrides rather than
@@ -170,7 +170,7 @@ guards:
     sigma_quantile: 0.90
     deadband: 0.05
     scope: ffn
-    multiple_testing: { method: bonferroni, alpha: 0.02, m: 4 }
+    multiple_testing: { method: bonferroni, alpha: 0.000625, m: 4 }
     max_caps: 3
 
     # Aggressive (compression-first)
@@ -235,7 +235,7 @@ gains = scan_model_gains(model)
 guards:
   rmt:
     # ε-band thresholds (primary acceptance rule)
-    epsilon_by_family: { ffn: 0.10, attn: 0.08, embed: 0.12, other: 0.12 }
+    epsilon_by_family: { ffn: 0.01, attn: 0.01, embed: 0.01, other: 0.01 }
 
     # Optional: pin the measurement contract for reproducibility
     estimator: { iters: 3, init: ones }
@@ -256,8 +256,8 @@ guards:
 from invarlock.guards.rmt import RMTGuard
 
 guard = RMTGuard(
-    epsilon_default=0.10,
-    epsilon_by_family={"ffn": 0.10, "attn": 0.08, "embed": 0.12, "other": 0.12},
+    epsilon_default=0.01,
+    epsilon_by_family={"ffn": 0.01, "attn": 0.01, "embed": 0.01, "other": 0.01},
 )
 guard.prepare(
     model,
@@ -382,7 +382,7 @@ guards:
     deadband: 0.05               # Small tolerance
     correction_enabled: true     # Conservative tier enables correction
   rmt:
-    epsilon_by_family: { ffn: 0.06, attn: 0.05, embed: 0.07, other: 0.07 }
+    epsilon_by_family: { ffn: 0.01, attn: 0.01, embed: 0.01, other: 0.01 }
     # activation_required defaults to true in CI/Release profiles
   variance:
     min_gain: 0.01               # High improvement requirement
@@ -397,7 +397,7 @@ guards:
     deadband: 0.10               # Standard deadband
     correction_enabled: false    # Monitor-only spectral caps
   rmt:
-    epsilon_by_family: { ffn: 0.10, attn: 0.08, embed: 0.12, other: 0.12 }
+    epsilon_by_family: { ffn: 0.01, attn: 0.01, embed: 0.01, other: 0.01 }
   variance:
     min_gain: 0.0                # VE gain floor (paired with min_effect_lognll)
 ```
@@ -410,7 +410,7 @@ guards:
     sigma_quantile: 0.98         # Loose spectral percentile
     deadband: 0.15            # Large tolerance
   rmt:
-    epsilon_by_family: { ffn: 0.15, attn: 0.15, embed: 0.15, other: 0.15 }
+    epsilon_by_family: { ffn: 0.01, attn: 0.01, embed: 0.01, other: 0.01 }
   variance:
     min_gain: 0.0             # Lower improvement requirement
 ```
@@ -450,9 +450,9 @@ rmt_policy = create_custom_rmt_policy(
     deadband=0.12,
     margin=1.6,
     correct=True,
-    epsilon_default=0.10,
-    epsilon_by_family={"ffn": 0.10, "attn": 0.08, "embed": 0.12, "other": 0.12},
 )
+rmt_policy["epsilon_default"] = 0.01
+rmt_policy["epsilon_by_family"] = {"ffn": 0.01, "attn": 0.01, "embed": 0.01, "other": 0.01}
 
 # Create custom variance policy
 variance_policy = create_custom_variance_policy(
@@ -477,7 +477,7 @@ guards:
   spectral:
     sigma_quantile: 0.95
   rmt:
-    epsilon_by_family: { ffn: 0.10, attn: 0.08, embed: 0.12, other: 0.12 }
+    epsilon_by_family: { ffn: 0.01, attn: 0.01, embed: 0.01, other: 0.01 }
   variance:
     min_gain: 0.20
 ```
@@ -724,8 +724,8 @@ guard_chain = GuardChain([
     InvariantsGuard(strict_mode=True),
     SpectralGuard(sigma_quantile=0.95, deadband=0.10),
     RMTGuard(
-        epsilon_default=0.10,
-        epsilon_by_family={"ffn": 0.10, "attn": 0.08, "embed": 0.12, "other": 0.12},
+        epsilon_default=0.01,
+        epsilon_by_family={"ffn": 0.01, "attn": 0.01, "embed": 0.01, "other": 0.01},
     ),
     VarianceGuard(get_variance_policy("balanced")),
 ])

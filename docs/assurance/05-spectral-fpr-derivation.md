@@ -28,7 +28,7 @@ $$
 Applying **Bonferroni** across the $m_f$ modules controls the family-wise error
 rate (FWER); applying **Benjamini–Hochberg (BH)** controls the expected
 false-discovery proportion (FDR). Balanced tiers choose BH (α=0.05, m=4);
-Conservative tiers choose Bonferroni (α=0.02, m=4). Document the policy
+Conservative tiers choose Bonferroni (α=0.000625, m=4). Document the policy
 alongside $\kappa_f$ so auditors can recover the expected per-run WARN rate.
 
 ## Assumptions & Scope
@@ -41,16 +41,15 @@ alongside $\kappa_f$ so auditors can recover the expected per-run WARN rate.
   monitoring. LayerNorm coverage is provided by invariants (presence checks)
   and activation‑based RMT (CI/Release); VE captures any aggregate performance shift.
 - Balanced tier uses the **Benjamini–Hochberg** procedure (`method = "bh"`, α =
-  0.05, m = 4 families) with per-family caps `{ffn: 3.834, attn: 3.423, embed: 3.1,
-  other: 3.1}`, `sigma_quantile = 0.95`, and `max_caps = 5`, yielding ≤5% WARN
-  rate on null runs (calibrated from the November 2025 pilot and stored in
-  `tiers.yaml`). Scope is `all`, so FFN, attention, embeddings, and other 2‑D
-  weights are all monitored.
-- Conservative tier applies **Bonferroni** (`method = "bonferroni"`, α = 0.02,
-  m = 4) with caps `{ffn: 2.3, attn: 2.6, embed: 2.8, other: 2.8}`,
-  `sigma_quantile = 0.90`, and `max_caps = 3`, keeping WARNs near 2%. Scope is
-  `ffn` in the shipped tier policies, so only FFN blocks are actively budgeted
-  under the Conservative spectral guard.
+  0.05, m = 4 families) with per-family caps `{ffn: 3.849, attn: 3.018, embed: 1.05,
+  other: 0.0}`, `sigma_quantile = 0.95`, and `max_caps = 5`, yielding ≤5% WARN
+  rate on null runs (stored in `tiers.yaml`). Scope is `all`, so FFN, attention,
+  embeddings, and other 2‑D weights are all monitored.
+- Conservative tier applies **Bonferroni** (`method = "bonferroni"`, α = 0.000625,
+  m = 4) with caps `{ffn: 3.849, attn: 2.6, embed: 2.8, other: 2.8}`,
+  `sigma_quantile = 0.90`, and `max_caps = 3`, keeping WARNs within the
+  calibrated budget. Scope is `ffn` in the shipped tier policies, so only FFN
+  blocks are actively budgeted under the Conservative spectral guard.
 - Deadband δ suppresses flicker around the cap: Balanced records δ = 0.10,
   Conservative δ = 0.05, surfaced in certificates via
   `spectral.summary.deadband`.
@@ -85,7 +84,7 @@ summary.
 
 ### Worked example (Balanced tier)
 
-- For FFN modules, `family_caps.ffn.kappa = 3.834`. Suppose a layer reports $z = 3.90$.
+- For FFN modules, `family_caps.ffn.kappa = 3.849`. Suppose a layer reports $z = 3.90$.
 - Certificate records a WARN in `spectral.families.ffn.violations += 1`; `spectral.caps_applied` increments.
 - Balanced `max_caps = 5`. After the fifth WARN the guard continues to WARN;
   the sixth triggers `spectral.caps_exceeded=true` and the run aborts.

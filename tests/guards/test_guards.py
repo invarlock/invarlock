@@ -362,6 +362,37 @@ class TestSpectralGuardComprehensive:
         assert guard_with_config.config["sigma_quantile"] == 0.85
         assert guard_with_config.config["scope"] == "test"
 
+    def test_max_spectral_norm_default_is_disabled(self):
+        class TinyModel(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.mlp_proj = nn.Linear(8, 8, bias=False)
+
+        model = TinyModel()
+        guard = SpectralGuard()
+        assert guard.max_spectral_norm is None
+        policy = {
+            "scope": "all",
+            "family_caps": {
+                "ffn": {"kappa": 100.0},
+                "attn": {"kappa": 100.0},
+                "embed": {"kappa": 100.0},
+                "other": {"kappa": 100.0},
+            },
+            "ignore_preview_inflation": False,
+        }
+
+        guard.prepare(model, Mock(), None, policy)
+
+        with torch.no_grad():
+            model.mlp_proj.weight.mul_(50.0)
+
+        result = guard.validate(model, Mock(), {})
+        assert all(
+            violation["type"] != "max_spectral_norm"
+            for violation in result["violations"]
+        )
+
     def test_absolute_cap_disabled_when_none(self):
         class TinyModel(nn.Module):
             def __init__(self):

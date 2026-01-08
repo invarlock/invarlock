@@ -50,16 +50,16 @@ knobs are recorded in the certificate.
 
 ## Calibration (pilot-derived)
 
-- Balanced tier uses $\epsilon_f = \{0.10, 0.08, 0.12, 0.12\}$ for
+- Balanced tier uses $\epsilon_f = \{0.01, 0.01, 0.01, 0.01\}$ for
   `{ffn, attn, embed, other}` respectively (q95–q97 of null deltas).
-- Conservative tightens to $\epsilon_f = \{0.06, 0.05, 0.07, 0.07\}$
-  (q97–q99 of null deltas).
+- Conservative uses the same per-family ε defaults:
+  $\epsilon_f = \{0.01, 0.01, 0.01, 0.01\}$.
   Values are recorded in the packaged `tiers.yaml`
   (`invarlock._data.runtime/tiers.yaml`) and surfaced in certificates. Provide
   overrides via `INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml` when needed.
 
-*Example:* with `r_base = 1.20` and ε = 0.10, the guard allows
-`r_cur ≤ (1+0.10) × 1.20 = 1.32`.
+*Example:* with `r_base = 1.20` and ε = 0.01, the guard allows
+`r_cur ≤ (1+0.01) × 1.20 = 1.212`.
 
 ## Calibration
 
