@@ -121,6 +121,59 @@ def explain_gates_command(
             f"  note: hysteresis applied → effective threshold = {limit_with_hyst:.3f}x"
         )
 
+    # Tail gate explanation (warn/fail; based on per-window Δlog-loss vs baseline)
+    pm_tail = (
+        cert.get("primary_metric_tail", {})
+        if isinstance(cert.get("primary_metric_tail"), dict)
+        else {}
+    )
+    if pm_tail:
+        mode = str(pm_tail.get("mode", "warn") or "warn").strip().lower()
+        evaluated = bool(pm_tail.get("evaluated", False))
+        passed = bool(pm_tail.get("passed", True))
+        policy = pm_tail.get("policy", {}) if isinstance(pm_tail.get("policy"), dict) else {}
+        stats = pm_tail.get("stats", {}) if isinstance(pm_tail.get("stats"), dict) else {}
+
+        q = policy.get("quantile", 0.95)
+        try:
+            qf = float(q)
+        except Exception:
+            qf = 0.95
+        qf = max(0.0, min(1.0, qf))
+        q_key = f"q{int(round(100.0 * qf))}"
+        q_name = f"P{int(round(100.0 * qf))}"
+        q_val = stats.get(q_key)
+        qmax = policy.get("quantile_max")
+        eps = policy.get("epsilon", stats.get("epsilon"))
+        mass = stats.get("tail_mass")
+        mmax = policy.get("mass_max")
+
+        if not evaluated:
+            status_tail = "INFO"
+        elif passed:
+            status_tail = "PASS"
+        elif mode == "fail":
+            status_tail = "FAIL"
+        else:
+            status_tail = "WARN"
+
+        console.print("\n[bold]Gate: Primary Metric Tail (ΔlogNLL)[/bold]")
+        console.print(f"  mode: {mode}")
+        console.print(f"  status: {status_tail}")
+        if isinstance(q_val, int | float):
+            console.print(f"  observed: {q_name}={float(q_val):.4f}")
+        if isinstance(mass, int | float):
+            console.print(f"  tail_mass: Pr[ΔlogNLL > ε]={float(mass):.4f}")
+        thr_parts: list[str] = []
+        if isinstance(qmax, int | float):
+            thr_parts.append(f"{q_name}≤{float(qmax):.4f}")
+        if isinstance(mmax, int | float):
+            thr_parts.append(f"mass≤{float(mmax):.4f}")
+        if isinstance(eps, int | float):
+            thr_parts.append(f"ε={float(eps):.1e}")
+        if thr_parts:
+            console.print("  threshold: " + "; ".join(thr_parts))
+
     # Dataset split visibility from report provenance
     try:
         split = (report_data.get("provenance", {}) or {}).get("dataset_split")
