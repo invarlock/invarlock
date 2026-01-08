@@ -1,9 +1,9 @@
-# Task preset: Masked LM (encoder), CI profile, CPU-friendly
+# Preset: Masked LM (encoder-only) on WikiText-2.
 
 model:
-  id: "<set-your-model-id>"   # e.g., bert-base-uncased
+  id: "prajjwal1/bert-tiny"
   adapter: "hf_bert"
-  device: "cpu"
+  device: "auto"
 
 dataset:
   provider: "wikitext2"
@@ -15,6 +15,8 @@ dataset:
   seed: 42
 
 eval:
+  metric:
+    kind: "ppl_mlm"
   loss:
     type: "mlm"
     mask_prob: 0.15
@@ -22,5 +24,19 @@ eval:
     random_token_prob: 0.10
     original_token_prob: 0.10
 
+edit:
+  name: "noop"
+  plan: {}
+
+auto:
+  enabled: true
+  tier: "balanced"
+  probes: 0
+
 guards:
   order: ["invariants", "spectral", "rmt", "variance", "invariants"]
+
+output:
+  dir: "runs"
+  save_model: false
+  save_report: true

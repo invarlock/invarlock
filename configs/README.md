@@ -1,66 +1,34 @@
-# Configs layout (task‑centric)
+# Repo-only configs (examples)
 
-This repo ships example presets (not included in the wheel) organized by:
+This repository ships example YAML configs for repo checkouts (they are not
+included in the wheel). Runtime policy is canonical and lives under
+`src/invarlock/_data/runtime/`.
 
-- tasks/ … what you evaluate (causal_lm, masked_lm)
-  - seq2seq (synthetic provider for demos)
-- edits/ … what you change (quant_rtn variants)
-- models/ … optional overlays for adapter/id
-- datasets/ … optional overlays for provider/seq len
+## Layout
 
-Pick one from each axis when needed. Typical flows use a task preset + edit plan:
+- `configs/presets/` — complete, runnable presets for `invarlock run`
+- `configs/overlays/` — partial overlays intended to be merged into presets
+  - `overlays/edits/` (edit plans)
+  - `overlays/models/` (model id/adapter overlays)
+  - `overlays/datasets/` (dataset overlays)
+- `configs/calibration/` — calibration harness configs (used by `invarlock calibrate ...`)
+- `configs/overrides/` — committed, copy-first examples for local guard overrides
+- `configs/local/` — ignored by git; for your working presets/overrides
 
-Examples
+## Examples
 
 ```bash
-# Causal LM (CI) + 8‑bit attention edit
-invarlock run -c configs/tasks/causal_lm/ci_cpu.yaml --profile ci \
-  --tier balanced --out runs/baseline
-invarlock run -c configs/edits/quant_rtn/8bit_attn.yaml --profile ci \
-  --baseline runs/baseline/report.json --out runs/edited
+# Baseline run (no-op edit)
+INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock run \
+  -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --tier balanced \
+  --out runs/baseline
 
-# Compare & Certify (BYOE)
+# Compare & Certify (preferred), using an edit overlay
 INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
-  --baseline gpt2 --subject gpt2 --adapter auto --profile ci \
-  --preset configs/tasks/causal_lm/ci_cpu.yaml
-
-# PASSing release certificates
-# Causal LM (auto device; larger windows)
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
-  --baseline gpt2 --subject gpt2 --adapter auto --profile release \
-  --preset configs/tasks/causal_lm/release_auto.yaml \
-  --edit-config configs/edits/quant_rtn/8bit_attn.yaml \
-  --out runs/release_gpt2 --cert-out reports/cert/release_gpt2
-
-# Masked LM (BERT) — release, auto device (no edit)
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
-  --baseline bert-base-uncased --subject bert-base-uncased --adapter auto \
-  --profile release --preset configs/tasks/masked_lm/release_auto.yaml \
-  --out runs/release_bert --cert-out reports/cert/release_bert
-
-# Seq2Seq (synthetic) — release, auto device (demo)
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
-  --baseline gpt2 --subject gpt2 --adapter auto --profile release \
-  --preset configs/tasks/seq2seq/release_auto.yaml \
-  --out runs/release_s2s --cert-out reports/cert/release_s2s
-
-# Seq2Seq (T5) — release, auto device (real HF adapter)
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
-  --baseline t5-small --subject t5-small --adapter hf_t5 --profile release \
-  --preset configs/tasks/seq2seq/release_auto_t5.yaml \
-  --out runs/release_s2s_t5 --cert-out reports/cert/release_s2s_t5
-
-Note: hf_seq2seq uses Hugging Face datasets. The project pins datasets==2.18.*
-in extras to avoid API drift. If you override, ensure your datasets version can
-load your chosen dataset. Alternatively, use a local JSONL pairs preset:
-
-# Seq2Seq (T5) — release, auto device (local JSONL pairs)
-# JSONL lines must include string keys: source and target
-# A sample is provided under data/seq2seq_pairs/sample.jsonl
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
-  --baseline t5-small --subject t5-small --adapter hf_t5 --profile release \
-  --preset configs/tasks/seq2seq/release_auto_t5_local.yaml \
-  --out runs/release_s2s_t5_local --cert-out reports/cert/release_s2s_t5_local
+  --baseline sshleifer/tiny-gpt2 --subject sshleifer/tiny-gpt2 --adapter auto \
+  --profile ci --tier balanced \
+  --preset configs/presets/causal_lm/wikitext2_512.yaml \
+  --edit-config configs/overlays/edits/quant_rtn/8bit_attn.yaml
 ```
 
 Runtime configs (canonical, in‑package) live under `src/invarlock/_data/runtime/`:
