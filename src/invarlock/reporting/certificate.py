@@ -1871,7 +1871,6 @@ def make_certificate(
             "tokens_available": capacity_tokens,
             "examples_available": capacity_examples,
         },
-        "pm_tail": pm_tail_result,
     }
     try:
         if (
@@ -1881,6 +1880,12 @@ def make_certificate(
             validation_kwargs["pm_acceptance_range"] = pm_acceptance_range
     except Exception:  # pragma: no cover - defensive against patched functions
         validation_kwargs["pm_acceptance_range"] = pm_acceptance_range
+
+    try:
+        if "pm_tail" in inspect.signature(_compute_validation_flags).parameters:
+            validation_kwargs["pm_tail"] = pm_tail_result
+    except Exception:  # pragma: no cover - defensive against patched functions
+        validation_kwargs["pm_tail"] = pm_tail_result
 
     validation_flags = _compute_validation_flags(**validation_kwargs)
 
