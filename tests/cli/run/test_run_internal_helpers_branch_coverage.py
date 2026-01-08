@@ -512,3 +512,30 @@ def test_postprocess_and_summarize_includes_event_path(
     )
     assert saved["json"].endswith("report.json")
     assert "Events:" in captured.getvalue()
+
+
+def test_postprocess_and_summarize_omits_event_path_when_missing(
+    monkeypatch, tmp_path: Path
+) -> None:
+    captured = io.StringIO()
+    console = Console(file=captured)
+    run_config = SimpleNamespace(event_path=None)
+
+    monkeypatch.setattr(
+        run_mod,
+        "_emit_run_artifacts",
+        lambda **_k: {"json": str(tmp_path / "report.json")},
+    )
+
+    saved = run_mod._postprocess_and_summarize(
+        report={},
+        run_dir=tmp_path,
+        run_config=run_config,
+        window_plan=None,
+        dataset_meta={},
+        match_fraction=None,
+        overlap_fraction=None,
+        console=console,
+    )
+    assert saved["json"].endswith("report.json")
+    assert "Events:" not in captured.getvalue()
