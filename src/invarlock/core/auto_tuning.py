@@ -114,9 +114,9 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
             "scope": "all",
             "family_caps": {
                 "ffn": {"kappa": 3.849},
-                "attn": {"kappa": 3.423},
-                "embed": {"kappa": 3.1},
-                "other": {"kappa": 3.1},
+                "attn": {"kappa": 3.018},
+                "embed": {"kappa": 1.05},
+                "other": {"kappa": 0.0},
             },
             "ignore_preview_inflation": True,
             "max_caps": 5,
