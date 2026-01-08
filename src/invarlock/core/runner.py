@@ -618,7 +618,9 @@ class CoreRunner:
                 )
 
                 run_final = (
-                    eval_windows.get("final", {}) if isinstance(eval_windows, dict) else {}
+                    eval_windows.get("final", {})
+                    if isinstance(eval_windows, dict)
+                    else {}
                 )
                 base_final = (
                     baseline_eval.get("final", {})
@@ -628,11 +630,25 @@ class CoreRunner:
 
                 deltas: list[float] = []
                 weights: list[float] = []
-                run_ids = run_final.get("window_ids") if isinstance(run_final, dict) else None
-                run_ll = run_final.get("logloss") if isinstance(run_final, dict) else None
-                run_tc = run_final.get("token_counts") if isinstance(run_final, dict) else None
-                base_ids = base_final.get("window_ids") if isinstance(base_final, dict) else None
-                base_ll = base_final.get("logloss") if isinstance(base_final, dict) else None
+                run_ids = (
+                    run_final.get("window_ids") if isinstance(run_final, dict) else None
+                )
+                run_ll = (
+                    run_final.get("logloss") if isinstance(run_final, dict) else None
+                )
+                run_tc = (
+                    run_final.get("token_counts")
+                    if isinstance(run_final, dict)
+                    else None
+                )
+                base_ids = (
+                    base_final.get("window_ids")
+                    if isinstance(base_final, dict)
+                    else None
+                )
+                base_ll = (
+                    base_final.get("logloss") if isinstance(base_final, dict) else None
+                )
 
                 if (
                     isinstance(run_ids, list)
@@ -669,7 +685,9 @@ class CoreRunner:
 
                 tail_result = evaluate_metric_tail(
                     deltas=deltas,
-                    weights=weights if (weights and len(weights) == len(deltas)) else None,
+                    weights=weights
+                    if (weights and len(weights) == len(deltas))
+                    else None,
                     policy=pm_tail_policy if isinstance(pm_tail_policy, dict) else None,
                 )
                 tail_result["source"] = "paired_baseline.final"

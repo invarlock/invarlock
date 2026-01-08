@@ -17,7 +17,11 @@ def _mk_reports_with_tail_policy(*, mode: str) -> tuple[dict, dict]:
     )
     base["metrics"]["primary_metric"] = {"kind": "ppl_causal", "final": math.exp(1.0)}
     base["evaluation_windows"] = {
-        "final": {"window_ids": window_ids, "logloss": baseline_ll, "token_counts": token_counts}
+        "final": {
+            "window_ids": window_ids,
+            "logloss": baseline_ll,
+            "token_counts": token_counts,
+        }
     }
 
     subj = create_empty_report()
@@ -27,7 +31,12 @@ def _mk_reports_with_tail_policy(*, mode: str) -> tuple[dict, dict]:
             "adapter": "a",
             "commit": "deadbeef",
             "device": "cpu",
-            "auto": {"enabled": True, "tier": "balanced", "probes_used": 0, "target_pm_ratio": None},
+            "auto": {
+                "enabled": True,
+                "tier": "balanced",
+                "probes_used": 0,
+                "target_pm_ratio": None,
+            },
             "config": {
                 "guards": {
                     "metrics": {
@@ -56,7 +65,11 @@ def _mk_reports_with_tail_policy(*, mode: str) -> tuple[dict, dict]:
         "display_ci": [ppl_sub / math.exp(1.0), ppl_sub / math.exp(1.0)],
     }
     subj["evaluation_windows"] = {
-        "final": {"window_ids": window_ids, "logloss": subject_ll, "token_counts": token_counts}
+        "final": {
+            "window_ids": window_ids,
+            "logloss": subject_ll,
+            "token_counts": token_counts,
+        }
     }
     return subj, base
 
@@ -88,4 +101,3 @@ def test_tail_gate_fail_sets_validation_false():
     assert pm_tail.get("evaluated") is True
     assert pm_tail.get("passed") is False
     assert pm_tail.get("violations")
-

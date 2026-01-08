@@ -131,8 +131,12 @@ def explain_gates_command(
         mode = str(pm_tail.get("mode", "warn") or "warn").strip().lower()
         evaluated = bool(pm_tail.get("evaluated", False))
         passed = bool(pm_tail.get("passed", True))
-        policy = pm_tail.get("policy", {}) if isinstance(pm_tail.get("policy"), dict) else {}
-        stats = pm_tail.get("stats", {}) if isinstance(pm_tail.get("stats"), dict) else {}
+        policy = (
+            pm_tail.get("policy", {}) if isinstance(pm_tail.get("policy"), dict) else {}
+        )
+        stats = (
+            pm_tail.get("stats", {}) if isinstance(pm_tail.get("stats"), dict) else {}
+        )
 
         q = policy.get("quantile", 0.95)
         try:

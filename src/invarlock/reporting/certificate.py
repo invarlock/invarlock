@@ -1798,11 +1798,25 @@ def make_certificate(
                 if isinstance(baseline_normalized.get("evaluation_windows"), dict)
                 else {}
             )
-            run_ids = run_windows.get("window_ids") if isinstance(run_windows, dict) else None
-            run_ll = run_windows.get("logloss") if isinstance(run_windows, dict) else None
-            run_tc = run_windows.get("token_counts") if isinstance(run_windows, dict) else None
-            base_ids = base_windows.get("window_ids") if isinstance(base_windows, dict) else None
-            base_ll = base_windows.get("logloss") if isinstance(base_windows, dict) else None
+            run_ids = (
+                run_windows.get("window_ids") if isinstance(run_windows, dict) else None
+            )
+            run_ll = (
+                run_windows.get("logloss") if isinstance(run_windows, dict) else None
+            )
+            run_tc = (
+                run_windows.get("token_counts")
+                if isinstance(run_windows, dict)
+                else None
+            )
+            base_ids = (
+                base_windows.get("window_ids")
+                if isinstance(base_windows, dict)
+                else None
+            )
+            base_ll = (
+                base_windows.get("logloss") if isinstance(base_windows, dict) else None
+            )
             if (
                 isinstance(run_ids, list)
                 and isinstance(run_ll, list)
@@ -1814,7 +1828,9 @@ def make_certificate(
                     if isinstance(b_id, int | float) and isinstance(b_val, int | float):
                         base_map[int(b_id)] = float(b_val)
                 for idx, (r_id, r_val) in enumerate(zip(run_ids, run_ll, strict=False)):
-                    if not (isinstance(r_id, int | float) and isinstance(r_val, int | float)):
+                    if not (
+                        isinstance(r_id, int | float) and isinstance(r_val, int | float)
+                    ):
                         continue
                     key = int(r_id)
                     if key not in base_map:

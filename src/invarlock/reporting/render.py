@@ -487,8 +487,12 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
         else:
             status = "⚠️ WARN" if warned else "⚠️ WARN"
 
-        policy = pm_tail.get("policy", {}) if isinstance(pm_tail.get("policy"), dict) else {}
-        stats = pm_tail.get("stats", {}) if isinstance(pm_tail.get("stats"), dict) else {}
+        policy = (
+            pm_tail.get("policy", {}) if isinstance(pm_tail.get("policy"), dict) else {}
+        )
+        stats = (
+            pm_tail.get("stats", {}) if isinstance(pm_tail.get("stats"), dict) else {}
+        )
 
         q = policy.get("quantile", 0.95)
         try:

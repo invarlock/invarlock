@@ -2165,7 +2165,11 @@ def run_command(
                             # Merge the sanitized pairing schedule into existing
                             # evaluation_windows without discarding logloss/token_counts.
                             for arm in ("preview", "final"):
-                                src = pairing_schedule.get(arm) if isinstance(pairing_schedule, dict) else None
+                                src = (
+                                    pairing_schedule.get(arm)
+                                    if isinstance(pairing_schedule, dict)
+                                    else None
+                                )
                                 if not isinstance(src, dict):
                                     continue
                                 dst = ew.get(arm)
