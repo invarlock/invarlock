@@ -44,9 +44,9 @@ def test_balanced_spectral_doc_knobs():
     assert doc["deadband"] == pytest.approx(0.10)
     # Calibrated values from spectral sweep
     assert doc["family_caps"]["ffn"] == pytest.approx(3.849)
-    assert doc["family_caps"]["attn"] == pytest.approx(3.423)
-    assert doc["family_caps"]["embed"] == pytest.approx(3.1)
-    assert doc["family_caps"]["other"] == pytest.approx(3.1)
+    assert doc["family_caps"]["attn"] == pytest.approx(3.018)
+    assert doc["family_caps"]["embed"] == pytest.approx(1.05)
+    assert doc["family_caps"]["other"] == pytest.approx(0.0)
 
 
 def test_conservative_spectral_doc_knobs():

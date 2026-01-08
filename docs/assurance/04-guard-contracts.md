@@ -189,7 +189,7 @@ If drift exceeds these bands, re-tune VE thresholds or increase window counts.
 | PM ratio gate (Balanced) | PM_final ≤ 1.10 × PM_preview | Tier acceptance; exceeding the gate fails the run |
 | PM ratio gate (Conservative) | PM_final ≤ 1.05 × PM_preview | Stricter release acceptance; exceeding the gate fails the run |
 | Bootstrap α | 0.05 | 95 % CI for ΔlogNLL |
-| Spectral κ | Balanced caps `{ffn: 3.849, attn: 3.423, embed: 3.1, other: 3.1}`; Conservative `{ffn: 3.849, attn: 2.6, embed: 2.8, other: 2.8}` (from `tiers.yaml`) | Keeps WARN rate within the calibrated null budget |
+| Spectral κ | Balanced caps `{ffn: 3.849, attn: 3.018, embed: 1.05, other: 0.0}`; Conservative `{ffn: 3.849, attn: 2.6, embed: 2.8, other: 2.8}` (from `tiers.yaml`) | Keeps WARN rate within the calibrated null budget |
 | RMT ε | `{ffn: 0.01, attn: 0.01, embed: 0.01, other: 0.01}` | q95–q97 of null ratio (+ margin) |
 | VE min_effect | 0.0 (balanced), 0.016 (conservative) | Calibrated from paired ΔlogNLL window sweeps |
 

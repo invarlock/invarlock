@@ -15,7 +15,7 @@
 ### What the tier ships with (pilot)
 
 - **Balanced** per-family κ caps:
-  `ffn: 3.849`, `attn: 3.423`, `embed: 3.1`, `other: 3.1`
+  `ffn: 3.849`, `attn: 3.018`, `embed: 1.05`, `other: 0.0`
   with **Benjamini–Hochberg (BH)** FDR control (`α=0.05`, `m=4` families), **deadband** `δ=0.10`, **scope: all** 2-D weight matrices (LayerNorm excluded), **no absolute clamp**, and **per-run WARN budget** `max_caps = 5`.
 - **Conservative** tightens caps and budget:
   `ffn: 3.849`, `attn: 2.6`, `embed: 2.8`, `other: 2.8`, **Bonferroni** (`α=0.000625`), and `max_caps = 3`.

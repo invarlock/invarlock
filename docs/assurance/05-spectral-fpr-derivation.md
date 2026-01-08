@@ -41,8 +41,8 @@ alongside $\kappa_f$ so auditors can recover the expected per-run WARN rate.
   monitoring. LayerNorm coverage is provided by invariants (presence checks)
   and activation‑based RMT (CI/Release); VE captures any aggregate performance shift.
 - Balanced tier uses the **Benjamini–Hochberg** procedure (`method = "bh"`, α =
-  0.05, m = 4 families) with per-family caps `{ffn: 3.849, attn: 3.423, embed: 3.1,
-  other: 3.1}`, `sigma_quantile = 0.95`, and `max_caps = 5`, yielding ≤5% WARN
+  0.05, m = 4 families) with per-family caps `{ffn: 3.849, attn: 3.018, embed: 1.05,
+  other: 0.0}`, `sigma_quantile = 0.95`, and `max_caps = 5`, yielding ≤5% WARN
   rate on null runs (stored in `tiers.yaml`). Scope is `all`, so FFN, attention,
   embeddings, and other 2‑D weights are all monitored.
 - Conservative tier applies **Bonferroni** (`method = "bonferroni"`, α = 0.000625,

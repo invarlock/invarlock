@@ -81,8 +81,8 @@ class TestConvenienceAccessors:
         assert "embed" in caps
         # Balanced tier values from tiers.yaml
         assert caps["ffn"] == 3.849
-        assert caps["attn"] == 3.423
-        assert caps["embed"] == 3.1
+        assert caps["attn"] == 3.018
+        assert caps["embed"] == 1.05
 
     def test_get_spectral_caps_conservative(self) -> None:
         """get_spectral_caps returns tighter caps for conservative tier."""

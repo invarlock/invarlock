@@ -86,7 +86,7 @@ if not outcome.passed:
 > `sigma_quantile: 0.95`, `deadband: 0.10`, `max_caps: 5`,
 > `max_spectral_norm: null`,
 > `multiple_testing: {method: bh, alpha: 0.05, m: 4}` with κ
-> `{ffn: 3.849, attn: 3.423, embed: 3.1, other: 3.1}`.
+> `{ffn: 3.849, attn: 3.018, embed: 1.05, other: 0.0}`.
 >
 > **Conservative note:** Bonferroni (`alpha = 0.000625`), `max_caps = 3`, κ
 > `{ffn: 3.849, attn: 2.6, embed: 2.8, other: 2.8}`.
@@ -108,7 +108,7 @@ guards:
     scope: all
     max_caps: 5
     multiple_testing: { method: bh, alpha: 0.05, m: 4 }
-    family_caps: { ffn: {kappa: 3.849}, attn: {kappa: 3.423}, embed: {kappa: 3.1}, other: {kappa: 3.1} }
+    family_caps: { ffn: {kappa: 3.849}, attn: {kappa: 3.018}, embed: {kappa: 1.05}, other: {kappa: 0.0} }
     max_spectral_norm: null
   rmt:
     epsilon_by_family: { ffn: 0.01, attn: 0.01, embed: 0.01, other: 0.01 }
