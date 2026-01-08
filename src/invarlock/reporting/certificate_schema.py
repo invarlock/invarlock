@@ -148,6 +148,7 @@ CERTIFICATE_JSON_SCHEMA: dict[str, Any] = {
 
 _VALIDATION_ALLOWLIST_DEFAULT = {
     "primary_metric_acceptable",
+    "primary_metric_tail_acceptable",
     "preview_final_drift_acceptable",
     "guard_overhead_acceptable",
     "invariants_pass",
