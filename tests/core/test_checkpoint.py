@@ -168,6 +168,31 @@ def test_checkpoint_manager_bytes_and_chunked(
     assert not Path(path).exists()
 
 
+def test_restore_checkpoint_chunked_missing_restore_chunked_returns_false(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    class ChunkedNoRestoreAdapter:
+        def __init__(self, tmpdir: Path):
+            self.tmpdir = tmpdir
+
+        def snapshot_chunked(self, model) -> str:  # type: ignore[no-untyped-def]
+            path = self.tmpdir / "chunked_snapshot_no_restore"
+            path.mkdir(parents=True, exist_ok=True)
+            (path / "chunk_0.bin").write_bytes(b"data")
+            return str(path)
+
+    monkeypatch.setenv("INVARLOCK_SNAPSHOT_MODE", "chunked")
+    adapter = ChunkedNoRestoreAdapter(tmp_path)
+    model = object()
+    mgr = CheckpointManager()
+
+    cid = mgr.create_checkpoint(model, adapter)
+    assert mgr.checkpoints[cid]["mode"] == "chunked"
+    assert mgr.restore_checkpoint(model, adapter, cid) is False
+
+    mgr.cleanup()
+
+
 def test_checkpoint_manager_create_error_raises(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):

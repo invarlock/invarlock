@@ -229,3 +229,13 @@ def test_create_plugin_info_parse_and_metadata_paths(monkeypatch):
     assert info_ok.available is True
     # Package name inferred from module path → top-level package
     assert info_ok.package == "invarlock"
+
+
+def test_check_runtime_dependencies_find_spec_exception_counts_missing(monkeypatch):
+    r = reg.CoreRegistry()
+
+    def _boom(dep: str):  # type: ignore[no-untyped-def]
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(reg.importlib.util, "find_spec", _boom)
+    assert r._check_runtime_dependencies(["some_dep"]) == ["some_dep"]
