@@ -176,9 +176,10 @@ def test_extract_compression_diagnostics_quant(monkeypatch):
             }
         },
     }
+    edit_cfg = {"scope": "unknown", "clamp_ratio": 0.2}
     diagnostics = cert._extract_compression_diagnostics(
         "quant_rtn_rank",
-        {"scope": "unknown", "clamp_ratio": 0.2},
+        edit_cfg,
         deltas,
         {"layers": 2},
         inference,

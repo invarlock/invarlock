@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import math
 from types import SimpleNamespace
 
+import pytest
 import torch
 import torch.nn as nn
 
@@ -204,4 +206,172 @@ def test_rmt_finalize_activation_required_failure():
 
     result = guard.finalize(NoMaskModel())
     passed = result.passed if hasattr(result, "passed") else result.get("passed")
+    action = result.action if hasattr(result, "action") else result.get("action")
+    metrics = (
+        result.metrics if hasattr(result, "metrics") else result.get("metrics", {})
+    )
+    violations = (
+        result.violations if hasattr(result, "violations") else result.get("violations")
+    )
+    errors = result.get("errors") if isinstance(result, dict) else None
+
     assert passed is False
+    if action is not None:
+        assert action == "abort"
+    assert metrics.get("activation_required") is True
+    assert metrics.get("activation_ready") is False
+    assert metrics.get("activation_reason") == "activation_required"
+
+    if violations is not None:
+        assert any(v.get("type") == "activation_required" for v in violations)
+    if errors is not None:
+        assert any("Activation edge-risk analysis required" in e for e in errors)
+
+
+def test_rmt_activation_edge_risk_rejects_invalid_inputs() -> None:
+    guard = RMTGuard()
+
+    assert guard._activation_edge_risk([1, 2, 3]) is None
+    assert guard._activation_edge_risk(torch.tensor([1.0, 2.0, 3.0])) is None
+    assert guard._activation_edge_risk(torch.empty((0, 3))) is None
+    assert guard._activation_edge_risk(torch.tensor([[float("nan"), 0.0]])) is None
+
+    # tuple/list input should unwrap the first element
+    out = guard._activation_edge_risk(
+        (torch.arange(12, dtype=torch.float32).reshape(3, 4),)
+    )
+    assert out is not None
+    risk, sigma, mp_edge = out
+    assert all(
+        isinstance(x, float) and math.isfinite(x) for x in (risk, sigma, mp_edge)
+    )
+    assert risk > 0.0 and sigma > 0.0 and mp_edge > 0.0
+
+
+def test_rmt_activation_edge_risk_is_scale_invariant() -> None:
+    guard = RMTGuard()
+    guard.estimator = {"type": "power_iter", "iters": 2, "init": "ones"}
+    base = torch.arange(1, 1 + 16 * 8, dtype=torch.float32).reshape(16, 8)
+    out1 = guard._activation_edge_risk(base)
+    out2 = guard._activation_edge_risk(base * 3.0)
+    assert out1 is not None and out2 is not None
+
+    risk1, sigma1, mp1 = out1
+    risk2, sigma2, mp2 = out2
+    assert mp1 == pytest.approx(mp2, rel=0.0, abs=0.0)
+    assert sigma1 == pytest.approx(sigma2, rel=1e-3, abs=1e-6)
+    assert risk1 == pytest.approx(risk2, rel=1e-3, abs=1e-6)
+
+
+def test_rmt_compute_activation_edge_risk_smoke_and_token_weight() -> None:
+    guard = RMTGuard()
+    guard.estimator = {"type": "power_iter", "iters": 2, "init": "ones"}
+    model = NoMaskModel()
+    out = guard._compute_activation_edge_risk(
+        model,
+        batches=[
+            {"input_ids": [1, 2, 3], "attention_mask": [1, 1, 1]},
+            {"input_ids": [1, 2, 3]},
+        ],
+    )
+    assert out is not None
+    assert out["analysis_source"] == "activations_edge_risk"
+    assert out["batches_used"] == 2
+    assert out["token_weight_total"] == 6
+    assert "attn" in out["edge_risk_by_module"]
+    assert out["edge_risk_by_family"]["attn"] == pytest.approx(
+        out["edge_risk_by_module"]["attn"]
+    )
+    assert out["edge_risk_by_family"]["attn"] > 0.0
+    assert set(out["edge_risk_by_family"].keys()) == {"attn", "ffn", "embed", "other"}
+
+
+def test_rmt_policy_property_round_trips_values() -> None:
+    guard = RMTGuard(epsilon_default=0.08, epsilon_by_family={"attn": 0.05})
+    policy = guard.policy()
+    assert policy["epsilon_default"] == pytest.approx(0.08)
+    assert policy["epsilon_by_family"]["attn"] == pytest.approx(0.05)
+    assert policy["margin"] == pytest.approx(guard.margin)
+    assert policy["deadband"] == pytest.approx(guard.deadband)
+
+
+def test_rmt_finalize_enforces_epsilon_band_and_action() -> None:
+    guard = RMTGuard(epsilon_default=0.10, epsilon_by_family={"attn": 0.10})
+    guard.prepared = True
+
+    # Baseline/current set directly so finalize does not re-run activation scoring.
+    guard.baseline_edge_risk_by_family = {"attn": 10.0}
+    guard.edge_risk_by_family = {"attn": 11.1}  # allowed is 11.0
+
+    result = guard.finalize(NoMaskModel())
+    passed = result.passed if hasattr(result, "passed") else result.get("passed")
+    action = result.action if hasattr(result, "action") else result.get("action")
+    metrics = (
+        result.metrics if hasattr(result, "metrics") else result.get("metrics", {})
+    )
+
+    assert passed is False
+    assert action == "abort"
+    assert metrics["stable"] is False
+    assert (
+        metrics["epsilon_violations"]
+        and metrics["epsilon_violations"][0]["family"] == "attn"
+    )
+    v0 = metrics["epsilon_violations"][0]
+    assert v0["edge_base"] == pytest.approx(10.0)
+    assert v0["edge_cur"] == pytest.approx(11.1)
+    assert v0["allowed"] == pytest.approx(11.0)
+    assert v0["delta"] == pytest.approx(0.11, rel=1e-6)
+    assert v0["epsilon"] == pytest.approx(0.10)
+
+
+def test_rmt_finalize_allows_epsilon_band_boundary() -> None:
+    guard = RMTGuard(epsilon_default=0.10, epsilon_by_family={"attn": 0.10})
+    guard.prepared = True
+    guard.baseline_edge_risk_by_family = {"attn": 10.0}
+    guard.edge_risk_by_family = {"attn": 11.0}  # allowed is 11.0
+
+    result = guard.finalize(NoMaskModel())
+    passed = result.passed if hasattr(result, "passed") else result.get("passed")
+    action = result.action if hasattr(result, "action") else result.get("action")
+    metrics = (
+        result.metrics if hasattr(result, "metrics") else result.get("metrics", {})
+    )
+
+    assert passed is True
+    if action is not None:
+        assert action == "continue"
+    assert metrics["stable"] is True
+    assert metrics["epsilon_violations"] == []
+
+
+def test_rmt_epsilon_band_boundary_allows_equal_threshold() -> None:
+    guard = RMTGuard(epsilon_default=0.10, epsilon_by_family={"attn": 0.10})
+    guard.baseline_edge_risk_by_family = {"attn": 10.0}
+    guard.edge_risk_by_family = {"attn": 11.0}  # allowed is 11.0
+    assert guard._compute_epsilon_violations() == []
+
+
+def test_rmt_set_epsilon_default_and_family_bounds() -> None:
+    guard = RMTGuard(epsilon_default=0.10)
+
+    guard._set_epsilon_default(0.0)
+    assert guard.epsilon_default == pytest.approx(0.0)
+    guard._set_epsilon_default(float("inf"))
+    assert guard.epsilon_default == pytest.approx(0.0)
+    guard._set_epsilon_default(-0.1)
+    assert guard.epsilon_default == pytest.approx(0.0)
+    guard._set_epsilon_default("0.2")
+    assert guard.epsilon_default == pytest.approx(0.2)
+
+    guard.epsilon_by_family = {}
+    guard._set_epsilon_by_family(
+        {
+            "attn": "0.1",
+            "bad": "nope",
+            "neg": -0.1,
+            "inf": float("inf"),
+        }
+    )
+    assert set(guard.epsilon_by_family.keys()) == {"attn"}
+    assert guard.epsilon_by_family.get("attn") == pytest.approx(0.1)

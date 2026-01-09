@@ -119,9 +119,8 @@ def test_verify_json_success_and_failure(
     out_bad = capsys.readouterr().out
     payload_bad = json.loads(out_bad)
     assert payload_bad["summary"]["ok"] is False
-    # reason can be policy_fail or malformed, but exit_code must be non-zero
-    assert payload_bad["resolution"]["exit_code"] != 0
-    assert getattr(ei_bad.value, "exit_code", getattr(ei_bad.value, "code", None)) != 0
+    assert payload_bad["resolution"]["exit_code"] == 1
+    assert getattr(ei_bad.value, "exit_code", getattr(ei_bad.value, "code", None)) == 1
 
 
 def test_verify_recompute_dev_warning_json(
@@ -161,8 +160,8 @@ def test_verify_ci_profile_enforces_provider_digest(
         verify_command([path], baseline=None, profile="ci", json_out=True)
     out = capsys.readouterr().out
     payload = json.loads(out)
-    assert payload["resolution"]["exit_code"] != 0
-    assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) != 0
+    assert payload["resolution"]["exit_code"] == 3
+    assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 3
 
 
 def test_verify_json_failure_envelope_multiple(
@@ -179,7 +178,8 @@ def test_verify_json_failure_envelope_multiple(
     assert isinstance(payload.get("results"), list) and len(payload["results"]) == 2
     reasons = {r.get("reason") for r in payload["results"]}
     assert reasons.issubset({"malformed", "policy_fail"}) and reasons
-    assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) != 0
+    assert payload["resolution"]["exit_code"] == 2
+    assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 2
 
 
 def test_verify_json_mixed_success_and_failure(
