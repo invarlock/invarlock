@@ -338,6 +338,19 @@ class TestMetricsAggregator:
         metrics = MetricsAggregator.extract_guard_metrics(report)
         assert metrics["tying_violations_post"] == 2
 
+    def test_extract_guard_metrics_skips_non_dict_guards_and_handles_bad_fallback_types(
+        self,
+    ):
+        report = create_empty_report()
+        report["guards"] = ["not-a-dict"]
+        report["metrics"] = {"rmt": "bad", "invariants": "bad"}
+        report["meta"] = {"rollback_reason": "boom"}
+
+        metrics = MetricsAggregator.extract_guard_metrics(report)
+        assert metrics["rmt_outliers"] == 0
+        assert metrics["tying_violations_post"] == 0
+        assert metrics["catastrophic_spike"] is True
+
     def test_compute_comparison_metrics_full_overhead_paths(self):
         """Exercise primary/time/mem overhead branches with finite baselines."""
         bare_report = create_empty_report()
