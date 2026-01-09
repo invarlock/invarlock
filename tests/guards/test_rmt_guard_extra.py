@@ -136,3 +136,16 @@ def test_rmt_guard_compute_epsilon_violations_respects_allowed_threshold():
 
     violations = guard._compute_epsilon_violations()
     assert violations == []  # allowed = 2.0 * (1 + 0.5) = 3.0, so within limit
+
+
+def test_rmt_guard_compute_epsilon_violations_skips_zero_baseline_and_uses_default_epsilon():
+    guard = RMTGuard(epsilon_default=0.10)
+    guard.baseline_edge_risk_by_family = {"ffn": 0.0, "attn": 10.0}
+    guard.edge_risk_by_family = {"ffn": 100.0, "attn": 12.0}
+    guard.epsilon_by_family = {"attn": 0.10}
+
+    violations = guard._compute_epsilon_violations()
+    assert {v["family"] for v in violations} == {"attn"}
+    v = violations[0]
+    assert v["epsilon"] == pytest.approx(0.10)
+    assert v["allowed"] == pytest.approx(11.0)
