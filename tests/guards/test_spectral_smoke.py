@@ -111,3 +111,29 @@ def test_spectral_finalize_fails_on_max_spectral_norm() -> None:
     assert result["passed"] is False
     assert any(v.get("type") == "max_spectral_norm" for v in result["violations"])
     assert result["metrics"]["fatal_violations"] >= 1
+
+
+def test_spectral_finalize_fails_on_fatal_violation_severity(monkeypatch) -> None:
+    model = TinyModel([TinyLayer()])
+    guard = SpectralGuard(degeneracy={"enabled": False})
+    out = guard.prepare(model, adapter=None, calib=None, policy={})
+    assert out["ready"] is True
+
+    def _fatal(_model, _metrics, phase: str = "finalize"):
+        _ = phase
+        return [
+            {
+                "type": "degeneracy_norm_collapse",
+                "severity": "fatal",
+                "module": "attn.c_proj",
+                "family": "attn",
+                "message": "fatal violation",
+            }
+        ]
+
+    monkeypatch.setattr(guard, "_detect_spectral_violations", _fatal, raising=True)
+
+    result = guard.finalize(model)
+    assert result["passed"] is False
+    assert result["metrics"]["fatal_violations"] >= 1
+    assert "fatal violation" in result["errors"]

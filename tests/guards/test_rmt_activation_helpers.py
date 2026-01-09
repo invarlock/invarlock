@@ -206,7 +206,26 @@ def test_rmt_finalize_activation_required_failure():
 
     result = guard.finalize(NoMaskModel())
     passed = result.passed if hasattr(result, "passed") else result.get("passed")
+    action = result.action if hasattr(result, "action") else result.get("action")
+    metrics = (
+        result.metrics if hasattr(result, "metrics") else result.get("metrics", {})
+    )
+    violations = (
+        result.violations if hasattr(result, "violations") else result.get("violations")
+    )
+    errors = result.get("errors") if isinstance(result, dict) else None
+
     assert passed is False
+    if action is not None:
+        assert action == "abort"
+    assert metrics.get("activation_required") is True
+    assert metrics.get("activation_ready") is False
+    assert metrics.get("activation_reason") == "activation_required"
+
+    if violations is not None:
+        assert any(v.get("type") == "activation_required" for v in violations)
+    if errors is not None:
+        assert any("Activation edge-risk analysis required" in e for e in errors)
 
 
 def test_rmt_activation_edge_risk_rejects_invalid_inputs() -> None:
@@ -292,7 +311,7 @@ def test_rmt_finalize_enforces_epsilon_band_and_action() -> None:
     )
 
     assert passed is False
-    assert action in {"abort", "warn"}
+    assert action == "abort"
     assert metrics["stable"] is False
     assert (
         metrics["epsilon_violations"]
@@ -304,6 +323,26 @@ def test_rmt_finalize_enforces_epsilon_band_and_action() -> None:
     assert v0["allowed"] == pytest.approx(11.0)
     assert v0["delta"] == pytest.approx(0.11, rel=1e-6)
     assert v0["epsilon"] == pytest.approx(0.10)
+
+
+def test_rmt_finalize_allows_epsilon_band_boundary() -> None:
+    guard = RMTGuard(epsilon_default=0.10, epsilon_by_family={"attn": 0.10})
+    guard.prepared = True
+    guard.baseline_edge_risk_by_family = {"attn": 10.0}
+    guard.edge_risk_by_family = {"attn": 11.0}  # allowed is 11.0
+
+    result = guard.finalize(NoMaskModel())
+    passed = result.passed if hasattr(result, "passed") else result.get("passed")
+    action = result.action if hasattr(result, "action") else result.get("action")
+    metrics = (
+        result.metrics if hasattr(result, "metrics") else result.get("metrics", {})
+    )
+
+    assert passed is True
+    if action is not None:
+        assert action == "continue"
+    assert metrics["stable"] is True
+    assert metrics["epsilon_violations"] == []
 
 
 def test_rmt_epsilon_band_boundary_allows_equal_threshold() -> None:

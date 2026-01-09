@@ -21,6 +21,25 @@ def test_compute_actual_window_hashes_uses_report_hashes():
     assert result["total_tokens"] == 220
 
 
+def test_compute_actual_window_hashes_report_hashes_non_int_token_counts():
+    report = {
+        "data": {
+            "preview_hash": "abc",
+            "final_hash": "def",
+            "dataset_hash": "ghi",
+            "preview_total_tokens": "100",
+            "final_total_tokens": None,
+        }
+    }
+    result = hashing_mod._compute_actual_window_hashes(report)
+    assert result["preview"] == "blake2s:abc"
+    assert result["final"] == "blake2s:def"
+    assert result["dataset"] == "ghi"
+    assert result["total_tokens"] == 0
+    assert result["preview_tokens"] == "100"
+    assert result["final_tokens"] is None
+
+
 def test_compute_actual_window_hashes_config_fallback(monkeypatch):
     report = {
         "data": {

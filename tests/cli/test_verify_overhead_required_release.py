@@ -107,8 +107,8 @@ def test_verify_release_fails_when_guard_overhead_missing(
         verify_command([path], baseline=None, profile="release", json_out=True)
 
     out = json.loads(capsys.readouterr().out)
-    assert out["resolution"]["exit_code"] != 0
-    assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) != 0
+    assert out["resolution"]["exit_code"] == 1
+    assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 1
 
 
 def test_verify_release_allows_explicit_overhead_skip_marker(
@@ -140,8 +140,8 @@ def test_verify_release_requires_overhead_evaluated_when_not_skipped(
         verify_command([path], baseline=None, profile="release", json_out=True)
 
     out = json.loads(capsys.readouterr().out)
-    assert out["resolution"]["exit_code"] != 0
-    assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) != 0
+    assert out["resolution"]["exit_code"] == 1
+    assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 1
 
 
 def test_verify_release_requires_overhead_ratio_when_evaluated(
@@ -159,5 +159,5 @@ def test_verify_release_requires_overhead_ratio_when_evaluated(
         verify_command([path], baseline=None, profile="release", json_out=True)
 
     out = json.loads(capsys.readouterr().out)
-    assert out["resolution"]["exit_code"] != 0
-    assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) != 0
+    assert out["resolution"]["exit_code"] == 1
+    assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 1
