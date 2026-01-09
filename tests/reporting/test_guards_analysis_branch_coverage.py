@@ -110,6 +110,31 @@ def test_extract_spectral_analysis_baseline_metrics_spectral_not_dict() -> None:
     assert out["evaluated"] is False
 
 
+def test_extract_spectral_analysis_uses_guard_baseline_metrics_and_derives_quantiles() -> None:
+    report = {
+        "guards": [
+            {
+                "name": "spectral",
+                "metrics": {
+                    "max_spectral_norm_final": 2.0,
+                    "mean_spectral_norm_final": 1.0,
+                },
+                "baseline_metrics": {
+                    "max_spectral_norm": 1.0,
+                    "mean_spectral_norm": 0.5,
+                },
+                "final_z_scores": {"m1": 1.23},
+                "module_family_map": {"m1": "ffn"},
+            }
+        ]
+    }
+    out = GA._extract_spectral_analysis(report, baseline={})
+    assert out["evaluated"] is True
+    assert out["summary"]["baseline_max_spectral_norm"] == 1.0
+    assert out["family_z_quantiles"]["ffn"]["count"] == 1
+    assert out["top_z_scores"]["ffn"][0]["module"] == "m1"
+
+
 def test_extract_rmt_analysis_edge_risk_paths_and_contract_hashes() -> None:
     contract = {"estimator": {"type": "power_iter"}}
     baseline = {
