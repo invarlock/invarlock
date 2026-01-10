@@ -125,6 +125,7 @@ def test_ppl_causal_paired_compare_uses_weight_fallback_when_needed(
     )
     assert captured.get("weights") == [1.0]
 
+
 def test_get_metric_unknown_kind_raises_key_error() -> None:
     with pytest.raises(KeyError):
         get_metric("does-not-exist")

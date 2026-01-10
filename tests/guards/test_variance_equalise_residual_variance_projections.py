@@ -70,4 +70,3 @@ def test_equalise_residual_variance_covers_projection_presence_branches() -> Non
         clamp_range=None,
     )
     assert isinstance(scales, dict)
-

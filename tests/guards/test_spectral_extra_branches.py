@@ -1,5 +1,5 @@
-import torch
 import pytest
+import torch
 
 import invarlock.guards.spectral as spectral
 
@@ -156,7 +156,9 @@ def test_spectral_prepare_percentile_failure_falls_back_to_sigma_quantile(
     monkeypatch.setattr(
         "invarlock.guards.spectral.scan_model_gains", lambda *a, **k: {}
     )
-    monkeypatch.setattr("invarlock.guards.spectral.np.percentile", lambda *_a, **_k: 1 / 0)
+    monkeypatch.setattr(
+        "invarlock.guards.spectral.np.percentile", lambda *_a, **_k: 1 / 0
+    )
 
     g = spectral.SpectralGuard(sigma_quantile=0.9)
 

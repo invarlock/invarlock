@@ -70,7 +70,11 @@ def test_two_tier_policy_enforced(tmp_path: Path) -> None:
                 0.91,
                 0.90,
             ),  # explicit critical file → PASS
-            ("src/invarlock/eval/metrics.py", 0.91, 0.90),  # explicit critical file → PASS
+            (
+                "src/invarlock/eval/metrics.py",
+                0.91,
+                0.90,
+            ),  # explicit critical file → PASS
             ("src/invarlock/guards/spectral.py", 0.89, 0.90),  # core (guards) → FAIL
         ],
     )

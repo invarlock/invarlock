@@ -137,4 +137,3 @@ def test_compute_real_metrics_dataset_seed_skips_non_dict_dataset_cfg() -> None:
         config=cfg,
     )
     assert metrics.get("eval_error") is None
-

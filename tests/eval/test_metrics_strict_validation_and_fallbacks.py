@@ -41,7 +41,9 @@ def test_mi_gini_optimized_cpu_path_subsamples_when_n_gt_max(monkeypatch) -> Non
 
     feats = torch.ones(L, N, D)
     targ = torch.arange(N)
-    cfg = metrics_mod.MetricsConfig(use_cache=False, progress_bars=False, strict_validation=False)
+    cfg = metrics_mod.MetricsConfig(
+        use_cache=False, progress_bars=False, strict_validation=False
+    )
 
     out = metrics_mod._mi_gini_optimized_cpu_path(
         feats, targ, max_per_layer=max_per_layer, config=cfg
@@ -49,7 +51,9 @@ def test_mi_gini_optimized_cpu_path_subsamples_when_n_gt_max(monkeypatch) -> Non
     assert math.isnan(out)
 
 
-def test_locate_transformer_blocks_enhanced_catches_len_typeerror_and_uses_fallback() -> None:
+def test_locate_transformer_blocks_enhanced_catches_len_typeerror_and_uses_fallback() -> (
+    None
+):
     class _BadLen:
         def __len__(self) -> int:
             raise TypeError("boom")
@@ -78,9 +82,13 @@ def test_extract_fc1_activations_returns_none_on_block_attr_error(monkeypatch) -
                 raise RuntimeError("boom")
             return super().__getattribute__(name)
 
-    monkeypatch.setattr(metrics_mod, "_locate_transformer_blocks_enhanced", lambda _m: [_BadBlock()])
+    monkeypatch.setattr(
+        metrics_mod, "_locate_transformer_blocks_enhanced", lambda _m: [_BadBlock()]
+    )
 
-    cfg = metrics_mod.MetricsConfig(use_cache=False, progress_bars=False, strict_validation=False)
+    cfg = metrics_mod.MetricsConfig(
+        use_cache=False, progress_bars=False, strict_validation=False
+    )
     out = metrics_mod._extract_fc1_activations(
         nn.Linear(2, 2),
         output=SimpleNamespace(hidden_states=[]),
@@ -94,7 +102,9 @@ def test_calculate_sigma_max_skips_when_dependency_missing() -> None:
         def is_available(self, _name: str) -> bool:  # noqa: ANN001
             return False
 
-    cfg = metrics_mod.MetricsConfig(use_cache=False, progress_bars=False, strict_validation=False)
+    cfg = metrics_mod.MetricsConfig(
+        use_cache=False, progress_bars=False, strict_validation=False
+    )
     out = metrics_mod._calculate_sigma_max(
         nn.Linear(2, 2),
         first_batch={"input_ids": [1]},
@@ -110,7 +120,9 @@ def test_calculate_sigma_max_skips_when_first_batch_missing() -> None:
         def is_available(self, _name: str) -> bool:  # noqa: ANN001
             return True
 
-    cfg = metrics_mod.MetricsConfig(use_cache=False, progress_bars=False, strict_validation=False)
+    cfg = metrics_mod.MetricsConfig(
+        use_cache=False, progress_bars=False, strict_validation=False
+    )
     out = metrics_mod._calculate_sigma_max(
         nn.Linear(2, 2),
         first_batch=None,
@@ -134,7 +146,9 @@ def test_calculate_head_energy_returns_nan_when_all_values_non_finite() -> None:
     assert math.isnan(out)
 
 
-def test_calculate_mi_gini_returns_nan_for_missing_dependency_and_missing_activations() -> None:
+def test_calculate_mi_gini_returns_nan_for_missing_dependency_and_missing_activations() -> (
+    None
+):
     class _DepMgrMissing:
         def is_available(self, _name: str) -> bool:  # noqa: ANN001
             return False
@@ -143,8 +157,13 @@ def test_calculate_mi_gini_returns_nan_for_missing_dependency_and_missing_activa
         def is_available(self, _name: str) -> bool:  # noqa: ANN001
             return True
 
-    cfg = metrics_mod.MetricsConfig(use_cache=False, progress_bars=False, strict_validation=False)
-    activation_data = {"fc1_activations": [torch.zeros(1, 1, 1, 1)], "targets": [torch.zeros(1, 1)]}
+    cfg = metrics_mod.MetricsConfig(
+        use_cache=False, progress_bars=False, strict_validation=False
+    )
+    activation_data = {
+        "fc1_activations": [torch.zeros(1, 1, 1, 1)],
+        "targets": [torch.zeros(1, 1)],
+    }
 
     out_missing = metrics_mod._calculate_mi_gini(
         nn.Linear(2, 2),
@@ -196,35 +215,61 @@ def test_calculate_lens_metrics_unwraps_base_model_and_returns_on_no_hidden_stat
         },
     )
 
-    cfg = metrics_mod.MetricsConfig(use_cache=False, progress_bars=False, strict_validation=False)
+    cfg = metrics_mod.MetricsConfig(
+        use_cache=False, progress_bars=False, strict_validation=False
+    )
     dataloader = [{"input_ids": torch.zeros(1, 2, dtype=torch.long)}]
-    out = metrics_mod.calculate_lens_metrics_for_model(_Wrapped(), dataloader, config=cfg)
+    out = metrics_mod.calculate_lens_metrics_for_model(
+        _Wrapped(), dataloader, config=cfg
+    )
     assert set(out) >= {"sigma_max", "head_energy", "mi_gini"}
 
 
 def test_calculate_lens_metrics_strict_validation_raises_on_activation_failure(
     monkeypatch,
 ) -> None:
-    monkeypatch.setattr(metrics_mod, "_collect_activations", lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(
+        metrics_mod,
+        "_collect_activations",
+        lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
 
-    cfg = metrics_mod.MetricsConfig(use_cache=False, progress_bars=False, strict_validation=True)
+    cfg = metrics_mod.MetricsConfig(
+        use_cache=False, progress_bars=False, strict_validation=True
+    )
     dataloader = [{"input_ids": torch.zeros(1, 2, dtype=torch.long)}]
     with pytest.raises(metrics_mod.MetricsError):
-        metrics_mod.calculate_lens_metrics_for_model(nn.Linear(2, 2), dataloader, config=cfg)
+        metrics_mod.calculate_lens_metrics_for_model(
+            nn.Linear(2, 2), dataloader, config=cfg
+        )
 
 
 def test_calculate_lens_metrics_non_strict_continues_on_activation_failure(
     monkeypatch,
 ) -> None:
-    monkeypatch.setattr(metrics_mod, "_collect_activations", lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(
+        metrics_mod,
+        "_collect_activations",
+        lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
 
-    cfg = metrics_mod.MetricsConfig(use_cache=False, progress_bars=False, strict_validation=False)
+    cfg = metrics_mod.MetricsConfig(
+        use_cache=False, progress_bars=False, strict_validation=False
+    )
     dataloader = [{"input_ids": torch.zeros(1, 2, dtype=torch.long)}]
-    out = metrics_mod.calculate_lens_metrics_for_model(nn.Linear(2, 2), dataloader, config=cfg)
-    assert math.isnan(out["sigma_max"]) and math.isnan(out["head_energy"]) and math.isnan(out["mi_gini"])
+    out = metrics_mod.calculate_lens_metrics_for_model(
+        nn.Linear(2, 2), dataloader, config=cfg
+    )
+    assert (
+        math.isnan(out["sigma_max"])
+        and math.isnan(out["head_energy"])
+        and math.isnan(out["mi_gini"])
+    )
 
 
-def test_perform_pre_eval_checks_handles_missing_context_attr_and_no_warning_branch() -> None:
+def test_perform_pre_eval_checks_handles_missing_context_attr_and_no_warning_branch() -> (
+    None
+):
     class _Cfg:
         n_positions = None
         max_position_embeddings = None
@@ -238,12 +283,16 @@ def test_perform_pre_eval_checks_handles_missing_context_attr_and_no_warning_bra
         def forward(self, **_kwargs):  # noqa: ANN001
             return SimpleNamespace(logits=torch.zeros(1, 1, 1))
 
-    cfg = metrics_mod.MetricsConfig(use_cache=False, progress_bars=False, strict_validation=False)
+    cfg = metrics_mod.MetricsConfig(
+        use_cache=False, progress_bars=False, strict_validation=False
+    )
     dataloader = [{"input_ids": torch.zeros(1, 2, dtype=torch.long)}]
     metrics_mod._perform_pre_eval_checks(_Model(), dataloader, torch.device("cpu"), cfg)
 
 
-def test_perform_pre_eval_checks_skips_warning_when_seq_len_within_model_limit() -> None:
+def test_perform_pre_eval_checks_skips_warning_when_seq_len_within_model_limit() -> (
+    None
+):
     class _Cfg:
         n_positions = 10
         max_position_embeddings = None
@@ -257,7 +306,9 @@ def test_perform_pre_eval_checks_skips_warning_when_seq_len_within_model_limit()
         def forward(self, **_kwargs):  # noqa: ANN001
             return SimpleNamespace(logits=torch.zeros(1, 1, 1))
 
-    cfg = metrics_mod.MetricsConfig(use_cache=False, progress_bars=False, strict_validation=False)
+    cfg = metrics_mod.MetricsConfig(
+        use_cache=False, progress_bars=False, strict_validation=False
+    )
     dataloader = [{"input_ids": torch.zeros(1, 5, dtype=torch.long)}]
     metrics_mod._perform_pre_eval_checks(_Model(), dataloader, torch.device("cpu"), cfg)
 
@@ -266,8 +317,12 @@ def test_extract_fc1_activations_skips_blocks_without_mlp(monkeypatch) -> None:
     class _Block(nn.Module):
         pass
 
-    monkeypatch.setattr(metrics_mod, "_locate_transformer_blocks_enhanced", lambda _m: [_Block()])
-    cfg = metrics_mod.MetricsConfig(use_cache=False, progress_bars=False, strict_validation=False)
+    monkeypatch.setattr(
+        metrics_mod, "_locate_transformer_blocks_enhanced", lambda _m: [_Block()]
+    )
+    cfg = metrics_mod.MetricsConfig(
+        use_cache=False, progress_bars=False, strict_validation=False
+    )
     out = metrics_mod._extract_fc1_activations(
         nn.Linear(2, 2),
         output=SimpleNamespace(hidden_states=[]),
@@ -309,11 +364,19 @@ def test_calculate_sigma_max_all_non_finite_triggers_nan_branch() -> None:
     assert math.isnan(out)
 
 
-def test_calculate_mi_gini_oom_calls_empty_cache_when_cuda_available(monkeypatch) -> None:
+def test_calculate_mi_gini_oom_calls_empty_cache_when_cuda_available(
+    monkeypatch,
+) -> None:
     called = {"empty_cache": 0}
     monkeypatch.setattr(metrics_mod.torch.cuda, "is_available", lambda: True)
-    monkeypatch.setattr(metrics_mod.torch.cuda, "empty_cache", lambda: called.__setitem__("empty_cache", called["empty_cache"] + 1))
-    monkeypatch.setattr(metrics_mod, "_mi_gini_optimized_cpu_path", lambda *_a, **_k: float("nan"))
+    monkeypatch.setattr(
+        metrics_mod.torch.cuda,
+        "empty_cache",
+        lambda: called.__setitem__("empty_cache", called["empty_cache"] + 1),
+    )
+    monkeypatch.setattr(
+        metrics_mod, "_mi_gini_optimized_cpu_path", lambda *_a, **_k: float("nan")
+    )
 
     class _DepMgr:
         def is_available(self, _name: str) -> bool:  # noqa: ANN001
@@ -325,7 +388,9 @@ def test_calculate_mi_gini_oom_calls_empty_cache_when_cuda_available(monkeypatch
 
             return _oom
 
-    cfg = metrics_mod.MetricsConfig(use_cache=False, progress_bars=False, strict_validation=False)
+    cfg = metrics_mod.MetricsConfig(
+        use_cache=False, progress_bars=False, strict_validation=False
+    )
     activation_data = {
         "fc1_activations": [torch.zeros(1, 1, 2, 1)],
         "targets": [torch.zeros(1, 2, dtype=torch.long)],
@@ -353,7 +418,9 @@ def test_calculate_mi_gini_runtime_error_non_oom_takes_raise_path(monkeypatch) -
 
             return _boom
 
-    cfg = metrics_mod.MetricsConfig(use_cache=False, progress_bars=False, strict_validation=False)
+    cfg = metrics_mod.MetricsConfig(
+        use_cache=False, progress_bars=False, strict_validation=False
+    )
     activation_data = {
         "fc1_activations": [torch.zeros(1, 1, 2, 1)],
         "targets": [torch.zeros(1, 2, dtype=torch.long)],

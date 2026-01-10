@@ -61,7 +61,9 @@ def test_print_guard_overhead_summary_formats_percent_and_threshold() -> None:
     assert "≤ +2.0%" in text
 
 
-def test_print_guard_overhead_summary_falls_back_to_ratio_and_default_threshold() -> None:
+def test_print_guard_overhead_summary_falls_back_to_ratio_and_default_threshold() -> (
+    None
+):
     console = Console(record=True)
     threshold = run_mod._print_guard_overhead_summary(
         console,

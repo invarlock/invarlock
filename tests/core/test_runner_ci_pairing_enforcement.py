@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import pytest
 import torch
 
 from invarlock.core.api import RunConfig
@@ -38,7 +37,9 @@ class _ToyModel(torch.nn.Module):
         return _FakeOutputs(loss)
 
 
-def _cfg(*, profile: str, pairing_baseline: dict, seq_len: int, stride: int) -> RunConfig:
+def _cfg(
+    *, profile: str, pairing_baseline: dict, seq_len: int, stride: int
+) -> RunConfig:
     return RunConfig(
         device="cpu",
         event_path=None,

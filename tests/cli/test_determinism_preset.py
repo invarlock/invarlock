@@ -173,7 +173,9 @@ def test_determinism_preset_warn_only_fallback_failure(monkeypatch) -> None:
     assert payload["level"] == "tolerance"
 
 
-def test_determinism_preset_cuda_low_memory_selects_cublas_fallback(monkeypatch) -> None:
+def test_determinism_preset_cuda_low_memory_selects_cublas_fallback(
+    monkeypatch,
+) -> None:
     class _CudaProps:
         total_memory = 1 * 1024**3
 

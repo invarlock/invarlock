@@ -14,7 +14,9 @@ def test_capture_sigmas_clamps_iters_defaults_init_and_skips_non_tensor(
 
     calls: dict[str, object] = {}
 
-    def fake_power_iter_sigma_max(weight: torch.Tensor, *, iters: int, init: str) -> float:
+    def fake_power_iter_sigma_max(
+        weight: torch.Tensor, *, iters: int, init: str
+    ) -> float:
         calls["iters"] = iters
         calls["init"] = init
         return 2.0
@@ -55,7 +57,9 @@ def test_prepare_degeneracy_skips_non_tensor_and_invalid_sigma(monkeypatch) -> N
         spectral, "classify_model_families", lambda *_a, **_k: {"t": "ffn", "n": "ffn"}
     )
     monkeypatch.setattr(
-        spectral, "compute_family_stats", lambda *_a, **_k: {"ffn": {"mean": 1.0, "std": 0.0}}
+        spectral,
+        "compute_family_stats",
+        lambda *_a, **_k: {"ffn": {"mean": 1.0, "std": 0.0}},
     )
     monkeypatch.setattr(spectral, "scan_model_gains", lambda *_a, **_k: {})
     monkeypatch.setattr(spectral, "auto_sigma_target", lambda *_a, **_k: 1.0)
@@ -94,7 +98,9 @@ def test_after_edit_applies_spectral_control_when_enabled(monkeypatch) -> None:
         lambda *_a, **_k: [{"type": "mock_violation"}],
         raising=False,
     )
-    monkeypatch.setattr(spectral, "apply_spectral_control", lambda *_a, **_k: {"applied": True})
+    monkeypatch.setattr(
+        spectral, "apply_spectral_control", lambda *_a, **_k: {"applied": True}
+    )
 
     class Model:
         def named_modules(self):
@@ -128,6 +134,8 @@ def test_detect_violations_computes_sigma_and_classifies_family_when_missing(
             yield "ln", torch.nn.LayerNorm(2)
             yield "lin", torch.nn.Linear(2, 2, bias=False)
 
-    violations = guard._detect_spectral_violations(Model(), metrics={}, phase="finalize")
+    violations = guard._detect_spectral_violations(
+        Model(), metrics={}, phase="finalize"
+    )
     assert violations == []
     assert guard.module_family_map.get("lin") == "ffn"
