@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - B200 validation bash test suite (`scripts/lib/tests/*`, `scripts/lib/tests/run.sh`) with deterministic command mocks and optional branch/line coverage checks.
-- B200 runtime helpers (`scripts/lib/runtime.sh`) plus a snapshot/diagnostics helper (`scripts/invarlock_snapshot.sh`) to capture queue/worker/GPU state during long runs.
+- B200 runtime helpers (`scripts/lib/runtime.sh`) plus a snapshot/diagnostics helper (`scripts/b200_invarlock_snapshot.sh`) to capture queue/worker/GPU state during long runs.
 - Perplexity token-id sanitization to mask out-of-range IDs (and ignore them in labels) instead of triggering device-side asserts.
 
 ### Changed

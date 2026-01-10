@@ -5,7 +5,7 @@
 # ==========================================================
 # Version: v2.1.0-b200
 # Dependencies: bash 4+, jq, python3, invarlock CLI, nvidia-smi
-# Optimized for 8x NVIDIA B200 180GB SXM6 GPUs with parallel orchestration.
+# Optimized for multi-GPU NVIDIA B200 180GB SXM6 with parallel orchestration.
 #
 # HARDWARE TARGET:
 # - 8x B200 180GB SXM6
@@ -4016,6 +4016,7 @@ generate_verdict() {
 
 	    python3 <<- EOF
 import json
+import os
 from pathlib import Path
 from datetime import datetime
 
@@ -4051,6 +4052,12 @@ total_tests = summary.get('total_tests', 0)
 	triage_review = triage_counts.get('REVIEW', 0)
 	triage_fail = triage_counts.get('FAIL', 0)
 
+gpu_count = os.environ.get("NUM_GPUS", "").strip() or "unknown"
+gpu_mem = os.environ.get("GPU_MEMORY_GB", "").strip() or "180"
+platform_header = f"B200 {gpu_mem}GB x {gpu_count} GPU"
+platform_line = f"{gpu_count}x NVIDIA B200 {gpu_mem}GB SXM6"
+platform_tag = f"B200_{gpu_mem}GB_x{gpu_count}"
+
 phase0_pass = accuracy >= 0.6 and err_rate >= 0.8
 
 if phase0_pass and accuracy >= 0.8 and confidence_score >= 75:
@@ -4068,7 +4075,7 @@ else:
 
 report = f'''
 ================================================================================
-     INVARLOCK PHASE 0 VALIDATION - B200 180GB x 8 GPU
+     INVARLOCK PHASE 0 VALIDATION - {platform_header}
 ================================================================================
      Models Tested:     {models_tested}
      Total Tests:       {total_tests}
@@ -4093,7 +4100,7 @@ EDIT TYPES TESTED:
   * Magnitude Pruning: 10% (clean), 50% (stress)
   * Low-Rank SVD: rank-256 (clean), rank-32 (stress)
 
-PLATFORM: 8x NVIDIA B200 180GB SXM6
+PLATFORM: {platform_line}
 
 '''
 
@@ -4115,7 +4122,7 @@ with open(reports_dir / "final_verdict.txt", 'w') as f:
 	        'confidence': {'score': confidence_score, 'level': confidence_level},
 	        'triage': {'pass': triage_pass, 'review': triage_review, 'fail': triage_fail},
 	        'phase0_pass': phase0_pass,
-	        'platform': 'B200_180GB_x8',
+	        'platform': platform_tag,
 	        'models_tested': models_tested,
 	        'total_tests': total_tests,
         'timestamp': datetime.now().isoformat()
@@ -4126,10 +4133,13 @@ EOF
 # ============ MAIN - DYNAMIC GPU SCHEDULING (v2.0) ============
 main_dynamic() {
     local start_time=$(date +%s)
+    local gpu_mem="${GPU_MEMORY_GB:-180}"
+    local gpu_count_label="${NUM_GPUS:-auto}"
+    [[ -z "${gpu_count_label}" ]] && gpu_count_label="auto"
 
     echo "========================================================================"
     echo "  InvarLock Validation Suite v${SCRIPT_VERSION}"
-    echo "  B200 180GB x 8 GPU DYNAMIC SCHEDULING"
+    echo "  B200 ${gpu_mem}GB x ${gpu_count_label} GPU DYNAMIC SCHEDULING"
     echo "========================================================================"
     echo ""
 
@@ -4533,9 +4543,9 @@ b200_entrypoint() {
     # ============ HELP ============
     if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
         cat << EOF
-	InvarLock Validation Suite v${SCRIPT_VERSION} - B200 180GB x 8 GPU
+	InvarLock Validation Suite v${SCRIPT_VERSION} - B200 ${GPU_MEMORY_GB:-180}GB x ${NUM_GPUS:-auto} GPU
 
-Optimized for 8x NVIDIA B200 180GB SXM6 GPUs with:
+Optimized for NVIDIA B200 ${GPU_MEMORY_GB:-180}GB SXM6 GPUs with:
   * FP4 quantization (simulated; B200-native hardware)
   * ~4.5 TB/s memory bandwidth
   * ~2250 FP16 TFLOPS
