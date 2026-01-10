@@ -311,10 +311,10 @@ def _extract_spectral_analysis(
     families: dict[str, dict[str, Any]] = {}
     family_caps: dict[str, dict[str, float]] = {}
     top_z_scores: dict[str, list[dict[str, Any]]] = {}
+    deadband_used: float | None = None
 
     if isinstance(guard_metrics, dict):
         # Resolve deadband from policy/metrics/defaults
-        deadband_used: float | None = None
         try:
             db_raw = guard_policy.get("deadband") if guard_policy else None
             if db_raw is None and isinstance(guard_metrics, dict):

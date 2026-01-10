@@ -72,7 +72,7 @@ PYTHONPATH=src pytest tests/guards_differential/ -v
 ## Coverage Targets
 
 Per CONTRIBUTING.md, guards are part of the critical surface:
-- **Target: ≥85% branch coverage** for all files in `src/invarlock/guards/`
+- **Target: ≥90% branch coverage** for all files in `src/invarlock/guards/`
 
 ## Related Test Directories
 

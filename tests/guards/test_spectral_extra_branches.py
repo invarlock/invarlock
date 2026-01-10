@@ -1,4 +1,5 @@
 import torch
+import pytest
 
 import invarlock.guards.spectral as spectral
 
@@ -108,6 +109,64 @@ def test_spectral_prepare_estimator_invalid_iters_and_init_defaults(
     assert out["ready"] is True
     assert g.estimator["iters"] == 4
     assert g.estimator["init"] == "ones"
+
+
+def test_spectral_prepare_coerces_max_spectral_norm_from_policy(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "invarlock.guards.spectral.capture_baseline_sigmas", lambda *a, **k: {"m": 1.0}
+    )
+    monkeypatch.setattr(
+        "invarlock.guards.spectral.classify_model_families",
+        lambda *a, **k: {"m": "ffn"},
+    )
+    monkeypatch.setattr(
+        "invarlock.guards.spectral.compute_family_stats",
+        lambda *a, **k: {"ffn": {"mean": 1.0, "std": 0.0}},
+    )
+    monkeypatch.setattr(
+        "invarlock.guards.spectral.scan_model_gains", lambda *a, **k: {}
+    )
+
+    g = spectral.SpectralGuard()
+
+    class DummyModel:
+        def named_modules(self):
+            return iter([])
+
+    out = g.prepare(DummyModel(), object(), None, {"max_spectral_norm": "2.5"})
+    assert out["ready"] is True
+    assert g.max_spectral_norm == 2.5
+    assert g.config["max_spectral_norm"] == 2.5
+
+
+def test_spectral_prepare_percentile_failure_falls_back_to_sigma_quantile(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        "invarlock.guards.spectral.capture_baseline_sigmas", lambda *a, **k: {"m": 1.0}
+    )
+    monkeypatch.setattr(
+        "invarlock.guards.spectral.classify_model_families",
+        lambda *a, **k: {"m": "ffn"},
+    )
+    monkeypatch.setattr(
+        "invarlock.guards.spectral.compute_family_stats",
+        lambda *a, **k: {"ffn": {"mean": 1.0, "std": 0.0}},
+    )
+    monkeypatch.setattr(
+        "invarlock.guards.spectral.scan_model_gains", lambda *a, **k: {}
+    )
+    monkeypatch.setattr("invarlock.guards.spectral.np.percentile", lambda *_a, **_k: 1 / 0)
+
+    g = spectral.SpectralGuard(sigma_quantile=0.9)
+
+    class DummyModel:
+        def named_modules(self):
+            return iter([])
+
+    out = g.prepare(DummyModel(), object(), None, {})
+    assert out["ready"] is True
+    assert g.target_sigma == pytest.approx(g.sigma_quantile)
 
 
 def test_spectral_guard_init_parses_estimator_and_degeneracy_branches() -> None:
