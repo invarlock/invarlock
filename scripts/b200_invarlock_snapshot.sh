@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Snapshot diagnostics for an InvarLock B200 validation run.
 # Usage:
-#   bash scripts/invarlock_snapshot.sh /path/to/invarlock_validation_b200_YYYYmmdd_HHMMSS
-#   OUT=/path/to/output bash scripts/invarlock_snapshot.sh
+#   bash scripts/b200_invarlock_snapshot.sh /path/to/invarlock_validation_b200_YYYYmmdd_HHMMSS
+#   OUT=/path/to/output bash scripts/b200_invarlock_snapshot.sh
 
 set -uo pipefail
 
