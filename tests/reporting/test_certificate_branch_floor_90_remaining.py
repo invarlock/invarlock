@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import importlib
 import json
 from copy import deepcopy
 
 import pytest
 
 from invarlock.reporting import certificate as cert_mod
+from invarlock.reporting import certificate_schema as cert_schema_mod
 from invarlock.reporting import primary_metric_utils
 from invarlock.reporting.certificate import make_certificate, validate_certificate
 from invarlock.reporting.report_types import create_empty_report
@@ -219,6 +221,11 @@ def test_enforce_pairing_and_coverage_branch_matrix() -> None:
     stats["actual_final"] = None
     cert_mod._enforce_pairing_and_coverage(stats, window_plan_profile="ci", tier="balanced")
 
+    # Mixed: actual_final present, actual_preview derived from coverage.
+    stats = dict(base)
+    stats["actual_preview"] = None
+    cert_mod._enforce_pairing_and_coverage(stats, window_plan_profile="ci", tier="balanced")
+
     # Coverage fallback disabled -> missing preview/final counts hard-fails.
     stats = {
         "window_match_fraction": 1.0,
@@ -347,3 +354,75 @@ def test_compute_validation_flags_acceptance_bounds_and_accuracy_tiny_relax(monk
         dataset_capacity={"examples_available": 1},
     )
     assert flags2.get("primary_metric_acceptable") is True
+
+
+def test_certificate_module_schema_tightening_branches(monkeypatch) -> None:
+    original_schema = cert_schema_mod.CERTIFICATE_JSON_SCHEMA
+    try:
+        monkeypatch.setattr(
+            cert_schema_mod, "CERTIFICATE_JSON_SCHEMA", {"properties": "nope"}
+        )
+        importlib.reload(cert_mod)
+
+        monkeypatch.setattr(
+            cert_schema_mod,
+            "CERTIFICATE_JSON_SCHEMA",
+            {"properties": {"validation": "nope"}},
+        )
+        importlib.reload(cert_mod)
+    finally:
+        monkeypatch.setattr(cert_schema_mod, "CERTIFICATE_JSON_SCHEMA", original_schema)
+        importlib.reload(cert_mod)
+
+
+def test_make_certificate_ratio_ci_fallback_skips_non_interval(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "invarlock.reporting.certificate.compute_paired_delta_log_ci",
+        lambda *_a, **_k: (-0.01, 0.01),
+    )
+    monkeypatch.setattr(cert_mod, "_coerce_interval", lambda _v: (0.0,))  # type: ignore[assignment]
+
+    baseline = _mk_baseline()
+    report = create_empty_report()
+    report["meta"].update(
+        {
+            "model_id": "m",
+            "adapter": "hf",
+            "device": "cpu",
+            "seed": 1,
+            "auto": {"tier": "balanced", "probes_used": 0, "target_pm_ratio": None},
+        }
+    )
+    report["data"].update(
+        {
+            "dataset": "ds",
+            "split": "validation",
+            "seq_len": 8,
+            "stride": 8,
+            "preview_n": 2,
+            "final_n": 2,
+        }
+    )
+    report["edit"]["name"] = "noop"
+    report["edit"]["plan_digest"] = "noop"
+    report["edit"]["deltas"]["params_changed"] = 0
+    report["evaluation_windows"] = deepcopy(baseline["evaluation_windows"])
+    report["metrics"]["bootstrap"] = {
+        "method": "percentile",
+        "replicates": 10,
+        "alpha": 0.05,
+        "seed": 0,
+        "coverage": {"preview": {"used": 2}, "final": {"used": 2}},
+    }
+    report["metrics"]["paired_delta_summary"] = {"mean": 0.0, "degenerate": False}
+    report["metrics"]["window_plan"] = {"profile": "dev"}
+    report["metrics"]["logloss_delta_ci"] = (-0.01, 0.01)
+    report["metrics"]["primary_metric"] = {
+        "kind": "ppl_causal",
+        "preview": 10.0,
+        "final": 10.0,
+        "ratio_vs_baseline": 1.0,
+    }
+
+    cert = make_certificate(report, baseline)
+    assert validate_certificate(cert)
