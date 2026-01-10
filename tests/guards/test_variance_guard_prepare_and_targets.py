@@ -98,6 +98,35 @@ def test_compute_variance_scales_topk_backstop_injects_best_candidate(
     assert out.get("block0.attn") == 1.3
 
 
+def test_compute_variance_scales_backstop_clamps_deadband_threshold(
+    monkeypatch,
+) -> None:
+    def fake_equalise(*_a, **_k):
+        return {"block0.attn": 1.2}
+
+    monkeypatch.setattr(variance_mod, "equalise_residual_variance", fake_equalise)
+
+    g = VarianceGuard(
+        policy={
+            "min_gain": 0.0,
+            "scope": "both",
+            "max_calib": 0,
+            "deadband": 1.0,
+            "clamp": (0.5, 2.0),
+            "min_abs_adjust": 0.20,
+            "max_scale_step": 0.0,
+            "topk_backstop": 1,
+            "max_adjusted_modules": 0,
+        }
+    )
+    monkeypatch.setattr(
+        g, "_tensorize_calibration_batches", lambda batches: list(batches)
+    )
+
+    out = g._compute_variance_scales(nn.Linear(2, 2, bias=False), [])
+    assert out.get("block0.attn") == 1.2
+
+
 def test_prepare_sets_focus_modules_stats_when_target_modules_policy_passed(
     monkeypatch,
 ) -> None:

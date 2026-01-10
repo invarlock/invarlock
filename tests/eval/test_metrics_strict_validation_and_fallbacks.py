@@ -12,7 +12,12 @@ from invarlock.eval import metrics as metrics_mod
 
 def test_resource_manager_falls_back_to_cpu_when_no_cuda_or_mps(monkeypatch) -> None:
     monkeypatch.setattr(metrics_mod.torch.cuda, "is_available", lambda: False)
-    monkeypatch.setattr(metrics_mod.torch.backends.mps, "is_available", lambda: False)
+    monkeypatch.setattr(
+        metrics_mod.torch.backends,
+        "mps",
+        SimpleNamespace(is_available=lambda: False),
+        raising=False,
+    )
 
     cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
     rm = metrics_mod.ResourceManager(cfg)
