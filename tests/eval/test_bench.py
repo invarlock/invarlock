@@ -351,6 +351,31 @@ class TestMetricsAggregator:
         assert metrics["tying_violations_post"] == 0
         assert metrics["catastrophic_spike"] is True
 
+    def test_extract_guard_metrics_rmt_structured_loop_exhaustion_uses_fallback(self):
+        """When structured RMT metrics are non-numeric, loop should exhaust and fallback."""
+        report = create_empty_report()
+        report["guards"] = [
+            {"name": "rmt", "metrics": {"layers_flagged": "bad"}, "violations": []}
+        ]
+        report["metrics"] = {"rmt": {"outliers": 9}}
+
+        metrics = MetricsAggregator.extract_guard_metrics(report)
+        assert metrics["rmt_outliers"] == 9
+
+    def test_extract_guard_metrics_invariants_violations_not_list_skips_len_fallback(self):
+        report = create_empty_report()
+        report["guards"] = [
+            {
+                "name": "invariants",
+                "metrics": {"violations_found": "bad"},
+                "violations": "bad",
+            }
+        ]
+        report["metrics"] = {"invariants": {"violations": 7}}
+
+        metrics = MetricsAggregator.extract_guard_metrics(report)
+        assert metrics["tying_violations_post"] == 7
+
     def test_compute_comparison_metrics_full_overhead_paths(self):
         """Exercise primary/time/mem overhead branches with finite baselines."""
         bare_report = create_empty_report()
@@ -380,6 +405,87 @@ class TestMetricsAggregator:
         assert comparison["guard_overhead_time"] == pytest.approx(0.5)
         assert comparison["guard_overhead_mem"] == pytest.approx(0.2)
 
+    def test_compute_comparison_metrics_time_overhead_falls_back_to_latency(self):
+        bare_report = create_empty_report()
+        bare_report["metrics"] = {
+            "primary_metric": {"kind": "ppl_causal", "final": 10.0},
+            "latency_ms_per_tok": 1.0,
+            "memory_mb_peak": 100.0,
+        }
+        bare_report["meta"] = {"duration_s": "bad"}
+
+        guarded_report = create_empty_report()
+        guarded_report["metrics"] = {
+            "primary_metric": {"kind": "ppl_causal", "final": 12.0},
+            "latency_ms_per_tok": 1.5,
+            "memory_mb_peak": 110.0,
+        }
+        guarded_report["meta"] = {"duration_s": None}
+
+        bare_result = RunResult("bare", bare_report, success=True)
+        guarded_result = RunResult("guarded", guarded_report, success=True)
+
+        comparison = MetricsAggregator.compute_comparison_metrics(
+            bare_result, guarded_result
+        )
+        assert comparison["guard_overhead_time"] == pytest.approx(0.5)
+
+
+def test_execute_single_run_skips_tokenizer_hash_and_duration_branches(
+    monkeypatch, tmp_path: Path
+):
+    import types
+
+    import invarlock.core.registry as core_registry
+    import invarlock.core.runner as core_runner
+    import invarlock.guards.rmt as rmt_mod
+
+    class _Adapter:
+        def restore(self, _model, _blob):  # noqa: ANN001
+            return None
+
+    class _Registry:
+        def get_edit(self, _name: str):  # noqa: ANN001
+            return object()
+
+    class _CoreRunner:
+        def execute(self, **_kwargs):  # noqa: ANN001
+            # Match the attribute shape expected by execute_single_run
+            return types.SimpleNamespace(
+                meta={"duration": "bad"},
+                edit="not-a-dict",
+                metrics={"rmt": "bad"},
+                guards={},
+                status="ok",
+            )
+
+    monkeypatch.setattr(core_registry, "get_registry", lambda: _Registry())
+    monkeypatch.setattr(core_runner, "CoreRunner", _CoreRunner)
+    monkeypatch.setattr(rmt_mod, "rmt_detect", lambda **_k: {"n_layers_flagged": 0})
+
+    scenario = ScenarioConfig(
+        edit="quant_rtn", tier="balanced", probes=0, profile="ci", device="cpu"
+    )
+    run_config: dict = {"dataset": {"provider": "wikitext2"}, "edit": {"plan": {}}}
+    runtime = {
+        "adapter": _Adapter(),
+        "model": object(),
+        "baseline_snapshot": b"blob",
+        "pairing_schedule": {},
+        "calibration_data": [],
+        "rmt_baseline_mp_stats": {},
+        "rmt_baseline_sigmas": {},
+        "tokenizer_hash": None,
+        "dataset_name": "wikitext2",
+        "split": "validation",
+    }
+
+    result = execute_single_run(
+        run_config, scenario, "bare", tmp_path, runtime=runtime
+    )
+    assert result.success is True
+    assert "tokenizer_hash" not in result.report.get("meta", {})
+    assert "duration_s" not in result.report.get("meta", {})
     def test_compute_comparison_metrics_invalid_inputs(self):
         """Test comparison with invalid inputs."""
         bare_result = None

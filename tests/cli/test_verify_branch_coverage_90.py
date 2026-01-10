@@ -50,3 +50,33 @@ def test_measurement_contract_digest_returns_none_on_stringify_error() -> None:
             raise RuntimeError("boom")
 
     assert v._measurement_contract_digest({"x": _Boom()}) is None
+
+
+def test_validate_measurement_contracts_skips_non_dict_guard_block() -> None:
+    cert = {
+        "spectral": "not-a-dict",
+        "rmt": {},
+        "resolved_policy": {},
+    }
+    errs = v._validate_measurement_contracts(cert, profile="ci")
+    assert isinstance(errs, list)
+    assert not any("spectral.measurement_contract" in e for e in errs)
+
+
+def test_validate_measurement_contracts_missing_hash_and_dev_profile_skip() -> None:
+    cert = {
+        "spectral": {
+            "measurement_contract": {"estimator": {"type": "power_iter"}},
+        },
+        "rmt": {"evaluated": False},
+        "resolved_policy": {
+            "spectral": {"measurement_contract": {"estimator": {"type": "power_iter"}}}
+        },
+    }
+    errs = v._validate_measurement_contracts(cert, profile="dev")
+    assert any("spectral.measurement_contract_hash" in e for e in errs)
+
+
+def test_apply_profile_lints_skips_when_lints_not_a_list() -> None:
+    cert = {"meta": {"model_profile": {"cert_lints": "bad"}}}
+    assert v._apply_profile_lints(cert) == []

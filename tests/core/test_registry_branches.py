@@ -150,15 +150,24 @@ def test_registry_additional_branches(monkeypatch):
         r.get_plugin_info("hello_guard", "widgets")
 
     # Guard fallback import path with type-mismatch (not a Guard instance)
-    # Inject a dummy plugin that points to a non-Guard class from this test module
+    # Use a synthetic module so importlib.import_module can resolve it even though
+    # tests/ is not a package.
+    import sys
+    import types
+
+    module_name = "invarlock_test_registry_type_mismatch"
+    dummy_mod = types.ModuleType(module_name)
+
     class NotGuard:
         pass
 
-    # Ensure module path for import exists
-    module_path = "tests.core.test_registry_branches"
-    info = reg.PluginInfo(
+    NotGuard.__module__ = module_name
+    dummy_mod.NotGuard = NotGuard
+    monkeypatch.setitem(sys.modules, module_name, dummy_mod)
+
+    r._guards["not_guard"] = reg.PluginInfo(
         name="not_guard",
-        module=module_path,
+        module=module_name,
         class_name="NotGuard",
         available=True,
         status="Available",
@@ -166,9 +175,6 @@ def test_registry_additional_branches(monkeypatch):
         version="0",
         entry_point=None,
     )
-    # Bind NotGuard into module globals so importlib can find it
-    globals()["NotGuard"] = NotGuard
-    r._guards["not_guard"] = info
 
     with pytest.raises(ImportError):
         r.get_guard("not_guard")
@@ -239,3 +245,59 @@ def test_check_runtime_dependencies_find_spec_exception_counts_missing(monkeypat
 
     monkeypatch.setattr(reg.importlib.util, "find_spec", _boom)
     assert r._check_runtime_dependencies(["some_dep"]) == ["some_dep"]
+
+
+def test_registry_get_paths_cover_unavailable_and_type_mismatch_branches(monkeypatch):
+    import sys
+    import types
+
+    r = reg.CoreRegistry()
+    r._initialized = True
+
+    r._adapters["unavailable_adapter"] = reg.PluginInfo(
+        name="unavailable_adapter",
+        module="invarlock.adapters",
+        class_name="HF_GPT2_Adapter",
+        available=False,
+        status="disabled",
+        entry_point=None,
+    )
+    with pytest.raises(ImportError, match="unavailable"):
+        r.get_adapter("unavailable_adapter")
+
+    module_name = "invarlock_test_registry_type_mismatch_more"
+    dummy_mod = types.ModuleType(module_name)
+
+    class NotAdapter:
+        pass
+
+    class NotEdit:
+        pass
+
+    NotAdapter.__module__ = module_name
+    NotEdit.__module__ = module_name
+    dummy_mod.NotAdapter = NotAdapter
+    dummy_mod.NotEdit = NotEdit
+    monkeypatch.setitem(sys.modules, module_name, dummy_mod)
+
+    r._adapters["bad_adapter"] = reg.PluginInfo(
+        name="bad_adapter",
+        module=module_name,
+        class_name="NotAdapter",
+        available=True,
+        status="Available",
+        entry_point=None,
+    )
+    with pytest.raises(ImportError):
+        r.get_adapter("bad_adapter")
+
+    r._edits["bad_edit"] = reg.PluginInfo(
+        name="bad_edit",
+        module=module_name,
+        class_name="NotEdit",
+        available=True,
+        status="Available",
+        entry_point=None,
+    )
+    with pytest.raises(ImportError):
+        r.get_edit("bad_edit")
