@@ -91,3 +91,15 @@ def test_print_guard_overhead_summary_handles_missing_ratio_and_percent() -> Non
     )
     assert "not evaluated" in console.export_text()
 
+
+def test_print_retry_summary_prints_when_attempts_present() -> None:
+    console = Console(record=True)
+
+    class Retry:
+        attempt_history = [object()]
+
+        def get_attempt_summary(self):  # noqa: ANN001
+            return {"total_attempts": 2, "elapsed_time": 1.2}
+
+    run_mod._print_retry_summary(console, Retry())
+    assert "Retry Summary" in console.export_text()
