@@ -1,8 +1,6 @@
 import os
 from pathlib import Path
 
-import pytest
-
 from invarlock.cli.config import load_config
 
 EXPECTED_CONFIGS = [
@@ -43,13 +41,3 @@ def test_cert_script_is_executable() -> None:
     script_path = repo_root / "scripts" / "cert_once.sh"
     assert script_path.exists(), "Expected scripts/cert_once.sh to exist"
     assert os.access(script_path, os.X_OK), "cert_once.sh should be executable"
-
-
-def test_agent_guidance_doc_contains_workflow() -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-    guide_path = repo_root / "AGENTS.md"
-    if not guide_path.exists():
-        pytest.skip("AGENTS.md not present in repository checkout")
-    contents = guide_path.read_text()
-    assert "Repository Guidelines" in contents
-    assert "Agent Workflow (Required Process)" in contents

@@ -252,7 +252,9 @@ python scripts/docs_lint.py --markdown   # style
 python scripts/docs_lint.py --spell      # spelling
 ```
 
-If you only have Node installed, the script will use `npx` automatically.
+If you only have Node installed, the script will look for `node_modules/.bin` first.
+To allow `npx` fetching, set `DOCS_LINT_ALLOW_NPX_INSTALL=1` (CI sets this);
+otherwise it skips with a warning.
 
 ### 4.3 Writing docs
 

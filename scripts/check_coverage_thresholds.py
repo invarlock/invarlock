@@ -140,7 +140,7 @@ def _parse_args() -> argparse.Namespace:
         type=float,
         default=DEFAULT_FLOOR_DEFAULT,
         help=(
-            "Branch coverage floor for non-core modules (default: 80%). "
+            f"Branch coverage floor for non-core modules (default: {DEFAULT_FLOOR_DEFAULT:.0%}). "
             "Note: non-core floors are only applied for files explicitly listed in THRESHOLDS."
         ),
     )

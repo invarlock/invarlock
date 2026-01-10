@@ -277,6 +277,9 @@ def attach_primary_metric(
                 if isinstance(point, float):
                     pm["display_ci"] = [point, point]
                 else:
+                    # As last resort, emit a degenerate [1.0, 1.0] to satisfy schema invariants
                     pm["display_ci"] = [1.0, 1.0]
+                    pm.setdefault("estimated", True)
+
     except Exception:
         pass
