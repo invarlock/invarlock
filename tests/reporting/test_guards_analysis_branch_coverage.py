@@ -110,7 +110,9 @@ def test_extract_spectral_analysis_baseline_metrics_spectral_not_dict() -> None:
     assert out["evaluated"] is False
 
 
-def test_extract_spectral_analysis_uses_guard_baseline_metrics_and_derives_quantiles() -> None:
+def test_extract_spectral_analysis_uses_guard_baseline_metrics_and_derives_quantiles() -> (
+    None
+):
     report = {
         "guards": [
             {
@@ -137,7 +139,7 @@ def test_extract_spectral_analysis_uses_guard_baseline_metrics_and_derives_quant
 
 def test_extract_spectral_analysis_quantile_position_integer_branch() -> None:
     final_z_scores = {f"m{i}": float(i) for i in range(21)}
-    module_family_map = {name: "ffn" for name in final_z_scores}
+    module_family_map = dict.fromkeys(final_z_scores, "ffn")
     report = {
         "guards": [
             {
@@ -152,7 +154,9 @@ def test_extract_spectral_analysis_quantile_position_integer_branch() -> None:
     assert out["family_z_quantiles"]["ffn"]["q95"] == 19.0
 
 
-def test_extract_spectral_analysis_summarize_returns_empty_when_family_map_empty() -> None:
+def test_extract_spectral_analysis_summarize_returns_empty_when_family_map_empty() -> (
+    None
+):
     report = {
         "guards": [
             {
@@ -182,7 +186,9 @@ def test_extract_spectral_analysis_summarize_skips_modules_without_family() -> N
     assert out.get("family_z_quantiles", {}) == {}
 
 
-def test_extract_spectral_analysis_skips_guard_metrics_block_when_metrics_falsy_non_dict() -> None:
+def test_extract_spectral_analysis_skips_guard_metrics_block_when_metrics_falsy_non_dict() -> (
+    None
+):
     report = {
         "guards": [
             {
@@ -197,13 +203,18 @@ def test_extract_spectral_analysis_skips_guard_metrics_block_when_metrics_falsy_
     assert out["evaluated"] is True
 
 
-def test_extract_spectral_analysis_bad_sigma_quantile_and_deadband_omits_summary_fields() -> None:
+def test_extract_spectral_analysis_bad_sigma_quantile_and_deadband_omits_summary_fields() -> (
+    None
+):
     report = {
         "guards": [
             {
                 "name": "spectral",
                 "policy": {"sigma_quantile": "bad", "deadband": "bad"},
-                "metrics": {"max_spectral_norm_final": 2.0, "mean_spectral_norm_final": 1.0},
+                "metrics": {
+                    "max_spectral_norm_final": 2.0,
+                    "mean_spectral_norm_final": 1.0,
+                },
             }
         ]
     }

@@ -362,7 +362,9 @@ class TestMetricsAggregator:
         metrics = MetricsAggregator.extract_guard_metrics(report)
         assert metrics["rmt_outliers"] == 9
 
-    def test_extract_guard_metrics_invariants_violations_not_list_skips_len_fallback(self):
+    def test_extract_guard_metrics_invariants_violations_not_list_skips_len_fallback(
+        self,
+    ):
         report = create_empty_report()
         report["guards"] = [
             {
@@ -480,12 +482,11 @@ def test_execute_single_run_skips_tokenizer_hash_and_duration_branches(
         "split": "validation",
     }
 
-    result = execute_single_run(
-        run_config, scenario, "bare", tmp_path, runtime=runtime
-    )
+    result = execute_single_run(run_config, scenario, "bare", tmp_path, runtime=runtime)
     assert result.success is True
     assert "tokenizer_hash" not in result.report.get("meta", {})
     assert "duration_s" not in result.report.get("meta", {})
+
     def test_compute_comparison_metrics_invalid_inputs(self):
         """Test comparison with invalid inputs."""
         bare_result = None

@@ -114,7 +114,9 @@ def test_make_certificate_covers_baseline_ratio_identity_branches(monkeypatch) -
         assert validate_certificate(cert)
 
 
-def test_make_certificate_synthesizes_display_ci_from_ratio_or_defaults(monkeypatch) -> None:
+def test_make_certificate_synthesizes_display_ci_from_ratio_or_defaults(
+    monkeypatch,
+) -> None:
     baseline = _mk_baseline()
 
     def attach_stub(certificate, report, baseline_raw, baseline_ref, ppl_analysis):  # noqa: ANN001,ARG001
@@ -129,7 +131,9 @@ def test_make_certificate_synthesizes_display_ci_from_ratio_or_defaults(monkeypa
         certificate["primary_metric"] = pm
 
     # Ensure our test payload survives normalization and triggers the local fallback block.
-    monkeypatch.setattr(cert_mod, "_normalize_and_validate_report", lambda r: r, raising=False)
+    monkeypatch.setattr(
+        cert_mod, "_normalize_and_validate_report", lambda r: r, raising=False
+    )
     monkeypatch.setattr(primary_metric_utils, "attach_primary_metric", attach_stub)
 
     cases = [
@@ -208,23 +212,31 @@ def test_enforce_pairing_and_coverage_branch_matrix() -> None:
     }
 
     # Pass-through: everything present.
-    cert_mod._enforce_pairing_and_coverage(dict(base), window_plan_profile="ci", tier="balanced")
+    cert_mod._enforce_pairing_and_coverage(
+        dict(base), window_plan_profile="ci", tier="balanced"
+    )
 
     # Fill missing actual_* from coverage dict.
     stats = dict(base)
     stats.pop("actual_preview")
     stats.pop("actual_final")
-    cert_mod._enforce_pairing_and_coverage(stats, window_plan_profile="ci", tier="balanced")
+    cert_mod._enforce_pairing_and_coverage(
+        stats, window_plan_profile="ci", tier="balanced"
+    )
 
     # Mixed: actual_preview present, actual_final derived from coverage.
     stats = dict(base)
     stats["actual_final"] = None
-    cert_mod._enforce_pairing_and_coverage(stats, window_plan_profile="ci", tier="balanced")
+    cert_mod._enforce_pairing_and_coverage(
+        stats, window_plan_profile="ci", tier="balanced"
+    )
 
     # Mixed: actual_final present, actual_preview derived from coverage.
     stats = dict(base)
     stats["actual_preview"] = None
-    cert_mod._enforce_pairing_and_coverage(stats, window_plan_profile="ci", tier="balanced")
+    cert_mod._enforce_pairing_and_coverage(
+        stats, window_plan_profile="ci", tier="balanced"
+    )
 
     # Coverage fallback disabled -> missing preview/final counts hard-fails.
     stats = {
@@ -236,19 +248,25 @@ def test_enforce_pairing_and_coverage_branch_matrix() -> None:
         "coverage": None,
     }
     with pytest.raises(ValueError, match="preview/final window counts"):
-        cert_mod._enforce_pairing_and_coverage(stats, window_plan_profile="ci", tier="balanced")
+        cert_mod._enforce_pairing_and_coverage(
+            stats, window_plan_profile="ci", tier="balanced"
+        )
 
     # Preview/final mismatch hard-fails.
     stats = dict(base)
     stats["actual_final"] = 179
     with pytest.raises(ValueError, match="matching preview/final counts"):
-        cert_mod._enforce_pairing_and_coverage(stats, window_plan_profile="ci", tier="balanced")
+        cert_mod._enforce_pairing_and_coverage(
+            stats, window_plan_profile="ci", tier="balanced"
+        )
 
     # Missing bootstrap coverage stats hard-fails.
     stats = dict(base)
     stats["coverage"] = None
     with pytest.raises(ValueError, match="bootstrap coverage stats"):
-        cert_mod._enforce_pairing_and_coverage(stats, window_plan_profile="ci", tier="balanced")
+        cert_mod._enforce_pairing_and_coverage(
+            stats, window_plan_profile="ci", tier="balanced"
+        )
 
     # Replicates derived from stats.bootstrap when coverage.replicates.used missing.
     stats = dict(base)
@@ -258,7 +276,9 @@ def test_enforce_pairing_and_coverage_branch_matrix() -> None:
         "replicates": {"used": None},
     }
     stats["bootstrap"] = {"replicates": 1200}
-    cert_mod._enforce_pairing_and_coverage(stats, window_plan_profile="ci", tier="balanced")
+    cert_mod._enforce_pairing_and_coverage(
+        stats, window_plan_profile="ci", tier="balanced"
+    )
 
     # Replicates remain missing when stats.bootstrap not a dict -> hard-fail.
     stats = dict(base)
@@ -269,7 +289,9 @@ def test_enforce_pairing_and_coverage_branch_matrix() -> None:
     }
     stats["bootstrap"] = "nope"
     with pytest.raises(ValueError, match="preview/final/replicates coverage stats"):
-        cert_mod._enforce_pairing_and_coverage(stats, window_plan_profile="ci", tier="balanced")
+        cert_mod._enforce_pairing_and_coverage(
+            stats, window_plan_profile="ci", tier="balanced"
+        )
 
     # Preview below tier floor hard-fails.
     stats = dict(base)
@@ -279,7 +301,9 @@ def test_enforce_pairing_and_coverage_branch_matrix() -> None:
         "replicates": {"used": 1200},
     }
     with pytest.raises(ValueError, match="tier floors"):
-        cert_mod._enforce_pairing_and_coverage(stats, window_plan_profile="ci", tier="balanced")
+        cert_mod._enforce_pairing_and_coverage(
+            stats, window_plan_profile="ci", tier="balanced"
+        )
 
     # Replicates below tier floor hard-fails.
     stats = dict(base)
@@ -289,14 +313,18 @@ def test_enforce_pairing_and_coverage_branch_matrix() -> None:
         "replicates": {"used": 1199},
     }
     with pytest.raises(ValueError, match="bootstrap replicates"):
-        cert_mod._enforce_pairing_and_coverage(stats, window_plan_profile="ci", tier="balanced")
+        cert_mod._enforce_pairing_and_coverage(
+            stats, window_plan_profile="ci", tier="balanced"
+        )
 
 
 def test_propagate_pairing_stats_early_returns() -> None:
     cert_mod._propagate_pairing_stats(certificate=None, ppl_analysis=None)  # type: ignore[arg-type]
     cert_mod._propagate_pairing_stats(certificate={}, ppl_analysis=None)
     cert_mod._propagate_pairing_stats(certificate={"dataset": None}, ppl_analysis={})
-    cert_mod._propagate_pairing_stats(certificate={"dataset": {"windows": None}}, ppl_analysis={})
+    cert_mod._propagate_pairing_stats(
+        certificate={"dataset": {"windows": None}}, ppl_analysis={}
+    )
     cert_mod._propagate_pairing_stats(
         certificate={"dataset": {"windows": {"stats": None}}}, ppl_analysis={}
     )
@@ -314,7 +342,11 @@ def test_normalize_baseline_derives_ppl_from_primary_metric() -> None:
         "metrics": {
             "primary_metric": {"kind": "ppl_causal", "final": 10.0, "preview": 9.0}
         },
-        "edit": {"name": "baseline", "plan_digest": "baseline_noop", "deltas": {"params_changed": 0}},
+        "edit": {
+            "name": "baseline",
+            "plan_digest": "baseline_noop",
+            "deltas": {"params_changed": 0},
+        },
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [1.0]}},
     }
     out = cert_mod._normalize_baseline(baseline)
@@ -329,7 +361,9 @@ def test_prepare_guard_overhead_section_keeps_skip_reason() -> None:
     assert out.get("skip_reason") == "because"
 
 
-def test_compute_validation_flags_acceptance_bounds_and_accuracy_tiny_relax(monkeypatch) -> None:
+def test_compute_validation_flags_acceptance_bounds_and_accuracy_tiny_relax(
+    monkeypatch,
+) -> None:
     # Acceptance bounds (min/max) parsing and PM ratio fallback.
     flags = cert_mod._compute_validation_flags(
         ppl={"preview_final_ratio": 1.0, "ratio_vs_baseline": float("nan")},

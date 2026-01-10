@@ -78,14 +78,15 @@ def _provider_windows(
     preview_n: int, final_n: int
 ) -> tuple[EvaluationWindow, EvaluationWindow]:
     prev = EvaluationWindow(
-        input_ids=[[1 + 4 * i, 2 + 4 * i, 3 + 4 * i, 4 + 4 * i] for i in range(preview_n)],
+        input_ids=[
+            [1 + 4 * i, 2 + 4 * i, 3 + 4 * i, 4 + 4 * i] for i in range(preview_n)
+        ],
         attention_masks=[[1, 1, 1, 1] for _ in range(preview_n)],
         indices=list(range(preview_n)),
     )
     fin = EvaluationWindow(
         input_ids=[
-            [101 + 4 * i, 102 + 4 * i, 103 + 4 * i, 104 + 4 * i]
-            for i in range(final_n)
+            [101 + 4 * i, 102 + 4 * i, 103 + 4 * i, 104 + 4 * i] for i in range(final_n)
         ],
         attention_masks=[[1, 1, 1, 1] for _ in range(final_n)],
         indices=[1000 + i for i in range(final_n)],
@@ -215,7 +216,8 @@ def _run_with_common_patches(*, cfg: _Cfg, exec_stub, post_stub, extra_patches=(
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch("invarlock.core.registry.get_registry", lambda: Registry()),
         patch(
-            "invarlock.cli.commands.run._should_measure_overhead", lambda *_a: (False, False)
+            "invarlock.cli.commands.run._should_measure_overhead",
+            lambda *_a: (False, False),
         ),
         patch("invarlock.cli.commands.run._execute_guarded_run", exec_stub),
         patch("invarlock.cli.commands.run._postprocess_and_summarize", post_stub),
@@ -223,7 +225,9 @@ def _run_with_common_patches(*, cfg: _Cfg, exec_stub, post_stub, extra_patches=(
             "invarlock.cli.commands.run._resolve_metric_and_provider",
             lambda *_a, **_k: ("ppl_causal", None, {}),
         ),
-        patch("invarlock.eval.primary_metric.compute_primary_metric_from_report", _pm_stub),
+        patch(
+            "invarlock.eval.primary_metric.compute_primary_metric_from_report", _pm_stub
+        ),
     ]
     patches.extend(extra_patches)
     with ExitStack() as stack:
@@ -273,7 +277,9 @@ def test_run_command_provider_dict_unwraps_nested_kwargs(tmp_path: Path) -> None
         cfg=cfg,
         exec_stub=exec_stub,
         post_stub=post_stub,
-        extra_patches=(patch("invarlock.cli.commands.run._resolve_provider_and_split", resolver),),
+        extra_patches=(
+            patch("invarlock.cli.commands.run._resolve_provider_and_split", resolver),
+        ),
     )
 
     provider_kwargs = captured["provider_kwargs"]
@@ -307,7 +313,9 @@ def test_run_command_provider_mapping_like_unwraps_data_and_items_fallback(
         return {"json": str(tmp_path / "report.json")}
 
     class ProviderObj:
-        def __init__(self, data: dict[str, object], *, break_data: bool = False) -> None:
+        def __init__(
+            self, data: dict[str, object], *, break_data: bool = False
+        ) -> None:
             self._data = None if break_data else data
             self._items = data
 
@@ -323,7 +331,8 @@ def test_run_command_provider_mapping_like_unwraps_data_and_items_fallback(
     cfg_data = {"kind": "hf", "dataset_name": "wikitext", "cache_dir": ""}
     cfg = _Cfg(outdir=tmp_path / "runs", dataset_provider=ProviderObj(cfg_data))
     cfg2 = _Cfg(
-        outdir=tmp_path / "runs2", dataset_provider=ProviderObj(cfg_data, break_data=True)
+        outdir=tmp_path / "runs2",
+        dataset_provider=ProviderObj(cfg_data, break_data=True),
     )
 
     extra = (patch("invarlock.cli.commands.run._resolve_provider_and_split", resolver),)
@@ -338,7 +347,9 @@ def test_run_command_provider_mapping_like_unwraps_data_and_items_fallback(
     assert captured[1].get("dataset_name") == "wikitext"
 
 
-def test_run_command_extracts_edit_config_from_plan_and_parameters(tmp_path: Path) -> None:
+def test_run_command_extracts_edit_config_from_plan_and_parameters(
+    tmp_path: Path,
+) -> None:
     captured: list[dict[str, object]] = []
 
     def resolver(*_a, **_k):
@@ -515,13 +526,20 @@ def test_run_command_baseline_token_counts_provider_parity_export_and_classifica
     with ExitStack() as stack:
         for p in (
             patch("invarlock.cli.commands.run.console", rec_console),
-            patch("invarlock.cli.commands.run._prepare_config_for_run", lambda **k: cfg),
-            patch("invarlock.cli.commands.run.detect_model_profile", _detect_profile),
-            patch("invarlock.cli.commands.run.resolve_tokenizer", lambda *_a, **_k: _tok()),
-            patch("invarlock.cli.device.resolve_device", lambda d: d),
-            patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
             patch(
-                "invarlock.cli.commands.run._should_measure_overhead", lambda *_a: (False, False)
+                "invarlock.cli.commands.run._prepare_config_for_run", lambda **k: cfg
+            ),
+            patch("invarlock.cli.commands.run.detect_model_profile", _detect_profile),
+            patch(
+                "invarlock.cli.commands.run.resolve_tokenizer", lambda *_a, **_k: _tok()
+            ),
+            patch("invarlock.cli.device.resolve_device", lambda d: d),
+            patch(
+                "invarlock.cli.device.validate_device_for_config", lambda d: (True, "")
+            ),
+            patch(
+                "invarlock.cli.commands.run._should_measure_overhead",
+                lambda *_a: (False, False),
             ),
             patch("invarlock.cli.commands.run._execute_guarded_run", exec_stub),
             patch("invarlock.cli.commands.run._postprocess_and_summarize", post_stub),
@@ -530,11 +548,16 @@ def test_run_command_baseline_token_counts_provider_parity_export_and_classifica
                 lambda *_a, **_k: ("ppl_causal", None, {}),
             ),
             patch(
-                "invarlock.eval.primary_metric.compute_primary_metric_from_report", _pm_stub
+                "invarlock.eval.primary_metric.compute_primary_metric_from_report",
+                _pm_stub,
             ),
             patch("invarlock.core.registry.get_registry", lambda: Registry()),
-            patch("invarlock.cli.commands.run._compute_provider_digest", provider_digest),
-            patch("invarlock.cli.commands.run._enforce_provider_parity", enforce_parity),
+            patch(
+                "invarlock.cli.commands.run._compute_provider_digest", provider_digest
+            ),
+            patch(
+                "invarlock.cli.commands.run._enforce_provider_parity", enforce_parity
+            ),
             patch(
                 "invarlock.cli.commands.run._format_debug_metric_diffs",
                 lambda *_a, **_k: "diffs",
@@ -558,10 +581,16 @@ def test_run_command_baseline_token_counts_provider_parity_export_and_classifica
 
     report = captured["report"]
     assert isinstance(report, dict)
-    assert captured.get("base_digest") == {"dataset": "synthetic", "split": "validation"}
+    assert captured.get("base_digest") == {
+        "dataset": "synthetic",
+        "split": "validation",
+    }
     assert captured.get("save_pretrained_called") is True
     assert report.get("artifacts", {}).get("checkpoint_path")
-    assert report.get("metrics", {}).get("classification", {}).get("counts_source") == "measured"
+    assert (
+        report.get("metrics", {}).get("classification", {}).get("counts_source")
+        == "measured"
+    )
     assert "DEBUG_METRIC_DIFFS" in rec_console.export_text()
 
 
@@ -614,21 +643,32 @@ def test_run_command_classification_pseudo_counts_and_export_env_dir(
 
     with ExitStack() as stack:
         for p in (
-            patch("invarlock.cli.commands.run._prepare_config_for_run", lambda **k: cfg),
-            patch("invarlock.cli.commands.run.detect_model_profile", _detect_profile),
-            patch("invarlock.cli.commands.run.resolve_tokenizer", lambda *_a, **_k: _tok()),
-            patch("invarlock.cli.device.resolve_device", lambda d: d),
-            patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
             patch(
-                "invarlock.cli.commands.run._should_measure_overhead", lambda *_a: (False, False)
+                "invarlock.cli.commands.run._prepare_config_for_run", lambda **k: cfg
+            ),
+            patch("invarlock.cli.commands.run.detect_model_profile", _detect_profile),
+            patch(
+                "invarlock.cli.commands.run.resolve_tokenizer", lambda *_a, **_k: _tok()
+            ),
+            patch("invarlock.cli.device.resolve_device", lambda d: d),
+            patch(
+                "invarlock.cli.device.validate_device_for_config", lambda d: (True, "")
+            ),
+            patch(
+                "invarlock.cli.commands.run._should_measure_overhead",
+                lambda *_a: (False, False),
             ),
             patch(
                 "invarlock.cli.commands.run._resolve_provider_and_split",
                 lambda *_a, **_k: (
                     SimpleNamespace(
                         windows=lambda **_kw: (
-                            SimpleNamespace(input_ids=[], attention_masks=[], indices=[]),
-                            SimpleNamespace(input_ids=[], attention_masks=[], indices=[]),
+                            SimpleNamespace(
+                                input_ids=[], attention_masks=[], indices=[]
+                            ),
+                            SimpleNamespace(
+                                input_ids=[], attention_masks=[], indices=[]
+                            ),
                         )
                     ),
                     "validation",
@@ -642,7 +682,8 @@ def test_run_command_classification_pseudo_counts_and_export_env_dir(
                 lambda *_a, **_k: ("ppl_causal", None, {}),
             ),
             patch(
-                "invarlock.eval.primary_metric.compute_primary_metric_from_report", _pm_stub
+                "invarlock.eval.primary_metric.compute_primary_metric_from_report",
+                _pm_stub,
             ),
             patch(
                 "invarlock.cli.commands.run._format_debug_metric_diffs",
@@ -750,20 +791,31 @@ def test_run_command_until_pass_auto_tune_head_budget_paths(tmp_path: Path) -> N
     for make_cert in (cert_fail_pm, cert_fail_other):
         with ExitStack() as stack:
             for p in (
-                patch("invarlock.cli.commands.run._prepare_config_for_run", lambda **k: cfg),
-                patch("invarlock.cli.commands.run.detect_model_profile", _detect_profile),
                 patch(
-                    "invarlock.cli.commands.run.resolve_tokenizer", lambda *_a, **_k: _tok()
+                    "invarlock.cli.commands.run._prepare_config_for_run",
+                    lambda **k: cfg,
+                ),
+                patch(
+                    "invarlock.cli.commands.run.detect_model_profile", _detect_profile
+                ),
+                patch(
+                    "invarlock.cli.commands.run.resolve_tokenizer",
+                    lambda *_a, **_k: _tok(),
                 ),
                 patch("invarlock.cli.device.resolve_device", lambda d: d),
-                patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
+                patch(
+                    "invarlock.cli.device.validate_device_for_config",
+                    lambda d: (True, ""),
+                ),
                 patch("invarlock.core.registry.get_registry", lambda: Registry()),
                 patch(
                     "invarlock.cli.commands.run._should_measure_overhead",
                     lambda *_a: (False, False),
                 ),
                 patch("invarlock.cli.commands.run._execute_guarded_run", exec_stub),
-                patch("invarlock.cli.commands.run._postprocess_and_summarize", post_stub),
+                patch(
+                    "invarlock.cli.commands.run._postprocess_and_summarize", post_stub
+                ),
                 patch("invarlock.core.retry.RetryController", RC),
                 patch("invarlock.reporting.certificate.make_certificate", make_cert),
             ):

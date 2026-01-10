@@ -37,7 +37,9 @@ class _DummyAdapter(ModelAdapter):
 class _DummyEdit(ModelEdit):
     name = "noop"
 
-    def can_edit(self, model_desc: dict[str, Any]) -> bool:  # pragma: no cover - not used
+    def can_edit(
+        self, model_desc: dict[str, Any]
+    ) -> bool:  # pragma: no cover - not used
         return True
 
     def apply(self, model: Any, adapter: ModelAdapter, **kwargs) -> dict[str, Any]:
@@ -128,6 +130,7 @@ def test_execute_auto_config_skips_merge_when_context_not_dict(monkeypatch) -> N
     _patch_minimal_pipeline(monkeypatch)
 
     runner = CoreRunner()
+
     # Mapping-like (supports `.get`), iterable-of-pairs (dict.update accepts), but not a dict
     # → auto merge branch skipped.
     class _Mapping:
@@ -166,14 +169,26 @@ def test_eval_phase_debug_trace_handles_empty_list(monkeypatch) -> None:
         "_compute_real_metrics",
         staticmethod(
             lambda *_a, **_k: (
-                {"primary_metric": {"kind": "ppl_causal", "preview": 1.0, "final": 1.0}},
+                {
+                    "primary_metric": {
+                        "kind": "ppl_causal",
+                        "preview": 1.0,
+                        "final": 1.0,
+                    }
+                },
                 {"preview": {}, "final": {}},
             )
         ),
     )
 
     metrics = runner._eval_phase(
-        model, adapter, calibration_data=[], report=report, preview_n=None, final_n=None, config=cfg
+        model,
+        adapter,
+        calibration_data=[],
+        report=report,
+        preview_n=None,
+        final_n=None,
+        config=cfg,
     )
     assert metrics["primary_metric"]["final"] == 1.0
 
@@ -198,14 +213,26 @@ def test_eval_phase_debug_trace_handles_custom_indexable(monkeypatch) -> None:
         "_compute_real_metrics",
         staticmethod(
             lambda *_a, **_k: (
-                {"primary_metric": {"kind": "ppl_causal", "preview": 1.0, "final": 1.0}},
+                {
+                    "primary_metric": {
+                        "kind": "ppl_causal",
+                        "preview": 1.0,
+                        "final": 1.0,
+                    }
+                },
                 {"preview": {}, "final": {}},
             )
         ),
     )
 
     metrics = runner._eval_phase(
-        model, adapter, calibration_data=_Indexable(), report=report, preview_n=None, final_n=None, config=cfg
+        model,
+        adapter,
+        calibration_data=_Indexable(),
+        report=report,
+        preview_n=None,
+        final_n=None,
+        config=cfg,
     )
     assert metrics["primary_metric"]["preview"] == 1.0
 
@@ -223,7 +250,13 @@ def test_eval_phase_debug_trace_handles_non_indexable_iterable(monkeypatch) -> N
         "_compute_real_metrics",
         staticmethod(
             lambda *_a, **_k: (
-                {"primary_metric": {"kind": "ppl_causal", "preview": 1.0, "final": 1.0}},
+                {
+                    "primary_metric": {
+                        "kind": "ppl_causal",
+                        "preview": 1.0,
+                        "final": 1.0,
+                    }
+                },
                 {"preview": {}, "final": {}},
             )
         ),

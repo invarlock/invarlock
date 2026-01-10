@@ -58,7 +58,9 @@ def test_rmt_detect_prints_improving_when_outliers_drop(monkeypatch, capsys) -> 
     assert "RMT correction improving" in out
 
 
-def test_rmt_detect_with_names_verbose_prints_more_layers_flagged(monkeypatch, capsys) -> None:
+def test_rmt_detect_with_names_verbose_prints_more_layers_flagged(
+    monkeypatch, capsys
+) -> None:
     model = _TinyModel(n_layers=5)
 
     def fake_layer_svd_stats(_layer, *_a, **_k):  # noqa: ANN001
@@ -75,7 +77,9 @@ def test_rmt_detect_with_names_verbose_prints_more_layers_flagged(monkeypatch, c
     assert "... and 2 more layers flagged" in out
 
 
-def test_apply_rmt_correction_fallback_scaling_on_svd_failure(monkeypatch, capsys) -> None:
+def test_apply_rmt_correction_fallback_scaling_on_svd_failure(
+    monkeypatch, capsys
+) -> None:
     layer = nn.Linear(4, 4, bias=False)
     before = layer.weight.detach().clone()
 
@@ -91,7 +95,9 @@ def test_apply_rmt_correction_fallback_scaling_on_svd_failure(monkeypatch, capsy
     assert torch.allclose(after, before * 0.9)
 
 
-def test_rmt_guard_finalize_hydrates_edge_risk_from_calibration_batches(monkeypatch) -> None:
+def test_rmt_guard_finalize_hydrates_edge_risk_from_calibration_batches(
+    monkeypatch,
+) -> None:
     guard = R.RMTGuard()
     guard.prepared = True
     guard._calibration_batches = [object()]
@@ -223,7 +229,9 @@ def test_rmt_detect_omits_details_when_worst_details_missing(monkeypatch) -> Non
     assert out["per_layer"] and "details" not in out["per_layer"][0]
 
 
-def test_rmt_detect_prints_stalled_when_outliers_do_not_improve(monkeypatch, capsys) -> None:
+def test_rmt_detect_prints_stalled_when_outliers_do_not_improve(
+    monkeypatch, capsys
+) -> None:
     model = _TinyModel(n_layers=2)
 
     def fake_layer_svd_stats(_layer, *_a, **_k):  # noqa: ANN001
@@ -284,7 +292,9 @@ def test_rmt_detect_improving_path_with_verbose_false_emits_no_message(
     assert "RMT correction improving" not in out
 
 
-def test_rmt_detect_logs_more_layers_when_over_three_outliers(monkeypatch, capsys) -> None:
+def test_rmt_detect_logs_more_layers_when_over_three_outliers(
+    monkeypatch, capsys
+) -> None:
     model = _TinyModel(n_layers=5)
 
     def fake_layer_svd_stats(_layer, *_a, **_k):  # noqa: ANN001
@@ -308,7 +318,9 @@ def test_rmt_detect_target_layers_handles_missing_named_modules(monkeypatch) -> 
 
     model = Model(n_layers=1)
     monkeypatch.setattr(
-        R, "layer_svd_stats", lambda *_a, **_k: {"sigma_min": 1.0, "sigma_max": 1.0, "worst_ratio": 1.0}
+        R,
+        "layer_svd_stats",
+        lambda *_a, **_k: {"sigma_min": 1.0, "sigma_max": 1.0, "worst_ratio": 1.0},
     )
 
     out = R.rmt_detect(model, target_layers=["transformer_layer_0"], detect_only=True)

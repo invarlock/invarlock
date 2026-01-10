@@ -48,7 +48,9 @@ def test_compute_variance_scales_filters_raw_scales_via_scale_matches_target(
     g = VarianceGuard(policy=policy)
     # Use a slightly-mismatched key to force the fallback `_scale_matches_target` branch.
     g._target_modules = {"transformer.h.0.attn": nn.Linear(2, 2, bias=False)}
-    monkeypatch.setattr(g, "_tensorize_calibration_batches", lambda batches: list(batches))
+    monkeypatch.setattr(
+        g, "_tensorize_calibration_batches", lambda batches: list(batches)
+    )
 
     out = g._compute_variance_scales(nn.Linear(2, 2, bias=False), [])
     assert out.get("block0.attn") == 1.1
@@ -67,7 +69,9 @@ def test_resolve_target_modules_adapter_describe_dict_path_populates_targets() -
     assert "transformer.h.1.mlp.c_proj" in targets
 
 
-def test_compute_variance_scales_topk_backstop_injects_best_candidate(monkeypatch) -> None:
+def test_compute_variance_scales_topk_backstop_injects_best_candidate(
+    monkeypatch,
+) -> None:
     def fake_equalise(*_a, **_k):
         return {"block0.attn": 1.3}
 
@@ -86,7 +90,9 @@ def test_compute_variance_scales_topk_backstop_injects_best_candidate(monkeypatc
             "max_adjusted_modules": 0,
         }
     )
-    monkeypatch.setattr(g, "_tensorize_calibration_batches", lambda batches: list(batches))
+    monkeypatch.setattr(
+        g, "_tensorize_calibration_batches", lambda batches: list(batches)
+    )
 
     out = g._compute_variance_scales(nn.Linear(2, 2, bias=False), [])
     assert out.get("block0.attn") == 1.3

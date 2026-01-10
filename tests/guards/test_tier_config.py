@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
 import warnings
+from copy import deepcopy
 from unittest import mock
 
 from invarlock.guards.policies import (

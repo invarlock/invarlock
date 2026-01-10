@@ -160,8 +160,12 @@ ci-matrix:  ## Verify CI matrix
 
 .PHONY: ensure-ruff
 ensure-ruff:
-	@python -c "import importlib.util, subprocess, sys; spec = importlib.util.find_spec('ruff'); \
-subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'ruff>=0.1.0']) if spec is None else None"
+	@if python -c "import importlib.util, sys; sys.exit(0 if importlib.util.find_spec('ruff') else 1)"; then \
+		:; \
+	else \
+		printf '%s\n' "ruff is required but not installed; install it in your active environment (e.g. 'python -m pip install ruff')" >&2; \
+		exit 1; \
+	fi
 
 ## (verify-ci and verify-release targets removed)
 

@@ -25,7 +25,9 @@ def _ppl_certificate(
     include_provider_digest: bool = True,
     include_guard_overhead: bool = False,
 ) -> dict:
-    spectral_contract = {"estimator": {"type": "power_iter", "iters": 4, "init": "ones"}}
+    spectral_contract = {
+        "estimator": {"type": "power_iter", "iters": 4, "init": "ones"}
+    }
     rmt_contract = {
         "estimator": {"type": "power_iter", "iters": 3, "init": "ones"},
         "activation_sampling": {
@@ -141,7 +143,10 @@ def test_verify_drift_band_exit_code_varies_by_profile(
     payload = json.loads(capsys.readouterr().out)
     assert payload["summary"]["ok"] is expected_ok
     assert payload["resolution"]["exit_code"] == expected_exit_code
-    assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == expected_exit_code
+    assert (
+        getattr(ei.value, "exit_code", getattr(ei.value, "code", None))
+        == expected_exit_code
+    )
 
 
 @pytest.mark.parametrize(
@@ -176,7 +181,10 @@ def test_verify_guard_overhead_exit_code_varies_by_profile(
     payload = json.loads(capsys.readouterr().out)
     assert payload["summary"]["ok"] is expected_ok
     assert payload["resolution"]["exit_code"] == expected_exit_code
-    assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == expected_exit_code
+    assert (
+        getattr(ei.value, "exit_code", getattr(ei.value, "code", None))
+        == expected_exit_code
+    )
 
 
 @pytest.mark.parametrize(
@@ -208,7 +216,10 @@ def test_verify_provider_digest_exit_code_varies_by_profile(
 
     payload = json.loads(capsys.readouterr().out)
     assert payload["resolution"]["exit_code"] == expected_exit_code
-    assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == expected_exit_code
+    assert (
+        getattr(ei.value, "exit_code", getattr(ei.value, "code", None))
+        == expected_exit_code
+    )
 
 
 @pytest.mark.parametrize("profile", ["dev", "ci", "release"])

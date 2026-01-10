@@ -162,7 +162,9 @@ def test_null_sweep_handles_missing_spectral_and_bad_metrics(tmp_path: Path) -> 
         )
 
 
-def test_null_sweep_covers_guard_search_empty_and_non_dict_guards(tmp_path: Path) -> None:
+def test_null_sweep_covers_guard_search_empty_and_non_dict_guards(
+    tmp_path: Path,
+) -> None:
     cfg = _write_base_config(tmp_path)
     out = tmp_path / "out"
 
