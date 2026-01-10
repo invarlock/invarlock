@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 import warnings
 from unittest import mock
 
@@ -177,6 +178,14 @@ class TestDriftDetection:
         drift = check_drift(silent=True)
         assert isinstance(drift, dict)
 
+    def test_check_drift_no_yaml_returns_empty(self) -> None:
+        """check_drift returns {} when tiers.yaml cannot be loaded."""
+        import invarlock.guards.tier_config as tc
+
+        with mock.patch.object(tc, "_load_yaml", return_value=None):
+            drift = tc.check_drift(silent=False)
+        assert drift == {}
+
     def test_check_policy_drift_alias(self) -> None:
         """check_policy_drift() is an alias for check_drift()."""
         drift = check_policy_drift(silent=True)
@@ -350,15 +359,21 @@ class TestCheckDriftWarning:
 
     def test_check_drift_emits_warning_when_not_silent(self) -> None:
         """check_drift emits warnings when silent=False and drift exists."""
-        # Since aggressive tier is not in tiers.yaml, it will have drift
+        import invarlock.guards.tier_config as tc
+
+        yaml_data = deepcopy(tc._FALLBACK_CONFIG)
+        yaml_data["balanced"]["variance_guard"]["deadband"] = (
+            yaml_data["balanced"]["variance_guard"]["deadband"] + 0.001
+        )
+
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            drift = check_drift(silent=False)
-            # Should have drift for aggressive tier (not in YAML)
-            if drift:
-                # There should be a warning emitted
-                user_warnings = [x for x in w if issubclass(x.category, UserWarning)]
-                assert len(user_warnings) > 0
+            with mock.patch.object(tc, "_load_yaml", return_value=yaml_data):
+                drift = tc.check_drift(silent=False)
+
+        assert drift
+        user_warnings = [x for x in w if issubclass(x.category, UserWarning)]
+        assert len(user_warnings) == 1
 
     def test_check_drift_no_warning_when_silent(self) -> None:
         """check_drift doesn't emit warnings when silent=True."""

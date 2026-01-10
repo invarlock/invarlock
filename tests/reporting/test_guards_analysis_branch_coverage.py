@@ -110,6 +110,108 @@ def test_extract_spectral_analysis_baseline_metrics_spectral_not_dict() -> None:
     assert out["evaluated"] is False
 
 
+def test_extract_spectral_analysis_uses_guard_baseline_metrics_and_derives_quantiles() -> None:
+    report = {
+        "guards": [
+            {
+                "name": "spectral",
+                "metrics": {
+                    "max_spectral_norm_final": 2.0,
+                    "mean_spectral_norm_final": 1.0,
+                },
+                "baseline_metrics": {
+                    "max_spectral_norm": 1.0,
+                    "mean_spectral_norm": 0.5,
+                },
+                "final_z_scores": {"m1": 1.23},
+                "module_family_map": {"m1": "ffn"},
+            }
+        ]
+    }
+    out = GA._extract_spectral_analysis(report, baseline={})
+    assert out["evaluated"] is True
+    assert out["summary"]["baseline_max_spectral_norm"] == 1.0
+    assert out["family_z_quantiles"]["ffn"]["count"] == 1
+    assert out["top_z_scores"]["ffn"][0]["module"] == "m1"
+
+
+def test_extract_spectral_analysis_quantile_position_integer_branch() -> None:
+    final_z_scores = {f"m{i}": float(i) for i in range(21)}
+    module_family_map = {name: "ffn" for name in final_z_scores}
+    report = {
+        "guards": [
+            {
+                "name": "spectral",
+                "metrics": {},
+                "final_z_scores": final_z_scores,
+                "module_family_map": module_family_map,
+            }
+        ]
+    }
+    out = GA._extract_spectral_analysis(report, baseline={})
+    assert out["family_z_quantiles"]["ffn"]["q95"] == 19.0
+
+
+def test_extract_spectral_analysis_summarize_returns_empty_when_family_map_empty() -> None:
+    report = {
+        "guards": [
+            {
+                "name": "spectral",
+                "metrics": {},
+                "final_z_scores": {"m1": 1.0},
+                "module_family_map": {},
+            }
+        ]
+    }
+    out = GA._extract_spectral_analysis(report, baseline={})
+    assert out.get("family_z_quantiles", {}) == {}
+
+
+def test_extract_spectral_analysis_summarize_skips_modules_without_family() -> None:
+    report = {
+        "guards": [
+            {
+                "name": "spectral",
+                "metrics": {},
+                "final_z_scores": {"m1": 1.0},
+                "module_family_map": {"other": "ffn"},
+            }
+        ]
+    }
+    out = GA._extract_spectral_analysis(report, baseline={})
+    assert out.get("family_z_quantiles", {}) == {}
+
+
+def test_extract_spectral_analysis_skips_guard_metrics_block_when_metrics_falsy_non_dict() -> None:
+    report = {
+        "guards": [
+            {
+                "name": "spectral",
+                "metrics": "",
+                "final_z_scores": {"m1": 1.0},
+                "module_family_map": {"m1": "ffn"},
+            }
+        ]
+    }
+    out = GA._extract_spectral_analysis(report, baseline={})
+    assert out["evaluated"] is True
+
+
+def test_extract_spectral_analysis_bad_sigma_quantile_and_deadband_omits_summary_fields() -> None:
+    report = {
+        "guards": [
+            {
+                "name": "spectral",
+                "policy": {"sigma_quantile": "bad", "deadband": "bad"},
+                "metrics": {"max_spectral_norm_final": 2.0, "mean_spectral_norm_final": 1.0},
+            }
+        ]
+    }
+    out = GA._extract_spectral_analysis(report, baseline={})
+    assert "sigma_quantile" not in out["summary"]
+    assert "deadband" not in out["summary"]
+
+
 def test_extract_rmt_analysis_edge_risk_paths_and_contract_hashes() -> None:
     contract = {"estimator": {"type": "power_iter"}}
     baseline = {

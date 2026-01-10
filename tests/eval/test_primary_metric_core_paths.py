@@ -90,6 +90,41 @@ def test_validate_primary_metric_block_success_and_failure() -> None:
         validate_primary_metric_block({"preview": "nan", "final": 2.0})
 
 
+def test_validate_primary_metric_block_missing_preview_final_raises() -> None:
+    with pytest.raises(ValidationError) as ei:
+        validate_primary_metric_block({})
+    assert getattr(ei.value, "code", None) == "E402"
+
+
+def test_ppl_causal_finalize_returns_nan_when_total_weight_non_positive() -> None:
+    metric = _PPLCausal()
+    metric._values = [1.0]  # type: ignore[attr-defined]
+    metric._weights = [-1.0]  # type: ignore[attr-defined]
+    assert math.isnan(metric.finalize())
+
+
+def test_ppl_causal_paired_compare_uses_weight_fallback_when_needed(
+    monkeypatch,
+) -> None:
+    metric = _PPLCausal()
+    captured: dict[str, object] = {}
+
+    def _fake_ci(subj_vals, base_vals, *, weights, **_kwargs):  # type: ignore[no-untyped-def]  # noqa: ARG001
+        captured["weights"] = list(weights or [])
+        return (0.0, 0.0)
+
+    monkeypatch.setattr(
+        "invarlock.eval.primary_metric.compute_paired_delta_log_ci", _fake_ci
+    )
+    metric.paired_compare(
+        [MetricContribution(1.0, 0.0)],
+        [MetricContribution(1.0, 0.0)],
+        reps=1,
+        seed=0,
+        ci_level=0.95,
+    )
+    assert captured.get("weights") == [1.0]
+
 def test_get_metric_unknown_kind_raises_key_error() -> None:
     with pytest.raises(KeyError):
         get_metric("does-not-exist")

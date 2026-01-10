@@ -200,11 +200,11 @@ Key points:
     `src/invarlock/cli/commands/run.py`,
     `src/invarlock/cli/commands/verify.py`
 
-- All of these surfaces are currently targeted at **≥85% branch (or line) coverage**.
+- All of these surfaces are currently targeted at **≥90% branch (or line) coverage**.
 
 When you modify a file covered by thresholds, please:
 
-- Add or extend tests to keep its measured coverage at or above 85%
+- Add or extend tests to keep its measured coverage at or above 90%
 - Update/add entries in `scripts/check_coverage_thresholds.py` if you
   expand the critical surface or add new core modules
 

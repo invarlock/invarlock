@@ -110,6 +110,17 @@ def test_enforce_display_ci_alignment_returns_on_empty_metric():
     cert._enforce_display_ci_alignment("paired_baseline", {}, (0.0, 0.1), "dev")
 
 
+def test_enforce_display_ci_alignment_returns_on_kind_coercion_error() -> None:
+    class _BadGet(dict):
+        def get(self, *_a, **_k):  # noqa: ANN001
+            raise RuntimeError("boom")
+
+    # Should be swallowed by the kind coercion try/except.
+    cert._enforce_display_ci_alignment(
+        "paired_baseline", _BadGet({"kind": "ppl_causal"}), (0.0, 0.1), "dev"
+    )
+
+
 def test_enforce_display_ci_alignment_dev_missing_ci_no_logloss_ci():
     pm = {"kind": "ppl_causal"}
     cert._enforce_display_ci_alignment(
@@ -156,6 +167,46 @@ def test_enforce_pairing_and_coverage_uses_fallback_counts():
 
 def test_enforce_pairing_and_coverage_returns_on_dev_profile():
     cert._enforce_pairing_and_coverage({}, window_plan_profile="dev", tier="balanced")
+
+
+def test_enforce_pairing_and_coverage_raises_on_missing_pairing_fractions() -> None:
+    stats = {"paired_windows": 1}
+    with pytest.raises(ValueError, match="window_match_fraction"):
+        cert._enforce_pairing_and_coverage(stats, window_plan_profile="ci", tier="balanced")
+
+    stats2 = {"window_match_fraction": 1.0, "paired_windows": 1}
+    with pytest.raises(ValueError, match="window_overlap_fraction"):
+        cert._enforce_pairing_and_coverage(stats2, window_plan_profile="ci", tier="balanced")
+
+
+def test_enforce_pairing_and_coverage_raises_on_imperfect_pairing_and_overlap() -> None:
+    with pytest.raises(ValueError, match="perfect pairing"):
+        cert._enforce_pairing_and_coverage(
+            {"window_match_fraction": 0.9, "window_overlap_fraction": 0.0, "paired_windows": 1},
+            window_plan_profile="ci",
+            tier="balanced",
+        )
+
+    with pytest.raises(ValueError, match="non-overlapping windows"):
+        cert._enforce_pairing_and_coverage(
+            {"window_match_fraction": 1.0, "window_overlap_fraction": 1e-6, "paired_windows": 1},
+            window_plan_profile="ci",
+            tier="balanced",
+        )
+
+
+@pytest.mark.parametrize("paired_windows", ["bad", -1, 1.2])
+def test_enforce_pairing_and_coverage_raises_on_invalid_paired_windows(paired_windows) -> None:
+    with pytest.raises(ValueError, match="paired_windows"):
+        cert._enforce_pairing_and_coverage(
+            {
+                "window_match_fraction": 1.0,
+                "window_overlap_fraction": 0.0,
+                "paired_windows": paired_windows,
+            },
+            window_plan_profile="ci",
+            tier="balanced",
+        )
 
 
 def test_enforce_pairing_and_coverage_raises_on_missing_stats():

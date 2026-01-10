@@ -46,15 +46,20 @@ def test_capture_baseline_sigmas_smoke() -> None:
 
 
 def test_spectral_finalize_passes_without_changes() -> None:
-    model = TinyModel([TinyLayer(), TinyLayer()])
-    guard = SpectralGuard()
-    out = guard.prepare(model, adapter=None, calib=None, policy={})
-    assert out["ready"] is True
+    rng_state = torch.random.get_rng_state()
+    torch.manual_seed(0)
+    try:
+        model = TinyModel([TinyLayer(), TinyLayer()])
+        guard = SpectralGuard()
+        out = guard.prepare(model, adapter=None, calib=None, policy={})
+        assert out["ready"] is True
 
-    result = guard.finalize(model)
-    assert result["passed"] is True
-    assert result["metrics"]["caps_applied"] == 0
-    assert result["metrics"]["caps_exceeded"] is False
+        result = guard.finalize(model)
+        assert result["passed"] is True
+        assert result["metrics"]["caps_applied"] == 0
+        assert result["metrics"]["caps_exceeded"] is False
+    finally:
+        torch.random.set_rng_state(rng_state)
 
 
 def test_spectral_finalize_fails_when_budget_exceeded() -> None:

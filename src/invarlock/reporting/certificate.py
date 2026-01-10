@@ -2172,7 +2172,48 @@ def make_certificate(
     except Exception:  # pragma: no cover
         pass
 
-    # Emit optional one-line telemetry summary (opt-in via INVARLOCK_TELEMETRY=1)
+    # Attach/normalize primary metric block (moved to helper)
+    from .primary_metric_utils import attach_primary_metric as _attach_pm
+
+    _attach_pm(certificate, report, baseline_raw, baseline_ref, ppl_analysis)
+    _enforce_display_ci_alignment(
+        ratio_ci_source,
+        certificate.get("primary_metric"),
+        logloss_delta_ci,
+        window_plan_profile,
+    )
+
+    # Ensure primary_metric has display_ci populated for schema invariants
+    try:
+        pm = (
+            certificate.get("primary_metric", {})
+            if isinstance(certificate.get("primary_metric"), dict)
+            else None
+        )
+        if isinstance(pm, dict) and pm:
+            # Prefer existing bounds; otherwise collapse to point estimate
+            disp = pm.get("display_ci")
+            if not (
+                isinstance(disp, list | tuple)
+                and len(disp) == 2
+                and all(isinstance(x, int | float) for x in disp)
+            ):
+                point = None
+                for key in ("ratio_vs_baseline", "final", "preview"):
+                    val = pm.get(key)
+                    if isinstance(val, int | float) and math.isfinite(float(val)):
+                        point = float(val)
+                        break
+                if isinstance(point, float):
+                    pm["display_ci"] = [point, point]
+                else:
+                    # As last resort, emit a degenerate [1.0, 1.0] to satisfy schema invariants
+                    pm["display_ci"] = [1.0, 1.0]
+    except Exception:  # pragma: no cover
+        pass
+
+    # Emit optional one-line telemetry summary (opt-in via INVARLOCK_TELEMETRY=1).
+    # This runs after primary_metric attachment so the summary can include display_ci/width.
     try:
         kind = None
         pm_try = (
@@ -2256,46 +2297,6 @@ def make_certificate(
             "on",
         }:
             print(summary_line)
-    except Exception:  # pragma: no cover
-        pass
-
-    # Attach/normalize primary metric block (moved to helper)
-    from .primary_metric_utils import attach_primary_metric as _attach_pm
-
-    _attach_pm(certificate, report, baseline_raw, baseline_ref, ppl_analysis)
-    _enforce_display_ci_alignment(
-        ratio_ci_source,
-        certificate.get("primary_metric"),
-        logloss_delta_ci,
-        window_plan_profile,
-    )
-
-    # Ensure primary_metric has display_ci populated for schema invariants
-    try:
-        pm = (
-            certificate.get("primary_metric", {})
-            if isinstance(certificate.get("primary_metric"), dict)
-            else None
-        )
-        if isinstance(pm, dict) and pm:
-            # Prefer existing bounds; otherwise collapse to point estimate
-            disp = pm.get("display_ci")
-            if not (
-                isinstance(disp, list | tuple)
-                and len(disp) == 2
-                and all(isinstance(x, int | float) for x in disp)
-            ):
-                point = None
-                for key in ("ratio_vs_baseline", "final", "preview"):
-                    val = pm.get(key)
-                    if isinstance(val, int | float) and math.isfinite(float(val)):
-                        point = float(val)
-                        break
-                if isinstance(point, float):
-                    pm["display_ci"] = [point, point]
-                else:
-                    # As last resort, emit a degenerate [1.0, 1.0] to satisfy schema invariants
-                    pm["display_ci"] = [1.0, 1.0]
     except Exception:  # pragma: no cover
         pass
 

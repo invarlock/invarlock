@@ -1301,7 +1301,8 @@ class VarianceGuard(Guard):
             if not filtered_scales and topk > 0 and best_candidate:
                 name, scale = best_candidate
                 deadband = float(self._policy.get("deadband", 0.0) or 0.0)
-                threshold = max(deadband * 0.5, min_abs)
+                # Backstop should remain below the main min_abs filter, otherwise it can never fire.
+                threshold = max(deadband * 0.5, min_abs * 0.5)
                 if best_delta >= threshold:
                     if max_step > 0.0:
                         limited_delta = min(best_delta, max_step)

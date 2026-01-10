@@ -21,59 +21,59 @@ from typing import Any
 # over time.
 THRESHOLDS = {
     # Evaluation & reporting
-    "src/invarlock/eval/metrics.py": 0.85,
+    "src/invarlock/eval/metrics.py": 0.90,
     # Guard-effect benchmark harness (Step 14) + primary metric core
-    "src/invarlock/eval/bench.py": 0.85,
-    "src/invarlock/eval/primary_metric.py": 0.85,
+    "src/invarlock/eval/bench.py": 0.90,
+    "src/invarlock/eval/primary_metric.py": 0.90,
     # Calibration (release artifacts / tier updates)
-    "src/invarlock/calibration/spectral_null.py": 0.85,
-    "src/invarlock/calibration/variance_ve.py": 0.85,
+    "src/invarlock/calibration/spectral_null.py": 0.90,
+    "src/invarlock/calibration/variance_ve.py": 0.90,
     # Reporting
-    "src/invarlock/reporting/certificate.py": 0.85,
-    "src/invarlock/reporting/report.py": 0.85,
-    "src/invarlock/reporting/validate.py": 0.85,
+    "src/invarlock/reporting/certificate.py": 0.90,
+    "src/invarlock/reporting/report.py": 0.90,
+    "src/invarlock/reporting/validate.py": 0.90,
     # Reporting types
-    "src/invarlock/reporting/report_types.py": 0.85,
-    "src/invarlock/reporting/dataset_hashing.py": 0.85,
-    "src/invarlock/reporting/certificate_schema.py": 0.85,
-    "src/invarlock/reporting/guards_analysis.py": 0.85,
-    "src/invarlock/reporting/primary_metric_utils.py": 0.85,
-    "src/invarlock/reporting/utils.py": 0.85,
+    "src/invarlock/reporting/report_types.py": 0.90,
+    "src/invarlock/reporting/dataset_hashing.py": 0.90,
+    "src/invarlock/reporting/certificate_schema.py": 0.90,
+    "src/invarlock/reporting/guards_analysis.py": 0.90,
+    "src/invarlock/reporting/primary_metric_utils.py": 0.90,
+    "src/invarlock/reporting/utils.py": 0.90,
     # Guards (safety mechanisms)
-    "src/invarlock/guards/variance.py": 0.85,
-    "src/invarlock/guards/invariants.py": 0.85,
-    "src/invarlock/guards/spectral.py": 0.85,
-    "src/invarlock/guards/rmt.py": 0.85,
-    "src/invarlock/guards/policies.py": 0.85,
+    "src/invarlock/guards/variance.py": 0.90,
+    "src/invarlock/guards/invariants.py": 0.90,
+    "src/invarlock/guards/spectral.py": 0.90,
+    "src/invarlock/guards/rmt.py": 0.90,
+    "src/invarlock/guards/policies.py": 0.90,
     # Core orchestration & runtime
-    "src/invarlock/core/runner.py": 0.85,
-    "src/invarlock/core/registry.py": 0.85,
+    "src/invarlock/core/runner.py": 0.90,
+    "src/invarlock/core/registry.py": 0.90,
     # Omit bootstrap here due to ambiguous bare-filename records in coverage.xml
     # "src/invarlock/core/bootstrap.py": 0.85,
-    "src/invarlock/core/contracts.py": 0.85,
-    "src/invarlock/core/auto_tuning.py": 0.85,
+    "src/invarlock/core/contracts.py": 0.90,
+    "src/invarlock/core/auto_tuning.py": 0.90,
     # Newly added core modules to critical surface
-    "src/invarlock/core/checkpoint.py": 0.85,
-    "src/invarlock/core/api.py": 0.85,
-    "src/invarlock/core/retry.py": 0.85,
-    "src/invarlock/core/types.py": 0.85,
+    "src/invarlock/core/checkpoint.py": 0.90,
+    "src/invarlock/core/api.py": 0.90,
+    "src/invarlock/core/retry.py": 0.90,
+    "src/invarlock/core/types.py": 0.90,
     # CLI commands
-    "src/invarlock/cli/_json.py": 0.85,
-    "src/invarlock/cli/_evidence.py": 0.85,
-    "src/invarlock/cli/config.py": 0.85,
-    "src/invarlock/cli/commands/run.py": 0.85,
-    "src/invarlock/cli/commands/verify.py": 0.85,
-    "src/invarlock/cli/commands/calibrate.py": 0.85,
+    "src/invarlock/cli/_json.py": 0.90,
+    "src/invarlock/cli/_evidence.py": 0.90,
+    "src/invarlock/cli/config.py": 0.90,
+    "src/invarlock/cli/commands/run.py": 0.90,
+    "src/invarlock/cli/commands/verify.py": 0.90,
+    "src/invarlock/cli/commands/calibrate.py": 0.90,
     # CLI determinism preset (CI/Release provenance)
-    "src/invarlock/cli/determinism.py": 0.85,
+    "src/invarlock/cli/determinism.py": 0.90,
     # Core events logger
-    "src/invarlock/core/events.py": 0.85,
+    "src/invarlock/core/events.py": 0.90,
 }
 
 # Default floors (applied only to core classification; non-core modules are not
 # globally enforced unless explicitly listed in THRESHOLDS)
-CORE_FLOOR_DEFAULT = 0.85
-DEFAULT_FLOOR_DEFAULT = 0.85
+CORE_FLOOR_DEFAULT = 0.90
+DEFAULT_FLOOR_DEFAULT = 0.90
 
 # Core module classification: files matching any of these prefixes are treated
 # as part of the critical surface and must meet the core floor (unless an

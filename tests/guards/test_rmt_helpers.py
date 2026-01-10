@@ -112,3 +112,61 @@ def test_iter_transformer_layers_transformer_h_without_iter_len() -> None:
 
     layers = list(_iter_transformer_layers(_Model()))
     assert layers == []
+
+
+def test_iter_transformer_layers_llama_style_yields_layers() -> None:
+    class _Model(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.model = nn.Module()
+            self.model.layers = nn.ModuleList([nn.Linear(1, 1), nn.Linear(1, 1)])
+
+    layers = list(_iter_transformer_layers(_Model()))
+    assert len(layers) == 2
+
+
+def test_iter_transformer_layers_llama_style_handles_iteration_error() -> None:
+    class _BadIterable:
+        def __len__(self) -> int:
+            return 1
+
+        def __iter__(self):
+            raise TypeError("boom")
+
+    class _Model(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.model = nn.Module()
+            self.model.layers = _BadIterable()
+
+    layers = list(_iter_transformer_layers(_Model()))
+    assert layers == []
+
+
+def test_iter_transformer_layers_bert_style_yields_layers() -> None:
+    class _Model(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.encoder = nn.Module()
+            self.encoder.layer = nn.ModuleList([nn.Linear(1, 1)])
+
+    layers = list(_iter_transformer_layers(_Model()))
+    assert len(layers) == 1
+
+
+def test_iter_transformer_layers_bert_style_handles_iteration_error() -> None:
+    class _BadIterable:
+        def __len__(self) -> int:
+            return 1
+
+        def __iter__(self):
+            raise TypeError("boom")
+
+    class _Model(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.encoder = nn.Module()
+            self.encoder.layer = _BadIterable()
+
+    layers = list(_iter_transformer_layers(_Model()))
+    assert layers == []
