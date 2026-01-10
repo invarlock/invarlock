@@ -877,18 +877,9 @@ def make_certificate(
 
     # Primary-metric analysis (PM-only)
     ppl_metrics = report.get("metrics", {}) if isinstance(report, dict) else {}
+    edited_preview = float("nan")
+    edited_final = float("nan")
     ratio_vs_baseline = float("nan")
-    # Populate the primary-metric ratio early for identity checks.
-    try:
-        pm_try = (
-            report.get("metrics", {}).get("primary_metric")
-            if isinstance(report.get("metrics"), dict)
-            else None
-        )
-        if isinstance(pm_try, dict):
-            ratio_vs_baseline = pm_try.get("ratio_vs_baseline", ratio_vs_baseline)
-    except Exception:  # pragma: no cover
-        pass
 
     metrics_bootstrap_obj = (
         report["metrics"].get("bootstrap", {})
@@ -1179,7 +1170,13 @@ def make_certificate(
 
     delta_mean = paired_delta_summary.get("mean")
     degenerate_delta = paired_delta_summary.get("degenerate", False)
-    drift_ratio = float(ratio_vs_baseline) if _is_number(ratio_vs_baseline) else float("nan")
+    drift_ratio = (
+        edited_final / edited_preview
+        if _is_number(edited_final)
+        and _is_number(edited_preview)
+        and edited_preview > 0
+        else float("nan")
+    )
 
     ratio_from_delta = None
     if _is_number(delta_mean) and not degenerate_delta:
@@ -1211,8 +1208,8 @@ def make_certificate(
                 # Provide a degenerate CI if none was computed
                 if not (
                     isinstance(ratio_ci, tuple | list) and len(ratio_ci) == 2
-                ) and _is_number(ratio_vs_baseline):
-                    ratio_ci = (float(ratio_vs_baseline), float(ratio_vs_baseline))
+                ) and isinstance(edited_final, int | float):
+                    ratio_ci = (float(edited_final), float(edited_final))
         except Exception:  # pragma: no cover
             pass
 
