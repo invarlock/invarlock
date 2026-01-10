@@ -31,7 +31,7 @@ coverage:  ## Run tests with coverage and generate XML
 		--cov=src/invarlock/eval --cov=src/invarlock/guards --cov=src/invarlock/calibration \
 		--cov=src/invarlock/cli --cov=src/invarlock/core --cov=src/invarlock/reporting \
 		--cov-branch \
-		--cov-report=term --cov-report=xml:reports/cov.xml
+		--cov-report=term --cov-report=xml:reports/cov.xml --cov-fail-under=80
 
 coverage-enforce:  ## Run coverage and enforce per-file thresholds
 	$(MAKE) coverage
