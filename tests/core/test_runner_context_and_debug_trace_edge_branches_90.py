@@ -124,6 +124,35 @@ def test_execute_merges_auto_config_when_context_already_has_auto(
     assert cfg.context["auto"]["keep"] is True
 
 
+def test_execute_auto_config_skips_merge_when_context_not_dict(monkeypatch) -> None:
+    _patch_minimal_pipeline(monkeypatch)
+
+    runner = CoreRunner()
+    # Mapping-like (supports `.get`), iterable-of-pairs (dict.update accepts), but not a dict
+    # → auto merge branch skipped.
+    class _Mapping:
+        def __init__(self, data: dict[str, Any]) -> None:
+            self._data = dict(data)
+
+        def get(self, key: str, default: Any = None) -> Any:
+            return self._data.get(key, default)
+
+        def __iter__(self):
+            return iter(self._data.items())
+
+    cfg = RunConfig(context=_Mapping({"x": 1}))
+    report = runner.execute(
+        _DummyModel(),
+        _DummyAdapter(),
+        _DummyEdit(),
+        [_DummyGuard()],
+        cfg,
+        calibration_data=None,
+        auto_config={"tier": "aggressive"},
+    )
+    assert report.status == "success"
+
+
 def test_eval_phase_debug_trace_handles_empty_list(monkeypatch) -> None:
     runner = CoreRunner()
     model = _DummyModel()
@@ -179,3 +208,37 @@ def test_eval_phase_debug_trace_handles_custom_indexable(monkeypatch) -> None:
         model, adapter, calibration_data=_Indexable(), report=report, preview_n=None, final_n=None, config=cfg
     )
     assert metrics["primary_metric"]["preview"] == 1.0
+
+
+def test_eval_phase_debug_trace_handles_non_indexable_iterable(monkeypatch) -> None:
+    runner = CoreRunner()
+    model = _DummyModel()
+    adapter = _DummyAdapter()
+    report = RunReport()
+    cfg = RunConfig(context={})
+
+    monkeypatch.setenv("INVARLOCK_DEBUG_TRACE", "1")
+    monkeypatch.setattr(
+        CoreRunner,
+        "_compute_real_metrics",
+        staticmethod(
+            lambda *_a, **_k: (
+                {"primary_metric": {"kind": "ppl_causal", "preview": 1.0, "final": 1.0}},
+                {"preview": {}, "final": {}},
+            )
+        ),
+    )
+
+    def _calib_iter():
+        yield {"input_ids": [1, 2], "labels": [-100, 5]}
+
+    metrics = runner._eval_phase(
+        model,
+        adapter,
+        calibration_data=_calib_iter(),
+        report=report,
+        preview_n=None,
+        final_n=None,
+        config=cfg,
+    )
+    assert metrics["primary_metric"]["final"] == 1.0
