@@ -174,8 +174,11 @@ Key points:
     --cov=src/invarlock/eval --cov=src/invarlock/guards \\
     --cov=src/invarlock/cli --cov=src/invarlock/core --cov=src/invarlock/reporting \\
     --cov-branch \\
-    --cov-report=term --cov-report=xml:reports/cov.xml
+    --cov-report=term --cov-report=xml:reports/cov.xml \
+    --cov-fail-under=80
   ```
+
+- The project-wide floor is enforced at **80%** via pytest-cov in `make coverage`.
 
 - Enforce thresholds:
 
