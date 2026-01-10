@@ -102,3 +102,32 @@ def test_after_edit_applies_spectral_control_when_enabled(monkeypatch) -> None:
 
     guard.after_edit(Model())
     assert any(e.get("operation") == "spectral_control_applied" for e in guard.events)
+
+
+def test_detect_violations_computes_sigma_and_classifies_family_when_missing(
+    monkeypatch,
+) -> None:
+    guard = spectral.SpectralGuard()
+    guard.baseline_sigmas = {}
+    guard.target_sigma = 1.0
+    guard.baseline_family_stats = {"ffn": {}}
+    guard.family_caps = {"ffn": {"kappa": 10.0}}
+
+    monkeypatch.setattr(
+        guard,
+        "_should_check_module",
+        lambda *_a, **_k: True,
+        raising=False,
+    )
+    monkeypatch.setattr(spectral, "compute_sigma_max", lambda *_a, **_k: 1.0)
+    monkeypatch.setattr(spectral, "classify_module_family", lambda *_a, **_k: "ffn")
+    monkeypatch.setattr(spectral, "compute_z_score_for_value", lambda *_a, **_k: 0.0)
+
+    class Model:
+        def named_modules(self):
+            yield "ln", torch.nn.LayerNorm(2)
+            yield "lin", torch.nn.Linear(2, 2, bias=False)
+
+    violations = guard._detect_spectral_violations(Model(), metrics={}, phase="finalize")
+    assert violations == []
+    assert guard.module_family_map.get("lin") == "ffn"
