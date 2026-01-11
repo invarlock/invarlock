@@ -977,6 +977,14 @@ generate_model_tasks() {
             use_batch="false"
         fi
     fi
+    # Allow explicit override via env
+    if [[ -n "${B200_USE_BATCH_EDITS:-}" ]]; then
+        if [[ "${B200_USE_BATCH_EDITS}" == "false" || "${B200_USE_BATCH_EDITS}" == "0" ]]; then
+            use_batch="false"
+        elif [[ "${B200_USE_BATCH_EDITS}" == "true" || "${B200_USE_BATCH_EDITS}" == "1" ]]; then
+            use_batch="true"
+        fi
+    fi
 
     # Track task IDs for dependencies
     local task_ids=()
@@ -1013,11 +1021,16 @@ generate_model_tasks() {
     fi
 
     # 4. GENERATE_PRESET (depends on all calibration runs)
-    local cal_deps=$(IFS=','; echo "${cal_ids[*]}")
-    local preset_id=$(add_task "GENERATE_PRESET" "${model_id}" "${model_name}" \
-        5 "${cal_deps}" '{}' 75)
-    task_ids+=("${preset_id}")
-    echo "Created: ${preset_id}"
+    local preset_id=""
+    if [[ ${calibration_runs} -gt 0 ]]; then
+        local cal_deps=$(IFS=','; echo "${cal_ids[*]}")
+        preset_id=$(add_task "GENERATE_PRESET" "${model_id}" "${model_name}" \
+            5 "${cal_deps}" '{}' 75)
+        task_ids+=("${preset_id}")
+        echo "Created: ${preset_id}"
+    else
+        echo "Skipping GENERATE_PRESET (calibration_runs=0)"
+    fi
 
     # 5/6. Edit creation + eval/certify
     # Clean edits (3 certify runs each)
@@ -1025,10 +1038,14 @@ generate_model_tasks() {
     # Stress edits (2 certify runs each)
     local stress_edits=("quant_rtn:4:32:all" "fp4_quant:aggressive:all" "magnitude_prune:0.5:all" "lowrank_svd:32:all")
 
-    if [[ "${use_batch}" == "true" ]]; then
-        :
-        # CREATE_EDITS_BATCH - Create all 8 edits with a single model load (Batch optimization)
-        # This replaces 8 separate CREATE_EDIT tasks, reducing model load overhead from 8× to 1×.
+    # Ensure use_batch is defined (defensive for set -u)
+    use_batch=${use_batch:-true}
+    # Skip edits entirely if both clean and stress runs are disabled
+    if [[ ${CLEAN_EDIT_RUNS:-0} -le 0 && ${STRESS_EDIT_RUNS:-0} -le 0 ]]; then
+        echo "Skipping edit creation (CLEAN_EDIT_RUNS=0, STRESS_EDIT_RUNS=0)"
+
+    elif [[ "${use_batch}" == "true" ]]; then
+        # CREATE_EDITS_BATCH - Create edits with a single model load (Batch optimization)
         local all_edit_specs='[
             {"spec": "quant_rtn:8:128:ffn", "version": "clean"},
             {"spec": "fp4_quant:e2m1:ffn", "version": "clean"},
@@ -1039,54 +1056,93 @@ generate_model_tasks() {
             {"spec": "magnitude_prune:0.5:all", "version": "stress"},
             {"spec": "lowrank_svd:32:all", "version": "stress"}
         ]'
-        local batch_edit_id=$(add_task "CREATE_EDITS_BATCH" "${model_id}" "${model_name}" \
-            "$(estimate_model_memory "${model_id}" "CREATE_EDIT")" \
-            "${setup_id}" '{"edit_specs": '"${all_edit_specs}"'}' 70)
-        task_ids+=("${batch_edit_id}")
-        echo "Created: ${batch_edit_id} (batch creates 8 edits with single model load)"
 
-        # Eval and Certify tasks for each edit (depend on batch creation)
-        for edit_spec in "${clean_edits[@]}"; do
-            generate_eval_certify_tasks "${model_id}" "${model_name}" "${batch_edit_id}" "${preset_id}" \
-                "${edit_spec}" "clean" 3
-        done
-        for edit_spec in "${stress_edits[@]}"; do
-            generate_eval_certify_tasks "${model_id}" "${model_name}" "${batch_edit_id}" "${preset_id}" \
-                "${edit_spec}" "stress" 2
-        done
+        local edits_id=$(add_task "CREATE_EDITS_BATCH" "${model_id}" "${model_name}" \
+            "$(estimate_model_memory "${model_id}" "CREATE_EDITS_BATCH")" \
+            "${setup_id}" '{"edit_specs": '"${all_edit_specs}"', "use_batch": true}' 70)
+        task_ids+=("${edits_id}")
+        echo "Created: ${edits_id}"
+
     else
-        # For very large models (70B+), avoid batch edit creation to prevent OOM from deep copies.
-        # Fall back to per-edit CREATE_EDIT + EVAL_EDIT + CERTIFY_EDIT tasks.
-        echo "Model ${model_name}: estimated ${base_size}GB for eval - disabling CREATE_EDITS_BATCH, using per-edit tasks"
-
+        # CREATE_EDIT - Create single edits (one task per edit) and enqueue eval/certify
         for edit_spec in "${clean_edits[@]}"; do
-            generate_edit_tasks "${model_id}" "${model_name}" "${setup_id}" "${preset_id}" \
-                "${edit_spec}" "clean" 3
+            local edit_id=$(add_task "CREATE_EDIT" "${model_id}" "${model_name}" \
+                "$(estimate_model_memory "${model_id}" "CREATE_EDIT")" \
+                "${setup_id}" '{"edit_spec": "'"${edit_spec}"'", "version": "clean", "model_idx": '"${model_idx}"'}' 70)
+            task_ids+=("${edit_id}")
+            echo "Created: ${edit_id}"
+
+            # EVAL_EDIT (monolithic) depends on this edit
+            local eval_id=$(add_task "EVAL_EDIT" "${model_id}" "${model_name}" \
+                "$(estimate_model_memory "${model_id}" "EVAL_EDIT")" \
+                "${edit_id}" '{"edit_spec": "'"${edit_spec}"'", "version": "clean"}' 65)
+            task_ids+=("${eval_id}")
+            echo "Created: ${eval_id}"
+
+            # CERTIFY_EDIT runs for clean edits (3 by default)
+            if [[ ${CLEAN_EDIT_RUNS:-0} -gt 0 && ${calibration_runs} -gt 0 ]]; then
+                for run in $(seq 1 "${CLEAN_EDIT_RUNS}"); do
+                    local cert_id=$(add_task "CERTIFY_EDIT" "${model_id}" "${model_name}" \
+                        "$(estimate_model_memory "${model_id}" "CERTIFY_EDIT")" \
+                        "${edit_id},${preset_id}" '{"edit_spec": "'"${edit_spec}"'", "version": "clean", "run": '"${run}"'}' 65)
+                    task_ids+=("${cert_id}")
+                    echo "Created: ${cert_id}"
+                done
+            fi
         done
+
         for edit_spec in "${stress_edits[@]}"; do
-            generate_edit_tasks "${model_id}" "${model_name}" "${setup_id}" "${preset_id}" \
-                "${edit_spec}" "stress" 2
+            local edit_id=$(add_task "CREATE_EDIT" "${model_id}" "${model_name}" \
+                "$(estimate_model_memory "${model_id}" "CREATE_EDIT")" \
+                "${setup_id}" '{"edit_spec": "'"${edit_spec}"'", "version": "stress", "model_idx": '"${model_idx}"'}' 70)
+            task_ids+=("${edit_id}")
+            echo "Created: ${edit_id}"
+
+            local eval_id=$(add_task "EVAL_EDIT" "${model_id}" "${model_name}" \
+                "$(estimate_model_memory "${model_id}" "EVAL_EDIT")" \
+                "${edit_id}" '{"edit_spec": "'"${edit_spec}"'", "version": "stress"}' 65)
+            task_ids+=("${eval_id}")
+            echo "Created: ${eval_id}"
+
+            if [[ ${STRESS_EDIT_RUNS:-0} -gt 0 && ${calibration_runs} -gt 0 ]]; then
+                for run in $(seq 1 "${STRESS_EDIT_RUNS}"); do
+                    local cert_id=$(add_task "CERTIFY_EDIT" "${model_id}" "${model_name}" \
+                        "$(estimate_model_memory "${model_id}" "CERTIFY_EDIT")" \
+                        "${edit_id},${preset_id}" '{"edit_spec": "'"${edit_spec}"'", "version": "stress", "run": '"${run}"'}' 65)
+                    task_ids+=("${cert_id}")
+                    echo "Created: ${cert_id}"
+                done
+            fi
         done
     fi
 
     # 7. Error injection tests (5 types)
-    local error_types=("nan_injection" "inf_injection" "extreme_quant" "scale_explosion" "zero_layer")
-    for error_type in "${error_types[@]}"; do
-        # CREATE_ERROR
-        local error_create_id=$(add_task "CREATE_ERROR" "${model_id}" "${model_name}" \
-            "$(estimate_model_memory "${model_id}" "CREATE_ERROR")" \
-            "${setup_id}" '{"error_type": "'"${error_type}"'"}' 60)
-        echo "Created: ${error_create_id}"
+    if [[ "${RUN_ERROR_INJECTION:-true}" == "true" ]]; then
+        local error_types=("nan_injection" "inf_injection" "extreme_quant" "scale_explosion" "zero_layer")
+        for error_type in "${error_types[@]}"; do
+            # CREATE_ERROR
+            local error_create_id=$(add_task "CREATE_ERROR" "${model_id}" "${model_name}" \
+                "$(estimate_model_memory "${model_id}" "CREATE_ERROR")" \
+                "${setup_id}" '{"error_type": "'"${error_type}"'"}' 60)
+            echo "Created: ${error_create_id}"
 
-        # CERTIFY_ERROR
-        local error_cert_id=$(add_task "CERTIFY_ERROR" "${model_id}" "${model_name}" \
-            "$(estimate_model_memory "${model_id}" "CERTIFY_ERROR")" \
-            "${error_create_id},${preset_id}" '{"error_type": "'"${error_type}"'"}' 55)
-        echo "Created: ${error_cert_id}"
-    done
+            # CERTIFY_ERROR (only if preset exists)
+            if [[ ${calibration_runs} -gt 0 ]]; then
+                local error_cert_id=$(add_task "CERTIFY_ERROR" "${model_id}" "${model_name}" \
+                    "$(estimate_model_memory "${model_id}" "CERTIFY_ERROR")" \
+                    "${error_create_id},${preset_id}" '{"error_type": "'"${error_type}"'"}' 55)
+                echo "Created: ${error_cert_id}"
+            else
+                echo "Skipping CERTIFY_ERROR (${error_type}) because calibration_runs=0"
+            fi
+        done
+    else
+        echo "Skipping error injection (RUN_ERROR_INJECTION=false)"
+    fi
 
     echo "Generated tasks for model ${model_name}"
 }
+
 
 # Generate eval and certify tasks for an edit (Split Eval optimization)
 # Usage: generate_eval_certify_tasks <model_id> <model_name> <batch_edit_id> <preset_id> <edit_spec> <version> <cert_runs>
