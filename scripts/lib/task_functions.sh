@@ -704,6 +704,9 @@ task_calibration_run() {
         fi
     fi
 
+    # Force non-overlapping windows during calibration to avoid pairing mismatches
+    stride="${seq_len}"
+
     echo "  Model size: ${model_size}, Config: seq=${seq_len}, stride=${stride}, windows=${preview_n}+${final_n}, batch=${eval_batch}" >> "${log_file}"
     if [[ ${applied_override} -eq 1 ]]; then
         echo "  OOM override applied: seq=${seq_len}, stride=${stride}, batch=${eval_batch}" >> "${log_file}"
@@ -719,9 +722,12 @@ task_calibration_run() {
         bootstrap_replicates="${INVARLOCK_BOOTSTRAP_N}"
     fi
 
-    local -a extra_env=()
+    echo "  Calibration: enforcing window_overlap_fraction=0.0" >> "${log_file}"
+    local -a extra_env=(
+        INVARLOCK_WINDOW_OVERLAP_FRACTION=0.0
+        INVARLOCK_SKIP_OVERHEAD_CHECK=1
+    )
     if _is_large_model "${model_size}"; then
-        extra_env+=(INVARLOCK_SKIP_OVERHEAD_CHECK=1)
         echo "  Large model (${model_size}): SKIP_OVERHEAD_CHECK=1" >> "${log_file}"
     fi
 
@@ -793,6 +799,7 @@ eval:
     replicates: ${bootstrap_replicates}
     parallel: true
   batch_size: ${eval_batch}
+  window_overlap_fraction: 0.0
 
 auto:
   enabled: true

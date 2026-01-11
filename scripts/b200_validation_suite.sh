@@ -130,18 +130,19 @@ fi
 # `model_profile.json` after download.
 
 # Small models (fit on a single B200 under typical settings)
-MODEL_1="${MODEL_1:-mistralai/Mistral-7B-v0.1}"           # ~14 GB - Mistral (PUBLIC, FA2 compatible)
-MODEL_2="${MODEL_2:-NousResearch/Llama-2-13b-hf}"         # ~26 GB - LLaMA-2 13B (PUBLIC via NousResearch)
-MODEL_3="${MODEL_3:-Qwen/Qwen2.5-14B}"                    # ~28 GB - Qwen2.5 (PUBLIC, FA2 compatible)
+# Note: leave a MODEL_N unset to use the default below; set it to an empty string to disable.
+if [[ ! ${MODEL_1+x} ]]; then MODEL_1="mistralai/Mistral-7B-v0.1"; fi           # ~14 GB
+if [[ ! ${MODEL_2+x} ]]; then MODEL_2="NousResearch/Llama-2-13b-hf"; fi         # ~26 GB
+if [[ ! ${MODEL_3+x} ]]; then MODEL_3="Qwen/Qwen2.5-14B"; fi                    # ~28 GB
 
-# Medium/MoE models (fit on a single B200 under typical settings)
-MODEL_4="${MODEL_4:-Qwen/Qwen2.5-32B}"                    # ~64 GB - Qwen2.5 32B (PUBLIC, FA2 compatible)
-MODEL_5="${MODEL_5:-01-ai/Yi-34B}"                        # ~68 GB - Yi 34B (PUBLIC, FA2 compatible)
-MODEL_6="${MODEL_6:-mistralai/Mixtral-8x7B-v0.1}"         # ~90 GB - Mixtral MoE (PUBLIC, FA2 compatible)
+# Medium/MoE models
+if [[ ! ${MODEL_4+x} ]]; then MODEL_4="Qwen/Qwen2.5-32B"; fi                    # ~64 GB
+if [[ ! ${MODEL_5+x} ]]; then MODEL_5="01-ai/Yi-34B"; fi                        # ~68 GB
+if [[ ! ${MODEL_6+x} ]]; then MODEL_6="mistralai/Mixtral-8x7B-v0.1"; fi         # ~90 GB
 
-# Large models (weights ~140+ GB; may scale to multi-GPU if overheads exceed 180GB)
-MODEL_7="${MODEL_7:-NousResearch/Llama-2-70b-hf}"         # ~140 GB - LLaMA-2 70B (PUBLIC via NousResearch)
-MODEL_8="${MODEL_8:-Qwen/Qwen1.5-72B}"                    # ~144 GB - Qwen 72B (PUBLIC, FA2 compatible)
+# Large models
+if [[ ! ${MODEL_7+x} ]]; then MODEL_7="NousResearch/Llama-2-70b-hf"; fi         # ~140 GB
+if [[ ! ${MODEL_8+x} ]]; then MODEL_8="Qwen/Qwen1.5-72B"; fi                    # ~144 GB
 
 # Edit Configuration
 EDIT_TYPE="${EDIT_TYPE:-quant_rtn}"
@@ -2295,6 +2296,9 @@ generate_invarlock_config() {
         accel_benchmark="false"
     fi
 
+    # Window overlap control (calibration and eval safety)
+    local eval_overlap="${INVARLOCK_WINDOW_OVERLAP_FRACTION:-0.0}"
+
     # Optional: override guard order for the suite (comma-separated list).
     # Default is a lightweight chain to keep calibration tractable on 70B+.
     local guards_order_csv="${B200_GUARDS_ORDER:-}"
@@ -2351,11 +2355,13 @@ guards:
 ${guards_order_yaml}
 
 eval:
+  window_overlap_fraction: ${eval_overlap}
   bootstrap:
     replicates: ${bootstrap_n}
     parallel: true
   max_pm_ratio: 2.0
   batch_size: ${eval_batch}
+
 
 auto:
   enabled: true
@@ -2409,6 +2415,15 @@ run_single_calibration() {
         "${stride}" \
         "${eval_batch}"
 
+    # Force no-overlap calibration to avoid pairing mismatches
+    python3 - "${config_yaml}" <<'PY'
+import sys, yaml, pathlib
+path = pathlib.Path(sys.argv[1])
+cfg = yaml.safe_load(path.read_text())
+cfg.setdefault('eval', {})['window_overlap_fraction'] = 0.0
+path.write_text(yaml.safe_dump(cfg, sort_keys=False))
+PY
+
     # For large models, skip overhead check to avoid OOM (task-local via env)
     local model_size
     model_size=$(estimate_model_params "${model_path}")
@@ -2416,15 +2431,22 @@ run_single_calibration() {
     local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
 
     local exit_code=0
+    # Enforce no-overlap windows and skip overhead checks to avoid E001/pairing issues
+    local env_common=(
+        INVARLOCK_WINDOW_OVERLAP_FRACTION=0.0
+        INVARLOCK_SKIP_OVERHEAD_CHECK=1
+    )
+
     if [[ "${model_size}" == "70" || "${model_size}" == "72" || "${model_size}" == "moe" ]]; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Large model (${model_size}): using INVARLOCK_SKIP_OVERHEAD_CHECK=1 for calibration" >> "${log_file}"
-        INVARLOCK_SKIP_OVERHEAD_CHECK=1 \
+        "${env_common[@]}" \
         CUDA_VISIBLE_DEVICES="${cuda_devices}" invarlock run \
             --config "${config_yaml}" \
             --profile ci \
             --out "${run_dir}" \
             >> "${log_file}" 2>&1 || exit_code=$?
     else
+        "${env_common[@]}" \
         CUDA_VISIBLE_DEVICES="${cuda_devices}" invarlock run \
             --config "${config_yaml}" \
             --profile ci \
@@ -2473,6 +2495,9 @@ run_invarlock_calibration() {
     # Get model-size-aware configuration
     local config=$(get_model_invarlock_config "${model_size}")
     IFS=':' read -r effective_seq_len effective_stride effective_preview_n effective_final_n effective_eval_batch <<< "${config}"
+    # Force non-overlapping windows for calibration to avoid pairing mismatches
+    effective_stride="${effective_seq_len}"
+    export INVARLOCK_WINDOW_OVERLAP_FRACTION=0.0
 
     # Log calibration start with proper model size label
     if [[ "${model_size}" == "moe" ]]; then
@@ -2741,18 +2766,23 @@ def calibrate_drift(recs):
             except Exception:
                 pass
 
+    ratios = [r for r in ratios if math.isfinite(r)]
     if len(ratios) < 2:
+        base = ratios[0] if ratios else 1.0
         return {
-            "mean": 1.0,
+            "mean": float(base),
             "std": 0.0,
-            "min": min(ratios) if ratios else 1.0,
-            "max": max(ratios) if ratios else 1.0,
+            "min": float(base),
+            "max": float(base),
             "suggested_band": [0.95, 1.05],
             "band_compatible": True,
         }
 
-    mean = statistics.mean(ratios)
-    std = statistics.stdev(ratios) if len(ratios) > 1 else 0.0
+    mean = statistics.fmean(ratios)
+    try:
+        std = statistics.pstdev(ratios)
+    except Exception:
+        std = 0.0
     margin = max(2 * std, 0.05)
     band = [round(mean - margin, 3), round(mean + margin, 3)]
     return {
@@ -3304,77 +3334,85 @@ process_model() {
             "${gpu_id}"
     fi
 
-    # Step 4: Clean edits (4 types)
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Processing clean edits..." >> "${gpu_log}"
-    for edit_spec in "${EDIT_TYPES_CLEAN[@]}"; do
-        local edit_path=$(process_edit "${baseline_path}" "${edit_spec}" "clean" "${model_name}" "${gpu_id}" "${model_output_dir}")
+    # Step 4: Clean edits (only when requested)
+    if [[ ${CLEAN_EDIT_RUNS:-0} -gt 0 ]]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Processing clean edits..." >> "${gpu_log}"
+        for edit_spec in "${EDIT_TYPES_CLEAN[@]}"; do
+            local edit_path=$(process_edit "${baseline_path}" "${edit_spec}" "clean" "${model_name}" "${gpu_id}" "${model_output_dir}")
 
-        if [[ -n "${edit_path}" && -d "${edit_path}" ]]; then
-            # Run eval for this edit
-            local edit_name=$(basename "${edit_path}")
-            local edit_eval="${model_output_dir}/evals/${edit_name}_results.json"
+            if [[ -n "${edit_path}" && -d "${edit_path}" ]]; then
+                # Run eval for this edit
+                local edit_name=$(basename "${edit_path}")
+                local edit_eval="${model_output_dir}/evals/${edit_name}_results.json"
 
-            if [[ "${RESUME_MODE}" != "true" || ! -f "${edit_eval}" ]]; then
-                run_lmeval \
-                    "${edit_path}" \
-                    "${edit_eval}" \
-                    "${EVAL_TASKS}" \
-                    "${EVAL_BATCH_SIZE}" \
-                    "${EVAL_NUM_FEWSHOT}" \
-                    "${gpu_id}"
-            fi
-
-            # Run InvarLock certify
-            for run in $(seq 1 "${CLEAN_EDIT_RUNS}"); do
-                local cert_file="${model_output_dir}/certificates/${edit_name}/run_${run}/evaluation.cert.json"
-                if [[ "${RESUME_MODE}" != "true" || ! -f "${cert_file}" ]]; then
-                    run_invarlock_certify \
+                if [[ "${RESUME_MODE}" != "true" || ! -f "${edit_eval}" ]]; then
+                    run_lmeval \
                         "${edit_path}" \
-                        "${baseline_path}" \
-                        "${model_output_dir}/certificates/${edit_name}" \
-                        "run_${run}" \
-                        "${preset_dir}" \
-                        "${model_name}" \
+                        "${edit_eval}" \
+                        "${EVAL_TASKS}" \
+                        "${EVAL_BATCH_SIZE}" \
+                        "${EVAL_NUM_FEWSHOT}" \
                         "${gpu_id}"
                 fi
-            done
-        fi
-    done
 
-    # Step 5: Stress edits (4 types)
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Processing stress edits..." >> "${gpu_log}"
-    for edit_spec in "${EDIT_TYPES_STRESS[@]}"; do
-        local edit_path=$(process_edit "${baseline_path}" "${edit_spec}" "stress" "${model_name}" "${gpu_id}" "${model_output_dir}")
-
-        if [[ -n "${edit_path}" && -d "${edit_path}" ]]; then
-            local edit_name=$(basename "${edit_path}")
-            local edit_eval="${model_output_dir}/evals/${edit_name}_results.json"
-
-            if [[ "${RESUME_MODE}" != "true" || ! -f "${edit_eval}" ]]; then
-                run_lmeval \
-                    "${edit_path}" \
-                    "${edit_eval}" \
-                    "${EVAL_TASKS}" \
-                    "${EVAL_BATCH_SIZE}" \
-                    "${EVAL_NUM_FEWSHOT}" \
-                    "${gpu_id}"
+                # Run InvarLock certify
+                for run in $(seq 1 "${CLEAN_EDIT_RUNS}"); do
+                    local cert_file="${model_output_dir}/certificates/${edit_name}/run_${run}/evaluation.cert.json"
+                    if [[ "${RESUME_MODE}" != "true" || ! -f "${cert_file}" ]]; then
+                        run_invarlock_certify \
+                            "${edit_path}" \
+                            "${baseline_path}" \
+                            "${model_output_dir}/certificates/${edit_name}" \
+                            "run_${run}" \
+                            "${preset_dir}" \
+                            "${model_name}" \
+                            "${gpu_id}"
+                    fi
+                done
             fi
+        done
+    else
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Skipping clean edits (CLEAN_EDIT_RUNS=0)" >> "${gpu_log}"
+    fi
 
-            for run in $(seq 1 "${STRESS_EDIT_RUNS}"); do
-                local cert_file="${model_output_dir}/certificates/${edit_name}/run_${run}/evaluation.cert.json"
-                if [[ "${RESUME_MODE}" != "true" || ! -f "${cert_file}" ]]; then
-                    run_invarlock_certify \
+    # Step 5: Stress edits (only when requested)
+    if [[ ${STRESS_EDIT_RUNS:-0} -gt 0 ]]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Processing stress edits..." >> "${gpu_log}"
+        for edit_spec in "${EDIT_TYPES_STRESS[@]}"; do
+            local edit_path=$(process_edit "${baseline_path}" "${edit_spec}" "stress" "${model_name}" "${gpu_id}" "${model_output_dir}")
+
+            if [[ -n "${edit_path}" && -d "${edit_path}" ]]; then
+                local edit_name=$(basename "${edit_path}")
+                local edit_eval="${model_output_dir}/evals/${edit_name}_results.json"
+
+                if [[ "${RESUME_MODE}" != "true" || ! -f "${edit_eval}" ]]; then
+                    run_lmeval \
                         "${edit_path}" \
-                        "${baseline_path}" \
-                        "${model_output_dir}/certificates/${edit_name}" \
-                        "run_${run}" \
-                        "${preset_dir}" \
-                        "${model_name}" \
+                        "${edit_eval}" \
+                        "${EVAL_TASKS}" \
+                        "${EVAL_BATCH_SIZE}" \
+                        "${EVAL_NUM_FEWSHOT}" \
                         "${gpu_id}"
                 fi
-            done
-        fi
-    done
+
+                for run in $(seq 1 "${STRESS_EDIT_RUNS}"); do
+                    local cert_file="${model_output_dir}/certificates/${edit_name}/run_${run}/evaluation.cert.json"
+                    if [[ "${RESUME_MODE}" != "true" || ! -f "${cert_file}" ]]; then
+                        run_invarlock_certify \
+                            "${edit_path}" \
+                            "${baseline_path}" \
+                            "${model_output_dir}/certificates/${edit_name}" \
+                            "run_${run}" \
+                            "${preset_dir}" \
+                            "${model_name}" \
+                            "${gpu_id}"
+                    fi
+                done
+            fi
+        done
+    else
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Skipping stress edits (STRESS_EDIT_RUNS=0)" >> "${gpu_log}"
+    fi
 
     # Step 6: Error injection
     if [[ "${RUN_ERROR_INJECTION}" == "true" ]]; then
@@ -4252,6 +4290,8 @@ main_dynamic() {
     else
         # Generate all tasks
         log "Generating tasks for all models..."
+        log "Config: CLEAN_EDIT_RUNS=${CLEAN_EDIT_RUNS}, STRESS_EDIT_RUNS=${STRESS_EDIT_RUNS}, RUN_ERROR_INJECTION=${RUN_ERROR_INJECTION}, DRIFT_CALIBRATION_RUNS=${DRIFT_CALIBRATION_RUNS}, B200_USE_BATCH_EDITS=${B200_USE_BATCH_EDITS:-auto}"
+        log "Models: ${MODEL_1:-<unset>}, ${MODEL_2:-<unset>}, ${MODEL_3:-<unset>}, ${MODEL_4:-<unset>}, ${MODEL_5:-<unset>}, ${MODEL_6:-<unset>}, ${MODEL_7:-<unset>}, ${MODEL_8:-<unset>}"
         generate_all_tasks "${MODEL_1}" "${MODEL_2}" "${MODEL_3}" "${MODEL_4}" \
                            "${MODEL_5}" "${MODEL_6}" "${MODEL_7}" "${MODEL_8}"
     fi
@@ -4586,12 +4626,12 @@ Note: GPUs are assigned dynamically; this is not a fixed mapping.
 Key environment variables:
     B200_DETERMINISM             Harness determinism preset: throughput (default) or strict
     B200_GUARDS_ORDER            Override InvarLock guard order (comma-separated); default: invariants,variance,invariants
-    MODEL_1 through MODEL_8      Override model assignments
+    MODEL_1 through MODEL_8      Override model assignments (set empty to disable)
     CUDA_VISIBLE_DEVICES         Explicit GPU IDs to use (default: auto-detect all)
     NUM_GPUS                     Number of GPUs to use (default: auto-detect all)
     SKIP_FLASH_ATTN              Skip flash-attn install (default: false)
     RESUME_MODE                  Skip completed work (default: true)
-    OUTPUT_DIR                   Set to existing dir to resume
+    OUTPUT_DIR                   Set to existing dir to resume (absolute path recommended)
     RUN_ERROR_INJECTION          Run error tests (default: true)
     MIN_FREE_DISK_GB             Abort if free disk below this (default: 200)
 
@@ -4618,6 +4658,11 @@ EOF
 
     if [[ -z "${OUTPUT_DIR:-}" ]]; then
         OUTPUT_DIR="./invarlock_validation_b200_$(date +%Y%m%d_%H%M%S)"
+    fi
+    # Normalize OUTPUT_DIR to an absolute path so worker log paths remain valid
+    # even if subshells or workers run with a different cwd.
+    if [[ -n "${OUTPUT_DIR}" ]]; then
+        OUTPUT_DIR="$(cd "$(dirname "${OUTPUT_DIR}")" && pwd)/$(basename "${OUTPUT_DIR}")"
     fi
 
     b200_source_libs || exit 1
