@@ -302,10 +302,6 @@ gpu_worker() {
         stop_heartbeat_thread "${heartbeat_pid}"
 
         # Handle result
-        if [[ ${exit_code} -eq 3 && "${INVARLOCK_SKIP_OVERHEAD_CHECK:-}" == "1" ]]; then
-            echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Task ${task_id} exit 3 tolerated (SKIP_OVERHEAD_CHECK=1)"
-            exit_code=0
-        fi
         if [[ ${exit_code} -eq 0 ]]; then
             echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Task ${task_id} completed successfully"
 

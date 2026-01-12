@@ -2395,11 +2395,6 @@ PRESET_YAML
             --preset "${abs_preset_file}" >> "${log_file}" 2>&1
     ) || exit_code=$?
 
-    if [[ ${exit_code} -eq 3 && "${INVARLOCK_SKIP_OVERHEAD_CHECK:-}" == "1" ]]; then
-        echo "  Certify returned exit 3; treating as success because SKIP_OVERHEAD_CHECK=1" >> "${log_file}"
-        exit_code=0
-    fi
-
     # Find and copy certificate (only the canonical cert)
     if [[ ! -f "${cert_file}" ]]; then
         local found_cert
