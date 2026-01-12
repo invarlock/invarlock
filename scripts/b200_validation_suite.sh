@@ -4245,6 +4245,7 @@ main_dynamic() {
     # Initialize GPU reservation tracking for multi-GPU tasks before workers start.
     if type init_gpu_reservations &>/dev/null; then
         init_gpu_reservations "${OUTPUT_DIR}"
+        log "GPU reservations dir: ${GPU_RESERVATION_DIR:-unset}; GPUs: $(list_run_gpu_ids | tr '\n' ',' | sed 's/,$//')"
     fi
     export QUEUE_DIR GPU_RESERVATION_DIR  # Export for subshell workers
 
@@ -4330,6 +4331,18 @@ main_dynamic() {
     start_worker() {
         local gpu_id="$1"
         local action="${2:-Starting}"
+
+        # Avoid duplicating a live worker on the same GPU
+        local pid_file="${OUTPUT_DIR}/workers/gpu_${gpu_id}.pid"
+        if [[ -f "${pid_file}" ]]; then
+            local existing_pid
+            existing_pid=$(cat "${pid_file}" 2>/dev/null || true)
+            if [[ -n "${existing_pid}" ]] && kill -0 "${existing_pid}" 2>/dev/null; then
+                log "  GPU ${gpu_id}: worker already running (PID ${existing_pid}), skipping start"
+                return 0
+            fi
+        fi
+
         log "  GPU ${gpu_id}: ${action} worker"
         # Run in subshell that sources libraries (bash functions don't inherit to background processes)
         # Note: SCRIPT_DIR, LIB_DIR, QUEUE_DIR, OUTPUT_DIR must all be exported before this point
