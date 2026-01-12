@@ -22,9 +22,9 @@ from typing import Any
 import typer
 from rich.console import Console
 
+from ...core.exceptions import MetricsError
 from ..adapter_auto import resolve_auto_adapter
 from ..config import _deep_merge as _merge  # reuse helper
-from ..errors import InvarlockError
 
 # Use the report group's programmatic entry for report generation
 from .report import report_command as _report
@@ -369,35 +369,52 @@ def certify_command(
             else None
         ) or "unknown"
 
-        # Enforce only when a metric block is present; skip for minimal stub reports
-        # Enforce only when a primary_metric block is present
+        # Enforce only when a primary_metric block is present; allow degraded-but-flagged metrics to emit certificates, but fail the task.
         has_metric_block = isinstance(pm, dict) and bool(pm)
         if has_metric_block:
-            # Treat non‑finite PM as hard error in CI/Release.
-            # Require a finite final value; preview is optional.
-            if not _finite(pm_final):
-                err = InvarlockError(
+            degraded = bool(pm.get("invalid") or pm.get("degraded"))
+            if degraded or not _finite(pm_final):
+                fallback = pm_prev if _finite(pm_prev) else pm_final
+                if not _finite(fallback) or fallback <= 0:
+                    fallback = 1.0
+                degraded_reason = (
+                    pm.get("degraded_reason")
+                    or (
+                        "non_finite_pm"
+                        if (not _finite(pm_prev) or not _finite(pm_final))
+                        else "primary_metric_degraded"
+                    )
+                )
+                console.print(
+                    "[yellow]⚠️  Primary metric degraded or non-finite; emitting certificate and marking task degraded.[/yellow]"
+                )
+                pm["degraded"] = True
+                pm["invalid"] = pm.get("invalid") or True
+                pm["preview"] = pm_prev if _finite(pm_prev) else fallback
+                pm["final"] = pm_final if _finite(pm_final) else fallback
+                pm["ratio_vs_baseline"] = pm_ratio if _finite(pm_ratio) else 1.0
+                pm["degraded_reason"] = degraded_reason
+                metrics["primary_metric"] = pm
+                edited_payload.setdefault("metrics", {}).update(metrics)
+
+                # Emit the certificate for inspection, then exit with a CI-visible error.
+                _report(
+                    run=str(edited_report),
+                    format="cert",
+                    baseline=str(baseline_report),
+                    output=cert_out,
+                )
+                err = MetricsError(
                     code="E111",
-                    message=(
-                        "Primary metric computation failed (NaN/inf). "
-                        f"Context: device={device}, adapter={adapter_name}, edit={edit_name}. "
-                        "Baseline ok; edited failed to compute ppl. "
-                        "Try: use an accelerator (mps/cuda), force float32, reduce max_modules, "
-                        "or lower the evaluation batch size."
-                    ),
+                    message=f"Primary metric degraded or non-finite ({degraded_reason}).",
                     details={
-                        "device": device,
+                        "reason": degraded_reason,
                         "adapter": adapter_name,
+                        "device": device,
                         "edit": edit_name,
-                        "pm_preview": pm_prev,
-                        "pm_final": pm_final,
-                        "pm_ratio": pm_ratio,
                     },
                 )
-                code = _resolve_exit_code(err, profile=prof)
-                console.print(f"[red]{err}[/red]")
-                # Do not emit a certificate
-                raise typer.Exit(code)
+                raise typer.Exit(_resolve_exit_code(err, profile=profile))
 
     console.print("📜 Emitting certificate")
     _report(

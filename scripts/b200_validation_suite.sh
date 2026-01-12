@@ -1248,12 +1248,12 @@ get_model_invarlock_config() {
         "7")
             # 7B models: ~14GB, can use long sequences and more windows
             # B200 has plenty of headroom
-            echo "2048:1024:64:64:96"
+            echo "2048:2048:192:192:96"
             ;;
         "13")
             # 13-14B models: ~26-28GB, moderate settings
             # Note: estimate_model_params() returns "13" for both 13B and 14B
-            echo "1536:768:48:48:64"
+            echo "1536:1536:192:192:64"
             ;;
         "30")
             # 30B models: ~60GB, reduced settings
@@ -3528,163 +3528,171 @@ for model_dir in output_dir.iterdir():
     if not certs_dir.exists():
         continue
 
-	    for cert_file in certs_dir.rglob("evaluation.cert.json"):
-	        try:
-	            cert = json.loads(cert_file.read_text())
-	            rel_path = cert_file.relative_to(certs_dir)
-	            parts = list(rel_path.parts)
+    for cert_file in certs_dir.rglob("evaluation.cert.json"):
+        try:
+            cert = json.loads(cert_file.read_text())
+            rel_path = cert_file.relative_to(certs_dir)
+            parts = list(rel_path.parts)
 
-	            v = cert.get('validation', {}) or {}
-	            def as_bool(val):
-	                if val is None:
-	                    return False
-	                if isinstance(val, bool):
-	                    return val
-	                if isinstance(val, str):
-	                    return val.strip().lower() in ('true', '1', 'yes', 'on')
-	                return bool(val)
+            v = cert.get('validation', {}) or {}
+            def as_bool(val):
+                if val is None:
+                    return False
+                if isinstance(val, bool):
+                    return val
+                if isinstance(val, str):
+                    return val.strip().lower() in ('true', '1', 'yes', 'on')
+                return bool(val)
 
-	            invariants_ok = as_bool(v.get('invariants_pass', False))
-	            pm_ok = as_bool(v.get('primary_metric_acceptable', False))
-	            spectral_ok = as_bool(v.get('spectral_stable', False))
-	            rmt_ok = as_bool(v.get('rmt_stable', False))
-	            drift_ok = as_bool(v.get('preview_final_drift_acceptable', True))
-	            hyst_applied = as_bool(v.get('hysteresis_applied', False))
+            invariants_ok = as_bool(v.get('invariants_pass', False))
+            pm_ok = as_bool(v.get('primary_metric_acceptable', False))
+            spectral_ok = as_bool(v.get('spectral_stable', False))
+            rmt_ok = as_bool(v.get('rmt_stable', False))
+            drift_ok = as_bool(v.get('preview_final_drift_acceptable', True))
+            hyst_applied = as_bool(v.get('hysteresis_applied', False))
 
-	            guard_overhead = cert.get('guard_overhead') or {}
-	            guard_evaluated = bool(guard_overhead.get('evaluated')) if isinstance(guard_overhead, dict) else False
-	            overhead_ok = as_bool(v.get('guard_overhead_acceptable', True))
+            guard_overhead = cert.get('guard_overhead') or {}
+            guard_evaluated = bool(guard_overhead.get('evaluated')) if isinstance(guard_overhead, dict) else False
+            overhead_ok = as_bool(v.get('guard_overhead_acceptable', True))
 
-	            # Backwards-compatible "all_pass" used by existing analysis logic.
-	            all_pass = all([invariants_ok, pm_ok, spectral_ok, rmt_ok])
+            pm_block = cert.get('primary_metric') or {}
+            pm_degraded = as_bool(pm_block.get('degraded')) or as_bool(pm_block.get('invalid'))
+            pm_degraded_reason = pm_block.get('degraded_reason')
 
-	            # Canonical overall pass aligned with InvarLock console validation block.
-	            overall_pass = all([invariants_ok, pm_ok, spectral_ok, rmt_ok, drift_ok])
-	            if guard_evaluated:
-	                overall_pass = overall_pass and overhead_ok
+            # Backwards-compatible "all_pass" used by existing analysis logic.
+            all_pass = all([invariants_ok, pm_ok, spectral_ok, rmt_ok]) and not pm_degraded
 
-	            conf = cert.get('confidence') or {}
-	            conf_label = conf.get('label') if isinstance(conf, dict) else None
-	            conf_label = str(conf_label).strip() if conf_label is not None else ''
-	            conf_label = conf_label if conf_label else 'Unknown'
+            # Canonical overall pass aligned with InvarLock console validation block.
+            overall_pass = all([invariants_ok, pm_ok, spectral_ok, rmt_ok, drift_ok]) and not pm_degraded
+            if guard_evaluated:
+                overall_pass = overall_pass and overhead_ok
 
-	            pm = cert.get('primary_metric') or {}
-	            pm_ratio = pm.get('ratio_vs_baseline') if isinstance(pm, dict) else None
-	            pm_ci_lo = None
-	            pm_ci_hi = None
-	            try:
-	                dci = pm.get('display_ci') if isinstance(pm, dict) else None
-	                if isinstance(dci, (list, tuple)) and len(dci) == 2:
-	                    pm_ci_lo = float(dci[0])
-	                    pm_ci_hi = float(dci[1])
-	                    if not (math.isfinite(pm_ci_lo) and math.isfinite(pm_ci_hi)):
-	                        pm_ci_lo = None
-	                        pm_ci_hi = None
-	            except Exception:
-	                pm_ci_lo = None
-	                pm_ci_hi = None
+            conf = cert.get('confidence') or {}
+            conf_label = conf.get('label') if isinstance(conf, dict) else None
+            conf_label = str(conf_label).strip() if conf_label is not None else ''
+            conf_label = conf_label if conf_label else 'Unknown'
 
-	            # Estimate the effective PM threshold used by the tier policy.
-	            tier = ''
-	            try:
-	                pd_try = cert.get('policy_digest') or {}
-	                auto_try = cert.get('auto') or {}
-	                tier = str(pd_try.get('tier_policy_name') or auto_try.get('tier') or '').strip().lower()
-	            except Exception:
-	                tier = ''
+            pm = pm_block
+            pm_ratio = pm.get('ratio_vs_baseline') if isinstance(pm, dict) else None
+            pm_ci_lo = None
+            pm_ci_hi = None
+            try:
+                dci = pm.get('display_ci') if isinstance(pm, dict) else None
+                if isinstance(dci, (list, tuple)) and len(dci) == 2:
+                    pm_ci_lo = float(dci[0])
+                    pm_ci_hi = float(dci[1])
+                    if not (math.isfinite(pm_ci_lo) and math.isfinite(pm_ci_hi)):
+                        pm_ci_lo = None
+                        pm_ci_hi = None
+            except Exception:
+                pm_ci_lo = None
+                pm_ci_hi = None
 
-	            pm_threshold = None
-	            try:
-	                pol = cert.get('resolved_policy') or {}
-	                metrics_pol = pol.get('metrics', {}) if isinstance(pol, dict) else {}
-	                pm_pol = metrics_pol.get('pm_ratio', {}) if isinstance(metrics_pol, dict) else {}
-	                base = pm_pol.get('ratio_limit_base')
-	                hyst = pm_pol.get('hysteresis_ratio', 0.0)
-	                if base is not None:
-	                    pm_threshold = float(base) + float(hyst or 0.0)
-	            except Exception:
-	                pm_threshold = None
-	            if pm_threshold is None:
-	                tier_thresholds = {'conservative': 1.05, 'balanced': 1.10, 'aggressive': 1.20}
-	                base = tier_thresholds.get(tier, 1.10)
-	                pm_threshold = float(base) + 0.002
+            # Estimate the effective PM threshold used by the tier policy.
+            tier = ''
+            try:
+                pd_try = cert.get('policy_digest') or {}
+                auto_try = cert.get('auto') or {}
+                tier = str(pd_try.get('tier_policy_name') or auto_try.get('tier') or '').strip().lower()
+            except Exception:
+                tier = ''
 
-	            # "Clear" PM failure if CI lower bound is above threshold, or ratio is far above.
-	            pm_clear_fail = False
-	            pm_far_fail = False
-	            pm_far_margin = 0.03  # absolute ratio margin above threshold
-	            try:
-	                if pm_ci_lo is not None and pm_threshold is not None:
-	                    pm_clear_fail = float(pm_ci_lo) > float(pm_threshold)
-	            except Exception:
-	                pm_clear_fail = False
-	            try:
-	                if isinstance(pm_ratio, (int, float)) and math.isfinite(float(pm_ratio)):
-	                    pm_far_fail = float(pm_ratio) > (float(pm_threshold) + float(pm_far_margin))
-	            except Exception:
-	                pm_far_fail = False
+            pm_threshold = None
+            try:
+                pol = cert.get('resolved_policy') or {}
+                metrics_pol = pol.get('metrics', {}) if isinstance(pol, dict) else {}
+                pm_pol = metrics_pol.get('pm_ratio', {}) if isinstance(metrics_pol, dict) else {}
+                base = pm_pol.get('ratio_limit_base')
+                hyst = pm_pol.get('hysteresis_ratio', 0.0)
+                if base is not None:
+                    pm_threshold = float(base) + float(hyst or 0.0)
+            except Exception:
+                pm_threshold = None
+            if pm_threshold is None:
+                tier_thresholds = {'conservative': 1.05, 'balanced': 1.10, 'aggressive': 1.20}
+                base = tier_thresholds.get(tier, 1.10)
+                pm_threshold = float(base) + 0.002
 
-	            # Triage layer (PASS/REVIEW/FAIL) for shadow-mode style workflows.
-	            triage_reasons = []
-	            if not invariants_ok:
-	                triage_reasons.append('invariants_fail')
-	            if not spectral_ok:
-	                triage_reasons.append('spectral_fail')
-	            if not rmt_ok:
-	                triage_reasons.append('rmt_fail')
-	            if not pm_ok:
-	                triage_reasons.append('primary_metric_fail')
-	            if not drift_ok:
-	                triage_reasons.append('drift_fail')
-	            if guard_evaluated and not overhead_ok:
-	                triage_reasons.append('overhead_fail')
-	            if hyst_applied:
-	                triage_reasons.append('hysteresis_applied')
-	            if conf_label != 'High':
-	                triage_reasons.append(f'confidence_{conf_label.lower()}')
+            # "Clear" PM failure if CI lower bound is above threshold, or ratio is far above.
+            pm_clear_fail = False
+            pm_far_fail = False
+            pm_far_margin = 0.03  # absolute ratio margin above threshold
+            try:
+                if pm_ci_lo is not None and pm_threshold is not None:
+                    pm_clear_fail = float(pm_ci_lo) > float(pm_threshold)
+            except Exception:
+                pm_clear_fail = False
+            try:
+                if isinstance(pm_ratio, (int, float)) and math.isfinite(float(pm_ratio)):
+                    pm_far_fail = float(pm_ratio) > (float(pm_threshold) + float(pm_far_margin))
+            except Exception:
+                pm_far_fail = False
 
-	            triage = 'REVIEW'
-	            if (not invariants_ok) or (not spectral_ok) or (not rmt_ok):
-	                triage = 'FAIL'
-	            elif (not pm_ok) and (pm_clear_fail or pm_far_fail):
-	                triage = 'FAIL'
-	                triage_reasons.append('primary_metric_clear' if pm_clear_fail else 'primary_metric_far')
-	            elif overall_pass and conf_label == 'High' and not hyst_applied:
-	                triage = 'PASS'
-	                triage_reasons = []
+            # Triage layer (PASS/REVIEW/FAIL) for shadow-mode style workflows.
+            triage_reasons = []
+            if pm_degraded:
+                triage_reasons.append('primary_metric_degraded')
+            if not invariants_ok:
+                triage_reasons.append('invariants_fail')
+            if not spectral_ok:
+                triage_reasons.append('spectral_fail')
+            if not rmt_ok:
+                triage_reasons.append('rmt_fail')
+            if not pm_ok:
+                triage_reasons.append('primary_metric_fail')
+            if not drift_ok:
+                triage_reasons.append('drift_fail')
+            if guard_evaluated and not overhead_ok:
+                triage_reasons.append('overhead_fail')
+            if hyst_applied:
+                triage_reasons.append('hysteresis_applied')
+            if conf_label != 'High':
+                triage_reasons.append(f'confidence_{conf_label.lower()}')
 
-	            triage_reason = 'strict_pass' if triage == 'PASS' else ('|'.join(triage_reasons) if triage_reasons else 'unspecified')
+            triage = 'REVIEW'
+            if pm_degraded or (not invariants_ok) or (not spectral_ok) or (not rmt_ok):
+                triage = 'FAIL'
+            elif (not pm_ok) and (pm_clear_fail or pm_far_fail):
+                triage = 'FAIL'
+                triage_reasons.append('primary_metric_clear' if pm_clear_fail else 'primary_metric_far')
+            elif overall_pass and conf_label == 'High' and not hyst_applied:
+                triage = 'PASS'
+                triage_reasons = []
 
-	            pd = cert.get('policy_digest') or {}
-	            meta = cert.get('meta') or {}
-	            det = meta.get('determinism') or {}
+            triage_reason = 'strict_pass' if triage == 'PASS' else ('|'.join(triage_reasons) if triage_reasons else 'unspecified')
 
-	            invar_rows.append({
-	                'model': model_dir.name,
-	                'experiment': parts[0] if parts else 'unknown',
-	                'run': parts[1] if len(parts) > 1 else '',
-	                'edit_type': parts[0] if parts else 'unknown',
-	                'pm_ratio': pm_ratio,
-	                'pm_ci_low': pm_ci_lo,
-	                'pm_ci_high': pm_ci_hi,
-	                'pm_threshold': pm_threshold,
-	                'pm_acceptable': v.get('primary_metric_acceptable'),
-	                'preview_final_drift_acceptable': v.get('preview_final_drift_acceptable'),
-	                'invariants_pass': v.get('invariants_pass'),
-	                'spectral_stable': v.get('spectral_stable'),
-	                'rmt_stable': v.get('rmt_stable'),
-	                'all_pass': all_pass,
-	                'overall_pass': overall_pass,
-	                'hysteresis_applied': v.get('hysteresis_applied'),
-	                'guard_overhead_acceptable': v.get('guard_overhead_acceptable'),
-	                'confidence_label': conf_label,
-	                'triage': triage,
-	                'triage_reason': triage_reason,
-	                'policy_digest_hash': pd.get('thresholds_hash'),
-	                'policy_digest_changed': pd.get('changed'),
-	                'determinism_level': det.get('level'),
-	                'determinism_profile': det.get('profile'),
-	                'determinism_requested': det.get('requested'),
+            pd = cert.get('policy_digest') or {}
+            meta = cert.get('meta') or {}
+            det = meta.get('determinism') or {}
+
+            invar_rows.append({
+                'model': model_dir.name,
+                'experiment': parts[0] if parts else 'unknown',
+                'run': parts[1] if len(parts) > 1 else '',
+                'edit_type': parts[0] if parts else 'unknown',
+                'pm_ratio': pm_ratio,
+                'pm_ci_low': pm_ci_lo,
+                'pm_ci_high': pm_ci_hi,
+                'pm_threshold': pm_threshold,
+                'pm_acceptable': v.get('primary_metric_acceptable'),
+                'pm_degraded': pm_degraded,
+                'pm_degraded_reason': pm_degraded_reason,
+                'preview_final_drift_acceptable': v.get('preview_final_drift_acceptable'),
+                'invariants_pass': v.get('invariants_pass'),
+                'spectral_stable': v.get('spectral_stable'),
+                'rmt_stable': v.get('rmt_stable'),
+                'all_pass': all_pass,
+                'overall_pass': overall_pass,
+                'hysteresis_applied': v.get('hysteresis_applied'),
+                'guard_overhead_acceptable': v.get('guard_overhead_acceptable'),
+                'confidence_label': conf_label,
+                'triage': triage,
+                'triage_reason': triage_reason,
+                'policy_digest_hash': pd.get('thresholds_hash'),
+                'policy_digest_changed': pd.get('changed'),
+                'determinism_level': det.get('level'),
+                'determinism_profile': det.get('profile'),
+                'determinism_requested': det.get('requested'),
             })
         except Exception as e:
             print(f"Error processing {cert_file}: {e}")
@@ -3850,6 +3858,14 @@ results = {
     'calibration': cal_summary,
     'pm_correlation': {},
 }
+def as_bool(val):
+    if val is None: return False
+    if isinstance(val, bool): return val
+    if isinstance(val, str): return val.strip().lower() in ('true', '1', 'yes', 'on')
+    return bool(val)
+
+degraded_edits = 0
+degraded_runs = []
 categories = defaultdict(int)
 # Track (delta_eval, pm_ratio) pairs for correlation analysis
 	pm_points = []
@@ -3911,6 +3927,12 @@ categories = defaultdict(int)
             str(r.get('all_pass', '')).lower() == 'false' or r.get('all_pass') is False
             for r in invar_results
         )
+        degraded_present = any(as_bool(r.get('pm_degraded')) for r in invar_results)
+        if degraded_present:
+            degraded_edits += 1
+            degraded_runs.extend([f"{model}/{r.get('run', 'unknown')}" for r in invar_results if as_bool(r.get('pm_degraded'))])
+        if degraded_present:
+            invar_flagged = True
 
         # Aggregate primary-metric ratio for this edit (continuous InvarLock signal)
         pm_vals = []
@@ -4038,6 +4060,7 @@ print(f"Accuracy: {accuracy:.0%}")
 print(f"Precision: {precision:.0%}")
 print(f"Recall: {recall:.0%}")
 print(f"F1 Score: {f1:.0%}")
+print(f"Degraded edits: {degraded_edits}")
 	print(f"Error Detection: {err_detected}/{err_total} ({err_rate:.0%})")
 	print(f"Triage (edits): PASS={triage_counts.get('PASS', 0)} REVIEW={triage_counts.get('REVIEW', 0)} FAIL={triage_counts.get('FAIL', 0)}")
 	print(f"Confidence Score: {confidence_score:.1f}/100 ({confidence_level})")
@@ -4052,6 +4075,8 @@ print(f"F1 Score: {f1:.0%}")
 	    'confidence_score': confidence_score,
 	    'confidence_level': confidence_level,
 	    'triage_counts': dict(triage_counts),
+	    'degraded_edits': degraded_edits,
+	    'degraded_runs': degraded_runs,
 	    'total_tests': total,
 	    'models_tested': len(results['models']),
 	    'accuracy_ci': acc_ci,
@@ -4104,6 +4129,8 @@ total_tests = summary.get('total_tests', 0)
 	triage_pass = triage_counts.get('PASS', 0)
 	triage_review = triage_counts.get('REVIEW', 0)
 	triage_fail = triage_counts.get('FAIL', 0)
+degraded = summary.get('degraded_edits', 0) or 0
+degraded_runs = summary.get('degraded_runs', []) or []
 
 gpu_count = os.environ.get("NUM_GPUS", "").strip() or "unknown"
 gpu_mem = os.environ.get("GPU_MEMORY_GB", "").strip() or "180"
@@ -4112,8 +4139,13 @@ platform_line = f"{gpu_count}x NVIDIA B200 {gpu_mem}GB SXM6"
 platform_tag = f"B200_{gpu_mem}GB_x{gpu_count}"
 
 phase0_pass = accuracy >= 0.6 and err_rate >= 0.8
+if degraded > 0:
+    phase0_pass = False
 
-if phase0_pass and accuracy >= 0.8 and confidence_score >= 75:
+if degraded > 0:
+    verdict = "PHASE0_DEGRADED"
+    verdict_confidence = "LOW"
+elif phase0_pass and accuracy >= 0.8 and confidence_score >= 75:
     verdict = "PHASE0_VALIDATED"
     verdict_confidence = "HIGH"
 elif phase0_pass and confidence_score >= 60:
@@ -4142,6 +4174,7 @@ report = f'''
 	--------------------------------------------------------------------------------
 	     CONFIDENCE SCORE:  {confidence_score:.1f}/100 ({confidence_level})
 	     TRIAGE (edits):    PASS={triage_pass} REVIEW={triage_review} FAIL={triage_fail}
+	     DEGRADED CERTS:    {degraded}
 	--------------------------------------------------------------------------------
 	     VERDICT: {verdict}
 	     VERDICT CONFIDENCE: {verdict_confidence}
@@ -4159,6 +4192,8 @@ PLATFORM: {platform_line}
 
 if verdict == "PHASE0_VALIDATED":
     report += "RESULT: InvarLock Phase 0 VALIDATED on B200 cluster.\n"
+elif verdict == "PHASE0_DEGRADED":
+    report += f"RESULT: Phase 0 degraded. {degraded} certificate(s) reported degraded primary metrics. See runs: {', '.join(degraded_runs) if degraded_runs else 'n/a'}\n"
 else:
     report += f"RESULT: Phase 0 validation failed. Accuracy: {accuracy:.0%}, Error Detection: {err_rate:.0%}\n"
 
@@ -4174,6 +4209,7 @@ with open(reports_dir / "final_verdict.txt", 'w') as f:
 	        'metrics': {'accuracy': accuracy, 'precision': precision, 'recall': recall, 'f1_score': f1, 'error_detection_rate': err_rate},
 	        'confidence': {'score': confidence_score, 'level': confidence_level},
 	        'triage': {'pass': triage_pass, 'review': triage_review, 'fail': triage_fail},
+	        'degraded': {'count': degraded, 'runs': degraded_runs},
 	        'phase0_pass': phase0_pass,
 	        'platform': platform_tag,
 	        'models_tested': models_tested,

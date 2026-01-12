@@ -50,34 +50,32 @@ _get_model_size_from_name() {
 _get_model_invarlock_config_fallback() {
     local model_size="$1"  # 7, 13, 30, 40, 70, moe
 
-    # Conservative defaults that won't OOM on B200 180GB
-    # These MUST match or be more conservative than main script's get_model_invarlock_config()
+    # Conservative defaults that satisfy CI pairing/coverage floors on B200.
+    # Use zero overlap (stride == seq_len) and ≥180 windows to avoid E001/E005
+    # if workers start without the main B200 wrapper.
     case "${model_size}" in
         "7")
-            echo "2048:1024:64:64:96"
+            echo "2048:2048:192:192:96"
             ;;
         "13")
-            echo "1536:768:48:48:64"
+            echo "1536:1536:192:192:64"
             ;;
         "30")
-            echo "1024:512:40:40:48"
+            echo "1024:1024:192:192:48"
             ;;
         "40")
-            echo "1024:512:36:36:32"
+            echo "1024:1024:192:192:32"
             ;;
         "moe")
-            echo "1024:512:40:40:24"
+            echo "1024:1024:192:192:24"
             ;;
         "70"|"72")
-            # ULTRA-CONSERVATIVE for 70B+ models.
-            # These settings minimize KV cache; the harness also sets
-            # INVARLOCK_SKIP_OVERHEAD_CHECK=1 for large models to avoid double-loading
-            # baseline+edited models during overhead measurement.
-            echo "128:64:8:8:2"
+            # Minimal sequence length to cap KV cache, but still meet coverage floors.
+            echo "128:128:192:192:2"
             ;;
         *)
             # Safe default
-            echo "1024:512:40:40:32"
+            echo "1024:1024:192:192:32"
             ;;
     esac
 }
