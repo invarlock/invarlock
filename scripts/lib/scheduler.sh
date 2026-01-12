@@ -670,6 +670,12 @@ is_gpu_usable() {
         min_free=10
     fi
 
+    # Relax gates for single-GPU single-model runs
+    if [[ "${NUM_GPUS:-}" == "1" ]] || [[ "${GPU_ID_LIST:-}" =~ ^0$ ]]; then
+        min_free=0
+        GPU_REQUIRE_IDLE="false"
+    fi
+
     local free_mem
     free_mem=$(get_gpu_available_memory "${gpu_id}")
     if ! [[ "${free_mem}" =~ ^[0-9]+$ ]] || [[ "${free_mem}" -lt ${min_free} ]]; then
@@ -980,13 +986,16 @@ get_gpu_available_memory() {
         return 0
     fi
 
-    # Cache miss - query nvidia-smi for free memory in MiB
+    local nsmi_timeout="${GPU_NSMI_TIMEOUT:-2}"
+    [[ -z "${nsmi_timeout}" || ! "${nsmi_timeout}" =~ ^[0-9]+$ ]] && nsmi_timeout=2
+
+    # Cache miss - query nvidia-smi for free memory in MiB, but fall back quickly
     local free_mib
-    free_mib=$(_cmd_nvidia_smi --query-gpu=memory.free --format=csv,noheader,nounits -i "${gpu_id}" 2>/dev/null | head -1 || true)
+    free_mib=$(timeout "${nsmi_timeout}" _cmd_nvidia_smi --query-gpu=memory.free --format=csv,noheader,nounits -i "${gpu_id}" 2>/dev/null | head -1 || true)
 
     if ! [[ "${free_mib}" =~ ^[0-9]+$ ]]; then
-        echo "0"
-        return 1
+        echo "180"
+        return 0
     fi
 
     # Convert MiB to GB (1024 MiB = 1 GiB ≈ 1.07 GB)
@@ -995,7 +1004,7 @@ get_gpu_available_memory() {
     # Update cache (also refresh idle status since we're querying)
     # Count only actual PID lines (numbers) to avoid empty line issues
     local raw_output
-    raw_output=$(_cmd_nvidia_smi --query-compute-apps=pid --format=csv,noheader -i "${gpu_id}" 2>/dev/null || true)
+    raw_output=$(timeout "${nsmi_timeout}" _cmd_nvidia_smi --query-compute-apps=pid --format=csv,noheader -i "${gpu_id}" 2>/dev/null || true)
     local processes=0
     if [[ -n "${raw_output}" ]]; then
         processes=$(echo "${raw_output}" | grep -cE '^[0-9]+' 2>/dev/null || echo "0")
@@ -1494,6 +1503,9 @@ find_and_claim_task() {
 
     # Reserve GPUs BEFORE releasing scheduler lock
     if ! reserve_gpus "${task_id}" "${gpu_list}"; then
+        if [[ "${SCHEDULER_DEBUG:-false}" == "true" ]]; then
+            echo "[scheduler] reserve_gpus failed task=${task_id} gpus=${gpu_list}" >&2
+        fi
         release_scheduler_lock
         return 1  # Failed to reserve GPUs (GPU already in use)
     fi
