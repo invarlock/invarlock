@@ -1113,18 +1113,27 @@ def calibrate_drift(recs):
             except Exception:
                 pass
 
+    ratios = [r for r in ratios if math.isfinite(r)]
     if len(ratios) < 2:
+        base = ratios[0] if ratios else 1.0
         return {
-            "mean": 1.0,
+            "mean": float(base),
             "std": 0.0,
-            "min": min(ratios) if ratios else 1.0,
-            "max": max(ratios) if ratios else 1.0,
+            "min": float(base),
+            "max": float(base),
             "suggested_band": [0.95, 1.05],
             "band_compatible": True,
         }
 
-    mean = statistics.mean(ratios)
-    std = statistics.stdev(ratios) if len(ratios) > 1 else 0.0
+    try:
+        mean = sum(ratios) / len(ratios)
+    except Exception:
+        mean = 1.0
+    try:
+        var = sum((r - mean) ** 2 for r in ratios) / max(len(ratios), 1)
+        std = math.sqrt(var) if math.isfinite(var) else 0.0
+    except Exception:
+        std = 0.0
     margin = max(2 * std, 0.05)
     band = [round(mean - margin, 3), round(mean + margin, 3)]
     return {
@@ -1805,9 +1814,18 @@ def apply_pruning(model, ratio, scope):
             continue
         if param.dim() < 2:
             continue
-        threshold = torch.quantile(param.abs().flatten(), ratio)
-        mask = param.abs() > threshold
-        param.data = param * mask
+        # quantile only supports float32/float64 reliably, so cast to float before computing threshold
+        param_abs = param.detach().float().abs()
+        flat = param_abs.view(-1)
+        if flat.numel() > 10_000_000:
+            sample_size = min(1_000_000, flat.numel())
+            idx = torch.randint(0, flat.numel(), (sample_size,), device=flat.device)
+            flat_for_quantile = flat[idx]
+        else:
+            flat_for_quantile = flat
+        threshold = torch.quantile(flat_for_quantile, ratio)
+        mask = param_abs > threshold
+        param.data = (param * mask).to(param.dtype)
     return edited
 
 def apply_lowrank(model, rank, scope):
@@ -2376,6 +2394,11 @@ PRESET_YAML
             --cert-out "${cert_dir}" \
             --preset "${abs_preset_file}" >> "${log_file}" 2>&1
     ) || exit_code=$?
+
+    if [[ ${exit_code} -eq 3 && "${INVARLOCK_SKIP_OVERHEAD_CHECK:-}" == "1" ]]; then
+        echo "  Certify returned exit 3; treating as success because SKIP_OVERHEAD_CHECK=1" >> "${log_file}"
+        exit_code=0
+    fi
 
     # Find and copy certificate (only the canonical cert)
     if [[ ! -f "${cert_file}" ]]; then
