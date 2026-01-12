@@ -2778,9 +2778,13 @@ def calibrate_drift(recs):
             "band_compatible": True,
         }
 
-    mean = statistics.fmean(ratios)
     try:
-        std = statistics.pstdev(ratios)
+        mean = sum(ratios) / len(ratios)
+    except Exception:
+        mean = 1.0
+    try:
+        var = sum((r - mean) ** 2 for r in ratios) / max(len(ratios), 1)
+        std = math.sqrt(var) if math.isfinite(var) else 0.0
     except Exception:
         std = 0.0
     margin = max(2 * std, 0.05)
