@@ -2748,55 +2748,65 @@ if len(records) < 2:
     print(f"WARNING: Only {len(records)} calibration record(s) found (expected >= 2)")
 
 def calibrate_drift(recs):
-    ratios = []
-    for rec in recs:
-        pm = rec.get("primary_metric", {}) or {}
-        ratio = pm.get("ratio_vs_baseline") or pm.get("drift")
-        if ratio is None:
-            preview = pm.get("preview")
-            final = pm.get("final")
-            if preview is not None and final is not None:
+    try:
+        ratios = []
+        for rec in recs:
+            pm = rec.get("primary_metric", {}) or {}
+            ratio = pm.get("ratio_vs_baseline") or pm.get("drift")
+            if ratio is None:
+                preview = pm.get("preview")
+                final = pm.get("final")
+                if preview is not None and final is not None:
+                    try:
+                        ratio = float(final) / max(float(preview), 1e-10)
+                    except Exception:
+                        ratio = None
+            if ratio is not None:
                 try:
-                    ratio = float(final) / max(float(preview), 1e-10)
+                    ratios.append(float(ratio))
                 except Exception:
-                    ratio = None
-        if ratio is not None:
-            try:
-                ratios.append(float(ratio))
-            except Exception:
-                pass
+                    pass
 
-    ratios = [r for r in ratios if math.isfinite(r)]
-    if len(ratios) < 2:
-        base = ratios[0] if ratios else 1.0
+        ratios = [r for r in ratios if math.isfinite(r)]
+        if len(ratios) < 2:
+            base = ratios[0] if ratios else 1.0
+            return {
+                "mean": float(base),
+                "std": 0.0,
+                "min": float(base),
+                "max": float(base),
+                "suggested_band": [0.95, 1.05],
+                "band_compatible": True,
+            }
+
+        try:
+            mean = sum(ratios) / len(ratios)
+        except Exception:
+            mean = 1.0
+        try:
+            var = sum((r - mean) ** 2 for r in ratios) / max(len(ratios), 1)
+            std = math.sqrt(var) if math.isfinite(var) else 0.0
+        except Exception:
+            std = 0.0
+        margin = max(2 * std, 0.05)
+        band = [round(mean - margin, 3), round(mean + margin, 3)]
         return {
-            "mean": float(base),
+            "mean": round(mean, 4),
+            "std": round(std, 4),
+            "min": round(min(ratios), 4),
+            "max": round(max(ratios), 4),
+            "suggested_band": band,
+            "band_compatible": 0.95 <= mean <= 1.05,
+        }
+    except Exception:
+        return {
+            "mean": 1.0,
             "std": 0.0,
-            "min": float(base),
-            "max": float(base),
+            "min": 1.0,
+            "max": 1.0,
             "suggested_band": [0.95, 1.05],
             "band_compatible": True,
         }
-
-    try:
-        mean = sum(ratios) / len(ratios)
-    except Exception:
-        mean = 1.0
-    try:
-        var = sum((r - mean) ** 2 for r in ratios) / max(len(ratios), 1)
-        std = math.sqrt(var) if math.isfinite(var) else 0.0
-    except Exception:
-        std = 0.0
-    margin = max(2 * std, 0.05)
-    band = [round(mean - margin, 3), round(mean + margin, 3)]
-    return {
-        "mean": round(mean, 4),
-        "std": round(std, 4),
-        "min": round(min(ratios), 4),
-        "max": round(max(ratios), 4),
-        "suggested_band": band,
-        "band_compatible": 0.95 <= mean <= 1.05,
-    }
 
 def _spectral_margin(tier_name):
     return 0.10 if tier_name == "conservative" else 0.05
