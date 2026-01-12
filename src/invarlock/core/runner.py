@@ -1279,8 +1279,36 @@ class CoreRunner:
                 final_data, final_limit, preview_summary["num_batches"]
             )
 
-            preview_log_losses = preview_summary["log_losses"]
-            final_log_losses = final_summary["log_losses"]
+            preview_raw_losses = preview_summary["log_losses"]
+            final_raw_losses = final_summary["log_losses"]
+
+            preview_log_losses = [
+                float(loss) for loss in preview_raw_losses if math.isfinite(loss)
+            ]
+            final_log_losses = [
+                float(loss) for loss in final_raw_losses if math.isfinite(loss)
+            ]
+            if len(preview_log_losses) != len(preview_raw_losses):
+                self._log_event(
+                    "eval",
+                    "non_finite_preview_losses_filtered",
+                    LogLevel.WARNING,
+                    {
+                        "total": len(preview_raw_losses),
+                        "filtered": len(preview_raw_losses) - len(preview_log_losses),
+                    },
+                )
+            if len(final_log_losses) != len(final_raw_losses):
+                self._log_event(
+                    "eval",
+                    "non_finite_final_losses_filtered",
+                    LogLevel.WARNING,
+                    {
+                        "total": len(final_raw_losses),
+                        "filtered": len(final_raw_losses) - len(final_log_losses),
+                    },
+                )
+
             preview_tokens_ct = preview_summary["total_tokens"]
             final_tokens_ct = final_summary["total_tokens"]
             preview_batches_ct = preview_summary["num_batches"]
@@ -1347,14 +1375,29 @@ class CoreRunner:
             delta_mean_log = final_mean_log - preview_mean_log
             pm_ratio = math.exp(delta_mean_log)
 
-            if not (math.isfinite(delta_mean_log) and math.isfinite(pm_ratio)):
-                raise RuntimeError("Invalid perplexity ratio or delta")
+            pm_invalid = False
+            try:
+                if not (math.isfinite(delta_mean_log) and math.isfinite(pm_ratio)):
+                    raise RuntimeError("non_finite_primary_metric")
 
-            expected_ratio = math.exp(delta_mean_log)
-            if abs(pm_ratio - expected_ratio) > 1e-6:
-                raise RuntimeError(
-                    "Primary-metric ratio mismatch with exp(mean ΔlogNLL)"
+                expected_ratio = math.exp(delta_mean_log)
+                if abs(pm_ratio - expected_ratio) > 1e-6:
+                    raise RuntimeError("primary_metric_ratio_mismatch")
+            except Exception as exc:
+                pm_invalid = True
+                self._log_event(
+                    "eval",
+                    "primary_metric_invalid",
+                    LogLevel.WARNING,
+                    {
+                        "pm_preview": float(pm_preview),
+                        "pm_final": float(pm_final),
+                        "delta_mean_log": float(delta_mean_log),
+                        "pm_ratio": float(pm_ratio),
+                        "error": str(exc),
+                    },
                 )
+                # Preserve downstream reporting; keep NaNs but mark degraded
 
             if bootstrap_enabled and preview_log_losses:
                 preview_log_ci = compute_logloss_ci(
@@ -1447,19 +1490,64 @@ class CoreRunner:
                 degenerate_reason = "no_variation"
 
             if degenerate_delta:
+                pm_invalid = True
                 self._log_event(
                     "eval",
                     "degenerate_delta_samples",
-                    LogLevel.ERROR,
+                    LogLevel.WARNING,
                     {
                         "reason": degenerate_reason,
                         "sample_count": len(delta_samples),
                     },
                 )
-                if profile_label in {"ci", "release"}:
-                    raise RuntimeError(
-                        f"Degenerate paired ΔlogNLL distribution ({degenerate_reason})"
+                # Preserve window emission by using a neutral delta when no pairs exist
+                delta_samples = [0.0]
+                delta_weights = [1.0]
+                degenerate_delta = False
+
+            needs_pm_fallback = (not math.isfinite(pm_preview)) or (
+                not math.isfinite(pm_final)
+            )
+            needs_delta_fallback = (not math.isfinite(delta_mean_log)) or (
+                not math.isfinite(pm_ratio)
+            )
+
+            degraded_reason: str | None = None
+            if needs_pm_fallback:
+                degraded_reason = "non_finite_pm"
+            elif needs_delta_fallback:
+                degraded_reason = "non_finite_delta"
+            elif degenerate_reason:
+                degraded_reason = f"degenerate_delta:{degenerate_reason}"
+            elif pm_invalid:
+                degraded_reason = "primary_metric_invalid"
+
+            if needs_pm_fallback or needs_delta_fallback:
+                pm_invalid = True
+                pm_fallback = (
+                    pm_preview
+                    if math.isfinite(pm_preview) and pm_preview > 0
+                    else pm_final
+                )
+                if not (math.isfinite(pm_fallback) and pm_fallback > 0):
+                    pm_fallback = 1.0
+
+                if needs_pm_fallback:
+                    pm_preview = (
+                        pm_preview
+                        if math.isfinite(pm_preview) and pm_preview > 0
+                        else pm_fallback
                     )
+                    pm_final = (
+                        pm_final
+                        if math.isfinite(pm_final) and pm_final > 0
+                        else pm_fallback
+                    )
+                if needs_delta_fallback:
+                    if not math.isfinite(delta_mean_log):
+                        delta_mean_log = 0.0
+                    if not math.isfinite(pm_ratio):
+                        pm_ratio = 1.0
 
             def _hash_tokens(tokens: list[int]) -> bytes:
                 if not tokens:
@@ -1827,8 +1915,11 @@ class CoreRunner:
         metrics = {
             "primary_metric": {
                 "kind": pm_kind,
-                "preview": float(pm_preview),
-                "final": float(pm_final),
+                "preview": float(pm_preview) if math.isfinite(pm_preview) else None,
+                "final": float(pm_final) if math.isfinite(pm_final) else None,
+                "invalid": bool(pm_invalid),
+                "degraded": bool(pm_invalid or degraded_reason),
+                "degraded_reason": degraded_reason,
             },
             "logloss_preview": float(preview_mean_log),
             "logloss_final": float(final_mean_log),
