@@ -2798,7 +2798,8 @@ def calibrate_drift(recs):
             "suggested_band": band,
             "band_compatible": 0.95 <= mean <= 1.05,
         }
-    except Exception:
+    except Exception as e:
+        print(f"ERROR: failed to compute drift stats: {e}")
         return {
             "mean": 1.0,
             "std": 0.0,
