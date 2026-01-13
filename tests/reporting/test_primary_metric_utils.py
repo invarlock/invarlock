@@ -155,6 +155,32 @@ def test_attach_primary_metric_marks_nonfinite_as_degraded():
     assert pm["degraded_reason"] == "non_finite_pm"
 
 
+def test_attach_primary_metric_skips_ratio_nan_without_baseline():
+    certificate: dict[str, object] = {}
+    report = {
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 1.2,
+                "final": 1.2,
+                "ratio_vs_baseline": float("nan"),
+            }
+        }
+    }
+
+    attach_primary_metric(
+        certificate,
+        report,
+        baseline_raw=None,
+        baseline_ref=None,
+        ppl_analysis=None,
+    )
+
+    pm = certificate["primary_metric"]
+    assert pm["degraded"] is False
+    assert "degraded_reason" not in pm
+
+
 def test_attach_primary_metric_retries_window_computation(monkeypatch):
     certificate: dict[str, object] = {}
     report = {"metrics": {"loss_type": "s2s"}}
