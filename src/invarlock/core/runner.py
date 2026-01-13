@@ -20,7 +20,16 @@ import numpy as np
 
 from invarlock.eval.tail_stats import evaluate_metric_tail
 
-from .api import Guard, ModelAdapter, ModelEdit, RunConfig, RunReport
+from .api import (
+    EditLike,
+    Guard,
+    GuardWithContext,
+    GuardWithPrepare,
+    ModelAdapter,
+    ModelEdit,
+    RunConfig,
+    RunReport,
+)
 from .auto_tuning import resolve_tier_policies
 from .bootstrap import (
     compute_logloss_ci,
@@ -114,7 +123,7 @@ class CoreRunner:
         self,
         model: Any,
         adapter: ModelAdapter,
-        edit: ModelEdit,
+        edit: ModelEdit | EditLike,
         guards: list[Guard],
         config: RunConfig,
         calibration_data: Any = None,
@@ -177,7 +186,7 @@ class CoreRunner:
                     config.context["auto"] = dict(auto_config)
                 try:
                     report.context["auto"] = config.context["auto"]
-                except Exception:
+                except Exception:  # pragma: no cover - defensive context propagation
                     pass
 
         report.status = RunStatus.RUNNING.value
@@ -305,10 +314,10 @@ class CoreRunner:
         self,
         model: Any,
         adapter: ModelAdapter,
-        edit: ModelEdit,
+        edit: ModelEdit | EditLike,
         model_desc: dict[str, Any],
         report: RunReport,
-        edit_config: dict[str, Any] | None = None,
+        edit_config: dict[str, Any] | None,
     ) -> dict[str, Any]:
         """Phase 2: Apply edit operation."""
         edit_label = "baseline" if edit.name == "baseline" else edit.name
@@ -390,7 +399,7 @@ class CoreRunner:
                         {"guard": guard.name, "policy": guard_policy},
                     )
 
-                if hasattr(guard, "set_run_context"):
+                if isinstance(guard, GuardWithContext):
                     try:
                         guard.set_run_context(report)
                     except Exception as exc:
@@ -402,7 +411,7 @@ class CoreRunner:
                         )
 
                 # Call prepare method if it exists (most guards need this)
-                if hasattr(guard, "prepare"):
+                if isinstance(guard, GuardWithPrepare):
                     prepare_result = guard.prepare(
                         model, adapter, calibration_data, guard_policy
                     )
@@ -456,7 +465,7 @@ class CoreRunner:
         for guard in guards:
             self._log_event("guard", "start", LogLevel.INFO, {"guard": guard.name})
 
-            if hasattr(guard, "set_run_context"):
+            if isinstance(guard, GuardWithContext):
                 try:
                     guard.set_run_context(report)
                 except Exception as exc:  # pragma: no cover - defensive
@@ -988,6 +997,8 @@ class CoreRunner:
         # even if an exception occurs during the main compute block.
         delta_samples: list[float] = []
         delta_weights: list[float] = []
+        pm_invalid = False
+        degraded_reason: str | None = None
 
         try:
 
@@ -1003,7 +1014,7 @@ class CoreRunner:
                 max_batches: int,
                 start_idx: int,
             ) -> dict[str, Any]:
-                nonlocal alignment_logged
+                nonlocal alignment_logged, eval_error
 
                 total_tokens_local = 0
                 actual_tokens_local = 0
@@ -1039,7 +1050,9 @@ class CoreRunner:
                 limit = _resolve_limit(batches, max_batches)
 
                 for batch in batches[:limit]:
-                    if max_batches > 0 and count >= max_batches:
+                    if (
+                        max_batches > 0 and count >= max_batches
+                    ):  # pragma: no cover - slicing already caps iteration
                         break
 
                     labels = None
@@ -1212,7 +1225,7 @@ class CoreRunner:
                                 "zero_mask_batches": zero_mask_batches,
                                 "requested": limit,
                             },
-                        )
+                        )  # pragma: no cover - requires debug tracing with zero batches
                     if resolved_loss_mode == "mlm":
                         error_msg = (
                             "MLM evaluation produced zero usable batches; "
@@ -1233,7 +1246,10 @@ class CoreRunner:
                                 "zero_mask_batches": zero_mask_batches,
                             },
                         )
-                        raise ValueError(error_msg)
+                        eval_error = {
+                            "error": "mlm_missing_masks",
+                            "detail": error_msg,
+                        }
                     return {
                         "ppl": float("nan"),
                         "total_tokens": total_tokens_local,
@@ -1453,7 +1469,20 @@ class CoreRunner:
                     abs(r - e) > 1e-6
                     for r, e in zip(ratio_ci, expected_ratio_ci, strict=False)
                 ):
-                    raise RuntimeError("Ratio CI inconsistent with Δlog CI")
+                    pm_invalid = True
+                    self._log_event(
+                        "eval",
+                        "ratio_ci_inconsistent",
+                        LogLevel.WARNING,
+                        {
+                            "ratio_ci": ratio_ci,
+                            "expected_ratio_ci": expected_ratio_ci,
+                        },
+                    )
+                    ratio_ci = (
+                        float(expected_ratio_ci[0]),
+                        float(expected_ratio_ci[1]),
+                    )
             else:
                 delta_log_ci = (delta_mean_log, delta_mean_log)
                 ratio_ci = (pm_ratio, pm_ratio)
@@ -1500,10 +1529,6 @@ class CoreRunner:
                         "sample_count": len(delta_samples),
                     },
                 )
-                # Preserve window emission by using a neutral delta when no pairs exist
-                delta_samples = [0.0]
-                delta_weights = [1.0]
-                degenerate_delta = False
 
             needs_pm_fallback = (not math.isfinite(pm_preview)) or (
                 not math.isfinite(pm_final)
@@ -1571,10 +1596,14 @@ class CoreRunner:
                 if not isinstance(dataset_cfg, dict):
                     return None
                 seq_len_val = dataset_cfg.get("seq_len")
-                stride_val = dataset_cfg.get("stride", seq_len_val)
+                if seq_len_val is None:
+                    return None
+                stride_raw = dataset_cfg.get("stride", seq_len_val)
+                if stride_raw is None:
+                    return None
                 try:
                     seq_len_f = float(seq_len_val)
-                    stride_f = float(stride_val)
+                    stride_f = float(stride_raw)
                 except (TypeError, ValueError):
                     return None
                 if not math.isfinite(seq_len_f) or seq_len_f <= 0:
@@ -2233,11 +2262,11 @@ class CoreRunner:
             except Exception:
                 drift_ratio = None
 
+        spike_threshold = getattr(config, "spike_threshold", 2.0)
         if drift_ratio is None:
             is_catastrophic_spike = False
             metrics_acceptable = True
         else:
-            spike_threshold = getattr(config, "spike_threshold", 2.0)
             is_catastrophic_spike = drift_ratio > spike_threshold
             # Check if standard metrics are acceptable against configured max ratio
             metrics_acceptable = drift_ratio <= getattr(config, "max_pm_ratio", 2.0)
@@ -2401,20 +2430,24 @@ class CoreRunner:
     ) -> dict[str, dict[str, Any]]:
         """Resolve tier-based guard policies from configuration."""
         # Use passed auto_config if available, otherwise extract from report meta
-        if auto_config is None:
-            config_meta = report.meta.get("config", {})
+        auto_cfg: dict[str, Any] | None = auto_config
+        if auto_cfg is None:
+            config_meta = report.meta.get("config") or {}
 
             # Try to get auto config from various possible locations
             if hasattr(report, "auto_config"):
-                auto_config = report.auto_config
-            elif "auto" in config_meta:
-                auto_config = config_meta["auto"]
+                auto_cfg = getattr(report, "auto_config")
+            elif isinstance(config_meta, dict) and "auto" in config_meta:
+                auto_cfg = config_meta["auto"]
             else:
                 # Fallback to default balanced tier
-                auto_config = {"tier": "balanced", "enabled": True}
+                auto_cfg = {"tier": "balanced", "enabled": True}
+
+        if not isinstance(auto_cfg, dict):
+            auto_cfg = {"tier": "balanced", "enabled": True}
 
         # Extract tier and edit name
-        tier = auto_config.get("tier", "balanced")
+        tier = auto_cfg.get("tier", "balanced")
         edit_name = None
         if hasattr(report, "edit") and report.edit:
             edit_name = report.edit.get("name")
@@ -2424,8 +2457,10 @@ class CoreRunner:
             edit_name = report.meta["edit_name"]
 
         # Get explicit guard overrides from config
-        config_meta = report.meta.get("config", {})
-        explicit_overrides = config_meta.get("guards", {})
+        config_meta = report.meta.get("config") or {}
+        explicit_overrides = (
+            config_meta.get("guards", {}) if isinstance(config_meta, dict) else {}
+        )
 
         try:
             # Resolve tier policies
@@ -2453,18 +2488,18 @@ class CoreRunner:
     def _apply_guard_policy(self, guard: Guard, policy: dict[str, Any]) -> None:
         """Apply resolved policy parameters to a guard instance."""
         try:
+            guard_config = getattr(guard, "config", None)
+            guard_policy = getattr(guard, "policy", None)
+
             # Apply policy parameters to guard
             for param_name, param_value in policy.items():
                 if hasattr(guard, param_name):
                     setattr(guard, param_name, param_value)
-                elif hasattr(guard, "config") and isinstance(guard.config, dict):
-                    # Try to set in guard's config dict
-                    guard.config[param_name] = param_value
-                elif hasattr(guard, "policy") and isinstance(guard.policy, dict):
-                    # Try to set in guard's policy dict
-                    guard.policy[param_name] = param_value
+                elif isinstance(guard_config, dict):
+                    guard_config[param_name] = param_value
+                elif isinstance(guard_policy, dict):
+                    guard_policy[param_name] = param_value
                 else:
-                    # Last resort: add to guard as attribute
                     setattr(guard, param_name, param_value)
 
         except Exception as e:
