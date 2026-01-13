@@ -3475,10 +3475,51 @@ output_dir = Path("${OUTPUT_DIR}")
 analysis_dir = output_dir / "analysis"
 analysis_dir.mkdir(exist_ok=True)
 
+skip_dirs = {
+    "logs",
+    "analysis",
+    "reports",
+    "presets",
+    "models",
+    "queue",
+    "workers",
+    "state",
+    "evals",
+    "certificates",
+}
+
+def _is_model_dir(path: Path) -> bool:
+    if not path.is_dir():
+        return False
+    if path.name in skip_dirs:
+        return False
+    if not (path / ".baseline_path").exists():
+        return False
+    return True
+
+
+def _pick_metric(task_results: dict):
+    for key in (
+        "acc_norm,none",
+        "acc,none",
+        "exact_match,none",
+        "acc_norm",
+        "acc",
+        "exact_match",
+    ):
+        if key in task_results and isinstance(task_results[key], (int, float)):
+            return key, float(task_results[key])
+    for key, value in task_results.items():
+        if "stderr" in key:
+            continue
+        if isinstance(value, (int, float)):
+            return key, float(value)
+    return None, None
+
 # Collect eval results
 eval_rows = []
 for model_dir in output_dir.iterdir():
-    if not model_dir.is_dir() or model_dir.name in ['logs', 'analysis', 'reports', 'presets', 'models']:
+    if not _is_model_dir(model_dir):
         continue
 
     evals_dir = model_dir / "evals"
@@ -3498,16 +3539,18 @@ for model_dir in output_dir.iterdir():
         try:
             data = json.loads(results_file.read_text())
             for task, task_results in data.get('results', {}).items():
-                for key in ['acc', 'acc_norm', 'exact_match']:
-                    if key in task_results:
-                        eval_rows.append({
-                            'model': model_dir.name,
-                            'edit_type': edit_type,
-                            'task': task,
-                            'metric': key,
-                            'value': task_results[key]
-                        })
-                        break
+                if not isinstance(task_results, dict):
+                    continue
+                metric_key, metric_val = _pick_metric(task_results)
+                if metric_key is None:
+                    continue
+                eval_rows.append({
+                    'model': model_dir.name,
+                    'edit_type': edit_type,
+                    'task': task,
+                    'metric': metric_key,
+                    'value': metric_val,
+                })
         except Exception as e:
             print(f"Error processing {results_file}: {e}")
 
@@ -3521,7 +3564,7 @@ if eval_rows:
 # Collect InvarLock results
 invar_rows = []
 for model_dir in output_dir.iterdir():
-    if not model_dir.is_dir() or model_dir.name in ['logs', 'analysis', 'reports', 'presets', 'models']:
+    if not _is_model_dir(model_dir):
         continue
 
     certs_dir = model_dir / "certificates"
@@ -3842,6 +3885,28 @@ from collections import defaultdict
 output_dir = Path("${OUTPUT_DIR}")
 analysis_dir = output_dir / "analysis"
 
+skip_dirs = {
+    "logs",
+    "analysis",
+    "reports",
+    "presets",
+    "models",
+    "queue",
+    "workers",
+    "state",
+    "evals",
+    "certificates",
+}
+
+def _is_model_dir(path: Path) -> bool:
+    if not path.is_dir():
+        return False
+    if path.name in skip_dirs:
+        return False
+    if not (path / ".baseline_path").exists():
+        return False
+    return True
+
 eval_data = defaultdict(dict)
 eval_csv = analysis_dir / "eval_results.csv"
 if eval_csv.exists():
@@ -3884,12 +3949,12 @@ degraded_edits = 0
 degraded_runs = []
 categories = defaultdict(int)
 # Track (delta_eval, pm_ratio) pairs for correlation analysis
-	pm_points = []
-	triage_counts = defaultdict(int)
+pm_points = []
+triage_counts = defaultdict(int)
 
-	for model_dir in output_dir.iterdir():
-	    if not model_dir.is_dir() or model_dir.name in ['logs', 'analysis', 'reports', 'presets', 'models']:
-	        continue
+for model_dir in output_dir.iterdir():
+    if not _is_model_dir(model_dir):
+        continue
 
     model = model_dir.name
     results['models'][model] = {}
