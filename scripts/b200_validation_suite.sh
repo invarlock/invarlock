@@ -3628,6 +3628,22 @@ for model_dir in output_dir.iterdir():
             except Exception:
                 pm_far_fail = False
 
+            # Derive degradation if fields are missing but PM is non-finite
+            try:
+                prev_val = pm.get('preview')
+                fin_val = pm.get('final')
+                ratio_val = pm_ratio
+                def _nonfinite(v):
+                    try:
+                        return not (isinstance(v, (int, float)) and math.isfinite(float(v)))
+                    except Exception:
+                        return True
+                if not pm_degraded and (_nonfinite(prev_val) or _nonfinite(fin_val) or _nonfinite(ratio_val)):
+                    pm_degraded = True
+                    pm_degraded_reason = pm_degraded_reason or 'non_finite_pm'
+            except Exception:
+                pass
+
             # Triage layer (PASS/REVIEW/FAIL) for shadow-mode style workflows.
             triage_reasons = []
             if pm_degraded:
