@@ -17,7 +17,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
 
 class ModelAdapter(ABC):
@@ -88,6 +88,15 @@ class ModelEdit(ABC):
         pass
 
 
+@runtime_checkable
+class EditLike(Protocol):
+    name: str
+
+    def can_edit(self, model_desc: dict[str, Any]) -> bool: ...
+
+    def apply(self, model: Any, adapter: ModelAdapter, **kwargs) -> dict[str, Any]: ...
+
+
 class Guard(ABC):
     """
     Abstract interface for safety guards.
@@ -114,6 +123,37 @@ class Guard(ABC):
             Dict with validation results and status
         """
         pass
+
+
+@runtime_checkable
+class GuardWithContext(Protocol):
+    def set_run_context(self, report: Any) -> None: ...
+
+
+@runtime_checkable
+class GuardWithPrepare(Protocol):
+    def prepare(
+        self,
+        model: Any,
+        adapter: ModelAdapter,
+        calib: Any,
+        policy_config: dict[str, Any],
+    ) -> dict[str, Any]: ...
+
+
+@runtime_checkable
+class GuardWithBeforeEdit(Protocol):
+    def before_edit(self, model: Any) -> Any: ...
+
+
+@runtime_checkable
+class GuardWithAfterEdit(Protocol):
+    def after_edit(self, model: Any) -> Any: ...
+
+
+@runtime_checkable
+class GuardWithFinalize(Protocol):
+    def finalize(self, model: Any) -> Any: ...
 
 
 class GuardChain:
@@ -145,7 +185,7 @@ class GuardChain:
         """Prepare all guards."""
         results = {}
         for guard in self.guards:
-            if hasattr(guard, "prepare"):
+            if isinstance(guard, GuardWithPrepare):
                 results[guard.name] = guard.prepare(
                     model, adapter, calib, policy_config
                 )
@@ -157,7 +197,7 @@ class GuardChain:
         """Execute before_edit on all guards."""
         results = []
         for guard in self.guards:
-            if hasattr(guard, "before_edit"):
+            if isinstance(guard, GuardWithBeforeEdit):
                 result = guard.before_edit(model)
                 if result is not None:
                     results.append(result)
@@ -167,7 +207,7 @@ class GuardChain:
         """Execute after_edit on all guards."""
         results = []
         for guard in self.guards:
-            if hasattr(guard, "after_edit"):
+            if isinstance(guard, GuardWithAfterEdit):
                 result = guard.after_edit(model)
                 if result is not None:
                     results.append(result)
@@ -177,7 +217,7 @@ class GuardChain:
         """Finalize all guards and return outcomes."""
         results = []
         for guard in self.guards:
-            if hasattr(guard, "finalize"):
+            if isinstance(guard, GuardWithFinalize):
                 result = guard.finalize(model)
                 results.append(result)
         return results
