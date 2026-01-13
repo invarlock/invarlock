@@ -955,8 +955,10 @@ class CoreRunner:
         pairing_reason = None
         preview_pair_stats = {"matched": 0, "expected": 0}
         final_pair_stats = {"matched": 0, "expected": 0}
+        paired_windows_attempted = 0
         preview_window_ids: list[int] = []
         final_window_ids: list[int] = []
+
         preview_tokens: list[list[int]] = []
         final_tokens: list[list[int]] = []
         preview_limit = min(preview_n, len(preview_data)) if preview_data else 0
@@ -1297,6 +1299,12 @@ class CoreRunner:
 
             preview_raw_losses = preview_summary["log_losses"]
             final_raw_losses = final_summary["log_losses"]
+            try:
+                paired_windows_attempted = min(
+                    len(preview_raw_losses), len(final_raw_losses)
+                )
+            except Exception:
+                paired_windows_attempted = 0
 
             preview_log_losses = [
                 float(loss) for loss in preview_raw_losses if math.isfinite(loss)
@@ -1916,7 +1924,9 @@ class CoreRunner:
         except Exception:
             pass
 
-        paired_windows_count = len(delta_samples)
+        paired_windows_count = (
+            paired_windows_attempted if paired_windows_attempted else len(delta_samples)
+        )
         unweighted_delta_mean = (
             float(np.mean(delta_samples)) if delta_samples else float(delta_mean_log)
         )
@@ -2435,11 +2445,14 @@ class CoreRunner:
             config_meta = report.meta.get("config") or {}
 
             # Try to get auto config from various possible locations
-            if hasattr(report, "auto_config"):
-                auto_cfg = getattr(report, "auto_config")
-            elif isinstance(config_meta, dict) and "auto" in config_meta:
+            auto_cfg = report.__dict__.get("auto_config")
+            if (
+                auto_cfg is None
+                and isinstance(config_meta, dict)
+                and "auto" in config_meta
+            ):
                 auto_cfg = config_meta["auto"]
-            else:
+            elif auto_cfg is None:
                 # Fallback to default balanced tier
                 auto_cfg = {"tier": "balanced", "enabled": True}
 

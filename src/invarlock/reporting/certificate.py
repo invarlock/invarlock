@@ -3350,6 +3350,45 @@ def _compute_validation_flags(
                 except Exception:  # pragma: no cover
                     pass
                 tokens_ok = total_tokens >= eff_min_tokens
+                if not tokens_ok:
+                    coverage_ok = False
+                    try:
+                        coverage = _ppl_metrics.get("bootstrap", {}).get("coverage")
+                        if isinstance(coverage, dict):
+                            prev_cov = coverage.get("preview")
+                            fin_cov = coverage.get("final")
+                            if isinstance(prev_cov, dict) and isinstance(fin_cov, dict):
+                                prev_used = prev_cov.get("used")
+                                prev_req = prev_cov.get("required")
+                                fin_used = fin_cov.get("used")
+                                fin_req = fin_cov.get("required")
+                                prev_ok = bool(prev_cov.get("ok")) or (
+                                    isinstance(prev_used, int | float)
+                                    and isinstance(prev_req, int | float)
+                                    and float(prev_used) >= float(prev_req)
+                                )
+                                fin_ok = bool(fin_cov.get("ok")) or (
+                                    isinstance(fin_used, int | float)
+                                    and isinstance(fin_req, int | float)
+                                    and float(fin_used) >= float(fin_req)
+                                )
+                                coverage_ok = prev_ok and fin_ok
+                    except Exception:  # pragma: no cover
+                        coverage_ok = False
+
+                    if coverage_ok:
+                        try:
+                            tolerance_ratio = float(
+                                pm_policy.get("min_tokens_tolerance", 0.02) or 0.0
+                            )
+                        except Exception:
+                            tolerance_ratio = 0.0
+                        if tolerance_ratio < 0.0:
+                            tolerance_ratio = 0.0
+                        relaxed_floor = int(
+                            math.floor(float(eff_min_tokens) * (1.0 - tolerance_ratio))
+                        )
+                        tokens_ok = total_tokens >= max(relaxed_floor, 0)
             except Exception:  # pragma: no cover
                 tokens_ok = True
     # Under tiny_relax, treat token floors as informational only

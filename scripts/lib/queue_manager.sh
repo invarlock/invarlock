@@ -1063,6 +1063,46 @@ generate_model_tasks() {
         task_ids+=("${edits_id}")
         echo "Created: ${edits_id}"
 
+        if [[ ${calibration_runs} -gt 0 ]]; then
+            for edit_spec in "${clean_edits[@]}"; do
+                local clean_runs=${CLEAN_EDIT_RUNS}
+                if ! [[ "${clean_runs}" =~ ^-?[0-9]+$ ]]; then
+                    clean_runs=1
+                fi
+                if [[ ${clean_runs} -lt 0 ]]; then
+                    clean_runs=0
+                fi
+                generate_eval_certify_tasks \
+                    "${model_id}" \
+                    "${model_name}" \
+                    "${edits_id}" \
+                    "${preset_id}" \
+                    "${edit_spec}" \
+                    "clean" \
+                    "${clean_runs}"
+            done
+
+            for edit_spec in "${stress_edits[@]}"; do
+                local stress_runs=${STRESS_EDIT_RUNS}
+                if ! [[ "${stress_runs}" =~ ^-?[0-9]+$ ]]; then
+                    stress_runs=1
+                fi
+                if [[ ${stress_runs} -lt 0 ]]; then
+                    stress_runs=0
+                fi
+                generate_eval_certify_tasks \
+                    "${model_id}" \
+                    "${model_name}" \
+                    "${edits_id}" \
+                    "${preset_id}" \
+                    "${edit_spec}" \
+                    "stress" \
+                    "${stress_runs}"
+            done
+        else
+            echo "Skipping edit certify tasks (calibration_runs=0)"
+        fi
+
     else
         # CREATE_EDIT - Create single edits (one task per edit) and enqueue eval/certify
         for edit_spec in "${clean_edits[@]}"; do
