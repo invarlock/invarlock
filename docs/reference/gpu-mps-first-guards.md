@@ -2,8 +2,6 @@
 title: GPU/MPS-First Guards (Decision Memo)
 ---
 
-# GPU/MPS-First Guards (Decision Memo)
-
 This document records the decisions for making InvarLock guards usable on
 large models (30B+ and beyond) where full-matrix SVD is operationally
 impractical.
