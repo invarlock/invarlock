@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import math
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
-from invarlock.core.api import Guard, ModelAdapter, RunConfig
+from invarlock.core.api import Guard, ModelAdapter, RunConfig, RunReport
 from invarlock.core.runner import CoreRunner
 
 
@@ -23,6 +24,18 @@ class DummyAdapter(ModelAdapter):
 
     def restore(self, model: Any, blob: bytes) -> None:  # pragma: no cover - stub
         return None
+
+
+class EditStub:
+    def __init__(self, name: str = "e", result: dict[str, Any] | None = None):
+        self.name = name
+        self._result = result or {"name": name, "deltas": {}}
+
+    def can_edit(self, model_desc: dict[str, Any]) -> bool:
+        return True
+
+    def apply(self, model: Any, adapter: ModelAdapter, **kwargs) -> dict[str, Any]:
+        return dict(self._result)
 
 
 def _toy_model_with_losses(losses):
@@ -84,6 +97,52 @@ def test_compute_metrics_both_windows_zero_raises(tmp_path):
             _minimal_calibration(2),
             adapter,
             preview_n=0,
+            final_n=0,
+            config=RunConfig(),
+        )
+
+
+def test_compute_metrics_unsliceable_calibration():
+    runner = CoreRunner()
+    model = _toy_model_with_losses([1.0])
+    adapter = DummyAdapter()
+    with pytest.raises(ValueError):
+        runner._compute_real_metrics(
+            model,
+            object(),
+            adapter,
+            preview_n=1,
+            final_n=0,
+            config=RunConfig(),
+        )
+
+
+def test_overlap_fraction_stride_none():
+    runner = CoreRunner()
+    model = _toy_model_with_losses([1.0, 1.1])
+    adapter = DummyAdapter()
+    cfg = RunConfig(context={"dataset": {"seq_len": 4, "stride": None}})
+    metrics, _ = runner._compute_real_metrics(
+        model, _minimal_calibration(2), adapter, preview_n=1, final_n=0, config=cfg
+    )
+    assert metrics.get("window_overlap_fraction") is not None
+
+
+def test_compute_metrics_bad_calibration_slice():
+    class BadCal:
+        def __len__(self):
+            return 2
+
+    runner = CoreRunner()
+    model = _toy_model_with_losses([1.0])
+    adapter = DummyAdapter()
+
+    with pytest.raises(TypeError):
+        runner._compute_real_metrics(
+            model,
+            BadCal(),
+            adapter,
+            preview_n=1,
             final_n=0,
             config=RunConfig(),
         )
@@ -165,7 +224,8 @@ def test_window_match_fraction_counts_unexpected_ids(monkeypatch, tmp_path):
         final_n=0,
         config=cfg,
     )
-    assert metrics.get("window_match_fraction") < 1.0
+    window_match_fraction = metrics.get("window_match_fraction")
+    assert window_match_fraction is not None and window_match_fraction < 1.0
 
 
 # Intentionally avoid ratio CI mismatch raise path here, as it can expose
@@ -327,7 +387,10 @@ def test_missing_loss_fallback_debug(monkeypatch):
         )
         # Fallback assigns finite primary metric preview/final
         pm = metrics.get("primary_metric", {})
-        assert pm.get("preview") > 0 and pm.get("final") > 0
+        preview_val = pm.get("preview")
+        final_val = pm.get("final")
+        assert preview_val is not None and final_val is not None
+        assert float(preview_val) > 0 and float(final_val) > 0
     finally:
         del os.environ["INVARLOCK_DEBUG_TRACE"]
 
@@ -337,11 +400,7 @@ def test_event_logger_enabled_and_closed(monkeypatch, tmp_path):
     runner = CoreRunner()
     model = _toy_model_with_losses([1.0])
     adapter = DummyAdapter()
-    edit = SimpleNamespace(
-        name="edit",
-        can_edit=lambda d: True,
-        apply=lambda *a, **k: {"name": "edit", "deltas": {}},
-    )
+    edit = EditStub("edit")
     cfg = RunConfig(context={"run_id": "rid"}, event_path=tmp_path / "events.jsonl")
     monkeypatch.setattr(
         CoreRunner, "_eval_phase", staticmethod(lambda *a, **k: {"ppl_ratio": 1.0})
@@ -361,11 +420,7 @@ def test_guard_prepare_skipped_branch(monkeypatch, tmp_path):
     runner = CoreRunner()
     model = _toy_model_with_losses([1.0])
     adapter = DummyAdapter()
-    edit = SimpleNamespace(
-        name="e",
-        can_edit=lambda d: True,
-        apply=lambda *a, **k: {"name": "e", "deltas": {}},
-    )
+    edit = EditStub("e")
     cfg = RunConfig(context={"run_id": "r"})
     monkeypatch.setattr(
         CoreRunner, "_eval_phase", staticmethod(lambda *a, **k: {"ppl_ratio": 1.0})
@@ -496,7 +551,10 @@ def test_count_zero_returns_non_mlm(tmp_path):
         Toy(), cal, adapter, preview_n=1, final_n=1, config=RunConfig()
     )
     pm = metrics.get("primary_metric", {})
-    assert pm.get("preview") > 0 and pm.get("final") > 0
+    preview_val = pm.get("preview")
+    final_val = pm.get("final")
+    assert preview_val is not None and final_val is not None
+    assert float(preview_val) > 0 and float(final_val) > 0
 
 
 def test_pairing_mismatch_warning_non_ci(tmp_path):
@@ -688,11 +746,7 @@ def test_execute_with_none_context(monkeypatch, tmp_path):
     runner = CoreRunner()
     model = _toy_model_with_losses([1.0])
     adapter = DummyAdapter()
-    edit = SimpleNamespace(
-        name="e",
-        can_edit=lambda d: True,
-        apply=lambda *a, **k: {"name": "e", "deltas": {}},
-    )
+    edit = EditStub("e")
     cfg = RunConfig(context=None, event_path=None)  # type: ignore[arg-type]
     monkeypatch.setattr(
         CoreRunner, "_eval_phase", staticmethod(lambda *a, **k: {"ppl_ratio": 1.0})
@@ -867,9 +921,9 @@ def test_eval_device_override_no_move_when_equal(monkeypatch):
                 self.lin = torch.nn.Linear(3, 3, bias=False)
                 self.moved = False
 
-            def to(self, device):
+            def to(self, *args, **kwargs):
                 self.moved = True
-                return super().to(device)
+                return super().to(*args, **kwargs)
 
             def forward(self, *a, **k):
                 class Obj:
@@ -903,11 +957,8 @@ def test_eval_debug_snapshot_with_labels(monkeypatch, tmp_path):
         runner = CoreRunner()
         model = _toy_model_with_losses([1.0])
         adapter = DummyAdapter()
-        edit = SimpleNamespace(
-            name="e",
-            can_edit=lambda d: True,
-            apply=lambda *a, **k: {"name": "e", "deltas": {}},
-        )
+        edit = EditStub("e")
+
         cfg = RunConfig(context={"run_id": "r"}, checkpoint_interval=0, event_path=None)
         cal = [
             {"input_ids": [1, 2, 3], "attention_mask": [1, 1, 1], "labels": [0, 0, 0]}
@@ -1063,7 +1114,8 @@ def test_window_shortage_and_final_shortage_warnings(tmp_path):
     metrics, _ = runner._compute_real_metrics(
         model, cal, adapter, preview_n=3, final_n=3, config=RunConfig()
     )
-    assert metrics.get("eval_samples") > 0
+    eval_samples = metrics.get("eval_samples")
+    assert eval_samples is not None and float(eval_samples) > 0
 
 
 def test_invalid_ppl_ratio_error_caught(monkeypatch):
@@ -1151,7 +1203,8 @@ def test_preview_zero_final_positive_path_local():
         model, cal, adapter, preview_n=0, final_n=1, config=RunConfig()
     )
     pm = metrics.get("primary_metric", {})
-    assert pm.get("final") > 0
+    final_val = pm.get("final")
+    assert final_val is not None and float(final_val) > 0
 
 
 def test_bootstrap_alpha_edge_again(tmp_path):
@@ -1222,11 +1275,7 @@ def test_eval_phase_no_calibration_fallback(tmp_path):
     runner = CoreRunner()
     model = _toy_model_with_losses([1.0])
     adapter = DummyAdapter()
-    edit = SimpleNamespace(
-        name="e",
-        can_edit=lambda d: True,
-        apply=lambda *a, **k: {"name": "e", "deltas": {}},
-    )
+    edit = EditStub("e")
     cfg = RunConfig(context={"run_id": "r"}, checkpoint_interval=0, event_path=None)
     report = runner.execute(model, adapter, edit, [], cfg, calibration_data=None)
     pm = report.metrics.get("primary_metric", {})
@@ -1404,6 +1453,39 @@ def test_ratio_ci_mismatch_caught(monkeypatch):
     assert isinstance(metrics, dict)
 
 
+def test_degenerate_delta_populates_weights_and_marks_degraded(monkeypatch):
+    calls: dict[str, object] = {}
+
+    def fake_delta_ci(final_losses, preview_losses, weights=None, **kwargs):
+        calls["weights"] = weights
+        return (0.0, 0.0)
+
+    monkeypatch.setattr(
+        "invarlock.core.runner.compute_paired_delta_log_ci", fake_delta_ci
+    )
+
+    runner = CoreRunner()
+    model = _toy_model_with_losses([1.0, 1.0, 1.0, 1.0])
+    adapter = DummyAdapter()
+    cfg = RunConfig(context={"eval": {"bootstrap": {"enabled": True, "replicates": 3}}})
+
+    metrics, _ = runner._compute_real_metrics(
+        model,
+        _minimal_calibration(4),
+        adapter,
+        preview_n=2,
+        final_n=2,
+        config=cfg,
+    )
+
+    pm = metrics.get("primary_metric", {})
+    assert pm.get("degraded") is True
+    assert str(pm.get("degraded_reason", "")).startswith("degenerate_delta")
+    weights = calls.get("weights")
+    assert isinstance(weights, list)
+    assert len(weights) == 2 and all(w >= 1.0 for w in weights)
+
+
 def test_pairing_unexpected_ids_reason(tmp_path):
     # Baseline has fewer IDs than run → unexpected IDs in run
     runner = CoreRunner()
@@ -1428,6 +1510,444 @@ def test_pairing_unexpected_ids_reason(tmp_path):
     reason = metrics.get("window_pairing_reason")
     # May be unexpected_ids or preview/final mismatch depending on ordering
     assert reason is None or isinstance(reason, str)
+
+
+def test_mlm_zero_mask_batches_sets_eval_error():
+    runner = CoreRunner()
+    model = _toy_model_with_losses([0.1, 0.2])
+    adapter = DummyAdapter()
+    cfg = RunConfig(context={"eval": {"loss": {"type": "mlm"}}})
+    calibration = [
+        {
+            "input_ids": [1, 2, 3],
+            "attention_mask": [0, 0, 0],
+            "labels": [1, 1, 1],
+        }
+    ]
+
+    metrics, _ = runner._compute_real_metrics(
+        model,
+        calibration,
+        adapter,
+        preview_n=1,
+        final_n=0,
+        config=cfg,
+    )
+
+    eval_error = metrics.get("eval_error") or {}
+    assert eval_error.get("error") == "mlm_missing_masks"
+
+
+def test_preview_handles_mixed_labels_and_missing_inputs():
+    runner = CoreRunner()
+    model = _toy_model_with_losses([0.5, 0.6, 0.7])
+    adapter = DummyAdapter()
+    calibration = [
+        {"input_ids": [1, 2, 3], "attention_mask": [1, 1, 1], "labels": [1, 2, 3]},
+        {"input_ids": [4, 5, 6], "attention_mask": [1, 1, 1]},
+        {"input_ids": None},
+    ]
+
+    metrics, _ = runner._compute_real_metrics(
+        model,
+        calibration,
+        adapter,
+        preview_n=3,
+        final_n=0,
+        config=RunConfig(),
+    )
+
+    pm = metrics.get("primary_metric", {})
+    assert pm.get("preview") and math.isfinite(float(pm.get("preview")))
+    assert metrics.get("eval_samples", 0) >= 2
+
+
+def test_strict_eval_raises_on_eval_error():
+    runner = CoreRunner()
+    model = _toy_model_with_losses([0.1, 0.2])
+    adapter = DummyAdapter()
+    cfg = RunConfig(context={"eval": {"loss": {"type": "mlm"}, "strict": True}})
+    calibration = [
+        {
+            "input_ids": [1, 2, 3],
+            "attention_mask": [0, 0, 0],
+            "labels": [1, 1, 1],
+        }
+    ]
+
+    report = RunReport()
+
+    with pytest.raises(RuntimeError):
+        runner._eval_phase(
+            model,
+            adapter,
+            calibration,
+            report,
+            preview_n=1,
+            final_n=0,
+            config=cfg,
+        )
+
+
+def test_tail_paired_baseline_emits_source(monkeypatch):
+    def fake_tail_eval(*args, **kwargs):
+        return {"mean": 0.0}
+
+    monkeypatch.setattr("invarlock.core.runner.evaluate_metric_tail", fake_tail_eval)
+
+    runner = CoreRunner()
+    model = _toy_model_with_losses([0.4, 0.5])
+    adapter = DummyAdapter()
+    cfg = RunConfig(
+        context={
+            "baseline_eval_windows": {
+                "preview": {"window_ids": [0], "logloss": [1.0], "token_counts": [3]},
+                "final": {"window_ids": [1], "logloss": [1.5], "token_counts": [4]},
+            }
+        }
+    )
+
+    report = RunReport()
+
+    metrics = runner._eval_phase(
+        model,
+        adapter,
+        _minimal_calibration(2),
+        report,
+        preview_n=1,
+        final_n=1,
+        config=cfg,
+    )
+
+    pm_tail = report.metrics.get("primary_metric_tail", {})
+    assert pm_tail.get("source") == "paired_baseline.final"
+
+
+def test_tail_paired_baseline_weights(monkeypatch):
+    tail_calls: dict[str, Any] = {}
+
+    def fake_tail_eval(*, deltas, weights=None, policy=None):
+        tail_calls["weights"] = weights
+        return {"mean": 0.0, "evaluated": True, "passed": True, "mode": "warn"}
+
+    monkeypatch.setattr("invarlock.core.runner.evaluate_metric_tail", fake_tail_eval)
+
+    def fake_compute_real_metrics(*args, **kwargs):
+        metrics = {
+            "primary_metric": {"kind": "ppl_causal", "preview": 1.0, "final": 1.4}
+        }
+        eval_windows = {
+            "final": {
+                "window_ids": [1],
+                "logloss": [0.6],
+                "token_counts": [3],
+            },
+            "preview": {"window_ids": [0], "logloss": [0.5], "token_counts": [2]},
+        }
+        return metrics, eval_windows
+
+    monkeypatch.setattr(
+        CoreRunner, "_compute_real_metrics", staticmethod(fake_compute_real_metrics)
+    )
+
+    runner = CoreRunner()
+    adapter = DummyAdapter()
+    report = RunReport()
+    cfg = RunConfig(
+        context={
+            "baseline_eval_windows": {
+                "final": {"window_ids": [1], "logloss": [0.4], "token_counts": [3]}
+            }
+        }
+    )
+
+    metrics = runner._eval_phase(
+        model=object(),
+        adapter=adapter,
+        calibration_data=[{"input_ids": [1, 2, 3]}],
+        report=report,
+        preview_n=1,
+        final_n=1,
+        config=cfg,
+    )
+
+    assert metrics["primary_metric_tail"]["source"] == "paired_baseline.final"
+    assert tail_calls.get("weights") == [3.0]
+
+
+def test_tail_token_count_conversion_error(monkeypatch):
+    tail_calls: dict[str, Any] = {}
+
+    def fake_tail_eval(*, deltas, weights=None, policy=None):
+        tail_calls["weights"] = weights
+        return {"mean": 0.0, "evaluated": True, "passed": True, "mode": "warn"}
+
+    monkeypatch.setattr("invarlock.core.runner.evaluate_metric_tail", fake_tail_eval)
+
+    def fake_compute_real_metrics(*args, **kwargs):
+        metrics = {
+            "primary_metric": {"kind": "ppl_causal", "preview": 1.0, "final": 1.4}
+        }
+        eval_windows = {
+            "final": {
+                "window_ids": [1],
+                "logloss": [0.6],
+                "token_counts": ["bad"],
+            },
+            "preview": {"window_ids": [0], "logloss": [0.5], "token_counts": [2]},
+        }
+        return metrics, eval_windows
+
+    monkeypatch.setattr(
+        CoreRunner, "_compute_real_metrics", staticmethod(fake_compute_real_metrics)
+    )
+
+    runner = CoreRunner()
+    adapter = DummyAdapter()
+    report = RunReport()
+    cfg = RunConfig(
+        context={
+            "baseline_eval_windows": {
+                "final": {"window_ids": [1], "logloss": [0.4], "token_counts": ["bad"]}
+            }
+        }
+    )
+
+    metrics = runner._eval_phase(
+        model=object(),
+        adapter=adapter,
+        calibration_data=[{"input_ids": [1, 2, 3]}],
+        report=report,
+        preview_n=1,
+        final_n=1,
+        config=cfg,
+    )
+
+    assert metrics["primary_metric_tail"]["source"] == "paired_baseline.final"
+    assert tail_calls.get("weights") == [0.0]
+
+
+def test_soft_eval_error_warns_not_raises():
+    runner = CoreRunner()
+    model = _toy_model_with_losses([0.1, 0.2])
+    adapter = DummyAdapter()
+    cfg = RunConfig(context={"eval": {"loss": {"type": "mlm"}, "strict": False}})
+    calibration = [
+        {
+            "input_ids": [1, 2, 3],
+            "attention_mask": [0, 0, 0],
+            "labels": [1, 1, 1],
+        }
+    ]
+
+    report = RunReport()
+
+    metrics = runner._eval_phase(
+        model,
+        adapter,
+        calibration,
+        report,
+        preview_n=1,
+        final_n=0,
+        config=cfg,
+    )
+
+    eval_error = metrics.get("eval_error") or {}
+    assert eval_error.get("error") == "mlm_missing_masks"
+
+
+def test_eval_phase_without_calibration_uses_mock_metrics():
+    runner = CoreRunner()
+    model = _toy_model_with_losses([0.3])
+    adapter = DummyAdapter()
+    report = RunReport()
+
+    metrics = runner._eval_phase(
+        model,
+        adapter,
+        calibration_data=None,
+        report=report,
+        preview_n=None,
+        final_n=None,
+        config=RunConfig(),
+    )
+
+    pm = metrics.get("primary_metric", {})
+    assert pm.get("preview") == 25.0 and pm.get("final") == 26.0
+    assert report.evaluation_windows == {"preview": {}, "final": {}}
+
+
+def test_measure_latency_paths():
+    runner = CoreRunner()
+    model = _toy_model_with_losses([0.2])
+
+    # Missing input_ids yields early 0.0
+    assert runner._measure_latency(model, [{"input_ids": None}], device="cpu") == 0.0
+
+    # 1-D tensor input exercises unsqueeze and to(device) guards
+    import torch
+
+    latency = runner._measure_latency(
+        model, [torch.tensor([1, 2, 3])], device=torch.device("cpu")
+    )
+    assert isinstance(latency, float)
+
+    # Dict input exercises attention_mask/token_type_ids handling
+    latency = runner._measure_latency(
+        model,
+        [
+            {
+                "input_ids": [4, 5, 6],
+                "attention_mask": [1, 1, 1],
+                "token_type_ids": [0, 0, 0],
+            }
+        ],
+        device="cpu",
+    )
+    assert isinstance(latency, float)
+
+
+def test_measure_latency_cuda_sync(monkeypatch):
+    import torch
+
+    runner = CoreRunner()
+
+    class M:
+        def __call__(self, *a, **k):
+            class Obj:
+                def __init__(self):
+                    self.loss = torch.tensor(0.01)
+
+            return Obj()
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    sync_called: dict[str, bool] = {"called": False}
+
+    def fake_sync():
+        sync_called["called"] = True
+
+    monkeypatch.setattr(torch.cuda, "synchronize", fake_sync)
+
+    latency = runner._measure_latency(
+        M(), [{"input_ids": [1, 2, 3]}], torch.device("cuda")
+    )
+    assert isinstance(latency, float)
+    assert sync_called["called"]
+
+
+def test_overlap_fraction_from_config():
+    runner = CoreRunner()
+    model = _toy_model_with_losses([0.4, 0.5])
+    adapter = DummyAdapter()
+    cfg = RunConfig(context={"eval": {"overlap": {"stride": 2, "seq_len": 4}}})
+
+    metrics, _ = runner._compute_real_metrics(
+        model,
+        _minimal_calibration(2),
+        adapter,
+        preview_n=1,
+        final_n=1,
+        config=cfg,
+    )
+
+    # When overlap config is provided, helper should not crash; default may
+    # clamp to 1.0 if not applied.
+    assert metrics.get("window_overlap_fraction") is not None
+
+
+def test_bootstrap_coverage_warning(monkeypatch):
+    events: list[tuple[str, dict[str, Any]]] = []
+
+    class CapturingLogger:
+        def log(self, component, operation, level, data):
+            events.append((operation, data or {}))
+
+    runner = CoreRunner()
+    runner.event_logger = CapturingLogger()  # type: ignore[assignment]
+    model = _toy_model_with_losses([0.4, 0.5])
+    adapter = DummyAdapter()
+    cfg = RunConfig(
+        context={
+            "eval": {
+                "bootstrap": {"enabled": True, "replicates": 5},
+                "overlap": {"stride": 2, "seq_len": 4},
+            }
+        }
+    )
+
+    runner._compute_real_metrics(
+        model,
+        _minimal_calibration(2),
+        adapter,
+        preview_n=1,
+        final_n=1,
+        config=cfg,
+    )
+
+    assert any(op == "bootstrap_coverage_warning" for op, _ in events)
+
+
+def test_finalize_phase_catastrophic_spike_rolls_back():
+    runner = CoreRunner()
+    report = RunReport()
+    guard_results = {"g": {"passed": True}}
+    metrics = {"primary_metric": {"kind": "ppl_causal", "preview": 1.0, "final": 3.5}}
+
+    status = runner._finalize_phase(
+        model=object(),
+        adapter=DummyAdapter(),
+        guard_results=guard_results,
+        metrics=metrics,
+        config=RunConfig(spike_threshold=2.0, max_pm_ratio=10.0),
+        report=report,
+    )
+
+    assert status == "rollback"
+
+
+def test_eval_overlap_warning_logged_non_ci():
+    events: list[str] = []
+
+    class CapturingLogger:
+        def log(self, component, operation, level, data):
+            events.append(operation)
+
+    runner = CoreRunner()
+    runner.event_logger = CapturingLogger()  # type: ignore[assignment]
+    model = _toy_model_with_losses([1.0, 1.1])
+    adapter = DummyAdapter()
+    cfg = RunConfig(
+        context={
+            "dataset": {"seq_len": 4, "stride": 2},
+            "pairing_baseline": {
+                "preview": {"window_ids": [0], "input_ids": [[1, 2, 3, 4]]},
+                "final": {"window_ids": [1], "input_ids": [[1, 2, 3, 4]]},
+            },
+            "profile": "dev",
+        }
+    )
+
+    runner._compute_real_metrics(
+        model,
+        _minimal_calibration(2),
+        adapter,
+        preview_n=1,
+        final_n=1,
+        config=cfg,
+    )
+
+    assert "window_overlap_warning" in events
+
+
+def test_measure_latency_model_exception_returns_zero():
+    runner = CoreRunner()
+
+    class BadModel:
+        def __call__(self, *a, **k):
+            raise RuntimeError("boom")
+
+    latency = runner._measure_latency(BadModel(), [{"input_ids": [1, 2, 3]}], "cpu")
+    assert latency == 0.0
 
 
 # Note: Avoid exercising the MLM zero-usable-batches raise path due to a known
