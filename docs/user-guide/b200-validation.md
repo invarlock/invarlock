@@ -32,9 +32,381 @@ OUTPUT_DIR=./invarlock_validation_b200_20241208_123456 \
 # 2) Continue from the calibration checkpoint (implies --resume when a queue exists)
 OUTPUT_DIR=./invarlock_validation_b200_20241208_123456 \
   ./scripts/b200_validation_suite.sh --run-only
+```
+
+On a fresh B200 node, you can bootstrap dependencies and run the suite via `scripts/b200_bootstrap_and_validate.sh`.
+
+## Hardware Target
+
+The B200 suite is specifically tuned for NVIDIA B200 180GB GPUs:
+
+- **Memory per GPU**: 180 GB HBM3e
+- **Memory Bandwidth**: ~4.5 TB/s aggregate
+- **Compute**: ~2250 FP16 TFLOPS
+- **FP4 Edit Path**: Simulated quantization; TransformerEngine is detected for optional fail-fast but native FP4 kernels are not exercised in this harness
+- **Target Utilization**: 85–92% VRAM (153–166 GB per GPU)
+
+The suite will run on other GPU configurations, but optimal performance assumes B200 (Blackwell). FP4 edits are simulated; TransformerEngine is only used to enforce optional native-support checks, not to execute FP4 kernels.
+
+## Model Suite
+
+All models are public and require **no HuggingFace login**:
+
+| Model | VRAM | Category | Notes |
+|-------|------|----------|-------|
+| `mistralai/Mistral-7B-v0.1` | ~14 GB | Small | Flash Attention 2 compatible |
+| `NousResearch/Llama-2-13b-hf` | ~26 GB | Small | Public via NousResearch |
+| `Qwen/Qwen2.5-14B` | ~28 GB | Small | Flash Attention 2 compatible |
+| `Qwen/Qwen2.5-32B` | ~64 GB | Medium | Flash Attention 2 compatible |
+| `01-ai/Yi-34B` | ~68 GB | Medium | Flash Attention 2 compatible |
+| `mistralai/Mixtral-8x7B-v0.1` | ~90 GB | MoE | MoE architecture |
+| `NousResearch/Llama-2-70b-hf` | ~140 GB | Large | Public via NousResearch |
+| `Qwen/Qwen1.5-72B` | ~144 GB | Large | Flash Attention 2 compatible |
+
+Models are dynamically assigned to GPUs via work-stealing—any available GPU can run any task. Override models via environment variables `MODEL_1` through `MODEL_8`.
+
+## Edit Types
+
+Each model undergoes 8 edit experiments (4 types × 2 versions):
+
+### Clean Edits (Minimal Impact)
+
+These should pass InvarLock guards with high probability:
+
+| Edit Type | Parameters | Scope |
+|-----------|------------|-------|
+| **Quantization RTN** | 8-bit, group_size=128 (group-wise) | FFN only |
+| **FP4 Quantization** | E2M1 format | FFN only |
+| **Magnitude Pruning** | 10% sparsity | FFN only |
+| **Low-Rank SVD** | rank=256 | FFN only |
+
+### Stress Edits (Significant Impact)
+
+These should be flagged by InvarLock guards:
+
+| Edit Type | Parameters | Scope |
+|-----------|------------|-------|
+| **Quantization RTN** | 4-bit, group_size=32 (group-wise) | All layers |
+| **FP4 Quantization** | Aggressive clipping | All layers |
+| **Magnitude Pruning** | 50% sparsity | All layers |
+| **Low-Rank SVD** | rank=32 | All layers |
+
+Note: RTN uses group-wise quantization along the input dimension per output channel. If a layer has fewer input features than `group_size`, it falls back to per-tensor for that layer. FP4 edits are simulated even when TransformerEngine is available; set `INVARLOCK_REQUIRE_FP4_NATIVE=true` to fail fast if native FP4 support is required.
+
+### Error Injection Tests
+
+Each model also undergoes deliberate error injection to verify InvarLock's failure detection:
+
+- **NaN injection**: Insert NaN value in first transformer block
+- **Inf injection**: Insert infinity in attention weights
+- **Extreme quantization**: Apply 2-bit quantization to all weights
+- **Scale explosion**: Multiply MLP weights by 100x
+- **Zero layer**: Zero out middle transformer block weights
+
+## Scheduling
+
+The suite uses dynamic work-stealing scheduling with optimized task prioritization:
+
+- **small_first strategy**: Prioritizes small models (7B-14B) for maximum early parallelism
+- **Adaptive GPU allocation**: Allows large models to run with fewer GPUs when queue is blocked
+- **Memory-aware task selection**: Tasks only claimed if they fit in available GPU memory
+- **Automatic dependency resolution**: Calibration completes before certification tasks run
+
+### small_first Priority Strategy
+
+Tasks are prioritized to maximize GPU utilization:
+
+```text
+Priority Queue (higher = runs first)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  90 ┤ SETUP_BASELINE (all models)         ◄── Run first
+     │
+  85 ┤ CALIBRATION    (all models)
+     │
+  80 ┤ EVAL_BASELINE  (all models)
+     │
+  70 ┤ Small models   (7B-14B)  ─────────┐
+     │ • Mistral-7B                       │ Ordered by
+     │ • Llama-2-13B                      │ model size
+     │ • Qwen2.5-14B                      │ (smallest
+     │                                    │ first)
+  60 ┤ Medium models  (30B-40B) ─────────┤
+     │ • Qwen2.5-32B                      │
+     │ • Yi-34B                           │
+     │                                    │
+  50 ┤ MoE models     (Mixtral) ─────────┤
+     │                                    │
+  40 ┤ Large models   (70B+)   ──────────┘ ◄── Run last
+     │ • Llama-2-70B
+     │ • Qwen1.5-72B
+  ───┴────────────────────────────────────────────────
+```
+
+**Why small_first works**:
+
+- Small tasks (1 GPU) complete quickly → GPUs free up → more parallelism
+- Large tasks scale to multiple GPUs only when the profile-based planner says they cannot fit
+- Scheduler avoids nested lock contention and cleans stale GPU reservations automatically
+Note: Priority values are illustrative; dynamic boosts and caps apply in `scheduler.sh`.
+
+### Dynamic Scheduling
+
+Work-stealing enabled scheduler that maximizes GPU utilization:
+
+```text
+                    ┌──────────────────────┐
+                    │   MAIN SCRIPT        │
+                    │ (main_dynamic)       │
+                    └──────────┬───────────┘
+                               │
+           ┌───────────────────┼───────────────────┐
+           ▼                   ▼                   ▼
+    ┌─────────────┐    ┌──────────────┐    ┌─────────────┐
+    │ init_queue  │    │generate_tasks│    │launch_workers
+    │ (dirs)      │    │(~54-71/model)│    │ (N GPUs)    │
+    └──────┬──────┘    └──────┬───────┘    └──────┬──────┘
+           │                  │                   │
+           └────────┬─────────┘                   │
+                    ▼                             │
+         ┌─────────────────────┐                  │
+         │   FILE-BASED        │◄─────────────────┘
+         │   TASK QUEUE        │
+         │                     │   (workers claim tasks under scheduler lock)
+         │ pending/ → ready/   │
+         │ ready/  → running/  │
+         │ running/→ completed │
+         └─────────────────────┘
+                    ▲
+    ┌───────────────┼───────────────────────────────┐
+    ▼               ▼               ▼               ▼
+┌───────┐       ┌───────┐       ┌───────┐       ┌───────┐
+│GPU id │       │GPU id │  ...  │GPU id │       │GPU id │
+│Worker │       │Worker │       │Worker │       │Worker │
+└───────┘       └───────┘       └───────┘       └───────┘
+```
+
+**Advantages**:
+
+- Idle GPUs automatically grab pending work
+- Memory-aware task selection (tasks only claimed if they fit in GPU memory)
+- Automatic dependency resolution (calibration must complete before certify)
+- Dependency-failure propagation (dependents fail instead of stalling the queue)
+- Worker heartbeat monitoring with automatic restart and orphan reclaim
+- Priority boosting to prevent task starvation
+
+## Multi-GPU Model Distribution
+
+The B200 suite uses **profile-based memory planning**. After each baseline download,
+it writes `model_profile.json` (weights + config) and recalculates per-task memory.
+Tasks reserve a single GPU when the computed peak fits within `GPU_MEMORY_PER_DEVICE`;
+they automatically scale to 2+ GPUs only when the profile says they cannot fit.
+
+| Model Size | Auto GPUs | When It Scales | Examples |
+|------------|-----------|----------------|----------|
+| Small (7B-14B) | 1 | Rare (only if overheads push >180GB) | Mistral-7B, Llama-2-13B, Qwen2.5-14B |
+| Medium (30B-40B) | 1 | If edits/evaluations exceed 180GB | Qwen2.5-32B, Yi-34B |
+| MoE | 1 | If deep-copy edits or large overheads exceed 180GB | Mixtral-8x7B |
+| Large (70B+) | 1 | If profile + task overhead exceed 180GB | Llama-2-70B, Qwen1.5-72B |
+
+### GPU-to-Model Mapping Visualization
+
+With profile-based reservations, any available GPU can run tasks that fit.
+When a task needs more memory, the scheduler reserves multiple GPUs and relies
+on `device_map="auto"` sharding in adapters.
+
+### GPU Reservation Protection
+
+When a task is claimed, the scheduler reserves the required GPUs to prevent conflicts:
+
+```text
+Task: llama-2-70b_EVAL_BASELINE requires 1 GPU
+Example shown for an 8-GPU node (GPU_ID_LIST=0,1,2,3,4,5,6,7)
+
+  ┌─────────────────────────────────────────────────────────┐
+  │                GPU Reservation State                     │
+  ├───────┬───────┬───────┬───────┬───────┬───────┬───────┬───────┤
+  │ GPU 0 │ GPU 1 │ GPU 2 │ GPU 3 │ GPU 4 │ GPU 5 │ GPU 6 │ GPU 7 │
+  ├───────┼───────┼───────┼───────┼───────┼───────┼───────┼───────┤
+  │ FREE  │ RSVD  │ FREE  │ FREE  │ FREE  │ FREE  │ FREE  │ FREE  │
+  │       │  ▲    │       │       │       │       │       │       │
+  └───────┴───┼───┴───────┴───────┴───────┴───────┴───────┴───────┘
+              └───────┘
+        Reserved for llama-2-70b task
+```
+
+**Reservation Flow**:
+
+1. Task enters READY queue with `required_gpus` field set (default 1; higher when the memory plan requires it)
+2. Worker acquires the scheduler lock and calls `find_and_claim_task()` to select + reserve GPUs
+3. `reserve_gpus()` writes per-GPU lock files (serialized by the scheduler lock)
+4. Task executes with `CUDA_VISIBLE_DEVICES` set to all assigned GPUs
+5. On completion/failure, `release_task_gpus()` removes lock files
+
+**Lock File Structure**:
+
+```text
+queue/scheduler.lock
+workers/gpu_reservations/
+├── gpu_1.lock          # Contains: "llama-2-70b_EVAL_BASELINE_001"
+└── task_llama-2-70b_EVAL_BASELINE_001.gpus  # Contains: "1"
+queue/running/llama-2-70b_EVAL_BASELINE_001.pid
+```
+
+### Stale Reservation Cleanup
+
+Reservations are automatically cleaned up when:
+
+- Task completes successfully
+- Task fails (after all retries)
+- Worker monitor detects a dead/stuck worker and `reclaim_orphaned_tasks` kills the task process group, releases GPU locks, and re-queues the task
+
+### Adaptive GPU Allocation
+
+Adaptive allocation is currently disabled for multi-GPU tasks to avoid
+under-allocation and OOM. If you intentionally want to allow tasks to run with
+fewer GPUs than the plan, you can lower the minimum GPU requirement in
+`get_minimum_gpus()` and accept the `[ADAPTIVE]` trade-offs.
+
+## Task Lifecycle
+
+Tasks flow through these states:
+
+```text
+┌─────────┐    ┌───────┐    ┌─────────┐    ┌───────────┐
+│ PENDING │───▶│ READY │───▶│ RUNNING │───▶│ COMPLETED │
+└─────────┘    └───────┘    └─────────┘    └───────────┘
+                                 │
+                                 ▼
+                             ┌────────┐
+                             │ FAILED │
+                             └────────┘
+```
+
+- **PENDING**: Dependencies not yet satisfied
+- **READY**: All dependencies met, awaiting GPU
+- **RUNNING**: Actively executing on a GPU
+- **COMPLETED**: Successfully finished
+- **FAILED**: Execution failed (may be retried)
+
+### Batch + Split Optimization
+
+The scheduler uses two key optimizations to maximize GPU utilization (batch path for small/medium models):
+
+**Batch Edit Creation**: Instead of loading the baseline model 8 times (once per edit), a single `CREATE_EDITS_BATCH` task loads the model once and creates all 8 edits sequentially. This reduces model loading overhead by ~87%.
+
+**Split Eval Benchmarks**: Instead of running all 4 lm-eval benchmarks (MMLU, HellaSwag, ARC, WinoGrande) in a single task, each benchmark runs as a separate task. This enables 4× parallelism for evaluation tasks.
+
+```text
+Optimization Impact:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Before (Per-edit):
+  8× CREATE_EDIT tasks (model load each time)  ─┐
+  8× EVAL_EDIT tasks (all 4 benchmarks)         ├─ Sequential bottleneck
+                                               ─┘
+
+After (Batch + Split):
+  1× CREATE_EDITS_BATCH (model loaded once)    ─┐
+  32× EVAL_* tasks (4 benchmarks × 8 edits)     ├─ Better parallelism
+                                               ─┘
+
+Result: Estimated ~62% faster execution on 8× B200 cluster
+```
+
+**Large or MoE models (70B+ or Mixtral-class)** skip batch edits and use per-edit tasks (CREATE_EDIT → EVAL_EDIT → CERTIFY_EDIT), so split eval is not used there.
+
+### Task Breakdown Per Model
+
+Each model generates approximately 71 tasks with Batch + Split optimization. Large or MoE models use per-edit tasks and generate fewer total tasks.
+
+```text
+Tasks Per Model (~71 total, batch enabled)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Setup & Calibration:
+  ├── 1× SETUP_BASELINE      (download model)
+  ├── 5× CALIBRATION_RUN     (drift calibration)
+  ├── 1× GENERATE_PRESET     (aggregate calibration)
+  └── 1× EVAL_BASELINE       (lm-eval baseline)
+                                              Total: 8
+
+Edit Creation (Batch Optimization):
+  └── 1× CREATE_EDITS_BATCH  (creates all 8 edits with single model load)
+      ├── quant_8bit_clean   (RTN 8-bit FFN)
+      ├── fp4_clean          (FP4 E2M1 FFN)
+      ├── prune_10pct_clean  (10% sparsity FFN)
+      ├── svd_rank256_clean  (rank=256 FFN)
+      ├── quant_4bit_stress  (RTN 4-bit all)
+      ├── fp4_stress         (FP4 aggressive all)
+      ├── prune_50pct_stress (50% sparsity all)
+      └── svd_rank32_stress  (rank=32 all)
+                                              Total: 1
+
+Edit Evaluation (Split Optimization):
+  └── 8 edits × 4 benchmarks = 32 tasks
+      Per edit:
+      ├── 1× EVAL_MMLU       (MMLU benchmark only)
+      ├── 1× EVAL_HELLASWAG  (HellaSwag benchmark only)
+      ├── 1× EVAL_ARC        (ARC-Challenge only)
+      └── 1× EVAL_WINOGRANDE (WinoGrande only)
+                                              Total: 32
+
+Edit Certification:
+  ├── 4 clean edits × 3 runs = 12× CERTIFY_EDIT
+  └── 4 stress edits × 2 runs = 8× CERTIFY_EDIT
+                                              Total: 20
+
+Error Injection (if enabled):
+  ├── 5× CREATE_ERROR        (NaN, Inf, 2-bit, scale, zero)
+  └── 5× CERTIFY_ERROR       (must all fail)
+                                              Total: 10
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                          Grand Total: ~71 tasks/model (batch)
+                          8 models × 71 = ~568 total tasks
+                          ~54 tasks/model when batch edits are disabled for 70B+
+```
+
+```text
+Tasks Per Model (~54 total, per-edit for 70B+)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Setup & Calibration:
+  ├── 1× SETUP_BASELINE
+  ├── 5× CALIBRATION_RUN
+  ├── 1× GENERATE_PRESET
+  └── 1× EVAL_BASELINE
+                                              Total: 8
+
+Edit Creation (Per-Edit):
+  └── 8× CREATE_EDIT
+                                              Total: 8
+
+Edit Evaluation (Benchmarking):
+  └── 8× EVAL_EDIT (all benchmarks per edit)
+                                              Total: 8
+
+Edit Certification:
+  ├── 4 clean edits × 3 runs = 12× CERTIFY_EDIT
+  └── 4 stress edits × 2 runs = 8× CERTIFY_EDIT
+                                              Total: 20
+
+Error Injection (if enabled):
+  ├── 5× CREATE_ERROR
+  └── 5× CERTIFY_ERROR
+                                              Total: 10
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                          Grand Total: ~54 tasks/model (per-edit)
+```
+
+### Task Dependency Graph (Per Model)
+
+The following shows how tasks depend on each other (with Batch + Split optimization):
+
 ```text
                       ┌────────────────────┐
-
                       │  SETUP_BASELINE    │  Priority: 90
                       │  (download model)  │
                       └─────────┬──────────┘
