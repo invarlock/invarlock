@@ -377,16 +377,13 @@ def certify_command(
                 fallback = pm_prev if _finite(pm_prev) else pm_final
                 if not _finite(fallback) or fallback <= 0:
                     fallback = 1.0
-                degraded_reason = (
-                    pm.get("degraded_reason")
-                    or (
-                        "non_finite_pm"
-                        if (not _finite(pm_prev) or not _finite(pm_final))
-                        else "primary_metric_degraded"
-                    )
+                degraded_reason = pm.get("degraded_reason") or (
+                    "non_finite_pm"
+                    if (not _finite(pm_prev) or not _finite(pm_final))
+                    else "primary_metric_degraded"
                 )
                 console.print(
-                    "[yellow]⚠️  Primary metric degraded or non-finite; emitting certificate and marking task degraded.[/yellow]"
+                    "[yellow]⚠️  Primary metric degraded or non-finite; emitting certificate and marking task degraded. Primary metric computation failed.[/yellow]"
                 )
                 pm["degraded"] = True
                 pm["invalid"] = pm.get("invalid") or True
