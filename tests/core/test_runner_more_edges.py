@@ -1609,7 +1609,7 @@ def test_tail_paired_baseline_emits_source(monkeypatch):
 
     report = RunReport()
 
-    metrics = runner._eval_phase(
+    _ = runner._eval_phase(
         model,
         adapter,
         _minimal_calibration(2),

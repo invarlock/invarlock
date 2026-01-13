@@ -4384,6 +4384,12 @@ def run_command(
                     pm = compute_primary_metric_from_report(
                         report, kind=metric_kind_resolved, baseline=baseline_report_data
                     )
+                    core_primary_metric = None
+                    if hasattr(core_report, "metrics") and isinstance(
+                        core_report.metrics, dict
+                    ):
+                        core_primary_metric = core_report.metrics.get("primary_metric")
+                    pm = _merge_primary_metric_health(pm, core_primary_metric)
                     report.setdefault("metrics", {})["primary_metric"] = pm
                     # Attach configured reps/ci_level when provided
                     if metric_opts:
@@ -4695,6 +4701,27 @@ def run_command(
         except Exception:
             # Best-effort cleanup printing; never raise from finally
             pass
+
+
+def _merge_primary_metric_health(
+    primary_metric: dict[str, Any] | None,
+    core_primary_metric: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if not isinstance(primary_metric, dict):
+        return {}
+    merged = dict(primary_metric)
+    if not isinstance(core_primary_metric, dict):
+        return merged
+    if core_primary_metric.get("invalid") is True:
+        merged["invalid"] = True
+        merged["degraded"] = True
+    if core_primary_metric.get("degraded") is True:
+        merged["degraded"] = True
+    core_reason = core_primary_metric.get("degraded_reason")
+    if isinstance(core_reason, str) and core_reason:
+        merged["degraded_reason"] = core_reason
+        merged["degraded"] = True
+    return merged
 
 
 def _format_debug_metric_diffs(
