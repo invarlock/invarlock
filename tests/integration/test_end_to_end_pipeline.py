@@ -219,7 +219,7 @@ class TestEndToEndPipeline:
     def test_guard_chain_integration(self):
         """Test integration with guard chain."""
         # Create guard instances
-        spectral_guard = SpectralGuard(kappa=0.95, deadband=0.1)
+        spectral_guard = SpectralGuard(sigma_quantile=0.95, deadband=0.1)
         rmt_guard = RMTGuard(margin=1.5, deadband=0.1)
         invariants_guard = InvariantsGuard(strict_mode=False)
 
@@ -482,7 +482,9 @@ class TestEndToEndPipeline:
     def test_sample_cli_config_uses_validation_split(self):
         """Sample task preset should exist and target the validation split."""
         project_root = Path(__file__).resolve().parents[2]
-        config_path = project_root / "configs" / "tasks" / "causal_lm" / "ci_cpu.yaml"
+        config_path = (
+            project_root / "configs" / "presets" / "causal_lm" / "wikitext2_512.yaml"
+        )
 
         assert config_path.exists()
 
@@ -621,7 +623,7 @@ class TestPipelineErrorScenarios:
     def test_guard_failure_scenarios(self):
         """Test various guard failure scenarios."""
         # Test spectral guard failure
-        spectral_guard = SpectralGuard(kappa=0.95)
+        spectral_guard = SpectralGuard(sigma_quantile=0.95)
 
         with patch.object(spectral_guard, "validate") as mock_validate:
             mock_validate.return_value = {

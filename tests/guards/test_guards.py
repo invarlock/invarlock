@@ -281,20 +281,6 @@ class TestSpectralGuardComprehensive:
         assert custom_guard.config["deadband"] == 0.05
         assert custom_guard.config["scope"] == "all"
 
-    def test_kappa_alias_remains_supported(self):
-        """Legacy `kappa` argument continues to hydrate contraction."""
-        guard = SpectralGuard(kappa=0.88)
-        assert guard.sigma_quantile == pytest.approx(0.88)
-        assert guard.config["sigma_quantile"] == pytest.approx(0.88)
-        assert "contraction" not in guard.config
-
-    def test_contraction_alias_is_supported_but_not_persisted(self):
-        """Legacy `contraction` argument is accepted and normalized to sigma_quantile."""
-        guard = SpectralGuard(contraction=0.91)
-        assert guard.sigma_quantile == pytest.approx(0.91)
-        assert guard.config["sigma_quantile"] == pytest.approx(0.91)
-        assert "contraction" not in guard.config
-
     def test_prepare_respects_correction_disabled(self):
         """Balanced policy should leave spectral guard in monitor-only mode."""
         mock_adapter = Mock()
@@ -375,6 +361,37 @@ class TestSpectralGuardComprehensive:
         assert guard_with_config.config["scope"] == "test"
         assert guard_with_config.config["sigma_quantile"] == 0.85
         assert guard_with_config.config["scope"] == "test"
+
+    def test_max_spectral_norm_default_is_disabled(self):
+        class TinyModel(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.mlp_proj = nn.Linear(8, 8, bias=False)
+
+        model = TinyModel()
+        guard = SpectralGuard()
+        assert guard.max_spectral_norm is None
+        policy = {
+            "scope": "all",
+            "family_caps": {
+                "ffn": {"kappa": 100.0},
+                "attn": {"kappa": 100.0},
+                "embed": {"kappa": 100.0},
+                "other": {"kappa": 100.0},
+            },
+            "ignore_preview_inflation": False,
+        }
+
+        guard.prepare(model, Mock(), None, policy)
+
+        with torch.no_grad():
+            model.mlp_proj.weight.mul_(50.0)
+
+        result = guard.validate(model, Mock(), {})
+        assert all(
+            violation["type"] != "max_spectral_norm"
+            for violation in result["violations"]
+        )
 
     def test_absolute_cap_disabled_when_none(self):
         class TinyModel(nn.Module):
@@ -523,21 +540,34 @@ class TestRMTGuardComprehensive:
 
     def _create_gpt2_like_model(self):
         """Create a GPT-2-like model for testing."""
-        model = nn.Module()
-        model.transformer = nn.Module()
-        model.transformer.h = nn.ModuleList()
 
-        # Add a transformer layer
-        layer = nn.Module()
-        layer.attn = nn.Module()
-        layer.attn.c_attn = nn.Linear(64, 192)
-        layer.attn.c_proj = nn.Linear(64, 64)
-        layer.mlp = nn.Module()
-        layer.mlp.c_fc = nn.Linear(64, 256)
-        layer.mlp.c_proj = nn.Linear(256, 64)
+        class GPT2LikeModel(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.transformer = nn.Module()
+                self.transformer.h = nn.ModuleList()
 
-        model.transformer.h.append(layer)
-        return model
+                layer = nn.Module()
+                layer.attn = nn.Module()
+                layer.attn.c_attn = nn.Linear(64, 192)
+                layer.attn.c_proj = nn.Linear(64, 64)
+                layer.mlp = nn.Module()
+                layer.mlp.c_fc = nn.Linear(64, 256)
+                layer.mlp.c_proj = nn.Linear(256, 64)
+                self.transformer.h.append(layer)
+
+            def forward(self, input_ids, attention_mask=None):
+                _ = attention_mask
+                x = input_ids.float()
+                if x.dim() > 2:
+                    x = x.reshape(x.shape[0], -1)
+                layer0 = self.transformer.h[0]
+                _ = layer0.attn.c_attn(x)
+                _ = layer0.attn.c_proj(x)
+                h = layer0.mlp.c_fc(x)
+                return layer0.mlp.c_proj(h)
+
+        return GPT2LikeModel()
 
     def test_guard_initialization(self):
         """Test guard initialization."""
@@ -558,21 +588,30 @@ class TestRMTGuardComprehensive:
     def test_prepare_method(self):
         """Test guard preparation."""
         mock_adapter = Mock()
-        mock_calib = Mock()
-        policy = {"margin": 2.0, "deadband": 0.05}
+        calib = [{"input_ids": torch.randint(0, 100, (1, 64))} for _ in range(3)]
+        policy = {
+            "deadband": 0.05,
+            "correct": True,
+            "estimator": {"iters": 2, "init": "ones"},
+            "activation": {
+                "sampling": {"windows": {"count": 2, "indices_policy": "first"}}
+            },
+        }
 
-        result = self.guard.prepare(self.model, mock_adapter, mock_calib, policy)
+        result = self.guard.prepare(self.model, mock_adapter, calib, policy)
 
         assert isinstance(result, dict)
         assert "ready" in result
         assert result["ready"]
         assert "baseline_metrics" in result
         assert self.guard.prepared
-        assert self.guard.baseline_mp_stats is not None
+        assert isinstance(self.guard.baseline_edge_risk_by_family, dict)
 
         # Check that policy was applied
-        assert self.guard.margin == 2.0
         assert self.guard.deadband == 0.05
+        assert self.guard.correct is True
+        assert self.guard.estimator["iters"] == 2
+        assert self.guard.activation_sampling["windows"]["indices_policy"] == "first"
 
     def test_prepare_respects_correction_flag(self):
         """Balanced policy should disable automatic correction."""
@@ -580,7 +619,7 @@ class TestRMTGuardComprehensive:
         result = self.guard.prepare(
             self.model,
             mock_adapter,
-            Mock(),
+            [{"input_ids": torch.randint(0, 100, (1, 64))}],
             {"correct": False},
         )
 
@@ -588,22 +627,32 @@ class TestRMTGuardComprehensive:
         assert self.guard.correct is False
 
     def test_epsilon_rule_enforced_per_family(self):
-        """Finalize flags epsilon-rule violations when guarded outliers exceed allowance."""
+        """Finalize flags epsilon-rule violations when edge-risk exceeds allowance."""
 
-        guard = RMTGuard(epsilon={"attn": 0.0, "ffn": 0.0, "embed": 0.0, "other": 0.0})
-        policy = {"epsilon": {"attn": 0.0, "ffn": 0.0, "embed": 0.0, "other": 0.0}}
-        guard.prepare(self.model, Mock(), None, policy)
-
-        guard._last_result = {
-            "n_layers_flagged": 1,
-            "per_layer": [
-                {
-                    "module_name": "transformer.h.0.attn.c_proj",
-                    "has_outlier": True,
-                    "worst_ratio": 5.0,
-                }
-            ],
-            "max_ratio": 5.0,
+        guard = RMTGuard(
+            epsilon_default=0.0,
+            epsilon_by_family={"attn": 0.0, "ffn": 0.0, "embed": 0.0, "other": 0.0},
+        )
+        policy = {
+            "epsilon_default": 0.0,
+            "epsilon_by_family": {
+                "attn": 0.0,
+                "ffn": 0.0,
+                "embed": 0.0,
+                "other": 0.0,
+            },
+        }
+        guard.prepare(
+            self.model,
+            Mock(),
+            [{"input_ids": torch.randint(0, 100, (1, 64))}],
+            policy,
+        )
+        base = float(guard.baseline_edge_risk_by_family.get("attn", 0.0) or 0.0)
+        assert base > 0.0
+        guard.edge_risk_by_family = {
+            **guard.baseline_edge_risk_by_family,
+            "attn": base * 2.0,
         }
 
         outcome = guard.finalize(self.model)
@@ -1199,11 +1248,13 @@ class TestIntegrationScenarios:
     def test_guards_with_different_policies(self):
         """Test guards with different policy configurations."""
         # Conservative policies
-        spectral_guard = SpectralGuard(kappa=0.90, deadband=0.05, scope="ffn")
+        spectral_guard = SpectralGuard(sigma_quantile=0.90, deadband=0.05, scope="ffn")
         rmt_guard = RMTGuard(q="auto", deadband=0.05, margin=1.3, correct=True)
 
         # Aggressive policies
-        spectral_guard_agg = SpectralGuard(kappa=0.98, deadband=0.15, scope="all")
+        spectral_guard_agg = SpectralGuard(
+            sigma_quantile=0.98, deadband=0.15, scope="all"
+        )
         rmt_guard_agg = RMTGuard(q="auto", deadband=0.15, margin=1.8, correct=True)
 
         # Test RMT guards that support preparation
@@ -1411,21 +1462,34 @@ class TestRMTGuardEdgeCases:
 
     def _create_gpt2_like_model(self):
         """Create a GPT-2-like model for testing."""
-        model = nn.Module()
-        model.transformer = nn.Module()
-        model.transformer.h = nn.ModuleList()
 
-        # Add a transformer layer
-        layer = nn.Module()
-        layer.attn = nn.Module()
-        layer.attn.c_attn = nn.Linear(64, 192)
-        layer.attn.c_proj = nn.Linear(64, 64)
-        layer.mlp = nn.Module()
-        layer.mlp.c_fc = nn.Linear(64, 256)
-        layer.mlp.c_proj = nn.Linear(256, 64)
+        class GPT2LikeModel(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.transformer = nn.Module()
+                self.transformer.h = nn.ModuleList()
 
-        model.transformer.h.append(layer)
-        return model
+                layer = nn.Module()
+                layer.attn = nn.Module()
+                layer.attn.c_attn = nn.Linear(64, 192)
+                layer.attn.c_proj = nn.Linear(64, 64)
+                layer.mlp = nn.Module()
+                layer.mlp.c_fc = nn.Linear(64, 256)
+                layer.mlp.c_proj = nn.Linear(256, 64)
+                self.transformer.h.append(layer)
+
+            def forward(self, input_ids, attention_mask=None):
+                _ = attention_mask
+                x = input_ids.float()
+                if x.dim() > 2:
+                    x = x.reshape(x.shape[0], -1)
+                layer0 = self.transformer.h[0]
+                _ = layer0.attn.c_attn(x)
+                _ = layer0.attn.c_proj(x)
+                h = layer0.mlp.c_fc(x)
+                return layer0.mlp.c_proj(h)
+
+        return GPT2LikeModel()
 
     def test_finalize_without_prepare(self):
         """Test finalize when not prepared."""
@@ -1450,17 +1514,14 @@ class TestRMTGuardEdgeCases:
         assert any(e.get("level") == "WARN" for e in self.guard.events)
 
     def test_apply_rmt_detection_and_correction(self):
-        """Test RMT detection and correction logic."""
-        # Prepare first
-        self.guard.prepare(self.model, None, None, {})
+        """Test RMT post-edit analysis populates edge-risk results."""
+        calib = [{"input_ids": torch.randint(0, 100, (1, 64))}]
+        self.guard.prepare(self.model, None, calib, {"activation_required": True})
+        self.guard.after_edit(self.model)
 
-        # Test the internal detection method
-        result = self.guard._apply_rmt_detection_and_correction(self.model)
-
-        assert isinstance(result, dict)
-        assert "has_outliers" in result
-        assert "per_layer" in result
-        assert isinstance(result["has_outliers"], bool)
+        assert isinstance(self.guard._last_result, dict)
+        assert self.guard._last_result.get("analysis_source") == "activations_edge_risk"
+        assert "edge_risk_by_family" in self.guard._last_result
 
     def test_rmt_utility_functions(self):
         """Test RMT utility functions."""
@@ -1844,7 +1905,7 @@ class TestRMTGuardCoverageBoost:
         assert isinstance(summary, dict)
         assert isinstance(per_layer, list)
         assert "has_outliers" in summary
-        assert "rmt_max_ratio" in summary
+        assert "max_ratio" in summary
 
     def test_layer_svd_stats_comprehensive(self):
         """Test layer_svd_stats with various parameters."""
@@ -1936,54 +1997,41 @@ class TestRMTGuardCoverageBoost:
                 assert "max" in stats["mp_edges"]
 
     def test_guard_finalize_comprehensive(self):
-        """Test RMT guard finalize with different scenarios."""
-        # Test finalize with different violation rates
+        """Test RMT finalize ε-band evaluation."""
         self.guard.prepare(self.model, None, None, {})
 
-        # Simulate low violation rate (should pass)
-        self.guard._last_result = {
-            "has_outliers": True,
-            "n_layers_flagged": 1,
-            "per_layer": [
-                {
-                    "layer": 0,
-                    "module_name": "test",
-                    "has_outlier": True,
-                    "worst_ratio": 1.6,
-                }
-            ],
-            "max_ratio": 1.6,
+        self.guard.baseline_edge_risk_by_family = {
+            "attn": 1.0,
+            "ffn": 1.0,
+            "embed": 0.0,
+            "other": 0.0,
+        }
+        self.guard.edge_risk_by_family = {
+            "attn": 1.4,
+            "ffn": 1.4,
+            "embed": 0.0,
+            "other": 0.0,
+        }
+        self.guard.epsilon_by_family = {
+            "attn": 0.5,
+            "ffn": 0.5,
+            "embed": 0.0,
+            "other": 0.0,
         }
 
         result = self.guard.finalize(self.model)
         metrics = result.metrics if hasattr(result, "metrics") else result["metrics"]
         passed = result.passed if hasattr(result, "passed") else result["passed"]
+        assert passed is True
+        assert metrics["epsilon_violations"] == []
 
-        assert not passed
-        assert metrics["epsilon_violations"], "Expected epsilon violations recorded"
-
-        # Simulate high violation rate (should fail)
-        self.guard._last_result = {
-            "has_outliers": True,
-            "n_layers_flagged": 10,
-            "per_layer": [
-                {
-                    "layer": i,
-                    "module_name": f"test_{i}",
-                    "has_outlier": True,
-                    "worst_ratio": 2.0,
-                }
-                for i in range(10)
-            ],
-            "max_ratio": 2.0,
-        }
-
+        # Exceed allowance → fail
+        self.guard.edge_risk_by_family["attn"] = 1.6
         result = self.guard.finalize(self.model)
         metrics = result.metrics if hasattr(result, "metrics") else result["metrics"]
         passed = result.passed if hasattr(result, "passed") else result["passed"]
-
-        assert not passed
-        assert metrics["epsilon_violations"], "Expected epsilon violations recorded"
+        assert passed is False
+        assert metrics["epsilon_violations"]
 
 
 class TestSpectralGuardCoverageBoost:
@@ -2386,14 +2434,12 @@ class TestSpectralGuardExceptionCoverage:
         assert sigma == 1.0  # Fallback value
 
         # Test with problematic tensor using patching
-        with (
-            patch("torch.linalg.svdvals", side_effect=RuntimeError("svdvals failed")),
-            patch("torch.linalg.svd", side_effect=RuntimeError("svd failed")),
+        with patch(
+            "invarlock.guards.spectral.power_iter_sigma_max",
+            side_effect=RuntimeError("power_iter failed"),
         ):
-            # Create a real tensor and patch SVD routines to fail
             real_tensor = torch.randn(5, 3)
             sigma = compute_sigma_max(real_tensor)
-            # Should catch exception and return fallback value (lines 87-88)
             assert sigma == 1.0
 
     def test_auto_sigma_target_exception_handling(self):
@@ -2835,8 +2881,7 @@ class TestRMTEnhancedCoverage:
         assert isinstance(summary, dict)
         assert isinstance(per_layer, list)
         assert "has_outliers" in summary
-        assert "rmt_max_ratio" in summary
-        assert "rmt_has_outliers" in summary
+        assert "max_ratio" in summary
 
     def test_apply_rmt_correction_comprehensive(self):
         """Test _apply_rmt_correction function (lines 744-834)."""
@@ -2967,12 +3012,16 @@ class TestRMTEnhancedCoverage:
         """Test RMTGuard prepare method failure (lines 1275-1284)."""
         guard = RMTGuard()
 
-        # Mock prepare to fail
         with patch(
-            "invarlock.guards.rmt.capture_baseline_mp_stats",
+            "invarlock.guards.rmt.RMTGuard._collect_calibration_batches",
             side_effect=Exception("Capture failed"),
         ):
-            result = guard.prepare(self.model, None, None, {})
+            result = guard.prepare(
+                self.model,
+                None,
+                [{"input_ids": torch.randint(0, 100, (1, 64))}],
+                {},
+            )
 
             assert isinstance(result, dict)
             assert not result["ready"]
@@ -2999,21 +3048,17 @@ class TestRMTEnhancedCoverage:
         guard.after_edit(self.model)
         assert any(e.get("level") == "WARN" for e in guard.events)
 
-        # Test with preparation and correction enabled
+        # Test with preparation and no activation batches
         guard.prepare(self.model, None, None, {})
-        guard.correct = True
-        guard.after_edit(self.model)
-
-        # Test with preparation and correction disabled
-        guard.correct = False
         guard.after_edit(self.model)
 
         # Test exception handling (lines 1371-1379)
         guard.prepared = True
-        guard.baseline_mp_stats = {"dummy": {}}
         with patch(
-            "invarlock.guards.rmt.rmt_detect", side_effect=Exception("Detection failed")
+            "invarlock.guards.rmt.RMTGuard._compute_activation_edge_risk",
+            side_effect=Exception("Detection failed"),
         ):
+            guard._calibration_batches = [{"input_ids": torch.randint(0, 100, (1, 64))}]
             guard.after_edit(self.model)
             assert any(e.get("level") == "ERROR" for e in guard.events)
 
@@ -3049,39 +3094,24 @@ class TestRMTEnhancedCoverage:
         guard = RMTGuard()
         guard.prepare(self.model, None, None, {})
 
-        # Test with high violation rate (should fail)
-        guard._last_result = {
-            "has_outliers": True,
-            "n_layers_flagged": 10,  # High number
-            "per_layer": [
-                {"has_outlier": True, "module_name": f"layer_{i}", "worst_ratio": 2.0}
-                for i in range(10)
-            ],
-            "max_ratio": 2.0,
-        }
+        guard.baseline_edge_risk_by_family = {"attn": 1.0}
+        guard.edge_risk_by_family = {"attn": 1.4}
+        guard.epsilon_by_family = {"attn": 0.5}
 
         result = guard.finalize(self.model)
         metrics = result.metrics if hasattr(result, "metrics") else result["metrics"]
         passed = result.passed if hasattr(result, "passed") else result["passed"]
 
-        assert not passed
-        assert metrics["epsilon_violations"], "Expected epsilon violations recorded"
+        assert passed is True
+        assert metrics["epsilon_violations"] == []
 
-        # Test with low violation rate (should pass)
-        guard._last_result = {
-            "has_outliers": True,
-            "n_layers_flagged": 1,  # Low number
-            "per_layer": [
-                {"has_outlier": True, "module_name": "layer_0", "worst_ratio": 1.6}
-            ],
-            "max_ratio": 1.6,
-        }
-
+        guard.edge_risk_by_family = {"attn": 1.6}
+        guard.epsilon_by_family = {"attn": 0.0}
         result = guard.finalize(self.model)
         metrics = result.metrics if hasattr(result, "metrics") else result["metrics"]
         passed = result.passed if hasattr(result, "passed") else result["passed"]
 
-        assert not passed
+        assert passed is False
         assert metrics["epsilon_violations"], "Expected epsilon violations recorded"
 
     def test_rmt_guard_get_linear_modules(self):
@@ -3123,21 +3153,12 @@ class TestRMTEnhancedCoverage:
             assert any(name.endswith(suffix) for suffix in guard.allowed_suffixes)
 
     def test_rmt_guard_apply_detection_and_correction(self):
-        """Test RMTGuard _apply_rmt_detection_and_correction method (lines 1115-1148, 1159-1163)."""
+        """Test RMTGuard after_edit produces an analysis result."""
         guard = RMTGuard()
         guard.prepare(self.model, None, None, {})
-
-        # Test detection and correction
-        guard.correct = True
-        result = guard._apply_rmt_detection_and_correction(self.model)
-        assert isinstance(result, dict)
-        assert "has_outliers" in result
-        assert "per_layer" in result
-
-        # Test fallback when no baseline MP stats (lines 1159-1163)
-        guard.baseline_mp_stats = None
-        result = guard._apply_rmt_detection_and_correction(self.model)
-        assert isinstance(result, dict)
+        guard.after_edit(self.model)
+        assert isinstance(guard._last_result, dict)
+        assert guard._last_result.get("analysis_source") == "activations_edge_risk"
 
     def test_rmt_guard_policy_method(self):
         """Test RMTGuard policy method (line 1181)."""

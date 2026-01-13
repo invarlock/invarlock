@@ -1,0 +1,12 @@
+# Edit overlay: RTN quantization, tiny demo (quick smokes).
+
+edit:
+  name: "quant_rtn"
+  plan:
+    bitwidth: 8
+    per_channel: true
+    group_size: 128
+    clamp_ratio: 0.0
+    scope: "attn"
+    max_modules: 4
+    seed: 42

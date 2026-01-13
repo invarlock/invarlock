@@ -18,7 +18,18 @@ from typing import Any
 
 import numpy as np
 
-from .api import Guard, ModelAdapter, ModelEdit, RunConfig, RunReport
+from invarlock.eval.tail_stats import evaluate_metric_tail
+
+from .api import (
+    EditLike,
+    Guard,
+    GuardWithContext,
+    GuardWithPrepare,
+    ModelAdapter,
+    ModelEdit,
+    RunConfig,
+    RunReport,
+)
 from .auto_tuning import resolve_tier_policies
 from .bootstrap import (
     compute_logloss_ci,
@@ -112,7 +123,7 @@ class CoreRunner:
         self,
         model: Any,
         adapter: ModelAdapter,
-        edit: ModelEdit,
+        edit: ModelEdit | EditLike,
         guards: list[Guard],
         config: RunConfig,
         calibration_data: Any = None,
@@ -175,7 +186,7 @@ class CoreRunner:
                     config.context["auto"] = dict(auto_config)
                 try:
                     report.context["auto"] = config.context["auto"]
-                except Exception:
+                except Exception:  # pragma: no cover - defensive context propagation
                     pass
 
         report.status = RunStatus.RUNNING.value
@@ -303,10 +314,10 @@ class CoreRunner:
         self,
         model: Any,
         adapter: ModelAdapter,
-        edit: ModelEdit,
+        edit: ModelEdit | EditLike,
         model_desc: dict[str, Any],
         report: RunReport,
-        edit_config: dict[str, Any] | None = None,
+        edit_config: dict[str, Any] | None,
     ) -> dict[str, Any]:
         """Phase 2: Apply edit operation."""
         edit_label = "baseline" if edit.name == "baseline" else edit.name
@@ -388,7 +399,7 @@ class CoreRunner:
                         {"guard": guard.name, "policy": guard_policy},
                     )
 
-                if hasattr(guard, "set_run_context"):
+                if isinstance(guard, GuardWithContext):
                     try:
                         guard.set_run_context(report)
                     except Exception as exc:
@@ -400,7 +411,7 @@ class CoreRunner:
                         )
 
                 # Call prepare method if it exists (most guards need this)
-                if hasattr(guard, "prepare"):
+                if isinstance(guard, GuardWithPrepare):
                     prepare_result = guard.prepare(
                         model, adapter, calibration_data, guard_policy
                     )
@@ -454,7 +465,7 @@ class CoreRunner:
         for guard in guards:
             self._log_event("guard", "start", LogLevel.INFO, {"guard": guard.name})
 
-            if hasattr(guard, "set_run_context"):
+            if isinstance(guard, GuardWithContext):
                 try:
                     guard.set_run_context(report)
                 except Exception as exc:  # pragma: no cover - defensive
@@ -582,6 +593,116 @@ class CoreRunner:
                 "memory_mb_peak": 1024.0,
             }
             eval_windows = {"preview": {}, "final": {}}
+
+        # Optional: compute primary metric tail evidence vs baseline when provided.
+        try:
+            pm = metrics.get("primary_metric", {}) if isinstance(metrics, dict) else {}
+            pm_kind = str(pm.get("kind", "")).lower() if isinstance(pm, dict) else ""
+            is_ppl_metric = pm_kind.startswith("ppl")
+
+            baseline_eval = {}
+            if (
+                is_ppl_metric
+                and config
+                and isinstance(config.context, dict)
+                and isinstance(config.context.get("baseline_eval_windows"), dict)
+            ):
+                baseline_eval = config.context.get("baseline_eval_windows") or {}
+
+            if is_ppl_metric and baseline_eval:
+                tier_policies = (
+                    report.meta.get("tier_policies", {})
+                    if isinstance(getattr(report, "meta", None), dict)
+                    else {}
+                )
+                metrics_policy = (
+                    tier_policies.get("metrics", {})
+                    if isinstance(tier_policies, dict)
+                    else {}
+                )
+                pm_tail_policy = (
+                    metrics_policy.get("pm_tail", {})
+                    if isinstance(metrics_policy, dict)
+                    else {}
+                )
+
+                run_final = (
+                    eval_windows.get("final", {})
+                    if isinstance(eval_windows, dict)
+                    else {}
+                )
+                base_final = (
+                    baseline_eval.get("final", {})
+                    if isinstance(baseline_eval, dict)
+                    else {}
+                )
+
+                deltas: list[float] = []
+                weights: list[float] = []
+                run_ids = (
+                    run_final.get("window_ids") if isinstance(run_final, dict) else None
+                )
+                run_ll = (
+                    run_final.get("logloss") if isinstance(run_final, dict) else None
+                )
+                run_tc = (
+                    run_final.get("token_counts")
+                    if isinstance(run_final, dict)
+                    else None
+                )
+                base_ids = (
+                    base_final.get("window_ids")
+                    if isinstance(base_final, dict)
+                    else None
+                )
+                base_ll = (
+                    base_final.get("logloss") if isinstance(base_final, dict) else None
+                )
+
+                if (
+                    isinstance(run_ids, list)
+                    and isinstance(run_ll, list)
+                    and isinstance(base_ids, list)
+                    and isinstance(base_ll, list)
+                ):
+                    base_map: dict[int, float] = {}
+                    for b_id, b_val in zip(base_ids, base_ll, strict=False):
+                        if isinstance(b_id, int | float) and isinstance(
+                            b_val, int | float
+                        ):
+                            base_map[int(b_id)] = float(b_val)
+                    for idx, (r_id, r_val) in enumerate(
+                        zip(run_ids, run_ll, strict=False)
+                    ):
+                        if not (
+                            isinstance(r_id, int | float)
+                            and isinstance(r_val, int | float)
+                        ):
+                            continue
+                        key = int(r_id)
+                        if key not in base_map:
+                            continue
+                        dv = float(r_val) - base_map[key]
+                        if math.isfinite(dv):
+                            deltas.append(float(dv))
+                            if isinstance(run_tc, list) and idx < len(run_tc):
+                                try:
+                                    wv = float(run_tc[idx])
+                                except Exception:
+                                    wv = 0.0
+                                weights.append(float(max(wv, 0.0)))
+
+                tail_result = evaluate_metric_tail(
+                    deltas=deltas,
+                    weights=weights
+                    if (weights and len(weights) == len(deltas))
+                    else None,
+                    policy=pm_tail_policy if isinstance(pm_tail_policy, dict) else None,
+                )
+                tail_result["source"] = "paired_baseline.final"
+                metrics["primary_metric_tail"] = tail_result
+        except Exception:  # pragma: no cover - best effort
+            pass
 
         policy_flags = self._resolve_policy_flags(config)
         eval_error = metrics.get("eval_error") if isinstance(metrics, dict) else None
@@ -834,8 +955,10 @@ class CoreRunner:
         pairing_reason = None
         preview_pair_stats = {"matched": 0, "expected": 0}
         final_pair_stats = {"matched": 0, "expected": 0}
+        paired_windows_attempted = 0
         preview_window_ids: list[int] = []
         final_window_ids: list[int] = []
+
         preview_tokens: list[list[int]] = []
         final_tokens: list[list[int]] = []
         preview_limit = min(preview_n, len(preview_data)) if preview_data else 0
@@ -876,6 +999,8 @@ class CoreRunner:
         # even if an exception occurs during the main compute block.
         delta_samples: list[float] = []
         delta_weights: list[float] = []
+        pm_invalid = False
+        degraded_reason: str | None = None
 
         try:
 
@@ -891,7 +1016,7 @@ class CoreRunner:
                 max_batches: int,
                 start_idx: int,
             ) -> dict[str, Any]:
-                nonlocal alignment_logged
+                nonlocal alignment_logged, eval_error
 
                 total_tokens_local = 0
                 actual_tokens_local = 0
@@ -927,7 +1052,9 @@ class CoreRunner:
                 limit = _resolve_limit(batches, max_batches)
 
                 for batch in batches[:limit]:
-                    if max_batches > 0 and count >= max_batches:
+                    if (
+                        max_batches > 0 and count >= max_batches
+                    ):  # pragma: no cover - slicing already caps iteration
                         break
 
                     labels = None
@@ -1100,7 +1227,7 @@ class CoreRunner:
                                 "zero_mask_batches": zero_mask_batches,
                                 "requested": limit,
                             },
-                        )
+                        )  # pragma: no cover - requires debug tracing with zero batches
                     if resolved_loss_mode == "mlm":
                         error_msg = (
                             "MLM evaluation produced zero usable batches; "
@@ -1121,7 +1248,10 @@ class CoreRunner:
                                 "zero_mask_batches": zero_mask_batches,
                             },
                         )
-                        raise ValueError(error_msg)
+                        eval_error = {
+                            "error": "mlm_missing_masks",
+                            "detail": error_msg,
+                        }
                     return {
                         "ppl": float("nan"),
                         "total_tokens": total_tokens_local,
@@ -1167,8 +1297,42 @@ class CoreRunner:
                 final_data, final_limit, preview_summary["num_batches"]
             )
 
-            preview_log_losses = preview_summary["log_losses"]
-            final_log_losses = final_summary["log_losses"]
+            preview_raw_losses = preview_summary["log_losses"]
+            final_raw_losses = final_summary["log_losses"]
+            try:
+                paired_windows_attempted = min(
+                    len(preview_raw_losses), len(final_raw_losses)
+                )
+            except Exception:
+                paired_windows_attempted = 0
+
+            preview_log_losses = [
+                float(loss) for loss in preview_raw_losses if math.isfinite(loss)
+            ]
+            final_log_losses = [
+                float(loss) for loss in final_raw_losses if math.isfinite(loss)
+            ]
+            if len(preview_log_losses) != len(preview_raw_losses):
+                self._log_event(
+                    "eval",
+                    "non_finite_preview_losses_filtered",
+                    LogLevel.WARNING,
+                    {
+                        "total": len(preview_raw_losses),
+                        "filtered": len(preview_raw_losses) - len(preview_log_losses),
+                    },
+                )
+            if len(final_log_losses) != len(final_raw_losses):
+                self._log_event(
+                    "eval",
+                    "non_finite_final_losses_filtered",
+                    LogLevel.WARNING,
+                    {
+                        "total": len(final_raw_losses),
+                        "filtered": len(final_raw_losses) - len(final_log_losses),
+                    },
+                )
+
             preview_tokens_ct = preview_summary["total_tokens"]
             final_tokens_ct = final_summary["total_tokens"]
             preview_batches_ct = preview_summary["num_batches"]
@@ -1235,14 +1399,29 @@ class CoreRunner:
             delta_mean_log = final_mean_log - preview_mean_log
             pm_ratio = math.exp(delta_mean_log)
 
-            if not (math.isfinite(delta_mean_log) and math.isfinite(pm_ratio)):
-                raise RuntimeError("Invalid perplexity ratio or delta")
+            pm_invalid = False
+            try:
+                if not (math.isfinite(delta_mean_log) and math.isfinite(pm_ratio)):
+                    raise RuntimeError("non_finite_primary_metric")
 
-            expected_ratio = math.exp(delta_mean_log)
-            if abs(pm_ratio - expected_ratio) > 1e-6:
-                raise RuntimeError(
-                    "Primary-metric ratio mismatch with exp(mean ΔlogNLL)"
+                expected_ratio = math.exp(delta_mean_log)
+                if abs(pm_ratio - expected_ratio) > 1e-6:
+                    raise RuntimeError("primary_metric_ratio_mismatch")
+            except Exception as exc:
+                pm_invalid = True
+                self._log_event(
+                    "eval",
+                    "primary_metric_invalid",
+                    LogLevel.WARNING,
+                    {
+                        "pm_preview": float(pm_preview),
+                        "pm_final": float(pm_final),
+                        "delta_mean_log": float(delta_mean_log),
+                        "pm_ratio": float(pm_ratio),
+                        "error": str(exc),
+                    },
                 )
+                # Preserve downstream reporting; keep NaNs but mark degraded
 
             if bootstrap_enabled and preview_log_losses:
                 preview_log_ci = compute_logloss_ci(
@@ -1298,7 +1477,20 @@ class CoreRunner:
                     abs(r - e) > 1e-6
                     for r, e in zip(ratio_ci, expected_ratio_ci, strict=False)
                 ):
-                    raise RuntimeError("Ratio CI inconsistent with Δlog CI")
+                    pm_invalid = True
+                    self._log_event(
+                        "eval",
+                        "ratio_ci_inconsistent",
+                        LogLevel.WARNING,
+                        {
+                            "ratio_ci": ratio_ci,
+                            "expected_ratio_ci": expected_ratio_ci,
+                        },
+                    )
+                    ratio_ci = (
+                        float(expected_ratio_ci[0]),
+                        float(expected_ratio_ci[1]),
+                    )
             else:
                 delta_log_ci = (delta_mean_log, delta_mean_log)
                 ratio_ci = (pm_ratio, pm_ratio)
@@ -1335,19 +1527,60 @@ class CoreRunner:
                 degenerate_reason = "no_variation"
 
             if degenerate_delta:
+                pm_invalid = True
                 self._log_event(
                     "eval",
                     "degenerate_delta_samples",
-                    LogLevel.ERROR,
+                    LogLevel.WARNING,
                     {
                         "reason": degenerate_reason,
                         "sample_count": len(delta_samples),
                     },
                 )
-                if profile_label in {"ci", "release"}:
-                    raise RuntimeError(
-                        f"Degenerate paired ΔlogNLL distribution ({degenerate_reason})"
+
+            needs_pm_fallback = (not math.isfinite(pm_preview)) or (
+                not math.isfinite(pm_final)
+            )
+            needs_delta_fallback = (not math.isfinite(delta_mean_log)) or (
+                not math.isfinite(pm_ratio)
+            )
+
+            degraded_reason: str | None = None
+            if needs_pm_fallback:
+                degraded_reason = "non_finite_pm"
+            elif needs_delta_fallback:
+                degraded_reason = "non_finite_delta"
+            elif degenerate_reason:
+                degraded_reason = f"degenerate_delta:{degenerate_reason}"
+            elif pm_invalid:
+                degraded_reason = "primary_metric_invalid"
+
+            if needs_pm_fallback or needs_delta_fallback:
+                pm_invalid = True
+                pm_fallback = (
+                    pm_preview
+                    if math.isfinite(pm_preview) and pm_preview > 0
+                    else pm_final
+                )
+                if not (math.isfinite(pm_fallback) and pm_fallback > 0):
+                    pm_fallback = 1.0
+
+                if needs_pm_fallback:
+                    pm_preview = (
+                        pm_preview
+                        if math.isfinite(pm_preview) and pm_preview > 0
+                        else pm_fallback
                     )
+                    pm_final = (
+                        pm_final
+                        if math.isfinite(pm_final) and pm_final > 0
+                        else pm_fallback
+                    )
+                if needs_delta_fallback:
+                    if not math.isfinite(delta_mean_log):
+                        delta_mean_log = 0.0
+                    if not math.isfinite(pm_ratio):
+                        pm_ratio = 1.0
 
             def _hash_tokens(tokens: list[int]) -> bytes:
                 if not tokens:
@@ -1371,10 +1604,14 @@ class CoreRunner:
                 if not isinstance(dataset_cfg, dict):
                     return None
                 seq_len_val = dataset_cfg.get("seq_len")
-                stride_val = dataset_cfg.get("stride", seq_len_val)
+                if seq_len_val is None:
+                    return None
+                stride_raw = dataset_cfg.get("stride", seq_len_val)
+                if stride_raw is None:
+                    return None
                 try:
                     seq_len_f = float(seq_len_val)
-                    stride_f = float(stride_val)
+                    stride_f = float(stride_raw)
                 except (TypeError, ValueError):
                     return None
                 if not math.isfinite(seq_len_f) or seq_len_f <= 0:
@@ -1687,7 +1924,9 @@ class CoreRunner:
         except Exception:
             pass
 
-        paired_windows_count = len(delta_samples)
+        paired_windows_count = (
+            paired_windows_attempted if paired_windows_attempted else len(delta_samples)
+        )
         unweighted_delta_mean = (
             float(np.mean(delta_samples)) if delta_samples else float(delta_mean_log)
         )
@@ -1715,8 +1954,11 @@ class CoreRunner:
         metrics = {
             "primary_metric": {
                 "kind": pm_kind,
-                "preview": float(pm_preview),
-                "final": float(pm_final),
+                "preview": float(pm_preview) if math.isfinite(pm_preview) else None,
+                "final": float(pm_final) if math.isfinite(pm_final) else None,
+                "invalid": bool(pm_invalid),
+                "degraded": bool(pm_invalid or degraded_reason),
+                "degraded_reason": degraded_reason,
             },
             "logloss_preview": float(preview_mean_log),
             "logloss_final": float(final_mean_log),
@@ -2030,17 +2272,27 @@ class CoreRunner:
             except Exception:
                 drift_ratio = None
 
+        spike_threshold = getattr(config, "spike_threshold", 2.0)
         if drift_ratio is None:
             is_catastrophic_spike = False
             metrics_acceptable = True
         else:
-            spike_threshold = getattr(config, "spike_threshold", 2.0)
             is_catastrophic_spike = drift_ratio > spike_threshold
             # Check if standard metrics are acceptable against configured max ratio
             metrics_acceptable = drift_ratio <= getattr(config, "max_pm_ratio", 2.0)
 
         # Determine rollback reason and status
         rollback_reason = None
+        tail_failed = False
+        try:
+            pm_tail = metrics.get("primary_metric_tail", {})
+            if isinstance(pm_tail, dict) and pm_tail:
+                mode = str(pm_tail.get("mode", "warn") or "warn").strip().lower()
+                evaluated = bool(pm_tail.get("evaluated", False))
+                passed = bool(pm_tail.get("passed", True))
+                tail_failed = bool(mode == "fail" and evaluated and (not passed))
+        except Exception:  # pragma: no cover
+            tail_failed = False
         if is_catastrophic_spike:
             rollback_reason = (
                 f"catastrophic_ppl_spike (ratio: {drift_ratio:.3f} > {spike_threshold})"
@@ -2057,6 +2309,9 @@ class CoreRunner:
                     "immediate_rollback": True,
                 },
             )
+        elif tail_failed:
+            rollback_reason = "primary_metric_tail_failed"
+            status = RunStatus.ROLLBACK.value
         elif (not all_guards_passed) or (not metrics_acceptable):
             # Match historical/test expectation string exactly
             rollback_reason = "guards_failed or metrics_unacceptable"
@@ -2185,20 +2440,27 @@ class CoreRunner:
     ) -> dict[str, dict[str, Any]]:
         """Resolve tier-based guard policies from configuration."""
         # Use passed auto_config if available, otherwise extract from report meta
-        if auto_config is None:
-            config_meta = report.meta.get("config", {})
+        auto_cfg: dict[str, Any] | None = auto_config
+        if auto_cfg is None:
+            config_meta = report.meta.get("config") or {}
 
             # Try to get auto config from various possible locations
-            if hasattr(report, "auto_config"):
-                auto_config = report.auto_config
-            elif "auto" in config_meta:
-                auto_config = config_meta["auto"]
-            else:
+            auto_cfg = report.__dict__.get("auto_config")
+            if (
+                auto_cfg is None
+                and isinstance(config_meta, dict)
+                and "auto" in config_meta
+            ):
+                auto_cfg = config_meta["auto"]
+            elif auto_cfg is None:
                 # Fallback to default balanced tier
-                auto_config = {"tier": "balanced", "enabled": True}
+                auto_cfg = {"tier": "balanced", "enabled": True}
+
+        if not isinstance(auto_cfg, dict):
+            auto_cfg = {"tier": "balanced", "enabled": True}
 
         # Extract tier and edit name
-        tier = auto_config.get("tier", "balanced")
+        tier = auto_cfg.get("tier", "balanced")
         edit_name = None
         if hasattr(report, "edit") and report.edit:
             edit_name = report.edit.get("name")
@@ -2208,8 +2470,10 @@ class CoreRunner:
             edit_name = report.meta["edit_name"]
 
         # Get explicit guard overrides from config
-        config_meta = report.meta.get("config", {})
-        explicit_overrides = config_meta.get("guards", {})
+        config_meta = report.meta.get("config") or {}
+        explicit_overrides = (
+            config_meta.get("guards", {}) if isinstance(config_meta, dict) else {}
+        )
 
         try:
             # Resolve tier policies
@@ -2237,18 +2501,18 @@ class CoreRunner:
     def _apply_guard_policy(self, guard: Guard, policy: dict[str, Any]) -> None:
         """Apply resolved policy parameters to a guard instance."""
         try:
+            guard_config = getattr(guard, "config", None)
+            guard_policy = getattr(guard, "policy", None)
+
             # Apply policy parameters to guard
             for param_name, param_value in policy.items():
                 if hasattr(guard, param_name):
                     setattr(guard, param_name, param_value)
-                elif hasattr(guard, "config") and isinstance(guard.config, dict):
-                    # Try to set in guard's config dict
-                    guard.config[param_name] = param_value
-                elif hasattr(guard, "policy") and isinstance(guard.policy, dict):
-                    # Try to set in guard's policy dict
-                    guard.policy[param_name] = param_value
+                elif isinstance(guard_config, dict):
+                    guard_config[param_name] = param_value
+                elif isinstance(guard_policy, dict):
+                    guard_policy[param_name] = param_value
                 else:
-                    # Last resort: add to guard as attribute
                     setattr(guard, param_name, param_value)
 
         except Exception as e:

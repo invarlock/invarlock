@@ -10,6 +10,7 @@ overlap=0.0).
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -220,9 +221,8 @@ def _validate_drift_band(certificate: dict[str, Any]) -> list[str]:
 def _validate_tokenizer_hash(certificate: dict[str, Any]) -> list[str]:
     """Validate tokenizer hash consistency between baseline and edited runs.
 
-    The check is enforced only when both hashes are present to preserve
-    compatibility with legacy certificates. When present and different,
-    the verification fails.
+    The check is enforced only when both hashes are present. When present and
+    different, the verification fails.
     """
     errors: list[str] = []
     meta = certificate.get("meta", {}) or {}
@@ -244,7 +244,7 @@ def _validate_tokenizer_hash(certificate: dict[str, Any]) -> list[str]:
     if isinstance(edited_hash, str) and isinstance(baseline_hash, str):
         if edited_hash and baseline_hash and edited_hash != baseline_hash:
             errors.append("Tokenizer hash mismatch between baseline and edited runs.")
-    # If either hash is missing, skip the check for backward compatibility
+    # If either hash is missing, skip the check
     return errors
 
 
@@ -257,6 +257,74 @@ def _resolve_path(payload: Any, path: str) -> Any:
         else:
             return None
     return current
+
+
+def _measurement_contract_digest(contract: Any) -> str | None:
+    if not isinstance(contract, dict) or not contract:
+        return None
+    try:
+        canonical = json.dumps(contract, sort_keys=True, default=str)
+    except Exception:
+        return None
+    return hashlib.sha256(canonical.encode()).hexdigest()[:16]
+
+
+def _validate_measurement_contracts(
+    certificate: dict[str, Any], *, profile: str
+) -> list[str]:
+    """Enforce measurement-contract presence and baseline pairing for guards."""
+    errors: list[str] = []
+    prof = (profile or "").strip().lower()
+    resolved_policy = certificate.get("resolved_policy") or {}
+
+    for guard_key in ("spectral", "rmt"):
+        block = certificate.get(guard_key) or {}
+        if not isinstance(block, dict):
+            continue
+        evaluated = bool(block.get("evaluated", True))
+        if not evaluated:
+            continue
+
+        mc = block.get("measurement_contract")
+        mc_hash = _measurement_contract_digest(mc)
+        expected_hash = block.get("measurement_contract_hash")
+        if not isinstance(mc, dict) or not mc:
+            errors.append(f"Certificate missing {guard_key}.measurement_contract.")
+        elif isinstance(expected_hash, str) and expected_hash:
+            if mc_hash and mc_hash != expected_hash:
+                errors.append(
+                    f"{guard_key}.measurement_contract_hash mismatch: expected={expected_hash}, computed={mc_hash}."
+                )
+        else:
+            errors.append(f"Certificate missing {guard_key}.measurement_contract_hash.")
+
+        rp_guard = (
+            resolved_policy.get(guard_key)
+            if isinstance(resolved_policy, dict)
+            else None
+        )
+        rp_mc = (
+            rp_guard.get("measurement_contract") if isinstance(rp_guard, dict) else None
+        )
+        rp_hash = _measurement_contract_digest(rp_mc)
+        if not isinstance(rp_mc, dict) or not rp_mc:
+            errors.append(
+                f"Certificate missing resolved_policy.{guard_key}.measurement_contract."
+            )
+        elif mc_hash and rp_hash and mc_hash != rp_hash:
+            errors.append(
+                f"{guard_key} measurement_contract differs between analysis and resolved_policy "
+                f"(analysis={mc_hash}, resolved_policy={rp_hash})."
+            )
+
+        if prof in {"ci", "release"}:
+            match = block.get("measurement_contract_match")
+            if match is not True:
+                errors.append(
+                    f"{guard_key} measurement contract must match baseline for {prof} profile."
+                )
+
+    return errors
 
 
 def _apply_profile_lints(certificate: dict[str, Any]) -> list[str]:
@@ -343,6 +411,12 @@ def _validate_certificate_payload(
         errors.extend(_validate_drift_band(certificate))
     errors.extend(_apply_profile_lints(certificate))
     errors.extend(_validate_tokenizer_hash(certificate))
+    if prof in {"ci", "release"}:
+        errors.extend(_validate_measurement_contracts(certificate, profile=prof))
+
+    # strict/fast assurance mode checks were removed; verification gates rely on
+    # structural schema + guard metric contracts instead.
+
     # Release-only enforcement: guard overhead must be measured or explicitly skipped.
     if prof == "release":
         go = certificate.get("guard_overhead")

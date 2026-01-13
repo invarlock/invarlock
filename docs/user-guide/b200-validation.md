@@ -23,6 +23,15 @@ The InvarLock B200 Validation Suite (`scripts/b200_validation_suite.sh`) is a co
 # Resume a failed or interrupted run
 OUTPUT_DIR=./invarlock_validation_b200_20241208_123456 \
   ./scripts/b200_validation_suite.sh --resume
+
+# Optional: split calibration from the rest of the suite
+# 1) Run calibration + preset generation only (checkpoint)
+OUTPUT_DIR=./invarlock_validation_b200_20241208_123456 \
+  ./scripts/b200_validation_suite.sh --calibrate-only
+
+# 2) Continue from the calibration checkpoint (implies --resume when a queue exists)
+OUTPUT_DIR=./invarlock_validation_b200_20241208_123456 \
+  ./scripts/b200_validation_suite.sh --run-only
 ```
 
 On a fresh B200 node, you can bootstrap dependencies and run the suite via `scripts/b200_bootstrap_and_validate.sh`.
@@ -107,7 +116,7 @@ The suite uses dynamic work-stealing scheduling with optimized task prioritizati
 
 Tasks are prioritized to maximize GPU utilization:
 
-```
+```text
 Priority Queue (higher = runs first)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -135,6 +144,7 @@ Priority Queue (higher = runs first)
 ```
 
 **Why small_first works**:
+
 - Small tasks (1 GPU) complete quickly → GPUs free up → more parallelism
 - Large tasks scale to multiple GPUs only when the profile-based planner says they cannot fit
 - Scheduler avoids nested lock contention and cleans stale GPU reservations automatically
@@ -144,7 +154,7 @@ Note: Priority values are illustrative; dynamic boosts and caps apply in `schedu
 
 Work-stealing enabled scheduler that maximizes GPU utilization:
 
-```
+```text
                     ┌──────────────────────┐
                     │   MAIN SCRIPT        │
                     │ (main_dynamic)       │
@@ -209,7 +219,7 @@ on `device_map="auto"` sharding in adapters.
 
 When a task is claimed, the scheduler reserves the required GPUs to prevent conflicts:
 
-```
+```text
 Task: llama-2-70b_EVAL_BASELINE requires 1 GPU
 Example shown for an 8-GPU node (GPU_ID_LIST=0,1,2,3,4,5,6,7)
 
@@ -235,7 +245,7 @@ Example shown for an 8-GPU node (GPU_ID_LIST=0,1,2,3,4,5,6,7)
 
 **Lock File Structure**:
 
-```
+```text
 queue/scheduler.lock
 workers/gpu_reservations/
 ├── gpu_1.lock          # Contains: "llama-2-70b_EVAL_BASELINE_001"
@@ -262,7 +272,7 @@ fewer GPUs than the plan, you can lower the minimum GPU requirement in
 
 Tasks flow through these states:
 
-```
+```text
 ┌─────────┐    ┌───────┐    ┌─────────┐    ┌───────────┐
 │ PENDING │───▶│ READY │───▶│ RUNNING │───▶│ COMPLETED │
 └─────────┘    └───────┘    └─────────┘    └───────────┘
@@ -287,11 +297,11 @@ The scheduler uses two key optimizations to maximize GPU utilization (batch path
 
 **Split Eval Benchmarks**: Instead of running all 4 lm-eval benchmarks (MMLU, HellaSwag, ARC, WinoGrande) in a single task, each benchmark runs as a separate task. This enables 4× parallelism for evaluation tasks.
 
-```
+```text
 Optimization Impact:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Before (Legacy):
+Before (Per-edit):
   8× CREATE_EDIT tasks (model load each time)  ─┐
   8× EVAL_EDIT tasks (all 4 benchmarks)         ├─ Sequential bottleneck
                                                ─┘
@@ -304,13 +314,13 @@ After (Batch + Split):
 Result: Estimated ~62% faster execution on 8× B200 cluster
 ```
 
-**Large or MoE models (70B+ or Mixtral-class)** skip batch edits and use legacy per-edit tasks (CREATE_EDIT → EVAL_EDIT → CERTIFY_EDIT), so split eval is not used there.
+**Large or MoE models (70B+ or Mixtral-class)** skip batch edits and use per-edit tasks (CREATE_EDIT → EVAL_EDIT → CERTIFY_EDIT), so split eval is not used there.
 
 ### Task Breakdown Per Model
 
 Each model generates approximately 71 tasks with Batch + Split optimization. Large or MoE models use per-edit tasks and generate fewer total tasks.
 
-```
+```text
 Tasks Per Model (~71 total, batch enabled)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -358,7 +368,7 @@ Error Injection (if enabled):
                           ~54 tasks/model when batch edits are disabled for 70B+
 ```
 
-```
+```text
 Tasks Per Model (~54 total, per-edit for 70B+)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -373,7 +383,7 @@ Edit Creation (Per-Edit):
   └── 8× CREATE_EDIT
                                               Total: 8
 
-Edit Evaluation (Legacy):
+Edit Evaluation (Benchmarking):
   └── 8× EVAL_EDIT (all benchmarks per edit)
                                               Total: 8
 
@@ -395,7 +405,7 @@ Error Injection (if enabled):
 
 The following shows how tasks depend on each other (with Batch + Split optimization):
 
-```
+```text
                       ┌────────────────────┐
                       │  SETUP_BASELINE    │  Priority: 90
                       │  (download model)  │
@@ -437,6 +447,7 @@ The following shows how tasks depend on each other (with Batch + Split optimizat
 ```
 
 **Key Optimization Notes**:
+
 - `CREATE_EDITS_BATCH` loads the model once and creates all 8 edits (vs 8 separate loads)
 - Split eval tasks (`EVAL_MMLU`, `EVAL_HELLASWAG`, `EVAL_ARC`, `EVAL_WINOGRANDE`) can run on different GPUs
 - `CERTIFY_EDIT` depends on `CREATE_EDITS_BATCH` and `GENERATE_PRESET`, but NOT on eval tasks
@@ -446,7 +457,7 @@ For 70B+ per-edit mode: `CREATE_EDIT → EVAL_EDIT → CERTIFY_EDIT` (no split e
 
 The following shows the per-edit dependency graph for 70B+ models:
 
-```
+```text
                       ┌────────────────────┐
                       │  SETUP_BASELINE    │  Priority: 90
                       │  (download model)  │
@@ -456,7 +467,7 @@ The following shows the per-edit dependency graph for 70B+ models:
         ▼                       ▼                       ▼
  ┌─────────────┐      ┌────────────────┐      ┌─────────────────────┐
  │EVAL_BASELINE│      │CALIBRATION_RUN │      │    CREATE_EDIT      │
- │ (lm-eval)   │      │    × 5 runs    │      │ (per-edit, legacy)  │
+ │ (lm-eval)   │      │    × 5 runs    │      │ (per-edit)          │
  │ pri:80      │      │    pri:85      │      │ pri:70              │
  └─────────────┘      └────────┬───────┘      └─────────┬───────────┘
                                │                        │
@@ -480,7 +491,7 @@ The following shows the per-edit dependency graph for 70B+ models:
 
 Each GPU runs a continuous worker loop:
 
-```
+```text
                 ┌─────────────────────────────┐
                 │      START gpu_worker       │
                 └──────────────┬──────────────┘
@@ -542,7 +553,7 @@ Note: Dependency promotion (pending→ready) is handled by the main monitor loop
 
 The scheduler only claims tasks that fit in available GPU memory:
 
-```
+```text
 GPU 6: 180GB total, 35GB free (70B model loaded)
 
   Ready queue scan (includes safety margin):
@@ -565,7 +576,7 @@ With dynamic scheduling, any GPU can claim any task. Small model tasks complete 
 
 Example shown for an 8-GPU node (GPU_ID_LIST=0,1,2,3,4,5,6,7).
 
-```
+```text
 Time→   T=0                    T=50%                  T=100%
 
 GPU 0   ████ small ████ small ████ large (helping) ████░░░░░░
@@ -684,10 +695,10 @@ Atomic task implementations for each task type:
   - `task_generate_preset()` - Create calibration preset
 - **lm-eval**:
   - `task_eval_baseline()` - Baseline lm-eval
-  - `task_eval_edit()` - Edited-model lm-eval (legacy: all benchmarks in one task)
+  - `task_eval_edit()` - Edited-model lm-eval (monolithic: all benchmarks in one task)
   - `task_eval_single_benchmark()` - Split eval for one benchmark (MMLU, HellaSwag, ARC, WinoGrande)
 - **Edit Creation**:
-  - `task_create_edit()` - Apply a single quantization/pruning/SVD edit (legacy)
+  - `task_create_edit()` - Apply a single quantization/pruning/SVD edit (per-edit)
   - `task_create_edits_batch()` - Create all 8 edits with a single model load (batch optimization)
 - **Certification & Errors**:
   - `task_certify_edit()` - InvarLock certify for an edit
@@ -734,7 +745,7 @@ Retry policies and recovery hooks:
 
 The validation suite executes in these phases:
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │  PHASE 0: Environment Setup                                 │
 │  - Dependency check (torch, transformers, lm_eval, etc.)    │
@@ -828,6 +839,7 @@ Bootstrap defaults are 2000 for small/medium models and 1000 for >=30B.
 |----------|---------|-------------|
 | `INVARLOCK_DATASET` | `wikitext2` | Evaluation dataset |
 | `INVARLOCK_TIER` | `balanced` | Guard tier preset |
+| `B200_GUARDS_ORDER` | unset | Override InvarLock guard order for generated configs/presets (comma-separated; e.g. `invariants,spectral,rmt,variance,invariants`) |
 | `INVARLOCK_BOOTSTRAP_N` | unset | Bootstrap replicates override (defaults: 2000, 1000 for ≥30B) |
 | `INVARLOCK_PM_ACCEPTANCE_MIN` | `0.90` | Primary metric lower bound |
 | `INVARLOCK_PM_ACCEPTANCE_MAX` | `1.20` | Primary metric upper bound |
@@ -895,7 +907,7 @@ B200_DETERMINISM=strict ./scripts/b200_validation_suite.sh
 
 ## Output Structure
 
-```
+```text
 invarlock_validation_b200_20241208_123456/
 ├── logs/
 │   ├── main.log                    # Overall execution log
@@ -961,21 +973,25 @@ invarlock_validation_b200_20241208_123456/
 **Solutions**:
 
 1. Skip overhead check:
+
    ```bash
    INVARLOCK_SKIP_OVERHEAD_CHECK=1 ./scripts/b200_validation_suite.sh
    ```
 
 2. Ensure single model per GPU - check no other processes are using GPU memory:
+
    ```bash
    nvidia-smi --query-gpu=index,memory.used,memory.free --format=csv
    ```
 
 3. Use a lighter guard tier for reduced overhead:
+
    ```bash
    INVARLOCK_TIER=dev
    ```
 
 4. Reduce eval batch caps for large models:
+
    ```bash
    EVAL_BATCH_SIZE_LARGE=auto:2 ./scripts/b200_validation_suite.sh
    ```
@@ -992,11 +1008,13 @@ invarlock_validation_b200_20241208_123456/
 **Solutions**:
 
 1. Increase the default timeout:
+
    ```bash
    TASK_TIMEOUT_DEFAULT=28800 ./scripts/b200_validation_suite.sh
    ```
 
 2. Override a specific task type:
+
    ```bash
    TASK_TIMEOUT_CREATE_EDIT=28800 ./scripts/b200_validation_suite.sh
    ```
@@ -1008,6 +1026,7 @@ invarlock_validation_b200_20241208_123456/
 **Solutions**:
 
 1. Rerun calibration to regenerate preset:
+
    ```bash
    # Remove existing calibration
    rm -rf ${OUTPUT_DIR}/{model_name}/certificates/calibration
@@ -1016,6 +1035,7 @@ invarlock_validation_b200_20241208_123456/
    ```
 
 2. Check preset directory exists and contains YAML files:
+
    ```bash
    ls -la ${OUTPUT_DIR}/presets/
    ```
@@ -1058,11 +1078,13 @@ grep -i error ${OUTPUT_DIR}/logs/*.log
 **Solutions**:
 
 1. Manually move stuck tasks back to pending:
+
    ```bash
    mv ${OUTPUT_DIR}/queue/running/*.task ${OUTPUT_DIR}/queue/pending/
    ```
 
 2. Check for dependency cycles (should not occur but verify):
+
    ```bash
    cat ${OUTPUT_DIR}/queue/pending/*.task | jq -r '.dependencies[]'
    ```
@@ -1074,11 +1096,13 @@ grep -i error ${OUTPUT_DIR}/logs/*.log
 **Solutions**:
 
 1. Skip Flash Attention entirely:
+
    ```bash
    SKIP_FLASH_ATTN=true ./scripts/b200_validation_suite.sh
    ```
 
 2. Install Python development headers:
+
    ```bash
    apt-get install python3-dev  # or python3.X-dev
    ```

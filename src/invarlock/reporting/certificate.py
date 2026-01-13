@@ -35,6 +35,7 @@ from invarlock.core.bootstrap import (
     logspace_to_ratio_ci,
 )
 from invarlock.eval.primary_metric import compute_primary_metric_from_report, get_metric
+from invarlock.eval.tail_stats import evaluate_metric_tail
 from invarlock.utils.digest import hash_json
 
 from . import certificate_schema as _cert_schema
@@ -81,7 +82,7 @@ TIER_RATIO_LIMITS: dict[str, float] = {
 def _is_ppl_kind(name: Any) -> bool:
     """Return True if a primary_metric kind denotes a ppl-like metric.
 
-    Supports legacy and alternate names to stay resilient across schema variants.
+    Supports alternate names to stay resilient across schema variants.
     """
     try:
         n = str(name or "").lower()
@@ -100,7 +101,7 @@ def _is_ppl_kind(name: Any) -> bool:
     }
 
 
-## NOTE: Deprecated legacy helper `_get_ppl_final` was removed; callers should
+## NOTE: Deprecated helper `_get_ppl_final` was removed; callers should
 ## use the normalized primary_metric block directly via make_certificate or
 ## report processing utilities.
 
@@ -391,6 +392,7 @@ def _compute_thresholds_hash(payload: dict[str, Any]) -> str:
 # Allow-list loader with safe defaults for validation keys
 _VALIDATION_ALLOWLIST_DEFAULT = {
     "primary_metric_acceptable",
+    "primary_metric_tail_acceptable",
     "preview_final_drift_acceptable",
     "guard_overhead_acceptable",
     "invariants_pass",
@@ -789,6 +791,19 @@ def make_certificate(
         )
         if isinstance(det, dict) and det:
             meta["determinism"] = det
+    except Exception:  # pragma: no cover
+        pass
+
+    # Execution profile provenance when available via run context.
+    try:
+        ctx = report.get("context") if isinstance(report, dict) else None
+        ctx_profile = (
+            str(ctx.get("profile") or "").strip().lower()
+            if isinstance(ctx, dict)
+            else ""
+        )
+        if ctx_profile:
+            meta["profile"] = ctx_profile
     except Exception:  # pragma: no cover
         pass
 
@@ -1518,7 +1533,10 @@ def make_certificate(
     )
     overrides_list = _extract_policy_overrides(report)
     resolved_digest = _compute_policy_digest(
-        {"resolved_policy": resolved_policy, "overrides": overrides_list}
+        {
+            "resolved_policy": resolved_policy,
+            "overrides": overrides_list,
+        }
     )
     policy_provenance = {
         "tier": auto.get("tier", "balanced"),
@@ -1738,6 +1756,104 @@ def make_certificate(
 
     pm_acceptance_range = _resolve_pm_acceptance_range_from_report(report)
 
+    # Primary metric tail evidence and gate evaluation (ΔlogNLL vs baseline, per-window).
+    pm_tail_result: dict[str, Any] = {}
+    try:
+        pm_kind = None
+        try:
+            pm_block = (
+                report.get("metrics", {}).get("primary_metric")
+                if isinstance(report.get("metrics"), dict)
+                else None
+            )
+            if isinstance(pm_block, dict):
+                pm_kind = pm_block.get("kind")
+        except Exception:  # pragma: no cover
+            pm_kind = None
+
+        pm_tail_policy: dict[str, Any] = {}
+        try:
+            metrics_pol = (
+                resolved_policy.get("metrics", {})
+                if isinstance(resolved_policy, dict)
+                else {}
+            )
+            if isinstance(metrics_pol, dict) and isinstance(
+                metrics_pol.get("pm_tail"), dict
+            ):
+                pm_tail_policy = dict(metrics_pol.get("pm_tail") or {})
+        except Exception:  # pragma: no cover
+            pm_tail_policy = {}
+
+        deltas: list[float] = []
+        weights: list[float] = []
+        if _is_ppl_kind(pm_kind):
+            run_windows = (
+                report.get("evaluation_windows", {}).get("final", {})
+                if isinstance(report.get("evaluation_windows"), dict)
+                else {}
+            )
+            base_windows = (
+                baseline_normalized.get("evaluation_windows", {}).get("final", {})
+                if isinstance(baseline_normalized.get("evaluation_windows"), dict)
+                else {}
+            )
+            run_ids = (
+                run_windows.get("window_ids") if isinstance(run_windows, dict) else None
+            )
+            run_ll = (
+                run_windows.get("logloss") if isinstance(run_windows, dict) else None
+            )
+            run_tc = (
+                run_windows.get("token_counts")
+                if isinstance(run_windows, dict)
+                else None
+            )
+            base_ids = (
+                base_windows.get("window_ids")
+                if isinstance(base_windows, dict)
+                else None
+            )
+            base_ll = (
+                base_windows.get("logloss") if isinstance(base_windows, dict) else None
+            )
+            if (
+                isinstance(run_ids, list)
+                and isinstance(run_ll, list)
+                and isinstance(base_ids, list)
+                and isinstance(base_ll, list)
+            ):
+                base_map: dict[int, float] = {}
+                for b_id, b_val in zip(base_ids, base_ll, strict=False):
+                    if isinstance(b_id, int | float) and isinstance(b_val, int | float):
+                        base_map[int(b_id)] = float(b_val)
+                for idx, (r_id, r_val) in enumerate(zip(run_ids, run_ll, strict=False)):
+                    if not (
+                        isinstance(r_id, int | float) and isinstance(r_val, int | float)
+                    ):
+                        continue
+                    key = int(r_id)
+                    if key not in base_map:
+                        continue
+                    dv = float(r_val) - base_map[key]
+                    if math.isfinite(dv):
+                        deltas.append(float(dv))
+                        if isinstance(run_tc, list) and idx < len(run_tc):
+                            try:
+                                wv = float(run_tc[idx])
+                            except Exception:
+                                wv = 0.0
+                            weights.append(float(max(wv, 0.0)))
+
+        pm_tail_result = evaluate_metric_tail(
+            deltas=deltas,
+            weights=weights if (weights and len(weights) == len(deltas)) else None,
+            policy=pm_tail_policy,
+        )
+        pm_tail_result["source"] = "paired_baseline.final"
+    except Exception:  # pragma: no cover
+        pm_tail_result = {"mode": "warn", "evaluated": False, "passed": True}
+
     validation_kwargs = {
         "ppl": ppl_analysis,
         "spectral": spectral,
@@ -1765,7 +1881,14 @@ def make_certificate(
     except Exception:  # pragma: no cover - defensive against patched functions
         validation_kwargs["pm_acceptance_range"] = pm_acceptance_range
 
+    try:
+        if "pm_tail" in inspect.signature(_compute_validation_flags).parameters:
+            validation_kwargs["pm_tail"] = pm_tail_result
+    except Exception:  # pragma: no cover - defensive against patched functions
+        validation_kwargs["pm_tail"] = pm_tail_result
+
     validation_flags = _compute_validation_flags(**validation_kwargs)
+
     # Enforce validation key allow-list to prevent surface drift
     _allowed_validation = _load_validation_allowlist()
     validation_filtered = {
@@ -1797,6 +1920,7 @@ def make_certificate(
         "artifacts": artifacts_payload,
         "validation": validation_filtered,
         "guard_overhead": guard_overhead_section,
+        "primary_metric_tail": pm_tail_result,
     }
 
     # Record tiny-relax provenance explicitly when active (dev-only demos)
@@ -2048,7 +2172,49 @@ def make_certificate(
     except Exception:  # pragma: no cover
         pass
 
-    # Emit optional one-line telemetry summary (opt-in via INVARLOCK_TELEMETRY=1)
+    # Attach/normalize primary metric block (moved to helper)
+    from .primary_metric_utils import attach_primary_metric as _attach_pm
+
+    _attach_pm(certificate, report, baseline_raw, baseline_ref, ppl_analysis)
+    _enforce_display_ci_alignment(
+        ratio_ci_source,
+        certificate.get("primary_metric"),
+        logloss_delta_ci,
+        window_plan_profile,
+    )
+
+    # Ensure primary_metric has display_ci populated for schema invariants
+    try:
+        pm = (
+            certificate.get("primary_metric", {})
+            if isinstance(certificate.get("primary_metric"), dict)
+            else None
+        )
+        if isinstance(pm, dict) and pm:
+            # Prefer existing bounds; otherwise collapse to point estimate
+            disp = pm.get("display_ci")
+            if not (
+                isinstance(disp, list | tuple)
+                and len(disp) == 2
+                and all(isinstance(x, int | float) for x in disp)
+            ):
+                point = None
+                for key in ("ratio_vs_baseline", "final", "preview"):
+                    val = pm.get(key)
+                    if isinstance(val, int | float) and math.isfinite(float(val)):
+                        point = float(val)
+                        break
+                if isinstance(point, float):
+                    pm["display_ci"] = [point, point]
+                else:
+                    # As last resort, emit a degenerate [1.0, 1.0] to satisfy schema invariants
+                    pm["display_ci"] = [1.0, 1.0]
+                    pm.setdefault("estimated", True)
+    except Exception:  # pragma: no cover
+        pass
+
+    # Emit optional one-line telemetry summary (opt-in via INVARLOCK_TELEMETRY=1).
+    # This runs after primary_metric attachment so the summary can include display_ci/width.
     try:
         kind = None
         pm_try = (
@@ -2135,46 +2301,6 @@ def make_certificate(
     except Exception:  # pragma: no cover
         pass
 
-    # Attach/normalize primary metric block (moved to helper)
-    from .primary_metric_utils import attach_primary_metric as _attach_pm
-
-    _attach_pm(certificate, report, baseline_raw, baseline_ref, ppl_analysis)
-    _enforce_display_ci_alignment(
-        ratio_ci_source,
-        certificate.get("primary_metric"),
-        logloss_delta_ci,
-        window_plan_profile,
-    )
-
-    # Ensure primary_metric has display_ci populated for schema invariants
-    try:
-        pm = (
-            certificate.get("primary_metric", {})
-            if isinstance(certificate.get("primary_metric"), dict)
-            else None
-        )
-        if isinstance(pm, dict) and pm:
-            # Prefer existing bounds; otherwise collapse to point estimate
-            disp = pm.get("display_ci")
-            if not (
-                isinstance(disp, list | tuple)
-                and len(disp) == 2
-                and all(isinstance(x, int | float) for x in disp)
-            ):
-                point = None
-                for key in ("ratio_vs_baseline", "final", "preview"):
-                    val = pm.get(key)
-                    if isinstance(val, int | float) and math.isfinite(float(val)):
-                        point = float(val)
-                        break
-                if isinstance(point, float):
-                    pm["display_ci"] = [point, point]
-                else:
-                    # As last resort, emit a degenerate [1.0, 1.0] to satisfy schema invariants
-                    pm["display_ci"] = [1.0, 1.0]
-    except Exception:  # pragma: no cover
-        pass
-
     # Attach confidence label (non-gating)
     try:
         certificate["confidence"] = _compute_confidence_label(certificate)
@@ -2208,7 +2334,7 @@ def _normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
             }
         # Check if it's a RunReport structure
         elif "meta" in baseline and "metrics" in baseline and "edit" in baseline:
-            # Accept both legacy ppl_* metrics and PM-first reports
+            # Accept both ppl_* metrics and PM-first reports
             metrics_blk = baseline.get("metrics", {}) or {}
             ppl_final = metrics_blk.get("ppl_final")
             ppl_preview = metrics_blk.get("ppl_preview")
@@ -2483,7 +2609,7 @@ def _extract_edit_metadata(
     algorithm = edit_section.get("algorithm")
     if not algorithm:
         algorithm = edit_name or ""
-    # Sanitize algorithm identifiers to purge legacy/unsupported edit labels
+    # Sanitize algorithm identifiers to purge unsupported edit labels
     try:
         alg_lower = str(algorithm).strip().lower()
     except Exception:  # pragma: no cover
@@ -3112,6 +3238,7 @@ def _compute_validation_flags(
     moe: dict[str, Any] | None = None,
     dataset_capacity: dict[str, Any] | None = None,
     pm_acceptance_range: dict[str, float] | None = None,
+    pm_tail: dict[str, Any] | None = None,
 ) -> dict[str, bool]:
     """Compute validation flags for the certificate including canonical gates."""
     tier = (tier or "balanced").lower()
@@ -3223,6 +3350,45 @@ def _compute_validation_flags(
                 except Exception:  # pragma: no cover
                     pass
                 tokens_ok = total_tokens >= eff_min_tokens
+                if not tokens_ok:
+                    coverage_ok = False
+                    try:
+                        coverage = _ppl_metrics.get("bootstrap", {}).get("coverage")
+                        if isinstance(coverage, dict):
+                            prev_cov = coverage.get("preview")
+                            fin_cov = coverage.get("final")
+                            if isinstance(prev_cov, dict) and isinstance(fin_cov, dict):
+                                prev_used = prev_cov.get("used")
+                                prev_req = prev_cov.get("required")
+                                fin_used = fin_cov.get("used")
+                                fin_req = fin_cov.get("required")
+                                prev_ok = bool(prev_cov.get("ok")) or (
+                                    isinstance(prev_used, int | float)
+                                    and isinstance(prev_req, int | float)
+                                    and float(prev_used) >= float(prev_req)
+                                )
+                                fin_ok = bool(fin_cov.get("ok")) or (
+                                    isinstance(fin_used, int | float)
+                                    and isinstance(fin_req, int | float)
+                                    and float(fin_used) >= float(fin_req)
+                                )
+                                coverage_ok = prev_ok and fin_ok
+                    except Exception:  # pragma: no cover
+                        coverage_ok = False
+
+                    if coverage_ok:
+                        try:
+                            tolerance_ratio = float(
+                                pm_policy.get("min_tokens_tolerance", 0.02) or 0.0
+                            )
+                        except Exception:
+                            tolerance_ratio = 0.0
+                        if tolerance_ratio < 0.0:
+                            tolerance_ratio = 0.0
+                        relaxed_floor = int(
+                            math.floor(float(eff_min_tokens) * (1.0 - tolerance_ratio))
+                        )
+                        tokens_ok = total_tokens >= max(relaxed_floor, 0)
             except Exception:  # pragma: no cover
                 tokens_ok = True
     # Under tiny_relax, treat token floors as informational only
@@ -3415,6 +3581,19 @@ def _compute_validation_flags(
             flags["moe_identity_ok"] = True
     except Exception:  # pragma: no cover
         pass
+
+    # Primary metric tail gate (warn/fail; default non-blocking)
+    try:
+        tail_ok = True
+        if isinstance(pm_tail, dict) and pm_tail:
+            mode = str(pm_tail.get("mode", "warn") or "warn").strip().lower()
+            evaluated = bool(pm_tail.get("evaluated", False))
+            passed = bool(pm_tail.get("passed", True))
+            if mode == "fail" and evaluated and (not passed):
+                tail_ok = False
+        flags["primary_metric_tail_acceptable"] = bool(tail_ok)
+    except Exception:  # pragma: no cover
+        flags["primary_metric_tail_acceptable"] = True
 
     return flags
 

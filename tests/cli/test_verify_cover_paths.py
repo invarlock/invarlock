@@ -20,6 +20,17 @@ def _minimal_ppl_certificate(
     *, ratio: float = 1.0, final: float = 10.0, baseline_final: float = 10.0
 ) -> dict:
     # Minimal schema-valid certificate for ppl-like metric
+    spectral_contract = {
+        "estimator": {"type": "power_iter", "iters": 4, "init": "ones"}
+    }
+    rmt_contract = {
+        "estimator": {"type": "power_iter", "iters": 3, "init": "ones"},
+        "activation_sampling": {
+            "windows": {"count": 8, "indices_policy": "evenly_spaced"}
+        },
+    }
+    spectral_hash = verify_mod._measurement_contract_digest(spectral_contract)
+    rmt_hash = verify_mod._measurement_contract_digest(rmt_contract)
     return {
         "schema_version": "v1",
         "run_id": "run-xyz",
@@ -46,6 +57,22 @@ def _minimal_ppl_certificate(
             "final": final,
             "ratio_vs_baseline": ratio,
             "display_ci": [ratio, ratio],
+        },
+        "spectral": {
+            "evaluated": True,
+            "measurement_contract": spectral_contract,
+            "measurement_contract_hash": spectral_hash,
+            "measurement_contract_match": True,
+        },
+        "rmt": {
+            "evaluated": True,
+            "measurement_contract": rmt_contract,
+            "measurement_contract_hash": rmt_hash,
+            "measurement_contract_match": True,
+        },
+        "resolved_policy": {
+            "spectral": {"measurement_contract": spectral_contract},
+            "rmt": {"measurement_contract": rmt_contract},
         },
         "baseline_ref": {
             "run_id": "base-xyz",
@@ -92,9 +119,8 @@ def test_verify_json_success_and_failure(
     out_bad = capsys.readouterr().out
     payload_bad = json.loads(out_bad)
     assert payload_bad["summary"]["ok"] is False
-    # reason can be policy_fail or malformed, but exit_code must be non-zero
-    assert payload_bad["resolution"]["exit_code"] != 0
-    assert getattr(ei_bad.value, "exit_code", getattr(ei_bad.value, "code", None)) != 0
+    assert payload_bad["resolution"]["exit_code"] == 1
+    assert getattr(ei_bad.value, "exit_code", getattr(ei_bad.value, "code", None)) == 1
 
 
 def test_verify_recompute_dev_warning_json(
@@ -134,8 +160,8 @@ def test_verify_ci_profile_enforces_provider_digest(
         verify_command([path], baseline=None, profile="ci", json_out=True)
     out = capsys.readouterr().out
     payload = json.loads(out)
-    assert payload["resolution"]["exit_code"] != 0
-    assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) != 0
+    assert payload["resolution"]["exit_code"] == 3
+    assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 3
 
 
 def test_verify_json_failure_envelope_multiple(
@@ -152,7 +178,8 @@ def test_verify_json_failure_envelope_multiple(
     assert isinstance(payload.get("results"), list) and len(payload["results"]) == 2
     reasons = {r.get("reason") for r in payload["results"]}
     assert reasons.issubset({"malformed", "policy_fail"}) and reasons
-    assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) != 0
+    assert payload["resolution"]["exit_code"] == 2
+    assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 2
 
 
 def test_verify_json_mixed_success_and_failure(

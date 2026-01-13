@@ -1,8 +1,21 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from ..eval.data import EvaluationWindow, compute_window_hash
+if TYPE_CHECKING:
+    from ..eval.data import EvaluationWindow
+
+
+def compute_window_hash(window: EvaluationWindow, *, include_data: bool) -> str:
+    """Lazy wrapper around `invarlock.eval.data.compute_window_hash`.
+
+    Importing `invarlock.eval.data` pulls in optional heavy deps (HF datasets /
+    pyarrow). Keep that import off the module import path so that lightweight
+    reporting/helpers can be used without eagerly importing those deps.
+    """
+    from ..eval.data import compute_window_hash as _compute_window_hash
+
+    return _compute_window_hash(window, include_data=include_data)
 
 
 def compute_window_hashes(

@@ -29,3 +29,12 @@ def test_free_model_memory_tolerates_missing_torch(monkeypatch):
     monkeypatch.setattr(run, "torch", None)
     # Should not raise when torch is unavailable
     run._free_model_memory(object())
+
+
+def test_free_model_memory_swallows_cuda_exceptions(monkeypatch):
+    class FakeCuda:
+        def is_available(self) -> bool:
+            raise RuntimeError("boom")
+
+    monkeypatch.setattr(run, "torch", SimpleNamespace(cuda=FakeCuda()))
+    run._free_model_memory(object())

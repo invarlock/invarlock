@@ -111,6 +111,20 @@ def test_extract_pairing_schedule_returns_none_on_invalid_shapes() -> None:
     )
 
 
+def test_extract_pairing_schedule_rejects_non_int_window_ids() -> None:
+    report = {
+        "evaluation_windows": {
+            "preview": {
+                "window_ids": ["bad"],
+                "input_ids": [[1, 2, 3]],
+                "attention_masks": [[1, 1, 1]],
+            },
+            "final": {"input_ids": [[1]]},
+        }
+    }
+    assert run_mod._extract_pairing_schedule(report) is None
+
+
 def test_apply_mlm_masks_covers_mask_random_and_original_branches(monkeypatch) -> None:
     # Force masking decision for each position.
     monkeypatch.setattr(run_mod.random, "random", lambda: 0.0)

@@ -13,13 +13,13 @@ calibration data that accompany the InvarLock assurance notes.
 | Guard | Inputs | Check & Threshold | Failure behavior | Code reference |
 |-------|--------|-------------------|-------------------|----------------|
 | **Invariants** | Model weights, adapter metadata | Structural invariants (non-finite scan, weight tying, embedding dims, layer norms) | Abort edit if violated before evaluation | `invarlock.guards.invariants` |
-| **Spectral** | 2‑D layer weights (FFN, attention proj, embeddings) | Compute $z = \frac{s - \mu_f}{\sigma_f}$; baseline percentile `sigma_quantile` selects the reference sigma; require `abs(z) ≤ κ_f` calibrated for ≤5% WARN FPR | WARN when cap applied; abort if cap would exceed `max_caps` | `invarlock.guards.spectral` |
-| **RMT** | Bare vs guarded activations | Outlier growth ≤ $\lceil\text{outliers}_{\text{bare}} \cdot (1+\varepsilon)\rceil$ | WARN when bound exceeded; certificate fails on ε‑rule violations. Detection uses `policies.rmt.{margin,deadband}`; catastrophic spikes in the primary metric are gated separately (`spike_threshold` = 2.0× for ppl‑like metrics). | `invarlock.guards.rmt` |
+| **Spectral** | 2‑D layer weights (FFN, attention proj, embeddings) | Compute $z = \frac{\hat{s} - \mu_f}{\sigma_f}$ where $\hat{s}$ is an **iterative estimate** of $\sigma_{\max}$ under a fixed measurement contract; require `abs(z) ≤ κ_f` calibrated for ≤5% WARN FPR. Optional degeneracy proxies (stable-rank drift, norm collapse) may add WARN/ABORT depending on policy. | WARN when cap applied; abort if cap would exceed `max_caps` (and for configured fatal degeneracy thresholds). | `invarlock.guards.spectral` |
+| **RMT** | Token‑weighted activations (sampled) | Compute a per‑module **edge risk score** $r = \hat{\sigma}_{\max}(A') / \sigma_{\mathrm{MP}}(m,n)$ on whitened activations $A'$ under a fixed measurement contract; accept when baseline‑relative growth stays within the calibrated ε-band per family. | Certificate fails on ε‑band violations; catastrophic spikes in the primary metric are gated separately (`spike_threshold` = 2.0× for ppl‑like metrics). | `invarlock.guards.rmt` |
 | **Variance (VE)** | Paired ΔlogNLL with calibration windows | Enable VE only if the predictive CI upper bound ≤ −`min_effect_lognll` **and** mean Δ ≤ −`min_effect_lognll` (Balanced uses one‑sided CI; Conservative uses two‑sided CI). A CI entirely above +`min_effect_lognll` is treated as regression and VE stays off. | VE disabled, guard records reason; edit continues | `invarlock.guards.variance` |
-| **Bootstrap sanity** | Evaluation windows, token counts | Matching window IDs, zero overlap; BCa replicates ≥ requested | Abort certification and surface reason | `invarlock.assurance.make_certificate` |
+| **Bootstrap sanity** | Evaluation windows, token counts | Matching window IDs, zero overlap; BCa replicates ≥ requested | Abort certification and surface reason | `invarlock.reporting.certificate` |
 
-Each guard logs its policy digest and metrics; certificates mirror those fields
-under `resolved_policy.*` and `spectral`/`rmt`/`variance` blocks.
+Each guard logs its policy digest, metrics, and **measurement contract**; certificates
+mirror those fields under `resolved_policy.*` and `spectral`/`rmt`/`variance` blocks.
 
 ### Invariants: what is checked
 
@@ -74,19 +74,28 @@ stores both the count and the limit under
     Thresholds come from the calibrated tier configuration in the packaged
     `tiers.yaml` (see `metrics.accuracy` for each tier) and are surfaced at
     runtime under `resolved_policy.metrics.accuracy`.
+- Primary metric tail (ppl-like kinds): a warn/fail gate on **per-window**
+  ΔlogNLL vs the paired baseline. The tail statistic (default P95) must stay
+  under `metrics.pm_tail.quantile_max`, and (optionally) the mass above ε must
+  stay under `metrics.pm_tail.mass_max`. Gate flag: `validation.primary_metric_tail_acceptable`
+  (only flips false when `metrics.pm_tail.mode = fail`).
 - Preview→final drift: require 0.95–1.05 for the guarded run’s final/preview
   ratio. Gate flag: `validation.preview_final_drift_acceptable`.
 - Spectral stability: caps applied must not exceed the tier’s `max_caps`
   (default 5 for Balanced; 3 for Conservative). Gate flag: `validation.spectral_stable`.
-- RMT ε‑rule stability: per‑family outliers must satisfy
-  `guarded ≤ ceil(bare · (1+ε))`. Gate flag: `validation.rmt_stable`.
+- RMT ε‑band stability: per‑family activation edge risk must satisfy
+  `edge_cur ≤ edge_base · (1+ε_f)` for each family with a non-zero baseline.
+  Gate flag: `validation.rmt_stable`.
 - Guard overhead: guard/bare runtime overhead must stay within budget when
   evaluated. Gate flag: `validation.guard_overhead_acceptable`.
 
 Exceeding any gate flips the corresponding `validation.*` flag to false and the
-certificate fails overall. Catastrophic spikes are handled during the run: the
-`spike_threshold` (default 2.0× PPL) triggers immediate rollback regardless of
-other gates. See also `src/invarlock/core/runner.py:1816`.
+certificate fails overall, **except** that the Primary Metric Tail gate can run
+in `mode: warn` (staged rollout) where it emits a warning but keeps
+`validation.primary_metric_tail_acceptable = true`. Catastrophic spikes are
+handled during the run: the `spike_threshold` (default 2.0× PPL) triggers
+immediate rollback regardless of other gates. See also
+`src/invarlock/core/runner.py:1816`.
 
 **Sigma quantile (qσ)** controls the target sigma used for spectral monitoring.
 Balanced uses `sigma_quantile = 0.95`, Conservative `0.90` (see
@@ -188,16 +197,17 @@ If drift exceeds these bands, re-tune VE thresholds or increase window counts.
 | PM ratio gate (Balanced) | PM_final ≤ 1.10 × PM_preview | Tier acceptance; exceeding the gate fails the run |
 | PM ratio gate (Conservative) | PM_final ≤ 1.05 × PM_preview | Stricter release acceptance; exceeding the gate fails the run |
 | Bootstrap α | 0.05 | 95 % CI for ΔlogNLL |
-| Spectral κ | Balanced caps `{ffn: 3.834, attn: 3.423, embed: 3.1, other: 3.1}`; Conservative `{ffn: 2.3, attn: 2.6, embed: 2.8, other: 2.8}` (from `tiers.yaml`) | Keeps WARN FPR ≤5% (balanced) and ≈2% (conservative) on null runs |
-| RMT ε | Balanced `{ffn: 0.10, attn: 0.08, embed: 0.12, other: 0.12}`; Conservative `{ffn: 0.06, attn: 0.05, embed: 0.07, other: 0.07}` | q95–q97 of null ratio |
-| VE min_effect | 9e−4 (balanced), 1.8e−3 (conservative) | `z·σ̂/√n` from pilot data |
+| Spectral κ | Balanced caps `{ffn: 3.849, attn: 3.018, embed: 1.05, other: 0.0}`; Conservative `{ffn: 3.849, attn: 2.6, embed: 2.8, other: 2.8}` (from `tiers.yaml`) | Keeps WARN rate within the calibrated null budget |
+| RMT ε | `{ffn: 0.01, attn: 0.01, embed: 0.01, other: 0.01}` | q95–q97 of null ratio (+ margin) |
+| VE min_effect | 0.0 (balanced), 0.016 (conservative) | Calibrated from paired ΔlogNLL window sweeps |
 
 Detailed derivations are in the calibration appendix (`09-tier-v1-calibration.md`).
 
 **Examples**
 
-- **ε-band corner case:** if `outliers_bare = 1` and ε = 0.10, the guard
-  allows `outliers_guarded = ceil(1.10 × 1) = 2`; one extra outlier is tolerated before a WARN fires.
+- **ε-band corner case:** if `rmt.families.attn.edge_base = 1.20` and
+  `rmt.families.attn.epsilon = 0.01`, the guard allows
+  `rmt.families.attn.edge_cur ≤ (1+0.01) × 1.20 = 1.212`.
 - **Predictive gate:** on Balanced, if Δ̄ = −0.002 and the one-sided CI is
   [−0.003, −0.001], VE enables (`mean_delta` and the CI upper bound both beat
   −`min_effect_lognll`).

@@ -353,7 +353,9 @@ def test_snapshot_mode_bytes_falls_back_to_chunked_on_failure(
 
         def snapshot_chunked(self, model):  # noqa: D401
             self.snapshot_chunked_calls += 1
-            return "tmpdir"
+            snap_dir = tmp_path / "snapshot_chunked"
+            snap_dir.mkdir(parents=True, exist_ok=True)
+            return str(snap_dir)
 
         def restore_chunked(self, model, path):  # noqa: D401
             self.restore_chunked_calls += 1
@@ -431,8 +433,9 @@ def test_snapshot_mode_chunked_restore_called(tmp_path: Path, monkeypatch):
             return object()
 
         def snapshot_chunked(self, model):  # noqa: D401
-            # return path-like object (string ok for test)
-            return "tmpdir"
+            snap_dir = tmp_path / "snapshot_chunked"
+            snap_dir.mkdir(parents=True, exist_ok=True)
+            return str(snap_dir)
 
         def restore_chunked(self, model, path):  # noqa: D401
             self.restored += 1

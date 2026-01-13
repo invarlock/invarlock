@@ -6,7 +6,7 @@ they don’t, roll back safely.
 Technical: edit‑agnostic guard pipeline (invariants → spectral → RMT →
 variance) producing a machine‑readable Safety Certificate.
 
-> **Status:** 0.3.5 (pre‑1.0). Until 1.0, **minor** releases may be
+> **Status:** 0.3.6 (pre‑1.0). Until 1.0, **minor** releases may be
 > breaking. See CLI help and the CHANGELOG for updates.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/invarlock/invarlock/ci.yml?branch=main&logo=github&label=CI)](https://github.com/invarlock/invarlock/actions/workflows/ci.yml)
@@ -64,7 +64,7 @@ Quick examples (repo presets, CPU; repo clone required for preset paths):
 pip install "invarlock[hf]"
 
 # Preflight a config (JSON diagnostics)
-invarlock doctor --config configs/tasks/causal_lm/ci_cpu.yaml --json
+invarlock doctor --config configs/presets/causal_lm/wikitext2_512.yaml --json
 
 # Calibrated GPT‑2 small (recommended starting point; repo preset)
 INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 \
@@ -73,7 +73,7 @@ invarlock certify \
   --subject  gpt2 \
   --adapter auto \
   --profile release \
-  --preset configs/tasks/causal_lm/release_auto.yaml
+  --preset configs/presets/causal_lm/wikitext2_512.yaml
 
 # Tiny causal LM smoke (out‑of‑calibration, dev‑only)
 INVARLOCK_ALLOW_NETWORK=1 \
@@ -143,7 +143,7 @@ INVARLOCK_ALLOW_NETWORK=1 invarlock certify \
   --subject  gpt2 \
   --adapter auto \
   --profile ci \
-  --preset configs/tasks/causal_lm/ci_cpu.yaml
+  --preset configs/presets/causal_lm/wikitext2_512.yaml
 ```
 
 - Offline/air‑gapped usage: pre‑download to a cache, then run with network
@@ -382,7 +382,7 @@ output:
 Run preflight checks before a run to catch misconfigurations early:
 
 ```bash
-invarlock doctor --config configs/tasks/causal_lm/ci_cpu.yaml --json
+invarlock doctor --config configs/presets/causal_lm/wikitext2_512.yaml --json
 ```
 
 Text mode emits lines prefixed with `ERROR:`, `WARNING:`, or `NOTE:` and stable

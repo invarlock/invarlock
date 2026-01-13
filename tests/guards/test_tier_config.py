@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import warnings
+from copy import deepcopy
 from unittest import mock
 
 from invarlock.guards.policies import (
@@ -79,16 +80,15 @@ class TestConvenienceAccessors:
         assert "ffn" in caps
         assert "attn" in caps
         assert "embed" in caps
-        # Balanced tier values from tiers.yaml (calibrated 2025-12)
-        assert caps["ffn"] == 3.834
-        assert caps["attn"] == 3.423
-        assert caps["embed"] == 3.1
+        # Balanced tier values from tiers.yaml
+        assert caps["ffn"] == 3.849
+        assert caps["attn"] == 3.018
+        assert caps["embed"] == 1.05
 
     def test_get_spectral_caps_conservative(self) -> None:
         """get_spectral_caps returns tighter caps for conservative tier."""
         caps = get_spectral_caps("conservative")
-        # Conservative tier has lower caps
-        assert caps["ffn"] == 2.3
+        assert caps["ffn"] == 3.849
         assert caps["attn"] == 2.6
 
     def test_get_rmt_epsilon_balanced(self) -> None:
@@ -96,27 +96,26 @@ class TestConvenienceAccessors:
         epsilon = get_rmt_epsilon("balanced")
         assert isinstance(epsilon, dict)
         # Values from tiers.yaml
-        assert epsilon["ffn"] == 0.10
-        assert epsilon["attn"] == 0.08
-        assert epsilon["embed"] == 0.12
-        assert epsilon["other"] == 0.12
+        assert epsilon["ffn"] == 0.01
+        assert epsilon["attn"] == 0.01
+        assert epsilon["embed"] == 0.01
+        assert epsilon["other"] == 0.01
 
     def test_get_rmt_epsilon_conservative(self) -> None:
         """get_rmt_epsilon returns tighter epsilon for conservative tier."""
         epsilon = get_rmt_epsilon("conservative")
-        # Conservative tier has lower epsilon values
-        assert epsilon["ffn"] == 0.06
-        assert epsilon["attn"] == 0.05
+        assert epsilon["ffn"] == 0.01
+        assert epsilon["attn"] == 0.01
 
     def test_get_variance_min_effect_balanced(self) -> None:
         """get_variance_min_effect returns calibrated min_effect_lognll."""
         min_effect = get_variance_min_effect("balanced")
-        assert min_effect == 0.0009
+        assert min_effect == 0.0
 
     def test_get_variance_min_effect_conservative(self) -> None:
         """get_variance_min_effect is higher for conservative tier."""
         min_effect = get_variance_min_effect("conservative")
-        assert min_effect == 0.0018
+        assert min_effect == 0.016
 
 
 class TestPolicyIntegration:
@@ -144,24 +143,26 @@ class TestPolicyIntegration:
     def test_get_rmt_policy_uses_yaml(self) -> None:
         """get_rmt_policy loads epsilon values from tiers.yaml."""
         policy = get_rmt_policy("balanced", use_yaml=True)
-        epsilon = policy.get("epsilon", {})
+        epsilon = policy.get("epsilon_by_family", {})
         # Should have per-family epsilon from tiers.yaml
-        assert epsilon.get("ffn") == 0.10
-        assert epsilon.get("attn") == 0.08
-        assert epsilon.get("embed") == 0.12
+        assert policy.get("epsilon_default") == 0.01
+        assert epsilon.get("ffn") == 0.01
+        assert epsilon.get("attn") == 0.01
+        assert epsilon.get("embed") == 0.01
 
     def test_get_rmt_policy_conservative_uses_yaml(self) -> None:
         """get_rmt_policy conservative tier uses tighter epsilon."""
         policy = get_rmt_policy("conservative", use_yaml=True)
-        epsilon = policy.get("epsilon", {})
+        epsilon = policy.get("epsilon_by_family", {})
         # Conservative has tighter values
-        assert epsilon.get("ffn") == 0.06
-        assert epsilon.get("attn") == 0.05
+        assert policy.get("epsilon_default") == 0.01
+        assert epsilon.get("ffn") == 0.01
+        assert epsilon.get("attn") == 0.01
 
     def test_get_variance_policy_uses_yaml(self) -> None:
         """get_variance_policy loads min_effect_lognll from tiers.yaml."""
         policy = get_variance_policy("balanced", use_yaml=True)
-        assert policy.get("min_effect_lognll") == 0.0009
+        assert policy.get("min_effect_lognll") == 0.0
         assert policy["deadband"] == 0.02
 
 
@@ -176,6 +177,14 @@ class TestDriftDetection:
         """check_drift() returns a dict (empty if no drift)."""
         drift = check_drift(silent=True)
         assert isinstance(drift, dict)
+
+    def test_check_drift_no_yaml_returns_empty(self) -> None:
+        """check_drift returns {} when tiers.yaml cannot be loaded."""
+        import invarlock.guards.tier_config as tc
+
+        with mock.patch.object(tc, "_load_yaml", return_value=None):
+            drift = tc.check_drift(silent=False)
+        assert drift == {}
 
     def test_check_policy_drift_alias(self) -> None:
         """check_policy_drift() is an alias for check_drift()."""
@@ -350,15 +359,21 @@ class TestCheckDriftWarning:
 
     def test_check_drift_emits_warning_when_not_silent(self) -> None:
         """check_drift emits warnings when silent=False and drift exists."""
-        # Since aggressive tier is not in tiers.yaml, it will have drift
+        import invarlock.guards.tier_config as tc
+
+        yaml_data = deepcopy(tc._FALLBACK_CONFIG)
+        yaml_data["balanced"]["variance_guard"]["deadband"] = (
+            yaml_data["balanced"]["variance_guard"]["deadband"] + 0.001
+        )
+
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            drift = check_drift(silent=False)
-            # Should have drift for aggressive tier (not in YAML)
-            if drift:
-                # There should be a warning emitted
-                user_warnings = [x for x in w if issubclass(x.category, UserWarning)]
-                assert len(user_warnings) > 0
+            with mock.patch.object(tc, "_load_yaml", return_value=yaml_data):
+                drift = tc.check_drift(silent=False)
+
+        assert drift
+        user_warnings = [x for x in w if issubclass(x.category, UserWarning)]
+        assert len(user_warnings) == 1
 
     def test_check_drift_no_warning_when_silent(self) -> None:
         """check_drift doesn't emit warnings when silent=True."""

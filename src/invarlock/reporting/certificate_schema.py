@@ -148,6 +148,7 @@ CERTIFICATE_JSON_SCHEMA: dict[str, Any] = {
 
 _VALIDATION_ALLOWLIST_DEFAULT = {
     "primary_metric_acceptable",
+    "primary_metric_tail_acceptable",
     "preview_final_drift_acceptable",
     "guard_overhead_acceptable",
     "invariants_pass",
@@ -181,7 +182,7 @@ def _load_validation_allowlist() -> set[str]:
 def _validate_with_jsonschema(certificate: dict[str, Any]) -> bool:
     """Validate certificate with JSON Schema when available."""
     if jsonschema is None:
-        return True  # Schema library unavailable; fall back to legacy checks
+        return True  # Schema library unavailable; fall back to minimal checks
     try:
         jsonschema.validate(instance=certificate, schema=CERTIFICATE_JSON_SCHEMA)
         return True

@@ -1,0 +1,18 @@
+# Local guard override example (copy/rename before editing).
+#
+# Intended usage: merge this into a run preset under `guards:` rather than
+# editing the packaged runtime tier policies.
+
+guards:
+  spectral:
+    sigma_quantile: 0.95
+    deadband: 0.10
+    scope: all
+    max_caps: 5
+    multiple_testing: { method: bh, alpha: 0.05, m: 4 }
+    family_caps:
+      ffn: {kappa: 3.849}
+      attn: {kappa: 3.018}
+      embed: {kappa: 1.05}
+      other: {kappa: 0.0}
+    max_spectral_norm: null

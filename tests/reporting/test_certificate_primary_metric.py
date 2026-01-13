@@ -82,6 +82,6 @@ def test_render_includes_primary_metric_section():
     md = render_certificate_markdown(cert)
     assert "## Primary Metric" in md
     assert "Primary Metric (accuracy)" in md
-    # With primary metric present, legacy PPL/Drift rows should be omitted
+    # With primary metric present, PPL/Drift rows should be omitted
     assert "PPL vs Baseline" not in md
     assert "Drift (final/preview)" not in md

@@ -9,10 +9,9 @@ Supports both automated CI testing and flexible user validation.
 from __future__ import annotations
 
 import json
-import os
 import warnings
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 __all__ = [
     "validate_against_baseline",
@@ -99,23 +98,7 @@ def validate_against_baseline(
     ratio_bounds: tuple[float, float] = (1.25, 1.32),
     delta_bounds_pp: tuple[float, float] | None = None,
     structural_exact: bool = True,
-    **kwargs,
 ) -> ValidationResult:
-    # Backward-compatible kwargs (deprecated): enable via INVARLOCK_VALIDATE_LEGACY=1
-    legacy = str(os.environ.get("INVARLOCK_VALIDATE_LEGACY", "")).strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
-    if legacy:
-        if "tol_ppl_ratio" in kwargs and isinstance(
-            kwargs["tol_ppl_ratio"], int | float
-        ):
-            tol_ratio = float(kwargs["tol_ppl_ratio"])
-        if "ppl_bounds" in kwargs and isinstance(kwargs["ppl_bounds"], tuple):
-            # Coerce after runtime guard
-            ratio_bounds = cast(tuple[float, float], kwargs["ppl_bounds"])
     """
     Validate pruning results against baseline metrics (PM-only API).
 

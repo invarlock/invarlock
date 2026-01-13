@@ -1,0 +1,42 @@
+# Preset: Masked LM (encoder-only) with synthetic dataset provider (offline-friendly).
+
+model:
+  id: "prajjwal1/bert-tiny"
+  adapter: "hf_bert"
+  device: "auto"
+
+dataset:
+  provider: "synthetic"
+  split: "validation"
+  seq_len: 128
+  stride: 128
+  preview_n: 64
+  final_n: 64
+  seed: 42
+
+eval:
+  metric:
+    kind: "ppl_mlm"
+  loss:
+    type: "mlm"
+    mask_prob: 0.15
+    seed: 42
+    random_token_prob: 0.10
+    original_token_prob: 0.10
+
+edit:
+  name: "noop"
+  plan: {}
+
+auto:
+  enabled: true
+  tier: "balanced"
+  probes: 0
+
+guards:
+  order: ["invariants", "spectral", "rmt", "variance", "invariants"]
+
+output:
+  dir: "runs"
+  save_model: false
+  save_report: true

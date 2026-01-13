@@ -79,7 +79,6 @@ reports/
 runs_cfg/
 runs/
 reports_report/
-runs/
 mock_run/
 *.log
 artifacts/
@@ -98,8 +97,6 @@ node_modules/
 npm-debug.log*
 pnpm-debug.log*
 yarn-error.log*
-*.tsbuildinfo
-npm-debug.log*
 *.tsbuildinfo
 
 # Local override configs (user-specific)
@@ -130,12 +127,8 @@ notebooks/*.csv
 sitecustomize.py
 fullLisk.txt
 test_config.yaml
-pip-wheel-metadata/
 
 # Environments and local configs
-.venv/
-venv/
-env/
 .env
 .envrc
 
@@ -143,12 +136,10 @@ env/
 .tox/
 .nox/
 .eggs/
-sitecustomize.py
-fullLisk.txt
-test_config.yaml
 
 
 # Optional local assets (not required for code/tests)
+plans/
 data/
 contracts/
 

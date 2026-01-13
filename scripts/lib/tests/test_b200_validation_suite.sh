@@ -733,7 +733,7 @@ test_b200_validation_setup_model_early_returns_for_local_or_cached_paths_and_err
 
     rm -rf "${OUTPUT_DIR}/models/${model_name}"
     mkdir -p "${OUTPUT_DIR}/models/model/baseline"
-    assert_eq "${OUTPUT_DIR}/models/model/baseline" "$(setup_model "${model_id}" 0)" "cached legacy baseline honored"
+    assert_eq "${OUTPUT_DIR}/models/model/baseline" "$(setup_model "${model_id}" 0)" "cached basename baseline honored"
 
     rm -rf "${OUTPUT_DIR}/models"
     mkdir -p "${OUTPUT_DIR}/models"
@@ -1251,6 +1251,68 @@ EOF
     assert_file_exists "${OUTPUT_DIR}/workers/SHUTDOWN" "touch shutdown when signal_shutdown missing"
 }
 
+test_b200_validation_main_dynamic_calibrate_only_stops_after_presets_even_with_pending_tasks() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    export OUTPUT_DIR
+    export B200_SUITE_MODE="calibrate-only"
+
+    source ./scripts/b200_validation_suite.sh
+    b200_setup_output_dirs
+
+    check_dependencies() { :; }
+    configure_gpu_pool() { NUM_GPUS=1; GPU_ID_LIST="0"; export NUM_GPUS GPU_ID_LIST; }
+    disk_preflight() { :; }
+    setup_b200_environment() { :; }
+    handle_disk_pressure() { return 0; }
+
+    RESUME_FLAG="true"
+
+    init_queue() {
+        QUEUE_DIR="${OUTPUT_DIR}/queue"
+        mkdir -p "${QUEUE_DIR}"/{pending,ready,running,completed,failed} "${OUTPUT_DIR}/workers"
+        export QUEUE_DIR
+    }
+    resolve_dependencies() { echo 0; }
+    reclaim_orphaned_tasks() { :; }
+    print_queue_stats() { :; }
+    count_tasks() { echo 0; }
+
+    # Ensure queue is NOT empty (pending contains non-calibration task), but
+    # calibration-only early exit triggers because all preset tasks are completed.
+    init_queue
+    printf '{"status":"pending"}\n' > "${QUEUE_DIR}/pending/model_EVAL_BASELINE_001_dead.task"
+    printf '{"status":"completed","task_type":"GENERATE_PRESET"}\n' > "${QUEUE_DIR}/completed/model_GENERATE_PRESET_001_beef.task"
+
+    list_run_gpu_ids() { printf '0\n'; }
+
+    # Stub worker scripts so start_worker doesn't run real gpu_worker.
+    local stub_lib="${TEST_TMPDIR}/stub_lib"
+    mkdir -p "${stub_lib}"
+    for f in task_serialization.sh queue_manager.sh scheduler.sh task_functions.sh fault_tolerance.sh; do
+        printf '%s\n' "#!/usr/bin/env bash" > "${stub_lib}/${f}"
+    done
+    cat > "${stub_lib}/gpu_worker.sh" <<'EOF'
+#!/usr/bin/env bash
+gpu_worker() { return 0; }
+EOF
+    LIB_DIR="${stub_lib}"
+    export LIB_DIR
+
+    compile_results() { echo "compile" >> "${TEST_TMPDIR}/analysis.calls"; }
+    run_analysis() { echo "analysis" >> "${TEST_TMPDIR}/analysis.calls"; }
+    generate_verdict() { echo "verdict" >> "${TEST_TMPDIR}/analysis.calls"; }
+
+    signal_shutdown() { echo "shutdown:$1" >> "${TEST_TMPDIR}/shutdown.calls"; }
+    get_free_disk_gb() { echo "999"; }
+
+    main_dynamic
+
+    assert_file_exists "${TEST_TMPDIR}/shutdown.calls" "calibration-only run signals shutdown early"
+    [[ ! -f "${TEST_TMPDIR}/analysis.calls" ]] || t_fail "analysis should not run for calibration-only mode"
+}
+
 test_b200_validation_main_wrapper_parses_progress_and_reports_failed_tasks_offline() {
     mock_reset
 
@@ -1324,6 +1386,34 @@ EOF
     assert_file_exists "${TEST_TMPDIR}/boost.calls" "progress path applies work-stealing boost"
     assert_file_exists "${TEST_TMPDIR}/task_id.calls" "failed task reporting reads task ids"
     assert_file_exists "${TEST_TMPDIR}/python3.calls" "analysis steps invoke python3"
+}
+
+test_b200_validation_entrypoint_parses_calibrate_only_and_run_only_flags() {
+    mock_reset
+
+    source ./scripts/b200_validation_suite.sh
+
+    b200_require_bash4() { return 0; }
+    b200_source_libs() { return 0; }
+    b200_setup_output_dirs() { return 0; }
+    b200_setup_hf_cache_dirs() { return 0; }
+    cleanup() { return 0; }
+
+    main() {
+        echo "${B200_SUITE_MODE}:${RESUME_FLAG}" > "${TEST_TMPDIR}/entrypoint.flags"
+    }
+
+    (
+        OUTPUT_DIR="${TEST_TMPDIR}/out1"
+        b200_entrypoint --calibrate-only
+    )
+    assert_eq "calibrate-only:false" "$(cat "${TEST_TMPDIR}/entrypoint.flags")" "calibrate-only sets mode without resume"
+
+    (
+        OUTPUT_DIR="${TEST_TMPDIR}/out2"
+        b200_entrypoint --run-only
+    )
+    assert_eq "run-only:true" "$(cat "${TEST_TMPDIR}/entrypoint.flags")" "run-only sets mode and implies resume"
 }
 
 test_b200_validation_entrypoint_sets_output_dir_default_and_runs_main() {

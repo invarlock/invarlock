@@ -35,6 +35,16 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
                 "hysteresis_ratio": 0.002,
                 "min_token_fraction": 0.01,
             },
+            "pm_tail": {
+                # Always-computed tail evidence; warn-only by default.
+                "mode": "warn",
+                "min_windows": 50,
+                "quantile": 0.95,
+                "quantile_max": 0.12,
+                "epsilon": 1e-4,
+                # Default to non-binding tail-mass checks until calibrated.
+                "mass_max": 1.0,
+            },
             "accuracy": {
                 "delta_min_pp": -0.5,
                 "min_examples": 200,
@@ -47,20 +57,26 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
             "deadband": 0.05,  # Smaller no-op zone
             "scope": "ffn",
             "family_caps": {
-                "ffn": {"kappa": 2.3},
+                "ffn": {"kappa": 3.849},
                 "attn": {"kappa": 2.6},
                 "embed": {"kappa": 2.8},
                 "other": {"kappa": 2.8},
             },
             "ignore_preview_inflation": True,
             "max_caps": 3,
-            "multiple_testing": {"method": "bonferroni", "alpha": 0.02, "m": 4},
+            "multiple_testing": {"method": "bonferroni", "alpha": 0.000625, "m": 4},
         },
         "rmt": {
             "margin": 1.40,  # Lower spike allowance
             "deadband": 0.10,  # Standard deadband
             "correct": True,
-            "epsilon": {"attn": 0.05, "ffn": 0.06, "embed": 0.07, "other": 0.07},
+            "epsilon_default": 0.01,
+            "epsilon_by_family": {
+                "attn": 0.01,
+                "ffn": 0.01,
+                "embed": 0.01,
+                "other": 0.01,
+            },
         },
         "variance": {
             "min_gain": 0.01,
@@ -73,7 +89,7 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
             "mode": "ci",
             "alpha": 0.05,
             "tie_breaker_deadband": 0.005,
-            "min_effect_lognll": 0.0018,
+            "min_effect_lognll": 0.016,
             "calibration": {
                 "windows": 10,
                 "min_coverage": 8,
@@ -95,6 +111,14 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
                 "hysteresis_ratio": 0.002,
                 "min_token_fraction": 0.01,
             },
+            "pm_tail": {
+                "mode": "warn",
+                "min_windows": 50,
+                "quantile": 0.95,
+                "quantile_max": 0.20,
+                "epsilon": 1e-4,
+                "mass_max": 1.0,
+            },
             "accuracy": {
                 "delta_min_pp": -1.0,
                 "min_examples": 200,
@@ -107,10 +131,10 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
             "deadband": 0.10,  # Standard no-op zone
             "scope": "all",
             "family_caps": {
-                "ffn": {"kappa": 2.5},
-                "attn": {"kappa": 2.8},
-                "embed": {"kappa": 3.0},
-                "other": {"kappa": 3.0},
+                "ffn": {"kappa": 3.849},
+                "attn": {"kappa": 3.018},
+                "embed": {"kappa": 1.05},
+                "other": {"kappa": 0.0},
             },
             "ignore_preview_inflation": True,
             "max_caps": 5,
@@ -121,7 +145,13 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
             "margin": 1.50,  # Default spike allowance
             "deadband": 0.10,  # Standard deadband
             "correct": True,
-            "epsilon": {"attn": 0.08, "ffn": 0.10, "embed": 0.12, "other": 0.12},
+            "epsilon_default": 0.01,
+            "epsilon_by_family": {
+                "attn": 0.01,
+                "ffn": 0.01,
+                "embed": 0.01,
+                "other": 0.01,
+            },
         },
         "variance": {
             "min_gain": 0.0,
@@ -134,7 +164,7 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
             "mode": "ci",
             "alpha": 0.05,
             "tie_breaker_deadband": 0.001,
-            "min_effect_lognll": 0.0009,
+            "min_effect_lognll": 0.0,
             "min_abs_adjust": 0.012,
             "max_scale_step": 0.03,
             "topk_backstop": 1,
@@ -156,6 +186,14 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
                 "hysteresis_ratio": 0.002,
                 "min_token_fraction": 0.01,
             },
+            "pm_tail": {
+                "mode": "warn",
+                "min_windows": 50,
+                "quantile": 0.95,
+                "quantile_max": 0.30,
+                "epsilon": 1e-4,
+                "mass_max": 1.0,
+            },
             "accuracy": {
                 "delta_min_pp": -2.0,
                 "min_examples": 200,
@@ -168,18 +206,27 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
             "deadband": 0.15,  # Larger no-op zone
             "scope": "ffn",
             "family_caps": {
-                "ffn": {"kappa": 3.0},
+                "ffn": {"kappa": 3.849},
                 "attn": {"kappa": 3.5},
                 "embed": {"kappa": 2.5},
                 "other": {"kappa": 3.5},
             },
             "ignore_preview_inflation": True,
+            "max_caps": 8,
+            "multiple_testing": {"method": "bh", "alpha": 0.00078125, "m": 4},
+            "max_spectral_norm": None,
         },
         "rmt": {
             "margin": 1.70,  # Higher spike allowance
             "deadband": 0.15,  # Larger deadband
             "correct": True,
-            "epsilon": {"attn": 0.15, "ffn": 0.15, "embed": 0.15, "other": 0.15},
+            "epsilon_default": 0.01,
+            "epsilon_by_family": {
+                "attn": 0.01,
+                "ffn": 0.01,
+                "embed": 0.01,
+                "other": 0.01,
+            },
         },
         "variance": {
             "min_gain": 0.0,
@@ -192,7 +239,7 @@ TIER_POLICIES: dict[str, dict[str, dict[str, Any]]] = {
             "mode": "ci",
             "alpha": 0.05,
             "tie_breaker_deadband": 0.0005,
-            "min_effect_lognll": 0.0005,
+            "min_effect_lognll": 0.033,
             "tap": ["transformer.h.*.mlp.c_proj", "transformer.h.*.attn.c_proj"],
             "predictive_gate": True,
             "calibration": {
@@ -244,8 +291,8 @@ def _load_runtime_yaml(
         res = base
         for part in rel_parts:
             res = res.joinpath(part)
-        if getattr(res, "is_file", None) and res.is_file():  # type: ignore[attr-defined]
-            text = res.read_text(encoding="utf-8")  # type: ignore[assignment]
+        if getattr(res, "is_file", None) and res.is_file():
+            text = res.read_text(encoding="utf-8")
             data = yaml.safe_load(text) or {}
             if not isinstance(data, dict):
                 raise ValueError("Runtime YAML must be a mapping")
@@ -301,7 +348,7 @@ def _tier_entry_to_policy(tier_entry: dict[str, Any]) -> dict[str, dict[str, Any
     if isinstance(metrics, dict):
         out["metrics"] = copy.deepcopy(metrics)
 
-    spectral_src = tier_entry.get("spectral") or tier_entry.get("spectral_guard")
+    spectral_src = tier_entry.get("spectral_guard")
     if isinstance(spectral_src, dict):
         spectral = copy.deepcopy(spectral_src)
         if "family_caps" in spectral:
@@ -314,7 +361,7 @@ def _tier_entry_to_policy(tier_entry: dict[str, Any]) -> dict[str, dict[str, Any
             )
         out["spectral"] = spectral
 
-    rmt_src = tier_entry.get("rmt") or tier_entry.get("rmt_guard")
+    rmt_src = tier_entry.get("rmt_guard")
     if isinstance(rmt_src, dict):
         rmt = copy.deepcopy(rmt_src)
         eps = rmt.get("epsilon_by_family")
@@ -322,11 +369,9 @@ def _tier_entry_to_policy(tier_entry: dict[str, Any]) -> dict[str, dict[str, Any
             rmt["epsilon_by_family"] = {
                 str(k): float(v) for k, v in eps.items() if isinstance(v, int | float)
             }
-            # Backward-compat: keep epsilon alias
-            rmt["epsilon"] = dict(rmt["epsilon_by_family"])
         out["rmt"] = rmt
 
-    variance_src = tier_entry.get("variance") or tier_entry.get("variance_guard")
+    variance_src = tier_entry.get("variance_guard")
     if isinstance(variance_src, dict):
         out["variance"] = copy.deepcopy(variance_src)
 

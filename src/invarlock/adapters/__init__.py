@@ -76,7 +76,7 @@ class _RemovedComponent:
         return _RemovedComponent(self._name, self._replacement)
 
 
-# Placeholders for removed/legacy utilities referenced in tests
+# Placeholders for removed utilities referenced in tests
 HF_Pythia_Adapter = _RemovedComponent("HF_Pythia_Adapter")
 auto_tune_pruning_budget = _RemovedComponent("auto_tune_pruning_budget")
 run_auto_invarlock = _RemovedComponent("run_auto_invarlock")

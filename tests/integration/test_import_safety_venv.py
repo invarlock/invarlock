@@ -38,7 +38,11 @@ def test_import_and_cli_help_without_torch(tmp_path: Path):
     project_root = Path(__file__).resolve().parents[2]
 
     install = _run(python_exe, ["-m", "pip", "install", str(project_root)])
-    assert install.returncode == 0, install.stderr
+    if install.returncode != 0:
+        combined = f"{install.stdout}{install.stderr}"
+        if "requires a different Python" in combined or "not in '>=3.12'" in combined:
+            pytest.skip("Requires Python 3.12+ to install invarlock in a venv.")
+        assert install.returncode == 0, combined
 
     # Ensure torch/transformers are not present in the venv.
     _run(python_exe, ["-m", "pip", "uninstall", "-y", "torch", "transformers"])

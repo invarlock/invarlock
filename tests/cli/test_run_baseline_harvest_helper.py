@@ -405,3 +405,95 @@ def test_baseline_harvest_empty_input_ids_fails() -> None:
             console=None,
         )
     assert exc.value.exit_code == 1
+
+
+def test_baseline_harvest_window_id_length_mismatch_fails() -> None:
+    cfg = _Cfg()
+    pairing = {
+        "preview": {"input_ids": [[0, 1, 2]], "window_ids": [0, 1]},
+        "final": {"input_ids": [[3, 4, 5]], "window_ids": [2]},
+    }
+    baseline = {
+        "data": {
+            "seq_len": 8,
+            "stride": 8,
+            "dataset": "wikitext2",
+            "split": "validation",
+        }
+    }
+
+    with pytest.raises(typer.Exit) as exc:
+        _validate_and_harvest_baseline_schedule(
+            cfg,
+            pairing,
+            baseline,
+            tokenizer_hash=None,
+            resolved_loss_type="causal",
+            baseline_path_str="baseline.json",
+            console=None,
+        )
+    assert exc.value.exit_code == 1
+
+
+def test_baseline_harvest_attention_mask_row_count_mismatch_fails() -> None:
+    cfg = _Cfg()
+    pairing = {
+        "preview": {
+            "input_ids": [[0, 1, 2], [3, 4, 5]],
+            "window_ids": [0, 1],
+            "attention_masks": [[1, 1, 1]],
+        },
+        "final": {"input_ids": [[6, 7, 8]], "window_ids": [2]},
+    }
+    baseline = {
+        "data": {
+            "seq_len": 8,
+            "stride": 8,
+            "dataset": "wikitext2",
+            "split": "validation",
+        }
+    }
+
+    with pytest.raises(typer.Exit) as exc:
+        _validate_and_harvest_baseline_schedule(
+            cfg,
+            pairing,
+            baseline,
+            tokenizer_hash=None,
+            resolved_loss_type="causal",
+            baseline_path_str="baseline.json",
+            console=None,
+        )
+    assert exc.value.exit_code == 1
+
+
+def test_baseline_harvest_attention_mask_row_not_list_fails() -> None:
+    cfg = _Cfg()
+    pairing = {
+        "preview": {
+            "input_ids": [[0, 1, 2], [3, 4, 5]],
+            "window_ids": [0, 1],
+            "attention_masks": [1, [1, 1, 1]],
+        },
+        "final": {"input_ids": [[6, 7, 8]], "window_ids": [2]},
+    }
+    baseline = {
+        "data": {
+            "seq_len": 8,
+            "stride": 8,
+            "dataset": "wikitext2",
+            "split": "validation",
+        }
+    }
+
+    with pytest.raises(typer.Exit) as exc:
+        _validate_and_harvest_baseline_schedule(
+            cfg,
+            pairing,
+            baseline,
+            tokenizer_hash=None,
+            resolved_loss_type="causal",
+            baseline_path_str="baseline.json",
+            console=None,
+        )
+    assert exc.value.exit_code == 1

@@ -183,6 +183,7 @@ def normalize_run_report(report: Mapping[str, Any] | RunReport) -> RunReport:
         "spectral",
         "rmt",
         "invariants",
+        "primary_metric_tail",
         "logloss_delta_ci",
         "bootstrap",
         "reduction",
@@ -236,6 +237,11 @@ def normalize_run_report(report: Mapping[str, Any] | RunReport) -> RunReport:
         artifacts=artifacts,
         flags=flags,
     )
+
+    # keep context when provided (profile/assurance provenance)
+    ctx = src.get("context")
+    if isinstance(ctx, Mapping):
+        out["context"] = dict(ctx)
 
     # keep evaluation_windows if provided (for deeper pairing-based features)
     ew = src.get("evaluation_windows")

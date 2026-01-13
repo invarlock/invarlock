@@ -1,0 +1,5 @@
+# Model overlay: HuggingFace GPT-2
+
+model:
+  id: "sshleifer/tiny-gpt2"
+  adapter: "hf_gpt2"

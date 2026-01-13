@@ -723,7 +723,10 @@ def calculate_lens_metrics_for_model(
     except Exception as e:
         logger.error(f"Metrics calculation failed: {e}")
         if config.strict_validation:
-            raise MetricsError(f"Metrics calculation failed: {e}") from e
+            raise MetricsError(
+                code="E401",
+                message=f"METRICS-COMPUTE-FAILED: {e}",
+            ) from e
 
     finally:
         resource_manager.cleanup()

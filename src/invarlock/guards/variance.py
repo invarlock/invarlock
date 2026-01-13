@@ -36,7 +36,7 @@ from ._contracts import guard_assert
 # Import the policy type and Guard interface
 from .policies import VariancePolicyDict
 
-__all__ = ["equalise_residual_variance", "equalise_branch_variance", "VarianceGuard"]
+__all__ = ["equalise_residual_variance", "VarianceGuard"]
 
 
 def _safe_mean(
@@ -346,33 +346,6 @@ def equalise_residual_variance(
                         applied_scales[name] = alpha
 
     return applied_scales
-
-
-def equalise_branch_variance(
-    model: nn.Module,
-    dataloader,
-    windows: int = 32,
-    tol: float = 0.02,
-    scale_bias: bool = True,
-    seed: int = 42,
-    device: str | None = None,
-    allow_empty: bool = False,
-) -> dict[str, float]:
-    """
-    Legacy alias for equalise_residual_variance.
-
-    Maintained for backward compatibility.
-    """
-    return equalise_residual_variance(
-        model=model,
-        dataloader=dataloader,
-        windows=windows,
-        tol=tol,
-        scale_bias=scale_bias,
-        seed=seed,
-        device=device,
-        allow_empty=allow_empty,
-    )
 
 
 def _predictive_gate_outcome(
@@ -1328,7 +1301,10 @@ class VarianceGuard(Guard):
             if not filtered_scales and topk > 0 and best_candidate:
                 name, scale = best_candidate
                 deadband = float(self._policy.get("deadband", 0.0) or 0.0)
-                threshold = max(deadband * 0.5, min_abs)
+                # Backstop should remain below the main min_abs filter; clamp if deadband is large.
+                threshold = max(deadband * 0.5, min_abs * 0.5)
+                if min_abs > 0 and threshold >= min_abs:
+                    threshold = min_abs * 0.5
                 if best_delta >= threshold:
                     if max_step > 0.0:
                         limited_delta = min(best_delta, max_step)

@@ -119,6 +119,18 @@ def test_generate_run_id_uses_existing_and_hashes_otherwise():
     assert len(derived) == 16 and derived != "abc"
 
 
+def test_generate_run_id_handles_non_dict_meta():
+    report = SimpleNamespace(meta="legacy-meta")
+    run_id = cert._generate_run_id(report)
+    assert isinstance(run_id, str)
+    assert len(run_id) == 16
+
+
+def test_analyze_bitwidth_map_empty_and_missing():
+    assert cert._analyze_bitwidth_map({}) == {}
+    assert cert._analyze_bitwidth_map({"layer": {"params": 128}}) == {}
+
+
 def test_analyze_bitwidth_map_and_rank_information():
     bitwidth_map = {
         "layer1": {"bitwidth": 4, "params": 128},
@@ -176,9 +188,10 @@ def test_extract_compression_diagnostics_quant(monkeypatch):
             }
         },
     }
+    edit_cfg = {"scope": "unknown", "clamp_ratio": 0.2}
     diagnostics = cert._extract_compression_diagnostics(
         "quant_rtn_rank",
-        {"scope": "unknown", "clamp_ratio": 0.2},
+        edit_cfg,
         deltas,
         {"layers": 2},
         inference,

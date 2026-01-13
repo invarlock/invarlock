@@ -42,13 +42,9 @@ def test_dataset_and_variance_validators_raise():
 
 def test_spectral_guard_alias_hydration_and_caps_normalization():
     sg = SpectralGuardConfig(
-        contraction=0.9, family_caps={"ffn": 2.5, "attn": {"kappa": 3}}
+        sigma_quantile=0.9, family_caps={"ffn": 2.5, "attn": {"kappa": 3}}
     )
-    assert (
-        sg.sigma_quantile == 0.9
-        and sg.contraction is None
-        and sg.family_caps["ffn"]["kappa"] == 2.5
-    )
+    assert sg.sigma_quantile == 0.9 and sg.family_caps["ffn"]["kappa"] == 2.5
 
 
 def test_auto_config_bounds_and_output_dir_coercion(tmp_path: Path):
@@ -104,6 +100,25 @@ def test_load_config_variance_guard_default_mode_and_floor(tmp_path: Path) -> No
     assert isinstance(var_cfg, VarianceGuardConfig)
     assert var_cfg.mode == "ci"
     assert var_cfg.absolute_floor_ppl == 0.1
+
+
+def test_load_config_guard_mode_overrides_normalize_and_validate(
+    tmp_path: Path,
+) -> None:
+    cfg_path = tmp_path / "guard_modes.yaml"
+    cfg_path.write_text(
+        "guards:\n  spectral: {mode: FAST}\n  rmt: {mode: strict}\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match=r"guards\.spectral\.mode is deprecated"):
+        load_config(cfg_path)
+
+
+def test_load_config_guard_mode_overrides_reject_invalid(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "bad_guard_mode.yaml"
+    cfg_path.write_text("guards: {spectral: {mode: turbo}}\n", encoding="utf-8")
+    with pytest.raises(ValueError, match=r"guards\.spectral\.mode is deprecated"):
+        load_config(cfg_path)
 
 
 def test_load_config_raises_on_bad_defaults_type(tmp_path: Path):

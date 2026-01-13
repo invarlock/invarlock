@@ -21,5 +21,5 @@ def test_auto_sigma_target_fallback() -> None:
         def forward(self, x: torch.Tensor) -> torch.Tensor:
             return x
 
-    target = auto_sigma_target(EmptyModel(), kappa=0.9)
+    target = auto_sigma_target(EmptyModel(), percentile=0.9)
     assert target == pytest.approx(0.9, rel=1e-6)

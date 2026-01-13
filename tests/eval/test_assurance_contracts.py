@@ -308,8 +308,8 @@ def test_rmt_epsilon_rule_acceptance_band():
             {
                 "name": "rmt",
                 "metrics": {
-                    "outliers_per_family": {"ffn": 11},
-                    "baseline_outliers_per_family": {"ffn": 10},
+                    "edge_risk_by_family_base": {"ffn": 1.0},
+                    "edge_risk_by_family": {"ffn": 1.09},
                     "epsilon_by_family": {"ffn": 0.10},
                 },
                 "policy": {"deadband": 0.10},
@@ -317,10 +317,10 @@ def test_rmt_epsilon_rule_acceptance_band():
         ],
         "metrics": {},
     }
-    baseline = {"rmt": {"outliers": 10}}
+    baseline = {"rmt": {}}
     result = _extract_rmt_analysis(report, baseline)
     assert result["stable"]
-    report["guards"][0]["metrics"]["outliers_per_family"]["ffn"] = 13
+    report["guards"][0]["metrics"]["edge_risk_by_family"]["ffn"] = 1.21
     result_unstable = _extract_rmt_analysis(report, baseline)
     assert not result_unstable["stable"]
 

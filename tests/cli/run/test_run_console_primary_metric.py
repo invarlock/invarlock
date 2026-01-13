@@ -9,7 +9,7 @@ from invarlock.cli.commands.run import run_command
 
 
 @pytest.mark.unit
-def test_run_prints_primary_metric_not_legacy(tmp_path: Path, capsys):
+def test_run_prints_primary_metric_not_ppl_table(tmp_path: Path, capsys):
     # Minimal YAML config
     cfg = tmp_path / "config.yaml"
     cfg.write_text(
@@ -45,7 +45,7 @@ output:
 
     class DummyRunner:
         def execute(self, **kwargs):
-            # Minimal report with legacy fields (still present internally)
+            # Minimal report with ppl_* fields (still present internally)
             return SimpleNamespace(
                 edit={"deltas": {}, "plan_digest": "x"},
                 metrics={

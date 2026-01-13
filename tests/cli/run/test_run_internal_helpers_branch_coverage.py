@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import io
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -53,9 +54,8 @@ def test_resolve_device_and_output_uses_cfg_output_dir(
     assert out_dir == tmp_path / "cfg_runs"
 
 
-def test_resolve_device_and_output_uses_legacy_out_dir(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_resolve_device_and_output_ignores_out_dir(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("invarlock.cli.device.resolve_device", lambda _d: "cpu")
     monkeypatch.setattr(
         "invarlock.cli.device.validate_device_for_config", lambda _d: (True, "")
@@ -63,12 +63,12 @@ def test_resolve_device_and_output_uses_legacy_out_dir(
 
     cfg = SimpleNamespace(
         model=SimpleNamespace(device="cpu"),
-        out=SimpleNamespace(dir=str(tmp_path / "legacy_runs")),
+        out=SimpleNamespace(dir=str(tmp_path / "ignored_runs")),
     )
     _, out_dir = run_mod._resolve_device_and_output(
         cfg, device=None, out=None, console=Console()
     )
-    assert out_dir == tmp_path / "legacy_runs"
+    assert out_dir == Path("runs")
 
 
 def test_resolve_device_and_output_falls_back_to_runs(
@@ -253,3 +253,289 @@ def test_load_model_with_cfg_passes_filtered_kwargs() -> None:
     assert calls["device"] == "cpu"
     assert isinstance(calls["kwargs"], dict)
     assert calls["kwargs"].get("foo") == 1
+
+
+def test_extract_model_load_kwargs_covers_unknown_dtype_normalization() -> None:
+    class _Cfg:
+        def model_dump(self):
+            return {"model": {"id": "m", "adapter": "a", "torch_dtype": "Float8"}}
+
+    out = run_mod._extract_model_load_kwargs(_Cfg())
+    assert out == {"torch_dtype": "float8"}
+
+
+def test_extract_model_load_kwargs_keeps_blank_dtype_string() -> None:
+    class _Cfg:
+        def model_dump(self):
+            return {"model": {"id": "m", "adapter": "a", "torch_dtype": " "}}
+
+    out = run_mod._extract_model_load_kwargs(_Cfg())
+    assert out == {"torch_dtype": " "}
+
+
+def test_load_model_with_cfg_passes_allowed_kwargs_for_strict_signature() -> None:
+    class _Cfg:
+        model = SimpleNamespace(id="m")
+
+        def model_dump(self):
+            return {"model": {"id": "m", "adapter": "a", "revision": "main"}}
+
+    calls: dict[str, object] = {}
+
+    class _Adapter:
+        def load_model(  # noqa: ANN001
+            self, model_id: str, device: str, revision: str | None = None
+        ):
+            calls["model_id"] = model_id
+            calls["device"] = device
+            calls["revision"] = revision
+            return object()
+
+    run_mod._load_model_with_cfg(_Adapter(), _Cfg(), device="cpu")
+    assert calls == {"model_id": "m", "device": "cpu", "revision": "main"}
+
+
+def test_load_model_with_cfg_uses_model_dump_fallback_when_cfg_model_id_raises() -> (
+    None
+):
+    class _Model:
+        @property
+        def id(self) -> str:
+            raise RuntimeError("boom")
+
+    class _Cfg:
+        model = _Model()
+
+        def model_dump(self):
+            return {"model": {"id": "m", "adapter": "a"}}
+
+    calls: dict[str, object] = {}
+
+    class _Adapter:
+        def load_model(self, model_id: str, device: str):  # noqa: ANN001
+            calls["model_id"] = model_id
+            calls["device"] = device
+            return object()
+
+    run_mod._load_model_with_cfg(_Adapter(), _Cfg(), device="cpu")
+    assert calls == {"model_id": "m", "device": "cpu"}
+
+
+def test_load_model_with_cfg_raises_when_model_dump_fails() -> None:
+    class _Model:
+        @property
+        def id(self) -> str:
+            raise RuntimeError("boom")
+
+    class _Cfg:
+        model = _Model()
+
+        def model_dump(self):
+            raise RuntimeError("boom")
+
+    class _Adapter:
+        def load_model(self, model_id: str, device: str):  # noqa: ANN001,ARG002
+            return object()
+
+    with pytest.raises(ValueError, match="model.id"):
+        run_mod._load_model_with_cfg(_Adapter(), _Cfg(), device="cpu")
+
+
+def test_load_model_with_cfg_raises_when_model_id_missing() -> None:
+    class _Cfg:
+        model = SimpleNamespace()
+
+        def model_dump(self):
+            return {"model": {}}
+
+    class _Adapter:
+        def load_model(self, model_id: str, device: str):  # noqa: ANN001,ARG002
+            return object()
+
+    with pytest.raises(ValueError, match="model.id"):
+        run_mod._load_model_with_cfg(_Adapter(), _Cfg(), device="cpu")
+
+
+def test_load_model_with_cfg_falls_back_when_signature_introspection_fails(
+    monkeypatch,
+) -> None:
+    class _Cfg:
+        model = SimpleNamespace(id="m")
+
+        def model_dump(self):
+            return {"model": {"id": "m", "adapter": "a", "foo": 1}}
+
+    calls: list[tuple[str, str]] = []
+
+    class _Adapter:
+        def load_model(self, model_id: str, device: str):  # noqa: ANN001
+            calls.append((model_id, device))
+            return object()
+
+    monkeypatch.setattr(run_mod.inspect, "signature", lambda _fn: 1 / 0)
+    run_mod._load_model_with_cfg(_Adapter(), _Cfg(), device="cpu")
+    assert calls == [("m", "cpu")]
+
+
+def test_execute_guarded_run_skip_model_load_uses_stub() -> None:
+    class DummyRunner:
+        def __init__(self) -> None:
+            self.model = None
+
+        def execute(self, **kwargs):  # noqa: D401, ARG002
+            self.model = kwargs.get("model")
+            return {"status": "ok"}
+
+    runner = DummyRunner()
+    report, model = run_mod._execute_guarded_run(
+        runner=runner,
+        adapter=SimpleNamespace(),
+        model=None,
+        cfg=SimpleNamespace(model=SimpleNamespace(id="dummy")),
+        edit_op=SimpleNamespace(name="noop"),
+        run_config=SimpleNamespace(),
+        guards=[],
+        calibration_data=[],
+        auto_config={},
+        edit_config={},
+        preview_count=1,
+        final_count=1,
+        restore_fn=None,
+        resolved_device="cpu",
+        console=Console(file=io.StringIO()),
+        skip_model_load=True,
+    )
+    assert isinstance(report, dict)
+    assert getattr(model, "name", "") == "guarded_stub_model"
+    assert runner.model is model
+
+
+def test_execute_guarded_run_sets_snapshot_provenance(monkeypatch) -> None:
+    sentinel = object()
+
+    class DummyRunner:
+        def __init__(self) -> None:
+            self.model = None
+
+        def execute(self, **kwargs):  # noqa: D401, ARG002
+            self.model = kwargs.get("model")
+            return {"status": "ok"}
+
+    monkeypatch.setattr(run_mod, "_load_model_with_cfg", lambda *_a, **_k: sentinel)
+
+    snapshot = {}
+    runner = DummyRunner()
+    report, model = run_mod._execute_guarded_run(
+        runner=runner,
+        adapter=SimpleNamespace(),
+        model=None,
+        cfg=SimpleNamespace(model=SimpleNamespace(id="dummy")),
+        edit_op=SimpleNamespace(name="noop"),
+        run_config=SimpleNamespace(),
+        guards=[],
+        calibration_data=[],
+        auto_config={},
+        edit_config={},
+        preview_count=1,
+        final_count=1,
+        restore_fn=None,
+        resolved_device="cpu",
+        console=Console(file=io.StringIO()),
+        snapshot_provenance=snapshot,
+    )
+    assert isinstance(report, dict)
+    assert model is sentinel
+    assert runner.model is sentinel
+    assert snapshot.get("reload_path_used") is True
+
+
+def test_execute_guarded_run_loads_model_without_snapshot_provenance(
+    monkeypatch,
+) -> None:
+    sentinel = object()
+
+    class DummyRunner:
+        def __init__(self) -> None:
+            self.model = None
+
+        def execute(self, **kwargs):  # noqa: D401, ARG002
+            self.model = kwargs.get("model")
+            return {"status": "ok"}
+
+    monkeypatch.setattr(run_mod, "_load_model_with_cfg", lambda *_a, **_k: sentinel)
+
+    runner = DummyRunner()
+    report, model = run_mod._execute_guarded_run(
+        runner=runner,
+        adapter=SimpleNamespace(),
+        model=None,
+        cfg=SimpleNamespace(model=SimpleNamespace(id="dummy")),
+        edit_op=SimpleNamespace(name="noop"),
+        run_config=SimpleNamespace(),
+        guards=[],
+        calibration_data=[],
+        auto_config={},
+        edit_config={},
+        preview_count=1,
+        final_count=1,
+        restore_fn=None,
+        resolved_device="cpu",
+        console=Console(file=io.StringIO()),
+    )
+    assert isinstance(report, dict)
+    assert model is sentinel
+    assert runner.model is sentinel
+
+
+def test_postprocess_and_summarize_includes_event_path(
+    monkeypatch, tmp_path: Path
+) -> None:
+    captured = io.StringIO()
+    console = Console(file=captured)
+    run_config = SimpleNamespace(event_path=str(tmp_path / "events.jsonl"))
+
+    monkeypatch.setattr(
+        run_mod,
+        "_emit_run_artifacts",
+        lambda **_k: {"json": str(tmp_path / "report.json")},
+    )
+
+    saved = run_mod._postprocess_and_summarize(
+        report={},
+        run_dir=tmp_path,
+        run_config=run_config,
+        window_plan=None,
+        dataset_meta={},
+        match_fraction=None,
+        overlap_fraction=None,
+        console=console,
+    )
+    assert saved["json"].endswith("report.json")
+    assert "Events:" in captured.getvalue()
+
+
+def test_postprocess_and_summarize_omits_event_path_when_missing(
+    monkeypatch, tmp_path: Path
+) -> None:
+    captured = io.StringIO()
+    console = Console(file=captured)
+    run_config = SimpleNamespace(event_path=None)
+
+    monkeypatch.setattr(
+        run_mod,
+        "_emit_run_artifacts",
+        lambda **_k: {"json": str(tmp_path / "report.json")},
+    )
+
+    saved = run_mod._postprocess_and_summarize(
+        report={},
+        run_dir=tmp_path,
+        run_config=run_config,
+        window_plan=None,
+        dataset_meta={},
+        match_fraction=None,
+        overlap_fraction=None,
+        console=console,
+    )
+    assert saved["json"].endswith("report.json")
+    assert "Events:" not in captured.getvalue()

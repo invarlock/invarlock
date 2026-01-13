@@ -16,18 +16,29 @@ cd "$ROOT"
 OUT_ROOT="${ROOT}/reports/telemetry/cpu-ci"
 mkdir -p "${OUT_ROOT}"
 
-echo "=== CPU telemetry sweep (GPT-2 small quant8) ==="
+echo "=== CPU telemetry sweep (quant8 attention) ==="
 
-# Baseline (CPU)
-BASE_RUN="${ROOT}/runs/telemetry_cpu/baseline"
-invarlock run -c configs/tasks/causal_lm/ci_cpu.yaml --profile ci_cpu --out "${BASE_RUN}"
-BASE_REPORT="$(ls -t "${BASE_RUN}"/*/report.json | head -n1)"
+# Defaults (override via env if desired)
+MODEL_ID="${MODEL_ID:-sshleifer/tiny-gpt2}"
+PROFILE="${PROFILE:-ci_cpu}"
+TIER="${TIER:-balanced}"
+PRESET="${PRESET:-configs/presets/causal_lm/wikitext2_512.yaml}"
+EDIT_CFG="${EDIT_CFG:-configs/overlays/edits/quant_rtn/8bit_attn.yaml}"
 
-# Quant8 (CPU)
-QUANT_RUN="${ROOT}/runs/telemetry_cpu/quant8"
-invarlock run -c configs/edits/quant_rtn/8bit_attn.yaml --profile ci_cpu --baseline "${BASE_REPORT}" --out "${QUANT_RUN}"
-QUANT_LATEST="$(ls -t "${QUANT_RUN}"/*/report.json | head -n1)"
-invarlock report --run "$(dirname "${QUANT_LATEST}")" --baseline "${BASE_REPORT}" --format cert --output "${OUT_ROOT}/quant8" >/dev/null
-invarlock verify "${OUT_ROOT}/quant8/evaluation.cert.json" >/dev/null
+RUN_ROOT="${ROOT}/runs/telemetry_cpu/quant8"
+CERT_ROOT="${OUT_ROOT}/quant8"
 
-echo "Telemetry certs written to ${OUT_ROOT}"
+invarlock certify \
+  --baseline "${MODEL_ID}" \
+  --subject "${MODEL_ID}" \
+  --adapter auto \
+  --profile "${PROFILE}" \
+  --tier "${TIER}" \
+  --preset "${PRESET}" \
+  --edit-config "${EDIT_CFG}" \
+  --out "${RUN_ROOT}" \
+  --cert-out "${CERT_ROOT}" >/dev/null
+
+invarlock verify "${CERT_ROOT}/evaluation.cert.json" >/dev/null
+
+echo "Telemetry certs written to ${CERT_ROOT}"

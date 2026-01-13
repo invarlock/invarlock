@@ -287,7 +287,7 @@ def _build_spectral_guard_with_z_scores() -> dict[str, Any]:
             "deadband": 0.1,
             "scope": "all",
             "max_caps": 5,
-            "multipletesting": {"method": "bh", "alpha": 0.05, "m": 4},
+            "multiple_testing": {"method": "bh", "alpha": 0.05, "m": 4},
             "max_spectral_norm": 9.9,
         },
         "metrics": {
@@ -814,55 +814,35 @@ class TestExtractRMTAnalysis:
                     "name": "rmt",
                     "policy": {"deadband": 0.1},
                     "metrics": {
-                        "rmt_outliers": 3,
-                        "outliers_per_family": {"ffn": 2, "attn": 1},
-                        "baseline_outliers_per_family": {"ffn": 1, "attn": 0},
+                        "edge_risk_by_family_base": {"ffn": 1.0, "attn": 1.0},
+                        "edge_risk_by_family": {"ffn": 1.05, "attn": 1.07},
                         "epsilon_by_family": {"ffn": 0.1, "attn": 0.08},
-                        "flagged_rate": 0.25,
-                        "max_mp_ratio_final": 1.2,
-                        "mean_mp_ratio_final": 1.05,
-                        "max_ratio": 1.3,
-                    },
-                    "baseline_metrics": {
-                        "max_mp_ratio": 1.1,
-                        "mean_mp_ratio": 1.0,
                     },
                 }
             ],
         }
-        baseline = {
-            "rmt": {
-                "outliers": 1,
-                "max_mp_ratio": 1.1,
-                "mean_mp_ratio": 1.0,
-            }
-        }
+        baseline = {"rmt": {}}
 
         result = _extract_rmt_analysis(report, baseline)
 
-        assert result["outliers_guarded"] == 3
-        assert result["outliers_bare"] >= 1
+        assert result["edge_risk_by_family_base"]["ffn"] == pytest.approx(1.0)
+        assert result["edge_risk_by_family"]["attn"] == pytest.approx(1.07)
         assert result["epsilon_by_family"]["ffn"] == pytest.approx(0.1)
         assert isinstance(result["stable"], bool)
-        assert result["mean_deviation_ratio"] == pytest.approx(1.05)
+        assert result["max_edge_ratio"] == pytest.approx(1.07)
 
     def test_extract_rmt_analysis_without_guard_falls_back(self):
         report = {
             "meta": {"auto": {"tier": "balanced"}},
-            "rmt": {
-                "families": {
-                    "ffn": {"outliers_bare": 2, "outliers_guarded": 3, "epsilon": 0.1},
-                },
-                "outliers": 2,
-            },
-            "metrics": {"rmt": {"outliers": 2}},
+            "guards": [],
+            "metrics": {},
         }
         baseline = {}
 
         result = _extract_rmt_analysis(report, baseline)
 
-        assert result["outliers_guarded"] == 2
-        assert result["families"]["ffn"]["epsilon"] == pytest.approx(0.1)
+        assert result["evaluated"] is False
+        assert result["families"]["ffn"]["epsilon"] == pytest.approx(0.01)
         assert result["status"] in {"stable", "unstable"}
 
 
@@ -1084,7 +1064,7 @@ class TestEffectivePoliciesAndResolution:
         assert resolved["rmt"]["epsilon_by_family"]["ffn"] == pytest.approx(0.09)
         assert resolved["variance"]["predictive_one_sided"] is True
         # Balanced tier enforces default min-effect value
-        assert resolved["variance"]["min_effect_lognll"] == pytest.approx(0.0009)
+        assert resolved["variance"]["min_effect_lognll"] == pytest.approx(0.0)
 
     def test_compute_policy_and_report_digest_helpers(self):
         policy = {"spectral": {"sigma_quantile": 0.95}}
@@ -1817,27 +1797,6 @@ class TestMakeCertificate:
         rmt_policy = certificate["policies"]["rmt"]
         assert rmt_policy["epsilon_default"] == pytest.approx(0.1)
         assert rmt_policy["epsilon_by_family"]["ffn"] == pytest.approx(0.1)
-
-    def test_spectral_alias_contraction_hydrated_but_not_emitted(self):
-        """Legacy contraction input hydrates sigma_quantile without emitting contraction."""
-        report = create_mock_run_report(include_guards=False)
-        report["guards"] = [
-            {
-                "name": "spectral",
-                "policy": {"contraction": 0.92},
-                "metrics": {"caps_applied": 0},
-            }
-        ]
-        baseline = create_mock_baseline()
-
-        with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
-        ):
-            certificate = make_certificate(report, baseline)
-
-        spectral_policy = certificate["policies"]["spectral"]
-        assert spectral_policy["sigma_quantile"] == pytest.approx(0.92)
-        assert "contraction" not in spectral_policy
 
     def test_variance_metadata_embedded_in_certificate(self):
         """Variance section should carry tap, targets, predictive gate, and A/B provenance."""
@@ -2745,22 +2704,32 @@ class TestPrivateHelperFunctions:
 
         result = _extract_rmt_analysis(report, baseline)
 
-        assert result["outliers_guarded"] == 2
-        assert result["outliers_bare"] == 1
-        assert result["epsilon"] == pytest.approx(0.12)
-        assert result["epsilon_default"] == pytest.approx(0.1)
+        assert result["epsilon_default"] == pytest.approx(0.01)
         assert result["stable"] is True
         assert result["status"] == "stable"
+        assert result["families"]["embed"]["epsilon"] == pytest.approx(0.01)
 
     def test_extract_rmt_analysis_calculated_stability(self):
         """Test _extract_rmt_analysis with calculated stability."""
-        report = create_mock_run_report()
-        report["metrics"]["rmt"].pop("stable")  # Remove explicit stable flag
-        baseline = create_mock_baseline()
+        report = {
+            "meta": {"auto": {"tier": "balanced"}},
+            "guards": [
+                {
+                    "name": "rmt",
+                    "metrics": {
+                        "edge_risk_by_family_base": {"ffn": 1.0},
+                        "edge_risk_by_family": {"ffn": 1.25},
+                        "epsilon_by_family": {"ffn": 0.1},
+                    },
+                }
+            ],
+            "metrics": {},
+        }
+        baseline = {"rmt": {}}
 
         result = _extract_rmt_analysis(report, baseline)
 
-        # Should calculate stability: 2 <= 1 * (1 + 0.1) = 1.1 -> False
+        # Should calculate stability from the ε-band when no explicit stable flag is present.
         assert result["stable"] is False
         assert result["status"] == "unstable"
 

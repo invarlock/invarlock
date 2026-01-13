@@ -12,18 +12,15 @@ from collections import defaultdict
 from datetime import datetime
 from typing import Any, TypedDict
 
-try:
-    from typing import NotRequired
-except ImportError:  # Python 3.10 fallback
-    from typing import NotRequired
-
 import numpy as np
 import torch
 
 from invarlock.cli._evidence import maybe_dump_guard_evidence
 from invarlock.core.api import Guard
+from invarlock.core.exceptions import ValidationError
 
 from ._contracts import guard_assert
+from ._estimators import frobenius_norm_sq, power_iter_sigma_max, row_col_norm_extrema
 
 
 def _z_to_two_sided_pvalue(z: Any) -> float:
@@ -104,10 +101,10 @@ class SpectralPolicy(TypedDict, total=False):
     """Type definition for spectral guard policy configuration."""
 
     sigma_quantile: float
-    contraction: NotRequired[float]  # Backward compatibility alias
-    kappa: NotRequired[float]  # Legacy alias
     deadband: float
     scope: str
+    estimator: dict[str, Any]
+    degeneracy: dict[str, Any]
     correction_enabled: bool
     family_caps: dict[str, dict[str, float]]
     ignore_preview_inflation: bool
@@ -173,23 +170,15 @@ class SpectralGuard(Guard):
         # Default configuration
         sigma_quantile = self.config.get("sigma_quantile")
         if sigma_quantile is None:
-            for alias in ("contraction", "kappa"):
-                if self.config.get(alias) is not None:
-                    sigma_quantile = self.config[alias]
-                    break
-        if sigma_quantile is None:
             sigma_quantile = 0.95
         self.sigma_quantile = float(sigma_quantile)
         self.config["sigma_quantile"] = self.sigma_quantile
-        self.config.pop("contraction", None)
-        self.config.pop("kappa", None)
         self.deadband = kwargs.get("deadband", 0.10)
         self.scope = kwargs.get("scope", "all")  # 'all', 'ffn', 'attn'
-        self.max_spectral_norm = kwargs.get("max_spectral_norm", 10.0)
+        self.max_spectral_norm = kwargs.get("max_spectral_norm", None)
         if self.max_spectral_norm is not None:
             self.max_spectral_norm = float(self.max_spectral_norm)
         self.config["max_spectral_norm"] = self.max_spectral_norm
-        self.min_condition_number = kwargs.get("min_condition_number", 1e-12)
         self.correction_enabled = kwargs.get("correction_enabled", True)
         self.family_caps = _normalize_family_caps(
             kwargs.get("family_caps"), default=True
@@ -200,12 +189,61 @@ class SpectralGuard(Guard):
             "multiple_testing", {"method": "bh", "alpha": 0.05, "m": 4}
         )
 
+        estimator_cfg = kwargs.get("estimator")
+        if not isinstance(estimator_cfg, dict):
+            estimator_cfg = {}
+        try:
+            est_iters = int(estimator_cfg.get("iters", 4) or 4)
+        except Exception:
+            est_iters = 4
+        if est_iters < 1:
+            est_iters = 1
+        est_init = str(estimator_cfg.get("init", "ones") or "ones").strip().lower()
+        if est_init not in {"ones", "e0"}:
+            est_init = "ones"
+        self.estimator: dict[str, Any] = {
+            "type": "power_iter",
+            "iters": est_iters,
+            "init": est_init,
+        }
+
+        degeneracy_cfg = kwargs.get("degeneracy")
+        if not isinstance(degeneracy_cfg, dict):
+            degeneracy_cfg = {}
+        stable_rank_cfg = (
+            degeneracy_cfg.get("stable_rank")
+            if isinstance(degeneracy_cfg, dict)
+            else {}
+        )
+        norm_collapse_cfg = (
+            degeneracy_cfg.get("norm_collapse")
+            if isinstance(degeneracy_cfg, dict)
+            else {}
+        )
+        self.degeneracy: dict[str, Any] = {
+            "enabled": bool(degeneracy_cfg.get("enabled", True)),
+            "stable_rank": {
+                "warn_ratio": float((stable_rank_cfg or {}).get("warn_ratio", 0.5)),
+                "fatal_ratio": float((stable_rank_cfg or {}).get("fatal_ratio", 0.25)),
+            },
+            "norm_collapse": {
+                "warn_ratio": float((norm_collapse_cfg or {}).get("warn_ratio", 0.25)),
+                "fatal_ratio": float(
+                    (norm_collapse_cfg or {}).get("fatal_ratio", 0.10)
+                ),
+            },
+        }
+
         # Baseline and tracking structures
         self.baseline_sigmas: dict[str, float] = {}
         self.baseline_family_stats: dict[str, dict[str, float]] = {}
         self.module_family_map: dict[str, str] = {}
         self.latest_z_scores: dict[str, float] = {}
         self.pre_edit_z_scores: dict[str, float] = {}
+        self.baseline_degeneracy: dict[str, dict[str, float]] = {}
+
+        # Run context (informational only; contract is policy-bound)
+        self._run_profile: str | None = None
 
     def _log_event(
         self, operation: str, level: str = "INFO", message: str = "", **data
@@ -221,6 +259,15 @@ class SpectralGuard(Guard):
         }
         self.events.append(event)
 
+    def set_run_context(self, report: Any) -> None:
+        """Capture run profile context for reporting (informational only)."""
+        ctx = getattr(report, "context", {}) or {}
+        profile = ""
+        if isinstance(ctx, dict):
+            profile = str(ctx.get("profile", "") or "").strip().lower()
+
+        self._run_profile = profile or None
+
     def _serialize_policy(self) -> dict[str, Any]:
         """Snapshot current guard policy for report serialization."""
         return {
@@ -235,6 +282,8 @@ class SpectralGuard(Guard):
             ),
             "family_caps": self.family_caps,
             "multiple_testing": self.multiple_testing,
+            "estimator": self.estimator,
+            "degeneracy": self.degeneracy,
             "correction_enabled": bool(self.correction_enabled),
             "ignore_preview_inflation": bool(self.ignore_preview_inflation),
         }
@@ -259,15 +308,14 @@ class SpectralGuard(Guard):
         # Update configuration from policy
         if policy:
             sigma_value = policy.get("sigma_quantile")
-            if sigma_value is None:
-                alias_value = policy.get("contraction", policy.get("kappa"))
-                if alias_value is not None:
-                    sigma_value = alias_value
+            if "contraction" in policy or "kappa" in policy:
+                raise ValueError(
+                    "Spectral policy keys 'contraction'/'kappa' are not supported; "
+                    "use 'sigma_quantile'."
+                )
             if sigma_value is not None:
                 self.sigma_quantile = float(sigma_value)
                 policy["sigma_quantile"] = self.sigma_quantile
-            policy.pop("contraction", None)
-            policy.pop("kappa", None)
             self.config["sigma_quantile"] = self.sigma_quantile
 
             for key in [
@@ -306,14 +354,65 @@ class SpectralGuard(Guard):
                     if isinstance(stats, dict)
                 }
                 self.config["baseline_family_stats"] = self.baseline_family_stats
+            if "multipletesting" in policy:
+                raise ValidationError(
+                    code="E501",
+                    message="POLICY-PARAM-INVALID",
+                    details={
+                        "param": "multipletesting",
+                        "hint": "Use spectral.multiple_testing instead.",
+                    },
+                )
             mt_policy = policy.get("multiple_testing")
-            if mt_policy is None:
-                mt_policy = policy.get("multipletesting")
             if isinstance(mt_policy, dict):
                 self.multiple_testing = mt_policy.copy()
                 policy["multiple_testing"] = self.multiple_testing
                 self.config["multiple_testing"] = self.multiple_testing
-            policy.pop("multipletesting", None)
+
+            estimator_policy = policy.get("estimator")
+            if isinstance(estimator_policy, dict):
+                try:
+                    est_iters = int(estimator_policy.get("iters", 4) or 4)
+                except Exception:
+                    est_iters = 4
+                if est_iters < 1:
+                    est_iters = 1
+                est_init = (
+                    str(estimator_policy.get("init", "ones") or "ones").strip().lower()
+                )
+                if est_init not in {"ones", "e0"}:
+                    est_init = "ones"
+                self.estimator = {
+                    "type": "power_iter",
+                    "iters": est_iters,
+                    "init": est_init,
+                }
+                self.config["estimator"] = self.estimator
+
+            degeneracy_policy = policy.get("degeneracy")
+            if isinstance(degeneracy_policy, dict):
+                stable_rank_cfg = degeneracy_policy.get("stable_rank")
+                norm_collapse_cfg = degeneracy_policy.get("norm_collapse")
+                self.degeneracy = {
+                    "enabled": bool(degeneracy_policy.get("enabled", True)),
+                    "stable_rank": {
+                        "warn_ratio": float(
+                            (stable_rank_cfg or {}).get("warn_ratio", 0.5)
+                        ),
+                        "fatal_ratio": float(
+                            (stable_rank_cfg or {}).get("fatal_ratio", 0.25)
+                        ),
+                    },
+                    "norm_collapse": {
+                        "warn_ratio": float(
+                            (norm_collapse_cfg or {}).get("warn_ratio", 0.25)
+                        ),
+                        "fatal_ratio": float(
+                            (norm_collapse_cfg or {}).get("fatal_ratio", 0.10)
+                        ),
+                    },
+                }
+                self.config["degeneracy"] = self.degeneracy
 
         self._log_event(
             "prepare",
@@ -325,7 +424,7 @@ class SpectralGuard(Guard):
 
         try:
             # Capture baseline spectral properties
-            self.baseline_sigmas = capture_baseline_sigmas(model, scope=self.scope)
+            self.baseline_sigmas = self._capture_sigmas(model, phase="prepare")
             self.module_family_map = classify_model_families(
                 model, scope=self.scope, existing=self.module_family_map
             )
@@ -334,14 +433,54 @@ class SpectralGuard(Guard):
                     self.baseline_sigmas, self.module_family_map
                 )
 
-            # Compute additional baseline metrics
-            baseline_stats = scan_model_gains(model, scope=self.scope)
-            summarized = _summarize_sigmas(self.baseline_sigmas)
-            baseline_stats.update(summarized)
+            baseline_stats: dict[str, Any] = _summarize_sigmas(self.baseline_sigmas)
 
-            # Store target sigma value
-            self.target_sigma = auto_sigma_target(model, percentile=self.sigma_quantile)
+            try:
+                values = np.array(list(self.baseline_sigmas.values()), dtype=float)
+                if values.size:
+                    self.target_sigma = float(
+                        np.percentile(values, float(self.sigma_quantile) * 100.0)
+                    )
+                else:
+                    self.target_sigma = float(self.sigma_quantile)
+            except Exception:
+                self.target_sigma = float(self.sigma_quantile)
             baseline_stats["target_sigma"] = self.target_sigma
+
+            self.baseline_degeneracy = {}
+            if bool((self.degeneracy or {}).get("enabled")):
+                eps = 1e-12
+                for name, module in model.named_modules():
+                    if not self._should_check_module(name, module):
+                        continue
+                    weight = getattr(module, "weight", None)
+                    if not isinstance(weight, torch.Tensor) or weight.ndim != 2:
+                        continue
+                    sigma = self.baseline_sigmas.get(name)
+                    if not (
+                        isinstance(sigma, int | float) and math.isfinite(float(sigma))
+                    ):
+                        continue
+                    try:
+                        stable_rank = frobenius_norm_sq(weight) / max(
+                            float(sigma) ** 2, eps
+                        )
+                        norms = row_col_norm_extrema(weight, eps=eps)
+                        row_med = max(float(norms.get("row_median", 0.0)), eps)
+                        col_med = max(float(norms.get("col_median", 0.0)), eps)
+                        collapse = min(
+                            float(norms.get("row_min", 0.0)) / row_med,
+                            float(norms.get("col_min", 0.0)) / col_med,
+                        )
+                        self.baseline_degeneracy[name] = {
+                            "stable_rank": float(stable_rank),
+                            "norm_collapse": float(collapse),
+                        }
+                    except Exception:
+                        continue
+            baseline_stats["baseline_degeneracy"] = {
+                name: vals.copy() for name, vals in self.baseline_degeneracy.items()
+            }
 
             baseline_stats["family_stats"] = {
                 family: stats.copy()
@@ -351,6 +490,10 @@ class SpectralGuard(Guard):
                 family: caps.copy() for family, caps in self.family_caps.items()
             }
             baseline_stats["module_sigmas"] = self.baseline_sigmas.copy()
+            baseline_stats["measurement_contract"] = {
+                "estimator": self.estimator,
+                "degeneracy": self.degeneracy,
+            }
 
             self.baseline_metrics = baseline_stats
 
@@ -399,7 +542,7 @@ class SpectralGuard(Guard):
             return
 
         # Capture pre-edit spectral state for comparison
-        self.pre_edit_metrics = capture_baseline_sigmas(model, scope=self.scope)
+        self.pre_edit_metrics = self._capture_sigmas(model, phase="before_edit")
         self.pre_edit_z_scores = compute_z_scores(
             self.pre_edit_metrics,
             self.baseline_family_stats,
@@ -421,7 +564,7 @@ class SpectralGuard(Guard):
 
         try:
             # Capture current spectral state
-            self.current_metrics = capture_baseline_sigmas(model, scope=self.scope)
+            self.current_metrics = self._capture_sigmas(model, phase="after_edit")
 
             # Detect violations
             violations = self._detect_spectral_violations(
@@ -460,6 +603,39 @@ class SpectralGuard(Guard):
                 message=f"Post-edit spectral analysis failed: {str(e)}",
                 error=str(e),
             )
+
+    def _capture_sigmas(self, model: Any, *, phase: str) -> dict[str, float]:
+        """Capture σ̂max for each in-scope module under the measurement contract."""
+        _ = phase  # reserved for future observability hooks
+        sigmas: dict[str, float] = {}
+        try:
+            iters = int((self.estimator or {}).get("iters", 4) or 4)
+        except Exception:
+            iters = 4
+        if iters < 1:
+            iters = 1
+        init = str((self.estimator or {}).get("init", "ones") or "ones").strip().lower()
+        if init not in {"ones", "e0"}:
+            init = "ones"
+
+        for name, module in model.named_modules():
+            if not _should_process_module(name, module, self.scope):
+                continue
+            weight = getattr(module, "weight", None)
+            if not isinstance(weight, torch.Tensor) or weight.ndim != 2:
+                continue
+            if weight.dtype in {torch.int8, torch.uint8}:
+                # Skip quantized weights; treat as neutral for baseline-relative stats.
+                sigmas[name] = 1.0
+                continue
+            try:
+                sigmas[name] = float(
+                    power_iter_sigma_max(weight, iters=iters, init=init)
+                )
+            except Exception:
+                sigmas[name] = 1.0
+
+        return sigmas
 
     def _detect_spectral_violations(
         self, model: Any, metrics: dict[str, float], phase: str = "finalize"
@@ -504,6 +680,7 @@ class SpectralGuard(Guard):
                         violations.append(
                             {
                                 "type": "family_z_cap",
+                                "severity": "budgeted",
                                 "module": name,
                                 "family": family,
                                 "z_score": float(z_score),
@@ -525,6 +702,7 @@ class SpectralGuard(Guard):
                         violations.append(
                             {
                                 "type": "max_spectral_norm",
+                                "severity": "fatal",
                                 "module": name,
                                 "family": family,
                                 "current_sigma": float(sigma_max),
@@ -533,25 +711,98 @@ class SpectralGuard(Guard):
                             }
                         )
 
-                    # Condition number monitoring (warn only)
-                    try:
-                        U, S, V = torch.svd(module.weight.float())
-                        if len(S) > 0:
-                            condition_number = S[0].item() / max(S[-1].item(), 1e-12)
-                            if S[-1].item() < self.min_condition_number:
-                                violations.append(
-                                    {
-                                        "type": "ill_conditioned",
-                                        "module": name,
-                                        "family": family,
-                                        "condition_number": float(condition_number),
-                                        "min_singular_value": float(S[-1].item()),
-                                        "threshold": float(self.min_condition_number),
-                                        "message": f"Matrix is ill-conditioned, min singular value: {S[-1].item():.2e}",
-                                    }
+                    if bool((self.degeneracy or {}).get("enabled")):
+                        base = self.baseline_degeneracy.get(name) or {}
+                        base_sr = base.get("stable_rank")
+                        base_nc = base.get("norm_collapse")
+                        eps = 1e-12
+                        try:
+                            sr_cfg = (
+                                (self.degeneracy.get("stable_rank") or {})
+                                if isinstance(self.degeneracy, dict)
+                                else {}
+                            )
+                            nc_cfg = (
+                                (self.degeneracy.get("norm_collapse") or {})
+                                if isinstance(self.degeneracy, dict)
+                                else {}
+                            )
+                            sr_warn = float(sr_cfg.get("warn_ratio", 0.5))
+                            sr_fatal = float(sr_cfg.get("fatal_ratio", 0.25))
+                            nc_warn = float(nc_cfg.get("warn_ratio", 0.25))
+                            nc_fatal = float(nc_cfg.get("fatal_ratio", 0.10))
+                        except Exception:
+                            sr_warn, sr_fatal, nc_warn, nc_fatal = 0.5, 0.25, 0.25, 0.10
+
+                        if (
+                            isinstance(base_sr, int | float)
+                            and math.isfinite(float(base_sr))
+                            and float(base_sr) > 0
+                        ):
+                            try:
+                                sr_cur = frobenius_norm_sq(module.weight) / max(
+                                    float(sigma_max) ** 2, eps
                                 )
-                    except Exception:
-                        pass  # SVD failure is not a violation
+                                sr_ratio = float(sr_cur) / max(float(base_sr), eps)
+                                if math.isfinite(sr_ratio) and sr_ratio < sr_warn:
+                                    violations.append(
+                                        {
+                                            "type": "degeneracy_stable_rank_drop",
+                                            "severity": "fatal"
+                                            if sr_ratio < sr_fatal
+                                            else "budgeted",
+                                            "module": name,
+                                            "family": family,
+                                            "stable_rank_base": float(base_sr),
+                                            "stable_rank_cur": float(sr_cur),
+                                            "ratio": float(sr_ratio),
+                                            "warn_ratio": float(sr_warn),
+                                            "fatal_ratio": float(sr_fatal),
+                                            "message": (
+                                                f"Stable-rank ratio {sr_ratio:.3f} below "
+                                                f"{sr_warn:.3f} (base={float(base_sr):.3f}, cur={float(sr_cur):.3f})"
+                                            ),
+                                        }
+                                    )
+                            except Exception:
+                                pass
+
+                        if (
+                            isinstance(base_nc, int | float)
+                            and math.isfinite(float(base_nc))
+                            and float(base_nc) > 0
+                        ):
+                            try:
+                                norms = row_col_norm_extrema(module.weight, eps=eps)
+                                row_med = max(float(norms.get("row_median", 0.0)), eps)
+                                col_med = max(float(norms.get("col_median", 0.0)), eps)
+                                nc_cur = min(
+                                    float(norms.get("row_min", 0.0)) / row_med,
+                                    float(norms.get("col_min", 0.0)) / col_med,
+                                )
+                                nc_ratio = float(nc_cur) / max(float(base_nc), eps)
+                                if math.isfinite(nc_ratio) and nc_ratio < nc_warn:
+                                    violations.append(
+                                        {
+                                            "type": "degeneracy_norm_collapse",
+                                            "severity": "fatal"
+                                            if nc_ratio < nc_fatal
+                                            else "budgeted",
+                                            "module": name,
+                                            "family": family,
+                                            "norm_collapse_base": float(base_nc),
+                                            "norm_collapse_cur": float(nc_cur),
+                                            "ratio": float(nc_ratio),
+                                            "warn_ratio": float(nc_warn),
+                                            "fatal_ratio": float(nc_fatal),
+                                            "message": (
+                                                f"Norm-collapse ratio {nc_ratio:.3f} below "
+                                                f"{nc_warn:.3f} (base={float(base_nc):.3e}, cur={float(nc_cur):.3e})"
+                                            ),
+                                        }
+                                    )
+                            except Exception:
+                                pass
 
             except Exception as e:
                 self._log_event(
@@ -776,7 +1027,7 @@ class SpectralGuard(Guard):
                 self.prepare(model, adapter, None, {})
 
             # Capture current spectral state
-            current_metrics = capture_baseline_sigmas(model, scope=self.scope)
+            current_metrics = self._capture_sigmas(model, phase="validate")
 
             # Detect violations (final validation phase)
             violations = self._detect_spectral_violations(
@@ -784,16 +1035,16 @@ class SpectralGuard(Guard):
             )
 
             # Determine if passed under budget/fatal rules
-            fatal_violation_types = {"max_spectral_norm", "ill_conditioned"}
-            budgeted_violations = [
-                violation
-                for violation in violations
-                if violation.get("type") not in fatal_violation_types
-            ]
             fatal_violations = [
                 violation
                 for violation in violations
-                if violation.get("type") in fatal_violation_types
+                if (violation.get("severity") == "fatal")
+                or (violation.get("type") == "max_spectral_norm")
+            ]
+            budgeted_violations = [
+                violation
+                for violation in violations
+                if violation not in fatal_violations
             ]
 
             selected_budgeted, mt_selection = self._select_budgeted_violations(
@@ -839,6 +1090,10 @@ class SpectralGuard(Guard):
                 "caps_exceeded": caps_exceeded,
                 "multiple_testing": self.multiple_testing,
                 "multiple_testing_selection": mt_selection,
+                "measurement_contract": {
+                    "estimator": self.estimator,
+                    "degeneracy": self.degeneracy,
+                },
             }
 
             family_quantiles, top_z_scores = self._compute_family_observability()
@@ -916,7 +1171,7 @@ class SpectralGuard(Guard):
             }
 
         # Final spectral analysis
-        final_metrics = capture_baseline_sigmas(model, scope=self.scope)
+        final_metrics = self._capture_sigmas(model, phase="finalize")
         final_violations = self._detect_spectral_violations(
             model, final_metrics, phase="finalize"
         )
@@ -928,16 +1183,16 @@ class SpectralGuard(Guard):
         family_quantiles, top_z_scores = self._compute_family_observability()
 
         # Determine overall status based on budgeted vs fatal violations
-        fatal_violation_types = {"max_spectral_norm", "ill_conditioned"}
-        budgeted_violations = [
-            violation
-            for violation in final_violations
-            if violation.get("type") not in fatal_violation_types
-        ]
         fatal_violations = [
             violation
             for violation in final_violations
-            if violation.get("type") in fatal_violation_types
+            if (violation.get("severity") == "fatal")
+            or (violation.get("type") == "max_spectral_norm")
+        ]
+        budgeted_violations = [
+            violation
+            for violation in final_violations
+            if violation not in fatal_violations
         ]
 
         selected_budgeted, mt_selection = self._select_budgeted_violations(
@@ -983,6 +1238,10 @@ class SpectralGuard(Guard):
             "multiple_testing_selection": mt_selection,
             "family_z_quantiles": family_quantiles,
             "top_z_scores": top_z_scores,
+            "measurement_contract": {
+                "estimator": self.estimator,
+                "degeneracy": self.degeneracy,
+            },
         }
 
         # Categorize violations
@@ -990,7 +1249,9 @@ class SpectralGuard(Guard):
         errors = []
 
         for violation in selected_final_violations:
-            if violation["type"] in ["max_spectral_norm", "ill_conditioned"]:
+            if (violation.get("severity") == "fatal") or (
+                violation.get("type") == "max_spectral_norm"
+            ):
                 errors.append(violation["message"])
             else:
                 warnings.append(violation["message"])
@@ -1029,7 +1290,9 @@ class SpectralGuard(Guard):
         return result
 
 
-def compute_sigma_max(weight_matrix: Any) -> float:
+def compute_sigma_max(
+    weight_matrix: Any, *, iters: int = 4, init: str = "ones"
+) -> float:
     """
     Compute maximum singular value of a weight matrix.
 
@@ -1040,35 +1303,29 @@ def compute_sigma_max(weight_matrix: Any) -> float:
         Maximum singular value
     """
     try:
-        if isinstance(weight_matrix, torch.Tensor):
-            # Handle different tensor types
-            if weight_matrix.dtype in [torch.int8]:
-                # Skip quantized weights
-                return 1.0
-
-            # Ensure float type for SVD
-            W = weight_matrix.float()
-
-            # Handle edge cases
-            if W.numel() == 0 or W.shape[0] == 0 or W.shape[1] == 0:
-                return 0.0
-
-            # Compute singular values using deterministic backend when available
-            try:
-                singular_values = torch.linalg.svdvals(W)
-            except RuntimeError:
-                # Fallback for older backends without svdvals
-                singular_values = torch.linalg.svd(W, full_matrices=False).S
-
-            return singular_values[0].item() if singular_values.numel() > 0 else 0.0
-        else:
-            return 1.0  # Fallback for non-tensor inputs
-
+        iters_i = int(iters)
     except Exception:
-        return 1.0  # Fallback on any error
+        iters_i = 4
+    if iters_i < 1:
+        iters_i = 1
+    init_s = str(init or "ones").strip().lower()
+    if init_s not in {"ones", "e0"}:
+        init_s = "ones"
+
+    if not isinstance(weight_matrix, torch.Tensor):
+        return 1.0
+    if weight_matrix.dtype in {torch.int8, torch.uint8}:
+        return 1.0
+    if weight_matrix.numel() == 0 or weight_matrix.ndim != 2:
+        return 0.0
+
+    try:
+        return float(power_iter_sigma_max(weight_matrix, iters=iters_i, init=init_s))
+    except Exception:
+        return 1.0
 
 
-def auto_sigma_target(model: Any, percentile: float = 0.95, **kwargs: Any) -> float:
+def auto_sigma_target(model: Any, percentile: float = 0.95) -> float:
     """
     Automatically determine sigma target for a model.
 
@@ -1079,11 +1336,6 @@ def auto_sigma_target(model: Any, percentile: float = 0.95, **kwargs: Any) -> fl
     Returns:
         Target sigma value
     """
-    if "kappa" in kwargs and percentile == 0.95:
-        try:
-            percentile = float(kwargs["kappa"])
-        except (TypeError, ValueError):
-            pass
     try:
         # Collect all spectral norms
         spectral_norms = []
@@ -1471,7 +1723,6 @@ def scan_model_gains(model: Any, scope: str = "all") -> dict[str, Any]:
             "total_layers": 0,
             "scanned_modules": 0,
             "spectral_norms": [],
-            "condition_numbers": [],
             "weight_statistics": {},
         }
 
@@ -1485,15 +1736,6 @@ def scan_model_gains(model: Any, scope: str = "all") -> dict[str, Any]:
                     # Compute spectral norm
                     sigma_max = compute_sigma_max(module.weight)
                     results["spectral_norms"].append(sigma_max)
-
-                    # Compute condition number if possible
-                    try:
-                        U, S, V = torch.svd(module.weight.float())
-                        if len(S) > 1:
-                            condition_num = (S[0] / S[-1]).item()
-                            results["condition_numbers"].append(condition_num)
-                    except Exception:
-                        pass
 
                     # Basic weight statistics
                     try:
@@ -1512,10 +1754,6 @@ def scan_model_gains(model: Any, scope: str = "all") -> dict[str, Any]:
             results["mean_spectral_norm"] = np.mean(results["spectral_norms"])
             results["max_spectral_norm"] = np.max(results["spectral_norms"])
             results["min_spectral_norm"] = np.min(results["spectral_norms"])
-
-        if results["condition_numbers"]:
-            results["mean_condition_number"] = np.mean(results["condition_numbers"])
-            results["max_condition_number"] = np.max(results["condition_numbers"])
 
         results["message"] = (
             f"Scanned {results['scanned_modules']} modules out of {results['total_layers']} total layers"
