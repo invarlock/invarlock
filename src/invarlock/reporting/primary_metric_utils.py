@@ -30,6 +30,32 @@ def attach_primary_metric(
         pm = m.get("primary_metric") if isinstance(m, dict) else None
         if isinstance(pm, dict) and pm:
             pm_copy = copy.deepcopy(pm)
+            pm_copy.setdefault("invalid", bool(pm_copy.get("invalid", False)))
+            degraded_reason = pm_copy.get("degraded_reason")
+            preview_val = pm_copy.get("preview")
+            final_val = pm_copy.get("final")
+            ratio_val = pm_copy.get("ratio_vs_baseline")
+
+            def _is_finite(value: Any) -> bool:
+                return isinstance(value, (int, float)) and math.isfinite(float(value))
+
+            needs_pm_fallback = not (_is_finite(preview_val) and _is_finite(final_val))
+            needs_ratio_fallback = not _is_finite(ratio_val)
+
+            if degraded_reason is None:
+                if needs_pm_fallback:
+                    degraded_reason = "non_finite_pm"
+                elif needs_ratio_fallback:
+                    degraded_reason = "non_finite_delta"
+                elif pm_copy.get("invalid"):
+                    degraded_reason = "invalid_pm"
+
+            pm_copy["degraded"] = bool(
+                pm_copy.get("degraded") or pm_copy.get("invalid") or degraded_reason
+            )
+            if pm_copy["degraded"]:
+                pm_copy.setdefault("degraded_reason", degraded_reason)
+
             # Propagate instability hint from ppl_analysis
             try:
                 if isinstance(ppl_analysis, dict) and bool(
