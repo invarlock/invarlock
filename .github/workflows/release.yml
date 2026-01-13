@@ -40,10 +40,20 @@ jobs:
           . .venv/bin/activate
           pip install dist/*.whl
           python -c "import invarlock; import sys; print('invarlock version', getattr(invarlock, '__version__', 'n/a')); sys.exit(0)"
+      - name: Upload dist artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: dist
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 3
 
   publish:
     needs: build_check
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     if: >-
       ${{ github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v') && inputs.publish == true }}
     steps:
@@ -51,6 +61,11 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
+      - name: Download dist artifacts
+        uses: actions/download-artifact@v5
+        with:
+          name: dist
+          path: dist
       - name: Publish to TestPyPI/PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
