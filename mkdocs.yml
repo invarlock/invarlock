@@ -23,12 +23,14 @@ nav:
       - API Guide: reference/api-guide.md
       - Programmatic Quickstart: reference/programmatic-quickstart.md
       - Guards: reference/guards.md
+      - GPU/MPS-First Guards (Decision Memo): reference/gpu-mps-first-guards.md
       - Environment Variables: reference/env-vars.md
       - Model Adapters: reference/model-adapters.md
       - Exporting Certificates (HTML): reference/exporting-certificates-html.md
       - Certificate Schema (v1): reference/certificate-schema.md
       - Certificate Telemetry: reference/certificate_telemetry.md
       - Configuration Schema: reference/config-schema.md
+      - Tier Policy Catalog: reference/tier-policy-catalog.md
       - Datasets: reference/datasets.md
       - Artifact Layout: reference/artifacts.md
   - Assurance:

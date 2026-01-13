@@ -7,10 +7,8 @@ from invarlock.guards.spectral import SpectralGuard
 class IllCondLayer(nn.Module):
     def __init__(self):
         super().__init__()
-        # Rank-deficient weight to yield very small min singular value
-        W = torch.randn(8, 8)
-        W[-1] = 0  # make last row zero to reduce rank
-        self.weight = nn.Parameter(W)
+        # Start well-conditioned; degeneracy is introduced post-prepare.
+        self.weight = nn.Parameter(torch.randn(8, 8))
 
 
 class MiniModel(nn.Module):
@@ -31,11 +29,12 @@ class MiniModel(nn.Module):
 def test_ill_conditioned_violation_detected():
     model = MiniModel()
     guard = SpectralGuard(
-        min_condition_number=1e3,
         correction_enabled=False,
         ignore_preview_inflation=False,
     )
     out = guard.prepare(model, adapter=None, calib=None, policy={})
     assert out["ready"] is True
+    with torch.no_grad():
+        model.transformer.h[0].attn.weight[-1].zero_()
     guard.after_edit(model)
-    assert any(v["type"] == "ill_conditioned" for v in guard.violations)
+    assert any(v["type"] == "degeneracy_norm_collapse" for v in guard.violations)

@@ -116,7 +116,7 @@ def test_run_report_has_dataset_windows_stats(tmp_path: Path, monkeypatch):
               metric: {{ kind: ppl_causal, reps: 10 }}
               loss: {{ type: auto }}
 
-            out: {{ dir: "{tmp_path}" }}
+            output: {{ dir: "{tmp_path}" }}
             """
         )
     )

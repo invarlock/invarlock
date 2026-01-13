@@ -120,7 +120,7 @@ def _generate_reports(
             else:
                 console.print(f"  📄 {fmt.upper()}: {file_path}")
 
-        # Show key metrics (PM-first). Avoid legacy PPL wording.
+        # Show key metrics (PM-first). Avoid PPL-first wording.
         console.print("\n📈 Key Metrics:")
         console.print(f"  Model: {primary_report['meta']['model_id']}")
         console.print(f"  Edit: {primary_report['edit']['name']}")

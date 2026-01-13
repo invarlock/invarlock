@@ -1,6 +1,0 @@
-# Model overlay: HuggingFace GPT-2
-
-model:
-  id: "gpt2"
-  adapter: "hf_gpt2"
-  device: "auto"

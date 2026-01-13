@@ -59,6 +59,22 @@ For details on windowing, pairing, and tier minima, see
 `docs/assurance/02-coverage-and-pairing.md` and
 `docs/assurance/09-tier-v1-calibration.md`.
 
+## Measurement Contracts (GPU/MPS-first)
+
+InvarLock’s guards are approximation-only and accelerator-first (CUDA/MPS).
+Each certificate records the measurement contract (estimator + sampling policy)
+used to produce guard statistics.
+
+- Recorded under:
+  - `resolved_policy.spectral.measurement_contract` / `resolved_policy.rmt.measurement_contract`
+  - `spectral.measurement_contract_hash` / `rmt.measurement_contract_hash`
+- In CI/Release, `invarlock verify --profile ci|release` enforces:
+  - measurement contract present, and
+  - baseline/subject pairing (`*_measurement_contract_match = true`).
+
+`assurance.mode` and per-guard `guards.{spectral,rmt}.mode` are not supported;
+configs containing them are rejected.
+
 ## Quickstart Commands
 
 ```bash
@@ -75,7 +91,7 @@ pip install "invarlock[awq,gptq]"
 invarlock certify --baseline gpt2 --subject gpt2-quant
 
 # Force CPU execution when no accelerator is available (baseline smoke)
-invarlock run -c configs/tasks/causal_lm/release_cpu.yaml \
+invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml \
   --profile release --tier balanced --device cpu --out runs/baseline_cpu
 
 # Explain decisions, compare, and render HTML
@@ -131,7 +147,8 @@ Exhaustive command map with brief descriptions and notable options.
     - `invarlock report verify` — recompute/verify metrics for report/cert.
       - Args: `CERTIFICATES...`
       - Options: `--baseline`, `--tolerance`, `--profile`, `--json`.
-    - `invarlock report explain` — explain gates for report vs baseline.
+    - `invarlock report explain` — explain gates for report vs baseline (primary metric ratio,
+      Primary Metric Tail (ΔlogNLL), drift, and guard overhead when available).
     - `invarlock report html` — render certificate JSON to HTML.
       - Options: `-i/--input`, `-o/--output`, `--embed-css/--no-embed-css`, `--force`.
     - `invarlock report validate` — validate certificate JSON against current schema (v1).
@@ -310,8 +327,7 @@ derived from the embedded inputs. Common causes and quick fixes:
     recomputed vs displayed values.
 
 If recompute is `"skipped"`, the certificate doesn’t include the inputs needed for
-this quick check; that’s OK for older artifacts. The verifier still checks schema
-and pairing math.
+this quick check. The verifier still checks schema and pairing math.
 
 #### plugins list --json (format: plugins-v1)
 
@@ -429,13 +445,8 @@ Notes:
 
 ```bash
 # Baseline (CI, GPT-2 small)
-invarlock run -c configs/tasks/causal_lm/ci_cpu.yaml \
+invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml \
   --profile ci --tier balanced
-
-# Quant RTN (built-in) smoke
-invarlock run -c configs/edits/quant_rtn/8bit_attn.yaml \
-  --profile ci --tier balanced \
-  --baseline runs/ci/gpt2_small/baseline/*/report.json
 
 # Compare & Certify (recommended)
 INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
@@ -443,7 +454,16 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
   --subject /path/to/edited \
   --adapter auto \
   --profile ci \
-  --preset configs/tasks/causal_lm/ci_cpu.yaml
+  --preset configs/presets/causal_lm/wikitext2_512.yaml
+
+# Demo edit overlay (quant_rtn)
+INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
+  --baseline gpt2 \
+  --subject gpt2 \
+  --adapter auto \
+  --profile ci \
+  --preset configs/presets/causal_lm/wikitext2_512.yaml \
+  --edit-config configs/overlays/edits/quant_rtn/8bit_attn.yaml
 ```
 
 ## Minimal Configuration (quant_rtn)
@@ -492,7 +512,7 @@ INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
   --edited <hf_dir_or_id> \
   --adapter auto \
   --profile ci \
-  --edit-config configs/edits/quant_rtn/8bit_attn.yaml
+  --edit-config configs/overlays/edits/quant_rtn/8bit_attn.yaml
 ```
 
 Behavior:
@@ -518,7 +538,7 @@ See also: User Guide → Scripts & Utilities for preparing checkpoints
 | Flag                                             | Description                                                       |
 | ------------------------------------------------ | ----------------------------------------------------------------- |
 | --tier {balanced,conservative,aggressive,none}   | Applies tier-specific guard thresholds.                           |
-| --profile {ci,release}                           | Selects evaluation window counts and bootstrap depth.             |
+| --profile {ci,release,ci_cpu}                    | Selects evaluation window counts and bootstrap depth.             |
 | --probes N                                       | Enables micro-probes for exploratory analysis (default 0 for CI). |
 | --out PATH                                       | Overrides the run output directory.                               |
 | --device {cpu,cuda,mps,auto}                     | Overrides device selection.                                       |
@@ -532,7 +552,7 @@ resulting report/certificate for audit trails.
 
 | Profile                     | Preview Windows (`dataset.preview_n`) | Final Windows (`dataset.final_n`) | Bootstrap Replicates (`eval.bootstrap.replicates`) | Notes                                                                                                                                                                                                         |
 | --------------------------- | ------------------------------------- | --------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CI (balanced defaults)      | 200                                   | 200                               | 1200                                               | Provided by the balanced presets (e.g., `configs/tasks/causal_lm/release_cpu.yaml`).                                                                                                                          |
+| CI (balanced defaults)      | 200                                   | 200                               | 1200                                               | Provided by the built-in CI profile defaults (or `INVARLOCK_CI_PREVIEW/FINAL` env overrides) when `--profile ci` is used.                                                                                     |
 | Release                     | 400                                   | 400                               | 3200                                               | Set by the packaged release profile (`invarlock._data.runtime/profiles/release.yaml`); also raises the VE calibration cap to 320 windows. Override via `INVARLOCK_CONFIG_ROOT/runtime/profiles/release.yaml`. |
 | CI CPU telemetry (optional) | 120                                   | 120                               | 1200 (inherits)                                    | Packaged `ci_cpu.yaml` (`invarlock._data.runtime/profiles/ci_cpu.yaml`) trims window counts and forces `model.device=cpu`. Override via `INVARLOCK_CONFIG_ROOT/runtime/profiles/ci_cpu.yaml`.                 |
 

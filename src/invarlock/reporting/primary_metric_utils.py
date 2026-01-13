@@ -30,6 +30,38 @@ def attach_primary_metric(
         pm = m.get("primary_metric") if isinstance(m, dict) else None
         if isinstance(pm, dict) and pm:
             pm_copy = copy.deepcopy(pm)
+            pm_copy.setdefault("invalid", bool(pm_copy.get("invalid", False)))
+            degraded_reason = pm_copy.get("degraded_reason")
+            preview_val = pm_copy.get("preview")
+            final_val = pm_copy.get("final")
+            ratio_val = pm_copy.get("ratio_vs_baseline")
+            baseline_final = (
+                baseline_ref.get("primary_metric", {}).get("final")
+                if isinstance(baseline_ref, dict)
+                else None
+            )
+
+            def _is_finite(value: Any) -> bool:
+                return isinstance(value, (int, float)) and math.isfinite(float(value))
+
+            baseline_has_reference = _is_finite(baseline_final)
+            needs_pm_fallback = not (_is_finite(preview_val) and _is_finite(final_val))
+            needs_ratio_fallback = baseline_has_reference and not _is_finite(ratio_val)
+
+            if degraded_reason is None:
+                if needs_pm_fallback:
+                    degraded_reason = "non_finite_pm"
+                elif needs_ratio_fallback:
+                    degraded_reason = "non_finite_delta"
+                elif pm_copy.get("invalid"):
+                    degraded_reason = "primary_metric_invalid"
+
+            pm_copy["degraded"] = bool(
+                pm_copy.get("degraded") or pm_copy.get("invalid") or degraded_reason
+            )
+            if pm_copy["degraded"] and degraded_reason:
+                pm_copy.setdefault("degraded_reason", degraded_reason)
+
             # Propagate instability hint from ppl_analysis
             try:
                 if isinstance(ppl_analysis, dict) and bool(
@@ -75,33 +107,52 @@ def attach_primary_metric(
                             pm_copy["analysis_point_final"] = float(mean_fin)
                     # Attach analysis-basis CIs for preview/final in log space from report metrics
                     try:
-                        dlci = (
-                            _coerce_interval(m.get("logloss_delta_ci"))
-                            if isinstance(m, dict)
-                            else (math.nan, math.nan)
-                        )
-                        if isinstance(dlci, tuple | list) and len(dlci) == 2:
-                            lo, hi = float(dlci[0]), float(dlci[1])
-                            if math.isfinite(lo) and math.isfinite(hi):
-                                pm_copy.setdefault("ci", (lo, hi))
+                        dlci_source: tuple[float, float] | list[float] | None = None
+                        pairing_source = None
+                        if isinstance(ppl_analysis, dict):
+                            stats = ppl_analysis.get("stats") or {}
+                            if isinstance(stats, dict):
+                                pairing_source = stats.get("pairing")
+                            if pairing_source == "paired_baseline":
+                                dlci_source = _coerce_interval(
+                                    ppl_analysis.get("logloss_delta_ci")
+                                )
+                        if dlci_source is None:
+                            dlci_source = (
+                                _coerce_interval(m.get("logloss_delta_ci"))
+                                if isinstance(m, dict)
+                                else (math.nan, math.nan)
+                            )
+                        if (
+                            isinstance(dlci_source, tuple | list)
+                            and len(dlci_source) == 2
+                        ):
+                            lo_raw, hi_raw = dlci_source[0], dlci_source[1]
+                            if isinstance(lo_raw, (int, float)) and isinstance(
+                                hi_raw, (int, float)
+                            ):
+                                lo, hi = float(lo_raw), float(hi_raw)
+                                if math.isfinite(lo) and math.isfinite(hi):
+                                    pm_copy.setdefault("ci", (lo, hi))
                     except Exception:
                         pass
                 except Exception:
                     pass
             # Ensure ratio_vs_baseline present and consistent
             try:
-                base_final = (
-                    baseline_ref.get("primary_metric", {}).get("final")
-                    if isinstance(baseline_ref, dict)
+                fin = pm_copy.get("final")
+                baseline_final_val = (
+                    float(baseline_final)
+                    if isinstance(baseline_final, (int, float))
+                    and _is_finite(baseline_final)
                     else None
                 )
-                fin = pm_copy.get("final")
                 if (
-                    isinstance(fin, int | float)
-                    and isinstance(base_final, int | float)
-                    and float(base_final) > 0
+                    isinstance(fin, (int, float))
+                    and baseline_final_val is not None
+                    and baseline_final_val > 0
                 ):
-                    pm_copy["ratio_vs_baseline"] = float(fin) / float(base_final)
+                    pm_copy["ratio_vs_baseline"] = float(fin) / baseline_final_val
                 # Ensure display_ci aligns with log-space CI for ppl-like metrics
                 try:
                     kind = str(pm_copy.get("kind", "")).lower()
@@ -277,6 +328,9 @@ def attach_primary_metric(
                 if isinstance(point, float):
                     pm["display_ci"] = [point, point]
                 else:
+                    # As last resort, emit a degenerate [1.0, 1.0] to satisfy schema invariants
                     pm["display_ci"] = [1.0, 1.0]
+                    pm.setdefault("estimated", True)
+
     except Exception:
         pass

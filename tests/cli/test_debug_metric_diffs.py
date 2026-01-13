@@ -4,7 +4,7 @@ from invarlock.cli.commands.run import _format_debug_metric_diffs
 
 
 def test_debug_metric_diffs_logs_small_deltas():
-    # Arrange: pm and legacy ppl_* are identical → deltas near zero
+    # Arrange: both PM blocks are identical → deltas near zero
     pm = {
         "kind": "ppl_causal",
         "preview": 50.0,

@@ -119,7 +119,7 @@ Then move the HF cache directory to your offline machine (or set
   Example:
 
   ```bash
-  INVARLOCK_CAPACITY_FAST=1 invarlock run -c configs/tasks/causal_lm/ci_cpu.yaml --profile ci
+  INVARLOCK_CAPACITY_FAST=1 invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci
   ```
 
   Note: use for quick checks; not suitable for release evidence.
@@ -130,5 +130,5 @@ Then move the HF cache directory to your offline machine (or set
   Example:
 
   ```bash
-  INVARLOCK_DEDUP_TEXTS=1 invarlock run -c configs/tasks/causal_lm/ci_cpu.yaml --profile ci
+  INVARLOCK_DEDUP_TEXTS=1 invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci
   ```

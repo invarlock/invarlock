@@ -1,0 +1,42 @@
+# Preset: Seq2Seq (T5) with Hugging Face seq2seq dataset provider (xsum).
+
+model:
+  id: "t5-small"
+  adapter: "hf_t5"
+  device: "auto"
+
+dataset:
+  provider:
+    kind: "hf_seq2seq"
+    dataset_name: "xsum"
+    src_field: "document"
+    tgt_field: "summary"
+  split: "validation"
+  seq_len: 256
+  stride: 256
+  preview_n: 64
+  final_n: 64
+  seed: 42
+
+eval:
+  metric:
+    kind: "ppl_seq2seq"
+  loss:
+    type: "seq2seq"
+
+edit:
+  name: "noop"
+  plan: {}
+
+auto:
+  enabled: true
+  tier: "balanced"
+  probes: 0
+
+guards:
+  order: ["invariants", "spectral", "rmt", "variance", "invariants"]
+
+output:
+  dir: "runs"
+  save_model: false
+  save_report: true

@@ -1,10 +1,7 @@
 import torch
 import torch.nn as nn
 
-from invarlock.guards.variance import (
-    equalise_branch_variance,
-    equalise_residual_variance,
-)
+from invarlock.guards.variance import equalise_residual_variance
 
 
 class TinyBlock(nn.Module):
@@ -29,7 +26,7 @@ class TinyModel(nn.Module):
         return y1 + y2
 
 
-def test_equalise_residual_variance_basic_and_alias():
+def test_equalise_residual_variance_basic():
     model = TinyModel()
     # Simple tensor batches act as dataloader
     batches = [torch.randn(2, 4) for _ in range(6)]
@@ -39,7 +36,3 @@ def test_equalise_residual_variance_basic_and_alias():
     # Expect at least one branch got a scale computed
     assert isinstance(scales, dict)
     assert any(k.endswith("attn") or k.endswith("mlp") for k in scales.keys())
-
-    # Legacy alias path, with empty dataloader allowed
-    scales2 = equalise_branch_variance(model, [], windows=0, allow_empty=True)
-    assert isinstance(scales2, dict) and len(scales2) >= 0

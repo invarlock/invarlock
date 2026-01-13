@@ -56,11 +56,7 @@ def test_spectral_summary_sigma_quantile_from_tier_defaults(tier: str):
 
     # summary.sigma_quantile should be present and reflect tier defaults
     summary = spectral.get("summary", {})
-    expected = (
-        TIER_POLICIES[tier]["spectral"].get("sigma_quantile")
-        or TIER_POLICIES[tier]["spectral"].get("contraction")
-        or TIER_POLICIES[tier]["spectral"].get("kappa")
-    )
+    expected = TIER_POLICIES[tier]["spectral"].get("sigma_quantile", 0.95)
     assert "sigma_quantile" in summary and pytest.approx(
         summary["sigma_quantile"], rel=0, abs=1e-12
     ) == float(expected)

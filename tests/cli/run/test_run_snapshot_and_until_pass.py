@@ -120,7 +120,9 @@ def test_snapshot_auto_chunked_selected_when_large_and_disk_ok(
             return LargeModel()
 
         def snapshot_chunked(self, model):
-            return "tmpdir"
+            snap_dir = tmp_path / "snapshot_chunked"
+            snap_dir.mkdir(parents=True, exist_ok=True)
+            return str(snap_dir)
 
         def restore_chunked(self, model, path):
             self.rest_chunked += 1

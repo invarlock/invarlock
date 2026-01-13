@@ -16,22 +16,11 @@ def _load_cert(path: Path) -> dict:
 
 
 def _extract_ratio(payload: dict) -> float:
-    # Prefer PM-only schema
     pm = payload.get("primary_metric")
     if isinstance(pm, dict):
         ratio = pm.get("ratio_vs_baseline")
         if isinstance(ratio, int | float):
             return float(ratio)
-    # Backward-compat: support legacy fixtures
-    ppl = payload.get("ppl")
-    if isinstance(ppl, dict):
-        ratio = ppl.get("ratio")
-        if isinstance(ratio, int | float):
-            return float(ratio)
-    metrics = payload.get("metrics", {})
-    ratio = metrics.get("ppl_ratio")
-    if isinstance(ratio, int | float):
-        return float(ratio)
     raise SystemExit(
         "Certificate missing ratio (expected 'primary_metric.ratio_vs_baseline')"
     )

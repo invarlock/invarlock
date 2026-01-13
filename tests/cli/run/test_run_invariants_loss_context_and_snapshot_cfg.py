@@ -439,7 +439,9 @@ def test_snapshot_auto_ram_fraction_env(tmp_path: Path, monkeypatch):
             return M()
 
         def snapshot_chunked(self, model):
-            return "tmp"
+            snap_dir = tmp_path / "snapshot_chunked"
+            snap_dir.mkdir(parents=True, exist_ok=True)
+            return str(snap_dir)
 
         def restore_chunked(self, model, path):
             self.rest_chunked += 1
@@ -510,7 +512,9 @@ def test_snapshot_cfg_threshold_and_tempdir(tmp_path: Path, monkeypatch):
             return M()
 
         def snapshot_chunked(self, model):
-            return "tmpdir"
+            snap_dir = tmp_path / "snapshot_chunked"
+            snap_dir.mkdir(parents=True, exist_ok=True)
+            return str(snap_dir)
 
         def restore_chunked(self, model, path):
             self.rest_chunked += 1

@@ -1,4 +1,3 @@
-import os
 from typing import Any
 
 from invarlock.reporting.validate import (
@@ -67,21 +66,6 @@ def test_validate_against_baseline_accuracy_delta_pp_bounds():
     bad = validate_against_baseline(run, baseline, delta_bounds_pp=(-0.2, +0.2))
     assert bad.checks.get("delta_bounds_pp") is False
     assert bad.passed is False
-
-
-def test_validate_against_baseline_legacy_kwargs_gate():
-    # Enable legacy path to exercise env-gated kwargs acceptance
-    os.environ["INVARLOCK_VALIDATE_LEGACY"] = "1"
-    try:
-        run = {"metrics": {"primary_metric": _pm("ppl_causal", ratio=1.30)}}
-        baseline = {"ratio_vs_baseline": 1.28, "param_reduction_ratio": 0.02}
-        res = validate_against_baseline(
-            run, baseline, tol_ppl_ratio=0.05, ppl_bounds=(1.0, 1.4)
-        )
-        assert res.checks.get("ratio_tolerance") is True
-        assert res.checks.get("ratio_bounds") is True
-    finally:
-        del os.environ["INVARLOCK_VALIDATE_LEGACY"]
 
 
 def test_validate_drift_gate_pass_and_fail():

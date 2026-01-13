@@ -162,6 +162,35 @@ def test_null_sweep_handles_missing_spectral_and_bad_metrics(tmp_path: Path) -> 
         )
 
 
+def test_null_sweep_covers_guard_search_empty_and_non_dict_guards(
+    tmp_path: Path,
+) -> None:
+    cfg = _write_base_config(tmp_path)
+    out = tmp_path / "out"
+
+    def _fake_run_command(*, out: str, tier: str, config: str, **_kwargs) -> str:  # noqa: ARG001
+        report_path = Path(out) / "report.json"
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        guards = [] if "seed_42" in out else ["not-a-dict"]
+        payload = {"guards": guards, "meta": {"tier": tier, "config": config}}
+        report_path.write_text(json.dumps(payload), encoding="utf-8")
+        return str(report_path)
+
+    with patch("invarlock.cli.commands.run.run_command", _fake_run_command):
+        calibrate_mod.null_sweep(
+            config=cfg,
+            out=out,
+            tiers=["balanced"],
+            seed=[42, 43],
+            n_seeds=2,
+            seed_start=42,
+            profile="ci",
+            device=None,
+            safety_margin=0.05,
+            target_any_warning_rate=0.01,
+        )
+
+
 def test_ve_sweep_emits_json_csv_power_curve_and_tier_patch(tmp_path: Path) -> None:
     cfg = _write_base_config(tmp_path)
     out = tmp_path / "out"

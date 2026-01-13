@@ -11,7 +11,7 @@ def _iter_source_files(root: Path):
                 yield Path(dirpath) / fn
 
 
-def test_cli_invariants_ban_legacy_strings():
+def test_cli_invariants_ban_removed_strings():
     # Restrict scan to code paths only
     src_root = Path(__file__).resolve().parents[2] / "src"
     assert src_root.exists()
@@ -34,4 +34,4 @@ def test_cli_invariants_ban_legacy_strings():
             if needle in lower:
                 offenders.append(f"{path}: contains '{needle}'")
 
-    assert not offenders, "Legacy CLI strings found in code:\n" + "\n".join(offenders)
+    assert not offenders, "Removed CLI strings found in code:\n" + "\n".join(offenders)

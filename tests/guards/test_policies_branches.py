@@ -195,7 +195,7 @@ def test_get_rmt_policy_overlay_and_fallback(monkeypatch: pytest.MonkeyPatch):
     overlaid = get_rmt_policy("balanced", use_yaml=True)
     assert overlaid["deadband"] == 0.21
     assert overlaid["margin"] == 1.7
-    assert overlaid["epsilon"] == {"ffn": 0.3}
+    assert overlaid["epsilon_by_family"] == {"ffn": 0.3}
 
     # Partial overlay to exercise false branches on some keys.
     def _partial_rmt_tier(name: str, guard: str):

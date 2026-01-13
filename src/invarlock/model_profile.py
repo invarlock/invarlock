@@ -5,12 +5,14 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+AutoTokenizer: Any | None = None
+GPT2Tokenizer: Any | None = None
+
 try:
-    from transformers import AutoTokenizer, GPT2Tokenizer
+    from transformers import AutoTokenizer as _AutoTokenizer
+    from transformers import GPT2Tokenizer as _GPT2Tokenizer
     from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 except Exception:  # pragma: no cover - exercised only when transformers is absent
-    AutoTokenizer = None  # type: ignore[assignment]
-    GPT2Tokenizer = None  # type: ignore[assignment]
 
     class PreTrainedTokenizerBase:  # type: ignore[no-redef]
         """Lightweight stub used when transformers is not installed."""
@@ -20,6 +22,11 @@ except Exception:  # pragma: no cover - exercised only when transformers is abse
                 "Tokenization requires the 'transformers' extra. "
                 "Install it with: pip install 'invarlock[adapters]'."
             )
+
+
+else:  # pragma: no cover - transformers optional
+    AutoTokenizer = _AutoTokenizer
+    GPT2Tokenizer = _GPT2Tokenizer
 
 
 TokenizerFactory = Callable[[], tuple[PreTrainedTokenizerBase, str]]
@@ -194,13 +201,24 @@ def _make_llama_tokenizer(model_id: str):
         # Try offline-first to respect InvarLock network guard; fall back to a
         # local GPT-2 tokenizer if the model assets are not cached or network
         # access is denied.
-        try:
-            tokenizer = AutoTokenizer.from_pretrained(model_id, local_files_only=True)
-        except Exception:
+        tokenizer = None
+        if AutoTokenizer is not None:
             try:
-                tokenizer = AutoTokenizer.from_pretrained(model_id)
+                tokenizer = AutoTokenizer.from_pretrained(
+                    model_id, local_files_only=True
+                )
             except Exception:
-                tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+                try:
+                    tokenizer = AutoTokenizer.from_pretrained(model_id)
+                except Exception:
+                    tokenizer = None
+        if tokenizer is None:
+            if GPT2Tokenizer is None:
+                raise RuntimeError(
+                    "Tokenization requires the 'transformers' extra. "
+                    "Install it with: pip install 'invarlock[adapters]'."
+                )
+            tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
         # Ensure padding/bos tokens are configured so downstream encoding
         # yields stable non-zero ids and a valid attention mask regardless of
         # environment defaults or tokenizer variants.
@@ -234,15 +252,24 @@ def _make_unknown_tokenizer(model_id: str):
                 "Install it with: pip install 'invarlock[adapters]'."
             )
         # Unknown families: try local-only first, then remote, then degrade to GPT-2
-        try:
-            tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(
-                model_id, local_files_only=True
-            )
-        except Exception:
+        tokenizer = None
+        if AutoTokenizer is not None:
             try:
-                tokenizer = AutoTokenizer.from_pretrained(model_id)
+                tokenizer = AutoTokenizer.from_pretrained(
+                    model_id, local_files_only=True
+                )
             except Exception:
-                tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+                try:
+                    tokenizer = AutoTokenizer.from_pretrained(model_id)
+                except Exception:
+                    tokenizer = None
+        if tokenizer is None:
+            if GPT2Tokenizer is None:
+                raise RuntimeError(
+                    "Text tokenization requires the 'transformers' extra. "
+                    "Install it with: pip install 'invarlock[adapters]'."
+                )
+            tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
         if getattr(tokenizer, "pad_token", None) is None:
             eos_token = getattr(tokenizer, "eos_token", None)
             if eos_token is not None:

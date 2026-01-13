@@ -592,6 +592,66 @@ def test_validate_and_harvest_baseline_schedule_counts_adjust():
     assert any("Adjusting evaluation window counts" in s for s in outputs)
 
 
+def test_validate_and_harvest_baseline_schedule_duplicate_preview_ids():
+    cfg = SimpleNamespace(
+        dataset=SimpleNamespace(seq_len=128, stride=64, preview_n=2, final_n=1)
+    )
+    pairing = {
+        "preview": {
+            "window_ids": [0, 0],
+            "input_ids": [[1, 2], [3, 4]],
+            "attention_masks": [[1, 1], [1, 1]],
+        },
+        "final": {
+            "window_ids": [1],
+            "input_ids": [[5, 6]],
+            "attention_masks": [[1, 1]],
+        },
+    }
+    baseline = {"data": {"seq_len": 128, "stride": 64, "dataset": "wikitext2"}}
+
+    with pytest.raises(typer.Exit):
+        run_mod._validate_and_harvest_baseline_schedule(
+            cfg,
+            pairing,
+            baseline,
+            tokenizer_hash=None,
+            resolved_loss_type="causal",
+            baseline_path_str="baseline.json",
+            console=None,
+        )
+
+
+def test_validate_and_harvest_baseline_schedule_overlap_ids_wraps_masks():
+    cfg = SimpleNamespace(
+        dataset=SimpleNamespace(seq_len=128, stride=64, preview_n=1, final_n=1)
+    )
+    pairing = {
+        "preview": {
+            "window_ids": [0],
+            "input_ids": [[1, 2]],
+            "attention_masks": [1, 1],
+        },
+        "final": {
+            "window_ids": [0],
+            "input_ids": [[3, 4]],
+            "attention_masks": [1, 1],
+        },
+    }
+    baseline = {"data": {"seq_len": 128, "stride": 64, "dataset": "wikitext2"}}
+
+    with pytest.raises(typer.Exit):
+        run_mod._validate_and_harvest_baseline_schedule(
+            cfg,
+            pairing,
+            baseline,
+            tokenizer_hash=None,
+            resolved_loss_type="causal",
+            baseline_path_str="baseline.json",
+            console=None,
+        )
+
+
 def test_tokenizer_digest_filters_non_string_keys():
     class WeirdTokenizer:
         def get_vocab(self):
@@ -831,10 +891,10 @@ def test_resolve_device_invalid(monkeypatch):
 
 
 def test_resolve_device_output_fallback(monkeypatch, tmp_path):
-    class CfgLegacy:
+    class CfgOutIgnored:
         model = SimpleNamespace(device=None)
         output = SimpleNamespace(dir=None)
-        out = SimpleNamespace(dir=str(tmp_path / "legacy"))
+        out = SimpleNamespace(dir=str(tmp_path / "ignored"))
 
     console = Console(file=io.StringIO())
     monkeypatch.setattr(
@@ -845,11 +905,12 @@ def test_resolve_device_output_fallback(monkeypatch, tmp_path):
         lambda device: (True, ""),
         raising=False,
     )
+    monkeypatch.chdir(tmp_path)
     resolved, out_dir = run_mod._resolve_device_and_output(
-        CfgLegacy(), device=None, out=None, console=console
+        CfgOutIgnored(), device=None, out=None, console=console
     )
     assert resolved == "cpu"
-    assert out_dir == tmp_path / "legacy"
+    assert out_dir == Path("runs")
 
     class CfgFallback:
         model = SimpleNamespace(device=None)
@@ -1261,6 +1322,143 @@ def test_run_bare_control_frees_private_reload_model(monkeypatch):
     )
     assert ("execute", shared_model) in events
     assert not any(kind == "free" for kind, _ in events)
+
+
+def test_run_bare_control_skip_model_load_uses_stub(monkeypatch):
+    seen: dict[str, object] = {}
+
+    class DummyRunner:
+        def execute(self, **kwargs):  # noqa: D401, ARG002
+            seen["model"] = kwargs.get("model")
+            return {
+                "status": "ok",
+                "metrics": {"primary_metric": {"preview": 1.0, "final": 1.0}},
+            }
+
+    class Adapter:
+        def load_model(self, model_id, device=None):  # noqa: ARG002
+            return object()
+
+    class Cfg:
+        class _Model:
+            id = "dummy"
+
+        model = _Model()
+
+    monkeypatch.setattr(
+        "invarlock.core.runner.CoreRunner", lambda: DummyRunner(), raising=False
+    )
+    monkeypatch.setattr(
+        run_mod, "_extract_pm_snapshot_for_overhead", lambda *a, **k: {}
+    )
+    monkeypatch.setattr(
+        run_mod,
+        "_load_model_with_cfg",
+        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("unexpected load")),
+    )
+
+    payload = run_mod._run_bare_control(
+        adapter=Adapter(),
+        edit_op=SimpleNamespace(name="noop"),
+        cfg=Cfg(),
+        model=None,
+        run_config=SimpleNamespace(context={}, event_path=None),
+        calibration_data=[],
+        auto_config={},
+        edit_config={},
+        preview_count=1,
+        final_count=1,
+        seed_bundle={"python": 0, "numpy": 0, "torch": None},
+        resolved_device="cpu",
+        restore_fn=None,
+        console=Console(file=io.StringIO()),
+        resolved_loss_type="causal",
+        profile_normalized="dev",
+        skip_model_load=True,
+    )
+    assert isinstance(payload, dict)
+    assert getattr(seen.get("model"), "name", "") == "bare_stub_model"
+
+
+def test_run_bare_control_ci_finite_does_not_warn(monkeypatch):
+    class DummyReport:
+        status = "ok"
+        metrics = {"primary_metric": {"preview": 1.0, "final": 1.0}}
+
+    class DummyRunner:
+        def execute(self, **kwargs):  # noqa: D401, ARG002
+            return DummyReport()
+
+    class Adapter:
+        def load_model(self, model_id, device=None):  # noqa: ARG002
+            return object()
+
+    class Cfg:
+        class _Model:
+            id = "dummy"
+
+        model = _Model()
+
+    monkeypatch.setattr(
+        "invarlock.core.runner.CoreRunner", lambda: DummyRunner(), raising=False
+    )
+    monkeypatch.setattr(
+        run_mod, "_extract_pm_snapshot_for_overhead", lambda *a, **k: {}
+    )
+
+    out = io.StringIO()
+    payload = run_mod._run_bare_control(
+        adapter=Adapter(),
+        edit_op=SimpleNamespace(name="noop"),
+        cfg=Cfg(),
+        model=None,
+        run_config=SimpleNamespace(context={}, event_path=None),
+        calibration_data=[],
+        auto_config={},
+        edit_config={},
+        preview_count=1,
+        final_count=1,
+        seed_bundle={"python": 0, "numpy": 0, "torch": None},
+        resolved_device="cpu",
+        restore_fn=None,
+        console=Console(file=out),
+        resolved_loss_type="causal",
+        profile_normalized="ci",
+    )
+    assert isinstance(payload, dict)
+    assert "non-finite" not in out.getvalue()
+
+
+def test_run_bare_control_restore_fn_failure_raises() -> None:
+    class Adapter:
+        def load_model(self, model_id, device=None):  # noqa: ARG002
+            return object()
+
+    class Cfg:
+        class _Model:
+            id = "dummy"
+
+        model = _Model()
+
+    with pytest.raises(run_mod._SnapshotRestoreFailed):
+        run_mod._run_bare_control(
+            adapter=Adapter(),
+            edit_op=SimpleNamespace(name="noop"),
+            cfg=Cfg(),
+            model=object(),
+            run_config=SimpleNamespace(context={}, event_path=None),
+            calibration_data=[],
+            auto_config={},
+            edit_config={},
+            preview_count=1,
+            final_count=1,
+            seed_bundle={"python": 0, "numpy": 0, "torch": None},
+            resolved_device="cpu",
+            restore_fn=lambda: (_ for _ in ()).throw(RuntimeError("boom")),
+            console=Console(file=io.StringIO()),
+            resolved_loss_type="causal",
+            profile_normalized="ci",
+        )
 
 
 def test_compute_provider_digest_paths():

@@ -144,7 +144,9 @@ def null_sweep(
     ),
     n_seeds: int = typer.Option(10, "--n-seeds", min=1, help="Number of seeds to run."),
     seed_start: int = typer.Option(42, "--seed-start", help="Starting seed."),
-    profile: str = typer.Option("ci", "--profile", help="Run profile (ci|release)."),
+    profile: str = typer.Option(
+        "ci", "--profile", help="Run profile (ci|release|ci_cpu|dev)."
+    ),
     device: str | None = typer.Option(None, "--device", help="Device override."),
     safety_margin: float = typer.Option(
         0.05, "--safety-margin", help="Safety margin applied to κ recommendations."
@@ -363,7 +365,9 @@ def ve_sweep(
         "--target-enable-rate",
         help="Target expected VE enable rate (predictive-gate lower bound).",
     ),
-    profile: str = typer.Option("ci", "--profile", help="Run profile (ci|release)."),
+    profile: str = typer.Option(
+        "ci", "--profile", help="Run profile (ci|release|ci_cpu|dev)."
+    ),
     device: str | None = typer.Option(None, "--device", help="Device override."),
     safety_margin: float = typer.Option(
         0.0,

@@ -4,6 +4,9 @@
 > (1) the **pilot numbers** we measured for GPT-2 small, BERT base, and TinyLLaMA (Nov 2025) that underpin the **Balanced** and **Conservative** tiers; and
 > (2) the **exact recipe** to recalibrate from scratch on your setup (weight-based Spectral κ, activation-based RMT ε, VE min-effect, and window sizing).
 > Every knob is surfaced in run reports and certificates so reviewers can audit or recompute.
+>
+> For a key-by-key explanation of every value in the packaged tier file
+> (`runtime/tiers.yaml`), see [Tier Policy Catalog](../reference/tier-policy-catalog.md).
 
 ---
 
@@ -12,10 +15,10 @@
 ### What the tier ships with (pilot)
 
 - **Balanced** per-family κ caps:
-  `ffn: 3.834`, `attn: 3.423`, `embed: 3.1`, `other: 3.1`
+  `ffn: 3.849`, `attn: 3.018`, `embed: 1.05`, `other: 0.0`
   with **Benjamini–Hochberg (BH)** FDR control (`α=0.05`, `m=4` families), **deadband** `δ=0.10`, **scope: all** 2-D weight matrices (LayerNorm excluded), **no absolute clamp**, and **per-run WARN budget** `max_caps = 5`.
 - **Conservative** tightens caps and budget:
-  `ffn: 2.3`, `attn: 2.6`, `embed: 2.8`, `other: 2.8`, **Bonferroni** (`α=0.02`), and `max_caps = 3`.
+  `ffn: 3.849`, `attn: 2.6`, `embed: 2.8`, `other: 2.8`, **Bonferroni** (`α=0.000625`), and `max_caps = 3`.
 
 **Runtime visibility.** Certificates record per-family WARNs and effective caps under `spectral.*` (summary, multiple_testing, families, family_caps) and the resolved policy under `resolved_policy.spectral`.
 
@@ -57,23 +60,25 @@ attach calibration certificates to change proposals.
 
 ### What the tier ships with (pilot)
 
-* **Balanced** ε per family: `{ffn: 0.10, attn: 0.08, embed: 0.12, other: 0.12}`
-* **Conservative** tightened: `{ffn: 0.06, attn: 0.05, embed: 0.07, other: 0.07}`
+* **Balanced** ε per family: `{ffn: 0.01, attn: 0.01, embed: 0.01, other: 0.01}`
+* **Conservative**: `{ffn: 0.01, attn: 0.01, embed: 0.01, other: 0.01}`
 
-Acceptance rule per family $f$: with bare outliers $b(f)$ and guarded outliers $g(f)$, $g(f) \le \left\lceil \big(1+\varepsilon(f)\big)\, b(f) \right\rceil$
+Acceptance rule per family $f$: with baseline edge‑risk $r_f^{\text{base}}$ and current edge‑risk $r_f^{\text{cur}}$,
+$r_f^{\text{cur}} \le \left(1+\varepsilon(f)\right)\, r_f^{\text{base}}$.
 
-**Runtime visibility.** Certificate fields under `rmt.*` report bare/guarded counts, ε (default and by family), status, and `validation.rmt_stable`.
+**Runtime visibility.** Certificate fields under `rmt.*` report baseline/current edge‑risk, ε (default and by family), status, and `validation.rmt_stable`.
 
 **RMT calibration provenance.** Aggregated null-run stats are derived from
 calibration certificates. Local tooling can parse certificate JSON files to
-extract `rmt.outliers_bare` and `rmt.outliers_guarded` per family, compute
-deltas Δ(f) = g(f)/b(f) − 1, and report quantile summaries.
+extract `rmt.families.*.{edge_base,edge_cur,delta}` per family, and report
+quantile summaries of Δ(f) = r_cur(f)/r_base(f) − 1 (skip cases with missing or
+zero baseline).
 
 ---
 
 ### How to recalibrate ε
 
-1. Run **null** baselines (no edit) and compute per-family deltas $\Delta(f) = g(f)/b(f) - 1$ (skip cases with $b(f)=0$).
+1. Run **null** baselines (no edit) and compute per-family deltas $\Delta(f) = r_{\text{cur}}(f)/r_{\text{base}}(f) - 1$ (skip cases with $r_{\text{base}}(f)=0$).
 2. Set $\varepsilon(f) = \mathrm{Quantile}\big(\Delta(f);\ q\big)$ with $q \in [0.95, 0.99]$.
 3. Use a slightly larger ε for tiny families (discreteness: $b(f)\in\{0,1\}$ matters).
 
@@ -83,8 +88,8 @@ deltas Δ(f) = g(f)/b(f) − 1, and report quantile summaries.
 
 ### What the tier ships with (pilot)
 
-* **Balanced (one-sided, improvement-only)**: `min_effect_lognll ≈ 9e-4`
-* **Conservative (two-sided, improvement-only)**: `≈ 1.8e-3`
+* **Balanced (one-sided, improvement-only)**: `min_effect_lognll = 0.0`
+* **Conservative (two-sided, improvement-only)**: `min_effect_lognll = 0.016`
 
 **Runtime visibility.** Recorded in certificates under `variance.predictive_gate` (CI, mean Δ, pass/fail reason) and under `resolved_policy.variance.{predictive_one_sided,min_effect_lognll}` (tier knobs).
 
@@ -112,8 +117,10 @@ $$
 * **Balanced pilot target:** ±0.001 on GPT-2/TinyLLaMA release profile (CI profile uses fewer windows).
 * Sweep $n$ to find the “coverage vs cost” knee; enforce **non-overlap** (`stride = seq_len`) and reuse baseline window IDs for perfect pairing.
 
-**Window sizing provenance.** Window counts are documented in preset configs
-under `configs/tasks/*/ci_*.yaml` and `configs/tasks/*/release_*.yaml`.
+**Window sizing provenance.** Window counts are controlled by the selected runtime
+profile (`--profile ...`), defined under `src/invarlock/_data/runtime/profiles/`.
+Repo-only runnable presets under `configs/presets/` set small defaults for
+unprofiled runs.
 **Runtime visibility.** Certificates expose window counts, coverage flags, and CI digests under `dataset.windows.stats` and `primary_metric`.
 
 ---
@@ -125,7 +132,7 @@ under `configs/tasks/*/ci_*.yaml` and `configs/tasks/*/release_*.yaml`.
 3. **RMT ε.** From null runs, set $\varepsilon(f)$ to the q95–q99 quantile of $\big(g(f)/b(f) - 1\big)$ per family (adjust for small $b(f)$).
 4. **VE min-effect.** ($\approx z\,\hat{\sigma}/\sqrt{n}$) with tier-appropriate sidedness.
 5. **Windows.** Size $n$ to hit the half-width target; enforce non-overlap and pairing.
-6. **Trial via override.** Write calibrated values to a local override YAML (e.g., `configs/overrides/spectral_balanced_local.yaml`) and merge it into a local run preset under `guards:` instead of editing the global tier. Re-run baseline + edits; pre-screen gates; then build certificates.
+6. **Trial via override.** Write calibrated values to a local override YAML (e.g., `configs/overrides/spectral_balanced_local.example.yaml`, copied locally and edited) and merge it into a local run preset under `guards:` instead of editing the global tier. Re-run baseline + edits; pre-screen gates; then build certificates.
 
 ---
 

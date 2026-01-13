@@ -4,7 +4,7 @@ from invarlock.reporting.certificate import (
 )
 
 
-def test_validate_certificate_accepts_pm_only_without_legacy_drift():
+def test_validate_certificate_accepts_pm_only_without_ppl_block():
     cert = {
         "schema_version": CERTIFICATE_SCHEMA_VERSION,
         "run_id": "r1",

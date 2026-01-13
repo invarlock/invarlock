@@ -45,8 +45,8 @@ Note: Internals live under `invarlock.reporting.certificate`, but import from
 - Public (stable import path): `invarlock.assurance`
   - Exposes `CERTIFICATE_SCHEMA_VERSION`, `make_certificate`,
     `validate_certificate`, `render_certificate_markdown`.
-  - Backwards‑compatibility target for certificate operations; prefer this
-    facade in all user code.
+  - Preferred stable surface for certificate operations; import from this
+    facade in user code.
 - Public (core types used in examples): `invarlock.core.api` and top‑level
   convenience namespaces (`invarlock.adapters`, `invarlock.edits`, `invarlock.guards`).
   These are intended for light programmatic integration shown in this guide.

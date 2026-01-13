@@ -148,7 +148,7 @@ def _selected_families_for_alpha(
 
 
 def summarize_null_sweep_reports(
-    reports: list[dict[str, Any]],
+    reports: list[object],
     *,
     tier: str,
     safety_margin: float = 0.05,
@@ -186,20 +186,25 @@ def summarize_null_sweep_reports(
         mt = _extract_multiple_testing(metrics)
         if mt:
             mt_method = str(mt.get("method", mt_method))
-            if mt.get("alpha") is not None:
-                mt_alpha = float(mt.get("alpha"))
-            if mt.get("m") is not None:
-                mt_m = int(mt.get("m"))
+            alpha_value = mt.get("alpha")
+            if alpha_value is not None:
+                try:
+                    mt_alpha = float(alpha_value)
+                except Exception:
+                    pass
+            m_value = mt.get("m")
+            if m_value is not None:
+                try:
+                    mt_m = int(m_value)
+                except Exception:
+                    pass
 
         fam_z = _extract_family_max_z(metrics)
         for fam, z in fam_z.items():
             family_max_z[fam] = max(family_max_z[fam], float(z))
 
-        selection = (
-            metrics.get("multiple_testing_selection")
-            if isinstance(metrics.get("multiple_testing_selection"), dict)
-            else {}
-        )
+        raw_selection = metrics.get("multiple_testing_selection")
+        selection = raw_selection if isinstance(raw_selection, dict) else {}
         pvals = selection.get("family_pvalues")
         if not isinstance(pvals, dict):
             pvals = {}

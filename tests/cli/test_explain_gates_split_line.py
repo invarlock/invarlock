@@ -26,7 +26,13 @@ def test_explain_gates_dataset_split_line(monkeypatch, tmp_path):
                 "primary_metric_acceptable": True,
                 "preview_final_drift_acceptable": True,
             },
-            "ppl": {},
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+                "ratio_vs_baseline": 1.0,
+                "display_ci": [1.0, 1.0],
+            },
         }
 
     monkeypatch.setattr(mod, "make_certificate", _fake_cert)

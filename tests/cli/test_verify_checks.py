@@ -28,6 +28,12 @@ def _cert_base(pm: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def test_coerce_float_rejects_non_numeric() -> None:
+    assert v._coerce_float(object()) is None
+    assert v._coerce_float("1.25") == 1.25
+    assert v._coerce_float("nan") is None
+
+
 def test_validate_primary_metric_ppl_ratio_ok_and_mismatch():
     pm = {"kind": "ppl_causal", "final": 110.0, "ratio_vs_baseline": 1.1}
     cert = _cert_base(pm)
@@ -38,6 +44,12 @@ def test_validate_primary_metric_ppl_ratio_ok_and_mismatch():
     )
     errs = v._validate_primary_metric(cert_bad)
     assert any("Primary metric ratio mismatch" in e for e in errs)
+
+
+def test_validate_primary_metric_ppl_baseline_final_non_numeric_is_ignored() -> None:
+    cert = _cert_base({"kind": "ppl_causal", "final": 110.0, "ratio_vs_baseline": 1.1})
+    cert["baseline_ref"]["primary_metric"]["final"] = "100"
+    assert v._validate_primary_metric(cert) == []
 
 
 def test_validate_primary_metric_non_ppl_requires_ratio():

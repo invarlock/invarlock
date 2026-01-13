@@ -18,15 +18,14 @@ in the **improvement** direction (negative ΔlogNLL).
   and the mean Δ ≤ −`min_effect_lognll`. If the CI lies entirely above
   +`min_effect_lognll`, VE stays off and the gate records a regression.
 
-Example (Balanced): with `min_effect_lognll = 9e-4`, a predictive estimate
+Example (Balanced): with `min_effect_lognll = 0.0`, a predictive estimate
 Δ̄ = −0.002 with CI [−0.003, −0.001] enables VE because both the mean and the
 CI upper bound beat −`min_effect_lognll`.
 
-Example (Conservative): with `min_effect_lognll = 9e-4`, a predictive estimate
-Δ̄ = −0.0013 with CI [−0.0021, −0.0010] enables VE because the entire CI lies
+Example (Conservative): with `min_effect_lognll = 0.016`, a predictive estimate
+Δ̄ = −0.020 with CI [−0.030, −0.017] enables VE because the entire CI lies
 outside the interval [−`min_effect_lognll`, +`min_effect_lognll`]. A CI that
-touches or sits within this interval (e.g., [−0.0015, −0.0002]) does not enable
-VE.
+touches or sits within this interval (e.g., [−0.015, −0.002]) does not enable VE.
 
 ## Derivation (power target)
 
@@ -41,17 +40,13 @@ stricter tiers.
 
 | Tier          | deadband | min_abs_adjust | max_scale_step | min_effect_lognll | predictive\_one\_sided | max\_adjusted\_modules |
 |---------------|----------|----------------|----------------|-------------------|------------------------|------------------------|
-| balanced      | 0.02     | 0.012          | 0.03           | 0.0009            | ✅ (one-sided)          | 1                      |
-| conservative  | 0.03     | 0.02           | 0.015          | 0.0018            | ❌ (two-sided)          | 0                      |
+| balanced      | 0.02     | 0.012          | 0.03           | 0.0               | ✅ (one-sided)          | 1                      |
+| conservative  | 0.03     | 0.02           | 0.015          | 0.016             | ❌ (two-sided)          | 0                      |
 
-Values come from the November 2025 pilot (see packaged `tiers.yaml`) and
-maintain VE responsiveness without triggering false
-positives.
+Values are stored in the packaged `tiers.yaml` and maintain VE responsiveness
+without triggering false positives under the chosen window budgets.
 
 > **Source of truth:** tier thresholds are drawn from the packaged `tiers.yaml`.
-> Balanced sets `min_effect_lognll = 0.0009`; older pilot drafts that
-> referenced `0.0005` have been retired to keep docs, configs, and certs
-> consistent.
 
 ## Calibration
 

@@ -468,9 +468,70 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
             f"| Guard Overhead Acceptable | {status} | {measured} | ≤ +{threshold_pct:.1f}% | point | Guarded vs bare PM overhead |"
         )
 
+    def _emit_pm_tail_gate_row() -> None:
+        pm_tail = certificate.get("primary_metric_tail", {}) or {}
+        if not isinstance(pm_tail, dict) or not pm_tail:
+            return
+
+        evaluated = bool(pm_tail.get("evaluated", False))
+        mode = str(pm_tail.get("mode", "warn") or "warn").strip().lower()
+        passed = bool(pm_tail.get("passed", True))
+        warned = bool(pm_tail.get("warned", False))
+
+        if not evaluated:
+            status = "🛈 INFO"
+        elif passed:
+            status = "✅ PASS"
+        elif mode == "fail":
+            status = "❌ FAIL"
+        else:
+            status = "⚠️ WARN" if warned else "⚠️ WARN"
+
+        policy = (
+            pm_tail.get("policy", {}) if isinstance(pm_tail.get("policy"), dict) else {}
+        )
+        stats = (
+            pm_tail.get("stats", {}) if isinstance(pm_tail.get("stats"), dict) else {}
+        )
+
+        q = policy.get("quantile", 0.95)
+        try:
+            qf = float(q)
+        except Exception:
+            qf = 0.95
+        qf = max(0.0, min(1.0, qf))
+        q_key = f"q{int(round(100.0 * qf))}"
+        q_name = f"P{int(round(100.0 * qf))}"
+        q_val = stats.get(q_key)
+        mass_val = stats.get("tail_mass")
+        eps = policy.get("epsilon", stats.get("epsilon"))
+
+        measured_parts: list[str] = []
+        if isinstance(q_val, int | float) and math.isfinite(float(q_val)):
+            measured_parts.append(f"{q_name}={float(q_val):.3f}")
+        if isinstance(mass_val, int | float) and math.isfinite(float(mass_val)):
+            measured_parts.append(f"mass={float(mass_val):.3f}")
+        measured = ", ".join(measured_parts) if measured_parts else "N/A"
+
+        thr_parts: list[str] = []
+        qmax = policy.get("quantile_max")
+        if isinstance(qmax, int | float) and math.isfinite(float(qmax)):
+            thr_parts.append(f"{q_name}≤{float(qmax):.3f}")
+        mmax = policy.get("mass_max")
+        if isinstance(mmax, int | float) and math.isfinite(float(mmax)):
+            thr_parts.append(f"mass≤{float(mmax):.3f}")
+        if isinstance(eps, int | float) and math.isfinite(float(eps)):
+            thr_parts.append(f"ε={float(eps):.1e}")
+        threshold = "; ".join(thr_parts) if thr_parts else "policy"
+
+        lines.append(
+            f"| Primary Metric Tail | {status} | {measured} | {threshold} | {q_name.lower()} | Tail regression vs baseline (ΔlogNLL) |"
+        )
+
     # Emit canonical gate rows
     if has_pm:
         _emit_pm_gate_row()
+        _emit_pm_tail_gate_row()
         _emit_drift_gate_row()
         _emit_overhead_gate_row()
 

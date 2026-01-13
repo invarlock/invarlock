@@ -6,21 +6,19 @@ Use the steps below to reproduce representative artifacts from the current relea
 ## 1. Generate a Certificate Bundle
 
 ```bash
-invarlock run -c configs/tasks/causal_lm/release_cpu.yaml \
-  --profile release --tier balanced --out runs/quant8_demo_baseline
-
-invarlock run -c configs/edits/quant_rtn/8bit_full.yaml \
-  --profile release --tier balanced \
-  --baseline runs/quant8_demo_baseline/report.json \
-  --out runs/quant8_demo
-
-invarlock report --run runs/quant8_demo \
-  --baseline runs/quant8_demo_baseline/report.json \
-  --format cert \
-  --output reports/quant8_demo
+INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
+  --baseline sshleifer/tiny-gpt2 \
+  --subject  sshleifer/tiny-gpt2 \
+  --adapter auto \
+  --profile release \
+  --tier balanced \
+  --preset configs/presets/causal_lm/wikitext2_512.yaml \
+  --edit-config configs/overlays/edits/quant_rtn/8bit_full.yaml \
+  --out runs/quant8_demo \
+  --cert-out reports/quant8_demo
 ```
 
-The last command writes `evaluation.cert.json` and `evaluation_certificate.md` under `reports/quant8_demo/`.
+The command writes `evaluation.cert.json` and `evaluation_certificate.md` under `reports/quant8_demo/`.
 Each certificate contains:
 
 - Model and edit metadata (model id, adapter, commit hash, edit plan)
@@ -31,7 +29,11 @@ Each certificate contains:
 ## 2. Create a Narrative Summary
 
 ```bash
-invarlock report --run runs/quant8_demo --format markdown
+# The certificate already includes a markdown summary:
+cat reports/quant8_demo/evaluation_certificate.md
+
+# To regenerate markdown from run reports, pass edited + baseline:
+invarlock report --run <edited_report.json> --baseline <baseline_report.json> --format markdown
 ```
 
 The markdown report mirrors the certificate content but highlights:
@@ -46,7 +48,7 @@ For audits, collect the following files:
 
 | File | Purpose |
 |------|---------|
-| `runs/<name>/report.json` | Execution log, metrics, and guard telemetry |
+| `runs/<name>/**/report.json` | Execution log, metrics, and guard telemetry |
 | `reports/<name>/evaluation.cert.json` | Signed compliance payload |
 | `reports/<name>/evaluation_certificate.md` | Human-friendly summary for reviewers |
 

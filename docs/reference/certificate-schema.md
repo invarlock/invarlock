@@ -5,7 +5,6 @@ This page anchors the certificate contract that InvarLock emits in the
 
 1. A **minimal example certificate** that matches the current validator.
 2. A **schema summary** describing required top‑level fields and key sections.
-3. A short **evolution note** for readers migrating from older, ppl‑centric layouts.
 
 > Certificates are versioned. The material below describes
 > `schema_version = "v1"`. Any change that alters required fields or semantics
@@ -60,8 +59,33 @@ fields produced by `invarlock.assurance.make_certificate`.
     "ratio_vs_baseline": 1.02,
     "display_ci": [1.00, 1.05]
   },
+  "primary_metric_tail": {
+    "mode": "warn",
+    "evaluated": true,
+    "passed": true,
+    "warned": false,
+    "violations": [],
+    "policy": {
+      "mode": "warn",
+      "min_windows": 50,
+      "quantile": 0.95,
+      "quantile_max": 0.20,
+      "epsilon": 0.0001,
+      "mass_max": 1.0
+    },
+    "stats": {
+      "n": 200,
+      "epsilon": 0.0001,
+      "q95": 0.02,
+      "q99": 0.04,
+      "max": 0.06,
+      "tail_mass": 0.03
+    },
+    "source": "paired_baseline.final"
+  },
   "validation": {
     "primary_metric_acceptable": true,
+    "primary_metric_tail_acceptable": true,
     "preview_final_drift_acceptable": true,
     "guard_overhead_acceptable": true
   },
@@ -72,7 +96,7 @@ fields produced by `invarlock.assurance.make_certificate`.
     "hysteresis": {
       "ppl": 0.002
     },
-    "min_effective": 0.0009,
+    "min_effective": 0.0,
     "changed": false
   },
   "artifacts": {
@@ -92,8 +116,7 @@ Notes
 - `schema_version` is a string and must be `"v1"` for the current format.
 - `run_id` is a short, opaque identifier; certificates treat it as a stable
   string key.
-- `primary_metric` is the **canonical** place for PM values; ppl‑like
-  legacy blocks are no longer required.
+- `primary_metric` is the **canonical** place for PM values.
 - The `validation` object holds boolean flags; only a small allow‑list of
   keys is recognized by the validator (see below).
 
@@ -133,6 +156,7 @@ fields while enforcing a small, stable core:
     set in code.
   - Common flags:
     - `primary_metric_acceptable`
+    - `primary_metric_tail_acceptable`
     - `preview_final_drift_acceptable`
     - `guard_overhead_acceptable`
     - `invariants_pass`
@@ -160,24 +184,16 @@ The full machine‑readable schema is available at runtime via
 `invarlock.reporting.certificate_schema.CERTIFICATE_JSON_SCHEMA`. Use that
 dict directly for tooling that needs strict validation.
 
----
+## Primary Metric Tail gate (optional)
 
-## Evolution from ppl‑centric schemas
+For ppl-like metrics with paired per-window logloss, certificates may include
+`primary_metric_tail`, which records tail summaries of per-window ΔlogNLL vs the
+baseline and the tail-gate evaluation outcome:
 
-Earlier experimental schemas exposed top‑level `ppl`, `spectral`, `rmt`, and
-`variance` blocks and treated ppl as the only primary metric. The v1
-PM‑only schema:
-
-- moves primary metric details under `primary_metric`,
-- relies on `validation` flags and `policy_digest` for gates and policies,
-- keeps guard‑specific blocks (`spectral`, `rmt`, `variance`) available but
-  **optional** from the validator’s perspective.
-
-For existing integrations:
-
-- Prefer `primary_metric.{preview,final,ratio_vs_baseline,display_ci}` over
-  legacy `ppl_*` fields.
-- Read gates from `validation.*` and thresholds from `policy_digest` /
-  `resolved_policy`.
-- Treat additional sections (MoE, system overhead, telemetry, etc.) as
-  optional extensions that may appear in future minor releases.
+- `primary_metric_tail.stats` — deterministic quantiles (`q50/q90/q95/q99`),
+  `max`, and `tail_mass = Pr[ΔlogNLL > ε]`.
+- `primary_metric_tail.policy` — resolved `metrics.pm_tail` policy (mode,
+  quantile, thresholds, floors).
+- `primary_metric_tail.violations` — structured reasons when thresholds are exceeded.
+- `validation.primary_metric_tail_acceptable` — remains `true` in `warn` mode;
+  flips `false` only when `mode=fail` and a violation is evaluated.

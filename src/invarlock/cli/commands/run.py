@@ -108,6 +108,64 @@ def _coerce_mapping(obj: object) -> dict[str, Any]:
     return {}
 
 
+def _prune_none_values(value: Any) -> Any:
+    """Recursively drop keys/items whose value is None.
+
+    Used when serializing dataclass-style config sections that define many optional
+    fields defaulting to None; those should behave as "unset" rather than explicit
+    policy overrides.
+    """
+
+    if isinstance(value, dict):
+        return {
+            key: _prune_none_values(val)
+            for key, val in value.items()
+            if val is not None
+        }
+    if isinstance(value, list):
+        return [_prune_none_values(item) for item in value if item is not None]
+    if isinstance(value, tuple):
+        return tuple(_prune_none_values(item) for item in value if item is not None)
+    return value
+
+
+def _to_serialisable_dict(section: object) -> dict[str, Any]:
+    """Coerce config fragments to plain dicts.
+
+    Handles InvarLockConfig sections (which wrap dicts in a private `_Obj` with
+    `_data`) so downstream components (core.runner) see canonical mappings,
+    e.g. `eval.bootstrap.replicates`.
+    """
+
+    # Prefer native dump methods
+    if hasattr(section, "model_dump"):
+        return section.model_dump()  # type: ignore[return-value]
+    if hasattr(section, "dict"):
+        try:
+            return section.dict()  # type: ignore[return-value]
+        except Exception:
+            pass
+    # Unwrap CLI _Obj wrapper used by InvarLockConfig for attribute access
+    try:
+        raw = getattr(section, "_data", None)
+        if isinstance(raw, dict):
+            return raw
+    except Exception:
+        pass
+    # Already a mapping
+    if isinstance(section, dict):
+        return section
+    # Best-effort attribute dump (prune None so "unset" does not override tier defaults)
+    try:
+        data = vars(section)
+        # Common case: {'_data': {...}}
+        if isinstance(data, dict) and isinstance(data.get("_data"), dict):
+            return data["_data"]
+        return _prune_none_values(data)  # type: ignore[return-value]
+    except TypeError:
+        return {}
+
+
 def _resolve_pm_acceptance_range(
     cfg: InvarLockConfig | dict[str, Any] | None,
 ) -> dict[str, float]:
@@ -296,7 +354,7 @@ def _resolve_exit_code(exc: Exception, *, profile: str | None) -> int:
     return 1
 
 
-## NOTE: Deprecated legacy helper `_check_pairability_or_abort` was removed.
+## NOTE: Deprecated helper `_check_pairability_or_abort` was removed.
 ## Provider parity and pairing guarantees are enforced via guard digests and
 ## invariant checks during run execution.
 
@@ -700,7 +758,7 @@ def _prepare_config_for_run(
     cfg = _load_config(config_path)
 
     # Apply profile if specified (dev is a no-op)
-    if profile and str(profile).lower() in {"ci", "release"}:
+    if profile and str(profile).lower() not in {"dev"}:
         console.print(f"🎯 Applying profile: {profile}")
         try:
             cfg = _apply_profile(cfg, profile)
@@ -814,17 +872,14 @@ def _resolve_device_and_output(
         console.print(f"[red]❌ Device validation failed: {error_msg}[/red]")
         raise typer.Exit(1)
 
-    # Determine output directory (support both 'output.dir' and legacy 'out.dir')
+    # Determine output directory
     if out:
         output_dir = Path(out)
     else:
         try:
             output_dir = Path(cfg.output.dir)
         except Exception:
-            try:
-                output_dir = Path(cfg.out.dir)  # type: ignore[attr-defined]
-            except Exception:
-                output_dir = Path("runs")
+            output_dir = Path("runs")
     output_dir.mkdir(parents=True, exist_ok=True)
     return str(resolved_device), output_dir
 
@@ -1297,7 +1352,7 @@ def _validate_and_harvest_baseline_schedule(
                     _fail_schedule(f"{label} input_ids empty at index {idx}")
                 seqs.append(seq_ints)
 
-            # attention_masks are required for pairing, but legacy baselines may omit them.
+            # attention_masks are required for pairing, but some baselines may omit them.
             # When absent, default to all-ones masks (cannot infer padding reliably).
             masks_rows: list[list[int]] = []
             masks_missing = masks is None or masks == []
@@ -1610,7 +1665,7 @@ def _resolve_metric_and_provider(
 ) -> tuple[str, str, dict[str, float]]:
     """Resolve metric kind, provider kind, and metric options from config with precedence.
 
-    Precedence: CLI args (not handled here) → config → ModelProfile defaults → legacy fallback.
+    Precedence: CLI args (not handled here) → config → ModelProfile defaults → fallback.
     Primary metric (metric‑v1) is canonical in dev‑phase; no env flag toggles.
     """
     # Provider kind
@@ -1684,11 +1739,11 @@ def _resolve_metric_and_provider(
     else:
         metric_kind = None
 
-    # Fallback to model profile default or legacy resolution by loss type
+    # Fallback to model profile default or loss-type mapping
     if not metric_kind and hasattr(model_profile, "default_metric"):
         metric_kind = model_profile.default_metric
     if not metric_kind:
-        # Legacy: map from loss kind
+        # Map from loss kind
         lk = (resolved_loss_type or "causal").lower()
         if lk == "mlm":
             metric_kind = "ppl_mlm"
@@ -1832,7 +1887,9 @@ def run_command(
         None, "--device", help="Device override (auto|cuda|mps|cpu)"
     ),
     profile: str | None = typer.Option(
-        None, "--profile", help="Profile to apply (ci|release)"
+        None,
+        "--profile",
+        help="Profile to apply (e.g. ci, release, ci_cpu; dev is a no-op)",
     ),
     out: str | None = typer.Option(None, "--out", help="Output directory override"),
     edit: str | None = typer.Option(None, "--edit", help="Edit kind (quant|mixed)"),
@@ -2099,11 +2156,28 @@ def run_command(
                     if pairing_schedule:
                         # Normalize baseline report in-memory so downstream digest/parity
                         # computations see a consistent window_id + mask shape even for
-                        # legacy baselines missing some fields.
+                        # baselines missing some fields.
                         try:
-                            baseline_report_data["evaluation_windows"] = (
-                                pairing_schedule
-                            )
+                            ew = baseline_report_data.get("evaluation_windows")
+                            if not isinstance(ew, dict):
+                                ew = {}
+                                baseline_report_data["evaluation_windows"] = ew
+                            # Merge the sanitized pairing schedule into existing
+                            # evaluation_windows without discarding logloss/token_counts.
+                            for arm in ("preview", "final"):
+                                src = (
+                                    pairing_schedule.get(arm)
+                                    if isinstance(pairing_schedule, dict)
+                                    else None
+                                )
+                                if not isinstance(src, dict):
+                                    continue
+                                dst = ew.get(arm)
+                                if not isinstance(dst, dict):
+                                    ew[arm] = dict(src)
+                                    continue
+                                for key, value in src.items():
+                                    dst[key] = value
                         except Exception:
                             pass
                         # Harvest tokenizer hash provenance from baseline when present.
@@ -2226,50 +2300,11 @@ def run_command(
         console.print(f"🔌 Adapter: {adapter.name}")
 
         # Create run configuration
-        def _to_serialisable_dict(section: object) -> dict[str, Any]:
-            """Coerce config fragments to plain dicts.
-
-            Handles InvarLockConfig sections (which wrap dicts in a private `_Obj` with
-            `_data`) so downstream components (core.runner) see canonical mappings,
-            e.g. `eval.bootstrap.replicates`.
-            """
-            # Prefer native dump methods
-            if hasattr(section, "model_dump"):
-                return section.model_dump()  # type: ignore[return-value]
-            if hasattr(section, "dict"):
-                try:
-                    return section.dict()  # type: ignore[return-value]
-                except Exception:
-                    pass
-            # Unwrap CLI _Obj wrapper used by InvarLockConfig for attribute access
-            try:
-                raw = getattr(section, "_data", None)
-                if isinstance(raw, dict):
-                    return raw
-            except Exception:
-                pass
-            # Already a mapping
-            if isinstance(section, dict):
-                return section
-            # Best-effort attribute dump
-            try:
-                data = vars(section)
-                # Common case: {'_data': {...}}
-                if isinstance(data, dict) and isinstance(data.get("_data"), dict):
-                    return data["_data"]
-                return data  # type: ignore[return-value]
-            except TypeError:
-                return {}
-
-        def _dump_guard(section: object) -> dict[str, Any]:
-            data = _to_serialisable_dict(section)
-            return data if isinstance(data, dict) else {}
-
         guard_overrides = {
-            "spectral": _dump_guard(getattr(cfg.guards, "spectral", {})),
-            "rmt": _dump_guard(getattr(cfg.guards, "rmt", {})),
-            "variance": _dump_guard(getattr(cfg.guards, "variance", {})),
-            "invariants": _dump_guard(getattr(cfg.guards, "invariants", {})),
+            "spectral": _to_serialisable_dict(getattr(cfg.guards, "spectral", {})),
+            "rmt": _to_serialisable_dict(getattr(cfg.guards, "rmt", {})),
+            "variance": _to_serialisable_dict(getattr(cfg.guards, "variance", {})),
+            "invariants": _to_serialisable_dict(getattr(cfg.guards, "invariants", {})),
         }
 
         if model_profile.invariants:
@@ -2297,6 +2332,31 @@ def run_command(
             "plugins": plugin_provenance,
             "run_id": run_id,
         }
+        # Provide baseline per-window logloss to the CoreRunner for paired tail
+        # evidence and (optionally) fail/rollback enforcement.
+        try:
+            if isinstance(baseline_report_data, dict):
+                ew = baseline_report_data.get("evaluation_windows")
+                if isinstance(ew, dict):
+                    final = ew.get("final")
+                    if (
+                        isinstance(final, dict)
+                        and isinstance(final.get("window_ids"), list)
+                        and isinstance(final.get("logloss"), list)
+                    ):
+                        base_eval: dict[str, Any] = {
+                            "final": {
+                                "window_ids": list(final.get("window_ids") or []),
+                                "logloss": list(final.get("logloss") or []),
+                            }
+                        }
+                        if isinstance(final.get("token_counts"), list):
+                            base_eval["final"]["token_counts"] = list(
+                                final.get("token_counts") or []
+                            )
+                        run_context["baseline_eval_windows"] = base_eval
+        except Exception:
+            pass
         run_context.setdefault("primary_metric", {})["acceptance_range"] = (
             pm_acceptance_range
         )
@@ -3461,6 +3521,16 @@ def run_command(
             # Convert CoreRunner report to evaluation report
             report = create_empty_report()
 
+            # Persist minimal run context for certificate/report provenance.
+            try:
+                report["context"] = {
+                    "profile": profile_normalized,
+                    "auto": dict(auto_config),
+                    "assurance": dict(run_context.get("assurance") or {}),
+                }
+            except Exception:
+                pass
+
             # Code provenance: commit hash and InvarLock version
             commit_value = (
                 getattr(cfg.meta, "commit", "") if hasattr(cfg, "meta") else ""
@@ -3696,6 +3766,7 @@ def run_command(
                     "window_pairing_final",
                     "paired_windows",
                     "paired_delta_summary",
+                    "primary_metric_tail",
                     "preview_total_tokens",
                     "final_total_tokens",
                     "masked_tokens_total",
@@ -4313,6 +4384,12 @@ def run_command(
                     pm = compute_primary_metric_from_report(
                         report, kind=metric_kind_resolved, baseline=baseline_report_data
                     )
+                    core_primary_metric = None
+                    if hasattr(core_report, "metrics") and isinstance(
+                        core_report.metrics, dict
+                    ):
+                        core_primary_metric = core_report.metrics.get("primary_metric")
+                    pm = _merge_primary_metric_health(pm, core_primary_metric)
                     report.setdefault("metrics", {})["primary_metric"] = pm
                     # Attach configured reps/ci_level when provided
                     if metric_opts:
@@ -4327,7 +4404,7 @@ def run_command(
                                 )  # type: ignore[index]
                         except Exception:
                             pass
-                # Shadow parity check against legacy ppl fields (best-effort)
+                # Shadow parity check against ppl_* fields (best-effort)
                 try:
                     pm_blk = report.get("metrics", {}).get("primary_metric", {})
                     ppl_final_v1 = float(pm_blk.get("final"))
@@ -4626,12 +4703,33 @@ def run_command(
             pass
 
 
+def _merge_primary_metric_health(
+    primary_metric: dict[str, Any] | None,
+    core_primary_metric: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if not isinstance(primary_metric, dict):
+        return {}
+    merged = dict(primary_metric)
+    if not isinstance(core_primary_metric, dict):
+        return merged
+    if core_primary_metric.get("invalid") is True:
+        merged["invalid"] = True
+        merged["degraded"] = True
+    if core_primary_metric.get("degraded") is True:
+        merged["degraded"] = True
+    core_reason = core_primary_metric.get("degraded_reason")
+    if isinstance(core_reason, str) and core_reason:
+        merged["degraded_reason"] = core_reason
+        merged["degraded"] = True
+    return merged
+
+
 def _format_debug_metric_diffs(
     pm: dict[str, float] | None,
     metrics: dict[str, float] | None,
     baseline_report_data: dict | None,
 ) -> str:
-    """Build a compact DEBUG_METRIC_DIFFS line comparing current snapshot vs legacy ppl_*.
+    """Build a compact DEBUG_METRIC_DIFFS line comparing current snapshot vs ppl_*.
 
     Returns a semicolon-separated string of deltas like
     "final: v1-v1 = +0.000000000; Δlog(final): +0.000000000; ...". Safe to call with

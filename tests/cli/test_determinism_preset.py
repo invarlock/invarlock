@@ -171,3 +171,52 @@ def test_determinism_preset_warn_only_fallback_failure(monkeypatch) -> None:
 
     payload = apply_determinism_preset(profile="ci", device="cuda:0", seed=7, threads=1)
     assert payload["level"] == "tolerance"
+
+
+def test_determinism_preset_cuda_low_memory_selects_cublas_fallback(
+    monkeypatch,
+) -> None:
+    class _CudaProps:
+        total_memory = 1 * 1024**3
+
+    class _Cuda:
+        def get_device_properties(self, _idx: int):  # type: ignore[no-untyped-def]
+            return _CudaProps()
+
+    class _CudnnNoDeterministic:
+        benchmark = True
+
+    class _Matmul:
+        allow_tf32 = True
+
+    class _Backends:
+        cuda = SimpleNamespace(matmul=_Matmul())
+        cudnn = _CudnnNoDeterministic()
+
+    fake_torch = SimpleNamespace(
+        cuda=_Cuda(),
+        backends=_Backends(),
+        set_num_threads=lambda *_a, **_k: None,
+        set_num_interop_threads=lambda *_a, **_k: None,
+        use_deterministic_algorithms=lambda *_a, **_k: None,
+        initial_seed=lambda: 7,
+        are_deterministic_algorithms_enabled=lambda: True,
+    )
+
+    monkeypatch.delenv("CUBLAS_WORKSPACE_CONFIG", raising=False)
+    monkeypatch.setattr("invarlock.cli.determinism.torch", fake_torch)
+    monkeypatch.setattr("invarlock.cli.determinism.set_seed", lambda *_a, **_k: None)
+
+    payload = apply_determinism_preset(profile="ci", device="cuda:0", seed=7, threads=2)
+    assert payload["requested"] == "strict"
+    assert payload["env"]["CUBLAS_WORKSPACE_CONFIG"] == ":16:8"
+
+
+def test_determinism_preset_prunes_empty_torch_payload_when_random_fails(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr("invarlock.cli.determinism.random.random", lambda: 1 / 0)
+    monkeypatch.setattr("invarlock.cli.determinism.set_seed", lambda *_a, **_k: None)
+
+    payload = apply_determinism_preset(profile="dev", device="cpu", seed=1, threads=1)
+    assert "torch" not in payload

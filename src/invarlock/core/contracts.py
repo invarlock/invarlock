@@ -21,7 +21,13 @@ def enforce_relative_spectral_cap(
         sigma = _spectral_norm(weight)
         limit = baseline_value * cap_ratio
         if sigma > limit and sigma > 0:
-            weight.mul_(limit / sigma)
+            # Apply a tiny safety margin so that downstream SVD computations
+            # (which have small numerical error) don't report a value above the
+            # theoretical cap.
+            safe_limit = limit * (1.0 - 1e-6)
+            if safe_limit < 0:
+                safe_limit = 0.0
+            weight.mul_(safe_limit / sigma)
     return weight
 
 

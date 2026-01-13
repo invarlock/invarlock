@@ -15,7 +15,7 @@ def test_certificate_schema_requires_primary_metric_and_window_stats() -> None:
             "seq_len": 8,
             "windows": {"preview": 1, "final": 1, "seed": 42},
         },
-        # Intentionally omit primary_metric + dataset.windows.stats (legacy)
+        # Intentionally omit primary_metric + dataset.windows.stats
     }
 
     assert schema_mod.validate_certificate(cert) is False

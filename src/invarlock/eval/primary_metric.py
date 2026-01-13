@@ -623,6 +623,9 @@ def compute_primary_metric_from_report(
             "preview": float("nan"),
             "final": float("nan"),
             "ratio_vs_baseline": float("nan"),
+            "invalid": True,
+            "degraded": True,
+            "degraded_reason": "non_finite_pm",
         }
     # For accuracy kinds, derive counts from input_ids if aggregates are missing
     if kind in {"accuracy", "vqa_accuracy"}:
@@ -661,6 +664,11 @@ def compute_primary_metric_from_report(
     final_point = metric.point_from_windows(windows=final_win)
 
     ratio_vs_baseline = float("nan")
+    baseline_has_reference = False
+
+    def _is_finite(value: Any) -> bool:
+        return isinstance(value, (int, float)) and math.isfinite(float(value))
+
     if isinstance(baseline, dict):
         try:
             base_metrics = (
@@ -686,13 +694,24 @@ def compute_primary_metric_from_report(
                     is_ppl_like = str(kind).lower().startswith("ppl")
                     if is_ppl_like and base_ref > 0:
                         ratio_vs_baseline = float(final_point) / float(base_ref)
+                        baseline_has_reference = True
                     elif (
                         str(kind).lower() in {"accuracy", "vqa_accuracy"}
                         and 0 <= base_ref <= 1
                     ):
                         ratio_vs_baseline = float(final_point) - float(base_ref)
+                        baseline_has_reference = True
         except Exception:
             ratio_vs_baseline = float("nan")
+
+    invalid = not (_is_finite(preview_point) and _is_finite(final_point))
+    degraded_reason = None
+    if invalid:
+        degraded_reason = "non_finite_pm"
+    elif baseline_has_reference and not _is_finite(ratio_vs_baseline):
+        degraded_reason = "non_finite_delta"
+
+    degraded = bool(degraded_reason or invalid)
 
     payload = {
         "kind": metric.kind,
@@ -705,7 +724,11 @@ def compute_primary_metric_from_report(
         "preview": preview_point,
         "final": final_point,
         "ratio_vs_baseline": ratio_vs_baseline,
+        "invalid": invalid,
+        "degraded": degraded,
     }
+    if degraded and degraded_reason:
+        payload["degraded_reason"] = degraded_reason
     # Carry counts for accuracy to aid gating
     if kind in {"accuracy", "vqa_accuracy"}:
         if "n_prev" in locals() and n_prev is not None:

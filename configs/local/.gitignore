@@ -1,0 +1,5 @@
+# Local working configs (keep out of git).
+*
+!.gitignore
+!README.md
+!*.example.yaml

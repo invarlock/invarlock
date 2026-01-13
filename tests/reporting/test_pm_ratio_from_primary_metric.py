@@ -7,7 +7,7 @@ def _mk_pm_only(final_val: float) -> dict:
     return {
         "meta": {"model_id": "model", "adapter": "hf_gpt2", "seed": 42},
         "metrics": {
-            # No ppl_* in legacy keys; only primary_metric present
+            # No ppl_* keys; only primary_metric present
             "primary_metric": {
                 "kind": "ppl_causal",
                 "unit": "ppl",

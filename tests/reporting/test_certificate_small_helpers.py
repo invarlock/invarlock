@@ -13,7 +13,7 @@ def test_is_ppl_kind_variants() -> None:
     assert not _is_ppl_kind("accuracy")
 
 
-# Removed legacy _get_ppl_final coverage; use primary_metric in certificate outputs instead.
+# Removed _get_ppl_final coverage; use primary_metric in certificate outputs instead.
 
 
 def test_compute_edit_digest_quantization_and_cert_only() -> None:

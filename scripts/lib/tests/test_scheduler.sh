@@ -509,7 +509,7 @@ test_should_use_adaptive_gpus_counts_single_gpu_tasks_and_adapts_only_when_safe(
     should_use_adaptive_gpus 2 4 2 || t_fail "expected adaptation when no single-GPU tasks are waiting"
 }
 
-test_required_gpu_category_case_arms_cover_legacy_classifier() {
+test_required_gpu_category_case_arms_cover_classifier() {
     mock_reset
     # shellcheck source=../scheduler.sh
     source "${TEST_ROOT}/scripts/lib/scheduler.sh"

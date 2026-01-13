@@ -1,0 +1,38 @@
+# Preset: Seq2Seq (synthetic pairs) — larger seq_len.
+
+model:
+  id: "sshleifer/tiny-gpt2"
+  adapter: "hf_gpt2"
+  device: "auto"
+
+dataset:
+  provider: "seq2seq"
+  split: "validation"
+  seq_len: 128
+  stride: 128
+  preview_n: 64
+  final_n: 64
+  seed: 42
+
+eval:
+  metric:
+    kind: "ppl_seq2seq"
+  loss:
+    type: "seq2seq"
+
+edit:
+  name: "noop"
+  plan: {}
+
+auto:
+  enabled: true
+  tier: "balanced"
+  probes: 0
+
+guards:
+  order: ["invariants", "spectral", "rmt", "variance", "invariants"]
+
+output:
+  dir: "runs"
+  save_model: false
+  save_report: true

@@ -1,4 +1,4 @@
-# InvarLock Documentation (0.3.5)
+# InvarLock Documentation (0.3.6)
 
 The OSS core is edit‑agnostic (BYOE). A small built‑in quantization demo
 (`quant_rtn`, 8‑bit) exists for CI/quickstart. See
@@ -55,10 +55,12 @@ Tip: enable Hub downloads per command when fetching models/datasets:
 - [CLI Reference](reference/cli.md)
 - [Configuration Schema](reference/config-schema.md)
 - [Guards](reference/guards.md)
+- [GPU/MPS-First Guards (Decision Memo)](reference/gpu-mps-first-guards.md)
 - [Model Adapters](reference/model-adapters.md)
 - [Exporting Certificates (HTML)](reference/exporting-certificates-html.md)
 - [Certificate Schema (v1)](reference/certificate-schema.md)
 - [Certificate Telemetry](reference/certificate_telemetry.md)
+- [Tier Policy Catalog (runtime tiers.yaml)](reference/tier-policy-catalog.md)
 - [Datasets](reference/datasets.md)
 - [Artifact Layout](reference/artifacts.md)
 
@@ -77,7 +79,10 @@ Tip: enable Hub downloads per command when fetching models/datasets:
 - [RMT ε-Rule](assurance/06-rmt-epsilon-rule.md)
 - [VE Predictive Gate](assurance/07-ve-gate-power.md)
 - [Determinism Contracts](assurance/08-determinism-contracts.md)
- - [Tier v1.0 Calibration](assurance/09-tier-v1-calibration.md)
+- [Tier v1.0 Calibration](assurance/09-tier-v1-calibration.md)
+- [Guard Overhead Method](assurance/10-guard-overhead-method.md)
+- [Policy Provenance & Digest](assurance/11-policy-provenance.md)
+- [Device Drift Bands](assurance/12-device-drift-bands.md)
 
 Note: Every safety claim is backed by automated tests and cross-referenced in
 the docs. See Guard Contracts → Coverage Reference
@@ -157,13 +162,13 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
   --subject /path/to/edited \
   --adapter auto \
   --profile ci \
-  --preset configs/tasks/causal_lm/ci_cpu.yaml
+  --preset configs/presets/causal_lm/wikitext2_512.yaml
 ```
 
 ### Development
 
 ```bash
-invarlock run -c configs/edits/quant_rtn/8bit_attn.yaml --profile ci --tier balanced
+invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --tier balanced
 invarlock plugins adapters
 python scripts/verify_ci_matrix.sh
 ```
@@ -176,7 +181,7 @@ INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
   --subject  /path/to/edited \
   --adapter auto \
   --profile release \
-  --preset configs/tasks/causal_lm/release_cpu.yaml
+  --preset configs/presets/causal_lm/wikitext2_512.yaml
 invarlock verify reports/cert/evaluation.cert.json
 ```
 

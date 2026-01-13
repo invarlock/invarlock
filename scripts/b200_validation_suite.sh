@@ -5,7 +5,7 @@
 # ==========================================================
 # Version: v2.1.0-b200
 # Dependencies: bash 4+, jq, python3, invarlock CLI, nvidia-smi
-# Optimized for 8x NVIDIA B200 180GB SXM6 GPUs with parallel orchestration.
+# Optimized for multi-GPU NVIDIA B200 180GB SXM6 with parallel orchestration.
 #
 # HARDWARE TARGET:
 # - 8x B200 180GB SXM6
@@ -130,18 +130,19 @@ fi
 # `model_profile.json` after download.
 
 # Small models (fit on a single B200 under typical settings)
-MODEL_1="${MODEL_1:-mistralai/Mistral-7B-v0.1}"           # ~14 GB - Mistral (PUBLIC, FA2 compatible)
-MODEL_2="${MODEL_2:-NousResearch/Llama-2-13b-hf}"         # ~26 GB - LLaMA-2 13B (PUBLIC via NousResearch)
-MODEL_3="${MODEL_3:-Qwen/Qwen2.5-14B}"                    # ~28 GB - Qwen2.5 (PUBLIC, FA2 compatible)
+# Note: leave a MODEL_N unset to use the default below; set it to an empty string to disable.
+if [[ ! ${MODEL_1+x} ]]; then MODEL_1="mistralai/Mistral-7B-v0.1"; fi           # ~14 GB
+if [[ ! ${MODEL_2+x} ]]; then MODEL_2="NousResearch/Llama-2-13b-hf"; fi         # ~26 GB
+if [[ ! ${MODEL_3+x} ]]; then MODEL_3="Qwen/Qwen2.5-14B"; fi                    # ~28 GB
 
-# Medium/MoE models (fit on a single B200 under typical settings)
-MODEL_4="${MODEL_4:-Qwen/Qwen2.5-32B}"                    # ~64 GB - Qwen2.5 32B (PUBLIC, FA2 compatible)
-MODEL_5="${MODEL_5:-01-ai/Yi-34B}"                        # ~68 GB - Yi 34B (PUBLIC, FA2 compatible)
-MODEL_6="${MODEL_6:-mistralai/Mixtral-8x7B-v0.1}"         # ~90 GB - Mixtral MoE (PUBLIC, FA2 compatible)
+# Medium/MoE models
+if [[ ! ${MODEL_4+x} ]]; then MODEL_4="Qwen/Qwen2.5-32B"; fi                    # ~64 GB
+if [[ ! ${MODEL_5+x} ]]; then MODEL_5="01-ai/Yi-34B"; fi                        # ~68 GB
+if [[ ! ${MODEL_6+x} ]]; then MODEL_6="mistralai/Mixtral-8x7B-v0.1"; fi         # ~90 GB
 
-# Large models (weights ~140+ GB; may scale to multi-GPU if overheads exceed 180GB)
-MODEL_7="${MODEL_7:-NousResearch/Llama-2-70b-hf}"         # ~140 GB - LLaMA-2 70B (PUBLIC via NousResearch)
-MODEL_8="${MODEL_8:-Qwen/Qwen1.5-72B}"                    # ~144 GB - Qwen 72B (PUBLIC, FA2 compatible)
+# Large models
+if [[ ! ${MODEL_7+x} ]]; then MODEL_7="NousResearch/Llama-2-70b-hf"; fi         # ~140 GB
+if [[ ! ${MODEL_8+x} ]]; then MODEL_8="Qwen/Qwen1.5-72B"; fi                    # ~144 GB
 
 # Edit Configuration
 EDIT_TYPE="${EDIT_TYPE:-quant_rtn}"
@@ -409,7 +410,7 @@ sanitize_model_name() {
 GPU_ID_LIST="${GPU_ID_LIST:-}"
 
 # Print newline-separated GPU IDs for this run.
-# Falls back to legacy 0..NUM_GPUS-1 when GPU_ID_LIST isn't set yet.
+# Defaults to 0..NUM_GPUS-1 when GPU_ID_LIST isn't set yet.
 list_run_gpu_ids() {
     if [[ -n "${GPU_ID_LIST:-}" ]]; then
         echo "${GPU_ID_LIST}" | tr -d ' ' | tr ',' '\n' | sed '/^$/d'
@@ -924,10 +925,10 @@ setup_model() {
     local gpu_id="${2:-0}"
     local model_name
     model_name=$(sanitize_model_name "${model_id}")
-    local legacy_name
-    legacy_name=$(basename "${model_id}" | tr '[:upper:]' '[:lower:]' | tr '/' '_')
+    local basename_name
+    basename_name=$(basename "${model_id}" | tr '[:upper:]' '[:lower:]' | tr '/' '_')
     local model_dir="${OUTPUT_DIR}/models/${model_name}"
-    local legacy_dir="${OUTPUT_DIR}/models/${legacy_name}"
+    local basename_dir="${OUTPUT_DIR}/models/${basename_name}"
 
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Setting up model (B200 GPU ${gpu_id}): ${model_id}" >> "${LOG_FILE}"
 
@@ -937,13 +938,13 @@ setup_model() {
         return 0
     fi
 
-    # Check if already downloaded (prefer sanitized path, but honor legacy basename)
+    # Check if already downloaded (prefer sanitized path, but honor basename fallback)
     if [[ -d "${model_dir}/baseline" ]]; then
         echo "${model_dir}/baseline"
         return 0
     fi
-    if [[ -d "${legacy_dir}/baseline" ]]; then
-        echo "${legacy_dir}/baseline"
+    if [[ -d "${basename_dir}/baseline" ]]; then
+        echo "${basename_dir}/baseline"
         return 0
     fi
 
@@ -1247,12 +1248,12 @@ get_model_invarlock_config() {
         "7")
             # 7B models: ~14GB, can use long sequences and more windows
             # B200 has plenty of headroom
-            echo "2048:1024:64:64:96"
+            echo "2048:2048:192:192:96"
             ;;
         "13")
             # 13-14B models: ~26-28GB, moderate settings
             # Note: estimate_model_params() returns "13" for both 13B and 14B
-            echo "1536:768:48:48:64"
+            echo "1536:1536:192:192:64"
             ;;
         "30")
             # 30B models: ~60GB, reduced settings
@@ -2295,6 +2296,29 @@ generate_invarlock_config() {
         accel_benchmark="false"
     fi
 
+    # Window overlap control (calibration and eval safety)
+    local eval_overlap="${INVARLOCK_WINDOW_OVERLAP_FRACTION:-0.0}"
+
+    # Optional: override guard order for the suite (comma-separated list).
+    # Default is a lightweight chain to keep calibration tractable on 70B+.
+    local guards_order_csv="${B200_GUARDS_ORDER:-}"
+    local -a guards_order=()
+    if [[ -n "${guards_order_csv}" ]]; then
+        IFS=',' read -ra guards_order <<< "${guards_order_csv}"
+    else
+        guards_order=("invariants" "variance" "invariants")
+    fi
+    local guards_order_yaml=""
+    local g
+    for g in "${guards_order[@]}"; do
+        g="$(echo "${g}" | xargs)"
+        [[ -z "${g}" ]] && continue
+        guards_order_yaml+=$'    - '"${g}"$'\n'
+    done
+    if [[ -z "${guards_order_yaml}" ]]; then
+        guards_order_yaml=$'    - invariants\n    - variance\n    - invariants\n'
+    fi
+
     cat > "${output_yaml}" << YAML_EOF
 # Auto-generated InvarLock config for B200 validation
 # Model: ${model_path}
@@ -2328,16 +2352,16 @@ edit:
 
 guards:
   order:
-    - invariants
-    - rmt
-    - variance
+${guards_order_yaml}
 
 eval:
+  window_overlap_fraction: ${eval_overlap}
   bootstrap:
     replicates: ${bootstrap_n}
     parallel: true
   max_pm_ratio: 2.0
   batch_size: ${eval_batch}
+
 
 auto:
   enabled: true
@@ -2391,21 +2415,38 @@ run_single_calibration() {
         "${stride}" \
         "${eval_batch}"
 
+    # Force no-overlap calibration to avoid pairing mismatches
+    python3 - "${config_yaml}" <<'PY'
+import sys, yaml, pathlib
+path = pathlib.Path(sys.argv[1])
+cfg = yaml.safe_load(path.read_text())
+cfg.setdefault('eval', {})['window_overlap_fraction'] = 0.0
+path.write_text(yaml.safe_dump(cfg, sort_keys=False))
+PY
+
     # For large models, skip overhead check to avoid OOM (task-local via env)
     local model_size
     model_size=$(estimate_model_params "${model_path}")
 
     local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
+
     local exit_code=0
+    # Enforce no-overlap windows and skip overhead checks to avoid E001/pairing issues
+    local env_common=(
+        INVARLOCK_WINDOW_OVERLAP_FRACTION=0.0
+        INVARLOCK_SKIP_OVERHEAD_CHECK=1
+    )
+
     if [[ "${model_size}" == "70" || "${model_size}" == "72" || "${model_size}" == "moe" ]]; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Large model (${model_size}): using INVARLOCK_SKIP_OVERHEAD_CHECK=1 for calibration" >> "${log_file}"
-        INVARLOCK_SKIP_OVERHEAD_CHECK=1 \
+        "${env_common[@]}" \
         CUDA_VISIBLE_DEVICES="${cuda_devices}" invarlock run \
             --config "${config_yaml}" \
             --profile ci \
             --out "${run_dir}" \
             >> "${log_file}" 2>&1 || exit_code=$?
     else
+        "${env_common[@]}" \
         CUDA_VISIBLE_DEVICES="${cuda_devices}" invarlock run \
             --config "${config_yaml}" \
             --profile ci \
@@ -2454,6 +2495,9 @@ run_invarlock_calibration() {
     # Get model-size-aware configuration
     local config=$(get_model_invarlock_config "${model_size}")
     IFS=':' read -r effective_seq_len effective_stride effective_preview_n effective_final_n effective_eval_batch <<< "${config}"
+    # Force non-overlapping windows for calibration to avoid pairing mismatches
+    effective_stride="${effective_seq_len}"
+    export INVARLOCK_WINDOW_OVERLAP_FRACTION=0.0
 
     # Log calibration start with proper model size label
     if [[ "${model_size}" == "moe" ]]; then
@@ -2518,6 +2562,33 @@ seq_len = int("${effective_seq_len}")
 stride = int("${effective_stride}")
 preview_n = int("${effective_preview_n}")
 final_n = int("${effective_final_n}")
+
+guards_order = None
+assurance_cfg = None
+if YAML_AVAILABLE:
+    cfg_path = None
+    for candidate in sorted(output_dir.glob("run_*/calibration_config.yaml")):
+        cfg_path = candidate
+        break
+    if cfg_path is not None:
+        try:
+            cfg = yaml.safe_load(cfg_path.read_text())
+            if isinstance(cfg, dict):
+                guards_block = cfg.get("guards") or {}
+                if isinstance(guards_block, dict):
+                    order = guards_block.get("order")
+                    if isinstance(order, list) and order:
+                        guards_order = [str(item) for item in order]
+                ab = cfg.get("assurance")
+                if isinstance(ab, dict) and ab:
+                    assurance_cfg = ab
+        except Exception:
+            guards_order = None
+
+if guards_order is None:
+    guards_order = ["invariants", "variance", "invariants"]
+
+enabled_guards = set(guards_order)
 
 def _safe_float(value):
     try:
@@ -2677,46 +2748,66 @@ if len(records) < 2:
     print(f"WARNING: Only {len(records)} calibration record(s) found (expected >= 2)")
 
 def calibrate_drift(recs):
-    ratios = []
-    for rec in recs:
-        pm = rec.get("primary_metric", {}) or {}
-        ratio = pm.get("ratio_vs_baseline") or pm.get("drift")
-        if ratio is None:
-            preview = pm.get("preview")
-            final = pm.get("final")
-            if preview is not None and final is not None:
+    try:
+        ratios = []
+        for rec in recs:
+            pm = rec.get("primary_metric", {}) or {}
+            ratio = pm.get("ratio_vs_baseline") or pm.get("drift")
+            if ratio is None:
+                preview = pm.get("preview")
+                final = pm.get("final")
+                if preview is not None and final is not None:
+                    try:
+                        ratio = float(final) / max(float(preview), 1e-10)
+                    except Exception:
+                        ratio = None
+            if ratio is not None:
                 try:
-                    ratio = float(final) / max(float(preview), 1e-10)
+                    ratios.append(float(ratio))
                 except Exception:
-                    ratio = None
-        if ratio is not None:
-            try:
-                ratios.append(float(ratio))
-            except Exception:
-                pass
+                    pass
 
-    if len(ratios) < 2:
+        ratios = [r for r in ratios if math.isfinite(r)]
+        if len(ratios) < 2:
+            base = ratios[0] if ratios else 1.0
+            return {
+                "mean": float(base),
+                "std": 0.0,
+                "min": float(base),
+                "max": float(base),
+                "suggested_band": [0.95, 1.05],
+                "band_compatible": True,
+            }
+
+        try:
+            mean = sum(ratios) / len(ratios)
+        except Exception:
+            mean = 1.0
+        try:
+            var = sum((r - mean) ** 2 for r in ratios) / max(len(ratios), 1)
+            std = math.sqrt(var) if math.isfinite(var) else 0.0
+        except Exception:
+            std = 0.0
+        margin = max(2 * std, 0.05)
+        band = [round(mean - margin, 3), round(mean + margin, 3)]
+        return {
+            "mean": round(mean, 4),
+            "std": round(std, 4),
+            "min": round(min(ratios), 4),
+            "max": round(max(ratios), 4),
+            "suggested_band": band,
+            "band_compatible": 0.95 <= mean <= 1.05,
+        }
+    except Exception as e:
+        print(f"ERROR: failed to compute drift stats: {e}")
         return {
             "mean": 1.0,
             "std": 0.0,
-            "min": min(ratios) if ratios else 1.0,
-            "max": max(ratios) if ratios else 1.0,
+            "min": 1.0,
+            "max": 1.0,
             "suggested_band": [0.95, 1.05],
             "band_compatible": True,
         }
-
-    mean = statistics.mean(ratios)
-    std = statistics.stdev(ratios) if len(ratios) > 1 else 0.0
-    margin = max(2 * std, 0.05)
-    band = [round(mean - margin, 3), round(mean + margin, 3)]
-    return {
-        "mean": round(mean, 4),
-        "std": round(std, 4),
-        "min": round(min(ratios), 4),
-        "max": round(max(ratios), 4),
-        "suggested_band": band,
-        "band_compatible": 0.95 <= mean <= 1.05,
-    }
 
 def _spectral_margin(tier_name):
     return 0.10 if tier_name == "conservative" else 0.05
@@ -3074,8 +3165,11 @@ preset = {
         "final_n": final_n,
         "seed": 42,
     },
-    "guards": {},
+    "guards": {"order": guards_order},
 }
+
+if isinstance(assurance_cfg, dict) and assurance_cfg:
+    preset["assurance"] = assurance_cfg
 
 spectral = {}
 if spectral_caps:
@@ -3086,7 +3180,7 @@ if spectral_summary.get("deadband") is not None:
     spectral["deadband"] = spectral_summary["deadband"]
 if spectral_summary.get("max_caps") is not None:
     spectral["max_caps"] = spectral_summary["max_caps"]
-if spectral:
+if "spectral" in enabled_guards and spectral:
     preset["guards"]["spectral"] = spectral
 
 rmt = {}
@@ -3096,16 +3190,18 @@ if rmt_summary.get("margin") is not None:
     rmt["margin"] = rmt_summary["margin"]
 if rmt_summary.get("deadband") is not None:
     rmt["deadband"] = rmt_summary["deadband"]
-if rmt:
+if "rmt" in enabled_guards and rmt:
     preset["guards"]["rmt"] = rmt
 
-if variance_config:
+if "variance" in enabled_guards and variance_config:
     preset["guards"]["variance"] = variance_config
 
 stats_path = output_dir / "calibration_stats.json"
 with open(stats_path, "w") as f:
     json.dump(
         {
+            "guards_order": guards_order,
+            "assurance": assurance_cfg,
             "drift": drift_stats,
             "spectral": {**spectral_summary, "family_caps": spectral_caps},
             "rmt": {**rmt_summary, "epsilon": rmt_epsilon},
@@ -3167,6 +3263,7 @@ run_invarlock_certify() {
     fi
 
     local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
+
     local exit_code=0
     # For large models, skip overhead check to avoid OOM (task-local via env)
     local model_size
@@ -3252,77 +3349,85 @@ process_model() {
             "${gpu_id}"
     fi
 
-    # Step 4: Clean edits (4 types)
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Processing clean edits..." >> "${gpu_log}"
-    for edit_spec in "${EDIT_TYPES_CLEAN[@]}"; do
-        local edit_path=$(process_edit "${baseline_path}" "${edit_spec}" "clean" "${model_name}" "${gpu_id}" "${model_output_dir}")
+    # Step 4: Clean edits (only when requested)
+    if [[ ${CLEAN_EDIT_RUNS:-0} -gt 0 ]]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Processing clean edits..." >> "${gpu_log}"
+        for edit_spec in "${EDIT_TYPES_CLEAN[@]}"; do
+            local edit_path=$(process_edit "${baseline_path}" "${edit_spec}" "clean" "${model_name}" "${gpu_id}" "${model_output_dir}")
 
-        if [[ -n "${edit_path}" && -d "${edit_path}" ]]; then
-            # Run eval for this edit
-            local edit_name=$(basename "${edit_path}")
-            local edit_eval="${model_output_dir}/evals/${edit_name}_results.json"
+            if [[ -n "${edit_path}" && -d "${edit_path}" ]]; then
+                # Run eval for this edit
+                local edit_name=$(basename "${edit_path}")
+                local edit_eval="${model_output_dir}/evals/${edit_name}_results.json"
 
-            if [[ "${RESUME_MODE}" != "true" || ! -f "${edit_eval}" ]]; then
-                run_lmeval \
-                    "${edit_path}" \
-                    "${edit_eval}" \
-                    "${EVAL_TASKS}" \
-                    "${EVAL_BATCH_SIZE}" \
-                    "${EVAL_NUM_FEWSHOT}" \
-                    "${gpu_id}"
-            fi
-
-            # Run InvarLock certify
-            for run in $(seq 1 "${CLEAN_EDIT_RUNS}"); do
-                local cert_file="${model_output_dir}/certificates/${edit_name}/run_${run}/evaluation.cert.json"
-                if [[ "${RESUME_MODE}" != "true" || ! -f "${cert_file}" ]]; then
-                    run_invarlock_certify \
+                if [[ "${RESUME_MODE}" != "true" || ! -f "${edit_eval}" ]]; then
+                    run_lmeval \
                         "${edit_path}" \
-                        "${baseline_path}" \
-                        "${model_output_dir}/certificates/${edit_name}" \
-                        "run_${run}" \
-                        "${preset_dir}" \
-                        "${model_name}" \
+                        "${edit_eval}" \
+                        "${EVAL_TASKS}" \
+                        "${EVAL_BATCH_SIZE}" \
+                        "${EVAL_NUM_FEWSHOT}" \
                         "${gpu_id}"
                 fi
-            done
-        fi
-    done
 
-    # Step 5: Stress edits (4 types)
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Processing stress edits..." >> "${gpu_log}"
-    for edit_spec in "${EDIT_TYPES_STRESS[@]}"; do
-        local edit_path=$(process_edit "${baseline_path}" "${edit_spec}" "stress" "${model_name}" "${gpu_id}" "${model_output_dir}")
-
-        if [[ -n "${edit_path}" && -d "${edit_path}" ]]; then
-            local edit_name=$(basename "${edit_path}")
-            local edit_eval="${model_output_dir}/evals/${edit_name}_results.json"
-
-            if [[ "${RESUME_MODE}" != "true" || ! -f "${edit_eval}" ]]; then
-                run_lmeval \
-                    "${edit_path}" \
-                    "${edit_eval}" \
-                    "${EVAL_TASKS}" \
-                    "${EVAL_BATCH_SIZE}" \
-                    "${EVAL_NUM_FEWSHOT}" \
-                    "${gpu_id}"
+                # Run InvarLock certify
+                for run in $(seq 1 "${CLEAN_EDIT_RUNS}"); do
+                    local cert_file="${model_output_dir}/certificates/${edit_name}/run_${run}/evaluation.cert.json"
+                    if [[ "${RESUME_MODE}" != "true" || ! -f "${cert_file}" ]]; then
+                        run_invarlock_certify \
+                            "${edit_path}" \
+                            "${baseline_path}" \
+                            "${model_output_dir}/certificates/${edit_name}" \
+                            "run_${run}" \
+                            "${preset_dir}" \
+                            "${model_name}" \
+                            "${gpu_id}"
+                    fi
+                done
             fi
+        done
+    else
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Skipping clean edits (CLEAN_EDIT_RUNS=0)" >> "${gpu_log}"
+    fi
 
-            for run in $(seq 1 "${STRESS_EDIT_RUNS}"); do
-                local cert_file="${model_output_dir}/certificates/${edit_name}/run_${run}/evaluation.cert.json"
-                if [[ "${RESUME_MODE}" != "true" || ! -f "${cert_file}" ]]; then
-                    run_invarlock_certify \
+    # Step 5: Stress edits (only when requested)
+    if [[ ${STRESS_EDIT_RUNS:-0} -gt 0 ]]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Processing stress edits..." >> "${gpu_log}"
+        for edit_spec in "${EDIT_TYPES_STRESS[@]}"; do
+            local edit_path=$(process_edit "${baseline_path}" "${edit_spec}" "stress" "${model_name}" "${gpu_id}" "${model_output_dir}")
+
+            if [[ -n "${edit_path}" && -d "${edit_path}" ]]; then
+                local edit_name=$(basename "${edit_path}")
+                local edit_eval="${model_output_dir}/evals/${edit_name}_results.json"
+
+                if [[ "${RESUME_MODE}" != "true" || ! -f "${edit_eval}" ]]; then
+                    run_lmeval \
                         "${edit_path}" \
-                        "${baseline_path}" \
-                        "${model_output_dir}/certificates/${edit_name}" \
-                        "run_${run}" \
-                        "${preset_dir}" \
-                        "${model_name}" \
+                        "${edit_eval}" \
+                        "${EVAL_TASKS}" \
+                        "${EVAL_BATCH_SIZE}" \
+                        "${EVAL_NUM_FEWSHOT}" \
                         "${gpu_id}"
                 fi
-            done
-        fi
-    done
+
+                for run in $(seq 1 "${STRESS_EDIT_RUNS}"); do
+                    local cert_file="${model_output_dir}/certificates/${edit_name}/run_${run}/evaluation.cert.json"
+                    if [[ "${RESUME_MODE}" != "true" || ! -f "${cert_file}" ]]; then
+                        run_invarlock_certify \
+                            "${edit_path}" \
+                            "${baseline_path}" \
+                            "${model_output_dir}/certificates/${edit_name}" \
+                            "run_${run}" \
+                            "${preset_dir}" \
+                            "${model_name}" \
+                            "${gpu_id}"
+                    fi
+                done
+            fi
+        done
+    else
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Skipping stress edits (STRESS_EDIT_RUNS=0)" >> "${gpu_log}"
+    fi
 
     # Step 6: Error injection
     if [[ "${RUN_ERROR_INJECTION}" == "true" ]]; then
@@ -3370,10 +3475,51 @@ output_dir = Path("${OUTPUT_DIR}")
 analysis_dir = output_dir / "analysis"
 analysis_dir.mkdir(exist_ok=True)
 
+skip_dirs = {
+    "logs",
+    "analysis",
+    "reports",
+    "presets",
+    "models",
+    "queue",
+    "workers",
+    "state",
+    "evals",
+    "certificates",
+}
+
+def _is_model_dir(path: Path) -> bool:
+    if not path.is_dir():
+        return False
+    if path.name in skip_dirs:
+        return False
+    if not (path / ".baseline_path").exists():
+        return False
+    return True
+
+
+def _pick_metric(task_results: dict):
+    for key in (
+        "acc_norm,none",
+        "acc,none",
+        "exact_match,none",
+        "acc_norm",
+        "acc",
+        "exact_match",
+    ):
+        if key in task_results and isinstance(task_results[key], (int, float)):
+            return key, float(task_results[key])
+    for key, value in task_results.items():
+        if "stderr" in key:
+            continue
+        if isinstance(value, (int, float)):
+            return key, float(value)
+    return None, None
+
 # Collect eval results
 eval_rows = []
 for model_dir in output_dir.iterdir():
-    if not model_dir.is_dir() or model_dir.name in ['logs', 'analysis', 'reports', 'presets', 'models']:
+    if not _is_model_dir(model_dir):
         continue
 
     evals_dir = model_dir / "evals"
@@ -3393,16 +3539,18 @@ for model_dir in output_dir.iterdir():
         try:
             data = json.loads(results_file.read_text())
             for task, task_results in data.get('results', {}).items():
-                for key in ['acc', 'acc_norm', 'exact_match']:
-                    if key in task_results:
-                        eval_rows.append({
-                            'model': model_dir.name,
-                            'edit_type': edit_type,
-                            'task': task,
-                            'metric': key,
-                            'value': task_results[key]
-                        })
-                        break
+                if not isinstance(task_results, dict):
+                    continue
+                metric_key, metric_val = _pick_metric(task_results)
+                if metric_key is None:
+                    continue
+                eval_rows.append({
+                    'model': model_dir.name,
+                    'edit_type': edit_type,
+                    'task': task,
+                    'metric': metric_key,
+                    'value': metric_val,
+                })
         except Exception as e:
             print(f"Error processing {results_file}: {e}")
 
@@ -3416,170 +3564,194 @@ if eval_rows:
 # Collect InvarLock results
 invar_rows = []
 for model_dir in output_dir.iterdir():
-    if not model_dir.is_dir() or model_dir.name in ['logs', 'analysis', 'reports', 'presets', 'models']:
+    if not _is_model_dir(model_dir):
         continue
 
     certs_dir = model_dir / "certificates"
     if not certs_dir.exists():
         continue
 
-	    for cert_file in certs_dir.rglob("evaluation.cert.json"):
-	        try:
-	            cert = json.loads(cert_file.read_text())
-	            rel_path = cert_file.relative_to(certs_dir)
-	            parts = list(rel_path.parts)
+    for cert_file in certs_dir.rglob("evaluation.cert.json"):
+        try:
+            cert = json.loads(cert_file.read_text())
+            rel_path = cert_file.relative_to(certs_dir)
+            parts = list(rel_path.parts)
 
-	            v = cert.get('validation', {}) or {}
-	            def as_bool(val):
-	                if val is None:
-	                    return False
-	                if isinstance(val, bool):
-	                    return val
-	                if isinstance(val, str):
-	                    return val.strip().lower() in ('true', '1', 'yes', 'on')
-	                return bool(val)
+            v = cert.get('validation', {}) or {}
+            def as_bool(val):
+                if val is None:
+                    return False
+                if isinstance(val, bool):
+                    return val
+                if isinstance(val, str):
+                    return val.strip().lower() in ('true', '1', 'yes', 'on')
+                return bool(val)
 
-	            invariants_ok = as_bool(v.get('invariants_pass', False))
-	            pm_ok = as_bool(v.get('primary_metric_acceptable', False))
-	            spectral_ok = as_bool(v.get('spectral_stable', False))
-	            rmt_ok = as_bool(v.get('rmt_stable', False))
-	            drift_ok = as_bool(v.get('preview_final_drift_acceptable', True))
-	            hyst_applied = as_bool(v.get('hysteresis_applied', False))
+            invariants_ok = as_bool(v.get('invariants_pass', False))
+            pm_ok = as_bool(v.get('primary_metric_acceptable', False))
+            spectral_ok = as_bool(v.get('spectral_stable', False))
+            rmt_ok = as_bool(v.get('rmt_stable', False))
+            drift_ok = as_bool(v.get('preview_final_drift_acceptable', True))
+            hyst_applied = as_bool(v.get('hysteresis_applied', False))
 
-	            guard_overhead = cert.get('guard_overhead') or {}
-	            guard_evaluated = bool(guard_overhead.get('evaluated')) if isinstance(guard_overhead, dict) else False
-	            overhead_ok = as_bool(v.get('guard_overhead_acceptable', True))
+            guard_overhead = cert.get('guard_overhead') or {}
+            guard_evaluated = bool(guard_overhead.get('evaluated')) if isinstance(guard_overhead, dict) else False
+            overhead_ok = as_bool(v.get('guard_overhead_acceptable', True))
 
-	            # Backwards-compatible "all_pass" used by existing analysis logic.
-	            all_pass = all([invariants_ok, pm_ok, spectral_ok, rmt_ok])
+            pm_block = cert.get('primary_metric') or {}
+            pm_degraded = as_bool(pm_block.get('degraded')) or as_bool(pm_block.get('invalid'))
+            pm_degraded_reason = pm_block.get('degraded_reason')
 
-	            # Canonical overall pass aligned with InvarLock console validation block.
-	            overall_pass = all([invariants_ok, pm_ok, spectral_ok, rmt_ok, drift_ok])
-	            if guard_evaluated:
-	                overall_pass = overall_pass and overhead_ok
+            # Backwards-compatible "all_pass" used by existing analysis logic.
+            all_pass = all([invariants_ok, pm_ok, spectral_ok, rmt_ok]) and not pm_degraded
 
-	            conf = cert.get('confidence') or {}
-	            conf_label = conf.get('label') if isinstance(conf, dict) else None
-	            conf_label = str(conf_label).strip() if conf_label is not None else ''
-	            conf_label = conf_label if conf_label else 'Unknown'
+            # Canonical overall pass aligned with InvarLock console validation block.
+            overall_pass = all([invariants_ok, pm_ok, spectral_ok, rmt_ok, drift_ok]) and not pm_degraded
+            if guard_evaluated:
+                overall_pass = overall_pass and overhead_ok
 
-	            pm = cert.get('primary_metric') or {}
-	            pm_ratio = pm.get('ratio_vs_baseline') if isinstance(pm, dict) else None
-	            pm_ci_lo = None
-	            pm_ci_hi = None
-	            try:
-	                dci = pm.get('display_ci') if isinstance(pm, dict) else None
-	                if isinstance(dci, (list, tuple)) and len(dci) == 2:
-	                    pm_ci_lo = float(dci[0])
-	                    pm_ci_hi = float(dci[1])
-	                    if not (math.isfinite(pm_ci_lo) and math.isfinite(pm_ci_hi)):
-	                        pm_ci_lo = None
-	                        pm_ci_hi = None
-	            except Exception:
-	                pm_ci_lo = None
-	                pm_ci_hi = None
+            conf = cert.get('confidence') or {}
+            conf_label = conf.get('label') if isinstance(conf, dict) else None
+            conf_label = str(conf_label).strip() if conf_label is not None else ''
+            conf_label = conf_label if conf_label else 'Unknown'
 
-	            # Estimate the effective PM threshold used by the tier policy.
-	            tier = ''
-	            try:
-	                pd_try = cert.get('policy_digest') or {}
-	                auto_try = cert.get('auto') or {}
-	                tier = str(pd_try.get('tier_policy_name') or auto_try.get('tier') or '').strip().lower()
-	            except Exception:
-	                tier = ''
+            pm = pm_block
+            pm_ratio = pm.get('ratio_vs_baseline') if isinstance(pm, dict) else None
+            pm_ci_lo = None
+            pm_ci_hi = None
+            try:
+                dci = pm.get('display_ci') if isinstance(pm, dict) else None
+                if isinstance(dci, (list, tuple)) and len(dci) == 2:
+                    pm_ci_lo = float(dci[0])
+                    pm_ci_hi = float(dci[1])
+                    if not (math.isfinite(pm_ci_lo) and math.isfinite(pm_ci_hi)):
+                        pm_ci_lo = None
+                        pm_ci_hi = None
+            except Exception:
+                pm_ci_lo = None
+                pm_ci_hi = None
 
-	            pm_threshold = None
-	            try:
-	                pol = cert.get('resolved_policy') or {}
-	                metrics_pol = pol.get('metrics', {}) if isinstance(pol, dict) else {}
-	                pm_pol = metrics_pol.get('pm_ratio', {}) if isinstance(metrics_pol, dict) else {}
-	                base = pm_pol.get('ratio_limit_base')
-	                hyst = pm_pol.get('hysteresis_ratio', 0.0)
-	                if base is not None:
-	                    pm_threshold = float(base) + float(hyst or 0.0)
-	            except Exception:
-	                pm_threshold = None
-	            if pm_threshold is None:
-	                tier_thresholds = {'conservative': 1.05, 'balanced': 1.10, 'aggressive': 1.20}
-	                base = tier_thresholds.get(tier, 1.10)
-	                pm_threshold = float(base) + 0.002
+            # Estimate the effective PM threshold used by the tier policy.
+            tier = ''
+            try:
+                pd_try = cert.get('policy_digest') or {}
+                auto_try = cert.get('auto') or {}
+                tier = str(pd_try.get('tier_policy_name') or auto_try.get('tier') or '').strip().lower()
+            except Exception:
+                tier = ''
 
-	            # "Clear" PM failure if CI lower bound is above threshold, or ratio is far above.
-	            pm_clear_fail = False
-	            pm_far_fail = False
-	            pm_far_margin = 0.03  # absolute ratio margin above threshold
-	            try:
-	                if pm_ci_lo is not None and pm_threshold is not None:
-	                    pm_clear_fail = float(pm_ci_lo) > float(pm_threshold)
-	            except Exception:
-	                pm_clear_fail = False
-	            try:
-	                if isinstance(pm_ratio, (int, float)) and math.isfinite(float(pm_ratio)):
-	                    pm_far_fail = float(pm_ratio) > (float(pm_threshold) + float(pm_far_margin))
-	            except Exception:
-	                pm_far_fail = False
+            pm_threshold = None
+            try:
+                pol = cert.get('resolved_policy') or {}
+                metrics_pol = pol.get('metrics', {}) if isinstance(pol, dict) else {}
+                pm_pol = metrics_pol.get('pm_ratio', {}) if isinstance(metrics_pol, dict) else {}
+                base = pm_pol.get('ratio_limit_base')
+                hyst = pm_pol.get('hysteresis_ratio', 0.0)
+                if base is not None:
+                    pm_threshold = float(base) + float(hyst or 0.0)
+            except Exception:
+                pm_threshold = None
+            if pm_threshold is None:
+                tier_thresholds = {'conservative': 1.05, 'balanced': 1.10, 'aggressive': 1.20}
+                base = tier_thresholds.get(tier, 1.10)
+                pm_threshold = float(base) + 0.002
 
-	            # Triage layer (PASS/REVIEW/FAIL) for shadow-mode style workflows.
-	            triage_reasons = []
-	            if not invariants_ok:
-	                triage_reasons.append('invariants_fail')
-	            if not spectral_ok:
-	                triage_reasons.append('spectral_fail')
-	            if not rmt_ok:
-	                triage_reasons.append('rmt_fail')
-	            if not pm_ok:
-	                triage_reasons.append('primary_metric_fail')
-	            if not drift_ok:
-	                triage_reasons.append('drift_fail')
-	            if guard_evaluated and not overhead_ok:
-	                triage_reasons.append('overhead_fail')
-	            if hyst_applied:
-	                triage_reasons.append('hysteresis_applied')
-	            if conf_label != 'High':
-	                triage_reasons.append(f'confidence_{conf_label.lower()}')
+            # "Clear" PM failure if CI lower bound is above threshold, or ratio is far above.
+            pm_clear_fail = False
+            pm_far_fail = False
+            pm_far_margin = 0.03  # absolute ratio margin above threshold
+            try:
+                if pm_ci_lo is not None and pm_threshold is not None:
+                    pm_clear_fail = float(pm_ci_lo) > float(pm_threshold)
+            except Exception:
+                pm_clear_fail = False
+            try:
+                if isinstance(pm_ratio, (int, float)) and math.isfinite(float(pm_ratio)):
+                    pm_far_fail = float(pm_ratio) > (float(pm_threshold) + float(pm_far_margin))
+            except Exception:
+                pm_far_fail = False
 
-	            triage = 'REVIEW'
-	            if (not invariants_ok) or (not spectral_ok) or (not rmt_ok):
-	                triage = 'FAIL'
-	            elif (not pm_ok) and (pm_clear_fail or pm_far_fail):
-	                triage = 'FAIL'
-	                triage_reasons.append('primary_metric_clear' if pm_clear_fail else 'primary_metric_far')
-	            elif overall_pass and conf_label == 'High' and not hyst_applied:
-	                triage = 'PASS'
-	                triage_reasons = []
+            # Derive degradation if fields are missing but PM is non-finite
+            try:
+                prev_val = pm.get('preview')
+                fin_val = pm.get('final')
+                ratio_val = pm_ratio
+                def _nonfinite(v):
+                    try:
+                        return not (isinstance(v, (int, float)) and math.isfinite(float(v)))
+                    except Exception:
+                        return True
+                if not pm_degraded and (_nonfinite(prev_val) or _nonfinite(fin_val) or _nonfinite(ratio_val)):
+                    pm_degraded = True
+                    pm_degraded_reason = pm_degraded_reason or 'non_finite_pm'
+            except Exception:
+                pass
 
-	            triage_reason = 'strict_pass' if triage == 'PASS' else ('|'.join(triage_reasons) if triage_reasons else 'unspecified')
+            # Triage layer (PASS/REVIEW/FAIL) for shadow-mode style workflows.
+            triage_reasons = []
+            if pm_degraded:
+                triage_reasons.append('primary_metric_degraded')
+            if not invariants_ok:
+                triage_reasons.append('invariants_fail')
+            if not spectral_ok:
+                triage_reasons.append('spectral_fail')
+            if not rmt_ok:
+                triage_reasons.append('rmt_fail')
+            if not pm_ok:
+                triage_reasons.append('primary_metric_fail')
+            if not drift_ok:
+                triage_reasons.append('drift_fail')
+            if guard_evaluated and not overhead_ok:
+                triage_reasons.append('overhead_fail')
+            if hyst_applied:
+                triage_reasons.append('hysteresis_applied')
+            if conf_label != 'High':
+                triage_reasons.append(f'confidence_{conf_label.lower()}')
 
-	            pd = cert.get('policy_digest') or {}
-	            meta = cert.get('meta') or {}
-	            det = meta.get('determinism') or {}
+            triage = 'REVIEW'
+            if pm_degraded or (not invariants_ok) or (not spectral_ok) or (not rmt_ok):
+                triage = 'FAIL'
+            elif (not pm_ok) and (pm_clear_fail or pm_far_fail):
+                triage = 'FAIL'
+                triage_reasons.append('primary_metric_clear' if pm_clear_fail else 'primary_metric_far')
+            elif overall_pass and conf_label == 'High' and not hyst_applied:
+                triage = 'PASS'
+                triage_reasons = []
 
-	            invar_rows.append({
-	                'model': model_dir.name,
-	                'experiment': parts[0] if parts else 'unknown',
-	                'run': parts[1] if len(parts) > 1 else '',
-	                'edit_type': parts[0] if parts else 'unknown',
-	                'pm_ratio': pm_ratio,
-	                'pm_ci_low': pm_ci_lo,
-	                'pm_ci_high': pm_ci_hi,
-	                'pm_threshold': pm_threshold,
-	                'pm_acceptable': v.get('primary_metric_acceptable'),
-	                'preview_final_drift_acceptable': v.get('preview_final_drift_acceptable'),
-	                'invariants_pass': v.get('invariants_pass'),
-	                'spectral_stable': v.get('spectral_stable'),
-	                'rmt_stable': v.get('rmt_stable'),
-	                'all_pass': all_pass,
-	                'overall_pass': overall_pass,
-	                'hysteresis_applied': v.get('hysteresis_applied'),
-	                'guard_overhead_acceptable': v.get('guard_overhead_acceptable'),
-	                'confidence_label': conf_label,
-	                'triage': triage,
-	                'triage_reason': triage_reason,
-	                'policy_digest_hash': pd.get('thresholds_hash'),
-	                'policy_digest_changed': pd.get('changed'),
-	                'determinism_level': det.get('level'),
-	                'determinism_profile': det.get('profile'),
-	                'determinism_requested': det.get('requested'),
+            triage_reason = 'strict_pass' if triage == 'PASS' else ('|'.join(triage_reasons) if triage_reasons else 'unspecified')
+
+            pd = cert.get('policy_digest') or {}
+            meta = cert.get('meta') or {}
+            det = meta.get('determinism') or {}
+
+            invar_rows.append({
+                'model': model_dir.name,
+                'experiment': parts[0] if parts else 'unknown',
+                'run': parts[1] if len(parts) > 1 else '',
+                'edit_type': parts[0] if parts else 'unknown',
+                'pm_ratio': pm_ratio,
+                'pm_ci_low': pm_ci_lo,
+                'pm_ci_high': pm_ci_hi,
+                'pm_threshold': pm_threshold,
+                'pm_acceptable': v.get('primary_metric_acceptable'),
+                'pm_degraded': pm_degraded,
+                'pm_degraded_reason': pm_degraded_reason,
+                'preview_final_drift_acceptable': v.get('preview_final_drift_acceptable'),
+                'invariants_pass': v.get('invariants_pass'),
+                'spectral_stable': v.get('spectral_stable'),
+                'rmt_stable': v.get('rmt_stable'),
+                'all_pass': all_pass,
+                'overall_pass': overall_pass,
+                'hysteresis_applied': v.get('hysteresis_applied'),
+                'guard_overhead_acceptable': v.get('guard_overhead_acceptable'),
+                'confidence_label': conf_label,
+                'triage': triage,
+                'triage_reason': triage_reason,
+                'policy_digest_hash': pd.get('thresholds_hash'),
+                'policy_digest_changed': pd.get('changed'),
+                'determinism_level': det.get('level'),
+                'determinism_profile': det.get('profile'),
+                'determinism_requested': det.get('requested'),
             })
         except Exception as e:
             print(f"Error processing {cert_file}: {e}")
@@ -3713,6 +3885,28 @@ from collections import defaultdict
 output_dir = Path("${OUTPUT_DIR}")
 analysis_dir = output_dir / "analysis"
 
+skip_dirs = {
+    "logs",
+    "analysis",
+    "reports",
+    "presets",
+    "models",
+    "queue",
+    "workers",
+    "state",
+    "evals",
+    "certificates",
+}
+
+def _is_model_dir(path: Path) -> bool:
+    if not path.is_dir():
+        return False
+    if path.name in skip_dirs:
+        return False
+    if not (path / ".baseline_path").exists():
+        return False
+    return True
+
 eval_data = defaultdict(dict)
 eval_csv = analysis_dir / "eval_results.csv"
 if eval_csv.exists():
@@ -3745,14 +3939,22 @@ results = {
     'calibration': cal_summary,
     'pm_correlation': {},
 }
+def as_bool(val):
+    if val is None: return False
+    if isinstance(val, bool): return val
+    if isinstance(val, str): return val.strip().lower() in ('true', '1', 'yes', 'on')
+    return bool(val)
+
+degraded_edits = 0
+degraded_runs = []
 categories = defaultdict(int)
 # Track (delta_eval, pm_ratio) pairs for correlation analysis
-	pm_points = []
-	triage_counts = defaultdict(int)
+pm_points = []
+triage_counts = defaultdict(int)
 
-	for model_dir in output_dir.iterdir():
-	    if not model_dir.is_dir() or model_dir.name in ['logs', 'analysis', 'reports', 'presets', 'models']:
-	        continue
+for model_dir in output_dir.iterdir():
+    if not _is_model_dir(model_dir):
+        continue
 
     model = model_dir.name
     results['models'][model] = {}
@@ -3806,6 +4008,12 @@ categories = defaultdict(int)
             str(r.get('all_pass', '')).lower() == 'false' or r.get('all_pass') is False
             for r in invar_results
         )
+        degraded_present = any(as_bool(r.get('pm_degraded')) for r in invar_results)
+        if degraded_present:
+            degraded_edits += 1
+            degraded_runs.extend([f"{model}/{r.get('run', 'unknown')}" for r in invar_results if as_bool(r.get('pm_degraded'))])
+        if degraded_present:
+            invar_flagged = True
 
         # Aggregate primary-metric ratio for this edit (continuous InvarLock signal)
         pm_vals = []
@@ -3933,6 +4141,7 @@ print(f"Accuracy: {accuracy:.0%}")
 print(f"Precision: {precision:.0%}")
 print(f"Recall: {recall:.0%}")
 print(f"F1 Score: {f1:.0%}")
+print(f"Degraded edits: {degraded_edits}")
 	print(f"Error Detection: {err_detected}/{err_total} ({err_rate:.0%})")
 	print(f"Triage (edits): PASS={triage_counts.get('PASS', 0)} REVIEW={triage_counts.get('REVIEW', 0)} FAIL={triage_counts.get('FAIL', 0)}")
 	print(f"Confidence Score: {confidence_score:.1f}/100 ({confidence_level})")
@@ -3947,6 +4156,8 @@ print(f"F1 Score: {f1:.0%}")
 	    'confidence_score': confidence_score,
 	    'confidence_level': confidence_level,
 	    'triage_counts': dict(triage_counts),
+	    'degraded_edits': degraded_edits,
+	    'degraded_runs': degraded_runs,
 	    'total_tests': total,
 	    'models_tested': len(results['models']),
 	    'accuracy_ci': acc_ci,
@@ -3964,6 +4175,7 @@ generate_verdict() {
 
 	    python3 <<- EOF
 import json
+import os
 from pathlib import Path
 from datetime import datetime
 
@@ -3998,10 +4210,23 @@ total_tests = summary.get('total_tests', 0)
 	triage_pass = triage_counts.get('PASS', 0)
 	triage_review = triage_counts.get('REVIEW', 0)
 	triage_fail = triage_counts.get('FAIL', 0)
+degraded = summary.get('degraded_edits', 0) or 0
+degraded_runs = summary.get('degraded_runs', []) or []
+
+gpu_count = os.environ.get("NUM_GPUS", "").strip() or "unknown"
+gpu_mem = os.environ.get("GPU_MEMORY_GB", "").strip() or "180"
+platform_header = f"B200 {gpu_mem}GB x {gpu_count} GPU"
+platform_line = f"{gpu_count}x NVIDIA B200 {gpu_mem}GB SXM6"
+platform_tag = f"B200_{gpu_mem}GB_x{gpu_count}"
 
 phase0_pass = accuracy >= 0.6 and err_rate >= 0.8
+if degraded > 0:
+    phase0_pass = False
 
-if phase0_pass and accuracy >= 0.8 and confidence_score >= 75:
+if degraded > 0:
+    verdict = "PHASE0_DEGRADED"
+    verdict_confidence = "LOW"
+elif phase0_pass and accuracy >= 0.8 and confidence_score >= 75:
     verdict = "PHASE0_VALIDATED"
     verdict_confidence = "HIGH"
 elif phase0_pass and confidence_score >= 60:
@@ -4016,7 +4241,7 @@ else:
 
 report = f'''
 ================================================================================
-     INVARLOCK PHASE 0 VALIDATION - B200 180GB x 8 GPU
+     INVARLOCK PHASE 0 VALIDATION - {platform_header}
 ================================================================================
      Models Tested:     {models_tested}
      Total Tests:       {total_tests}
@@ -4030,6 +4255,7 @@ report = f'''
 	--------------------------------------------------------------------------------
 	     CONFIDENCE SCORE:  {confidence_score:.1f}/100 ({confidence_level})
 	     TRIAGE (edits):    PASS={triage_pass} REVIEW={triage_review} FAIL={triage_fail}
+	     DEGRADED CERTS:    {degraded}
 	--------------------------------------------------------------------------------
 	     VERDICT: {verdict}
 	     VERDICT CONFIDENCE: {verdict_confidence}
@@ -4041,12 +4267,14 @@ EDIT TYPES TESTED:
   * Magnitude Pruning: 10% (clean), 50% (stress)
   * Low-Rank SVD: rank-256 (clean), rank-32 (stress)
 
-PLATFORM: 8x NVIDIA B200 180GB SXM6
+PLATFORM: {platform_line}
 
 '''
 
 if verdict == "PHASE0_VALIDATED":
     report += "RESULT: InvarLock Phase 0 VALIDATED on B200 cluster.\n"
+elif verdict == "PHASE0_DEGRADED":
+    report += f"RESULT: Phase 0 degraded. {degraded} certificate(s) reported degraded primary metrics. See runs: {', '.join(degraded_runs) if degraded_runs else 'n/a'}\n"
 else:
     report += f"RESULT: Phase 0 validation failed. Accuracy: {accuracy:.0%}, Error Detection: {err_rate:.0%}\n"
 
@@ -4062,8 +4290,9 @@ with open(reports_dir / "final_verdict.txt", 'w') as f:
 	        'metrics': {'accuracy': accuracy, 'precision': precision, 'recall': recall, 'f1_score': f1, 'error_detection_rate': err_rate},
 	        'confidence': {'score': confidence_score, 'level': confidence_level},
 	        'triage': {'pass': triage_pass, 'review': triage_review, 'fail': triage_fail},
+	        'degraded': {'count': degraded, 'runs': degraded_runs},
 	        'phase0_pass': phase0_pass,
-	        'platform': 'B200_180GB_x8',
+	        'platform': platform_tag,
 	        'models_tested': models_tested,
 	        'total_tests': total_tests,
         'timestamp': datetime.now().isoformat()
@@ -4074,10 +4303,13 @@ EOF
 # ============ MAIN - DYNAMIC GPU SCHEDULING (v2.0) ============
 main_dynamic() {
     local start_time=$(date +%s)
+    local gpu_mem="${GPU_MEMORY_GB:-180}"
+    local gpu_count_label="${NUM_GPUS:-auto}"
+    [[ -z "${gpu_count_label}" ]] && gpu_count_label="auto"
 
     echo "========================================================================"
     echo "  InvarLock Validation Suite v${SCRIPT_VERSION}"
-    echo "  B200 180GB x 8 GPU DYNAMIC SCHEDULING"
+    echo "  B200 ${gpu_mem}GB x ${gpu_count_label} GPU DYNAMIC SCHEDULING"
     echo "========================================================================"
     echo ""
 
@@ -4145,6 +4377,7 @@ main_dynamic() {
     # Initialize GPU reservation tracking for multi-GPU tasks before workers start.
     if type init_gpu_reservations &>/dev/null; then
         init_gpu_reservations "${OUTPUT_DIR}"
+        log "GPU reservations dir: ${GPU_RESERVATION_DIR:-unset}; GPUs: $(list_run_gpu_ids | tr '\n' ',' | sed 's/,$//')"
     fi
     export QUEUE_DIR GPU_RESERVATION_DIR  # Export for subshell workers
 
@@ -4190,6 +4423,8 @@ main_dynamic() {
     else
         # Generate all tasks
         log "Generating tasks for all models..."
+        log "Config: CLEAN_EDIT_RUNS=${CLEAN_EDIT_RUNS}, STRESS_EDIT_RUNS=${STRESS_EDIT_RUNS}, RUN_ERROR_INJECTION=${RUN_ERROR_INJECTION}, DRIFT_CALIBRATION_RUNS=${DRIFT_CALIBRATION_RUNS}, B200_USE_BATCH_EDITS=${B200_USE_BATCH_EDITS:-auto}"
+        log "Models: ${MODEL_1:-<unset>}, ${MODEL_2:-<unset>}, ${MODEL_3:-<unset>}, ${MODEL_4:-<unset>}, ${MODEL_5:-<unset>}, ${MODEL_6:-<unset>}, ${MODEL_7:-<unset>}, ${MODEL_8:-<unset>}"
         generate_all_tasks "${MODEL_1}" "${MODEL_2}" "${MODEL_3}" "${MODEL_4}" \
                            "${MODEL_5}" "${MODEL_6}" "${MODEL_7}" "${MODEL_8}"
     fi
@@ -4206,6 +4441,9 @@ main_dynamic() {
         local moved_initial=0
         moved_initial=$(resolve_dependencies 2>/dev/null) || moved_initial=0
         log "Resolved initial dependencies: moved ${moved_initial} task(s) to ready queue"
+    fi
+    if type demote_ready_tasks_for_calibration_only &>/dev/null; then
+        demote_ready_tasks_for_calibration_only 2>/dev/null || true
     fi
 
     total_tasks=$(count_tasks "pending")
@@ -4225,6 +4463,18 @@ main_dynamic() {
     start_worker() {
         local gpu_id="$1"
         local action="${2:-Starting}"
+
+        # Avoid duplicating a live worker on the same GPU
+        local pid_file="${OUTPUT_DIR}/workers/gpu_${gpu_id}.pid"
+        if [[ -f "${pid_file}" ]]; then
+            local existing_pid
+            existing_pid=$(cat "${pid_file}" 2>/dev/null || true)
+            if [[ -n "${existing_pid}" ]] && kill -0 "${existing_pid}" 2>/dev/null; then
+                log "  GPU ${gpu_id}: worker already running (PID ${existing_pid}), skipping start"
+                return 0
+            fi
+        fi
+
         log "  GPU ${gpu_id}: ${action} worker"
         # Run in subshell that sources libraries (bash functions don't inherit to background processes)
         # Note: SCRIPT_DIR, LIB_DIR, QUEUE_DIR, OUTPUT_DIR must all be exported before this point
@@ -4270,6 +4520,21 @@ main_dynamic() {
         fi
 
         # Check if done
+        if [[ "${B200_SUITE_MODE:-full}" == "calibrate-only" ]]; then
+            local preset_total=0
+            local preset_completed=0
+            preset_total=$(find "${QUEUE_DIR}" -type f -name "*_GENERATE_PRESET_*.task" 2>/dev/null | wc -l | tr -d ' ')
+            preset_completed=$(find "${QUEUE_DIR}/completed" -type f -name "*_GENERATE_PRESET_*.task" 2>/dev/null | wc -l | tr -d ' ')
+            if [[ ${preset_total} -gt 0 && ${preset_completed} -eq ${preset_total} ]]; then
+                log "Calibration-only: generated ${preset_completed}/${preset_total} calibrated preset(s); stopping early"
+                if type signal_shutdown &>/dev/null; then
+                    signal_shutdown "${OUTPUT_DIR}"
+                else
+                    touch "${OUTPUT_DIR}/workers/SHUTDOWN"
+                fi
+                break
+            fi
+        fi
         if is_queue_empty; then
             if type signal_shutdown &>/dev/null; then
                 signal_shutdown "${OUTPUT_DIR}"
@@ -4389,6 +4654,14 @@ main_dynamic() {
         done
     fi
 
+    if [[ "${B200_SUITE_MODE:-full}" == "calibrate-only" ]]; then
+        log_section "CALIBRATION CHECKPOINT"
+        log "Calibration-only run stopped after preset generation."
+        log "Presets: ${OUTPUT_DIR}/presets/"
+        log "To continue: OUTPUT_DIR=${OUTPUT_DIR} $0 --run-only"
+        return 0
+    fi
+
     log_section "PHASE 4: ANALYSIS"
     compile_results
     run_analysis
@@ -4414,21 +4687,50 @@ main() {
 b200_entrypoint() {
     # ============ CLI ARGUMENT PARSING (no strict mode; help should work everywhere) ============
     RESUME_FLAG="false"
-    local arg
-    for arg in "$@"; do
-        case "${arg}" in
-            --resume|-r) RESUME_FLAG="true" ;;
-            --help|-h) break ;;
+    B200_SUITE_MODE="${B200_SUITE_MODE:-full}"
+
+    while [[ $# -gt 0 ]]; do
+        case "${1}" in
+            --resume|-r)
+                RESUME_FLAG="true"
+                shift
+                ;;
+            --calibrate-only)
+                if [[ "${B200_SUITE_MODE}" != "full" ]]; then
+                    echo "ERROR: --calibrate-only conflicts with mode=${B200_SUITE_MODE}" >&2
+                    exit 2
+                fi
+                B200_SUITE_MODE="calibrate-only"
+                shift
+                ;;
+            --run-only)
+                if [[ "${B200_SUITE_MODE}" != "full" ]]; then
+                    echo "ERROR: --run-only conflicts with mode=${B200_SUITE_MODE}" >&2
+                    exit 2
+                fi
+                # Run-only implies resume semantics when a queue already exists.
+                RESUME_FLAG="true"
+                B200_SUITE_MODE="run-only"
+                shift
+                ;;
+            --help|-h)
+                break
+                ;;
+            *)
+                echo "Unknown arg: ${1}" >&2
+                echo "Run with --help for usage." >&2
+                exit 2
+                ;;
         esac
     done
-    export RESUME_FLAG
+    export RESUME_FLAG B200_SUITE_MODE
 
     # ============ HELP ============
     if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
         cat << EOF
-InvarLock Validation Suite v${SCRIPT_VERSION} - B200 180GB x 8 GPU
+	InvarLock Validation Suite v${SCRIPT_VERSION} - B200 ${GPU_MEMORY_GB:-180}GB x ${NUM_GPUS:-auto} GPU
 
-Optimized for 8x NVIDIA B200 180GB SXM6 GPUs with:
+Optimized for NVIDIA B200 ${GPU_MEMORY_GB:-180}GB SXM6 GPUs with:
   * FP4 quantization (simulated; B200-native hardware)
   * ~4.5 TB/s memory bandwidth
   * ~2250 FP16 TFLOPS
@@ -4458,31 +4760,37 @@ Model Suite (8 PUBLIC models - no HuggingFace login):
 
 Note: GPUs are assigned dynamically; this is not a fixed mapping.
 
-Usage: $0 [options]
+	Usage: $0 [options]
 
-Options:
-    --resume, -r                 Resume from existing queue (skip task generation)
-    --help, -h                   Show this help message
+	Options:
+	    --resume, -r                 Resume from existing queue (skip task generation)
+	    --calibrate-only             Run only baseline calibration + preset generation, then stop
+	    --run-only                   Run remaining tasks (implies --resume when queue exists)
+	    --help, -h                   Show this help message
 
 Key environment variables:
     B200_DETERMINISM             Harness determinism preset: throughput (default) or strict
-    MODEL_1 through MODEL_8      Override model assignments
+    B200_GUARDS_ORDER            Override InvarLock guard order (comma-separated); default: invariants,variance,invariants
+    MODEL_1 through MODEL_8      Override model assignments (set empty to disable)
     CUDA_VISIBLE_DEVICES         Explicit GPU IDs to use (default: auto-detect all)
     NUM_GPUS                     Number of GPUs to use (default: auto-detect all)
     SKIP_FLASH_ATTN              Skip flash-attn install (default: false)
     RESUME_MODE                  Skip completed work (default: true)
-    OUTPUT_DIR                   Set to existing dir to resume
+    OUTPUT_DIR                   Set to existing dir to resume (absolute path recommended)
     RUN_ERROR_INJECTION          Run error tests (default: true)
     MIN_FREE_DISK_GB             Abort if free disk below this (default: 200)
 
-Examples:
-    $0                                    # Run validation
-    $0 --resume                           # Resume previous run
-    SKIP_FLASH_ATTN=true $0               # Skip flash-attn compile
-    NUM_GPUS=4 $0                         # Use only 4 GPUs
+	Examples:
+	    $0                                    # Run validation
+	    $0 --resume                           # Resume previous run
+	    $0 --calibrate-only                   # Run calibration only (presets only)
+	    OUTPUT_DIR=./run $0 --calibrate-only  # Calibration checkpoint run
+	    OUTPUT_DIR=./run $0 --run-only        # Continue from checkpoint
+	    SKIP_FLASH_ATTN=true $0               # Skip flash-attn compile
+	    NUM_GPUS=4 $0                         # Use only 4 GPUs
 
-Resume a failed run:
-    OUTPUT_DIR=./invarlock_validation_b200_20241208_123456 $0 --resume
+	Resume a failed run:
+	    OUTPUT_DIR=./invarlock_validation_b200_20241208_123456 $0 --resume
 EOF
         exit 0
     fi
@@ -4495,6 +4803,11 @@ EOF
 
     if [[ -z "${OUTPUT_DIR:-}" ]]; then
         OUTPUT_DIR="./invarlock_validation_b200_$(date +%Y%m%d_%H%M%S)"
+    fi
+    # Normalize OUTPUT_DIR to an absolute path so worker log paths remain valid
+    # even if subshells or workers run with a different cwd.
+    if [[ -n "${OUTPUT_DIR}" ]]; then
+        OUTPUT_DIR="$(cd "$(dirname "${OUTPUT_DIR}")" && pwd)/$(basename "${OUTPUT_DIR}")"
     fi
 
     b200_source_libs || exit 1

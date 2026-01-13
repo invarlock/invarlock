@@ -107,8 +107,6 @@ def summarize_ve_sweep_reports(
     evaluated = 0
 
     for report in reports:
-        if not isinstance(report, dict):
-            continue
         g = _extract_guard(report, "variance") or {}
         metrics = g.get("metrics", {}) if isinstance(g.get("metrics"), dict) else {}
         pg = metrics.get("predictive_gate")

@@ -92,7 +92,6 @@ class BenchmarkConfig:
     epsilon: float | None = (
         None  # RMT deadband tolerance (None = use resolved deadband)
     )
-    strict: bool = False  # If True, sets epsilon = 0
     ppl_overhead_threshold: float = 0.01  # 1%
     guard_overhead_time_threshold: float = 0.15  # 15%
     guard_overhead_mem_threshold: float = 0.10  # 10%
@@ -103,10 +102,6 @@ class BenchmarkConfig:
     def __post_init__(self):
         """Apply post-initialization logic."""
         self.output_dir = Path(self.output_dir)
-
-        # Handle strict mode
-        if self.strict:
-            self.epsilon = 0.0
 
 
 @dataclass
@@ -1043,7 +1038,6 @@ def run_guard_effect_benchmark(
     profile: str = "ci",
     output_dir: str | Path = "benchmarks",
     epsilon: float | None = None,
-    strict: bool = False,
     **kwargs,
 ) -> dict[str, Any]:
     """
@@ -1056,7 +1050,6 @@ def run_guard_effect_benchmark(
         profile: "ci" (50/50 windows) or "release" (100/100 windows)
         output_dir: Directory to save results
         epsilon: Optional epsilon override
-        strict: If True, sets epsilon = 0
         **kwargs: Additional configuration options
 
     Returns:
@@ -1075,7 +1068,6 @@ def run_guard_effect_benchmark(
         profile=profile,
         output_dir=Path(output_dir),
         epsilon=epsilon,
-        strict=strict,
         **kwargs,
     )
 
@@ -1384,7 +1376,6 @@ def _config_to_dict(config: BenchmarkConfig) -> dict[str, Any]:
         "stride": config.stride,
         "seed": config.seed,
         "epsilon": config.epsilon,
-        "strict": config.strict,
         "ppl_overhead_threshold": config.ppl_overhead_threshold,
         "guard_overhead_time_threshold": config.guard_overhead_time_threshold,
         "guard_overhead_mem_threshold": config.guard_overhead_mem_threshold,
@@ -1425,9 +1416,6 @@ def main():
         "--epsilon",
         type=float,
         help="RMT outliers epsilon threshold (default: use resolved RMT deadband)",
-    )
-    parser.add_argument(
-        "--strict", action="store_true", help="Set epsilon=0 (overrides --epsilon)"
     )
 
     # Model and dataset configuration
@@ -1505,7 +1493,6 @@ def main():
             profile=args.profile,
             output_dir=args.out,
             epsilon=args.epsilon,
-            strict=args.strict,
             **kwargs,
         )
 

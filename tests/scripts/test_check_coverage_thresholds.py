@@ -26,20 +26,20 @@ def _write_cov_xml(path: Path, class_specs: list[tuple[str, float, float]]) -> N
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def _run_checker(xml_path: Path, json_path: Path) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        [
-            sys.executable,
-            str(Path("scripts") / "check_coverage_thresholds.py"),
-            "--coverage",
-            str(xml_path),
-            "--json",
-            str(json_path),
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+def _run_checker(
+    xml_path: Path, json_path: Path, extra_args: list[str] | None = None
+) -> subprocess.CompletedProcess:
+    cmd = [
+        sys.executable,
+        str(Path("scripts") / "check_coverage_thresholds.py"),
+        "--coverage",
+        str(xml_path),
+        "--json",
+        str(json_path),
+    ]
+    if extra_args:
+        cmd.extend(extra_args)
+    return subprocess.run(cmd, capture_output=True, text=True, check=False)
 
 
 def test_two_tier_policy_enforced(tmp_path: Path) -> None:
@@ -49,17 +49,17 @@ def test_two_tier_policy_enforced(tmp_path: Path) -> None:
     _write_cov_xml(
         xml,
         [
-            ("src/invarlock/core/runner.py", 0.84, 0.90),  # core → FAIL (needs 0.85)
+            ("src/invarlock/core/runner.py", 0.89, 0.90),  # core → FAIL (needs 0.90)
             (
                 "src/invarlock/cli/commands/run.py",
-                0.86,
+                0.91,
                 0.90,
             ),  # core meets floor → PASS
             (
                 "src/invarlock/reporting/certificate.py",
-                0.86,
+                0.91,
                 0.90,
-            ),  # override set to 0.85 → PASS
+            ),  # override set to 0.90 → PASS
             (
                 "src/invarlock/cli/commands/plugins.py",
                 0.81,
@@ -67,11 +67,15 @@ def test_two_tier_policy_enforced(tmp_path: Path) -> None:
             ),  # non-core → not enforced (absent from THRESHOLDS)
             (
                 "src/invarlock/eval/primary_metric.py",
-                0.79,
+                0.91,
                 0.90,
-            ),  # non-core → not enforced
-            ("src/invarlock/eval/metrics.py", 0.85, 0.90),  # core single-file → PASS
-            ("src/invarlock/guards/spectral.py", 0.84, 0.90),  # core (guards) → FAIL
+            ),  # explicit critical file → PASS
+            (
+                "src/invarlock/eval/metrics.py",
+                0.91,
+                0.90,
+            ),  # explicit critical file → PASS
+            ("src/invarlock/guards/spectral.py", 0.89, 0.90),  # core (guards) → FAIL
         ],
     )
 
@@ -87,17 +91,17 @@ def test_two_tier_policy_enforced(tmp_path: Path) -> None:
 
 
 def test_overrides_take_precedence(tmp_path: Path) -> None:
-    # Only files with explicit overrides (now at 85%)
+    # Explicit overrides should win over a stricter core-floor flag.
     xml = tmp_path / "cov.xml"
     json_out = tmp_path / "out.json"
-    _write_cov_xml(xml, [("src/invarlock/reporting/certificate.py", 0.86, 0.90)])
-    proc = _run_checker(xml, json_out)
+    _write_cov_xml(xml, [("src/invarlock/reporting/certificate.py", 0.94, 0.90)])
+    proc = _run_checker(xml, json_out, extra_args=["--core-floor", "0.95"])
 
-    # Should pass with explicit 85% override applied
+    # Should pass with explicit 90% override applied
     assert proc.returncode == 0, proc.stderr
     payload = json.loads(json_out.read_text())
     assert payload["status"] == "ok"
     files = {f["path"]: f for f in payload["files"]}
     assert (
-        abs(files["src/invarlock/reporting/certificate.py"]["threshold"] - 0.85) < 1e-9
+        abs(files["src/invarlock/reporting/certificate.py"]["threshold"] - 0.90) < 1e-9
     )

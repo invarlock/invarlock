@@ -48,6 +48,10 @@ def _compute_thresholds_payload(
     if not isinstance(pm_policy, dict):
         pm_policy = {}
 
+    pm_tail_policy = metrics_policy.get("pm_tail", {})
+    if not isinstance(pm_tail_policy, dict):
+        pm_tail_policy = {}
+
     acc_policy = metrics_policy.get("accuracy", {})
     if not isinstance(acc_policy, dict):
         acc_policy = {}
@@ -76,6 +80,12 @@ def _compute_thresholds_payload(
         resolved_policy.get("variance", {}) if isinstance(resolved_policy, dict) else {}
     )
 
+    def _safe_float_any(value: Any, default: float) -> float:
+        try:
+            return float(value)
+        except Exception:
+            return float(default)
+
     payload = {
         "tier": tier_lc,
         "pm_ratio": {
@@ -85,6 +95,22 @@ def _compute_thresholds_payload(
                 pm_policy.get("min_token_fraction", 0.0) or 0.0
             ),
             "hysteresis_ratio": float(pm_policy.get("hysteresis_ratio", 0.0) or 0.0),
+        },
+        "pm_tail": {
+            "mode": str(pm_tail_policy.get("mode", "warn") or "warn").strip().lower(),
+            "min_windows": int(pm_tail_policy.get("min_windows", 0) or 0),
+            "quantile": _safe_float_any(pm_tail_policy.get("quantile", 0.95), 0.95),
+            "quantile_max": (
+                float(pm_tail_policy.get("quantile_max"))
+                if isinstance(pm_tail_policy.get("quantile_max"), int | float)
+                else None
+            ),
+            "epsilon": _safe_float_any(pm_tail_policy.get("epsilon", 0.0), 0.0),
+            "mass_max": (
+                float(pm_tail_policy.get("mass_max"))
+                if isinstance(pm_tail_policy.get("mass_max"), int | float)
+                else None
+            ),
         },
         "accuracy": {
             "delta_min_pp": float(acc_policy.get("delta_min_pp", -1.0) or -1.0),
@@ -108,16 +134,6 @@ def _compute_thresholds_payload(
 def _compute_thresholds_hash(payload: dict[str, Any]) -> str:
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
-
-
-def _promote_legacy_multiple_testing_key(payload: dict[str, Any]) -> None:
-    """Promote legacy 'multipletesting' to 'multiple_testing' in-place if present."""
-    try:
-        legacy_mt = payload.pop("multipletesting", None)
-        if legacy_mt is not None and "multiple_testing" not in payload:
-            payload["multiple_testing"] = legacy_mt
-    except Exception:
-        pass
 
 
 def _resolve_policy_tier(report: RunReport) -> str:
@@ -218,15 +234,9 @@ def _build_resolved_policies(
     from .policy_utils import _format_family_caps as _ffc  # self import safe
 
     spectral_resolved["family_caps"] = _ffc(spectral_caps)
-    # Prefer observed policy sigma_quantile (accepting legacy aliases), then fallback
     pol_sq = None
     try:
         pol_sq = (spectral.get("policy", {}) or {}).get("sigma_quantile")
-        if pol_sq is None:
-            # Legacy aliases
-            pol_sq = (spectral.get("policy", {}) or {}).get("contraction") or (
-                spectral.get("policy", {}) or {}
-            ).get("kappa")
     except Exception:
         pol_sq = None
     spectral_resolved["sigma_quantile"] = _safe_float(
@@ -276,6 +286,9 @@ def _build_resolved_policies(
         spectral_resolved["max_spectral_norm"] = spectral.get("policy", {}).get(
             "max_spectral_norm", spectral_resolved.get("max_spectral_norm")
         )
+    mc = spectral.get("measurement_contract")
+    if isinstance(mc, dict) and mc:
+        spectral_resolved["measurement_contract"] = copy.deepcopy(mc)
     resolved["spectral"] = spectral_resolved
 
     # RMT guard
@@ -295,15 +308,16 @@ def _build_resolved_policies(
     rmt_resolved["epsilon_default"] = _safe_float(epsilon_default_val, 0.1)
     from .policy_utils import _format_epsilon_map as _fem
 
-    epsilon_map = _fem(rmt.get("epsilon_by_family") or rmt_resolved.pop("epsilon", {}))
+    epsilon_map = _fem(
+        rmt.get("epsilon_by_family") or rmt_resolved.get("epsilon_by_family") or {}
+    )
     if epsilon_map:
         rmt_resolved["epsilon_by_family"] = epsilon_map
-    else:
-        rmt_resolved.pop("epsilon", None)
-    if "epsilon" in rmt_resolved:
-        rmt_resolved.pop("epsilon", None)
     if "correct" in rmt_resolved:
         rmt_resolved["correct"] = bool(rmt_resolved["correct"])
+    mc = rmt.get("measurement_contract")
+    if isinstance(mc, dict) and mc:
+        rmt_resolved["measurement_contract"] = copy.deepcopy(mc)
     resolved["rmt"] = rmt_resolved
 
     # Variance guard
@@ -441,13 +455,9 @@ def _extract_effective_policies(report: RunReport) -> dict[str, Any]:
             elif guard_name == "spectral":
                 sigma_quantile = guard_metrics.get(
                     "sigma_quantile",
-                    guard_metrics.get("contraction", guard_metrics.get("kappa", 0.95)),
+                    0.95,
                 )
-                multiple_testing = guard_metrics.get("multiple_testing") or (
-                    guard_metrics.get("multipletesting")
-                    if isinstance(guard_metrics.get("multipletesting"), dict)
-                    else None
-                )
+                multiple_testing = guard_metrics.get("multiple_testing")
                 guard_policy = {
                     "max_spectral_norm": guard_metrics.get("max_spectral_norm"),
                     "stability_score": guard_metrics.get("stability_score", 0.95),
@@ -473,20 +483,13 @@ def _extract_effective_policies(report: RunReport) -> dict[str, Any]:
 
         if guard_policy:
             if guard_name == "spectral":
-                sigma_quantile = guard_policy.get("sigma_quantile")
-                if sigma_quantile is None:
-                    sigma_quantile = guard_policy.get("contraction")
-                if sigma_quantile is None and "kappa" in guard_policy:
-                    sigma_quantile = guard_policy["kappa"]
                 sanitized_policy = dict(guard_policy)
+                sigma_quantile = sanitized_policy.get("sigma_quantile")
                 if sigma_quantile is not None:
                     try:
                         sanitized_policy["sigma_quantile"] = float(sigma_quantile)
                     except (TypeError, ValueError):
                         pass
-                _promote_legacy_multiple_testing_key(sanitized_policy)
-                sanitized_policy.pop("contraction", None)
-                sanitized_policy.pop("kappa", None)
                 if sanitized_policy.get("max_spectral_norm") in (None, 0):
                     sanitized_policy["max_spectral_norm"] = None
                 guard_policy = sanitized_policy
@@ -587,7 +590,6 @@ __all__ = [
     "_compute_variance_policy_digest",
     "_compute_thresholds_payload",
     "_compute_thresholds_hash",
-    "_promote_legacy_multiple_testing_key",
     "_resolve_policy_tier",
     "_build_resolved_policies",
     "_extract_effective_policies",

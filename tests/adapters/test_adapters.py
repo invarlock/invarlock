@@ -1074,8 +1074,8 @@ class TestInitModule:
 
         # Placeholder previously referenced here is no longer present
 
-    def test_legacy_stubs(self):
-        """Test legacy component stubs."""
+    def test_removed_component_stubs(self):
+        """Test removed component stubs."""
         # Test removed components
         with pytest.raises(NotImplementedError, match="InvarLock 1.0"):
             invarlock.adapters.InvarLockPipeline()

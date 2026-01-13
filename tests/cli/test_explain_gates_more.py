@@ -24,11 +24,12 @@ def test_explain_gates_tokens_below_floor_and_drift_fail(monkeypatch, tmp_path):
                 "preview_final_drift_acceptable": False,
             },
             "telemetry": {"preview_total_tokens": 10_000, "final_total_tokens": 10_000},
-            "ppl": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 11.0,
                 "ratio_vs_baseline": 1.01,
-                "ratio_ci": [0.99, 1.02],
-                "drift_ci": [0.90, 1.10],
-                "preview_final_ratio": 1.10,
+                "display_ci": [0.99, 1.02],
             },
         }
 
@@ -76,9 +77,11 @@ def test_explain_gates_handles_edge_cases(monkeypatch, tmp_path):
                 "guard_overhead_acceptable": False,
             },
             "telemetry": FlakyTelemetry(),
-            "ppl": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 1.0,
+                "final": 0.97,
                 "ratio_vs_baseline": 1.2,
-                "preview_final_ratio": 0.97,
             },
             "guard_overhead": {
                 "threshold_percent": "n/a",
@@ -126,7 +129,13 @@ def test_explain_gates_dataset_split_handles_exception(monkeypatch, tmp_path):
             "auto": {"tier": "balanced"},
             "validation": {"primary_metric_acceptable": True},
             "telemetry": {"preview_total_tokens": 0, "final_total_tokens": 0},
-            "ppl": {},
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+                "ratio_vs_baseline": 1.0,
+                "display_ci": [1.0, 1.0],
+            },
         },
     )
 

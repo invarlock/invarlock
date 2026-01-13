@@ -110,6 +110,17 @@ def test_enforce_display_ci_alignment_returns_on_empty_metric():
     cert._enforce_display_ci_alignment("paired_baseline", {}, (0.0, 0.1), "dev")
 
 
+def test_enforce_display_ci_alignment_returns_on_kind_coercion_error() -> None:
+    class _BadGet(dict):
+        def get(self, *_a, **_k):  # noqa: ANN001
+            raise RuntimeError("boom")
+
+    # Should be swallowed by the kind coercion try/except.
+    cert._enforce_display_ci_alignment(
+        "paired_baseline", _BadGet({"kind": "ppl_causal"}), (0.0, 0.1), "dev"
+    )
+
+
 def test_enforce_display_ci_alignment_dev_missing_ci_no_logloss_ci():
     pm = {"kind": "ppl_causal"}
     cert._enforce_display_ci_alignment(
@@ -156,6 +167,60 @@ def test_enforce_pairing_and_coverage_uses_fallback_counts():
 
 def test_enforce_pairing_and_coverage_returns_on_dev_profile():
     cert._enforce_pairing_and_coverage({}, window_plan_profile="dev", tier="balanced")
+
+
+def test_enforce_pairing_and_coverage_raises_on_missing_pairing_fractions() -> None:
+    stats = {"paired_windows": 1}
+    with pytest.raises(ValueError, match="window_match_fraction"):
+        cert._enforce_pairing_and_coverage(
+            stats, window_plan_profile="ci", tier="balanced"
+        )
+
+    stats2 = {"window_match_fraction": 1.0, "paired_windows": 1}
+    with pytest.raises(ValueError, match="window_overlap_fraction"):
+        cert._enforce_pairing_and_coverage(
+            stats2, window_plan_profile="ci", tier="balanced"
+        )
+
+
+def test_enforce_pairing_and_coverage_raises_on_imperfect_pairing_and_overlap() -> None:
+    with pytest.raises(ValueError, match="perfect pairing"):
+        cert._enforce_pairing_and_coverage(
+            {
+                "window_match_fraction": 0.9,
+                "window_overlap_fraction": 0.0,
+                "paired_windows": 1,
+            },
+            window_plan_profile="ci",
+            tier="balanced",
+        )
+
+    with pytest.raises(ValueError, match="non-overlapping windows"):
+        cert._enforce_pairing_and_coverage(
+            {
+                "window_match_fraction": 1.0,
+                "window_overlap_fraction": 1e-6,
+                "paired_windows": 1,
+            },
+            window_plan_profile="ci",
+            tier="balanced",
+        )
+
+
+@pytest.mark.parametrize("paired_windows", ["bad", -1, 1.2])
+def test_enforce_pairing_and_coverage_raises_on_invalid_paired_windows(
+    paired_windows,
+) -> None:
+    with pytest.raises(ValueError, match="paired_windows"):
+        cert._enforce_pairing_and_coverage(
+            {
+                "window_match_fraction": 1.0,
+                "window_overlap_fraction": 0.0,
+                "paired_windows": paired_windows,
+            },
+            window_plan_profile="ci",
+            tier="balanced",
+        )
 
 
 def test_enforce_pairing_and_coverage_raises_on_missing_stats():
@@ -315,10 +380,56 @@ def test_compute_validation_flags_accuracy_hysteresis(monkeypatch):
         dataset_capacity=dataset_capacity,
     )
 
+    assert flags["preview_final_drift_acceptable"] is True
+    assert flags["invariants_pass"] is True
+    assert flags["rmt_stable"] is True
     assert flags["spectral_stable"] is False
     assert flags["guard_overhead_acceptable"] is False
     assert flags["primary_metric_acceptable"] is False
     assert flags["hysteresis_applied"] is True
+    assert flags["primary_metric_tail_acceptable"] is True
+
+
+def test_compute_validation_flags_core_gates_ppl_and_tail_fail(monkeypatch):
+    fake_policies = {
+        "balanced": {
+            "metrics": {
+                "pm_ratio": {
+                    "hysteresis_ratio": 0.0,
+                    "min_tokens": 0,
+                    "min_token_fraction": 0.0,
+                    "ratio_limit_base": 1.10,
+                },
+            },
+            "spectral": {"max_caps": 1},
+        }
+    }
+    monkeypatch.setattr(
+        cert, "get_tier_policies", lambda *_a, **_k: dict(fake_policies)
+    )
+    monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
+
+    flags = cert._compute_validation_flags(
+        {
+            "preview_final_ratio": 1.20,  # out of [0.95, 1.05]
+            "ratio_vs_baseline": 1.25,  # > ratio limit
+            "ratio_ci": (1.20, 1.30),
+        },
+        {"caps_applied": 2, "max_caps": 1, "caps_exceeded": False, "summary": {}},
+        {"stable": False},
+        {"status": "fail"},
+        tier="balanced",
+        guard_overhead={"overhead_ratio": 1.20, "overhead_threshold": 0.0},
+        pm_tail={"mode": "fail", "evaluated": True, "passed": False},
+    )
+
+    assert flags["preview_final_drift_acceptable"] is False
+    assert flags["primary_metric_acceptable"] is False
+    assert flags["invariants_pass"] is False
+    assert flags["spectral_stable"] is False
+    assert flags["rmt_stable"] is False
+    assert flags["guard_overhead_acceptable"] is False
+    assert flags["primary_metric_tail_acceptable"] is False
 
 
 def test_compute_validation_flags_tiny_relax_allows_unevaluated_overhead(monkeypatch):
@@ -840,7 +951,7 @@ def test_normalize_baseline_falls_back_for_invalid_ppl():
 
 def test_normalize_baseline_extracts_runreport_payload():
     baseline = {
-        "meta": {"model_id": "legacy", "auto": {"tier": "balanced"}},
+        "meta": {"model_id": "demo", "auto": {"tier": "balanced"}},
         "edit": {
             "name": "baseline",
             "plan": {"target_sparsity": 0.0},
@@ -1056,7 +1167,30 @@ def test_extract_compression_diagnostics_no_modifications():
         inference_record,
     )
     assert diagnostics["execution_status"] == "no_modifications"
-    assert any("No parameters were modified" in w for w in diagnostics["warnings"])
+    assert diagnostics["target_analysis"] == {
+        "modules_found": 0,
+        "modules_eligible": 0,
+        "modules_modified": 0,
+        "scope": "ffn",
+    }
+    assert diagnostics["parameter_analysis"] == {
+        "bitwidth": {"value": "unknown", "effectiveness": "ineffective"},
+        "clamp_ratio": {"value": 0.0, "effectiveness": "disabled"},
+    }
+    assert diagnostics["algorithm_details"] == {
+        "scope_targeting": "ffn",
+        "seed": "unknown",
+    }
+    assert diagnostics["warnings"] == [
+        "No parameters were modified - algorithm may be too conservative",
+        "Check scope configuration and parameter thresholds",
+        "FFN scope may not match model architecture - try 'all' scope",
+    ]
+    assert diagnostics["inferred"] == dict.fromkeys(
+        ("scope", "seed", "rank_policy", "frac"), False
+    )
+    assert "inference_source" not in diagnostics
+    assert "inference_log" not in diagnostics
 
 
 def test_extract_compression_diagnostics_quant_success():
@@ -1077,11 +1211,33 @@ def test_extract_compression_diagnostics_quant_success():
         inference_record,
     )
     assert diagnostics["execution_status"] == "successful"
-    assert diagnostics["parameter_analysis"]["bitwidth"]["value"] == 8
-    assert diagnostics["algorithm_details"]["modules_quantized"] == 1
+    assert diagnostics["target_analysis"] == {
+        "modules_found": 1,
+        "modules_eligible": 1,
+        "modules_modified": 1,
+        "scope": "attn",
+    }
+    assert diagnostics["parameter_analysis"] == {
+        "bitwidth": {"value": 8, "effectiveness": "applied"},
+        "group_size": {"value": 32, "effectiveness": "used"},
+        "clamp_ratio": {"value": 0.5, "effectiveness": "applied"},
+    }
+    assert diagnostics["algorithm_details"] == {
+        "scope_targeting": "attn",
+        "seed": "unknown",
+        "modules_quantized": 1,
+        "quantization_type": "grouped",
+        "total_params_quantized": 256,
+        "estimated_memory_saved_mb": 0.0,
+    }
     # Successful quantization diagnostics should remain edit-agnostic and avoid
     # prescriptive parameter hints (e.g., suggesting 4-bit alternatives).
-    assert all("4-bit quantization" not in str(msg) for msg in diagnostics["warnings"])
+    assert diagnostics["warnings"] == []
+    assert diagnostics["inferred"] == dict.fromkeys(
+        ("scope", "seed", "rank_policy", "frac"), False
+    )
+    assert "inference_source" not in diagnostics
+    assert "inference_log" not in diagnostics
 
 
 def test_extract_rank_information_tracks_skipped_modules():

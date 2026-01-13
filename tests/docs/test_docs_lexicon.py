@@ -18,6 +18,7 @@ def test_reference_uses_canonical_labels_only():
     validation = obj.get("validation", {}) or {}
     allowed = {
         "primary_metric_acceptable",
+        "primary_metric_tail_acceptable",
         "preview_final_drift_acceptable",
         "guard_overhead_acceptable",
         # optional non-gating rows may be omitted from examples

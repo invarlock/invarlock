@@ -165,8 +165,8 @@ run "invarlock verify --json (invalid)" "$CLI verify --json \"$TMP_DIR/cert_inva
 OFFLINE_ENV="HF_DATASETS_OFFLINE=1 TRANSFORMERS_OFFLINE=1 TOKENIZERS_PARALLELISM=false"
 
 if have_adapters_stack; then
-  run_to "invarlock run (offline)" 60 "$OFFLINE_ENV $CLI run -c configs/tasks/causal_lm/ci_cpu.yaml --profile ci --device cpu --out \"$TMP_DIR/run_offline\""
-  run_to "invarlock certify (offline)" 60 "$OFFLINE_ENV $CLI certify --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/tasks/causal_lm/ci_cpu.yaml --out \"$TMP_DIR/cert_offline\" --cert-out \"$TMP_DIR/cert_offline_out\""
+  run_to "invarlock run (offline)" 60 "$OFFLINE_ENV $CLI run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --device cpu --out \"$TMP_DIR/run_offline\""
+  run_to "invarlock certify (offline)" 60 "$OFFLINE_ENV $CLI certify --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --out \"$TMP_DIR/cert_offline\" --cert-out \"$TMP_DIR/cert_offline_out\""
 else
   {
     echo "\n==== BEGIN invarlock run (offline) ===="
@@ -181,8 +181,8 @@ fi
 # With network allowed (may still fail fast if extras missing)
 NET_ENV="INVARLOCK_ALLOW_NETWORK=1 TOKENIZERS_PARALLELISM=false"
 if have_adapters_stack; then
-  run_to "invarlock run (network)" 60 "$NET_ENV $CLI run -c configs/tasks/causal_lm/ci_cpu.yaml --profile ci --device cpu --out \"$TMP_DIR/run_net\""
-  run_to "invarlock certify (network)" 60 "$NET_ENV $CLI certify --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/tasks/causal_lm/ci_cpu.yaml --out \"$TMP_DIR/cert_net\" --cert-out \"$TMP_DIR/cert_net_out\""
+  run_to "invarlock run (network)" 60 "$NET_ENV $CLI run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --device cpu --out \"$TMP_DIR/run_net\""
+  run_to "invarlock certify (network)" 60 "$NET_ENV $CLI certify --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --out \"$TMP_DIR/cert_net\" --cert-out \"$TMP_DIR/cert_net_out\""
 else
   {
     echo "\n==== BEGIN invarlock run (network) ===="

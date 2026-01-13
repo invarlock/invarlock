@@ -338,7 +338,9 @@ def test_env_var_poisoning_for_tmpdir_and_debug(tmp_path: Path, monkeypatch):
             return M()
 
         def snapshot_chunked(self, model):
-            return "tmpdir"
+            snap_dir = tmp_path / "snapshot_chunked"
+            snap_dir.mkdir(parents=True, exist_ok=True)
+            return str(snap_dir)
 
         def restore_chunked(self, model, path):
             self.rest_chunked += 1

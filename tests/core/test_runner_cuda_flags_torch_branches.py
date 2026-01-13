@@ -36,3 +36,22 @@ def test_collect_cuda_flags_with_cudnn_and_matmul_tf32(monkeypatch):
     assert flags["cudnn_benchmark"] is False
     assert flags["cudnn_allow_tf32"] is True
     assert flags["cuda_matmul_allow_tf32"] is True
+
+
+def test_collect_cuda_flags_with_cudnn_and_matmul_without_tf32(monkeypatch):
+    cudnn = types.SimpleNamespace(deterministic=True, benchmark=False)
+    matmul = types.SimpleNamespace()
+    cuda = types.SimpleNamespace(matmul=matmul)
+    backends = types.SimpleNamespace(cudnn=cudnn, cuda=cuda)
+    TorchStub = types.SimpleNamespace(
+        are_deterministic_algorithms_enabled=lambda: True,
+        backends=backends,
+    )
+    monkeypatch.setitem(__import__("sys").modules, "torch", TorchStub)
+
+    flags = _collect_cuda_flags()
+    assert flags["deterministic_algorithms"] is True
+    assert flags["cudnn_deterministic"] is True
+    assert flags["cudnn_benchmark"] is False
+    assert "cudnn_allow_tf32" not in flags
+    assert "cuda_matmul_allow_tf32" not in flags

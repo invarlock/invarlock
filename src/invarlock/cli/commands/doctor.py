@@ -188,7 +188,9 @@ def doctor_command(
         None, "--config", "-c", help="Path to YAML config for preflight lints"
     ),
     profile: str | None = typer.Option(
-        None, "--profile", help="Profile to apply for preflight (ci|release)"
+        None,
+        "--profile",
+        help="Profile to apply for preflight (e.g. ci, release, ci_cpu; dev is a no-op)",
     ),
     baseline: str | None = typer.Option(
         None, "--baseline", help="Optional baseline report to check pairing readiness"

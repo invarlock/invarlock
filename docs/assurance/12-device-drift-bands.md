@@ -29,11 +29,11 @@ Bands were empirically derived on pilot models and are enforced in CI. Actual va
 
 ```bash
 # Baseline on CPU → certificate
-invarlock run -c configs/tasks/causal_lm/ci_cpu.yaml --device cpu --profile ci --out runs/baseline_cpu
+invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml --device cpu --profile ci --out runs/baseline_cpu
 invarlock report --run runs/baseline_cpu --format cert --output runs/baseline_cpu
 
 # Same schedule on MPS → certificate
-invarlock run -c configs/tasks/causal_lm/ci_cpu.yaml --device mps --profile ci --out runs/baseline_mps
+invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml --device mps --profile ci --out runs/baseline_mps
 invarlock report --run runs/baseline_mps --format cert --output runs/baseline_mps
 
 # Lint cross-device drift (absolute ratio tolerance)

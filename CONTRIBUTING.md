@@ -174,8 +174,11 @@ Key points:
     --cov=src/invarlock/eval --cov=src/invarlock/guards \\
     --cov=src/invarlock/cli --cov=src/invarlock/core --cov=src/invarlock/reporting \\
     --cov-branch \\
-    --cov-report=term --cov-report=xml:reports/cov.xml
+    --cov-report=term --cov-report=xml:reports/cov.xml \
+    --cov-fail-under=80
   ```
+
+- The project-wide floor is enforced at **80%** via pytest-cov in `make coverage`.
 
 - Enforce thresholds:
 
@@ -200,11 +203,11 @@ Key points:
     `src/invarlock/cli/commands/run.py`,
     `src/invarlock/cli/commands/verify.py`
 
-- All of these surfaces are currently targeted at **≥85% branch (or line) coverage**.
+- All of these surfaces are currently targeted at **≥90% branch (or line) coverage**.
 
 When you modify a file covered by thresholds, please:
 
-- Add or extend tests to keep its measured coverage at or above 85%
+- Add or extend tests to keep its measured coverage at or above 90%
 - Update/add entries in `scripts/check_coverage_thresholds.py` if you
   expand the critical surface or add new core modules
 
@@ -252,7 +255,9 @@ python scripts/docs_lint.py --markdown   # style
 python scripts/docs_lint.py --spell      # spelling
 ```
 
-If you only have Node installed, the script will use `npx` automatically.
+If you only have Node installed, the script will look for `node_modules/.bin` first.
+To allow `npx` fetching, set `DOCS_LINT_ALLOW_NPX_INSTALL=1` (CI sets this);
+otherwise it skips with a warning.
 
 ### 4.3 Writing docs
 

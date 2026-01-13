@@ -31,7 +31,7 @@ coverage:  ## Run tests with coverage and generate XML
 		--cov=src/invarlock/eval --cov=src/invarlock/guards --cov=src/invarlock/calibration \
 		--cov=src/invarlock/cli --cov=src/invarlock/core --cov=src/invarlock/reporting \
 		--cov-branch \
-		--cov-report=term --cov-report=xml:reports/cov.xml
+		--cov-report=term --cov-report=xml:reports/cov.xml --cov-fail-under=80
 
 coverage-enforce:  ## Run coverage and enforce per-file thresholds
 	$(MAKE) coverage
@@ -141,17 +141,15 @@ docs-ci:  ## Build documentation and run link checker
 ##@ Certification
 cert-loop:  ## Run automated certification loop (baseline + quant8)
 	@echo "Running automated certification workflow..."
-	@rm -rf runs/baseline runs/quant
-	@invarlock run -c configs/tasks/causal_lm/ci_cpu.yaml --profile ci --out runs/baseline
-	@latest_report=$$(ls -t runs/baseline/*/report.json | head -n1); \
-	if [ -z "$$latest_report" ]; then \
-		echo "Baseline run did not produce a report.json" >&2; \
-		exit 1; \
-	fi; \
-	cp "$$latest_report" runs/baseline/report.json
-	@invarlock run -c configs/edits/quant_rtn/8bit_attn.yaml --until-pass \
-		--baseline runs/baseline/report.json --out runs/quant
-	@echo "Certification loop complete. Check runs/ for results."
+	@rm -rf runs/cert_loop reports/cert/cert_loop
+	@INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
+		--baseline sshleifer/tiny-gpt2 --subject sshleifer/tiny-gpt2 --adapter auto \
+		--profile ci --tier balanced \
+		--preset configs/presets/causal_lm/wikitext2_512.yaml \
+		--edit-config configs/overlays/edits/quant_rtn/8bit_attn.yaml \
+		--out runs/cert_loop \
+		--cert-out reports/cert/cert_loop
+	@echo "Certification complete. Artifacts: runs/cert_loop/, reports/cert/cert_loop/"
 
 ##@ Utilities
 ci-matrix:  ## Verify CI matrix
@@ -162,8 +160,12 @@ ci-matrix:  ## Verify CI matrix
 
 .PHONY: ensure-ruff
 ensure-ruff:
-	@python -c "import importlib.util, subprocess, sys; spec = importlib.util.find_spec('ruff'); \
-subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'ruff>=0.1.0']) if spec is None else None"
+	@if python -c "import importlib.util, sys; sys.exit(0 if importlib.util.find_spec('ruff') else 1)"; then \
+		:; \
+	else \
+		printf '%s\n' "ruff is required but not installed; install it in your active environment (e.g. 'python -m pip install ruff')" >&2; \
+		exit 1; \
+	fi
 
 ## (verify-ci and verify-release targets removed)
 

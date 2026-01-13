@@ -28,7 +28,7 @@ def _report_with_pm():
         {
             "latency_ms_per_tok": 1.23,
             "memory_mb_peak": 42.0,
-            # Legacy fields may exist but the renderer should ignore them when primary_metric is present
+            # ppl_* fields may exist but the renderer should ignore them when primary_metric is present
             "ppl_preview": 10.0,
             "ppl_final": 10.0,
             "ppl_ratio": 1.0,
@@ -43,12 +43,12 @@ def _report_with_pm():
     return rep
 
 
-def test_to_markdown_prefers_primary_metric_over_legacy():
+def test_to_markdown_prefers_primary_metric_over_ppl_table():
     rep = _report_with_pm()
     md = to_markdown(rep)
     assert "## Primary Metric" in md
     assert "ppl_causal" in md
-    # Should not render the legacy PPL metrics table
+    # Should not render the PPL metrics table
     assert "Preview PPL" not in md
     assert "Final PPL" not in md
     assert "PPL Ratio" not in md

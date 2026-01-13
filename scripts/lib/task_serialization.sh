@@ -40,7 +40,7 @@ _task_serialization_require_jq() {
 #   required_gpus:   Number of GPUs needed based on per-device memory planning
 #   assigned_gpus:   Comma-separated list of assigned GPU IDs (set at runtime)
 #   status:          One of: pending, ready, running, completed, failed
-#   gpu_id:          Assigned GPU (-1 if unassigned) - legacy, use assigned_gpus
+#   gpu_id:          Assigned GPU (-1 if unassigned) - deprecated, use assigned_gpus
 #   dependencies:    Array of task_ids that must complete first
 #   params:          Task-specific parameters object
 #   priority:        Scheduling priority (0-100, higher = more urgent)

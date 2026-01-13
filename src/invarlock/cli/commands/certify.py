@@ -22,9 +22,9 @@ from typing import Any
 import typer
 from rich.console import Console
 
+from ...core.exceptions import MetricsError
 from ..adapter_auto import resolve_auto_adapter
 from ..config import _deep_merge as _merge  # reuse helper
-from ..errors import InvarlockError
 
 # Use the report group's programmatic entry for report generation
 from .report import report_command as _report
@@ -98,7 +98,9 @@ def certify_command(
         "--device",
         help="Device override for runs (auto|cuda|mps|cpu)",
     ),
-    profile: str = typer.Option("ci", "--profile", help="Profile (ci|release)"),
+    profile: str = typer.Option(
+        "ci", "--profile", help="Profile (ci|release|ci_cpu|dev)"
+    ),
     tier: str = typer.Option("balanced", "--tier", help="Tier label for context"),
     preset: str | None = typer.Option(
         None,
@@ -152,9 +154,9 @@ def certify_command(
     # scenario), fall back to a minimal built-in universal preset so the
     # flag-only quick start works without cloning the repo.
     default_universal = (
-        Path("configs/tasks/masked_lm/ci_cpu.yaml")
+        Path("configs/presets/masked_lm/wikitext2_128.yaml")
         if eff_adapter == "hf_bert"
-        else Path("configs/tasks/causal_lm/ci_cpu.yaml")
+        else Path("configs/presets/causal_lm/wikitext2_512.yaml")
     )
     preset_path = Path(preset) if preset is not None else default_universal
 
@@ -185,6 +187,20 @@ def certify_command(
             model_block.pop("device", None)
             preset_data["model"] = model_block
 
+    default_guards_order = ["invariants", "spectral", "rmt", "variance", "invariants"]
+    guards_order = None
+    preset_guards = preset_data.get("guards")
+    if isinstance(preset_guards, dict):
+        preset_order = preset_guards.get("order")
+        if (
+            isinstance(preset_order, list)
+            and preset_order
+            and all(isinstance(item, str) for item in preset_order)
+        ):
+            guards_order = list(preset_order)
+    if guards_order is None:
+        guards_order = list(default_guards_order)
+
     # Create temp baseline config (no-op edit)
     # Normalize possible "hf:" prefixes for HF adapters
     norm_src_id = _normalize_model_id(src_id, eff_adapter)
@@ -199,9 +215,7 @@ def certify_command(
             },
             "edit": {"name": "noop", "plan": {}},
             "eval": {},
-            "guards": {
-                "order": ["invariants", "spectral", "rmt", "variance", "invariants"]
-            },
+            "guards": {"order": guards_order},
             "output": {"dir": str(Path(out) / "source")},
             "context": {"profile": profile, "tier": tier},
         },
@@ -292,15 +306,7 @@ def certify_command(
                 "model": {"id": norm_edt_id, "adapter": eff_adapter},
                 "edit": {"name": "noop", "plan": {}},
                 "eval": {},
-                "guards": {
-                    "order": [
-                        "invariants",
-                        "spectral",
-                        "rmt",
-                        "variance",
-                        "invariants",
-                    ]
-                },
+                "guards": {"order": guards_order},
                 "output": {"dir": str(Path(out) / "edited")},
                 "context": {"profile": profile, "tier": tier},
             },
@@ -325,12 +331,11 @@ def certify_command(
         raise typer.Exit(1)
 
     # CI/Release hard‑abort: fail fast when primary metric is not computable.
-    # Fall back to legacy ppl_* keys when primary_metric block is absent.
     try:
         prof = str(profile or "").strip().lower()
     except Exception:
         prof = ""
-    if prof in {"ci", "release"}:
+    if prof in {"ci", "ci_cpu", "release"}:
         try:
             with Path(edited_report).open("r", encoding="utf-8") as fh:
                 edited_payload = json.load(fh)
@@ -364,35 +369,49 @@ def certify_command(
             else None
         ) or "unknown"
 
-        # Enforce only when a metric block is present; skip for minimal stub reports
-        # Enforce only when a primary_metric block is present
+        # Enforce only when a primary_metric block is present; allow degraded-but-flagged metrics to emit certificates, but fail the task.
         has_metric_block = isinstance(pm, dict) and bool(pm)
         if has_metric_block:
-            # Treat non‑finite PM as hard error in CI/Release (after legacy fallback).
-            # Require a finite final value; preview is optional for legacy reports.
-            if not _finite(pm_final):
-                err = InvarlockError(
+            degraded = bool(pm.get("invalid") or pm.get("degraded"))
+            if degraded or not _finite(pm_final):
+                fallback = pm_prev if _finite(pm_prev) else pm_final
+                if not _finite(fallback) or fallback <= 0:
+                    fallback = 1.0
+                degraded_reason = pm.get("degraded_reason") or (
+                    "non_finite_pm"
+                    if (not _finite(pm_prev) or not _finite(pm_final))
+                    else "primary_metric_degraded"
+                )
+                console.print(
+                    "[yellow]⚠️  Primary metric degraded or non-finite; emitting certificate and marking task degraded. Primary metric computation failed.[/yellow]"
+                )
+                pm["degraded"] = True
+                pm["invalid"] = pm.get("invalid") or True
+                pm["preview"] = pm_prev if _finite(pm_prev) else fallback
+                pm["final"] = pm_final if _finite(pm_final) else fallback
+                pm["ratio_vs_baseline"] = pm_ratio if _finite(pm_ratio) else 1.0
+                pm["degraded_reason"] = degraded_reason
+                metrics["primary_metric"] = pm
+                edited_payload.setdefault("metrics", {}).update(metrics)
+
+                # Emit the certificate for inspection, then exit with a CI-visible error.
+                _report(
+                    run=str(edited_report),
+                    format="cert",
+                    baseline=str(baseline_report),
+                    output=cert_out,
+                )
+                err = MetricsError(
                     code="E111",
-                    message=(
-                        "Primary metric computation failed (NaN/inf). "
-                        f"Context: device={device}, adapter={adapter_name}, edit={edit_name}. "
-                        "Baseline ok; edited failed to compute ppl. "
-                        "Try: use an accelerator (mps/cuda), force float32, reduce max_modules, "
-                        "or lower the evaluation batch size."
-                    ),
+                    message=f"Primary metric degraded or non-finite ({degraded_reason}).",
                     details={
-                        "device": device,
+                        "reason": degraded_reason,
                         "adapter": adapter_name,
+                        "device": device,
                         "edit": edit_name,
-                        "pm_preview": pm_prev,
-                        "pm_final": pm_final,
-                        "pm_ratio": pm_ratio,
                     },
                 )
-                code = _resolve_exit_code(err, profile=prof)
-                console.print(f"[red]{err}[/red]")
-                # Do not emit a certificate
-                raise typer.Exit(code)
+                raise typer.Exit(_resolve_exit_code(err, profile=profile))
 
     console.print("📜 Emitting certificate")
     _report(

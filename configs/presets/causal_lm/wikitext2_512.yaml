@@ -1,0 +1,41 @@
+# Preset: Causal LM (decoder-only) on WikiText-2.
+#
+# - Runnable (repo checkout): `invarlock run -c ... [--profile ci|release|ci_cpu]`
+# - Also usable as `invarlock certify --preset ...`
+
+model:
+  id: "sshleifer/tiny-gpt2"
+  adapter: "hf_gpt2"
+  device: "auto"
+
+dataset:
+  provider: "wikitext2"
+  split: "validation"
+  seq_len: 512
+  stride: 512
+  preview_n: 64
+  final_n: 64
+  seed: 42
+
+eval:
+  metric:
+    kind: "ppl_causal"
+  loss:
+    type: "causal"
+
+edit:
+  name: "noop"
+  plan: {}
+
+auto:
+  enabled: true
+  tier: "balanced"
+  probes: 0
+
+guards:
+  order: ["invariants", "spectral", "rmt", "variance", "invariants"]
+
+output:
+  dir: "runs"
+  save_model: false
+  save_report: true

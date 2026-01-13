@@ -33,6 +33,15 @@ auto:                 # Auto-tuning surface
 
 guards:               # Guard chain and per-guard overrides
   order: ["invariants", "spectral", "rmt", "variance", "invariants"]
+  # Optional per-guard measurement knobs (recorded into the certificate):
+  # spectral:
+  #   estimator: {type: power_iter, iters: 4, init: ones}
+  # rmt:
+  #   epsilon_by_family: {ffn: 0.01, attn: 0.01, embed: 0.01, other: 0.01}
+  #   estimator: {type: power_iter, iters: 3, init: ones}
+  #   activation:
+  #     sampling:
+  #       windows: {count: 8, indices_policy: evenly_spaced}
 
 output:               # Artifact destinations
   dir: runs/examples/quant_rtn
@@ -85,7 +94,7 @@ Online mode requires `INVARLOCK_ALLOW_NETWORK=1` for the first run to populate t
 
 ## Metric and Provider Selection
 
-Configure task-agnostic evaluation via `eval.metric.*` and pick the dataset provider kind explicitly. Config takes precedence over env flags; if both are set, config wins and a deprecation notice is logged for `INVARLOCK_METRIC_V1`.
+Configure task-agnostic evaluation via `eval.metric.*` and pick the dataset provider kind explicitly. Config takes precedence over env flags; if both are set, config wins.
 
 ```yaml
 eval:

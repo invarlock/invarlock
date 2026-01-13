@@ -50,34 +50,32 @@ _get_model_size_from_name() {
 _get_model_invarlock_config_fallback() {
     local model_size="$1"  # 7, 13, 30, 40, 70, moe
 
-    # Conservative defaults that won't OOM on B200 180GB
-    # These MUST match or be more conservative than main script's get_model_invarlock_config()
+    # Conservative defaults that satisfy CI pairing/coverage floors on B200.
+    # Use zero overlap (stride == seq_len) and ≥180 windows to avoid E001/E005
+    # if workers start without the main B200 wrapper.
     case "${model_size}" in
         "7")
-            echo "2048:1024:64:64:96"
+            echo "2048:2048:192:192:96"
             ;;
         "13")
-            echo "1536:768:48:48:64"
+            echo "1536:1536:192:192:64"
             ;;
         "30")
-            echo "1024:512:40:40:48"
+            echo "1024:1024:192:192:48"
             ;;
         "40")
-            echo "1024:512:36:36:32"
+            echo "1024:1024:192:192:32"
             ;;
         "moe")
-            echo "1024:512:40:40:24"
+            echo "1024:1024:192:192:24"
             ;;
         "70"|"72")
-            # ULTRA-CONSERVATIVE for 70B+ models.
-            # These settings minimize KV cache; the harness also sets
-            # INVARLOCK_SKIP_OVERHEAD_CHECK=1 for large models to avoid double-loading
-            # baseline+edited models during overhead measurement.
-            echo "128:64:8:8:2"
+            # Minimal sequence length to cap KV cache, but still meet coverage floors.
+            echo "128:128:192:192:2"
             ;;
         *)
             # Safe default
-            echo "1024:512:40:40:32"
+            echo "1024:1024:192:192:32"
             ;;
     esac
 }
@@ -704,6 +702,9 @@ task_calibration_run() {
         fi
     fi
 
+    # Force non-overlapping windows during calibration to avoid pairing mismatches
+    stride="${seq_len}"
+
     echo "  Model size: ${model_size}, Config: seq=${seq_len}, stride=${stride}, windows=${preview_n}+${final_n}, batch=${eval_batch}" >> "${log_file}"
     if [[ ${applied_override} -eq 1 ]]; then
         echo "  OOM override applied: seq=${seq_len}, stride=${stride}, batch=${eval_batch}" >> "${log_file}"
@@ -719,9 +720,12 @@ task_calibration_run() {
         bootstrap_replicates="${INVARLOCK_BOOTSTRAP_N}"
     fi
 
-    local -a extra_env=()
+    echo "  Calibration: enforcing window_overlap_fraction=0.0" >> "${log_file}"
+    local -a extra_env=(
+        INVARLOCK_WINDOW_OVERLAP_FRACTION=0.0
+        INVARLOCK_SKIP_OVERHEAD_CHECK=1
+    )
     if _is_large_model "${model_size}"; then
-        extra_env+=(INVARLOCK_SKIP_OVERHEAD_CHECK=1)
         echo "  Large model (${model_size}): SKIP_OVERHEAD_CHECK=1" >> "${log_file}"
     fi
 
@@ -745,6 +749,24 @@ YAML
 
     # Generate config YAML
     local config_yaml="${run_dir}/calibration_config.yaml"
+    local guards_order_csv="${B200_GUARDS_ORDER:-}"
+    local -a guards_order=()
+    if [[ -n "${guards_order_csv}" ]]; then
+        IFS=',' read -ra guards_order <<< "${guards_order_csv}"
+    else
+        guards_order=("invariants" "variance" "invariants")
+    fi
+    local guards_order_yaml=""
+    local g
+    for g in "${guards_order[@]}"; do
+        g="$(echo "${g}" | xargs)"
+        [[ -z "${g}" ]] && continue
+        guards_order_yaml+=$'    - '"${g}"$'\n'
+    done
+    if [[ -z "${guards_order_yaml}" ]]; then
+        guards_order_yaml=$'    - invariants\n    - variance\n    - invariants\n'
+    fi
+
     cat > "${config_yaml}" << YAML_EOF
 model:
   id: "${baseline_path}"
@@ -768,15 +790,14 @@ edit:
 
 guards:
   order:
-    - invariants
-    - rmt
-    - variance
+${guards_order_yaml}
 
 eval:
   bootstrap:
     replicates: ${bootstrap_replicates}
     parallel: true
   batch_size: ${eval_batch}
+  window_overlap_fraction: 0.0
 
 auto:
   enabled: true
@@ -891,6 +912,33 @@ preset_seq_len = int(os.environ.get("PRESET_SEQ_LEN", 1024))
 preset_stride = int(os.environ.get("PRESET_STRIDE", 512))
 preset_preview_n = int(os.environ.get("PRESET_PREVIEW_N", 40))
 preset_final_n = int(os.environ.get("PRESET_FINAL_N", 40))
+
+guards_order = None
+assurance_cfg = None
+if YAML_AVAILABLE:
+    cfg_path = None
+    for candidate in sorted(cal_dir.glob("run_*/calibration_config.yaml")):
+        cfg_path = candidate
+        break
+    if cfg_path is not None:
+        try:
+            cfg = yaml.safe_load(cfg_path.read_text())
+            if isinstance(cfg, dict):
+                guards_block = cfg.get("guards") or {}
+                if isinstance(guards_block, dict):
+                    order = guards_block.get("order")
+                    if isinstance(order, list) and order:
+                        guards_order = [str(item) for item in order]
+                ab = cfg.get("assurance")
+                if isinstance(ab, dict) and ab:
+                    assurance_cfg = ab
+        except Exception:
+            guards_order = None
+
+if guards_order is None:
+    guards_order = ["invariants", "variance", "invariants"]
+
+enabled_guards = set(guards_order)
 
 def _safe_float(value):
     try:
@@ -1063,18 +1111,27 @@ def calibrate_drift(recs):
             except Exception:
                 pass
 
+    ratios = [r for r in ratios if math.isfinite(r)]
     if len(ratios) < 2:
+        base = ratios[0] if ratios else 1.0
         return {
-            "mean": 1.0,
+            "mean": float(base),
             "std": 0.0,
-            "min": min(ratios) if ratios else 1.0,
-            "max": max(ratios) if ratios else 1.0,
+            "min": float(base),
+            "max": float(base),
             "suggested_band": [0.95, 1.05],
             "band_compatible": True,
         }
 
-    mean = statistics.mean(ratios)
-    std = statistics.stdev(ratios) if len(ratios) > 1 else 0.0
+    try:
+        mean = sum(ratios) / len(ratios)
+    except Exception:
+        mean = 1.0
+    try:
+        var = sum((r - mean) ** 2 for r in ratios) / max(len(ratios), 1)
+        std = math.sqrt(var) if math.isfinite(var) else 0.0
+    except Exception:
+        std = 0.0
     margin = max(2 * std, 0.05)
     band = [round(mean - margin, 3), round(mean + margin, 3)]
     return {
@@ -1441,8 +1498,11 @@ preset = {
         "final_n": preset_final_n,
         "seed": 42,
     },
-    "guards": {},
+    "guards": {"order": guards_order},
 }
+
+if isinstance(assurance_cfg, dict) and assurance_cfg:
+    preset["assurance"] = assurance_cfg
 
 spectral = {}
 if spectral_caps:
@@ -1453,7 +1513,7 @@ if spectral_summary.get("deadband") is not None:
     spectral["deadband"] = spectral_summary["deadband"]
 if spectral_summary.get("max_caps") is not None:
     spectral["max_caps"] = spectral_summary["max_caps"]
-if spectral:
+if "spectral" in enabled_guards and spectral:
     preset["guards"]["spectral"] = spectral
 
 rmt = {}
@@ -1463,16 +1523,18 @@ if rmt_summary.get("margin") is not None:
     rmt["margin"] = rmt_summary["margin"]
 if rmt_summary.get("deadband") is not None:
     rmt["deadband"] = rmt_summary["deadband"]
-if rmt:
+if "rmt" in enabled_guards and rmt:
     preset["guards"]["rmt"] = rmt
 
-if variance_config:
+if "variance" in enabled_guards and variance_config:
     preset["guards"]["variance"] = variance_config
 
 stats_path = cal_dir / "calibration_stats.json"
 with open(stats_path, "w") as f:
     json.dump(
         {
+            "guards_order": guards_order,
+            "assurance": assurance_cfg,
             "drift": drift_stats,
             "spectral": {**spectral_summary, "family_caps": spectral_caps},
             "rmt": {**rmt_summary, "epsilon": rmt_epsilon},
@@ -1750,9 +1812,18 @@ def apply_pruning(model, ratio, scope):
             continue
         if param.dim() < 2:
             continue
-        threshold = torch.quantile(param.abs().flatten(), ratio)
-        mask = param.abs() > threshold
-        param.data = param * mask
+        # quantile only supports float32/float64 reliably, so cast to float before computing threshold
+        param_abs = param.detach().float().abs()
+        flat = param_abs.view(-1)
+        if flat.numel() > 10_000_000:
+            sample_size = min(1_000_000, flat.numel())
+            idx = torch.randint(0, flat.numel(), (sample_size,), device=flat.device)
+            flat_for_quantile = flat[idx]
+        else:
+            flat_for_quantile = flat
+        threshold = torch.quantile(flat_for_quantile, ratio)
+        mask = param_abs > threshold
+        param.data = (param * mask).to(param.dtype)
     return edited
 
 def apply_lowrank(model, rank, scope):

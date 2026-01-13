@@ -57,7 +57,7 @@ def _minimal_report() -> dict:
                 "ratio_vs_baseline": 1.02,
                 "display_ci": (10.2, 10.2),
             },
-            # legacy fields still present in run report, not in cert
+            # ppl_* fields may still be present in run report, not in cert
             "ppl_preview": 10.0,
             "ppl_final": 10.2,
             "ppl_ratio": 1.02,

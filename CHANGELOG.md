@@ -7,11 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.6] - 2026-01-13
+
+### Added
+- Measurement contracts for guard estimators (approximation-only, GPU/MPS-first) recorded in certificates and enforced by `invarlock verify --profile ci|release`.
+- B200 validation suite workflow split: `scripts/b200_validation_suite.sh --calibrate-only` (stop after preset generation) and `--run-only` (resume remaining tasks).
+- B200 backend revalidation harness for CPU vs CUDA SVD deltas (`scripts/b200_gpu_backend_validation/validate_svd_backend_equivalence.py`) plus a multi-GPU runner (`scripts/b200_gpu_backend_validation/run_multi_gpu.sh`).
+- B200 suite knob for controlled experiments: `B200_GUARDS_ORDER`.
+
+### Changed
+- B200 calibration configs now default to `guards.order: [invariants, variance, invariants]` (drops spectral/rmt) to avoid CPU-bound SVD (`torch.linalg.svdvals` / MKL `sgesdd`) dominating wall time and making GPUs appear idle during calibration.
+- B200 calibrated presets now include `guards.order`, and only include `guards.spectral` / `guards.rmt` sections when those guards are enabled (run a smaller follow-up calibration pass if you need spectral caps or an RMT ε).
+- B200 bootstrap defaults HuggingFace caches under `${OUTPUT_DIR}/.hf` (override with `HF_HOME` / `HF_HUB_CACHE` / `HF_DATASETS_CACHE` / `TRANSFORMERS_CACHE`) to avoid small `/root` partitions on GPU nodes.
+- `invarlock certify` now honors `guards.order` when provided by `--preset` (instead of always forcing `["invariants", "spectral", "rmt", "variance", "invariants"]`), so certify matches the calibration preset’s intended guard set.
+
+### Dependencies
+- Bump katex from 0.16.25 to 0.16.27.
+- Bump markdownlint-cli2 from 0.19.1 to 0.20.0.
+
 ## [0.3.5] - 2026-01-02
 
 ### Added
 - B200 validation bash test suite (`scripts/lib/tests/*`, `scripts/lib/tests/run.sh`) with deterministic command mocks and optional branch/line coverage checks.
-- B200 runtime helpers (`scripts/lib/runtime.sh`) plus a snapshot/diagnostics helper (`scripts/invarlock_snapshot.sh`) to capture queue/worker/GPU state during long runs.
+- B200 runtime helpers (`scripts/lib/runtime.sh`) plus a snapshot/diagnostics helper (`scripts/b200_invarlock_snapshot.sh`) to capture queue/worker/GPU state during long runs.
 - Perplexity token-id sanitization to mask out-of-range IDs (and ignore them in labels) instead of triggering device-side asserts.
 
 ### Changed

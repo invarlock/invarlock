@@ -39,7 +39,6 @@ def test_spectral_guard_before_edit_skips_when_not_prepared():
 
 def test_spectral_guard_detects_multiple_violation_types():
     guard = SpectralGuard(scope="all", correction_enabled=False, max_spectral_norm=1.0)
-    guard.min_condition_number = 1e-2
     guard.deadband = 0.1
     guard.ignore_preview_inflation = False
     guard.ignore_preview_inflation = False
@@ -49,6 +48,9 @@ def test_spectral_guard_detects_multiple_violation_types():
     guard.module_family_map = {"layer.mlp.c_fc": "ffn"}
     guard.family_caps = {"ffn": {"kappa": 0.5}}
     guard.target_sigma = 1.0
+    guard.baseline_degeneracy = {
+        "layer.mlp.c_fc": {"stable_rank": 2.0, "norm_collapse": 1.0}
+    }
 
     weight = torch.tensor([[3.0, 0.0], [0.0, 1e-5]], dtype=torch.float32)
     module = DummyModule(weight)
@@ -61,7 +63,7 @@ def test_spectral_guard_detects_multiple_violation_types():
     violation_types = {v["type"] for v in violations}
     assert "family_z_cap" in violation_types
     assert "max_spectral_norm" in violation_types
-    assert "ill_conditioned" in violation_types
+    assert "degeneracy_norm_collapse" in violation_types
     assert guard.latest_z_scores["layer.mlp.c_fc"] > 0
 
 
@@ -131,8 +133,10 @@ def test_apply_relative_spectral_cap_scales_module():
 
     assert result["applied"] is True
     capped = result["capped_modules"][0]
-    assert math.isclose(capped["scale_factor"], 0.6, rel_tol=1e-5)
-    assert torch.allclose(module.weight, torch.tensor([[1.2, 0.0], [0.0, 0.6]]))
+    assert math.isclose(capped["scale_factor"], 0.6, rel_tol=1e-3)
+    assert torch.allclose(
+        module.weight, torch.tensor([[1.2, 0.0], [0.0, 0.6]]), atol=1e-3, rtol=1e-3
+    )
 
 
 def test_apply_relative_spectral_cap_handles_failure(monkeypatch):

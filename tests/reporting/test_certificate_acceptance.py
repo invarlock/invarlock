@@ -113,4 +113,6 @@ def test_no_top_level_ppl_keys() -> None:
     offenders = [
         k for k in cert.keys() if isinstance(k, str) and k.lower().startswith("ppl")
     ]
-    assert not offenders, f"Certificate contains legacy top-level ppl keys: {offenders}"
+    assert not offenders, (
+        f"Certificate contains disallowed top-level ppl keys: {offenders}"
+    )
