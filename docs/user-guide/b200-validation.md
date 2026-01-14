@@ -43,10 +43,10 @@ The B200 suite is specifically tuned for NVIDIA B200 180GB GPUs:
 - **Memory per GPU**: 180 GB HBM3e
 - **Memory Bandwidth**: ~4.5 TB/s aggregate
 - **Compute**: ~2250 FP16 TFLOPS
-- **FP4 Edit Path**: Simulated quantization; TransformerEngine is detected for optional fail-fast but native FP4 kernels are not exercised in this harness
+- **FP8 Edit Path**: Simulated quantization; uses torch float8 when available and falls back to float16 if not
 - **Target Utilization**: 85–92% VRAM (153–166 GB per GPU)
 
-The suite will run on other GPU configurations, but optimal performance assumes B200 (Blackwell). FP4 edits are simulated; TransformerEngine is only used to enforce optional native-support checks, not to execute FP4 kernels.
+The suite will run on other GPU configurations, but optimal performance assumes B200 (Blackwell). FP8 edits are simulated; when torch float8 dtypes are unavailable the suite falls back to float16.
 
 ## Model Suite
 
@@ -71,14 +71,16 @@ Each model undergoes 8 edit experiments (4 types × 2 versions):
 
 ### Clean Edits (Minimal Impact)
 
-These should pass InvarLock guards with high probability:
+These are calibrated per model to avoid lm-eval regressions (no InvarLock signal used):
 
 | Edit Type | Parameters | Scope |
 |-----------|------------|-------|
-| **Quantization RTN** | 8-bit, group_size=128 (group-wise) | FFN only |
-| **FP4 Quantization** | E2M1 format | FFN only |
-| **Magnitude Pruning** | 10% sparsity | FFN only |
-| **Low-Rank SVD** | rank=256 | FFN only |
+| **Quantization RTN** | Calibrated bits + group size (lm-eval stable) | FFN only |
+| **FP8 Quantization** | Calibrated format (e4m3fn default) | FFN only |
+| **Magnitude Pruning** | Calibrated sparsity (lm-eval stable) | FFN only |
+| **Low-Rank SVD** | Calibrated rank (ratio of hidden/FFN dim) | FFN only |
+
+Clean calibration uses a strict no-regression rule: if any benchmark drops beyond the 2×SE threshold vs baseline, the candidate is rejected.
 
 ### Stress Edits (Significant Impact)
 
@@ -87,11 +89,11 @@ These should be flagged by InvarLock guards:
 | Edit Type | Parameters | Scope |
 |-----------|------------|-------|
 | **Quantization RTN** | 4-bit, group_size=32 (group-wise) | All layers |
-| **FP4 Quantization** | Aggressive clipping | All layers |
+| **FP8 Quantization** | E5M2 format | All layers |
 | **Magnitude Pruning** | 50% sparsity | All layers |
 | **Low-Rank SVD** | rank=32 | All layers |
 
-Note: RTN uses group-wise quantization along the input dimension per output channel. If a layer has fewer input features than `group_size`, it falls back to per-tensor for that layer. FP4 edits are simulated even when TransformerEngine is available; set `INVARLOCK_REQUIRE_FP4_NATIVE=true` to fail fast if native FP4 support is required.
+Note: RTN uses group-wise quantization along the input dimension per output channel. If a layer has fewer input features than `group_size`, it falls back to per-tensor for that layer. Clean edits are calibrated per model using lm-eval (no InvarLock signal), and FP8 edits fall back to float16 if torch float8 dtypes are unavailable.
 
 ### Error Injection Tests
 
@@ -326,19 +328,20 @@ Tasks Per Model (~71 total, batch enabled)
 
 Setup & Calibration:
   ├── 1× SETUP_BASELINE      (download model)
+  ├── 1× EVAL_BASELINE       (lm-eval baseline)
+  ├── 1× CALIBRATE_CLEAN     (lm-eval clean calibration)
   ├── 5× CALIBRATION_RUN     (drift calibration)
-  ├── 1× GENERATE_PRESET     (aggregate calibration)
-  └── 1× EVAL_BASELINE       (lm-eval baseline)
-                                              Total: 8
+  └── 1× GENERATE_PRESET     (aggregate calibration)
+                                              Total: 9
 
 Edit Creation (Batch Optimization):
   └── 1× CREATE_EDITS_BATCH  (creates all 8 edits with single model load)
-      ├── quant_8bit_clean   (RTN 8-bit FFN)
-      ├── fp4_clean          (FP4 E2M1 FFN)
-      ├── prune_10pct_clean  (10% sparsity FFN)
-      ├── svd_rank256_clean  (rank=256 FFN)
+      ├── quant_8bit_clean   (RTN clean, calibrated group size)
+      ├── fp8_e4m3fn_clean   (FP8 clean, calibrated format)
+      ├── prune_10pct_clean  (pruning clean, calibrated sparsity)
+      ├── svd_rank256_clean  (low-rank clean, calibrated rank)
       ├── quant_4bit_stress  (RTN 4-bit all)
-      ├── fp4_stress         (FP4 aggressive all)
+      ├── fp8_e5m2_stress    (FP8 E5M2 all)
       ├── prune_50pct_stress (50% sparsity all)
       └── svd_rank32_stress  (rank=32 all)
                                               Total: 1
@@ -691,6 +694,7 @@ Atomic task implementations for each task type:
   - `execute_task()` - Run a task by type with standard logging and timeouts
 - **Setup & Calibration**:
   - `task_setup_baseline()` - Download and prepare model
+  - `task_calibrate_clean_edits()` - Per-model clean edit calibration (lm-eval only)
   - `task_calibration_run()` - Run drift calibration
   - `task_generate_preset()` - Create calibration preset
 - **lm-eval**:
@@ -712,7 +716,7 @@ Shared model creation helpers used by workers:
   - `create_edited_model()` - RTN quantization edits
   - `create_pruned_model()` - Magnitude pruning edits
   - `create_lowrank_model()` - Low-rank SVD edits
-  - `create_fp4_model()` - FP4 quantization edits (simulated)
+  - `create_fp8_model()` - FP8 quantization edits (simulated)
 - **Error Injection**:
   - `create_error_model()` - Error injection variants
 
@@ -846,7 +850,20 @@ Bootstrap defaults are 2000 for small/medium models and 1000 for >=30B.
 | `INVARLOCK_SKIP_OVERHEAD_CHECK` | unset | Skip guard overhead measurement |
 | `INVARLOCK_CONFIG_ROOT` | unset | Per-task runtime profile root (set automatically by the suite) |
 | `INVARLOCK_ALLOW_NETWORK` | `1` | Allow dataset downloads |
-| `INVARLOCK_REQUIRE_FP4_NATIVE` | `false` | Require TransformerEngine for native FP4 validation |
+
+### Clean Edit Calibration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CALIBRATE_CLEAN_EDITS` | `true` | Enable per-model clean calibration using lm-eval only |
+| `CLEAN_EVAL_TASKS` | `mmlu,hellaswag,arc_challenge,winogrande` | Benchmarks used for clean calibration |
+| `CLEAN_EVAL_LIMIT` | `200` | lm-eval `--limit` for calibration runs (0 disables) |
+| `CLEAN_EVAL_NUM_FEWSHOT` | `5` | Few-shot examples used during calibration |
+| `CLEAN_QUANT_BITS` | `8` | Bits used for clean RTN candidates |
+| `CLEAN_QUANT_GROUP_SIZES` | `128,64,32` | Group sizes explored for clean RTN |
+| `CLEAN_PRUNE_LEVELS` | `0.1,0.05,0.02` | Sparsity candidates for clean pruning |
+| `CLEAN_SVD_RANK_RATIOS` | `0.25,0.35,0.5` | Rank ratios explored for clean SVD (relative to min hidden/FFN dim) |
+| `CLEAN_FP8_FORMATS` | `e4m3fn` | FP8 formats explored for clean FP8 edits |
 
 ### Performance Tuning
 
@@ -934,10 +951,13 @@ invarlock_validation_b200_20241208_123456/
 │   ├── models/                     # Edited model variants
 │   │   ├── quant_8bit_clean/
 │   │   ├── quant_4bit_stress/
-│   │   ├── fp4_e2m1_clean/
+│   │   ├── fp8_e4m3fn_clean/
+│   │   ├── fp8_e5m2_stress/
 │   │   ├── prune_10pct_clean/
 │   │   ├── svd_rank256_clean/
 │   │   └── error_nan_injection/
+│   ├── state/
+│   │   └── clean_edit_params.json  # lm-eval-based clean calibration
 │   ├── evals/                      # lm-eval results
 │   │   ├── baseline_results.json
 │   │   └── {edit}_results.json
