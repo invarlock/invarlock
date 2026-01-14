@@ -1,35 +1,79 @@
 # Tier Policy Catalog (runtime `tiers.yaml`)
 
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Explain each policy key in `tiers.yaml` and its rationale. |
+| **Audience** | Operators auditing tier defaults and guard thresholds. |
+| **Supported tiers** | `balanced`, `conservative` (aggressive is research-only). |
+| **Source of truth** | `src/invarlock/_data/runtime/tiers.yaml` (override via `INVARLOCK_CONFIG_ROOT`). |
+
+## Quick Start
+
+```bash
+# Inspect resolved tier policies in a report
+invarlock report explain --report runs/subject/report.json --baseline runs/baseline/report.json
+```
+
+## Concepts
+
+- **Calibrated vs policy keys**: calibrated values come from pilot runs; policy
+  keys define safety margins and floors.
+- **Resolved policies** are recorded in certificates under `resolved_policy.*`.
+
+**Policy resolution order (highest → lowest)**
+
+1. Explicit guard overrides in config (`guards.*` in YAML, deep‑merged).
+2. Edit adjustments (`EDIT_ADJUSTMENTS`, e.g. `quant_rtn` tweaks `rmt.deadband`).
+3. Profile guard overrides (`runtime/profiles/<profile>.yaml` → `guards.*`).
+4. Runtime `tiers.yaml` (via `INVARLOCK_CONFIG_ROOT` or packaged data).
+5. Built‑in defaults (`TIER_POLICIES`).
+
+### Key override matrix
+
+| Setting | Tier default | Profile override | Edit adjustment | Config override | Winner rule | Confirm |
+| --- | --- | --- | --- | --- | --- | --- |
+| `spectral.sigma_quantile` | ✅ | ✅ | — | ✅ | Config > profile > tier. | `resolved_policy.spectral.sigma_quantile`. |
+| `rmt.deadband` | ✅ | ✅ | ✅ | ✅ | Config > edit > profile > tier. | `resolved_policy.rmt.deadband`. |
+| `variance.max_calib` | ✅ | ✅ | — | ✅ | Config > profile > tier. | `resolved_policy.variance.max_calib`. |
+
+Metric gates (`metrics.pm_ratio`, `metrics.pm_tail`, `metrics.accuracy`) are
+resolved from tier policies (tiers.yaml + defaults) and surfaced under
+`resolved_policy.metrics.*`.
+
+## Reference
+
 > **Plain language:** The packaged `runtime/tiers.yaml` is the source of truth
 > for tier defaults. Some values are **calibrated** from pilot/null runs (e.g.,
 > Spectral κ, RMT ε, VE min‑effect). The rest are **policies** (explicit design
-> choices like sample-size floors, deadbands, and caps). This page is the “why
+> choices like sample-size floors, dead bands, and caps). This page is the “why
 > map”: for every key in `tiers.yaml`, it explains what it controls and where to
 > point for the rationale.
 
-## Location
+### Location
 
 - Packaged default: `src/invarlock/_data/runtime/tiers.yaml`
 - Override: set `INVARLOCK_CONFIG_ROOT` and provide `runtime/tiers.yaml` under it
   (see `docs/reference/env-vars.md`).
 
-## Tier scope
+### Tier scope
 
 Balanced and Conservative are the supported safety tiers; Aggressive is
 research‑oriented and explicitly outside the safety case (see
 `docs/assurance/00-safety-case.md`).
 
-## Catalog (what + why)
+### Catalog (what + why)
 
 This page documents the tier keys grouped by section. Each section follows the
 same structure:
 
 - **What it controls** (runtime behavior)
-- **Where documented** (assurance notes / method writeups)
+- **Where documented** (assurance notes / method write-ups)
 - **Keys** (key-by-key meaning)
 - **Observability** (where it appears in reports/certificates)
 
-### Primary-metric gates (`metrics.*`)
+#### Primary-metric gates (`metrics.*`)
 
 **What it controls.** Run-level acceptance gates applied when generating/verifying
 a certificate (see “Quality Gates” in `docs/assurance/04-guard-contracts.md`).
@@ -44,7 +88,7 @@ a certificate (see “Quality Gates” in `docs/assurance/04-guard-contracts.md`
 - Gate flags: `validation.primary_metric_acceptable`, `validation.primary_metric_tail_acceptable`
 - CLI: `invarlock report explain` prints the resolved thresholds, floors, and outcomes.
 
-#### `metrics.pm_ratio.*` (ppl-like kinds)
+##### `metrics.pm_ratio.*` (ppl-like kinds)
 
 **Keys.**
 
@@ -71,7 +115,7 @@ a certificate (see “Quality Gates” in `docs/assurance/04-guard-contracts.md`
 - Evidence: `primary_metric.{ratio_vs_baseline,display_ci}`
 - Gate flag: `validation.primary_metric_acceptable`
 
-#### `metrics.pm_tail.*` (Primary Metric Tail gate; ppl-like kinds)
+##### `metrics.pm_tail.*` (Primary Metric Tail gate; ppl-like kinds)
 
 **What it controls.** A **tail-regression backstop** computed on paired
 **per-window** ΔlogNLL samples vs the baseline (window-by-window
@@ -103,19 +147,19 @@ schedule). It is additive to the mean/CI primary-metric gate.
 - Validation flag: `validation.primary_metric_tail_acceptable` (false only in `fail` mode).
 - CLI: `invarlock report explain` prints “Gate: Primary Metric Tail (ΔlogNLL)”.
 
-#### `metrics.accuracy.*` (accuracy kinds)
+##### `metrics.accuracy.*` (accuracy kinds)
 
 **Keys.**
 
-- `delta_min_pp` *(policy)* — minimum allowed Δaccuracy vs baseline (percentage
+- `delta_min_pp` *(policy)* — minimum allowed delta accuracy vs baseline (percentage
   points). Defaults per tier are stated in `docs/assurance/04-guard-contracts.md`
   (“accuracy kinds … defaults”).
 - `min_examples` *(policy)* — minimum `n_final` required before enforcing the
-  Δaccuracy gate. Rationale: avoids gating on too few examples.
+  delta accuracy gate. Rationale: avoids gating on too few examples.
 - `min_examples_fraction` *(policy)* — dataset-scale-aware floor: when available
   examples are known, the effective floor becomes
   `max(min_examples, ceil(examples_available * min_examples_fraction))`.
-- `hysteresis_delta_pp` *(policy)* — small slack on the Δaccuracy gate
+- `hysteresis_delta_pp` *(policy)* — small slack on the delta accuracy gate
   (`delta_min_pp - hysteresis_delta_pp`). Rationale: avoids flapping near the
   boundary; marked in certificates via `validation.hysteresis_applied`.
 
@@ -125,7 +169,7 @@ schedule). It is additive to the mean/CI primary-metric gate.
 - Evidence: `primary_metric.{ratio_vs_baseline,display_ci}`
 - Gate flag: `validation.primary_metric_acceptable`
 
-### Spectral guard (`spectral_guard.*`)
+#### Spectral guard (`spectral_guard.*`)
 
 **What it controls.** Weight-based stability thresholds for per-family spectral
 monitoring.
@@ -160,7 +204,7 @@ monitoring.
 - Resolved policy: `resolved_policy.spectral`
 - Gate flag: `validation.spectral_stable`
 
-### RMT guard (`rmt_guard.*`)
+#### RMT guard (`rmt_guard.*`)
 
 **What it controls.** Activation edge-risk stability via the ε-band acceptance
 rule.
@@ -189,7 +233,7 @@ rule.
 - Resolved policy: `resolved_policy.rmt`
 - Gate flag: `validation.rmt_stable`
 
-### Variance guard (`variance_guard.*`)
+#### Variance guard (`variance_guard.*`)
 
 **What it controls.** VE enablement/correction knobs including the predictive
 gate and min-effect semantics.
@@ -210,7 +254,7 @@ gate and min-effect semantics.
   VE enablement; derived from `z·σ̂/√n` per tier, see
   `docs/assurance/07-ve-gate-power.md`.
 - `deadband` *(policy)* — ignores small proposed adjustments (prevents
-  “flicker”/tiny rescalings).
+  “flicker”/tiny rescaling).
 - `min_abs_adjust` *(policy)* — absolute floor on per-module |scale − 1| before a
   proposed scale is considered.
 - `max_scale_step` *(policy)* — per-module maximum |scale − 1| applied in a
@@ -227,3 +271,22 @@ gate and min-effect semantics.
 
 - Evidence: `variance.{enabled,predictive_gate,ab_test,scope,proposed_scales}`
 - Resolved policy: `resolved_policy.variance`
+
+## Troubleshooting
+
+- **Overrides not taking effect**: ensure `INVARLOCK_CONFIG_ROOT` points to a
+  directory containing `runtime/tiers.yaml`.
+- **Aggressive tier usage**: this tier is research-only and outside the safety
+  case; prefer `balanced` or `conservative`.
+
+## Observability
+
+- Resolved policies appear under `resolved_policy.*` in certificates.
+- The CLI `invarlock report explain` prints gate decisions and policy digests.
+
+## Related Documentation
+
+- [Guards](guards.md)
+- [Configuration Schema](config-schema.md)
+- [Environment Variables](env-vars.md)
+- [Guard Contracts & Primer](../assurance/04-guard-contracts.md)
