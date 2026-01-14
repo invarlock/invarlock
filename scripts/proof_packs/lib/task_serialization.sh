@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # task_serialization.sh - Task JSON handling for dynamic GPU scheduling
-# Version: v2.1.0-b200 (InvarLock B200 Validation Suite)
+# Version: proof-packs-v1 (InvarLock Proof Pack Suite)
 # Dependencies: jq
 # Usage: sourced by queue_manager.sh/gpu_worker.sh to read/write queue task files
 #
@@ -53,21 +53,20 @@ _task_serialization_require_jq() {
 
 # ============ MULTI-GPU CALCULATION ============
 
-# GPU memory per device (B200 has 180GB)
-# Set via environment variable for other GPU types
-GPU_MEMORY_PER_DEVICE="${GPU_MEMORY_PER_DEVICE:-${GPU_MEMORY_GB:-180}}"
+# GPU memory per device (defaults to GPU_MEMORY_GB when available)
+GPU_MEMORY_PER_DEVICE="${GPU_MEMORY_PER_DEVICE:-${GPU_MEMORY_GB:-80}}"
 
 # Calculate required GPUs based on model memory size.
 # Usage: calculate_required_gpus <model_size_gb>
 # Returns: integer GPU count (min 1).
 #
-# B200 OPTIMIZATION (v2.2.3): Dynamic sizing based on per-GPU memory.
+# Proof pack optimization: dynamic sizing based on per-GPU memory.
 # - Prefer single GPU when model fits within GPU_MEMORY_PER_DEVICE.
 # - Scale to multiple GPUs when required memory exceeds per-GPU capacity.
 #
 calculate_required_gpus() {
     local model_size_gb="$1"
-    local per_device="${GPU_MEMORY_PER_DEVICE:-180}"
+    local per_device="${GPU_MEMORY_PER_DEVICE:-80}"
     local max_gpus="${NUM_GPUS:-8}"
 
     if ! [[ "${model_size_gb}" =~ ^[0-9]+$ ]]; then
@@ -75,7 +74,7 @@ calculate_required_gpus() {
         return
     fi
     if ! [[ "${per_device}" =~ ^[0-9]+$ ]] || [[ "${per_device}" -le 0 ]]; then
-        per_device=180
+        per_device=80
     fi
     if ! [[ "${max_gpus}" =~ ^[0-9]+$ ]]; then
         max_gpus=8

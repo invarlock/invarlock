@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-test_b200_validation_cleanup_kills_spawned_pids_and_exits_with_previous_rc() {
+test_pack_validation_cleanup_kills_spawned_pids_and_exits_with_previous_rc() {
     mock_reset
 
-    source ./scripts/b200_validation_suite.sh
+    source ./scripts/proof_packs/lib/validation_suite.sh
 
     local rc=0
     (
@@ -28,40 +28,32 @@ test_b200_validation_cleanup_kills_spawned_pids_and_exits_with_previous_rc() {
     assert_rc "1" "${rc}" "cleanup exits with previous rc"
 }
 
-test_b200_validation_determinism_strict_sets_compile_off() {
+test_pack_validation_determinism_strict_sets_compile_off() {
     mock_reset
 
-    B200_DETERMINISM="strict"
-    source ./scripts/b200_validation_suite.sh
+    PACK_DETERMINISM="strict"
+    source ./scripts/proof_packs/lib/validation_suite.sh
 
-    assert_eq "strict" "${B200_DETERMINISM}" "strict preserved"
+    assert_eq "strict" "${PACK_DETERMINISM}" "strict preserved"
     assert_eq "0" "${LMEVAL_TORCH_COMPILE}" "strict disables torch compile"
 }
 
-test_b200_validation_determinism_invalid_defaults_to_throughput() {
+test_pack_validation_determinism_invalid_defaults_to_throughput() {
     mock_reset
 
-    B200_DETERMINISM="not-a-preset"
-    source ./scripts/b200_validation_suite.sh
+    PACK_DETERMINISM="not-a-preset"
+    source ./scripts/proof_packs/lib/validation_suite.sh
 
-    assert_eq "throughput" "${B200_DETERMINISM}" "invalid preset coerces to throughput"
+    assert_eq "throughput" "${PACK_DETERMINISM}" "invalid preset coerces to throughput"
     assert_eq "1" "${LMEVAL_TORCH_COMPILE}" "throughput enables torch compile"
 }
 
-test_b200_validation_script_help_runs_offline_and_covers_entrypoint_guard() {
+test_pack_validation_bash4_guard_reports_error_on_bash3() {
     mock_reset
 
-    local out
-    out="$(bash -x ./scripts/b200_validation_suite.sh --help)"
-    assert_match "InvarLock Validation Suite" "${out}" "help header"
-}
-
-test_b200_validation_bash4_guard_reports_error_on_bash3() {
-    mock_reset
-
-    source ./scripts/b200_validation_suite.sh
+    source ./scripts/proof_packs/lib/validation_suite.sh
     local rc=0
-    if b200_require_bash4; then
+    if pack_require_bash4; then
         rc=0
     else
         rc=$?
@@ -69,27 +61,27 @@ test_b200_validation_bash4_guard_reports_error_on_bash3() {
     assert_ne "0" "${rc}" "bash4 guard should fail under bash 3"
 }
 
-test_b200_validation_bash4_guard_succeeds_when_bash4_is_reported() {
+test_pack_validation_bash4_guard_succeeds_when_bash4_is_reported() {
     mock_reset
 
-    source ./scripts/b200_validation_suite.sh
+    source ./scripts/proof_packs/lib/validation_suite.sh
 
-    b200_is_bash4() { return 0; }
-    b200_require_bash4
+    pack_is_bash4() { return 0; }
+    pack_require_bash4
 }
 
-test_b200_validation_setup_hf_cache_dirs_errors_when_home_is_file() {
+test_pack_validation_setup_hf_cache_dirs_errors_when_home_is_file() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
+    source ./scripts/proof_packs/lib/validation_suite.sh
 
     local hf_home="${TEST_TMPDIR}/hf_file"
     : > "${hf_home}"
     export HF_HOME="${hf_home}"
 
     local rc=0
-    if b200_setup_hf_cache_dirs; then
+    if pack_setup_hf_cache_dirs; then
         rc=0
     else
         rc=$?
@@ -97,37 +89,86 @@ test_b200_validation_setup_hf_cache_dirs_errors_when_home_is_file() {
     assert_ne "0" "${rc}" "expected mkdir failure when HF_HOME is a file"
 }
 
-test_b200_validation_setup_hf_cache_dirs_creates_directories_and_returns_zero() {
+test_pack_validation_setup_hf_cache_dirs_creates_directories_and_returns_zero() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
+    source ./scripts/proof_packs/lib/validation_suite.sh
 
     export HF_HOME="${TEST_TMPDIR}/hf"
     unset HF_HUB_CACHE HF_DATASETS_CACHE TRANSFORMERS_CACHE
 
-    b200_setup_hf_cache_dirs
+    pack_setup_hf_cache_dirs
     assert_dir_exists "${HF_HOME}" "HF_HOME created"
     assert_dir_exists "${HF_HOME}/hub" "HF_HUB_CACHE created"
 }
 
-_make_validation_suite_sandbox() {
-    local sandbox
-    sandbox="$(mktemp -d "${TEST_TMPDIR}/b200_validation_suite.XXXXXX")"
-    mkdir -p "${sandbox}/lib"
-    cp "${TEST_ROOT}/scripts/lib/"*.sh "${sandbox}/lib/"
-    echo "${sandbox}"
-}
-
-test_b200_validation_source_libs_nested_layout_succeeds_and_exports_loaded_flags() {
+test_pack_validation_run_determinism_repeats_writes_summary() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
+    PACK_SUITE="subset"
+    PACK_DETERMINISM="strict"
+    PACK_REPEATS="2"
+    source ./scripts/proof_packs/lib/validation_suite.sh
 
-    b200_source_libs
+    pack_setup_output_dirs
 
-    assert_match "/scripts/lib$" "${LIB_DIR}" "LIB_DIR points at scripts/lib"
+    local model_id="org/model"
+    local model_name
+    model_name="$(sanitize_model_name "${model_id}")"
+    mkdir -p "${OUTPUT_DIR}/${model_name}"
+    mkdir -p "${TEST_TMPDIR}/baseline"
+    echo "${TEST_TMPDIR}/baseline" > "${OUTPUT_DIR}/${model_name}/.baseline_path"
+
+    PACK_MODEL_LIST=("${model_id}")
+
+    process_edit() {
+        mkdir -p "${TEST_TMPDIR}/edit"
+        echo "${TEST_TMPDIR}/edit"
+    }
+
+    run_invarlock_certify() {
+        local output_dir="$3"
+        local run_name="$4"
+        local run_dir="${output_dir}/${run_name}"
+        mkdir -p "${run_dir}"
+        local count_file="${TEST_TMPDIR}/repeat.count"
+        local count=0
+        if [[ -f "${count_file}" ]]; then
+            count="$(cat "${count_file}")"
+        fi
+        count=$((count + 1))
+        echo "${count}" > "${count_file}"
+        cat > "${run_dir}/evaluation.cert.json" << EOF
+{"verdict": {"primary_metric_ratio": ${count}.01}}
+EOF
+    }
+
+    pack_run_determinism_repeats
+
+    local path="${OUTPUT_DIR}/analysis/determinism_repeats.json"
+    assert_file_exists "${path}" "determinism repeats file written"
+    assert_match "\"completed\": 2" "$(cat "${path}")" "repeat count recorded"
+}
+
+_make_validation_suite_sandbox() {
+    local sandbox
+    sandbox="$(mktemp -d "${TEST_TMPDIR}/pack_validation_suite.XXXXXX")"
+    mkdir -p "${sandbox}/lib"
+    cp "${TEST_ROOT}/scripts/proof_packs/lib/"*.sh "${sandbox}/lib/"
+    echo "${sandbox}"
+}
+
+test_pack_validation_source_libs_nested_layout_succeeds_and_exports_loaded_flags() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    pack_source_libs
+
+    assert_match "/scripts/proof_packs/lib$" "${LIB_DIR}" "LIB_DIR points at scripts/proof_packs/lib"
     assert_eq "1" "${TASK_SERIALIZATION_LOADED:-}" "task_serialization loaded"
     assert_eq "1" "${QUEUE_MANAGER_LOADED:-}" "queue_manager loaded"
     assert_eq "1" "${SCHEDULER_LOADED:-}" "scheduler loaded"
@@ -136,10 +177,10 @@ test_b200_validation_source_libs_nested_layout_succeeds_and_exports_loaded_flags
     assert_eq "1" "${FAULT_TOLERANCE_LOADED:-}" "fault_tolerance loaded"
 }
 
-test_b200_validation_source_libs_falls_back_to_lib_dir_when_missing() {
+test_pack_validation_source_libs_falls_back_to_lib_dir_when_missing() {
     mock_reset
 
-    source ./scripts/b200_validation_suite.sh
+    source ./scripts/proof_packs/lib/validation_suite.sh
 
     local sandbox
     sandbox="$(_make_validation_suite_sandbox)"
@@ -148,16 +189,16 @@ test_b200_validation_source_libs_falls_back_to_lib_dir_when_missing() {
 
     local rc=0
     (
-        _b200_script_dir() { echo "${sandbox}"; }
-        b200_source_libs
+        _pack_script_dir() { echo "${sandbox}"; }
+        pack_source_libs
     ) || rc=$?
-    assert_ne "0" "${rc}" "expected b200_source_libs failure when scripts/lib is missing"
+    assert_ne "0" "${rc}" "expected pack_source_libs failure when scripts/proof_packs/lib is missing"
 }
 
-test_b200_validation_source_libs_flat_layout_errors_when_queue_manager_missing() {
+test_pack_validation_source_libs_flat_layout_errors_when_queue_manager_missing() {
     mock_reset
 
-    source ./scripts/b200_validation_suite.sh
+    source ./scripts/proof_packs/lib/validation_suite.sh
 
     local sandbox
     sandbox="$(_make_validation_suite_sandbox)"
@@ -168,16 +209,16 @@ test_b200_validation_source_libs_flat_layout_errors_when_queue_manager_missing()
 
     local rc=0
     (
-        _b200_script_dir() { echo "${sandbox}"; }
-        b200_source_libs
+        _pack_script_dir() { echo "${sandbox}"; }
+        pack_source_libs
     ) || rc=$?
     assert_ne "0" "${rc}" "expected failure when queue_manager is missing in flat layout"
 }
 
-test_b200_validation_source_libs_flat_layout_errors_when_scheduler_missing() {
+test_pack_validation_source_libs_flat_layout_errors_when_scheduler_missing() {
     mock_reset
 
-    source ./scripts/b200_validation_suite.sh
+    source ./scripts/proof_packs/lib/validation_suite.sh
 
     local sandbox
     sandbox="$(_make_validation_suite_sandbox)"
@@ -189,16 +230,16 @@ test_b200_validation_source_libs_flat_layout_errors_when_scheduler_missing() {
 
     local rc=0
     (
-        _b200_script_dir() { echo "${sandbox}"; }
-        b200_source_libs
+        _pack_script_dir() { echo "${sandbox}"; }
+        pack_source_libs
     ) || rc=$?
     assert_ne "0" "${rc}" "expected failure when scheduler is missing in flat layout"
 }
 
-test_b200_validation_source_libs_flat_layout_errors_when_task_functions_missing() {
+test_pack_validation_source_libs_flat_layout_errors_when_task_functions_missing() {
     mock_reset
 
-    source ./scripts/b200_validation_suite.sh
+    source ./scripts/proof_packs/lib/validation_suite.sh
 
     local sandbox
     sandbox="$(_make_validation_suite_sandbox)"
@@ -211,16 +252,16 @@ test_b200_validation_source_libs_flat_layout_errors_when_task_functions_missing(
 
     local rc=0
     (
-        _b200_script_dir() { echo "${sandbox}"; }
-        b200_source_libs
+        _pack_script_dir() { echo "${sandbox}"; }
+        pack_source_libs
     ) || rc=$?
     assert_ne "0" "${rc}" "expected failure when task_functions is missing in flat layout"
 }
 
-test_b200_validation_source_libs_flat_layout_errors_when_gpu_worker_missing() {
+test_pack_validation_source_libs_flat_layout_errors_when_gpu_worker_missing() {
     mock_reset
 
-    source ./scripts/b200_validation_suite.sh
+    source ./scripts/proof_packs/lib/validation_suite.sh
 
     local sandbox
     sandbox="$(_make_validation_suite_sandbox)"
@@ -234,16 +275,16 @@ test_b200_validation_source_libs_flat_layout_errors_when_gpu_worker_missing() {
 
     local rc=0
     (
-        _b200_script_dir() { echo "${sandbox}"; }
-        b200_source_libs
+        _pack_script_dir() { echo "${sandbox}"; }
+        pack_source_libs
     ) || rc=$?
     assert_ne "0" "${rc}" "expected failure when gpu_worker is missing in flat layout"
 }
 
-test_b200_validation_list_run_gpu_ids_prefers_gpu_id_list_and_falls_back_to_num_gpus() {
+test_pack_validation_list_run_gpu_ids_prefers_gpu_id_list_and_falls_back_to_num_gpus() {
     mock_reset
 
-    source ./scripts/b200_validation_suite.sh
+    source ./scripts/proof_packs/lib/validation_suite.sh
 
     GPU_ID_LIST="2,3,,4"
     local out
@@ -256,12 +297,12 @@ test_b200_validation_list_run_gpu_ids_prefers_gpu_id_list_and_falls_back_to_num_
     assert_match "^0" "${out}" "fallback generates numeric ids"
 }
 
-test_b200_validation_configure_gpu_pool_parses_sources_and_validates_ids() {
+test_pack_validation_configure_gpu_pool_parses_sources_and_validates_ids() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
-    b200_setup_output_dirs
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
 
     # CUDA_VISIBLE_DEVICES branch
     CUDA_VISIBLE_DEVICES="0,1"
@@ -296,12 +337,12 @@ test_b200_validation_configure_gpu_pool_parses_sources_and_validates_ids() {
     assert_eq "1" "${NUM_GPUS}" "requested <1 clamps to 1"
 }
 
-test_b200_validation_configure_gpu_pool_errors_on_non_numeric_invalid_or_empty() {
+test_pack_validation_configure_gpu_pool_errors_on_non_numeric_invalid_or_empty() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
-    b200_setup_output_dirs
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
 
     # Non-numeric branch
     local rc=0
@@ -323,20 +364,20 @@ test_b200_validation_configure_gpu_pool_errors_on_non_numeric_invalid_or_empty()
     assert_ne "0" "${rc}" "empty gpu list triggers error_exit"
 }
 
-test_b200_validation_format_gb_as_tb_returns_empty_for_invalid_input() {
+test_pack_validation_format_gb_as_tb_returns_empty_for_invalid_input() {
     mock_reset
 
-    source ./scripts/b200_validation_suite.sh
+    source ./scripts/proof_packs/lib/validation_suite.sh
 
     local out
     out="$(format_gb_as_tb "nope")"
     assert_eq "" "${out}" "invalid gb returns empty string"
 }
 
-test_b200_validation_get_free_disk_gb_parses_df_output() {
+test_pack_validation_get_free_disk_gb_parses_df_output() {
     mock_reset
 
-    source ./scripts/b200_validation_suite.sh
+    source ./scripts/proof_packs/lib/validation_suite.sh
 
     local path="${TEST_TMPDIR}/disk"
     mkdir -p "${path}"
@@ -350,10 +391,10 @@ EOF
     assert_eq "987" "$(get_free_disk_gb "${path}")" "extracts available GB from df -BG output"
 }
 
-test_b200_validation_estimate_model_weights_covers_known_patterns_and_local_path() {
+test_pack_validation_estimate_model_weights_covers_known_patterns_and_local_path() {
     mock_reset
 
-    source ./scripts/b200_validation_suite.sh
+    source ./scripts/proof_packs/lib/validation_suite.sh
 
     local local_model="${TEST_TMPDIR}/local_model"
     mkdir -p "${local_model}"
@@ -375,10 +416,10 @@ test_b200_validation_estimate_model_weights_covers_known_patterns_and_local_path
     assert_eq "14" "$(estimate_model_weights_gb "mistralai/Mistral-7B-v0.1")" "7B"
 }
 
-test_b200_validation_estimate_model_weights_default_case_returns_nonzero() {
+test_pack_validation_estimate_model_weights_default_case_returns_nonzero() {
     mock_reset
 
-    source ./scripts/b200_validation_suite.sh
+    source ./scripts/proof_packs/lib/validation_suite.sh
 
     local rc=0
     local out
@@ -390,12 +431,12 @@ test_b200_validation_estimate_model_weights_default_case_returns_nonzero() {
     assert_eq "" "${out}" "unknown model id prints no estimate"
 }
 
-test_b200_validation_process_edit_parses_specs_dispatches_creators_and_covers_resume_and_failure_paths() {
+test_pack_validation_process_edit_parses_specs_dispatches_creators_and_covers_resume_and_failure_paths() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
-    b200_setup_output_dirs
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
 
     local baseline="${TEST_TMPDIR}/baseline"
     mkdir -p "${baseline}"
@@ -454,12 +495,12 @@ test_b200_validation_process_edit_parses_specs_dispatches_creators_and_covers_re
     assert_eq "1" "${rc}" "failed creator propagates as 1"
 }
 
-test_b200_validation_edit_creators_run_offline_with_stubbed_python() {
+test_pack_validation_edit_creators_run_offline_with_stubbed_python() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
-    b200_setup_output_dirs
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
 
     log() { :; }
     log_section() { :; }
@@ -471,11 +512,11 @@ test_b200_validation_edit_creators_run_offline_with_stubbed_python() {
     create_error_model "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/errors/nan/model" "nan_injection" "0"
 }
 
-test_b200_validation_estimate_planned_storage_accounts_for_modes_and_unknown_models() {
+test_pack_validation_estimate_planned_storage_accounts_for_modes_and_unknown_models() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
+    source ./scripts/proof_packs/lib/validation_suite.sh
 
     # Force the hub cache to appear on a different device than OUTPUT_DIR.
     export HF_HUB_CACHE="${TEST_TMPDIR}/hub"
@@ -485,7 +526,7 @@ test_b200_validation_estimate_planned_storage_accounts_for_modes_and_unknown_mod
     fixture_write "df.P.hub" "$(printf 'Filesystem 512-blocks Used Available Capacity Mounted on\n/dev/hubdev 1 1 1 1%% %s\n' "${HF_HUB_CACHE}")"
 
     RUN_ERROR_INJECTION="true"
-    B200_BASELINE_STORAGE_MODE="snapshot_symlink"
+    PACK_BASELINE_STORAGE_MODE="snapshot_symlink"
     MODEL_1="mistralai/Mistral-7B-v0.1"
     MODEL_2="unknown/NoProfile"
     MODEL_3=""
@@ -505,11 +546,11 @@ test_b200_validation_estimate_planned_storage_accounts_for_modes_and_unknown_mod
     assert_eq "" "${out}" "unknown model returns empty planned gb"
 }
 
-test_b200_validation_estimate_planned_storage_succeeds_when_all_models_are_known() {
+test_pack_validation_estimate_planned_storage_succeeds_when_all_models_are_known() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
+    source ./scripts/proof_packs/lib/validation_suite.sh
 
     HF_HUB_CACHE=""
     MODEL_1="mistralai/Mistral-7B-v0.1"
@@ -527,12 +568,12 @@ test_b200_validation_estimate_planned_storage_succeeds_when_all_models_are_known
     assert_match "^[0-9]+$" "${out}" "planned gb computed"
 }
 
-test_b200_validation_disk_preflight_allows_resume_but_aborts_without_resume() {
+test_pack_validation_disk_preflight_allows_resume_but_aborts_without_resume() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
-    b200_setup_output_dirs
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
 
     get_free_disk_gb() { echo "10"; }
     estimate_planned_model_storage_gb() { echo "1000"; }
@@ -549,11 +590,11 @@ test_b200_validation_disk_preflight_allows_resume_but_aborts_without_resume() {
     assert_eq "99" "${rc}" "non-resume path aborts via error_exit"
 }
 
-test_b200_validation_disk_preflight_returns_ok_when_disk_is_sufficient() {
+test_pack_validation_disk_preflight_returns_ok_when_disk_is_sufficient() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
+    source ./scripts/proof_packs/lib/validation_suite.sh
 
     get_free_disk_gb() { echo "5000"; }
     estimate_planned_model_storage_gb() { echo "10"; }
@@ -562,12 +603,12 @@ test_b200_validation_disk_preflight_returns_ok_when_disk_is_sufficient() {
     disk_preflight
 }
 
-test_b200_validation_handle_disk_pressure_shutdown_and_reclaim_branches() {
+test_pack_validation_handle_disk_pressure_shutdown_and_reclaim_branches() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
-    b200_setup_output_dirs
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
 
     QUEUE_DIR="${OUTPUT_DIR}/queue"
     mkdir -p "${QUEUE_DIR}"
@@ -593,33 +634,33 @@ test_b200_validation_handle_disk_pressure_shutdown_and_reclaim_branches() {
     assert_file_exists "${OUTPUT_DIR}/workers/SHUTDOWN" "shutdown marker touched"
 }
 
-test_b200_validation_setup_b200_environment_sets_fp8_flag_and_propagates_failure() {
+test_pack_validation_setup_pack_environment_sets_fp8_flag_and_propagates_failure() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
-    b200_setup_output_dirs
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
 
     python3() { printf '%s\n' "ok" "[FP8_NATIVE_SUPPORT=true]"; }
-    setup_b200_environment
+    setup_pack_environment
     assert_eq "true" "${FP8_NATIVE_SUPPORT}" "FP8_NATIVE_SUPPORT true"
 
     python3() { printf '%s\n' "ok" "[FP8_NATIVE_SUPPORT=false]"; }
-    setup_b200_environment
+    setup_pack_environment
     assert_eq "false" "${FP8_NATIVE_SUPPORT}" "FP8_NATIVE_SUPPORT false"
 
     python3() { printf '%s\n' "boom"; return 3; }
     local rc=0
-    ( setup_b200_environment ) || rc=$?
+    ( setup_pack_environment ) || rc=$?
     assert_eq "3" "${rc}" "propagates python3 rc"
 }
 
-test_b200_validation_check_dependencies_flash_attn_branches_and_package_installs() {
+test_pack_validation_check_dependencies_flash_attn_branches_and_package_installs() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
-    b200_setup_output_dirs
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
 
     fixture_write "timeout.stub" ""
 
@@ -696,12 +737,12 @@ test_b200_validation_check_dependencies_flash_attn_branches_and_package_installs
     check_dependencies
 }
 
-test_b200_validation_check_dependencies_errors_when_missing() {
+test_pack_validation_check_dependencies_errors_when_missing() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
-    b200_setup_output_dirs
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
 
     log_section() { :; }
     log() { :; }
@@ -714,12 +755,14 @@ test_b200_validation_check_dependencies_errors_when_missing() {
     assert_eq "11" "${rc}" "missing dependencies trigger error_exit"
 }
 
-test_b200_validation_setup_model_early_returns_for_local_or_cached_paths_and_errors_on_failed_download() {
+test_pack_validation_setup_model_early_returns_for_local_or_cached_paths_and_errors_on_failed_download() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
-    b200_setup_output_dirs
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
+    PACK_NET=1
+    pack_model_revision() { echo "rev"; }
 
     local local_model="${TEST_TMPDIR}/local_model"
     mkdir -p "${local_model}"
@@ -749,12 +792,14 @@ test_b200_validation_setup_model_early_returns_for_local_or_cached_paths_and_err
     assert_eq "" "${out}" "failed download returns empty baseline path"
 }
 
-test_b200_validation_setup_model_cleans_incomplete_baseline_dir_on_download_failure() {
+test_pack_validation_setup_model_cleans_incomplete_baseline_dir_on_download_failure() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
-    b200_setup_output_dirs
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
+    PACK_NET=1
+    pack_model_revision() { echo "rev"; }
 
     local model_id="Remote/Incomplete"
     local model_name
@@ -811,12 +856,14 @@ EOF
     assert_eq "2" "$(cat "${TEST_TMPDIR}/python3.count")" "python3 invoked again (no stale cached baseline dir)"
 }
 
-test_b200_validation_setup_model_succeeds_when_python_stub_creates_success_marker() {
+test_pack_validation_setup_model_succeeds_when_python_stub_creates_success_marker() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
-    b200_setup_output_dirs
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
+    PACK_NET=1
+    pack_model_revision() { echo "rev"; }
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
@@ -854,20 +901,20 @@ EOF
     assert_dir_exists "${out}" "baseline directory created"
 }
 
-test_b200_validation_estimate_model_params_defaults_to_7_without_config() {
+test_pack_validation_estimate_model_params_defaults_to_7_without_config() {
     mock_reset
 
-    source ./scripts/b200_validation_suite.sh
+    source ./scripts/proof_packs/lib/validation_suite.sh
 
     local model_dir="${TEST_TMPDIR}/model"
     mkdir -p "${model_dir}"
     assert_eq "7" "$(estimate_model_params "${model_dir}")" "missing config defaults to 7B"
 }
 
-test_b200_validation_estimate_model_params_classifies_when_config_is_present() {
+test_pack_validation_estimate_model_params_classifies_when_config_is_present() {
     mock_reset
 
-    source ./scripts/b200_validation_suite.sh
+    source ./scripts/proof_packs/lib/validation_suite.sh
 
     local model_dir="${TEST_TMPDIR}/model"
     mkdir -p "${model_dir}"
@@ -878,10 +925,10 @@ EOF
     assert_eq "7" "$(estimate_model_params "${model_dir}")" "config-based estimation classifies small bucket"
 }
 
-test_b200_validation_get_model_invarlock_config_covers_all_case_arms() {
+test_pack_validation_get_model_invarlock_config_covers_all_case_arms() {
     mock_reset
 
-    source ./scripts/b200_validation_suite.sh
+    source ./scripts/proof_packs/lib/validation_suite.sh
 
     assert_eq "2048:1024:64:64:96" "$(get_model_invarlock_config 7)" "7B config"
     assert_eq "1536:768:48:48:64" "$(get_model_invarlock_config 13)" "13B config"
@@ -892,12 +939,12 @@ test_b200_validation_get_model_invarlock_config_covers_all_case_arms() {
     assert_eq "1024:512:40:40:32" "$(get_model_invarlock_config unknown)" "default config"
 }
 
-test_b200_validation_create_edited_model_quant_rtn_and_unknown_edit_type_branches() {
+test_pack_validation_create_edited_model_quant_rtn_and_unknown_edit_type_branches() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
-    b200_setup_output_dirs
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
 
     fixture_write "python3.stub" ""
 
@@ -909,12 +956,12 @@ test_b200_validation_create_edited_model_quant_rtn_and_unknown_edit_type_branche
     assert_eq "4" "${rc}" "unknown edit type aborts via error_exit"
 }
 
-test_b200_validation_run_lmeval_batch_size_selection_flash_attention_and_results_handling() {
+test_pack_validation_run_lmeval_batch_size_selection_flash_attention_and_results_handling() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
-    b200_setup_output_dirs
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
 
     fixture_write "python3.stub" ""
 
@@ -943,12 +990,12 @@ test_b200_validation_run_lmeval_batch_size_selection_flash_attention_and_results
     run_lmeval "falcon-model" "${falcon_dir}/out.json" "mmlu" "auto" "0" "0"
 }
 
-test_b200_validation_run_lmeval_logs_warning_when_results_missing() {
+test_pack_validation_run_lmeval_logs_warning_when_results_missing() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
-    b200_setup_output_dirs
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
 
     fixture_write "python3.stub" ""
     estimate_model_params() { echo "7"; }
@@ -959,12 +1006,12 @@ test_b200_validation_run_lmeval_logs_warning_when_results_missing() {
     assert_ne "0" "${RUN_RC}" "missing results returns non-zero"
 }
 
-test_b200_validation_run_lmeval_returns_nonzero_when_results_move_fails() {
+test_pack_validation_run_lmeval_returns_nonzero_when_results_move_fails() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
-    b200_setup_output_dirs
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
 
     fixture_write "python3.stub" ""
     estimate_model_params() { echo "7"; }
@@ -978,31 +1025,31 @@ test_b200_validation_run_lmeval_returns_nonzero_when_results_move_fails() {
     assert_ne "0" "${RUN_RC}" "results move failure returns non-zero"
 }
 
-test_b200_validation_generate_invarlock_config_attn_and_strict_accelerator_flags() {
+test_pack_validation_generate_invarlock_config_attn_and_strict_accelerator_flags() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
+    source ./scripts/proof_packs/lib/validation_suite.sh
 
     FLASH_ATTENTION_AVAILABLE="true"
-    B200_DETERMINISM="strict"
+    PACK_DETERMINISM="strict"
     local cfg="${TEST_TMPDIR}/cfg.yaml"
     generate_invarlock_config "model" "${cfg}" "edit"
     assert_file_exists "${cfg}" "config generated"
     assert_match "flash_attention_2" "$(cat "${cfg}")" "attn implementation emitted"
 
     FLASH_ATTENTION_AVAILABLE="false"
-    B200_DETERMINISM="throughput"
+    PACK_DETERMINISM="throughput"
     generate_invarlock_config "model" "${cfg}" "edit"
     assert_match "flash_attention_2 not available" "$(cat "${cfg}")" "comment emitted when FA2 unavailable"
 }
 
-test_b200_validation_run_single_calibration_large_model_and_report_copy_branch() {
+test_pack_validation_run_single_calibration_large_model_and_report_copy_branch() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
-    b200_setup_output_dirs
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
 
     fixture_write "python3.stub" ""
     fixture_write "invarlock.create_report" ""
@@ -1018,12 +1065,12 @@ test_b200_validation_run_single_calibration_large_model_and_report_copy_branch()
     run_single_calibration "model" "${TEST_TMPDIR}/cal/run2" "42" "1" "1" "1" "${log_file}" "0"
 }
 
-test_b200_validation_run_invarlock_calibration_failure_paths_and_labels() {
+test_pack_validation_run_invarlock_calibration_failure_paths_and_labels() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
-    b200_setup_output_dirs
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
 
     fixture_write "python3.stub" ""
 
@@ -1040,12 +1087,12 @@ test_b200_validation_run_invarlock_calibration_failure_paths_and_labels() {
     assert_ne "0" "${rc}" "all calibration runs failing returns non-zero"
 }
 
-test_b200_validation_run_invarlock_certify_preset_optional_and_cert_copy_paths() {
+test_pack_validation_run_invarlock_certify_preset_optional_and_cert_copy_paths() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
-    b200_setup_output_dirs
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
 
     fixture_write "python3.stub" ""
 
@@ -1068,12 +1115,12 @@ test_b200_validation_run_invarlock_certify_preset_optional_and_cert_copy_paths()
     run_invarlock_certify "subject" "baseline" "${TEST_TMPDIR}/certs" "run_alt" "${preset_dir}" "model" "0"
 }
 
-test_b200_validation_process_model_branches_across_baseline_edits_and_error_injection() {
+test_pack_validation_process_model_branches_across_baseline_edits_and_error_injection() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
-    b200_setup_output_dirs
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
 
     setup_model() { return 1; }
     local rc=0
@@ -1097,18 +1144,18 @@ test_b200_validation_process_model_branches_across_baseline_edits_and_error_inje
     process_model "ok/model" "0"
 }
 
-test_b200_validation_main_dynamic_resume_and_monitoring_branches_offline() {
+test_pack_validation_main_dynamic_resume_and_monitoring_branches_offline() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
-    b200_setup_output_dirs
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
 
     # Stub early heavyweight phases.
     check_dependencies() { :; }
     configure_gpu_pool() { NUM_GPUS=2; GPU_ID_LIST="0,1"; export NUM_GPUS GPU_ID_LIST; }
     disk_preflight() { :; }
-    setup_b200_environment() { :; }
+    setup_pack_environment() { :; }
     handle_disk_pressure() { echo "disk_pressure:$1:$2" >> "${TEST_TMPDIR}/disk_pressure.calls"; return 0; }
 
     # Existing queue with tasks for --resume branch coverage.
@@ -1200,17 +1247,17 @@ EOF
     assert_file_exists "${TEST_TMPDIR}/shutdown.calls" "signal_shutdown called on empty queue"
 }
 
-test_b200_validation_main_dynamic_fresh_task_generation_and_touch_shutdown_branch() {
+test_pack_validation_main_dynamic_fresh_task_generation_and_touch_shutdown_branch() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
-    b200_setup_output_dirs
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
 
     check_dependencies() { :; }
     configure_gpu_pool() { NUM_GPUS=1; GPU_ID_LIST="0"; export NUM_GPUS GPU_ID_LIST; }
     disk_preflight() { :; }
-    setup_b200_environment() { :; }
+    setup_pack_environment() { :; }
     handle_disk_pressure() { return 0; }
 
     RESUME_FLAG="false"
@@ -1251,20 +1298,20 @@ EOF
     assert_file_exists "${OUTPUT_DIR}/workers/SHUTDOWN" "touch shutdown when signal_shutdown missing"
 }
 
-test_b200_validation_main_dynamic_calibrate_only_stops_after_presets_even_with_pending_tasks() {
+test_pack_validation_main_dynamic_calibrate_only_stops_after_presets_even_with_pending_tasks() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
     export OUTPUT_DIR
-    export B200_SUITE_MODE="calibrate-only"
+    export PACK_SUITE_MODE="calibrate-only"
 
-    source ./scripts/b200_validation_suite.sh
-    b200_setup_output_dirs
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
 
     check_dependencies() { :; }
     configure_gpu_pool() { NUM_GPUS=1; GPU_ID_LIST="0"; export NUM_GPUS GPU_ID_LIST; }
     disk_preflight() { :; }
-    setup_b200_environment() { :; }
+    setup_pack_environment() { :; }
     handle_disk_pressure() { return 0; }
 
     RESUME_FLAG="true"
@@ -1313,12 +1360,12 @@ EOF
     [[ ! -f "${TEST_TMPDIR}/analysis.calls" ]] || t_fail "analysis should not run for calibration-only mode"
 }
 
-test_b200_validation_main_wrapper_parses_progress_and_reports_failed_tasks_offline() {
+test_pack_validation_main_wrapper_parses_progress_and_reports_failed_tasks_offline() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/b200_validation_suite.sh
-    b200_setup_output_dirs
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
 
     log() { :; }
     log_section() { :; }
@@ -1326,7 +1373,7 @@ test_b200_validation_main_wrapper_parses_progress_and_reports_failed_tasks_offli
     check_dependencies() { :; }
     configure_gpu_pool() { NUM_GPUS=1; GPU_ID_LIST="0"; export NUM_GPUS GPU_ID_LIST; }
     disk_preflight() { :; }
-    setup_b200_environment() { :; }
+    setup_pack_environment() { :; }
 
     RESUME_FLAG="false"
     init_queue() {
@@ -1388,102 +1435,15 @@ EOF
     assert_file_exists "${TEST_TMPDIR}/python3.calls" "analysis steps invoke python3"
 }
 
-test_b200_validation_entrypoint_parses_calibrate_only_and_run_only_flags() {
+test_pack_validation_setup_output_dirs_returns_nonzero_when_output_dir_is_file() {
     mock_reset
 
-    source ./scripts/b200_validation_suite.sh
-
-    b200_require_bash4() { return 0; }
-    b200_source_libs() { return 0; }
-    b200_setup_output_dirs() { return 0; }
-    b200_setup_hf_cache_dirs() { return 0; }
-    cleanup() { return 0; }
-
-    main() {
-        echo "${B200_SUITE_MODE}:${RESUME_FLAG}" > "${TEST_TMPDIR}/entrypoint.flags"
-    }
-
-    (
-        OUTPUT_DIR="${TEST_TMPDIR}/out1"
-        b200_entrypoint --calibrate-only
-    )
-    assert_eq "calibrate-only:false" "$(cat "${TEST_TMPDIR}/entrypoint.flags")" "calibrate-only sets mode without resume"
-
-    (
-        OUTPUT_DIR="${TEST_TMPDIR}/out2"
-        b200_entrypoint --run-only
-    )
-    assert_eq "run-only:true" "$(cat "${TEST_TMPDIR}/entrypoint.flags")" "run-only sets mode and implies resume"
-}
-
-test_b200_validation_entrypoint_sets_output_dir_default_and_runs_main() {
-    mock_reset
-
-    source ./scripts/b200_validation_suite.sh
-
-    b200_require_bash4() { return 0; }
-    b200_source_libs() { return 0; }
-    b200_setup_output_dirs() { return 0; }
-    b200_setup_hf_cache_dirs() { return 0; }
-
-    main() { echo "${OUTPUT_DIR}" > "${TEST_TMPDIR}/entrypoint.output_dir"; }
-    cleanup() { return 0; }
-
-    (
-        OUTPUT_DIR=""
-        b200_entrypoint --resume
-    )
-
-    assert_file_exists "${TEST_TMPDIR}/entrypoint.output_dir" "main ran"
-    assert_eq "./invarlock_validation_b200_20250101_000000" "$(cat "${TEST_TMPDIR}/entrypoint.output_dir")" "default output dir uses deterministic date"
-}
-
-test_b200_validation_setup_output_dirs_returns_nonzero_when_output_dir_is_file() {
-    mock_reset
-
-    source ./scripts/b200_validation_suite.sh
+    source ./scripts/proof_packs/lib/validation_suite.sh
 
     OUTPUT_DIR="${TEST_TMPDIR}/out_file"
     echo "not a dir" > "${OUTPUT_DIR}"
 
-    run b200_setup_output_dirs
+    run pack_setup_output_dirs
     assert_rc "1" "${RUN_RC}" "mkdir failure propagates as non-zero"
 }
 
-test_b200_validation_entrypoint_exit_branches() {
-    mock_reset
-
-    source ./scripts/b200_validation_suite.sh
-
-    cleanup() { return 0; }
-    b200_source_libs() { return 0; }
-    b200_setup_output_dirs() { return 0; }
-    b200_setup_hf_cache_dirs() { return 0; }
-
-    _invoke_entrypoint() {
-        ( OUTPUT_DIR="" b200_entrypoint --resume )
-    }
-
-    # b200_require_bash4 || exit 1
-    b200_require_bash4() { return 1; }
-    run _invoke_entrypoint
-    assert_rc "1" "${RUN_RC}" "exit when bash4 guard fails"
-
-    # b200_source_libs || exit 1
-    b200_require_bash4() { return 0; }
-    b200_source_libs() { return 1; }
-    run _invoke_entrypoint
-    assert_rc "1" "${RUN_RC}" "exit when libs cannot be sourced"
-
-    # b200_setup_output_dirs || exit 1
-    b200_source_libs() { return 0; }
-    b200_setup_output_dirs() { return 1; }
-    run _invoke_entrypoint
-    assert_rc "1" "${RUN_RC}" "exit when output dir setup fails"
-
-    # b200_setup_hf_cache_dirs || exit 1
-    b200_setup_output_dirs() { return 0; }
-    b200_setup_hf_cache_dirs() { return 1; }
-    run _invoke_entrypoint
-    assert_rc "1" "${RUN_RC}" "exit when HF cache setup fails"
-}

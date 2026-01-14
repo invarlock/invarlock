@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # task_functions.sh - Atomic task implementations for dynamic scheduling
-# Version: v2.1.0-b200 (InvarLock B200 Validation Suite)
+# Version: proof-packs-v1 (InvarLock Proof Pack Suite)
 # Dependencies: jq, python3, invarlock CLI, lm_eval, task_serialization.sh
-# Usage: sourced by gpu_worker.sh/b200_validation_suite.sh for per-task execution
+# Usage: sourced by gpu_worker.sh/validation_suite.sh for per-task execution
 #
 # Each function executes a single atomic task type with explicit parameters.
 # These are extracted from the original monolithic process_model() function
@@ -50,9 +50,9 @@ _get_model_size_from_name() {
 _get_model_invarlock_config_fallback() {
     local model_size="$1"  # 7, 13, 30, 40, 70, moe
 
-    # Conservative defaults that satisfy CI pairing/coverage floors on B200.
+    # Conservative defaults that satisfy CI pairing/coverage floors for proof packs.
     # Use zero overlap (stride == seq_len) and ≥180 windows to avoid E001/E005
-    # if workers start without the main B200 wrapper.
+    # if workers start without the main suite wrapper.
     case "${model_size}" in
         "7")
             echo "2048:2048:192:192:96"
@@ -106,6 +106,30 @@ _get_invarlock_config() {
 
     # Use fallback
     _get_model_invarlock_config_fallback "${model_size}"
+}
+
+_task_get_model_revision() {
+    local model_id="$1"
+    if type pack_model_revision &>/dev/null; then
+        pack_model_revision "${model_id}"
+        return
+    fi
+    local path="${PACK_MODEL_REVISIONS_FILE:-${OUTPUT_DIR:-}/state/model_revisions.json}"
+    [[ -f "${path}" ]] || return 0
+    python3 - "${path}" "${model_id}" <<'PY' 2>/dev/null
+import json
+import sys
+
+path = sys.argv[1]
+model_id = sys.argv[2]
+try:
+    data = json.loads(open(path).read())
+except Exception:
+    raise SystemExit(0)
+
+revision = data.get("models", {}).get(model_id, {}).get("revision") or ""
+print(revision)
+PY
 }
 
 # Build lm-eval model_args with optional multi-GPU parallelization.
@@ -616,9 +640,25 @@ task_setup_baseline() {
         # Inline implementation
         echo "  Downloading model ${model_id}..." >> "${log_file}"
 
+        local revision=""
+        revision=$(_task_get_model_revision "${model_id}" || true)
+        if [[ -z "${revision}" ]]; then
+            if [[ "${PACK_NET}" == "1" ]]; then
+                echo "  ERROR: Missing pinned revision for ${model_id}; run preflight (--net 1)." >> "${log_file}"
+            else
+                echo "  ERROR: Offline mode requires model revisions. Run with --net 1 to preflight." >> "${log_file}"
+            fi
+            return 1
+        fi
+
+        if [[ "${PACK_NET}" != "1" ]]; then
+            echo "  ERROR: Offline mode requested and baseline not cached for ${model_id}." >> "${log_file}"
+            return 1
+        fi
+
         # CUDA_VISIBLE_DEVICES is inherited from execute_task() for multi-GPU support
         local exit_code=0
-        _cmd_python << SETUP_EOF >> "${log_file}" 2>&1 || exit_code=$?
+        PACK_MODEL_REVISION="${revision}" _cmd_python << SETUP_EOF >> "${log_file}" 2>&1 || exit_code=$?
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from pathlib import Path
@@ -630,10 +670,12 @@ model_id = "${model_id}"
 output_dir = Path("${baseline_dir}")
 output_dir.mkdir(parents=True, exist_ok=True)
 
-print(f"Downloading {model_id}...")
+revision = os.environ.get("PACK_MODEL_REVISION") or None
+rev_label = f"@{revision}" if revision else ""
+print(f"Downloading {model_id}{rev_label}...")
 
 try:
-    mode = os.environ.get("B200_DETERMINISM", "").strip().lower()
+    mode = os.environ.get("PACK_DETERMINISM", "").strip().lower()
     if mode == "strict":
         torch.backends.cuda.matmul.allow_tf32 = False
         torch.backends.cudnn.allow_tf32 = False
@@ -641,7 +683,11 @@ try:
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32 = True
 
-    tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_id,
+        trust_remote_code=True,
+        revision=revision,
+    )
     tokenizer.save_pretrained(output_dir)
 
     model = AutoModelForCausalLM.from_pretrained(
@@ -650,6 +696,7 @@ try:
         trust_remote_code=True,
         device_map="auto",
         low_cpu_mem_usage=True,
+        revision=revision,
     )
 
     model.save_pretrained(output_dir, safe_serialization=True)
@@ -1290,7 +1337,7 @@ YAML
 
     # Generate config YAML
     local config_yaml="${run_dir}/calibration_config.yaml"
-    local guards_order_csv="${B200_GUARDS_ORDER:-}"
+    local guards_order_csv="${PACK_GUARDS_ORDER:-}"
     local -a guards_order=()
     if [[ -n "${guards_order_csv}" ]]; then
         IFS=',' read -ra guards_order <<< "${guards_order_csv}"
@@ -2274,7 +2321,7 @@ if clean_params_path.exists():
 
 print(f"Loading baseline model once for {len(edit_specs)} edits...")
 
-mode = os.environ.get("B200_DETERMINISM", "").strip().lower()
+mode = os.environ.get("PACK_DETERMINISM", "").strip().lower()
 if mode == "strict":
     torch.backends.cuda.matmul.allow_tf32 = False
     torch.backends.cudnn.allow_tf32 = False

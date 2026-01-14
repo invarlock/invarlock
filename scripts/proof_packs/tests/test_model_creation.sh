@@ -3,7 +3,7 @@
 test_create_edited_model_unknown_type_exits_nonzero() {
     mock_reset
     # shellcheck source=../model_creation.sh
-    source "${TEST_ROOT}/scripts/lib/model_creation.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/model_creation.sh"
 
     local rc=0
     if ( create_edited_model "/b" "${TEST_TMPDIR}/out/model" "nope" "8" "128" "ffn" "0" ); then
@@ -17,7 +17,7 @@ test_create_edited_model_unknown_type_exits_nonzero() {
 test_create_pruned_model_invokes_python_wrapper() {
     mock_reset
     # shellcheck source=../model_creation.sh
-    source "${TEST_ROOT}/scripts/lib/model_creation.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/model_creation.sh"
 
     local calls="${TEST_TMPDIR}/python.calls"
     _cmd_python() { echo "python $*" >> "${calls}"; cat >/dev/null || true; return 0; }
@@ -30,7 +30,7 @@ test_create_pruned_model_invokes_python_wrapper() {
 test_create_pruned_model_returns_nonzero_when_parent_dir_is_file() {
     mock_reset
     # shellcheck source=../model_creation.sh
-    source "${TEST_ROOT}/scripts/lib/model_creation.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/model_creation.sh"
 
     local calls="${TEST_TMPDIR}/python.calls"
     _cmd_python() { echo "python $*" >> "${calls}"; cat >/dev/null || true; return 0; }
@@ -46,7 +46,7 @@ test_create_pruned_model_returns_nonzero_when_parent_dir_is_file() {
 test_create_edited_model_quant_rtn_invokes_python_wrapper() {
     mock_reset
     # shellcheck source=../model_creation.sh
-    source "${TEST_ROOT}/scripts/lib/model_creation.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/model_creation.sh"
 
     local calls="${TEST_TMPDIR}/python.calls"
     _cmd_python() { echo "python $*" >> "${calls}"; cat >/dev/null || true; return 0; }
@@ -59,7 +59,7 @@ test_create_edited_model_quant_rtn_invokes_python_wrapper() {
 test_create_lowrank_model_invokes_python_wrapper() {
     mock_reset
     # shellcheck source=../model_creation.sh
-    source "${TEST_ROOT}/scripts/lib/model_creation.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/model_creation.sh"
 
     local calls="${TEST_TMPDIR}/python.calls"
     _cmd_python() { echo "python $*" >> "${calls}"; cat >/dev/null || true; return 0; }
@@ -72,7 +72,7 @@ test_create_lowrank_model_invokes_python_wrapper() {
 test_create_fp8_model_invokes_python_wrapper() {
     mock_reset
     # shellcheck source=../model_creation.sh
-    source "${TEST_ROOT}/scripts/lib/model_creation.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/model_creation.sh"
 
     local calls="${TEST_TMPDIR}/python.calls"
     _cmd_python() { echo "python $*" >> "${calls}"; cat >/dev/null || true; return 0; }
@@ -85,7 +85,7 @@ test_create_fp8_model_invokes_python_wrapper() {
 test_create_error_model_invokes_python_wrapper() {
     mock_reset
     # shellcheck source=../model_creation.sh
-    source "${TEST_ROOT}/scripts/lib/model_creation.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/model_creation.sh"
 
     local calls="${TEST_TMPDIR}/python.calls"
     _cmd_python() { echo "python $*" >> "${calls}"; cat >/dev/null || true; return 0; }

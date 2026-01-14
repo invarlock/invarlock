@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Measurement contracts for guard estimators (approximation-only, GPU/MPS-first) recorded in certificates and enforced by `invarlock verify --profile ci|release`.
-- B200 validation suite workflow split: `scripts/b200_validation_suite.sh --calibrate-only` (stop after preset generation) and `--run-only` (resume remaining tasks).
+- Proof pack suite workflow split: `scripts/proof_packs/run_suite.sh --calibrate-only` (stop after preset generation) and `--run-only` (resume remaining tasks).
 - B200 backend revalidation harness for CPU vs CUDA SVD deltas (`scripts/b200_gpu_backend_validation/validate_svd_backend_equivalence.py`) plus a multi-GPU runner (`scripts/b200_gpu_backend_validation/run_multi_gpu.sh`).
 - B200 suite knob for controlled experiments: `B200_GUARDS_ORDER`.
 
@@ -22,8 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.5] - 2026-01-02
 
 ### Added
-- B200 validation bash test suite (`scripts/lib/tests/*`, `scripts/lib/tests/run.sh`) with deterministic command mocks and optional branch/line coverage checks.
-- B200 runtime helpers (`scripts/lib/runtime.sh`) plus a snapshot/diagnostics helper (`scripts/b200_invarlock_snapshot.sh`) to capture queue/worker/GPU state during long runs.
+- Proof pack bash test suite (`scripts/proof_packs/tests/*`, `scripts/proof_packs/tests/run.sh`) with deterministic command mocks and optional branch/line coverage checks.
+- Proof pack runtime helpers (`scripts/proof_packs/lib/runtime.sh`) plus pack build/verify helpers (`scripts/proof_packs/run_pack.sh`, `scripts/proof_packs/verify_pack.sh`) to capture artifacts during long runs.
 - Perplexity token-id sanitization to mask out-of-range IDs (and ignore them in labels) instead of triggering device-side asserts.
 
 ### Changed
@@ -45,7 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Chunked snapshot/restore support for HF adapters to reduce peak memory during retries.
-- B200 validation workflow helpers (bootstrap + scheduler/queue utilities + model creation tooling).
+- Proof pack workflow helpers (run_suite + scheduler/queue utilities + model creation tooling).
 
 ### Changed
 - CI/Release baseline pairing is fail-closed: `invarlock run --baseline ...` now requires valid `evaluation_windows` evidence and enforces dataset/tokenizer/masking parity.
@@ -109,7 +109,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **INVARLOCK_SKIP_OVERHEAD_CHECK env var** - Skip guard overhead measurement even with ci/release profiles for large models.
 - **Configurable PM acceptance range** - Set via preset config or `INVARLOCK_PM_ACCEPTANCE_MIN/MAX` environment variables.
-- **Comprehensive B200 validation guide** - New documentation at `docs/user-guide/b200-validation.md`.
+- **Comprehensive proof pack guide** - New documentation at `docs/user-guide/proof-packs.md`.
 
 ### Changed
 - B200 validation scripts updated to v2.0.1 with improved cleanup traps and progress monitoring.

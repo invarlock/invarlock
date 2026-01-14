@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # fault_tolerance.sh - Retry logic and error recovery
-# Version: v2.0.1 (InvarLock B200 Validation Suite)
+# Version: v2.0.1 (InvarLock Proof Pack Suite)
 # Dependencies: queue_manager.sh, scheduler.sh, jq
 # Usage: sourced optionally by gpu_worker.sh for retry/backoff handling
 #

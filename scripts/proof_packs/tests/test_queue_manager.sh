@@ -3,7 +3,7 @@
 test_acquire_queue_lock_recovers_stale_owner_pid() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
@@ -23,7 +23,7 @@ test_acquire_queue_lock_recovers_stale_owner_pid() {
 test_claim_complete_fail_and_retry_transitions() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     _now_iso() { echo "2025-01-01T00:00:00Z"; }
 
@@ -73,9 +73,9 @@ test_claim_complete_fail_and_retry_transitions() {
 test_resolve_dependencies_filters_non_calibration_tasks_in_calibration_only_mode() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
-    export B200_SUITE_MODE="calibrate-only"
+    export PACK_SUITE_MODE="calibrate-only"
 
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
@@ -100,9 +100,9 @@ test_resolve_dependencies_filters_non_calibration_tasks_in_calibration_only_mode
 test_demote_ready_tasks_for_calibration_only_moves_disallowed_ready_to_pending() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
-    export B200_SUITE_MODE="calibrate-only"
+    export PACK_SUITE_MODE="calibrate-only"
 
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
@@ -128,7 +128,7 @@ test_demote_ready_tasks_for_calibration_only_moves_disallowed_ready_to_pending()
 test_claim_task_returns_nonzero_when_mark_task_started_fails() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
@@ -148,7 +148,7 @@ test_claim_task_returns_nonzero_when_mark_task_started_fails() {
 test_complete_task_returns_nonzero_when_mark_task_completed_fails() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
@@ -169,7 +169,7 @@ test_complete_task_returns_nonzero_when_mark_task_completed_fails() {
 test_fail_task_returns_nonzero_when_mark_task_failed_fails() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
@@ -190,7 +190,7 @@ test_fail_task_returns_nonzero_when_mark_task_failed_fails() {
 test_retry_task_respects_max_retries() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
@@ -207,7 +207,7 @@ test_retry_task_respects_max_retries() {
 test_retry_task_sanitizes_missing_retry_fields() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
@@ -225,7 +225,7 @@ test_retry_task_sanitizes_missing_retry_fields() {
 test_cancel_tasks_with_failed_dependencies_moves_pending_to_failed() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     _now_iso() { echo "2025-01-01T00:00:00Z"; }
 
@@ -251,7 +251,7 @@ test_cancel_tasks_with_failed_dependencies_moves_pending_to_failed() {
 test_queue_lock_timeout_and_no_owner_stale_branches() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
@@ -279,7 +279,7 @@ test_queue_lock_timeout_and_no_owner_stale_branches() {
 test_queue_task_listing_and_count_branches() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
@@ -297,7 +297,7 @@ test_queue_task_listing_and_count_branches() {
 test_mark_task_ready_and_claim_lock_timeout_validation() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     _now_iso() { echo "2025-01-01T00:00:00Z"; }
 
@@ -318,7 +318,7 @@ test_mark_task_ready_and_claim_lock_timeout_validation() {
 test_complete_fail_and_retry_missing_file_branches() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
@@ -342,7 +342,7 @@ test_complete_fail_and_retry_missing_file_branches() {
 test_reclaim_orphaned_tasks_branches() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     _sleep() { :; }
 
@@ -395,7 +395,7 @@ test_reclaim_orphaned_tasks_branches() {
 test_check_dependencies_met_and_update_dependents_branches() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     _now_iso() { echo "2025-01-01T00:00:00Z"; }
 
@@ -419,7 +419,7 @@ test_check_dependencies_met_and_update_dependents_branches() {
 test_cancel_tasks_with_failed_dependencies_invalid_grace_and_mtime_missing_branches() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     _now_iso() { echo "2025-01-01T00:00:00Z"; }
     _now_epoch() { echo "100"; }
@@ -441,7 +441,7 @@ test_cancel_tasks_with_failed_dependencies_invalid_grace_and_mtime_missing_branc
 test_update_progress_state_status_and_percent_branches() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     _now_iso() { echo "2025-01-01T00:00:00Z"; }
 
@@ -464,7 +464,7 @@ test_update_progress_state_status_and_percent_branches() {
 test_find_and_refresh_branches() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
@@ -488,7 +488,7 @@ test_find_and_refresh_branches() {
 test_generate_model_tasks_use_batch_branches() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local seq=0
     add_task() { seq=$((seq + 1)); echo "t${seq}"; }
@@ -520,7 +520,7 @@ test_generate_model_tasks_use_batch_branches() {
 test_generate_model_tasks_sanitizes_invalid_calibration_runs() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local calls="${TEST_TMPDIR}/calls"
     : > "${calls}"
@@ -545,7 +545,7 @@ test_generate_model_tasks_sanitizes_invalid_calibration_runs() {
 test_generate_edit_tasks_sanitizes_cert_runs() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local calls="${TEST_TMPDIR}/calls"
     : > "${calls}"
@@ -598,7 +598,7 @@ test_generate_edit_tasks_sanitizes_cert_runs() {
 test_generate_all_tasks_and_update_model_task_memory_branches() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local calls=""
     generate_model_tasks() { calls+="$2;"; }
@@ -641,7 +641,7 @@ test_generate_all_tasks_and_update_model_task_memory_branches() {
 test_with_queue_lock_returns_nonzero_when_lock_acquire_fails() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
@@ -656,7 +656,7 @@ test_with_queue_lock_returns_nonzero_when_lock_acquire_fails() {
 test_with_queue_lock_runs_action_and_propagates_status() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
@@ -669,7 +669,7 @@ test_with_queue_lock_runs_action_and_propagates_status() {
 test_acquire_queue_lock_sleeps_when_lock_held_by_live_owner() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
@@ -705,7 +705,7 @@ test_acquire_queue_lock_sleeps_when_lock_held_by_live_owner() {
 test_print_queue_stats_and_is_queue_complete_cover_success_and_failure() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
@@ -724,7 +724,7 @@ test_print_queue_stats_and_is_queue_complete_cover_success_and_failure() {
 test_mark_task_ready_and_claim_task_return_nonzero_when_source_missing() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
@@ -739,7 +739,7 @@ test_mark_task_ready_and_claim_task_return_nonzero_when_source_missing() {
 test_mark_task_ready_returns_nonzero_when_update_task_status_fails() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
@@ -758,7 +758,7 @@ test_mark_task_ready_returns_nonzero_when_update_task_status_fails() {
 test_check_dependencies_met_returns_nonzero_when_task_json_is_invalid() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
@@ -771,7 +771,7 @@ test_check_dependencies_met_returns_nonzero_when_task_json_is_invalid() {
 test_check_dependencies_met_returns_nonzero_when_task_file_missing() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
@@ -783,7 +783,7 @@ test_check_dependencies_met_returns_nonzero_when_task_file_missing() {
 test_generate_eval_certify_tasks_and_generate_edit_tasks_create_expected_tasks() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     _now_iso() { echo "2025-01-01T00:00:00Z"; }
     estimate_model_memory() { echo "14"; }
@@ -806,7 +806,7 @@ test_generate_eval_certify_tasks_and_generate_edit_tasks_create_expected_tasks()
 test_task_ops_short_circuit_when_lock_acquire_fails() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
@@ -826,7 +826,7 @@ test_task_ops_short_circuit_when_lock_acquire_fails() {
 test_retry_task_short_circuits_when_lock_acquire_fails() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
@@ -842,7 +842,7 @@ test_retry_task_short_circuits_when_lock_acquire_fails() {
 test_retry_task_returns_nonzero_when_task_missing() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
@@ -854,7 +854,7 @@ test_retry_task_returns_nonzero_when_task_missing() {
 test_retry_task_atomic_update_failure_triggers_error_block() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
@@ -878,7 +878,7 @@ test_retry_task_atomic_update_failure_triggers_error_block() {
 test_retry_task_move_failure_returns_error() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
@@ -901,7 +901,7 @@ test_retry_task_move_failure_returns_error() {
 test_update_progress_state_returns_nonzero_when_atomic_move_fails() {
     mock_reset
     # shellcheck source=../queue_manager.sh
-    source "${TEST_ROOT}/scripts/lib/queue_manager.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
 
     local out_dir="${TEST_TMPDIR}/out"
     init_queue "${out_dir}" >/dev/null
