@@ -1,33 +1,48 @@
 # Certificate Telemetry Fields
 
-InvarLock certificates now embed latency, memory, and token throughput details under
-`/telemetry` for quick edge-readiness checks. Each field is copied directly from
-`report.json` when available and is always accompanied by the device recorded in
-`meta.device`.
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Document telemetry fields embedded in certificates. |
+| **Audience** | Operators validating latency/memory characteristics. |
+| **Source of truth** | `report.json` telemetry values copied into certificates. |
+
+## Quick Start
+
+```bash
+invarlock verify reports/telemetry/evaluation.cert.json
+jq '.telemetry' reports/telemetry/evaluation.cert.json
+```
+
+## Concepts
+
+- Telemetry values are copied from `report.json` and always include the device.
+- CPU telemetry sweeps are collected via `scripts/run_cpu_telemetry.sh`.
+
+## Reference
 
 | JSON Pointer | Meaning | Notes |
-|--------------|---------|-------|
-| `/telemetry/device` | Execution device reported by the run (e.g. `cpu`, `mps`, `cuda`). | Mirrors `meta.device`. |
-| `/telemetry/latency_ms_per_tok` | Mean wall-clock latency per generated token. | Reported in milliseconds/token. |
-| `/telemetry/memory_mb_peak` | Peak resident memory observed during the run. | Reported in MiB. |
-| `/telemetry/preview_total_tokens` | Total tokens processed in the preview split. | Helpful for throughput calculations. |
-| `/telemetry/final_total_tokens` | Total tokens processed in the final split. | Matches the tokens counted in the paired bootstrap. |
-| `/telemetry/throughput_tok_per_s` | Average throughput when available (tokens/second). | Present when the adapter surfaces throughput statistics. |
+| --- | --- | --- |
+| `/telemetry/device` | Execution device (`cpu`, `mps`, `cuda`). | Mirrors `meta.device`. |
+| `/telemetry/latency_ms_per_tok` | Mean latency per token. | ms/token. |
+| `/telemetry/memory_mb_peak` | Peak resident memory. | MiB. |
+| `/telemetry/preview_total_tokens` | Tokens processed in preview. | Derived from windows. |
+| `/telemetry/final_total_tokens` | Tokens processed in final. | Derived from windows. |
+| `/telemetry/throughput_tok_per_s` | Average throughput. | Present when available. |
 
-Use `invarlock verify` to ensure the certificate remains valid once extracted:
+## Troubleshooting
 
-```bash
-invarlock verify reports/release/gpt2_small/ci/quant8_cert/evaluation.cert.json
-jq '.telemetry' reports/release/gpt2_small/ci/quant8_cert/evaluation.cert.json
-```
+- **Telemetry missing**: ensure the run completed successfully and check
+  `report.metrics` for latency/memory values.
 
-For CPU edge targets, the helper profile `ci_cpu` and script below capture a
-minimal telemetry sweep:
+## Observability
 
-```bash
-bash scripts/run_cpu_telemetry.sh
-# certs emitted to reports/telemetry/cpu-ci/**/evaluation.cert.json
-```
+- `report.json` contains `metrics.latency_ms_per_tok` and `metrics.memory_mb_peak`.
+- `telemetry.summary_line` is emitted when `INVARLOCK_TELEMETRY=1`.
 
-The resulting certificates can be archived alongside the release matrix to
-showcase latency/memory behavior across both GPU/MPS and CPU deployments.
+## Related Documentation
+
+- [Artifact Layout](artifacts.md)
+- [Certificate Schema (v1)](certificate-schema.md)
+- [CLI Reference](cli.md)

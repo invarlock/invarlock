@@ -1,5 +1,45 @@
 # Certificate Schema (v1)
 
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Define the v1 certificate contract emitted by InvarLock. |
+| **Audience** | Operators verifying certificates and tool authors parsing them. |
+| **Schema version** | `schema_version = "v1"` (PM-only). |
+| **Source of truth** | `invarlock.reporting.certificate_schema.CERTIFICATE_JSON_SCHEMA`. |
+
+## Quick Start
+
+```bash
+# Generate a certificate from a run report
+invarlock report --run runs/subject/report.json --baseline runs/baseline/report.json --format cert
+
+# Validate certificate structure
+invarlock verify reports/cert/evaluation.cert.json
+```
+
+## Concepts
+
+- **Schema stability**: v1 is a PM-only contract; breaking changes require a
+  schema-version bump.
+- **Validation allow-list**: only specific `validation.*` flags are accepted by
+  the schema validator.
+- **Baseline pairing**: certificates assume paired windows; verification enforces
+  pairing in CI/Release profiles.
+
+### Provenance map
+
+| Certificate block | Sourced from report | Verify checks |
+| --- | --- | --- |
+| `meta` | `report.meta` | Schema only. |
+| `dataset` / `evaluation_windows` | `report.data`, `report.dataset.windows.stats` | Pairing + count checks. |
+| `primary_metric` | `report.metrics.primary_metric` | Ratio + drift band (CI/Release). |
+| `spectral` / `rmt` / `variance` | `report.guards[]` | Measurement contracts (CI/Release). |
+| `provenance.provider_digest` | `report.provenance.provider_digest` | Required in CI/Release. |
+
+## Reference
+
 This page anchors the certificate contract that InvarLock emits in the
 **PM‑only v1** format. It focuses on:
 
@@ -12,7 +52,7 @@ This page anchors the certificate contract that InvarLock emits in the
 
 ---
 
-## Minimal v1 Certificate Example
+### Minimal v1 Certificate Example
 
 The example below shows a realistic, PM‑only certificate envelope. It follows
 the current validator in `invarlock.reporting.certificate_schema` and the
@@ -122,7 +162,7 @@ Notes
 
 ---
 
-## Schema Summary (Validator View)
+### Schema Summary (Validator View)
 
 The v1 validator uses a JSON Schema (draft 2020‑12) embedded in
 `CERTIFICATE_JSON_SCHEMA`. The schema is intentionally permissive around new
@@ -162,8 +202,12 @@ fields while enforcing a small, stable core:
     - `invariants_pass`
     - `spectral_stable`
     - `rmt_stable`
+    - `hysteresis_applied`
+    - `moe_observed`
+    - `moe_identity_ok`
   - The validator rejects certificates that contain non‑boolean values under
-    any of these keys.
+    any of these keys; the allow‑list may expand when
+    `contracts/validation_keys.json` is present.
 
 - **Policy and structure**
   - `policy_digest` — small summary of tier policy thresholds and whether they
@@ -184,7 +228,35 @@ The full machine‑readable schema is available at runtime via
 `invarlock.reporting.certificate_schema.CERTIFICATE_JSON_SCHEMA`. Use that
 dict directly for tooling that needs strict validation.
 
-## Primary Metric Tail gate (optional)
+### Certificate → Verify matrix
+
+| Certificate block | Derived from | Verify checks |
+| --- | --- | --- |
+| `meta` | `report.meta` | Schema only. |
+| `dataset` / `evaluation_windows` | `report.data`, `report.dataset.windows.stats` | Pairing + count checks. |
+| `primary_metric` | `report.metrics.primary_metric` | Ratio + drift band (CI/Release). |
+| `validation` | `report.metrics` + policy thresholds | Schema allow‑list only. |
+| `spectral` / `rmt` / `variance` | `report.guards[]` | Measurement contracts (CI/Release). |
+| `guard_overhead` | `report.guard_overhead` | Required in Release unless skipped. |
+| `provenance.provider_digest` | `report.provenance.provider_digest` | Required in CI/Release. |
+
+### Required vs optional blocks
+
+| Key | Required | Source | Stability |
+| --- | --- | --- | --- |
+| `schema_version` | Yes | `CERTIFICATE_SCHEMA_VERSION` | PM-only v1 |
+| `run_id` | Yes | Run metadata | Stable |
+| `meta` | Yes | `report.meta` | Stable |
+| `dataset` | Yes | `report.dataset` + windows stats | Stable |
+| `primary_metric` | Yes | `report.metrics.primary_metric` | Stable |
+| `artifacts` | Yes | Run artifact paths | Stable |
+| `plugins` | Yes | Plugin discovery snapshot | Stable |
+| `validation` | Optional | Gate outcomes | Allow-list evolves |
+| `policy_digest` / `resolved_policy` | Optional | Tier policies | Calibrated changes |
+| `primary_metric_tail` | Optional | Paired ΔlogNLL tail gate | ppl-like only |
+| `structure` / `confidence` / `system_overhead` / `provenance` | Optional | Best-effort evidence | May evolve |
+
+### Primary Metric Tail gate (optional)
 
 For ppl-like metrics with paired per-window logloss, certificates may include
 `primary_metric_tail`, which records tail summaries of per-window ΔlogNLL vs the
@@ -197,3 +269,21 @@ baseline and the tail-gate evaluation outcome:
 - `primary_metric_tail.violations` — structured reasons when thresholds are exceeded.
 - `validation.primary_metric_tail_acceptable` — remains `true` in `warn` mode;
   flips `false` only when `mode=fail` and a violation is evaluated.
+
+## Troubleshooting
+
+- **Schema validation fails**: check `schema_version` and required top-level
+  fields (`run_id`, `meta`, `dataset`, `artifacts`, `primary_metric`).
+- **Unexpected validation keys**: ensure `validation.*` keys match the allow-list
+  in `certificate_schema`.
+
+## Observability
+
+- `validation.*`, `resolved_policy.*`, and `policy_digest.*` capture policy state.
+- `primary_metric_tail` appears only for ppl-like metrics with paired windows.
+
+## Related Documentation
+
+- [CLI Reference](cli.md)
+- [Certificate Telemetry](certificate_telemetry.md)
+- [Artifact Layout](artifacts.md)
