@@ -1,55 +1,57 @@
----
-title: GPU/MPS-First Guards (Decision Memo)
----
+# GPU/MPS-First Guards (Decision Memo)
 
-This document records the decisions for making InvarLock guards usable on
-large models (30B+ and beyond) where full-matrix SVD is operationally
-impractical.
+## Overview
 
-## Goals
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Record the guard design decisions enabling large-model execution. |
+| **Audience** | Contributors and reviewers of guard measurement contracts. |
+| **Scope** | Spectral + RMT guard contracts, accelerator-first design. |
+| **Source of truth** | Guard implementations in `src/invarlock/guards/*.py`. |
 
-- Make Spectral and RMT guard computations **device-resident** (CUDA/MPS-first).
-- Make guard math **approximation-only** (iterative, matvec-based).
-- Keep results **reproducible**: fixed budgets and deterministic sampling.
-- Bind guard semantics to certificates via a **measurement contract** that is
-  verify-time enforced.
+## Quick Start
 
-## Decisions
+This is a decision memo; for implementation usage see [Guards](guards.md).
 
-### 1) Single evidence mode
+## Concepts
 
-- There is a single canonical guard contract.
-- Certificates and verification require a complete measurement contract.
+- **Accelerator-first**: guard math must run on CUDA/MPS without full SVD.
+- **Approximation-only**: iterative estimators and deterministic sampling.
+- **Measurement contracts**: estimator + sampling policy must be recorded in certificates.
 
-### 2) Spectral contract: $\hat{\sigma}_{\max}$ + degeneracy proxies
+## Reference
 
-- Primary signal remains baseline-relative per-family monitoring of
-  $\hat{\sigma}_{\max}$ (largest singular value estimate).
-- The σmin/condition-number check is replaced with **GPU-feasible
-  degeneracy proxies**:
-  - stable-rank drift (baseline-relative)
-  - row/col norm collapse (baseline-relative)
+### Goals
 
-**Note:** these proxies are reduced coverage compared to true σmin/κ semantics;
-they are intended to catch collapse/rank loss in a scalable way.
+- Device-resident guard computation for large models.
+- Reproducible approximations with fixed budgets.
+- Contract binding enforced at verification time.
 
-### 3) RMT contract: activation edge risk score
+### Decisions
 
-- Replace “count of singular value outliers” with an activation **edge risk
-  score**:
-  - whiten activations (center + standardize)
-  - estimate top singular value $\hat{\sigma}_{\max}$
-  - normalize by the MP edge for the observed shape
-- Acceptance is baseline-relative via an ε-band on score growth (per family).
+1. **Single evidence mode**: one canonical contract for each guard.
+2. **Spectral contract**: track `σ̂_max` and degeneracy proxies (stable-rank drift,
+   row/col norm collapse).
+3. **RMT contract**: activation edge-risk score normalized by MP edge.
+4. **Verification gate**: certificates must record the measurement contract and hash.
 
-### 4) Verification gate: measurement contract binding
+### Non-goals
 
-- Certificates must record the measurement contract (estimator + sampling + dtype
-  policy).
-- Verification rejects certificates missing the contract or whose recorded
-  contract hash does not match the resolved policy.
+- Full-spectrum or exact SVD computations.
+- Certificates missing measurement contracts.
 
-## Non-goals
+## Troubleshooting
 
-- Support for certificates or policies without a complete measurement contract.
-- Full-spectrum or exact SVD computations in guard code paths.
+- See [Guards](guards.md) for operational guidance and guard configuration.
+
+## Observability
+
+- Contract hashes appear under `spectral.measurement_contract_hash` and
+  `rmt.measurement_contract_hash` in certificates.
+
+## Related Documentation
+
+- [Guards](guards.md)
+- [Guard Contracts & Primer](../assurance/04-guard-contracts.md)
+- [Spectral False-Positive Control](../assurance/05-spectral-fpr-derivation.md)
+- [RMT ε-Rule](../assurance/06-rmt-epsilon-rule.md)
