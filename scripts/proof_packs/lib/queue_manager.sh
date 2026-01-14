@@ -673,7 +673,9 @@ resolve_dependencies() {
                 local task_type=""
                 task_type="$(get_task_type "${task_file}" 2>/dev/null || true)"
                 case "${task_type}" in
-                    SETUP_BASELINE|CALIBRATION_RUN|GENERATE_PRESET) : ;;
+                    SETUP_BASELINE|CALIBRATION_RUN|GENERATE_PRESET)
+                        :
+                        ;;
                     *)
                         continue
                         ;;
@@ -696,7 +698,9 @@ resolve_dependencies() {
                 local task_type=""
                 task_type="$(get_task_type "${task_file}" 2>/dev/null || true)"
                 case "${task_type}" in
-                    SETUP_BASELINE|CALIBRATION_RUN|GENERATE_PRESET) : ;;
+                    SETUP_BASELINE|CALIBRATION_RUN|GENERATE_PRESET)
+                        :
+                        ;;
                     *)
                         continue
                         ;;
@@ -728,7 +732,9 @@ demote_ready_tasks_for_calibration_only() {
         local task_type=""
         task_type="$(get_task_type "${task_file}" 2>/dev/null || true)"
         case "${task_type}" in
-            SETUP_BASELINE|CALIBRATION_RUN|GENERATE_PRESET) : ;;
+            SETUP_BASELINE|CALIBRATION_RUN|GENERATE_PRESET)
+                :
+                ;;
             *)
                 update_task_status "${task_file}" "pending" 2>/dev/null || true
                 mv "${task_file}" "${QUEUE_DIR}/pending/" 2>/dev/null || true
@@ -1007,6 +1013,7 @@ generate_model_tasks() {
     local clean_cal_id=""
     local calibrate_clean="${CALIBRATE_CLEAN_EDITS:-true}"
     if [[ "${calibrate_clean}" == "true" && ${CLEAN_EDIT_RUNS:-0} -gt 0 ]]; then
+        :
         clean_cal_id=$(add_task "CALIBRATE_CLEAN" "${model_id}" "${model_name}" \
             "$(estimate_model_memory "${model_id}" "CALIBRATE_CLEAN")" \
             "${setup_id},${eval_base_id}" '{}' 82)
@@ -1057,6 +1064,7 @@ generate_model_tasks() {
 
     elif [[ "${use_batch}" == "true" ]]; then
         # CREATE_EDITS_BATCH - Create edits with a single model load (Batch optimization)
+        :
         local all_edit_specs='[
             {"spec": "quant_rtn:clean:ffn", "version": "clean"},
             {"spec": "fp8_quant:clean:ffn", "version": "clean"},
@@ -1187,6 +1195,7 @@ generate_model_tasks() {
 
             # CERTIFY_ERROR (only if preset exists)
             if [[ ${calibration_runs} -gt 0 ]]; then
+                :
                 local error_cert_id=$(add_task "CERTIFY_ERROR" "${model_id}" "${model_name}" \
                     "$(estimate_model_memory "${model_id}" "CERTIFY_ERROR")" \
                     "${error_create_id},${preset_id}" '{"error_type": "'"${error_type}"'"}' 55)

@@ -170,6 +170,7 @@ function is_case_pattern_line(s) {
     if (s ~ /^(case|esac|in)[[:space:]]/) return 0
     if (s ~ /^(;;|;;&|;&)/) return 0
     if (s ~ /\$\(/) return 0
+    if (s ~ /[$:{=}]/) return 0
     return (s ~ /^[^)]*\)/)
 }
 function case_pattern_has_inline_cmd(line,    pos, rest) {
@@ -510,6 +511,7 @@ function is_case_pattern_line(s) {
     if (s ~ /^(case|esac|in)[[:space:]]/) return 0
     if (s ~ /^(;;|;;&|;&)/) return 0
     if (s ~ /\$\(/) return 0
+    if (s ~ /[$:{=}]/) return 0
     return (s ~ /^[^)]*\)/)
 }
 function case_pattern_has_inline_cmd(line,    pos, rest) {

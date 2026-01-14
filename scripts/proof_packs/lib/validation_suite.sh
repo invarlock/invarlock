@@ -87,7 +87,9 @@ export GPU_MEMORY_GB="${GPU_MEMORY_GB:-}"
 # - strict: prefer deterministic-friendly flags and avoid overriding CLI presets.
 PACK_DETERMINISM="${PACK_DETERMINISM:-throughput}"
 case "${PACK_DETERMINISM}" in
-    strict|throughput) : ;;
+    strict|throughput)
+        :
+        ;;
     *)
         PACK_DETERMINISM="throughput"
         ;;
@@ -614,8 +616,6 @@ export FLASH_ATTENTION_AVAILABLE="false"
 
 # FP8 support flag - detected in setup
 export FP8_NATIVE_SUPPORT="false"
-# FP4 support flag retained for optional FP4 edits
-export FP4_NATIVE_SUPPORT="${FP4_NATIVE_SUPPORT:-false}"
 
 # Target memory fraction (0.92 = 92% of available) - optimal zone
 export CUDA_MEMORY_FRACTION=0.92
@@ -745,7 +745,7 @@ if clean_spec:
                 param1 = str(entry.get("bits", ""))
                 param2 = str(entry.get("group_size", ""))
                 scope = str(entry.get("scope") or scope or "")
-            elif edit_type in ("fp8_quant", "fp4_quant"):
+            elif edit_type == "fp8_quant":
                 param1 = str(entry.get("format", ""))
                 scope = str(entry.get("scope") or scope or "")
             elif edit_type == "magnitude_prune":
@@ -782,7 +782,7 @@ else:
         if not _is_int(param1):
             status = "invalid"
             reason = "invalid_lowrank_rank"
-    elif edit_type in ("fp8_quant", "fp4_quant"):
+    elif edit_type == "fp8_quant":
         if not param1:
             status = "invalid"
             reason = "invalid_fp_format"
@@ -794,8 +794,6 @@ if status == "selected" and not edit_dir_name:
         edit_dir_name = f"quant_{param1}bit_{version}" if version else ""
     elif edit_type == "fp8_quant":
         edit_dir_name = f"fp8_{param1}_{version}" if version else ""
-    elif edit_type == "fp4_quant":
-        edit_dir_name = f"fp4_{param1}_{version}" if version else ""
     elif edit_type == "magnitude_prune":
         try:
             pct = int(float(param1) * 100)
@@ -994,14 +992,30 @@ estimate_model_weights_gb() {
     fi
 
     case "${lower}" in
-        *"72b"*) echo 144 ;;
-        *"70b"*) echo 140 ;;
-        *"34b"*) echo 68 ;;
-        *"32b"*) echo 64 ;;
-        *"14b"*) echo 28 ;;
-        *"13b"*) echo 26 ;;
-        *"7b"*) echo 14 ;;
-        *) return 1 ;;
+        *"72b"*)
+            echo 144
+            ;;
+        *"70b"*)
+            echo 140
+            ;;
+        *"34b"*)
+            echo 68
+            ;;
+        *"32b"*)
+            echo 64
+            ;;
+        *"14b"*)
+            echo 28
+            ;;
+        *"13b"*)
+            echo 26
+            ;;
+        *"7b"*)
+            echo 14
+            ;;
+        *)
+            return 1
+            ;;
     esac
 }
 
@@ -2345,197 +2359,6 @@ EOF
 }
 export -f create_fp8_model
 
-# ============ FP4 QUANTIZATION (SIMULATED) ============
-create_fp4_model() {
-    local baseline_path="$1"
-    local output_path="$2"
-    local format="$3"      # e2m1 (standard) or aggressive
-    local scope="$4"       # ffn, attn, all
-    local gpu_id="${5:-0}"
-
-    log "Creating FP4 model (GPU ${gpu_id}):"
-    log "  Baseline: ${baseline_path}"
-    log "  Output: ${output_path}"
-    log "  Format: ${format}, Scope: ${scope}"
-    log "  FP4 Native Support: ${FP4_NATIVE_SUPPORT}"
-
-    mkdir -p "$(dirname "${output_path}")"
-
-    local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
-    CUDA_VISIBLE_DEVICES="${cuda_devices}" python3 << EOF
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from pathlib import Path
-import json
-import gc
-import os
-import sys
-
-try:
-    baseline_path = Path("${baseline_path}")
-    output_path = Path("${output_path}")
-    format_type = "${format}"
-    scope = "${scope}"
-
-    # Check for native FP4 support (Blackwell-class GPUs)
-    if not torch.cuda.is_available():
-        raise RuntimeError("CUDA not available")
-
-    device_name = torch.cuda.get_device_name(0)
-    is_blackwell = "B200" in device_name or "Blackwell" in device_name
-
-    require_native = os.environ.get("INVARLOCK_REQUIRE_FP4_NATIVE", "false").strip().lower() in ("1", "true", "yes")
-    te_available = False
-    try:
-        import transformer_engine.pytorch as te  # noqa: F401
-        te_available = True
-    except Exception as e:
-        if require_native:
-            raise RuntimeError("TransformerEngine not available for native FP4 validation") from e
-
-    fp4_native = bool(is_blackwell and te_available)
-
-    if not fp4_native:
-        if is_blackwell:
-            print("WARNING: Blackwell-class GPU detected but TransformerEngine not available.")
-            print("         FP4 quantization is simulated; no FP4 Tensor Core validation.")
-        else:
-            print(f"WARNING: FP4 native support is Blackwell-class; current GPU: {device_name}")
-            print("         FP4 quantization is simulated; results may not match native FP4 behavior")
-
-    print(f"Loading baseline from {baseline_path}...")
-    tokenizer = AutoTokenizer.from_pretrained(baseline_path, trust_remote_code=True)
-    model = AutoModelForCausalLM.from_pretrained(
-        baseline_path,
-        torch_dtype=torch.bfloat16,
-        trust_remote_code=True,
-        device_map="auto",
-        low_cpu_mem_usage=True,
-    )
-
-    def should_quantize(name, scope):
-        """Check if parameter should be FP4 quantized.
-
-        Supports multiple architectures (LLaMA, MPT, Falcon).
-        """
-        name_lower = name.lower()
-        if scope == "all":
-            return "weight" in name_lower and any(x in name_lower for x in [
-                "linear", "proj", "fc", "mlp", "attn",
-                "wqkv", "query_key_value"  # MPT/Falcon
-            ])
-        elif scope == "ffn":
-            return "weight" in name_lower and any(x in name_lower for x in [
-                "mlp", "fc", "gate", "up_proj", "down_proj",
-                "dense_h_to_4h", "dense_4h_to_h"  # Falcon FFN
-            ])
-        elif scope == "attn":
-            return "weight" in name_lower and any(x in name_lower for x in [
-                "attn", "q_proj", "k_proj", "v_proj", "o_proj",
-                "wqkv", "out_proj", "query_key_value"  # MPT/Falcon
-            ])
-        return False
-
-    @torch.no_grad()
-    def fp4_quantize(tensor, format_type):
-        """
-        FP4 quantization (E2M1 or aggressive).
-
-        E2M1 format: 2 exponent bits, 1 mantissa bit
-        Range: [-6, 6] with 7 distinct magnitudes + zero
-
-        Aggressive: tighter clipping for stress testing
-        """
-        # FP4 E2M1 representable values (approximate)
-        if format_type == "e2m1":
-            # Standard E2M1: {0, ±0.5, ±1, ±1.5, ±2, ±3, ±4, ±6}
-            levels = torch.tensor([0.0, 0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0], device=tensor.device, dtype=torch.float16)
-        else:
-            # Aggressive: tighter range for stress testing
-            levels = torch.tensor([0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0], device=tensor.device, dtype=torch.float16)
-
-        # Memory-safe nearest-level quantization via bucketize (no NxK diff matrix).
-        max_val = float(levels[-1].item())
-        scale = tensor.abs().amax().float() / max_val
-        scale = torch.clamp(scale, min=1e-10).to(device=tensor.device, dtype=torch.float16)
-
-        thresholds = ((levels[:-1] + levels[1:]) / 2).to(device=tensor.device)
-
-        flat = tensor.view(-1)
-        n = flat.numel()
-        chunk_elems = 5_000_000  # Bound peak temp memory (idx is int64)
-        for start in range(0, n, chunk_elems):
-            end = min(start + chunk_elems, n)
-            chunk = flat[start:end]
-            scaled = chunk.to(torch.float16) / scale
-            idx = torch.bucketize(scaled.abs(), thresholds)
-            q = levels[idx] * scaled.sign()
-            chunk.copy_((q * scale).to(chunk.dtype))
-
-        return tensor
-
-    print(f"Applying FP4 quantization (format={format_type}, scope={scope})...")
-    quantized_count = 0
-    total_error = 0
-    num_tensors = 0
-    total_model_params = sum(p.numel() for p in model.parameters())
-    edited_params = 0
-
-    for name, param in model.named_parameters():
-        if should_quantize(name, scope) and param.dim() >= 2:
-            original = param.data.clone()
-            param.data = fp4_quantize(param.data, format_type)
-
-            # Compute relative error
-            error = (param.data - original).abs().mean() / (original.abs().mean() + 1e-10)
-            total_error += error.item()
-            quantized_count += 1
-            num_tensors += 1
-            edited_params += param.numel()
-
-            if quantized_count <= 3:
-                print(f"  FP4: {name}, rel_error: {error.item():.4f}")
-
-    avg_error = total_error / num_tensors if num_tensors > 0 else 0
-    coverage_pct = 100.0 * edited_params / total_model_params if total_model_params > 0 else 0
-    print(f"Quantized {quantized_count} tensors ({edited_params:,} / {total_model_params:,} = {coverage_pct:.1f}% coverage)")
-    print(f"Average relative error: {avg_error:.4f}")
-
-    model = model.cpu()
-    gc.collect()
-    torch.cuda.empty_cache()
-
-    output_path.mkdir(parents=True, exist_ok=True)
-    tokenizer.save_pretrained(output_path)
-    model.save_pretrained(output_path, safe_serialization=True)
-
-    metadata = {
-        "edit_type": "fp4_quant",
-        "format": format_type,
-        "scope": scope,
-        "quantized_tensors": quantized_count,
-        "avg_relative_error": avg_error,
-        "pack_native": is_b200,
-        "fp4_native": fp4_native,
-        "transformer_engine": te_available
-    }
-    with open(output_path / "edit_metadata.json", "w") as f:
-        json.dump(metadata, f, indent=2)
-
-    del model
-    gc.collect()
-    torch.cuda.empty_cache()
-    print(f"Saved FP4-quantized model to {output_path}")
-
-except Exception as e:
-    print(f"ERROR: Failed to create FP4 model: {e}", file=sys.stderr)
-    import traceback
-    traceback.print_exc()
-    sys.exit(1)
-EOF
-}
-export -f create_fp4_model
-
 # ============ ERROR MODEL CREATION ============
 create_error_model() {
     local baseline_path="$1"
@@ -2749,10 +2572,6 @@ process_edit() {
             # 3-part: type:format:scope -> param1=format, scope=scope
             create_fp8_model "${baseline_path}" "${edit_path}" "${param1}" "${scope}" "${gpu_id}" || create_result=$?
             ;;
-        "fp4_quant")
-            # 3-part: type:format:scope -> param1=format, scope=scope
-            create_fp4_model "${baseline_path}" "${edit_path}" "${param1}" "${scope}" "${gpu_id}" || create_result=$?
-            ;;
         "magnitude_prune")
             # 3-part: type:sparsity:scope -> param1=sparsity, scope=scope
             create_pruned_model "${baseline_path}" "${edit_path}" "${param1}" "${scope}" "${gpu_id}" || create_result=$?
@@ -2793,11 +2612,21 @@ run_lmeval() {
     if [[ "${batch_size}" == "auto" ]]; then
         local model_size=$(estimate_model_params "${model_path}")
         case "${model_size}" in
-            "70"|"72") effective_batch_size="${EVAL_BATCH_SIZE_LARGE}" ;;
-            "40")      effective_batch_size="${EVAL_BATCH_SIZE_MEDIUM}" ;;
-            "30")      effective_batch_size="${EVAL_BATCH_SIZE_MEDIUM}" ;;  # MPT-30B uses medium
-            "moe")     effective_batch_size="${EVAL_BATCH_SIZE_MOE}" ;;      # Mixtral/MoE models
-            *)         effective_batch_size="${EVAL_BATCH_SIZE_SMALL}" ;;
+            "70"|"72")
+                effective_batch_size="${EVAL_BATCH_SIZE_LARGE}"
+                ;;
+            "40")
+                effective_batch_size="${EVAL_BATCH_SIZE_MEDIUM}"
+                ;;
+            "30")
+                effective_batch_size="${EVAL_BATCH_SIZE_MEDIUM}"  # MPT-30B uses medium
+                ;;
+            "moe")
+                effective_batch_size="${EVAL_BATCH_SIZE_MOE}"  # Mixtral/MoE models
+                ;;
+            *)
+                effective_batch_size="${EVAL_BATCH_SIZE_SMALL}"
+                ;;
         esac
         # Log with proper label for model size (avoid "moeB params")
         if [[ "${model_size}" == "moe" ]]; then
@@ -3140,6 +2969,8 @@ run_invarlock_calibration() {
     python3 << CALIBRATION_SCRIPT
 import json
 import math
+import os
+import re
 import statistics
 from pathlib import Path
 from collections import defaultdict
@@ -3749,11 +3580,18 @@ spectral_summary, spectral_caps = calibrate_spectral(records)
 rmt_summary, rmt_epsilon = calibrate_rmt(records)
 variance_config = calibrate_variance(records)
 
+gpu_count = (os.environ.get("PACK_GPU_COUNT") or os.environ.get("NUM_GPUS") or "").strip() or "unknown"
+gpu_mem = (os.environ.get("PACK_GPU_MEM_GB") or os.environ.get("GPU_MEMORY_GB") or "").strip()
+gpu_name = (os.environ.get("PACK_GPU_NAME") or "GPU").strip() or "GPU"
+gpu_mem_label = f"{gpu_mem}GB" if gpu_mem else "unknown"
+tag_name = re.sub(r"[^A-Za-z0-9]+", "_", gpu_name).strip("_") or "GPU"
+platform_tag = f"{tag_name}_{gpu_mem_label}_x{gpu_count}"
+
 preset = {
     "_calibration_meta": {
         "model_name": model_name,
         "tier": tier,
-        "platform": "PACK_180GB",
+        "platform": platform_tag,
         "drift_mean": drift_stats.get("mean"),
         "drift_std": drift_stats.get("std"),
         "drift_band_compatible": drift_stats.get("band_compatible"),

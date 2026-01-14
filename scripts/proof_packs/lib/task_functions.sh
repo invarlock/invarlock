@@ -245,7 +245,7 @@ if clean_spec:
                 param1 = str(entry.get("bits", ""))
                 param2 = str(entry.get("group_size", ""))
                 scope = str(entry.get("scope") or scope or "")
-            elif edit_type in ("fp8_quant", "fp4_quant"):
+            elif edit_type == "fp8_quant":
                 param1 = str(entry.get("format", ""))
                 scope = str(entry.get("scope") or scope or "")
             elif edit_type == "magnitude_prune":
@@ -282,7 +282,7 @@ else:
         if not _is_int(param1):
             status = "invalid"
             reason = "invalid_lowrank_rank"
-    elif edit_type in ("fp8_quant", "fp4_quant"):
+    elif edit_type == "fp8_quant":
         if not param1:
             status = "invalid"
             reason = "invalid_fp_format"
@@ -294,8 +294,6 @@ if status == "selected" and not edit_dir_name:
         edit_dir_name = f"quant_{param1}bit_{version}" if version else ""
     elif edit_type == "fp8_quant":
         edit_dir_name = f"fp8_{param1}_{version}" if version else ""
-    elif edit_type == "fp4_quant":
-        edit_dir_name = f"fp4_{param1}_{version}" if version else ""
     elif edit_type == "magnitude_prune":
         try:
             pct = int(float(param1) * 100)
@@ -469,7 +467,9 @@ execute_task() {
 
     local job_control_enabled=0
     case $- in
-        *m*) job_control_enabled=1 ;;
+        *m*)
+            job_control_enabled=1
+            ;;
     esac
     if [[ ${job_control_enabled} -eq 0 ]]; then
         set -m
@@ -865,7 +865,7 @@ task_calibrate_clean_edits() {
         echo "ERROR: Clean calibration lock held too long" >> "${log_file}"
         return 1
     fi
-    trap 'rm -rf "${lock_dir}"' RETURN
+    trap 'rm -rf "${lock_dir:-}"' RETURN
 
     local calib_eval="${model_output_dir}/evals/baseline_calibration_results.json"
     local calib_tmp_dir="${model_output_dir}/evals/.clean_calib"
@@ -1117,6 +1117,7 @@ PY
                 selected="true"
                 case "${family}" in
                     "quant_rtn")
+                        :
                         status_payload=$(jq -n \
                             --arg status "selected" \
                             --arg scope "${scope}" \
@@ -1126,6 +1127,7 @@ PY
                             '{status:$status, bits:$bits, group_size:$group_size, scope:$scope, edit_dir_name:$edit_dir_name}')
                         ;;
                     "fp8_quant")
+                        :
                         status_payload=$(jq -n \
                             --arg status "selected" \
                             --arg scope "${scope}" \
@@ -1134,6 +1136,7 @@ PY
                             '{status:$status, format:$format, scope:$scope, edit_dir_name:$edit_dir_name}')
                         ;;
                     "magnitude_prune")
+                        :
                         status_payload=$(jq -n \
                             --arg status "selected" \
                             --arg scope "${scope}" \
@@ -1142,6 +1145,7 @@ PY
                             '{status:$status, sparsity:$sparsity, scope:$scope, edit_dir_name:$edit_dir_name}')
                         ;;
                     "lowrank_svd")
+                        :
                         status_payload=$(jq -n \
                             --arg status "selected" \
                             --arg scope "${scope}" \
@@ -1309,10 +1313,7 @@ task_calibration_run() {
     fi
 
     echo "  Calibration: enforcing window_overlap_fraction=0.0" >> "${log_file}"
-    local -a extra_env=(
-        INVARLOCK_WINDOW_OVERLAP_FRACTION=0.0
-        INVARLOCK_SKIP_OVERHEAD_CHECK=1
-    )
+    local -a extra_env=(INVARLOCK_WINDOW_OVERLAP_FRACTION=0.0 INVARLOCK_SKIP_OVERHEAD_CHECK=1)
     if _is_large_model "${model_size}"; then
         echo "  Large model (${model_size}): SKIP_OVERHEAD_CHECK=1" >> "${log_file}"
     fi
@@ -2225,14 +2226,6 @@ task_create_edit() {
                 return 1
             fi
             ;;
-        "fp4_quant")
-            if type create_fp4_model &>/dev/null; then
-                create_fp4_model "${baseline_path}" "${edit_path}" "${param1}" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1 || true
-            else
-                echo "ERROR: create_fp4_model not available" >> "${log_file}"
-                return 1
-            fi
-            ;;
         "magnitude_prune")
             if type create_pruned_model &>/dev/null; then
                 create_pruned_model "${baseline_path}" "${edit_path}" "${param1}" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1 || true
@@ -2379,8 +2372,6 @@ def parse_edit_spec(spec_str):
                 "edit_dir_name": entry.get("edit_dir_name"),
             }
         return {"type": "fp8_quant", "format": parts[1], "scope": parts[2]}
-    if edit_type == "fp4_quant":
-        return {"type": "fp4_quant", "format": parts[1], "scope": parts[2]}
     if edit_type == "magnitude_prune":
         if len(parts) > 1 and parts[1] == "clean":
             entry, status = _clean_entry()
@@ -2420,8 +2411,6 @@ def get_edit_dir_name(parsed_spec, version):
         return f"quant_{parsed_spec['bits']}bit_{version}"
     if t == "fp8_quant":
         return f"fp8_{parsed_spec['format']}_{version}"
-    if t == "fp4_quant":
-        return f"fp4_{parsed_spec['format']}_{version}"
     if t == "magnitude_prune":
         pct = int(parsed_spec["ratio"] * 100)
         return f"prune_{pct}pct_{version}"
@@ -2534,42 +2523,6 @@ def apply_fp8(model, format_type, scope):
         param.data = _quantize(param.data)
     return edited
 
-def apply_fp4(model, format_type, scope):
-    import copy
-    edited = copy.deepcopy(model)
-    target_modules = _target_modules(scope)
-
-    if format_type == "e2m1":
-        levels = torch.tensor([0.0, 0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0], dtype=torch.float16)
-    else:
-        levels = torch.tensor([0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0], dtype=torch.float16)
-
-    def fp4_quantize_inplace(t, chunk_elems=5_000_000):
-        max_val = float(levels[-1].item())
-        scale = t.abs().amax().float() / max_val
-        scale = torch.clamp(scale, min=1e-10).to(device=t.device, dtype=torch.float16)
-
-        lvl = levels.to(device=t.device)
-        thresholds = ((lvl[:-1] + lvl[1:]) / 2).to(device=t.device)
-
-        flat = t.view(-1)
-        n = flat.numel()
-        for start in range(0, n, chunk_elems):
-            end = min(start + chunk_elems, n)
-            chunk = flat[start:end]
-            scaled = chunk.to(torch.float16) / scale
-            idx = torch.bucketize(scaled.abs(), thresholds)
-            q = lvl[idx] * scaled.sign()
-            chunk.copy_((q * scale).to(chunk.dtype))
-
-    for name, param in edited.named_parameters():
-        if not any(t in name.lower() for t in target_modules):
-            continue
-        if param.dim() < 2:
-            continue
-        fp4_quantize_inplace(param.data)
-    return edited
-
 created_count = 0
 failed_count = 0
 
@@ -2605,8 +2558,6 @@ for spec_entry in edit_specs:
             edited_model = apply_lowrank(model, parsed["rank"], parsed["scope"])
         elif t == "fp8_quant":
             edited_model = apply_fp8(model, parsed["format"], parsed["scope"])
-        elif t == "fp4_quant":
-            edited_model = apply_fp4(model, parsed["format"], parsed["scope"])
         else:
             raise ValueError(f"Unknown edit type: {t}")
 

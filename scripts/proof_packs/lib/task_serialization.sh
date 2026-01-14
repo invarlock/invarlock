@@ -565,7 +565,7 @@ validate_task() {
 
     # Validate task_type
     local task_type=$(get_task_type "${task_file}")
-    # v2.1.0-b200: Added CREATE_EDITS_BATCH and split eval benchmarks (EVAL_MMLU, etc.)
+    # v2.1.0: Added CREATE_EDITS_BATCH and split eval benchmarks (EVAL_MMLU, etc.)
     local valid_types="SETUP_BASELINE EVAL_BASELINE CALIBRATION_RUN CREATE_EDIT CREATE_EDITS_BATCH EVAL_EDIT EVAL_MMLU EVAL_HELLASWAG EVAL_ARC EVAL_WINOGRANDE CERTIFY_EDIT CREATE_ERROR CERTIFY_ERROR GENERATE_PRESET"
     if [[ ! " ${valid_types} " =~ " ${task_type} " ]]; then
         echo "ERROR: Invalid task_type '${task_type}' in: ${task_file}" >&2
@@ -677,12 +677,24 @@ estimate_model_memory() {
     # Base memory in GB
     local base_memory
     case "${size_bucket}" in
-        "70"|"72") base_memory=140 ;;
-        "moe")     base_memory=90 ;;
-        "40")      base_memory=80 ;;
-        "30")      base_memory=64 ;;
-        "13")      base_memory=26 ;;
-        *)         base_memory=14 ;;
+        "70"|"72")
+            base_memory=140
+            ;;
+        "moe")
+            base_memory=90
+            ;;
+        "40")
+            base_memory=80
+            ;;
+        "30")
+            base_memory=64
+            ;;
+        "13")
+            base_memory=26
+            ;;
+        *)
+            base_memory=14
+            ;;
     esac
 
     local is_large="false"
@@ -694,31 +706,75 @@ estimate_model_memory() {
     local multiplier
     if [[ "${is_large}" == "true" ]]; then
         case "${task_type}" in
-            "SETUP_BASELINE")  multiplier="1.0" ;;
-            "EVAL_BASELINE")   multiplier="1.1" ;;
-            "CALIBRATE_CLEAN") multiplier="1.2" ;;
-            "CALIBRATION_RUN") multiplier="1.05" ;;
-            "CREATE_EDIT")     multiplier="1.2" ;;
-            "EVAL_EDIT")       multiplier="1.1" ;;
-            "CERTIFY_EDIT")    multiplier="1.05" ;;
-            "CREATE_ERROR")    multiplier="1.15" ;;
-            "CERTIFY_ERROR")   multiplier="1.05" ;;
-            "GENERATE_PRESET") multiplier="0.1" ;;  # CPU only
-            *)                 multiplier="1.1" ;;
+            "SETUP_BASELINE")
+                multiplier="1.0"
+                ;;
+            "EVAL_BASELINE")
+                multiplier="1.1"
+                ;;
+            "CALIBRATE_CLEAN")
+                multiplier="1.2"
+                ;;
+            "CALIBRATION_RUN")
+                multiplier="1.05"
+                ;;
+            "CREATE_EDIT")
+                multiplier="1.2"
+                ;;
+            "EVAL_EDIT")
+                multiplier="1.1"
+                ;;
+            "CERTIFY_EDIT")
+                multiplier="1.05"
+                ;;
+            "CREATE_ERROR")
+                multiplier="1.15"
+                ;;
+            "CERTIFY_ERROR")
+                multiplier="1.05"
+                ;;
+            "GENERATE_PRESET")
+                multiplier="0.1"  # CPU only
+                ;;
+            *)
+                multiplier="1.1"
+                ;;
         esac
     else
         case "${task_type}" in
-            "SETUP_BASELINE")  multiplier="1.0" ;;
-            "EVAL_BASELINE")   multiplier="1.2" ;;
-            "CALIBRATE_CLEAN") multiplier="1.4" ;;
-            "CALIBRATION_RUN") multiplier="1.1" ;;
-            "CREATE_EDIT")     multiplier="1.5" ;;
-            "EVAL_EDIT")       multiplier="1.2" ;;
-            "CERTIFY_EDIT")    multiplier="1.1" ;;
-            "CREATE_ERROR")    multiplier="1.3" ;;
-            "CERTIFY_ERROR")   multiplier="1.1" ;;
-            "GENERATE_PRESET") multiplier="0.1" ;;  # CPU only
-            *)                 multiplier="1.2" ;;
+            "SETUP_BASELINE")
+                multiplier="1.0"
+                ;;
+            "EVAL_BASELINE")
+                multiplier="1.2"
+                ;;
+            "CALIBRATE_CLEAN")
+                multiplier="1.4"
+                ;;
+            "CALIBRATION_RUN")
+                multiplier="1.1"
+                ;;
+            "CREATE_EDIT")
+                multiplier="1.5"
+                ;;
+            "EVAL_EDIT")
+                multiplier="1.2"
+                ;;
+            "CERTIFY_EDIT")
+                multiplier="1.1"
+                ;;
+            "CREATE_ERROR")
+                multiplier="1.3"
+                ;;
+            "CERTIFY_ERROR")
+                multiplier="1.1"
+                ;;
+            "GENERATE_PRESET")
+                multiplier="0.1"  # CPU only
+                ;;
+            *)
+                multiplier="1.2"
+                ;;
         esac
     fi
 

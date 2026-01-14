@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Measurement contracts for guard estimators (approximation-only, GPU/MPS-first) recorded in certificates and enforced by `invarlock verify --profile ci|release`.
 - Proof pack suite workflow split: `scripts/proof_packs/run_suite.sh --calibrate-only` (stop after preset generation) and `--run-only` (resume remaining tasks).
 - B200 backend revalidation harness for CPU vs CUDA SVD deltas (`scripts/b200_gpu_backend_validation/validate_svd_backend_equivalence.py`) plus a multi-GPU runner (`scripts/b200_gpu_backend_validation/run_multi_gpu.sh`).
-- B200 suite knob for controlled experiments: `B200_GUARDS_ORDER`.
+- Proof pack suite knob for controlled experiments: `PACK_GUARDS_ORDER`.
 
 ### Changed
 - B200 calibration configs now default to `guards.order: [invariants, variance, invariants]` (drops spectral/rmt) to avoid CPU-bound SVD (`torch.linalg.svdvals` / MKL `sgesdd`) dominating wall time and making GPUs appear idle during calibration.
