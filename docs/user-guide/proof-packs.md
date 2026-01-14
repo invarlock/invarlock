@@ -18,6 +18,11 @@ that can fit the selected models.
 ./scripts/proof_packs/verify_pack.sh --pack ./proof_pack_runs/subset_20250101_000000/proof_pack
 ```
 
+## How It Works
+
+This page focuses on running proof packs. For the internal task graph,
+scheduler flow, and artifacts, see [Proof Pack Internals](proof-packs-internals.md).
+
 ## Suites
 
 Model suites live in `scripts/proof_packs/suites.sh`. You can also override individual
