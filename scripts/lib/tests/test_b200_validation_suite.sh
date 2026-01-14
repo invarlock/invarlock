@@ -403,16 +403,16 @@ test_b200_validation_process_edit_parses_specs_dispatches_creators_and_covers_re
     mkdir -p "${model_out}"
 
     create_edited_model() { mkdir -p "${2}"; : > "${2}/config.json"; return "${CREATE_RC:-0}"; }
-    create_fp4_model() { mkdir -p "${2}"; : > "${2}/config.json"; return 0; }
+    create_fp8_model() { mkdir -p "${2}"; : > "${2}/config.json"; return 0; }
     create_pruned_model() { mkdir -p "${2}"; : > "${2}/config.json"; return 0; }
     create_lowrank_model() { mkdir -p "${2}"; : > "${2}/config.json"; return 0; }
 
     RESUME_MODE="false"
 
-    # 3-part spec parsing + fp4_quant dir naming + case dispatch + success echo
-    local fp4_path
-    fp4_path="$(process_edit "${baseline}" "fp4_quant:e2m1:ffn" "clean" "m" "0" "${model_out}")"
-    assert_dir_exists "${fp4_path}" "fp4 edit created"
+    # 3-part spec parsing + fp8_quant dir naming + case dispatch + success echo
+    local fp8_path
+    fp8_path="$(process_edit "${baseline}" "fp8_quant:e4m3fn:ffn" "clean" "m" "0" "${model_out}")"
+    assert_dir_exists "${fp8_path}" "fp8 edit created"
 
     # quant_rtn dir naming + case dispatch
     local quant_path
@@ -436,10 +436,10 @@ test_b200_validation_process_edit_parses_specs_dispatches_creators_and_covers_re
 
     # Resume mode skips creation when directory + config exist
     RESUME_MODE="true"
-    local resume_dir="${model_out}/models/fp4_e2m1_clean"
+    local resume_dir="${model_out}/models/fp8_e4m3fn_clean"
     mkdir -p "${resume_dir}"
     : > "${resume_dir}/config.json"
-    assert_eq "${resume_dir}" "$(process_edit "${baseline}" "fp4_quant:e2m1:ffn" "clean" "m" "0" "${model_out}" | tail -n 1)" "resume echoes existing path"
+    assert_eq "${resume_dir}" "$(process_edit "${baseline}" "fp8_quant:e4m3fn:ffn" "clean" "m" "0" "${model_out}" | tail -n 1)" "resume echoes existing path"
 
     # Unknown edit type case arm
     rc=0
@@ -467,7 +467,7 @@ test_b200_validation_edit_creators_run_offline_with_stubbed_python() {
 
     create_pruned_model "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/edits/prune/model" "0.1" "ffn" "0"
     create_lowrank_model "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/edits/svd/model" "256" "ffn" "0"
-    create_fp4_model "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/edits/fp4/model" "e2m1" "ffn" "0"
+    create_fp8_model "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/edits/fp8/model" "e4m3fn" "ffn" "0"
     create_error_model "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/errors/nan/model" "nan_injection" "0"
 }
 
@@ -593,20 +593,20 @@ test_b200_validation_handle_disk_pressure_shutdown_and_reclaim_branches() {
     assert_file_exists "${OUTPUT_DIR}/workers/SHUTDOWN" "shutdown marker touched"
 }
 
-test_b200_validation_setup_b200_environment_sets_fp4_flag_and_propagates_failure() {
+test_b200_validation_setup_b200_environment_sets_fp8_flag_and_propagates_failure() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
     source ./scripts/b200_validation_suite.sh
     b200_setup_output_dirs
 
-    python3() { printf '%s\n' "ok" "[FP4_NATIVE_SUPPORT=true]"; }
+    python3() { printf '%s\n' "ok" "[FP8_NATIVE_SUPPORT=true]"; }
     setup_b200_environment
-    assert_eq "true" "${FP4_NATIVE_SUPPORT}" "FP4_NATIVE_SUPPORT true"
+    assert_eq "true" "${FP8_NATIVE_SUPPORT}" "FP8_NATIVE_SUPPORT true"
 
-    python3() { printf '%s\n' "ok" "[FP4_NATIVE_SUPPORT=false]"; }
+    python3() { printf '%s\n' "ok" "[FP8_NATIVE_SUPPORT=false]"; }
     setup_b200_environment
-    assert_eq "false" "${FP4_NATIVE_SUPPORT}" "FP4_NATIVE_SUPPORT false"
+    assert_eq "false" "${FP8_NATIVE_SUPPORT}" "FP8_NATIVE_SUPPORT false"
 
     python3() { printf '%s\n' "boom"; return 3; }
     local rc=0

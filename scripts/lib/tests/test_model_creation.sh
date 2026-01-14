@@ -69,7 +69,7 @@ test_create_lowrank_model_invokes_python_wrapper() {
     assert_match "python - ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/lowrank 256 ffn" "$(cat "${calls}")" "args passed via argv"
 }
 
-test_create_fp4_model_invokes_python_wrapper() {
+test_create_fp8_model_invokes_python_wrapper() {
     mock_reset
     # shellcheck source=../model_creation.sh
     source "${TEST_ROOT}/scripts/lib/model_creation.sh"
@@ -77,9 +77,9 @@ test_create_fp4_model_invokes_python_wrapper() {
     local calls="${TEST_TMPDIR}/python.calls"
     _cmd_python() { echo "python $*" >> "${calls}"; cat >/dev/null || true; return 0; }
 
-    create_fp4_model "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/out/fp4" "e2m1" "ffn" "0"
-    assert_file_exists "${calls}" "python called for fp4"
-    assert_match "python - ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/fp4 e2m1 ffn" "$(cat "${calls}")" "args passed via argv"
+    create_fp8_model "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/out/fp8" "e4m3fn" "ffn" "0"
+    assert_file_exists "${calls}" "python called for fp8"
+    assert_match "python - ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/fp8 e4m3fn ffn" "$(cat "${calls}")" "args passed via argv"
 }
 
 test_create_error_model_invokes_python_wrapper() {

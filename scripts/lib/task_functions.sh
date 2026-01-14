@@ -168,6 +168,135 @@ _get_eval_batch_size() {
     fi
 }
 
+# Resolve an edit spec to concrete parameters and directory name.
+# Returns JSON with status, edit_dir_name, and resolved params.
+resolve_edit_params() {
+    local model_output_dir="$1"
+    local edit_spec="$2"
+    local version_hint="${3:-}"
+
+    _cmd_python - "${model_output_dir}" "${edit_spec}" "${version_hint}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+model_output_dir = Path(sys.argv[1])
+edit_spec = sys.argv[2] if len(sys.argv) > 2 else ""
+version_hint = sys.argv[3] if len(sys.argv) > 3 else ""
+
+parts = edit_spec.split(":") if edit_spec else []
+edit_type = parts[0] if parts else ""
+param1 = parts[1] if len(parts) > 1 else ""
+param2 = parts[2] if len(parts) > 2 else ""
+scope = parts[3] if len(parts) > 3 else ""
+
+if edit_type != "quant_rtn" and not scope:
+    scope = param2
+    param2 = ""
+
+if edit_type == "quant_rtn" and not scope:
+    if param1 and param2:
+        scope = param2
+        param2 = ""
+
+clean_spec = param1 == "clean"
+status = "selected"
+reason = ""
+edit_dir_name = ""
+
+if clean_spec:
+    clean_file = model_output_dir / "state" / "clean_edit_params.json"
+    if not clean_file.exists():
+        status = "missing"
+    else:
+        try:
+            data = json.loads(clean_file.read_text())
+        except Exception:
+            data = {}
+        entry = data.get(edit_type) or {}
+        status = str(entry.get("status") or "missing")
+        reason = str(entry.get("reason") or "")
+        if status == "selected":
+            if edit_type == "quant_rtn":
+                param1 = str(entry.get("bits", ""))
+                param2 = str(entry.get("group_size", ""))
+                scope = str(entry.get("scope") or scope or "")
+            elif edit_type in ("fp8_quant", "fp4_quant"):
+                param1 = str(entry.get("format", ""))
+                scope = str(entry.get("scope") or scope or "")
+            elif edit_type == "magnitude_prune":
+                param1 = str(entry.get("sparsity", ""))
+                scope = str(entry.get("scope") or scope or "")
+            elif edit_type == "lowrank_svd":
+                param1 = str(entry.get("rank", ""))
+                scope = str(entry.get("scope") or scope or "")
+            edit_dir_name = str(entry.get("edit_dir_name") or "")
+else:
+    def _is_int(val):
+        try:
+            int(val)
+            return True
+        except Exception:
+            return False
+
+    def _is_float(val):
+        try:
+            float(val)
+            return True
+        except Exception:
+            return False
+
+    if edit_type == "quant_rtn":
+        if not (_is_int(param1) and _is_int(param2)):
+            status = "invalid"
+            reason = "invalid_quant_params"
+    elif edit_type == "magnitude_prune":
+        if not _is_float(param1):
+            status = "invalid"
+            reason = "invalid_prune_sparsity"
+    elif edit_type == "lowrank_svd":
+        if not _is_int(param1):
+            status = "invalid"
+            reason = "invalid_lowrank_rank"
+    elif edit_type in ("fp8_quant", "fp4_quant"):
+        if not param1:
+            status = "invalid"
+            reason = "invalid_fp_format"
+
+version = version_hint or ("clean" if clean_spec else "")
+
+if status == "selected" and not edit_dir_name:
+    if edit_type == "quant_rtn":
+        edit_dir_name = f"quant_{param1}bit_{version}" if version else ""
+    elif edit_type == "fp8_quant":
+        edit_dir_name = f"fp8_{param1}_{version}" if version else ""
+    elif edit_type == "fp4_quant":
+        edit_dir_name = f"fp4_{param1}_{version}" if version else ""
+    elif edit_type == "magnitude_prune":
+        try:
+            pct = int(float(param1) * 100)
+        except Exception:
+            pct = 0
+        edit_dir_name = f"prune_{pct}pct_{version}" if version else ""
+    elif edit_type == "lowrank_svd":
+        edit_dir_name = f"svd_rank{param1}_{version}" if version else ""
+    else:
+        edit_dir_name = f"{edit_type}_{version}" if version else ""
+
+payload = {
+    "status": status,
+    "reason": reason,
+    "edit_type": edit_type,
+    "param1": param1,
+    "param2": param2,
+    "scope": scope,
+    "version": version,
+    "edit_dir_name": edit_dir_name,
+}
+print(json.dumps(payload))
+PY
+}
+
 # Resolve task timeout in seconds (empty/0 disables).
 _get_task_timeout() {
     local task_type="$1"
@@ -330,6 +459,9 @@ execute_task() {
                 ;;
             EVAL_BASELINE)
                 task_eval_baseline "${model_name}" "${gpu_id}" "${output_dir}" "${task_log}" || exit_code=$?
+                ;;
+            CALIBRATE_CLEAN)
+                task_calibrate_clean_edits "${model_name}" "${gpu_id}" "${output_dir}" "${task_log}" || exit_code=$?
                 ;;
             CALIBRATION_RUN)
                 local run=$(echo "${params}" | jq -r '.run // 1')
@@ -627,10 +759,419 @@ task_eval_baseline() {
         [[ ${exit_code} -eq 0 ]] && exit_code=1
     fi
 
-    return ${exit_code}
+        return ${exit_code}
 }
 
-# ============ TASK: CALIBRATION_RUN ============
+# ============ TASK: CALIBRATE_CLEAN ==========
+
+# Calibrate clean edit parameters using lm-eval (no InvarLock signal)
+# Usage: task_calibrate_clean_edits <model_name> <gpu_id> <output_dir> <log_file>
+task_calibrate_clean_edits() {
+    local model_name="$1"
+    local gpu_id="$2"
+    local output_dir="$3"
+    local log_file="$4"
+
+    local model_output_dir="${output_dir}/${model_name}"
+    local baseline_path
+    baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null || true)
+    local model_id
+    model_id=$(cat "${model_output_dir}/.model_id" 2>/dev/null || true)
+    local baseline_eval="${model_output_dir}/evals/baseline_results.json"
+    local state_dir="${model_output_dir}/state"
+    local clean_params_file="${state_dir}/clean_edit_params.json"
+
+    local calibrate_clean="${CALIBRATE_CLEAN_EDITS:-true}"
+    if [[ "${calibrate_clean}" != "true" ]]; then
+        echo "  Clean calibration disabled (CALIBRATE_CLEAN_EDITS=${calibrate_clean})" >> "${log_file}"
+        return 0
+    fi
+
+    if [[ -f "${clean_params_file}" ]]; then
+        echo "  Clean calibration already exists, skipping" >> "${log_file}"
+        return 0
+    fi
+
+    if [[ -z "${baseline_path}" || ! -d "${baseline_path}" ]]; then
+        echo "ERROR: Baseline path not found for ${model_name}" >> "${log_file}"
+        return 1
+    fi
+    if [[ ! -f "${baseline_eval}" ]]; then
+        echo "ERROR: Baseline eval missing for ${model_name} (expected ${baseline_eval})" >> "${log_file}"
+        return 1
+    fi
+
+    mkdir -p "${state_dir}"
+
+    # Simple lock to avoid concurrent calibration
+    local lock_dir="${state_dir}/clean_edit_cal.lock"
+    if ! mkdir "${lock_dir}" 2>/dev/null; then
+        local waited=0
+        while [[ ${waited} -lt 120 ]]; do
+            if [[ -f "${clean_params_file}" ]]; then
+                echo "  Clean calibration already completed by another worker" >> "${log_file}"
+                return 0
+            fi
+            _sleep 5
+            waited=$((waited + 5))
+        done
+        echo "ERROR: Clean calibration lock held too long" >> "${log_file}"
+        return 1
+    fi
+    trap 'rm -rf "${lock_dir}"' RETURN
+
+    local calib_eval="${model_output_dir}/evals/baseline_calibration_results.json"
+    local calib_tmp_dir="${model_output_dir}/evals/.clean_calib"
+    mkdir -p "${calib_tmp_dir}"
+
+    local model_size
+    model_size=$(_estimate_model_size "${baseline_path}")
+    if [[ -z "${model_size}" || "${model_size}" == "7" ]] && [[ -n "${model_id}" ]]; then
+        model_size=$(_get_model_size_from_name "${model_id}")
+    fi
+
+    local base_batch_size
+    base_batch_size=$(_get_eval_batch_size "${model_size}")
+
+    local clean_tasks="${CLEAN_EVAL_TASKS:-${EVAL_TASKS:-mmlu,hellaswag,arc_challenge,winogrande}}"
+    local clean_limit="${CLEAN_EVAL_LIMIT:-200}"
+    local clean_fewshot="${CLEAN_EVAL_NUM_FEWSHOT:-${EVAL_NUM_FEWSHOT:-5}}"
+    local clean_bits="${CLEAN_QUANT_BITS:-8}"
+    local clean_group_sizes="${CLEAN_QUANT_GROUP_SIZES:-128,64,32}"
+    local clean_prune_levels="${CLEAN_PRUNE_LEVELS:-0.1,0.05,0.02}"
+    local clean_svd_ratios="${CLEAN_SVD_RANK_RATIOS:-0.25,0.35,0.5}"
+    local clean_fp8_formats="${CLEAN_FP8_FORMATS:-e4m3fn}"
+
+    run_clean_lmeval() {
+        local model_path="$1"
+        local output_file="$2"
+        local label="$3"
+
+        if [[ -f "${output_file}" ]]; then
+            return 0
+        fi
+
+        local model_args
+        model_args=$(_get_lmeval_model_args "${model_path}")
+        local torch_compile="${LMEVAL_TORCH_COMPILE:-0}"
+        local tmp_eval_dir="${calib_tmp_dir}/${label}_${TASK_ID:-$$}"
+        mkdir -p "${tmp_eval_dir}"
+
+        local limit_args=()
+        if [[ -n "${clean_limit}" && "${clean_limit}" != "0" ]]; then
+            limit_args+=("--limit" "${clean_limit}")
+        fi
+
+        local exit_code=0
+        TORCH_COMPILE="${torch_compile}" _cmd_python -m lm_eval \
+            --model hf \
+            --model_args "${model_args}" \
+            --tasks "${clean_tasks}" \
+            --batch_size "${base_batch_size}" \
+            --num_fewshot "${clean_fewshot}" \
+            --output_path "${tmp_eval_dir}" \
+            "${limit_args[@]}" \
+            >> "${log_file}" 2>&1 || exit_code=$?
+
+        local found_results
+        found_results=$(find "${tmp_eval_dir}" -name "results*.json" -type f 2>/dev/null | head -1)
+        if [[ -n "${found_results}" && -f "${found_results}" ]]; then
+            mv "${found_results}" "${output_file}" 2>/dev/null || exit_code=1
+            rm -rf "${tmp_eval_dir}" 2>/dev/null || true
+        else
+            exit_code=1
+        fi
+
+        return ${exit_code}
+    }
+
+    if [[ ! -f "${calib_eval}" ]]; then
+        echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Running baseline calibration lm-eval" >> "${log_file}"
+        run_clean_lmeval "${baseline_path}" "${calib_eval}" "baseline_calib" || {
+            echo "ERROR: Baseline calibration lm-eval failed" >> "${log_file}"
+            return 1
+        }
+    fi
+
+    local params_jsonl="${state_dir}/clean_edit_params.jsonl"
+    : > "${params_jsonl}"
+
+    local svd_min_dim
+    svd_min_dim=$(_cmd_python - "${baseline_path}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+baseline_path = Path(sys.argv[1])
+config_path = baseline_path / "config.json"
+if not config_path.exists():
+    print(1024)
+    raise SystemExit(0)
+
+cfg = json.loads(config_path.read_text())
+
+def _get(*keys):
+    for key in keys:
+        val = cfg.get(key)
+        if isinstance(val, int):
+            return val
+    return None
+
+hidden = _get("hidden_size", "n_embd", "d_model", "model_dim") or 1024
+intermediate = _get("intermediate_size", "ffn_dim", "n_inner")
+if intermediate is None:
+    intermediate = hidden * 4
+min_dim = min(hidden, intermediate)
+print(int(min_dim))
+PY
+    )
+
+    check_no_regression() {
+        local candidate_eval="$1"
+        _cmd_python - "${calib_eval}" "${candidate_eval}" <<'PY'
+import json
+import math
+import sys
+from pathlib import Path
+
+baseline_path = Path(sys.argv[1])
+candidate_path = Path(sys.argv[2])
+
+if not baseline_path.exists() or not candidate_path.exists():
+    sys.exit(1)
+
+baseline = json.loads(baseline_path.read_text())
+candidate = json.loads(candidate_path.read_text())
+
+base_results = baseline.get("results", {}) if isinstance(baseline, dict) else {}
+edit_results = candidate.get("results", {}) if isinstance(candidate, dict) else {}
+
+if not isinstance(base_results, dict) or not isinstance(edit_results, dict):
+    sys.exit(1)
+
+N_TABLE = {
+    "mmlu": 14042,
+    "hellaswag": 10042,
+    "arc_challenge": 2590,
+    "winogrande": 1767,
+}
+
+def pick_metric(task_results):
+    for key in ("acc_norm,none", "acc,none", "exact_match,none", "acc_norm", "acc", "exact_match"):
+        if key in task_results and isinstance(task_results[key], (int, float)):
+            return float(task_results[key])
+    for key, value in task_results.items():
+        if "stderr" in key:
+            continue
+        if isinstance(value, (int, float)):
+            return float(value)
+    return None
+
+for task, base_vals in base_results.items():
+    if not isinstance(base_vals, dict):
+        continue
+    edit_vals = edit_results.get(task)
+    if not isinstance(edit_vals, dict):
+        sys.exit(1)
+    base_metric = pick_metric(base_vals)
+    edit_metric = pick_metric(edit_vals)
+    if base_metric is None or edit_metric is None:
+        sys.exit(1)
+    task_key = task
+    if task_key.startswith("arc"):
+        task_key = "arc_challenge"
+    n = N_TABLE.get(task_key, 1000)
+    p = max(min(base_metric, 0.999), 0.001)
+    se = math.sqrt(p * (1.0 - p) / n)
+    if (edit_metric - base_metric) < -2.0 * se:
+        sys.exit(1)
+
+sys.exit(0)
+PY
+    }
+
+    select_candidate() {
+        local family="$1"
+        local scope="$2"
+        shift 2
+        local candidates=("$@")
+        local selected="false"
+
+        for cand in "${candidates[@]}"; do
+            local edit_dir_name=""
+            local edit_path=""
+            local candidate_eval=""
+            local status_payload=""
+
+            case "${family}" in
+                "quant_rtn")
+                    local group_size="${cand}"
+                    edit_dir_name="quant_${clean_bits}bit_clean"
+                    edit_path="${model_output_dir}/models/${edit_dir_name}"
+                    candidate_eval="${calib_tmp_dir}/${edit_dir_name}_calib.json"
+                    echo "  Calibrating quant_rtn bits=${clean_bits} group_size=${group_size}" >> "${log_file}"
+                    create_edited_model "${baseline_path}" "${edit_path}" "quant_rtn" "${clean_bits}" "${group_size}" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1 || {
+                        echo "  ERROR: quant_rtn creation failed" >> "${log_file}"
+                        rm -rf "${edit_path}" 2>/dev/null || true
+                        continue
+                    }
+                    ;;
+                "fp8_quant")
+                    local format="${cand}"
+                    edit_dir_name="fp8_${format}_clean"
+                    edit_path="${model_output_dir}/models/${edit_dir_name}"
+                    candidate_eval="${calib_tmp_dir}/${edit_dir_name}_calib.json"
+                    echo "  Calibrating fp8_quant format=${format}" >> "${log_file}"
+                    create_fp8_model "${baseline_path}" "${edit_path}" "${format}" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1 || {
+                        echo "  ERROR: fp8_quant creation failed" >> "${log_file}"
+                        rm -rf "${edit_path}" 2>/dev/null || true
+                        continue
+                    }
+                    ;;
+                "magnitude_prune")
+                    local sparsity="${cand}"
+                    local pct
+                    pct=$(echo "${sparsity}" | awk '{printf "%.0f", $1 * 100}')
+                    edit_dir_name="prune_${pct}pct_clean"
+                    edit_path="${model_output_dir}/models/${edit_dir_name}"
+                    candidate_eval="${calib_tmp_dir}/${edit_dir_name}_calib.json"
+                    echo "  Calibrating magnitude_prune sparsity=${sparsity}" >> "${log_file}"
+                    create_pruned_model "${baseline_path}" "${edit_path}" "${sparsity}" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1 || {
+                        echo "  ERROR: prune creation failed" >> "${log_file}"
+                        rm -rf "${edit_path}" 2>/dev/null || true
+                        continue
+                    }
+                    ;;
+                "lowrank_svd")
+                    local rank="${cand}"
+                    edit_dir_name="svd_rank${rank}_clean"
+                    edit_path="${model_output_dir}/models/${edit_dir_name}"
+                    candidate_eval="${calib_tmp_dir}/${edit_dir_name}_calib.json"
+                    echo "  Calibrating lowrank_svd rank=${rank}" >> "${log_file}"
+                    create_lowrank_model "${baseline_path}" "${edit_path}" "${rank}" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1 || {
+                        echo "  ERROR: lowrank creation failed" >> "${log_file}"
+                        rm -rf "${edit_path}" 2>/dev/null || true
+                        continue
+                    }
+                    ;;
+                *)
+                    continue
+                    ;;
+            esac
+
+            run_clean_lmeval "${edit_path}" "${candidate_eval}" "${edit_dir_name}" || {
+                echo "  ERROR: lm-eval failed for ${edit_dir_name}" >> "${log_file}"
+                rm -rf "${edit_path}" "${candidate_eval}" 2>/dev/null || true
+                continue
+            }
+
+            if check_no_regression "${candidate_eval}"; then
+                echo "  ✅ Clean candidate accepted: ${edit_dir_name}" >> "${log_file}"
+                selected="true"
+                case "${family}" in
+                    "quant_rtn")
+                        status_payload=$(jq -n \
+                            --arg status "selected" \
+                            --arg scope "${scope}" \
+                            --arg edit_dir_name "${edit_dir_name}" \
+                            --argjson bits "${clean_bits}" \
+                            --argjson group_size "${group_size}" \
+                            '{status:$status, bits:$bits, group_size:$group_size, scope:$scope, edit_dir_name:$edit_dir_name}')
+                        ;;
+                    "fp8_quant")
+                        status_payload=$(jq -n \
+                            --arg status "selected" \
+                            --arg scope "${scope}" \
+                            --arg format "${format}" \
+                            --arg edit_dir_name "${edit_dir_name}" \
+                            '{status:$status, format:$format, scope:$scope, edit_dir_name:$edit_dir_name}')
+                        ;;
+                    "magnitude_prune")
+                        status_payload=$(jq -n \
+                            --arg status "selected" \
+                            --arg scope "${scope}" \
+                            --arg edit_dir_name "${edit_dir_name}" \
+                            --argjson sparsity "${sparsity}" \
+                            '{status:$status, sparsity:$sparsity, scope:$scope, edit_dir_name:$edit_dir_name}')
+                        ;;
+                    "lowrank_svd")
+                        status_payload=$(jq -n \
+                            --arg status "selected" \
+                            --arg scope "${scope}" \
+                            --arg edit_dir_name "${edit_dir_name}" \
+                            --argjson rank "${rank}" \
+                            '{status:$status, rank:$rank, scope:$scope, edit_dir_name:$edit_dir_name}')
+                        ;;
+                esac
+                printf '{"family":"%s","data":%s}\n' "${family}" "${status_payload}" >> "${params_jsonl}"
+                return 0
+            fi
+
+            echo "  ❌ Clean candidate rejected: ${edit_dir_name}" >> "${log_file}"
+            rm -rf "${edit_path}" "${candidate_eval}" 2>/dev/null || true
+        done
+
+        if [[ "${selected}" != "true" ]]; then
+            local skip_payload
+            skip_payload=$(jq -n --arg status "skipped" --arg reason "lm_eval_regression" --arg scope "${scope}" '{status:$status, reason:$reason, scope:$scope}')
+            printf '{"family":"%s","data":%s}\n' "${family}" "${skip_payload}" >> "${params_jsonl}"
+        fi
+    }
+
+    IFS=',' read -r -a group_sizes <<< "${clean_group_sizes}"
+    select_candidate "quant_rtn" "ffn" "${group_sizes[@]}"
+
+    IFS=',' read -r -a fp8_formats <<< "${clean_fp8_formats}"
+    select_candidate "fp8_quant" "ffn" "${fp8_formats[@]}"
+
+    IFS=',' read -r -a prune_levels <<< "${clean_prune_levels}"
+    select_candidate "magnitude_prune" "ffn" "${prune_levels[@]}"
+
+    IFS=',' read -r -a svd_ratios <<< "${clean_svd_ratios}"
+    svd_candidates=()
+    for ratio in "${svd_ratios[@]}"; do
+        local rank
+        rank=$(awk -v min="${svd_min_dim}" -v ratio="${ratio}" 'BEGIN { printf "%d", min * ratio }')
+        if [[ -z "${rank}" || ${rank} -lt 8 ]]; then
+            rank=8
+        fi
+        if [[ ${rank} -gt ${svd_min_dim} ]]; then
+            rank=${svd_min_dim}
+        fi
+        svd_candidates+=("${rank}")
+    done
+    select_candidate "lowrank_svd" "ffn" "${svd_candidates[@]}"
+
+    _cmd_python - "${params_jsonl}" "${clean_params_file}" "${clean_tasks}" "${clean_limit}" <<'PY'
+import json
+import sys
+from datetime import datetime
+from pathlib import Path
+
+params_path = Path(sys.argv[1])
+output_path = Path(sys.argv[2])
+clean_tasks = sys.argv[3]
+clean_limit = sys.argv[4]
+
+payload = {"_meta": {"tasks": clean_tasks, "limit": clean_limit, "generated_at": datetime.utcnow().isoformat()}}
+
+for line in params_path.read_text().splitlines():
+    if not line.strip():
+        continue
+    rec = json.loads(line)
+    family = rec.get("family")
+    data = rec.get("data")
+    if family and isinstance(data, dict):
+        payload[family] = data
+
+output_path.write_text(json.dumps(payload, indent=2))
+PY
+
+    echo "  Clean calibration saved: ${clean_params_file}" >> "${log_file}"
+    return 0
+}
+
+# ============ TASK: CALIBRATION_RUN ==========
 
 # Run single InvarLock calibration
 # Usage: task_calibration_run <model_name> <gpu_id> <run_num> <seed> <output_dir> <log_file>
@@ -1025,10 +1566,16 @@ def _merge_record(cert, report):
                 val = gmetrics.get(key)
                 if isinstance(val, dict) and val:
                     rmt.setdefault(key, val)
-            if gmetrics.get("epsilon_by_family"):
-                rmt.setdefault("epsilon_by_family", gmetrics.get("epsilon_by_family"))
-            if gmetrics.get("epsilon") is not None:
-                rmt.setdefault("epsilon", gmetrics.get("epsilon"))
+            epsilon_by_family = gmetrics.get("epsilon_by_family")
+            if epsilon_by_family:
+                rmt.setdefault("epsilon_by_family", epsilon_by_family)
+            else:
+                epsilon = gmetrics.get("epsilon")
+                if epsilon is not None:
+                    if isinstance(epsilon, dict):
+                        rmt.setdefault("epsilon_by_family", epsilon)
+                    else:
+                        rmt.setdefault("epsilon_default", epsilon)
             if gmetrics.get("epsilon_default") is not None:
                 rmt.setdefault("epsilon_default", gmetrics.get("epsilon_default"))
             if gmetrics.get("margin_used") is not None:
@@ -1518,7 +2065,7 @@ if "spectral" in enabled_guards and spectral:
 
 rmt = {}
 if rmt_epsilon:
-    rmt["epsilon"] = rmt_epsilon
+    rmt["epsilon_by_family"] = rmt_epsilon
 if rmt_summary.get("margin") is not None:
     rmt["margin"] = rmt_summary["margin"]
 if rmt_summary.get("deadband") is not None:
@@ -1537,7 +2084,7 @@ with open(stats_path, "w") as f:
             "assurance": assurance_cfg,
             "drift": drift_stats,
             "spectral": {**spectral_summary, "family_caps": spectral_caps},
-            "rmt": {**rmt_summary, "epsilon": rmt_epsilon},
+            "rmt": {**rmt_summary, "epsilon_by_family": rmt_epsilon},
             "variance": variance_config,
         },
         f,
@@ -1579,33 +2126,29 @@ task_create_edit() {
         return 1
     fi
 
-    # Parse edit spec
-    local edit_type param1 param2 scope
-    IFS=':' read -r edit_type param1 param2 scope <<< "${edit_spec}"
-
-    # Handle 3-part vs 4-part specs
-    if [[ -z "${scope}" && "${edit_type}" != "quant_rtn" ]]; then
-        scope="${param2}"
-        param2=""
+    local resolved
+    resolved=$(resolve_edit_params "${model_output_dir}" "${edit_spec}" "${version}")
+    local status
+    status=$(echo "${resolved}" | jq -r '.status')
+    if [[ "${status}" == "skipped" ]]; then
+        echo "  Clean edit skipped by calibration: ${edit_spec}" >> "${log_file}"
+        return 0
+    fi
+    if [[ "${status}" != "selected" ]]; then
+        echo "ERROR: Unable to resolve edit spec (${edit_spec}): ${status}" >> "${log_file}"
+        return 1
     fi
 
-    # Determine output path
-    local edit_dir_name="${edit_type}_${version}"
-    case "${edit_type}" in
-        "quant_rtn")
-            edit_dir_name="quant_${param1}bit_${version}"
-            ;;
-        "fp4_quant")
-            edit_dir_name="fp4_${param1}_${version}"
-            ;;
-        "magnitude_prune")
-            local pct=$(echo "${param1}" | awk '{printf "%.0f", $1 * 100}')
-            edit_dir_name="prune_${pct}pct_${version}"
-            ;;
-        "lowrank_svd")
-            edit_dir_name="svd_rank${param1}_${version}"
-            ;;
-    esac
+    local edit_type param1 param2 scope edit_dir_name
+    edit_type=$(echo "${resolved}" | jq -r '.edit_type')
+    param1=$(echo "${resolved}" | jq -r '.param1')
+    param2=$(echo "${resolved}" | jq -r '.param2')
+    scope=$(echo "${resolved}" | jq -r '.scope')
+    edit_dir_name=$(echo "${resolved}" | jq -r '.edit_dir_name')
+    if [[ -z "${edit_dir_name}" || "${edit_dir_name}" == "null" ]]; then
+        echo "ERROR: Empty edit_dir_name for ${edit_spec}" >> "${log_file}"
+        return 1
+    fi
 
     local edit_path="${model_output_dir}/models/${edit_dir_name}"
 
@@ -1624,6 +2167,14 @@ task_create_edit() {
                 create_edited_model "${baseline_path}" "${edit_path}" "quant_rtn" "${param1}" "${param2}" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1 || true
             else
                 echo "ERROR: create_edited_model not available" >> "${log_file}"
+                return 1
+            fi
+            ;;
+        "fp8_quant")
+            if type create_fp8_model &>/dev/null; then
+                create_fp8_model "${baseline_path}" "${edit_path}" "${param1}" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1 || true
+            else
+                echo "ERROR: create_fp8_model not available" >> "${log_file}"
                 return 1
             fi
             ;;
@@ -1713,6 +2264,14 @@ except json.JSONDecodeError as e:
     print(f"ERROR: Invalid edit_specs JSON: {e}", file=sys.stderr)
     sys.exit(1)
 
+clean_params_path = model_output_dir / "state" / "clean_edit_params.json"
+clean_params = {}
+if clean_params_path.exists():
+    try:
+        clean_params = json.loads(clean_params_path.read_text())
+    except Exception:
+        clean_params = {}
+
 print(f"Loading baseline model once for {len(edit_specs)} edits...")
 
 mode = os.environ.get("B200_DETERMINISM", "").strip().lower()
@@ -1739,21 +2298,81 @@ def parse_edit_spec(spec_str):
     parts = spec_str.split(":")
     edit_type = parts[0] if parts else ""
 
+    def _clean_entry():
+        entry = clean_params.get(edit_type) or {}
+        status = str(entry.get("status") or "missing")
+        return entry, status
+
     if edit_type == "quant_rtn":
+        if len(parts) > 1 and parts[1] == "clean":
+            entry, status = _clean_entry()
+            if status == "skipped":
+                return {"type": edit_type, "skip": True, "reason": status}
+            if status != "selected":
+                return {"type": edit_type, "error": status}
+            return {
+                "type": "quant_rtn",
+                "bits": int(entry.get("bits", 8)),
+                "group_size": int(entry.get("group_size", 128)),
+                "scope": entry.get("scope", parts[2] if len(parts) > 2 else "ffn"),
+                "edit_dir_name": entry.get("edit_dir_name"),
+            }
         return {"type": "quant_rtn", "bits": int(parts[1]), "group_size": int(parts[2]), "scope": parts[3]}
+    if edit_type == "fp8_quant":
+        if len(parts) > 1 and parts[1] == "clean":
+            entry, status = _clean_entry()
+            if status == "skipped":
+                return {"type": edit_type, "skip": True, "reason": status}
+            if status != "selected":
+                return {"type": edit_type, "error": status}
+            return {
+                "type": "fp8_quant",
+                "format": entry.get("format", "e4m3fn"),
+                "scope": entry.get("scope", parts[2] if len(parts) > 2 else "ffn"),
+                "edit_dir_name": entry.get("edit_dir_name"),
+            }
+        return {"type": "fp8_quant", "format": parts[1], "scope": parts[2]}
     if edit_type == "fp4_quant":
         return {"type": "fp4_quant", "format": parts[1], "scope": parts[2]}
     if edit_type == "magnitude_prune":
+        if len(parts) > 1 and parts[1] == "clean":
+            entry, status = _clean_entry()
+            if status == "skipped":
+                return {"type": edit_type, "skip": True, "reason": status}
+            if status != "selected":
+                return {"type": edit_type, "error": status}
+            return {
+                "type": "magnitude_prune",
+                "ratio": float(entry.get("sparsity", 0.0)),
+                "scope": entry.get("scope", parts[2] if len(parts) > 2 else "ffn"),
+                "edit_dir_name": entry.get("edit_dir_name"),
+            }
         return {"type": "magnitude_prune", "ratio": float(parts[1]), "scope": parts[2]}
     if edit_type == "lowrank_svd":
+        if len(parts) > 1 and parts[1] == "clean":
+            entry, status = _clean_entry()
+            if status == "skipped":
+                return {"type": edit_type, "skip": True, "reason": status}
+            if status != "selected":
+                return {"type": edit_type, "error": status}
+            return {
+                "type": "lowrank_svd",
+                "rank": int(entry.get("rank", 0)),
+                "scope": entry.get("scope", parts[2] if len(parts) > 2 else "ffn"),
+                "edit_dir_name": entry.get("edit_dir_name"),
+            }
         return {"type": "lowrank_svd", "rank": int(parts[1]), "scope": parts[2]}
 
     return {"type": edit_type, "params": parts[1:]}
 
 def get_edit_dir_name(parsed_spec, version):
+    if parsed_spec.get("edit_dir_name"):
+        return parsed_spec["edit_dir_name"]
     t = parsed_spec["type"]
     if t == "quant_rtn":
         return f"quant_{parsed_spec['bits']}bit_{version}"
+    if t == "fp8_quant":
+        return f"fp8_{parsed_spec['format']}_{version}"
     if t == "fp4_quant":
         return f"fp4_{parsed_spec['format']}_{version}"
     if t == "magnitude_prune":
@@ -1844,6 +2463,30 @@ def apply_lowrank(model, rank, scope):
         param.data = ((U * S) @ V.T).to(param.dtype)
     return edited
 
+def apply_fp8(model, format_type, scope):
+    import copy
+    edited = copy.deepcopy(model)
+    target_modules = _target_modules(scope)
+
+    dtype = None
+    if format_type in {"e4m3", "e4m3fn", "e4m3fnuz"}:
+        dtype = getattr(torch, "float8_e4m3fn", None)
+    elif format_type in {"e5m2", "e5m2fn", "e5m2fnuz"}:
+        dtype = getattr(torch, "float8_e5m2", None)
+
+    def _quantize(tensor):
+        if dtype is None:
+            return tensor.to(torch.float16).to(tensor.dtype)
+        return tensor.to(dtype).to(tensor.dtype)
+
+    for name, param in edited.named_parameters():
+        if not any(t in name.lower() for t in target_modules):
+            continue
+        if param.dim() < 2:
+            continue
+        param.data = _quantize(param.data)
+    return edited
+
 def apply_fp4(model, format_type, scope):
     import copy
     edited = copy.deepcopy(model)
@@ -1888,6 +2531,11 @@ for spec_entry in edit_specs:
     version = spec_entry.get("version", "clean")
 
     parsed = parse_edit_spec(spec_str)
+    if parsed.get("skip"):
+        print(f"  Skip (clean calibration skipped): {spec_str}")
+        continue
+    if parsed.get("error"):
+        raise ValueError(f"Clean calibration missing for {spec_str}: {parsed['error']}")
     edit_dir_name = get_edit_dir_name(parsed, version)
     edit_path = model_output_dir / "models" / edit_dir_name
 
@@ -1908,6 +2556,8 @@ for spec_entry in edit_specs:
             edited_model = apply_pruning(model, parsed["ratio"], parsed["scope"])
         elif t == "lowrank_svd":
             edited_model = apply_lowrank(model, parsed["rank"], parsed["scope"])
+        elif t == "fp8_quant":
+            edited_model = apply_fp8(model, parsed["format"], parsed["scope"])
         elif t == "fp4_quant":
             edited_model = apply_fp4(model, parsed["format"], parsed["scope"])
         else:
@@ -1963,31 +2613,41 @@ task_eval_edit() {
     local edit_type param1
     IFS=':' read -r edit_type param1 _ _ <<< "${edit_spec}"
 
-    # Find the edit directory (could be clean or stress)
     local edit_path=""
-    for version in clean stress; do
-        local potential_path
-        case "${edit_type}" in
-            "quant_rtn")
-                potential_path="${model_output_dir}/models/quant_${param1}bit_${version}"
-                ;;
-            "fp4_quant")
-                potential_path="${model_output_dir}/models/fp4_${param1}_${version}"
-                ;;
-            "magnitude_prune")
-                local pct=$(echo "${param1}" | awk '{printf "%.0f", $1 * 100}')
-                potential_path="${model_output_dir}/models/prune_${pct}pct_${version}"
-                ;;
-            "lowrank_svd")
-                potential_path="${model_output_dir}/models/svd_rank${param1}_${version}"
-                ;;
-        esac
-
-        if [[ -d "${potential_path}" ]]; then
-            edit_path="${potential_path}"
-            break
+    if [[ "${param1}" == "clean" ]]; then
+        local resolved
+        resolved=$(resolve_edit_params "${model_output_dir}" "${edit_spec}" "clean")
+        local status
+        status=$(echo "${resolved}" | jq -r '.status')
+        if [[ "${status}" == "skipped" ]]; then
+            echo "  Clean edit skipped by calibration: ${edit_spec}" >> "${log_file}"
+            return 0
         fi
-    done
+        if [[ "${status}" != "selected" ]]; then
+            echo "ERROR: Unable to resolve clean edit for ${edit_spec} (${status})" >> "${log_file}"
+            return 1
+        fi
+        local edit_dir_name
+        edit_dir_name=$(echo "${resolved}" | jq -r '.edit_dir_name')
+        edit_path="${model_output_dir}/models/${edit_dir_name}"
+    else
+        for version in clean stress; do
+            local resolved
+            resolved=$(resolve_edit_params "${model_output_dir}" "${edit_spec}" "${version}")
+            local status
+            status=$(echo "${resolved}" | jq -r '.status')
+            if [[ "${status}" != "selected" ]]; then
+                continue
+            fi
+            local edit_dir_name
+            edit_dir_name=$(echo "${resolved}" | jq -r '.edit_dir_name')
+            local potential_path="${model_output_dir}/models/${edit_dir_name}"
+            if [[ -d "${potential_path}" ]]; then
+                edit_path="${potential_path}"
+                break
+            fi
+        done
+    fi
 
     if [[ -z "${edit_path}" || ! -d "${edit_path}" ]]; then
         echo "ERROR: Edit model not found for spec: ${edit_spec}" >> "${log_file}"
@@ -2078,31 +2738,41 @@ task_eval_single_benchmark() {
     local edit_type param1
     IFS=':' read -r edit_type param1 _ _ <<< "${edit_spec}"
 
-    # Find the edit directory (could be clean or stress)
     local edit_path=""
-    for version in clean stress; do
-        local potential_path
-        case "${edit_type}" in
-            "quant_rtn")
-                potential_path="${model_output_dir}/models/quant_${param1}bit_${version}"
-                ;;
-            "fp4_quant")
-                potential_path="${model_output_dir}/models/fp4_${param1}_${version}"
-                ;;
-            "magnitude_prune")
-                local pct=$(echo "${param1}" | awk '{printf "%.0f", $1 * 100}')
-                potential_path="${model_output_dir}/models/prune_${pct}pct_${version}"
-                ;;
-            "lowrank_svd")
-                potential_path="${model_output_dir}/models/svd_rank${param1}_${version}"
-                ;;
-        esac
-
-        if [[ -d "${potential_path}" ]]; then
-            edit_path="${potential_path}"
-            break
+    if [[ "${param1}" == "clean" ]]; then
+        local resolved
+        resolved=$(resolve_edit_params "${model_output_dir}" "${edit_spec}" "clean")
+        local status
+        status=$(echo "${resolved}" | jq -r '.status')
+        if [[ "${status}" == "skipped" ]]; then
+            echo "  Clean edit skipped by calibration: ${edit_spec}" >> "${log_file}"
+            return 0
         fi
-    done
+        if [[ "${status}" != "selected" ]]; then
+            echo "ERROR: Unable to resolve clean edit for ${edit_spec} (${status})" >> "${log_file}"
+            return 1
+        fi
+        local edit_dir_name
+        edit_dir_name=$(echo "${resolved}" | jq -r '.edit_dir_name')
+        edit_path="${model_output_dir}/models/${edit_dir_name}"
+    else
+        for version in clean stress; do
+            local resolved
+            resolved=$(resolve_edit_params "${model_output_dir}" "${edit_spec}" "${version}")
+            local status
+            status=$(echo "${resolved}" | jq -r '.status')
+            if [[ "${status}" != "selected" ]]; then
+                continue
+            fi
+            local edit_dir_name
+            edit_dir_name=$(echo "${resolved}" | jq -r '.edit_dir_name')
+            local potential_path="${model_output_dir}/models/${edit_dir_name}"
+            if [[ -d "${potential_path}" ]]; then
+                edit_path="${potential_path}"
+                break
+            fi
+        done
+    fi
 
     if [[ -z "${edit_path}" || ! -d "${edit_path}" ]]; then
         echo "ERROR: Edit model not found for spec: ${edit_spec}" >> "${log_file}"
@@ -2217,26 +2887,20 @@ task_certify_edit() {
         return 1
     fi
 
-    # Parse edit spec to find path
-    local edit_type param1
-    IFS=':' read -r edit_type param1 _ _ <<< "${edit_spec}"
-
+    local resolved
+    resolved=$(resolve_edit_params "${model_output_dir}" "${edit_spec}" "${version}")
+    local status
+    status=$(echo "${resolved}" | jq -r '.status')
+    if [[ "${status}" == "skipped" ]]; then
+        echo "  Clean edit skipped by calibration: ${edit_spec}" >> "${log_file}"
+        return 0
+    fi
+    if [[ "${status}" != "selected" ]]; then
+        echo "ERROR: Unable to resolve edit spec (${edit_spec}): ${status}" >> "${log_file}"
+        return 1
+    fi
     local edit_dir_name
-    case "${edit_type}" in
-        "quant_rtn")
-            edit_dir_name="quant_${param1}bit_${version}"
-            ;;
-        "fp4_quant")
-            edit_dir_name="fp4_${param1}_${version}"
-            ;;
-        "magnitude_prune")
-            local pct=$(echo "${param1}" | awk '{printf "%.0f", $1 * 100}')
-            edit_dir_name="prune_${pct}pct_${version}"
-            ;;
-        "lowrank_svd")
-            edit_dir_name="svd_rank${param1}_${version}"
-            ;;
-    esac
+    edit_dir_name=$(echo "${resolved}" | jq -r '.edit_dir_name')
 
     local edit_path="${model_output_dir}/models/${edit_dir_name}"
     local cert_dir="${model_output_dir}/certificates/${edit_dir_name}/run_${run_num}"

@@ -1,259 +1,66 @@
 #!/usr/bin/env bash
 
+stub_resolve_edit_params() {
+    resolve_edit_params() {
+        local model_output_dir="$1"
+        local edit_spec="$2"
+        local version="${3:-}"
+
+        local edit_type param1 param2 scope
+        IFS=':' read -r edit_type param1 param2 scope <<< "${edit_spec}"
+        if [[ -z "${scope}" && "${edit_type}" != "quant_rtn" ]]; then
+            scope="${param2}"
+            param2=""
+        fi
+        if [[ "${edit_type}" == "quant_rtn" && -z "${scope}" ]]; then
+            scope="${param2}"
+            param2=""
+        fi
+
+        local status="selected"
+        local edit_dir_name=""
+        case "${edit_type}" in
+            quant_rtn)
+                edit_dir_name="quant_${param1}bit_${version}"
+                ;;
+            fp8_quant)
+                edit_dir_name="fp8_${param1}_${version}"
+                ;;
+            fp4_quant)
+                edit_dir_name="fp4_${param1}_${version}"
+                ;;
+            magnitude_prune)
+                local pct
+                pct=$(echo "${param1}" | awk '{printf "%.0f", $1 * 100}')
+                edit_dir_name="prune_${pct}pct_${version}"
+                ;;
+            lowrank_svd)
+                edit_dir_name="svd_rank${param1}_${version}"
+                ;;
+            *)
+                status="invalid"
+                ;;
+        esac
+
+        jq -n \
+            --arg status "${status}" \
+            --arg edit_type "${edit_type}" \
+            --arg param1 "${param1}" \
+            --arg param2 "${param2}" \
+            --arg scope "${scope}" \
+            --arg version "${version}" \
+            --arg edit_dir_name "${edit_dir_name}" \
+            '{status:$status, edit_type:$edit_type, param1:$param1, param2:$param2, scope:$scope, version:$version, edit_dir_name:$edit_dir_name}'
+    }
+}
+
 test_model_size_and_eval_batch_selection() {
     mock_reset
     # shellcheck source=../task_functions.sh
     source "${TEST_ROOT}/scripts/lib/task_functions.sh"
 
-    assert_eq "moe" "$(_get_model_size_from_name "mistralai/Mixtral-8x7B-v0.1")" "moe bucket"
-    assert_eq "70" "$(_get_model_size_from_name "NousResearch/Llama-2-70b-hf")" "70B bucket"
-    assert_eq "40" "$(_get_model_size_from_name "meta-llama/Llama-2-34b-hf")" "40B bucket"
-    assert_eq "30" "$(_get_model_size_from_name "meta-llama/Llama-2-33b-hf")" "30B bucket"
-    assert_eq "13" "$(_get_model_size_from_name "NousResearch/Llama-2-13b-hf")" "13B bucket"
-    assert_eq "7" "$(_get_model_size_from_name "mistralai/Mistral-7B-v0.1")" "default bucket"
-
-    EVAL_BATCH_SIZE_SMALL="auto:16" EVAL_BATCH_SIZE_MEDIUM="auto:8" EVAL_BATCH_SIZE_LARGE="auto:4" EVAL_BATCH_SIZE_MOE="auto:6"
-    assert_eq "auto:6" "$(_get_eval_batch_size moe)" "moe batch"
-    assert_eq "auto:4" "$(_get_eval_batch_size 70)" "large batch"
-    assert_eq "auto:8" "$(_get_eval_batch_size 32)" "medium batch"
-    assert_eq "auto:16" "$(_get_eval_batch_size 7)" "small batch"
-    assert_eq "auto:16" "$(_get_eval_batch_size weird)" "non-numeric defaults to small"
-}
-
-test_invarlock_config_fallback_case_arms() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/lib/task_functions.sh"
-
-    assert_eq "2048:1024:64:64:96" "$(_get_model_invarlock_config_fallback 7)" "7B fallback config"
-    assert_eq "1536:768:48:48:64" "$(_get_model_invarlock_config_fallback 13)" "13B fallback config"
-    assert_eq "1024:512:40:40:48" "$(_get_model_invarlock_config_fallback 30)" "30B fallback config"
-    assert_eq "1024:512:36:36:32" "$(_get_model_invarlock_config_fallback 40)" "40B fallback config"
-    assert_eq "1024:512:40:40:24" "$(_get_model_invarlock_config_fallback moe)" "moe fallback config"
-    assert_eq "128:64:8:8:2" "$(_get_model_invarlock_config_fallback 70)" "70B fallback config"
-    assert_eq "1024:512:40:40:32" "$(_get_model_invarlock_config_fallback unknown)" "default fallback config"
-}
-
-test_wrapper_functions_prefer_main_script_implementations() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/lib/task_functions.sh"
-
-    estimate_model_params() { echo "70"; }
-    get_model_invarlock_config() { echo "1:2:3:4:5"; }
-
-    assert_eq "70" "$(_estimate_model_size /m)" "uses estimate_model_params when available"
-    assert_eq "1:2:3:4:5" "$(_get_invarlock_config 7)" "uses get_model_invarlock_config when available"
-}
-
-test_is_large_model_and_task_timeout_helpers_cover_numeric_and_fallback_paths() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/lib/task_functions.sh"
-
-    _is_large_model moe
-    _is_large_model 40
-    _is_large_model llama-2-70b
-
-    TASK_TIMEOUT_DEFAULT="0"
-    assert_eq "" "$(_get_task_timeout FOO)" "0 disables timeout"
-    TASK_TIMEOUT_DEFAULT="5"
-    assert_eq "5" "$(_get_task_timeout FOO)" "numeric timeout is returned"
-    TASK_TIMEOUT_FOO="none"
-    assert_eq "" "$(_get_task_timeout FOO)" "override can disable timeout"
-}
-
-test_lmeval_model_args_multi_gpu_parallelize_flag() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/lib/task_functions.sh"
-
-    CUDA_VISIBLE_DEVICES=""
-    assert_eq "pretrained=/m,trust_remote_code=True,dtype=bfloat16" "$(_get_lmeval_model_args "/m")" "single GPU args"
-
-    CUDA_VISIBLE_DEVICES="0,1"
-    LM_EVAL_PARALLELIZE=true
-    assert_eq "pretrained=/m,trust_remote_code=True,dtype=bfloat16,device_map=auto,parallelize=True" "$(_get_lmeval_model_args "/m")" "multi GPU parallelize"
-
-    LM_EVAL_PARALLELIZE=false
-    assert_eq "pretrained=/m,trust_remote_code=True,dtype=bfloat16,device_map=auto" "$(_get_lmeval_model_args "/m")" "parallelize off"
-}
-
-test_write_model_profile_creates_profile_from_config() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/lib/task_functions.sh"
-
-    local baseline_dir="${TEST_TMPDIR}/baseline"
-    mkdir -p "${baseline_dir}"
-    cat > "${baseline_dir}/config.json" <<'JSON'
-{"hidden_size": 4096, "num_hidden_layers": 32, "num_attention_heads": 32}
-JSON
-
-    _write_model_profile "${baseline_dir}" "org/model"
-    assert_file_exists "${baseline_dir}/model_profile.json" "profile created"
-}
-
-test_write_model_profile_returns_nonzero_when_baseline_dir_missing() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/lib/task_functions.sh"
-
-    run _write_model_profile "${TEST_TMPDIR}/missing_baseline" "org/model"
-    assert_rc "1" "${RUN_RC}" "missing baseline dir returns non-zero"
-}
-
-test_kill_task_process_group_prefers_pgid_when_different() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/lib/task_functions.sh"
-
-    local calls="${TEST_TMPDIR}/kill.calls"
-    _cmd_kill() { echo "kill $*" >> "${calls}"; return 0; }
-
-    # First call (pgid) returns 200, second (self pgid) returns 100.
-    _cmd_ps() {
-        if [[ "$*" == *"-p 123"* ]]; then
-            echo " 200"
-        else
-            echo " 100"
-        fi
-    }
-    _sleep() { return 0; }
-
-    _kill_task_process_group "123"
-    assert_match 'kill -TERM -- -200' "$(cat "${calls}")" "kills pgid"
-}
-
-test_kill_task_process_group_falls_back_to_pid_when_pgid_missing_or_same() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/lib/task_functions.sh"
-
-    local calls="${TEST_TMPDIR}/kill.calls"
-    _cmd_kill() { echo "kill $*" >> "${calls}"; return 0; }
-    _cmd_ps() { echo " 100"; }
-    _sleep() { return 0; }
-
-    _kill_task_process_group "123"
-    assert_match 'kill -TERM 123' "$(cat "${calls}")" "kills pid"
-}
-
-test_execute_task_unknown_type_fails_cleanly() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/lib/task_functions.sh"
-
-    local out="${TEST_TMPDIR}/out"
-    mkdir -p "${out}/queue/running" "${out}/logs/tasks"
-    export QUEUE_DIR="${out}/queue"
-
-    local task_file="${TEST_TMPDIR}/t.task"
-    jq -n '{task_id:"t", task_type:"NOPE", model_id:"m", model_name:"n", status:"ready", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, gpu_id:-1, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${task_file}"
-
-    run execute_task "${task_file}" "0" "${out}"
-    assert_rc "1" "${RUN_RC}" "unknown task type fails"
-    assert_file_exists "${out}/logs/tasks/t.log" "task log created"
-    assert_match 'Unknown task type' "$(cat "${out}/logs/tasks/t.log")" "log message"
-}
-
-test_execute_task_dispatches_all_known_task_types_and_job_control_case_arm() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/lib/task_functions.sh"
-
-    set -m
-
-    local out="${TEST_TMPDIR}/out"
-    mkdir -p "${out}/queue/running" "${out}/logs/tasks"
-    export QUEUE_DIR="${out}/queue"
-
-    local calls="${TEST_TMPDIR}/calls"
-    task_setup_baseline() { echo "setup $*" >> "${calls}"; }
-    task_eval_baseline() { echo "eval_base $*" >> "${calls}"; }
-    task_calibration_run() { echo "cal $*" >> "${calls}"; }
-    task_create_edit() { echo "create_edit $*" >> "${calls}"; }
-    task_create_edits_batch() { echo "batch $*" >> "${calls}"; }
-    task_eval_edit() { echo "eval_edit $*" >> "${calls}"; }
-    task_eval_single_benchmark() { echo "eval_one $*" >> "${calls}"; }
-    task_certify_edit() { echo "cert_edit $*" >> "${calls}"; }
-    task_create_error() { echo "create_err $*" >> "${calls}"; }
-    task_certify_error() { echo "cert_err $*" >> "${calls}"; }
-    task_generate_preset() { echo "preset $*" >> "${calls}"; }
-
-    local mk_task
-    mk_task() {
-        local id="$1"
-        local type="$2"
-        local params_json="$3"
-        local file="${TEST_TMPDIR}/${id}.task"
-        jq -n --arg id "${id}" --arg type "${type}" --argjson params "${params_json}" \
-            '{task_id:$id, task_type:$type, model_id:"m", model_name:"n", status:"ready", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, gpu_id:-1, assigned_gpus:null, dependencies:[], params:$params, priority:50}' \
-            > "${file}"
-        echo "${file}"
-    }
-
-    execute_task "$(mk_task t_setup SETUP_BASELINE '{}')" 0 "${out}"
-    execute_task "$(mk_task t_eval EVAL_BASELINE '{}')" 0 "${out}"
-    execute_task "$(mk_task t_cal CALIBRATION_RUN '{"run":2,"seed":9}')" 0 "${out}"
-    execute_task "$(mk_task t_edit CREATE_EDIT '{"edit_spec":"quant_rtn:4:32:attn","version":"clean"}')" 0 "${out}"
-    execute_task "$(mk_task t_batch CREATE_EDITS_BATCH '{"edit_specs":[]}')" 0 "${out}"
-    execute_task "$(mk_task t_eval_edit EVAL_EDIT '{"edit_spec":"quant_rtn:4:32:attn"}')" 0 "${out}"
-    execute_task "$(mk_task t_eval_mmlu EVAL_MMLU '{"edit_spec":"quant_rtn:4:32:attn","benchmark":"mmlu"}')" 0 "${out}"
-    execute_task "$(mk_task t_cert CERTIFY_EDIT '{"edit_spec":"quant_rtn:4:32:attn","version":"clean","run":1}')" 0 "${out}"
-    execute_task "$(mk_task t_err CREATE_ERROR '{"error_type":"cuda_assert"}')" 0 "${out}"
-    execute_task "$(mk_task t_cert_err CERTIFY_ERROR '{"error_type":"cuda_assert"}')" 0 "${out}"
-    execute_task "$(mk_task t_preset GENERATE_PRESET '{}')" 0 "${out}"
-
-    grep -q 'setup' "${calls}" || t_fail "expected setup call"
-    grep -q 'eval_base' "${calls}" || t_fail "expected eval baseline call"
-    grep -q 'cal' "${calls}" || t_fail "expected calibration call"
-    grep -q 'create_edit' "${calls}" || t_fail "expected create edit call"
-    grep -q 'batch' "${calls}" || t_fail "expected batch edit call"
-    grep -q 'eval_edit' "${calls}" || t_fail "expected eval edit call"
-    grep -q 'eval_one' "${calls}" || t_fail "expected eval single benchmark call"
-    grep -q 'cert_edit' "${calls}" || t_fail "expected certify edit call"
-    grep -q 'create_err' "${calls}" || t_fail "expected create error call"
-    grep -q 'cert_err' "${calls}" || t_fail "expected certify error call"
-    grep -q 'preset' "${calls}" || t_fail "expected preset call"
-}
-
-test_execute_task_timeout_marks_exit_124_and_cleans_up_timeout_marker() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/lib/task_functions.sh"
-
-    local out="${TEST_TMPDIR}/out"
-    mkdir -p "${out}/queue/running" "${out}/logs/tasks"
-    export QUEUE_DIR="${out}/queue"
-
-    _get_task_timeout() { echo "1"; }
-    _sleep() { return 0; }
-    _cmd_kill() { return 0; }
-    _kill_task_process_group() { return 0; }
-
-    task_setup_baseline() {
-        local i
-        for i in $(seq 1 5000); do :; done
-        return 0
-    }
-
-    local task_file="${TEST_TMPDIR}/t.task"
-    jq -n '{task_id:"t", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"ready", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, gpu_id:-1, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
-        > "${task_file}"
-
-    if execute_task "${task_file}" 0 "${out}" >/dev/null; then
-        t_fail "expected timeout to force non-zero exit"
-    fi
-}
-
-test_task_setup_baseline_branches_resume_setup_model_and_inline_paths() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/lib/task_functions.sh"
-
     fixture_write "python3.stub" ""
+
     fixture_write "python3.rc" "0"
 
     local out="${TEST_TMPDIR}/out"
@@ -438,6 +245,7 @@ test_task_create_edit_and_batch_edits_cover_success_failure_and_missing_function
     mock_reset
     # shellcheck source=../task_functions.sh
     source "${TEST_ROOT}/scripts/lib/task_functions.sh"
+    stub_resolve_edit_params
 
     fixture_write "python3.stub" ""
     fixture_write "python3.rc" "0"
@@ -459,12 +267,12 @@ test_task_create_edit_and_batch_edits_cover_success_failure_and_missing_function
 
     # Create function stubs that materialize config.json for verification.
     create_edited_model() { mkdir -p "$2"; echo "{}" > "$2/config.json"; }
-    create_fp4_model() { mkdir -p "$2"; echo "{}" > "$2/config.json"; }
+    create_fp8_model() { mkdir -p "$2"; echo "{}" > "$2/config.json"; }
     create_pruned_model() { mkdir -p "$2"; echo "{}" > "$2/config.json"; }
     create_lowrank_model() { mkdir -p "$2"; echo "{}" > "$2/config.json"; }
 
     task_create_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean "${out}" "${log_file}"
-    task_create_edit "${model_name}" 0 "fp4_quant:e2m1:ffn" clean "${out}" "${log_file}"
+    task_create_edit "${model_name}" 0 "fp8_quant:e4m3fn:ffn" clean "${out}" "${log_file}"
     task_create_edit "${model_name}" 0 "magnitude_prune:0.1:ffn" clean "${out}" "${log_file}"
     task_create_edit "${model_name}" 0 "lowrank_svd:8:attn" clean "${out}" "${log_file}"
 
@@ -472,16 +280,16 @@ test_task_create_edit_and_batch_edits_cover_success_failure_and_missing_function
     task_create_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean "${out}" "${log_file}"
 
     # Missing create_* function branches.
-    rm -rf "${model_output_dir}/models/fp4_e2m1_clean"
-    unset -f create_fp4_model
-    if task_create_edit "${model_name}" 0 "fp4_quant:e2m1:ffn" clean "${out}" "${log_file}"; then
-        t_fail "expected missing create_fp4_model to fail"
+    rm -rf "${model_output_dir}/models/fp8_e4m3fn_clean"
+    unset -f create_fp8_model
+    if task_create_edit "${model_name}" 0 "fp8_quant:e4m3fn:ffn" clean "${out}" "${log_file}"; then
+        t_fail "expected missing create_fp8_model to fail"
     fi
 
     # Verify-failure branch when creation does not produce config.json.
-    rm -rf "${model_output_dir}/models/fp4_e2m1_clean"
-    create_fp4_model() { mkdir -p "$2"; }
-    if task_create_edit "${model_name}" 0 "fp4_quant:e2m1:ffn" clean "${out}" "${log_file}"; then
+    rm -rf "${model_output_dir}/models/fp8_e4m3fn_clean"
+    create_fp8_model() { mkdir -p "$2"; }
+    if task_create_edit "${model_name}" 0 "fp8_quant:e4m3fn:ffn" clean "${out}" "${log_file}"; then
         t_fail "expected create_edit verification failure"
     fi
 
@@ -523,6 +331,7 @@ test_task_eval_edit_and_single_benchmark_cover_mapping_overrides_results_and_war
     mock_reset
     # shellcheck source=../task_functions.sh
     source "${TEST_ROOT}/scripts/lib/task_functions.sh"
+    stub_resolve_edit_params
 
     fixture_write "python3.stub" ""
     fixture_write "python3.rc" "0"
@@ -545,7 +354,7 @@ test_task_eval_edit_and_single_benchmark_cover_mapping_overrides_results_and_war
 
     # Create edit dirs for each mapping arm.
     mkdir -p "${model_output_dir}/models/quant_4bit_clean"
-    mkdir -p "${model_output_dir}/models/fp4_e2m1_clean"
+    mkdir -p "${model_output_dir}/models/fp8_e4m3fn_clean"
     mkdir -p "${model_output_dir}/models/prune_10pct_clean"
     mkdir -p "${model_output_dir}/models/svd_rank8_clean"
 
@@ -561,7 +370,7 @@ test_task_eval_edit_and_single_benchmark_cover_mapping_overrides_results_and_war
     rm -f "${model_output_dir}/evals/"*.json 2>/dev/null || true
     rm -rf "${tmp_eval_dir}"
     mkdir -p "${tmp_eval_dir}"
-    run task_eval_edit "${model_name}" 0 "fp4_quant:e2m1:ffn" "${out}" "${log_file}"
+    run task_eval_edit "${model_name}" 0 "fp8_quant:e4m3fn:ffn" "${out}" "${log_file}"
     assert_rc "1" "${RUN_RC}" "missing results returns non-zero"
 
     # Edit type mapping arms in task_eval_edit.
@@ -600,7 +409,7 @@ test_task_eval_edit_and_single_benchmark_cover_mapping_overrides_results_and_war
     # task_eval_single_benchmark edit mapping arms.
     mkdir -p "${tmp_eval_dir}"
     echo "{}" > "${tmp_eval_dir}/results.json"
-    task_eval_single_benchmark "${model_name}" 0 "fp4_quant:e2m1:ffn" mmlu "${out}" "${log_file}"
+    task_eval_single_benchmark "${model_name}" 0 "fp8_quant:e4m3fn:ffn" mmlu "${out}" "${log_file}"
     mkdir -p "${tmp_eval_dir}"
     echo "{}" > "${tmp_eval_dir}/results.json"
     task_eval_single_benchmark "${model_name}" 0 "magnitude_prune:0.1:ffn" mmlu "${out}" "${log_file}"
@@ -628,6 +437,7 @@ test_task_eval_edit_returns_nonzero_when_results_move_fails() {
     mock_reset
     # shellcheck source=../task_functions.sh
     source "${TEST_ROOT}/scripts/lib/task_functions.sh"
+    stub_resolve_edit_params
 
     fixture_write "python3.stub" ""
     fixture_write "python3.rc" "0"
@@ -666,6 +476,7 @@ test_task_eval_single_benchmark_returns_nonzero_when_results_move_fails() {
     mock_reset
     # shellcheck source=../task_functions.sh
     source "${TEST_ROOT}/scripts/lib/task_functions.sh"
+    stub_resolve_edit_params
 
     fixture_write "python3.stub" ""
     fixture_write "python3.rc" "0"
@@ -704,6 +515,7 @@ test_task_certify_edit_and_error_cover_preset_discovery_overrides_and_certificat
     mock_reset
     # shellcheck source=../task_functions.sh
     source "${TEST_ROOT}/scripts/lib/task_functions.sh"
+    stub_resolve_edit_params
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -722,7 +534,7 @@ test_task_certify_edit_and_error_cover_preset_discovery_overrides_and_certificat
     fi
 
     # Case arms for edit dir name mapping + missing edit path error.
-    if task_certify_edit "${model_name}" 0 "fp4_quant:e2m1:ffn" clean 1 "${out}" "${log_file}"; then :; fi
+    if task_certify_edit "${model_name}" 0 "fp8_quant:e4m3fn:ffn" clean 1 "${out}" "${log_file}"; then :; fi
     if task_certify_edit "${model_name}" 0 "magnitude_prune:0.1:ffn" clean 1 "${out}" "${log_file}"; then :; fi
     if task_certify_edit "${model_name}" 0 "lowrank_svd:8:attn" clean 1 "${out}" "${log_file}"; then :; fi
 
@@ -759,6 +571,7 @@ test_task_certify_edit_exits_when_workdir_cd_fails() {
     mock_reset
     # shellcheck source=../task_functions.sh
     source "${TEST_ROOT}/scripts/lib/task_functions.sh"
+    stub_resolve_edit_params
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"

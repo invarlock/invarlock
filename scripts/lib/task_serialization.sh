@@ -697,6 +697,7 @@ estimate_model_memory() {
         case "${task_type}" in
             "SETUP_BASELINE")  multiplier="1.0" ;;
             "EVAL_BASELINE")   multiplier="1.1" ;;
+            "CALIBRATE_CLEAN") multiplier="1.2" ;;
             "CALIBRATION_RUN") multiplier="1.05" ;;
             "CREATE_EDIT")     multiplier="1.2" ;;
             "EVAL_EDIT")       multiplier="1.1" ;;
@@ -710,6 +711,7 @@ estimate_model_memory() {
         case "${task_type}" in
             "SETUP_BASELINE")  multiplier="1.0" ;;
             "EVAL_BASELINE")   multiplier="1.2" ;;
+            "CALIBRATE_CLEAN") multiplier="1.4" ;;
             "CALIBRATION_RUN") multiplier="1.1" ;;
             "CREATE_EDIT")     multiplier="1.5" ;;
             "EVAL_EDIT")       multiplier="1.2" ;;
