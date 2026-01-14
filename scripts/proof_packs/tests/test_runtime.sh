@@ -3,7 +3,7 @@
 test_rand_jitter_ms_invalid_input_returns_zero() {
     mock_reset
     # shellcheck source=../runtime.sh
-    source "${TEST_ROOT}/scripts/lib/runtime.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/runtime.sh"
 
     assert_eq "0" "$(_rand_jitter_ms "nope")" "non-numeric jitter clamps to 0"
     assert_eq "0" "$(_rand_jitter_ms "0")" "zero jitter clamps to 0"
@@ -13,7 +13,7 @@ test_rand_jitter_ms_invalid_input_returns_zero() {
 test_rand_jitter_ms_positive_returns_value_in_range() {
     mock_reset
     # shellcheck source=../runtime.sh
-    source "${TEST_ROOT}/scripts/lib/runtime.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/runtime.sh"
 
     local max="7"
     local val
@@ -32,7 +32,7 @@ test_now_iso_plus_seconds_invalid_input_coerces_to_zero_seconds() {
     _cmd_python() { echo "ERROR: python fallback should not be used" >&2; return 1; }
 
     # shellcheck source=../runtime.sh
-    source "${TEST_ROOT}/scripts/lib/runtime.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/runtime.sh"
 
     assert_eq "2025-01-01T00:00:00Z" "$(_now_iso_plus_seconds "not-a-number")" "invalid seconds coerced to 0"
 }
@@ -44,7 +44,7 @@ test_now_iso_plus_seconds_uses_date_v_and_python_fallback_when_date_d_fails() {
     _cmd_python() { echo "2025-01-01T00:00:10Z"; }
 
     # shellcheck source=../runtime.sh
-    source "${TEST_ROOT}/scripts/lib/runtime.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/runtime.sh"
 
     assert_eq "2025-01-01T00:00:10Z" "$(_now_iso_plus_seconds "10")" "python fallback used when date flags unavailable"
 }
@@ -52,7 +52,7 @@ test_now_iso_plus_seconds_uses_date_v_and_python_fallback_when_date_d_fails() {
 test_pid_is_alive_backend_uses_proc_hook() {
     mock_reset
     # shellcheck source=../runtime.sh
-    source "${TEST_ROOT}/scripts/lib/runtime.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/runtime.sh"
 
     _has_proc_dir() { return 0; }
     assert_eq "proc" "$(_pid_is_alive_backend)" "forced proc backend"
@@ -64,7 +64,7 @@ test_pid_is_alive_backend_uses_proc_hook() {
 test_pid_is_alive_proc_checks_proc_pid_dir() {
     mock_reset
     # shellcheck source=../runtime.sh
-    source "${TEST_ROOT}/scripts/lib/runtime.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/runtime.sh"
 
     run _pid_is_alive_proc "123"
     assert_rc "1" "${RUN_RC}" "macOS has no /proc, so pid is not alive via proc backend"
@@ -76,7 +76,7 @@ test_pid_is_alive_ps_calls_ps_for_valid_pid() {
     _cmd_ps() { return 0; }
 
     # shellcheck source=../runtime.sh
-    source "${TEST_ROOT}/scripts/lib/runtime.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/runtime.sh"
 
     run _pid_is_alive_ps "123"
     assert_rc "0" "${RUN_RC}" "ps backend uses _cmd_ps for valid pid"
@@ -97,7 +97,7 @@ test_file_mtime_epoch_falls_back_to_stat_f_format_and_errors_when_unavailable() 
     }
 
     # shellcheck source=../runtime.sh
-    source "${TEST_ROOT}/scripts/lib/runtime.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/runtime.sh"
 
     assert_eq "1700000001" "$(_file_mtime_epoch "${TEST_TMPDIR}")" "stat -f fallback used when -c unsupported"
 
@@ -122,7 +122,7 @@ test_file_mtime_epoch_prefers_stat_c_when_available() {
     }
 
     # shellcheck source=../runtime.sh
-    source "${TEST_ROOT}/scripts/lib/runtime.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/runtime.sh"
 
     assert_eq "1700000002" "$(_file_mtime_epoch "${TEST_TMPDIR}")" "stat -c used when available"
     assert_match '-c %Y' "$(cat "${calls}")" "stat -c called"
@@ -137,7 +137,7 @@ test_file_mtime_epoch_returns_nonzero_on_non_numeric_output() {
     }
 
     # shellcheck source=../runtime.sh
-    source "${TEST_ROOT}/scripts/lib/runtime.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/runtime.sh"
 
     run _file_mtime_epoch "${TEST_TMPDIR}"
     assert_rc "1" "${RUN_RC}" "non-numeric stat output returns non-zero"
@@ -146,7 +146,7 @@ test_file_mtime_epoch_returns_nonzero_on_non_numeric_output() {
 test_pid_is_alive_case_arms_call_expected_impl() {
     mock_reset
     # shellcheck source=../runtime.sh
-    source "${TEST_ROOT}/scripts/lib/runtime.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/runtime.sh"
 
     local calls="${TEST_TMPDIR}/pid.calls"
     : >"${calls}"
@@ -176,7 +176,7 @@ test_pid_is_alive_case_arms_call_expected_impl() {
 test_iso_to_epoch_python_fallback_parses_iso() {
     mock_reset
     # shellcheck source=../runtime.sh
-    source "${TEST_ROOT}/scripts/lib/runtime.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/runtime.sh"
 
     # The date mock forces portable fallback; verify the python fallback receives args.
     assert_eq "1735689610" "$(_iso_to_epoch "2025-01-01T00:00:10Z")" "iso parses to epoch seconds"
@@ -189,7 +189,7 @@ test_iso_to_epoch_empty_and_null_return_zero_without_shelling_out() {
     _cmd_python() { echo "ERROR: python should not be called" >&2; return 1; }
 
     # shellcheck source=../runtime.sh
-    source "${TEST_ROOT}/scripts/lib/runtime.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/runtime.sh"
 
     assert_eq "0" "$(_iso_to_epoch "")" "empty iso returns 0"
     assert_eq "0" "$(_iso_to_epoch "null")" "null iso returns 0"
@@ -215,7 +215,7 @@ test_iso_to_epoch_uses_date_j_f_in_utc_when_available() {
     _cmd_python() { echo "ERROR: python fallback should not be used" >&2; return 1; }
 
     # shellcheck source=../runtime.sh
-    source "${TEST_ROOT}/scripts/lib/runtime.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/runtime.sh"
 
     assert_eq "1735689610" "$(_iso_to_epoch "2025-01-01T00:00:10Z")" "date -u -j -f path used when available"
     assert_match '-u -j -f' "$(cat "${calls}")" "calls include -u -j -f"
@@ -228,7 +228,7 @@ test_iso_to_epoch_falls_back_when_date_returns_non_numeric() {
     _cmd_python() { echo "1735689610"; }
 
     # shellcheck source=../runtime.sh
-    source "${TEST_ROOT}/scripts/lib/runtime.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/runtime.sh"
 
     assert_eq "1735689610" "$(_iso_to_epoch "2025-01-01T00:00:10Z")" "non-numeric date output falls back to python"
 }
@@ -236,7 +236,7 @@ test_iso_to_epoch_falls_back_when_date_returns_non_numeric() {
 test_pid_is_alive_ps_invalid_pid_short_circuits() {
     mock_reset
     # shellcheck source=../runtime.sh
-    source "${TEST_ROOT}/scripts/lib/runtime.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/runtime.sh"
 
     run _pid_is_alive_ps "nope"
     assert_rc "1" "${RUN_RC}" "invalid pid returns non-zero"
@@ -260,7 +260,7 @@ test_now_iso_plus_seconds_negative_formats_date_args_without_v_plus_minus() {
     _cmd_python() { echo "2024-12-31T23:59:55Z"; }
 
     # shellcheck source=../runtime.sh
-    source "${TEST_ROOT}/scripts/lib/runtime.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/runtime.sh"
 
     assert_eq "2024-12-31T23:59:55Z" "$(_now_iso_plus_seconds "-5")" "negative seconds uses python fallback"
 

@@ -1,28 +1,12 @@
 #!/usr/bin/env bash
-# b200_validation_suite.sh
+# validation_suite.sh
 # ==========================================================
-# InvarLock Definitive Validation Suite - B200 180GB Optimized
+# InvarLock Proof Pack Validation Suite
 # ==========================================================
-# Version: v2.1.0-b200
+# Version: proof-packs-v1
 # Dependencies: bash 4+, jq, python3, invarlock CLI, nvidia-smi
-# Optimized for multi-GPU NVIDIA B200 180GB SXM6 with parallel orchestration.
-#
-# HARDWARE TARGET:
-# - 8x B200 180GB SXM6
-# - ~4.5 TB/s memory bandwidth
-# - ~2250 FP16 TFLOPS
-# - Native FP8/FP4 hardware support (suite uses FP8 + RTN)
-#
-# MEMORY UTILIZATION STRATEGY:
-# - Target: 85-92% VRAM (153-166 GB of 180 GB per GPU)
-# - Large models auto-scale to multi-GPU only when profile exceeds per-GPU memory
-# - Adaptive under-allocation is disabled by default to avoid OOM
-# - All 8 GPUs utilized in parallel
-#
-# OPERATIONAL NOTES:
-# - Disk: baseline + edits can exceed multiple TB across 8 models.
-# - Host RAM: saving 70B+ edits can require >140 GB CPU RAM.
-# - Runtime: low-rank SVD on 70B+ can dominate wall time.
+# Hardware-agnostic: runs on NVIDIA GPUs where models fit VRAM.
+# Designed for multi-GPU scheduling with dynamic work-stealing.
 #
 # EDIT TYPES (4 types × 2 versions = 8 tests per model):
 # - Quantization RTN (group-wise): clean calibrated per model, 4-bit stress
@@ -30,20 +14,14 @@
 # - Magnitude Pruning: clean calibrated per model, 50% stress
 # - Low-Rank SVD: clean calibrated per model, rank-32 stress
 #
-# MODEL SUITE (8 PUBLIC models - no HuggingFace login required):
-# - Mistral-7B-v0.1 (~14 GB)
-# - Llama-2-13b-hf (~26 GB)
-# - Qwen2.5-14B (~28 GB)
-# - Qwen2.5-32B (~64 GB)
-# - Yi-34B (~68 GB)
-# - Mixtral-8x7B-v0.1 (~90 GB)
-# - Llama-2-70b-hf (~140 GB)
-# - Qwen1.5-72B (~144 GB)
+# MODEL SUITES:
+# - Defined in scripts/proof_packs/suites.sh (ungated-only models).
+# - Subset targets single-GPU runs; full targets multi-GPU hardware.
 #
 # EXECUTION FLOW:
-# 1. Launch all 8 models in parallel across 8 GPUs
-# 2. Each GPU runs: calibration → 4 clean edits → 4 stress edits → error injection
-# 3. Wait for all GPUs to complete
+# 1. Optional preflight to pin model revisions
+# 2. Launch models across available GPUs
+# 3. Each GPU runs: calibration → edits → error injection
 # 4. Correlation analysis (lm-eval vs InvarLock) → verdict
 # ==========================================================
 
@@ -79,9 +57,9 @@ cleanup() {
 
 # Trap + strict mode are enabled only when executed as a script (not when sourced).
 
-b200_require_bash4() {
+pack_require_bash4() {
     # Associative arrays require bash 4.0+
-    if ! b200_is_bash4; then
+    if ! pack_is_bash4; then
         echo "ERROR: This script requires bash 4.0 or later (have ${BASH_VERSION})" >&2
         echo "       Associative arrays are not supported in bash ${BASH_VERSION}" >&2
         return 1
@@ -90,46 +68,54 @@ b200_require_bash4() {
 }
 
 # Overrideable hook for tests (simulate bash4 on bash3 without env vars).
-b200_is_bash4() {
+pack_is_bash4() {
     [[ "${BASH_VERSINFO[0]}" -ge 4 ]]
 }
 
 # ============ VERSION ============
-SCRIPT_VERSION="2.1.0-b200"
+SCRIPT_VERSION="proof-packs-v1"
 
-# ============ B200-SPECIFIC CONFIGURATION ============
-# These settings are tuned for 8x B200 180GB maximum utilization
+# ============ PACK CONFIGURATION ============
+# Settings tuned for multi-GPU proof packs; defaults stay conservative.
 
 # GPU Configuration (auto-detected at runtime unless explicitly set)
 NUM_GPUS="${NUM_GPUS:-}"
-export GPU_MEMORY_GB="${GPU_MEMORY_GB:-180}"
+export GPU_MEMORY_GB="${GPU_MEMORY_GB:-}"
 
 # Determinism/throughput toggle for this harness (independent of InvarLock CLI presets).
 # - throughput (default): enable TF32 + cuDNN benchmark for maximum speed.
 # - strict: prefer deterministic-friendly flags and avoid overriding CLI presets.
-B200_DETERMINISM="${B200_DETERMINISM:-throughput}"
-case "${B200_DETERMINISM}" in
+PACK_DETERMINISM="${PACK_DETERMINISM:-throughput}"
+case "${PACK_DETERMINISM}" in
     strict|throughput) : ;;
     *)
-        B200_DETERMINISM="throughput"
+        PACK_DETERMINISM="throughput"
         ;;
 esac
-export B200_DETERMINISM
-if [[ "${B200_DETERMINISM}" == "strict" ]]; then
+export PACK_DETERMINISM
+if [[ "${PACK_DETERMINISM}" == "strict" ]]; then
     export LMEVAL_TORCH_COMPILE=0
 else
     export LMEVAL_TORCH_COMPILE=1
 fi
 
+PACK_SUITE="${PACK_SUITE:-subset}"
+PACK_NET="${PACK_NET:-0}"
+PACK_REPEATS="${PACK_REPEATS:-0}"
+PACK_OUTPUT_DIR="${PACK_OUTPUT_DIR:-}"
+PACK_MODEL_REVISIONS_FILE="${PACK_MODEL_REVISIONS_FILE:-}"
+if [[ -n "${PACK_OUTPUT_DIR}" && -z "${OUTPUT_DIR:-}" ]]; then
+    OUTPUT_DIR="${PACK_OUTPUT_DIR}"
+fi
+
 # ============================================================
-# MODEL SELECTION - ALL PUBLIC (NO HUGGINGFACE LOGIN REQUIRED)
+# MODEL SELECTION (DEFAULT FULL SUITE)
 # ============================================================
-# All models below are confirmed public and do not require gated access.
-# Using NousResearch versions of LLaMA-2 to avoid Meta's gated repos.
+# Defaults are ungated/public. run_suite.sh overrides these via suites.sh.
 # Approx VRAM below is weights-only; exact per-task memory is computed from
 # `model_profile.json` after download.
 
-# Small models (fit on a single B200 under typical settings)
+# Small models (fit on a single high-memory GPU under typical settings)
 # Note: leave a MODEL_N unset to use the default below; set it to an empty string to disable.
 if [[ ! ${MODEL_1+x} ]]; then MODEL_1="mistralai/Mistral-7B-v0.1"; fi           # ~14 GB
 if [[ ! ${MODEL_2+x} ]]; then MODEL_2="NousResearch/Llama-2-13b-hf"; fi         # ~26 GB
@@ -143,6 +129,166 @@ if [[ ! ${MODEL_6+x} ]]; then MODEL_6="mistralai/Mixtral-8x7B-v0.1"; fi         
 # Large models
 if [[ ! ${MODEL_7+x} ]]; then MODEL_7="NousResearch/Llama-2-70b-hf"; fi         # ~140 GB
 if [[ ! ${MODEL_8+x} ]]; then MODEL_8="Qwen/Qwen1.5-72B"; fi                    # ~144 GB
+
+pack_model_list() {
+    local -a models=(
+        "${MODEL_1:-}" "${MODEL_2:-}" "${MODEL_3:-}" "${MODEL_4:-}"
+        "${MODEL_5:-}" "${MODEL_6:-}" "${MODEL_7:-}" "${MODEL_8:-}"
+    )
+    local model
+    for model in "${models[@]}"; do
+        [[ -n "${model}" ]] && printf '%s\n' "${model}"
+    done
+}
+
+pack_model_list_array() {
+    PACK_MODEL_LIST=()
+    if command -v mapfile >/dev/null 2>&1; then
+        mapfile -t PACK_MODEL_LIST < <(pack_model_list)
+        return 0
+    fi
+    while IFS= read -r model; do
+        [[ -n "${model}" ]] || continue
+        PACK_MODEL_LIST+=("${model}")
+    done < <(pack_model_list)
+}
+
+pack_model_revisions_path() {
+    local path="${PACK_MODEL_REVISIONS_FILE:-${OUTPUT_DIR}/state/model_revisions.json}"
+    echo "${path}"
+}
+
+pack_load_model_revisions() {
+    local path
+    path="$(pack_model_revisions_path)"
+    if [[ -f "${path}" ]]; then
+        PACK_MODEL_REVISIONS_FILE="${path}"
+        export PACK_MODEL_REVISIONS_FILE
+        local gated
+        gated=$(python3 - "${path}" <<'PY' 2>/dev/null || echo "1"
+import json
+import sys
+
+path = sys.argv[1]
+try:
+    data = json.loads(open(path).read())
+except Exception:
+    raise SystemExit(1)
+
+models = data.get("models", {})
+for model_id, entry in models.items():
+    if entry.get("gated") or entry.get("private"):
+        print(model_id)
+        raise SystemExit(0)
+print("")
+PY
+)
+        if [[ -n "${gated}" ]]; then
+            echo "ERROR: model_revisions.json includes gated/private models; proof packs require ungated models." >&2
+            return 1
+        fi
+        return 0
+    fi
+    return 1
+}
+
+pack_model_revision() {
+    local model_id="$1"
+    local path
+    path="$(pack_model_revisions_path)"
+    [[ -f "${path}" ]] || return 1
+    python3 - "${path}" "${model_id}" <<'PY' 2>/dev/null
+import json
+import sys
+
+path = sys.argv[1]
+model_id = sys.argv[2]
+try:
+    data = json.loads(open(path).read())
+except Exception:
+    raise SystemExit(0)
+
+revision = data.get("models", {}).get(model_id, {}).get("revision") or ""
+print(revision)
+PY
+}
+
+pack_preflight_models() {
+    local output_dir="$1"
+    shift
+    local -a models=("$@")
+    if [[ "${PACK_NET}" != "1" ]]; then
+        error_exit "Preflight requires --net 1 (PACK_NET=1)."
+    fi
+    if [[ ${#models[@]} -eq 0 ]]; then
+        error_exit "No models provided for preflight."
+    fi
+
+    mkdir -p "${output_dir}/state"
+    local out_file="${output_dir}/state/model_revisions.json"
+
+    python3 - "${out_file}" "${models[@]}" <<'PY'
+import json
+import os
+import sys
+from datetime import datetime
+from pathlib import Path
+
+try:
+    from huggingface_hub import HfApi
+    from huggingface_hub.utils import HfHubHTTPError
+except Exception as exc:
+    print("ERROR: huggingface_hub is required for preflight; install it before running with --net 1.", file=sys.stderr)
+    sys.exit(2)
+
+out_file = Path(sys.argv[1])
+model_ids = sys.argv[2:]
+api = HfApi(token=False)
+
+payload = {
+    "generated_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+    "suite": os.environ.get("PACK_SUITE", ""),
+    "model_list": model_ids,
+    "models": {},
+}
+
+errors = []
+for model_id in model_ids:
+    try:
+        info = api.model_info(model_id, token=False)
+    except Exception as err:
+        status = getattr(getattr(err, "response", None), "status_code", None)
+        if status in (401, 403):
+            msg = "requires authentication (gated/private)"
+        else:
+            msg = str(err)
+        print(f"ERROR: {model_id} is not publicly accessible ({msg})", file=sys.stderr)
+        errors.append(model_id)
+        continue
+
+    gated = bool(getattr(info, "gated", False))
+    private = bool(getattr(info, "private", False))
+    if gated or private:
+        print(f"ERROR: {model_id} is gated/private; proof packs require ungated models.", file=sys.stderr)
+        errors.append(model_id)
+        continue
+
+    payload["models"][model_id] = {
+        "revision": info.sha,
+        "resolved_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "gated": gated,
+        "private": private,
+    }
+
+if errors:
+    sys.exit(2)
+
+out_file.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+print(f"Wrote model revisions to {out_file}")
+PY
+    PACK_MODEL_REVISIONS_FILE="${out_file}"
+    export PACK_MODEL_REVISIONS_FILE
+}
 
 # Edit Configuration
 EDIT_TYPE="${EDIT_TYPE:-quant_rtn}"
@@ -166,7 +312,7 @@ EDIT_TYPES_STRESS=(
     "lowrank_svd:32:all"         # rank-32 SVD on all
 )
 
-# Eval Configuration - ULTRA-CONSERVATIVE BATCH SIZES for B200 180GB
+# Eval Configuration - conservative batch sizes for large GPUs
 # Using lm-eval's "auto:N" feature: auto-detect with max cap of N
 # This prevents OOM by letting lm-eval find optimal batch size bounded by max
 EVAL_TASKS="${EVAL_TASKS:-mmlu,hellaswag,arc_challenge,winogrande}"
@@ -233,7 +379,11 @@ OUTPUT_DIR="${OUTPUT_DIR:-}"
 #
 # Override by exporting HF_HOME / HF_HUB_CACHE / HF_DATASETS_CACHE /
 # TRANSFORMERS_CACHE before running this script.
-b200_setup_hf_cache_dirs() {
+pack_setup_hf_cache_dirs() {
+    if [[ -z "${OUTPUT_DIR:-}" ]]; then
+        echo "ERROR: OUTPUT_DIR is not set; use --out or PACK_OUTPUT_DIR." >&2
+        return 1
+    fi
     export HF_HOME="${HF_HOME:-${OUTPUT_DIR}/.hf}"
     export HF_HUB_CACHE="${HF_HUB_CACHE:-${HF_HOME}/hub}"
     export HF_DATASETS_CACHE="${HF_DATASETS_CACHE:-${HF_HOME}/datasets}"
@@ -245,19 +395,166 @@ b200_setup_hf_cache_dirs() {
     return 0
 }
 
+pack_run_determinism_repeats() {
+    local repeats="${PACK_REPEATS:-0}"
+    if [[ -z "${OUTPUT_DIR:-}" ]]; then
+        echo "ERROR: OUTPUT_DIR is not set; use --out or PACK_OUTPUT_DIR." >&2
+        return 1
+    fi
+    if [[ -z "${repeats}" || "${repeats}" == "0" ]]; then
+        return 0
+    fi
+    if ! [[ "${repeats}" =~ ^[0-9]+$ ]]; then
+        echo "ERROR: PACK_REPEATS must be an integer" >&2
+        return 1
+    fi
+
+    if [[ -z "${PACK_MODEL_LIST[*]:-}" ]]; then
+        pack_model_list_array
+    fi
+
+    local model_id="${PACK_MODEL_LIST[0]:-}"
+    if [[ -z "${model_id}" ]]; then
+        echo "ERROR: PACK_REPEATS requested but no models configured." >&2
+        return 1
+    fi
+
+    local model_name
+    model_name=$(sanitize_model_name "${model_id}")
+    local model_output_dir="${OUTPUT_DIR}/${model_name}"
+    local baseline_path=""
+    if [[ -f "${model_output_dir}/.baseline_path" ]]; then
+        baseline_path="$(cat "${model_output_dir}/.baseline_path" 2>/dev/null || true)"
+    fi
+    if [[ -z "${baseline_path}" || ! -d "${baseline_path}" ]]; then
+        echo "ERROR: PACK_REPEATS requires a baseline path for ${model_name}." >&2
+        return 1
+    fi
+
+    local edit_spec=""
+    local repeat_mode="clean"
+    if [[ ${#EDIT_TYPES_CLEAN[@]} -gt 0 ]]; then
+        edit_spec="${EDIT_TYPES_CLEAN[0]}"
+        repeat_mode="clean"
+    elif [[ ${#EDIT_TYPES_STRESS[@]} -gt 0 ]]; then
+        edit_spec="${EDIT_TYPES_STRESS[0]}"
+        repeat_mode="stress"
+    else
+        echo "ERROR: PACK_REPEATS requested but no edit specs configured." >&2
+        return 1
+    fi
+
+    local edit_path
+    edit_path=$(process_edit "${baseline_path}" "${edit_spec}" "${repeat_mode}" "${model_name}" "0" "${model_output_dir}") || return 1
+    if [[ -z "${edit_path}" || ! -d "${edit_path}" ]]; then
+        echo "ERROR: Failed to prepare edit for determinism repeats." >&2
+        return 1
+    fi
+    local edit_name
+    edit_name=$(basename "${edit_path}")
+
+    local preset_dir="${OUTPUT_DIR}/presets"
+    local det_dir="${OUTPUT_DIR}/determinism/${model_name}/${edit_name}"
+    mkdir -p "${det_dir}" || return 1
+
+    local -a certs=()
+    local run
+    for run in $(seq 1 "${repeats}"); do
+        run_invarlock_certify "${edit_path}" "${baseline_path}" "${det_dir}" "repeat_${run}" "${preset_dir}" "${model_name}" "0" || return 1
+        local cert_path="${det_dir}/repeat_${run}/evaluation.cert.json"
+        if [[ -f "${cert_path}" ]]; then
+            certs+=("${cert_path}")
+        fi
+    done
+
+    mkdir -p "${OUTPUT_DIR}/analysis" || return 1
+    python3 - "${OUTPUT_DIR}/analysis/determinism_repeats.json" "${model_id}" "${edit_name}" "${repeats}" "${PACK_DETERMINISM}" "${PACK_SUITE}" "${certs[@]}" <<'PY'
+import hashlib
+import json
+import sys
+from datetime import datetime
+from pathlib import Path
+
+out_path = Path(sys.argv[1])
+model_id = sys.argv[2]
+edit_name = sys.argv[3]
+try:
+    requested = int(sys.argv[4])
+except Exception:
+    requested = 0
+mode = sys.argv[5]
+suite = sys.argv[6]
+cert_paths = [Path(p) for p in sys.argv[7:]]
+
+hashes = []
+ratios = []
+errors = []
+
+for path in cert_paths:
+    try:
+        raw = path.read_bytes()
+        hashes.append(hashlib.sha256(raw).hexdigest())
+        data = json.loads(raw.decode("utf-8"))
+    except Exception as exc:
+        errors.append(f"{path}: {exc}")
+        continue
+
+    ratio = None
+    verdict = data.get("verdict") or {}
+    metrics = data.get("metrics") or {}
+    for candidate in (
+        verdict.get("primary_metric_ratio"),
+        verdict.get("primary_metric_ratio_raw"),
+        verdict.get("primary_metric_ratio_mean"),
+        metrics.get("primary_metric_ratio"),
+        metrics.get("primary_metric_ratio_mean"),
+    ):
+        if isinstance(candidate, (int, float)):
+            ratio = float(candidate)
+            break
+    if ratio is not None:
+        ratios.append(ratio)
+
+hashes_match = bool(hashes) and len(set(hashes)) == 1
+ratio_summary = None
+if ratios:
+    ratio_summary = {
+        "min": min(ratios),
+        "max": max(ratios),
+        "delta": max(ratios) - min(ratios),
+    }
+
+payload = {
+    "requested": requested,
+    "completed": len(cert_paths),
+    "mode": mode,
+    "suite": suite,
+    "model_id": model_id,
+    "edit_name": edit_name,
+    "cert_hashes_match": hashes_match,
+    "cert_hashes": hashes,
+    "primary_metric_ratio": ratio_summary,
+    "errors": errors,
+    "generated_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+}
+
+out_path.write_text(json.dumps(payload, indent=2) + "\n")
+PY
+}
+
 # Resume support - skip completed steps if output files exist
 RESUME_MODE="${RESUME_MODE:-true}"
 
-# ============ B200 GPU OPTIMIZATION FLAGS - MAXIMUM MEMORY ============
+# ============ GPU OPTIMIZATION FLAGS ============
 # GPU selection is configured at runtime:
 # - If `CUDA_VISIBLE_DEVICES` is explicitly set (e.g., by Slurm or the user), it is respected.
 # - Otherwise, the harness detects available GPUs and uses all of them.
 # The selected pool is exported as `GPU_ID_LIST` (physical GPU indices) for scheduler/workers.
 
-# TF32 / cuDNN benchmark behavior depends on B200_DETERMINISM:
+# TF32 / cuDNN benchmark behavior depends on PACK_DETERMINISM:
 # - throughput: enable TF32 + benchmark for speed (script-level runs).
 # - strict: avoid overriding determinism-friendly flags; rely on InvarLock presets.
-if [[ "${B200_DETERMINISM}" == "strict" ]]; then
+if [[ "${PACK_DETERMINISM}" == "strict" ]]; then
     export NVIDIA_TF32_OVERRIDE=0
     export CUDNN_BENCHMARK=0
 else
@@ -268,13 +565,13 @@ fi
 # Enable text-level deduplication
 export INVARLOCK_DEDUP_TEXTS=1
 
-# Memory optimization for B200 - AGGRESSIVE SETTINGS
+# Memory optimization for large-model runs
 export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True,max_split_size_mb:1024,garbage_collection_threshold:0.9"
 unset PYTORCH_ALLOC_CONF 2>/dev/null || true
 
 # Force deterministic workspace config with larger workspace (strict only)
-if [[ "${B200_DETERMINISM}" == "strict" ]]; then
-    export CUBLAS_WORKSPACE_CONFIG=:32768:8
+if [[ "${PACK_DETERMINISM}" == "strict" ]]; then
+    export CUBLAS_WORKSPACE_CONFIG=:4096:8
 else
     unset CUBLAS_WORKSPACE_CONFIG 2>/dev/null || true
 fi
@@ -282,8 +579,30 @@ fi
 # Keep CUDA caching enabled for maximum memory reuse
 export PYTORCH_NO_CUDA_MEMORY_CACHING=0
 
-# Allow network access for dataset downloads (wikitext2, etc.)
-export INVARLOCK_ALLOW_NETWORK=1
+pack_apply_network_mode() {
+    local mode="${1:-${PACK_NET}}"
+    mode=$(echo "${mode}" | tr '[:upper:]' '[:lower:]')
+    case "${mode}" in
+        1|true|yes|on)
+            PACK_NET=1
+            export INVARLOCK_ALLOW_NETWORK=1
+            export HF_DATASETS_OFFLINE=0
+            export TRANSFORMERS_OFFLINE=0
+            export HF_HUB_OFFLINE=0
+            export HF_HUB_DISABLE_TELEMETRY=1
+            ;;
+        *)
+            PACK_NET=0
+            export INVARLOCK_ALLOW_NETWORK=0
+            export HF_DATASETS_OFFLINE=1
+            export TRANSFORMERS_OFFLINE=1
+            export HF_HUB_OFFLINE=1
+            export HF_HUB_DISABLE_TELEMETRY=1
+            ;;
+    esac
+}
+
+pack_apply_network_mode "${PACK_NET}"
 
 # PM acceptance range used during validation
 # These bounds help avoid unnecessary gate failures during validation runs
@@ -301,25 +620,26 @@ export FP4_NATIVE_SUPPORT="${FP4_NATIVE_SUPPORT:-false}"
 # Target memory fraction (0.92 = 92% of available) - optimal zone
 export CUDA_MEMORY_FRACTION=0.92
 
-if ! declare -F _b200_script_dir >/dev/null 2>&1; then
-    _b200_script_dir() {
+if ! declare -F _pack_script_dir >/dev/null 2>&1; then
+    _pack_script_dir() {
         cd "$(dirname "${BASH_SOURCE[0]}")" && pwd
     }
 fi
 
-b200_source_libs() {
+pack_source_libs() {
     # ============ LIB MODULES FOR DYNAMIC SCHEDULING ============
-    SCRIPT_DIR="$(_b200_script_dir)"
+    SCRIPT_DIR="$(_pack_script_dir)"
     export SCRIPT_DIR  # Export for subshell workers
 
-    # Determine lib directory - support both nested (scripts/lib/) and flat (scripts/) layouts
-    if [[ -d "${SCRIPT_DIR}/lib" && -f "${SCRIPT_DIR}/lib/task_serialization.sh" ]]; then
-        LIB_DIR="${SCRIPT_DIR}/lib"
-    elif [[ -f "${SCRIPT_DIR}/task_serialization.sh" ]]; then
-        # Flat directory structure (all files in same dir)
+    # Determine lib directory - support lib/ and flat layouts.
+    if [[ -f "${SCRIPT_DIR}/task_serialization.sh" ]]; then
         LIB_DIR="${SCRIPT_DIR}"
-    else
+    elif [[ -d "${SCRIPT_DIR}/lib" && -f "${SCRIPT_DIR}/lib/task_serialization.sh" ]]; then
         LIB_DIR="${SCRIPT_DIR}/lib"
+    elif [[ -d "${SCRIPT_DIR}/../lib" && -f "${SCRIPT_DIR}/../lib/task_serialization.sh" ]]; then
+        LIB_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)/lib"
+    else
+        LIB_DIR="${SCRIPT_DIR}"
     fi
     export LIB_DIR  # Export for subshell workers
 
@@ -502,9 +822,9 @@ PY
 }
 fi
 
-b200_setup_output_dirs() {
+pack_setup_output_dirs() {
     # ============ SETUP ============
-    mkdir -p "${OUTPUT_DIR}"/{logs,models,evals,certificates,analysis,reports,presets,workers} || return 1
+    mkdir -p "${OUTPUT_DIR}"/{logs,models,evals,certificates,analysis,reports,presets,workers,state} || return 1
     LOG_FILE="${OUTPUT_DIR}/logs/main.log"
 
     # Create a lock file for thread-safe logging
@@ -686,7 +1006,15 @@ estimate_model_weights_gb() {
 }
 
 estimate_planned_model_storage_gb() {
-    local -a models=("${MODEL_1}" "${MODEL_2}" "${MODEL_3}" "${MODEL_4}" "${MODEL_5}" "${MODEL_6}" "${MODEL_7}" "${MODEL_8}")
+    local -a models=()
+    if command -v mapfile >/dev/null 2>&1; then
+        mapfile -t models < <(pack_model_list)
+    else
+        while IFS= read -r model; do
+            [[ -n "${model}" ]] || continue
+            models+=("${model}")
+        done < <(pack_model_list)
+    fi
 
     local edits_total=$(( ${#EDIT_TYPES_CLEAN[@]} + ${#EDIT_TYPES_STRESS[@]} ))
     local errors_total=0
@@ -694,7 +1022,7 @@ estimate_planned_model_storage_gb() {
         errors_total=5  # nan_injection, inf_injection, extreme_quant, scale_explosion, zero_layer
     fi
 
-    local baseline_mode="${B200_BASELINE_STORAGE_MODE:-snapshot_symlink}"
+    local baseline_mode="${PACK_BASELINE_STORAGE_MODE:-snapshot_symlink}"
     local baseline_copy=1
     if [[ "${baseline_mode}" == "snapshot_symlink" ]]; then
         baseline_copy=0  # baseline files are symlinks to HF hub cache blobs
@@ -744,7 +1072,7 @@ estimate_planned_model_storage_gb() {
 }
 
 disk_preflight() {
-    [[ "${B200_SKIP_DISK_PREFLIGHT:-0}" == "1" ]] && return 0
+    [[ "${PACK_SKIP_DISK_PREFLIGHT:-0}" == "1" ]] && return 0
 
     local free_gb=""
     free_gb=$(get_free_disk_gb "${OUTPUT_DIR}" 2>/dev/null || echo "")
@@ -768,9 +1096,9 @@ disk_preflight() {
     log "ERROR: Estimated storage for this configuration: ~${planned_gb}GB (~$(format_gb_as_tb "${planned_gb}")TB) for model weights alone."
     log "       Free disk on output filesystem: ${free_gb}GB (~$(format_gb_as_tb "${free_gb}")TB)."
     log "       This suite saves full bf16 copies of edits (+ error models if enabled)."
-    log "       Baseline storage mode: ${B200_BASELINE_STORAGE_MODE:-snapshot_symlink} (snapshot_symlink avoids a full extra baseline copy)."
-    log "       Fix: mount a larger volume and set OUTPUT_DIR, or run fewer models (unset MODEL_4..MODEL_8), or set RUN_ERROR_INJECTION=false."
-    log "       Override (not recommended): B200_SKIP_DISK_PREFLIGHT=1"
+    log "       Baseline storage mode: ${PACK_BASELINE_STORAGE_MODE:-snapshot_symlink} (snapshot_symlink avoids a full extra baseline copy)."
+    log "       Fix: mount a larger volume and set OUTPUT_DIR, or run the subset suite, or set RUN_ERROR_INJECTION=false."
+    log "       Override (not recommended): PACK_SKIP_DISK_PREFLIGHT=1"
 
     # Resume mode may already have artifacts; allow user to proceed if explicitly resuming.
     if [[ "${RESUME_FLAG:-false}" == "true" ]]; then
@@ -825,58 +1153,51 @@ handle_disk_pressure() {
     error_exit "Aborted due to disk pressure (free ${free_gb}GB < ${min_gb}GB)."
 }
 
-# ============ B200 ENVIRONMENT SETUP ============
-setup_b200_environment() {
-    log_section "PHASE 0: B200 ENVIRONMENT SETUP"
+# ============ GPU ENVIRONMENT SETUP ============
+setup_pack_environment() {
+    log_section "PHASE 0: GPU ENVIRONMENT SETUP"
 
-    # Use python3 -c to avoid heredoc indentation issues on macOS
     local env_report
-    env_report=$(python3 -c '
-import torch
+    env_report=$(python3 - <<'PY'
 import os
 import sys
+import torch
 
-print("=== B200 Environment Configuration ===\n")
+print("=== Proof Pack Environment Configuration ===\n")
 
-# Check CUDA availability
 if not torch.cuda.is_available():
     print("ERROR: CUDA not available!")
     sys.exit(1)
 
-# Get GPU count and info
 num_gpus = torch.cuda.device_count()
 print(f"GPUs Detected: {num_gpus}")
 
-# Normalize determinism mode for this harness.
-mode = str(os.environ.get("B200_DETERMINISM", "throughput")).strip().lower()
+mode = str(os.environ.get("PACK_DETERMINISM", "throughput")).strip().lower()
 if mode not in {"throughput", "strict"}:
     mode = "throughput"
 
-is_b200 = False
-total_vram = 0
 fp8_support = hasattr(torch, "float8_e4m3fn")
 
+gpu_names = []
+gpu_mem_gb = []
+total_vram = 0.0
+
 for i in range(num_gpus):
-    gpu_name = torch.cuda.get_device_name(i)
-    gpu_memory = torch.cuda.get_device_properties(i).total_memory / (1024**3)
-    total_vram += gpu_memory
+    name = torch.cuda.get_device_name(i)
+    mem = torch.cuda.get_device_properties(i).total_memory / (1024**3)
+    gpu_names.append(name)
+    gpu_mem_gb.append(mem)
+    total_vram += mem
+    print(f"  GPU {i}: {name} ({mem:.1f} GB)")
 
-    print(f"  GPU {i}: {gpu_name} ({gpu_memory:.1f} GB)")
-
-    if "B200" in gpu_name or "Blackwell" in gpu_name:
-        is_b200 = True
-
+min_vram = min(gpu_mem_gb) if gpu_mem_gb else 0.0
+primary_name = gpu_names[0] if gpu_names else ""
 print(f"\nTotal VRAM: {total_vram:.1f} GB")
-print(f"B200 Detected: {is_b200}")
+print(f"Min GPU VRAM: {min_vram:.1f} GB")
 print(f"FP8 Support: {fp8_support}")
 
-if not is_b200:
-    print("\nWARNING: This script is optimized for B200. Performance may vary on other GPUs.")
-    print("         FP8 quantization will use an approximate implementation on non-B200 GPUs.")
-
 if mode == "strict":
-    print("\nDeterminism mode: strict (B200_DETERMINISM=strict)")
-    # Prefer deterministic-friendly flags; leave detailed presets to InvarLock CLI.
+    print("\nDeterminism mode: strict (PACK_DETERMINISM=strict)")
     try:
         if hasattr(torch, "use_deterministic_algorithms"):
             torch.use_deterministic_algorithms(True, warn_only=False)
@@ -902,8 +1223,7 @@ if mode == "strict":
     print("\nTF32 enabled: False")
     print("cuDNN benchmark: False")
 else:
-    print("\nDeterminism mode: throughput (B200_DETERMINISM!=strict)")
-    # Enable TF32 (huge speedup on B200/H100/A100)
+    print("\nDeterminism mode: throughput (PACK_DETERMINISM=throughput)")
     torch.backends.cuda.matmul.allow_tf32 = True
     try:
         cudnn_mod = getattr(torch.backends, "cudnn", None)
@@ -916,54 +1236,53 @@ else:
     print("\nTF32 enabled: True")
     print("cuDNN benchmark: True")
 
-# Set BF16 as preferred dtype if supported
 if torch.cuda.is_bf16_supported():
     torch.set_default_dtype(torch.bfloat16)
     print("Default dtype: bfloat16")
 else:
     print("Default dtype: float16 (BF16 not supported)")
 
-# Memory targets - optimal zone for B200
-target_fraction = float(os.environ.get("CUDA_MEMORY_FRACTION", "0.92"))
-gpu_mem = 180  # B200 has 180GB
-
-print(f"\n=== MEMORY TARGETS (85-92% of {gpu_mem}GB per GPU) ===")
-print(f"  Optimal range: {gpu_mem*0.85:.1f} - {gpu_mem*0.92:.1f} GB per GPU")
-print(f"  Target fraction: {target_fraction*100:.0f}%")
-print(f"  Total usable: {num_gpus * gpu_mem * target_fraction:.0f} GB across {num_gpus} GPUs")
-
-# Check flash attention availability
 try:
     from transformers.utils import is_flash_attn_2_available
     flash_avail = is_flash_attn_2_available()
     print(f"\nFlash Attention 2: {flash_avail}")
-except ImportError:
+except Exception:
     print("\nFlash Attention 2: Unknown (transformers too old)")
 
-# Check torch.compile availability
 compile_avail = hasattr(torch, "compile")
 print(f"torch.compile: {compile_avail}")
 
-# Write FP8 support flag for shell script
+print(f"\n[PACK_GPU_NAME={primary_name}]")
+print(f"[PACK_GPU_MEM_GB={int(round(min_vram))}]")
+print(f"[PACK_GPU_COUNT={num_gpus}]")
 if fp8_support:
-    print("\n[FP8_NATIVE_SUPPORT=true]")
+    print("[FP8_NATIVE_SUPPORT=true]")
 else:
-    print("\n[FP8_NATIVE_SUPPORT=false]")
+    print("[FP8_NATIVE_SUPPORT=false]")
 
-print("\n=== Environment Ready for B200 Maximum Utilization ===")
-')
+print("\n=== Environment Ready for Proof Pack Runs ===")
+PY
+)
     local setup_rc=$?
     if [[ ${setup_rc} -ne 0 ]]; then
         printf '%s\n' "${env_report}"
         return ${setup_rc}
     fi
     printf '%s\n' "${env_report}"
+
+    PACK_GPU_NAME=$(printf '%s\n' "${env_report}" | sed -n 's/^\[PACK_GPU_NAME=//p' | sed 's/\]$//' | tail -1)
+    PACK_GPU_MEM_GB=$(printf '%s\n' "${env_report}" | sed -n 's/^\[PACK_GPU_MEM_GB=//p' | sed 's/\]$//' | tail -1)
+    PACK_GPU_COUNT=$(printf '%s\n' "${env_report}" | sed -n 's/^\[PACK_GPU_COUNT=//p' | sed 's/\]$//' | tail -1)
     if [[ "${env_report}" == *"[FP8_NATIVE_SUPPORT=true]"* ]]; then
         export FP8_NATIVE_SUPPORT="true"
     else
         export FP8_NATIVE_SUPPORT="false"
     fi
-    log "B200 Environment Setup: Complete (FP8_NATIVE_SUPPORT=${FP8_NATIVE_SUPPORT})"
+    if [[ -n "${PACK_GPU_MEM_GB}" && -z "${GPU_MEMORY_GB}" ]]; then
+        GPU_MEMORY_GB="${PACK_GPU_MEM_GB}"
+    fi
+    export PACK_GPU_NAME PACK_GPU_MEM_GB PACK_GPU_COUNT GPU_MEMORY_GB
+    log "GPU Environment Setup: Complete (FP8_NATIVE_SUPPORT=${FP8_NATIVE_SUPPORT})"
 }
 
 # ============ DEPENDENCY CHECK ============
@@ -1061,7 +1380,7 @@ check_dependencies() {
     log "All dependencies satisfied"
 }
 
-# ============ MODEL SETUP WITH B200 OPTIMIZATIONS ============
+# ============ MODEL SETUP WITH PROOF PACK OPTIMIZATIONS ============
 setup_model() {
     local model_id="$1"
     local gpu_id="${2:-0}"
@@ -1072,7 +1391,7 @@ setup_model() {
     local model_dir="${OUTPUT_DIR}/models/${model_name}"
     local basename_dir="${OUTPUT_DIR}/models/${basename_name}"
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Setting up model (B200 GPU ${gpu_id}): ${model_id}" >> "${LOG_FILE}"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Setting up model (GPU ${gpu_id}): ${model_id}" >> "${LOG_FILE}"
 
     # Check if local path
     if [[ -d "${model_id}" ]]; then
@@ -1090,7 +1409,23 @@ setup_model() {
         return 0
     fi
 
-    # Download with B200 optimizations
+    local revision=""
+    revision=$(pack_model_revision "${model_id}" || true)
+    if [[ -z "${revision}" ]]; then
+        if [[ "${PACK_NET}" == "1" ]]; then
+            error_exit "Missing pinned revision for ${model_id}; run preflight (--net 1)."
+        else
+            error_exit "Offline mode requires model revisions. Run with --net 1 to preflight."
+        fi
+    fi
+
+    if [[ "${PACK_NET}" != "1" ]]; then
+        echo "ERROR: Offline mode requested and baseline not cached for ${model_id}." >&2
+        echo "       Run with --net 1 to populate the cache." >&2
+        return 1
+    fi
+
+    # Download with proof pack optimizations
     mkdir -p "${model_dir}"
 
     local success_marker="${model_dir}/.download_success"
@@ -1098,7 +1433,7 @@ setup_model() {
 
     local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
     {
-        CUDA_VISIBLE_DEVICES="${cuda_devices}" python3 << EOF
+        PACK_MODEL_REVISION="${revision}" CUDA_VISIBLE_DEVICES="${cuda_devices}" python3 << EOF
 import json
 import os
 import sys
@@ -1108,16 +1443,18 @@ model_id = "${model_id}"
 output_dir = Path("${model_dir}/baseline")
 success_marker = Path("${success_marker}")
 flash_available = "${FLASH_ATTENTION_AVAILABLE}" == "true"
+revision = os.environ.get("PACK_MODEL_REVISION") or None
 
 # Storage strategy for the baseline directory:
 # - snapshot_symlink (default): create baseline/ as symlinks to HF hub cache blobs (saves ~1× weights on disk)
 # - snapshot_copy: copy snapshot files into baseline/ (duplicates hub cache)
 # - save_pretrained: load with transformers and write a full baseline copy (also duplicates hub cache)
-baseline_mode = os.environ.get("B200_BASELINE_STORAGE_MODE", "snapshot_symlink").strip().lower()
+baseline_mode = os.environ.get("PACK_BASELINE_STORAGE_MODE", "snapshot_symlink").strip().lower()
 
 output_dir.mkdir(parents=True, exist_ok=True)
 
-print(f"Downloading {model_id} (B200 optimized)...")
+rev_label = f"@{revision}" if revision else ""
+print(f"Downloading {model_id}{rev_label} (proof pack optimized)...")
 print(f"Baseline storage mode: {baseline_mode}")
 if os.environ.get("HF_HUB_CACHE"):
     print(f"HF_HUB_CACHE: {os.environ.get('HF_HUB_CACHE')}")
@@ -1184,6 +1521,7 @@ def write_model_profile(model_dir: Path, model_id: str) -> None:
 
     profile = {
         "model_id": model_id,
+        "revision": revision,
         "weights_bytes": weights_bytes,
         "weights_gb": round(weights_bytes / (1024**3), 3),
         "hidden_size": config.get("hidden_size"),
@@ -1206,6 +1544,7 @@ def download_snapshot(repo_id: str, model_dir: Path, mode: str) -> None:
         local_dir_use_symlinks=local_dir_use_symlinks,
         cache_dir=os.environ.get("HF_HUB_CACHE"),
         resume_download=True,
+        revision=revision,
     )
 
 
@@ -1227,7 +1566,7 @@ try:
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
-    mode = os.environ.get("B200_DETERMINISM", "throughput").strip().lower()
+    mode = os.environ.get("PACK_DETERMINISM", "throughput").strip().lower()
     if mode == "strict":
         torch.backends.cuda.matmul.allow_tf32 = False
         torch.backends.cudnn.allow_tf32 = False
@@ -1236,7 +1575,9 @@ try:
         torch.backends.cudnn.allow_tf32 = True
 
     cache_dir = os.environ.get("HF_HUB_CACHE")
-    tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True, cache_dir=cache_dir)
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_id, trust_remote_code=True, cache_dir=cache_dir, revision=revision
+    )
     tokenizer.save_pretrained(output_dir)
 
     use_fa2 = flash_available and model_supports_flash_attention(model_id)
@@ -1246,6 +1587,7 @@ try:
         "device_map": "auto",
         "low_cpu_mem_usage": True,
         "cache_dir": cache_dir,
+        "revision": revision,
     }
     if use_fa2:
         model_kwargs["attn_implementation"] = "flash_attention_2"
@@ -1381,17 +1723,15 @@ export -f estimate_model_params
 
 # ============ MODEL-SIZE-AWARE INVARLOCK CONFIGURATION ============
 # Returns: seq_len:stride:preview_n:final_n:eval_batch
-# Based on model size and B200 180GB memory budget
+# Based on model size and available GPU memory budget
 get_model_invarlock_config() {
     local model_size="$1"  # 7, 13, 30, 40, 70, moe
 
-    # WikiText-2 has ~1174 samples, need conservative window counts
-    # B200 has 180GB VRAM - can be more generous than H100
+    # WikiText-2 has ~1174 samples; defaults assume high-memory GPUs.
     # Format: seq_len:stride:preview_n:final_n:eval_batch
     case "${model_size}" in
         "7")
-            # 7B models: ~14GB, can use long sequences and more windows
-            # B200 has plenty of headroom
+            # 7B models: ~14GB, can use longer sequences and more windows
             echo "2048:1024:64:64:96"
             ;;
         "13")
@@ -1414,7 +1754,7 @@ get_model_invarlock_config() {
             ;;
         "70"|"72")
             # 70-72B models: ~140-144GB, ultra-conservative settings
-            # B200 180GB minus ~140GB model = ~36GB headroom
+            # Keep headroom for baseline/edited overlap and overhead checks.
             # Settings chosen to avoid double-loading baseline and edited models during overhead checks:
             # - seq_len=128: Minimal KV cache
             # - stride=64: Maintains 50% overlap
@@ -1443,7 +1783,7 @@ create_edited_model() {
     local scope="$6"
     local gpu_id="${7:-0}"
 
-    log "Creating edited model (B200 GPU ${gpu_id}):"
+    log "Creating edited model (GPU ${gpu_id}):"
     log "  Baseline: ${baseline_path}"
     log "  Output: ${output_path}"
     log "  Edit: ${edit_type} bits=${bits} group_size=${group_size} scope=${scope}"
@@ -1462,7 +1802,7 @@ import os
 import sys
 
 try:
-    mode = os.environ.get("B200_DETERMINISM", "throughput").strip().lower()
+    mode = os.environ.get("PACK_DETERMINISM", "throughput").strip().lower()
     if mode == "strict":
         torch.backends.cuda.matmul.allow_tf32 = False
         torch.backends.cudnn.allow_tf32 = False
@@ -1600,7 +1940,7 @@ create_pruned_model() {
     local scope="$4"     # ffn, attn, all
     local gpu_id="${5:-0}"
 
-    log "Creating pruned model (B200 GPU ${gpu_id}):"
+    log "Creating pruned model (GPU ${gpu_id}):"
     log "  Baseline: ${baseline_path}"
     log "  Output: ${output_path}"
     log "  Sparsity: ${sparsity}, Scope: ${scope}"
@@ -1731,7 +2071,7 @@ create_lowrank_model() {
     local scope="$4"     # ffn, attn, all
     local gpu_id="${5:-0}"
 
-    log "Creating low-rank model (B200 GPU ${gpu_id}):"
+    log "Creating low-rank model (GPU ${gpu_id}):"
     log "  Baseline: ${baseline_path}"
     log "  Output: ${output_path}"
     log "  Rank: ${rank}, Scope: ${scope}"
@@ -1880,7 +2220,7 @@ create_fp8_model() {
     local scope="$4"       # ffn, attn, all
     local gpu_id="${5:-0}"
 
-    log "Creating FP8 model (B200 GPU ${gpu_id}):"
+    log "Creating FP8 model (GPU ${gpu_id}):"
     log "  Baseline: ${baseline_path}"
     log "  Output: ${output_path}"
     log "  Format: ${format}, Scope: ${scope}"
@@ -2013,7 +2353,7 @@ create_fp4_model() {
     local scope="$4"       # ffn, attn, all
     local gpu_id="${5:-0}"
 
-    log "Creating FP4 model (B200 GPU ${gpu_id}):"
+    log "Creating FP4 model (GPU ${gpu_id}):"
     log "  Baseline: ${baseline_path}"
     log "  Output: ${output_path}"
     log "  Format: ${format}, Scope: ${scope}"
@@ -2037,12 +2377,12 @@ try:
     format_type = "${format}"
     scope = "${scope}"
 
-    # Check for B200 FP4 support
+    # Check for native FP4 support (Blackwell-class GPUs)
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA not available")
 
     device_name = torch.cuda.get_device_name(0)
-    is_b200 = "B200" in device_name or "Blackwell" in device_name
+    is_blackwell = "B200" in device_name or "Blackwell" in device_name
 
     require_native = os.environ.get("INVARLOCK_REQUIRE_FP4_NATIVE", "false").strip().lower() in ("1", "true", "yes")
     te_available = False
@@ -2053,15 +2393,15 @@ try:
         if require_native:
             raise RuntimeError("TransformerEngine not available for native FP4 validation") from e
 
-    fp4_native = bool(is_b200 and te_available)
+    fp4_native = bool(is_blackwell and te_available)
 
     if not fp4_native:
-        if is_b200:
-            print("WARNING: B200 detected but TransformerEngine not available.")
+        if is_blackwell:
+            print("WARNING: Blackwell-class GPU detected but TransformerEngine not available.")
             print("         FP4 quantization is simulated; no FP4 Tensor Core validation.")
         else:
-            print(f"WARNING: FP4 is B200-native, current GPU: {device_name}")
-            print("         FP4 quantization is simulated; results may not match true B200 behavior")
+            print(f"WARNING: FP4 native support is Blackwell-class; current GPU: {device_name}")
+            print("         FP4 quantization is simulated; results may not match native FP4 behavior")
 
     print(f"Loading baseline from {baseline_path}...")
     tokenizer = AutoTokenizer.from_pretrained(baseline_path, trust_remote_code=True)
@@ -2175,7 +2515,7 @@ try:
         "scope": scope,
         "quantized_tensors": quantized_count,
         "avg_relative_error": avg_error,
-        "b200_native": is_b200,
+        "pack_native": is_b200,
         "fp4_native": fp4_native,
         "transformer_engine": te_available
     }
@@ -2437,7 +2777,7 @@ process_edit() {
 }
 export -f process_edit
 
-# ============ LM-EVAL WITH B200 OPTIMIZATION ============
+# ============ LM-EVAL OPTIMIZATION ============
 run_lmeval() {
     local model_path="$1"
     local output_file="$2"
@@ -2533,7 +2873,7 @@ run_lmeval() {
 }
 export -f run_lmeval
 
-# ============ INVARLOCK CONFIG WITH B200 SETTINGS ============
+# ============ INVARLOCK CONFIG FOR PROOF PACKS ============
 generate_invarlock_config() {
     local model_path="$1"
     local output_yaml="$2"
@@ -2559,7 +2899,7 @@ generate_invarlock_config() {
     local accel_compile="true"
     local accel_tf32="true"
     local accel_benchmark="true"
-    if [[ "${B200_DETERMINISM}" == "strict" ]]; then
+    if [[ "${PACK_DETERMINISM}" == "strict" ]]; then
         accel_compile="false"
         accel_tf32="false"
         accel_benchmark="false"
@@ -2570,7 +2910,7 @@ generate_invarlock_config() {
 
     # Optional: override guard order for the suite (comma-separated list).
     # Default is a lightweight chain to keep calibration tractable on 70B+.
-    local guards_order_csv="${B200_GUARDS_ORDER:-}"
+    local guards_order_csv="${PACK_GUARDS_ORDER:-}"
     local -a guards_order=()
     if [[ -n "${guards_order_csv}" ]]; then
         IFS=',' read -ra guards_order <<< "${guards_order_csv}"
@@ -2589,11 +2929,9 @@ generate_invarlock_config() {
     fi
 
     cat > "${output_yaml}" << YAML_EOF
-# Auto-generated InvarLock config for B200 validation
-# Model: ${model_path}
-# Edit: ${edit_name}
-# Generated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
-# Platform: B200 180GB optimized
+# Auto-generated InvarLock config for proof packs
+# Platform: proof pack runner
+
 
 model:
   id: "${model_path}"
@@ -3415,7 +3753,7 @@ preset = {
     "_calibration_meta": {
         "model_name": model_name,
         "tier": tier,
-        "platform": "B200_180GB",
+        "platform": "PACK_180GB",
         "drift_mean": drift_stats.get("mean"),
         "drift_std": drift_stats.get("std"),
         "drift_band_compatible": drift_stats.get("band_compatible"),
@@ -3491,7 +3829,7 @@ print(f"Saved: {preset_path}")
 CALIBRATION_SCRIPT
 }
 
-# ============ CERTIFY WITH B200 SETTINGS ============
+# ============ CERTIFY WITH PROOF PACK SETTINGS ============
 run_invarlock_certify() {
     local subject_path="$1"
     local baseline_path="$2"
@@ -4207,7 +4545,7 @@ cal_json = analysis_dir / "calibration_summary.json"
 if cal_json.exists():
     cal_summary = json.loads(cal_json.read_text())
 
-print("=== CORRELATION ANALYSIS (B200 8-GPU) ===\n")
+print("=== CORRELATION ANALYSIS (Proof Pack) ===\n")
 
 results = {
     'models': {},
@@ -4465,6 +4803,7 @@ generate_verdict() {
 	    python3 <<- EOF
 import json
 import os
+import re
 from pathlib import Path
 from datetime import datetime
 
@@ -4503,11 +4842,22 @@ degraded = summary.get('degraded_edits', 0) or 0
 degraded_runs = summary.get('degraded_runs', []) or []
 models = analysis.get('models', {}) or {}
 
-gpu_count = os.environ.get("NUM_GPUS", "").strip() or "unknown"
-gpu_mem = os.environ.get("GPU_MEMORY_GB", "").strip() or "180"
-platform_header = f"B200 {gpu_mem}GB x {gpu_count} GPU"
-platform_line = f"{gpu_count}x NVIDIA B200 {gpu_mem}GB SXM6"
-platform_tag = f"B200_{gpu_mem}GB_x{gpu_count}"
+determinism_path = analysis_dir / "determinism_repeats.json"
+determinism_repeats = None
+if determinism_path.exists():
+    try:
+        determinism_repeats = json.loads(determinism_path.read_text())
+    except Exception:
+        determinism_repeats = None
+
+gpu_count = (os.environ.get("PACK_GPU_COUNT") or os.environ.get("NUM_GPUS") or "").strip() or "unknown"
+gpu_mem = (os.environ.get("PACK_GPU_MEM_GB") or os.environ.get("GPU_MEMORY_GB") or "").strip()
+gpu_name = (os.environ.get("PACK_GPU_NAME") or "GPU").strip() or "GPU"
+gpu_mem_label = f"{gpu_mem}GB" if gpu_mem else "unknown"
+tag_name = re.sub(r"[^A-Za-z0-9]+", "_", gpu_name).strip("_") or "GPU"
+platform_header = f"{gpu_name} {gpu_mem_label} x {gpu_count} GPU"
+platform_line = f"{gpu_count}x {gpu_name} {gpu_mem_label}"
+platform_tag = f"{tag_name}_{gpu_mem_label}_x{gpu_count}"
 
 def fmt_delta(val):
     try:
@@ -4621,7 +4971,7 @@ PLATFORM: {platform_line}
 '''
 
 if verdict == "PHASE0_VALIDATED":
-    report += "RESULT: InvarLock Phase 0 VALIDATED on B200 cluster.\n"
+    report += "RESULT: InvarLock Phase 0 VALIDATED on proof pack hardware.\n"
 elif verdict == "PHASE0_DEGRADED":
     report += f"RESULT: Phase 0 degraded. {degraded} certificate(s) reported degraded primary metrics. See runs: {', '.join(degraded_runs) if degraded_runs else 'n/a'}\n"
 else:
@@ -4633,20 +4983,26 @@ with open(reports_dir / "final_verdict.txt", 'w') as f:
     f.write(report)
 
 	with open(reports_dir / "final_verdict.json", 'w') as f:
-	    json.dump({
-	        'verdict': verdict,
-	        'verdict_confidence': verdict_confidence,
-	        'metrics': {'accuracy': accuracy, 'precision': precision, 'recall': recall, 'f1_score': f1, 'error_detection_rate': err_rate},
-	        'confidence': {'score': confidence_score, 'level': confidence_level},
-	        'triage': {'pass': triage_pass, 'review': triage_review, 'fail': triage_fail},
-	        'degraded': {'count': degraded, 'runs': degraded_runs},
-	        'phase0_pass': phase0_pass,
-	        'platform': platform_tag,
+    json.dump({
+        'verdict': verdict,
+        'verdict_confidence': verdict_confidence,
+        'metrics': {'accuracy': accuracy, 'precision': precision, 'recall': recall, 'f1_score': f1, 'error_detection_rate': err_rate},
+        'confidence': {'score': confidence_score, 'level': confidence_level},
+        'triage': {'pass': triage_pass, 'review': triage_review, 'fail': triage_fail},
+        'degraded': {'count': degraded, 'runs': degraded_runs},
+        'phase0_pass': phase0_pass,
+        'platform': platform_tag,
+        'platform_name': gpu_name,
+        'suite': os.environ.get('PACK_SUITE'),
+        'network_mode': 'online' if os.environ.get('PACK_NET') == '1' else 'offline',
+        'determinism_mode': os.environ.get('PACK_DETERMINISM'),
+        'determinism_repeats': determinism_repeats,
         'models_tested': models_tested,
         'total_tests': total_tests,
         'lm_eval_deltas': delta_summary,
         'timestamp': datetime.now().isoformat()
     }, f, indent=2)
+
 
 EOF
 }
@@ -4654,18 +5010,20 @@ EOF
 # ============ MAIN - DYNAMIC GPU SCHEDULING (v2.0) ============
 main_dynamic() {
     local start_time=$(date +%s)
-    local gpu_mem="${GPU_MEMORY_GB:-180}"
+    local gpu_mem="${PACK_GPU_MEM_GB:-${GPU_MEMORY_GB:-}}"
     local gpu_count_label="${NUM_GPUS:-auto}"
+    [[ -z "${gpu_mem}" ]] && gpu_mem="auto"
     [[ -z "${gpu_count_label}" ]] && gpu_count_label="auto"
 
     echo "========================================================================"
-    echo "  InvarLock Validation Suite v${SCRIPT_VERSION}"
-    echo "  B200 ${gpu_mem}GB x ${gpu_count_label} GPU DYNAMIC SCHEDULING"
+    echo "  InvarLock Proof Pack Suite v${SCRIPT_VERSION}"
+    echo "  ${gpu_mem}GB x ${gpu_count_label} GPU DYNAMIC SCHEDULING"
     echo "========================================================================"
     echo ""
 
     check_dependencies
     configure_gpu_pool
+    pack_model_list_array
 
     # Disk pressure preflight (Slurm/Ray-style node health gate).
     # Abort before starting work to avoid half-written artifacts when storage is nearly full.
@@ -4683,11 +5041,13 @@ main_dynamic() {
     # This prevents expensive GPU time from being spent only to later hit ENOSPC.
     disk_preflight
 
-    setup_b200_environment
+    setup_pack_environment
 
     log "Output directory: ${OUTPUT_DIR}"
     log "GPU pool: ${NUM_GPUS} GPU(s) [${GPU_ID_LIST}]"
-    log "Models: 8 (7B to 72B)"
+    local model_count
+    model_count=$(pack_model_list | wc -l | tr -d ' ')
+    log "Models: ${model_count} (PACK_SUITE=${PACK_SUITE})"
     log "Edit Types: 4 x 2 versions = 8 per model"
     log "Scheduling: DYNAMIC (work-stealing enabled)"
     log ""
@@ -4774,10 +5134,11 @@ main_dynamic() {
     else
         # Generate all tasks
         log "Generating tasks for all models..."
-        log "Config: CLEAN_EDIT_RUNS=${CLEAN_EDIT_RUNS}, STRESS_EDIT_RUNS=${STRESS_EDIT_RUNS}, RUN_ERROR_INJECTION=${RUN_ERROR_INJECTION}, DRIFT_CALIBRATION_RUNS=${DRIFT_CALIBRATION_RUNS}, B200_USE_BATCH_EDITS=${B200_USE_BATCH_EDITS:-auto}"
-        log "Models: ${MODEL_1:-<unset>}, ${MODEL_2:-<unset>}, ${MODEL_3:-<unset>}, ${MODEL_4:-<unset>}, ${MODEL_5:-<unset>}, ${MODEL_6:-<unset>}, ${MODEL_7:-<unset>}, ${MODEL_8:-<unset>}"
-        generate_all_tasks "${MODEL_1}" "${MODEL_2}" "${MODEL_3}" "${MODEL_4}" \
-                           "${MODEL_5}" "${MODEL_6}" "${MODEL_7}" "${MODEL_8}"
+        log "Config: CLEAN_EDIT_RUNS=${CLEAN_EDIT_RUNS}, STRESS_EDIT_RUNS=${STRESS_EDIT_RUNS}, RUN_ERROR_INJECTION=${RUN_ERROR_INJECTION}, DRIFT_CALIBRATION_RUNS=${DRIFT_CALIBRATION_RUNS}, PACK_USE_BATCH_EDITS=${PACK_USE_BATCH_EDITS:-auto}"
+        local model_csv
+        model_csv=$(printf '%s\n' "${PACK_MODEL_LIST[@]}" | paste -sd "," -)
+        log "Models: ${model_csv:-<none>}"
+        generate_all_tasks "${PACK_MODEL_LIST[@]}"
     fi
 
     if type refresh_task_memory_from_profiles &>/dev/null; then
@@ -4871,7 +5232,7 @@ main_dynamic() {
         fi
 
         # Check if done
-        if [[ "${B200_SUITE_MODE:-full}" == "calibrate-only" ]]; then
+        if [[ "${PACK_SUITE_MODE:-full}" == "calibrate-only" ]]; then
             local preset_total=0
             local preset_completed=0
             preset_total=$(find "${QUEUE_DIR}" -type f -name "*_GENERATE_PRESET_*.task" 2>/dev/null | wc -l | tr -d ' ')
@@ -5005,12 +5366,19 @@ main_dynamic() {
         done
     fi
 
-    if [[ "${B200_SUITE_MODE:-full}" == "calibrate-only" ]]; then
+    if [[ "${PACK_SUITE_MODE:-full}" == "calibrate-only" ]]; then
         log_section "CALIBRATION CHECKPOINT"
         log "Calibration-only run stopped after preset generation."
         log "Presets: ${OUTPUT_DIR}/presets/"
         log "To continue: OUTPUT_DIR=${OUTPUT_DIR} $0 --run-only"
         return 0
+    fi
+
+    if [[ -n "${PACK_REPEATS:-}" && "${PACK_REPEATS}" != "0" ]]; then
+        log_section "DETERMINISM REPEATS"
+        if ! pack_run_determinism_repeats; then
+            log "WARNING: Determinism repeats failed; see logs for details."
+        fi
     fi
 
     log_section "PHASE 4: ANALYSIS"
@@ -5035,138 +5403,41 @@ main() {
     main_dynamic "$@"
 }
 
-b200_entrypoint() {
-    # ============ CLI ARGUMENT PARSING (no strict mode; help should work everywhere) ============
-    RESUME_FLAG="false"
-    B200_SUITE_MODE="${B200_SUITE_MODE:-full}"
-
-    while [[ $# -gt 0 ]]; do
-        case "${1}" in
-            --resume|-r)
-                RESUME_FLAG="true"
-                shift
-                ;;
-            --calibrate-only)
-                if [[ "${B200_SUITE_MODE}" != "full" ]]; then
-                    echo "ERROR: --calibrate-only conflicts with mode=${B200_SUITE_MODE}" >&2
-                    exit 2
-                fi
-                B200_SUITE_MODE="calibrate-only"
-                shift
-                ;;
-            --run-only)
-                if [[ "${B200_SUITE_MODE}" != "full" ]]; then
-                    echo "ERROR: --run-only conflicts with mode=${B200_SUITE_MODE}" >&2
-                    exit 2
-                fi
-                # Run-only implies resume semantics when a queue already exists.
-                RESUME_FLAG="true"
-                B200_SUITE_MODE="run-only"
-                shift
-                ;;
-            --help|-h)
-                break
-                ;;
-            *)
-                echo "Unknown arg: ${1}" >&2
-                echo "Run with --help for usage." >&2
-                exit 2
-                ;;
-        esac
-    done
-    export RESUME_FLAG B200_SUITE_MODE
-
-    # ============ HELP ============
-    if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
-        cat << EOF
-	InvarLock Validation Suite v${SCRIPT_VERSION} - B200 ${GPU_MEMORY_GB:-180}GB x ${NUM_GPUS:-auto} GPU
-
-Optimized for NVIDIA B200 ${GPU_MEMORY_GB:-180}GB SXM6 GPUs with:
-  * FP8 quantization (simulated; B200-native hardware)
-  * ~4.5 TB/s memory bandwidth
-  * ~2250 FP16 TFLOPS
-  * Dynamic work-stealing GPU scheduling with "small_first" strategy
-
-Scheduling:
-  Uses dynamic scheduling with work-stealing. When a GPU finishes its tasks
-  early, it automatically picks up pending tasks from other models. The
-  "small_first" priority strategy (7B-14B models first) maximizes early
-  parallelism across available GPUs.
-
-Edit Types (4 x 2 versions each):
-  * Quantization RTN (group-wise): clean calibrated, 4-bit stress
-  * FP8 Quantization: clean calibrated, E5M2 stress
-  * Magnitude Pruning: clean calibrated, 50% stress
-  * Low-Rank SVD: clean calibrated, rank-32 stress
-
-Model Suite (8 PUBLIC models - no HuggingFace login):
-  - Mistral-7B-v0.1     (~14 GB weights)
-  - Llama-2-13b-hf      (~26 GB weights)
-  - Qwen2.5-14B         (~28 GB weights)
-  - Qwen2.5-32B         (~64 GB weights)
-  - Yi-34B              (~68 GB weights)
-  - Mixtral-8x7B-v0.1   (~90 GB weights)
-  - Llama-2-70b-hf      (~140 GB weights)
-  - Qwen1.5-72B         (~144 GB weights)
-
-Note: GPUs are assigned dynamically; this is not a fixed mapping.
-
-	Usage: $0 [options]
-
-	Options:
-	    --resume, -r                 Resume from existing queue (skip task generation)
-	    --calibrate-only             Run only baseline calibration + preset generation, then stop
-	    --run-only                   Run remaining tasks (implies --resume when queue exists)
-	    --help, -h                   Show this help message
-
-Key environment variables:
-    B200_DETERMINISM             Harness determinism preset: throughput (default) or strict
-    B200_GUARDS_ORDER            Override InvarLock guard order (comma-separated); default: invariants,variance,invariants
-    MODEL_1 through MODEL_8      Override model assignments (set empty to disable)
-    CUDA_VISIBLE_DEVICES         Explicit GPU IDs to use (default: auto-detect all)
-    NUM_GPUS                     Number of GPUs to use (default: auto-detect all)
-    SKIP_FLASH_ATTN              Skip flash-attn install (default: false)
-    RESUME_MODE                  Skip completed work (default: true)
-    OUTPUT_DIR                   Set to existing dir to resume (absolute path recommended)
-    RUN_ERROR_INJECTION          Run error tests (default: true)
-    MIN_FREE_DISK_GB             Abort if free disk below this (default: 200)
-
-	Examples:
-	    $0                                    # Run validation
-	    $0 --resume                           # Resume previous run
-	    $0 --calibrate-only                   # Run calibration only (presets only)
-	    OUTPUT_DIR=./run $0 --calibrate-only  # Calibration checkpoint run
-	    OUTPUT_DIR=./run $0 --run-only        # Continue from checkpoint
-	    SKIP_FLASH_ATTN=true $0               # Skip flash-attn compile
-	    NUM_GPUS=4 $0                         # Use only 4 GPUs
-
-	Resume a failed run:
-	    OUTPUT_DIR=./invarlock_validation_b200_20241208_123456 $0 --resume
-EOF
-        exit 0
-    fi
-
-    # Enable strict mode only for actual script execution (tests may source this file).
+pack_run_suite() {
+    # Enable strict mode only for actual suite execution (tests may source this file).
     set -uo pipefail
     trap cleanup EXIT INT TERM HUP QUIT
 
-    b200_require_bash4 || exit 1
+    pack_require_bash4 || return 1
 
     if [[ -z "${OUTPUT_DIR:-}" ]]; then
-        OUTPUT_DIR="./invarlock_validation_b200_$(date +%Y%m%d_%H%M%S)"
+        echo "ERROR: OUTPUT_DIR is not set; use run_suite.sh --out or PACK_OUTPUT_DIR." >&2
+        return 1
     fi
-    # Optionally normalize OUTPUT_DIR to an absolute path (set B200_OUTPUT_DIR_ABSOLUTE=true).
-    if [[ -n "${OUTPUT_DIR}" && "${B200_OUTPUT_DIR_ABSOLUTE:-false}" == "true" ]]; then
+    # Optionally normalize OUTPUT_DIR to an absolute path (set PACK_OUTPUT_DIR_ABSOLUTE=true).
+    if [[ -n "${OUTPUT_DIR}" && "${PACK_OUTPUT_DIR_ABSOLUTE:-false}" == "true" ]]; then
         OUTPUT_DIR="$(cd "$(dirname "${OUTPUT_DIR}")" && pwd)/$(basename "${OUTPUT_DIR}")"
     fi
+    PACK_OUTPUT_DIR="${OUTPUT_DIR}"
+    export PACK_OUTPUT_DIR
 
-    b200_source_libs || exit 1
-    b200_setup_output_dirs || exit 1
-    b200_setup_hf_cache_dirs || exit 1
+    pack_apply_network_mode "${PACK_NET}"
+    pack_source_libs || return 1
+    pack_setup_output_dirs || return 1
+    pack_setup_hf_cache_dirs || return 1
 
-    main "$@"
+    pack_model_list_array
+    if [[ ${#PACK_MODEL_LIST[@]} -eq 0 ]]; then
+        error_exit "No models configured for PACK_SUITE=${PACK_SUITE}."
+    fi
+
+    if [[ "${PACK_NET}" == "1" ]]; then
+        pack_preflight_models "${OUTPUT_DIR}" "${PACK_MODEL_LIST[@]}"
+    else
+        if ! pack_load_model_revisions; then
+            error_exit "Offline mode requires model revisions. Run with --net 1 to preflight."
+        fi
+    fi
+
+    main_dynamic
 }
-
-if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
-    b200_entrypoint "$@"
-fi

@@ -3,7 +3,7 @@
 test_should_shutdown_checks_global_and_worker_flags() {
     mock_reset
     # shellcheck source=../gpu_worker.sh
-    source "${TEST_ROOT}/scripts/lib/gpu_worker.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/gpu_worker.sh"
 
     local out="${TEST_TMPDIR}/out"
     mkdir -p "${out}/workers"
@@ -24,7 +24,7 @@ test_should_shutdown_checks_global_and_worker_flags() {
 test_gpu_worker_sets_waiting_deps_when_only_pending_tasks() {
     mock_reset
     # shellcheck source=../gpu_worker.sh
-    source "${TEST_ROOT}/scripts/lib/gpu_worker.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/gpu_worker.sh"
 
     local out="${TEST_TMPDIR}/out"
     mkdir -p "${out}/workers" "${out}/logs/tasks"
@@ -60,7 +60,7 @@ test_gpu_worker_sets_waiting_deps_when_only_pending_tasks() {
 test_gpu_worker_exits_on_poison_context_log() {
     mock_reset
     # shellcheck source=../gpu_worker.sh
-    source "${TEST_ROOT}/scripts/lib/gpu_worker.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/gpu_worker.sh"
 
     local out="${TEST_TMPDIR}/out"
     mkdir -p "${out}/workers" "${out}/logs/tasks"
@@ -99,7 +99,7 @@ test_gpu_worker_exits_on_poison_context_log() {
 test_gpu_worker_breaks_on_shutdown_signal_and_updates_info() {
     mock_reset
     # shellcheck source=../gpu_worker.sh
-    source "${TEST_ROOT}/scripts/lib/gpu_worker.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/gpu_worker.sh"
 
     local out="${TEST_TMPDIR}/out"
     mkdir -p "${out}/workers"
@@ -114,7 +114,7 @@ test_gpu_worker_breaks_on_shutdown_signal_and_updates_info() {
 test_gpu_worker_updates_heartbeat_and_retries_when_gpu_mem_unavailable() {
     mock_reset
     # shellcheck source=../gpu_worker.sh
-    source "${TEST_ROOT}/scripts/lib/gpu_worker.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/gpu_worker.sh"
 
     local out="${TEST_TMPDIR}/out"
     mkdir -p "${out}/workers"
@@ -136,7 +136,7 @@ test_gpu_worker_updates_heartbeat_and_retries_when_gpu_mem_unavailable() {
 test_gpu_worker_shuts_down_when_queue_empty_and_no_task() {
     mock_reset
     # shellcheck source=../gpu_worker.sh
-    source "${TEST_ROOT}/scripts/lib/gpu_worker.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/gpu_worker.sh"
 
     local out="${TEST_TMPDIR}/out"
     mkdir -p "${out}/workers"
@@ -152,7 +152,7 @@ test_gpu_worker_shuts_down_when_queue_empty_and_no_task() {
 test_gpu_worker_sets_idle_when_queue_not_empty_but_no_task_available() {
     mock_reset
     # shellcheck source=../gpu_worker.sh
-    source "${TEST_ROOT}/scripts/lib/gpu_worker.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/gpu_worker.sh"
 
     local out="${TEST_TMPDIR}/out"
     mkdir -p "${out}/workers"
@@ -179,7 +179,7 @@ test_gpu_worker_sets_idle_when_queue_not_empty_but_no_task_available() {
 test_gpu_worker_success_path_with_oom_precheck_and_cleanup_hooks() {
     mock_reset
     # shellcheck source=../gpu_worker.sh
-    source "${TEST_ROOT}/scripts/lib/gpu_worker.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/gpu_worker.sh"
 
     local out="${TEST_TMPDIR}/out"
     mkdir -p "${out}/workers" "${out}/logs/tasks"
@@ -216,7 +216,7 @@ test_gpu_worker_success_path_with_oom_precheck_and_cleanup_hooks() {
 test_gpu_worker_survives_risk_level_probe_failure() {
     mock_reset
     # shellcheck source=../gpu_worker.sh
-    source "${TEST_ROOT}/scripts/lib/gpu_worker.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/gpu_worker.sh"
 
     local out="${TEST_TMPDIR}/out"
     mkdir -p "${out}/workers" "${out}/logs/tasks"
@@ -254,7 +254,7 @@ test_gpu_worker_survives_risk_level_probe_failure() {
 test_wait_for_workers_returns_zero_when_all_workers_succeed() {
     mock_reset
     # shellcheck source=../gpu_worker.sh
-    source "${TEST_ROOT}/scripts/lib/gpu_worker.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/gpu_worker.sh"
 
     ( exit 0 ) &
     local pid1=$!
@@ -273,7 +273,7 @@ test_wait_for_workers_returns_zero_when_all_workers_succeed() {
 test_gpu_worker_failure_timeout_and_oom_branches_and_failure_threshold() {
     mock_reset
     # shellcheck source=../gpu_worker.sh
-    source "${TEST_ROOT}/scripts/lib/gpu_worker.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/gpu_worker.sh"
 
     local out="${TEST_TMPDIR}/out"
     mkdir -p "${out}/workers" "${out}/logs/tasks"
@@ -321,7 +321,7 @@ test_gpu_worker_failure_timeout_and_oom_branches_and_failure_threshold() {
 test_launch_wait_monitor_and_summary_branches() {
     mock_reset
     # shellcheck source=../gpu_worker.sh
-    source "${TEST_ROOT}/scripts/lib/gpu_worker.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/gpu_worker.sh"
 
     local out="${TEST_TMPDIR}/out"
     mkdir -p "${out}/workers"
@@ -380,7 +380,7 @@ test_launch_wait_monitor_and_summary_branches() {
 test_worker_pool_sanitizes_invalid_numeric_args() {
     mock_reset
     # shellcheck source=../gpu_worker.sh
-    source "${TEST_ROOT}/scripts/lib/gpu_worker.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/gpu_worker.sh"
 
     local out="${TEST_TMPDIR}/out"
     mkdir -p "${out}/workers"
@@ -401,7 +401,7 @@ test_worker_pool_sanitizes_invalid_numeric_args() {
 test_gpu_worker_sanitizes_invalid_worker_config() {
     mock_reset
     # shellcheck source=../gpu_worker.sh
-    source "${TEST_ROOT}/scripts/lib/gpu_worker.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/gpu_worker.sh"
 
     local out="${TEST_TMPDIR}/out"
     mkdir -p "${out}/workers"
@@ -418,7 +418,7 @@ test_gpu_worker_sanitizes_invalid_worker_config() {
 test_monitor_workers_stops_when_queue_empty_even_with_failures() {
     mock_reset
     # shellcheck source=../gpu_worker.sh
-    source "${TEST_ROOT}/scripts/lib/gpu_worker.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/gpu_worker.sh"
 
     local out="${TEST_TMPDIR}/out"
     mkdir -p "${out}/workers"

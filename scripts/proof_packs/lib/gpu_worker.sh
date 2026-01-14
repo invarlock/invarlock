@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # gpu_worker.sh - GPU worker loop for dynamic task execution
-# Version: v2.2.0 (InvarLock B200 Validation Suite)
+# Version: v2.2.0 (InvarLock Proof Pack Suite)
 # Dependencies: scheduler.sh, task_functions.sh, queue_manager.sh
-# Usage: spawned by b200_validation_suite.sh for each GPU worker
+# Usage: spawned by validation_suite.sh for each GPU worker
 #
 # Each worker runs on a dedicated GPU and continuously:
 # 1. Checks available GPU memory

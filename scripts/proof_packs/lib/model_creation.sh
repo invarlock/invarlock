@@ -42,7 +42,7 @@ create_edited_model() {
     local scope="$6"
     local gpu_id="${7:-0}"
 
-    log "Creating edited model (B200 GPU ${gpu_id}):"
+    log "Creating edited model (GPU ${gpu_id}):"
     log "  Baseline: ${baseline_path}"
     log "  Output: ${output_path}"
     log "  Edit: ${edit_type} bits=${bits} group_size=${group_size} scope=${scope}"
@@ -61,7 +61,7 @@ import os
 import sys
 
 try:
-    mode = os.environ.get("B200_DETERMINISM", "throughput").strip().lower()
+    mode = os.environ.get("PACK_DETERMINISM", "throughput").strip().lower()
     if mode == "strict":
         torch.backends.cuda.matmul.allow_tf32 = False
         torch.backends.cudnn.allow_tf32 = False
@@ -199,7 +199,7 @@ create_pruned_model() {
     local scope="$4"     # ffn, attn, all
     local gpu_id="${5:-0}"
 
-    log "Creating pruned model (B200 GPU ${gpu_id}):"
+    log "Creating pruned model (GPU ${gpu_id}):"
     log "  Baseline: ${baseline_path}"
     log "  Output: ${output_path}"
     log "  Sparsity: ${sparsity}, Scope: ${scope}"
@@ -330,7 +330,7 @@ create_lowrank_model() {
     local scope="$4"     # ffn, attn, all
     local gpu_id="${5:-0}"
 
-    log "Creating low-rank model (B200 GPU ${gpu_id}):"
+    log "Creating low-rank model (GPU ${gpu_id}):"
     log "  Baseline: ${baseline_path}"
     log "  Output: ${output_path}"
     log "  Rank: ${rank}, Scope: ${scope}"
@@ -479,7 +479,7 @@ create_fp8_model() {
     local scope="$4"       # ffn, attn, all
     local gpu_id="${5:-0}"
 
-    log "Creating FP8 model (B200 GPU ${gpu_id}):"
+    log "Creating FP8 model (GPU ${gpu_id}):"
     log "  Baseline: ${baseline_path}"
     log "  Output: ${output_path}"
     log "  Format: ${format}, Scope: ${scope}"
@@ -599,7 +599,7 @@ create_fp4_model() {
     local scope="$4"       # ffn, attn, all
     local gpu_id="${5:-0}"
 
-    log "Creating FP4 model (B200 GPU ${gpu_id}):"
+    log "Creating FP4 model (GPU ${gpu_id}):"
     log "  Baseline: ${baseline_path}"
     log "  Output: ${output_path}"
     log "  Format: ${format}, Scope: ${scope}"
@@ -623,12 +623,12 @@ try:
     format_type = sys.argv[3]
     scope = sys.argv[4]
 
-    # Check for B200 FP4 support
+    # Check for Blackwell FP4 support
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA not available")
 
     device_name = torch.cuda.get_device_name(0)
-    is_b200 = "B200" in device_name or "Blackwell" in device_name
+    is_blackwell = "B200" in device_name or "Blackwell" in device_name
 
     require_native = os.environ.get("INVARLOCK_REQUIRE_FP4_NATIVE", "false").strip().lower() in ("1", "true", "yes")
     te_available = False
@@ -639,15 +639,15 @@ try:
         if require_native:
             raise RuntimeError("TransformerEngine not available for native FP4 validation") from e
 
-    fp4_native = bool(is_b200 and te_available)
+    fp4_native = bool(is_blackwell and te_available)
 
     if not fp4_native:
-        if is_b200:
-            print("WARNING: B200 detected but TransformerEngine not available.")
+        if is_blackwell:
+            print("WARNING: Blackwell-class GPU detected but TransformerEngine not available.")
             print("         FP4 quantization is simulated; no FP4 Tensor Core validation.")
         else:
-            print(f"WARNING: FP4 is B200-native, current GPU: {device_name}")
-            print("         FP4 quantization is simulated; results may not match true B200 behavior")
+            print(f"WARNING: FP4 native support is Blackwell-class, current GPU: {device_name}")
+            print("         FP4 quantization is simulated; results may not match native FP4 behavior")
 
     print(f"Loading baseline from {baseline_path}...")
     tokenizer = AutoTokenizer.from_pretrained(baseline_path, trust_remote_code=True)
@@ -761,7 +761,7 @@ try:
         "scope": scope,
         "quantized_tensors": quantized_count,
         "avg_relative_error": avg_error,
-        "b200_native": is_b200,
+        "b200_native": is_blackwell,
         "fp4_native": fp4_native,
         "transformer_engine": te_available
     }

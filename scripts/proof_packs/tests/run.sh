@@ -14,12 +14,12 @@ COVERAGE_RAW_HITS=""
 
 usage() {
     cat <<'EOF'
-Usage: scripts/lib/tests/run.sh [--filter REGEX] [--coverage] [--line-coverage]
+Usage: scripts/proof_packs/tests/run.sh [--filter REGEX] [--coverage] [--line-coverage]
 
 Options:
   --filter REGEX     Run only tests whose id matches REGEX (id: test_file::test_fn)
-  --coverage         Run tests under xtrace and enforce 100% branch coverage for B200 bash scripts
-  --line-coverage    Run tests under xtrace and enforce 100% executable-line coverage for B200 bash scripts
+  --coverage         Run tests under xtrace and enforce 100% branch coverage for proof pack bash scripts
+  --line-coverage    Run tests under xtrace and enforce 100% executable-line coverage for proof pack bash scripts
 EOF
 }
 
@@ -54,25 +54,29 @@ REAL_PYTHON3="$(command -v python3 2>/dev/null || true)"
 coverage_owner_hint() {
     local rel="$1"
     case "${rel}" in
-        scripts/lib/task_serialization.sh) echo "scripts/lib/tests/test_task_serialization.sh" ;;
-        scripts/lib/queue_manager.sh) echo "scripts/lib/tests/test_queue_manager.sh" ;;
-        scripts/lib/scheduler.sh) echo "scripts/lib/tests/test_scheduler.sh" ;;
-        scripts/lib/gpu_worker.sh) echo "scripts/lib/tests/test_gpu_worker.sh" ;;
-        scripts/lib/fault_tolerance.sh) echo "scripts/lib/tests/test_fault_tolerance.sh" ;;
-        scripts/lib/task_functions.sh) echo "scripts/lib/tests/test_task_functions.sh" ;;
-        scripts/lib/model_creation.sh) echo "scripts/lib/tests/test_model_creation.sh" ;;
-        scripts/lib/runtime.sh) echo "scripts/lib/tests/test_runtime.sh" ;;
-        scripts/b200_validation_suite.sh) echo "scripts/lib/tests/test_b200_validation_suite.sh" ;;
-        scripts/b200_bootstrap_and_validate.sh) echo "scripts/lib/tests/test_b200_bootstrap_and_validate.sh" ;;
-        *) echo "scripts/lib/tests/<add_test>.sh" ;;
+        scripts/proof_packs/lib/task_serialization.sh) echo "scripts/proof_packs/tests/test_task_serialization.sh" ;;
+        scripts/proof_packs/lib/queue_manager.sh) echo "scripts/proof_packs/tests/test_queue_manager.sh" ;;
+        scripts/proof_packs/lib/scheduler.sh) echo "scripts/proof_packs/tests/test_scheduler.sh" ;;
+        scripts/proof_packs/lib/gpu_worker.sh) echo "scripts/proof_packs/tests/test_gpu_worker.sh" ;;
+        scripts/proof_packs/lib/fault_tolerance.sh) echo "scripts/proof_packs/tests/test_fault_tolerance.sh" ;;
+        scripts/proof_packs/lib/task_functions.sh) echo "scripts/proof_packs/tests/test_task_functions.sh" ;;
+        scripts/proof_packs/lib/model_creation.sh) echo "scripts/proof_packs/tests/test_model_creation.sh" ;;
+        scripts/proof_packs/lib/runtime.sh) echo "scripts/proof_packs/tests/test_runtime.sh" ;;
+        scripts/proof_packs/lib/validation_suite.sh) echo "scripts/proof_packs/tests/test_validation_suite.sh" ;;
+        scripts/proof_packs/lib/setup_remote.sh) echo "scripts/proof_packs/tests/test_setup_remote.sh" ;;
+        scripts/proof_packs/suites.sh) echo "scripts/proof_packs/tests/test_suites.sh" ;;
+        scripts/proof_packs/run_suite.sh) echo "scripts/proof_packs/tests/test_run_suite.sh" ;;
+        scripts/proof_packs/run_pack.sh) echo "scripts/proof_packs/tests/test_run_pack.sh" ;;
+        scripts/proof_packs/verify_pack.sh) echo "scripts/proof_packs/tests/test_verify_pack.sh" ;;
+        *) echo "scripts/proof_packs/tests/<add_test>.sh" ;;
     esac
 }
 
 coverage_target_files() {
     (
         cd "${ROOT_DIR}"
-        find scripts -maxdepth 1 -type f -name 'b200_*.sh' -print
-        find scripts/lib -maxdepth 1 -type f -name '*.sh' -print
+        find scripts/proof_packs -maxdepth 1 -type f -name '*.sh' -print
+        find scripts/proof_packs/lib -maxdepth 1 -type f -name '*.sh' -print
     ) | sort
 }
 

@@ -57,7 +57,7 @@ stub_resolve_edit_params() {
 test_model_size_and_eval_batch_selection() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
 
     fixture_write "python3.stub" ""
 
@@ -92,6 +92,8 @@ test_model_size_and_eval_batch_selection() {
 
     # Inline python branch (setup_model absent) success.
     unset -f setup_model
+    PACK_NET=1
+    _task_get_model_revision() { echo "rev"; }
     _cmd_python() {
         mkdir -p "${baseline_dir}"
         echo "{}" > "${baseline_dir}/config.json"
@@ -110,7 +112,7 @@ test_model_size_and_eval_batch_selection() {
 test_task_eval_baseline_branches_for_missing_paths_overrides_and_results_move() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
 
     fixture_write "python3.stub" ""
     fixture_write "python3.rc" "0"
@@ -157,7 +159,7 @@ test_task_eval_baseline_branches_for_missing_paths_overrides_and_results_move() 
 test_task_eval_baseline_returns_nonzero_when_results_move_fails() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
 
     fixture_write "python3.stub" ""
     fixture_write "python3.rc" "0"
@@ -192,7 +194,7 @@ test_task_eval_baseline_returns_nonzero_when_results_move_fails() {
 test_task_calibration_run_and_generate_preset_cover_overrides_large_model_and_report_branches() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
 
     fixture_write "python3.stub" ""
     fixture_write "python3.rc" "0"
@@ -244,7 +246,7 @@ test_task_calibration_run_and_generate_preset_cover_overrides_large_model_and_re
 test_task_create_edit_and_batch_edits_cover_success_failure_and_missing_function_branches() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
     stub_resolve_edit_params
 
     fixture_write "python3.stub" ""
@@ -330,7 +332,7 @@ test_task_create_edit_and_batch_edits_cover_success_failure_and_missing_function
 test_task_eval_edit_and_single_benchmark_cover_mapping_overrides_results_and_warnings() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
     stub_resolve_edit_params
 
     fixture_write "python3.stub" ""
@@ -436,7 +438,7 @@ test_task_eval_edit_and_single_benchmark_cover_mapping_overrides_results_and_war
 test_task_eval_edit_returns_nonzero_when_results_move_fails() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
     stub_resolve_edit_params
 
     fixture_write "python3.stub" ""
@@ -475,7 +477,7 @@ test_task_eval_edit_returns_nonzero_when_results_move_fails() {
 test_task_eval_single_benchmark_returns_nonzero_when_results_move_fails() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
     stub_resolve_edit_params
 
     fixture_write "python3.stub" ""
@@ -514,7 +516,7 @@ test_task_eval_single_benchmark_returns_nonzero_when_results_move_fails() {
 test_task_certify_edit_and_error_cover_preset_discovery_overrides_and_certificate_copy_paths() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
     stub_resolve_edit_params
 
     local out="${TEST_TMPDIR}/out"
@@ -570,7 +572,7 @@ test_task_certify_edit_and_error_cover_preset_discovery_overrides_and_certificat
 test_task_certify_edit_exits_when_workdir_cd_fails() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
     stub_resolve_edit_params
 
     local out="${TEST_TMPDIR}/out"
@@ -600,7 +602,7 @@ test_task_certify_edit_exits_when_workdir_cd_fails() {
 test_task_certify_error_exits_when_workdir_cd_fails() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -629,7 +631,7 @@ test_task_certify_error_exits_when_workdir_cd_fails() {
 test_task_certify_error_missing_baseline_missing_error_model_skip_and_preset_missing_branches() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -670,7 +672,7 @@ test_task_certify_error_missing_baseline_missing_error_model_skip_and_preset_mis
 test_task_create_error_branches_cover_skip_missing_function_and_verify_paths() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"

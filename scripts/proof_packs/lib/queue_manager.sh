@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # queue_manager.sh - File-based task queue with atomic operations
-# Version: v2.0.1 (InvarLock B200 Validation Suite)
+# Version: proof-packs-v1 (InvarLock Proof Pack Suite)
 # Dependencies: task_serialization.sh, jq
 # Usage: sourced by gpu_worker.sh and scheduler to manage task lifecycle
 #
@@ -662,7 +662,7 @@ resolve_dependencies() {
     local -a candidate_task_ids=()
     local task_file
     local task_id
-    local suite_mode="${B200_SUITE_MODE:-full}"
+    local suite_mode="${PACK_SUITE_MODE:-full}"
 
     # Scan WITHOUT holding the queue lock to avoid starving workers trying to claim tasks.
     for task_file in "${QUEUE_DIR}/pending"/*.task; do
@@ -717,7 +717,7 @@ resolve_dependencies() {
 # This is a safety net for resumed queues where non-calibration tasks might
 # already be in the ready queue when switching into calibrate-only mode.
 demote_ready_tasks_for_calibration_only() {
-    local suite_mode="${B200_SUITE_MODE:-full}"
+    local suite_mode="${PACK_SUITE_MODE:-full}"
     [[ "${suite_mode}" == "calibrate-only" ]] || return 0
 
     acquire_queue_lock 10 || return 0
@@ -978,10 +978,10 @@ generate_model_tasks() {
         fi
     fi
     # Allow explicit override via env
-    if [[ -n "${B200_USE_BATCH_EDITS:-}" ]]; then
-        if [[ "${B200_USE_BATCH_EDITS}" == "false" || "${B200_USE_BATCH_EDITS}" == "0" ]]; then
+    if [[ -n "${PACK_USE_BATCH_EDITS:-}" ]]; then
+        if [[ "${PACK_USE_BATCH_EDITS}" == "false" || "${PACK_USE_BATCH_EDITS}" == "0" ]]; then
             use_batch="false"
-        elif [[ "${B200_USE_BATCH_EDITS}" == "true" || "${B200_USE_BATCH_EDITS}" == "1" ]]; then
+        elif [[ "${PACK_USE_BATCH_EDITS}" == "true" || "${PACK_USE_BATCH_EDITS}" == "1" ]]; then
             use_batch="true"
         fi
     fi
@@ -1291,20 +1291,10 @@ generate_edit_tasks() {
 }
 
 # Generate all tasks for all models
-# Usage: generate_all_tasks <models_array>
-# Note: models_array should be passed as quoted array string
+# Usage: generate_all_tasks <model_id...>
+# Pass any number of model IDs as arguments.
 generate_all_tasks() {
-    local model_1="$1"
-    local model_2="$2"
-    local model_3="$3"
-    local model_4="$4"
-    local model_5="$5"
-    local model_6="$6"
-    local model_7="$7"
-    local model_8="$8"
-
-    local models=("${model_1}" "${model_2}" "${model_3}" "${model_4}" \
-                  "${model_5}" "${model_6}" "${model_7}" "${model_8}")
+    local models=("$@")
 
     export TASK_SEQUENCE=0
 

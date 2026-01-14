@@ -16,7 +16,7 @@ nav:
       - Configuration Gallery: user-guide/config-gallery.md
       - Example Reports: user-guide/example-reports.md
       - Reading a Certificate: user-guide/reading-certificate.md
-      - B200 Validation: user-guide/b200-validation.md
+      - Proof Packs: user-guide/proof-packs.md
   - CLI Reference:
       - CLI Overview: reference/cli.md
   - Reference:

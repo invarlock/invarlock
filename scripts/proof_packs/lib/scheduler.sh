@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # scheduler.sh - Memory-aware task scheduling and priority management
-# Version: v2.2.1 (InvarLock B200 Validation Suite)
+# Version: proof-packs-v1 (InvarLock Proof Pack Suite)
 # Dependencies: queue_manager.sh, task_serialization.sh, nvidia-smi
 # Usage: sourced by gpu_worker.sh to select tasks per GPU memory headroom
 #
@@ -285,12 +285,12 @@ release_scheduler_lock() {
 # Usage: get_required_gpus <model_size_gb>
 # Returns: integer GPU count (>=1)
 #
-# B200 OPTIMIZATION (v2.2.1): Uses calculate_required_gpus from task_serialization.sh
-# which accounts for per-device memory (defaults to 180GB on B200).
+# Proof pack optimization: uses calculate_required_gpus from task_serialization.sh
+# which accounts for per-device memory (GPU_MEMORY_GB/GPU_MEMORY_PER_DEVICE).
 get_required_gpus() {
     local model_size_gb="$1"
 
-    # Delegate to task_serialization.sh which has the B200-optimized logic
+    # Delegate to task_serialization.sh which has the per-device memory logic
     calculate_required_gpus "${model_size_gb}"
 }
 
@@ -350,11 +350,11 @@ get_required_gpus_from_category() {
             echo "1"
             ;;
         "moe")
-            # Mixtral-8x7B needs ~90GB - fits on single B200 (180GB)
+            # Mixtral-8x7B needs ~90GB - fits on single high-memory GPU
             echo "1"
             ;;
         "40"|"30")
-            # 30-40B models need ~60-80GB - fit on single B200
+            # 30-40B models need ~60-80GB - fit on single high-memory GPU
             echo "1"
             ;;
         *)
@@ -1026,7 +1026,7 @@ get_gpu_total_memory() {
     total_mib=$(_cmd_nvidia_smi --query-gpu=memory.total --format=csv,noheader,nounits -i "${gpu_id}" 2>/dev/null | head -1 || true)
 
     if ! [[ "${total_mib}" =~ ^[0-9]+$ ]]; then
-        echo "180"  # Default to B200 size
+        echo "80"  # Default to 80GB when GPU size unknown
         return 1
     fi
 
@@ -1258,7 +1258,7 @@ find_best_task() {
     done
 
     # Adaptive safety margin based on available memory
-    # For B200 (180GB GPUs):
+    # For high-memory GPUs:
     #   - High memory (>=160GB): 2% margin (allows 157GB for 154GB 70B models)
     #   - Medium memory (>=80GB): 5% margin
     #   - Low memory (<80GB): 10% margin for safety

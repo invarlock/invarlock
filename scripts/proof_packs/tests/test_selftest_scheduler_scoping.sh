@@ -10,7 +10,7 @@ test_lock_ownerless_recovery() {
     mkdir -p "${GPU_RESERVATION_DIR}"
 
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/scheduler.sh"
 
     mkdir -p "${QUEUE_DIR}/queue.lock.d"
     QUEUE_LOCK_NOOWNER_STALE_SECONDS=0 acquire_queue_lock 5
@@ -37,7 +37,7 @@ test_reservation_scoping_does_not_clobber_locals() {
     mkdir -p "${GPU_RESERVATION_DIR}"
 
     # shellcheck source=../scheduler.sh
-    source "${TEST_ROOT}/scripts/lib/scheduler.sh"
+    source "${TEST_ROOT}/scripts/proof_packs/lib/scheduler.sh"
 
     local gpu_id="SENTINEL_GPU_ID"
     reserve_gpus "task_scoping" "0,1" >/dev/null

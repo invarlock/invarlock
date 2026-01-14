@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# runtime.sh - Deterministic hooks + command wrappers for B200 bash scripts.
+# runtime.sh - Deterministic hooks + command wrappers for proof pack scripts.
 #
 # This file is intentionally tiny and safe-to-source. Tests can override any
 # function here via function redefinition after sourcing.
