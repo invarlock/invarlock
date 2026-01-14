@@ -11,7 +11,7 @@
 # - 8x B200 180GB SXM6
 # - ~4.5 TB/s memory bandwidth
 # - ~2250 FP16 TFLOPS
-# - Native FP4 hardware support (B200-exclusive; script uses simulated quantization)
+# - Native FP8/FP4 hardware support (suite uses FP8 + RTN)
 #
 # MEMORY UTILIZATION STRATEGY:
 # - Target: 85-92% VRAM (153-166 GB of 180 GB per GPU)
@@ -25,10 +25,10 @@
 # - Runtime: low-rank SVD on 70B+ can dominate wall time.
 #
 # EDIT TYPES (4 types × 2 versions = 8 tests per model):
-# - Quantization RTN (group-wise): 8-bit clean, 4-bit stress
-# - FP4 Quantization (simulated E2M1): clean, aggressive stress
-# - Magnitude Pruning: 10% sparsity, 50% sparsity
-# - Low-Rank SVD: rank=256 clean, rank=32 stress
+# - Quantization RTN (group-wise): clean calibrated per model, 4-bit stress
+# - FP8 Quantization: clean calibrated per model, E5M2 stress
+# - Magnitude Pruning: clean calibrated per model, 50% stress
+# - Low-Rank SVD: clean calibrated per model, rank-32 stress
 #
 # MODEL SUITE (8 PUBLIC models - no HuggingFace login required):
 # - Mistral-7B-v0.1 (~14 GB)
@@ -151,17 +151,17 @@ EDIT_GROUP_SIZE="${EDIT_GROUP_SIZE:-128}"
 EDIT_SCOPE="${EDIT_SCOPE:-ffn}"
 
 # Edit Types to test (4 types × 2 versions each)
-# Format: "type:param1:param2:scope" for clean, more aggressive for stress
+# Clean specs are calibrated per model using lm-eval; use "clean" sentinel.
 EDIT_TYPES_CLEAN=(
-    "quant_rtn:8:128:ffn"        # 8-bit group-wise RTN on FFN
-    "fp4_quant:e2m1:ffn"         # FP4 E2M1 on FFN (simulated)
-    "magnitude_prune:0.1:ffn"    # 10% sparsity on FFN
-    "lowrank_svd:256:ffn"        # rank-256 SVD on FFN
+    "quant_rtn:clean:ffn"        # Clean RTN (calibrated bits/group_size on FFN)
+    "fp8_quant:clean:ffn"        # Clean FP8 (calibrated format on FFN)
+    "magnitude_prune:clean:ffn"  # Clean pruning (calibrated sparsity on FFN)
+    "lowrank_svd:clean:ffn"      # Clean low-rank (calibrated rank on FFN)
 )
 
 EDIT_TYPES_STRESS=(
     "quant_rtn:4:32:all"         # 4-bit group-wise RTN on all
-    "fp4_quant:aggressive:all"   # FP4 aggressive on all (simulated)
+    "fp8_quant:e5m2:all"         # FP8 E5M2 on all (stress)
     "magnitude_prune:0.5:all"    # 50% sparsity on all
     "lowrank_svd:32:all"         # rank-32 SVD on all
 )
@@ -177,6 +177,17 @@ EVAL_BATCH_SIZE_MEDIUM="${EVAL_BATCH_SIZE_MEDIUM:-auto:8}"  # 30B-40B models - a
 EVAL_BATCH_SIZE_LARGE="${EVAL_BATCH_SIZE_LARGE:-auto:4}"    # 70B+ models - auto with max 4
 EVAL_BATCH_SIZE_MOE="${EVAL_BATCH_SIZE_MOE:-auto:6}"        # MoE models (Mixtral) - auto with max 6
 EVAL_CONTEXT_LEN="${EVAL_CONTEXT_LEN:-2048}"
+
+# Clean edit calibration (lm-eval only; no InvarLock signal)
+CALIBRATE_CLEAN_EDITS="${CALIBRATE_CLEAN_EDITS:-true}"
+CLEAN_EVAL_TASKS="${CLEAN_EVAL_TASKS:-${EVAL_TASKS}}"
+CLEAN_EVAL_LIMIT="${CLEAN_EVAL_LIMIT:-200}"            # 0 disables limit
+CLEAN_EVAL_NUM_FEWSHOT="${CLEAN_EVAL_NUM_FEWSHOT:-${EVAL_NUM_FEWSHOT}}"
+CLEAN_QUANT_BITS="${CLEAN_QUANT_BITS:-8}"
+CLEAN_QUANT_GROUP_SIZES="${CLEAN_QUANT_GROUP_SIZES:-128,64,32}"
+CLEAN_PRUNE_LEVELS="${CLEAN_PRUNE_LEVELS:-0.1,0.05,0.02}"
+CLEAN_SVD_RANK_RATIOS="${CLEAN_SVD_RANK_RATIOS:-0.25,0.35,0.5}"
+CLEAN_FP8_FORMATS="${CLEAN_FP8_FORMATS:-e4m3fn}"
 
 # InvarLock Configuration - BASE DEFAULTS (will be overridden per-model)
 # WikiText-2 validation has ~1174 usable samples
@@ -282,8 +293,10 @@ export INVARLOCK_PM_ACCEPTANCE_MAX="${INVARLOCK_PM_ACCEPTANCE_MAX:-1.20}"
 # Flash attention flag - will be set dynamically based on availability
 export FLASH_ATTENTION_AVAILABLE="false"
 
-# FP4 support flag - detected in setup
-export FP4_NATIVE_SUPPORT="false"
+# FP8 support flag - detected in setup
+export FP8_NATIVE_SUPPORT="false"
+# FP4 support flag retained for optional FP4 edits
+export FP4_NATIVE_SUPPORT="${FP4_NATIVE_SUPPORT:-false}"
 
 # Target memory fraction (0.92 = 92% of available) - optimal zone
 export CUDA_MEMORY_FRACTION=0.92
@@ -358,6 +371,136 @@ b200_source_libs() {
 
     return 0
 }
+
+# Fallback resolver for clean edit specs when task_functions isn't sourced.
+if ! declare -F resolve_edit_params >/dev/null 2>&1; then
+resolve_edit_params() {
+    local model_output_dir="$1"
+    local edit_spec="$2"
+    local version_hint="${3:-}"
+
+    python3 - "${model_output_dir}" "${edit_spec}" "${version_hint}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+model_output_dir = Path(sys.argv[1])
+edit_spec = sys.argv[2] if len(sys.argv) > 2 else ""
+version_hint = sys.argv[3] if len(sys.argv) > 3 else ""
+
+parts = edit_spec.split(":") if edit_spec else []
+edit_type = parts[0] if parts else ""
+param1 = parts[1] if len(parts) > 1 else ""
+param2 = parts[2] if len(parts) > 2 else ""
+scope = parts[3] if len(parts) > 3 else ""
+
+if edit_type != "quant_rtn" and not scope:
+    scope = param2
+    param2 = ""
+
+if edit_type == "quant_rtn" and not scope:
+    if param1 and param2:
+        scope = param2
+        param2 = ""
+
+clean_spec = param1 == "clean"
+status = "selected"
+reason = ""
+edit_dir_name = ""
+
+if clean_spec:
+    clean_file = model_output_dir / "state" / "clean_edit_params.json"
+    if not clean_file.exists():
+        status = "missing"
+    else:
+        try:
+            data = json.loads(clean_file.read_text())
+        except Exception:
+            data = {}
+        entry = data.get(edit_type) or {}
+        status = str(entry.get("status") or "missing")
+        reason = str(entry.get("reason") or "")
+        if status == "selected":
+            if edit_type == "quant_rtn":
+                param1 = str(entry.get("bits", ""))
+                param2 = str(entry.get("group_size", ""))
+                scope = str(entry.get("scope") or scope or "")
+            elif edit_type in ("fp8_quant", "fp4_quant"):
+                param1 = str(entry.get("format", ""))
+                scope = str(entry.get("scope") or scope or "")
+            elif edit_type == "magnitude_prune":
+                param1 = str(entry.get("sparsity", ""))
+                scope = str(entry.get("scope") or scope or "")
+            elif edit_type == "lowrank_svd":
+                param1 = str(entry.get("rank", ""))
+                scope = str(entry.get("scope") or scope or "")
+            edit_dir_name = str(entry.get("edit_dir_name") or "")
+else:
+    def _is_int(val):
+        try:
+            int(val)
+            return True
+        except Exception:
+            return False
+
+    def _is_float(val):
+        try:
+            float(val)
+            return True
+        except Exception:
+            return False
+
+    if edit_type == "quant_rtn":
+        if not (_is_int(param1) and _is_int(param2)):
+            status = "invalid"
+            reason = "invalid_quant_params"
+    elif edit_type == "magnitude_prune":
+        if not _is_float(param1):
+            status = "invalid"
+            reason = "invalid_prune_sparsity"
+    elif edit_type == "lowrank_svd":
+        if not _is_int(param1):
+            status = "invalid"
+            reason = "invalid_lowrank_rank"
+    elif edit_type in ("fp8_quant", "fp4_quant"):
+        if not param1:
+            status = "invalid"
+            reason = "invalid_fp_format"
+
+version = version_hint or ("clean" if clean_spec else "")
+
+if status == "selected" and not edit_dir_name:
+    if edit_type == "quant_rtn":
+        edit_dir_name = f"quant_{param1}bit_{version}" if version else ""
+    elif edit_type == "fp8_quant":
+        edit_dir_name = f"fp8_{param1}_{version}" if version else ""
+    elif edit_type == "fp4_quant":
+        edit_dir_name = f"fp4_{param1}_{version}" if version else ""
+    elif edit_type == "magnitude_prune":
+        try:
+            pct = int(float(param1) * 100)
+        except Exception:
+            pct = 0
+        edit_dir_name = f"prune_{pct}pct_{version}" if version else ""
+    elif edit_type == "lowrank_svd":
+        edit_dir_name = f"svd_rank{param1}_{version}" if version else ""
+    else:
+        edit_dir_name = f"{edit_type}_{version}" if version else ""
+
+payload = {
+    "status": status,
+    "reason": reason,
+    "edit_type": edit_type,
+    "param1": param1,
+    "param2": param2,
+    "scope": scope,
+    "version": version,
+    "edit_dir_name": edit_dir_name,
+}
+print(json.dumps(payload))
+PY
+}
+fi
 
 b200_setup_output_dirs() {
     # ============ SETUP ============
@@ -711,7 +854,7 @@ if mode not in {"throughput", "strict"}:
 
 is_b200 = False
 total_vram = 0
-fp4_support = False
+fp8_support = hasattr(torch, "float8_e4m3fn")
 
 for i in range(num_gpus):
     gpu_name = torch.cuda.get_device_name(i)
@@ -722,15 +865,14 @@ for i in range(num_gpus):
 
     if "B200" in gpu_name or "Blackwell" in gpu_name:
         is_b200 = True
-        fp4_support = True
 
 print(f"\nTotal VRAM: {total_vram:.1f} GB")
 print(f"B200 Detected: {is_b200}")
-print(f"FP4 Native Support: {fp4_support}")
+print(f"FP8 Support: {fp8_support}")
 
 if not is_b200:
     print("\nWARNING: This script is optimized for B200. Performance may vary on other GPUs.")
-    print("         FP4 quantization will use an approximate implementation on non-B200 GPUs.")
+    print("         FP8 quantization will use an approximate implementation on non-B200 GPUs.")
 
 if mode == "strict":
     print("\nDeterminism mode: strict (B200_DETERMINISM=strict)")
@@ -802,11 +944,11 @@ except ImportError:
 compile_avail = hasattr(torch, "compile")
 print(f"torch.compile: {compile_avail}")
 
-# Write FP4 support flag for shell script
-if fp4_support:
-    print("\n[FP4_NATIVE_SUPPORT=true]")
+# Write FP8 support flag for shell script
+if fp8_support:
+    print("\n[FP8_NATIVE_SUPPORT=true]")
 else:
-    print("\n[FP4_NATIVE_SUPPORT=false]")
+    print("\n[FP8_NATIVE_SUPPORT=false]")
 
 print("\n=== Environment Ready for B200 Maximum Utilization ===")
 ')
@@ -816,12 +958,12 @@ print("\n=== Environment Ready for B200 Maximum Utilization ===")
         return ${setup_rc}
     fi
     printf '%s\n' "${env_report}"
-    if [[ "${env_report}" == *"[FP4_NATIVE_SUPPORT=true]"* ]]; then
-        export FP4_NATIVE_SUPPORT="true"
+    if [[ "${env_report}" == *"[FP8_NATIVE_SUPPORT=true]"* ]]; then
+        export FP8_NATIVE_SUPPORT="true"
     else
-        export FP4_NATIVE_SUPPORT="false"
+        export FP8_NATIVE_SUPPORT="false"
     fi
-    log "B200 Environment Setup: Complete (FP4_NATIVE_SUPPORT=${FP4_NATIVE_SUPPORT})"
+    log "B200 Environment Setup: Complete (FP8_NATIVE_SUPPORT=${FP8_NATIVE_SUPPORT})"
 }
 
 # ============ DEPENDENCY CHECK ============
@@ -955,7 +1097,8 @@ setup_model() {
     rm -f "${success_marker}"
 
     local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
-    CUDA_VISIBLE_DEVICES="${cuda_devices}" python3 << EOF 2>&1 | tee -a "${LOG_FILE}" >&2
+    {
+        CUDA_VISIBLE_DEVICES="${cuda_devices}" python3 << EOF
 import json
 import os
 import sys
@@ -1150,6 +1293,7 @@ except Exception as e:
     print(f"ERROR: Model download failed: {e}", file=sys.stderr)
     sys.exit(1)
 EOF
+    } 2>&1 | tee -a "${LOG_FILE}" >&2
 
 	    if [[ ! -f "${success_marker}" ]]; then
 	        # Output error to stderr (not stdout) and return empty string
@@ -1248,12 +1392,12 @@ get_model_invarlock_config() {
         "7")
             # 7B models: ~14GB, can use long sequences and more windows
             # B200 has plenty of headroom
-            echo "2048:2048:192:192:96"
+            echo "2048:1024:64:64:96"
             ;;
         "13")
             # 13-14B models: ~26-28GB, moderate settings
             # Note: estimate_model_params() returns "13" for both 13B and 14B
-            echo "1536:1536:192:192:64"
+            echo "1536:768:48:48:64"
             ;;
         "30")
             # 30B models: ~60GB, reduced settings
@@ -1728,6 +1872,139 @@ EOF
 }
 export -f create_lowrank_model
 
+# ============ FP8 QUANTIZATION (SIMULATED) ============
+create_fp8_model() {
+    local baseline_path="$1"
+    local output_path="$2"
+    local format="$3"      # e4m3fn or e5m2
+    local scope="$4"       # ffn, attn, all
+    local gpu_id="${5:-0}"
+
+    log "Creating FP8 model (B200 GPU ${gpu_id}):"
+    log "  Baseline: ${baseline_path}"
+    log "  Output: ${output_path}"
+    log "  Format: ${format}, Scope: ${scope}"
+
+    mkdir -p "$(dirname "${output_path}")"
+
+    local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
+    CUDA_VISIBLE_DEVICES="${cuda_devices}" python3 << EOF
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from pathlib import Path
+import json
+import gc
+import sys
+
+try:
+    baseline_path = Path("${baseline_path}")
+    output_path = Path("${output_path}")
+    format_type = "${format}"
+    scope = "${scope}"
+
+    if not torch.cuda.is_available():
+        raise RuntimeError("CUDA not available")
+
+    print(f"Loading baseline from {baseline_path}...")
+    tokenizer = AutoTokenizer.from_pretrained(baseline_path, trust_remote_code=True)
+    model = AutoModelForCausalLM.from_pretrained(
+        baseline_path,
+        torch_dtype=torch.bfloat16,
+        trust_remote_code=True,
+        device_map="auto",
+        low_cpu_mem_usage=True,
+    )
+
+    def should_quantize(name, scope):
+        name_lower = name.lower()
+        if scope == "all":
+            return "weight" in name_lower and any(x in name_lower for x in [
+                "linear", "proj", "fc", "mlp", "attn",
+                "wqkv", "query_key_value"
+            ])
+        if scope == "ffn":
+            return "weight" in name_lower and any(x in name_lower for x in [
+                "mlp", "fc", "gate", "up_proj", "down_proj",
+                "dense_h_to_4h", "dense_4h_to_h"
+            ])
+        if scope == "attn":
+            return "weight" in name_lower and any(x in name_lower for x in [
+                "attn", "q_proj", "k_proj", "v_proj", "o_proj",
+                "wqkv", "out_proj", "query_key_value"
+            ])
+        return False
+
+    if format_type in {"e4m3", "e4m3fn", "e4m3fnuz"}:
+        fp8_dtype = getattr(torch, "float8_e4m3fn", None)
+    else:
+        fp8_dtype = getattr(torch, "float8_e5m2", None)
+
+    if fp8_dtype is None:
+        print("WARNING: torch float8 dtype not available; falling back to float16 quantization")
+
+    @torch.no_grad()
+    def quantize_fp8(tensor):
+        if fp8_dtype is None:
+            return tensor.to(torch.float16).to(tensor.dtype)
+        return tensor.to(fp8_dtype).to(tensor.dtype)
+
+    print(f"Applying FP8 quantization (format={format_type}, scope={scope})...")
+    quantized_count = 0
+    num_tensors = 0
+    rel_error_total = 0.0
+    edited_params = 0
+    total_model_params = sum(p.numel() for p in model.parameters())
+
+    for name, param in model.named_parameters():
+        if not should_quantize(name, scope) or param.dim() < 2:
+            continue
+        original = param.data.clone()
+        param.data = quantize_fp8(param.data)
+        num_tensors += 1
+        quantized_count += 1
+        edited_params += param.numel()
+        denom = original.abs().mean() + 1e-10
+        rel_error_total += float((param.data - original).abs().mean() / denom)
+        if quantized_count <= 3:
+            print(f"  FP8: {name}")
+
+    avg_error = rel_error_total / max(num_tensors, 1)
+    coverage_pct = 100.0 * edited_params / total_model_params if total_model_params > 0 else 0
+    print(f"Quantized {quantized_count} tensors ({edited_params:,} / {total_model_params:,} = {coverage_pct:.1f}% coverage)")
+    print(f"Average relative error: {avg_error:.4f}")
+
+    model = model.cpu()
+    gc.collect()
+    torch.cuda.empty_cache()
+
+    output_path.mkdir(parents=True, exist_ok=True)
+    tokenizer.save_pretrained(output_path)
+    model.save_pretrained(output_path, safe_serialization=True)
+
+    metadata = {
+        "edit_type": "fp8_quant",
+        "format": format_type,
+        "scope": scope,
+        "quantized_tensors": quantized_count,
+        "avg_relative_error": avg_error,
+    }
+    with open(output_path / "edit_metadata.json", "w") as f:
+        json.dump(metadata, f, indent=2)
+
+    del model
+    gc.collect()
+    torch.cuda.empty_cache()
+    print(f"Saved FP8-quantized model to {output_path}")
+
+except Exception as e:
+    print(f"ERROR: Failed to create FP8 model: {e}", file=sys.stderr)
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+EOF
+}
+export -f create_fp8_model
+
 # ============ FP4 QUANTIZATION (SIMULATED) ============
 create_fp4_model() {
     local baseline_path="$1"
@@ -2092,37 +2369,25 @@ process_edit() {
     local gpu_id="$5"
     local output_dir="$6"
 
-    # Parse edit spec - handle both 3-part and 4-part formats
-    # quant_rtn uses 4 parts: "quant_rtn:8:128:ffn"
-    # others use 3 parts: "fp4_quant:e2m1:ffn"
-    local edit_type param1 param2 scope
-    IFS=':' read -r edit_type param1 param2 scope <<< "${edit_spec}"
-
-    # For 3-part specs (fp4, prune, svd), scope is in param2 position
-    # For 4-part specs (quant_rtn), all vars are correctly populated
-    if [[ -z "${scope}" && "${edit_type}" != "quant_rtn" ]]; then
-        scope="${param2}"
-        param2=""
+    local resolved
+    resolved=$(resolve_edit_params "${output_dir}" "${edit_spec}" "${version}")
+    local status
+    status=$(echo "${resolved}" | jq -r '.status')
+    if [[ "${status}" == "skipped" ]]; then
+        log "  Clean edit skipped by calibration: ${edit_spec}"
+        return 0
+    fi
+    if [[ "${status}" != "selected" ]]; then
+        log "  ERROR: Unable to resolve edit spec (${edit_spec}): ${status}"
+        return 1
     fi
 
-    # Determine output path
-    local edit_dir_name="${edit_type}_${version}"
-    if [[ "${edit_type}" == "quant_rtn" ]]; then
-        edit_dir_name="quant_${param1}bit_${version}"
-    elif [[ "${edit_type}" == "fp4_quant" ]]; then
-        edit_dir_name="fp4_${param1}_${version}"
-    elif [[ "${edit_type}" == "magnitude_prune" ]]; then
-        # Convert 0.1 -> 10pct, 0.5 -> 50pct for cleaner dir names
-        # Validate that param1 is a valid number first
-        if ! [[ "${param1}" =~ ^[0-9]*\.?[0-9]+$ ]]; then
-            log "  ERROR: Invalid sparsity value: ${param1}"
-            return 1
-        fi
-        local pct=$(echo "${param1}" | awk '{printf "%.0f", $1 * 100}')
-        edit_dir_name="prune_${pct}pct_${version}"
-    elif [[ "${edit_type}" == "lowrank_svd" ]]; then
-        edit_dir_name="svd_rank${param1}_${version}"
-    fi
+    local edit_type param1 param2 scope edit_dir_name
+    edit_type=$(echo "${resolved}" | jq -r '.edit_type')
+    param1=$(echo "${resolved}" | jq -r '.param1')
+    param2=$(echo "${resolved}" | jq -r '.param2')
+    scope=$(echo "${resolved}" | jq -r '.scope')
+    edit_dir_name=$(echo "${resolved}" | jq -r '.edit_dir_name')
 
     local edit_path="${output_dir}/models/${edit_dir_name}"
 
@@ -2139,6 +2404,10 @@ process_edit() {
         "quant_rtn")
             # 4-part: type:bits:group_size:scope
             create_edited_model "${baseline_path}" "${edit_path}" "${edit_type}" "${param1}" "${param2}" "${scope}" "${gpu_id}" || create_result=$?
+            ;;
+        "fp8_quant")
+            # 3-part: type:format:scope -> param1=format, scope=scope
+            create_fp8_model "${baseline_path}" "${edit_path}" "${param1}" "${scope}" "${gpu_id}" || create_result=$?
             ;;
         "fp4_quant")
             # 3-part: type:format:scope -> param1=format, scope=scope
@@ -2432,27 +2701,18 @@ PY
 
     local exit_code=0
     # Enforce no-overlap windows and skip overhead checks to avoid E001/pairing issues
-    local env_common=(
-        INVARLOCK_WINDOW_OVERLAP_FRACTION=0.0
-        INVARLOCK_SKIP_OVERHEAD_CHECK=1
-    )
 
     if [[ "${model_size}" == "70" || "${model_size}" == "72" || "${model_size}" == "moe" ]]; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Large model (${model_size}): using INVARLOCK_SKIP_OVERHEAD_CHECK=1 for calibration" >> "${log_file}"
-        "${env_common[@]}" \
-        CUDA_VISIBLE_DEVICES="${cuda_devices}" invarlock run \
-            --config "${config_yaml}" \
-            --profile ci \
-            --out "${run_dir}" \
-            >> "${log_file}" 2>&1 || exit_code=$?
-    else
-        "${env_common[@]}" \
-        CUDA_VISIBLE_DEVICES="${cuda_devices}" invarlock run \
-            --config "${config_yaml}" \
-            --profile ci \
-            --out "${run_dir}" \
-            >> "${log_file}" 2>&1 || exit_code=$?
     fi
+
+    INVARLOCK_WINDOW_OVERLAP_FRACTION=0.0 \
+    INVARLOCK_SKIP_OVERHEAD_CHECK=1 \
+    CUDA_VISIBLE_DEVICES="${cuda_devices}" invarlock run \
+        --config "${config_yaml}" \
+        --profile ci \
+        --out "${run_dir}" \
+        >> "${log_file}" 2>&1 || exit_code=$?
 
     # Generate certificate from report
     local report_file=$(find "${run_dir}" -name "report*.json" -type f 2>/dev/null | head -1)
@@ -2676,10 +2936,16 @@ def _merge_record(cert, report):
                 val = gmetrics.get(key)
                 if isinstance(val, dict) and val:
                     rmt.setdefault(key, val)
-            if gmetrics.get("epsilon_by_family"):
-                rmt.setdefault("epsilon_by_family", gmetrics.get("epsilon_by_family"))
-            if gmetrics.get("epsilon") is not None:
-                rmt.setdefault("epsilon", gmetrics.get("epsilon"))
+            epsilon_by_family = gmetrics.get("epsilon_by_family")
+            if epsilon_by_family:
+                rmt.setdefault("epsilon_by_family", epsilon_by_family)
+            else:
+                epsilon = gmetrics.get("epsilon")
+                if epsilon is not None:
+                    if isinstance(epsilon, dict):
+                        rmt.setdefault("epsilon_by_family", epsilon)
+                    else:
+                        rmt.setdefault("epsilon_default", epsilon)
             if gmetrics.get("epsilon_default") is not None:
                 rmt.setdefault("epsilon_default", gmetrics.get("epsilon_default"))
             if gmetrics.get("margin_used") is not None:
@@ -3185,7 +3451,7 @@ if "spectral" in enabled_guards and spectral:
 
 rmt = {}
 if rmt_epsilon:
-    rmt["epsilon"] = rmt_epsilon
+    rmt["epsilon_by_family"] = rmt_epsilon
 if rmt_summary.get("margin") is not None:
     rmt["margin"] = rmt_summary["margin"]
 if rmt_summary.get("deadband") is not None:
@@ -3204,7 +3470,7 @@ with open(stats_path, "w") as f:
             "assurance": assurance_cfg,
             "drift": drift_stats,
             "spectral": {**spectral_summary, "family_caps": spectral_caps},
-            "rmt": {**rmt_summary, "epsilon": rmt_epsilon},
+            "rmt": {**rmt_summary, "epsilon_by_family": rmt_epsilon},
             "variance": variance_config,
         },
         f,
@@ -3334,6 +3600,16 @@ process_model() {
             "${EVAL_BATCH_SIZE}" \
             "${EVAL_NUM_FEWSHOT}" \
             "${gpu_id}"
+    fi
+
+    # Step 2.5: Clean edit calibration (lm-eval only)
+    if [[ "${CALIBRATE_CLEAN_EDITS:-true}" == "true" && ${CLEAN_EDIT_RUNS:-0} -gt 0 ]]; then
+        if type task_calibrate_clean_edits &>/dev/null; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Calibrating clean edits..." >> "${gpu_log}"
+            task_calibrate_clean_edits "${model_name}" "${gpu_id}" "${OUTPUT_DIR}" "${gpu_log}"
+        else
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Clean calibration unavailable; skipping" >> "${gpu_log}"
+        fi
     fi
 
     # Step 3: Calibration
@@ -3987,11 +4263,15 @@ for model_dir in output_dir.iterdir():
 
         has_regression = False
         deltas = []
+        delta_by_task = {}
+        regression_tasks = []
         for task, base_val in baseline_evals.items():
             edit_val = edit_evals.get(task)
             if edit_val is None:
                 continue
-            deltas.append(edit_val - base_val)
+            delta = edit_val - base_val
+            deltas.append(delta)
+            delta_by_task[task] = delta
             # Map task name back to benchmark key
             task_key = task
             if task_key.startswith('arc'):
@@ -3999,10 +4279,15 @@ for model_dir in output_dir.iterdir():
             n = N_TABLE.get(task_key, 1000)
             p = max(min(base_val, 0.999), 0.001)
             se = math.sqrt(p * (1.0 - p) / n)
-            if (edit_val - base_val) < -2.0 * se:
+            if delta < -2.0 * se:
                 has_regression = True
+                regression_tasks.append(task)
                 # Keep scanning to accumulate deltas but we already know it's regressed
         mean_delta = sum(deltas) / len(deltas) if deltas else 0.0
+        worst_task = None
+        worst_delta = None
+        if delta_by_task:
+            worst_task, worst_delta = min(delta_by_task.items(), key=lambda item: item[1])
 
         invar_flagged = any(
             str(r.get('all_pass', '')).lower() == 'false' or r.get('all_pass') is False
@@ -4055,6 +4340,10 @@ for model_dir in output_dir.iterdir():
 	            'flagged': invar_flagged,
 	            'triage': triage,
 	            'mean_delta_eval': mean_delta,
+	            'delta_by_task': delta_by_task,
+	            'regression_tasks': regression_tasks,
+	            'worst_delta_task': worst_task,
+	            'worst_delta': worst_delta,
 	            'mean_pm_ratio': pm_ratio_mean,
 	        }
 	        print(f"  {edit_type}: {category}")
@@ -4212,12 +4501,72 @@ total_tests = summary.get('total_tests', 0)
 	triage_fail = triage_counts.get('FAIL', 0)
 degraded = summary.get('degraded_edits', 0) or 0
 degraded_runs = summary.get('degraded_runs', []) or []
+models = analysis.get('models', {}) or {}
 
 gpu_count = os.environ.get("NUM_GPUS", "").strip() or "unknown"
 gpu_mem = os.environ.get("GPU_MEMORY_GB", "").strip() or "180"
 platform_header = f"B200 {gpu_mem}GB x {gpu_count} GPU"
 platform_line = f"{gpu_count}x NVIDIA B200 {gpu_mem}GB SXM6"
 platform_tag = f"B200_{gpu_mem}GB_x{gpu_count}"
+
+def fmt_delta(val):
+    try:
+        return f"{float(val):+0.4f}"
+    except Exception:
+        return "n/a"
+
+def ordered_tasks(delta_by_task):
+    order = ["mmlu", "hellaswag", "arc_challenge", "winogrande"]
+    tasks = [task for task in order if task in delta_by_task]
+    extra = sorted(task for task in delta_by_task if task not in order)
+    return tasks + extra
+
+metric_definitions = (
+    "METRIC DEFINITIONS:\n"
+    "  * Regression: any lm-eval benchmark drop below -2xSE vs baseline.\n"
+    "  * Flagged: InvarLock guard failure or primary metric degradation.\n"
+    "  * Accuracy/Precision/Recall treat regression as positive class.\n"
+)
+
+delta_lines = []
+delta_summary = {}
+if models:
+    delta_lines.append("LM-EVAL DELTAS (edit - baseline):")
+    for model in sorted(models):
+        edits = models.get(model) or {}
+        delta_summary[model] = {}
+        if not edits:
+            continue
+        delta_lines.append(f"  {model}:")
+        for edit_name in sorted(edits):
+            entry = edits.get(edit_name) or {}
+            delta_by_task = entry.get("delta_by_task") or {}
+            mean_delta = entry.get("mean_delta_eval")
+            worst_task = entry.get("worst_delta_task")
+            worst_delta = entry.get("worst_delta")
+            regression_tasks = entry.get("regression_tasks") or []
+            tasks_ordered = ordered_tasks(delta_by_task)
+            if tasks_ordered:
+                task_blob = ", ".join(
+                    f"{task}:{fmt_delta(delta_by_task.get(task))}" for task in tasks_ordered
+                )
+            else:
+                task_blob = "n/a"
+            worst_blob = f"{worst_task}:{fmt_delta(worst_delta)}" if worst_task else "n/a"
+            regression_blob = "none" if not regression_tasks else ", ".join(regression_tasks)
+            delta_lines.append(
+                f"    {edit_name}: mean {fmt_delta(mean_delta)} | worst {worst_blob} | regressions {regression_blob} | [{task_blob}]"
+            )
+            delta_summary[model][edit_name] = {
+                "mean_delta_eval": mean_delta,
+                "delta_by_task": delta_by_task,
+                "regression_tasks": regression_tasks,
+                "worst_delta_task": worst_task,
+                "worst_delta": worst_delta,
+            }
+    delta_section = "\n".join(delta_lines) + "\n\n"
+else:
+    delta_section = ""
 
 phase0_pass = accuracy >= 0.6 and err_rate >= 0.8
 if degraded > 0:
@@ -4261,9 +4610,9 @@ report = f'''
 	     VERDICT CONFIDENCE: {verdict_confidence}
 	================================================================================
 
-EDIT TYPES TESTED:
+{metric_definitions}{delta_section}EDIT TYPES TESTED:
   * Quantization RTN (group-wise): 8-bit (clean), 4-bit (stress)
-  * FP4 Quantization (simulated E2M1): clean, aggressive (stress)
+  * FP8 Quantization (E4M3 clean, E5M2 stress)
   * Magnitude Pruning: 10% (clean), 50% (stress)
   * Low-Rank SVD: rank-256 (clean), rank-32 (stress)
 
@@ -4293,10 +4642,12 @@ with open(reports_dir / "final_verdict.txt", 'w') as f:
 	        'degraded': {'count': degraded, 'runs': degraded_runs},
 	        'phase0_pass': phase0_pass,
 	        'platform': platform_tag,
-	        'models_tested': models_tested,
-	        'total_tests': total_tests,
+        'models_tested': models_tested,
+        'total_tests': total_tests,
+        'lm_eval_deltas': delta_summary,
         'timestamp': datetime.now().isoformat()
     }, f, indent=2)
+
 EOF
 }
 
@@ -4731,7 +5082,7 @@ b200_entrypoint() {
 	InvarLock Validation Suite v${SCRIPT_VERSION} - B200 ${GPU_MEMORY_GB:-180}GB x ${NUM_GPUS:-auto} GPU
 
 Optimized for NVIDIA B200 ${GPU_MEMORY_GB:-180}GB SXM6 GPUs with:
-  * FP4 quantization (simulated; B200-native hardware)
+  * FP8 quantization (simulated; B200-native hardware)
   * ~4.5 TB/s memory bandwidth
   * ~2250 FP16 TFLOPS
   * Dynamic work-stealing GPU scheduling with "small_first" strategy
@@ -4743,10 +5094,10 @@ Scheduling:
   parallelism across available GPUs.
 
 Edit Types (4 x 2 versions each):
-  * Quantization RTN (group-wise): 8-bit clean, 4-bit stress
-  * FP4 Quantization (simulated E2M1): clean, aggressive stress
-  * Magnitude Pruning: 10% clean, 50% stress
-  * Low-Rank SVD: rank-256 clean, rank-32 stress
+  * Quantization RTN (group-wise): clean calibrated, 4-bit stress
+  * FP8 Quantization: clean calibrated, E5M2 stress
+  * Magnitude Pruning: clean calibrated, 50% stress
+  * Low-Rank SVD: clean calibrated, rank-32 stress
 
 Model Suite (8 PUBLIC models - no HuggingFace login):
   - Mistral-7B-v0.1     (~14 GB weights)
@@ -4804,9 +5155,8 @@ EOF
     if [[ -z "${OUTPUT_DIR:-}" ]]; then
         OUTPUT_DIR="./invarlock_validation_b200_$(date +%Y%m%d_%H%M%S)"
     fi
-    # Normalize OUTPUT_DIR to an absolute path so worker log paths remain valid
-    # even if subshells or workers run with a different cwd.
-    if [[ -n "${OUTPUT_DIR}" ]]; then
+    # Optionally normalize OUTPUT_DIR to an absolute path (set B200_OUTPUT_DIR_ABSOLUTE=true).
+    if [[ -n "${OUTPUT_DIR}" && "${B200_OUTPUT_DIR_ABSOLUTE:-false}" == "true" ]]; then
         OUTPUT_DIR="$(cd "$(dirname "${OUTPUT_DIR}")" && pwd)/$(basename "${OUTPUT_DIR}")"
     fi
 

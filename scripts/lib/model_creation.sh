@@ -471,6 +471,126 @@ PY
 }
 export -f create_lowrank_model
 
+# ============ FP8 QUANTIZATION (SIMULATED) ============
+create_fp8_model() {
+    local baseline_path="$1"
+    local output_path="$2"
+    local format="$3"      # e4m3fn or e5m2
+    local scope="$4"       # ffn, attn, all
+    local gpu_id="${5:-0}"
+
+    log "Creating FP8 model (B200 GPU ${gpu_id}):"
+    log "  Baseline: ${baseline_path}"
+    log "  Output: ${output_path}"
+    log "  Format: ${format}, Scope: ${scope}"
+
+    local parent_dir
+    parent_dir="$(dirname "${output_path}")"
+    local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
+    _model_creation_run_python "${parent_dir}" "${cuda_devices}" - "${baseline_path}" "${output_path}" "${format}" "${scope}" <<'PY'
+import gc
+import json
+import sys
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+baseline_path = Path(sys.argv[1])
+output_path = Path(sys.argv[2])
+format_type = sys.argv[3]
+scope = sys.argv[4]
+
+if not torch.cuda.is_available():
+    raise RuntimeError("CUDA not available")
+
+print(f"Loading baseline from {baseline_path}...")
+model_kwargs = {
+    "torch_dtype": torch.bfloat16,
+    "trust_remote_code": True,
+    "device_map": "auto",
+    "low_cpu_mem_usage": True,
+}
+model = AutoModelForCausalLM.from_pretrained(baseline_path, **model_kwargs)
+tokenizer = AutoTokenizer.from_pretrained(baseline_path, trust_remote_code=True)
+
+def should_quantize(name, scope):
+    name_lower = name.lower()
+    if scope == "all":
+        return "weight" in name_lower and any(x in name_lower for x in [
+            "linear", "proj", "fc", "mlp", "attn",
+            "wqkv", "query_key_value"
+        ])
+    if scope == "ffn":
+        return "weight" in name_lower and any(x in name_lower for x in [
+            "mlp", "fc", "gate", "up_proj", "down_proj",
+            "dense_h_to_4h", "dense_4h_to_h"
+        ])
+    if scope == "attn":
+        return "weight" in name_lower and any(x in name_lower for x in [
+            "attn", "q_proj", "k_proj", "v_proj", "o_proj",
+            "wqkv", "out_proj", "query_key_value"
+        ])
+    return False
+
+if format_type in {"e4m3", "e4m3fn", "e4m3fnuz"}:
+    fp8_dtype = getattr(torch, "float8_e4m3fn", None)
+else:
+    fp8_dtype = getattr(torch, "float8_e5m2", None)
+
+if fp8_dtype is None:
+    print("WARNING: torch float8 dtype not available; falling back to float16 quantization")
+
+@torch.no_grad()
+def quantize_fp8(tensor):
+    if fp8_dtype is None:
+        return tensor.to(torch.float16).to(tensor.dtype)
+    return tensor.to(fp8_dtype).to(tensor.dtype)
+
+print(f"Applying FP8 quantization (format={format_type}, scope={scope})...")
+quantized_count = 0
+num_tensors = 0
+rel_error_total = 0.0
+edited_params = 0
+for name, param in model.named_parameters():
+    if not should_quantize(name, scope) or param.dim() < 2:
+        continue
+    original = param.data.clone()
+    param.data = quantize_fp8(param.data)
+    num_tensors += 1
+    quantized_count += 1
+    edited_params += param.numel()
+    denom = original.abs().mean() + 1e-10
+    rel_error_total += float((param.data - original).abs().mean() / denom)
+    if quantized_count <= 3:
+        print(f"  FP8: {name}")
+
+avg_error = rel_error_total / max(num_tensors, 1)
+print(f"Quantized {quantized_count} tensors, avg relative error: {avg_error:.4f}")
+
+model = model.cpu()
+gc.collect()
+torch.cuda.empty_cache()
+
+output_path.mkdir(parents=True, exist_ok=True)
+model.save_pretrained(output_path, safe_serialization=True)
+tokenizer.save_pretrained(output_path)
+
+metadata = {
+    "edit_type": "fp8_quant",
+    "format": format_type,
+    "scope": scope,
+    "quantized_tensors": quantized_count,
+    "avg_relative_error": avg_error,
+}
+with open(output_path / "edit_metadata.json", "w") as f:
+    json.dump(metadata, f, indent=2)
+
+print(f"Saved FP8-quantized model to {output_path}")
+PY
+}
+export -f create_fp8_model
+
 # ============ FP4 QUANTIZATION (SIMULATED) ============
 create_fp4_model() {
     local baseline_path="$1"

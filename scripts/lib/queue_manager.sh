@@ -1003,6 +1003,17 @@ generate_model_tasks() {
     task_ids+=("${eval_base_id}")
     echo "Created: ${eval_base_id}"
 
+    # 2.5 CALIBRATE_CLEAN (depends on setup + baseline eval)
+    local clean_cal_id=""
+    local calibrate_clean="${CALIBRATE_CLEAN_EDITS:-true}"
+    if [[ "${calibrate_clean}" == "true" && ${CLEAN_EDIT_RUNS:-0} -gt 0 ]]; then
+        clean_cal_id=$(add_task "CALIBRATE_CLEAN" "${model_id}" "${model_name}" \
+            "$(estimate_model_memory "${model_id}" "CALIBRATE_CLEAN")" \
+            "${setup_id},${eval_base_id}" '{}' 82)
+        task_ids+=("${clean_cal_id}")
+        echo "Created: ${clean_cal_id}"
+    fi
+
     # 3. CALIBRATION_RUN × N (depend on setup)
     local cal_ids=()
     local calibration_runs="${DRIFT_CALIBRATION_RUNS:-5}"
@@ -1033,10 +1044,10 @@ generate_model_tasks() {
     fi
 
     # 5/6. Edit creation + eval/certify
-    # Clean edits (3 certify runs each)
-    local clean_edits=("quant_rtn:8:128:ffn" "fp4_quant:e2m1:ffn" "magnitude_prune:0.1:ffn" "lowrank_svd:256:ffn")
+    # Clean edits (3 certify runs each); params calibrated per model using lm-eval.
+    local clean_edits=("quant_rtn:clean:ffn" "fp8_quant:clean:ffn" "magnitude_prune:clean:ffn" "lowrank_svd:clean:ffn")
     # Stress edits (2 certify runs each)
-    local stress_edits=("quant_rtn:4:32:all" "fp4_quant:aggressive:all" "magnitude_prune:0.5:all" "lowrank_svd:32:all")
+    local stress_edits=("quant_rtn:4:32:all" "fp8_quant:e5m2:all" "magnitude_prune:0.5:all" "lowrank_svd:32:all")
 
     # Ensure use_batch is defined (defensive for set -u)
     use_batch=${use_batch:-true}
@@ -1047,19 +1058,23 @@ generate_model_tasks() {
     elif [[ "${use_batch}" == "true" ]]; then
         # CREATE_EDITS_BATCH - Create edits with a single model load (Batch optimization)
         local all_edit_specs='[
-            {"spec": "quant_rtn:8:128:ffn", "version": "clean"},
-            {"spec": "fp4_quant:e2m1:ffn", "version": "clean"},
-            {"spec": "magnitude_prune:0.1:ffn", "version": "clean"},
-            {"spec": "lowrank_svd:256:ffn", "version": "clean"},
+            {"spec": "quant_rtn:clean:ffn", "version": "clean"},
+            {"spec": "fp8_quant:clean:ffn", "version": "clean"},
+            {"spec": "magnitude_prune:clean:ffn", "version": "clean"},
+            {"spec": "lowrank_svd:clean:ffn", "version": "clean"},
             {"spec": "quant_rtn:4:32:all", "version": "stress"},
-            {"spec": "fp4_quant:aggressive:all", "version": "stress"},
+            {"spec": "fp8_quant:e5m2:all", "version": "stress"},
             {"spec": "magnitude_prune:0.5:all", "version": "stress"},
             {"spec": "lowrank_svd:32:all", "version": "stress"}
         ]'
 
+        local edit_deps="${setup_id}"
+        if [[ -n "${clean_cal_id}" ]]; then
+            edit_deps="${setup_id},${clean_cal_id}"
+        fi
         local edits_id=$(add_task "CREATE_EDITS_BATCH" "${model_id}" "${model_name}" \
             "$(estimate_model_memory "${model_id}" "CREATE_EDITS_BATCH")" \
-            "${setup_id}" '{"edit_specs": '"${all_edit_specs}"', "use_batch": true}' 70)
+            "${edit_deps}" '{"edit_specs": '"${all_edit_specs}"', "use_batch": true}' 70)
         task_ids+=("${edits_id}")
         echo "Created: ${edits_id}"
 
@@ -1106,9 +1121,13 @@ generate_model_tasks() {
     else
         # CREATE_EDIT - Create single edits (one task per edit) and enqueue eval/certify
         for edit_spec in "${clean_edits[@]}"; do
+            local edit_deps="${setup_id}"
+            if [[ -n "${clean_cal_id}" ]]; then
+                edit_deps="${setup_id},${clean_cal_id}"
+            fi
             local edit_id=$(add_task "CREATE_EDIT" "${model_id}" "${model_name}" \
                 "$(estimate_model_memory "${model_id}" "CREATE_EDIT")" \
-                "${setup_id}" '{"edit_spec": "'"${edit_spec}"'", "version": "clean", "model_idx": '"${model_idx}"'}' 70)
+                "${edit_deps}" '{"edit_spec": "'"${edit_spec}"'", "version": "clean", "model_idx": '"${model_idx}"'}' 70)
             task_ids+=("${edit_id}")
             echo "Created: ${edit_id}"
 

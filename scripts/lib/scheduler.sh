@@ -986,16 +986,17 @@ get_gpu_available_memory() {
         return 0
     fi
 
-    local nsmi_timeout="${GPU_NSMI_TIMEOUT:-2}"
-    [[ -z "${nsmi_timeout}" || ! "${nsmi_timeout}" =~ ^[0-9]+$ ]] && nsmi_timeout=2
-
-    # Cache miss - query nvidia-smi for free memory in MiB, but fall back quickly
+    # Cache miss - query nvidia-smi for free memory in MiB.
+    local free_output
+    if ! free_output=$(_cmd_nvidia_smi --query-gpu=memory.free --format=csv,noheader,nounits -i "${gpu_id}" 2>/dev/null); then
+        echo "0"
+        return 1
+    fi
     local free_mib
-    free_mib=$(timeout "${nsmi_timeout}" _cmd_nvidia_smi --query-gpu=memory.free --format=csv,noheader,nounits -i "${gpu_id}" 2>/dev/null | head -1 || true)
-
+    free_mib=$(echo "${free_output}" | head -1 | tr -d ' ')
     if ! [[ "${free_mib}" =~ ^[0-9]+$ ]]; then
-        echo "180"
-        return 0
+        echo "0"
+        return 1
     fi
 
     # Convert MiB to GB (1024 MiB = 1 GiB ≈ 1.07 GB)
@@ -1004,7 +1005,7 @@ get_gpu_available_memory() {
     # Update cache (also refresh idle status since we're querying)
     # Count only actual PID lines (numbers) to avoid empty line issues
     local raw_output
-    raw_output=$(timeout "${nsmi_timeout}" _cmd_nvidia_smi --query-compute-apps=pid --format=csv,noheader -i "${gpu_id}" 2>/dev/null || true)
+    raw_output=$(_cmd_nvidia_smi --query-compute-apps=pid --format=csv,noheader -i "${gpu_id}" 2>/dev/null || true)
     local processes=0
     if [[ -n "${raw_output}" ]]; then
         processes=$(echo "${raw_output}" | grep -cE '^[0-9]+' 2>/dev/null || echo "0")
