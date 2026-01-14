@@ -164,7 +164,7 @@ pip install "invarlock[gpu]"  # Includes bitsandbytes
 **Supported Quantization**:
 
 - 8-bit quantization (INT8)
-- 4-bit quantization (NF4, FP4)
+- 4-bit quantization (NF4)
 - Double quantization (4-bit)
 
 **Configuration**:

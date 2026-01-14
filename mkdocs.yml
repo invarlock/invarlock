@@ -17,6 +17,7 @@ nav:
       - Example Reports: user-guide/example-reports.md
       - Reading a Certificate: user-guide/reading-certificate.md
       - Proof Packs: user-guide/proof-packs.md
+      - Proof Pack Internals: user-guide/proof-packs-internals.md
   - CLI Reference:
       - CLI Overview: reference/cli.md
   - Reference:
