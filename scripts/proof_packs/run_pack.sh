@@ -394,7 +394,9 @@ pack_run_pack() {
     fi
 
     case "${net}" in
-        0|1) : ;;
+        0|1)
+            :
+            ;;
         *)
             echo "ERROR: --net requires 1 or 0" >&2
             return 2

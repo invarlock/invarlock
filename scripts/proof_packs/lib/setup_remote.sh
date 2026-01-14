@@ -31,7 +31,7 @@ log() {
 }
 
 pack_run_cmd() {
-    "$@"
+    env "$@"
 }
 
 pack_activate_venv() {

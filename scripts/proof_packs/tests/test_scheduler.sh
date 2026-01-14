@@ -192,6 +192,22 @@ test_is_reservation_valid_sanitizes_invalid_ttl() {
     _is_reservation_valid "${task_id}"
 }
 
+
+test_is_gpu_usable_sanitizes_invalid_min_free() {
+    mock_reset
+    # shellcheck source=../scheduler.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/scheduler.sh"
+
+    GPU_MIN_FREE_GB="bad"
+    GPU_REQUIRE_IDLE="false"
+
+    is_gpu_available() { return 0; }
+    get_gpu_available_memory() { echo "11"; }
+
+    run is_gpu_usable "0"
+    assert_rc "0" "${RUN_RC}" "invalid min free defaults to 10"
+}
+
 test_refresh_all_gpu_cache_and_scheduler_lock_file_empty_fallback_cover_lines() {
     mock_reset
     # shellcheck source=../scheduler.sh
@@ -767,6 +783,22 @@ test_get_task_gpus_handles_missing_dir_and_missing_file_paths() {
     assert_eq "" "$(get_task_gpus missing || true)" "missing file returns empty"
 }
 
+test_init_gpu_reservations_sets_dir_and_refreshes_cache() {
+    mock_reset
+    # shellcheck source=../scheduler.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/scheduler.sh"
+
+    local out_dir="${TEST_TMPDIR}/out"
+    local refresh_calls=0
+    refresh_all_gpu_cache() { refresh_calls=$((refresh_calls + 1)); }
+
+    init_gpu_reservations "${out_dir}"
+
+    assert_eq "${out_dir}/workers/gpu_reservations" "${GPU_RESERVATION_DIR}" "GPU reservation dir set"
+    assert_dir_exists "${GPU_RESERVATION_DIR}" "reservation dir created"
+    assert_eq "1" "${refresh_calls}" "gpu cache refreshed"
+}
+
 test_cleanup_stale_reservations_skips_valid_and_cleans_stale_branches() {
     mock_reset
     # shellcheck source=../scheduler.sh
@@ -800,6 +832,11 @@ test_oom_helpers_cover_missing_file_risk_and_risk_levels() {
     get_gpu_available_memory() { echo "1"; }
     if check_oom_safe "${task_file}" "0,1" >/dev/null; then
         t_fail "expected OOM risk when available memory is too low"
+    fi
+
+    get_gpu_available_memory() { echo "1000"; }
+    if ! check_oom_safe "${task_file}" "0" >/dev/null; then
+        t_fail "expected check_oom_safe to succeed when memory is sufficient"
     fi
 
     # Risk levels exercise all threshold branches.
@@ -1193,16 +1230,65 @@ test_is_gpu_usable_returns_zero_when_available_and_has_free_memory() {
     is_gpu_usable 0
 }
 
-test_is_gpu_usable_sanitizes_invalid_min_free_setting() {
+test_scheduler_is_gpu_usable_relaxes_for_single_gpu() {
+    mock_reset
+    # shellcheck source=../scheduler.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/scheduler.sh"
+
+    is_gpu_available() { return 0; }
+    get_gpu_available_memory() { echo "0"; }
+    NUM_GPUS=1
+    GPU_ID_LIST="0"
+    GPU_MIN_FREE_GB=99
+    GPU_REQUIRE_IDLE="true"
+
+    is_gpu_usable 0
+    assert_eq "false" "${GPU_REQUIRE_IDLE}" "single GPU disables idle requirement"
+}
+
+test_scheduler_is_gpu_usable_sanitizes_invalid_min_free() {
     mock_reset
     # shellcheck source=../scheduler.sh
     source "${TEST_ROOT}/scripts/proof_packs/lib/scheduler.sh"
 
     GPU_MIN_FREE_GB="nope"
-    GPU_REQUIRE_IDLE="true"
+    GPU_REQUIRE_IDLE="false"
+    NUM_GPUS=2
     is_gpu_available() { return 0; }
-    get_gpu_available_memory() { echo "15"; }
-    is_gpu_idle() { return 0; }
+    get_gpu_available_memory() { echo "9"; }
 
-    is_gpu_usable 0
+    run is_gpu_usable 0
+    assert_rc "1" "${RUN_RC}" "invalid min free defaults to 10"
 }
+
+test_scheduler_find_and_claim_logs_reserve_failure_when_debug() {
+    mock_reset
+    # shellcheck source=../scheduler.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/scheduler.sh"
+
+    export QUEUE_DIR="${TEST_TMPDIR}/queue"
+    mkdir -p "${QUEUE_DIR}/ready" "${QUEUE_DIR}/running"
+
+    local desired_task_id="task1"
+    jq -n '{task_id:"task1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"ready", model_size_gb:20, required_gpus:1, dependencies:[], params:{}}' \
+        > "${QUEUE_DIR}/ready/${desired_task_id}.task"
+
+    find_best_task() { echo "${desired_task_id}"; }
+    get_task_field() {
+        if [[ "$2" == "model_size_gb" ]]; then echo "20"; fi
+        if [[ "$2" == "required_gpus" ]]; then echo "1"; fi
+    }
+    get_required_gpus() { echo "1"; }
+    get_minimum_gpus() { echo "1"; }
+    count_available_gpus() { echo "1"; }
+    get_available_gpus() { echo "0"; }
+    acquire_scheduler_lock() { return 0; }
+    release_scheduler_lock() { return 0; }
+    reserve_gpus() { return 1; }
+
+    SCHEDULER_DEBUG="true"
+    run find_and_claim_task 100 0
+    assert_rc "1" "${RUN_RC}" "reserve failure returns non-zero"
+    assert_match "reserve_gpus failed" "${RUN_ERR}" "debug message emitted"
+}
+

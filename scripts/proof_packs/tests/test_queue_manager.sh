@@ -714,8 +714,16 @@ test_print_queue_stats_and_is_queue_complete_cover_success_and_failure() {
     jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"failed", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:"x", gpu_id:-1, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
         > "${QUEUE_DIR}/failed/${task_id}.task"
 
+    local pending_id="t2"
+    jq -n '{task_id:"t2", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, gpu_id:-1, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
+        > "${QUEUE_DIR}/pending/${pending_id}.task"
+
     assert_match 'QUEUE STATUS' "$(print_queue_stats)" "queue status header"
+    ! is_queue_empty
     ! is_queue_complete
+
+    rm -f "${QUEUE_DIR}/pending/${pending_id}.task"
+    is_queue_empty
 
     rm -f "${QUEUE_DIR}/failed/${task_id}.task"
     is_queue_complete
@@ -910,4 +918,181 @@ test_update_progress_state_returns_nonzero_when_atomic_move_fails() {
 
     run update_progress_state
     assert_rc "1" "${RUN_RC}" "mv failure returns non-zero"
+}
+
+test_queue_manager_find_task_returns_path() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
+
+    local out_dir="${TEST_TMPDIR}/out"
+    init_queue "${out_dir}" >/dev/null
+
+    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"ready", dependencies:[], params:{}}' \
+        > "${QUEUE_DIR}/ready/t1.task"
+
+    assert_eq "${QUEUE_DIR}/ready/t1.task" "$(find_task "t1")" "find_task returns path"
+
+    run find_task "missing"
+    assert_rc "1" "${RUN_RC}" "find_task returns non-zero when missing"
+    assert_eq "" "${RUN_OUT}" "find_task returns empty output when missing"
+}
+
+test_queue_manager_resolve_dependencies_skips_disallowed_tasks() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
+
+    export PACK_SUITE_MODE="calibrate-only"
+    local out_dir="${TEST_TMPDIR}/out"
+    init_queue "${out_dir}" >/dev/null
+
+    jq -n '{task_id:"t1", task_type:"EVAL_BASELINE", model_id:"m", model_name:"n", status:"pending", dependencies:[], params:{}}' \
+        > "${QUEUE_DIR}/pending/t1.task"
+
+    check_dependencies_met() { return 0; }
+
+    assert_eq "0" "$(resolve_dependencies)" "disallowed task skipped"
+    assert_file_exists "${QUEUE_DIR}/pending/t1.task" "task stays pending"
+}
+
+
+test_queue_manager_resolve_dependencies_skips_on_second_pass_after_type_change() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
+
+    export PACK_SUITE_MODE="calibrate-only"
+    local out_dir="${TEST_TMPDIR}/out"
+    init_queue "${out_dir}" >/dev/null
+
+    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"pending", dependencies:[], params:{}}' \
+        > "${QUEUE_DIR}/pending/t1.task"
+
+    check_dependencies_met() { return 0; }
+    local type_calls_file="${TEST_TMPDIR}/type_calls"
+    echo "0" > "${type_calls_file}"
+    get_task_type() {
+        local count
+        count="$(cat "${type_calls_file}")"
+        count=$((count + 1))
+        echo "${count}" > "${type_calls_file}"
+        if [[ ${count} -eq 1 ]]; then
+            echo "SETUP_BASELINE"
+        else
+            echo "EVAL_BASELINE"
+        fi
+    }
+
+    assert_eq "0" "$(resolve_dependencies)" "second-pass disallowed task skipped"
+    assert_file_exists "${QUEUE_DIR}/pending/t1.task" "task remains pending after second-pass skip"
+}
+
+test_generate_model_tasks_branch_coverage() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
+
+    local calls="${TEST_TMPDIR}/calls"
+    : > "${calls}"
+    add_task() {
+        local task_type="$1"
+        printf '%s\n' "${task_type}" >> "${calls}"
+        local count
+        count=$(wc -l < "${calls}" | tr -d ' ')
+        echo "t${count}"
+    }
+    estimate_model_memory() { echo "14"; }
+    generate_eval_certify_tasks() { :; }
+    generate_edit_tasks() { :; }
+
+    PACK_USE_BATCH_EDITS="true"
+    CALIBRATE_CLEAN_EDITS="true"
+    CLEAN_EDIT_RUNS="1"
+    STRESS_EDIT_RUNS="1"
+    DRIFT_CALIBRATION_RUNS=1
+    RUN_ERROR_INJECTION="true"
+    generate_model_tasks "1" "org/model" "model" >/dev/null
+
+    CLEAN_EDIT_RUNS="-1"
+    STRESS_EDIT_RUNS="-1"
+    generate_model_tasks "2" "org/model" "model" >/dev/null
+
+    PACK_USE_BATCH_EDITS="false"
+    CLEAN_EDIT_RUNS=2
+    STRESS_EDIT_RUNS=2
+    DRIFT_CALIBRATION_RUNS=1
+    RUN_ERROR_INJECTION="true"
+    generate_model_tasks "3" "org/model" "model" >/dev/null
+
+    DRIFT_CALIBRATION_RUNS=0
+    RUN_ERROR_INJECTION="true"
+    generate_model_tasks "4" "org/model" "model" >/dev/null
+
+    RUN_ERROR_INJECTION="false"
+    generate_model_tasks "5" "org/model" "model" >/dev/null
+}
+
+
+test_generate_model_tasks_additional_batch_branches() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
+
+    local calls="${TEST_TMPDIR}/calls_extra"
+    : > "${calls}"
+    add_task() {
+        local task_type="$1"
+        printf '%s\n' "${task_type}" >> "${calls}"
+        local count
+        count=$(wc -l < "${calls}" | tr -d ' ')
+        echo "t${count}"
+    }
+    estimate_model_memory() { echo "14"; }
+    generate_eval_certify_tasks() { :; }
+    generate_edit_tasks() { :; }
+
+    PACK_USE_BATCH_EDITS="true"
+    CALIBRATE_CLEAN_EDITS="true"
+    CLEAN_EDIT_RUNS=1
+    STRESS_EDIT_RUNS=1
+    DRIFT_CALIBRATION_RUNS=1
+    RUN_ERROR_INJECTION="true"
+    generate_model_tasks "1" "org/model" "model" >/dev/null
+    assert_match "CALIBRATE_CLEAN" "$(cat "${calls}")" "clean calibration task created"
+    local error_count
+    error_count="$(awk '/^CERTIFY_ERROR$/ {c++} END {print c+0}' "${calls}")"
+    assert_eq "5" "${error_count}" "certify error tasks created"
+
+    : > "${calls}"
+    CLEAN_EDIT_RUNS=""
+    STRESS_EDIT_RUNS=1
+    DRIFT_CALIBRATION_RUNS=1
+    RUN_ERROR_INJECTION="false"
+    generate_model_tasks "2" "org/model" "model" >/dev/null
+
+    : > "${calls}"
+    CLEAN_EDIT_RUNS="-1"
+    STRESS_EDIT_RUNS=1
+    DRIFT_CALIBRATION_RUNS=1
+    generate_model_tasks "3" "org/model" "model" >/dev/null
+
+    : > "${calls}"
+    CLEAN_EDIT_RUNS=1
+    STRESS_EDIT_RUNS=""
+    DRIFT_CALIBRATION_RUNS=1
+    generate_model_tasks "4" "org/model" "model" >/dev/null
+
+    : > "${calls}"
+    CLEAN_EDIT_RUNS=1
+    STRESS_EDIT_RUNS="-1"
+    DRIFT_CALIBRATION_RUNS=1
+    generate_model_tasks "5" "org/model" "model" >/dev/null
+
+    : > "${calls}"
+    CLEAN_EDIT_RUNS=1
+    STRESS_EDIT_RUNS=1
+    DRIFT_CALIBRATION_RUNS=0
+    RUN_ERROR_INJECTION="true"
+    generate_model_tasks "6" "org/model" "model" >/dev/null
 }

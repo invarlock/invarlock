@@ -379,10 +379,34 @@ test_task_serialization_field_access_and_update_error_paths() {
     update_task_field "${task_file}" "gpu_id" "7" "true"
     assert_eq "7" "$(jq -r '.gpu_id' "${task_file}")" "json update writes numeric value"
 
+    update_task_field "${task_file}" "status" "ready"
+    assert_eq "ready" "$(jq -r '.status' "${task_file}")" "string update writes value"
+
     rc=0
     update_task_field "${task_file}" "gpu_id" "nope" "true" || rc=$?
     assert_rc "1" "${rc}" "invalid json value fails"
     assert_eq "7" "$(jq -r '.gpu_id' "${task_file}")" "invalid update does not clobber file"
+}
+
+test_task_serialization_helper_accessors_cover_wrappers() {
+    mock_reset
+    # shellcheck source=../task_serialization.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_serialization.sh"
+
+    local task="${TEST_TMPDIR}/helper.task"
+    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, gpu_id:-1, assigned_gpus:"0,1", dependencies:["d1","d2"], params:{batch_size:2}, priority:50}' \
+        > "${task}"
+
+    assert_eq "t1" "$(get_task_id "${task}")" "task_id accessor"
+    assert_eq "0,1" "$(get_task_assigned_gpus "${task}")" "assigned_gpus accessor"
+    assert_eq $'d1\nd2' "$(get_task_dependencies "${task}")" "dependencies accessor"
+    assert_match '"batch_size"[[:space:]]*:[[:space:]]*2' "$(get_task_params "${task}")" "params accessor"
+
+    update_task_status "${task}" "ready"
+    assert_eq "ready" "$(jq -r '.status' "${task}")" "update_task_status wrapper"
+
+    assign_task_gpu "${task}" "3"
+    assert_eq "3" "$(jq -r '.gpu_id' "${task}")" "assign_task_gpu wrapper"
 }
 
 test_validate_task_required_fields_and_enums() {
@@ -556,6 +580,7 @@ test_estimate_model_memory_multiplier_case_arms_large_and_small() {
     local large="Qwen/Qwen1.5-72B"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${large}" "SETUP_BASELINE")" "large SETUP_BASELINE"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${large}" "CALIBRATION_RUN")" "large CALIBRATION_RUN"
+    assert_match '^[0-9]+$' "$(estimate_model_memory "${large}" "CALIBRATE_CLEAN")" "large CALIBRATE_CLEAN"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${large}" "CREATE_EDIT")" "large CREATE_EDIT"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${large}" "EVAL_EDIT")" "large EVAL_EDIT"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${large}" "CERTIFY_EDIT")" "large CERTIFY_EDIT"
@@ -567,6 +592,7 @@ test_estimate_model_memory_multiplier_case_arms_large_and_small() {
     local small="org/Thing-13B"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${small}" "SETUP_BASELINE")" "small SETUP_BASELINE"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${small}" "CALIBRATION_RUN")" "small CALIBRATION_RUN"
+    assert_match '^[0-9]+$' "$(estimate_model_memory "${small}" "CALIBRATE_CLEAN")" "small CALIBRATE_CLEAN"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${small}" "CREATE_EDIT")" "small CREATE_EDIT"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${small}" "EVAL_EDIT")" "small EVAL_EDIT"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${small}" "CERTIFY_EDIT")" "small CERTIFY_EDIT"

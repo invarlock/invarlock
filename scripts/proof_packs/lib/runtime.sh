@@ -127,9 +127,15 @@ if ! declare -F _pid_is_alive >/dev/null 2>&1; then
     _pid_is_alive() {
         local pid="$1"
         case "$(_pid_is_alive_backend)" in
-            proc) _pid_is_alive_proc "${pid}" ;;
-            ps) _pid_is_alive_ps "${pid}" ;;
-            *) _pid_is_alive_ps "${pid}" ;;
+            proc)
+                _pid_is_alive_proc "${pid}"
+                ;;
+            ps)
+                _pid_is_alive_ps "${pid}"
+                ;;
+            *)
+                _pid_is_alive_ps "${pid}"
+                ;;
         esac
     }
 fi
