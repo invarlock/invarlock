@@ -1,131 +1,175 @@
 # Environment Variables
 
-This page lists InvarLock environment variables and their purpose. Unless noted,
-unset variables default to “off”.
+## Overview
 
-## Network & Data
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Environment-level toggles for network access, evaluation, snapshots, and docs tooling. |
+| **Audience** | CLI users and operators tuning runtime behavior. |
+| **Scope** | CLI commands and programmatic runs; config values override env when both are set. |
+| **Network** | Offline by default; network must be explicitly enabled. |
+| **Source of truth** | `docs/reference/env-vars.md`, `src/invarlock/cli/commands/*`, `src/invarlock/core/runner.py`. |
 
-- `INVARLOCK_ALLOW_NETWORK=1`
-  - Enable outbound network access for commands that fetch models/datasets.
-  - Default: disabled (offline), set per command to opt in.
-- `HF_DATASETS_OFFLINE=1` (from Hugging Face)
-  - Make datasets operate fully offline using local cache.
+## Quick Start
 
-## Evaluation & Pairing
+```bash
+# Allow model + dataset downloads for a single command
+INVARLOCK_ALLOW_NETWORK=1 invarlock certify --baseline gpt2 --subject gpt2
 
-- `INVARLOCK_BOOTSTRAP_BCA=1`
-  - Prefer BCa bootstrap for paired Δlog confidence intervals (when sample size allows).
-- `INVARLOCK_EVAL_STRICT=0`
-  - Allow evaluation failures to soft-fail and emit `metrics.eval_error` instead of aborting.
-  - Default: strict (fail-closed).
-- `INVARLOCK_TINY_RELAX=1`
-  - Relax some gates/thresholds in tiny dev demos; used by `doctor` and certificate heuristics.
-- `INVARLOCK_EVAL_DEVICE=<device>`
-  - Override evaluation device for the main model.
-    Accepts `cpu`, `cuda`, `cuda:0`, or `mps`. When unset, evaluation uses the model’s
-    loaded device (resolved from `model.device` / `--device`).
-- `INVARLOCK_STORE_EVAL_WINDOWS=0`
-  - Disable storing token/attention windows in reports (smaller artifacts; can reduce memory/time on long runs).
-  - Default: enabled (stores windows).
-- `INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE=1`
-  - Allow iterables without `__len__`/slicing to be materialized for evaluation.
-  - Default: disabled to preserve deterministic, indexable windowing.
+# Force evaluation device for a one-off run
+INVARLOCK_EVAL_DEVICE=cpu invarlock run -c <config>.yaml --out runs/cpu_smoke
+```
 
-## Dataset Preparation
+## Concepts
 
-- `INVARLOCK_CAPACITY_FAST=1`
-  - Faster capacity estimation in dataset provider (approximate).
-- `INVARLOCK_DEDUP_TEXTS=1`
-  - Exact-text deduplication before tokenization to reduce duplicates.
+- **Offline-first**: all network access is opt-in and must be explicitly enabled.
+- **Precedence**: when a setting exists in both env + config/CLI, the winner is
+  setting-specific (see the matrix below).
+- **Auditability**: selected env flags are recorded in `report.meta.env_flags` for
+  traceability.
 
-## Determinism & Performance
+**Precedence (conflict cases)**
 
-- `INVARLOCK_OMP_THREADS=<int>`
-  - Controls the CPU thread caps used by the determinism preset (CI/Release), including `torch.set_num_threads` and common BLAS/OMP thread env vars.
-  - Default: `1`.
-- `INVARLOCK_DEBUG_TRACE=1`
-  - Emit verbose debug traces from dataset/evaluation code paths (high volume).
-  - Default: disabled.
-- `INVARLOCK_LIGHT_IMPORT=1`
-  - Lightweight import mode for docs/tests; avoids heavy optional imports and some side effects during CLI import.
-  - Default: disabled.
+1. Env overrides for strictness/materialization (`INVARLOCK_EVAL_STRICT`,
+   `INVARLOCK_GUARD_PREPARE_STRICT`, `INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE`).
+2. CLI/config values for overlapping settings (device/tier/probes).
+3. Packaged defaults when no explicit setting exists.
 
-## Checkpointing & Snapshots
+### Key override matrix
 
-- `INVARLOCK_SNAPSHOT_MODE={auto|bytes|chunked}`
-  - Control snapshot mode (used by CLI `run` and checkpoint utilities).
-  - If `bytes` snapshotting fails, the CLI will attempt `chunked` snapshotting when supported; otherwise it falls back to reload-per-attempt.
-- `INVARLOCK_SNAPSHOT_AUTO_RAM_FRACTION=<float>`
-  - Tune `auto` mode RAM fraction (default 0.4).
-- `INVARLOCK_SNAPSHOT_THRESHOLD_MB=<int>`
-  - Minimum model size (MiB) before chunked snapshotting kicks in (default 768).
+| Setting | Env var | Config/CLI | Winner rule | How to confirm |
+| --- | --- | --- | --- | --- |
+| Strict eval errors | `INVARLOCK_EVAL_STRICT` | `context.eval.strict` / `context.eval.strict_errors` | Env wins. | Config shows in `report.context.eval`; env is not recorded. |
+| Guard prepare strict | `INVARLOCK_GUARD_PREPARE_STRICT` | `context.run.strict_guard_prepare` | Env wins. | Config shows in `report.context.run`; env is not recorded. |
+| Calibration materialize | `INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE` | `context.eval.materialize_calibration` / `context.eval.allow_iterable_calibration` | Env wins. | Config shows in `report.context`; env is not recorded. |
+| Network downloads | `INVARLOCK_ALLOW_NETWORK` | — | Env-only toggle. | Not recorded; rely on env. |
+| Offline datasets | `HF_DATASETS_OFFLINE` | — | Env-only toggle. | Not recorded; rely on env. |
 
-## Model Export
+### Conflict examples
 
-- `INVARLOCK_EXPORT_MODEL=1`
-  - In `invarlock run`, export a Hugging Face-loadable model directory (if the adapter supports it).
-  - Default: disabled.
-- `INVARLOCK_EXPORT_DIR=<path>`
-  - Export destination (absolute or relative to the run directory). Used when export is enabled.
+| Scenario | Result | Fix |
+| --- | --- | --- |
+| `context.eval.strict_errors: false` + `INVARLOCK_EVAL_STRICT=1` | Strict evaluation stays on. | Unset the env var. |
+| `context.run.strict_guard_prepare: false` + `INVARLOCK_GUARD_PREPARE_STRICT=1` | Guard prepare stays strict. | Unset the env var. |
 
-## Guarding & Evidence
+## Reference
 
-- `INVARLOCK_ASSERT_GUARDS=1`
-  - Enable lightweight guard runtime assertions (`guard_assert`).
-- `INVARLOCK_GUARD_PREPARE_STRICT=0`
-  - Allow guard `prepare()` failures to log and continue instead of aborting.
-  - Default: strict (fail-closed).
-- `INVARLOCK_EVIDENCE_DEBUG=1`
-  - Emit a small `guards_evidence.json` next to reports for audit.
+### Network & data
 
-## Guard Overhead & Primary Metric
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `INVARLOCK_ALLOW_NETWORK` | unset | Enable outbound downloads for models/datasets. |
+| `HF_DATASETS_OFFLINE` | unset | Force Hugging Face datasets to use local cache only. |
 
-- `INVARLOCK_SKIP_OVERHEAD_CHECK=1`
-  - Skip guard-overhead measurement even in `ci`/`release` profiles to avoid double-loading large models.
-- `INVARLOCK_PM_ACCEPTANCE_MAX=<float>`
-  - Upper bound for primary-metric acceptance (default 1.10). Set to 1.15 for slight drift allowance.
-- `INVARLOCK_PM_ACCEPTANCE_MIN=<float>`
-  - Lower bound for primary-metric acceptance (default 0.95) when enforcing a symmetric ratio band.
+### Model loading
 
-## Config Loading
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `INVARLOCK_TRUST_REMOTE_CODE` | unset | Allow HF adapters to set `trust_remote_code=true`. |
 
-- `INVARLOCK_CONFIG_ROOT=<path>`
-  - Override packaged runtime data (`runtime/tiers.yaml`, `runtime/profiles/*.yaml`, etc.). When set, InvarLock checks `$INVARLOCK_CONFIG_ROOT/runtime/...` before the packaged `invarlock._data.runtime` resources.
-- `INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE=1`
-  - Allow YAML `!include` to reference files outside the config directory.
-  - Default: disabled to prevent accidental reads of unrelated local files.
+HF adapters also honor `TRUST_REMOTE_CODE_BOOL` and `ALLOW_REMOTE_CODE` for compatibility.
 
-## Reporting
+### Evaluation & pairing
 
-- `INVARLOCK_TELEMETRY=1`
-  - Print a one-line summary telemetry line (also stored in certificates under `telemetry.summary_line`).
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `INVARLOCK_BOOTSTRAP_BCA` | unset | Prefer BCa bootstrap CIs when sample size allows. |
+| `INVARLOCK_EVAL_STRICT` | unset | Soft-fail evaluation errors when set to `0`. |
+| `INVARLOCK_TINY_RELAX` | unset | Relax gates for tiny dev demos (doctor heuristics). |
+| `INVARLOCK_EVAL_DEVICE` | unset | Force evaluation device (`cpu`, `cuda`, `mps`). |
+| `INVARLOCK_STORE_EVAL_WINDOWS` | `1` | Store token windows in reports (set `0` to disable). |
+| `INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE` | unset | Allow materializing iterables lacking `__len__`. |
 
-## Plugins
+### Profiles (CI fallback)
 
-- `INVARLOCK_DISABLE_PLUGIN_DISCOVERY=1`
-  - Disable plugin discovery in `invarlock plugins` and `invarlock doctor` (useful for docs/tests or minimal environments).
-- `INVARLOCK_MINIMAL=1`
-  - Show a minimal plugin list (hide core/built-in adapters) in `invarlock plugins`.
-- `INVARLOCK_PLUGINS_DRY_RUN=1`
-  - Force `invarlock plugins-install` / `invarlock plugins-uninstall` to behave as `--dry-run` even when `--apply` is set.
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `INVARLOCK_CI_PREVIEW` | `200` | Override preview window count when `ci` profile YAML is absent. |
+| `INVARLOCK_CI_FINAL` | `200` | Override final window count when `ci` profile YAML is absent. |
 
-## Documentation Build
+### Dataset preparation
 
-- `INVARLOCK_DOCS_MERMAID=1`
-  - Enable Mermaid diagrams (mermaid2 plugin). Default is disabled to avoid
-    network checks during strict/offline builds.
-- `INVARLOCK_DOCS_EXTRA_JS='["<url>", "<url>"]'`
-  - Provide a YAML/JSON list of JavaScript URLs to inject (e.g., MathJax,
-    Polyfill). By default, no CDN scripts are included. Example:
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `INVARLOCK_CAPACITY_FAST` | unset | Approximate capacity estimation for quick runs. |
+| `INVARLOCK_DEDUP_TEXTS` | unset | Exact-text dedupe before tokenization. |
 
-    ```bash
-    INVARLOCK_DOCS_MERMAID=1 \
-    INVARLOCK_DOCS_EXTRA_JS='["https://polyfill.io/v3/polyfill.min.js?features=es6","https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.js"]' \
-    mkdocs build --strict
-    ```
+### Determinism & performance
 
-## Notes
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `INVARLOCK_OMP_THREADS` | `1` | Thread caps for determinism preset. |
+| `INVARLOCK_DEBUG_TRACE` | unset | Verbose debug traces for data/eval paths. |
+| `INVARLOCK_LIGHT_IMPORT` | unset | Avoid heavy imports for docs/tests. |
 
-- All network-related features in docs are opt-in by environment variable.
-- The CLI remains offline by default; explicitly set `INVARLOCK_ALLOW_NETWORK=1`
-  per command when you need downloads.
+### Checkpointing & snapshots
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `INVARLOCK_SNAPSHOT_MODE` | `auto` | `auto`, `bytes`, or `chunked` snapshot strategy. |
+| `INVARLOCK_SNAPSHOT_AUTO_RAM_FRACTION` | `0.4` | RAM fraction threshold for `auto` mode. |
+| `INVARLOCK_SNAPSHOT_THRESHOLD_MB` | `768` | Size threshold for chunked snapshots. |
+
+### Model export
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `INVARLOCK_EXPORT_MODEL` | unset | Enable HF export during `invarlock run`. |
+| `INVARLOCK_EXPORT_DIR` | unset | Target directory for model export. |
+
+### Guarding & evidence
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `INVARLOCK_ASSERT_GUARDS` | unset | Enable guard runtime assertions. |
+| `INVARLOCK_GUARD_PREPARE_STRICT` | unset | Allow guard prepare failures to continue when set to `0`. |
+| `INVARLOCK_EVIDENCE_DEBUG` | unset | Emit `guards_evidence.json` for audit. |
+| `INVARLOCK_SKIP_OVERHEAD_CHECK` | unset | Skip overhead checks in CI/Release profiles. |
+| `INVARLOCK_PM_ACCEPTANCE_MAX` | `1.10` | Upper PM acceptance ratio. |
+| `INVARLOCK_PM_ACCEPTANCE_MIN` | `0.95` | Lower PM acceptance ratio (symmetric band). |
+
+### Config loading
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `INVARLOCK_CONFIG_ROOT` | unset | Override packaged `runtime/` data. |
+| `INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE` | unset | Allow YAML `!include` outside config dir. |
+
+### Reporting & telemetry
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `INVARLOCK_TELEMETRY` | unset | Emit single-line telemetry summary. |
+
+### Plugins
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `INVARLOCK_DISABLE_PLUGIN_DISCOVERY` | unset | Disable plugin discovery in `plugins` and `doctor`. |
+| `INVARLOCK_MINIMAL` | unset | Show minimal plugin list in `invarlock plugins`. |
+| `INVARLOCK_PLUGINS_DRY_RUN` | unset | Force plugin install/uninstall dry run. |
+
+### Docs build
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `INVARLOCK_DOCS_MERMAID` | unset | Enable Mermaid diagrams in MkDocs. |
+| `INVARLOCK_DOCS_EXTRA_JS` | unset | Extra JavaScript URLs for docs build. |
+
+## Troubleshooting
+
+- **Downloads blocked**: set `INVARLOCK_ALLOW_NETWORK=1` and retry.
+- **Calibration iterables fail**: use `INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE=1`.
+- **Plugin list empty**: unset `INVARLOCK_DISABLE_PLUGIN_DISCOVERY` or `INVARLOCK_MINIMAL`.
+
+## Observability
+
+- `report.meta.env_flags` records selected env toggles.
+- Certificates capture telemetry and policy digests derived from these flags.
+
+## Related Documentation
+
+- [CLI Reference](cli.md)
+- [Configuration Schema](config-schema.md)
+- [Dataset Providers](datasets.md)
+- [Guards](guards.md)
