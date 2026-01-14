@@ -1,68 +1,104 @@
-# Artifact Layout & Retention
+# Artifact Layout
 
-InvarLock keeps intermediate run artifacts and long-lived certification evidence in a predictable directory structure. Use the conventions below when running the certification loop or automations so reports are reproducible and easy to audit.
+## Overview
 
----
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Explain where run outputs and certificates live. |
+| **Audience** | Operators archiving evidence and CI outputs. |
+| **Scope** | `runs/` scratch outputs and `reports/` long-lived evidence. |
+| **Source of truth** | CLI run/report commands (`src/invarlock/cli/commands/run.py`). |
 
-## 1. Run Outputs (`runs/`)
+## Quick Start
 
-Each invocation of `invarlock run` writes into a user-specified output directory (default `runs/<nickname>/`). A timestamped subdirectory is created for every attempt:
+```bash
+# Run baseline
+invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml --out runs/baseline
+
+# Generate certificate
+invarlock report --run runs/baseline/report.json --format cert --output reports/baseline
+```
+
+## Concepts
+
+- `runs/` is scratch space: timestamped run directories with `report.json` + `events.jsonl`.
+- `reports/` is evidence: copy `report.json` and certificates for audit.
+- Certificates reference baseline reports; keep them together to preserve pairing.
+
+### Command outputs
+
+| Command | Writes | What to archive |
+| --- | --- | --- |
+| `invarlock run` | `runs/<name>/<timestamp>/report.json`, `events.jsonl` | Baseline + subject `report.json`. |
+| `invarlock report --format cert` | `reports/<name>/evaluation.cert.json` | Certificate + baseline report. |
+| `invarlock report html` | `reports/<name>/evaluation.html` | Optional (can be rebuilt). |
+
+## Reference
+
+### Run outputs (`runs/`)
 
 ```text
 runs/
   baseline/
     20251010_182515/
-      report.json          # full RunReport (metrics, guard results, deltas)
-      events.jsonl         # event log (prepare/edit/guard/eval phases)
-      model.pt?            # optional checkpoint if `output.save_model=true`
-    report.json            # convenience copy of the latest successful run
+      report.json
+      events.jsonl
   quant8/
     20251010_151826/
       report.json
       events.jsonl
 ```
 
-- `report.json` captures metrics, seeds, hashes, guard verdicts, and edit deltas. It is the canonical source for certificate generation.
-- `events.jsonl` is an append-only log useful for debugging guard triggers or edit progress.
-- Delete timestamped subdirectories only after copying the relevant `report.json` into a long-term location.
-
----
-
-## 2. Reports & Certificates (`reports/`)
-
-After validating a run, copy its canonical artifacts into `reports/<run-id>/`:
+### Reports and certificates (`reports/`)
 
 ```text
 reports/
   baseline/
-    report.json            # normalized baseline report
+    report.json
   quant8_balanced/
-    evaluation.cert.json   # `invarlock report --format cert`
-    report.json            # (optional) copy of the edited RunReport
-    metadata.json          # (optional) automation annotations
+    evaluation.cert.json
+    report.json
 ```
 
-- Use deterministic directory names (e.g., `quant8_balanced_20251010T1509Z.json`) when archiving multiple attempts.
-- Certificates reference the baseline report path, policy tier, policy digest, seeds, dataset/tokenizer hashes, and variance tap/targets. Keep baseline `report.json` next to edited certs so `invarlock verify` can resolve them without editing paths.
-- Preserve `evaluation_windows` inside the baseline `report.json`. CI/Release baseline pairing is fail-closed: `invarlock run --baseline ...` refuses to proceed if the baseline window evidence is missing/invalid, and `invarlock verify` rejects certificates that are not provably paired.
-- For a field-by-field description of the certificate bundle consult [Certificate Schema (v1)](certificate-schema.md).
-- Do **not** commit raw model checkpoints or `events.jsonl`; they can contain large payloads and operational metadata. Store them in your artifact store if required.
+### Archive checklist
 
----
+- Move baseline + subject `report.json` into `reports/`.
+- Keep `evaluation.cert.json` with the baseline report.
+- Retain `events.jsonl` only if debugging; HTML exports are optional.
+- Prune timestamped `runs/` once evidence is archived.
 
-## 3. Seeds, Hashes & Policy Digests
+| Artifact | Why archive | Required for verify |
+| --- | --- | --- |
+| `report.json` (baseline + subject) | Metrics, windows, provenance | Yes |
+| `evaluation.cert.json` | Safety certificate snapshot | Yes |
+| `events.jsonl` | Debugging timeline | No |
+| `evaluation.html` | Human review | No |
 
-- Every `report.json` includes `meta.seeds` (Python/NumPy/Torch), `data.dataset_hash`, `data.tokenizer_hash`, and `auto.policy_digest`. Certificates preserve the same fields.
-- External automations can persist the seed bundle separately (e.g., `runs/<name>/<ts>/seed_bundle.json`) but the RunReport already satisfies the retention requirement.
-- When comparing runs, always reference certificates rather than regenerating them so the hashed policy digest and pairing statistics remain immutable.
+### Seeds, hashes, and policy digests
 
----
+- `report.meta.seeds` includes Python/NumPy/Torch seeds.
+- `report.meta.tokenizer_hash` and dataset digests support pairing verification.
+- Certificates record `policy_digest` and resolved tier policy snapshots.
 
-## 4. Cleanup Checklist
+### Cleanup checklist
 
-1. Promote any PASS run into `reports/` (copy `report.json` and generated `cert.json`).
-2. Record the mapping from `<run>` → `<baseline>` in your change log or tracker.
-3. Delete stale timestamped subdirectories under `runs/` once evidence is archived.
-4. Keep `reports/` under version control; exclude `runs/` and `reports_*` scratch directories via `.gitignore`.
+1. Copy `report.json` and `evaluation.cert.json` into `reports/` for retention.
+2. Keep baseline reports alongside derived certificates for pairing checks.
+3. Remove stale timestamped runs once evidence is archived.
 
-Following these practices keeps long-lived evidence small, deterministic, and auditable while allowing `runs/` to remain a scratch space for repeated attempts.
+## Troubleshooting
+
+- **Missing baseline report**: certificates cannot be validated without the
+  baseline `report.json`; keep it alongside the certificate.
+- **Large run dirs**: prune old timestamped runs after archiving certificates.
+
+## Observability
+
+- `report.json` is the canonical source for metrics/guards.
+- `events.jsonl` provides per-phase logs for debugging.
+
+## Related Documentation
+
+- [Certificate Schema (v1)](certificate-schema.md)
+- [CLI Reference](cli.md)
+- [Exporting Certificates (HTML)](exporting-certificates-html.md)
