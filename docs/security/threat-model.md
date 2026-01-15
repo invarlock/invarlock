@@ -44,6 +44,63 @@ security or alignment.
 - Certificate fields for seeds, windowing, dataset/tokenizer hashes, and guard
   telemetry so reviewers can audit the safety case.
 
+## Attack Scenarios
+
+Concrete attack scenarios InvarLock is designed to address or explicitly
+delegates to external processes:
+
+### 1. Poisoned Baseline Model
+
+**Threat:** Attacker provides a pre-backdoored baseline that passes all guards.
+
+**Mitigation:** Baseline provenance is the caller's responsibility. InvarLock
+compares subject to baseline but does not validate baseline correctness.
+
+**Detection:** None — baseline is trusted by design. Use external model
+provenance checks (e.g., model cards, hash verification) before certification.
+
+### 2. Malformed Pickle in Subject Checkpoint
+
+**Threat:** Unsafe deserialization executes arbitrary code during model load.
+
+**Mitigation:** Use `weights_only=True` when available in PyTorch. Adapters
+using `from_pretrained` inherit HF's safetensors preference.
+
+**Detection:** Invariants guard checks for non-finite values post-load; does
+not catch code execution during load itself.
+
+### 3. Edit That Evades Guards
+
+**Threat:** Carefully crafted edit stays within spectral/RMT bounds but causes
+task-specific degradation not captured by primary metric.
+
+**Mitigation:** Primary metric gate + guard ensemble provides layered defense.
+Tighten tier (conservative) for high-stakes releases.
+
+**Detection:** `validation.primary_metric_acceptable = false` or guard warnings
+in certificate. Manual review of `report.guards[]` evidence.
+
+### 4. Configuration Drift Attack
+
+**Threat:** Attacker modifies config to weaken guards (larger ε, disabled
+checks) hoping reviewers don't notice.
+
+**Mitigation:** Certificates capture `resolved_policy.*` and `policy_digest`
+for audit. `invarlock verify` enforces schema compliance.
+
+**Detection:** Policy changes appear in `policy_digest.changed = true`.
+Compare certificates side-by-side for unexpected policy drift.
+
+### 5. Window Schedule Manipulation
+
+**Threat:** Attacker provides crafted baseline windows that inflate subject
+performance (cherry-picked easy examples).
+
+**Mitigation:** Pairing enforcement requires `window_match_fraction = 1.0` and
+`window_overlap_fraction = 0.0`. CI/Release profiles fail on pairing violations.
+
+**Detection:** `[INVARLOCK:E001]` error on pairing schedule mismatch.
+
 ## Out of scope (security non-goals)
 
 These match the assurance **non-goals**:
@@ -56,6 +113,6 @@ These match the assurance **non-goals**:
 
 ## See also
 
-- Assurance Overview and scope: `../assurance/00-safety-case.md`
-- Security Best Practices: `./best-practices.md`
-- Security Architecture: `./architecture.md`
+- [Assurance Overview and scope](../assurance/00-safety-case.md)
+- [Security Best Practices](best-practices.md)
+- [Security Architecture](architecture.md)
