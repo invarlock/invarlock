@@ -82,3 +82,10 @@ mind:
 
 Determinism, pairing math, and provenance are surfaced in certificates
 (provider and policy digests) and revalidated by `invarlock verify`.
+
+## Related Documentation
+
+- [CLI Reference](../reference/cli.md) — Full `certify` command options
+- [Reading a Certificate](reading-certificate.md) — Understanding output certificates
+- [Coverage & Pairing (Assurance)](../assurance/02-coverage-and-pairing.md) — Window pairing invariants
+- [Determinism Contracts (Assurance)](../assurance/08-determinism-contracts.md) — Seed and reproducibility guarantees

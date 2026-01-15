@@ -54,6 +54,60 @@ attach calibration certificates to change proposals.
 
 > **Spectral is weight-based.** z-tails are driven by weights, not evaluation windows; changing dataset seeds/windows **does not** move |z|. Prefer pooling per-module z across related baselines (e.g., 1B/3B/7B) rather than re-sampling windows.
 
+### Worked Example: Recalibrating Spectral κ for a Custom GPT-2 Run
+
+Suppose you ran a baseline and extracted z-scores from the report:
+
+```bash
+# 1. Run baseline
+invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml \
+  --profile ci --tier balanced --out runs/baseline_calib
+
+# 2. Extract z-scores (example using jq)
+jq '.guards[] | select(.name == "spectral") | .metrics.final_z_scores' \
+  runs/baseline_calib/*/report.json > z_scores.json
+```
+
+With 120 total modules distributed as: FFN=40, Attn=40, Embed=8, Other=32.
+
+**Step-by-step κ calculation:**
+
+1. **Allocate budget.** With budget B=5 and M=120 total modules:
+   - B(ffn) = ⌊5 × 40/120 + 0.5⌋ = ⌊2.17⌋ = 2
+   - B(attn) = ⌊5 × 40/120 + 0.5⌋ = 2
+   - B(embed) = ⌊5 × 8/120 + 0.5⌋ = 1
+   - B(other) = ⌊5 × 32/120 + 0.5⌋ = 1
+
+2. **Sort |z| per family.** Suppose FFN z-scores sorted descending are:
+   [2.1, 1.8, 1.6, 1.5, 1.4, 1.3, ...]
+
+3. **Set κ using order statistic.** κ(ffn) = Z(ffn)^(B(ffn)) + margin = 1.8 + 0.1 = **1.9**
+
+4. **Repeat for other families.** If Attn's 2nd-largest |z| is 2.6, κ(attn) = 2.7.
+
+5. **Write local override:**
+
+   ```yaml
+   # configs/overrides/spectral_local.yaml
+   guards:
+     spectral:
+       family_caps:
+         ffn: 1.9
+         attn: 2.7
+         embed: 1.5
+         other: 1.2
+   ```
+
+6. **Re-run with override:**
+
+   ```bash
+   invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml \
+     -c configs/overrides/spectral_local.yaml \
+     --profile ci --tier balanced
+   ```
+
+7. **Verify.** Check `report.guards[spectral].metrics.warnings_count ≤ 5` on clean baselines.
+
 ---
 
 ## RMT ε (acceptance bands)
@@ -140,6 +194,12 @@ unprofiled runs.
 > calibration on their models/datasets/hardware and attach the resulting
 > certificates and summary statistics to change proposals. The certificate
 > fields make such updates auditable end-to-end.
+
+## See Also
+
+- [Calibration Reference](../reference/calibration.md) — CLI commands for running calibration sweeps
+- [Tier Policy Catalog](../reference/tier-policy-catalog.md) — Policy keys and where they appear in certificates
+- [Guards Reference](../reference/guards.md) — Guard configuration options
 
 ## References
 
