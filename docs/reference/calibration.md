@@ -79,9 +79,7 @@ invarlock calibrate ve-sweep \
 
 Runs a null (no-op edit) sweep and calibrates spectral κ/alpha empirically.
 
-```bash
-invarlock calibrate null-sweep [OPTIONS]
-```
+**Usage:** `invarlock calibrate null-sweep --config <CONFIG> --out <OUT> [options]`
 
 | Option | Default | Description |
 | --- | --- | --- |
@@ -107,9 +105,7 @@ invarlock calibrate null-sweep [OPTIONS]
 
 Runs VE predictive-gate sweeps and recommends `min_effect_lognll` per tier.
 
-```bash
-invarlock calibrate ve-sweep [OPTIONS]
-```
+**Usage:** `invarlock calibrate ve-sweep --config <CONFIG> --out <OUT> [options]`
 
 | Option | Default | Description |
 | --- | --- | --- |
