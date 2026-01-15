@@ -14,13 +14,18 @@ Steps:
 
 from __future__ import annotations
 
+import io
 import json
 import math
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
 import typer
 from rich.console import Console
+
+from invarlock import __version__ as INVARLOCK_VERSION
 
 from ...core.exceptions import MetricsError
 from ..adapter_auto import resolve_auto_adapter
@@ -32,7 +37,141 @@ from .run import _resolve_exit_code as _resolve_exit_code
 
 _LAZY_RUN_IMPORT = True
 
+PHASE_BAR_WIDTH = 67
+VERBOSITY_QUIET = 0
+VERBOSITY_DEFAULT = 1
+VERBOSITY_VERBOSE = 2
+
 console = Console()
+
+
+def _render_banner_lines(title: str, context: str) -> list[str]:
+    width = max(len(title), len(context))
+    border = "─" * (width + 2)
+    return [
+        f"┌{border}┐",
+        f"│ {title.ljust(width)} │",
+        f"│ {context.ljust(width)} │",
+        f"└{border}┘",
+    ]
+
+
+def _print_header_banner(
+    console: Console, *, version: str, profile: str, tier: str, adapter: str
+) -> None:
+    title = f"INVARLOCK v{version} · Certification Pipeline"
+    context = f"Profile: {profile} · Tier: {tier} · Adapter: {adapter}"
+    for line in _render_banner_lines(title, context):
+        console.print(line)
+
+
+def _phase_title(index: int, total: int, title: str) -> str:
+    return f"PHASE {index}/{total} · {title}"
+
+
+def _print_phase_header(console: Console, title: str) -> None:
+    bar_width = max(PHASE_BAR_WIDTH, len(title))
+    bar = "═" * bar_width
+    console.print(bar)
+    console.print(title)
+    console.print(bar)
+
+
+def _format_ratio(value: Any) -> str:
+    try:
+        val = float(value)
+    except (TypeError, ValueError):
+        return "N/A"
+    if not math.isfinite(val):
+        return "N/A"
+    return f"{val:.3f}"
+
+
+def _resolve_verbosity(quiet: bool, verbose: bool) -> int:
+    if quiet and verbose:
+        console.print("[red]❌ --quiet and --verbose are mutually exclusive[/red]")
+        raise typer.Exit(2)
+    if quiet:
+        return VERBOSITY_QUIET
+    if verbose:
+        return VERBOSITY_VERBOSE
+    return VERBOSITY_DEFAULT
+
+
+@contextmanager
+def _override_console(module: Any, new_console: Console) -> Iterator[None]:
+    original_console = getattr(module, "console", None)
+    module.console = new_console
+    try:
+        yield
+    finally:
+        module.console = original_console
+
+
+@contextmanager
+def _suppress_child_output(enabled: bool) -> Iterator[io.StringIO | None]:
+    if not enabled:
+        yield None
+        return
+    from . import report as report_mod
+    from . import run as run_mod
+
+    buffer = io.StringIO()
+    quiet_console = Console(file=buffer, force_terminal=False, color_system=None)
+    with _override_console(run_mod, quiet_console), _override_console(
+        report_mod, quiet_console
+    ):
+        yield buffer
+
+
+def _print_quiet_summary(
+    *,
+    cert_out: Path,
+    source: str,
+    edited: str,
+    profile: str,
+) -> None:
+    cert_path = cert_out / "evaluation.cert.json"
+    console.print(f"INVARLOCK v{INVARLOCK_VERSION} · CERTIFY")
+    console.print(
+        f"Baseline: {source} -> Subject: {edited} · Profile: {profile}"
+    )
+    if not cert_path.exists():
+        console.print(f"Output: {cert_out}")
+        return
+    try:
+        with cert_path.open("r", encoding="utf-8") as fh:
+            certificate = json.load(fh)
+    except Exception:
+        console.print(f"Output: {cert_path}")
+        return
+    if not isinstance(certificate, dict):
+        console.print(f"Output: {cert_path}")
+        return
+    try:
+        from invarlock.reporting.render import (
+            compute_console_validation_block as _console_block,
+        )
+
+        block = _console_block(certificate)
+        rows = block.get("rows", [])
+        total = len(rows) if isinstance(rows, list) else 0
+        passed = (
+            sum(1 for row in rows if row.get("ok")) if isinstance(rows, list) else 0
+        )
+        status = "PASS" if block.get("overall_pass") else "FAIL"
+    except Exception:
+        total = 0
+        passed = 0
+        status = "UNKNOWN"
+    pm_ratio = _format_ratio(
+        (certificate.get("primary_metric") or {}).get("ratio_vs_baseline")
+    )
+    gate_summary = f"{passed}/{total} passed" if total else "N/A"
+    console.print(f"Status: {status} · Gates: {gate_summary}")
+    if pm_ratio != "N/A":
+        console.print(f"Primary metric ratio: {pm_ratio}")
+    console.print(f"Output: {cert_path}")
 
 
 def _latest_run_report(run_root: Path) -> Path | None:
@@ -117,6 +256,15 @@ def certify_command(
     edit_config: str | None = typer.Option(
         None, "--edit-config", help="Edit preset to apply a demo edit (quant_rtn)"
     ),
+    quiet: bool = typer.Option(
+        False, "--quiet", "-q", help="Minimal output (suppress run/report detail)"
+    ),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Verbose output (include debug details)"
+    ),
+    banner: bool = typer.Option(
+        True, "--banner/--no-banner", help="Show header banner"
+    ),
 ):
     """Certify two checkpoints (baseline vs subject) with pinned windows."""
     # Support programmatic calls and Typer-invoked calls uniformly
@@ -140,15 +288,48 @@ def certify_command(
     out = _coerce_option(out, "runs")
     cert_out = _coerce_option(cert_out, "reports/cert")
     edit_config = _coerce_option(edit_config)
+    quiet = _coerce_option(quiet, False)
+    verbose = _coerce_option(verbose, False)
+    banner = _coerce_option(banner, True)
+
+    verbosity = _resolve_verbosity(bool(quiet), bool(verbose))
+
+    def _info(msg: str) -> None:
+        if verbosity >= VERBOSITY_DEFAULT:
+            console.print(msg)
+
+    def _debug(msg: str) -> None:
+        if verbosity >= VERBOSITY_VERBOSE:
+            console.print(msg)
+
+    def _phase(index: int, total: int, title: str) -> None:
+        if verbosity >= VERBOSITY_DEFAULT:
+            console.print("")
+            _print_phase_header(console, _phase_title(index, total, title))
 
     src_id = str(source)
     edt_id = str(edited)
 
     # Resolve adapter when requested
     eff_adapter = adapter
+    adapter_auto = False
     if str(adapter).strip().lower() in {"auto", "hf_auto", "auto_hf"}:
         eff_adapter = resolve_auto_adapter(src_id)
-        console.print(f"🔎 Adapter:auto → {eff_adapter}")
+        adapter_auto = True
+
+    show_banner = bool(banner) and verbosity >= VERBOSITY_DEFAULT
+    if show_banner:
+        _print_header_banner(
+            console,
+            version=INVARLOCK_VERSION,
+            profile=profile,
+            tier=tier,
+            adapter=str(eff_adapter),
+        )
+        console.print("")
+
+    if adapter_auto:
+        _debug(f"Adapter:auto -> {eff_adapter}")
 
     # Choose preset. If none provided and repo preset is missing (pip install
     # scenario), fall back to a minimal built-in universal preset so the
@@ -226,29 +407,39 @@ def certify_command(
     baseline_yaml = tmp_dir / "baseline_noop.yaml"
     _dump_yaml(baseline_yaml, baseline_cfg)
 
-    console.print("🏁 Running baseline (no-op edit)")
+    _phase(1, 3, "BASELINE EVALUATION")
+    _info("🏁 Running baseline (no-op edit)")
+    _debug(f"Baseline config: {baseline_yaml}")
     from .run import run_command as _run
 
-    _run(
-        config=str(baseline_yaml),
-        profile=profile,
-        out=str(Path(out) / "source"),
-        tier=tier,
-        device=device,
-    )
+    with _suppress_child_output(verbosity == VERBOSITY_QUIET) as quiet_buffer:
+        try:
+            _run(
+                config=str(baseline_yaml),
+                profile=profile,
+                out=str(Path(out) / "source"),
+                tier=tier,
+                device=device,
+            )
+        except Exception:
+            if quiet_buffer is not None:
+                console.print(quiet_buffer.getvalue(), markup=False)
+            raise
 
     baseline_report = _latest_run_report(Path(out) / "source")
     if not baseline_report:
         console.print("[red]❌ Could not locate baseline report after run")
         raise typer.Exit(1)
+    _debug(f"Baseline report: {baseline_report}")
 
     # Edited run: either no-op (Compare & Certify) or provided edit_config (demo edit)
+    _phase(2, 3, "SUBJECT EVALUATION")
     if edit_config:
         edited_yaml = Path(edit_config)
         if not edited_yaml.exists():
             console.print(f"[red]❌ Edit config not found: {edited_yaml}")
             raise typer.Exit(1)
-        console.print("✂️  Running edited (demo edit via --edit-config)")
+        _info("✂️  Running edited (demo edit via --edit-config)")
         # Overlay subject model id/adapter and output/context onto the provided edit config
         try:
             cfg_loaded: dict[str, Any] = _load_yaml(edited_yaml)
@@ -288,17 +479,24 @@ def certify_command(
         tmp_dir.mkdir(parents=True, exist_ok=True)
         edited_merged_yaml = tmp_dir / "edited_merged.yaml"
         _dump_yaml(edited_merged_yaml, merged_edited_cfg)
+        _debug(f"Edited config (merged): {edited_merged_yaml}")
 
         from .run import run_command as _run
 
-        _run(
-            config=str(edited_merged_yaml),
-            profile=profile,
-            out=str(Path(out) / "edited"),
-            tier=tier,
-            baseline=str(baseline_report),
-            device=device,
-        )
+        with _suppress_child_output(verbosity == VERBOSITY_QUIET) as quiet_buffer:
+            try:
+                _run(
+                    config=str(edited_merged_yaml),
+                    profile=profile,
+                    out=str(Path(out) / "edited"),
+                    tier=tier,
+                    baseline=str(baseline_report),
+                    device=device,
+                )
+            except Exception:
+                if quiet_buffer is not None:
+                    console.print(quiet_buffer.getvalue(), markup=False)
+                raise
     else:
         edited_cfg = _merge(
             preset_data,
@@ -313,22 +511,47 @@ def certify_command(
         )
         edited_yaml = tmp_dir / "edited_noop.yaml"
         _dump_yaml(edited_yaml, edited_cfg)
-        console.print("🧪 Running edited (no-op, Compare & Certify)")
+        _info("🧪 Running edited (no-op, Compare & Certify)")
+        _debug(f"Edited config: {edited_yaml}")
         from .run import run_command as _run
 
-        _run(
-            config=str(edited_yaml),
-            profile=profile,
-            out=str(Path(out) / "edited"),
-            tier=tier,
-            baseline=str(baseline_report),
-            device=device,
-        )
+        with _suppress_child_output(verbosity == VERBOSITY_QUIET) as quiet_buffer:
+            try:
+                _run(
+                    config=str(edited_yaml),
+                    profile=profile,
+                    out=str(Path(out) / "edited"),
+                    tier=tier,
+                    baseline=str(baseline_report),
+                    device=device,
+                )
+            except Exception:
+                if quiet_buffer is not None:
+                    console.print(quiet_buffer.getvalue(), markup=False)
+                raise
 
     edited_report = _latest_run_report(Path(out) / "edited")
     if not edited_report:
         console.print("[red]❌ Could not locate edited report after run")
         raise typer.Exit(1)
+    _debug(f"Edited report: {edited_report}")
+
+    _phase(3, 3, "CERTIFICATE GENERATION")
+
+    def _emit_certificate() -> None:
+        _info("📜 Emitting certificate")
+        with _suppress_child_output(verbosity == VERBOSITY_QUIET) as quiet_buffer:
+            try:
+                _report(
+                    run=str(edited_report),
+                    format="cert",
+                    baseline=str(baseline_report),
+                    output=cert_out,
+                )
+            except Exception:
+                if quiet_buffer is not None:
+                    console.print(quiet_buffer.getvalue(), markup=False)
+                raise
 
     # CI/Release hard‑abort: fail fast when primary metric is not computable.
     try:
@@ -395,12 +618,7 @@ def certify_command(
                 edited_payload.setdefault("metrics", {}).update(metrics)
 
                 # Emit the certificate for inspection, then exit with a CI-visible error.
-                _report(
-                    run=str(edited_report),
-                    format="cert",
-                    baseline=str(baseline_report),
-                    output=cert_out,
-                )
+                _emit_certificate()
                 err = MetricsError(
                     code="E111",
                     message=f"Primary metric degraded or non-finite ({degraded_reason}).",
@@ -413,10 +631,11 @@ def certify_command(
                 )
                 raise typer.Exit(_resolve_exit_code(err, profile=profile))
 
-    console.print("📜 Emitting certificate")
-    _report(
-        run=str(edited_report),
-        format="cert",
-        baseline=str(baseline_report),
-        output=cert_out,
-    )
+    _emit_certificate()
+    if verbosity == VERBOSITY_QUIET:
+        _print_quiet_summary(
+            cert_out=Path(cert_out),
+            source=src_id,
+            edited=edt_id,
+            profile=profile,
+        )
