@@ -9,6 +9,21 @@
 | **Primary commands** | `certify`, `verify`, `report`, `run`, `plugins`, `doctor`. |
 | **Requires** | `invarlock[hf]` for HF workflows; optional extras for quantized adapters. |
 | **Network** | Offline by default; enable per command with `INVARLOCK_ALLOW_NETWORK=1`. |
+| **Source of truth** | `src/invarlock/cli/commands/*.py`, `src/invarlock/cli/app.py`. |
+
+## Contents
+
+- [Overview](#overview)
+- [Quick Start](#quick-start)
+- [Concepts](#concepts)
+- [Reference](#reference)
+  - [Artifact outputs matrix](#artifact-outputs-matrix)
+  - [Command Index](#command-index)
+  - [JSON Output](#json-output-verify-and-plugins)
+- [Profiles](#profile-reference-ci-vs-release)
+- [Security Defaults](#security-defaults)
+- [Troubleshooting](#troubleshooting)
+- [Related Documentation](#related-documentation)
 
 ## Quick Start
 
