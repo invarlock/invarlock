@@ -15,6 +15,7 @@ from typing import Any
 import typer
 from rich.console import Console
 
+from invarlock.cli.output import print_event, resolve_output_style
 from invarlock.reporting import certificate as certificate_lib
 from invarlock.reporting import report as report_lib
 
@@ -100,6 +101,8 @@ def _generate_reports(
     compare: str | None = None,
     baseline: str | None = None,
     output: str | None = None,
+    style: str = "audit",
+    no_color: bool = False,
 ) -> None:
     # This callback runs only when invoked without subcommand (default Click behavior)
     try:
@@ -122,21 +125,34 @@ def _generate_reports(
         compare = _coerce_option(compare)
         baseline = _coerce_option(baseline)
         output = _coerce_option(output)
+        style = _coerce_option(style, "audit")
+        no_color = bool(_coerce_option(no_color, False))
+
+        output_style = resolve_output_style(
+            style=str(style),
+            profile="ci",
+            progress=False,
+            timing=False,
+            no_color=no_color,
+        )
+
+        def _event(tag: str, message: str, *, emoji: str | None = None) -> None:
+            print_event(console, tag, message, style=output_style, emoji=emoji)
 
         # Load primary report
-        console.print(f"📊 Loading run report: {run}")
+        _event("DATA", f"Loading run report: {run}", emoji="📊")
         primary_report = _load_run_report(run)
 
         # Load comparison report if specified
         compare_report = None
         if compare:
-            console.print(f"📊 Loading comparison report: {compare}")
+            _event("DATA", f"Loading comparison report: {compare}", emoji="📊")
             compare_report = _load_run_report(compare)
 
         # Load baseline report if specified
         baseline_report = None
         if baseline:
-            console.print(f"📊 Loading baseline report: {baseline}")
+            _event("DATA", f"Loading baseline report: {baseline}", emoji="📊")
             baseline_report = _load_run_report(baseline)
 
         # Determine output directory
@@ -155,17 +171,20 @@ def _generate_reports(
         # Validate certificate requirements
         if "cert" in formats:
             if baseline_report is None:
-                console.print(
-                    "[red]❌ Certificate format requires --baseline parameter[/red]"
-                )
-                console.print(
-                    "Use: invarlock report --run <run_dir> --format cert --baseline <baseline_run_dir>"
+                _event("FAIL", "Certificate format requires --baseline", emoji="❌")
+                _event(
+                    "INFO",
+                    "Use: invarlock report --run <run_dir> --format cert --baseline <baseline_run_dir>",
                 )
                 raise typer.Exit(1)
-            console.print("📜 Generating safety certificate with baseline comparison")
+            _event(
+                "EXEC",
+                "Generating safety certificate with baseline comparison",
+                emoji="📜",
+            )
 
         # Generate reports
-        console.print(f"📝 Generating reports in formats: {formats}")
+        _event("EXEC", f"Generating reports in formats: {formats}", emoji="📝")
         saved_files = report_lib.save_report(
             primary_report,
             output_dir,
@@ -176,7 +195,7 @@ def _generate_reports(
         )
 
         # Show results
-        console.print("[green]Reports generated successfully.[/green]")
+        _event("PASS", "Reports generated successfully.", emoji="✅")
 
         if "cert" in formats and baseline_report:
             try:
@@ -265,9 +284,7 @@ def _generate_reports(
                 # CI gating should be handled by dedicated verify commands.
 
             except Exception as e:
-                console.print(
-                    f"  [yellow]⚠️  Certificate validation error: {e}[/yellow]"
-                )
+                _event("WARN", f"Certificate validation error: {e}", emoji="⚠️")
                 # Exit non-zero on certificate generation error
                 raise typer.Exit(1) from e
         else:
@@ -278,7 +295,19 @@ def _generate_reports(
                 )
 
     except Exception as e:
-        console.print(f"[red]❌ Report generation failed: {e}[/red]")
+        print_event(
+            console,
+            "FAIL",
+            f"Report generation failed: {e}",
+            style=resolve_output_style(
+                style="audit",
+                profile="ci",
+                progress=False,
+                timing=False,
+                no_color=False,
+            ),
+            emoji="❌",
+        )
         raise typer.Exit(1) from e
 
 
@@ -300,15 +329,37 @@ def report_callback(
         help="Path to baseline run for certificate generation (required for cert format)",
     ),
     output: str | None = typer.Option(None, "--output", "-o", help="Output directory"),
+    style: str = typer.Option("audit", "--style", help="Output style (audit|friendly)"),
+    no_color: bool = typer.Option(
+        False, "--no-color", help="Disable ANSI colors (respects NO_COLOR=1)"
+    ),
 ):
     """Generate a report from a run (default callback)."""
     if getattr(ctx, "resilient_parsing", False) or ctx.invoked_subcommand is not None:
         return
     if not run:
-        console.print("[red]❌ --run is required when no subcommand is provided[/red]")
+        print_event(
+            console,
+            "FAIL",
+            "--run is required when no subcommand is provided",
+            style=resolve_output_style(
+                style=str(style),
+                profile="ci",
+                progress=False,
+                timing=False,
+                no_color=no_color,
+            ),
+            emoji="❌",
+        )
         raise typer.Exit(2)
     return _generate_reports(
-        run=run, format=format, compare=compare, baseline=baseline, output=output
+        run=run,
+        format=format,
+        compare=compare,
+        baseline=baseline,
+        output=output,
+        style=style,
+        no_color=no_color,
     )
 
 
@@ -319,9 +370,17 @@ def report_command(
     compare: str | None = None,
     baseline: str | None = None,
     output: str | None = None,
+    style: str = "audit",
+    no_color: bool = False,
 ):
     return _generate_reports(
-        run=run, format=format, compare=compare, baseline=baseline, output=output
+        run=run,
+        format=format,
+        compare=compare,
+        baseline=baseline,
+        output=output,
+        style=style,
+        no_color=no_color,
     )
 
 
@@ -420,11 +479,22 @@ def report_validate(
     ),
 ):
     """Validate a certificate JSON against the current schema (v1)."""
+    output_style = resolve_output_style(
+        style="audit",
+        profile="ci",
+        progress=False,
+        timing=False,
+        no_color=False,
+    )
+
+    def _event(tag: str, message: str, *, emoji: str | None = None) -> None:
+        print_event(console, tag, message, style=output_style, emoji=emoji)
+
     p = Path(report)
     try:
         payload = json.loads(p.read_text(encoding="utf-8"))
     except Exception as exc:  # noqa: BLE001
-        console.print(f"[red]❌ Failed to read input JSON: {exc}[/red]")
+        _event("FAIL", f"Failed to read input JSON: {exc}", emoji="❌")
         raise typer.Exit(1) from exc
 
     try:
@@ -432,16 +502,16 @@ def report_validate(
 
         ok = validate_certificate(payload)
         if not ok:
-            console.print("[red]❌ Certificate schema validation failed[/red]")
+            _event("FAIL", "Certificate schema validation failed", emoji="❌")
             raise typer.Exit(2)
-        console.print("✅ Certificate schema is valid")
+        _event("PASS", "Certificate schema is valid", emoji="✅")
     except ValueError as exc:
-        console.print(f"[red]❌ Certificate validation error: {exc}[/red]")
+        _event("FAIL", f"Certificate validation error: {exc}", emoji="❌")
         raise typer.Exit(2) from exc
     except typer.Exit:
         raise
     except Exception as exc:  # noqa: BLE001
-        console.print(f"[red]❌ Validation failed: {exc}[/red]")
+        _event("FAIL", f"Validation failed: {exc}", emoji="❌")
         raise typer.Exit(1) from exc
 
 
