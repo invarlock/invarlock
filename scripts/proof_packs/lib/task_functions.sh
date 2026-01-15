@@ -2993,8 +2993,17 @@ task_certify_edit() {
         echo "  Pairing override: seq=${seq_len}, stride=${stride}" >> "${log_file}"
     fi
     # For large models, use INVARLOCK_SKIP_OVERHEAD_CHECK to avoid loading
-    # both baseline and edited models simultaneously (which would exceed 180GB).
+    # both baseline and edited models simultaneously.
     local profile_flag="ci"
+    local min_windows="${INVARLOCK_CERT_MIN_WINDOWS:-192}"
+    if [[ "${profile_flag}" == "ci" && "${min_windows}" =~ ^[0-9]+$ && "${min_windows}" -gt 0 ]]; then
+        if [[ "${preview_n}" -lt "${min_windows}" || "${final_n}" -lt "${min_windows}" ]]; then
+            preview_n="${min_windows}"
+            final_n="${min_windows}"
+            applied_override=1
+            echo "  CI window override: preview=${preview_n}, final=${final_n}" >> "${log_file}"
+        fi
+    fi
     local bootstrap_replicates=2000
     if _is_large_model "${model_size}"; then
         bootstrap_replicates=1000
@@ -3245,6 +3254,15 @@ task_certify_error() {
     # For large models, use INVARLOCK_SKIP_OVERHEAD_CHECK to avoid loading
     # both baseline and edited models simultaneously (which would exceed 180GB).
     local profile_flag="ci"
+    local min_windows="${INVARLOCK_CERT_MIN_WINDOWS:-192}"
+    if [[ "${profile_flag}" == "ci" && "${min_windows}" =~ ^[0-9]+$ && "${min_windows}" -gt 0 ]]; then
+        if [[ "${preview_n}" -lt "${min_windows}" || "${final_n}" -lt "${min_windows}" ]]; then
+            preview_n="${min_windows}"
+            final_n="${min_windows}"
+            applied_override=1
+            echo "  CI window override: preview=${preview_n}, final=${final_n}" >> "${log_file}"
+        fi
+    fi
     local bootstrap_replicates=2000
     if _is_large_model "${model_size}"; then
         bootstrap_replicates=1000
