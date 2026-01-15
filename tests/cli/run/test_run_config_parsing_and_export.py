@@ -707,6 +707,47 @@ def test_run_command_classification_pseudo_counts_and_export_env_dir(
     assert "metric_notes" in (report.get("provenance", {}) or {})
 
 
+def test_run_command_allows_empty_eval_windows(tmp_path: Path, monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def resolver(*_a, **kwargs):  # noqa: ANN001
+        return (
+            SimpleNamespace(
+                windows=lambda **kw: _provider_windows(
+                    int(kw.get("preview_n", 0) or 0), int(kw.get("final_n", 0) or 0)
+                )
+            ),
+            "validation",
+            False,
+        )
+
+    def exec_stub(**kwargs):  # noqa: ANN001
+        return _core_report(evaluation_windows=None), kwargs.get("model")
+
+    def post_stub(**kwargs):  # noqa: ANN001
+        captured["report"] = kwargs.get("report")
+        return {"json": str(tmp_path / "report.json")}
+
+    monkeypatch.setenv("INVARLOCK_ALLOW_EMPTY_EVAL_WINDOWS", "1")
+
+    cfg = _Cfg(outdir=tmp_path / "runs", dataset_provider="synthetic")
+
+    _run_with_common_patches(
+        cfg=cfg,
+        exec_stub=exec_stub,
+        post_stub=post_stub,
+        extra_patches=(
+            patch("invarlock.cli.commands.run._resolve_provider_and_split", resolver),
+        ),
+    )
+
+    report = captured["report"]
+    assert isinstance(report, dict)
+    eval_windows = report["evaluation_windows"]
+    assert eval_windows["preview"]["window_ids"] == []
+    assert eval_windows["final"]["window_ids"] == []
+
+
 def test_run_command_until_pass_auto_tune_head_budget_paths(tmp_path: Path) -> None:
     baseline = tmp_path / "baseline.json"
     baseline.write_text(

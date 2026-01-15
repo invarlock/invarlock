@@ -2988,7 +2988,7 @@ task_certify_edit() {
         extra_env+=(INVARLOCK_SKIP_OVERHEAD_CHECK=1)
         echo "  Large model (${model_size}): SKIP_OVERHEAD_CHECK=1" >> "${log_file}"
     fi
-    extra_env+=(INVARLOCK_STORE_EVAL_WINDOWS=1)
+    extra_env+=(INVARLOCK_STORE_EVAL_WINDOWS=1 INVARLOCK_ALLOW_EMPTY_EVAL_WINDOWS=1)
 
     local config_root_base
     config_root_base="$(cd "${cert_dir}" && pwd)"
@@ -3230,7 +3230,7 @@ task_certify_error() {
         extra_env+=(INVARLOCK_SKIP_OVERHEAD_CHECK=1)
         echo "  Large model (${model_size}): SKIP_OVERHEAD_CHECK=1" >> "${log_file}"
     fi
-    extra_env+=(INVARLOCK_STORE_EVAL_WINDOWS=1)
+    extra_env+=(INVARLOCK_STORE_EVAL_WINDOWS=1 INVARLOCK_ALLOW_EMPTY_EVAL_WINDOWS=1)
 
     local config_root_base
     config_root_base="$(cd "${cert_dir}" && pwd)"
