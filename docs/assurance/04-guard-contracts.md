@@ -4,7 +4,18 @@
 > thresholds we enforce, and how those decisions appear in the certificate so
 > reviewers can trace every PASS or FAIL.
 
-This handbook captures the practical guarantees that underpin InvarLock’s guard
+**Contents:**
+
+- [1. Guard Contracts](#1-guard-contracts) — what each guard checks and how it fails
+- [2. Statistical Method Primer](#2-statistical-method-primer) — paired Δlog perplexity and bootstrap CIs
+- [3. Calibration & Evaluation Slice Requirements](#3-calibration--evaluation-slice-requirements) — acceptance criteria for evaluation schedules
+- [4. Reproducibility Kit](#4-reproducibility-kit) — how to reproduce a certificate
+- [5. Device Tolerance Guidance](#5-device-tolerance-guidance) — expected drift across backends
+- [6. Threshold Rationale (Defaults)](#6-threshold-rationale-defaults) — why the defaults are what they are
+- [7. Known Limitations](#7-known-limitations) — what the safety case does not cover
+- [8. Coverage Reference](#8-coverage-reference) — tests that underpin this handbook
+
+This handbook captures the practical guarantees that underpin InvarLock's guard
 pipeline. It consolidates the guard contracts, statistical assumptions, and
 calibration data that accompany the InvarLock assurance notes.
 
