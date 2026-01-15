@@ -49,6 +49,7 @@ Tip: enable Hub downloads per command when fetching models/datasets:
 - [Configuration Gallery](user-guide/config-gallery.md)
 - [Example Reports](user-guide/example-reports.md)
 - [Reading a Certificate](user-guide/reading-certificate.md)
+- [Troubleshooting](user-guide/troubleshooting.md) — Error codes and common fixes
 - [Plugins](user-guide/plugins.md) — Extending adapters and guards
 - [Bring Your Own Data](user-guide/bring-your-own-data.md) — Custom datasets
 - [Proof Packs](user-guide/proof-packs.md) — Validation suite bundles
