@@ -1,6 +1,29 @@
 # Getting Started
 
-This quick guide walks through installation, environment setup, and the first automated certification loop.
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Install InvarLock and run your first certification. |
+| **Audience** | New users setting up their environment. |
+| **Python** | 3.12+ recommended (CI uses 3.13). |
+| **Install** | `pip install "invarlock[hf]"` for HF adapter workflows. |
+| **Next step** | [Quickstart](quickstart.md) for hands-on commands. |
+
+This guide covers installation, environment setup, and your first certification run.
+
+## Learning Paths
+
+Choose your path based on your role:
+
+| Persona | Path |
+|---------|------|
+| **First-time user** | Getting Started → [Quickstart](quickstart.md) → [Compare & Certify](compare-and-certify.md) |
+| **Python developer** | Getting Started → [Primary Metric Smoke](primary-metric-smoke.md) → [API Guide](../reference/api-guide.md) |
+| **Custom data user** | Getting Started → [Bring Your Own Data](bring-your-own-data.md) → [Config Gallery](config-gallery.md) |
+| **Plugin developer** | Getting Started → [Plugins](plugins.md) → [Guards Reference](../reference/guards.md) |
+| **Validation engineer** | Getting Started → [Proof Packs](proof-packs.md) → [Proof Packs Internals](proof-packs-internals.md) |
+| **Security auditor** | Getting Started → [Threat Model](../security/threat-model.md) → [Best Practices](../security/best-practices.md) |
 
 ## Install InvarLock
 

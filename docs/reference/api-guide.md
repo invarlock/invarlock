@@ -267,4 +267,6 @@ Core exceptions live in `invarlock.core.exceptions`:
 - [Configuration Schema](config-schema.md)
 - [Dataset Providers](datasets.md)
 - [Guards](guards.md)
-- [Certificate Schema (v1)](certificate-schema.md)
+- [Certificates](certificates.md) — Schema, telemetry, and HTML export
+- [Determinism Contracts](../assurance/08-determinism-contracts.md) — Reproducibility guarantees
+- [Observability](observability.md) — Monitoring and telemetry
