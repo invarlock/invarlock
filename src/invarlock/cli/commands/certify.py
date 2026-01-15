@@ -14,6 +14,7 @@ Steps:
 
 from __future__ import annotations
 
+import inspect
 import io
 import json
 import math
@@ -89,7 +90,7 @@ def _format_ratio(value: Any) -> str:
 
 def _resolve_verbosity(quiet: bool, verbose: bool) -> int:
     if quiet and verbose:
-        console.print("[red]❌ --quiet and --verbose are mutually exclusive[/red]")
+        console.print("--quiet and --verbose are mutually exclusive")
         raise typer.Exit(2)
     if quiet:
         return VERBOSITY_QUIET
@@ -264,6 +265,14 @@ def certify_command(
     banner: bool = typer.Option(
         True, "--banner/--no-banner", help="Show header banner"
     ),
+    style: str = typer.Option("audit", "--style", help="Output style (audit|friendly)"),
+    timing: bool = typer.Option(False, "--timing", help="Show timing summary"),
+    progress: bool = typer.Option(
+        True, "--progress/--no-progress", help="Show progress done messages"
+    ),
+    no_color: bool = typer.Option(
+        False, "--no-color", help="Disable ANSI colors (respects NO_COLOR=1)"
+    ),
 ):
     """Certify two checkpoints (baseline vs subject) with pinned windows."""
     # Support programmatic calls and Typer-invoked calls uniformly
@@ -290,16 +299,44 @@ def certify_command(
     quiet = _coerce_option(quiet, False)
     verbose = _coerce_option(verbose, False)
     banner = _coerce_option(banner, True)
+    style = _coerce_option(style, "audit")
+    timing = bool(_coerce_option(timing, False))
+    progress = bool(_coerce_option(progress, True))
+    no_color = bool(_coerce_option(no_color, False))
 
     verbosity = _resolve_verbosity(bool(quiet), bool(verbose))
 
-    def _info(msg: str) -> None:
+    if verbosity == VERBOSITY_QUIET:
+        progress = False
+        timing = False
+
+    from invarlock.cli.output import (
+        make_console,
+        perf_counter,
+        print_event,
+        print_timing_summary,
+        resolve_output_style,
+        timed_step,
+    )
+
+    output_style = resolve_output_style(
+        style=str(style),
+        profile=str(profile),
+        progress=bool(progress),
+        timing=bool(timing),
+        no_color=bool(no_color),
+    )
+    console = make_console(no_color=not output_style.color)
+    timings: dict[str, float] = {}
+    total_start: float | None = perf_counter() if output_style.timing else None
+
+    def _info(message: str, *, tag: str = "INFO", emoji: str | None = None) -> None:
         if verbosity >= VERBOSITY_DEFAULT:
-            console.print(msg)
+            print_event(console, tag, message, style=output_style, emoji=emoji)
 
     def _debug(msg: str) -> None:
         if verbosity >= VERBOSITY_VERBOSE:
-            console.print(msg)
+            console.print(msg, markup=False)
 
     def _phase(index: int, total: int, title: str) -> None:
         if verbosity >= VERBOSITY_DEFAULT:
@@ -356,7 +393,13 @@ def certify_command(
         }
     else:
         if not preset_path.exists():
-            console.print(f"[red]❌ Preset not found: {preset_path}")
+            print_event(
+                console,
+                "FAIL",
+                f"Preset not found: {preset_path}",
+                style=output_style,
+                emoji="❌",
+            )
             raise typer.Exit(1)
         preset_data = _load_yaml(preset_path)
         # Do not hard-code device from presets in auto-generated certify configs;
@@ -407,19 +450,32 @@ def certify_command(
     _dump_yaml(baseline_yaml, baseline_cfg)
 
     _phase(1, 3, "BASELINE EVALUATION")
-    _info("🏁 Running baseline (no-op edit)")
+    _info("Running baseline (no-op edit)", tag="EXEC", emoji="🏁")
     _debug(f"Baseline config: {baseline_yaml}")
     from .run import run_command as _run
 
     with _suppress_child_output(verbosity == VERBOSITY_QUIET) as quiet_buffer:
         try:
-            _run(
-                config=str(baseline_yaml),
-                profile=profile,
-                out=str(Path(out) / "source"),
-                tier=tier,
-                device=device,
-            )
+            with timed_step(
+                console=console,
+                style=output_style,
+                timings=timings,
+                key="baseline",
+                tag="EXEC",
+                message="Baseline",
+                emoji="🏁",
+            ):
+                _run(
+                    config=str(baseline_yaml),
+                    profile=profile,
+                    out=str(Path(out) / "source"),
+                    tier=tier,
+                    device=device,
+                    style=output_style.name,
+                    progress=progress,
+                    timing=False,
+                    no_color=no_color,
+                )
         except Exception:
             if quiet_buffer is not None:
                 console.print(quiet_buffer.getvalue(), markup=False)
@@ -427,7 +483,13 @@ def certify_command(
 
     baseline_report = _latest_run_report(Path(out) / "source")
     if not baseline_report:
-        console.print("[red]❌ Could not locate baseline report after run")
+        print_event(
+            console,
+            "FAIL",
+            "Could not locate baseline report after run",
+            style=output_style,
+            emoji="❌",
+        )
         raise typer.Exit(1)
     _debug(f"Baseline report: {baseline_report}")
 
@@ -436,14 +498,26 @@ def certify_command(
     if edit_config:
         edited_yaml = Path(edit_config)
         if not edited_yaml.exists():
-            console.print(f"[red]❌ Edit config not found: {edited_yaml}")
+            print_event(
+                console,
+                "FAIL",
+                f"Edit config not found: {edited_yaml}",
+                style=output_style,
+                emoji="❌",
+            )
             raise typer.Exit(1)
-        _info("✂️  Running edited (demo edit via --edit-config)")
+        _info("Running edited (demo edit via --edit-config)", tag="EXEC", emoji="✂️")
         # Overlay subject model id/adapter and output/context onto the provided edit config
         try:
             cfg_loaded: dict[str, Any] = _load_yaml(edited_yaml)
         except Exception as exc:  # noqa: BLE001
-            console.print(f"[red]❌ Failed to load edit config: {exc}")
+            print_event(
+                console,
+                "FAIL",
+                f"Failed to load edit config: {exc}",
+                style=output_style,
+                emoji="❌",
+            )
             raise typer.Exit(1) from exc
 
         # Ensure model.id/adapter point to the requested subject
@@ -484,14 +558,27 @@ def certify_command(
 
         with _suppress_child_output(verbosity == VERBOSITY_QUIET) as quiet_buffer:
             try:
-                _run(
-                    config=str(edited_merged_yaml),
-                    profile=profile,
-                    out=str(Path(out) / "edited"),
-                    tier=tier,
-                    baseline=str(baseline_report),
-                    device=device,
-                )
+                with timed_step(
+                    console=console,
+                    style=output_style,
+                    timings=timings,
+                    key="subject",
+                    tag="EXEC",
+                    message="Subject",
+                    emoji="✂️",
+                ):
+                    _run(
+                        config=str(edited_merged_yaml),
+                        profile=profile,
+                        out=str(Path(out) / "edited"),
+                        tier=tier,
+                        baseline=str(baseline_report),
+                        device=device,
+                        style=output_style.name,
+                        progress=progress,
+                        timing=False,
+                        no_color=no_color,
+                    )
             except Exception:
                 if quiet_buffer is not None:
                     console.print(quiet_buffer.getvalue(), markup=False)
@@ -510,20 +597,33 @@ def certify_command(
         )
         edited_yaml = tmp_dir / "edited_noop.yaml"
         _dump_yaml(edited_yaml, edited_cfg)
-        _info("🧪 Running edited (no-op, Compare & Certify)")
+        _info("Running edited (no-op, Compare & Certify)", tag="EXEC", emoji="🧪")
         _debug(f"Edited config: {edited_yaml}")
         from .run import run_command as _run
 
         with _suppress_child_output(verbosity == VERBOSITY_QUIET) as quiet_buffer:
             try:
-                _run(
-                    config=str(edited_yaml),
-                    profile=profile,
-                    out=str(Path(out) / "edited"),
-                    tier=tier,
-                    baseline=str(baseline_report),
-                    device=device,
-                )
+                with timed_step(
+                    console=console,
+                    style=output_style,
+                    timings=timings,
+                    key="subject",
+                    tag="EXEC",
+                    message="Subject",
+                    emoji="🧪",
+                ):
+                    _run(
+                        config=str(edited_yaml),
+                        profile=profile,
+                        out=str(Path(out) / "edited"),
+                        tier=tier,
+                        baseline=str(baseline_report),
+                        device=device,
+                        style=output_style.name,
+                        progress=progress,
+                        timing=False,
+                        no_color=no_color,
+                    )
             except Exception:
                 if quiet_buffer is not None:
                     console.print(quiet_buffer.getvalue(), markup=False)
@@ -531,22 +631,57 @@ def certify_command(
 
     edited_report = _latest_run_report(Path(out) / "edited")
     if not edited_report:
-        console.print("[red]❌ Could not locate edited report after run")
+        print_event(
+            console,
+            "FAIL",
+            "Could not locate edited report after run",
+            style=output_style,
+            emoji="❌",
+        )
         raise typer.Exit(1)
     _debug(f"Edited report: {edited_report}")
 
     _phase(3, 3, "CERTIFICATE GENERATION")
 
     def _emit_certificate() -> None:
-        _info("📜 Emitting certificate")
+        _info("Emitting certificate", tag="EXEC", emoji="📜")
         with _suppress_child_output(verbosity == VERBOSITY_QUIET) as quiet_buffer:
             try:
-                _report(
-                    run=str(edited_report),
-                    format="cert",
-                    baseline=str(baseline_report),
-                    output=cert_out,
-                )
+                with timed_step(
+                    console=console,
+                    style=output_style,
+                    timings=timings,
+                    key="certificate",
+                    tag="EXEC",
+                    message="Certificate",
+                    emoji="📜",
+                ):
+                    report_kwargs = {
+                        "run": str(edited_report),
+                        "format": "cert",
+                        "baseline": str(baseline_report),
+                        "output": cert_out,
+                        "style": output_style.name,
+                        "no_color": no_color,
+                    }
+                    try:
+                        sig = inspect.signature(_report)
+                    except (TypeError, ValueError):
+                        _report(**report_kwargs)
+                    else:
+                        if any(
+                            param.kind == inspect.Parameter.VAR_KEYWORD
+                            for param in sig.parameters.values()
+                        ):
+                            _report(**report_kwargs)
+                        else:
+                            _report(
+                                **{
+                                    key: value
+                                    for key, value in report_kwargs.items()
+                                    if key in sig.parameters
+                                }
+                            )
             except Exception:
                 if quiet_buffer is not None:
                     console.print(quiet_buffer.getvalue(), markup=False)
@@ -562,7 +697,13 @@ def certify_command(
             with Path(edited_report).open("r", encoding="utf-8") as fh:
                 edited_payload = json.load(fh)
         except Exception as exc:  # noqa: BLE001
-            console.print(f"[red]❌ Failed to read edited report: {exc}")
+            print_event(
+                console,
+                "FAIL",
+                f"Failed to read edited report: {exc}",
+                style=output_style,
+                emoji="❌",
+            )
             raise typer.Exit(1) from exc
 
         def _finite(x: Any) -> bool:
@@ -604,8 +745,12 @@ def certify_command(
                     if (not _finite(pm_prev) or not _finite(pm_final))
                     else "primary_metric_degraded"
                 )
-                console.print(
-                    "[yellow]⚠️  Primary metric degraded or non-finite; emitting certificate and marking task degraded. Primary metric computation failed.[/yellow]"
+                print_event(
+                    console,
+                    "WARN",
+                    "Primary metric degraded or non-finite; emitting certificate and marking task degraded. Primary metric computation failed.",
+                    style=output_style,
+                    emoji="⚠️",
                 )
                 pm["degraded"] = True
                 pm["invalid"] = pm.get("invalid") or True
@@ -631,6 +776,26 @@ def certify_command(
                 raise typer.Exit(_resolve_exit_code(err, profile=profile))
 
     _emit_certificate()
+    if timing:
+        if total_start is not None:
+            timings["total"] = max(0.0, float(perf_counter() - total_start))
+        else:
+            timings["total"] = (
+                float(timings.get("baseline", 0.0))
+                + float(timings.get("subject", 0.0))
+                + float(timings.get("certificate", 0.0))
+            )
+        print_timing_summary(
+            console,
+            timings,
+            style=output_style,
+            order=[
+                ("Baseline", "baseline"),
+                ("Subject", "subject"),
+                ("Certificate", "certificate"),
+                ("Total", "total"),
+            ],
+        )
     if verbosity == VERBOSITY_QUIET:
         _print_quiet_summary(
             cert_out=Path(cert_out),
