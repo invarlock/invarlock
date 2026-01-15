@@ -141,6 +141,12 @@ unprofiled runs.
 > certificates and summary statistics to change proposals. The certificate
 > fields make such updates auditable end-to-end.
 
+## See Also
+
+- [Calibration Reference](../reference/calibration.md) — CLI commands for running calibration sweeps
+- [Tier Policy Catalog](../reference/tier-policy-catalog.md) — Policy keys and where they appear in certificates
+- [Guards Reference](../reference/guards.md) — Guard configuration options
+
 ## References
 
 - Benjamini, Y., & Hochberg, Y. (1995). “Controlling the False Discovery Rate: A Practical and Powerful Approach to Multiple Testing.” *Journal of the Royal Statistical Society: Series B (Methodological)*, 57(1), 289–300. <https://doi.org/10.1111/j.2517-6161.1995.tb02031.x>
