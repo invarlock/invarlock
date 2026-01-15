@@ -144,3 +144,62 @@ def test_certify_autogen_uses_device_auto(monkeypatch, tmp_path):
     assert model_block.get("device") != "cpu"
     # And the run call saw device=None (auto resolution) by default
     assert calls and calls[0]["device"] is None
+
+
+def test_certify_quiet_summary_emits_status(monkeypatch, tmp_path, capsys):
+    src = tmp_path / "src_model"
+    edt = tmp_path / "edt_model"
+    src.mkdir()
+    edt.mkdir()
+    (src / "config.json").write_text(
+        json.dumps({"model_type": "gpt2", "architectures": ["GPT2LMHeadModel"]}),
+        encoding="utf-8",
+    )
+    (edt / "config.json").write_text(
+        json.dumps({"model_type": "gpt2", "architectures": ["GPT2LMHeadModel"]}),
+        encoding="utf-8",
+    )
+
+    def fake_run(**kwargs):
+        out = Path(kwargs.get("out"))
+        _stub_run(out)
+
+    def fake_report(**kwargs):
+        output_dir = Path(kwargs.get("output"))
+        output_dir.mkdir(parents=True, exist_ok=True)
+        cert = {
+            "primary_metric": {"ratio_vs_baseline": 1.01},
+            "validation": {
+                "primary_metric_acceptable": True,
+                "preview_final_drift_acceptable": True,
+                "invariants_pass": True,
+                "spectral_stable": True,
+                "rmt_stable": True,
+            },
+        }
+        (output_dir / "evaluation.cert.json").write_text(
+            json.dumps(cert), encoding="utf-8"
+        )
+
+    import invarlock.cli.commands.run as run_mod
+    from invarlock.cli.commands import certify as mod
+
+    monkeypatch.setattr(
+        run_mod, "run_command", lambda **kwargs: fake_run(**kwargs), raising=False
+    )
+    monkeypatch.setattr(mod, "_report", fake_report, raising=False)
+
+    certify_command(
+        source=str(src),
+        edited=str(edt),
+        adapter="auto",
+        profile="ci",
+        out=str(tmp_path / "runs"),
+        cert_out=str(tmp_path / "reports"),
+        quiet=True,
+    )
+
+    out = capsys.readouterr().out
+    assert "INVARLOCK v" in out
+    assert "Status: PASS" in out
+    assert "Output:" in out

@@ -118,8 +118,9 @@ def _suppress_child_output(enabled: bool) -> Iterator[io.StringIO | None]:
 
     buffer = io.StringIO()
     quiet_console = Console(file=buffer, force_terminal=False, color_system=None)
-    with _override_console(run_mod, quiet_console), _override_console(
-        report_mod, quiet_console
+    with (
+        _override_console(run_mod, quiet_console),
+        _override_console(report_mod, quiet_console),
     ):
         yield buffer
 
@@ -133,9 +134,7 @@ def _print_quiet_summary(
 ) -> None:
     cert_path = cert_out / "evaluation.cert.json"
     console.print(f"INVARLOCK v{INVARLOCK_VERSION} · CERTIFY")
-    console.print(
-        f"Baseline: {source} -> Subject: {edited} · Profile: {profile}"
-    )
+    console.print(f"Baseline: {source} -> Subject: {edited} · Profile: {profile}")
     if not cert_path.exists():
         console.print(f"Output: {cert_out}")
         return
