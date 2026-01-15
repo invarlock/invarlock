@@ -211,7 +211,10 @@ pack_write_checksums() {
     sha_cmd="$(pack_sha256_cmd)"
     (
         cd "${pack_dir}"
-        find . -type f ! -name "checksums.sha256" -print | sort | ${sha_cmd} > "checksums.sha256"
+        while IFS= read -r file; do
+            [[ -n "${file}" ]] || continue
+            ${sha_cmd} "${file}"
+        done < <(find . -type f ! -name "checksums.sha256" -print | sort) > "checksums.sha256"
     )
 }
 
