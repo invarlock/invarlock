@@ -98,19 +98,19 @@ InvarLock registers these metrics automatically:
 
 | Metric | Type | Description |
 | --- | --- | --- |
-| `invarlock.operations.total` | Counter | Total operations by type and status. |
-| `invarlock.errors.total` | Counter | Total errors by type. |
-| `invarlock.edits.applied` | Counter | Total edits applied. |
-| `invarlock.guards.triggered` | Counter | Guard triggers. |
-| `invarlock.operation.duration` | Histogram | Operation duration distribution. |
-| `invarlock.edit.duration` | Histogram | Edit operation duration. |
-| `invarlock.guard.duration` | Histogram | Guard execution duration. |
-| `invarlock.memory.usage` | Gauge | Current memory usage. |
-| `invarlock.gpu.memory.usage` | Gauge | Current GPU memory usage. |
-| `invarlock.cpu.usage` | Gauge | Current CPU usage. |
-| `invarlock.model.parameters` | Gauge | Model parameter count. |
-| `invarlock.model.size_mb` | Gauge | Model size in MB. |
-| `invarlock.model.loads` | Counter | Model loads. |
+| `'invarlock.operations.total'` | Counter | Total operations by type and status. |
+| `'invarlock.errors.total'` | Counter | Total errors by type. |
+| `'invarlock.edits.applied'` | Counter | Total edits applied. |
+| `'invarlock.guards.triggered'` | Counter | Guard triggers. |
+| `'invarlock.operation.duration'` | Histogram | Operation duration distribution. |
+| `'invarlock.edit.duration'` | Histogram | Edit operation duration. |
+| `'invarlock.guard.duration'` | Histogram | Guard execution duration. |
+| `'invarlock.memory.usage'` | Gauge | Current memory usage. |
+| `'invarlock.gpu.memory.usage'` | Gauge | Current GPU memory usage. |
+| `'invarlock.cpu.usage'` | Gauge | Current CPU usage. |
+| `'invarlock.model.parameters'` | Gauge | Model parameter count. |
+| `'invarlock.model.size_mb'` | Gauge | Model size in MB. |
+| `'invarlock.model.loads'` | Counter | Model loads. |
 
 ### Health Checks
 
