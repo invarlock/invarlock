@@ -1314,7 +1314,19 @@ task_calibration_run() {
 
     # For large models, use INVARLOCK_SKIP_OVERHEAD_CHECK to avoid loading
     # both baseline and edited models simultaneously (which would exceed 180GB).
+    local profile_flag="ci"
+    local min_windows="${INVARLOCK_CERT_MIN_WINDOWS:-192}"
+    if [[ "${profile_flag}" == "ci" && "${min_windows}" =~ ^[0-9]+$ && "${min_windows}" -gt 0 ]]; then
+        if [[ "${preview_n}" -lt "${min_windows}" || "${final_n}" -lt "${min_windows}" ]]; then
+            preview_n="${min_windows}"
+            final_n="${min_windows}"
+            applied_override=1
+            echo "  CI window override: preview=${preview_n}, final=${final_n}" >> "${log_file}"
+        fi
+    fi
     local bootstrap_replicates=2000
+
+
     if _is_large_model "${model_size}"; then
         bootstrap_replicates=1000
     fi
@@ -2933,6 +2945,14 @@ task_certify_edit() {
 
     mkdir -p "${cert_dir}"
 
+    local abs_cert_dir
+    abs_cert_dir="$(cd "${cert_dir}" && pwd)"
+    local abs_log_file
+    abs_log_file="$(cd "$(dirname "${log_file}")" && pwd)/$(basename "${log_file}")"
+    cert_dir="${abs_cert_dir}"
+    cert_file="${cert_dir}/evaluation.cert.json"
+    log_file="${abs_log_file}"
+
     # Get model size for config and profile decision
     local model_size
     model_size=$(_estimate_model_size "${baseline_path}")
@@ -3173,6 +3193,14 @@ task_certify_error() {
     echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Certifying error model: ${error_type}" >> "${log_file}"
 
     mkdir -p "${cert_dir}"
+
+    local abs_cert_dir
+    abs_cert_dir="$(cd "${cert_dir}" && pwd)"
+    local abs_log_file
+    abs_log_file="$(cd "$(dirname "${log_file}")" && pwd)/$(basename "${log_file}")"
+    cert_dir="${abs_cert_dir}"
+    cert_file="${cert_dir}/evaluation.cert.json"
+    log_file="${abs_log_file}"
 
     # Get model size for config and profile decision
     local model_size
