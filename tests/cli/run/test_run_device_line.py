@@ -119,7 +119,7 @@ def test_device_line_cpu(tmp_path: Path, monkeypatch):
     cfg = _cfg(tmp_path)
     r = CliRunner().invoke(cli, ["run", "-c", cfg, "--profile", "dev"])
     s = r.stdout
-    assert "Device: cpu (requested=auto, resolved=cpu)" in s
+    assert "Device    : cpu (auto-resolved)" in s
 
 
 def test_device_line_cuda0(tmp_path: Path, monkeypatch):
@@ -130,4 +130,4 @@ def test_device_line_cuda0(tmp_path: Path, monkeypatch):
     cfg = _cfg(tmp_path)
     r = CliRunner().invoke(cli, ["run", "-c", cfg, "--profile", "dev"])
     s = r.stdout
-    assert "Device: cuda:0 (requested=auto, resolved=cuda:0)" in s
+    assert "Device    : cuda:0 (auto-resolved)" in s
