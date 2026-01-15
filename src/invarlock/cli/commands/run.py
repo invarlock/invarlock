@@ -17,8 +17,10 @@ import random
 import shutil
 import sys as _sys
 import types as _types
+import warnings
 from array import array
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -76,6 +78,59 @@ RELEASE_MIN_WINDOWS_PER_ARM = 200
 RELEASE_CALIBRATION_MIN = 16
 RELEASE_CALIBRATION_MAX = 24
 GUARD_OVERHEAD_THRESHOLD = 0.01
+KV_LABEL_WIDTH = 10
+
+_NOISY_WARNING_PATTERNS = (
+    r".*`torch_dtype` is deprecated.*",
+    r".*loss_type=None.*unrecognized.*",
+)
+
+
+@contextmanager
+def _suppress_noisy_warnings(profile: str | None) -> Iterator[None]:
+    suppress_all = os.getenv("INVARLOCK_SUPPRESS_WARNINGS", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    profile_norm = (profile or "").strip().lower()
+    if not suppress_all and profile_norm not in {"ci", "ci_cpu", "release"}:
+        yield
+        return
+    with warnings.catch_warnings():
+        if suppress_all:
+            warnings.simplefilter("ignore")
+        else:
+            for pattern in _NOISY_WARNING_PATTERNS:
+                warnings.filterwarnings("ignore", message=pattern)
+        yield
+
+
+def _format_kv_line(label: str, value: str, *, width: int = KV_LABEL_WIDTH) -> str:
+    return f"  {label:<{width}}: {value}"
+
+
+def _device_resolution_note(target_device: str, resolved_device: str) -> str:
+    target_norm = str(target_device or "").strip().lower()
+    resolved_norm = str(resolved_device or "").strip().lower()
+    if not target_norm or target_norm == "auto":
+        return "auto-resolved"
+    if target_norm == resolved_norm:
+        return "requested"
+    return f"resolved from {target_device}"
+
+
+def _format_guard_chain(guards: list[Any]) -> str:
+    names = [str(getattr(guard, "name", "unknown")) for guard in guards]
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for name in names:
+        if name in seen:
+            continue
+        seen.add(name)
+        deduped.append(name)
+    return " → ".join(deduped)
 
 
 # Common dataset split aliases we probe in order when not explicitly set
@@ -864,9 +919,8 @@ def _resolve_device_and_output(
         cfg_device = None
     target_device = device or cfg_device or "auto"
     resolved_device = _resolve_device(target_device)
-    console.print(
-        f"Device: {resolved_device} (requested={target_device}, resolved={resolved_device})"
-    )
+    resolution_note = _device_resolution_note(target_device, resolved_device)
+    console.print(_format_kv_line("Device", f"{resolved_device} ({resolution_note})"))
     is_valid, error_msg = _validate(resolved_device)
     if not is_valid:
         console.print(f"[red]❌ Device validation failed: {error_msg}[/red]")
@@ -972,7 +1026,13 @@ def _extract_model_load_kwargs(cfg: InvarLockConfig) -> dict[str, Any]:
     return extra
 
 
-def _load_model_with_cfg(adapter: Any, cfg: InvarLockConfig, device: str) -> Any:
+def _load_model_with_cfg(
+    adapter: Any,
+    cfg: InvarLockConfig,
+    device: str,
+    *,
+    profile: str | None = None,
+) -> Any:
     """Load a model with config-provided kwargs, filtering for strict adapters."""
     try:
         model_id = cfg.model.id
@@ -985,20 +1045,21 @@ def _load_model_with_cfg(adapter: Any, cfg: InvarLockConfig, device: str) -> Any
         raise ValueError("Missing model.id in config")
 
     extra = _extract_model_load_kwargs(cfg)
-    try:
-        sig = inspect.signature(adapter.load_model)
-        accepts_var_kw = any(
-            p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
-        )
-        if accepts_var_kw:
-            return adapter.load_model(model_id, device=device, **extra)
-        allowed = {k: v for k, v in extra.items() if k in sig.parameters}
-        if allowed:
-            return adapter.load_model(model_id, device=device, **allowed)
-    except Exception:
-        # Fall back to the strictest call shape.
-        pass
-    return adapter.load_model(model_id, device=device)
+    with _suppress_noisy_warnings(profile):
+        try:
+            sig = inspect.signature(adapter.load_model)
+            accepts_var_kw = any(
+                p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+            )
+            if accepts_var_kw:
+                return adapter.load_model(model_id, device=device, **extra)
+            allowed = {k: v for k, v in extra.items() if k in sig.parameters}
+            if allowed:
+                return adapter.load_model(model_id, device=device, **allowed)
+        except Exception:
+            # Fall back to the strictest call shape.
+            pass
+        return adapter.load_model(model_id, device=device)
 
 
 def _run_bare_control(
@@ -1018,7 +1079,7 @@ def _run_bare_control(
     restore_fn: Any | None,
     console: Console,
     resolved_loss_type: str,
-    profile_normalized: str | None,
+    profile_normalized: str | None = None,
     snapshot_provenance: dict[str, bool] | None = None,
     skip_model_load: bool = False,
 ) -> dict[str, Any] | None:
@@ -1047,7 +1108,9 @@ def _run_bare_control(
         elif skip_model_load:
             bare_target_model = model or SimpleNamespace(name="bare_stub_model")
         else:
-            bare_target_model = _load_model_with_cfg(adapter, cfg, resolved_device)
+            bare_target_model = _load_model_with_cfg(
+                adapter, cfg, resolved_device, profile=profile_normalized
+            )
             private_model_loaded = True
             if snapshot_provenance is not None:
                 snapshot_provenance["reload_path_used"] = True
@@ -1137,6 +1200,7 @@ def _execute_guarded_run(
     final_count: int,
     restore_fn: Any | None,
     resolved_device: str,
+    profile_normalized: str | None = None,
     console: Console,
     snapshot_provenance: dict[str, bool] | None = None,
     skip_model_load: bool = False,
@@ -1151,7 +1215,9 @@ def _execute_guarded_run(
         model = model or SimpleNamespace(name="guarded_stub_model")
     else:
         console.print(f"🔧 Loading model: {cfg.model.id} (attempt 1)")
-        model = _load_model_with_cfg(adapter, cfg, resolved_device)
+        model = _load_model_with_cfg(
+            adapter, cfg, resolved_device, profile=profile_normalized
+        )
         if snapshot_provenance is not None:
             snapshot_provenance["reload_path_used"] = True
 
@@ -1936,6 +2002,7 @@ def run_command(
     config = _coerce_option(config)
     device = _coerce_option(device)
     profile = _coerce_option(profile)
+    profile_normalized = (str(profile or "")).strip().lower()
     out = _coerce_option(out)
     edit = _coerce_option(edit)
     tier = _coerce_option(tier)
@@ -2044,7 +2111,7 @@ def run_command(
             seed_value = 42
         set_seed(seed_value)
         # Enforce deterministic algorithms in CI/Release profiles when torch is available
-        profile_label = (str(profile or "").lower()) if profile else None
+        profile_label = profile_normalized or None
         if torch is not None and profile_label in {"ci", "release"}:
             try:  # pragma: no cover - behavior depends on torch availability
                 if hasattr(torch, "use_deterministic_algorithms"):
@@ -2111,8 +2178,8 @@ def run_command(
 
         run_id = f"{output_dir.name}-{timestamp}" if output_dir.name else timestamp
 
-        console.print(f"📁 Output directory: {run_dir}")
-        console.print(f"🆔  Run ID: {run_id}")
+        console.print(_format_kv_line("Output", str(run_dir)))
+        console.print(_format_kv_line("Run ID", run_id))
 
         # Initialize retry controller if --until-pass mode enabled
         retry_controller = _init_retry_controller(
@@ -2127,7 +2194,6 @@ def run_command(
         pairing_schedule: dict[str, Any] | None = None
         if baseline:
             baseline_path = Path(baseline)
-            profile_normalized = (profile or "").strip().lower()
             strict_baseline = profile_normalized in {"ci", "release"}
             if not baseline_path.exists():
                 msg = (
@@ -3185,8 +3251,8 @@ def run_command(
                 for key, values in model_profile.module_selectors.items()
             }
 
-        console.print(f"✂️  Edit: {edit_op.name}")
-        console.print(f"🛡️  Guards: {[g.name for g in guards]}")
+        console.print(_format_kv_line("Edit", str(edit_op.name)))
+        console.print(_format_kv_line("Guards", _format_guard_chain(guards)))
 
         # Model load/snapshot strategy
         model = None
@@ -3201,7 +3267,9 @@ def run_command(
         try:
             # Load once
             console.print(f"🔧 Loading model once: {cfg.model.id}")
-            model = _load_model_with_cfg(adapter, cfg, resolved_device)
+            model = _load_model_with_cfg(
+                adapter, cfg, resolved_device, profile=profile_normalized
+            )
 
             # No edit-specific bootstrap logic
 
@@ -3402,7 +3470,6 @@ def run_command(
 
         # RETRY LOOP - All report processing inside loop
         attempt = 1
-        profile_normalized = (profile or "").lower()
         measure_guard_overhead, skip_overhead = _should_measure_overhead(
             profile_normalized
         )
@@ -3487,6 +3554,7 @@ def run_command(
                     final_count=final_count,
                     restore_fn=restore_fn,
                     resolved_device=resolved_device,
+                    profile_normalized=profile_normalized,
                     console=console,
                     snapshot_provenance=snapshot_provenance,
                     skip_model_load=skip_model_load,

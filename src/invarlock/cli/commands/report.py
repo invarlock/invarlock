@@ -8,7 +8,9 @@ Provides the `invarlock report` group with:
 """
 
 import json
+import math
 from pathlib import Path
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -17,6 +19,71 @@ from invarlock.reporting import certificate as certificate_lib
 from invarlock.reporting import report as report_lib
 
 console = Console()
+
+SECTION_WIDTH = 67
+KV_LABEL_WIDTH = 16
+GATE_LABEL_WIDTH = 32
+ARTIFACT_LABEL_WIDTH = 18
+
+
+def _print_section_header(console: Console, title: str) -> None:
+    bar = "═" * SECTION_WIDTH
+    console.print(bar)
+    console.print(title)
+    console.print(bar)
+
+
+def _format_kv_line(label: str, value: str, *, width: int = KV_LABEL_WIDTH) -> str:
+    return f"  {label:<{width}}: {value}"
+
+
+def _format_status(ok: bool) -> str:
+    return "PASS" if ok else "FAIL"
+
+
+def _fmt_metric_value(value: Any) -> str:
+    try:
+        val = float(value)
+    except (TypeError, ValueError):
+        return "N/A"
+    if not math.isfinite(val):
+        return "N/A"
+    return f"{val:.3f}"
+
+
+def _fmt_ci_range(ci: Any) -> str:
+    if isinstance(ci, (list, tuple)) and len(ci) == 2:
+        try:
+            lo = float(ci[0])
+            hi = float(ci[1])
+        except (TypeError, ValueError):
+            return "N/A"
+        if math.isfinite(lo) and math.isfinite(hi):
+            return f"{lo:.3f}–{hi:.3f}"
+    return "N/A"
+
+
+def _artifact_entries(
+    saved_files: dict[str, str], output_dir: str
+) -> list[tuple[str, str]]:
+    order = [
+        ("cert", "Certificate (JSON)"),
+        ("cert_md", "Certificate (MD)"),
+        ("json", "JSON"),
+        ("markdown", "Markdown"),
+        ("html", "HTML"),
+    ]
+    entries: list[tuple[str, str]] = [("Output", output_dir)]
+    used: set[str] = set()
+    for key, label in order:
+        if key in saved_files:
+            entries.append((label, str(saved_files[key])))
+            used.add(key)
+    for key in sorted(saved_files.keys()):
+        if key in used:
+            continue
+        entries.append((key.upper(), str(saved_files[key])))
+    return entries
 
 
 # Group with callback so `invarlock report` still generates reports
@@ -109,40 +176,8 @@ def _generate_reports(
         )
 
         # Show results
-        console.print("[green]✅ Reports generated successfully![/green]")
-        console.print(f"📁 Output directory: {output_dir}")
+        console.print("[green]Reports generated successfully.[/green]")
 
-        for fmt, file_path in saved_files.items():
-            if fmt == "cert":
-                console.print(f"  📜 CERTIFICATE (JSON): {file_path}")
-            elif fmt == "cert_md":
-                console.print(f"  📜 CERTIFICATE (MD): {file_path}")
-            else:
-                console.print(f"  📄 {fmt.upper()}: {file_path}")
-
-        # Show key metrics (PM-first). Avoid PPL-first wording.
-        console.print("\n📈 Key Metrics:")
-        console.print(f"  Model: {primary_report['meta']['model_id']}")
-        console.print(f"  Edit: {primary_report['edit']['name']}")
-        pm = (primary_report.get("metrics", {}) or {}).get("primary_metric", {})
-        if isinstance(pm, dict) and pm:
-            kind = str(pm.get("kind") or "primary")
-            console.print(f"  Primary Metric: {kind}")
-            final = pm.get("final")
-            if isinstance(final, int | float):
-                console.print(f"  point (final): {final:.3f}")
-            dci = pm.get("display_ci")
-            if isinstance(dci, tuple | list) and len(dci) == 2:
-                try:
-                    lo, hi = float(dci[0]), float(dci[1])
-                    console.print(f"  CI: {lo:.3f}–{hi:.3f}")
-                except Exception:
-                    pass
-            ratio = pm.get("ratio_vs_baseline")
-            if isinstance(ratio, int | float):
-                console.print(f"  ratio vs baseline: {ratio:.3f}")
-
-        # Show certificate validation if generated
         if "cert" in formats and baseline_report:
             try:
                 certificate = certificate_lib.make_certificate(
@@ -155,23 +190,76 @@ def _generate_reports(
 
                 block = _console_block(certificate)
                 overall_pass = bool(block.get("overall_pass"))
+                status_text = _format_status(overall_pass)
 
-                console.print("\n📜 Certificate Validation:")
-                status_emoji = "✅" if overall_pass else "❌"
-                console.print(
-                    f"  Overall Status: {status_emoji} {'PASS' if overall_pass else 'FAIL'}"
+                console.print("")
+                _print_section_header(console, "CERTIFICATE SUMMARY")
+                console.print(_format_kv_line("Status", status_text))
+
+                schema_version = certificate.get("schema_version")
+                if schema_version:
+                    console.print(
+                        _format_kv_line("Schema Version", str(schema_version))
+                    )
+
+                run_id = certificate.get("run_id") or (
+                    (primary_report.get("meta", {}) or {}).get("run_id")
                 )
+                if run_id:
+                    console.print(_format_kv_line("Run ID", str(run_id)))
 
+                model_id = (primary_report.get("meta", {}) or {}).get("model_id")
+                edit_name = (primary_report.get("edit", {}) or {}).get("name")
+                if model_id:
+                    console.print(_format_kv_line("Model", str(model_id)))
+                if edit_name:
+                    console.print(_format_kv_line("Edit", str(edit_name)))
+
+                pm = (primary_report.get("metrics", {}) or {}).get("primary_metric", {})
+                console.print("  PRIMARY METRIC")
+                pm_entries: list[tuple[str, str]] = []
+                if isinstance(pm, dict) and pm:
+                    kind = str(pm.get("kind") or "primary")
+                    pm_entries.append(("Kind", kind))
+                    preview = pm.get("preview")
+                    if preview is not None:
+                        pm_entries.append(("Preview", _fmt_metric_value(preview)))
+                    final = pm.get("final")
+                    if final is not None:
+                        pm_entries.append(("Final", _fmt_metric_value(final)))
+                    ratio = pm.get("ratio_vs_baseline")
+                    if ratio is not None:
+                        pm_entries.append(("Ratio", _fmt_metric_value(ratio)))
+                    dci = pm.get("display_ci")
+                    if dci is not None:
+                        pm_entries.append(("CI", _fmt_ci_range(dci)))
+                if not pm_entries:
+                    pm_entries.append(("Status", "Unavailable"))
+                for idx, (label, value) in enumerate(pm_entries):
+                    branch = "└─" if idx == len(pm_entries) - 1 else "├─"
+                    console.print(f"  {branch} {label:<14} {value}")
+
+                console.print("  VALIDATION GATES")
                 rows = block.get("rows", [])
                 if isinstance(rows, list) and rows:
-                    for row in rows:
-                        try:
-                            label = row.get("label")
-                            status = row.get("status")
-                            if label and status:
-                                console.print(f"  {label}: {status}")
-                        except Exception:
-                            continue
+                    for idx, row in enumerate(rows):
+                        label = str(row.get("label") or "Unknown")
+                        ok = bool(row.get("ok"))
+                        status = _format_status(ok)
+                        mark = "✓" if ok else "✗"
+                        branch = "└─" if idx == len(rows) - 1 else "├─"
+                        console.print(
+                            f"  {branch} {label:<{GATE_LABEL_WIDTH}} {mark} {status}"
+                        )
+                else:
+                    console.print(f"  └─ {'No validation rows':<{GATE_LABEL_WIDTH}} -")
+
+                console.print("  ARTIFACTS")
+                entries = _artifact_entries(saved_files, str(output_dir))
+                for idx, (label, value) in enumerate(entries):
+                    branch = "└─" if idx == len(entries) - 1 else "├─"
+                    console.print(f"  {branch} {label:<{ARTIFACT_LABEL_WIDTH}} {value}")
+                console.print("═" * SECTION_WIDTH)
 
                 # In CLI report flow, do not hard-exit on validation failure; just display status.
                 # CI gating should be handled by dedicated verify commands.
@@ -182,6 +270,12 @@ def _generate_reports(
                 )
                 # Exit non-zero on certificate generation error
                 raise typer.Exit(1) from e
+        else:
+            console.print(_format_kv_line("Output", str(output_dir)))
+            for label, value in _artifact_entries(saved_files, str(output_dir))[1:]:
+                console.print(
+                    _format_kv_line(label, str(value), width=ARTIFACT_LABEL_WIDTH)
+                )
 
     except Exception as e:
         console.print(f"[red]❌ Report generation failed: {e}[/red]")
