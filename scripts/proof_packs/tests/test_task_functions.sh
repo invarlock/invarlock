@@ -1275,7 +1275,7 @@ test_task_calibrate_clean_edits_candidate_selection_branches() {
             echo "4"
             return 0
         fi
-        if [[ "${1:-}" == "-" ]]; then
+        if [[ "${1:-}" == "-" && "${2:-}" == "${model_output_dir}/state/clean_edit_params.jsonl" ]]; then
             local output_path="${3:-}"
             if [[ -n "${output_path}" ]]; then
                 mkdir -p "$(dirname "${output_path}")"
