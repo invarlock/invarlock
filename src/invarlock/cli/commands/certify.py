@@ -14,6 +14,7 @@ Steps:
 
 from __future__ import annotations
 
+import inspect
 import io
 import json
 import math
@@ -655,14 +656,32 @@ def certify_command(
                     message="Certificate",
                     emoji="📜",
                 ):
-                    _report(
-                        run=str(edited_report),
-                        format="cert",
-                        baseline=str(baseline_report),
-                        output=cert_out,
-                        style=output_style.name,
-                        no_color=no_color,
-                    )
+                    report_kwargs = {
+                        "run": str(edited_report),
+                        "format": "cert",
+                        "baseline": str(baseline_report),
+                        "output": cert_out,
+                        "style": output_style.name,
+                        "no_color": no_color,
+                    }
+                    try:
+                        sig = inspect.signature(_report)
+                    except (TypeError, ValueError):
+                        _report(**report_kwargs)
+                    else:
+                        if any(
+                            param.kind == inspect.Parameter.VAR_KEYWORD
+                            for param in sig.parameters.values()
+                        ):
+                            _report(**report_kwargs)
+                        else:
+                            _report(
+                                **{
+                                    key: value
+                                    for key, value in report_kwargs.items()
+                                    if key in sig.parameters
+                                }
+                            )
             except Exception:
                 if quiet_buffer is not None:
                     console.print(quiet_buffer.getvalue(), markup=False)
