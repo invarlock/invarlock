@@ -23,6 +23,11 @@ def test_resolve_auto_adapter_llama(tmp_path):
     assert resolve_auto_adapter(str(model_dir)) == "hf_llama"
 
 
+def test_resolve_auto_adapter_qwen(tmp_path):
+    model_dir = _write_cfg(tmp_path, "qwen2", "Qwen2ForCausalLM")
+    assert resolve_auto_adapter(str(model_dir)) == "hf_llama"
+
+
 def test_resolve_auto_adapter_bert(tmp_path):
     model_dir = _write_cfg(tmp_path, "bert", "BertForMaskedLM")
     assert resolve_auto_adapter(str(model_dir)) == "hf_bert"

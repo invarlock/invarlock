@@ -80,9 +80,10 @@ def resolve_auto_adapter(
         archs = [str(a) for a in c.get("architectures", []) if isinstance(a, str)]
         arch_blob = " ".join(archs)
         if (
-            mt in {"llama", "mistral", "qwen", "yi"}
+            mt in {"llama", "mistral", "qwen", "qwen2", "qwen2_moe", "yi"}
             or "Llama" in arch_blob
             or "Mistral" in arch_blob
+            or "Qwen" in arch_blob
         ):
             return "hf_llama"
         # Treat masked-LM families as BERT-like
