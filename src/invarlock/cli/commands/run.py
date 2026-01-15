@@ -3884,17 +3884,12 @@ def run_command(
                     report["guard_overhead"] = guard_overhead_payload
 
             had_baseline = bool(baseline and Path(baseline).exists())
-            allow_empty_eval_windows = str(
-                os.environ.get("INVARLOCK_ALLOW_EMPTY_EVAL_WINDOWS", "")
-            ).lower() in {"1", "true", "yes"}
-            eval_windows = getattr(core_report, "evaluation_windows", None)
-            if allow_empty_eval_windows and eval_windows is None:
-                eval_windows = {}
-            if isinstance(eval_windows, dict) and (
-                eval_windows or allow_empty_eval_windows
+            if (
+                hasattr(core_report, "evaluation_windows")
+                and core_report.evaluation_windows
             ):
-                preview_windows = eval_windows.get("preview", {})
-                final_windows = eval_windows.get("final", {})
+                preview_windows = core_report.evaluation_windows.get("preview", {})
+                final_windows = core_report.evaluation_windows.get("final", {})
                 report["evaluation_windows"] = {
                     "preview": {
                         "window_ids": list(preview_windows.get("window_ids", [])),
