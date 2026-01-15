@@ -49,6 +49,10 @@ Tip: enable Hub downloads per command when fetching models/datasets:
 - [Configuration Gallery](user-guide/config-gallery.md)
 - [Example Reports](user-guide/example-reports.md)
 - [Reading a Certificate](user-guide/reading-certificate.md)
+- [Plugins](user-guide/plugins.md) — Extending adapters and guards
+- [Bring Your Own Data](user-guide/bring-your-own-data.md) — Custom datasets
+- [Proof Packs](user-guide/proof-packs.md) — Validation suite bundles
+- [Proof Packs Internals](user-guide/proof-packs-internals.md) — Suite architecture
 
 ### Reference
 
@@ -100,6 +104,9 @@ to change proposals or releases when you update calibration.
 
 ### Security
 
+- [Threat Model](security/threat-model.md) — Assets and adversaries
+- [Security Architecture](security/architecture.md) — Components and defaults
+- [Best Practices](security/best-practices.md) — Operational recommendations
 - [pip-audit Allowlist](security/pip-audit-allowlist.md)
 
 ### Governance
