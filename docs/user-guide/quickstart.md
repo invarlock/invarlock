@@ -1,11 +1,18 @@
 # InvarLock Quickstart Guide
 
-This guide helps you get started with InvarLock (Edit‑agnostic robustness certificates for weight edits)
-quickly. Every run flows through the **GuardChain**
-(invariants → spectral → RMT → variance) and produces a machine-readable safety
-certificate with drift, guard-overhead, and policy digests.
+This guide covers core commands and workflows for InvarLock. Every run flows
+through the **GuardChain** (invariants → spectral → RMT → variance) and produces
+a machine-readable safety certificate.
 
-Note: For installation and environment setup, see Getting Started. This page focuses on core commands and workflow.
+## Prerequisites
+
+**Before using this guide**, complete the setup in [Getting Started](getting-started.md):
+
+- Python 3.12+ environment with `pip install "invarlock[hf]"`
+- Network access enabled via `INVARLOCK_ALLOW_NETWORK=1` (first run only)
+- `invarlock doctor` passes without errors
+
+This page assumes setup is complete and focuses on **workflows**, not installation.
 
 Tip: Enable downloads per command when fetching models/datasets:
 `INVARLOCK_ALLOW_NETWORK=1 invarlock certify ...`
@@ -131,14 +138,24 @@ By default `invarlock run` uses `--device auto`, which selects CUDA, then Apple
 Silicon (MPS), then CPU. Override it explicitly (`--device cpu`, `--device mps`,
 etc.) when validating portability or troubleshooting driver issues.
 
-## Next Steps
+## Related Documentation
 
-- See [CLI Reference](../reference/cli.md) for detailed command options
-- Check [Configuration Schema](../reference/config-schema.md) for all config options
-- Review [Certificate Schema](../reference/certificate-schema.md) for validation details
-- See [Reading a Certificate](reading-certificate.md) for guidance
- - Read the [Device Support note](getting-started.md#device-support) if you plan to run on CPU or Apple Silicon.
+**Workflows:**
 
-> Note: presets and the tiny-matrix script are repo-first assets (not shipped in wheels)
-> Clone the repository if you want to reference presets under `configs/` or use the matrix script
-> Otherwise, pass flags directly (no preset) for CLI-only flows
+- [Compare & Certify (BYOE)](compare-and-certify.md) — Full baseline ↔ subject workflow
+- [Bring Your Own Data](bring-your-own-data.md) — Custom datasets
+- [Reading a Certificate](reading-certificate.md) — Understanding output
+
+**Reference:**
+
+- [CLI Reference](../reference/cli.md) — Detailed command options
+- [Configuration Schema](../reference/config-schema.md) — All config options
+- [Certificate Schema](../reference/certificate-schema.md) — Validation details
+
+**Troubleshooting:**
+
+- [Troubleshooting Guide](troubleshooting.md) — Common errors and fixes
+- [Device Support](getting-started.md#device-support) — CPU and Apple Silicon notes
+
+> Note: Presets and the tiny-matrix script are repo-first assets (not shipped in wheels).
+> Clone the repository to use presets under `configs/`, or pass flags directly for CLI-only flows.
