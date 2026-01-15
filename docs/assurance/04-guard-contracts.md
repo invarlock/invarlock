@@ -8,7 +8,7 @@
 
 - [1. Guard Contracts](#1-guard-contracts) — what each guard checks and how it fails
 - [2. Statistical Method Primer](#2-statistical-method-primer) — paired Δlog perplexity and bootstrap CIs
-- [3. Calibration & Evaluation Slice Requirements](#3-calibration--evaluation-slice-requirements) — acceptance criteria for evaluation schedules
+- [3. Calibration & Evaluation Slice Requirements](#3-calibration-evaluation-slice-requirements) — acceptance criteria for evaluation schedules
 - [4. Reproducibility Kit](#4-reproducibility-kit) — how to reproduce a certificate
 - [5. Device Tolerance Guidance](#5-device-tolerance-guidance) — expected drift across backends
 - [6. Threshold Rationale (Defaults)](#6-threshold-rationale-defaults) — why the defaults are what they are
