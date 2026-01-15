@@ -69,7 +69,30 @@ EOF
     assert_file_exists "${pack_dir}/README.md" "readme written"
 }
 
+
+test_run_pack_checksums_include_files() {
+    mock_reset
+
+    source ./scripts/proof_packs/run_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}/results"
+    echo "verdict" > "${pack_dir}/results/final_verdict.txt"
+    echo "{}" > "${pack_dir}/manifest.json"
+
+    pack_write_checksums "${pack_dir}"
+
+    assert_file_exists "${pack_dir}/checksums.sha256" "checksums written"
+
+    local checksums
+    checksums="$(cat "${pack_dir}/checksums.sha256")"
+    assert_match "results/final_verdict.txt" "${checksums}" "checksums include results"
+    assert_match "manifest.json" "${checksums}" "checksums include manifest"
+}
+
+
 test_run_pack_helpers_cover_error_paths() {
+
     mock_reset
 
     source ./scripts/proof_packs/run_pack.sh
