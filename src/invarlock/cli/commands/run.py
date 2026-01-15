@@ -32,6 +32,15 @@ import psutil
 import typer
 from rich.console import Console
 
+from invarlock.cli.output import (
+    OutputStyle,
+    make_console,
+    print_event,
+    print_timing_summary,
+    resolve_output_style,
+    timed_step,
+)
+
 try:
     import torch
 except ImportError:
@@ -65,7 +74,42 @@ from ..config import (
 )
 from ..overhead_utils import _extract_pm_snapshot_for_overhead
 
-console = Console()
+console = make_console()
+
+
+def _style_from_console(console: Console, profile: str | None = None) -> OutputStyle:
+    style = getattr(console, "_invarlock_output_style", None)
+    if isinstance(style, OutputStyle):
+        return style
+    return resolve_output_style(
+        style=None,
+        profile=profile,
+        progress=False,
+        timing=False,
+        no_color=False,
+    )
+
+
+def _event(
+    console: Console,
+    tag: str,
+    message: str,
+    *,
+    emoji: str | None = None,
+    console_style: str | None = None,
+    profile: str | None = None,
+) -> None:
+    style = _style_from_console(console, profile=profile)
+    print_event(
+        console,
+        tag,
+        message,
+        style=style,
+        emoji=emoji,
+        console_style=console_style,
+    )
+
+
 LIGHT_IMPORT = os.getenv("INVARLOCK_LIGHT_IMPORT", "").strip().lower() in {
     "1",
     "true",
@@ -809,38 +853,60 @@ def _prepare_config_for_run(
         resolve_edit_kind as _resolve_edit_kind,
     )
 
-    console.print(f"📋 Loading configuration: {config_path}")
+    _event(
+        console,
+        "INIT",
+        f"Loading configuration: {config_path}",
+        emoji="📋",
+        profile=profile,
+    )
     cfg = _load_config(config_path)
 
     # Apply profile if specified (dev is a no-op)
     if profile and str(profile).lower() not in {"dev"}:
-        console.print(f"🎯 Applying profile: {profile}")
+        _event(
+            console, "INIT", f"Applying profile: {profile}", emoji="🎯", profile=profile
+        )
         try:
             cfg = _apply_profile(cfg, profile)
         except Exception as exc:
-            console.print(f"[red]❌ {exc}[/red]")
+            _event(console, "FAIL", str(exc), emoji="❌", profile=profile)
             raise typer.Exit(1) from exc
 
     # Apply edit override
     if edit:
         try:
             edit_name = _resolve_edit_kind(edit)
-            console.print(f"✂️  Edit override: {edit} → {edit_name}")
+            _event(
+                console,
+                "EXEC",
+                f"Edit override: {edit} → {edit_name}",
+                emoji="✂️",
+                profile=profile,
+            )
             cfg = _apply_edit_override(cfg, edit)
         except ValueError as e:
-            console.print(f"[red]❌ {e}[/red]")
+            _event(console, "FAIL", str(e), emoji="❌", profile=profile)
             raise typer.Exit(1) from e
 
     # Apply CLI overrides for auto configuration
     if tier or probes is not None:
         if tier and tier not in ["conservative", "balanced", "aggressive", "none"]:
-            console.print(
-                f"[red]❌ Invalid tier '{tier}'. Valid options: conservative, balanced, aggressive, none[/red]"
+            _event(
+                console,
+                "FAIL",
+                f"Invalid tier '{tier}'. Valid options: conservative, balanced, aggressive, none",
+                emoji="❌",
+                profile=profile,
             )
             raise typer.Exit(1)
         if probes is not None and (probes < 0 or probes > 10):
-            console.print(
-                f"[red]❌ Invalid probes '{probes}'. Must be between 0 and 10[/red]"
+            _event(
+                console,
+                "FAIL",
+                f"Invalid probes '{probes}'. Must be between 0 and 10",
+                emoji="❌",
+                profile=profile,
             )
             raise typer.Exit(1)
 
@@ -851,10 +917,22 @@ def _prepare_config_for_run(
         cfg_dict["auto"] = auto_section
         if tier:
             auto_section["tier"] = tier
-            console.print(f"🎛️  Auto tier override: {tier}")
+            _event(
+                console,
+                "INIT",
+                f"Auto tier override: {tier}",
+                emoji="🎛️",
+                profile=profile,
+            )
         if probes is not None:
             auto_section["probes"] = probes
-            console.print(f"🔬 Auto probes override: {probes}")
+            _event(
+                console,
+                "INIT",
+                f"Auto probes override: {probes}",
+                emoji="🔬",
+                profile=profile,
+            )
         cfg = InvarLockConfig(cfg_dict)
 
     # Resolve adapter:auto to a concrete built-in adapter if requested
@@ -887,7 +965,7 @@ def _maybe_plan_release_windows(
 
 
 def _print_pipeline_start(console: Console) -> None:
-    console.print("🚀 Starting InvarLock pipeline...")
+    _event(console, "INIT", "Starting InvarLock pipeline...", emoji="🚀")
 
 
 def _emit_run_artifacts(
@@ -896,7 +974,7 @@ def _emit_run_artifacts(
     """Save run report and return emitted artifact paths."""
     from invarlock.reporting.report import save_report as _save_report
 
-    console.print("💾 Saving run report...")
+    _event(console, "DATA", "Saving run report...", emoji="💾")
     return _save_report(
         report, out_dir, formats=["json"], filename_prefix=filename_prefix
     )
@@ -923,7 +1001,7 @@ def _resolve_device_and_output(
     console.print(_format_kv_line("Device", f"{resolved_device} ({resolution_note})"))
     is_valid, error_msg = _validate(resolved_device)
     if not is_valid:
-        console.print(f"[red]❌ Device validation failed: {error_msg}[/red]")
+        _event(console, "FAIL", f"Device validation failed: {error_msg}", emoji="❌")
         raise typer.Exit(1)
 
     # Determine output directory
@@ -1086,7 +1164,13 @@ def _run_bare_control(
     """Execute the bare-control run for overhead estimation and return payload."""
     from invarlock.core.runner import CoreRunner as _CoreRunner
 
-    console.print("🧪 Running bare control (guards disabled) for overhead check")
+    _event(
+        console,
+        "EXEC",
+        "Running bare control (guards disabled) for overhead check",
+        emoji="🧪",
+        profile=profile_normalized,
+    )
     set_seed(seed_bundle["python"])  # type: ignore[arg-type]
 
     bare_runner = _CoreRunner()
@@ -1147,8 +1231,12 @@ def _run_bare_control(
                 return False
 
         if not (_finite(bare_ppl_preview) and _finite(bare_ppl_final)):
-            console.print(
-                "[yellow]⚠️  Primary metric non-finite during bare control; continuing with diagnostics.[/yellow]"
+            _event(
+                console,
+                "WARN",
+                "Primary metric non-finite during bare control; continuing with diagnostics.",
+                emoji="⚠️",
+                profile=profile_normalized,
             )
 
     payload: dict[str, Any] = {
@@ -1214,7 +1302,13 @@ def _execute_guarded_run(
     elif skip_model_load:
         model = model or SimpleNamespace(name="guarded_stub_model")
     else:
-        console.print(f"🔧 Loading model: {cfg.model.id} (attempt 1)")
+        _event(
+            console,
+            "INIT",
+            f"Loading model: {cfg.model.id} (attempt 1)",
+            emoji="🔧",
+            profile=profile_normalized,
+        )
         model = _load_model_with_cfg(
             adapter, cfg, resolved_device, profile=profile_normalized
         )
@@ -1266,10 +1360,10 @@ def _postprocess_and_summarize(
     saved_files = _emit_run_artifacts(
         report=report, out_dir=run_dir, filename_prefix="report", console=console
     )
-    console.print("[green]✅ Run completed successfully![/green]")
-    console.print(f"📄 Report: {saved_files['json']}")
+    _event(console, "PASS", "Run completed successfully!", emoji="✅")
+    _event(console, "DATA", f"Report: {saved_files['json']}", emoji="📄")
     if run_config.event_path:
-        console.print(f"📝 Events: {run_config.event_path}")
+        _event(console, "DATA", f"Events: {run_config.event_path}", emoji="📝")
     return saved_files
 
 
@@ -1359,9 +1453,14 @@ def _validate_and_harvest_baseline_schedule(
         message = f"PAIRING-EVIDENCE-MISSING: {path}: {reason}"
         if prof in {"ci", "release"}:
             raise InvarlockError(code="E001", message=message)
-        _print(
-            f"[red]❌ Baseline pairing schedule '{path}' is incompatible: {reason}[/red]"
-        )
+        if console is not None:
+            _event(
+                console,
+                "FAIL",
+                f"Baseline pairing schedule '{path}' is incompatible: {reason}",
+                emoji="❌",
+                profile=prof,
+            )
         raise typer.Exit(1)
 
     baseline_meta = (
@@ -1516,9 +1615,14 @@ def _validate_and_harvest_baseline_schedule(
             prof = (profile or "dev").strip().lower()
             if prof in {"ci", "release"}:
                 _fail_schedule("preview_hash mismatch vs baseline report data")
-            _print(
-                "[yellow]⚠️  Baseline preview_hash mismatch; continuing in dev profile.[/yellow]"
-            )
+            if console is not None:
+                _event(
+                    console,
+                    "WARN",
+                    "Baseline preview_hash mismatch; continuing in dev profile.",
+                    emoji="⚠️",
+                    profile=prof,
+                )
         if (
             isinstance(baseline_final_hash, str)
             and baseline_final_hash
@@ -1527,9 +1631,14 @@ def _validate_and_harvest_baseline_schedule(
             prof = (profile or "dev").strip().lower()
             if prof in {"ci", "release"}:
                 _fail_schedule("final_hash mismatch vs baseline report data")
-            _print(
-                "[yellow]⚠️  Baseline final_hash mismatch; continuing in dev profile.[/yellow]"
-            )
+            if console is not None:
+                _event(
+                    console,
+                    "WARN",
+                    "Baseline final_hash mismatch; continuing in dev profile.",
+                    emoji="⚠️",
+                    profile=prof,
+                )
         if (
             isinstance(baseline_dataset_hash, str)
             and baseline_dataset_hash
@@ -1538,9 +1647,14 @@ def _validate_and_harvest_baseline_schedule(
             prof = (profile or "dev").strip().lower()
             if prof in {"ci", "release"}:
                 _fail_schedule("dataset_hash mismatch vs baseline report data")
-            _print(
-                "[yellow]⚠️  Baseline dataset_hash mismatch; continuing in dev profile.[/yellow]"
-            )
+            if console is not None:
+                _event(
+                    console,
+                    "WARN",
+                    "Baseline dataset_hash mismatch; continuing in dev profile.",
+                    emoji="⚠️",
+                    profile=prof,
+                )
     except InvarlockError:
         raise
     except typer.Exit:
@@ -1562,10 +1676,14 @@ def _validate_and_harvest_baseline_schedule(
         and baseline_final is not None
         and baseline_final != cfg_final
     ):
-        _print(
-            "[yellow]⚠️  Adjusting evaluation window counts to match baseline schedule "
-            f"({baseline_preview}/{baseline_final}).[/yellow]"
-        )
+        if console is not None:
+            _event(
+                console,
+                "WARN",
+                f"Adjusting evaluation window counts to match baseline schedule ({baseline_preview}/{baseline_final}).",
+                emoji="⚠️",
+                profile=profile,
+            )
 
     effective_preview = int(baseline_preview)
     effective_final = int(baseline_final)
@@ -1891,18 +2009,25 @@ def _plan_release_windows(
             candidate_msg = f", candidate_unique={int(candidate_unique)}" + (
                 f"/{int(candidate_limit)}" if candidate_limit is not None else ""
             )
-        console.print(
-            "📏 Release window capacity:"
+        _event(
+            console,
+            "METRIC",
+            "Release window capacity:"
             f" unique={available_unique}, reserve={reserve_windows} "
             f"(calib {calibration_windows}, buffer {buffer_windows}), "
             f"usable={available_for_eval}, "
             f"per-arm raw={actual_per_arm_raw} → selected {actual_per_arm} "
-            f"(target {target_per_arm}{candidate_msg})"
+            f"(target {target_per_arm}{candidate_msg})",
+            emoji="📏",
+            profile="release",
         )
         if actual_per_arm < target_per_arm:
-            console.print(
-                "[yellow]⚠️ Adjusted per-arm windows down from "
-                f"{target_per_arm} to {actual_per_arm} based on capacity.[/yellow]"
+            _event(
+                console,
+                "WARN",
+                f"Adjusted per-arm windows down from {target_per_arm} to {actual_per_arm} based on capacity.",
+                emoji="⚠️",
+                profile="release",
             )
 
     plan = {
@@ -1984,6 +2109,16 @@ def run_command(
     no_cleanup: bool = typer.Option(
         False, "--no-cleanup", help="Skip cleanup of temporary artifacts"
     ),
+    style: str | None = typer.Option(
+        None, "--style", help="Output style (audit|friendly)"
+    ),
+    progress: bool = typer.Option(
+        False, "--progress", help="Show progress done messages"
+    ),
+    timing: bool = typer.Option(False, "--timing", help="Show timing summary"),
+    no_color: bool = typer.Option(
+        False, "--no-color", help="Disable ANSI colors (respects NO_COLOR=1)"
+    ),
 ):
     """
     Run InvarLock pipeline with the given configuration.
@@ -2012,12 +2147,28 @@ def run_command(
     timeout = _coerce_option(timeout)
     baseline = _coerce_option(baseline)
     no_cleanup = bool(_coerce_option(no_cleanup, False))
+    style = _coerce_option(style)
+    progress = bool(_coerce_option(progress, False))
+    timing = bool(_coerce_option(timing, False))
+    no_color = bool(_coerce_option(no_color, False))
+
+    output_style = resolve_output_style(
+        style=str(style) if style is not None else None,
+        profile=profile_normalized,
+        progress=progress,
+        timing=timing,
+        no_color=no_color,
+    )
+    console._invarlock_output_style = output_style
+    if not output_style.color:
+        console.no_color = True
+    timings: dict[str, float] = {}
 
     # Use shared CLI coercers from invarlock.cli.utils
     report_path_out: str | None = None
 
     def _fail_run(message: str) -> None:
-        console.print(f"[red]❌ {message}[/red]")
+        _event(console, "FAIL", message, emoji="❌", profile=profile_normalized)
         # Generic failure path → exit 1 (InvarlockError paths handle code 3 separately)
         raise typer.Exit(1)
 
@@ -2028,12 +2179,14 @@ def run_command(
 
         _ = _torch  # pragma: no cover
     except (ImportError, ModuleNotFoundError) as e:
-        console.print(
-            "❌ Torch is required for this command. "
+        _event(
+            console,
+            "FAIL",
+            "Torch is required for this command. "
             'Install extras with: pip install "invarlock[hf]" '
             'or "invarlock[adapters]".',
-            style="red",
-            markup=False,
+            emoji="❌",
+            profile=profile_normalized,
         )
         raise typer.Exit(1) from e
 
@@ -2140,10 +2293,14 @@ def run_command(
             "numpy": int(numpy_seed),
             "torch": int(torch_seed) if torch_seed is not None else None,
         }
-        console.print(
-            "🎲 Deterministic seeds → "
+        _event(
+            console,
+            "INIT",
+            "Deterministic seeds → "
             f"python={seed_bundle['python']}, numpy={seed_bundle['numpy']}, "
-            f"torch={seed_bundle['torch'] if seed_bundle['torch'] is not None else 'N/A'}"
+            f"torch={seed_bundle['torch'] if seed_bundle['torch'] is not None else 'N/A'}",
+            emoji="🎲",
+            profile=profile_normalized,
         )
 
         # Resolve device and output directory
@@ -2202,8 +2359,12 @@ def run_command(
                 )
                 if strict_baseline:
                     raise InvarlockError(code="E001", message=msg)
-                console.print(
-                    f"[yellow]⚠️  {msg}. Falling back to dataset schedule.[/yellow]"
+                _event(
+                    console,
+                    "WARN",
+                    f"{msg}. Falling back to dataset schedule.",
+                    emoji="⚠️",
+                    profile=profile_normalized,
                 )
             else:
                 try:
@@ -2213,8 +2374,12 @@ def run_command(
                     msg = f"PAIRING-EVIDENCE-MISSING: baseline report JSON parse failed ({exc})"
                     if strict_baseline:
                         raise InvarlockError(code="E001", message=msg) from exc
-                    console.print(
-                        f"[yellow]⚠️  {msg}. Falling back to dataset schedule.[/yellow]"
+                    _event(
+                        console,
+                        "WARN",
+                        f"{msg}. Falling back to dataset schedule.",
+                        emoji="⚠️",
+                        profile=profile_normalized,
                     )
                     baseline_report_data = None
                 if isinstance(baseline_report_data, dict):
@@ -2272,8 +2437,12 @@ def run_command(
                                     tokenizer_hash = tok
                         except Exception:
                             pass
-                        console.print(
-                            "🧬 Loaded baseline evaluation schedule for pairing"
+                        _event(
+                            console,
+                            "DATA",
+                            "Loaded baseline evaluation schedule for pairing",
+                            emoji="🧬",
+                            profile=profile_normalized,
                         )
                     else:
                         msg = (
@@ -2282,8 +2451,12 @@ def run_command(
                         )
                         if strict_baseline:
                             raise InvarlockError(code="E001", message=msg)
-                        console.print(
-                            f"[yellow]⚠️  {msg}. Falling back to dataset schedule.[/yellow]"
+                        _event(
+                            console,
+                            "WARN",
+                            f"{msg}. Falling back to dataset schedule.",
+                            emoji="⚠️",
+                            profile=profile_normalized,
                         )
                         baseline_report_data = None
                         pairing_schedule = None
@@ -2309,15 +2482,23 @@ def run_command(
         adapter = registry.get_adapter(cfg.model.adapter)
         edit_name = getattr(getattr(cfg, "edit", None), "name", None)
         if not isinstance(edit_name, str) or not edit_name.strip():
-            console.print(
-                "[red]❌ Edit configuration must specify a non-empty `edit.name`.[/red]"
+            _event(
+                console,
+                "FAIL",
+                "Edit configuration must specify a non-empty `edit.name`.",
+                emoji="❌",
+                profile=profile_normalized,
             )
             raise typer.Exit(1)
         try:
             edit_op = registry.get_edit(edit_name.strip())
         except Exception:
-            console.print(
-                f"[yellow]⚠️  Unknown edit '{edit_name.strip()}'. Using pass-through shim.[/yellow]"
+            _event(
+                console,
+                "WARN",
+                f"Unknown edit '{edit_name.strip()}'. Using pass-through shim.",
+                emoji="⚠️",
+                profile=profile_normalized,
             )
             edit_op = SimpleNamespace(name=edit_name.strip())
 
@@ -2353,8 +2534,12 @@ def run_command(
                         registry.get_plugin_metadata(guard_name, "guards")
                     )
                 except KeyError:
-                    console.print(
-                        f"[yellow]⚠️  Guard '{guard_name}' not found, skipping[/yellow]"
+                    _event(
+                        console,
+                        "WARN",
+                        f"Guard '{guard_name}' not found, skipping",
+                        emoji="⚠️",
+                        profile=profile_normalized,
                     )
         plugin_provenance = {
             "adapter": adapter_meta,
@@ -2363,7 +2548,13 @@ def run_command(
         }
         pm_acceptance_range = _resolve_pm_acceptance_range(cfg)
 
-        console.print(f"🔌 Adapter: {adapter.name}")
+        _event(
+            console,
+            "DATA",
+            f"Adapter: {adapter.name}",
+            emoji="🔌",
+            profile=profile_normalized,
+        )
 
         # Create run configuration
         guard_overrides = {
@@ -2479,7 +2670,7 @@ def run_command(
                 try:
                     tokenizer, tokenizer_hash = resolve_tokenizer(model_profile)
                 except Exception as exc:
-                    console.print(f"[red]❌ {exc}[/red]")
+                    _event(console, "FAIL", str(exc), emoji="❌", profile=profile)
                     raise typer.Exit(1) from exc
             preview_window_ids = pairing_schedule["preview"].get("window_ids")
             preview_labels = pairing_schedule["preview"].get("labels")
@@ -2701,7 +2892,13 @@ def run_command(
                 if capacity_meta and "window_capacity" not in dataset_meta:
                     dataset_meta["window_capacity"] = capacity_meta
         elif cfg.dataset.provider:
-            console.print(f"📊 Loading dataset: {cfg.dataset.provider}")
+            _event(
+                console,
+                "DATA",
+                f"Loading dataset: {cfg.dataset.provider}",
+                emoji="📊",
+                profile=profile_normalized,
+            )
             # Pass through provider-specific kwargs when available
             provider_kwargs = {}
             for key in (
@@ -2768,7 +2965,7 @@ def run_command(
             try:
                 tokenizer, tokenizer_hash = resolve_tokenizer(model_profile)
             except Exception as exc:
-                console.print(f"[red]❌ {exc}[/red]")
+                _event(console, "FAIL", str(exc), emoji="❌", profile=profile)
                 raise typer.Exit(1) from exc
 
             dataset_stride = getattr(
@@ -2802,7 +2999,7 @@ def run_command(
                             console=console,
                         )
                     except RuntimeError as err:
-                        console.print(f"[red]❌ {err}[/red]")
+                        _event(console, "FAIL", str(err), emoji="❌", profile=profile)
                         raise typer.Exit(1) from err
 
                     actual_per_arm = int(window_plan["actual_preview"])
@@ -2814,9 +3011,12 @@ def run_command(
                         cfg.dataset, "stride", getattr(cfg.dataset, "seq_len", 0)
                     )
                 else:
-                    console.print(
-                        "[yellow]⚠️ Release profile requested but dataset provider "
-                        "does not expose capacity estimation; using configured window counts.[/yellow]"
+                    _event(
+                        console,
+                        "WARN",
+                        "Release profile requested but dataset provider does not expose capacity estimation; using configured window counts.",
+                        emoji="⚠️",
+                        profile=profile_normalized,
                     )
 
             preview_records: list[tuple[list[int], list[int]]] = []
@@ -3020,8 +3220,12 @@ def run_command(
                     raise RuntimeError(
                         "Unable to construct non-overlapping windows within minimum window floor."
                     )
-                console.print(
-                    f"[yellow]⚠️  Detected {deficit} duplicate windows; reducing per-arm windows to {proposed_per_arm} and retrying stratification.[/yellow]"
+                _event(
+                    console,
+                    "WARN",
+                    f"Detected {deficit} duplicate windows; reducing per-arm windows to {proposed_per_arm} and retrying stratification.",
+                    emoji="⚠️",
+                    profile=profile_normalized,
                 )
 
                 effective_preview = proposed_per_arm
@@ -3186,7 +3390,13 @@ def run_command(
                 )
 
         # Execute the real pipeline using CoreRunner
-        console.print(f"⚙️  Executing pipeline with {len(guards)} guards...")
+        _event(
+            console,
+            "EXEC",
+            f"Executing pipeline with {len(guards)} guards...",
+            emoji="⚙️",
+            profile=profile_normalized,
+        )
         runner = CoreRunner()
 
         # Prepare auto configuration for tier resolution
@@ -3266,10 +3476,25 @@ def run_command(
         # Try single-load with snapshot/restore if adapter supports it; fallback to reload per attempt
         try:
             # Load once
-            console.print(f"🔧 Loading model once: {cfg.model.id}")
-            model = _load_model_with_cfg(
-                adapter, cfg, resolved_device, profile=profile_normalized
+            _event(
+                console,
+                "INIT",
+                f"Loading model once: {cfg.model.id}",
+                emoji="🔧",
+                profile=profile_normalized,
             )
+            with timed_step(
+                console=console,
+                style=_style_from_console(console, profile=profile_normalized),
+                timings=timings,
+                key="load_model",
+                tag="INIT",
+                message="Load model",
+                emoji="🔧",
+            ):
+                model = _load_model_with_cfg(
+                    adapter, cfg, resolved_device, profile=profile_normalized
+                )
 
             # No edit-specific bootstrap logic
 
@@ -3474,8 +3699,12 @@ def run_command(
             profile_normalized
         )
         if skip_overhead and profile_normalized in {"ci", "release"}:
-            console.print(
-                "[yellow]⚠️  Overhead check skipped via INVARLOCK_SKIP_OVERHEAD_CHECK[/yellow]"
+            _event(
+                console,
+                "WARN",
+                "Overhead check skipped via INVARLOCK_SKIP_OVERHEAD_CHECK",
+                emoji="⚠️",
+                profile=profile_normalized,
             )
 
         while True:
@@ -3483,12 +3712,32 @@ def run_command(
             set_seed(seed_bundle["python"])
 
             if retry_controller:
-                console.print(f"\n🚀 Attempt {attempt}/{max_attempts}")
+                console.print("\n")
+                _event(
+                    console,
+                    "EXEC",
+                    f"Attempt {attempt}/{max_attempts}",
+                    emoji="🚀",
+                    profile=profile_normalized,
+                )
                 if attempt > 1:
-                    console.print(f"🔄 Retry attempt {attempt}/{max_attempts}")
+                    _event(
+                        console,
+                        "EXEC",
+                        f"Retry attempt {attempt}/{max_attempts}",
+                        emoji="🔄",
+                        profile=profile_normalized,
+                    )
             else:
                 if attempt > 1:
-                    console.print(f"\n🚀 Attempt {attempt}")
+                    console.print("\n")
+                    _event(
+                        console,
+                        "EXEC",
+                        f"Attempt {attempt}",
+                        emoji="🚀",
+                        profile=profile_normalized,
+                    )
 
             # Adjust parameters for retry attempts
             if retry_controller and attempt > 1:
@@ -3539,35 +3788,53 @@ def run_command(
                     )
 
                 # Ensure clean state for guarded run
-                core_report, model = _execute_guarded_run(
-                    runner=runner,
-                    adapter=adapter,
-                    model=model,
-                    cfg=cfg,
-                    edit_op=edit_op,
-                    run_config=run_config,
-                    guards=guards,
-                    calibration_data=calibration_data,
-                    auto_config=auto_config,
-                    edit_config=edit_config,
-                    preview_count=preview_count,
-                    final_count=final_count,
-                    restore_fn=restore_fn,
-                    resolved_device=resolved_device,
-                    profile_normalized=profile_normalized,
+                with timed_step(
                     console=console,
-                    snapshot_provenance=snapshot_provenance,
-                    skip_model_load=skip_model_load,
-                )
+                    style=_style_from_console(console, profile=profile_normalized),
+                    timings=timings,
+                    key="execute",
+                    tag="EXEC",
+                    message="Execute pipeline",
+                    emoji="⚙️",
+                ):
+                    core_report, model = _execute_guarded_run(
+                        runner=runner,
+                        adapter=adapter,
+                        model=model,
+                        cfg=cfg,
+                        edit_op=edit_op,
+                        run_config=run_config,
+                        guards=guards,
+                        calibration_data=calibration_data,
+                        auto_config=auto_config,
+                        edit_config=edit_config,
+                        preview_count=preview_count,
+                        final_count=final_count,
+                        restore_fn=restore_fn,
+                        resolved_device=resolved_device,
+                        profile_normalized=profile_normalized,
+                        console=console,
+                        snapshot_provenance=snapshot_provenance,
+                        skip_model_load=skip_model_load,
+                    )
             except _SnapshotRestoreFailed as exc:
                 snapshot_provenance["restore_failed"] = True
                 _free_model_memory(model)
                 model = None
                 restore_fn = None
-                console.print(
-                    "[yellow]⚠️  Snapshot restore failed; switching to reload-per-attempt.[/yellow]"
+                _event(
+                    console,
+                    "WARN",
+                    "Snapshot restore failed; switching to reload-per-attempt.",
+                    emoji="⚠️",
+                    profile=profile_normalized,
                 )
-                console.print(f"[yellow]↳ {exc}[/yellow]")
+                _event(
+                    console,
+                    "WARN",
+                    f"↳ {exc}",
+                    profile=profile_normalized,
+                )
                 if retry_controller:
                     retry_controller.record_attempt(
                         attempt,
@@ -4003,8 +4270,12 @@ def run_command(
                     },
                 }
             elif had_baseline and (profile or "").lower() in {"ci", "release"}:
-                console.print(
-                    "[red]❌ [INVARLOCK:E001] PAIRING-SCHEDULE-MISMATCH: baseline pairing requested but evaluation windows were not produced. Check capacity/pairing config.[/red]"
+                _event(
+                    console,
+                    "FAIL",
+                    "[INVARLOCK:E001] PAIRING-SCHEDULE-MISMATCH: baseline pairing requested but evaluation windows were not produced. Check capacity/pairing config.",
+                    emoji="❌",
+                    profile=profile_normalized,
                 )
                 raise typer.Exit(3)
             else:
@@ -4215,12 +4486,20 @@ def run_command(
                     if ok:
                         report["artifacts"]["checkpoint_path"] = str(export_dir)
                     else:
-                        console.print(
-                            "[yellow]⚠️  Model export requested but adapter did not save a HF directory.[/yellow]"
+                        _event(
+                            console,
+                            "WARN",
+                            "Model export requested but adapter did not save a HF directory.",
+                            emoji="⚠️",
+                            profile=profile_normalized,
                         )
                 except Exception:
-                    console.print(
-                        "[yellow]⚠️  Model export requested but failed due to an unexpected error.[/yellow]"
+                    _event(
+                        console,
+                        "WARN",
+                        "Model export requested but failed due to an unexpected error.",
+                        emoji="⚠️",
+                        profile=profile_normalized,
                     )
 
             # Set flags
@@ -4550,15 +4829,23 @@ def run_command(
                     if isinstance(pm_prev, (int | float)) and isinstance(
                         pm_fin, (int | float)
                     ):
-                        console.print(
-                            f"📌 Primary Metric [{pm_kind}] — preview: {pm_prev:.3f}, final: {pm_fin:.3f}"
+                        _event(
+                            console,
+                            "METRIC",
+                            f"Primary Metric [{pm_kind}] — preview: {pm_prev:.3f}, final: {pm_fin:.3f}",
+                            emoji="📌",
+                            profile=profile_normalized,
                         )
                     ratio_vs_base = pm_obj.get("ratio_vs_baseline")
                     if isinstance(ratio_vs_base, (int | float)) and math.isfinite(
                         ratio_vs_base
                     ):
-                        console.print(
-                            f"🔗 Ratio vs baseline [{pm_kind}]: {ratio_vs_base:.3f}"
+                        _event(
+                            console,
+                            "METRIC",
+                            f"Ratio vs baseline [{pm_kind}]: {ratio_vs_base:.3f}",
+                            emoji="🔗",
+                            profile=profile_normalized,
                         )
                 except Exception:
                     pass
@@ -4570,8 +4857,12 @@ def run_command(
                     console, guard_overhead_info
                 )
                 if not guard_overhead_info.get("passed", True):
-                    console.print(
-                        "[red]⚠️  Guard overhead gate FAILED: Guards add more than the permitted budget[/red]"
+                    _event(
+                        console,
+                        "FAIL",
+                        "Guard overhead gate FAILED: Guards add more than the permitted budget",
+                        emoji="⚠️",
+                        profile=profile_normalized,
                     )
                     # Only fail hard when the overhead check was actually evaluated
                     # (e.g., for causal LMs with available bare/guarded PM). For
@@ -4612,7 +4903,13 @@ def run_command(
                     if baseline_report is None:
                         raise FileNotFoundError("Baseline report unavailable")
 
-                    console.print("📜 Generating safety certificate...")
+                    _event(
+                        console,
+                        "EXEC",
+                        "Generating safety certificate...",
+                        emoji="📜",
+                        profile=profile_normalized,
+                    )
                     certificate = make_certificate(report, baseline_report)
 
                     validation = certificate.get("validation", {})
@@ -4629,11 +4926,21 @@ def run_command(
                     )
 
                     if certificate_passed:
-                        console.print("[green]✅ Certificate PASSED all gates![/green]")
+                        _event(
+                            console,
+                            "PASS",
+                            "Certificate PASSED all gates!",
+                            emoji="✅",
+                            profile=profile_normalized,
+                        )
                         break
                     else:
-                        console.print(
-                            f"[yellow]⚠️  Certificate FAILED gates: {', '.join(failed_gates)}[/yellow]"
+                        _event(
+                            console,
+                            "FAIL",
+                            f"Certificate FAILED gates: {', '.join(failed_gates)}",
+                            emoji="⚠️",
+                            profile=profile_normalized,
                         )
 
                         # Auto-tune mask-only heads (binary search on keep count)
@@ -4678,8 +4985,12 @@ def run_command(
                                     }
                                 )
                                 head_section["global_k"] = next_keep
-                                console.print(
-                                    f"🔧 Auto-tune adjust: global_k → {next_keep} (bounds {keep_low}-{keep_high})"
+                                _event(
+                                    console,
+                                    "INIT",
+                                    f"Auto-tune adjust: global_k → {next_keep} (bounds {keep_low}-{keep_high})",
+                                    emoji="🔧",
+                                    profile=profile_normalized,
                                 )
                         except Exception:
                             pass
@@ -4688,14 +4999,22 @@ def run_command(
                             attempt += 1
                             continue
                         else:
-                            console.print(
-                                f"[red]❌ Exhausted retry budget after {attempt} attempts[/red]"
+                            _event(
+                                console,
+                                "FAIL",
+                                f"Exhausted retry budget after {attempt} attempts",
+                                emoji="❌",
+                                profile=profile_normalized,
                             )
                             break
 
                 except Exception as cert_error:
-                    console.print(
-                        f"[yellow]⚠️  Certificate validation failed: {cert_error}[/yellow]"
+                    _event(
+                        console,
+                        "WARN",
+                        f"Certificate validation failed: {cert_error}",
+                        emoji="⚠️",
+                        profile=profile_normalized,
                     )
                     if retry_controller:
                         retry_controller.record_attempt(
@@ -4724,11 +5043,31 @@ def run_command(
             # (moved) Cleanup printing occurs after loop to guarantee execution
             pass
 
+        if output_style.timing and timings:
+            timings_for_summary = dict(timings)
+            timings_for_summary["total"] = sum(timings_for_summary.values())
+            print_timing_summary(
+                console,
+                timings_for_summary,
+                style=output_style,
+                order=[
+                    ("Load model", "load_model"),
+                    ("Execute", "execute"),
+                    ("Total", "total"),
+                ],
+            )
+
         # Normal path falls through; cleanup handled below in finally
         return report_path_out
 
     except FileNotFoundError as e:
-        console.print(f"[red]❌ Configuration file not found: {e}[/red]")
+        _event(
+            console,
+            "FAIL",
+            f"Configuration file not found: {e}",
+            emoji="❌",
+            profile=profile_normalized,
+        )
         raise typer.Exit(1) from e
     except InvarlockError as ce:
         # InvarlockError → code 3 only in CI/Release; dev → 1
@@ -4744,12 +5083,22 @@ def run_command(
             traceback.print_exc()
         # Emit a clearer message for schema failures (exit 2)
         if isinstance(e, ValueError) and "Invalid RunReport" in str(e):
-            console.print(
-                "[red]❌ Schema invalid: run report structure failed validation[/red]"
+            _event(
+                console,
+                "FAIL",
+                "Schema invalid: run report structure failed validation",
+                emoji="❌",
+                profile=profile_normalized,
             )
             code = 2
         else:
-            console.print(f"[red]❌ Pipeline execution failed: {e}[/red]")
+            _event(
+                console,
+                "FAIL",
+                f"Pipeline execution failed: {e}",
+                emoji="❌",
+                profile=profile_normalized,
+            )
             code = _resolve_exit_code(e, profile=profile)
         raise typer.Exit(code) from e
     finally:
@@ -4912,11 +5261,9 @@ def _print_guard_overhead_summary(
     """Print a concise guard-overhead console summary. Returns threshold fraction used."""
     evaluated = bool(guard_overhead_info.get("evaluated", True))
     if not evaluated:
-        console.print("🛡️  Guard Overhead: not evaluated")
+        _event(console, "METRIC", "Guard Overhead: not evaluated", emoji="🛡️")
         return GUARD_OVERHEAD_THRESHOLD
-    overhead_status = (
-        "✅ PASS" if guard_overhead_info.get("passed", True) else "❌ FAIL"
-    )
+    overhead_status = "PASS" if guard_overhead_info.get("passed", True) else "FAIL"
     overhead_percent = guard_overhead_info.get("overhead_percent")
     if isinstance(overhead_percent, (int | float)) and math.isfinite(
         float(overhead_percent)
@@ -4935,8 +5282,11 @@ def _print_guard_overhead_summary(
     except (TypeError, ValueError):
         threshold_fraction = GUARD_OVERHEAD_THRESHOLD
     threshold_display = f"≤ +{threshold_fraction * 100:.1f}%"
-    console.print(
-        f"🛡️  Guard Overhead: {overhead_status} {overhead_display} ({threshold_display})"
+    _event(
+        console,
+        "METRIC",
+        f"Guard Overhead: {overhead_status} {overhead_display} ({threshold_display})",
+        emoji="🛡️",
     )
     return threshold_fraction
 
@@ -4946,8 +5296,12 @@ def _print_retry_summary(console: Console, retry_controller: Any | None) -> None
     try:
         if retry_controller and getattr(retry_controller, "attempt_history", None):
             summary = retry_controller.get_attempt_summary()
-            console.print(
-                f"\n📊 Retry Summary: {summary['total_attempts']} attempts in {summary['elapsed_time']:.1f}s"
+            console.print("\n")
+            _event(
+                console,
+                "METRIC",
+                f"Retry Summary: {summary['total_attempts']} attempts in {summary['elapsed_time']:.1f}s",
+                emoji="📊",
             )
     except Exception:
         # Never break the run for summary printing
@@ -4970,10 +5324,15 @@ def _init_retry_controller(
         retry_controller = RetryController(
             max_attempts=max_attempts, timeout=timeout, verbose=True
         )
-        console.print(f"🔄 Retry mode enabled: max {max_attempts} attempts")
+        _event(
+            console,
+            "INIT",
+            f"Retry mode enabled: max {max_attempts} attempts",
+            emoji="🔄",
+        )
         if baseline:
-            console.print(f"📋 Using baseline: {baseline}")
+            _event(console, "DATA", f"Using baseline: {baseline}", emoji="📋")
     else:
         if baseline:
-            console.print(f"📋 Using baseline: {baseline}")
+            _event(console, "DATA", f"Using baseline: {baseline}", emoji="📋")
     return retry_controller

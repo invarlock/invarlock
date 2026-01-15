@@ -148,6 +148,14 @@ def _certify_lazy(
     banner: bool = typer.Option(
         True, "--banner/--no-banner", help="Show header banner"
     ),
+    style: str = typer.Option("audit", "--style", help="Output style (audit|friendly)"),
+    timing: bool = typer.Option(False, "--timing", help="Show timing summary"),
+    progress: bool = typer.Option(
+        True, "--progress/--no-progress", help="Show progress done messages"
+    ),
+    no_color: bool = typer.Option(
+        False, "--no-color", help="Disable ANSI colors (respects NO_COLOR=1)"
+    ),
 ):
     from .commands.certify import certify_command as _cert
 
@@ -165,6 +173,10 @@ def _certify_lazy(
         quiet=quiet,
         verbose=verbose,
         banner=banner,
+        style=style,
+        timing=timing,
+        progress=progress,
+        no_color=no_color,
     )
 
 
@@ -282,6 +294,16 @@ def _run_typed(
     no_cleanup: bool = typer.Option(
         False, "--no-cleanup", help="Skip cleanup of temporary artifacts"
     ),
+    style: str | None = typer.Option(
+        None, "--style", help="Output style (audit|friendly)"
+    ),
+    progress: bool = typer.Option(
+        False, "--progress", help="Show progress done messages"
+    ),
+    timing: bool = typer.Option(False, "--timing", help="Show timing summary"),
+    no_color: bool = typer.Option(
+        False, "--no-color", help="Disable ANSI colors (respects NO_COLOR=1)"
+    ),
 ):
     from .commands.run import run_command as _run
 
@@ -298,6 +320,10 @@ def _run_typed(
         timeout=timeout,
         baseline=baseline,
         no_cleanup=no_cleanup,
+        style=style,
+        progress=progress,
+        timing=timing,
+        no_color=no_color,
     )
 
 
