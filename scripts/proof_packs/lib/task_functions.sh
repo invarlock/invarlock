@@ -1118,7 +1118,7 @@ PY
                 case "${family}" in
                     "quant_rtn")
                         :
-                        status_payload=$(jq -n \
+                        status_payload=$(jq -cn \
                             --arg status "selected" \
                             --arg scope "${scope}" \
                             --arg edit_dir_name "${edit_dir_name}" \
@@ -1128,7 +1128,7 @@ PY
                         ;;
                     "fp8_quant")
                         :
-                        status_payload=$(jq -n \
+                        status_payload=$(jq -cn \
                             --arg status "selected" \
                             --arg scope "${scope}" \
                             --arg format "${format}" \
@@ -1137,7 +1137,7 @@ PY
                         ;;
                     "magnitude_prune")
                         :
-                        status_payload=$(jq -n \
+                        status_payload=$(jq -cn \
                             --arg status "selected" \
                             --arg scope "${scope}" \
                             --arg edit_dir_name "${edit_dir_name}" \
@@ -1146,7 +1146,7 @@ PY
                         ;;
                     "lowrank_svd")
                         :
-                        status_payload=$(jq -n \
+                        status_payload=$(jq -cn \
                             --arg status "selected" \
                             --arg scope "${scope}" \
                             --arg edit_dir_name "${edit_dir_name}" \
@@ -1164,7 +1164,7 @@ PY
 
         if [[ "${selected}" != "true" ]]; then
             local skip_payload
-            skip_payload=$(jq -n --arg status "skipped" --arg reason "lm_eval_regression" --arg scope "${scope}" '{status:$status, reason:$reason, scope:$scope}')
+            skip_payload=$(jq -cn --arg status "skipped" --arg reason "lm_eval_regression" --arg scope "${scope}" '{status:$status, reason:$reason, scope:$scope}')
             printf '{"family":"%s","data":%s}\n' "${family}" "${skip_payload}" >> "${params_jsonl}"
         fi
     }
@@ -1193,7 +1193,8 @@ PY
     done
     select_candidate "lowrank_svd" "ffn" "${svd_candidates[@]}"
 
-    _cmd_python - "${params_jsonl}" "${clean_params_file}" "${clean_tasks}" "${clean_limit}" <<'PY'
+    local convert_rc=0
+    _cmd_python - "${params_jsonl}" "${clean_params_file}" "${clean_tasks}" "${clean_limit}" <<'PY' || convert_rc=$?
 import json
 import sys
 from datetime import datetime
@@ -1217,6 +1218,15 @@ for line in params_path.read_text().splitlines():
 
 output_path.write_text(json.dumps(payload, indent=2))
 PY
+
+    if [[ ${convert_rc} -ne 0 ]]; then
+        echo "ERROR: Failed to build clean calibration JSON" >> "${log_file}"
+        return ${convert_rc}
+    fi
+    if [[ ! -f "${clean_params_file}" ]]; then
+        echo "ERROR: Clean calibration output missing: ${clean_params_file}" >> "${log_file}"
+        return 1
+    fi
 
     echo "  Clean calibration saved: ${clean_params_file}" >> "${log_file}"
     return 0
@@ -2909,6 +2919,11 @@ task_certify_edit() {
         return 1
     fi
 
+    local abs_baseline_path
+    abs_baseline_path="$(cd "$(dirname "${baseline_path}")" && pwd)/$(basename "${baseline_path}")"
+    local abs_edit_path
+    abs_edit_path="$(cd "$(dirname "${edit_path}")" && pwd)/$(basename "${edit_path}")"
+
     if [[ -f "${cert_file}" ]]; then
         echo "  Certification for ${edit_dir_name} run ${run_num} already exists, skipping" >> "${log_file}"
         return 0
@@ -3046,8 +3061,8 @@ PRESET_YAML
     (
         cd "${work_dir}" || exit 1
         env "${extra_env[@]}" invarlock certify \
-            --source "${baseline_path}" \
-            --edited "${edit_path}" \
+            --source "${abs_baseline_path}" \
+            --edited "${abs_edit_path}" \
             --profile "${profile_flag}" \
             --tier "${INVARLOCK_TIER:-balanced}" \
             --out "${cert_dir}" \
@@ -3138,6 +3153,11 @@ task_certify_error() {
         echo "ERROR: Error model not found: ${error_path}" >> "${log_file}"
         return 1
     fi
+
+    local abs_baseline_path
+    abs_baseline_path="$(cd "$(dirname "${baseline_path}")" && pwd)/$(basename "${baseline_path}")"
+    local abs_error_path
+    abs_error_path="$(cd "$(dirname "${error_path}")" && pwd)/$(basename "${error_path}")"
 
     if [[ -f "${cert_file}" ]]; then
         echo "  Certification for error ${error_type} already exists, skipping" >> "${log_file}"
@@ -3277,8 +3297,8 @@ PRESET_YAML
     (
         cd "${work_dir}" || exit 1
         env "${extra_env[@]}" invarlock certify \
-            --source "${baseline_path}" \
-            --edited "${error_path}" \
+            --source "${abs_baseline_path}" \
+            --edited "${abs_error_path}" \
             --profile "${profile_flag}" \
             --tier "${INVARLOCK_TIER:-balanced}" \
             --out "${cert_dir}" \
