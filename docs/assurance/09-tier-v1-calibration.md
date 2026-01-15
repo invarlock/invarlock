@@ -197,7 +197,6 @@ unprofiled runs.
 
 ## See Also
 
-- [Calibration Reference](../reference/calibration.md) — CLI commands for running calibration sweeps
 - [Tier Policy Catalog](../reference/tier-policy-catalog.md) — Policy keys and where they appear in certificates
 - [Guards Reference](../reference/guards.md) — Guard configuration options
 
