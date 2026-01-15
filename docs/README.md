@@ -93,6 +93,7 @@ Tip: enable Hub downloads per command when fetching models/datasets:
 - [Guard Overhead Method](assurance/10-guard-overhead-method.md)
 - [Policy Provenance & Digest](assurance/11-policy-provenance.md)
 - [Device Drift Bands](assurance/12-device-drift-bands.md)
+- [Glossary](assurance/glossary.md)
 
 Note: Every safety claim is backed by automated tests and cross-referenced in
 the docs. See Guard Contracts → Coverage Reference
