@@ -9,6 +9,24 @@
 | **Primary commands** | `certify`, `verify`, `report`, `run`, `plugins`, `doctor`. |
 | **Requires** | `invarlock[hf]` for HF workflows; optional extras for quantized adapters. |
 | **Network** | Offline by default; enable per command with `INVARLOCK_ALLOW_NETWORK=1`. |
+| **Source of truth** | `src/invarlock/cli/app.py`, `src/invarlock/cli/commands/*.py`. |
+
+## Contents
+
+1. [Quick Start](#quick-start)
+2. [Concepts](#concepts)
+3. [Reference](#reference)
+   - [Artifact outputs matrix](#artifact-outputs-matrix)
+   - [Early Stops (CI/Release)](#early-stops-cirelease)
+   - [Measurement Contracts](#measurement-contracts-gpumps-first)
+   - [Command Index](#command-index)
+4. [Quickstart Commands](#quickstart-commands)
+5. [JSON Output](#json-output-verify-and-plugins)
+6. [Compare & Certify](#compare--certify)
+7. [Profile Reference](#profile-reference-ci-vs-release)
+8. [Security Defaults](#security-defaults)
+9. [Troubleshooting](#troubleshooting)
+10. [Related Documentation](#related-documentation)
 
 ## Quick Start
 
@@ -688,4 +706,4 @@ Notes:
 - [Configuration Schema](config-schema.md)
 - [Dataset Providers](datasets.md)
 - [Environment Variables](env-vars.md)
-- [Certificate Schema (v1)](certificate-schema.md)
+- [Certificates](certificates.md) — Schema, telemetry, and HTML export

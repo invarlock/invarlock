@@ -202,4 +202,4 @@ finally:
 - [Configuration Schema](config-schema.md)
 - [Dataset Providers](datasets.md)
 - [Environment Variables](env-vars.md)
-- [Exporting Certificates (HTML)](exporting-certificates-html.md)
+- [Certificates](certificates.md) — Schema, telemetry, and HTML export

@@ -1,5 +1,15 @@
 # Proof Packs
 
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Hardware-agnostic validation runs that bundle certificates into portable artifacts. |
+| **Audience** | CI operators producing validation evidence across GPU topologies. |
+| **Requires** | GPU capable of fitting selected models; HF cache or network for model download. |
+| **Outputs** | Proof pack directory with certificates, reports, checksums, and optional GPG signature. |
+| **Source of truth** | `scripts/proof_packs/run_suite.sh`, `scripts/proof_packs/run_pack.sh`. |
+
 Proof packs are hardware-agnostic validation runs that bundle InvarLock certificates,
 summary reports, and verification metadata into a portable artifact. They replace the
 B200-specific validation harness with a suite that can run on any NVIDIA GPU topology

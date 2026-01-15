@@ -17,6 +17,67 @@ security or alignment.
 - Certification runs use the pairing, windowing, and bootstrap profiles
   described in the assurance docs and configs.
 
+## Security Flow Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      SECURITY BOUNDARY LAYERS                           │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                    NETWORK LAYER                                │   │
+│  │  ┌───────────────────────────────────────────────────────────┐ │   │
+│  │  │ INVARLOCK_ALLOW_NETWORK=0 (default)                       │ │   │
+│  │  │ ─────────────────────────────────────                     │ │   │
+│  │  │ • Socket blocking via invarlock.security                  │ │   │
+│  │  │ • Outbound connections denied by default                  │ │   │
+│  │  │ • Downloads require explicit opt-in                       │ │   │
+│  │  └───────────────────────────────────────────────────────────┘ │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                              │                                          │
+│                              ▼                                          │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                    ARTIFACT LAYER                               │   │
+│  │  ┌─────────────────┐  ┌──────────────────┐  ┌────────────────┐ │   │
+│  │  │ MODEL LOADING   │  │ DATASET LOADING  │  │ CONFIG LOADING │ │   │
+│  │  │ ─────────────── │  │ ────────────────  │  │ ──────────────  │ │   │
+│  │  │ • Adapter       │  │ • Provider       │  │ • YAML parsing │ │   │
+│  │  │   validation    │  │   validation     │  │ • Schema       │ │   │
+│  │  │ • Torch device  │  │ • Tokenizer hash │  │   validation   │ │   │
+│  │  │   placement     │  │ • Window pairing │  │ • include      │ │   │
+│  │  │ • No pickle     │  │   verification   │  │   restriction  │ │   │
+│  │  │   execution     │  │                  │  │   to config dir│ │   │
+│  │  └─────────────────┘  └──────────────────┘  └────────────────┘ │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                              │                                          │
+│                              ▼                                          │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                    VALIDATION LAYER                             │   │
+│  │  ┌─────────────────────────────────────────────────────────────┐│   │
+│  │  │ invarlock doctor → invarlock certify → invarlock verify    ││   │
+│  │  │ ────────────────────────────────────────────────────────── ││   │
+│  │  │ • Environment    • Guard checks      • Schema validation   ││   │
+│  │  │   diagnostics    • Pairing math      • Ratio math check    ││   │
+│  │  │ • Config check   • CI/Release gates  • Contract match      ││   │
+│  │  └─────────────────────────────────────────────────────────────┘│   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                              │                                          │
+│                              ▼                                          │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                    EVIDENCE LAYER                               │   │
+│  │  ┌────────────────────────────────────────────────────────────┐ │   │
+│  │  │ evaluation.cert.json                                       │ │   │
+│  │  │ ────────────────────────────────                           │ │   │
+│  │  │ • seeds, device, policy_digest                             │ │   │
+│  │  │ • tokenizer_hash, provider_digest                          │ │   │
+│  │  │ • measurement_contract_hash (guards)                       │ │   │
+│  │  │ • Events log for forensic review                           │ │   │
+│  │  └────────────────────────────────────────────────────────────┘ │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
 ## Assets and adversaries (in scope)
 
 **Assets**

@@ -164,7 +164,7 @@ To reproduce a certificate:
    to regenerate the certificate; when seeds, config, and backend match, the
    resulting certificate is bit-for-bit identical.
 
-Explainers for each field live in `docs/reference/certificate-schema.md`.
+Explainers for each field live in [`docs/reference/certificates.md`](../reference/certificates.md).
 
 ## 5. Device Tolerance Guidance
 
