@@ -221,6 +221,7 @@ test_task_calibration_run_and_generate_preset_cover_overrides_large_model_and_re
 
     # Override parsing + stride clamp + large model bootstrap/env + report handling.
     export INVARLOCK_BOOTSTRAP_N="1234"
+    export INVARLOCK_CERT_MIN_WINDOWS="256"
     export TASK_ID="cal1"
     export TASK_PARAMS='{"seq_len":100,"stride":200,"batch_size":16}'
     _estimate_model_size() { echo "7"; }
@@ -228,6 +229,7 @@ test_task_calibration_run_and_generate_preset_cover_overrides_large_model_and_re
     mkdir -p "${run_dir}"
     echo "{}" > "${run_dir}/report.json"
     task_calibration_run "${model_name}" 0 1 42 "${out}" "${log_file}"
+    assert_match "CI window override: preview=256, final=256" "$(cat "${log_file}")" "ci window override applied"
 
     # Preset skip and fallback to model_id when model_size is 7.
     local preset_dir="${out}/presets"
