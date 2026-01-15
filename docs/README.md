@@ -58,6 +58,7 @@ Tip: enable Hub downloads per command when fetching models/datasets:
 
 - [Reference Index](reference/index.md)
 - [CLI Reference](reference/cli.md)
+- [Calibration CLI](reference/calibration.md) — `invarlock calibrate` for tier policy sweeps
 - [Configuration Schema](reference/config-schema.md)
 - [Guards](reference/guards.md)
 - [Model Adapters](reference/model-adapters.md)
