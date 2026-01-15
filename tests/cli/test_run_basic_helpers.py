@@ -1263,7 +1263,7 @@ def test_run_bare_control_frees_private_reload_model(monkeypatch):
         run_mod, "_extract_pm_snapshot_for_overhead", lambda *a, **k: {}
     )
 
-    def _load_model_with_cfg(adapter, cfg, device):  # noqa: ARG001
+    def _load_model_with_cfg(adapter, cfg, device, **_kwargs):  # noqa: ARG001
         events.append(("load", None))
         return private_model
 
