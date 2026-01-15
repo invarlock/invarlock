@@ -548,6 +548,12 @@ test_task_certify_edit_and_error_cover_preset_discovery_overrides_and_certificat
     _estimate_model_size() { echo "7"; }
 
     task_certify_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean 1 "${out}" "${log_file}"
+    local override_preset="${cert_dir}/oom_override_preset.yaml"
+    assert_file_exists "${override_preset}" "override preset created"
+    local override_contents
+    override_contents="$(cat "${override_preset}")"
+    assert_match "seq_len: 100" "${override_contents}" "override preset seq_len"
+    assert_match "stride: 100" "${override_contents}" "override preset stride uses pairing"
     # Skip branch when cert already exists.
     task_certify_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean 1 "${out}" "${log_file}"
 

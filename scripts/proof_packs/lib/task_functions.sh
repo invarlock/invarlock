@@ -2967,6 +2967,11 @@ task_certify_edit() {
             echo "  OOM override: seq=${seq_len}, stride=${stride}" >> "${log_file}"
         fi
     fi
+    if [[ "${stride}" -ne "${seq_len}" ]]; then
+        stride="${seq_len}"
+        applied_override=1
+        echo "  Pairing override: seq=${seq_len}, stride=${stride}" >> "${log_file}"
+    fi
     # For large models, use INVARLOCK_SKIP_OVERHEAD_CHECK to avoid loading
     # both baseline and edited models simultaneously (which would exceed 180GB).
     local profile_flag="ci"
@@ -3046,7 +3051,7 @@ dataset:
   seed: 42
 PRESET_YAML
         preset_file="${override_preset}"
-        echo "  Using OOM override preset: ${preset_file}" >> "${log_file}"
+        echo "  Using override preset: ${preset_file}" >> "${log_file}"
     fi
 
     # Run certify in isolated working directory to avoid temp file race conditions
@@ -3202,6 +3207,11 @@ task_certify_error() {
             echo "  OOM override: seq=${seq_len}, stride=${stride}" >> "${log_file}"
         fi
     fi
+    if [[ "${stride}" -ne "${seq_len}" ]]; then
+        stride="${seq_len}"
+        applied_override=1
+        echo "  Pairing override: seq=${seq_len}, stride=${stride}" >> "${log_file}"
+    fi
 
     # For large models, use INVARLOCK_SKIP_OVERHEAD_CHECK to avoid loading
     # both baseline and edited models simultaneously (which would exceed 180GB).
@@ -3282,7 +3292,7 @@ dataset:
   seed: 42
 PRESET_YAML
         preset_file="${override_preset}"
-        echo "  Using OOM override preset: ${preset_file}" >> "${log_file}"
+        echo "  Using override preset: ${preset_file}" >> "${log_file}"
     fi
 
     # Run certify in isolated working directory to avoid temp file race conditions
