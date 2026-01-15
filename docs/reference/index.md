@@ -17,7 +17,6 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 | [Environment Variables](env-vars.md) | Runtime toggles and flags | Operators |
 | [API Guide](api-guide.md) | Programmatic interface | Python developers |
 | [Observability](observability.md) | Monitoring and telemetry | Operators |
-| [Calibration](calibration.md) | Guard threshold calibration | Guard maintainers |
 
 ## By Task
 
@@ -38,7 +37,6 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 1. [Guards](guards.md) — Configuration and evidence
 2. [Tier Policy Catalog](tier-policy-catalog.md) — Threshold rationale
 3. [GPU/MPS-First Guards](../assurance/13-gpu-mps-first-guards.md) — Design decisions
-4. [Calibration](calibration.md) — Threshold calibration
 
 ### Programming Against InvarLock
 

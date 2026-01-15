@@ -280,4 +280,3 @@ Certificates copy these to the `telemetry` block.
 - [CLI Reference](cli.md)
 - [Certificates](certificates.md) — Schema, telemetry, and HTML export
 - [Environment Variables](env-vars.md)
-- [Troubleshooting](../user-guide/troubleshooting.md)
