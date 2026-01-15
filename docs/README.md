@@ -53,9 +53,11 @@ Tip: enable Hub downloads per command when fetching models/datasets:
 - [Reading a Certificate](user-guide/reading-certificate.md)
 - [Proof Packs](user-guide/proof-packs.md)
 - [Proof Packs Internals](user-guide/proof-packs-internals.md)
+- [Troubleshooting](user-guide/troubleshooting.md)
 
 ### Reference
 
+- [Reference Index](reference/index.md)
 - [CLI Reference](reference/cli.md)
 - [API Guide](reference/api-guide.md)
 - [Programmatic Quickstart](reference/programmatic-quickstart.md)
@@ -65,6 +67,7 @@ Tip: enable Hub downloads per command when fetching models/datasets:
 - [GPU/MPS-First Guards (Decision Memo)](reference/gpu-mps-first-guards.md)
 - [Model Adapters](reference/model-adapters.md)
 - [Datasets](reference/datasets.md)
+- [Calibration](reference/calibration.md)
 - [Exporting Certificates (HTML)](reference/exporting-certificates-html.md)
 - [Certificate Schema (v1)](reference/certificate-schema.md)
 - [Certificate Telemetry](reference/certificate-telemetry.md)

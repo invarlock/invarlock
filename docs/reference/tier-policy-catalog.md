@@ -16,6 +16,23 @@
 invarlock report explain --report runs/subject/report.json --baseline runs/baseline/report.json
 ```
 
+## Quick Comparison
+
+| Aspect | Balanced | Conservative |
+|--------|----------|--------------|
+| **PM Ratio Limit** | ≤ 1.10 | ≤ 1.05 |
+| **Spectral σ Quantile** | 0.95 | 0.90 |
+| **Spectral Deadband** | 0.10 | 0.05 |
+| **Spectral Max Caps** | 5 | 3 |
+| **RMT ε (all families)** | 0.01 | 0.01 |
+| **VE Predictive Gate** | One-sided CI | Two-sided CI |
+| **VE min_effect_lognll** | 0.0 | 0.016 |
+| **Bootstrap Replicates** | ≥ 1200 | ≥ 1500 |
+| **Min Windows** | 180/180 | 220/220 |
+| **Use Case** | Standard edits, dev/CI | High-stakes releases |
+
+> Values are from the packaged `tiers.yaml`; inspect with `invarlock report explain`.
+
 ## Concepts
 
 - **Calibrated vs policy keys**: calibrated values come from pilot runs; policy
