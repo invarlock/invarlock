@@ -100,3 +100,18 @@ if you need to run InvarLock from a Windows host. When in doubt:
 - `invarlock doctor` reports the detected accelerators.
 - Use `--device cpu` to force portability runs, or `--profile ci_cpu` to exercise the reduced-window telemetry preset.
 - Keep `INVARLOCK_OMP_THREADS` >= 4 for long CPU jobs to avoid multi-hour baselines.
+
+## Next Steps
+
+Choose your path based on your workflow:
+
+| I want to... | Start here |
+|--------------|------------|
+| Certify my own edited model (BYOE) | [Compare & Certify (BYOE)](compare-and-certify.md) |
+| Understand the CLI commands | [Quickstart](quickstart.md) |
+| Bring my own evaluation dataset | [Bring Your Own Data](bring-your-own-data.md) |
+| See example outputs | [Example Reports](example-reports.md) |
+| Understand what's in a certificate | [Reading a Certificate](reading-certificate.md) |
+| Use InvarLock programmatically | [API Guide](../reference/api-guide.md) |
+| Understand the safety guarantees | [Safety Case](../assurance/00-safety-case.md) |
+| Set up secure production deployment | [Security Best Practices](../security/best-practices.md) |

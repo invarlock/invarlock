@@ -47,21 +47,28 @@ Tip: enable Hub downloads per command when fetching models/datasets:
 - [Compare & Certify (BYOE)](user-guide/compare-and-certify.md)
 - [Primary Metric Smoke](user-guide/primary-metric-smoke.md)
 - [Configuration Gallery](user-guide/config-gallery.md)
+- [Bring Your Own Data](user-guide/bring-your-own-data.md)
+- [Plugins](user-guide/plugins.md)
 - [Example Reports](user-guide/example-reports.md)
 - [Reading a Certificate](user-guide/reading-certificate.md)
+- [Proof Packs](user-guide/proof-packs.md)
+- [Proof Packs Internals](user-guide/proof-packs-internals.md)
 
 ### Reference
 
 - [CLI Reference](reference/cli.md)
+- [API Guide](reference/api-guide.md)
+- [Programmatic Quickstart](reference/programmatic-quickstart.md)
 - [Configuration Schema](reference/config-schema.md)
+- [Environment Variables](reference/env-vars.md)
 - [Guards](reference/guards.md)
 - [GPU/MPS-First Guards (Decision Memo)](reference/gpu-mps-first-guards.md)
 - [Model Adapters](reference/model-adapters.md)
+- [Datasets](reference/datasets.md)
 - [Exporting Certificates (HTML)](reference/exporting-certificates-html.md)
 - [Certificate Schema (v1)](reference/certificate-schema.md)
-- [Certificate Telemetry](reference/certificate_telemetry.md)
+- [Certificate Telemetry](reference/certificate-telemetry.md)
 - [Tier Policy Catalog (runtime tiers.yaml)](reference/tier-policy-catalog.md)
-- [Datasets](reference/datasets.md)
 - [Artifact Layout](reference/artifacts.md)
 
 <!-- Runbooks removed in minimal OSS footprint -->
@@ -97,6 +104,9 @@ to change proposals or releases when you update calibration.
 
 ### Security
 
+- [Threat Model](security/threat-model.md)
+- [Architecture](security/architecture.md)
+- [Best Practices](security/best-practices.md)
 - [pip-audit Allowlist](security/pip-audit-allowlist.md)
 
 ### Governance

@@ -285,5 +285,5 @@ baseline and the tail-gate evaluation outcome:
 ## Related Documentation
 
 - [CLI Reference](cli.md)
-- [Certificate Telemetry](certificate_telemetry.md)
+- [Certificate Telemetry](certificate-telemetry.md)
 - [Artifact Layout](artifacts.md)
