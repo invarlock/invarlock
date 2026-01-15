@@ -61,7 +61,6 @@ Tip: enable Hub downloads per command when fetching models/datasets:
 - [Tier Policy Catalog (runtime tiers.yaml)](reference/tier-policy-catalog.md)
 - [Datasets](reference/datasets.md)
 - [Artifact Layout](reference/artifacts.md)
-- [Calibration](reference/calibration.md)
 - [Observability](reference/observability.md)
 - [API Guide](reference/api-guide.md)
 - [Programmatic Quickstart](reference/programmatic-quickstart.md)
@@ -87,7 +86,6 @@ Tip: enable Hub downloads per command when fetching models/datasets:
 - [Policy Provenance & Digest](assurance/11-policy-provenance.md)
 - [Device Drift Bands](assurance/12-device-drift-bands.md)
 - [GPU/MPS-First Guards (Decision Memo)](assurance/13-gpu-mps-first-guards.md)
-- [Glossary](assurance/glossary.md)
 
 Note: Every safety claim is backed by automated tests and cross-referenced in
 the docs. See Guard Contracts → Coverage Reference

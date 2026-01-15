@@ -490,7 +490,8 @@ invarlock plugins list --verbose
 
 # Get details for specific plugin
 invarlock plugins adapters --explain custom_format
-invarlock plugins guards --explain nan_check
+# For guards, use --verbose to show module and entry point details
+invarlock plugins guards --verbose
 ```
 
 ### Debug Loading Issues
@@ -534,5 +535,5 @@ print(f"Validate: {result}")
 
 - [Guards Reference](../reference/guards.md) — Built-in guard configuration
 - [Model Adapters](../reference/model-adapters.md) — Built-in adapter reference
-- [CLI Reference](../reference/cli.md#plugins--entry-points) — Plugin CLI commands
+- [CLI Reference](../reference/cli.md#plugins-entry-points) — Plugin CLI commands
 - [Configuration Schema](../reference/config-schema.md) — YAML config for guards

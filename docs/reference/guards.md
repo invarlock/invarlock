@@ -117,7 +117,7 @@ guards:
 | `guards.variance.*` | `report.guards[name=variance]` | `certificate.variance`, `resolved_policy.variance` | Schema only. |
 | `--profile release` | `report.guard_overhead` | `certificate.guard_overhead` | Required unless skipped. |
 
-### Invariants guard
+### Invariants Guard
 
 ```yaml
 guards:
@@ -126,7 +126,7 @@ guards:
     on_fail: warn   # warn | rollback | abort
 ```
 
-### Spectral guard (measurement contract)
+### Spectral Guard (measurement contract)
 
 ```yaml
 guards:
@@ -142,7 +142,7 @@ guards:
       norm_collapse: { warn_ratio: 0.25, fatal_ratio: 0.10 }
 ```
 
-### RMT guard (activation edge-risk)
+### RMT Guard (activation edge-risk)
 
 ```yaml
 guards:
@@ -155,7 +155,7 @@ guards:
         windows: { count: 8, indices_policy: evenly_spaced }
 ```
 
-### Variance guard (A/B gate)
+### Variance Guard (A/B gate)
 
 ```yaml
 guards:

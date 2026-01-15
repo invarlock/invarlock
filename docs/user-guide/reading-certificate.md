@@ -46,5 +46,4 @@ Tip: Use `invarlock verify` to recheck schema, pairing, and ratio math.
 
 - [Certificates](../reference/certificates.md) — Full v1 schema reference, telemetry, and HTML export
 - [Safety Case](../assurance/00-safety-case.md) — What the certificate does and does not guarantee
-- [Troubleshooting](troubleshooting.md) — Common certificate issues and fixes
-- [CLI Reference](../reference/cli.md#invarlock-verify) — `invarlock verify` command details
+- [CLI Reference](../reference/cli.md) — `invarlock verify` command details
