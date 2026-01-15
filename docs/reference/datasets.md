@@ -150,4 +150,6 @@ dataset:
 - [Configuration Schema](config-schema.md)
 - [Environment Variables](env-vars.md)
 - [CLI Reference](cli.md)
-- [Certificate Schema (v1)](certificate-schema.md)
+- [Certificates](certificates.md) — Schema, telemetry, and HTML export
+- [Coverage & Pairing](../assurance/02-coverage-and-pairing.md) — Window requirements and pairing math
+- [Bring Your Own Data](../user-guide/bring-your-own-data.md) — Custom dataset workflows

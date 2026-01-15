@@ -99,6 +99,5 @@ reports/
 
 ## Related Documentation
 
-- [Certificate Schema (v1)](certificate-schema.md)
+- [Certificates](certificates.md) — Schema, telemetry, and HTML export
 - [CLI Reference](cli.md)
-- [Exporting Certificates (HTML)](exporting-certificates-html.md)

@@ -4,7 +4,17 @@ title: Compare & Certify (BYOE)
 
 ## Compare & Certify (BYOE)
 
-InvarLock’s primary, most stable path is Compare & Certify (BYOE): you provide the
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Certify two checkpoints (baseline vs subject) with deterministic pairing. |
+| **Audience** | Users with existing edit pipelines who want certification without coupling. |
+| **Workflow** | Baseline run → Subject run → Certificate with paired windows. |
+| **Network** | Offline by default; `INVARLOCK_ALLOW_NETWORK=1` for model downloads. |
+| **Output** | `evaluation.cert.json` + `evaluation_certificate.md`. |
+
+InvarLock's primary, most stable path is Compare & Certify (BYOE): you provide the
 baseline and the subject checkpoints, and InvarLock produces a deterministic
 certificate. This avoids coupling to any particular edit stack and keeps your
 existing tooling intact.
@@ -72,3 +82,10 @@ mind:
 
 Determinism, pairing math, and provenance are surfaced in certificates
 (provider and policy digests) and revalidated by `invarlock verify`.
+
+## Related Documentation
+
+- [CLI Reference](../reference/cli.md) — Full `certify` command options
+- [Reading a Certificate](reading-certificate.md) — Understanding output certificates
+- [Coverage & Pairing (Assurance)](../assurance/02-coverage-and-pairing.md) — Window pairing invariants
+- [Determinism Contracts (Assurance)](../assurance/08-determinism-contracts.md) — Seed and reproducibility guarantees

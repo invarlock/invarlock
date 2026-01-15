@@ -1,5 +1,15 @@
 # Reading a Certificate (v1)
 
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Understand and interpret InvarLock v1 certificates. |
+| **Audience** | Reviewers validating certification evidence. |
+| **Key sections** | Primary Metric, Tail gate, Provenance, Measurement contracts. |
+| **Validation** | Use `invarlock verify <cert.json>` to check schema and pairing. |
+| **Source of truth** | [Certificates](../reference/certificates.md) for full schema. |
+
 This guide highlights the key sections of a v1 certificate and how to
 interpret them.
 
@@ -31,3 +41,9 @@ interpret them.
   - High/Medium/Low based on CI width and stability; see thresholds and `unstable` flag.
 
 Tip: Use `invarlock verify` to recheck schema, pairing, and ratio math.
+
+## Related Documentation
+
+- [Certificates](../reference/certificates.md) — Full v1 schema reference, telemetry, and HTML export
+- [Safety Case](../assurance/00-safety-case.md) — What the certificate does and does not guarantee
+- [CLI Reference](../reference/cli.md) — `invarlock verify` command details

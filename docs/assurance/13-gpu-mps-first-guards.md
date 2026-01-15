@@ -11,7 +11,7 @@
 
 ## Quick Start
 
-This is a decision memo; for implementation usage see [Guards](guards.md).
+This is a decision memo; for implementation usage see [Guards](../reference/guards.md).
 
 ## Concepts
 
@@ -42,7 +42,7 @@ This is a decision memo; for implementation usage see [Guards](guards.md).
 
 ## Troubleshooting
 
-- See [Guards](guards.md) for operational guidance and guard configuration.
+- See [Guards](../reference/guards.md) for operational guidance and guard configuration.
 
 ## Observability
 
@@ -51,7 +51,7 @@ This is a decision memo; for implementation usage see [Guards](guards.md).
 
 ## Related Documentation
 
-- [Guards](guards.md)
-- [Guard Contracts & Primer](../assurance/04-guard-contracts.md)
-- [Spectral False-Positive Control](../assurance/05-spectral-fpr-derivation.md)
-- [RMT ε-Rule](../assurance/06-rmt-epsilon-rule.md)
+- [Guards](../reference/guards.md)
+- [Guard Contracts & Primer](04-guard-contracts.md)
+- [Spectral False-Positive Control](05-spectral-fpr-derivation.md)
+- [RMT ε-Rule](06-rmt-epsilon-rule.md)

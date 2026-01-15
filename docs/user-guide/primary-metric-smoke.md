@@ -1,6 +1,16 @@
 # Primary Metric — Tiny Smoke Examples
 
-Small, deterministic snippets for each Primary Metric kind. These use only in‑memory “windows” and do not require models, datasets, or network.
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Demonstrate PM computation for each metric kind. |
+| **Audience** | Developers understanding PM math and testing pipelines. |
+| **Metric kinds** | `ppl_causal`, `ppl_mlm`, `ppl_seq2seq`, `accuracy`, `vqa_accuracy`. |
+| **Network** | Fully offline; uses in-memory windows only. |
+| **Source of truth** | `src/invarlock/eval/primary_metric.py`. |
+
+Small, deterministic snippets for each Primary Metric kind. These use only in‑memory "windows" and do not require models, datasets, or network.
 
 ## Setup
 
@@ -107,3 +117,10 @@ assert pm_vqa["ratio_vs_baseline"] == pm_acc["ratio_vs_baseline"]
 ---
 
 Tip: For CI or smoke demos, these snippets run offline and avoid heavy imports. They exercise the exact paths used by reporting and certificate generation.
+
+## Related Documentation
+
+- [Evaluation Math Proof](../assurance/01-eval-math-proof.md) — Mathematical foundations for PM computation
+- [API Guide](../reference/api-guide.md) — Programmatic access to PM computation
+- [Certificates](../reference/certificates.md) — How PM appears in certificates
+- [Tier Policy Catalog](../reference/tier-policy-catalog.md) — PM gates and thresholds by tier

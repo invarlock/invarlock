@@ -32,6 +32,44 @@ guards:
 > Most thresholds come from the tier defaults (see `tiers.yaml`). Use overrides
 > sparingly and keep evidence in the certificate.
 
+## Guard Pipeline Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        GUARD PIPELINE FLOW                              │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│   ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐         │
+│   │invariants│───▶│ spectral │───▶│   rmt    │───▶│ variance │         │
+│   │(pre-edit)│    │ (weight) │    │(activatn)│    │  (A/B)   │         │
+│   └────┬─────┘    └────┬─────┘    └────┬─────┘    └────┬─────┘         │
+│        │               │               │               │                │
+│        ▼               ▼               ▼               ▼                │
+│   ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐         │
+│   │ prepare  │    │ prepare  │    │ prepare  │    │ prepare  │         │
+│   │(baseline)│    │(baseline)│    │(calibrtn)│    │(calibrtn)│         │
+│   └────┬─────┘    └────┬─────┘    └────┬─────┘    └────┬─────┘         │
+│        │               │               │               │                │
+│        ▼               ▼               ▼               ▼                │
+│   ┌──────────────────────────────────────────────────────────┐         │
+│   │                    EDIT APPLIED                          │         │
+│   └──────────────────────────────────────────────────────────┘         │
+│        │               │               │               │                │
+│        ▼               ▼               ▼               ▼                │
+│   ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐         │
+│   │ validate │    │ validate │    │ validate │    │ validate │         │
+│   │(post-edt)│    │(κ-check) │    │(ε-band)  │    │(gain>0?) │         │
+│   └────┬─────┘    └────┬─────┘    └────┬─────┘    └────┬─────┘         │
+│        │               │               │               │                │
+│        ▼               ▼               ▼               ▼                │
+│   ┌──────────────────────────────────────────────────────────┐         │
+│   │                GUARD RESULTS → CERTIFICATE               │         │
+│   │     (passed/warned/failed + metrics + measurement_hash)  │         │
+│   └──────────────────────────────────────────────────────────┘         │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
 ## Concepts
 
 - **Guard lifecycle**: the core runner calls `prepare(...)` (if implemented)
@@ -79,7 +117,7 @@ guards:
 | `guards.variance.*` | `report.guards[name=variance]` | `certificate.variance`, `resolved_policy.variance` | Schema only. |
 | `--profile release` | `report.guard_overhead` | `certificate.guard_overhead` | Required unless skipped. |
 
-### Invariants guard
+### Invariants Guard
 
 ```yaml
 guards:
@@ -88,7 +126,7 @@ guards:
     on_fail: warn   # warn | rollback | abort
 ```
 
-### Spectral guard (measurement contract)
+### Spectral Guard (measurement contract)
 
 ```yaml
 guards:
@@ -104,7 +142,7 @@ guards:
       norm_collapse: { warn_ratio: 0.25, fatal_ratio: 0.10 }
 ```
 
-### RMT guard (activation edge-risk)
+### RMT Guard (activation edge-risk)
 
 ```yaml
 guards:
@@ -117,7 +155,7 @@ guards:
         windows: { count: 8, indices_policy: evenly_spaced }
 ```
 
-### Variance guard (A/B gate)
+### Variance Guard (A/B gate)
 
 ```yaml
 guards:
@@ -163,7 +201,7 @@ packaged presets include it by default; remove a guard from the list to skip it.
 ## Related Documentation
 
 - [Tier Policy Catalog](tier-policy-catalog.md)
-- [GPU/MPS-First Guards (Decision Memo)](gpu-mps-first-guards.md)
+- [GPU/MPS-First Guards (Decision Memo)](../assurance/13-gpu-mps-first-guards.md)
 - [Configuration Schema](config-schema.md)
 - [Environment Variables](env-vars.md)
 - [Guard Contracts & Primer](../assurance/04-guard-contracts.md)
