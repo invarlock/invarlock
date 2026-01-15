@@ -141,6 +141,7 @@ pack_model_list() {
     for model in "${models[@]}"; do
         [[ -n "${model}" ]] && printf '%s\n' "${model}"
     done
+    return 0
 }
 
 pack_model_list_array() {
