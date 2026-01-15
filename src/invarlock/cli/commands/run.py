@@ -1079,7 +1079,7 @@ def _run_bare_control(
     restore_fn: Any | None,
     console: Console,
     resolved_loss_type: str,
-    profile_normalized: str | None,
+    profile_normalized: str | None = None,
     snapshot_provenance: dict[str, bool] | None = None,
     skip_model_load: bool = False,
 ) -> dict[str, Any] | None:
@@ -1200,7 +1200,7 @@ def _execute_guarded_run(
     final_count: int,
     restore_fn: Any | None,
     resolved_device: str,
-    profile_normalized: str | None,
+    profile_normalized: str | None = None,
     console: Console,
     snapshot_provenance: dict[str, bool] | None = None,
     skip_model_load: bool = False,
