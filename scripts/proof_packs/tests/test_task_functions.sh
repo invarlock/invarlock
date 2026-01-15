@@ -1275,6 +1275,14 @@ test_task_calibrate_clean_edits_candidate_selection_branches() {
             echo "4"
             return 0
         fi
+        if [[ "${1:-}" == "-" ]]; then
+            local output_path="${3:-}"
+            if [[ -n "${output_path}" ]]; then
+                mkdir -p "$(dirname "${output_path}")"
+                echo '{}' > "${output_path}"
+            fi
+            return 0
+        fi
         return 0
     }
 
