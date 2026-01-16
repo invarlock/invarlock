@@ -8,7 +8,7 @@ InvarLock is an edit-agnostic safety certification framework for ML model weight
 
 ### High-Level Flow
 
-```
+```text
 CLI -> Core Runtime -> Guards -> Reporting
 ```
 

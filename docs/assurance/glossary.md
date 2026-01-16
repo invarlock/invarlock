@@ -6,6 +6,7 @@ certificates.
 ## Terms
 
 ### BCa Bootstrap
+
 - **Definition:** Bias-corrected and accelerated bootstrap used to estimate
   confidence intervals for paired deltas.
 - **Context:** Applied to paired log-loss deltas for primary metric gating.
@@ -14,6 +15,7 @@ certificates.
 - **Example:** "BCa bootstrap with 2000 reps on paired deltas."
 
 ### Compare & Certify (BYOE)
+
 - **Definition:** Workflow that compares a subject model to a baseline without
   performing the edit inside InvarLock.
 - **Context:** `invarlock certify --baseline ... --subject ...`.
@@ -22,6 +24,7 @@ certificates.
 - **Example:** "BYOE: subject checkpoint produced externally."
 
 ### Four-Guard Pipeline
+
 - **Definition:** The default guard chain: invariants, spectral, RMT, variance.
 - **Context:** Core safety checks in `run` and `certify` flows.
 - **Related terms:** Guard Chain, Guard Overhead.
@@ -29,6 +32,7 @@ certificates.
 - **Example:** "Four-Guard Pipeline: invariants -> spectral -> RMT -> variance."
 
 ### Guard Chain (Canonical Order)
+
 - **Definition:** Fixed execution order for guard preparation and evaluation.
 - **Context:** Ensures deterministic, auditable guard outcomes.
 - **Related terms:** Four-Guard Pipeline, Guard Overhead.
@@ -36,6 +40,7 @@ certificates.
 - **Example:** "Guards execute in canonical order for reproducibility."
 
 ### kappa Threshold
+
 - **Definition:** Per-family spectral cap used to flag abnormal z-scores.
 - **Context:** `spectral.family_caps.*.kappa` in policy.
 - **Related terms:** Spectral Cap, z-score.
@@ -43,6 +48,7 @@ certificates.
 - **Example:** "kappa=2.8 for attention families."
 
 ### Policy Digest
+
 - **Definition:** Stable hash summarizing resolved policy thresholds.
 - **Context:** Stored in `policy_digest.thresholds_hash` and `policy_provenance`.
 - **Related terms:** Tier Policy, Policy Overrides.
@@ -50,6 +56,7 @@ certificates.
 - **Example:** "Digest changed after policy override."
 
 ### Primary Metric
+
 - **Definition:** The canonical task metric used for gating (ppl or accuracy).
 - **Context:** `metrics.primary_metric` in reports and certificates.
 - **Related terms:** Primary Metric Tail, Window Pairing.
@@ -57,6 +64,7 @@ certificates.
 - **Example:** "primary_metric.kind=ppl_causal".
 
 ### Primary Metric Tail
+
 - **Definition:** Optional tail regression gate for ppl-like metrics.
 - **Context:** `primary_metric_tail` block in certificates.
 - **Related terms:** Primary Metric, BCa Bootstrap.
@@ -64,6 +72,7 @@ certificates.
 - **Example:** "Tail gate warned on q95 mass."
 
 ### Spectral Cap
+
 - **Definition:** Limit on spectral z-scores per family to flag instability.
 - **Context:** Applied by the spectral guard to cap outliers.
 - **Related terms:** kappa Threshold, z-score.
@@ -71,6 +80,7 @@ certificates.
 - **Example:** "Spectral cap exceeded for FFN family."
 
 ### Spectral Guard
+
 - **Definition:** Guard that monitors spectral norms and z-scores for weights.
 - **Context:** Emits `spectral` metrics and stability flags.
 - **Related terms:** Four-Guard Pipeline, Spectral Cap.
@@ -78,6 +88,7 @@ certificates.
 - **Example:** "Spectral guard stable with 0 caps applied."
 
 ### RMT epsilon Rule
+
 - **Definition:** Random Matrix Theory epsilon band used for stability checks.
 - **Context:** `rmt.epsilon_default` and `rmt.epsilon_by_family.*` thresholds per family.
 - **Related terms:** RMT Guard, kappa Threshold.
@@ -85,6 +96,7 @@ certificates.
 - **Example:** "RMT epsilon band within policy."
 
 ### RMT Guard
+
 - **Definition:** Guard that checks eigenvalue statistics against RMT bounds.
 - **Context:** Emits `rmt` metrics and stability flags.
 - **Related terms:** Four-Guard Pipeline, RMT epsilon Rule.
@@ -92,6 +104,7 @@ certificates.
 - **Example:** "RMT guard stable with delta_total=0."
 
 ### Variance Effect (VE)
+
 - **Definition:** Guard that tracks variance change in model activations.
 - **Context:** Variance guard calibration and predictive gate.
 - **Related terms:** Four-Guard Pipeline, Guard Overhead.
@@ -99,6 +112,7 @@ certificates.
 - **Example:** "VE predictive gate disabled for edit."
 
 ### Tier Policy
+
 - **Definition:** Guard threshold preset (conservative, balanced, aggressive).
 - **Context:** Resolved from `tiers.yaml` and applied during run/certify.
 - **Related terms:** Policy Digest, Policy Overrides.
@@ -106,6 +120,7 @@ certificates.
 - **Example:** "Tier Policy: balanced".
 
 ### Window Pairing
+
 - **Definition:** Alignment of baseline and subject evaluation windows.
 - **Context:** Required for paired gating and CI computation.
 - **Related terms:** BCa Bootstrap, Primary Metric.
@@ -113,6 +128,7 @@ certificates.
 - **Example:** "paired_windows=200; window_match_fraction=1.0".
 
 ### z-score
+
 - **Definition:** Standardized deviation used in spectral guard scoring.
 - **Context:** `spectral.top_z_scores` and family summaries.
 - **Related terms:** Spectral Cap, kappa Threshold.
@@ -120,6 +136,7 @@ certificates.
 - **Example:** "max |z| = 2.1".
 
 ### Baseline
+
 - **Definition:** Unedited reference run used for comparison and gating.
 - **Context:** `baseline` report in Compare & Certify.
 - **Related terms:** Subject Run, Window Pairing.
@@ -127,6 +144,7 @@ certificates.
 - **Example:** "baseline report.json".
 
 ### Subject Run
+
 - **Definition:** Edited or target model run under evaluation.
 - **Context:** `subject` report in Compare & Certify.
 - **Related terms:** Baseline, Certificate.
@@ -134,6 +152,7 @@ certificates.
 - **Example:** "subject report.json".
 
 ### Guard Overhead
+
 - **Definition:** Performance impact of guard checks vs bare control.
 - **Context:** `guard_overhead` block in reports and certificates.
 - **Related terms:** Four-Guard Pipeline, Timing Summary.
@@ -141,6 +160,7 @@ certificates.
 - **Example:** "overhead_ratio=1.003".
 
 ### Measurement Contract
+
 - **Definition:** Guard measurement procedure signature and digest.
 - **Context:** `measurement_contract_hash` for spectral/RMT.
 - **Related terms:** Policy Digest, Guard Chain.
@@ -148,6 +168,7 @@ certificates.
 - **Example:** "contract hash matched baseline." 
 
 ### Provider Digest
+
 - **Definition:** Dataset identity hash (ids/tokenizer/masking).
 - **Context:** `provenance.provider_digest` ensures pairing parity.
 - **Related terms:** Window Pairing, Tokenizer Hash.
@@ -155,6 +176,7 @@ certificates.
 - **Example:** "provider_digest.ids_hash".
 
 ### Tokenizer Hash
+
 - **Definition:** Stable hash of tokenizer settings and vocab.
 - **Context:** Stored in `provenance.provider_digest` and dataset metadata.
 - **Related terms:** Provider Digest, Window Pairing.
@@ -162,6 +184,7 @@ certificates.
 - **Example:** "tokenizer hash mismatch triggers E002." 
 
 ### Certificate
+
 - **Definition:** Structured evidence artifact summarizing a certification run.
 - **Context:** `evaluation.cert.json` and rendered markdown/HTML.
 - **Related terms:** Report, Evidence Bundle.
@@ -169,6 +192,7 @@ certificates.
 - **Example:** "certificate schema_version=v1".
 
 ### Report
+
 - **Definition:** Run-level artifact with metrics, guards, and metadata.
 - **Context:** `report.json` generated by `run`.
 - **Related terms:** Certificate, Evidence Bundle.
@@ -176,6 +200,7 @@ certificates.
 - **Example:** "report.metrics.primary_metric".
 
 ### Evidence Bundle
+
 - **Definition:** Set of files produced for audit (reports, certs, manifests).
 - **Context:** `reports/cert/` output from `report --format cert`.
 - **Related terms:** Report, Certificate.
@@ -183,6 +208,7 @@ certificates.
 - **Example:** "manifest.json lists bundle files." 
 
 ### Timing Summary
+
 - **Definition:** Consolidated timing breakdown for a certification run.
 - **Context:** CLI timing output and telemetry fields.
 - **Related terms:** Guard Overhead, Telemetry.
@@ -190,6 +216,7 @@ certificates.
 - **Example:** "Timing Summary: model load, eval, cert gen." 
 
 ### Telemetry
+
 - **Definition:** Performance and resource metrics emitted with certificates.
 - **Context:** `telemetry.*` fields in certificates.
 - **Related terms:** Timing Summary, Guard Overhead.
