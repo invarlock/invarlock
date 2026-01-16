@@ -201,6 +201,7 @@ pack_write_checksums() {
 
 pack_write_readme() {
     local pack_dir="$1"
+    echo "[run_pack.sh] Writing README.md to ${pack_dir}" >&2
     cat > "${pack_dir}/README.md" <<'EOF'
 # InvarLock Proof Pack
 
