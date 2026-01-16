@@ -14,6 +14,7 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 | [Model Adapters](model-adapters.md) | Adapter selection and capabilities | CLI and API users |
 | [Datasets](datasets.md) | Dataset providers and pairing | CLI users |
 | [Certificates](certificates.md) | v1 schema, telemetry, and HTML export | Operators, tool authors |
+| [Architecture](architecture.md) | System layers, data flow, and dependencies | Builders, reviewers |
 | [Tier Policy Catalog](tier-policy-catalog.md) | Guard threshold explanations | Operators auditing policies |
 | [Environment Variables](env-vars.md) | Runtime toggles and flags | Operators |
 | [API Guide](api-guide.md) | Programmatic interface | Python developers |
@@ -44,7 +45,8 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 
 1. [API Guide](api-guide.md) — `CoreRunner.execute` and helpers
 2. [Programmatic Quickstart](programmatic-quickstart.md) — Minimal examples
-3. [Observability](observability.md) — Monitoring infrastructure
+3. [Architecture](architecture.md) — System layers and data flow
+4. [Observability](observability.md) — Monitoring infrastructure
 
 ### Operations
 
