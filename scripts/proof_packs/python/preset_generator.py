@@ -56,7 +56,9 @@ def _load_guard_order_and_assurance(
     guards_order: list[str] | None = None
     assurance_cfg: dict[str, Any] | None = None
     if _YAML_AVAILABLE:
-        cfg_path = next(iter(sorted(cal_dir.glob("run_*/calibration_config.yaml"))), None)
+        cfg_path = next(
+            iter(sorted(cal_dir.glob("run_*/calibration_config.yaml"))), None
+        )
         if cfg_path is not None:
             try:
                 cfg = yaml.safe_load(cfg_path.read_text())  # type: ignore[attr-defined]
@@ -110,7 +112,9 @@ def _merge_record(cert: Any, report: Any) -> dict[str, Any] | None:
                 rec.get("spectral", {}) if isinstance(rec.get("spectral"), dict) else {}
             )
             if gmetrics.get("family_z_quantiles"):
-                spec.setdefault("family_z_quantiles", gmetrics.get("family_z_quantiles"))
+                spec.setdefault(
+                    "family_z_quantiles", gmetrics.get("family_z_quantiles")
+                )
             if gmetrics.get("family_z_summary"):
                 spec.setdefault("family_z_summary", gmetrics.get("family_z_summary"))
             if gmetrics.get("family_caps"):
@@ -128,7 +132,9 @@ def _merge_record(cert: Any, report: Any) -> dict[str, Any] | None:
             z_scores = guard.get("final_z_scores") or gmetrics.get("final_z_scores")
             if isinstance(z_scores, dict):
                 spec["final_z_scores"] = z_scores
-            fam_map = guard.get("module_family_map") or gmetrics.get("module_family_map")
+            fam_map = guard.get("module_family_map") or gmetrics.get(
+                "module_family_map"
+            )
             if isinstance(fam_map, dict):
                 spec["module_family_map"] = fam_map
             if gpolicy and not spec.get("policy"):
@@ -137,7 +143,11 @@ def _merge_record(cert: Any, report: Any) -> dict[str, Any] | None:
 
         elif name == "rmt":
             rmt = rec.get("rmt", {}) if isinstance(rec.get("rmt"), dict) else {}
-            for key in ("outliers_per_family", "baseline_outliers_per_family", "families"):
+            for key in (
+                "outliers_per_family",
+                "baseline_outliers_per_family",
+                "families",
+            ):
                 val = gmetrics.get(key)
                 if isinstance(val, dict) and val:
                     rmt.setdefault(key, val)
@@ -268,10 +278,10 @@ def _default_max_caps(tier_name: str) -> int:
 
 def _allocate_budget(counts: dict[str, int], budget: int) -> dict[str, int]:
     if not counts or budget <= 0:
-        return {fam: 0 for fam in counts}
+        return dict.fromkeys(counts, 0)
     total = sum(counts.values())
     if total <= 0:
-        return {fam: 0 for fam in counts}
+        return dict.fromkeys(counts, 0)
     raw = {fam: budget * count / total for fam, count in counts.items()}
     alloc = {fam: int(round(val)) for fam, val in raw.items()}
     diff = budget - sum(alloc.values())
@@ -378,9 +388,7 @@ def calibrate_spectral(
                     if not values:
                         continue
                     values_sorted = sorted(values, reverse=True)
-                    idx = max(
-                        0, min(alloc.get(fam, 1) - 1, len(values_sorted) - 1)
-                    )
+                    idx = max(0, min(alloc.get(fam, 1) - 1, len(values_sorted) - 1))
                     per_run_caps[fam].append(values_sorted[idx])
 
         fq = spec.get("family_z_quantiles", {})
@@ -398,7 +406,9 @@ def calibrate_spectral(
                     max_values[str(fam)].append(val_max)
 
     summary = {
-        "families_seen": sorted(set(per_run_caps) | set(q99_values) | set(existing_caps)),
+        "families_seen": sorted(
+            set(per_run_caps) | set(q99_values) | set(existing_caps)
+        ),
         "sigma_quantile": sigma_quantile,
         "deadband": deadband,
         "max_caps": max_caps,
@@ -523,7 +533,9 @@ def calibrate_variance(recs: list[dict[str, Any]]) -> dict[str, Any]:
             deadband = _safe_float(policy.get("deadband") or var.get("deadband"))
         if min_gain is None:
             min_gain = _safe_float(
-                policy.get("min_gain") or policy.get("min_rel_gain") or var.get("min_gain")
+                policy.get("min_gain")
+                or policy.get("min_rel_gain")
+                or var.get("min_gain")
             )
         if policy_min_effect is None:
             policy_min_effect = _safe_float(
@@ -542,7 +554,11 @@ def calibrate_variance(recs: list[dict[str, Any]]) -> dict[str, Any]:
 
         calib = var.get("calibration") or var.get("calibration_stats") or {}
         if isinstance(calib, dict):
-            vchange = calib.get("variance_change") or calib.get("delta") or calib.get("max_delta")
+            vchange = (
+                calib.get("variance_change")
+                or calib.get("delta")
+                or calib.get("max_delta")
+            )
             vchange_val = _safe_float(vchange)
             if vchange_val is not None:
                 variance_changes.append(abs(vchange_val))
@@ -629,7 +645,9 @@ def generate_preset(
 
     records = load_records(cal_dir=cal_dir)
     if not records:
-        raise SystemExit("ERROR: No calibration records found; cannot create valid preset")
+        raise SystemExit(
+            "ERROR: No calibration records found; cannot create valid preset"
+        )
 
     drift_stats = calibrate_drift(records)
     spectral_summary, spectral_caps = calibrate_spectral(records, tier=tier)
@@ -720,7 +738,9 @@ def generate_preset(
         if isinstance(meta, dict):
             meta["edit_type"] = edit_type
         _apply_spectral_max_caps(derived, edit_type=edit_type, tier=tier)
-        out = preset_file.with_name(f"{preset_file.stem}__{edit_type}{preset_file.suffix}")
+        out = preset_file.with_name(
+            f"{preset_file.stem}__{edit_type}{preset_file.suffix}"
+        )
         if _YAML_AVAILABLE and out.suffix.lower() in {".yaml", ".yml"}:
             out.write_text(
                 yaml.safe_dump(derived, sort_keys=False)  # type: ignore[attr-defined]
@@ -734,7 +754,9 @@ def generate_preset(
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate calibrated proof-pack presets")
+    parser = argparse.ArgumentParser(
+        description="Generate calibrated proof-pack presets"
+    )
     parser.add_argument("--cal-dir", required=True)
     parser.add_argument("--preset-file", required=True)
     parser.add_argument("--model-name", required=True)
@@ -791,4 +813,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -105,7 +105,9 @@ def write_manifest(
         "format": "proof-pack-v1",
         "generated_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
         "suite": suite,
-        "network_mode": "online" if str(net) in {"1", "true", "yes", "on"} else "offline",
+        "network_mode": "online"
+        if str(net) in {"1", "true", "yes", "on"}
+        else "offline",
         "determinism": determinism,
         "repeats": repeats,
         "determinism_repeats": determinism_repeats,
