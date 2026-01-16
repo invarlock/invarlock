@@ -38,6 +38,23 @@ def test_suppress_noisy_warnings_passthrough(monkeypatch) -> None:
             warnings.warn("noisy", UserWarning, stacklevel=2)
 
 
+def test_suppress_noisy_warnings_dev_filters_known_messages(monkeypatch) -> None:
+    monkeypatch.delenv("INVARLOCK_SUPPRESS_WARNINGS", raising=False)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        with run_mod._suppress_noisy_warnings("dev"):
+            warnings.warn(
+                "`torch_dtype` is deprecated and will be removed",
+                UserWarning,
+                stacklevel=2,
+            )
+            warnings.warn(
+                "loss_type=None is unrecognized by this model",
+                UserWarning,
+                stacklevel=2,
+            )
+
+
 def test_certify_helpers_cover_banner_and_ratio() -> None:
     lines = certify_mod._render_banner_lines("Title", "Context")
     assert len(lines) == 4

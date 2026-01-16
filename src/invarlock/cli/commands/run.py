@@ -19,7 +19,7 @@ import sys as _sys
 import types as _types
 import warnings
 from array import array
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -139,7 +139,7 @@ def _suppress_noisy_warnings(profile: str | None) -> Iterator[None]:
         "on",
     }
     profile_norm = (profile or "").strip().lower()
-    if not suppress_all and profile_norm not in {"ci", "ci_cpu", "release"}:
+    if not suppress_all and profile_norm not in {"ci", "ci_cpu", "release", "dev"}:
         yield
         return
     with warnings.catch_warnings():
@@ -1024,6 +1024,7 @@ def _resolve_provider_and_split(
     provider_kwargs: dict[str, Any] | None = None,
     console: Console,
     resolved_device: str | None = None,
+    emit: Callable[[str, str, str | None], None] | None = None,
 ) -> tuple[Any, str, bool]:
     """Resolve dataset provider and split, returning (provider, split, used_fallback)."""
     provider_name = None
@@ -1050,7 +1051,10 @@ def _resolve_provider_and_split(
     # Pass device hint only to providers that understand it (currently WikiText-2)
     if resolved_device and provider_name == "wikitext2":
         provider_kwargs.setdefault("device_hint", resolved_device)
-    data_provider = get_provider_fn(provider_name, **provider_kwargs)
+    if emit is not None and provider_name == "wikitext2":
+        data_provider = get_provider_fn(provider_name, emit=emit, **provider_kwargs)
+    else:
+        data_provider = get_provider_fn(provider_name, **provider_kwargs)
 
     requested_split = None
     try:
@@ -2172,6 +2176,15 @@ def run_command(
         # Generic failure path → exit 1 (InvarlockError paths handle code 3 separately)
         raise typer.Exit(1)
 
+    def _provider_event(tag: str, message: str, emoji: str | None = None) -> None:
+        _event(
+            console,
+            tag,
+            message,
+            emoji=emoji,
+            profile=profile_normalized,
+        )
+
     # Fail fast when torch is missing so users see a clear extras hint instead of
     # a raw ModuleNotFoundError from deeper imports.
     try:
@@ -2958,6 +2971,7 @@ def run_command(
                     provider_kwargs=provider_kwargs,
                     console=console,
                     resolved_device=resolved_device,
+                    emit=_provider_event,
                 )
             )
 
@@ -3650,9 +3664,13 @@ def run_command(
                 return "reload"
 
             mode = _choose_snapshot_mode()
-            # Emit deterministic snapshot mode status line
-            console.print(
-                f"snapshot_mode: {'enabled' if mode in {'bytes', 'chunked'} else 'disabled'}"
+            enabled = mode in {"bytes", "chunked"}
+            _event(
+                console,
+                "INIT",
+                f"Snapshot mode: {'enabled' if enabled else 'disabled'}",
+                emoji="💾",
+                profile=profile_normalized,
             )
             if mode == "chunked":
                 snapshot_tmpdir = adapter.snapshot_chunked(model)  # type: ignore[attr-defined]
@@ -5112,9 +5130,21 @@ def run_command(
                 except Exception:
                     pass
                 finally:
-                    console.print("cleanup: removed")
+                    _event(
+                        console,
+                        "INFO",
+                        "Cleanup: removed",
+                        emoji="🧹",
+                        profile=profile_normalized,
+                    )
             else:
-                console.print("cleanup: skipped")
+                _event(
+                    console,
+                    "INFO",
+                    "Cleanup: skipped",
+                    emoji="🧹",
+                    profile=profile_normalized,
+                )
         except Exception:
             # Best-effort cleanup printing; never raise from finally
             pass

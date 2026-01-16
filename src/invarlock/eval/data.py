@@ -15,7 +15,7 @@ import time
 import warnings
 from abc import abstractmethod
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any, NamedTuple, Protocol
 
@@ -54,6 +54,9 @@ try:
     HAS_TORCH = True
 except ImportError:
     HAS_TORCH = False
+
+
+EventEmitter = Callable[[str, str, str | None], None]
 
 
 class EvaluationWindow(NamedTuple):
@@ -166,6 +169,7 @@ class WikiText2Provider:
         self,
         cache_dir: Path | None = None,
         device_hint: str | None = None,
+        emit: EventEmitter | None = None,
         **_: Any,
     ):
         """
@@ -175,6 +179,7 @@ class WikiText2Provider:
             cache_dir: Optional cache directory for dataset storage
         """
         self.cache_dir = cache_dir
+        self._emit_event = emit
         self._validate_dependencies()
         self._last_stratification_stats: dict[str, Any] | None = None
         self._last_batch_size_used: int = 0
@@ -185,6 +190,20 @@ class WikiText2Provider:
         # Optional device hint from CLI/resolved run device (e.g. "cpu", "cuda", "mps", "auto")
         normalized_hint = (device_hint or "").strip().lower()
         self._device_hint: str | None = normalized_hint or None
+
+    def _event(self, tag: str, message: str, *, emoji: str | None = None) -> None:
+        """Emit a dataset event via an optional CLI-provided sink."""
+        if self._emit_event is None:
+            if emoji:
+                print(f"{emoji} {message}")
+            else:
+                print(message)
+            return
+        try:
+            self._emit_event(tag, message, emoji)
+        except TypeError:
+            # Back-compat: tolerate sinks that only accept (tag, message).
+            self._emit_event(tag, message)  # type: ignore[misc]
 
     def _validate_dependencies(self) -> None:
         """Check that required dependencies are available."""
@@ -319,7 +338,11 @@ class WikiText2Provider:
         Returns:
             List of filtered text strings
         """
-        print(f"📚 Loading WikiText-2 {split} split...")
+        self._event(
+            "DATA",
+            f"WikiText-2 {split}: loading split...",
+            emoji="📚",
+        )
 
         # Serve from cache when possible (load the largest slice once)
         cached = self._texts_cache.get(split)
@@ -366,7 +389,10 @@ class WikiText2Provider:
         if prev is None or len(valid_texts) > len(prev):
             self._texts_cache[split] = list(valid_texts)
 
-        print(f"  ✓ Loaded {len(valid_texts)} valid samples from {len(dataset)} total")
+        self._event(
+            "DATA",
+            f"Loaded {len(valid_texts)}/{len(dataset)} valid samples",
+        )
         return valid_texts
 
     def windows(
@@ -435,9 +461,13 @@ class WikiText2Provider:
         cursor = 0
         chunk_size = max(64, min(256, target_pool))
 
-        print("  📊 Creating evaluation windows:")
-        print(f"    Requested preview/final: {preview_n}/{final_n}")
-        print(f"    Sampling pool target: {target_pool} (reserve {reserve})")
+        self._event(
+            "DATA",
+            "Creating evaluation windows:",
+            emoji="📊",
+        )
+        self._event("DATA", f"Requested preview/final: {preview_n}/{final_n}")
+        self._event("DATA", f"Sampling pool target: {target_pool} (reserve {reserve})")
 
         while len(candidates) < total_required + reserve and cursor < len(
             shuffled_indices
@@ -708,9 +738,9 @@ class WikiText2Provider:
             ),
         }
 
-        print(f"    Seed: {seed}, Seq length: {seq_len}")
-        print(f"    Preview: {len(preview_window)} samples")
-        print(f"    Final: {len(final_window)} samples")
+        self._event("DATA", f"Seed: {seed}, Seq length: {seq_len}")
+        self._event("DATA", f"Preview: {len(preview_window)} samples")
+        self._event("DATA", f"Final: {len(final_window)} samples")
 
         return preview_window, final_window
 
@@ -840,8 +870,9 @@ class WikiText2Provider:
         attention_masks_list = [entry[2] for entry in collected]
         valid_indices = [entry[0] for entry in collected]
 
-        print(
-            f"    ✓ {window_name}: {len(valid_indices)}/{len(indices)} samples tokenized successfully"
+        self._event(
+            "DATA",
+            f"{window_name}: {len(valid_indices)}/{len(indices)} samples tokenized",
         )
 
         return EvaluationWindow(
@@ -1801,12 +1832,15 @@ _PROVIDERS: dict[str, type] = {
 }
 
 
-def get_provider(name: str, **kwargs) -> DatasetProvider:
+def get_provider(
+    name: str, *, emit: EventEmitter | None = None, **kwargs: Any
+) -> DatasetProvider:
     """
     Get a dataset provider by name.
 
     Args:
         name: Provider name ("wikitext2", "synthetic")
+        emit: Optional event sink for dataset/provider logs.
         **kwargs: Provider-specific initialization parameters
 
     Returns:
@@ -1825,7 +1859,10 @@ def get_provider(name: str, **kwargs) -> DatasetProvider:
         )
 
     provider_class = _PROVIDERS[name]
-    return provider_class(**kwargs)
+    init_kwargs = dict(kwargs)
+    if emit is not None and name == "wikitext2":
+        init_kwargs["emit"] = emit
+    return provider_class(**init_kwargs)
 
 
 def list_providers() -> list[str]:
