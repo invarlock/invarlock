@@ -85,11 +85,18 @@ for model_dir in output_dir.iterdir():
                 metric_key, metric_val = _pick_metric(task_results)
                 if metric_key is None:
                     continue
+                metric_name = metric_key
+                metric_type = ""
+                if isinstance(metric_key, str) and "," in metric_key:
+                    metric_name, metric_type = metric_key.split(",", 1)
+                    metric_name = metric_name.strip()
+                    metric_type = metric_type.strip()
                 eval_rows.append({
                     'model': model_dir.name,
                     'edit_type': edit_type,
                     'task': task,
-                    'metric': metric_key,
+                    'metric': metric_name,
+                    'metric_type': metric_type,
                     'value': metric_val,
                 })
         except Exception as e:
@@ -100,6 +107,10 @@ if eval_rows:
         writer = csv.DictWriter(f, fieldnames=eval_rows[0].keys())
         writer.writeheader()
         writer.writerows(eval_rows)
+    jsonl_path = analysis_dir / "eval_results.jsonl"
+    with open(jsonl_path, "w", encoding="utf-8") as f:
+        for row in eval_rows:
+            f.write(json.dumps(row, sort_keys=True) + "\\n")
     print(f"Wrote {len(eval_rows)} eval rows")
 
 # Collect InvarLock results
@@ -795,7 +806,11 @@ def fmt_delta(val):
 def ordered_tasks(delta_by_task):
     order = ["mmlu", "hellaswag", "arc_challenge", "winogrande"]
     tasks = [task for task in order if task in delta_by_task]
-    extra = sorted(task for task in delta_by_task if task not in order)
+    extra = sorted(
+        task
+        for task in delta_by_task
+        if task not in order and not str(task).startswith("mmlu_")
+    )
     return tasks + extra
 
 metric_definitions = (
@@ -834,9 +849,21 @@ if models:
             delta_lines.append(
                 f"    {edit_name}: mean {fmt_delta(mean_delta)} | worst {worst_blob} | regressions {regression_blob} | [{task_blob}]"
             )
+            mmlu_subtasks = {
+                k: v for k, v in delta_by_task.items() if str(k).startswith("mmlu_")
+            }
+            delta_by_task_compact = {
+                k: v
+                for k, v in delta_by_task.items()
+                if not str(k).startswith("mmlu_")
+            }
+            if mmlu_subtasks:
+                delta_by_task_compact["mmlu_subtasks"] = dict(
+                    sorted(mmlu_subtasks.items())
+                )
             delta_summary[model][edit_name] = {
                 "mean_delta_eval": mean_delta,
-                "delta_by_task": delta_by_task,
+                "delta_by_task": delta_by_task_compact,
                 "regression_tasks": regression_tasks,
                 "worst_delta_task": worst_task,
                 "worst_delta": worst_delta,
@@ -933,4 +960,3 @@ with open(reports_dir / "final_verdict.txt", 'w') as f:
 
 EOF
 }
-
