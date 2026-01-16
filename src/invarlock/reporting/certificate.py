@@ -1558,7 +1558,13 @@ def make_certificate(
     telemetry: dict[str, Any] = {}
     metrics_section = report.get("metrics", {})
     if isinstance(metrics_section, dict):
-        for key in ("latency_ms_per_tok", "memory_mb_peak", "throughput_tok_per_s"):
+        for key in (
+            "latency_ms_per_tok",
+            "memory_mb_peak",
+            "gpu_memory_mb_peak",
+            "gpu_memory_reserved_mb_peak",
+            "throughput_tok_per_s",
+        ):
             value = metrics_section.get(key)
             if isinstance(value, int | float) and math.isfinite(value):
                 telemetry[key] = float(value)
