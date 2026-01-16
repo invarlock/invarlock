@@ -1855,30 +1855,8 @@ process_edit() {
         return 0
     fi
 
-    # Create edit based on type
     local create_result=0
-    case "${edit_type}" in
-        "quant_rtn")
-            # 4-part: type:bits:group_size:scope
-            create_edited_model "${baseline_path}" "${edit_path}" "${edit_type}" "${param1}" "${param2}" "${scope}" "${gpu_id}" || create_result=$?
-            ;;
-        "fp8_quant")
-            # 3-part: type:format:scope -> param1=format, scope=scope
-            create_fp8_model "${baseline_path}" "${edit_path}" "${param1}" "${scope}" "${gpu_id}" || create_result=$?
-            ;;
-        "magnitude_prune")
-            # 3-part: type:sparsity:scope -> param1=sparsity, scope=scope
-            create_pruned_model "${baseline_path}" "${edit_path}" "${param1}" "${scope}" "${gpu_id}" || create_result=$?
-            ;;
-        "lowrank_svd")
-            # 3-part: type:rank:scope -> param1=rank, scope=scope
-            create_lowrank_model "${baseline_path}" "${edit_path}" "${param1}" "${scope}" "${gpu_id}" || create_result=$?
-            ;;
-        *)
-            log "  ERROR: Unknown edit type: ${edit_type}"
-            return 1
-            ;;
-    esac
+    create_model_variant "${baseline_path}" "${edit_path}" "${edit_type}" "${param1}" "${param2}" "${scope}" "${gpu_id}" || create_result=$?
 
     # Only output path if creation succeeded
     if [[ ${create_result} -eq 0 && -d "${edit_path}" ]]; then

@@ -33,6 +33,63 @@ _model_creation_run_python() {
     CUDA_VISIBLE_DEVICES="${cuda_devices}" _cmd_python "$@"
 }
 
+create_model_variant() {
+    local baseline_path="$1"
+    local output_path="$2"
+    local edit_type="$3"
+    local param1="${4:-}"
+    local param2="${5:-}"
+    local scope="${6:-}"
+    local gpu_id="${7:-0}"
+
+    [[ "${param1}" == "null" ]] && param1=""
+    [[ "${param2}" == "null" ]] && param2=""
+    [[ "${scope}" == "null" ]] && scope=""
+
+    case "${edit_type}" in
+        "quant_rtn")
+            if [[ -z "${param1}" || -z "${param2}" || -z "${scope}" ]]; then
+                echo "ERROR: quant_rtn requires bits, group_size, scope" >&2
+                return 1
+            fi
+            create_edited_model "${baseline_path}" "${output_path}" "quant_rtn" "${param1}" "${param2}" "${scope}" "${gpu_id}"
+            ;;
+        "fp8_quant")
+            if [[ -z "${param1}" || -z "${scope}" ]]; then
+                echo "ERROR: fp8_quant requires format and scope" >&2
+                return 1
+            fi
+            create_fp8_model "${baseline_path}" "${output_path}" "${param1}" "${scope}" "${gpu_id}"
+            ;;
+        "magnitude_prune")
+            if [[ -z "${param1}" || -z "${scope}" ]]; then
+                echo "ERROR: magnitude_prune requires sparsity and scope" >&2
+                return 1
+            fi
+            create_pruned_model "${baseline_path}" "${output_path}" "${param1}" "${scope}" "${gpu_id}"
+            ;;
+        "lowrank_svd")
+            if [[ -z "${param1}" || -z "${scope}" ]]; then
+                echo "ERROR: lowrank_svd requires rank and scope" >&2
+                return 1
+            fi
+            create_lowrank_model "${baseline_path}" "${output_path}" "${param1}" "${scope}" "${gpu_id}"
+            ;;
+        "error_injection")
+            if [[ -z "${param1}" ]]; then
+                echo "ERROR: error_injection requires error_type" >&2
+                return 1
+            fi
+            create_error_model "${baseline_path}" "${output_path}" "${param1}" "${gpu_id}"
+            ;;
+        *)
+            echo "ERROR: Unknown edit type: ${edit_type}" >&2
+            return 1
+            ;;
+    esac
+}
+export -f create_model_variant
+
 create_edited_model() {
     local baseline_path="$1"
     local output_path="$2"
@@ -51,7 +108,7 @@ create_edited_model() {
         local parent_dir
         parent_dir="$(dirname "${output_path}")"
         local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
-        _model_creation_run_python "${parent_dir}" "${cuda_devices}" - "${baseline_path}" "${output_path}" "${bits}" "${group_size}" "${scope}" <<'PY'
+    _model_creation_run_python "${parent_dir}" "${cuda_devices}" - "${baseline_path}" "${output_path}" "${bits}" "${group_size}" "${scope}" <<'PY'
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from pathlib import Path
