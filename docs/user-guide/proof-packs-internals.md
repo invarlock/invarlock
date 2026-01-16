@@ -73,31 +73,46 @@ task graph, scheduling, and artifact generation. It complements
 
 ```text
 ┌─────────────────────────────────────────────────────────┐
-│                       ENTRYPOINTS                        │
+│                         ENTRYPOINTS                      │
 ├──────────────┬──────────────┬────────────────────────────┤
-│  run_pack.sh  │ run_suite.sh │ verify_pack.sh            │
-│  (pack+run)   │ (run only)   │ (checksums+certs verify)  │
+│  run_pack.sh  │ run_suite.sh │ verify_pack.sh             │
+│  (pack+run)   │ (run only)   │ (checksums+certs verify)   │
 └──────┬────────┴──────┬───────┴────────────────────────────┘
        │               │
        ▼               ▼
-┌─────────────────────────────────────────────────────────┐
-│                 ORCHESTRATION LAYER                      │
-├─────────────────────────────────────────────────────────┤
-│  lib/validation_suite.sh (main_dynamic)                  │
-│   ├─ lib/lmeval_runner.sh                                │
-│   ├─ lib/config_generator.sh                             │
-│   ├─ lib/result_compiler.sh                              │
-│   └─ scripts/proof_packs/python/*                        │
-└─────────────────────────────┬───────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────┐
-│                   CORE SERVICES                          │
-├─────────────────────────────────────────────────────────┤
-│  lib/queue_manager.sh   lib/scheduler.sh                 │
-│  lib/gpu_worker.sh      lib/task_functions.sh            │
-│  lib/model_creation.sh  lib/fault_tolerance.sh           │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                    ORCHESTRATION LAYER                    │
+├──────────────────────────────────────────────────────────┤
+│  lib/validation_suite.sh (main_dynamic)                   │
+│  ├─ Phase 0: setup + preflight                            │
+│  ├─ Phase 1: queue init      ───────────┐                 │
+│  ├─ Phase 2: worker launch   │          │                 │
+│  └─ Phase 3: monitor + retry │          │                 │
+└──────────────────────────────┼──────────┼─────────────────┘
+                               │          │
+       ┌───────────────────────┘          └─────────────┐
+       ▼                                                 ▼
+┌──────────────────────────┐                   ┌──────────────────┐
+│       TASK EXECUTION      │                   │  CORE SERVICES   │
+├──────────────────────────┤                   ├──────────────────┤
+│  lib/gpu_worker.sh        │◄──────────────────┤  queue_manager   │
+│  ├─ Task claim            │                   │  scheduler       │
+│  ├─ OOM pre-check         │                   │  task_serial.    │
+│  ├─ execute_task()        │                   │  fault_tol.      │
+│  └─ GPU cleanup           │                   └──────────────────┘
+└──────┬───────────────────┘
+       │
+       ▼
+┌──────────────────────────┐
+│       TASK FUNCTIONS      │
+├──────────────────────────┤
+│  ├─ SETUP_BASELINE        │
+│  ├─ CALIBRATION_RUN       │
+│  ├─ GENERATE_PRESET       │
+│  ├─ CREATE_EDITS(_BATCH)  │
+│  ├─ EVAL_* (split)        │
+│  └─ CERTIFY_*             │
+└──────────────────────────┘
 ```
 
 ## Troubleshooting decision tree
