@@ -312,12 +312,12 @@ class RTNQuantEdit(ModelEdit):
             for i, (name, module) in enumerate(target_modules):
                 weight_shape = module.weight.shape
                 param_count = module.weight.numel()
-                self._emit(
-                    f"[{i + 1}] {name}: {weight_shape} ({param_count:,} params)"
-                )
+                self._emit(f"[{i + 1}] {name}: {weight_shape} ({param_count:,} params)")
 
             if len(target_modules) == 0:
-                self._emit("WARNING: No target modules found! Check scope configuration.")
+                self._emit(
+                    "WARNING: No target modules found! Check scope configuration."
+                )
                 self._emit("Available linear modules:")
                 linear_modules = []
                 for name, module in model.named_modules():
@@ -344,9 +344,7 @@ class RTNQuantEdit(ModelEdit):
             total_params_quantized = 0
 
             for i, (module_name, module) in enumerate(target_modules):
-                self._emit(
-                    f"[{i + 1}/{len(target_modules)}] Quantizing: {module_name}"
-                )
+                self._emit(f"[{i + 1}/{len(target_modules)}] Quantizing: {module_name}")
                 self._emit(
                     f"Shape: {module.weight.shape}, Params: {module.weight.numel():,}"
                 )
@@ -367,9 +365,7 @@ class RTNQuantEdit(ModelEdit):
                 quantization_results.append(quant_result)
                 total_params_quantized += quant_result["params_quantized"]
 
-                self._emit(
-                    f"Quantized {quant_result['params_quantized']:,} parameters"
-                )
+                self._emit(f"Quantized {quant_result['params_quantized']:,} parameters")
 
             # Execute GuardChain after edit (if provided)
             if self.guard_chain is not None:

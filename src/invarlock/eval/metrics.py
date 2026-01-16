@@ -2296,7 +2296,11 @@ class PerplexityMetric:
                 tok_val = float(tokens)
             except Exception:
                 continue
-            if not math.isfinite(loss_val) or not math.isfinite(tok_val) or tok_val <= 0:
+            if (
+                not math.isfinite(loss_val)
+                or not math.isfinite(tok_val)
+                or tok_val <= 0
+            ):
                 continue
             total_loss += loss_val * tok_val
             total_tokens += tok_val
