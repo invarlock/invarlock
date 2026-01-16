@@ -63,5 +63,5 @@ def test_markdown_policy_provenance_and_resolved_policy_blocks() -> None:
     cert["resolved_policy"] = {"metrics": {"pm_ratio": {"min_tokens": 50000}}}
 
     md = render_certificate_markdown(cert)
-    assert "Policy Provenance" in md and "Overrides:" in md and "Policy Digest:" in md
-    assert "Resolved Policy" in md and "```yaml" in md
+    assert "Policy Configuration" in md and "Overrides:" in md and "Digest:" in md
+    assert "Resolved Policy YAML" in md and "```yaml" in md
