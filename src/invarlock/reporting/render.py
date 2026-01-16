@@ -113,6 +113,455 @@ def _short_digest(v: str) -> str:
     return v if len(v) <= 16 else (v[:8] + "…" + v[-8:])
 
 
+def _append_safety_dashboard_section(
+    lines: list[str], certificate: dict[str, Any]
+) -> None:
+    """Append a concise, first-screen dashboard for the certificate."""
+    block = compute_console_validation_block(certificate)
+    overall_pass = bool(block.get("overall_pass"))
+    overall_status = (
+        f"{'✅' if overall_pass else '❌'} {'PASS' if overall_pass else 'FAIL'}"
+    )
+
+    validation = certificate.get("validation", {}) or {}
+    pm = certificate.get("primary_metric", {}) or {}
+    auto = certificate.get("auto", {}) or {}
+    tier = str(auto.get("tier") or "balanced").lower()
+
+    # Primary metric summary
+    pm_kind = str(pm.get("kind", "")).lower()
+    pm_basis = pm.get("gating_basis") or pm.get("basis") or "point"
+    pm_ok: bool | None
+    if isinstance(validation, dict) and "primary_metric_acceptable" in validation:
+        pm_ok = bool(validation.get("primary_metric_acceptable"))
+    else:
+        pm_ok = None
+    pm_value = pm.get("ratio_vs_baseline")
+
+    if pm_kind in {"accuracy", "vqa_accuracy"}:
+        measured = f"{pm_value:+.2f} pp" if isinstance(pm_value, int | float) else "N/A"
+        th_map = {
+            "conservative": -0.5,
+            "balanced": -1.0,
+            "aggressive": -2.0,
+            "none": -1.0,
+        }
+        th = th_map.get(tier, -1.0)
+        threshold = f"≥ {th:+.2f} pp ({pm_basis})"
+    else:
+        measured = f"{pm_value:.3f}×" if isinstance(pm_value, int | float) else "N/A"
+        tier_thresholds = {
+            "conservative": 1.05,
+            "balanced": 1.10,
+            "aggressive": 1.20,
+            "none": 1.10,
+        }
+        ratio_limit = tier_thresholds.get(tier, 1.10)
+        target_ratio = auto.get("target_pm_ratio")
+        if isinstance(target_ratio, int | float) and target_ratio > 0:
+            ratio_limit = min(ratio_limit, float(target_ratio))
+        threshold = f"≤ {ratio_limit:.2f}× ({pm_basis})"
+
+    pm_status = (
+        f"{'✅' if pm_ok else '❌'} {measured}"
+        if isinstance(pm_ok, bool)
+        else f"🛈 {measured}"
+    )
+
+    # Drift summary (final/preview ratio) when preview/final are numeric
+    drift_ok: bool | None
+    if isinstance(validation, dict) and "preview_final_drift_acceptable" in validation:
+        drift_ok = bool(validation.get("preview_final_drift_acceptable"))
+    else:
+        drift_ok = None
+    drift_val = "N/A"
+    try:
+        pv = (
+            float(pm.get("preview"))
+            if isinstance(pm.get("preview"), int | float)
+            else float("nan")
+        )
+        fv = (
+            float(pm.get("final"))
+            if isinstance(pm.get("final"), int | float)
+            else float("nan")
+        )
+        drift = (
+            fv / pv
+            if (math.isfinite(pv) and pv > 0 and math.isfinite(fv))
+            else float("nan")
+        )
+        if math.isfinite(drift):
+            drift_val = f"{drift:.3f}×"
+    except Exception:
+        drift_val = "N/A"
+    drift_status = (
+        f"{'✅' if drift_ok else '❌'} {drift_val}"
+        if isinstance(drift_ok, bool)
+        else f"🛈 {drift_val}"
+    )
+
+    def _gate_cell(key: str, ok_default: bool | None = None) -> str:
+        ok: bool | None
+        if not isinstance(validation, dict):
+            ok = ok_default
+        elif key not in validation:
+            ok = ok_default
+        else:
+            ok = bool(validation.get(key))
+        if ok is None:
+            return "🛈 N/A"
+        return "✅ PASS" if ok else "❌ FAIL"
+
+    overhead_ctx = certificate.get("guard_overhead", {}) or {}
+    overhead_evaluated = (
+        bool(overhead_ctx.get("evaluated")) if isinstance(overhead_ctx, dict) else False
+    )
+    overhead_row: tuple[str, str, str] | None = None
+    if overhead_evaluated:
+        overhead_pct = overhead_ctx.get("overhead_percent")
+        overhead_ratio = overhead_ctx.get("overhead_ratio")
+        if isinstance(overhead_pct, int | float) and math.isfinite(float(overhead_pct)):
+            overhead_measured = f"{float(overhead_pct):+.2f}%"
+        elif isinstance(overhead_ratio, int | float) and math.isfinite(
+            float(overhead_ratio)
+        ):
+            overhead_measured = f"{float(overhead_ratio):.3f}×"
+        else:
+            overhead_measured = "N/A"
+        threshold_pct = overhead_ctx.get("threshold_percent")
+        if isinstance(threshold_pct, int | float) and math.isfinite(
+            float(threshold_pct)
+        ):
+            threshold_str = f"≤ +{float(threshold_pct):.1f}%"
+        else:
+            threshold_str = "≤ +1.0%"
+        overhead_row = (
+            "Overhead",
+            f"{'✅' if bool(validation.get('guard_overhead_acceptable', True)) else '❌'} {overhead_measured}"
+            if isinstance(validation, dict)
+            else f"🛈 {overhead_measured}",
+            threshold_str,
+        )
+
+    lines.append("## Safety Dashboard")
+    lines.append("")
+    lines.append("| Check | Status | Quick Summary |")
+    lines.append("|-------|--------|---------------|")
+    lines.append(f"| Overall | {overall_status} | Canonical gate outcomes |")
+    lines.append(f"| Primary Metric | {pm_status} | {threshold} |")
+    lines.append(f"| Drift | {drift_status} | 0.95–1.05× band |")
+    lines.append(
+        f"| Invariants | {_gate_cell('invariants_pass')} | Model integrity checks |"
+    )
+    lines.append(
+        f"| Spectral | {_gate_cell('spectral_stable')} | Weight matrix spectral norms |"
+    )
+    lines.append(f"| RMT | {_gate_cell('rmt_stable')} | Random Matrix Theory guard |")
+    if overhead_row:
+        lines.append(f"| {overhead_row[0]} | {overhead_row[1]} | {overhead_row[2]} |")
+    lines.append("")
+
+
+def _append_primary_metric_section(
+    lines: list[str], certificate: dict[str, Any]
+) -> None:
+    """Append the Primary Metric section early for quick triage."""
+    pm = certificate.get("primary_metric")
+    if not isinstance(pm, dict) or not pm:
+        return
+
+    kind = pm.get("kind", "unknown")
+    lines.append("## Primary Metric")
+    lines.append("")
+    unit = pm.get("unit", "-")
+    paired = pm.get("paired", False)
+
+    estimated_flag = False
+    try:
+        if bool(pm.get("estimated")):
+            estimated_flag = True
+        elif str(pm.get("counts_source", "")).lower() == "pseudo_config":
+            estimated_flag = True
+    except Exception:
+        estimated_flag = False
+    est_suffix = " (estimated)" if estimated_flag else ""
+
+    lines.append(f"- Kind: {kind} (unit: {unit}){est_suffix}")
+    gating_basis = pm.get("gating_basis") or pm.get("basis")
+    if gating_basis:
+        lines.append(f"- Basis: {gating_basis}")
+    if isinstance(paired, bool):
+        lines.append(f"- Paired: {paired}")
+    reps = pm.get("reps")
+    if isinstance(reps, int | float):
+        lines.append(f"- Bootstrap Reps: {int(reps)}")
+    ci = pm.get("ci") or pm.get("display_ci")
+    if (
+        isinstance(ci, list | tuple)
+        and len(ci) == 2
+        and all(isinstance(x, int | float) for x in ci)
+    ):
+        lines.append(f"- CI: {ci[0]:.3f}–{ci[1]:.3f}")
+
+    prev = pm.get("preview")
+    fin = pm.get("final")
+    ratio = pm.get("ratio_vs_baseline")
+
+    lines.append("")
+    if estimated_flag and str(kind).lower() in {"accuracy", "vqa_accuracy"}:
+        lines.append(
+            "- Note: Accuracy derived from pseudo counts (quick dev preset); use a labeled preset for measured accuracy."
+        )
+    lines.append("| Field | Value |")
+    lines.append("|-------|-------|")
+    lines.append(f"| Preview | {_fmt_by_kind(prev, str(kind))} |")
+    lines.append(f"| Final | {_fmt_by_kind(fin, str(kind))} |")
+
+    if kind in {"accuracy", "vqa_accuracy"}:
+        lines.append(f"| Δ vs Baseline | {_fmt_by_kind(ratio, str(kind))} |")
+        try:
+            base_pt = pm.get("baseline_point")
+            if isinstance(base_pt, int | float) and base_pt < 0.05:
+                lines.append("- Note: baseline < 5%; ratio suppressed; showing Δpp")
+        except Exception:
+            pass
+    else:
+        try:
+            lines.append(f"| Ratio vs Baseline | {float(ratio):.3f} |")
+        except Exception:
+            lines.append("| Ratio vs Baseline | N/A |")
+    lines.append("")
+
+    # Secondary metrics (informational)
+    try:
+        secs = certificate.get("secondary_metrics")
+        if isinstance(secs, list) and secs:
+            lines.append("## Secondary Metrics (informational)")
+            lines.append("")
+            lines.append("| Kind | Preview | Final | vs Baseline | CI |")
+            lines.append("|------|---------|-------|-------------|----|")
+            for m in secs:
+                if not isinstance(m, dict):
+                    continue
+                k = m.get("kind", "?")
+                pv = _fmt_by_kind(m.get("preview"), str(k))
+                fv = _fmt_by_kind(m.get("final"), str(k))
+                rb = m.get("ratio_vs_baseline")
+                try:
+                    rb_str = (
+                        f"{float(rb):.3f}"
+                        if (str(k).startswith("ppl"))
+                        else _fmt_by_kind(rb, str(k))
+                    )
+                except Exception:
+                    rb_str = "N/A"
+                ci = m.get("display_ci") or m.get("ci")
+                if isinstance(ci, tuple | list) and len(ci) == 2:
+                    ci_str = f"{float(ci[0]):.3f}-{float(ci[1]):.3f}"
+                else:
+                    ci_str = "–"
+                lines.append(f"| {k} | {pv} | {fv} | {rb_str} | {ci_str} |")
+            lines.append("")
+    except Exception:
+        pass
+
+
+def _append_policy_configuration_section(
+    lines: list[str], certificate: dict[str, Any]
+) -> None:
+    resolved_policy = certificate.get("resolved_policy")
+    policy_provenance = certificate.get("policy_provenance", {}) or {}
+    has_prov = isinstance(policy_provenance, dict) and bool(policy_provenance)
+    has_resolved = isinstance(resolved_policy, dict) and bool(resolved_policy)
+    if not (has_prov or has_resolved):
+        return
+
+    lines.append("## Policy Configuration")
+    lines.append("")
+
+    tier = None
+    if has_prov:
+        tier = policy_provenance.get("tier")
+    if not tier:
+        tier = (certificate.get("auto", {}) or {}).get("tier")
+    digest_value = None
+    if has_prov:
+        digest_value = policy_provenance.get("policy_digest")
+    if not digest_value:
+        digest_value = (certificate.get("policy_digest", {}) or {}).get(
+            "thresholds_hash"
+        )
+
+    summary_parts: list[str] = []
+    if tier:
+        summary_parts.append(f"**Tier:** {tier}")
+    if digest_value:
+        summary_parts.append(f"**Digest:** `{_short_digest(str(digest_value))}`")
+    if summary_parts:
+        lines.append(" | ".join(summary_parts))
+
+    if has_prov:
+        overrides_list = policy_provenance.get("overrides") or []
+        if overrides_list:
+            lines.append(f"- **Overrides:** {', '.join(overrides_list)}")
+        else:
+            lines.append("- **Overrides:** (none)")
+        if policy_provenance.get("resolved_at"):
+            lines.append(f"- **Resolved At:** {policy_provenance.get('resolved_at')}")
+
+    if has_resolved:
+        lines.append("")
+        lines.append("<details>")
+        lines.append("<summary>Resolved Policy YAML</summary>")
+        lines.append("")
+        lines.append("```yaml")
+        resolved_yaml = yaml.safe_dump(
+            resolved_policy, sort_keys=True, width=80, default_flow_style=False
+        ).strip()
+        for line in resolved_yaml.splitlines():
+            lines.append(line)
+        lines.append("```")
+        lines.append("")
+        lines.append("</details>")
+
+    lines.append("")
+
+
+def _append_dataset_and_provenance_section(
+    lines: list[str], certificate: dict[str, Any]
+) -> None:
+    dataset = certificate.get("dataset", {}) or {}
+    provenance_info = certificate.get("provenance", {}) or {}
+
+    has_dataset = isinstance(dataset, dict) and bool(dataset)
+    has_provenance = isinstance(provenance_info, dict) and bool(provenance_info)
+    if not (has_dataset or has_provenance):
+        return
+
+    lines.append("## Dataset and Provenance")
+    lines.append("")
+
+    if has_dataset:
+        prov = dataset.get("provider") or "unknown"
+        lines.append(f"- **Provider:** {prov}")
+        try:
+            seq_len_val = (
+                int(dataset.get("seq_len"))
+                if isinstance(dataset.get("seq_len"), int | float)
+                else dataset.get("seq_len")
+            )
+        except Exception:  # pragma: no cover - defensive
+            seq_len_val = dataset.get("seq_len")
+        if seq_len_val is not None:
+            lines.append(f"- **Sequence Length:** {seq_len_val}")
+        windows_blk = (
+            dataset.get("windows", {})
+            if isinstance(dataset.get("windows"), dict)
+            else {}
+        )
+        win_prev = windows_blk.get("preview")
+        win_final = windows_blk.get("final")
+        if win_prev is not None and win_final is not None:
+            lines.append(f"- **Windows:** {win_prev} preview + {win_final} final")
+        if windows_blk.get("seed") is not None:
+            lines.append(f"- **Seed:** {windows_blk.get('seed')}")
+        hash_blk = (
+            dataset.get("hash", {}) if isinstance(dataset.get("hash"), dict) else {}
+        )
+        if hash_blk.get("preview_tokens") is not None:
+            lines.append(f"- **Preview Tokens:** {hash_blk.get('preview_tokens'):,}")
+        if hash_blk.get("final_tokens") is not None:
+            lines.append(f"- **Final Tokens:** {hash_blk.get('final_tokens'):,}")
+        if hash_blk.get("total_tokens") is not None:
+            lines.append(f"- **Total Tokens:** {hash_blk.get('total_tokens'):,}")
+        if hash_blk.get("dataset"):
+            lines.append(f"- **Dataset Hash:** {hash_blk.get('dataset')}")
+        tokenizer = dataset.get("tokenizer", {})
+        if isinstance(tokenizer, dict) and (
+            tokenizer.get("name") or tokenizer.get("hash")
+        ):
+            vocab_size = tokenizer.get("vocab_size")
+            vocab_suffix = (
+                f" (vocab {vocab_size})" if isinstance(vocab_size, int) else ""
+            )
+            lines.append(
+                f"- **Tokenizer:** {tokenizer.get('name', 'unknown')}{vocab_suffix}"
+            )
+            if tokenizer.get("hash"):
+                lines.append(f"  - Hash: {tokenizer['hash']}")
+            lines.append(
+                f"  - BOS/EOS: {tokenizer.get('bos_token')} / {tokenizer.get('eos_token')}"
+            )
+            if tokenizer.get("pad_token") is not None:
+                lines.append(f"  - PAD: {tokenizer.get('pad_token')}")
+            if tokenizer.get("add_prefix_space") is not None:
+                lines.append(
+                    f"  - add_prefix_space: {tokenizer.get('add_prefix_space')}"
+                )
+
+    if has_provenance:
+        baseline_info = provenance_info.get("baseline", {}) or {}
+        edited_info = provenance_info.get("edited", {}) or {}
+
+        if baseline_info or edited_info:
+            lines.append("")
+        if baseline_info:
+            lines.append(f"- **Baseline Run ID:** {baseline_info.get('run_id')}")
+            if baseline_info.get("report_hash"):
+                lines.append(f"  - Report Hash: `{baseline_info.get('report_hash')}`")
+            if baseline_info.get("report_path"):
+                lines.append(f"  - Report Path: {baseline_info.get('report_path')}")
+        if edited_info:
+            lines.append(f"- **Edited Run ID:** {edited_info.get('run_id')}")
+            if edited_info.get("report_hash"):
+                lines.append(f"  - Report Hash: `{edited_info.get('report_hash')}`")
+            if edited_info.get("report_path"):
+                lines.append(f"  - Report Path: {edited_info.get('report_path')}")
+
+        provider_digest = provenance_info.get("provider_digest")
+        if isinstance(provider_digest, dict) and provider_digest:
+            ids_d = provider_digest.get("ids_sha256")
+            tok_d = provider_digest.get("tokenizer_sha256")
+            mask_d = provider_digest.get("masking_sha256")
+
+            lines.append("- **Provider Digest:**")
+            if tok_d:
+                lines.append(
+                    f"  - tokenizer_sha256: `{_short_digest(tok_d)}` (full in JSON)"
+                )
+            if ids_d:
+                lines.append(f"  - ids_sha256: `{_short_digest(ids_d)}` (full in JSON)")
+            if mask_d:
+                lines.append(
+                    f"  - masking_sha256: `{_short_digest(mask_d)}` (full in JSON)"
+                )
+
+        try:
+            conf = certificate.get("confidence", {}) or {}
+            if isinstance(conf, dict) and conf.get("label"):
+                lines.append(f"- **Confidence:** {conf.get('label')}")
+        except Exception:
+            pass
+
+        try:
+            pd = certificate.get("policy_digest", {}) or {}
+            if isinstance(pd, dict) and pd:
+                pv = pd.get("policy_version")
+                th = pd.get("thresholds_hash")
+                if pv:
+                    lines.append(f"- **Policy Version:** {pv}")
+                if isinstance(th, str) and th:
+                    short = th if len(th) <= 16 else (th[:8] + "…" + th[-8:])
+                    lines.append(f"- **Thresholds Digest:** `{short}` (full in JSON)")
+                if pd.get("changed"):
+                    lines.append("- Note: policy changed")
+        except Exception:
+            pass
+
+    lines.append("")
+
+
 def _fmt_by_kind(x: Any, k: str) -> str:
     try:
         xv = float(x)
@@ -275,7 +724,8 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
     if not validate_certificate(certificate):
         raise ValueError("Invalid certificate structure")
 
-    lines = []
+    lines: list[str] = []
+    appendix_lines: list[str] = []
     edit_name = str(certificate.get("edit_name") or "").lower()
 
     # Header
@@ -290,6 +740,10 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
     lines.append(f"**Run ID:** `{certificate['run_id']}`")
     lines.append(f"**Generated:** {certificate['artifacts']['generated_at']}")
     lines.append(f"**Edit Type:** {certificate.get('edit_name', 'Unknown')}")
+    lines.append("")
+    lines.append(
+        "> Full evidence: see [`evaluation.cert.json`](evaluation.cert.json) for complete provenance, digests, and raw measurements."
+    )
     lines.append("")
 
     plugins = certificate.get("plugins", {})
@@ -314,7 +768,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
             ]
             if guard_entries:
                 lines.append("- Guards:\n  - " + "\n  - ".join(guard_entries))
-        lines.append("")
+    lines.append("")
 
     # Executive Summary with validation status (canonical, from console block)
     lines.append("## Executive Summary")
@@ -352,6 +806,22 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
             )
     except Exception:
         pass
+    lines.append("")
+
+    _append_safety_dashboard_section(lines, certificate)
+
+    lines.append("## Contents")
+    lines.append("")
+    lines.append("- [Safety Dashboard](#safety-dashboard)")
+    lines.append("- [Quality Gates](#quality-gates)")
+    lines.append("- [Safety Check Details](#safety-check-details)")
+    lines.append("- [Primary Metric](#primary-metric)")
+    lines.append("- [Guard Observability](#guard-observability)")
+    lines.append("- [Model Information](#model-information)")
+    lines.append("- [Dataset and Provenance](#dataset-and-provenance)")
+    lines.append("- [Policy Configuration](#policy-configuration)")
+    lines.append("- [Appendix](#appendix)")
+    lines.append("- [Certificate Integrity](#certificate-integrity)")
     lines.append("")
 
     # Validation table with canonical gates (mirrors console allow-list)
@@ -616,14 +1086,39 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
             or overlap_frac is not None
         ):
             lines.append("")
-            lines.append(
-                f"- Pairing: paired={paired_windows}, match={match_frac:.3f}, overlap={overlap_frac:.3f}"
-            )
+            parts: list[str] = []
+            if paired_windows is not None:
+                try:
+                    parts.append(f"{int(paired_windows)} windows")
+                except Exception:
+                    parts.append(f"windows={paired_windows}")
+            if isinstance(match_frac, int | float) and math.isfinite(float(match_frac)):
+                parts.append(f"{float(match_frac) * 100.0:.1f}% match")
+            elif match_frac is not None:
+                parts.append(f"match={match_frac}")
+            if isinstance(overlap_frac, int | float) and math.isfinite(
+                float(overlap_frac)
+            ):
+                parts.append(f"{float(overlap_frac) * 100.0:.1f}% overlap")
+            elif overlap_frac is not None:
+                parts.append(f"overlap={overlap_frac}")
+            lines.append(f"✅ Pairing: {', '.join(parts) if parts else 'N/A'}")
         if isinstance(bootstrap, dict):
             reps = bootstrap.get("replicates")
             bseed = bootstrap.get("seed")
             if reps is not None or bseed is not None:
-                lines.append(f"- Bootstrap: replicates={reps}, seed={bseed}")
+                bits: list[str] = []
+                if reps is not None:
+                    try:
+                        bits.append(f"{int(reps)} replicates")
+                    except Exception:
+                        bits.append(f"replicates={reps}")
+                if bseed is not None:
+                    try:
+                        bits.append(f"seed={int(bseed)}")
+                    except Exception:
+                        bits.append(f"seed={bseed}")
+                lines.append(f"✅ Bootstrap: {', '.join(bits) if bits else 'N/A'}")
         # Optional: show log-space paired Δ CI next to ratio CI for clarity
         delta_ci = certificate.get("primary_metric", {}).get("ci") or certificate.get(
             "ppl", {}
@@ -633,7 +1128,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
             and len(delta_ci) == 2
             and all(isinstance(x, int | float) for x in delta_ci)
         ):
-            lines.append(f"- Log Δ (paired) CI: [{delta_ci[0]:.6f}, {delta_ci[1]:.6f}]")
+            lines.append(f"🛈 Log Δ (paired) CI: [{delta_ci[0]:.6f}, {delta_ci[1]:.6f}]")
     except Exception:
         pass
 
@@ -654,116 +1149,179 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
 
     lines.append("")
 
+    _append_primary_metric_section(lines, certificate)
+
     # Guard observability snapshots
     lines.append("## Guard Observability")
     lines.append("")
 
     spectral_info = certificate.get("spectral", {}) or {}
     if spectral_info:
-        lines.append("### Spectral Guard")
+        lines.append("### Spectral Guard Summary")
         lines.append("")
-        mt_info = spectral_info.get("multiple_testing", {}) or {}
-        if mt_info:
-            lines.append("- **Multiple Testing:**")
-            lines.append("  ```yaml")
-            mt_yaml = (
-                yaml.safe_dump(mt_info, sort_keys=True, width=70).strip().splitlines()
-            )
-            for line in mt_yaml:
-                lines.append(f"  {line}")
-            lines.append("  ```")
-        # Spectral summary (place key knobs together for quick scan)
-        spec_sigma = spectral_info.get("sigma_quantile")
-        spec_deadband = spectral_info.get("deadband")
-        spec_max_caps = spectral_info.get("max_caps")
-        summary_yaml = {
-            "sigma_quantile": float(spec_sigma)
-            if isinstance(spec_sigma, int | float)
-            else None,
-            "deadband": float(spec_deadband)
-            if isinstance(spec_deadband, int | float)
-            else None,
-            "max_caps": int(spec_max_caps)
-            if isinstance(spec_max_caps, int | float)
-            else None,
-        }
-        # Drop Nones from summary
-        summary_yaml = {k: v for k, v in summary_yaml.items() if v is not None}
-        if summary_yaml:
-            lines.append("- **Spectral Summary:**")
-            lines.append("  ```yaml")
-            for line in (
-                yaml.safe_dump(summary_yaml, sort_keys=True, width=70)
-                .strip()
-                .splitlines()
-            ):
-                lines.append(f"  {line}")
-            lines.append("  ```")
-        lines.append(
-            f"- Caps Applied: {spectral_info.get('caps_applied')} / {spectral_info.get('max_caps')}"
+        lines.append("| Metric | Value | Status |")
+        lines.append("|--------|-------|--------|")
+
+        spectral_ok = bool(validation.get("spectral_stable", False))
+        caps_applied = spectral_info.get("caps_applied")
+        max_caps = spectral_info.get("max_caps")
+        caps_val = (
+            f"{caps_applied}/{max_caps}"
+            if caps_applied is not None and max_caps is not None
+            else "-"
         )
+        lines.append(
+            f"| Caps Applied | {caps_val} | {'✅ OK' if spectral_ok else '❌ FAIL'} |"
+        )
+
         summary = spectral_info.get("summary", {}) or {}
-        lines.append(f"- Caps Exceeded: {summary.get('caps_exceeded', False)}")
-        caps_by_family = spectral_info.get("caps_applied_by_family") or {}
-        family_caps = spectral_info.get("family_caps") or {}
-        if caps_by_family:
-            lines.append("")
-            lines.append("| Family | κ | Violations |")
-            lines.append("|--------|---|------------|")
-            for family, count in caps_by_family.items():
-                kappa = family_caps.get(family, {}).get("kappa")
-                if isinstance(kappa, int | float) and math.isfinite(float(kappa)):
-                    kappa_str = f"{kappa:.3f}"
-                else:
-                    kappa_str = "-"
-                lines.append(f"| {family} | {kappa_str} | {count} |")
-            lines.append("")
-        quantiles = spectral_info.get("family_z_quantiles") or {}
-        if quantiles:
-            lines.append("| Family | q95 | q99 | Max | Samples |")
-            lines.append("|--------|-----|-----|-----|---------|")
-            for family, stats in quantiles.items():
-                q95 = stats.get("q95")
-                q99 = stats.get("q99")
-                max_z = stats.get("max")
-                count = stats.get("count")
-                q95_str = f"{q95:.3f}" if isinstance(q95, int | float) else "-"
-                q99_str = f"{q99:.3f}" if isinstance(q99, int | float) else "-"
-                max_str = f"{max_z:.3f}" if isinstance(max_z, int | float) else "-"
-                count_str = str(count) if isinstance(count, int | float) else "-"
-                lines.append(
-                    f"| {family} | {q95_str} | {q99_str} | {max_str} | {count_str} |"
-                )
-            lines.append("")
-        policy_caps = spectral_info.get("policy", {}).get("family_caps")
-        if policy_caps:
-            lines.append("- **Family κ (policy):**")
-            lines.append("  ```yaml")
-            caps_yaml = (
-                yaml.safe_dump(policy_caps, sort_keys=True, width=70)
-                .strip()
-                .splitlines()
-            )
-            for line in caps_yaml:
-                lines.append(f"  {line}")
-            lines.append("  ```")
+        caps_exceeded = summary.get("caps_exceeded")
+        if caps_exceeded is not None:
+            cap_status = "✅ OK" if not bool(caps_exceeded) else "⚠️ WARN"
+            lines.append(f"| Caps Exceeded | {caps_exceeded} | {cap_status} |")
+
         top_scores = spectral_info.get("top_z_scores") or {}
-        if top_scores:
-            lines.append("Top |z| per family:")
-            for family in sorted(top_scores.keys()):
-                entries = top_scores[family]
-                if not entries:
+        max_family: str | None = None
+        max_module: str | None = None
+        max_abs_z: float | None = None
+        if isinstance(top_scores, dict):
+            for family, entries in top_scores.items():
+                if not isinstance(entries, list):
                     continue
-                formatted_entries = []
                 for entry in entries:
-                    module_name = entry.get("module", "unknown")
+                    if not isinstance(entry, dict):
+                        continue
                     z_val = entry.get("z")
-                    if isinstance(z_val, int | float) and math.isfinite(float(z_val)):
-                        z_str = f"{z_val:.3f}"
-                    else:
-                        z_str = "n/a"
-                    formatted_entries.append(f"{module_name} (|z|={z_str})")
-                lines.append(f"- {family}: {', '.join(formatted_entries)}")
+                    if not (
+                        isinstance(z_val, int | float) and math.isfinite(float(z_val))
+                    ):
+                        continue
+                    z_abs = abs(float(z_val))
+                    if max_abs_z is None or z_abs > max_abs_z:
+                        max_abs_z = z_abs
+                        max_family = str(family)
+                        max_module = (
+                            str(entry.get("module")) if entry.get("module") else None
+                        )
+
+        family_caps = spectral_info.get("family_caps") or {}
+        kappa = None
+        if max_family and isinstance(family_caps, dict):
+            try:
+                kappa = (family_caps.get(max_family, {}) or {}).get("kappa")
+            except Exception:
+                kappa = None
+        kappa_f = (
+            float(kappa)
+            if isinstance(kappa, int | float) and math.isfinite(float(kappa))
+            else None
+        )
+
+        if max_abs_z is not None:
+            max_val = f"{max_abs_z:.3f}"
+            if max_family:
+                max_val += f" ({max_family})"
+            if max_module:
+                max_val += f" – {max_module}"
+            if kappa_f is None:
+                max_status = "🛈 No κ"
+            elif max_abs_z <= kappa_f:
+                max_status = f"✅ Within κ={kappa_f:.3f}"
+            else:
+                max_status = f"❌ Exceeds κ={kappa_f:.3f}"
+            lines.append(f"| Max |z| | {max_val} | {max_status} |")
+
+        mt_info = spectral_info.get("multiple_testing", {}) or {}
+        if isinstance(mt_info, dict) and mt_info:
+            mt_method = mt_info.get("method")
+            mt_alpha = mt_info.get("alpha")
+            mt_m = mt_info.get("m")
+            parts: list[str] = []
+            if mt_method:
+                parts.append(f"method={mt_method}")
+            if isinstance(mt_alpha, int | float) and math.isfinite(float(mt_alpha)):
+                parts.append(f"α={float(mt_alpha):.3g}")
+            if isinstance(mt_m, int | float) and math.isfinite(float(mt_m)):
+                parts.append(f"m={int(mt_m)}")
+            lines.append(
+                f"| Multiple Testing | {', '.join(parts) if parts else '—'} | 🛈 INFO |"
+            )
+
+        lines.append("")
+
+        caps_by_family = spectral_info.get("caps_applied_by_family") or {}
+        quantiles = spectral_info.get("family_z_quantiles") or {}
+        if any(
+            bool(x)
+            for x in (caps_by_family, quantiles, family_caps, top_scores)
+            if isinstance(x, dict)
+        ):
+            lines.append("<details>")
+            lines.append("<summary>Per-family details</summary>")
+            lines.append("")
+            lines.append("| Family | κ | q95 | Max |z| | Violations |")
+            lines.append("|--------|---|-----|--------|------------|")
+
+            families: set[str] = set()
+            for block in (caps_by_family, quantiles, family_caps, top_scores):
+                if isinstance(block, dict):
+                    families.update(str(k) for k in block.keys())
+
+            for family in sorted(families):
+                kappa = None
+                if isinstance(family_caps, dict):
+                    kappa = (family_caps.get(family, {}) or {}).get("kappa")
+                kappa_str = (
+                    f"{float(kappa):.3f}"
+                    if isinstance(kappa, int | float) and math.isfinite(float(kappa))
+                    else "-"
+                )
+
+                q95 = None
+                max_z = None
+                if isinstance(quantiles, dict):
+                    stats = quantiles.get(family) or {}
+                    if isinstance(stats, dict):
+                        q95 = stats.get("q95")
+                        max_z = stats.get("max")
+                q95_str = f"{q95:.3f}" if isinstance(q95, int | float) else "-"
+                max_str = f"{max_z:.3f}" if isinstance(max_z, int | float) else "-"
+
+                violations = None
+                if isinstance(caps_by_family, dict):
+                    violations = caps_by_family.get(family)
+                v_str = (
+                    str(int(violations)) if isinstance(violations, int | float) else "0"
+                )
+
+                lines.append(
+                    f"| {family} | {kappa_str} | {q95_str} | {max_str} | {v_str} |"
+                )
+
+            if isinstance(top_scores, dict) and top_scores:
+                lines.append("")
+                lines.append("Top |z| per family:")
+                for family in sorted(top_scores.keys()):
+                    entries = top_scores[family]
+                    if not isinstance(entries, list) or not entries:
+                        continue
+                    formatted_entries = []
+                    for entry in entries:
+                        if not isinstance(entry, dict):
+                            continue
+                        module_name = entry.get("module", "unknown")
+                        z_val = entry.get("z")
+                        if isinstance(z_val, int | float) and math.isfinite(
+                            float(z_val)
+                        ):
+                            z_str = f"{z_val:.3f}"
+                        else:
+                            z_str = "n/a"
+                        formatted_entries.append(f"{module_name} (|z|={z_str})")
+                    lines.append(f"- {family}: {', '.join(formatted_entries)}")
+
+            lines.append("")
+            lines.append("</details>")
             lines.append("")
 
     rmt_info = certificate.get("rmt", {}) or {}
@@ -863,21 +1421,21 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
     inference_sources = compression_diag.get("inference_source") or {}
     inference_log = compression_diag.get("inference_log") or []
     if inference_flags or inference_sources or inference_log:
-        lines.append("## Inference")
-        lines.append("")
+        appendix_lines.append("### Inference Diagnostics")
+        appendix_lines.append("")
         if inference_flags:
-            lines.append("- **Fields Inferred:**")
+            appendix_lines.append("- **Fields Inferred:**")
             for field, flag in inference_flags.items():
-                lines.append(f"  - {field}: {'yes' if flag else 'no'}")
+                appendix_lines.append(f"  - {field}: {'yes' if flag else 'no'}")
         if inference_sources:
-            lines.append("- **Sources:**")
+            appendix_lines.append("- **Sources:**")
             for field, source in inference_sources.items():
-                lines.append(f"  - {field}: {source}")
+                appendix_lines.append(f"  - {field}: {source}")
         if inference_log:
-            lines.append("- **Inference Log:**")
+            appendix_lines.append("- **Inference Log:**")
             for entry in inference_log:
-                lines.append(f"  - {entry}")
-        lines.append("")
+                appendix_lines.append(f"  - {entry}")
+        appendix_lines.append("")
 
     # Model and Configuration
     lines.append("## Model Information")
@@ -906,28 +1464,48 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
     if invarlock_version:
         lines.append(f"- **InvarLock Version:** {invarlock_version}")
     env_flags = meta.get("env_flags")
-    if isinstance(env_flags, dict) and env_flags:
-        lines.append("- **Env Flags:**")
-        lines.append("  ```yaml")
-        for k, v in env_flags.items():
-            lines.append(f"  {k}: {v}")
-        lines.append("  ```")
-    # Determinism flags (if present)
     cuda_flags = meta.get("cuda_flags")
+
+    # Compressed determinism/environment summary for readability
+    det_parts: list[str] = []
+    for label, keys in (
+        ("torch_det", ("torch_deterministic_algorithms", "deterministic_algorithms")),
+        ("cudnn_det", ("cudnn_deterministic",)),
+        ("cudnn_bench", ("cudnn_benchmark",)),
+        ("tf32_matmul", ("cuda_matmul_allow_tf32",)),
+        ("tf32_cudnn", ("cudnn_allow_tf32",)),
+        ("cublas_ws", ("CUBLAS_WORKSPACE_CONFIG",)),
+    ):
+        val = None
+        for key in keys:
+            if isinstance(env_flags, dict) and env_flags.get(key) is not None:
+                val = env_flags.get(key)
+                break
+            if isinstance(cuda_flags, dict) and cuda_flags.get(key) is not None:
+                val = cuda_flags.get(key)
+                break
+        if val is not None:
+            det_parts.append(f"{label}={val}")
+    if det_parts:
+        lines.append(f"- **Determinism:** {', '.join(det_parts)}")
+
+    full_flags: dict[str, Any] = {}
+    if isinstance(env_flags, dict) and env_flags:
+        full_flags["env_flags"] = env_flags
     if isinstance(cuda_flags, dict) and cuda_flags:
-        parts = []
-        for key in (
-            "deterministic_algorithms",
-            "cudnn_deterministic",
-            "cudnn_benchmark",
-            "cudnn_allow_tf32",
-            "cuda_matmul_allow_tf32",
-            "CUBLAS_WORKSPACE_CONFIG",
-        ):
-            if key in cuda_flags and cuda_flags[key] is not None:
-                parts.append(f"{key}={cuda_flags[key]}")
-        if parts:
-            lines.append(f"- **Determinism Flags:** {', '.join(parts)}")
+        full_flags["cuda_flags"] = cuda_flags
+    if full_flags:
+        lines.append("")
+        lines.append("<details>")
+        lines.append("<summary>Environment flags (full)</summary>")
+        lines.append("")
+        lines.append("```yaml")
+        flags_yaml = yaml.safe_dump(full_flags, sort_keys=True, width=80).strip()
+        for line in flags_yaml.splitlines():
+            lines.append(line)
+        lines.append("```")
+        lines.append("")
+        lines.append("</details>")
     lines.append("")
 
     # Edit Configuration (removed duplicate Edit Information section)
@@ -951,266 +1529,9 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
             pass
         lines.append("")
 
-    resolved_policy = certificate.get("resolved_policy")
-    if resolved_policy:
-        lines.append("## Resolved Policy")
-        lines.append("")
-        lines.append("```yaml")
-        resolved_yaml = yaml.safe_dump(
-            resolved_policy, sort_keys=True, width=80, default_flow_style=False
-        ).strip()
-        for line in resolved_yaml.splitlines():
-            lines.append(line)
-        lines.append("```")
-        lines.append("")
-
-    policy_provenance = certificate.get("policy_provenance", {})
-    if policy_provenance:
-        lines.append("## Policy Provenance")
-        lines.append("")
-        lines.append(f"- **Tier:** {policy_provenance.get('tier')}")
-        overrides_list = policy_provenance.get("overrides") or []
-        if overrides_list:
-            lines.append(f"- **Overrides:** {', '.join(overrides_list)}")
-        else:
-            lines.append("- **Overrides:** (none)")
-        digest_value = policy_provenance.get("policy_digest")
-        if digest_value:
-            lines.append(f"- **Policy Digest:** `{digest_value}`")
-        else:
-            lines.append("- **Policy Digest:** (not recorded)")
-        if policy_provenance.get("resolved_at"):
-            lines.append(f"- **Resolved At:** {policy_provenance.get('resolved_at')}")
-        lines.append("")
-
-    # Dataset Information
-    lines.append("## Dataset Configuration")
-    lines.append("")
-    dataset = certificate.get("dataset", {}) or {}
-    prov = (
-        (dataset.get("provider") or "unknown")
-        if isinstance(dataset, dict)
-        else "unknown"
-    )
-    lines.append(f"- **Provider:** {prov}")
-    try:
-        seq_len_val = (
-            int(dataset.get("seq_len"))
-            if isinstance(dataset.get("seq_len"), int | float)
-            else dataset.get("seq_len")
-        )
-    except Exception:  # pragma: no cover - defensive
-        seq_len_val = dataset.get("seq_len")
-    if seq_len_val is not None:
-        lines.append(f"- **Sequence Length:** {seq_len_val}")
-    windows_blk = (
-        dataset.get("windows", {}) if isinstance(dataset.get("windows"), dict) else {}
-    )
-    win_prev = windows_blk.get("preview")
-    win_final = windows_blk.get("final")
-    if win_prev is not None and win_final is not None:
-        lines.append(f"- **Windows:** {win_prev} preview + {win_final} final")
-    if windows_blk.get("seed") is not None:
-        lines.append(f"- **Seed:** {windows_blk.get('seed')}")
-    hash_blk = dataset.get("hash", {}) if isinstance(dataset.get("hash"), dict) else {}
-    if hash_blk.get("preview_tokens") is not None:
-        lines.append(f"- **Preview Tokens:** {hash_blk.get('preview_tokens'):,}")
-    if hash_blk.get("final_tokens") is not None:
-        lines.append(f"- **Final Tokens:** {hash_blk.get('final_tokens'):,}")
-    if hash_blk.get("total_tokens") is not None:
-        lines.append(f"- **Total Tokens:** {hash_blk.get('total_tokens'):,}")
-    if hash_blk.get("dataset"):
-        lines.append(f"- **Dataset Hash:** {hash_blk.get('dataset')}")
-    tokenizer = dataset.get("tokenizer", {})
-    if tokenizer.get("name") or tokenizer.get("hash"):
-        vocab_size = tokenizer.get("vocab_size")
-        vocab_suffix = f" (vocab {vocab_size})" if isinstance(vocab_size, int) else ""
-        lines.append(
-            f"- **Tokenizer:** {tokenizer.get('name', 'unknown')}{vocab_suffix}"
-        )
-        if tokenizer.get("hash"):
-            lines.append(f"  - Hash: {tokenizer['hash']}")
-        lines.append(
-            f"  - BOS/EOS: {tokenizer.get('bos_token')} / {tokenizer.get('eos_token')}"
-        )
-        if tokenizer.get("pad_token") is not None:
-            lines.append(f"  - PAD: {tokenizer.get('pad_token')}")
-        if tokenizer.get("add_prefix_space") is not None:
-            lines.append(f"  - add_prefix_space: {tokenizer.get('add_prefix_space')}")
-    lines.append("")
-
-    provenance_info = certificate.get("provenance", {}) or {}
-    if provenance_info:
-        lines.append("## Run Provenance")
-        lines.append("")
-        baseline_info = provenance_info.get("baseline", {}) or {}
-        if baseline_info:
-            lines.append(f"- **Baseline Run ID:** {baseline_info.get('run_id')}")
-            if baseline_info.get("report_hash"):
-                lines.append(f"  - Report Hash: `{baseline_info.get('report_hash')}`")
-            if baseline_info.get("report_path"):
-                lines.append(f"  - Report Path: {baseline_info.get('report_path')}")
-        edited_info = provenance_info.get("edited", {}) or {}
-        if edited_info:
-            lines.append(f"- **Edited Run ID:** {edited_info.get('run_id')}")
-            if edited_info.get("report_hash"):
-                lines.append(f"  - Report Hash: `{edited_info.get('report_hash')}`")
-            if edited_info.get("report_path"):
-                lines.append(f"  - Report Path: {edited_info.get('report_path')}")
-        window_plan = provenance_info.get("window_plan")
-        if isinstance(window_plan, dict) and window_plan:
-            preview_val = window_plan.get(
-                "preview_n", window_plan.get("actual_preview")
-            )
-            final_val = window_plan.get("final_n", window_plan.get("actual_final"))
-            lines.append(
-                f"- **Window Plan:** profile={window_plan.get('profile')}, preview={preview_val}, final={final_val}"
-            )
-        provider_digest = provenance_info.get("provider_digest")
-        if isinstance(provider_digest, dict) and provider_digest:
-            ids_d = provider_digest.get("ids_sha256")
-            tok_d = provider_digest.get("tokenizer_sha256")
-            mask_d = provider_digest.get("masking_sha256")
-
-            lines.append("- **Provider Digest:**")
-            if tok_d:
-                lines.append(
-                    f"  - tokenizer_sha256: `{_short_digest(tok_d)}` (full in JSON)"
-                )
-            if ids_d:
-                lines.append(f"  - ids_sha256: `{_short_digest(ids_d)}` (full in JSON)")
-            if mask_d:
-                lines.append(
-                    f"  - masking_sha256: `{_short_digest(mask_d)}` (full in JSON)"
-                )
-        # Surface confidence label prominently
-        try:
-            conf = certificate.get("confidence", {}) or {}
-            if isinstance(conf, dict) and conf.get("label"):
-                lines.append(f"- **Confidence:** {conf.get('label')}")
-        except Exception:
-            pass
-        # Surface policy version + thresholds hash (short)
-        try:
-            pd = certificate.get("policy_digest", {}) or {}
-            if isinstance(pd, dict) and pd:
-                pv = pd.get("policy_version")
-                th = pd.get("thresholds_hash")
-                if pv:
-                    lines.append(f"- **Policy Version:** {pv}")
-                if isinstance(th, str) and th:
-                    short = th if len(th) <= 16 else (th[:8] + "…" + th[-8:])
-                    lines.append(f"- **Thresholds Digest:** `{short}` (full in JSON)")
-                if pd.get("changed"):
-                    lines.append("- Note: policy changed")
-        except Exception:
-            pass
-        lines.append("")
+    _append_dataset_and_provenance_section(lines, certificate)
 
     # Structural Changes heading is printed with content later; avoid empty header here
-
-    # Primary Metric (metric-v1) snapshot, if present
-    try:
-        pm = certificate.get("primary_metric")
-        if isinstance(pm, dict) and pm:
-            kind = pm.get("kind", "unknown")
-            lines.append(f"## Primary Metric ({kind})")
-            lines.append("")
-            unit = pm.get("unit", "-")
-            paired = pm.get("paired", False)
-            reps = None
-            # Snapshot only; bootstrap reps live in ppl.stats.bootstrap for ppl metrics
-            # Mark estimated metrics (e.g., pseudo accuracy counts) clearly
-            estimated_flag = False
-            try:
-                if bool(pm.get("estimated")):
-                    estimated_flag = True
-                elif str(pm.get("counts_source", "")).lower() == "pseudo_config":
-                    estimated_flag = True
-            except Exception:
-                estimated_flag = False
-            est_suffix = " (estimated)" if estimated_flag else ""
-            lines.append(f"- Kind: {kind} (unit: {unit}){est_suffix}")
-            gating_basis = pm.get("gating_basis") or pm.get("basis")
-            if gating_basis:
-                lines.append(f"- Basis: {gating_basis}")
-            if isinstance(paired, bool):
-                lines.append(f"- Paired: {paired}")
-            reps = pm.get("reps")
-            if isinstance(reps, int | float):
-                lines.append(f"- Bootstrap Reps: {int(reps)}")
-            ci = pm.get("ci") or pm.get("display_ci")
-            if (
-                isinstance(ci, list | tuple)
-                and len(ci) == 2
-                and all(isinstance(x, int | float) for x in ci)
-            ):
-                lines.append(f"- CI: {ci[0]:.3f}–{ci[1]:.3f}")
-            prev = pm.get("preview")
-            fin = pm.get("final")
-            ratio = pm.get("ratio_vs_baseline")
-
-            lines.append("")
-            if estimated_flag and str(kind).lower() in {"accuracy", "vqa_accuracy"}:
-                lines.append(
-                    "- Note: Accuracy derived from pseudo counts (quick dev preset); use a labeled preset for measured accuracy."
-                )
-            lines.append("| Field | Value |")
-            lines.append("|-------|-------|")
-            lines.append(f"| Preview | {_fmt_by_kind(prev, str(kind))} |")
-            lines.append(f"| Final | {_fmt_by_kind(fin, str(kind))} |")
-            # For accuracy, ratio field is actually a delta (as per helper); clarify inline
-            if kind in {"accuracy", "vqa_accuracy"}:
-                lines.append(f"| Δ vs Baseline | {_fmt_by_kind(ratio, str(kind))} |")
-                # When baseline accuracy is near-zero, clarify display rule
-                try:
-                    base_pt = pm.get("baseline_point")
-                    if isinstance(base_pt, int | float) and base_pt < 0.05:
-                        lines.append(
-                            "- Note: baseline < 5%; ratio suppressed; showing Δpp"
-                        )
-                except Exception:
-                    pass
-            else:
-                try:
-                    lines.append(f"| Ratio vs Baseline | {float(ratio):.3f} |")
-                except Exception:
-                    lines.append("| Ratio vs Baseline | N/A |")
-            lines.append("")
-            # Secondary metrics (informational)
-            try:
-                secs = certificate.get("secondary_metrics")
-                if isinstance(secs, list) and secs:
-                    lines.append("## Secondary Metrics (informational)")
-                    lines.append("")
-                    lines.append("| Kind | Preview | Final | vs Baseline | CI |")
-                    lines.append("|------|---------|-------|-------------|----|")
-                    for m in secs:
-                        if not isinstance(m, dict):
-                            continue
-                        k = m.get("kind", "?")
-                        pv = _fmt_by_kind(m.get("preview"), str(k))
-                        fv = _fmt_by_kind(m.get("final"), str(k))
-                        rb = m.get("ratio_vs_baseline")
-                        try:
-                            rb_str = (
-                                f"{float(rb):.3f}"
-                                if (str(k).startswith("ppl"))
-                                else _fmt_by_kind(rb, str(k))
-                            )
-                        except Exception:
-                            rb_str = "N/A"
-                        ci = m.get("display_ci") or m.get("ci")
-                        if isinstance(ci, tuple | list) and len(ci) == 2:
-                            ci_str = f"{float(ci[0]):.3f}-{float(ci[1]):.3f}"
-                        else:
-                            ci_str = "–"
-                        lines.append(f"| {k} | {pv} | {fv} | {rb_str} | {ci_str} |")
-                    lines.append("")
-            except Exception:
-                pass
-    except Exception:
-        pass
 
     # System Overhead section (latency/throughput)
     sys_over = certificate.get("system_overhead", {}) or {}
@@ -1370,31 +1691,32 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
 
     # Variance Guard (Spectral/RMT summaries are already provided above)
     variance = certificate["variance"]
-    lines.append("## Variance Guard")
+    appendix_lines.append("### Variance Guard")
+    appendix_lines.append("")
 
     # Display whether VE was enabled after A/B test
-    lines.append(f"- **Enabled:** {'Yes' if variance['enabled'] else 'No'}")
+    appendix_lines.append(f"- **Enabled:** {'Yes' if variance['enabled'] else 'No'}")
 
     if variance["enabled"]:
         # VE was enabled - show the gain
         gain_value = variance.get("gain", "N/A")
         if isinstance(gain_value, int | float):
-            lines.append(f"- **Gain:** {gain_value:.3f}")
+            appendix_lines.append(f"- **Gain:** {gain_value:.3f}")
         else:
-            lines.append(f"- **Gain:** {gain_value}")
+            appendix_lines.append(f"- **Gain:** {gain_value}")
     else:
         # VE was not enabled - show succinct reason if available, else a clear disabled message
         ppl_no_ve = variance.get("ppl_no_ve")
         ppl_with_ve = variance.get("ppl_with_ve")
         ratio_ci = variance.get("ratio_ci")
         if ppl_no_ve is not None and ppl_with_ve is not None and ratio_ci:
-            lines.append(f"- **Primary metric without VE:** {ppl_no_ve:.3f}")
-            lines.append(f"- **Primary metric with VE:** {ppl_with_ve:.3f}")
+            appendix_lines.append(f"- **Primary metric without VE:** {ppl_no_ve:.3f}")
+            appendix_lines.append(f"- **Primary metric with VE:** {ppl_with_ve:.3f}")
             gain_value = variance.get("gain")
             if isinstance(gain_value, int | float):
-                lines.append(f"- **Gain (insufficient):** {gain_value:.3f}")
+                appendix_lines.append(f"- **Gain (insufficient):** {gain_value:.3f}")
         else:
-            lines.append(
+            appendix_lines.append(
                 "- Variance Guard: Disabled (predictive gate not evaluated for this edit)."
             )
             # Add concise rationale aligned with Balanced predictive gate contract
@@ -1402,14 +1724,14 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
                 ve_policy = certificate.get("policies", {}).get("variance", {})
                 min_effect = ve_policy.get("min_effect_lognll")
                 if isinstance(min_effect, int | float):
-                    lines.append(
+                    appendix_lines.append(
                         f"- Predictive gate (Balanced): one-sided; enables only if CI excludes 0 and |mean Δ| ≥ {float(min_effect):.4g}."
                     )
                 else:
-                    lines.append(
+                    appendix_lines.append(
                         "- Predictive gate (Balanced): one-sided; enables only if CI excludes 0 and |mean Δ| ≥ min_effect."
                     )
-                lines.append(
+                appendix_lines.append(
                     "- Predictive Gate: evaluated=false (disabled under current policy/edit)."
                 )
             except Exception:
@@ -1417,14 +1739,17 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
 
     if variance.get("ratio_ci"):
         ratio_lo, ratio_hi = variance["ratio_ci"]
-        lines.append(f"- **Ratio CI:** [{ratio_lo:.3f}, {ratio_hi:.3f}]")
+        appendix_lines.append(f"- **Ratio CI:** [{ratio_lo:.3f}, {ratio_hi:.3f}]")
 
     if variance.get("calibration") and variance.get("enabled"):
         calib = variance["calibration"]
         coverage = calib.get("coverage")
         requested = calib.get("requested")
         status = calib.get("status", "unknown")
-        lines.append(f"- **Calibration:** {coverage}/{requested} windows ({status})")
+        appendix_lines.append(
+            f"- **Calibration:** {coverage}/{requested} windows ({status})"
+        )
+    appendix_lines.append("")
 
     lines.append("")
 
@@ -1458,32 +1783,22 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
                 lines.append(f"- **{label}:** {float(moe[key]):+.4f}")
         lines.append("")
 
-    # Policy Summary
-    lines.append("## Applied Policies")
-    lines.append("")
-    policies = certificate["policies"]
-    for guard_name, policy in policies.items():
-        lines.append(f"### {guard_name.title()}")
-        lines.append("")
-        policy_yaml = (
-            yaml.safe_dump(policy, sort_keys=True, width=80).strip().splitlines()
-        )
-        lines.append("```yaml")
-        for line in policy_yaml:
-            lines.append(line)
-        lines.append("```")
-        lines.append("")
+    _append_policy_configuration_section(lines, certificate)
 
-    # Artifacts
-    lines.append("## Artifacts")
-    lines.append("")
+    appendix_lines.append("### Artifacts")
+    appendix_lines.append("")
     artifacts = certificate["artifacts"]
     if artifacts.get("events_path"):
-        lines.append(f"- **Events Log:** `{artifacts['events_path']}`")
+        appendix_lines.append(f"- **Events Log:** `{artifacts['events_path']}`")
     if artifacts.get("report_path"):
-        lines.append(f"- **Full Report:** `{artifacts['report_path']}`")
-    lines.append(f"- **Certificate Generated:** {artifacts['generated_at']}")
-    lines.append("")
+        appendix_lines.append(f"- **Full Report:** `{artifacts['report_path']}`")
+    appendix_lines.append(f"- **Certificate Generated:** {artifacts['generated_at']}")
+    appendix_lines.append("")
+
+    if appendix_lines:
+        lines.append("## Appendix")
+        lines.append("")
+        lines.extend(appendix_lines)
 
     # Certificate Hash for Integrity
     cert_hash = _compute_certificate_hash(certificate)
