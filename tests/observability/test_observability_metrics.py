@@ -727,3 +727,18 @@ class TestMetricUtilities:
         assert "memory_usage" in metrics
         assert "gpu_memory" in metrics
         assert "disk_usage" in metrics
+
+
+def test_summarize_memory_snapshots_peaks():
+    from invarlock.observability.metrics import summarize_memory_snapshots
+
+    snapshots = [
+        {"phase": "prepare", "rss_mb": 10.0},
+        {"phase": "eval", "rss_mb": 12.0, "gpu_peak_mb": 3.0},
+        {"phase": "finalize", "gpu_reserved_mb": 4.0},
+    ]
+
+    summary = summarize_memory_snapshots(snapshots)
+    assert summary["memory_mb_peak"] == 12.0
+    assert summary["gpu_memory_mb_peak"] == 3.0
+    assert summary["gpu_memory_reserved_mb_peak"] == 4.0

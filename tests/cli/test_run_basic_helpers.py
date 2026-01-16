@@ -39,10 +39,12 @@ def test_suppress_noisy_warnings_release_profile() -> None:
         warnings.warn(
             "`torch_dtype` is deprecated! Use `dtype` instead!",
             UserWarning,
+            stacklevel=2,
         )
         warnings.warn(
             "`loss_type=None` was set in the config but it is unrecognized.",
             UserWarning,
+            stacklevel=2,
         )
     assert records == []
 
