@@ -2138,7 +2138,7 @@ class TestRenderCertificateMarkdown:
         markdown = render_certificate_markdown(cert)
 
         assert "Quality Gates" in markdown
-        assert "Resolved Policy" in markdown
+        assert "Policy Configuration" in markdown
 
     def test_render_markdown_includes_guard_overhead_details(self):
         report = create_mock_run_report()
@@ -2174,7 +2174,7 @@ class TestRenderCertificateMarkdown:
         markdown = render_certificate_markdown(certificate)
         # Guard Overhead section may be omitted if normalization dropped the measure
         assert ("Guard Overhead" in markdown) or ("Executive Summary" in markdown)
-        assert "## Inference" in markdown
+        assert "Inference Diagnostics" in markdown
 
     def test_render_markdown_includes_basis_and_spectral_tables(self):
         report = create_mock_run_report()
@@ -2209,7 +2209,7 @@ class TestRenderCertificateMarkdown:
             "| Gate | Status | Measured | Threshold | Basis | Description |" in markdown
         )
         assert "> *Basis:" in markdown
-        assert "| Family | q95 | q99 | Max | Samples |" in markdown
+        assert "| Family | κ | q95 | Max |z| | Violations |" in markdown
         assert "Top |z| per family:" in markdown
 
     def test_render_markdown_with_invariant_failures(self):
@@ -2244,7 +2244,7 @@ class TestRenderCertificateMarkdown:
 
         markdown = render_certificate_markdown(certificate)
 
-        assert "## Resolved Policy" in markdown
+        assert "## Policy Configuration" in markdown
         assert "```yaml" in markdown
         assert "spectral:" in markdown
 
@@ -2480,7 +2480,7 @@ class TestRenderCertificateMarkdown:
         markdown = render_certificate_markdown(certificate)
 
         assert "Spectral Guard" in markdown
-        assert "| Family | κ | Violations |" in markdown
+        assert "| Family | κ | q95 | Max |z| | Violations |" in markdown
         assert "Top |z| per family" in markdown
         assert "| Family | ε_f | Bare | Guarded |" in markdown
         assert "Bare Primary Metric: 118.000" in markdown

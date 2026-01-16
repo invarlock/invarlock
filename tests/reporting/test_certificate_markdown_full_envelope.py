@@ -169,5 +169,5 @@ def test_render_certificate_markdown_full_envelope() -> None:
     assert "Executive Summary" in md
     assert "Primary Metric" in md
     assert "System Overhead" in md
-    assert "Dataset Configuration" in md
-    assert "Run Provenance" in md or "Policy Provenance" in md
+    assert "Dataset and Provenance" in md
+    assert "Policy Configuration" in md
