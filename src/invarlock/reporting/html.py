@@ -12,10 +12,13 @@ from typing import Any
 
 from .render import render_certificate_markdown
 
+markdown_module: Any | None = None
 try:
-    import markdown as _markdown
+    import markdown as _markdown  # type: ignore[import-untyped]
 except Exception:  # pragma: no cover - optional dependency
-    _markdown = None  # type: ignore[assignment]
+    _markdown = None
+else:
+    markdown_module = _markdown
 
 
 _STATUS_BADGES = {
@@ -41,10 +44,10 @@ def render_certificate_html(certificate: dict[str, Any]) -> str:
     to a <pre> block when the markdown dependency is missing.
     """
     md = render_certificate_markdown(certificate)
-    if _markdown is None:
+    if markdown_module is None:
         body = f'<pre class="invarlock-md">{escape(md)}</pre>'
     else:
-        html_body = _markdown.markdown(md, extensions=["tables", "fenced_code"])
+        html_body = markdown_module.markdown(md, extensions=["tables", "fenced_code"])
         html_body = _apply_status_badges(html_body)
         body = f'<div class="invarlock-md">{html_body}</div>'
     return (
