@@ -15,7 +15,7 @@ CLI -> Core Runtime -> Guards -> Reporting
 ### Component Layers
 
 1. **CLI Layer** (Typer-based)
-   - `certify`, `run`, `verify`, `doctor`, `calibrate`, `report`, `export-html`, `plugins`, `explain-gates`
+   - `certify`, `run`, `verify`, `doctor`, `calibrate`, `report`, `export html`, `plugins`, `explain gates`
 2. **Core Runtime** (`runner.py`)
    - Pipeline orchestration: prepare -> edit -> guards -> eval -> finalize
 3. **Guards Layer**

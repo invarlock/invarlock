@@ -79,7 +79,7 @@ certificates.
 
 ### RMT epsilon Rule
 - **Definition:** Random Matrix Theory epsilon band used for stability checks.
-- **Context:** `rmt.epsilon` thresholds per family.
+- **Context:** `rmt.epsilon_default` and `rmt.epsilon_by_family.*` thresholds per family.
 - **Related terms:** RMT Guard, kappa Threshold.
 - **See also:** [RMT epsilon Rule](06-rmt-epsilon-rule.md)
 - **Example:** "RMT epsilon band within policy."
