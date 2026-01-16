@@ -127,8 +127,8 @@ def test_snapshot_and_cleanup_lines(tmp_path: Path, monkeypatch):
     cfg = _cfg(tmp_path)
     r = CliRunner().invoke(cli, ["run", "-c", cfg, "--profile", "dev"])
     s = r.stdout
-    assert "snapshot_mode:" in s
-    assert ("cleanup: removed" in s) or ("cleanup: skipped" in s)
+    assert "Snapshot mode:" in s
+    assert ("Cleanup: removed" in s) or ("Cleanup: skipped" in s)
 
 
 def test_no_cleanup_flag_skips_deletion(tmp_path: Path, monkeypatch):
@@ -136,4 +136,4 @@ def test_no_cleanup_flag_skips_deletion(tmp_path: Path, monkeypatch):
     cfg = _cfg(tmp_path)
     r = CliRunner().invoke(cli, ["run", "-c", cfg, "--no-cleanup", "--profile", "dev"])
     s = r.stdout
-    assert "cleanup: skipped" in s
+    assert "Cleanup: skipped" in s
