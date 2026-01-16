@@ -20,7 +20,7 @@ test_suites_apply_subset_sets_models() {
 
     assert_eq "subset" "${PACK_SUITE}" "suite set"
     assert_eq "mistralai/Mistral-7B-v0.1" "${MODEL_1}" "model 1 set"
-    assert_eq "Qwen/Qwen2.5-14B" "${MODEL_2}" "model 2 set"
+    assert_eq "" "${MODEL_2}" "model 2 cleared"
     assert_eq "" "${MODEL_3}" "model 3 cleared"
 }
 

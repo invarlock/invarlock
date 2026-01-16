@@ -91,17 +91,67 @@ pack_generate_html() {
 pack_verify_certs() {
     local pack_dir="$1"
     local profile="${PACK_VERIFY_PROFILE:-dev}"
-    local count=0
+    local count_clean=0
+    local count_error=0
+    local count_failed=0
     local cert
     while IFS= read -r cert; do
         [[ -n "${cert}" ]] || continue
         local cert_dir
         cert_dir="$(dirname "${cert}")"
-        invarlock verify --json --profile "${profile}" "${cert}" > "${cert_dir}/verify.json"
-        count=$((count + 1))
+        if [[ "${cert}" == */errors/*/evaluation.cert.json ]]; then
+            # Error injection certs are expected to fail verify (unsafe edits by design).
+            invarlock verify --json --profile "${profile}" "${cert}" > "${cert_dir}/verify.json" || true
+            count_error=$((count_error + 1))
+            continue
+        fi
+
+        if invarlock verify --json --profile "${profile}" "${cert}" > "${cert_dir}/verify.json"; then
+            count_clean=$((count_clean + 1))
+        else
+            echo "ERROR: Unexpected verify failure: ${cert}" >&2
+            count_failed=$((count_failed + 1))
+        fi
     done < <(find "${pack_dir}/certs" -type f -name "evaluation.cert.json" | sort)
-    if [[ ${count} -eq 0 ]]; then
+
+    local total=$((count_clean + count_error + count_failed))
+    if [[ ${total} -eq 0 ]]; then
         echo "ERROR: No certificates found to verify." >&2
+        return 1
+    fi
+
+    PACK_VERIFY_COUNT_CLEAN="${count_clean}"
+    PACK_VERIFY_COUNT_ERROR="${count_error}"
+    PACK_VERIFY_COUNT_FAILED="${count_failed}"
+    PACK_VERIFY_PROFILE_USED="${profile}"
+    export PACK_VERIFY_COUNT_CLEAN PACK_VERIFY_COUNT_ERROR PACK_VERIFY_COUNT_FAILED PACK_VERIFY_PROFILE_USED
+
+    local results_dir="${pack_dir}/results"
+    mkdir -p "${results_dir}"
+    python3 - "${results_dir}/verification_summary.json" "${count_clean}" "${count_error}" "${count_failed}" "${profile}" <<'PY'
+import json
+import sys
+
+out_path = sys.argv[1]
+count_clean = int(sys.argv[2])
+count_error = int(sys.argv[3])
+count_failed = int(sys.argv[4])
+profile = sys.argv[5]
+
+payload = {
+    "clean_certs": count_clean,
+    "error_injection_certs": count_error,
+    "failed_certs": count_failed,
+    "policy_profile": profile,
+}
+
+with open(out_path, "w", encoding="utf-8") as f:
+    f.write(json.dumps(payload, indent=2, sort_keys=True) + "\\n")
+PY
+
+    echo "Verified: ${count_clean} clean, ${count_error} error-injection (expected fail), ${count_failed} unexpected failures"
+
+    if [[ ${count_failed} -gt 0 ]]; then
         return 1
     fi
 }
@@ -149,6 +199,25 @@ if revisions_path.is_file():
             "revision": info.get("revision") or "",
         })
 
+known_licenses = {
+    # Mistral 7B (v0.1) is Apache-2.0 licensed.
+    "mistralai/Mistral-7B-v0.1": "Apache-2.0",
+}
+used_models = set()
+for item in model_list:
+    try:
+        used_models.add(str(item))
+    except Exception:
+        continue
+for item in models:
+    try:
+        model_id = item.get("model_id")
+    except Exception:
+        model_id = None
+    if model_id:
+        used_models.add(str(model_id))
+model_licenses = {mid: lic for mid, lic in known_licenses.items() if mid in used_models}
+
 determinism_repeats = None
 det_path = pack_dir / "results" / "determinism_repeats.json"
 if det_path.is_file():
@@ -156,6 +225,14 @@ if det_path.is_file():
         determinism_repeats = json.loads(det_path.read_text())
     except Exception:
         determinism_repeats = None
+
+verification_summary = None
+verification_path = pack_dir / "results" / "verification_summary.json"
+if verification_path.is_file():
+    try:
+        verification_summary = json.loads(verification_path.read_text())
+    except Exception:
+        verification_summary = None
 
 artifacts = []
 for path in pack_dir.rglob("*"):
@@ -187,6 +264,10 @@ payload = {
     "artifacts": sorted(artifacts),
     "checksums_sha256": "checksums.sha256",
 }
+if model_licenses:
+    payload["model_licenses"] = model_licenses
+if isinstance(verification_summary, dict) and verification_summary:
+    payload["verification"] = verification_summary
 
 out_path = pack_dir / "manifest.json"
 out_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
@@ -286,7 +367,12 @@ pack_build_pack() {
         cp "${cert}" "${dest_dir}/evaluation.cert.json"
     done < <(pack_collect_certs "${run_dir}")
 
-    pack_verify_certs "${pack_dir}"
+    local verify_rc=0
+    if pack_verify_certs "${pack_dir}"; then
+        verify_rc=0
+    else
+        verify_rc=$?
+    fi
 
     if [[ "${PACK_SKIP_HTML:-0}" != "1" ]]; then
         pack_generate_html "${pack_dir}"
@@ -296,6 +382,8 @@ pack_build_pack() {
     pack_write_manifest "${pack_dir}" "${run_dir}" "${PACK_SUITE:-}" "${PACK_NET:-0}" "${PACK_DETERMINISM:-}" "${PACK_REPEATS:-0}"
     pack_sign_manifest "${pack_dir}"
     pack_write_checksums "${pack_dir}"
+
+    return "${verify_rc}"
 }
 
 pack_run_pack() {

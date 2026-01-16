@@ -69,6 +69,140 @@ EOF
     assert_file_exists "${pack_dir}/README.md" "readme written"
 }
 
+test_run_pack_build_pack_ignores_error_injection_verify_failures() {
+    mock_reset
+
+    source ./scripts/proof_packs/run_pack.sh
+
+    local run_dir="${TEST_TMPDIR}/run"
+    mkdir -p "${run_dir}/reports" "${run_dir}/analysis" "${run_dir}/state"
+    mkdir -p "${run_dir}/modelA/certificates/edit/run_1"
+    mkdir -p "${run_dir}/modelA/certificates/errors/nan_injection"
+
+    echo "verdict" > "${run_dir}/reports/final_verdict.txt"
+    echo "{}" > "${run_dir}/reports/final_verdict.json"
+    echo "model,score" > "${run_dir}/analysis/eval_results.csv"
+    echo "{}" > "${run_dir}/modelA/certificates/edit/run_1/evaluation.cert.json"
+    echo "{}" > "${run_dir}/modelA/certificates/errors/nan_injection/evaluation.cert.json"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/invarlock" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+cmd="${1:-}"
+shift || true
+case "${cmd}" in
+    report)
+        sub="${1:-}"
+        if [[ "${sub}" == "html" ]]; then
+            out=""
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --output|-o)
+                        out="$2"
+                        shift 2
+                        ;;
+                    *)
+                        shift
+                        ;;
+                esac
+            done
+            mkdir -p "$(dirname "${out}")"
+            printf '<html>ok</html>\n' > "${out}"
+            exit 0
+        fi
+        ;;
+    verify)
+        cert="${@: -1}"
+        echo '{"ok": false}'
+        if [[ "${cert}" == */errors/*/evaluation.cert.json ]]; then
+            exit 1
+        fi
+        exit 0
+        ;;
+esac
+echo '{}'
+EOF
+    chmod +x "${bin_dir}/invarlock"
+    export PATH="${bin_dir}:${PATH}"
+
+    PACK_GPG_SIGN=0
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    pack_build_pack "${run_dir}" "${pack_dir}"
+
+    assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/verify.json" "clean verify output captured"
+    assert_file_exists "${pack_dir}/certs/modelA/errors/nan_injection/verify.json" "error injection verify output captured"
+    assert_file_exists "${pack_dir}/results/verification_summary.json" "verification summary written"
+    assert_match "\"clean_certs\": 1" "$(cat "${pack_dir}/results/verification_summary.json")" "clean count recorded"
+    assert_match "\"error_injection_certs\": 1" "$(cat "${pack_dir}/results/verification_summary.json")" "error injection count recorded"
+    assert_match "\"failed_certs\": 0" "$(cat "${pack_dir}/results/verification_summary.json")" "failed count recorded"
+}
+
+test_run_pack_build_pack_writes_pack_files_on_unexpected_verify_failure() {
+    mock_reset
+
+    source ./scripts/proof_packs/run_pack.sh
+
+    local run_dir="${TEST_TMPDIR}/run"
+    mkdir -p "${run_dir}/reports" "${run_dir}/analysis"
+    mkdir -p "${run_dir}/modelA/certificates/edit/run_1"
+
+    echo "verdict" > "${run_dir}/reports/final_verdict.txt"
+    echo "{}" > "${run_dir}/reports/final_verdict.json"
+    echo "model,score" > "${run_dir}/analysis/eval_results.csv"
+    echo "{}" > "${run_dir}/modelA/certificates/edit/run_1/evaluation.cert.json"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/invarlock" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+cmd="${1:-}"
+shift || true
+case "${cmd}" in
+    report)
+        sub="${1:-}"
+        if [[ "${sub}" == "html" ]]; then
+            out=""
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --output|-o)
+                        out="$2"
+                        shift 2
+                        ;;
+                    *)
+                        shift
+                        ;;
+                esac
+            done
+            mkdir -p "$(dirname "${out}")"
+            printf '<html>ok</html>\n' > "${out}"
+            exit 0
+        fi
+        ;;
+    verify)
+        echo '{"ok": false}'
+        exit 1
+        ;;
+esac
+echo '{}'
+EOF
+    chmod +x "${bin_dir}/invarlock"
+    export PATH="${bin_dir}:${PATH}"
+
+    PACK_GPG_SIGN=0
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    run pack_build_pack "${run_dir}" "${pack_dir}"
+    assert_rc "1" "${RUN_RC}" "unexpected verify failure returns non-zero"
+
+    assert_file_exists "${pack_dir}/manifest.json" "manifest written even on verify failure"
+    assert_file_exists "${pack_dir}/checksums.sha256" "checksums written even on verify failure"
+    assert_file_exists "${pack_dir}/results/verification_summary.json" "verification summary written on verify failure"
+}
+
 
 test_run_pack_checksums_include_files() {
     mock_reset
@@ -347,4 +481,3 @@ test_run_pack_entrypoint_builds_run_args_for_modes() {
     assert_match "--resume" "$(cat "${TEST_TMPDIR}/run.args")" "resume forwarded"
     assert_eq "${TEST_TMPDIR}/out3|${TEST_TMPDIR}/pack3" "$(cat "${TEST_TMPDIR}/pack.args")" "custom pack dir used"
 }
-

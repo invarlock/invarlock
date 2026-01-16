@@ -13,6 +13,9 @@ pack_usage() {
 InvarLock Proof Pack Suite
 Usage: scripts/proof_packs/run_suite.sh [options]
 
+WARNING: This runs the suite WITHOUT creating a proof pack.
+         For distributable validation artifacts, use scripts/proof_packs/run_pack.sh instead.
+
 Options:
   --suite NAME         Suite name (subset|full)
   --net 1|0            Enable network access for preflight/downloads (default: 0)

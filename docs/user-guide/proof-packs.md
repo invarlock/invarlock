@@ -15,14 +15,22 @@ summary reports, and verification metadata into a portable artifact. They replac
 B200-specific validation harness with a suite that can run on any NVIDIA GPU topology
 that can fit the selected models.
 
+## Entrypoint Guide
+
+| Script | Purpose | Output | Use When |
+| --- | --- | --- | --- |
+| `run_pack.sh` | Full proof pack: runs suite + packages artifacts | Proof pack directory with manifest + checksums | Default: distributable validation evidence |
+| `run_suite.sh` | Suite execution only | Reports + certs under the run directory | Development/debugging, iterative runs |
+| `verify_pack.sh` | Validate an existing proof pack | Verification status | Validating received proof packs |
+
 ## Quick Start
 
 ```bash
-# Run the subset suite (offline by default)
-./scripts/proof_packs/run_suite.sh --suite subset
+# RECOMMENDED: Full proof pack with verification artifacts
+./scripts/proof_packs/run_pack.sh --suite subset --net 1
 
-# Run the full suite and build a proof pack
-./scripts/proof_packs/run_pack.sh --suite full --net 1
+# Development/debugging only (runs the suite, but does not build a proof pack)
+./scripts/proof_packs/run_suite.sh --suite subset --resume
 
 # Verify an existing proof pack
 ./scripts/proof_packs/verify_pack.sh --pack ./proof_pack_runs/subset_20250101_000000/proof_pack
@@ -40,7 +48,7 @@ models via `MODEL_1`–`MODEL_8`.
 
 | Suite | Models | Notes |
 | --- | --- | --- |
-| `subset` | `mistralai/Mistral-7B-v0.1`, `Qwen/Qwen2.5-14B` | Single-GPU friendly |
+| `subset` | `mistralai/Mistral-7B-v0.1` | Single-GPU friendly |
 | `full` | 7B–72B ungated models | Multi-GPU recommended |
 
 ## Network & Model Revisions

@@ -260,7 +260,7 @@ def save_report(
         try:
             from datetime import datetime as _dt
 
-            manifest = {
+            manifest: dict[str, Any] = {
                 "generated_at": _dt.now().isoformat(),
                 "files": {
                     "certificate_json": str(cert_json_path),
@@ -291,10 +291,10 @@ def save_report(
 
                 pm_ratio = None
                 pm = certificate_obj.get("primary_metric", {}) or {}
-                if isinstance(pm, dict) and isinstance(
-                    pm.get("ratio_vs_baseline"), int | float
-                ):
-                    pm_ratio = float(pm.get("ratio_vs_baseline"))
+                if isinstance(pm, dict):
+                    ratio = pm.get("ratio_vs_baseline")
+                    if isinstance(ratio, int | float):
+                        pm_ratio = float(ratio)
 
                 manifest["summary"].update(
                     {
