@@ -46,6 +46,13 @@ interpret them.
 
 Tip: Use `invarlock verify` to recheck schema, pairing, and ratio math.
 
+### Safety Dashboard Interpretation
+
+- **Overall** mirrors the canonical gate allow-list. A FAIL means at least one gate failed.
+- **Primary Metric** shows ratio/Δpp vs baseline; compare to tier thresholds in the gate table.
+- **Drift** is final/preview; large drift usually indicates dataset/device instability.
+- **Overhead** appears only when guard overhead is evaluated; skipped in some profiles.
+
 ## Related Documentation
 
 - [Certificates](../reference/certificates.md) — Full v1 schema reference, telemetry, and HTML export

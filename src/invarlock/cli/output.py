@@ -91,7 +91,10 @@ def make_console(
 ) -> Console:
     if no_color is None:
         no_color = env_no_color()
-    color_system = None if no_color else "auto"
+    if no_color:
+        color_system = None
+    else:
+        color_system = "standard" if force_terminal else "auto"
     return Console(
         file=file,
         force_terminal=force_terminal,
@@ -173,6 +176,7 @@ def print_timing_summary(
     *,
     style: OutputStyle,
     order: list[tuple[str, str]],
+    extra_lines: list[str] | None = None,
 ) -> None:
     if not style.timing:
         return
@@ -184,3 +188,6 @@ def print_timing_summary(
         _safe_console_print(
             console, f"  {label:<11}: {timings[key]:.2f}s", markup=False
         )
+    if extra_lines:
+        for line in extra_lines:
+            _safe_console_print(console, line, markup=False)

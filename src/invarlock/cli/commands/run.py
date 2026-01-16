@@ -35,6 +35,7 @@ from rich.console import Console
 from invarlock.cli.output import (
     OutputStyle,
     make_console,
+    perf_counter,
     print_event,
     print_timing_summary,
     resolve_output_style,
@@ -130,8 +131,7 @@ _NOISY_WARNING_PATTERNS = (
 )
 
 
-@contextmanager
-def _suppress_noisy_warnings(profile: str | None) -> Iterator[None]:
+def _resolve_warning_suppression(profile: str | None) -> tuple[bool, bool]:
     suppress_all = os.getenv("INVARLOCK_SUPPRESS_WARNINGS", "").strip().lower() in {
         "1",
         "true",
@@ -139,15 +139,30 @@ def _suppress_noisy_warnings(profile: str | None) -> Iterator[None]:
         "on",
     }
     profile_norm = (profile or "").strip().lower()
-    if not suppress_all and profile_norm not in {"ci", "ci_cpu", "release", "dev"}:
+    enabled = bool(suppress_all) or profile_norm in {"ci", "ci_cpu", "release", "dev"}
+    return enabled, suppress_all
+
+
+def _apply_warning_filters(profile: str | None) -> bool:
+    enabled, suppress_all = _resolve_warning_suppression(profile)
+    if not enabled:
+        return False
+    if suppress_all:
+        warnings.simplefilter("ignore")
+    else:
+        for pattern in _NOISY_WARNING_PATTERNS:
+            warnings.filterwarnings("ignore", message=pattern)
+    return True
+
+
+@contextmanager
+def _suppress_noisy_warnings(profile: str | None) -> Iterator[None]:
+    enabled, _suppress_all = _resolve_warning_suppression(profile)
+    if not enabled:
         yield
         return
     with warnings.catch_warnings():
-        if suppress_all:
-            warnings.simplefilter("ignore")
-        else:
-            for pattern in _NOISY_WARNING_PATTERNS:
-                warnings.filterwarnings("ignore", message=pattern)
+        _apply_warning_filters(profile)
         yield
 
 
@@ -1183,6 +1198,12 @@ def _run_bare_control(
     bare_context = copy.deepcopy(run_config.context)
     bare_context.setdefault("validation", {})["guard_overhead_mode"] = "bare"
     bare_config.context = bare_context
+    runtime_edit_config = dict(edit_config or {})
+    runtime_edit_config.setdefault("console", console)
+    runtime_edit_config.setdefault(
+        "output_style", _style_from_console(console, profile=profile_normalized)
+    )
+    runtime_edit_config.setdefault("emit", True)
 
     private_model_loaded = False
     bare_target_model = None
@@ -1211,7 +1232,7 @@ def _run_bare_control(
             config=bare_config,
             calibration_data=calibration_data,
             auto_config=auto_config,
-            edit_config=edit_config,
+            edit_config=runtime_edit_config,
             preview_n=preview_count,
             final_n=final_count,
         )
@@ -1319,6 +1340,13 @@ def _execute_guarded_run(
         if snapshot_provenance is not None:
             snapshot_provenance["reload_path_used"] = True
 
+    runtime_edit_config = dict(edit_config or {})
+    runtime_edit_config.setdefault("console", console)
+    runtime_edit_config.setdefault(
+        "output_style", _style_from_console(console, profile=profile_normalized)
+    )
+    runtime_edit_config.setdefault("emit", True)
+
     core_report = runner.execute(
         model=model,
         adapter=adapter,
@@ -1327,7 +1355,7 @@ def _execute_guarded_run(
         config=run_config,
         calibration_data=calibration_data,
         auto_config=auto_config,
-        edit_config=edit_config,
+        edit_config=runtime_edit_config,
         preview_n=preview_count,
         final_n=final_count,
     )
@@ -1850,6 +1878,7 @@ def _resolve_metric_and_provider(
     model_profile: Any,
     *,
     resolved_loss_type: str | None = None,
+    metric_kind_override: str | None = None,
 ) -> tuple[str, str, dict[str, float]]:
     """Resolve metric kind, provider kind, and metric options from config with precedence.
 
@@ -1889,9 +1918,13 @@ def _resolve_metric_and_provider(
         metric_cfg = None
 
     metric_kind = None
+    if isinstance(metric_kind_override, str) and metric_kind_override.strip():
+        mk_override = metric_kind_override.strip().lower()
+        if mk_override != "auto":
+            metric_kind = mk_override
     reps = None
     ci_level = None
-    if metric_cfg is not None:
+    if metric_kind is None and metric_cfg is not None:
         try:
             metric_kind = (
                 metric_cfg.get("kind")
@@ -2093,6 +2126,11 @@ def run_command(
         "--tier",
         help="Auto-tuning tier override (conservative|balanced|aggressive)",
     ),
+    metric_kind: str | None = typer.Option(
+        None,
+        "--metric-kind",
+        help="Primary metric kind override (ppl_causal|ppl_mlm|accuracy|etc.)",
+    ),
     probes: int | None = typer.Option(
         None, "--probes", help="Number of micro-probes (0=deterministic, >0=adaptive)"
     ),
@@ -2120,6 +2158,9 @@ def run_command(
         False, "--progress", help="Show progress done messages"
     ),
     timing: bool = typer.Option(False, "--timing", help="Show timing summary"),
+    telemetry: bool = typer.Option(
+        False, "--telemetry", help="Write telemetry JSON alongside the report"
+    ),
     no_color: bool = typer.Option(
         False, "--no-color", help="Disable ANSI colors (respects NO_COLOR=1)"
     ),
@@ -2145,6 +2186,7 @@ def run_command(
     out = _coerce_option(out)
     edit = _coerce_option(edit)
     tier = _coerce_option(tier)
+    metric_kind = _coerce_option(metric_kind)
     probes = _coerce_option(probes)
     until_pass = bool(_coerce_option(until_pass, False))
     max_attempts = int(_coerce_option(max_attempts, 3))
@@ -2154,6 +2196,7 @@ def run_command(
     style = _coerce_option(style)
     progress = bool(_coerce_option(progress, False))
     timing = bool(_coerce_option(timing, False))
+    telemetry = bool(_coerce_option(telemetry, False))
     no_color = bool(_coerce_option(no_color, False))
 
     output_style = resolve_output_style(
@@ -2167,6 +2210,10 @@ def run_command(
     if not output_style.color:
         console.no_color = True
     timings: dict[str, float] = {}
+    collect_timings = bool(output_style.timing or telemetry)
+    total_start: float | None = perf_counter() if collect_timings else None
+
+    _apply_warning_filters(profile_normalized)
 
     # Use shared CLI coercers from invarlock.cli.utils
     report_path_out: str | None = None
@@ -2661,6 +2708,7 @@ def run_command(
         dataset_meta: dict[str, Any] = {}
         baseline_meta: dict[str, Any] = {}
         window_plan: dict[str, Any] | None = None
+        dataset_timing_start: float | None = perf_counter() if collect_timings else None
         if pairing_schedule:
             harvested = _validate_and_harvest_baseline_schedule(
                 cfg,
@@ -3381,6 +3429,10 @@ def run_command(
         run_context["dataset_meta"] = dataset_meta
         if window_plan:
             run_context["window_plan"] = window_plan
+        if dataset_timing_start is not None:
+            timings["load_dataset"] = max(
+                0.0, float(perf_counter() - dataset_timing_start)
+            )
 
         if os.environ.get("INVARLOCK_DEBUG_TRACE"):
             console.print(
@@ -3784,6 +3836,8 @@ def run_command(
                         "checks": {},
                     }
                 elif measure_guard_overhead:
+                    bare_edit_config = dict(edit_config or {})
+                    bare_edit_config["emit"] = False
                     guard_overhead_payload = _run_bare_control(
                         adapter=adapter,
                         edit_op=edit_op,
@@ -3792,7 +3846,7 @@ def run_command(
                         run_config=run_config,
                         calibration_data=calibration_data,
                         auto_config=auto_config,
-                        edit_config=edit_config,
+                        edit_config=bare_edit_config,
                         preview_count=preview_count,
                         final_count=final_count,
                         seed_bundle=seed_bundle,
@@ -4074,6 +4128,22 @@ def run_command(
 
             # Transfer metrics (PM-only: do not write ppl_* fields)
             if hasattr(core_report, "metrics") and core_report.metrics:
+                if isinstance(core_report.metrics, dict):
+                    core_timings = core_report.metrics.get("timings")
+                    if isinstance(core_timings, dict):
+                        for key in (
+                            "prepare",
+                            "prepare_guards",
+                            "edit",
+                            "guards",
+                            "eval",
+                            "finalize",
+                        ):
+                            if key in core_timings:
+                                try:
+                                    timings[key] = float(core_timings[key])
+                                except Exception:
+                                    timings[key] = core_timings[key]
                 metrics_payload = {
                     "latency_ms_per_tok": core_report.metrics.get(
                         "latency_ms_per_tok", 0.0
@@ -4125,6 +4195,11 @@ def run_command(
                     "masked_tokens_total",
                     "masked_tokens_preview",
                     "masked_tokens_final",
+                    "timings",
+                    "guard_timings",
+                    "memory_snapshots",
+                    "gpu_memory_mb_peak",
+                    "gpu_memory_reserved_mb_peak",
                     "reduction",
                 ]
                 for key in optional_keys:
@@ -4738,7 +4813,10 @@ def run_command(
             try:
                 metric_kind_resolved, _provider_kind, metric_opts = (
                     _resolve_metric_and_provider(
-                        cfg, model_profile, resolved_loss_type=resolved_loss_type
+                        cfg,
+                        model_profile,
+                        resolved_loss_type=resolved_loss_type,
+                        metric_kind_override=metric_kind,
                     )
                 )
                 if metric_kind_resolved:
@@ -4817,6 +4895,13 @@ def run_command(
             except Exception:
                 pass
 
+            telemetry_path: Path | None = None
+            if telemetry:
+                telemetry_path = run_dir / "telemetry.json"
+                report.setdefault("artifacts", {})["telemetry_path"] = str(
+                    telemetry_path
+                )
+
             saved_files = _postprocess_and_summarize(
                 report=report,
                 run_dir=run_dir,
@@ -4832,6 +4917,31 @@ def run_command(
                     report_path_out = str(saved_files["json"])
             except Exception:
                 pass
+
+            if telemetry and telemetry_path is not None:
+                try:
+                    from invarlock.reporting.telemetry import save_telemetry_report
+
+                    saved_path = save_telemetry_report(
+                        report, run_dir, filename=telemetry_path.name
+                    )
+                    if isinstance(saved_files, dict):
+                        saved_files["telemetry"] = str(saved_path)
+                    _event(
+                        console,
+                        "DATA",
+                        f"Telemetry: {saved_path}",
+                        emoji="📈",
+                        profile=profile_normalized,
+                    )
+                except Exception as exc:  # pragma: no cover - best-effort
+                    _event(
+                        console,
+                        "WARN",
+                        f"Telemetry export failed: {exc}",
+                        emoji="⚠️",
+                        profile=profile_normalized,
+                    )
 
             # Metrics display
             pm_obj = None
@@ -5061,19 +5171,70 @@ def run_command(
             # (moved) Cleanup printing occurs after loop to guarantee execution
             pass
 
-        if output_style.timing and timings:
-            timings_for_summary = dict(timings)
-            timings_for_summary["total"] = sum(timings_for_summary.values())
-            print_timing_summary(
-                console,
-                timings_for_summary,
-                style=output_style,
-                order=[
-                    ("Load model", "load_model"),
-                    ("Execute", "execute"),
-                    ("Total", "total"),
-                ],
+        if output_style.timing:
+            total_duration = (
+                max(0.0, float(perf_counter() - total_start))
+                if total_start is not None
+                else None
             )
+            timings_for_summary: dict[str, float] = {}
+            for key, value in timings.items():
+                if isinstance(value, (int | float)):
+                    timings_for_summary[key] = float(value)
+            if total_duration is not None:
+                timings_for_summary["total"] = total_duration
+
+            has_breakdown = any(
+                key in timings_for_summary
+                for key in (
+                    "prepare",
+                    "prepare_guards",
+                    "edit",
+                    "guards",
+                    "eval",
+                    "finalize",
+                )
+            )
+
+            order: list[tuple[str, str]] = []
+
+            def _add(label: str, key: str) -> None:
+                if key in timings_for_summary:
+                    order.append((label, key))
+
+            _add("Load model", "load_model")
+            _add("Load data", "load_dataset")
+            if has_breakdown:
+                _add("Prepare", "prepare")
+                _add("Prep guards", "prepare_guards")
+                _add("Edit", "edit")
+                _add("Guards", "guards")
+                _add("Eval", "eval")
+                _add("Finalize", "finalize")
+            else:
+                _add("Execute", "execute")
+            _add("Total", "total")
+
+            extra_lines: list[str] = []
+            metrics_section = (
+                report.get("metrics", {}) if isinstance(report, dict) else {}
+            )
+            if isinstance(metrics_section, dict):
+                mem_peak = metrics_section.get("memory_mb_peak")
+                gpu_peak = metrics_section.get("gpu_memory_mb_peak")
+                if isinstance(mem_peak, (int | float)):
+                    extra_lines.append(f"  Peak Memory : {float(mem_peak):.2f} MB")
+                if isinstance(gpu_peak, (int | float)):
+                    extra_lines.append(f"  Peak GPU Mem: {float(gpu_peak):.2f} MB")
+
+            if timings_for_summary and order:
+                print_timing_summary(
+                    console,
+                    timings_for_summary,
+                    style=output_style,
+                    order=order,
+                    extra_lines=extra_lines,
+                )
 
         # Normal path falls through; cleanup handled below in finally
         return report_path_out

@@ -116,4 +116,5 @@ def test_render_certificate_markdown_rmt_handles_non_numeric_counts():
     rendered = render_mod.render_certificate_markdown(cert)
 
     assert "| mlp | 0.200 | - | - | - |" in rendered
-    assert "- Stable: False" in rendered
+    assert "- Status: \u274c FAIL" in rendered
+    assert "- Families: 1" in rendered

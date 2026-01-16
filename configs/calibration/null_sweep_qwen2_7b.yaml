@@ -1,0 +1,38 @@
+# Calibration config: Null sweep for Qwen2 7B spectral/RMT calibration.
+
+model:
+  id: "Qwen/Qwen2-7B"
+  adapter: "hf_llama"
+  device: "auto"
+
+dataset:
+  provider: "wikitext2"
+  split: "validation"
+  seq_len: 512
+  stride: 512
+  preview_n: 64
+  final_n: 64
+  seed: 42
+
+edit:
+  name: noop
+  plan: {}
+
+eval:
+  metric:
+    kind: ppl_causal
+  loss:
+    type: causal
+
+auto:
+  enabled: true
+  tier: balanced
+  probes: 0
+
+guards:
+  order: ["invariants", "spectral", "rmt", "variance", "invariants"]
+
+output:
+  dir: runs/null_sweeps/qwen2_7b
+  save_model: false
+  save_report: true
