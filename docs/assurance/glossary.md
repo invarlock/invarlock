@@ -1,224 +1,463 @@
 # Glossary
 
-This glossary defines key terms used across InvarLock documentation and
-certificates.
+> **TL;DR:** This glossary defines key terms used across InvarLock documentation,
+> certificates, and code. Terms are grouped by domain (metrics, guards, data,
+> provenance) for quick reference. Each entry includes a definition, context,
+> and cross-references to relevant assurance documents.
 
-## Terms
+> **Plain language:** When reading a certificate or debugging a pipeline, use this
+> glossary to understand what each field means and where the term originated.
 
-### BCa Bootstrap
+---
 
-- **Definition:** Bias-corrected and accelerated bootstrap used to estimate
-  confidence intervals for paired deltas.
-- **Context:** Applied to paired log-loss deltas for primary metric gating.
-- **Related terms:** Primary Metric, Window Pairing, Confidence Interval.
-- **See also:** [BCa Bootstrap](03-bca-bootstrap.md)
-- **Example:** "BCa bootstrap with 2000 reps on paired deltas."
+## Quick Reference Tables
 
-### Compare & Certify (BYOE)
+### Primary Metric Terms
 
-- **Definition:** Workflow that compares a subject model to a baseline without
-  performing the edit inside InvarLock.
-- **Context:** `invarlock certify --baseline ... --subject ...`.
-- **Related terms:** Baseline, Subject Run, Certificate.
-- **See also:** [Compare & Certify](../user-guide/compare-and-certify.md)
-- **Example:** "BYOE: subject checkpoint produced externally."
+| Term | Short Definition | Certificate Field |
+| --- | --- | --- |
+| Primary Metric | Canonical task metric for gating (ppl or accuracy) | `primary_metric.*` |
+| BCa Bootstrap | Bias-corrected accelerated bootstrap for CIs | `primary_metric.ci`, `primary_metric.reps` |
+| Ratio vs Baseline | Edited ÷ baseline metric (ppl: lower=worse, acc: higher=better) | `primary_metric.ratio_vs_baseline` |
+| Primary Metric Tail | Tail regression gate (ΔlogNLL at q95) | `primary_metric_tail.*` |
 
-### Four-Guard Pipeline
+### Guard Terms
 
-- **Definition:** The default guard chain: invariants, spectral, RMT, variance.
-- **Context:** Core safety checks in `run` and `certify` flows.
-- **Related terms:** Guard Chain, Guard Overhead.
-- **See also:** [Guards](../reference/guards.md)
-- **Example:** "Four-Guard Pipeline: invariants -> spectral -> RMT -> variance."
+| Term | Short Definition | Certificate Field |
+| --- | --- | --- |
+| Four-Guard Pipeline | invariants → spectral → RMT → variance | `validation.{invariants_pass,spectral_stable,rmt_stable}`, `variance.{enabled,predictive_gate.passed}` |
+| κ (kappa) Threshold | Per-family spectral cap for z-score outliers | `spectral.family_caps.*.kappa` |
+| ε (epsilon) Band | RMT acceptance threshold for edge-risk | `rmt.epsilon_by_family.*` |
+| Guard Overhead | Performance cost of guards vs bare run | `guard_overhead.*` |
+| Measurement Contract | Estimator + sampling policy recorded in certs | `spectral.measurement_contract_hash` |
 
-### Guard Chain (Canonical Order)
+### Data Terms
 
-- **Definition:** Fixed execution order for guard preparation and evaluation.
-- **Context:** Ensures deterministic, auditable guard outcomes.
-- **Related terms:** Four-Guard Pipeline, Guard Overhead.
-- **See also:** [Guards](../reference/guards.md)
-- **Example:** "Guards execute in canonical order for reproducibility."
+| Term | Short Definition | Certificate Field |
+| --- | --- | --- |
+| Window Pairing | Aligning baseline and subject eval windows | `dataset.windows.stats.paired_windows` |
+| Provider Digest | Hash of dataset identity (ids/tokenizer/masking) | `provenance.provider_digest` |
+| Tokenizer Hash | Stable hash of tokenizer settings | `dataset.tokenizer.hash` |
 
-### kappa Threshold
+### Policy Terms
 
-- **Definition:** Per-family spectral cap used to flag abnormal z-scores.
-- **Context:** `spectral.family_caps.*.kappa` in policy.
-- **Related terms:** Spectral Cap, z-score.
-- **See also:** [Spectral Guard](../reference/guards.md)
-- **Example:** "kappa=2.8 for attention families."
+| Term | Short Definition | Certificate Field |
+| --- | --- | --- |
+| Tier Policy | Guard threshold preset (conservative/balanced/aggressive) | `auto.tier` |
+| Policy Digest | Stable hash of resolved policy thresholds | `policy_digest.thresholds_hash` |
 
-### Policy Digest
+---
 
-- **Definition:** Stable hash summarizing resolved policy thresholds.
-- **Context:** Stored in `policy_digest.thresholds_hash` and `policy_provenance`.
-- **Related terms:** Tier Policy, Policy Overrides.
-- **See also:** [Policy Provenance](11-policy-provenance.md)
-- **Example:** "Digest changed after policy override."
+## Detailed Definitions
 
-### Primary Metric
+### A–B
 
-- **Definition:** The canonical task metric used for gating (ppl or accuracy).
-- **Context:** `metrics.primary_metric` in reports and certificates.
-- **Related terms:** Primary Metric Tail, Window Pairing.
-- **See also:** [Certificates](../reference/certificates.md)
-- **Example:** "primary_metric.kind=ppl_causal".
+#### Baseline
 
-### Primary Metric Tail
+The unedited reference model run used for comparison and gating.
 
-- **Definition:** Optional tail regression gate for ppl-like metrics.
-- **Context:** `primary_metric_tail` block in certificates.
-- **Related terms:** Primary Metric, BCa Bootstrap.
-- **See also:** [Certificates](../reference/certificates.md)
-- **Example:** "Tail gate warned on q95 mass."
+| Aspect | Details |
+| --- | --- |
+| **Context** | `baseline` report in Compare & Certify workflow |
+| **Related terms** | Subject Run, Window Pairing, Certificate |
+| **Certificate fields** | `provenance.baseline.*`, `baseline_ref.*` |
+| **See also** | [Compare & Certify](../user-guide/compare-and-certify.md) |
 
-### Spectral Cap
+**Example:** `invarlock certify --baseline gpt2 --subject gpt2-quant`
 
-- **Definition:** Limit on spectral z-scores per family to flag instability.
-- **Context:** Applied by the spectral guard to cap outliers.
-- **Related terms:** kappa Threshold, z-score.
-- **See also:** [Spectral FPR](05-spectral-fpr-derivation.md)
-- **Example:** "Spectral cap exceeded for FFN family."
+---
 
-### Spectral Guard
+#### BCa Bootstrap
 
-- **Definition:** Guard that monitors spectral norms and z-scores for weights.
-- **Context:** Emits `spectral` metrics and stability flags.
-- **Related terms:** Four-Guard Pipeline, Spectral Cap.
-- **See also:** [Guards](../reference/guards.md)
-- **Example:** "Spectral guard stable with 0 caps applied."
+Bias-corrected and accelerated bootstrap method for estimating confidence intervals.
 
-### RMT epsilon Rule
+| Aspect | Details |
+| --- | --- |
+| **Context** | Applied to paired log-loss deltas for primary metric gating |
+| **Related terms** | Primary Metric, Window Pairing, Confidence Interval |
+| **Certificate fields** | `primary_metric.ci`, `primary_metric.reps`, `dataset.windows.stats.bootstrap` |
+| **See also** | [BCa Bootstrap Derivation](03-bca-bootstrap.md) |
 
-- **Definition:** Random Matrix Theory epsilon band used for stability checks.
-- **Context:** `rmt.epsilon_default` and `rmt.epsilon_by_family.*` thresholds per family.
-- **Related terms:** RMT Guard, kappa Threshold.
-- **See also:** [RMT epsilon Rule](06-rmt-epsilon-rule.md)
-- **Example:** "RMT epsilon band within policy."
+**Example:** BCa bootstrap with 2000 replicates produces `ci: [0.995, 1.008]` on
+paired ΔlogNLL, then exponentiated to ratio CI.
 
-### RMT Guard
+---
 
-- **Definition:** Guard that checks eigenvalue statistics against RMT bounds.
-- **Context:** Emits `rmt` metrics and stability flags.
-- **Related terms:** Four-Guard Pipeline, RMT epsilon Rule.
-- **See also:** [Guards](../reference/guards.md)
-- **Example:** "RMT guard stable with delta_total=0."
+### C–D
 
-### Variance Effect (VE)
+#### Certificate
 
-- **Definition:** Guard that tracks variance change in model activations.
-- **Context:** Variance guard calibration and predictive gate.
-- **Related terms:** Four-Guard Pipeline, Guard Overhead.
-- **See also:** [VE Predictive Gate](07-ve-gate-power.md)
-- **Example:** "VE predictive gate disabled for edit."
+Structured evidence artifact summarizing a certification run and its validation status.
 
-### Tier Policy
+| Aspect | Details |
+| --- | --- |
+| **Context** | Generated by `invarlock certify` or `invarlock report --format cert` |
+| **Related terms** | Report, Evidence Bundle, Manifest |
+| **Certificate fields** | `schema_version`, `run_id`, `validation.*`, `artifacts.*` |
+| **See also** | [Certificates Reference](../reference/certificates.md) |
 
-- **Definition:** Guard threshold preset (conservative, balanced, aggressive).
-- **Context:** Resolved from `tiers.yaml` and applied during run/certify.
-- **Related terms:** Policy Digest, Policy Overrides.
-- **See also:** [Tier Policy Catalog](../reference/tier-policy-catalog.md)
-- **Example:** "Tier Policy: balanced".
+**Example:** `evaluation.cert.json` with `schema_version: v1` and `validation.overall_pass: true`
 
-### Window Pairing
+---
 
-- **Definition:** Alignment of baseline and subject evaluation windows.
-- **Context:** Required for paired gating and CI computation.
-- **Related terms:** BCa Bootstrap, Primary Metric.
-- **See also:** [Coverage & Pairing Plan](02-coverage-and-pairing.md)
-- **Example:** "paired_windows=200; window_match_fraction=1.0".
+#### Compare & Certify (BYOE)
 
-### z-score
+Workflow that compares a subject model to a baseline, optionally with an external edit
+(Bring Your Own Edit).
 
-- **Definition:** Standardized deviation used in spectral guard scoring.
-- **Context:** `spectral.top_z_scores` and family summaries.
-- **Related terms:** Spectral Cap, kappa Threshold.
-- **See also:** [Spectral FPR](05-spectral-fpr-derivation.md)
-- **Example:** "max |z| = 2.1".
+| Aspect | Details |
+| --- | --- |
+| **Context** | `invarlock certify --baseline ... --subject ...` |
+| **Related terms** | Baseline, Subject Run, Certificate |
+| **Certificate fields** | `provenance.baseline.*`, `provenance.edited.*` |
+| **See also** | [Compare & Certify Guide](../user-guide/compare-and-certify.md) |
 
-### Baseline
+**Example:** BYOE workflow certifies an externally quantized checkpoint against its
+unmodified baseline.
 
-- **Definition:** Unedited reference run used for comparison and gating.
-- **Context:** `baseline` report in Compare & Certify.
-- **Related terms:** Subject Run, Window Pairing.
-- **See also:** [Compare & Certify](../user-guide/compare-and-certify.md)
-- **Example:** "baseline report.json".
+---
 
-### Subject Run
+### E–G
 
-- **Definition:** Edited or target model run under evaluation.
-- **Context:** `subject` report in Compare & Certify.
-- **Related terms:** Baseline, Certificate.
-- **See also:** [Compare & Certify](../user-guide/compare-and-certify.md)
-- **Example:** "subject report.json".
+#### Evidence Bundle
 
-### Guard Overhead
+Set of files produced for audit: reports, certificates, manifests, and events.
 
-- **Definition:** Performance impact of guard checks vs bare control.
-- **Context:** `guard_overhead` block in reports and certificates.
-- **Related terms:** Four-Guard Pipeline, Timing Summary.
-- **See also:** [Guard Overhead Method](10-guard-overhead-method.md)
-- **Example:** "overhead_ratio=1.003".
+| Aspect | Details |
+| --- | --- |
+| **Context** | Output directory from `invarlock certify` or `report --format cert` |
+| **Related terms** | Report, Certificate, Manifest |
+| **Typical contents** | `evaluation.cert.json`, `evaluation_certificate.md`, `manifest.json` |
+| **See also** | [Artifact Layout](../reference/artifacts.md) |
 
-### Measurement Contract
+---
 
-- **Definition:** Guard measurement procedure signature and digest.
-- **Context:** `measurement_contract_hash` for spectral/RMT.
-- **Related terms:** Policy Digest, Guard Chain.
-- **See also:** [Guard Contracts](04-guard-contracts.md)
-- **Example:** "contract hash matched baseline." 
+#### Four-Guard Pipeline
 
-### Provider Digest
+The default guard chain: invariants → spectral → RMT → variance.
 
-- **Definition:** Dataset identity hash (ids/tokenizer/masking).
-- **Context:** `provenance.provider_digest` ensures pairing parity.
-- **Related terms:** Window Pairing, Tokenizer Hash.
-- **See also:** [Coverage & Pairing Plan](02-coverage-and-pairing.md)
-- **Example:** "provider_digest.ids_hash".
+| Aspect | Details |
+| --- | --- |
+| **Context** | Core safety checks in `run` and `certify` flows |
+| **Canonical order** | `invariants` (pre), `spectral`, `rmt`, `variance`, `invariants` (post) |
+| **Related terms** | Guard Chain, Guard Overhead |
+| **See also** | [Guards Reference](../reference/guards.md) |
 
-### Tokenizer Hash
+**Enforcement:** Guards execute in canonical order for reproducibility; results are
+recorded in `validation.invariants_pass`, `validation.spectral_stable`,
+`validation.rmt_stable`.
 
-- **Definition:** Stable hash of tokenizer settings and vocab.
-- **Context:** Stored in `provenance.provider_digest` and dataset metadata.
-- **Related terms:** Provider Digest, Window Pairing.
-- **See also:** [Determinism Contracts](08-determinism-contracts.md)
-- **Example:** "tokenizer hash mismatch triggers E002." 
+---
 
-### Certificate
+#### Guard Chain (Canonical Order)
 
-- **Definition:** Structured evidence artifact summarizing a certification run.
-- **Context:** `evaluation.cert.json` and rendered markdown/HTML.
-- **Related terms:** Report, Evidence Bundle.
-- **See also:** [Certificates](../reference/certificates.md)
-- **Example:** "certificate schema_version=v1".
+Fixed execution order for guard preparation and evaluation ensuring deterministic,
+auditable outcomes.
 
-### Report
+| Aspect | Details |
+| --- | --- |
+| **Context** | Defined by `guards.order` in config YAML |
+| **Related terms** | Four-Guard Pipeline, Guard Overhead |
+| **Certificate fields** | Not stored directly (order is config-driven). |
+| **See also** | [Guards Reference](../reference/guards.md) |
 
-- **Definition:** Run-level artifact with metrics, guards, and metadata.
-- **Context:** `report.json` generated by `run`.
-- **Related terms:** Certificate, Evidence Bundle.
-- **See also:** [Artifact Layout](../reference/artifacts.md)
-- **Example:** "report.metrics.primary_metric".
+---
 
-### Evidence Bundle
+#### Guard Overhead
 
-- **Definition:** Set of files produced for audit (reports, certs, manifests).
-- **Context:** `reports/cert/` output from `report --format cert`.
-- **Related terms:** Report, Certificate.
-- **See also:** [Artifact Layout](../reference/artifacts.md)
-- **Example:** "manifest.json lists bundle files." 
+Performance impact of guard checks vs bare control run (no guards).
 
-### Timing Summary
+| Aspect | Details |
+| --- | --- |
+| **Context** | Measured in Release profile; gate requires ≤ +1.0% PM overhead |
+| **Related terms** | Four-Guard Pipeline, Timing Summary |
+| **Certificate fields** | `guard_overhead.{bare_ppl,guarded_ppl,overhead_ratio,overhead_percent}` |
+| **See also** | [Guard Overhead Method](10-guard-overhead-method.md) |
 
-- **Definition:** Consolidated timing breakdown for a certification run.
-- **Context:** CLI timing output and telemetry fields.
-- **Related terms:** Guard Overhead, Telemetry.
-- **See also:** [Observability](../reference/observability.md)
-- **Example:** "Timing Summary: model load, eval, cert gen." 
+**Example:** `overhead_percent: +0.12%` indicates guards add 0.12% to primary metric.
 
-### Telemetry
+---
 
-- **Definition:** Performance and resource metrics emitted with certificates.
-- **Context:** `telemetry.*` fields in certificates.
-- **Related terms:** Timing Summary, Guard Overhead.
-- **See also:** [Observability](../reference/observability.md)
-- **Example:** "telemetry.memory_mb_peak".
+### K–M
+
+#### κ (kappa) Threshold
+
+Per-family spectral cap used to flag abnormally high z-scores.
+
+| Aspect | Details |
+| --- | --- |
+| **Context** | `spectral.family_caps.*.kappa` in tier policy |
+| **Typical values** | ffn: 3.85, attn: 3.02, embed: 1.05 (Balanced tier) |
+| **Related terms** | Spectral Cap, z-score, Spectral Guard |
+| **See also** | [Spectral FPR Derivation](05-spectral-fpr-derivation.md) |
+
+**Example:** `kappa=2.8` for attention family means z-scores > 2.8 are flagged.
+
+---
+
+#### Measurement Contract
+
+Guard measurement procedure signature and digest recorded in certificates.
+
+| Aspect | Details |
+| --- | --- |
+| **Context** | Spectral and RMT guards record estimator + sampling policy |
+| **Verified by** | `invarlock verify --profile ci\|release` |
+| **Certificate fields** | `spectral.measurement_contract_hash`, `rmt.measurement_contract_hash` |
+| **See also** | [Guard Contracts](04-guard-contracts.md) |
+
+**Enforcement:** CI/Release profiles require measurement contract match between
+baseline and subject.
+
+---
+
+### P–R
+
+#### Policy Digest
+
+Stable hash summarizing resolved policy thresholds for auditability.
+
+| Aspect | Details |
+| --- | --- |
+| **Context** | Stored in certificate for policy change detection |
+| **Related terms** | Tier Policy, Policy Overrides, Policy Provenance |
+| **Certificate fields** | `policy_digest.thresholds_hash`, `policy_provenance.*` |
+| **See also** | [Policy Provenance](11-policy-provenance.md) |
+
+---
+
+#### Primary Metric
+
+The canonical task metric used for gating (perplexity for LMs, accuracy for classification).
+
+| Aspect | Details |
+| --- | --- |
+| **Supported kinds** | `ppl_causal`, `ppl_mlm`, `accuracy`, `vqa_accuracy` |
+| **Gating logic** | Ratio vs baseline must stay within tier thresholds |
+| **Related terms** | Primary Metric Tail, BCa Bootstrap, Window Pairing |
+| **Certificate fields** | `primary_metric.{kind,preview,final,ratio_vs_baseline,ci}` |
+| **See also** | [Certificates Reference](../reference/certificates.md) |
+
+**Example:** `primary_metric.kind: ppl_causal` with `ratio_vs_baseline: 1.003`
+
+---
+
+#### Primary Metric Tail
+
+Optional tail regression gate checking high-loss windows (e.g., q95 ΔlogNLL).
+
+| Aspect | Details |
+| --- | --- |
+| **Context** | Catches regression in hard examples even when mean is acceptable |
+| **Mode** | `warn` (default) or `fail` |
+| **Related terms** | Primary Metric, BCa Bootstrap |
+| **Certificate fields** | `primary_metric_tail.{evaluated,passed,warned,stats}` |
+| **See also** | [Certificates Reference](../reference/certificates.md) |
+
+---
+
+#### Provider Digest
+
+Dataset identity hash covering token IDs, tokenizer config, and masking strategy.
+
+| Aspect | Details |
+| --- | --- |
+| **Context** | Ensures baseline and subject use identical data |
+| **Related terms** | Window Pairing, Tokenizer Hash |
+| **Certificate fields** | `provenance.provider_digest.ids_sha256` |
+| **See also** | [Coverage & Pairing](02-coverage-and-pairing.md) |
+
+---
+
+#### Report
+
+Run-level artifact with metrics, guard results, and metadata.
+
+| Aspect | Details |
+| --- | --- |
+| **Context** | Generated by `invarlock run`; input to certificate generation |
+| **Related terms** | Certificate, Evidence Bundle |
+| **File format** | `report.json` + `events.jsonl` |
+| **See also** | [Artifact Layout](../reference/artifacts.md) |
+
+---
+
+#### RMT ε (epsilon) Rule
+
+Random Matrix Theory epsilon band used for activation edge-risk stability checks.
+
+| Aspect | Details |
+| --- | --- |
+| **Context** | `rmt.epsilon_default` and `rmt.epsilon_by_family.*` thresholds |
+| **Calibration** | Derived from null-sweep runs on target model families |
+| **Related terms** | RMT Guard, κ Threshold |
+| **Certificate fields** | `rmt.{epsilon_default,epsilon_by_family,stable,max_edge_ratio,max_edge_delta}` |
+| **See also** | [RMT ε Rule](06-rmt-epsilon-rule.md) |
+
+---
+
+#### RMT Guard
+
+Guard that checks eigenvalue statistics against Random Matrix Theory bounds.
+
+| Aspect | Details |
+| --- | --- |
+| **Focus** | Activation edge-risk growth across model families |
+| **Validation** | `validation.rmt_stable` |
+| **Related terms** | Four-Guard Pipeline, RMT ε Rule |
+| **Certificate fields** | `rmt.{families,stable,max_edge_delta}` |
+| **See also** | [Guards Reference](../reference/guards.md) |
+
+---
+
+### S–T
+
+#### Spectral Cap
+
+Limit on spectral z-scores per family to flag weight instability.
+
+| Aspect | Details |
+| --- | --- |
+| **Context** | Applied by spectral guard; counts violations per family |
+| **Related terms** | κ Threshold, z-score, Spectral Guard |
+| **Certificate fields** | `spectral.{caps_applied,caps_exceeded,top_z_scores}` |
+| **See also** | [Spectral FPR](05-spectral-fpr-derivation.md) |
+
+---
+
+#### Spectral Guard
+
+Guard that monitors spectral norms and z-scores for weight matrices.
+
+| Aspect | Details |
+| --- | --- |
+| **Focus** | Baseline-relative weight matrix stability |
+| **Validation** | `validation.spectral_stable` |
+| **Related terms** | Four-Guard Pipeline, Spectral Cap, κ Threshold |
+| **Certificate fields** | `spectral.{caps_applied,family_caps,top_z_scores,summary}` |
+| **See also** | [Guards Reference](../reference/guards.md) |
+
+---
+
+#### Subject Run
+
+The edited or target model run under evaluation (compared against baseline).
+
+| Aspect | Details |
+| --- | --- |
+| **Context** | `subject` checkpoint in Compare & Certify |
+| **Related terms** | Baseline, Certificate, Window Pairing |
+| **Certificate fields** | `provenance.edited.*` |
+| **See also** | [Compare & Certify](../user-guide/compare-and-certify.md) |
+
+---
+
+#### Telemetry
+
+Performance and resource metrics emitted with certificates.
+
+| Aspect | Details |
+| --- | --- |
+| **Context** | Optional fields for performance analysis |
+| **Related terms** | Timing Summary, Guard Overhead |
+| **Certificate fields** | `telemetry.*`, `metrics.memory_mb_peak` |
+| **See also** | [Observability](../reference/observability.md) |
+
+---
+
+#### Tier Policy
+
+Guard threshold preset selecting the safety profile for a run.
+
+| Aspect | Details |
+| --- | --- |
+| **Options** | `conservative` (strictest), `balanced` (default), `aggressive` (loosest) |
+| **Source** | `src/invarlock/_data/runtime/tiers.yaml` |
+| **Related terms** | Policy Digest, Policy Overrides |
+| **Certificate fields** | `auto.tier`, `resolved_policy.*` |
+| **See also** | [Tier Policy Catalog](../reference/tier-policy-catalog.md) |
+
+---
+
+#### Timing Summary
+
+Consolidated timing breakdown for a certification run.
+
+| Aspect | Details |
+| --- | --- |
+| **Context** | CLI output via `print_timing_summary()` |
+| **Includes** | Model load, dataset load, evaluation, certificate generation |
+| **Related terms** | Guard Overhead, Telemetry |
+| **See also** | [Observability](../reference/observability.md) |
+
+---
+
+#### Tokenizer Hash
+
+Stable hash of tokenizer settings and vocabulary for reproducibility.
+
+| Aspect | Details |
+| --- | --- |
+| **Context** | Ensures baseline and subject use identical tokenization |
+| **Related terms** | Provider Digest, Window Pairing |
+| **Certificate fields** | `dataset.tokenizer.hash`, `meta.tokenizer_hash` |
+| **See also** | [Determinism Contracts](08-determinism-contracts.md) |
+
+---
+
+### V–Z
+
+#### Variance Effect (VE)
+
+Guard that tracks variance change and applies equalization when beneficial.
+
+| Aspect | Details |
+| --- | --- |
+| **Context** | A/B test compares bare vs VE-enabled evaluation |
+| **Enabling condition** | CI excludes 0 AND mean Δ ≥ min_effect_lognll |
+| **Related terms** | Four-Guard Pipeline, Guard Overhead, Predictive Gate |
+| **Certificate fields** | `variance.{enabled,gain,predictive_gate.delta_ci,predictive_gate.passed}` |
+| **See also** | [VE Gate Power](07-ve-gate-power.md) |
+
+---
+
+#### Window Pairing
+
+Alignment of baseline and subject evaluation windows for paired statistical testing.
+
+| Aspect | Details |
+| --- | --- |
+| **Requirements** | Same window IDs, zero overlap, 100% match fraction |
+| **Violation** | `E001` pairing error in CI/Release profiles |
+| **Related terms** | BCa Bootstrap, Primary Metric, Provider Digest |
+| **Certificate fields** | `dataset.windows.stats.{paired_windows,window_match_fraction,window_overlap_fraction}` |
+| **See also** | [Coverage & Pairing](02-coverage-and-pairing.md) |
+
+**Example:** `paired_windows: 200`, `window_match_fraction: 1.0`,
+`window_overlap_fraction: 0.0`
+
+---
+
+#### z-score
+
+Standardized deviation used in spectral guard scoring.
+
+| Aspect | Details |
+| --- | --- |
+| **Formula** | `z = (σ_edited - μ_baseline) / std_baseline` |
+| **Thresholding** | Compared against family-specific κ caps |
+| **Related terms** | Spectral Cap, κ Threshold |
+| **Certificate fields** | `spectral.top_z_scores`, `spectral.family_caps.*.kappa` |
+| **See also** | [Spectral FPR](05-spectral-fpr-derivation.md) |
+
+**Example:** `max |z| = 2.1` indicates the largest z-score across all weight matrices.
+
+---
+
+## See Also
+
+- [Safety Case Overview](00-safety-case.md) — Enumerated claims and evidence
+- [Guard Contracts](04-guard-contracts.md) — Guard behavior specifications
+- [CLI Reference](../reference/cli.md) — Command-line usage
+- [Guards Reference](../reference/guards.md) — Guard configuration
+- [Certificates Reference](../reference/certificates.md) — Certificate schema
