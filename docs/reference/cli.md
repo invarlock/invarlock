@@ -213,7 +213,7 @@ Exhaustive command map with brief descriptions and notable options.
   - Purpose: Execute pipeline from a YAML config (edit + guards + reports).
   - Options: `--config/-c`, `--device`, `--profile`, `--out`, `--edit`, `--tier`,
     `--metric-kind`, `--probes`, `--until-pass`, `--max-attempts`, `--timeout`,
-    `--baseline`, `--no-cleanup`.
+    `--baseline`, `--no-cleanup`, `--timing`, `--telemetry`.
 
 - `invarlock report` (group)
   - Purpose: Operations on reports/certificates (verify, explain, html, validate).

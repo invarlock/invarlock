@@ -455,3 +455,111 @@ def create_resource_metrics(registry: MetricsRegistry) -> dict[str, Any]:
         "gpu_memory": registry.register_gauge("invarlock.resource.gpu_memory_percent"),
         "disk_usage": registry.register_gauge("invarlock.resource.disk_percent"),
     }
+
+
+def reset_peak_memory_stats() -> None:
+    """Reset GPU peak memory stats when available."""
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            torch.cuda.reset_peak_memory_stats()
+        mps = getattr(torch, "mps", None)
+        if mps is not None and hasattr(mps, "reset_peak_memory_stats"):
+            mps.reset_peak_memory_stats()
+    except Exception:
+        pass
+
+
+def capture_memory_snapshot(
+    phase: str, *, timestamp: float | None = None
+) -> dict[str, Any]:
+    """Capture a point-in-time memory snapshot for the current process."""
+    snapshot: dict[str, Any] = {"phase": str(phase)}
+    if timestamp is None:
+        timestamp = time.time()
+    snapshot["ts"] = float(timestamp)
+
+    try:
+        import os
+
+        import psutil
+
+        process = psutil.Process(os.getpid())
+        rss_mb = process.memory_info().rss / 1024 / 1024
+        snapshot["rss_mb"] = float(rss_mb)
+    except Exception:
+        pass
+
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            device_index = torch.cuda.current_device()
+            snapshot["gpu_device"] = f"cuda:{device_index}"
+            snapshot["gpu_mb"] = float(
+                torch.cuda.memory_allocated(device_index) / 1024 / 1024
+            )
+            snapshot["gpu_reserved_mb"] = float(
+                torch.cuda.memory_reserved(device_index) / 1024 / 1024
+            )
+            snapshot["gpu_peak_mb"] = float(
+                torch.cuda.max_memory_allocated(device_index) / 1024 / 1024
+            )
+            snapshot["gpu_peak_reserved_mb"] = float(
+                torch.cuda.max_memory_reserved(device_index) / 1024 / 1024
+            )
+        else:
+            mps = getattr(torch, "mps", None)
+            if mps is not None and hasattr(torch.backends, "mps"):
+                if torch.backends.mps.is_available():
+                    snapshot["gpu_device"] = "mps"
+                    if hasattr(mps, "current_allocated_memory"):
+                        snapshot["gpu_mb"] = float(
+                            mps.current_allocated_memory() / 1024 / 1024
+                        )
+                    if hasattr(mps, "driver_allocated_memory"):
+                        snapshot["gpu_reserved_mb"] = float(
+                            mps.driver_allocated_memory() / 1024 / 1024
+                        )
+    except Exception:
+        pass
+
+    if len(snapshot) <= 2:
+        return {}
+    return snapshot
+
+
+def summarize_memory_snapshots(
+    snapshots: list[dict[str, Any]],
+) -> dict[str, float]:
+    """Summarize memory snapshots into peak metrics."""
+
+    def _peak(key: str) -> float | None:
+        values: list[float] = []
+        for entry in snapshots:
+            if not isinstance(entry, dict):
+                continue
+            value = entry.get(key)
+            if isinstance(value, int | float):
+                values.append(float(value))
+        return max(values) if values else None
+
+    summary: dict[str, float] = {}
+    rss_peak = _peak("rss_mb")
+    if rss_peak is not None:
+        summary["memory_mb_peak"] = rss_peak
+
+    gpu_peak = _peak("gpu_peak_mb")
+    if gpu_peak is None:
+        gpu_peak = _peak("gpu_mb")
+    if gpu_peak is not None:
+        summary["gpu_memory_mb_peak"] = gpu_peak
+
+    gpu_reserved_peak = _peak("gpu_peak_reserved_mb")
+    if gpu_reserved_peak is None:
+        gpu_reserved_peak = _peak("gpu_reserved_mb")
+    if gpu_reserved_peak is not None:
+        summary["gpu_memory_reserved_mb_peak"] = gpu_reserved_peak
+
+    return summary
