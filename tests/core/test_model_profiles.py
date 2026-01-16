@@ -20,6 +20,9 @@ pytest.importorskip("transformers")
             "llama",
             "causal",
         ),
+        ("meta-llama/Meta-Llama-3-8B", "hf_llama", "llama3", "causal"),
+        ("mistralai/Mistral-7B-v0.1", "hf_llama", "mistral", "causal"),
+        ("Qwen/Qwen2-7B", "hf_llama", "qwen", "causal"),
     ],
 )
 def test_detect_profile_core(model_id, adapter, expected_family, expected_loss):

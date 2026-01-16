@@ -15,6 +15,8 @@ telemetry fields, and HTML export.
 ## Table of Contents
 
 - [Quick Start](#quick-start)
+- [Certificate Layout](#certificate-layout)
+  - [Safety Dashboard Interpretation](#safety-dashboard-interpretation)
 - [Schema](#schema)
   - [Minimal v1 Certificate Example](#minimal-v1-certificate-example)
   - [Schema Summary](#schema-summary-validator-view)
@@ -42,6 +44,28 @@ jq '.telemetry' reports/cert/evaluation.cert.json
 # Export to HTML
 invarlock report html -i reports/cert/evaluation.cert.json -o reports/cert/evaluation.html
 ```
+
+## Certificate Layout
+
+The markdown certificate is structured to highlight safety outcomes first:
+
+- **Safety Dashboard**: one-line PASS/FAIL + core gates (primary metric, drift, invariants, spectral, RMT, overhead).
+- **Quality Gates**: table of canonical gating checks with measured values.
+- **Safety Check Details**: invariants, spectral stability, RMT health, and pairing snapshots.
+- **Primary Metric**: task-specific metric summary with CI + baseline comparison.
+- **Guard Observability**: compact summaries with expandable guard details.
+- **Policy Configuration**: tier + digest summary with resolved policy details in `<details>`.
+- **Appendix**: environment, inference diagnostics, and variance guard details.
+
+### Safety Dashboard Interpretation
+
+| Row | Meaning | Action |
+| --- | --- | --- |
+| Overall | Aggregate PASS/FAIL of canonical gates | If FAIL, inspect the matching gate row |
+| Primary Metric | Ratio/Δpp vs baseline | Confirm within tier threshold |
+| Drift | Final/preview ratio | Check device stability, dataset drift |
+| Invariants/Spectral/RMT | Guard status | Expand guard details for failures |
+| Overhead | Guarded vs bare PM | Only present if overhead is evaluated |
 
 ## Evidence Flow
 
@@ -357,9 +381,12 @@ include the execution device. CPU telemetry sweeps are collected via
 
 ## HTML Export
 
-The HTML renderer wraps the Markdown certificate view and preserves the same
-numeric values (ratios, CIs, deltas). Use `--embed-css` (default) to inline a
-minimal stylesheet for standalone use.
+The HTML renderer converts the Markdown certificate into structured HTML
+tables (via the `markdown` library when available) and preserves the same
+numeric values (ratios, CIs, deltas). When the dependency is unavailable, the
+renderer falls back to a `<pre>` block. Use `--embed-css` (default) to inline
+a minimal stylesheet for standalone use, including status badges and
+print-friendly rules.
 
 ### CLI
 

@@ -18,9 +18,10 @@ import gc
 import logging
 import math
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 import numpy as np
 import psutil
@@ -2269,6 +2270,57 @@ def analyze_rmt_changes(
         return {"error": str(e)}
 
 
+class Metric(Protocol):
+    name: str
+    kind: str  # "ppl", "accuracy", "exact_match", "bleu", "rouge"
+
+    def compute(self, model: Any, dataset: Iterable[dict[str, Any]]) -> float: ...
+
+
+class PerplexityMetric:
+    """Lightweight perplexity metric from per-record logloss + token counts."""
+
+    name = "perplexity"
+    kind = "ppl"
+
+    def compute(self, model: Any, dataset: Iterable[dict[str, Any]]) -> float:  # noqa: ARG002
+        total_loss = 0.0
+        total_tokens = 0.0
+        for record in dataset:
+            if not isinstance(record, dict):
+                continue
+            loss = record.get("logloss", record.get("loss"))
+            tokens = record.get("token_count", record.get("tokens", 1))
+            try:
+                loss_val = float(loss)
+                tok_val = float(tokens)
+            except Exception:
+                continue
+            if (
+                not math.isfinite(loss_val)
+                or not math.isfinite(tok_val)
+                or tok_val <= 0
+            ):
+                continue
+            total_loss += loss_val * tok_val
+            total_tokens += tok_val
+        if total_tokens <= 0:
+            return float("nan")
+        return float(math.exp(total_loss / total_tokens))
+
+
+class AccuracyMetric:
+    """Classification accuracy metric from label/prediction records."""
+
+    name = "accuracy"
+    kind = "accuracy"
+
+    def compute(self, model: Any, dataset: Iterable[dict[str, Any]]) -> float:  # noqa: ARG002
+        from invarlock.eval.tasks.classification import accuracy_from_records
+
+        return accuracy_from_records(dataset)
+
+
 # ── Integration with existing system ───────────────────────────────────────
 
 # Update exports to include new functions (add to existing __all__ if it exists)
@@ -2282,6 +2334,9 @@ try:
             "compute_parameter_deltas",
             "analyze_spectral_changes",
             "analyze_rmt_changes",
+            "Metric",
+            "PerplexityMetric",
+            "AccuracyMetric",
         ]
     )
 except NameError:
@@ -2294,4 +2349,7 @@ except NameError:
         "compute_parameter_deltas",
         "analyze_spectral_changes",
         "analyze_rmt_changes",
+        "Metric",
+        "PerplexityMetric",
+        "AccuracyMetric",
     ]

@@ -94,11 +94,11 @@ def test_until_pass_restore_failure_discards_model_and_reloads_next_attempt(
                 raise RuntimeError("restore failed")
 
     adapter = Adapter()
-    execute_models: list[int] = []
+    execute_models: list[object] = []
 
     class Runner:
         def execute(self, **kwargs):  # type: ignore[no-untyped-def]
-            execute_models.append(id(kwargs.get("model")))
+            execute_models.append(kwargs.get("model"))
             return SimpleNamespace(
                 edit={"plan_digest": "abcd", "deltas": {"params_changed": 0}},
                 metrics={
@@ -236,7 +236,7 @@ def test_until_pass_restore_failure_discards_model_and_reloads_next_attempt(
     assert adapter.restore_calls == 2
     assert adapter.load_calls == 2
     assert len(execute_models) == 2
-    assert execute_models[0] != execute_models[1]
+    assert execute_models[0] is not execute_models[1]
 
     report = captured.get("report")
     assert isinstance(report, dict)

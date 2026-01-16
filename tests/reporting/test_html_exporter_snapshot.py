@@ -65,10 +65,23 @@ def test_html_export_contains_same_numbers_as_markdown():
     html = render_certificate_html(cert)
 
     nums_md = _extract_numbers(md)
-    # Extract inner <pre> content and unescape
-    m = re.search(r"<pre[^>]*>(.*?)</pre>", html, flags=re.DOTALL | re.IGNORECASE)
-    assert m, "expected <pre> block in HTML output"
-    inner = html_mod.unescape(m.group(1))
-    nums_html = _extract_numbers(inner)
+    # Strip HTML tags from the body and compare number parity
+    m = re.search(r"<body[^>]*>(.*)</body>", html, flags=re.DOTALL | re.IGNORECASE)
+    assert m, "expected <body> in HTML output"
+    body = m.group(1)
+    stripped = re.sub(r"<[^>]+>", " ", body)
+    nums_html = _extract_numbers(html_mod.unescape(stripped))
 
     assert nums_md == nums_html
+
+
+def test_html_exporter_prefers_markdown_when_available():
+    from invarlock.reporting import html as html_mod
+
+    cert = make_certificate(_mk_report(), _mk_report())
+    html = html_mod.render_certificate_html(cert)
+    if html_mod._markdown is None:
+        assert "<pre" in html
+    else:
+        assert "<table" in html
+        assert "badge" in html

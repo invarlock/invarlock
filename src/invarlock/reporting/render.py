@@ -113,6 +113,13 @@ def _short_digest(v: str) -> str:
     return v if len(v) <= 16 else (v[:8] + "…" + v[-8:])
 
 
+def _render_executive_dashboard(cert: dict[str, Any]) -> str:
+    """Render executive summary dashboard table."""
+    lines: list[str] = []
+    _append_safety_dashboard_section(lines, cert)
+    return "\n".join(lines).rstrip()
+
+
 def _append_safety_dashboard_section(
     lines: list[str], certificate: dict[str, Any]
 ) -> None:
@@ -808,7 +815,10 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
         pass
     lines.append("")
 
-    _append_safety_dashboard_section(lines, certificate)
+    dashboard = _render_executive_dashboard(certificate)
+    if dashboard:
+        lines.extend(dashboard.splitlines())
+        lines.append("")
 
     lines.append("## Contents")
     lines.append("")
@@ -1329,7 +1339,18 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
         lines.append("### RMT Guard")
         lines.append("")
         families = rmt_info.get("families") or {}
+        stable = bool(rmt_info.get("stable", True))
+        status = "✅ OK" if stable else "❌ FAIL"
+        delta_total = rmt_info.get("delta_total")
+        if isinstance(delta_total, int):
+            lines.append(f"- Δ total: {delta_total:+d}")
+        lines.append(f"- Status: {status}")
+        lines.append(f"- Families: {len(families)}")
         if families:
+            lines.append("")
+            lines.append("<details>")
+            lines.append("<summary>RMT family details</summary>")
+            lines.append("")
             lines.append("| Family | ε_f | Bare | Guarded | Δ |")
             lines.append("|--------|-----|------|---------|---|")
             for family, data in families.items():
@@ -1359,12 +1380,10 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
                     f"| {family} | {epsilon_str} | {bare_str} | {guarded_str} | {delta_str} |"
                 )
             lines.append("")
-        # Delta total and stability flags
-        delta_total = rmt_info.get("delta_total")
-        if isinstance(delta_total, int):
-            lines.append(f"- Δ total: {delta_total:+d}")
-        lines.append(f"- Stable: {rmt_info.get('stable', True)}")
-        lines.append("")
+            lines.append("</details>")
+            lines.append("")
+        else:
+            lines.append("")
 
     guard_overhead_info = certificate.get("guard_overhead", {}) or {}
     if guard_overhead_info:

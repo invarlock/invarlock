@@ -13,6 +13,9 @@
 | **Outputs / Artifacts** | `report.guards` entries, certificate `resolved_policy`, `validation.*` flags. |
 | **Source of truth** | `src/invarlock/guards/*.py`, `src/invarlock/guards/policies.py`, `src/invarlock/_data/runtime/tiers.yaml`. |
 
+See the [Glossary](../assurance/glossary.md) for definitions of guard terms such
+as kappa threshold, epsilon band, and guard overhead.
+
 ## Quick Start
 
 ```yaml
