@@ -903,6 +903,19 @@ task_calibrate_clean_edits() {
     # Simple lock to avoid concurrent calibration
     local lock_dir="${state_dir}/clean_edit_cal.lock"
     if ! mkdir "${lock_dir}" 2>/dev/null; then
+        local lock_age=0
+        if command -v date >/dev/null 2>&1 && command -v stat >/dev/null 2>&1; then
+            local now
+            local mtime
+            now=$(date +%s)
+            mtime=$(stat -c %Y "${lock_dir}" 2>/dev/null || echo 0)
+            if [[ "${mtime}" =~ ^[0-9]+$ && "${now}" =~ ^[0-9]+$ ]]; then
+                lock_age=$((now - mtime))
+            fi
+        fi
+        if [[ "${lock_age}" -gt 900 ]]; then
+            rm -rf "${lock_dir}" 2>/dev/null || true
+        fi
         local waited=0
         while [[ ${waited} -lt 120 ]]; do
             if [[ -f "${clean_params_file}" ]]; then
