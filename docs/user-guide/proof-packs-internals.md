@@ -645,7 +645,7 @@ Common knobs for the setup script:
 | `INVARLOCK_EVAL_BATCH` | `32` | InvarLock batch size |
 | `INVARLOCK_PM_ACCEPTANCE_MIN` | `0.90` | Primary metric lower bound |
 | `INVARLOCK_PM_ACCEPTANCE_MAX` | `1.20` | Primary metric upper bound |
-| `PACK_GUARDS_ORDER` | unset | Override guard order (CSV) |
+| `PACK_GUARDS_ORDER` | `invariants,spectral,rmt,variance,invariants` | Guards included in calibration and presets |
 
 ### Clean edit calibration
 

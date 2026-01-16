@@ -19,6 +19,10 @@ except Exception:  # pragma: no cover - optional dependency
     _YAML_AVAILABLE = False
 
 
+def get_default_guards_order() -> list[str]:
+    return ["invariants", "spectral", "rmt", "variance", "invariants"]
+
+
 def _safe_float(value: Any) -> float | None:
     try:
         if value is None:
@@ -75,7 +79,7 @@ def _load_guard_order_and_assurance(
                     assurance_cfg = ab
 
     if guards_order is None:
-        guards_order = ["invariants", "variance", "invariants"]
+        guards_order = get_default_guards_order()
     return guards_order, assurance_cfg
 
 
