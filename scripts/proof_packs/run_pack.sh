@@ -164,114 +164,13 @@ pack_write_manifest() {
     local determinism="$5"
     local repeats="$6"
 
-    python3 - "${pack_dir}" "${run_dir}" "${suite}" "${net}" "${determinism}" "${repeats}" <<'PY'
-import json
-import sys
-from datetime import datetime
-from pathlib import Path
-
-pack_dir = Path(sys.argv[1])
-run_dir = Path(sys.argv[2])
-suite = sys.argv[3]
-net = sys.argv[4]
-determinism = sys.argv[5]
-repeats_raw = sys.argv[6]
-
-try:
-    repeats = int(repeats_raw)
-except Exception:
-    repeats = 0
-
-models = []
-model_list = []
-revisions_path = pack_dir / "state" / "model_revisions.json"
-if revisions_path.is_file():
-    try:
-        data = json.loads(revisions_path.read_text())
-    except Exception:
-        data = {}
-    model_list = data.get("model_list") or []
-    for model_id, info in (data.get("models") or {}).items():
-        if not isinstance(info, dict):
-            info = {}
-        models.append({
-            "model_id": model_id,
-            "revision": info.get("revision") or "",
-        })
-
-known_licenses = {
-    # Mistral 7B (v0.1) is Apache-2.0 licensed.
-    "mistralai/Mistral-7B-v0.1": "Apache-2.0",
-}
-used_models = set()
-for item in model_list:
-    try:
-        used_models.add(str(item))
-    except Exception:
-        continue
-for item in models:
-    try:
-        model_id = item.get("model_id")
-    except Exception:
-        model_id = None
-    if model_id:
-        used_models.add(str(model_id))
-model_licenses = {mid: lic for mid, lic in known_licenses.items() if mid in used_models}
-
-determinism_repeats = None
-det_path = pack_dir / "results" / "determinism_repeats.json"
-if det_path.is_file():
-    try:
-        determinism_repeats = json.loads(det_path.read_text())
-    except Exception:
-        determinism_repeats = None
-
-verification_summary = None
-verification_path = pack_dir / "results" / "verification_summary.json"
-if verification_path.is_file():
-    try:
-        verification_summary = json.loads(verification_path.read_text())
-    except Exception:
-        verification_summary = None
-
-artifacts = []
-for path in pack_dir.rglob("*"):
-    if not path.is_file():
-        continue
-    rel = path.relative_to(pack_dir)
-    if rel.name in {"manifest.json", "manifest.json.asc", "checksums.sha256"}:
-        continue
-    artifacts.append(str(rel))
-
-try:
-    import invarlock
-    version = getattr(invarlock, "__version__", "")
-except Exception:
-    version = ""
-
-payload = {
-    "format": "proof-pack-v1",
-    "generated_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-    "suite": suite,
-    "network_mode": "online" if str(net) in {"1", "true", "yes", "on"} else "offline",
-    "determinism": determinism,
-    "repeats": repeats,
-    "determinism_repeats": determinism_repeats,
-    "run_dir": str(run_dir),
-    "invarlock_version": version,
-    "model_list": model_list,
-    "models": sorted(models, key=lambda item: item.get("model_id", "")),
-    "artifacts": sorted(artifacts),
-    "checksums_sha256": "checksums.sha256",
-}
-if model_licenses:
-    payload["model_licenses"] = model_licenses
-if isinstance(verification_summary, dict) and verification_summary:
-    payload["verification"] = verification_summary
-
-out_path = pack_dir / "manifest.json"
-out_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
-PY
+    python3 "${SCRIPT_DIR}/python/manifest_writer.py" \
+        --pack-dir "${pack_dir}" \
+        --run-dir "${run_dir}" \
+        --suite "${suite}" \
+        --net "${net}" \
+        --determinism "${determinism}" \
+        --repeats "${repeats}"
 }
 
 pack_sign_manifest() {
