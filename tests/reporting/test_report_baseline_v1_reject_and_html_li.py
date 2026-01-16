@@ -29,6 +29,10 @@ def test_baseline_v1_missing_pm_final_rejects() -> None:
     assert _validate_baseline_or_report(base_v1_bad) is False
 
 
+def test_baseline_rejects_non_dict() -> None:
+    assert _validate_baseline_or_report(None) is False
+
+
 def test_single_html_renders_bullet_items() -> None:
     rp = _mk_report()
     html = to_html(rp, include_css=False)
