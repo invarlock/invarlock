@@ -248,6 +248,7 @@ def _sample_certificates() -> list[dict[str, Any]]:
                     "caps_applied": 0,
                     "caps_exceeded": False,
                     "modules_checked": 1,
+                    "top_z_scores": {"ffn": [{"module": "mlp.c_proj", "z": 2.3}]},
                     "measurement_contract": {"kind": "spectral", "version": 1},
                 },
             },
