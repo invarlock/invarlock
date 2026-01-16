@@ -6,13 +6,15 @@
 | --- | --- |
 | **Purpose** | Understand and interpret InvarLock v1 certificates. |
 | **Audience** | Reviewers validating certification evidence. |
-| **Key sections** | Primary Metric, Tail gate, Provenance, Measurement contracts. |
+| **Key sections** | Safety Dashboard, Quality Gates, Primary Metric, Provenance, Measurement contracts. |
 | **Validation** | Use `invarlock verify <cert.json>` to check schema and pairing. |
 | **Source of truth** | [Certificates](../reference/certificates.md) for full schema. |
 
 This guide highlights the key sections of a v1 certificate and how to
 interpret them.
 
+- Safety Dashboard
+  - First-screen summary of overall PASS/FAIL plus key gates (primary metric, drift, invariants, guards, overhead when evaluated).
 - Primary Metric row
   - Shows the task‑appropriate metric (ppl_* or accuracy), its point estimates,
     and paired CI. The ratio/Δpp vs baseline drives the gate.
@@ -30,6 +32,8 @@ interpret them.
   - Provider/environment/policy digests: `provider_digest`
     (ids/tokenizer/masking), `env_flags`, and `policy_digest` with thresholds
     snapshot.
+- Policy Configuration
+  - Human-readable tier/digest plus collapsible resolved policy YAML; full details remain in `evaluation.cert.json`.
 - Measurement contract
   - `resolved_policy.spectral.measurement_contract` /
     `resolved_policy.rmt.measurement_contract` pin the estimator + sampling

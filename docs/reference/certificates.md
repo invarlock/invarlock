@@ -409,6 +409,7 @@ html = render_certificate_html(certificate)
 - `primary_metric_tail` appears only for ppl-like metrics with paired windows.
 - The rendered HTML is derived from the Markdown report. If values look wrong,
   inspect the underlying `evaluation.cert.json`.
+- The Markdown certificate is a human-readable view (starts with a Safety Dashboard + Contents); the JSON certificate is the canonical evidence artifact.
 
 ---
 
