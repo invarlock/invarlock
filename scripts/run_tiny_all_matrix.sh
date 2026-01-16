@@ -26,8 +26,16 @@ if [ -z "${PROFILE+x}" ]; then
 fi
 
 STAMP=$(date +%Y%m%d_%H%M%S)
-TMP_DIR=${TMP_DIR:-"tmp/tiny_all_$STAMP"}
+DEFAULT_TMP_DIR=0
+if [ -z "${TMP_DIR:-}" ]; then
+  TMP_DIR="tmp/tiny_all_$STAMP"
+  DEFAULT_TMP_DIR=1
+fi
 mkdir -p "$TMP_DIR"
+if [ "$DEFAULT_TMP_DIR" = "1" ]; then
+  LATEST_TARGET=${TMP_DIR#tmp/}
+  ln -sfn "$LATEST_TARGET" "tmp/tiny_all_latest"
+fi
 
 # Env knobs for speed and determinism
 export INVARLOCK_DEDUP_TEXTS=1

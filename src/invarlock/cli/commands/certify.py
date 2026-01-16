@@ -481,18 +481,18 @@ def certify_command(
                 message="Baseline",
                 emoji="🏁",
             ):
-                    _run(
-                        config=str(baseline_yaml),
-                        profile=profile,
-                        out=str(Path(out) / "source"),
-                        tier=tier,
-                        device=device,
-                        edit_label=baseline_label,
-                        style=output_style.name,
-                        progress=progress,
-                        timing=False,
-                        no_color=no_color,
-                    )
+                _run(
+                    config=str(baseline_yaml),
+                    profile=profile,
+                    out=str(Path(out) / "source"),
+                    tier=tier,
+                    device=device,
+                    edit_label=baseline_label,
+                    style=output_style.name,
+                    progress=progress,
+                    timing=False,
+                    no_color=no_color,
+                )
         except Exception:
             if quiet_buffer is not None:
                 console.print(quiet_buffer.getvalue(), markup=False)
