@@ -212,8 +212,8 @@ Exhaustive command map with brief descriptions and notable options.
 - `invarlock run`
   - Purpose: Execute pipeline from a YAML config (edit + guards + reports).
   - Options: `--config/-c`, `--device`, `--profile`, `--out`, `--edit`, `--tier`,
-    `--probes`, `--until-pass`, `--max-attempts`, `--timeout`, `--baseline`,
-    `--no-cleanup`.
+    `--metric-kind`, `--probes`, `--until-pass`, `--max-attempts`, `--timeout`,
+    `--baseline`, `--no-cleanup`.
 
 - `invarlock report` (group)
   - Purpose: Operations on reports/certificates (verify, explain, html, validate).

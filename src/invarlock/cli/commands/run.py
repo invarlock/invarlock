@@ -1864,6 +1864,7 @@ def _resolve_metric_and_provider(
     model_profile: Any,
     *,
     resolved_loss_type: str | None = None,
+    metric_kind_override: str | None = None,
 ) -> tuple[str, str, dict[str, float]]:
     """Resolve metric kind, provider kind, and metric options from config with precedence.
 
@@ -1903,9 +1904,13 @@ def _resolve_metric_and_provider(
         metric_cfg = None
 
     metric_kind = None
+    if isinstance(metric_kind_override, str) and metric_kind_override.strip():
+        mk_override = metric_kind_override.strip().lower()
+        if mk_override != "auto":
+            metric_kind = mk_override
     reps = None
     ci_level = None
-    if metric_cfg is not None:
+    if metric_kind is None and metric_cfg is not None:
         try:
             metric_kind = (
                 metric_cfg.get("kind")
@@ -2107,6 +2112,11 @@ def run_command(
         "--tier",
         help="Auto-tuning tier override (conservative|balanced|aggressive)",
     ),
+    metric_kind: str | None = typer.Option(
+        None,
+        "--metric-kind",
+        help="Primary metric kind override (ppl_causal|ppl_mlm|accuracy|etc.)",
+    ),
     probes: int | None = typer.Option(
         None, "--probes", help="Number of micro-probes (0=deterministic, >0=adaptive)"
     ),
@@ -2159,6 +2169,7 @@ def run_command(
     out = _coerce_option(out)
     edit = _coerce_option(edit)
     tier = _coerce_option(tier)
+    metric_kind = _coerce_option(metric_kind)
     probes = _coerce_option(probes)
     until_pass = bool(_coerce_option(until_pass, False))
     max_attempts = int(_coerce_option(max_attempts, 3))
@@ -4759,7 +4770,10 @@ def run_command(
             try:
                 metric_kind_resolved, _provider_kind, metric_opts = (
                     _resolve_metric_and_provider(
-                        cfg, model_profile, resolved_loss_type=resolved_loss_type
+                        cfg,
+                        model_profile,
+                        resolved_loss_type=resolved_loss_type,
+                        metric_kind_override=metric_kind,
                     )
                 )
                 if metric_kind_resolved:

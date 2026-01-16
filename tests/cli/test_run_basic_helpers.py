@@ -47,6 +47,25 @@ def test_suppress_noisy_warnings_release_profile() -> None:
     assert records == []
 
 
+def test_resolve_metric_override_takes_precedence() -> None:
+    cfg = SimpleNamespace(
+        dataset=SimpleNamespace(provider="wikitext2"),
+        eval=SimpleNamespace(metric=SimpleNamespace(kind="ppl_causal")),
+    )
+    model_profile = SimpleNamespace(
+        default_metric="ppl_causal",
+        default_provider="wikitext2",
+    )
+    metric_kind, provider_kind, _opts = run_mod._resolve_metric_and_provider(
+        cfg,
+        model_profile,
+        resolved_loss_type="causal",
+        metric_kind_override="accuracy",
+    )
+    assert metric_kind == "accuracy"
+    assert provider_kind == "wikitext2"
+
+
 def test_resolve_pm_acceptance_range_missing_min_uses_default(monkeypatch):
     monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MIN", raising=False)
     monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MAX", raising=False)
