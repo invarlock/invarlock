@@ -2476,6 +2476,13 @@ PRESET_YAML
     mkdir -p "${work_dir}"
     local abs_preset_file
     abs_preset_file="$(cd "$(dirname "${preset_file}")" && pwd)/$(basename "${preset_file}")"
+    local edit_label
+    edit_label="$(basename "${abs_edit_path}")"
+    edit_label="${edit_label%_stress}"
+    edit_label="${edit_label%_clean}"
+    if [[ -z "${edit_label}" ]]; then
+        edit_label="custom"
+    fi
 
     # CUDA_VISIBLE_DEVICES is inherited from execute_task() for multi-GPU support
     local exit_code=0
@@ -2484,6 +2491,7 @@ PRESET_YAML
         env "${extra_env[@]}" invarlock certify \
             --source "${abs_baseline_path}" \
             --edited "${abs_edit_path}" \
+            --edit-label "${edit_label}" \
             --profile "${profile_flag}" \
             --tier "${INVARLOCK_TIER:-balanced}" \
             --out "${cert_dir}" \
