@@ -8,6 +8,9 @@ This note enumerates the explicit **safety claims** the toolkit makes, the
 **evidence** shipped in-tree, and the **runtime contracts** that enforce each
 claim. Each claim must have:
 
+If you need definitions for guard terms (kappa threshold, epsilon band, window
+pairing), see the [Glossary](glossary.md).
+
 1) a short argument/derivation (“Evidence”), and
 2) a **test or contract** that fails fast when assumptions are violated
    (“Runtime enforcement”).

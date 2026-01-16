@@ -36,6 +36,7 @@ nav:
       - Observability: reference/observability.md
   - Assurance:
       - Safety Case: assurance/00-safety-case.md
+      - Glossary: assurance/glossary.md
       # Merged into Evaluation Math
       - Evaluation Math: assurance/01-eval-math-proof.md
       - Coverage & Pairing Plan: assurance/02-coverage-and-pairing.md
