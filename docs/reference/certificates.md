@@ -45,7 +45,7 @@ invarlock report html -i reports/cert/evaluation.cert.json -o reports/cert/evalu
 
 ## Evidence Flow
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                        EVIDENCE FLOW                                    │
 ├─────────────────────────────────────────────────────────────────────────┤
