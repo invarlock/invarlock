@@ -19,6 +19,10 @@ except Exception:  # pragma: no cover - optional dependency
     _YAML_AVAILABLE = False
 
 
+def get_default_guards_order() -> list[str]:
+    return ["invariants", "spectral", "rmt", "variance", "invariants"]
+
+
 def _safe_float(value: Any) -> float | None:
     try:
         if value is None:
@@ -75,7 +79,7 @@ def _load_guard_order_and_assurance(
                     assurance_cfg = ab
 
     if guards_order is None:
-        guards_order = ["invariants", "variance", "invariants"]
+        guards_order = get_default_guards_order()
     return guards_order, assurance_cfg
 
 
@@ -601,6 +605,13 @@ def _coerce_int_env(name: str) -> int | None:
         return None
 
 
+def get_spectral_max_caps(edit_type: str) -> int:
+    env_override = _coerce_int_env("PACK_SPECTRAL_MAX_CAPS")
+    if env_override is not None:
+        return env_override
+    return _spectral_max_caps_for_edit_type(edit_type)
+
+
 def _apply_spectral_max_caps(
     preset: dict[str, Any], *, edit_type: str | None, tier: str
 ) -> None:
@@ -617,12 +628,13 @@ def _apply_spectral_max_caps(
     except Exception:
         base_int = None
 
-    suggested = _spectral_max_caps_for_edit_type(edit_type or "")
     override = _coerce_int_env("PACK_SPECTRAL_MAX_CAPS")
-    if override is not None:
-        suggested = max(suggested, override)
+    suggested = get_spectral_max_caps(edit_type or "")
 
-    final = suggested if base_int is None else max(base_int, suggested)
+    if override is not None:
+        final = override
+    else:
+        final = suggested if base_int is None else max(base_int, suggested)
     spectral["max_caps"] = int(final)
 
 

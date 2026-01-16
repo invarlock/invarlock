@@ -2121,6 +2121,14 @@ def run_command(
     ),
     out: str | None = typer.Option(None, "--out", help="Output directory override"),
     edit: str | None = typer.Option(None, "--edit", help="Edit kind (quant|mixed)"),
+    edit_label: str | None = typer.Option(
+        None,
+        "--edit-label",
+        help=(
+            "Edit algorithm label for BYOE models. Use 'noop' for baseline, "
+            "'quant_rtn' etc. for built-in edits, 'custom' for pre-edited models."
+        ),
+    ),
     tier: str | None = typer.Option(
         None,
         "--tier",
@@ -2185,6 +2193,7 @@ def run_command(
     profile_normalized = (str(profile or "")).strip().lower()
     out = _coerce_option(out)
     edit = _coerce_option(edit)
+    edit_label = _coerce_option(edit_label)
     tier = _coerce_option(tier)
     metric_kind = _coerce_option(metric_kind)
     probes = _coerce_option(probes)
@@ -4120,6 +4129,14 @@ def run_command(
                             "layers_modified": edit_deltas.get("layers_modified", 0),
                         }
                     )
+
+            if edit_label:
+                report.setdefault("edit", {})
+                report["edit"]["name"] = edit_label
+                report["edit"]["algorithm"] = edit_label
+                if isinstance(core_report.context, dict):
+                    core_report.context.setdefault("edit", {})
+                    core_report.context["edit"]["name"] = edit_label
 
             mask_artifact_path = _persist_ref_masks(core_report, run_dir)
             if mask_artifact_path:

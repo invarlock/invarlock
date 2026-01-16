@@ -2620,7 +2620,7 @@ def _extract_edit_metadata(
         alg_lower = str(algorithm).strip().lower()
     except Exception:  # pragma: no cover
         alg_lower = ""
-    allowed_algorithms = {"quant_rtn", "noop"}
+    allowed_algorithms = {"quant_rtn", "noop", "custom"}
     if alg_lower not in allowed_algorithms:
         algorithm = ""
 

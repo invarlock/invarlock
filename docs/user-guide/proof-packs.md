@@ -78,6 +78,18 @@ A suite run writes artifacts under `OUTPUT_DIR` (default: `./proof_pack_runs/<su
 - `README.md`, `manifest.json`, `checksums.sha256`
 - `manifest.json.asc` if GPG signing is available
 
+## Edit Provenance Labels
+
+Certificates record the edit algorithm used:
+
+| Label | When to Use |
+| --- | --- |
+| `noop` | Baseline model with no edit applied |
+| `quant_rtn`, `magnitude_prune`, etc. | Using InvarLock's built-in edit functions |
+| `custom` | BYOE (Bring-Your-Own-Edit) pre-edited models |
+
+For BYOE workflows, use `--edit-label custom` or let InvarLock infer from the model path.
+
 ## Determinism
 
 Use `--determinism strict` to disable TF32 and cuDNN benchmarks and align with
