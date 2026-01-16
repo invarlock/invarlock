@@ -242,16 +242,19 @@ def save_report(
         if baseline is None:
             raise ValueError("Baseline report required for certificate generation")
 
+        # Generate the certificate once (JSON is canonical; Markdown is display-only).
+        certificate = make_certificate(report, baseline)
+
         # Generate certificate JSON in canonical path/name
         cert_json_path = output_path / "evaluation.cert.json"
         with open(cert_json_path, "w", encoding="utf-8") as f:
-            f.write(to_certificate(report, baseline, format="json"))
+            f.write(json.dumps(certificate, indent=2, ensure_ascii=False))
         saved_files["cert"] = cert_json_path
 
         # Also emit a markdown variant for human consumption
         cert_md_path = output_path / f"{filename_prefix}_certificate.md"
         with open(cert_md_path, "w", encoding="utf-8") as f:
-            f.write(to_certificate(report, baseline, format="markdown"))
+            f.write(render_certificate_markdown(certificate))
         saved_files["cert_md"] = cert_md_path
 
         # Emit a lightweight manifest to serve as an evidence bundle index
@@ -270,6 +273,36 @@ def save_report(
                     "seed": (report.get("meta", {}) or {}).get("seed"),
                 },
             }
+
+            # Surface quick triage fields without opening the certificate.
+            try:
+                from .render import compute_console_validation_block
+
+                block = compute_console_validation_block(certificate)
+                rows = block.get("rows", []) or []
+                gates_total = len(rows)
+                gates_passed = sum(
+                    1 for r in rows if isinstance(r, dict) and bool(r.get("ok"))
+                )
+                overall_status = "PASS" if block.get("overall_pass") else "FAIL"
+
+                pm_ratio = None
+                pm = certificate.get("primary_metric", {}) or {}
+                if isinstance(pm, dict) and isinstance(
+                    pm.get("ratio_vs_baseline"), int | float
+                ):
+                    pm_ratio = float(pm.get("ratio_vs_baseline"))
+
+                manifest["summary"].update(
+                    {
+                        "overall_status": overall_status,
+                        "primary_metric_ratio": pm_ratio,
+                        "gates_passed": gates_passed,
+                        "gates_total": gates_total,
+                    }
+                )
+            except Exception:
+                pass
             # Write debug evidence (tiny) when requested via env
             guard_payload = {}
             try:
