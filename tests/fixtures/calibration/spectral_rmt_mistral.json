@@ -1,0 +1,16 @@
+{
+  "spectral": {
+    "families": {
+      "ffn": {"max_z": 2.20},
+      "attn": {"max_z": 2.10},
+      "embed": {"max_z": 1.40}
+    }
+  },
+  "rmt": {
+    "families": {
+      "ffn": {"delta": 0.040},
+      "attn": {"delta": 0.025},
+      "embed": {"delta": 0.018}
+    }
+  }
+}
