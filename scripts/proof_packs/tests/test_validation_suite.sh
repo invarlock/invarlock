@@ -504,7 +504,7 @@ test_pack_validation_edit_creators_run_offline_with_stubbed_python() {
 
     log() { :; }
     log_section() { :; }
-    python3() { cat >/dev/null || true; return 0; }
+    _cmd_python() { cat >/dev/null || true; return 0; }
 
     create_pruned_model "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/edits/prune/model" "0.1" "ffn" "0"
     create_lowrank_model "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/edits/svd/model" "256" "ffn" "0"
@@ -2092,4 +2092,3 @@ test_pack_apply_network_mode_sets_env_flags() {
     assert_eq "1" "${TRANSFORMERS_OFFLINE}" "transformers offline"
     assert_eq "1" "${HF_HUB_OFFLINE}" "hub offline"
 }
-

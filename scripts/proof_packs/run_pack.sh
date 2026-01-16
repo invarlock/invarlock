@@ -15,6 +15,7 @@ Options:
   --net 1|0            Enable network access for preflight/downloads (default: 0)
   --out DIR            Output directory for the run (default: ./proof_pack_runs/<suite>_<timestamp>)
   --pack-dir DIR       Output directory for the proof pack (default: <out>/proof_pack)
+  --layout NAME        Pack layout (v1|v2) (default: v1)
   --determinism MODE   Determinism mode (strict|throughput)
   --repeats N          Determinism repeat count metadata (default: 0)
   --calibrate-only     Only run calibration tasks (implies PACK_SUITE_MODE=calibrate-only)
@@ -164,114 +165,13 @@ pack_write_manifest() {
     local determinism="$5"
     local repeats="$6"
 
-    python3 - "${pack_dir}" "${run_dir}" "${suite}" "${net}" "${determinism}" "${repeats}" <<'PY'
-import json
-import sys
-from datetime import datetime
-from pathlib import Path
-
-pack_dir = Path(sys.argv[1])
-run_dir = Path(sys.argv[2])
-suite = sys.argv[3]
-net = sys.argv[4]
-determinism = sys.argv[5]
-repeats_raw = sys.argv[6]
-
-try:
-    repeats = int(repeats_raw)
-except Exception:
-    repeats = 0
-
-models = []
-model_list = []
-revisions_path = pack_dir / "state" / "model_revisions.json"
-if revisions_path.is_file():
-    try:
-        data = json.loads(revisions_path.read_text())
-    except Exception:
-        data = {}
-    model_list = data.get("model_list") or []
-    for model_id, info in (data.get("models") or {}).items():
-        if not isinstance(info, dict):
-            info = {}
-        models.append({
-            "model_id": model_id,
-            "revision": info.get("revision") or "",
-        })
-
-known_licenses = {
-    # Mistral 7B (v0.1) is Apache-2.0 licensed.
-    "mistralai/Mistral-7B-v0.1": "Apache-2.0",
-}
-used_models = set()
-for item in model_list:
-    try:
-        used_models.add(str(item))
-    except Exception:
-        continue
-for item in models:
-    try:
-        model_id = item.get("model_id")
-    except Exception:
-        model_id = None
-    if model_id:
-        used_models.add(str(model_id))
-model_licenses = {mid: lic for mid, lic in known_licenses.items() if mid in used_models}
-
-determinism_repeats = None
-det_path = pack_dir / "results" / "determinism_repeats.json"
-if det_path.is_file():
-    try:
-        determinism_repeats = json.loads(det_path.read_text())
-    except Exception:
-        determinism_repeats = None
-
-verification_summary = None
-verification_path = pack_dir / "results" / "verification_summary.json"
-if verification_path.is_file():
-    try:
-        verification_summary = json.loads(verification_path.read_text())
-    except Exception:
-        verification_summary = None
-
-artifacts = []
-for path in pack_dir.rglob("*"):
-    if not path.is_file():
-        continue
-    rel = path.relative_to(pack_dir)
-    if rel.name in {"manifest.json", "manifest.json.asc", "checksums.sha256"}:
-        continue
-    artifacts.append(str(rel))
-
-try:
-    import invarlock
-    version = getattr(invarlock, "__version__", "")
-except Exception:
-    version = ""
-
-payload = {
-    "format": "proof-pack-v1",
-    "generated_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-    "suite": suite,
-    "network_mode": "online" if str(net) in {"1", "true", "yes", "on"} else "offline",
-    "determinism": determinism,
-    "repeats": repeats,
-    "determinism_repeats": determinism_repeats,
-    "run_dir": str(run_dir),
-    "invarlock_version": version,
-    "model_list": model_list,
-    "models": sorted(models, key=lambda item: item.get("model_id", "")),
-    "artifacts": sorted(artifacts),
-    "checksums_sha256": "checksums.sha256",
-}
-if model_licenses:
-    payload["model_licenses"] = model_licenses
-if isinstance(verification_summary, dict) and verification_summary:
-    payload["verification"] = verification_summary
-
-out_path = pack_dir / "manifest.json"
-out_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
-PY
+    python3 "${SCRIPT_DIR}/python/manifest_writer.py" \
+        --pack-dir "${pack_dir}" \
+        --run-dir "${run_dir}" \
+        --suite "${suite}" \
+        --net "${net}" \
+        --determinism "${determinism}" \
+        --repeats "${repeats}"
 }
 
 pack_sign_manifest() {
@@ -346,16 +246,40 @@ pack_build_pack() {
 
     mkdir -p "${pack_dir}"
 
+    local layout="${PACK_PACK_LAYOUT:-v1}"
+    case "${layout}" in
+        v2|enhanced)
+            layout="v2"
+            ;;
+        v1|flat|legacy|"")
+            layout="v1"
+            ;;
+        *)
+            echo "ERROR: Unknown pack layout: ${layout} (expected v1|v2)" >&2
+            return 2
+            ;;
+    esac
+
     local results_dir="${pack_dir}/results"
-    mkdir -p "${results_dir}"
+    local verdicts_dir="${results_dir}"
+    local analysis_dir="${results_dir}"
+    local revisions_dest="${pack_dir}/state/model_revisions.json"
+    if [[ "${layout}" == "v2" ]]; then
+        verdicts_dir="${results_dir}/verdicts"
+        analysis_dir="${results_dir}/analysis"
+        revisions_dest="${pack_dir}/metadata/model_revisions.json"
+    fi
 
-    pack_copy_file "${run_dir}/reports/final_verdict.txt" "${results_dir}/final_verdict.txt"
-    pack_copy_file "${run_dir}/reports/final_verdict.json" "${results_dir}/final_verdict.json"
-    pack_copy_file "${run_dir}/analysis/eval_results.csv" "${results_dir}/eval_results.csv"
-    pack_copy_optional "${run_dir}/analysis/guard_sensitivity_matrix.csv" "${results_dir}/guard_sensitivity_matrix.csv"
-    pack_copy_optional "${run_dir}/analysis/determinism_repeats.json" "${results_dir}/determinism_repeats.json"
+    mkdir -p "${results_dir}" "${verdicts_dir}" "${analysis_dir}"
 
-    pack_copy_optional "${run_dir}/state/model_revisions.json" "${pack_dir}/state/model_revisions.json"
+    pack_copy_file "${run_dir}/reports/final_verdict.txt" "${verdicts_dir}/final_verdict.txt"
+    pack_copy_file "${run_dir}/reports/final_verdict.json" "${verdicts_dir}/final_verdict.json"
+    pack_copy_file "${run_dir}/analysis/eval_results.csv" "${analysis_dir}/eval_results.csv"
+    pack_copy_optional "${run_dir}/analysis/eval_results.jsonl" "${analysis_dir}/eval_results.jsonl"
+    pack_copy_optional "${run_dir}/analysis/guard_sensitivity_matrix.csv" "${analysis_dir}/guard_sensitivity_matrix.csv"
+    pack_copy_optional "${run_dir}/analysis/determinism_repeats.json" "${analysis_dir}/determinism_repeats.json"
+
+    pack_copy_optional "${run_dir}/state/model_revisions.json" "${revisions_dest}"
 
     local cert
     while IFS= read -r cert; do
@@ -381,7 +305,17 @@ pack_build_pack() {
     pack_write_readme "${pack_dir}"
     pack_write_manifest "${pack_dir}" "${run_dir}" "${PACK_SUITE:-}" "${PACK_NET:-0}" "${PACK_DETERMINISM:-}" "${PACK_REPEATS:-0}"
     pack_sign_manifest "${pack_dir}"
+    if [[ "${layout}" == "v2" ]]; then
+        mkdir -p "${pack_dir}/metadata"
+        cp "${pack_dir}/manifest.json" "${pack_dir}/metadata/manifest.json"
+        if [[ -f "${pack_dir}/manifest.json.asc" ]]; then
+            cp "${pack_dir}/manifest.json.asc" "${pack_dir}/metadata/manifest.json.asc"
+        fi
+    fi
     pack_write_checksums "${pack_dir}"
+    if [[ "${layout}" == "v2" ]]; then
+        cp "${pack_dir}/checksums.sha256" "${pack_dir}/metadata/checksums.sha256"
+    fi
 
     return "${verify_rc}"
 }
@@ -397,6 +331,7 @@ pack_run_pack() {
     local suite_mode="${PACK_SUITE_MODE:-full}"
     local resume_flag="${RESUME_FLAG:-false}"
     local pack_dir="${PACK_DIR:-}"
+    local layout="${PACK_PACK_LAYOUT:-v1}"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -432,6 +367,14 @@ pack_run_pack() {
                 pack_dir="${2:-}"
                 if [[ -z "${pack_dir}" ]]; then
                     echo "ERROR: --pack-dir requires a value" >&2
+                    return 2
+                fi
+                shift 2
+                ;;
+            --layout)
+                layout="${2:-}"
+                if [[ -z "${layout}" ]]; then
+                    echo "ERROR: --layout requires a value" >&2
                     return 2
                 fi
                 shift 2
@@ -505,6 +448,8 @@ pack_run_pack() {
     fi
 
     pack_entrypoint "${run_args[@]}"
+    PACK_PACK_LAYOUT="${layout}"
+    export PACK_PACK_LAYOUT
 
     if [[ -z "${pack_dir}" ]]; then
         pack_dir="${out}/proof_pack"
