@@ -636,6 +636,37 @@ pack_apply_network_mode() {
 
 pack_apply_network_mode "${PACK_NET}"
 
+pack_configure_hf_access() {
+    if [[ "${PACK_NET}" != "1" ]]; then
+        return 0
+    fi
+
+    export HF_HUB_TIMEOUT="${HF_HUB_TIMEOUT:-60}"
+    export HF_HUB_ETAG_TIMEOUT="${HF_HUB_ETAG_TIMEOUT:-60}"
+    export HF_HUB_DOWNLOAD_TIMEOUT="${HF_HUB_DOWNLOAD_TIMEOUT:-300}"
+    export HF_HUB_MAX_RETRIES="${HF_HUB_MAX_RETRIES:-10}"
+
+    if [[ -n "${HF_ENDPOINT:-}" ]]; then
+        return 0
+    fi
+
+    local primary="${HF_PRIMARY_ENDPOINT:-https://huggingface.co}"
+    local mirror="${HF_MIRROR_ENDPOINT:-https://hf-mirror.com}"
+    local test_path="${HF_ENDPOINT_TEST_PATH:-/datasets/cais/mmlu/resolve/main/README.md}"
+    local test_timeout="${HF_ENDPOINT_TEST_TIMEOUT:-3}"
+
+    if command -v curl >/dev/null 2>&1; then
+        if curl -I --max-time "${test_timeout}" "${primary}${test_path}" >/dev/null 2>&1; then
+            export HF_ENDPOINT="${primary}"
+        elif curl -I --max-time "${test_timeout}" "${mirror}${test_path}" >/dev/null 2>&1; then
+            export HF_ENDPOINT="${mirror}"
+        else
+            export HF_ENDPOINT="${primary}"
+        fi
+    else
+        export HF_ENDPOINT="${primary}"
+    fi
+}
 # PM acceptance range used during validation
 # These bounds help avoid unnecessary gate failures during validation runs
 export INVARLOCK_PM_ACCEPTANCE_MIN="${INVARLOCK_PM_ACCEPTANCE_MIN:-0.90}"

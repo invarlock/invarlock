@@ -2092,3 +2092,92 @@ test_pack_apply_network_mode_sets_env_flags() {
     assert_eq "1" "${TRANSFORMERS_OFFLINE}" "transformers offline"
     assert_eq "1" "${HF_HUB_OFFLINE}" "hub offline"
 }
+
+test_pack_configure_hf_access_noop_when_offline() {
+    mock_reset
+
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    PACK_NET="0"
+    unset HF_ENDPOINT HF_HUB_TIMEOUT HF_HUB_ETAG_TIMEOUT HF_HUB_DOWNLOAD_TIMEOUT HF_HUB_MAX_RETRIES
+    unset HF_PRIMARY_ENDPOINT HF_MIRROR_ENDPOINT
+
+    pack_configure_hf_access
+    assert_eq "" "${HF_ENDPOINT:-}" "offline mode does not set HF_ENDPOINT"
+    assert_eq "" "${HF_HUB_TIMEOUT:-}" "offline mode does not set HF_HUB_TIMEOUT"
+    assert_eq "" "${HF_HUB_ETAG_TIMEOUT:-}" "offline mode does not set HF_HUB_ETAG_TIMEOUT"
+    assert_eq "" "${HF_HUB_DOWNLOAD_TIMEOUT:-}" "offline mode does not set HF_HUB_DOWNLOAD_TIMEOUT"
+    assert_eq "" "${HF_HUB_MAX_RETRIES:-}" "offline mode does not set HF_HUB_MAX_RETRIES"
+}
+
+test_pack_configure_hf_access_sets_timeouts_and_chooses_mirror_when_primary_fails() {
+    mock_reset
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/curl" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+url="${!#}"
+echo "${url}" >> "${TEST_TMPDIR}/curl.calls"
+
+if [[ "${url}" == "https://huggingface.co/api/whoami-v2" ]]; then
+    exit 1
+fi
+
+if [[ "${url}" == "https://hf-mirror.com/api/whoami-v2" ]]; then
+    exit 0
+fi
+
+exit 1
+EOF
+    chmod +x "${bin_dir}/curl"
+    export PATH="${bin_dir}:$PATH"
+    hash -r 2>/dev/null || true
+
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    PACK_NET="1"
+    unset HF_ENDPOINT HF_HUB_TIMEOUT HF_HUB_ETAG_TIMEOUT HF_HUB_DOWNLOAD_TIMEOUT HF_HUB_MAX_RETRIES
+    unset HF_PRIMARY_ENDPOINT HF_MIRROR_ENDPOINT HF_ENDPOINT_TEST_PATH
+    export HF_ENDPOINT_TEST_PATH="/api/whoami-v2"
+
+    pack_configure_hf_access
+    assert_eq "60" "${HF_HUB_TIMEOUT}" "HF_HUB_TIMEOUT default set"
+    assert_eq "60" "${HF_HUB_ETAG_TIMEOUT}" "HF_HUB_ETAG_TIMEOUT default set"
+    assert_eq "300" "${HF_HUB_DOWNLOAD_TIMEOUT}" "HF_HUB_DOWNLOAD_TIMEOUT default set"
+    assert_eq "10" "${HF_HUB_MAX_RETRIES}" "HF_HUB_MAX_RETRIES default set"
+    assert_eq "https://hf-mirror.com" "${HF_ENDPOINT}" "mirror endpoint chosen when primary fails"
+
+    assert_file_exists "${TEST_TMPDIR}/curl.calls" "curl invoked for endpoint probe"
+}
+
+test_pack_configure_hf_access_respects_existing_hf_endpoint() {
+    mock_reset
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/curl" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+echo "unexpected curl call" >> "${TEST_TMPDIR}/curl.calls"
+exit 0
+EOF
+    chmod +x "${bin_dir}/curl"
+    export PATH="${bin_dir}:$PATH"
+    hash -r 2>/dev/null || true
+
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    PACK_NET="1"
+    HF_ENDPOINT="https://example.invalid"
+    export HF_ENDPOINT
+    rm -f "${TEST_TMPDIR}/curl.calls"
+
+    pack_configure_hf_access
+    assert_eq "https://example.invalid" "${HF_ENDPOINT}" "existing HF_ENDPOINT preserved"
+    if [[ -f "${TEST_TMPDIR}/curl.calls" ]]; then
+        t_fail "curl should not be invoked when HF_ENDPOINT is already set"
+    fi
+}
