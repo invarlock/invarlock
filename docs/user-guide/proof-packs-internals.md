@@ -11,11 +11,11 @@ task graph, scheduling, and artifact generation. It complements
 | Purpose | Hardware-agnostic Phase 0 validation harness for edit detection |
 | Version | `proof-packs-v1` |
 | Hardware | NVIDIA GPUs where models fit VRAM; multi-GPU recommended for `full` |
-| Models | `subset` (2 models) or `full` (6 models), ungated public |
+| Models | `subset` (1 model) or `full` (6 models), ungated public |
 | Edits | 4 types × 2 versions per model; clean variants calibrated via lm-eval |
 | Scheduling | Dynamic work-stealing, `small_first` priority strategy |
 | Multi-GPU | Profile-based; `required_gpus` grows only when memory requires it |
-| Output | Proof pack with `manifest.json`, `checksums.sha256`, and cert bundles |
+| Output | Proof pack with `manifest.json`, `checksums.sha256`, and cert bundles (`--layout v2` nests results + metadata) |
 
 ## Quick Start (Context)
 
@@ -62,7 +62,68 @@ task graph, scheduling, and artifact generation. It complements
 - `lib/gpu_worker.sh`: worker loop, heartbeats, task execution glue.
 - `lib/task_functions.sh`: implementations for each task type.
 - `lib/model_creation.sh`: edit and error-model creation helpers.
+- `lib/lmeval_runner.sh`: lm-eval orchestration helper.
+- `lib/config_generator.sh`: InvarLock config generation and wrapper helpers.
+- `lib/result_compiler.sh`: analysis, correlation, and verdict compilation.
 - `lib/fault_tolerance.sh`: error classification and retry/backoff logic.
+- `scripts/proof_packs/python/manifest_writer.py`: proof pack `manifest.json` writer.
+- `scripts/proof_packs/python/preset_generator.py`: calibrated preset + edit-type variants.
+
+### Module dependency graph
+
+```text
+┌─────────────────────────────────────────────────────────┐
+│                       ENTRYPOINTS                        │
+├──────────────┬──────────────┬────────────────────────────┤
+│  run_pack.sh  │ run_suite.sh │ verify_pack.sh            │
+│  (pack+run)   │ (run only)   │ (checksums+certs verify)  │
+└──────┬────────┴──────┬───────┴────────────────────────────┘
+       │               │
+       ▼               ▼
+┌─────────────────────────────────────────────────────────┐
+│                 ORCHESTRATION LAYER                      │
+├─────────────────────────────────────────────────────────┤
+│  lib/validation_suite.sh (main_dynamic)                  │
+│   ├─ lib/lmeval_runner.sh                                │
+│   ├─ lib/config_generator.sh                             │
+│   ├─ lib/result_compiler.sh                              │
+│   └─ scripts/proof_packs/python/*                        │
+└─────────────────────────────┬───────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────┐
+│                   CORE SERVICES                          │
+├─────────────────────────────────────────────────────────┤
+│  lib/queue_manager.sh   lib/scheduler.sh                 │
+│  lib/gpu_worker.sh      lib/task_functions.sh            │
+│  lib/model_creation.sh  lib/fault_tolerance.sh           │
+└─────────────────────────────────────────────────────────┘
+```
+
+## Troubleshooting decision tree
+
+```text
+Proof pack issues?
+│
+├─ Missing manifest.json/checksums.sha256?
+│  └─ Used run_suite.sh instead of run_pack.sh
+│     → Run: ./scripts/proof_packs/run_pack.sh --suite ... --net ...
+│
+├─ Spectral guard failing “clean” quantization edits?
+│  ├─ Check: caps_exceeded in certificate spectral.summary
+│  │  └─ Use edit-type presets (generated from calibration) or increase max_caps
+│  └─ Check: high z-scores in attention layers
+│     └─ Expected for quantization; calibrate or adjust thresholds
+│
+├─ OOM errors?
+│  ├─ Lower GPU_MEMORY_PER_DEVICE / GPU_MEMORY_GB
+│  ├─ Disable batching: PACK_USE_BATCH_EDITS=false
+│  └─ Reduce eval batch sizes (EVAL_BATCH_SIZE_*)
+│
+└─ Disk pressure / ENOSPC?
+   ├─ Check OUTPUT_DIR filesystem free space
+   └─ Use a larger volume and rerun (suite writes caches under OUTPUT_DIR/.hf)
+```
 
 ## Model Suite
 
@@ -71,7 +132,7 @@ Model suites are defined in `scripts/proof_packs/suites.sh` and applied by
 
 | Suite | Models | Notes |
 | --- | --- | --- |
-| `subset` | `mistralai/Mistral-7B-v0.1`, `Qwen/Qwen2.5-14B` | Single-GPU friendly |
+| `subset` | `mistralai/Mistral-7B-v0.1` | Single-GPU friendly |
 | `full` | `mistralai/Mistral-7B-v0.1`, `Qwen/Qwen2.5-14B`, `Qwen/Qwen2.5-32B`, `01-ai/Yi-34B`, `mistralai/Mixtral-8x7B-v0.1`, `Qwen/Qwen1.5-72B` | Multi-GPU recommended |
 
 Default full-suite model sizes (weights-only, approximate):
