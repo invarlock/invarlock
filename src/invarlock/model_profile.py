@@ -302,13 +302,13 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
             cert_lints=(
                 {
                     "type": "equals",
-                    "path": "metrics.loss_type",
-                    "value": "mlm",
-                    "message": "BERT cert must record MLM loss type.",
+                    "path": "primary_metric.kind",
+                    "value": "ppl_mlm",
+                    "message": "BERT cert must use MLM metric.",
                 },
                 {
                     "type": "gte",
-                    "path": "metrics.masked_tokens_total",
+                    "path": "telemetry.masked_tokens_total",
                     "value": "1",
                     "message": "BERT cert must report masked tokens.",
                 },
@@ -329,9 +329,9 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
             cert_lints=(
                 {
                     "type": "equals",
-                    "path": "metrics.loss_type",
-                    "value": "causal",
-                    "message": "LLaMA cert should report causal loss.",
+                    "path": "primary_metric.kind",
+                    "value": "ppl_causal",
+                    "message": "LLaMA cert must use causal ppl metric.",
                 },
             ),
         )
@@ -350,9 +350,9 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
             cert_lints=(
                 {
                     "type": "equals",
-                    "path": "metrics.loss_type",
-                    "value": "causal",
-                    "message": "GPT-style cert should record causal loss.",
+                    "path": "primary_metric.kind",
+                    "value": "ppl_causal",
+                    "message": "GPT-style cert must use causal ppl metric.",
                 },
             ),
         )
