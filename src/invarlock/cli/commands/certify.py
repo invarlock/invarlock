@@ -256,6 +256,14 @@ def certify_command(
     edit_config: str | None = typer.Option(
         None, "--edit-config", help="Edit preset to apply a demo edit (quant_rtn)"
     ),
+    edit_label: str | None = typer.Option(
+        None,
+        "--edit-label",
+        help=(
+            "Edit algorithm label for BYOE models. Use 'noop' for baseline, "
+            "'quant_rtn' etc. for built-in edits, 'custom' for pre-edited models."
+        ),
+    ),
     quiet: bool = typer.Option(
         False, "--quiet", "-q", help="Minimal output (suppress run/report detail)"
     ),
@@ -296,6 +304,7 @@ def certify_command(
     out = _coerce_option(out, "runs")
     cert_out = _coerce_option(cert_out, "reports/cert")
     edit_config = _coerce_option(edit_config)
+    edit_label = _coerce_option(edit_label)
     quiet = _coerce_option(quiet, False)
     verbose = _coerce_option(verbose, False)
     banner = _coerce_option(banner, True)
@@ -444,6 +453,13 @@ def certify_command(
         },
     )
 
+    baseline_label = "noop"
+    subject_label: str | None = None
+    if edit_label:
+        subject_label = edit_label
+    elif not edit_config:
+        subject_label = "custom" if norm_src_id != norm_edt_id else "noop"
+
     tmp_dir = Path(".certify_tmp")
     tmp_dir.mkdir(parents=True, exist_ok=True)
     baseline_yaml = tmp_dir / "baseline_noop.yaml"
@@ -465,17 +481,18 @@ def certify_command(
                 message="Baseline",
                 emoji="🏁",
             ):
-                _run(
-                    config=str(baseline_yaml),
-                    profile=profile,
-                    out=str(Path(out) / "source"),
-                    tier=tier,
-                    device=device,
-                    style=output_style.name,
-                    progress=progress,
-                    timing=False,
-                    no_color=no_color,
-                )
+                    _run(
+                        config=str(baseline_yaml),
+                        profile=profile,
+                        out=str(Path(out) / "source"),
+                        tier=tier,
+                        device=device,
+                        edit_label=baseline_label,
+                        style=output_style.name,
+                        progress=progress,
+                        timing=False,
+                        no_color=no_color,
+                    )
         except Exception:
             if quiet_buffer is not None:
                 console.print(quiet_buffer.getvalue(), markup=False)
@@ -574,6 +591,7 @@ def certify_command(
                         tier=tier,
                         baseline=str(baseline_report),
                         device=device,
+                        edit_label=subject_label if edit_label else None,
                         style=output_style.name,
                         progress=progress,
                         timing=False,
@@ -619,6 +637,7 @@ def certify_command(
                         tier=tier,
                         baseline=str(baseline_report),
                         device=device,
+                        edit_label=subject_label,
                         style=output_style.name,
                         progress=progress,
                         timing=False,
