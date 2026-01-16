@@ -43,7 +43,7 @@ generate_invarlock_config() {
     if [[ -n "${guards_order_csv}" ]]; then
         IFS=',' read -ra guards_order <<< "${guards_order_csv}"
     else
-        guards_order=("invariants" "variance" "invariants")
+        guards_order=("invariants" "spectral" "rmt" "variance" "invariants")
     fi
     local guards_order_yaml=""
     local g
@@ -53,7 +53,7 @@ generate_invarlock_config() {
         guards_order_yaml+=$'    - '"${g}"$'\n'
     done
     if [[ -z "${guards_order_yaml}" ]]; then
-        guards_order_yaml=$'    - invariants\n    - variance\n    - invariants\n'
+        guards_order_yaml=$'    - invariants\n    - spectral\n    - rmt\n    - variance\n    - invariants\n'
     fi
 
     cat > "${output_yaml}" << YAML_EOF
@@ -314,7 +314,7 @@ if YAML_AVAILABLE:
             guards_order = None
 
 if guards_order is None:
-    guards_order = ["invariants", "variance", "invariants"]
+    guards_order = ["invariants", "spectral", "rmt", "variance", "invariants"]
 
 enabled_guards = set(guards_order)
 
@@ -1052,4 +1052,3 @@ run_invarlock_certify() {
     return ${exit_code}
 }
 export -f run_invarlock_certify
-

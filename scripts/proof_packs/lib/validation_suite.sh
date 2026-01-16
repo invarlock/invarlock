@@ -2273,6 +2273,24 @@ main_dynamic() {
         echo "${pids[${gpu_id}]}" > "${OUTPUT_DIR}/workers/gpu_${gpu_id}.pid"
     }
 
+    update_progress() {
+        local total="$1"
+        local completed="$2"
+        local failed="$3"
+        local status="$4"
+
+        mkdir -p "${OUTPUT_DIR}/state"
+        cat > "${OUTPUT_DIR}/state/progress.json" <<EOF
+{
+  "total_tasks": ${total},
+  "completed_tasks": ${completed},
+  "failed_tasks": ${failed},
+  "status": "${status}",
+  "updated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
+    }
+
     # Unified monitor loop: progress + dependency resolution + worker health
     log_section "PHASE 3: MONITORING PROGRESS"
     local check_interval=60
@@ -2313,6 +2331,12 @@ main_dynamic() {
                 else
                     touch "${OUTPUT_DIR}/workers/SHUTDOWN"
                 fi
+                local summary_stats=""
+                summary_stats="$(get_queue_stats 2>/dev/null || true)"
+                if [[ -n "${summary_stats}" ]]; then
+                    IFS=':' read -r pending ready running completed failed total <<< "${summary_stats}"
+                    update_progress "${total:-0}" "${completed:-0}" "${failed:-0}" "complete"
+                fi
                 break
             fi
         fi
@@ -2321,6 +2345,12 @@ main_dynamic() {
                 signal_shutdown "${OUTPUT_DIR}"
             else
                 touch "${OUTPUT_DIR}/workers/SHUTDOWN"
+            fi
+            local summary_stats=""
+            summary_stats="$(get_queue_stats 2>/dev/null || true)"
+            if [[ -n "${summary_stats}" ]]; then
+                IFS=':' read -r pending ready running completed failed total <<< "${summary_stats}"
+                update_progress "${total:-0}" "${completed:-0}" "${failed:-0}" "complete"
             fi
             break
         fi
@@ -2395,6 +2425,7 @@ main_dynamic() {
         [[ ${total} -gt 0 ]] && pct=$((completed * 100 / total))
 
         log "Progress: ${completed}/${total} tasks (${pct}%) | Running: ${running} | Ready: ${ready} | Failed: ${failed}"
+        update_progress "${total}" "${completed}" "${failed}" "running"
 
         # Apply work-stealing boost if needed
         apply_work_stealing_boost 2>/dev/null || true
