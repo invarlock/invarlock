@@ -15,6 +15,7 @@ Options:
   --net 1|0            Enable network access for preflight/downloads (default: 0)
   --out DIR            Output directory for the run (default: ./proof_pack_runs/<suite>_<timestamp>)
   --pack-dir DIR       Output directory for the proof pack (default: <out>/proof_pack)
+  --layout NAME        Pack layout (v1|v2) (default: v1)
   --determinism MODE   Determinism mode (strict|throughput)
   --repeats N          Determinism repeat count metadata (default: 0)
   --calibrate-only     Only run calibration tasks (implies PACK_SUITE_MODE=calibrate-only)
@@ -245,16 +246,40 @@ pack_build_pack() {
 
     mkdir -p "${pack_dir}"
 
+    local layout="${PACK_PACK_LAYOUT:-v1}"
+    case "${layout}" in
+        v2|enhanced)
+            layout="v2"
+            ;;
+        v1|flat|legacy|"")
+            layout="v1"
+            ;;
+        *)
+            echo "ERROR: Unknown pack layout: ${layout} (expected v1|v2)" >&2
+            return 2
+            ;;
+    esac
+
     local results_dir="${pack_dir}/results"
-    mkdir -p "${results_dir}"
+    local verdicts_dir="${results_dir}"
+    local analysis_dir="${results_dir}"
+    local revisions_dest="${pack_dir}/state/model_revisions.json"
+    if [[ "${layout}" == "v2" ]]; then
+        verdicts_dir="${results_dir}/verdicts"
+        analysis_dir="${results_dir}/analysis"
+        revisions_dest="${pack_dir}/metadata/model_revisions.json"
+    fi
 
-    pack_copy_file "${run_dir}/reports/final_verdict.txt" "${results_dir}/final_verdict.txt"
-    pack_copy_file "${run_dir}/reports/final_verdict.json" "${results_dir}/final_verdict.json"
-    pack_copy_file "${run_dir}/analysis/eval_results.csv" "${results_dir}/eval_results.csv"
-    pack_copy_optional "${run_dir}/analysis/guard_sensitivity_matrix.csv" "${results_dir}/guard_sensitivity_matrix.csv"
-    pack_copy_optional "${run_dir}/analysis/determinism_repeats.json" "${results_dir}/determinism_repeats.json"
+    mkdir -p "${results_dir}" "${verdicts_dir}" "${analysis_dir}"
 
-    pack_copy_optional "${run_dir}/state/model_revisions.json" "${pack_dir}/state/model_revisions.json"
+    pack_copy_file "${run_dir}/reports/final_verdict.txt" "${verdicts_dir}/final_verdict.txt"
+    pack_copy_file "${run_dir}/reports/final_verdict.json" "${verdicts_dir}/final_verdict.json"
+    pack_copy_file "${run_dir}/analysis/eval_results.csv" "${analysis_dir}/eval_results.csv"
+    pack_copy_optional "${run_dir}/analysis/eval_results.jsonl" "${analysis_dir}/eval_results.jsonl"
+    pack_copy_optional "${run_dir}/analysis/guard_sensitivity_matrix.csv" "${analysis_dir}/guard_sensitivity_matrix.csv"
+    pack_copy_optional "${run_dir}/analysis/determinism_repeats.json" "${analysis_dir}/determinism_repeats.json"
+
+    pack_copy_optional "${run_dir}/state/model_revisions.json" "${revisions_dest}"
 
     local cert
     while IFS= read -r cert; do
@@ -280,7 +305,17 @@ pack_build_pack() {
     pack_write_readme "${pack_dir}"
     pack_write_manifest "${pack_dir}" "${run_dir}" "${PACK_SUITE:-}" "${PACK_NET:-0}" "${PACK_DETERMINISM:-}" "${PACK_REPEATS:-0}"
     pack_sign_manifest "${pack_dir}"
+    if [[ "${layout}" == "v2" ]]; then
+        mkdir -p "${pack_dir}/metadata"
+        cp "${pack_dir}/manifest.json" "${pack_dir}/metadata/manifest.json"
+        if [[ -f "${pack_dir}/manifest.json.asc" ]]; then
+            cp "${pack_dir}/manifest.json.asc" "${pack_dir}/metadata/manifest.json.asc"
+        fi
+    fi
     pack_write_checksums "${pack_dir}"
+    if [[ "${layout}" == "v2" ]]; then
+        cp "${pack_dir}/checksums.sha256" "${pack_dir}/metadata/checksums.sha256"
+    fi
 
     return "${verify_rc}"
 }
@@ -296,6 +331,7 @@ pack_run_pack() {
     local suite_mode="${PACK_SUITE_MODE:-full}"
     local resume_flag="${RESUME_FLAG:-false}"
     local pack_dir="${PACK_DIR:-}"
+    local layout="${PACK_PACK_LAYOUT:-v1}"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -331,6 +367,14 @@ pack_run_pack() {
                 pack_dir="${2:-}"
                 if [[ -z "${pack_dir}" ]]; then
                     echo "ERROR: --pack-dir requires a value" >&2
+                    return 2
+                fi
+                shift 2
+                ;;
+            --layout)
+                layout="${2:-}"
+                if [[ -z "${layout}" ]]; then
+                    echo "ERROR: --layout requires a value" >&2
                     return 2
                 fi
                 shift 2
@@ -404,6 +448,8 @@ pack_run_pack() {
     fi
 
     pack_entrypoint "${run_args[@]}"
+    PACK_PACK_LAYOUT="${layout}"
+    export PACK_PACK_LAYOUT
 
     if [[ -z "${pack_dir}" ]]; then
         pack_dir="${out}/proof_pack"

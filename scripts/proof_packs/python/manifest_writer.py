@@ -17,6 +17,8 @@ def _load_json(path: Path) -> Any:
 def _collect_model_revisions(pack_dir: Path) -> tuple[list[str], list[dict[str, str]]]:
     revisions_path = pack_dir / "state" / "model_revisions.json"
     if not revisions_path.is_file():
+        revisions_path = pack_dir / "metadata" / "model_revisions.json"
+    if not revisions_path.is_file():
         return [], []
 
     data = _load_json(revisions_path)
@@ -154,4 +156,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
