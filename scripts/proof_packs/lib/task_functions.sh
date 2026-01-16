@@ -108,6 +108,56 @@ _get_invarlock_config() {
     _get_model_invarlock_config_fallback "${model_size}"
 }
 
+_task_create_model_variant() {
+    local baseline_path="$1"
+    local output_path="$2"
+    local edit_type="$3"
+    local param1="${4:-}"
+    local param2="${5:-}"
+    local scope="${6:-}"
+    local gpu_id="${7:-0}"
+
+    if type create_model_variant &>/dev/null; then
+        create_model_variant "${baseline_path}" "${output_path}" "${edit_type}" "${param1}" "${param2}" "${scope}" "${gpu_id}"
+        return $?
+    fi
+
+    case "${edit_type}" in
+        "quant_rtn")
+            if ! type create_edited_model &>/dev/null; then
+                echo "ERROR: create_edited_model not available" >&2
+                return 1
+            fi
+            create_edited_model "${baseline_path}" "${output_path}" "quant_rtn" "${param1}" "${param2}" "${scope}" "${gpu_id}"
+            ;;
+        "fp8_quant")
+            if ! type create_fp8_model &>/dev/null; then
+                echo "ERROR: create_fp8_model not available" >&2
+                return 1
+            fi
+            create_fp8_model "${baseline_path}" "${output_path}" "${param1}" "${scope}" "${gpu_id}"
+            ;;
+        "magnitude_prune")
+            if ! type create_pruned_model &>/dev/null; then
+                echo "ERROR: create_pruned_model not available" >&2
+                return 1
+            fi
+            create_pruned_model "${baseline_path}" "${output_path}" "${param1}" "${scope}" "${gpu_id}"
+            ;;
+        "lowrank_svd")
+            if ! type create_lowrank_model &>/dev/null; then
+                echo "ERROR: create_lowrank_model not available" >&2
+                return 1
+            fi
+            create_lowrank_model "${baseline_path}" "${output_path}" "${param1}" "${scope}" "${gpu_id}"
+            ;;
+        *)
+            echo "ERROR: Unknown edit type: ${edit_type}" >&2
+            return 1
+            ;;
+    esac
+}
+
 _task_get_model_revision() {
     local model_id="$1"
     if type pack_model_revision &>/dev/null; then
@@ -1050,58 +1100,58 @@ PY
             local candidate_eval=""
             local status_payload=""
 
-            case "${family}" in
-                "quant_rtn")
-                    local group_size="${cand}"
-                    edit_dir_name="quant_${clean_bits}bit_clean"
-                    edit_path="${model_output_dir}/models/${edit_dir_name}"
-                    candidate_eval="${calib_tmp_dir}/${edit_dir_name}_calib.json"
-                    echo "  Calibrating quant_rtn bits=${clean_bits} group_size=${group_size}" >> "${log_file}"
-                    create_edited_model "${baseline_path}" "${edit_path}" "quant_rtn" "${clean_bits}" "${group_size}" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1 || {
-                        echo "  ERROR: quant_rtn creation failed" >> "${log_file}"
-                        rm -rf "${edit_path}" 2>/dev/null || true
-                        continue
-                    }
-                    ;;
-                "fp8_quant")
-                    local format="${cand}"
-                    edit_dir_name="fp8_${format}_clean"
-                    edit_path="${model_output_dir}/models/${edit_dir_name}"
-                    candidate_eval="${calib_tmp_dir}/${edit_dir_name}_calib.json"
-                    echo "  Calibrating fp8_quant format=${format}" >> "${log_file}"
-                    create_fp8_model "${baseline_path}" "${edit_path}" "${format}" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1 || {
-                        echo "  ERROR: fp8_quant creation failed" >> "${log_file}"
-                        rm -rf "${edit_path}" 2>/dev/null || true
-                        continue
-                    }
-                    ;;
-                "magnitude_prune")
-                    local sparsity="${cand}"
-                    local pct
-                    pct=$(echo "${sparsity}" | awk '{printf "%.0f", $1 * 100}')
-                    edit_dir_name="prune_${pct}pct_clean"
-                    edit_path="${model_output_dir}/models/${edit_dir_name}"
-                    candidate_eval="${calib_tmp_dir}/${edit_dir_name}_calib.json"
-                    echo "  Calibrating magnitude_prune sparsity=${sparsity}" >> "${log_file}"
-                    create_pruned_model "${baseline_path}" "${edit_path}" "${sparsity}" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1 || {
-                        echo "  ERROR: prune creation failed" >> "${log_file}"
-                        rm -rf "${edit_path}" 2>/dev/null || true
-                        continue
-                    }
-                    ;;
-                "lowrank_svd")
-                    local rank="${cand}"
-                    edit_dir_name="svd_rank${rank}_clean"
-                    edit_path="${model_output_dir}/models/${edit_dir_name}"
-                    candidate_eval="${calib_tmp_dir}/${edit_dir_name}_calib.json"
-                    echo "  Calibrating lowrank_svd rank=${rank}" >> "${log_file}"
-                    create_lowrank_model "${baseline_path}" "${edit_path}" "${rank}" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1 || {
-                        echo "  ERROR: lowrank creation failed" >> "${log_file}"
-                        rm -rf "${edit_path}" 2>/dev/null || true
-                        continue
-                    }
-                    ;;
-                *)
+	            case "${family}" in
+	                "quant_rtn")
+	                    local group_size="${cand}"
+	                    edit_dir_name="quant_${clean_bits}bit_clean"
+	                    edit_path="${model_output_dir}/models/${edit_dir_name}"
+	                    candidate_eval="${calib_tmp_dir}/${edit_dir_name}_calib.json"
+	                    echo "  Calibrating quant_rtn bits=${clean_bits} group_size=${group_size}" >> "${log_file}"
+	                    _task_create_model_variant "${baseline_path}" "${edit_path}" "quant_rtn" "${clean_bits}" "${group_size}" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1 || {
+	                        echo "  ERROR: quant_rtn creation failed" >> "${log_file}"
+	                        rm -rf "${edit_path}" 2>/dev/null || true
+	                        continue
+	                    }
+	                    ;;
+	                "fp8_quant")
+	                    local format="${cand}"
+	                    edit_dir_name="fp8_${format}_clean"
+	                    edit_path="${model_output_dir}/models/${edit_dir_name}"
+	                    candidate_eval="${calib_tmp_dir}/${edit_dir_name}_calib.json"
+	                    echo "  Calibrating fp8_quant format=${format}" >> "${log_file}"
+	                    _task_create_model_variant "${baseline_path}" "${edit_path}" "fp8_quant" "${format}" "" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1 || {
+	                        echo "  ERROR: fp8_quant creation failed" >> "${log_file}"
+	                        rm -rf "${edit_path}" 2>/dev/null || true
+	                        continue
+	                    }
+	                    ;;
+	                "magnitude_prune")
+	                    local sparsity="${cand}"
+	                    local pct
+	                    pct=$(echo "${sparsity}" | awk '{printf "%.0f", $1 * 100}')
+	                    edit_dir_name="prune_${pct}pct_clean"
+	                    edit_path="${model_output_dir}/models/${edit_dir_name}"
+	                    candidate_eval="${calib_tmp_dir}/${edit_dir_name}_calib.json"
+	                    echo "  Calibrating magnitude_prune sparsity=${sparsity}" >> "${log_file}"
+	                    _task_create_model_variant "${baseline_path}" "${edit_path}" "magnitude_prune" "${sparsity}" "" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1 || {
+	                        echo "  ERROR: prune creation failed" >> "${log_file}"
+	                        rm -rf "${edit_path}" 2>/dev/null || true
+	                        continue
+	                    }
+	                    ;;
+	                "lowrank_svd")
+	                    local rank="${cand}"
+	                    edit_dir_name="svd_rank${rank}_clean"
+	                    edit_path="${model_output_dir}/models/${edit_dir_name}"
+	                    candidate_eval="${calib_tmp_dir}/${edit_dir_name}_calib.json"
+	                    echo "  Calibrating lowrank_svd rank=${rank}" >> "${log_file}"
+	                    _task_create_model_variant "${baseline_path}" "${edit_path}" "lowrank_svd" "${rank}" "" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1 || {
+	                        echo "  ERROR: lowrank creation failed" >> "${log_file}"
+	                        rm -rf "${edit_path}" 2>/dev/null || true
+	                        continue
+	                    }
+	                    ;;
+	                *)
                     continue
                     ;;
             esac
@@ -1572,45 +1622,11 @@ task_create_edit() {
 
     echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Creating edit: ${edit_dir_name}" >> "${log_file}"
 
-    # Use main script's functions if available
-    case "${edit_type}" in
-        "quant_rtn")
-            if type create_edited_model &>/dev/null; then
-                create_edited_model "${baseline_path}" "${edit_path}" "quant_rtn" "${param1}" "${param2}" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1 || true
-            else
-                echo "ERROR: create_edited_model not available" >> "${log_file}"
-                return 1
-            fi
-            ;;
-        "fp8_quant")
-            if type create_fp8_model &>/dev/null; then
-                create_fp8_model "${baseline_path}" "${edit_path}" "${param1}" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1 || true
-            else
-                echo "ERROR: create_fp8_model not available" >> "${log_file}"
-                return 1
-            fi
-            ;;
-        "magnitude_prune")
-            if type create_pruned_model &>/dev/null; then
-                create_pruned_model "${baseline_path}" "${edit_path}" "${param1}" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1 || true
-            else
-                echo "ERROR: create_pruned_model not available" >> "${log_file}"
-                return 1
-            fi
-            ;;
-        "lowrank_svd")
-            if type create_lowrank_model &>/dev/null; then
-                create_lowrank_model "${baseline_path}" "${edit_path}" "${param1}" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1 || true
-            else
-                echo "ERROR: create_lowrank_model not available" >> "${log_file}"
-                return 1
-            fi
-            ;;
-        *)
-            echo "ERROR: Unknown edit type: ${edit_type}" >> "${log_file}"
-            return 1
-            ;;
-    esac
+    local create_rc=0
+    _task_create_model_variant "${baseline_path}" "${edit_path}" "${edit_type}" "${param1}" "${param2}" "${scope}" "${gpu_id}" >> "${log_file}" 2>&1 || create_rc=$?
+    if [[ ${create_rc} -ne 0 ]]; then
+        return 1
+    fi
 
     # Verify creation
     if [[ -d "${edit_path}" && -f "${edit_path}/config.json" ]]; then
