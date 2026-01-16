@@ -61,7 +61,7 @@ task graph, scheduling, and artifact generation. It complements
 - `lib/scheduler.sh`: dynamic priority, memory gating, reservations.
 - `lib/gpu_worker.sh`: worker loop, heartbeats, task execution glue.
 - `lib/task_functions.sh`: implementations for each task type.
-- `lib/model_creation.sh`: edit and error-model creation helpers.
+- `lib/model_creation.sh`: edit and error-model creation helpers (`create_model_variant` dispatcher).
 - `lib/lmeval_runner.sh`: lm-eval orchestration helper.
 - `lib/config_generator.sh`: InvarLock config generation and wrapper helpers.
 - `lib/result_compiler.sh`: analysis, correlation, and verdict compilation.
