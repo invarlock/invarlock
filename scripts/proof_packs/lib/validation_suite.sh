@@ -3581,6 +3581,25 @@ spectral_summary, spectral_caps = calibrate_spectral(records)
 rmt_summary, rmt_epsilon = calibrate_rmt(records)
 variance_config = calibrate_variance(records)
 
+spectral_max_caps_override = (os.environ.get("PACK_SPECTRAL_MAX_CAPS") or "").strip()
+try:
+    spectral_max_caps_override = int(spectral_max_caps_override) if spectral_max_caps_override else None
+except Exception:
+    spectral_max_caps_override = None
+if spectral_max_caps_override is None and tier == "balanced":
+    spectral_max_caps_override = 15
+if spectral_max_caps_override is not None:
+    try:
+        current_max_caps = spectral_summary.get("max_caps")
+    except Exception:
+        current_max_caps = None
+    try:
+        current_int = int(current_max_caps) if current_max_caps is not None else None
+    except Exception:
+        current_int = None
+    if current_int is None or current_int < spectral_max_caps_override:
+        spectral_summary["max_caps"] = spectral_max_caps_override
+
 gpu_count = (os.environ.get("PACK_GPU_COUNT") or os.environ.get("NUM_GPUS") or "").strip() or "unknown"
 gpu_mem = (os.environ.get("PACK_GPU_MEM_GB") or os.environ.get("GPU_MEMORY_GB") or "").strip()
 gpu_name = (os.environ.get("PACK_GPU_NAME") or "GPU").strip() or "GPU"
