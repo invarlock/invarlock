@@ -47,6 +47,8 @@ invarlock verify reports/cert/evaluation.cert.json
 - **Profiles**: `--profile ci|release|ci_cpu` controls window counts and determinism.
 - **Tiers**: `--tier balanced|conservative` selects guard thresholds from `tiers.yaml`.
 - **Offline-first**: downloads are opt-in; local paths work without network.
+For definitions of common terms (pairing, tier policy, primary metric), see the
+[Glossary](../assurance/glossary.md).
 
 ### Task → Command map
 
