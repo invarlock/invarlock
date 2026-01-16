@@ -2379,8 +2379,22 @@ YAML
 
     extra_env+=("INVARLOCK_CONFIG_ROOT=${config_root}")
 
+    local edit_type=""
+    IFS=':' read -r edit_type _ _ _ <<< "${edit_spec}"
+
     # Find calibrated preset (must have seq_len/stride embedded)
     local preset_file=""
+    if [[ -n "${edit_type}" ]]; then
+        for ext in yaml json; do
+            local f="${preset_dir}/calibrated_preset_${model_name}__${edit_type}.${ext}"
+            if [[ -f "${f}" ]]; then
+                preset_file="${f}"
+                echo "  Using edit-type preset: ${preset_file}" >> "${log_file}"
+                break
+            fi
+        done
+    fi
+    if [[ -z "${preset_file}" ]]; then
     for ext in yaml json; do
         local f="${preset_dir}/calibrated_preset_${model_name}.${ext}"
         if [[ -f "${f}" ]]; then
@@ -2388,6 +2402,7 @@ YAML
             break
         fi
     done
+    fi
 
     # If no preset found, we need to create one with model-specific params
     if [[ -z "${preset_file}" || ! -f "${preset_file}" ]]; then
