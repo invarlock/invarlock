@@ -94,3 +94,24 @@ test_create_error_model_invokes_python_wrapper() {
     assert_file_exists "${calls}" "python called for error model"
     assert_match "python - ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/error nan_injection" "$(cat "${calls}")" "args passed via argv"
 }
+
+test_create_model_variant_dispatches_and_rejects_unknown_type() {
+    mock_reset
+    # shellcheck source=../model_creation.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/model_creation.sh"
+
+    local calls="${TEST_TMPDIR}/python.calls"
+    _cmd_python() { echo "python $*" >> "${calls}"; cat >/dev/null || true; return 0; }
+
+    create_model_variant "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/out/pruned" "magnitude_prune" "0.1" "" "ffn" "0"
+    assert_file_exists "${calls}" "python called via create_model_variant"
+    assert_match "python - ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/pruned 0.1 ffn" "$(cat "${calls}")" "dispatch args passed via argv"
+
+    local rc=0
+    if create_model_variant "/b" "${TEST_TMPDIR}/out/nope" "nope" "1" "2" "ffn" "0"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    assert_ne "0" "${rc}" "unknown type returns non-zero"
+}
