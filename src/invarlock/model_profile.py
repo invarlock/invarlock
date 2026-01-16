@@ -318,8 +318,15 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
     if any(keyword in adapter_lower for keyword in ("llama", "mistral", "qwen")) or any(
         keyword in model_lower for keyword in ("llama", "mistral", "qwen")
     ):
+        family = "llama"
+        if "mistral" in adapter_lower or "mistral" in model_lower:
+            family = "mistral"
+        elif "qwen" in adapter_lower or "qwen" in model_lower:
+            family = "qwen"
+        elif "llama-3" in model_lower or "llama3" in model_lower:
+            family = "llama3"
         return ModelProfile(
-            family="llama",
+            family=family,
             default_loss="causal",
             make_tokenizer=_make_llama_tokenizer(model_id),
             default_metric="ppl_causal",
