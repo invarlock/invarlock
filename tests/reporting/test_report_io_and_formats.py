@@ -116,3 +116,10 @@ def test_to_certificate_and_save_report(tmp_path: Path, monkeypatch) -> None:
     ev_path = out / "guards_evidence.json"
     assert ev_path.exists()
     assert "evidence" in manifest
+    summary = manifest.get("summary", {})
+    assert summary.get("overall_status") in {"PASS", "FAIL"}
+    assert isinstance(summary.get("gates_passed"), int)
+    assert isinstance(summary.get("gates_total"), int)
+    assert summary.get("primary_metric_ratio") is None or isinstance(
+        summary.get("primary_metric_ratio"), float
+    )
