@@ -8,7 +8,7 @@ from typer.testing import CliRunner
 from invarlock.cli.app import app as cli
 
 
-def _cfg(tmp_path: Path) -> str:
+def _cfg(tmp_path: Path, *, provider: str = "synthetic") -> str:
     p = tmp_path / "cfg.yaml"
     p.write_text(
         """
@@ -21,8 +21,8 @@ edit:
   plan: {}
 
 dataset:
-  provider: synthetic
-  id: synthetic
+  provider: __PROVIDER__
+  id: __PROVIDER__
   split: validation
   seq_len: 8
   stride: 4
@@ -38,7 +38,7 @@ eval:
 
 output:
   dir: runs
-"""
+""".replace("__PROVIDER__", provider)
     )
     return str(p)
 
@@ -121,5 +121,57 @@ def test_run_ci_uses_semantic_prefixes_no_emojis(tmp_path: Path, monkeypatch) ->
     assert r.exit_code == 0
     s = r.stdout
     assert "[INIT]" in s or "[EXEC]" in s or "[DATA]" in s
-    for emoji in ["🚀", "📋", "🔧", "🛡️", "📜", "✅", "❌", "⚠️", "📊", "✂️", "🧪", "🏁"]:
+    for emoji in [
+        "🚀",
+        "📋",
+        "🔧",
+        "🛡️",
+        "📜",
+        "✅",
+        "❌",
+        "⚠️",
+        "📊",
+        "📚",
+        "💾",
+        "🧹",
+        "✂️",
+        "🧪",
+        "🏁",
+    ]:
         assert emoji not in s
+
+
+def test_run_audit_routes_provider_events_without_emojis(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _common_stubs(monkeypatch)
+    monkeypatch.setattr("invarlock.cli.device.resolve_device", lambda _d: "cpu")
+
+    def _provider_factory(kind: str, *, emit=None, **kwargs):
+        _ = kwargs
+        assert kind == "wikitext2"
+        assert emit is not None
+
+        def _windows(**kw):
+            _ = kw
+            emit("DATA", "WikiText-2 validation: loading split...", "📚")
+            emit("DATA", "Creating evaluation windows:", "📊")
+            return (
+                SimpleNamespace(input_ids=[[1, 2]], attention_masks=[[1, 1]]),
+                SimpleNamespace(input_ids=[[3, 4]], attention_masks=[[1, 1]]),
+            )
+
+        return SimpleNamespace(windows=_windows)
+
+    monkeypatch.setattr("invarlock.eval.data.get_provider", _provider_factory)
+
+    cfg = _cfg(tmp_path, provider="wikitext2")
+    r = CliRunner().invoke(
+        cli, ["run", "-c", cfg, "--profile", "ci", "--style", "audit"]
+    )
+    assert r.exit_code == 0
+    s = r.stdout
+    assert "[DATA] WikiText-2 validation: loading split..." in s
+    assert "[DATA] Creating evaluation windows:" in s
+    assert "📚" not in s
+    assert "📊" not in s
