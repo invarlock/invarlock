@@ -22,6 +22,7 @@ nav:
       - CLI Overview: reference/cli.md
   - Reference:
       - Index: reference/index.md
+      - Architecture: reference/architecture.md
       - API Guide: reference/api-guide.md
       - Programmatic Quickstart: reference/programmatic-quickstart.md
       - Guards: reference/guards.md

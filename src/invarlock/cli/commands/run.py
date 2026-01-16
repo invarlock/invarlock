@@ -130,8 +130,7 @@ _NOISY_WARNING_PATTERNS = (
 )
 
 
-@contextmanager
-def _suppress_noisy_warnings(profile: str | None) -> Iterator[None]:
+def _resolve_warning_suppression(profile: str | None) -> tuple[bool, bool]:
     suppress_all = os.getenv("INVARLOCK_SUPPRESS_WARNINGS", "").strip().lower() in {
         "1",
         "true",
@@ -139,15 +138,30 @@ def _suppress_noisy_warnings(profile: str | None) -> Iterator[None]:
         "on",
     }
     profile_norm = (profile or "").strip().lower()
-    if not suppress_all and profile_norm not in {"ci", "ci_cpu", "release", "dev"}:
+    enabled = bool(suppress_all) or profile_norm in {"ci", "ci_cpu", "release", "dev"}
+    return enabled, suppress_all
+
+
+def _apply_warning_filters(profile: str | None) -> bool:
+    enabled, suppress_all = _resolve_warning_suppression(profile)
+    if not enabled:
+        return False
+    if suppress_all:
+        warnings.simplefilter("ignore")
+    else:
+        for pattern in _NOISY_WARNING_PATTERNS:
+            warnings.filterwarnings("ignore", message=pattern)
+    return True
+
+
+@contextmanager
+def _suppress_noisy_warnings(profile: str | None) -> Iterator[None]:
+    enabled, _suppress_all = _resolve_warning_suppression(profile)
+    if not enabled:
         yield
         return
     with warnings.catch_warnings():
-        if suppress_all:
-            warnings.simplefilter("ignore")
-        else:
-            for pattern in _NOISY_WARNING_PATTERNS:
-                warnings.filterwarnings("ignore", message=pattern)
+        _apply_warning_filters(profile)
         yield
 
 
@@ -2168,6 +2182,8 @@ def run_command(
         console.no_color = True
     timings: dict[str, float] = {}
 
+    _apply_warning_filters(profile_normalized)
+
     # Use shared CLI coercers from invarlock.cli.utils
     report_path_out: str | None = None
 
@@ -3474,6 +3490,9 @@ def run_command(
                 key: list(values)
                 for key, values in model_profile.module_selectors.items()
             }
+        edit_config.setdefault("console", console)
+        edit_config.setdefault("output_style", output_style)
+        edit_config.setdefault("emit", True)
 
         console.print(_format_kv_line("Edit", str(edit_op.name)))
         console.print(_format_kv_line("Guards", _format_guard_chain(guards)))
@@ -3784,6 +3803,8 @@ def run_command(
                         "checks": {},
                     }
                 elif measure_guard_overhead:
+                    bare_edit_config = dict(edit_config or {})
+                    bare_edit_config["emit"] = False
                     guard_overhead_payload = _run_bare_control(
                         adapter=adapter,
                         edit_op=edit_op,
@@ -3792,7 +3813,7 @@ def run_command(
                         run_config=run_config,
                         calibration_data=calibration_data,
                         auto_config=auto_config,
-                        edit_config=edit_config,
+                        edit_config=bare_edit_config,
                         preview_count=preview_count,
                         final_count=final_count,
                         seed_bundle=seed_bundle,

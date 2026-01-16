@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import warnings
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -29,6 +30,21 @@ def test_choose_dataset_split_variants():
         "validation",
         True,
     )
+
+
+def test_suppress_noisy_warnings_release_profile() -> None:
+    with warnings.catch_warnings(record=True) as records:
+        warnings.simplefilter("always")
+        run_mod._apply_warning_filters("release")
+        warnings.warn(
+            "`torch_dtype` is deprecated! Use `dtype` instead!",
+            UserWarning,
+        )
+        warnings.warn(
+            "`loss_type=None` was set in the config but it is unrecognized.",
+            UserWarning,
+        )
+    assert records == []
 
 
 def test_resolve_pm_acceptance_range_missing_min_uses_default(monkeypatch):
