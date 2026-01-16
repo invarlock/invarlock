@@ -22,7 +22,7 @@
    - [Command Index](#command-index)
 4. [Quickstart Commands](#quickstart-commands)
 5. [JSON Output](#json-output-verify-and-plugins)
-6. [Compare & Certify](#compare-certify)
+6. [Compare & Certify](#compare--certify)
 7. [Profile Reference](#profile-reference-ci-vs-release)
 8. [Security Defaults](#security-defaults)
 9. [Troubleshooting](#troubleshooting)

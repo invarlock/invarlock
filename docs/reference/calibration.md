@@ -42,7 +42,7 @@ invarlock calibrate ve-sweep \
 
 ### Sweep → Tier policy flow
 
-```
+```text
   ┌──────────────────┐
   │ Base Config YAML │
   └────────┬─────────┘
