@@ -242,19 +242,18 @@ def save_report(
         if baseline is None:
             raise ValueError("Baseline report required for certificate generation")
 
-        # Generate the certificate once (JSON is canonical; Markdown is display-only).
-        certificate = make_certificate(report, baseline)
-
         # Generate certificate JSON in canonical path/name
+        cert_json = to_certificate(report, baseline, format="json")
         cert_json_path = output_path / "evaluation.cert.json"
         with open(cert_json_path, "w", encoding="utf-8") as f:
-            f.write(json.dumps(certificate, indent=2, ensure_ascii=False))
+            f.write(cert_json)
         saved_files["cert"] = cert_json_path
 
         # Also emit a markdown variant for human consumption
+        cert_md = to_certificate(report, baseline, format="markdown")
         cert_md_path = output_path / f"{filename_prefix}_certificate.md"
         with open(cert_md_path, "w", encoding="utf-8") as f:
-            f.write(render_certificate_markdown(certificate))
+            f.write(cert_md)
         saved_files["cert_md"] = cert_md_path
 
         # Emit a lightweight manifest to serve as an evidence bundle index
@@ -278,7 +277,11 @@ def save_report(
             try:
                 from .render import compute_console_validation_block
 
-                block = compute_console_validation_block(certificate)
+                certificate_obj = json.loads(cert_json)
+                if not isinstance(certificate_obj, dict):
+                    raise TypeError("certificate JSON did not decode to a dict")
+
+                block = compute_console_validation_block(certificate_obj)
                 rows = block.get("rows", []) or []
                 gates_total = len(rows)
                 gates_passed = sum(
@@ -287,7 +290,7 @@ def save_report(
                 overall_status = "PASS" if block.get("overall_pass") else "FAIL"
 
                 pm_ratio = None
-                pm = certificate.get("primary_metric", {}) or {}
+                pm = certificate_obj.get("primary_metric", {}) or {}
                 if isinstance(pm, dict) and isinstance(
                     pm.get("ratio_vs_baseline"), int | float
                 ):
