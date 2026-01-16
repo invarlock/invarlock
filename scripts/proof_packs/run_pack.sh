@@ -199,6 +199,25 @@ if revisions_path.is_file():
             "revision": info.get("revision") or "",
         })
 
+known_licenses = {
+    # Mistral 7B (v0.1) is Apache-2.0 licensed.
+    "mistralai/Mistral-7B-v0.1": "Apache-2.0",
+}
+used_models = set()
+for item in model_list:
+    try:
+        used_models.add(str(item))
+    except Exception:
+        continue
+for item in models:
+    try:
+        model_id = item.get("model_id")
+    except Exception:
+        model_id = None
+    if model_id:
+        used_models.add(str(model_id))
+model_licenses = {mid: lic for mid, lic in known_licenses.items() if mid in used_models}
+
 determinism_repeats = None
 det_path = pack_dir / "results" / "determinism_repeats.json"
 if det_path.is_file():
@@ -245,6 +264,8 @@ payload = {
     "artifacts": sorted(artifacts),
     "checksums_sha256": "checksums.sha256",
 }
+if model_licenses:
+    payload["model_licenses"] = model_licenses
 if isinstance(verification_summary, dict) and verification_summary:
     payload["verification"] = verification_summary
 
