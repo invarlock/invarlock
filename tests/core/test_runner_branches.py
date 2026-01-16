@@ -235,6 +235,101 @@ def test_runner_edit_cannot_apply_sets_failed(tmp_path):
     assert isinstance(report.error, str) and "cannot be applied" in report.error
 
 
+def test_runner_records_timing_and_guard_timings(tmp_path):
+    runner = CoreRunner()
+    model = DummyModel()
+    adapter = DummyAdapter()
+    edit = DummyEdit()
+    guards = [GoodGuard()]
+    cfg = make_config(tmp_path, checkpoint_interval=0)
+
+    report = runner.execute(model, adapter, edit, guards, cfg, calibration_data=None)
+    timings = report.metrics.get("timings", {})
+    assert isinstance(timings, dict)
+    for key in (
+        "prepare",
+        "prepare_guards",
+        "edit",
+        "guards",
+        "eval",
+        "finalize",
+        "total",
+    ):
+        assert key in timings
+
+    guard_timings = report.metrics.get("guard_timings", {})
+    assert isinstance(guard_timings, dict)
+    assert guard_timings.get("good") is not None
+
+
+def test_runner_merges_memory_snapshots_into_metrics(monkeypatch, tmp_path):
+    import invarlock.core.runner as runner_mod
+
+    runner = CoreRunner()
+    model = DummyModel()
+    adapter = DummyAdapter()
+    edit = DummyEdit()
+    cfg = make_config(tmp_path, checkpoint_interval=0)
+
+    monkeypatch.setattr(
+        runner_mod,
+        "capture_memory_snapshot",
+        lambda phase: {"phase": phase, "rss_mb": 1.0},
+    )
+    monkeypatch.setattr(
+        runner_mod,
+        "summarize_memory_snapshots",
+        lambda _snaps: {"memory_mb_peak": 0.5},
+    )
+
+    report = runner.execute(model, adapter, edit, [], cfg, calibration_data=None)
+    assert report.metrics.get("memory_snapshots")
+    assert report.metrics.get("memory_mb_peak") is not None
+
+
+def test_runner_skips_empty_memory_snapshots(monkeypatch, tmp_path):
+    import invarlock.core.runner as runner_mod
+
+    runner = CoreRunner()
+    model = DummyModel()
+    adapter = DummyAdapter()
+    edit = DummyEdit()
+    cfg = make_config(tmp_path, checkpoint_interval=0)
+
+    monkeypatch.setattr(runner_mod, "capture_memory_snapshot", lambda phase: {})
+    monkeypatch.setattr(runner_mod, "summarize_memory_snapshots", lambda _snaps: {})
+
+    report = runner.execute(model, adapter, edit, [], cfg, calibration_data=None)
+    assert "memory_snapshots" not in report.metrics
+
+
+def test_runner_memory_snapshot_summary_empty(monkeypatch, tmp_path):
+    import invarlock.core.runner as runner_mod
+
+    called = {"summary": 0}
+
+    runner = CoreRunner()
+    model = DummyModel()
+    adapter = DummyAdapter()
+    edit = DummyEdit()
+    cfg = make_config(tmp_path, checkpoint_interval=0)
+
+    monkeypatch.setattr(
+        runner_mod,
+        "capture_memory_snapshot",
+        lambda phase: {"phase": phase, "rss_mb": 1.0},
+    )
+    monkeypatch.setattr(
+        runner_mod,
+        "summarize_memory_snapshots",
+        lambda _snaps: called.__setitem__("summary", called["summary"] + 1) or {},
+    )
+
+    report = runner.execute(model, adapter, edit, [], cfg, calibration_data=None)
+    assert report.metrics.get("memory_snapshots")
+    assert called["summary"] == 1
+
+
 def test_runner_eval_phase_with_calibration_uses_compute(monkeypatch, tmp_path):
     runner = CoreRunner()
     model = DummyModel()
