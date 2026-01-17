@@ -419,7 +419,49 @@ try:
         low_cpu_mem_usage=True,
     )
 
-    def should_lowrank(name, scope):
+    def _parse_scope(raw_scope: str):
+        base = (raw_scope or "").strip()
+        layer_limit = None
+        layer_exact = None
+        if "@" in base:
+            base, rest = base.split("@", 1)
+            base = base.strip()
+            for item in (s.strip() for s in rest.split(",") if s.strip()):
+                if item.startswith("layers="):
+                    try:
+                        layer_limit = int(item.split("=", 1)[1])
+                    except Exception:
+                        layer_limit = None
+                elif item.startswith("layer="):
+                    try:
+                        layer_exact = int(item.split("=", 1)[1])
+                    except Exception:
+                        layer_exact = None
+        return base, layer_limit, layer_exact
+
+    base_scope, layer_limit, layer_exact = _parse_scope(scope)
+    if base_scope != scope:
+        print(
+            f"Parsed scope={scope} -> base_scope={base_scope}, layer_limit={layer_limit}, layer={layer_exact}"
+        )
+
+    def _extract_layer_index(name: str):
+        marker = ".layers."
+        pos = name.find(marker)
+        if pos < 0:
+            return None
+        start = pos + len(marker)
+        end = start
+        while end < len(name) and name[end].isdigit():
+            end += 1
+        if end == start:
+            return None
+        try:
+            return int(name[start:end])
+        except Exception:
+            return None
+
+    def should_lowrank(name, base_scope):
         """Check if parameter should have low-rank approximation.
 
         Supports multiple architectures:
@@ -428,17 +470,17 @@ try:
         - Falcon: query_key_value, dense_h_to_4h, dense_4h_to_h
         """
         name_lower = name.lower()
-        if scope == "all":
+        if base_scope == "all":
             return "weight" in name_lower and any(x in name_lower for x in [
                 "linear", "proj", "fc", "mlp",
                 "wqkv", "query_key_value"  # MPT/Falcon
             ])
-        elif scope == "ffn":
+        elif base_scope == "ffn":
             return "weight" in name_lower and any(x in name_lower for x in [
                 "mlp", "fc", "gate", "up_proj", "down_proj",
                 "dense_h_to_4h", "dense_4h_to_h"  # Falcon FFN
             ])
-        elif scope == "attn":
+        elif base_scope == "attn":
             return "weight" in name_lower and any(x in name_lower for x in [
                 "q_proj", "k_proj", "v_proj", "o_proj",
                 "wqkv", "out_proj", "query_key_value"  # MPT/Falcon
@@ -479,7 +521,16 @@ try:
     edited_params = 0
 
     for name, param in model.named_parameters():
-        if should_lowrank(name, scope) and param.dim() >= 2:
+        if layer_limit is not None or layer_exact is not None:
+            idx = _extract_layer_index(name)
+            if idx is None:
+                continue
+            if layer_exact is not None and idx != layer_exact:
+                continue
+            if layer_limit is not None and idx >= layer_limit:
+                continue
+
+        if should_lowrank(name, base_scope) and param.dim() >= 2:
             original_norm = param.data.norm()
             param.data = truncated_svd(param.data, rank)
             new_norm = param.data.norm()
