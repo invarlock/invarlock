@@ -2026,6 +2026,8 @@ task_certify_edit() {
 model:
   device_map: "auto"
 dataset:
+  seq_len: ${seq_len}
+  stride: ${stride}
   preview_n: ${preview_n}
   final_n: ${final_n}
 eval:
@@ -2080,22 +2082,6 @@ dataset:
   seed: 42
 PRESET_YAML
         echo "  Created preset: ${preset_file}" >> "${log_file}"
-    fi
-
-    if [[ ${applied_override} -eq 1 ]]; then
-        local override_preset="${cert_dir}/oom_override_preset.yaml"
-        cat > "${override_preset}" << PRESET_YAML
-dataset:
-  provider: wikitext2
-  split: validation
-  seq_len: ${seq_len}
-  stride: ${stride}
-  preview_n: ${preview_n}
-  final_n: ${final_n}
-  seed: 42
-PRESET_YAML
-        preset_file="${override_preset}"
-        echo "  Using override preset: ${preset_file}" >> "${log_file}"
     fi
 
     # Run certify in isolated working directory to avoid temp file race conditions
@@ -2308,6 +2294,8 @@ task_certify_error() {
 model:
   device_map: "auto"
 dataset:
+  seq_len: ${seq_len}
+  stride: ${stride}
   preview_n: ${preview_n}
   final_n: ${final_n}
 eval:
@@ -2347,22 +2335,6 @@ dataset:
   seed: 42
 PRESET_YAML
         echo "  Created preset: ${preset_file}" >> "${log_file}"
-    fi
-
-    if [[ ${applied_override} -eq 1 ]]; then
-        local override_preset="${cert_dir}/oom_override_preset.yaml"
-        cat > "${override_preset}" << PRESET_YAML
-dataset:
-  provider: wikitext2
-  split: validation
-  seq_len: ${seq_len}
-  stride: ${stride}
-  preview_n: ${preview_n}
-  final_n: ${final_n}
-  seed: 42
-PRESET_YAML
-        preset_file="${override_preset}"
-        echo "  Using override preset: ${preset_file}" >> "${log_file}"
     fi
 
     # Run certify in isolated working directory to avoid temp file race conditions
