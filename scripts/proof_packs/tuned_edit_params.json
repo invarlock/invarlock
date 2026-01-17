@@ -1,0 +1,56 @@
+{
+  "_meta": {
+    "generated_at": "2026-01-17T07:00:24Z",
+    "notes": "Generated via external tuning; lowrank scope may include layer filters (e.g., ffn@layer=31).",
+    "schema": "tuned_edit_params_v1"
+  },
+  "models": {
+    "mistralai/Mistral-7B-v0.1": {
+      "_meta": {
+        "baseline_mean_by_limit": {
+          "100": 0.6464473684210527,
+          "200": 0.6450714635739954
+        },
+        "limits": [
+          100,
+          200
+        ],
+        "tasks": [
+          "mmlu",
+          "hellaswag",
+          "arc_challenge",
+          "winogrande"
+        ]
+      },
+      "fp8_quant": {
+        "edit_dir_name": "fp8_e5m2_clean",
+        "format": "e5m2",
+        "reason": "selected_by_lmeval_no_regression",
+        "scope": "ffn",
+        "status": "selected"
+      },
+      "lowrank_svd": {
+        "edit_dir_name": "svd_rank32_l31_clean",
+        "rank": 32,
+        "reason": "manual_selected_no_regression_lmeval",
+        "scope": "ffn@layer=31",
+        "status": "selected"
+      },
+      "magnitude_prune": {
+        "edit_dir_name": "prune_12pct_clean",
+        "reason": "selected_by_lmeval_no_regression",
+        "scope": "ffn",
+        "sparsity": 0.115,
+        "status": "selected"
+      },
+      "quant_rtn": {
+        "bits": 4,
+        "edit_dir_name": "quant_4bit_clean",
+        "group_size": 32,
+        "reason": "selected_by_lmeval_no_regression",
+        "scope": "ffn",
+        "status": "selected"
+      }
+    }
+  }
+}
