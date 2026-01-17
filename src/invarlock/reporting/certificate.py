@@ -1761,6 +1761,7 @@ def make_certificate(
         capacity_examples = None
 
     pm_acceptance_range = _resolve_pm_acceptance_range_from_report(report)
+    pm_drift_band = _resolve_pm_drift_band_from_report(report)
 
     # Primary metric tail evidence and gate evaluation (ΔlogNLL vs baseline, per-window).
     pm_tail_result: dict[str, Any] = {}
@@ -1886,6 +1887,12 @@ def make_certificate(
             validation_kwargs["pm_acceptance_range"] = pm_acceptance_range
     except Exception:  # pragma: no cover - defensive against patched functions
         validation_kwargs["pm_acceptance_range"] = pm_acceptance_range
+
+    try:
+        if "pm_drift_band" in inspect.signature(_compute_validation_flags).parameters:
+            validation_kwargs["pm_drift_band"] = pm_drift_band
+    except Exception:  # pragma: no cover - defensive against patched functions
+        validation_kwargs["pm_drift_band"] = pm_drift_band
 
     try:
         if "pm_tail" in inspect.signature(_compute_validation_flags).parameters:
@@ -2182,6 +2189,13 @@ def make_certificate(
     from .primary_metric_utils import attach_primary_metric as _attach_pm
 
     _attach_pm(certificate, report, baseline_raw, baseline_ref, ppl_analysis)
+    try:
+        if isinstance(pm_drift_band, dict) and pm_drift_band:
+            pm_block = certificate.get("primary_metric")
+            if isinstance(pm_block, dict):
+                pm_block.setdefault("drift_band", dict(pm_drift_band))
+    except Exception:  # pragma: no cover
+        pass
     _enforce_display_ci_alignment(
         ratio_ci_source,
         certificate.get("primary_metric"),
@@ -3231,6 +3245,105 @@ def _resolve_pm_acceptance_range_from_report(
     return {"min": float(min_val), "max": float(max_val)}
 
 
+def _resolve_pm_drift_band_from_report(
+    report: dict[str, Any] | None,
+) -> dict[str, float]:
+    """Resolve preview→final drift band from report context/meta/env."""
+
+    base_min = 0.95
+    base_max = 1.05
+
+    def _safe_float(val: Any) -> float | None:
+        try:
+            if val is None:
+                return None
+            out = float(val)
+        except Exception:
+            return None
+        return out if math.isfinite(out) else None
+
+    cfg_min = None
+    cfg_max = None
+
+    ctx = report.get("context") if isinstance(report, dict) else None
+    if isinstance(ctx, dict):
+        pm_ctx = ctx.get("primary_metric")
+        if isinstance(pm_ctx, dict):
+            band = pm_ctx.get("drift_band")
+            if isinstance(band, dict):
+                cfg_min = _safe_float(band.get("min"))
+                cfg_max = _safe_float(band.get("max"))
+            elif isinstance(band, list | tuple) and len(band) == 2:
+                cfg_min = _safe_float(band[0])
+                cfg_max = _safe_float(band[1])
+        if cfg_min is None or cfg_max is None:
+            alt = ctx.get("pm_drift_band")
+            if isinstance(alt, dict):
+                cfg_min = (
+                    cfg_min if cfg_min is not None else _safe_float(alt.get("min"))
+                )
+                cfg_max = (
+                    cfg_max if cfg_max is not None else _safe_float(alt.get("max"))
+                )
+
+    if (cfg_min is None or cfg_max is None) and isinstance(report, dict):
+        meta = report.get("meta")
+        if isinstance(meta, dict):
+            meta_band = meta.get("pm_drift_band")
+            if isinstance(meta_band, dict):
+                cfg_min = (
+                    cfg_min
+                    if cfg_min is not None
+                    else _safe_float(meta_band.get("min"))
+                )
+                cfg_max = (
+                    cfg_max
+                    if cfg_max is not None
+                    else _safe_float(meta_band.get("max"))
+                )
+
+    def _parse_env(name: str) -> float | None:
+        try:
+            raw = os.environ.get(name, "")
+            if raw is None or str(raw).strip() == "":
+                return None
+            return float(raw)
+        except Exception:
+            return None
+
+    env_min = _parse_env("INVARLOCK_PM_DRIFT_MIN")
+    env_max = _parse_env("INVARLOCK_PM_DRIFT_MAX")
+
+    has_explicit = any(v is not None for v in (cfg_min, cfg_max, env_min, env_max))
+    if not has_explicit:
+        return {}
+
+    min_val = (
+        env_min if env_min is not None else cfg_min if cfg_min is not None else base_min
+    )
+    max_val = (
+        env_max if env_max is not None else cfg_max if cfg_max is not None else base_max
+    )
+
+    try:
+        if min_val is not None and min_val <= 0:
+            min_val = base_min
+    except Exception:
+        min_val = base_min
+    try:
+        if max_val is not None and max_val <= 0:
+            max_val = base_max
+    except Exception:
+        max_val = base_max
+    try:
+        if min_val is not None and max_val is not None and min_val >= max_val:
+            min_val, max_val = base_min, base_max
+    except Exception:
+        min_val, max_val = base_min, base_max
+
+    return {"min": float(min_val), "max": float(max_val)}
+
+
 def _compute_validation_flags(
     ppl: dict[str, Any],
     spectral: dict[str, Any],
@@ -3244,6 +3357,7 @@ def _compute_validation_flags(
     moe: dict[str, Any] | None = None,
     dataset_capacity: dict[str, Any] | None = None,
     pm_acceptance_range: dict[str, float] | None = None,
+    pm_drift_band: dict[str, float] | None = None,
     pm_tail: dict[str, Any] | None = None,
 ) -> dict[str, bool]:
     """Compute validation flags for the certificate including canonical gates."""
@@ -3307,9 +3421,27 @@ def _compute_validation_flags(
         ratio_limit = min(ratio_limit, float(target_ratio))
 
     # Canonical Gates
-    # 1. Drift gate: 0.95 ≤ final/preview ≤ 1.05
+    # 1. Drift gate: by default 0.95 ≤ final/preview ≤ 1.05 (configurable)
     drift_ratio = ppl.get("preview_final_ratio", 1.0)
-    preview_final_drift_acceptable = 0.95 <= drift_ratio <= 1.05
+    drift_min = 0.95
+    drift_max = 1.05
+    if isinstance(pm_drift_band, dict):
+        try:
+            cand_min = pm_drift_band.get("min")
+            cand_max = pm_drift_band.get("max")
+            if isinstance(cand_min, int | float) and isinstance(cand_max, int | float):
+                cand_min_f = float(cand_min)
+                cand_max_f = float(cand_max)
+                if (
+                    math.isfinite(cand_min_f)
+                    and math.isfinite(cand_max_f)
+                    and 0 < cand_min_f < cand_max_f
+                ):
+                    drift_min = cand_min_f
+                    drift_max = cand_max_f
+        except Exception:  # pragma: no cover
+            pass
+    preview_final_drift_acceptable = drift_min <= drift_ratio <= drift_max
     if _tiny_relax:
         # Treat drift identity as informational in tiny dev demos
         preview_final_drift_acceptable = True
