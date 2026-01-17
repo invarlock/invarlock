@@ -1050,9 +1050,9 @@ generate_verdict() {
 	                "description": (
 	                    f"Only {clean.get('total', 0)} of 4 clean edit types generated."
 	                ),
-	                "fix_command": "Check CALIBRATE_CLEAN task logs for calibration failures.",
-	            }
-	        )
+                "fix_command": "Verify PACK_TUNED_EDIT_PARAMS_FILE has selected entries for all clean edit types.",
+            }
+        )
 	
 	    return recs
 	

@@ -1007,7 +1007,6 @@ test_generate_model_tasks_branch_coverage() {
     generate_edit_tasks() { :; }
 
     PACK_USE_BATCH_EDITS="true"
-    CALIBRATE_CLEAN_EDITS="true"
     CLEAN_EDIT_RUNS="1"
     STRESS_EDIT_RUNS="1"
     DRIFT_CALIBRATION_RUNS=1
@@ -1026,9 +1025,11 @@ test_generate_model_tasks_branch_coverage() {
     generate_model_tasks "3" "org/model" "model" >/dev/null
 
     DRIFT_CALIBRATION_RUNS=0
+    PACK_PRESET_READY="true"
     RUN_ERROR_INJECTION="true"
     generate_model_tasks "4" "org/model" "model" >/dev/null
 
+    PACK_PRESET_READY="false"
     RUN_ERROR_INJECTION="false"
     generate_model_tasks "5" "org/model" "model" >/dev/null
 }
@@ -1053,13 +1054,12 @@ test_generate_model_tasks_additional_batch_branches() {
     generate_edit_tasks() { :; }
 
     PACK_USE_BATCH_EDITS="true"
-    CALIBRATE_CLEAN_EDITS="true"
     CLEAN_EDIT_RUNS=1
     STRESS_EDIT_RUNS=1
     DRIFT_CALIBRATION_RUNS=1
     RUN_ERROR_INJECTION="true"
     generate_model_tasks "1" "org/model" "model" >/dev/null
-    assert_match "CALIBRATE_CLEAN" "$(cat "${calls}")" "clean calibration task created"
+    assert_match "CALIBRATION_RUN" "$(cat "${calls}")" "calibration task created"
     local error_count
     error_count="$(awk '/^CERTIFY_ERROR$/ {c++} END {print c+0}' "${calls}")"
     assert_eq "5" "${error_count}" "certify error tasks created"

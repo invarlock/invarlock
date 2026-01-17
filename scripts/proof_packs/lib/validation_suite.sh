@@ -9,10 +9,10 @@
 # Designed for multi-GPU scheduling with dynamic work-stealing.
 #
 # EDIT TYPES (4 types × 2 versions = 8 tests per model):
-# - Quantization RTN (group-wise): clean calibrated per model, 4-bit stress
-# - FP8 Quantization: clean calibrated per model, E5M2 stress
-# - Magnitude Pruning: clean calibrated per model, 50% stress
-# - Low-Rank SVD: clean calibrated per model, rank-32 stress
+# - Quantization RTN (group-wise): clean tuned preset per model, 4-bit stress
+# - FP8 Quantization: clean tuned preset per model, E5M2 stress
+# - Magnitude Pruning: clean tuned preset per model, 50% stress
+# - Low-Rank SVD: clean tuned preset per model, rank-32 stress
 #
 # MODEL SUITES:
 # - Defined in scripts/proof_packs/suites.sh (ungated-only models).
@@ -199,6 +199,7 @@ pack_load_model_revisions() {
         local gated
         gated=$(python3 - "${path}" <<'PY' 2>/dev/null || echo "1"
 import json
+import os
 import sys
 
 path = sys.argv[1]
@@ -329,7 +330,7 @@ EDIT_GROUP_SIZE="${EDIT_GROUP_SIZE:-128}"
 EDIT_SCOPE="${EDIT_SCOPE:-ffn}"
 
 # Edit Types to test (4 types × 2 versions each)
-# Clean specs are calibrated per model using lm-eval; use "clean" sentinel.
+# Clean specs use tuned edit presets; use "clean" sentinel.
 EDIT_TYPES_CLEAN=(
     "quant_rtn:clean:ffn"        # Clean RTN (calibrated bits/group_size on FFN)
     "fp8_quant:clean:ffn"        # Clean FP8 (calibrated format on FFN)
@@ -356,16 +357,11 @@ EVAL_BATCH_SIZE_LARGE="${EVAL_BATCH_SIZE_LARGE:-auto:4}"    # 70B+ models - auto
 EVAL_BATCH_SIZE_MOE="${EVAL_BATCH_SIZE_MOE:-auto:6}"        # MoE models (Mixtral) - auto with max 6
 EVAL_CONTEXT_LEN="${EVAL_CONTEXT_LEN:-2048}"
 
-# Clean edit calibration (lm-eval only; no InvarLock signal)
-CALIBRATE_CLEAN_EDITS="${CALIBRATE_CLEAN_EDITS:-true}"
-CLEAN_EVAL_TASKS="${CLEAN_EVAL_TASKS:-${EVAL_TASKS}}"
-CLEAN_EVAL_LIMIT="${CLEAN_EVAL_LIMIT:-200}"            # 0 disables limit
-CLEAN_EVAL_NUM_FEWSHOT="${CLEAN_EVAL_NUM_FEWSHOT:-${EVAL_NUM_FEWSHOT}}"
-CLEAN_QUANT_BITS="${CLEAN_QUANT_BITS:-8}"
-CLEAN_QUANT_GROUP_SIZES="${CLEAN_QUANT_GROUP_SIZES:-128,64,32}"
-CLEAN_PRUNE_LEVELS="${CLEAN_PRUNE_LEVELS:-0.1,0.05,0.02}"
-CLEAN_SVD_RANK_RATIOS="${CLEAN_SVD_RANK_RATIOS:-0.25,0.35,0.5}"
-CLEAN_FP8_FORMATS="${CLEAN_FP8_FORMATS:-e4m3fn}"
+# Tuned edit presets (external inputs; required for clean edits)
+PACK_TUNED_EDIT_PARAMS_FILE="${PACK_TUNED_EDIT_PARAMS_FILE:-}"
+# Optional calibration preset reuse (skip calibration runs, copy presets in)
+PACK_CALIBRATION_PRESET_DIR="${PACK_CALIBRATION_PRESET_DIR:-}"
+PACK_CALIBRATION_PRESET_FILE="${PACK_CALIBRATION_PRESET_FILE:-}"
 
 # InvarLock Configuration - BASE DEFAULTS (will be overridden per-model)
 # WikiText-2 validation has ~1174 usable samples
@@ -753,7 +749,7 @@ pack_source_libs() {
     return 0
 }
 
-# Fallback resolver for clean edit specs when task_functions isn't sourced.
+# Fallback resolver for clean edit specs using tuned presets when task_functions isn't sourced.
 if ! declare -F resolve_edit_params >/dev/null 2>&1; then
 resolve_edit_params() {
     local model_output_dir="$1"
@@ -790,32 +786,64 @@ reason = ""
 edit_dir_name = ""
 
 if clean_spec:
-    clean_file = model_output_dir / "state" / "clean_edit_params.json"
-    if not clean_file.exists():
-        status = "missing"
-    else:
+    tuned_path = (os.environ.get("PACK_TUNED_EDIT_PARAMS_FILE") or "").strip()
+    model_id_path = model_output_dir / ".model_id"
+    model_id = ""
+    if model_id_path.exists():
         try:
-            data = json.loads(clean_file.read_text())
+            model_id = model_id_path.read_text().strip()
         except Exception:
-            data = {}
-        entry = data.get(edit_type) or {}
+            model_id = ""
+    model_key = model_id or model_output_dir.name
+
+    def _load_tuned_entry():
+        if not tuned_path:
+            return {}, "missing", "missing_tuned_edit_params_file"
+        path = Path(tuned_path)
+        if not path.exists():
+            return {}, "missing", "missing_tuned_edit_params_file"
+        try:
+            data = json.loads(path.read_text())
+        except Exception:
+            return {}, "invalid", "invalid_tuned_edit_params_file"
+        if not isinstance(data, dict):
+            return {}, "invalid", "invalid_tuned_edit_params_file"
+
+        entry_map = {}
+        models = data.get("models")
+        if isinstance(models, dict):
+            entry_map = (
+                models.get(model_key)
+                or models.get(model_id)
+                or models.get(model_output_dir.name)
+                or {}
+            )
+        if not entry_map and isinstance(data.get(edit_type), dict):
+            entry_map = data
+        defaults = data.get("defaults")
+        entry = entry_map.get(edit_type) or (defaults.get(edit_type) if isinstance(defaults, dict) else {}) or {}
+        if not isinstance(entry, dict):
+            entry = {}
         status = str(entry.get("status") or "missing")
         reason = str(entry.get("reason") or "")
-        if status == "selected":
-            if edit_type == "quant_rtn":
-                param1 = str(entry.get("bits", ""))
-                param2 = str(entry.get("group_size", ""))
-                scope = str(entry.get("scope") or scope or "")
-            elif edit_type == "fp8_quant":
-                param1 = str(entry.get("format", ""))
-                scope = str(entry.get("scope") or scope or "")
-            elif edit_type == "magnitude_prune":
-                param1 = str(entry.get("sparsity", ""))
-                scope = str(entry.get("scope") or scope or "")
-            elif edit_type == "lowrank_svd":
-                param1 = str(entry.get("rank", ""))
-                scope = str(entry.get("scope") or scope or "")
-            edit_dir_name = str(entry.get("edit_dir_name") or "")
+        return entry, status, reason
+
+    entry, status, reason = _load_tuned_entry()
+    if status == "selected":
+        if edit_type == "quant_rtn":
+            param1 = str(entry.get("bits", ""))
+            param2 = str(entry.get("group_size", ""))
+            scope = str(entry.get("scope") or scope or "")
+        elif edit_type == "fp8_quant":
+            param1 = str(entry.get("format", ""))
+            scope = str(entry.get("scope") or scope or "")
+        elif edit_type == "magnitude_prune":
+            param1 = str(entry.get("sparsity", ""))
+            scope = str(entry.get("scope") or scope or "")
+        elif edit_type == "lowrank_svd":
+            param1 = str(entry.get("rank", ""))
+            scope = str(entry.get("scope") or scope or "")
+        edit_dir_name = str(entry.get("edit_dir_name") or "")
 else:
     def _is_int(val):
         try:
@@ -889,6 +917,160 @@ pack_setup_output_dirs() {
     # Create a lock file for thread-safe logging
     LOG_LOCK="${OUTPUT_DIR}/logs/.log_lock"
     return 0
+}
+
+pack_resolve_tuned_edit_params_file() {
+    if [[ -n "${PACK_TUNED_EDIT_PARAMS_FILE:-}" ]]; then
+        return 0
+    fi
+
+    local repo_root
+    repo_root="$(cd "${_PACK_VALIDATION_LIB_DIR}/../../.." && pwd)"
+    local candidate
+    for candidate in \
+        "${repo_root}/scripts/proof_packs/tuned_edit_params.json" \
+        "${repo_root}/scripts/proof_packs/presets/tuned_edit_params.json"
+    do
+        if [[ -f "${candidate}" ]]; then
+            PACK_TUNED_EDIT_PARAMS_FILE="${candidate}"
+            export PACK_TUNED_EDIT_PARAMS_FILE
+            return 0
+        fi
+    done
+}
+
+pack_prepare_tuned_edit_params() {
+    if [[ ${CLEAN_EDIT_RUNS:-0} -le 0 ]]; then
+        return 0
+    fi
+
+    pack_resolve_tuned_edit_params_file
+    if [[ -z "${PACK_TUNED_EDIT_PARAMS_FILE:-}" ]]; then
+        error_exit "Missing PACK_TUNED_EDIT_PARAMS_FILE for clean edit presets."
+    fi
+    if [[ ! -f "${PACK_TUNED_EDIT_PARAMS_FILE}" ]]; then
+        error_exit "Tuned edit preset file not found: ${PACK_TUNED_EDIT_PARAMS_FILE}"
+    fi
+
+    mkdir -p "${OUTPUT_DIR}/state"
+    local dest="${OUTPUT_DIR}/state/tuned_edit_params.json"
+    cp "${PACK_TUNED_EDIT_PARAMS_FILE}" "${dest}"
+    PACK_TUNED_EDIT_PARAMS_FILE="${dest}"
+    export PACK_TUNED_EDIT_PARAMS_FILE
+}
+
+pack_validate_tuned_edit_params() {
+    if [[ ${CLEAN_EDIT_RUNS:-0} -le 0 ]]; then
+        return 0
+    fi
+
+    local model_csv
+    model_csv=$(printf '%s\n' "${PACK_MODEL_LIST[@]}" | paste -sd "," -)
+    local model_names_csv=""
+    for model_id in "${PACK_MODEL_LIST[@]}"; do
+        local model_name
+        model_name=$(sanitize_model_name "${model_id}")
+        if [[ -z "${model_names_csv}" ]]; then
+            model_names_csv="${model_name}"
+        else
+            model_names_csv="${model_names_csv},${model_name}"
+        fi
+    done
+    local edit_types_csv
+    edit_types_csv=$(printf '%s\n' "${EDIT_TYPES_CLEAN[@]}" | awk -F: '{print $1}' | sort -u | paste -sd "," -)
+    PACK_MODEL_LIST_CSV="${model_csv}" PACK_MODEL_NAMES_CSV="${model_names_csv}" EDIT_TYPES_CSV="${edit_types_csv}" python3 - <<'PY' || return 1
+import json
+import os
+
+path = os.environ.get("PACK_TUNED_EDIT_PARAMS_FILE", "")
+models = [m for m in os.environ.get("PACK_MODEL_LIST_CSV", "").split(",") if m]
+model_names = [m for m in os.environ.get("PACK_MODEL_NAMES_CSV", "").split(",") if m]
+required = [t for t in os.environ.get("EDIT_TYPES_CSV", "").split(",") if t]
+
+if not path or not os.path.exists(path):
+    raise SystemExit("Missing tuned edit preset file.")
+
+with open(path, "r") as f:
+    data = json.load(f)
+
+if not isinstance(data, dict):
+    raise SystemExit("Invalid tuned edit preset file (expected JSON object).")
+
+defaults = data.get("defaults") if isinstance(data.get("defaults"), dict) else {}
+models_map = data.get("models") if isinstance(data.get("models"), dict) else {}
+
+def _get_entry(model_id, model_name, edit_type):
+    entry_map = {}
+    if isinstance(models_map, dict):
+        entry_map = models_map.get(model_id) or models_map.get(model_name) or {}
+    if not entry_map and isinstance(data.get(edit_type), dict):
+        entry_map = data
+    entry = entry_map.get(edit_type) or defaults.get(edit_type) or {}
+    return entry if isinstance(entry, dict) else {}
+
+missing = []
+for idx, model in enumerate(models):
+    model_name = model_names[idx] if idx < len(model_names) else ""
+    for edit_type in required:
+        entry = _get_entry(model, model_name, edit_type)
+        status = str(entry.get("status") or "missing")
+        if status != "selected":
+            missing.append(f"{model}:{edit_type}:{status}")
+
+if missing:
+    msg = "Missing tuned edit presets: " + ", ".join(missing)
+    raise SystemExit(msg)
+PY
+}
+
+pack_prepare_calibration_presets() {
+    if [[ -z "${PACK_CALIBRATION_PRESET_DIR:-}" && -z "${PACK_CALIBRATION_PRESET_FILE:-}" ]]; then
+        return 0
+    fi
+
+    if [[ -n "${PACK_CALIBRATION_PRESET_FILE:-}" && ! -f "${PACK_CALIBRATION_PRESET_FILE}" ]]; then
+        error_exit "Calibration preset file not found: ${PACK_CALIBRATION_PRESET_FILE}"
+    fi
+
+    mkdir -p "${OUTPUT_DIR}/presets"
+
+    for model_id in "${PACK_MODEL_LIST[@]}"; do
+        local model_name
+        model_name=$(sanitize_model_name "${model_id}")
+        local src=""
+        if [[ -n "${PACK_CALIBRATION_PRESET_FILE:-}" ]]; then
+            src="${PACK_CALIBRATION_PRESET_FILE}"
+        else
+            for ext in yaml yml json; do
+                local candidate="${PACK_CALIBRATION_PRESET_DIR}/calibrated_preset_${model_name}.${ext}"
+                if [[ -f "${candidate}" ]]; then
+                    src="${candidate}"
+                    break
+                fi
+            done
+        fi
+        if [[ -z "${src}" ]]; then
+            error_exit "Missing calibration preset for ${model_id} in ${PACK_CALIBRATION_PRESET_DIR:-<unset>}."
+        fi
+        local ext="${src##*.}"
+        local dest="${OUTPUT_DIR}/presets/calibrated_preset_${model_name}.${ext}"
+        cp "${src}" "${dest}"
+    done
+
+    PACK_PRESET_READY="true"
+    export PACK_PRESET_READY
+    DRIFT_CALIBRATION_RUNS=0
+    export DRIFT_CALIBRATION_RUNS
+}
+
+pack_validate_guard_calibration() {
+    local runs="${DRIFT_CALIBRATION_RUNS:-5}"
+    if ! [[ "${runs}" =~ ^[0-9]+$ ]]; then
+        runs=5
+    fi
+    if [[ ${runs} -le 0 && -z "${PACK_CALIBRATION_PRESET_DIR:-}" && -z "${PACK_CALIBRATION_PRESET_FILE:-}" ]]; then
+        error_exit "Guard calibration disabled (DRIFT_CALIBRATION_RUNS=0) without a calibration preset file/dir."
+    fi
 }
 
 log() {
@@ -1862,7 +2044,7 @@ process_edit() {
     local status
     status=$(echo "${resolved}" | jq -r '.status')
     if [[ "${status}" == "skipped" ]]; then
-        log "  Clean edit skipped by calibration: ${edit_spec}"
+        log "  Clean edit skipped by tuned preset: ${edit_spec}"
         return 0
     fi
     if [[ "${status}" != "selected" ]]; then
@@ -1940,16 +2122,6 @@ process_model() {
             "${EVAL_BATCH_SIZE}" \
             "${EVAL_NUM_FEWSHOT}" \
             "${gpu_id}"
-    fi
-
-    # Step 2.5: Clean edit calibration (lm-eval only)
-    if [[ "${CALIBRATE_CLEAN_EDITS:-true}" == "true" && ${CLEAN_EDIT_RUNS:-0} -gt 0 ]]; then
-        if type task_calibrate_clean_edits &>/dev/null; then
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Calibrating clean edits..." >> "${gpu_log}"
-            task_calibrate_clean_edits "${model_name}" "${gpu_id}" "${OUTPUT_DIR}" "${gpu_log}"
-        else
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Clean calibration unavailable; skipping" >> "${gpu_log}"
-        fi
     fi
 
     # Step 3: Calibration
@@ -2118,6 +2290,12 @@ main_dynamic() {
     model_count=$(pack_model_list | wc -l | tr -d ' ')
     log "Models: ${model_count} (PACK_SUITE=${PACK_SUITE})"
     log "Edit Types: 4 x 2 versions = 8 per model"
+    log "Tuned edit presets: ${PACK_TUNED_EDIT_PARAMS_FILE:-<unset>}"
+    if [[ "${PACK_PRESET_READY:-false}" == "true" ]]; then
+        log "Calibration presets: reuse (${OUTPUT_DIR}/presets)"
+    else
+        log "Calibration presets: ${DRIFT_CALIBRATION_RUNS:-5} run(s)"
+    fi
     log "Scheduling: DYNAMIC (work-stealing enabled)"
     log ""
 
@@ -2203,7 +2381,7 @@ main_dynamic() {
     else
         # Generate all tasks
         log "Generating tasks for all models..."
-        log "Config: CLEAN_EDIT_RUNS=${CLEAN_EDIT_RUNS}, STRESS_EDIT_RUNS=${STRESS_EDIT_RUNS}, RUN_ERROR_INJECTION=${RUN_ERROR_INJECTION}, DRIFT_CALIBRATION_RUNS=${DRIFT_CALIBRATION_RUNS}, PACK_USE_BATCH_EDITS=${PACK_USE_BATCH_EDITS:-auto}"
+        log "Config: CLEAN_EDIT_RUNS=${CLEAN_EDIT_RUNS}, STRESS_EDIT_RUNS=${STRESS_EDIT_RUNS}, RUN_ERROR_INJECTION=${RUN_ERROR_INJECTION}, DRIFT_CALIBRATION_RUNS=${DRIFT_CALIBRATION_RUNS}, PACK_PRESET_READY=${PACK_PRESET_READY:-false}, PACK_USE_BATCH_EDITS=${PACK_USE_BATCH_EDITS:-auto}"
         local model_csv
         model_csv=$(printf '%s\n' "${PACK_MODEL_LIST[@]}" | paste -sd "," -)
         log "Models: ${model_csv:-<none>}"
@@ -2530,6 +2708,11 @@ pack_run_suite() {
     if [[ ${#PACK_MODEL_LIST[@]} -eq 0 ]]; then
         error_exit "No models configured for PACK_SUITE=${PACK_SUITE}."
     fi
+
+    pack_prepare_tuned_edit_params || return 1
+    pack_validate_tuned_edit_params || return 1
+    pack_prepare_calibration_presets || return 1
+    pack_validate_guard_calibration || return 1
 
     if [[ "${PACK_NET}" == "1" ]]; then
         pack_preflight_models "${OUTPUT_DIR}" "${PACK_MODEL_LIST[@]}"
