@@ -194,7 +194,10 @@ def _validate_counts(certificate: dict[str, Any]) -> list[str]:
 
 
 def _validate_drift_band(certificate: dict[str, Any]) -> list[str]:
-    """Validate preview→final drift stays within the configured band (0.95–1.05)."""
+    """Validate preview→final drift stays within the configured band.
+
+    Defaults to 0.95–1.05 unless the certificate provides `primary_metric.drift_band`.
+    """
     errors: list[str] = []
     pm = certificate.get("primary_metric", {}) or {}
     drift_ratio = None
@@ -210,9 +213,33 @@ def _validate_drift_band(certificate: dict[str, Any]) -> list[str]:
         errors.append("Certificate missing preview/final to compute drift ratio.")
         return errors
 
-    if not 0.95 <= float(drift_ratio) <= 1.05:
+    drift_min = 0.95
+    drift_max = 1.05
+    band = pm.get("drift_band")
+    try:
+        if isinstance(band, dict):
+            lo = band.get("min")
+            hi = band.get("max")
+            if isinstance(lo, int | float) and isinstance(hi, int | float):
+                lo_f = float(lo)
+                hi_f = float(hi)
+                if math.isfinite(lo_f) and math.isfinite(hi_f) and 0 < lo_f < hi_f:
+                    drift_min = lo_f
+                    drift_max = hi_f
+        elif isinstance(band, list | tuple) and len(band) == 2:
+            lo_raw, hi_raw = band[0], band[1]
+            if isinstance(lo_raw, int | float) and isinstance(hi_raw, int | float):
+                lo_f = float(lo_raw)
+                hi_f = float(hi_raw)
+                if math.isfinite(lo_f) and math.isfinite(hi_f) and 0 < lo_f < hi_f:
+                    drift_min = lo_f
+                    drift_max = hi_f
+    except Exception:
+        pass
+
+    if not drift_min <= float(drift_ratio) <= drift_max:
         errors.append(
-            f"Preview→final drift ratio out of band (0.95–1.05): observed {drift_ratio:.6f}."
+            f"Preview→final drift ratio out of band ({drift_min:.2f}–{drift_max:.2f}): observed {drift_ratio:.6f}."
         )
 
     return errors
@@ -406,8 +433,17 @@ def _validate_certificate_payload(
         )
     except Exception:
         prof = "dev"
-    # Enforce drift band only for CI/Release; skip in dev profile
-    if prof in {"ci", "release"}:
+    pm = certificate.get("primary_metric", {}) or {}
+    prev = pm.get("preview")
+    fin = pm.get("final")
+    basis_ok = (
+        isinstance(prev, int | float)
+        and isinstance(fin, int | float)
+        and math.isfinite(float(prev))
+        and math.isfinite(float(fin))
+        and float(prev) > 0.0
+    )
+    if prof in {"ci", "release"} or basis_ok:
         errors.extend(_validate_drift_band(certificate))
     errors.extend(_apply_profile_lints(certificate))
     errors.extend(_validate_tokenizer_hash(certificate))

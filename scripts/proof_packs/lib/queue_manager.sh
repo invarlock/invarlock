@@ -1241,7 +1241,7 @@ generate_eval_certify_tasks() {
         local task_type="EVAL_$(printf '%s' "${benchmark}" | tr '[:lower:]' '[:upper:]')"  # uppercase: EVAL_MMLU, EVAL_HELLASWAG, etc.
         local eval_id=$(add_task "${task_type}" "${model_id}" "${model_name}" \
             "$(estimate_model_memory "${model_id}" "EVAL_EDIT")" \
-            "${batch_edit_id}" '{"edit_spec": "'"${edit_spec}"'", "benchmark": "'"${benchmark}"'"}' 65)
+            "${batch_edit_id}" '{"edit_spec": "'"${edit_spec}"'", "benchmark": "'"${benchmark}"'", "version": "'"${version}"'"}' 65)
         eval_ids+=("${eval_id}")
         echo "Created: ${eval_id} (${benchmark} eval)"
     done
