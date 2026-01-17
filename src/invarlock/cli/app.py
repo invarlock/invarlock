@@ -139,6 +139,14 @@ def _certify_lazy(
     edit_config: str | None = typer.Option(
         None, "--edit-config", help="Edit preset to apply a demo edit (quant_rtn)"
     ),
+    edit_label: str | None = typer.Option(
+        None,
+        "--edit-label",
+        help=(
+            "Edit algorithm label for BYOE models. Use 'noop' for baseline, "
+            "'quant_rtn' etc. for built-in edits, 'custom' for pre-edited models."
+        ),
+    ),
     quiet: bool = typer.Option(
         False, "--quiet", "-q", help="Minimal output (suppress run/report detail)"
     ),
@@ -170,6 +178,7 @@ def _certify_lazy(
         out=out,
         cert_out=cert_out,
         edit_config=edit_config,
+        edit_label=edit_label,
         quiet=quiet,
         verbose=verbose,
         banner=banner,
