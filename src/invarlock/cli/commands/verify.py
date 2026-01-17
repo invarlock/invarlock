@@ -433,17 +433,9 @@ def _validate_certificate_payload(
         )
     except Exception:
         prof = "dev"
-    pm = certificate.get("primary_metric", {}) or {}
-    prev = pm.get("preview")
-    fin = pm.get("final")
-    basis_ok = (
-        isinstance(prev, int | float)
-        and isinstance(fin, int | float)
-        and math.isfinite(float(prev))
-        and math.isfinite(float(fin))
-        and float(prev) > 0.0
-    )
-    if prof in {"ci", "release"} or basis_ok:
+    # Drift band is a CI/Release enforcement check; dev profile should not
+    # fail verification due to preview→final drift.
+    if prof in {"ci", "release"}:
         errors.extend(_validate_drift_band(certificate))
     errors.extend(_apply_profile_lints(certificate))
     errors.extend(_validate_tokenizer_hash(certificate))
