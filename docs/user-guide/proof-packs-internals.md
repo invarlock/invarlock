@@ -12,7 +12,7 @@ task graph, scheduling, and artifact generation. It complements
 | Version | `proof-packs-v1` |
 | Hardware | NVIDIA GPUs where models fit VRAM; multi-GPU recommended for `full` |
 | Models | `subset` (1 model) or `full` (6 models), ungated public |
-| Edits | 4 types × 2 versions per model; clean variants calibrated via lm-eval |
+| Edits | 4 types × 2 versions per model; clean variants use tuned presets |
 | Scheduling | Dynamic work-stealing, `small_first` priority strategy |
 | Multi-GPU | Profile-based; `required_gpus` grows only when memory requires it |
 | Output | Proof pack with `manifest.json`, `checksums.sha256`, and cert bundles (`--layout v2` nests results + metadata) |
@@ -221,7 +221,6 @@ Priority (base)     Task type
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   90 ┤ SETUP_BASELINE
   85 ┤ CALIBRATION_RUN
-  82 ┤ CALIBRATE_CLEAN
   80 ┤ EVAL_BASELINE
   75 ┤ GENERATE_PRESET
   70 ┤ CREATE_EDITS_BATCH / CREATE_EDIT
@@ -388,8 +387,6 @@ Batch + split (default):
 
 Notes:
 
-- `CALIBRATE_CLEAN` (optional) depends on `SETUP_BASELINE` + `EVAL_BASELINE` and
-  gates edit creation when enabled.
 - Error injection tasks (`CREATE_ERROR` → `CERTIFY_ERROR`) branch off
   `SETUP_BASELINE` and require the preset for certification.
 
@@ -405,29 +402,28 @@ SETUP_BASELINE
 ## Task breakdown per model (defaults)
 
 Defaults: `DRIFT_CALIBRATION_RUNS=5`, `CLEAN_EDIT_RUNS=3`,
-`STRESS_EDIT_RUNS=2`, `RUN_ERROR_INJECTION=true`,
-`CALIBRATE_CLEAN_EDITS=true`.
+`STRESS_EDIT_RUNS=2`, `RUN_ERROR_INJECTION=true`.
 
 Batch path (default for small/medium):
 
-- Setup + baseline eval + clean calibration: 3 tasks
+- Setup + baseline eval: 2 tasks
 - Calibration runs + preset: 6 tasks
 - Batch edits: 1 task
 - Split eval tasks: 32 tasks
 - Certify edits: 20 tasks
 - Error injection: 10 tasks
 
-Total: ~72 tasks/model (varies with overrides).
+Total: ~71 tasks/model (varies with overrides).
 
 Per-edit path (large/MoE or `PACK_USE_BATCH_EDITS=false`):
 
-- Setup + baseline eval + clean calibration: 3 tasks
+- Setup + baseline eval: 2 tasks
 - Calibration runs + preset: 6 tasks
 - Per-edit create/eval: 16 tasks
 - Certify edits: 20 tasks
 - Error injection: 10 tasks
 
-Total: ~55 tasks/model (varies with overrides).
+Total: ~54 tasks/model (varies with overrides).
 
 ## Execution phases
 
@@ -472,6 +468,10 @@ OUTPUT_DIR/
     gpu_<id>.status
     gpu_reservations/
     SHUTDOWN
+  state/
+    model_revisions.json
+    progress.json
+    tuned_edit_params.json
   models/         # top-level cache dirs created by the suite
   evals/          # top-level cache dirs created by the suite
   certificates/   # top-level cache dirs created by the suite
@@ -493,7 +493,7 @@ OUTPUT_DIR/
 
 - `--calibrate-only` / `PACK_SUITE_MODE=calibrate-only`
   - Only promotes `SETUP_BASELINE`, `CALIBRATION_RUN`, and `GENERATE_PRESET`
-    tasks. It intentionally skips `EVAL_BASELINE` and `CALIBRATE_CLEAN`.
+    tasks. It intentionally skips `EVAL_BASELINE`.
   - The monitor exits after all `GENERATE_PRESET` tasks complete.
 - `--run-only`
   - Continue a prior run after calibration. This is effectively `--resume` with
@@ -647,19 +647,18 @@ Common knobs for the setup script:
 | `INVARLOCK_PM_ACCEPTANCE_MAX` | `1.20` | Primary metric upper bound |
 | `PACK_GUARDS_ORDER` | `invariants,spectral,rmt,variance,invariants` | Guards included in calibration and presets |
 
-### Clean edit calibration
+### Tuned edit presets
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `CALIBRATE_CLEAN_EDITS` | `true` | Enable clean calibration |
-| `CLEAN_EVAL_TASKS` | `EVAL_TASKS` | Tasks for clean calibration |
-| `CLEAN_EVAL_LIMIT` | `200` | lm-eval limit (0 disables) |
-| `CLEAN_EVAL_NUM_FEWSHOT` | `EVAL_NUM_FEWSHOT` | Few-shot examples |
-| `CLEAN_QUANT_BITS` | `8` | RTN bits |
-| `CLEAN_QUANT_GROUP_SIZES` | `128,64,32` | RTN group sizes |
-| `CLEAN_PRUNE_LEVELS` | `0.1,0.05,0.02` | Prune sparsity candidates |
-| `CLEAN_SVD_RANK_RATIOS` | `0.25,0.35,0.5` | SVD rank ratios |
-| `CLEAN_FP8_FORMATS` | `e4m3fn` | FP8 formats |
+| `PACK_TUNED_EDIT_PARAMS_FILE` | unset | JSON file with tuned clean edit params (required when `CLEAN_EDIT_RUNS>0`). |
+
+### Calibration preset reuse
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PACK_CALIBRATION_PRESET_DIR` | unset | Directory containing `calibrated_preset_<model>.yaml/json` to reuse; skips calibration runs. |
+| `PACK_CALIBRATION_PRESET_FILE` | unset | Single preset file applied to all models (advanced). |
 
 ### Experiment controls
 
