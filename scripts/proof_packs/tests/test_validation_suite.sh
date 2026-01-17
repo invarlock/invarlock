@@ -152,6 +152,49 @@ EOF
     assert_match "\"completed\": 2" "$(cat "${path}")" "repeat count recorded"
 }
 
+test_pack_validation_generate_verdict_writes_reports() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    PACK_GPU_NAME="Mock GPU"
+    PACK_GPU_MEM_GB="80"
+    PACK_GPU_COUNT="2"
+    PACK_SUITE="subset"
+    PACK_NET="1"
+    PACK_DETERMINISM="throughput"
+    PACK_REPEATS="0"
+
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    pack_setup_output_dirs
+    mkdir -p "${OUTPUT_DIR}/analysis"
+    cat > "${OUTPUT_DIR}/analysis/correlation_analysis.json" <<'EOF'
+{
+  "summary": {
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0,
+    "error_detection_rate": 1.0,
+    "confidence_score": 95,
+    "confidence_level": "HIGH",
+    "triage_counts": {"PASS": 1, "REVIEW": 0, "FAIL": 0},
+    "degraded_edits": 0,
+    "degraded_runs": [],
+    "total_tests": 1,
+    "models_tested": 1
+  },
+  "models": {}
+}
+EOF
+
+    generate_verdict
+
+    assert_file_exists "${OUTPUT_DIR}/reports/final_verdict.txt" "final verdict text written"
+    assert_file_exists "${OUTPUT_DIR}/reports/final_verdict.json" "final verdict json written"
+    assert_match "VERDICT" "$(cat "${OUTPUT_DIR}/reports/final_verdict.txt")" "verdict content emitted"
+}
+
 _make_validation_suite_sandbox() {
     local sandbox
     sandbox="$(mktemp -d "${TEST_TMPDIR}/pack_validation_suite.XXXXXX")"
