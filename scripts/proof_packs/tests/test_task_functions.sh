@@ -810,7 +810,6 @@ test_execute_task_dispatches_all_task_types() {
 
     task_setup_baseline() { :; }
     task_eval_baseline() { :; }
-    task_calibrate_clean_edits() { :; }
     task_calibration_run() { :; }
     task_create_edit() { :; }
     task_create_edits_batch() { :; }
@@ -833,7 +832,7 @@ test_execute_task_dispatches_all_task_types() {
             > "${TEST_TMPDIR}/${task_id}.task"
     }
 
-    local types=(SETUP_BASELINE EVAL_BASELINE CALIBRATE_CLEAN CALIBRATION_RUN CREATE_EDIT CREATE_EDITS_BATCH EVAL_EDIT EVAL_MMLU EVAL_HELLASWAG EVAL_ARC EVAL_WINOGRANDE CERTIFY_EDIT CREATE_ERROR CERTIFY_ERROR GENERATE_PRESET)
+    local types=(SETUP_BASELINE EVAL_BASELINE CALIBRATION_RUN CREATE_EDIT CREATE_EDITS_BATCH EVAL_EDIT EVAL_MMLU EVAL_HELLASWAG EVAL_ARC EVAL_WINOGRANDE CERTIFY_EDIT CREATE_ERROR CERTIFY_ERROR GENERATE_PRESET)
     local type
     for type in "${types[@]}"; do
         make_task "task_${type}" "${type}" '{}'
@@ -1076,7 +1075,7 @@ test_task_certify_edit_skip_and_invalid() {
     assert_rc "1" "${RUN_RC}" "invalid resolution errors"
 }
 
-test_task_calibrate_clean_edits_early_exits() {
+test_resolve_edit_params_uses_tuned_presets() {
     mock_reset
     # shellcheck source=../task_functions.sh
     source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
@@ -1084,428 +1083,50 @@ test_task_calibrate_clean_edits_early_exits() {
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
     local model_output_dir="${out}/${model_name}"
-    local baseline_dir="${model_output_dir}/models/baseline"
-    local log_file="${TEST_TMPDIR}/log.txt"
-    mkdir -p "$(dirname "${log_file}")"
-    : > "${log_file}"
+    mkdir -p "${model_output_dir}"
+    echo "org/model" > "${model_output_dir}/.model_id"
 
-    CALIBRATE_CLEAN_EDITS="false"
-    task_calibrate_clean_edits "${model_name}" 0 "${out}" "${log_file}"
-
-    CALIBRATE_CLEAN_EDITS="true"
-    mkdir -p "${model_output_dir}/state"
-    echo "{}" > "${model_output_dir}/state/clean_edit_params.json"
-    task_calibrate_clean_edits "${model_name}" 0 "${out}" "${log_file}"
-
-    rm -rf "${model_output_dir}"
-    mkdir -p "${model_output_dir}/evals"
-    if task_calibrate_clean_edits "${model_name}" 0 "${out}" "${log_file}"; then
-        t_fail "expected missing baseline to fail"
-    fi
-
-    mkdir -p "${baseline_dir}"
-    echo "{}" > "${baseline_dir}/config.json"
-    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
-    if task_calibrate_clean_edits "${model_name}" 0 "${out}" "${log_file}"; then
-        t_fail "expected missing baseline eval to fail"
-    fi
-
-    mkdir -p "${model_output_dir}/evals"
-    echo "{}" > "${model_output_dir}/evals/baseline_results.json"
-    mkdir -p "${model_output_dir}/state/clean_edit_cal.lock"
-    echo "{}" > "${model_output_dir}/state/clean_edit_params.json"
-    task_calibrate_clean_edits "${model_name}" 0 "${out}" "${log_file}"
-}
-
-
-test_task_calibrate_clean_edits_waits_on_lock_and_detects_params() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
-
-    local out="${TEST_TMPDIR}/out"
-    local model_name="m"
-    local model_output_dir="${out}/${model_name}"
-    local baseline_dir="${model_output_dir}/models/baseline"
-    local log_file="${TEST_TMPDIR}/log.txt"
-    mkdir -p "${baseline_dir}" "${model_output_dir}/evals" "$(dirname "${log_file}")"
-    echo "{}" > "${baseline_dir}/config.json"
-    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
-    echo "{}" > "${model_output_dir}/evals/baseline_results.json"
-    : > "${log_file}"
-
-    local lock_dir="${model_output_dir}/state/clean_edit_cal.lock"
-    mkdir -p "${lock_dir}"
-
-    local slept=0
-    _sleep() {
-        slept=$((slept + 1))
-        if [[ ${slept} -eq 1 ]]; then
-            mkdir -p "${model_output_dir}/state"
-            echo "{}" > "${model_output_dir}/state/clean_edit_params.json"
-        fi
+    local tuned_file="${TEST_TMPDIR}/tuned_edit_params.json"
+    cat > "${tuned_file}" <<'JSON'
+{
+  "models": {
+    "org/model": {
+      "quant_rtn": {
+        "status": "selected",
+        "bits": 8,
+        "group_size": 128,
+        "scope": "ffn",
+        "edit_dir_name": "quant_8bit_clean"
+      }
     }
-
-    task_calibrate_clean_edits "${model_name}" 0 "${out}" "${log_file}"
-    assert_file_exists "${model_output_dir}/state/clean_edit_params.json" "params detected after lock wait"
-}
-
-
-test_task_calibrate_clean_edits_lock_timeout_errors() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
-
-    local out="${TEST_TMPDIR}/out"
-    local model_name="m"
-    local model_output_dir="${out}/${model_name}"
-    local baseline_dir="${model_output_dir}/models/baseline"
-    local log_file="${TEST_TMPDIR}/log.txt"
-    mkdir -p "${baseline_dir}" "${model_output_dir}/evals" "$(dirname "${log_file}")"
-    echo "{}" > "${baseline_dir}/config.json"
-    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
-    echo "{}" > "${model_output_dir}/evals/baseline_results.json"
-    : > "${log_file}"
-
-    mkdir -p "${model_output_dir}/state/clean_edit_cal.lock"
-    _sleep() { :; }
-
-    run task_calibrate_clean_edits "${model_name}" 0 "${out}" "${log_file}"
-    assert_rc "1" "${RUN_RC}" "lock timeout returns non-zero"
-}
-
-
-test_task_calibrate_clean_edits_baseline_lmeval_missing_results() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
-
-    local out="${TEST_TMPDIR}/out"
-    local model_name="m"
-    local model_output_dir="${out}/${model_name}"
-    local baseline_dir="${model_output_dir}/models/baseline"
-    local log_file="${TEST_TMPDIR}/log.txt"
-    mkdir -p "${baseline_dir}" "${model_output_dir}/evals" "$(dirname "${log_file}")"
-    echo "{}" > "${baseline_dir}/config.json"
-    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
-    echo "id" > "${model_output_dir}/.model_id"
-    echo "{}" > "${model_output_dir}/evals/baseline_results.json"
-    : > "${log_file}"
-
-    _cmd_python() {
-        if [[ "$*" == *"-m"*"lm_eval"* ]]; then
-            local out_dir=""
-            local args=("$@");
-            local i=0
-            while [[ ${i} -lt ${#args[@]} ]]; do
-                if [[ "${args[$i]}" == "--output_path" ]]; then
-                    out_dir="${args[$((i + 1))]}"
-                    break
-                fi
-                i=$((i + 1))
-            done
-            mkdir -p "${out_dir}"
-            return 0
-        fi
-        return 0
+  },
+  "defaults": {
+    "fp8_quant": {
+      "status": "selected",
+      "format": "e4m3fn",
+      "scope": "ffn",
+      "edit_dir_name": "fp8_e4m3fn_clean"
     }
-
-    run task_calibrate_clean_edits "${model_name}" 0 "${out}" "${log_file}"
-    assert_rc "1" "${RUN_RC}" "baseline lm-eval missing results returns non-zero"
+  }
 }
+JSON
 
-test_task_calibrate_clean_edits_baseline_failure() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+    PACK_TUNED_EDIT_PARAMS_FILE="${tuned_file}"
+    export PACK_TUNED_EDIT_PARAMS_FILE
+    local resolved
+    resolved=$(resolve_edit_params "${model_output_dir}" "quant_rtn:clean:ffn" "clean")
+    assert_eq "selected" "$(echo "${resolved}" | jq -r '.status')" "quant_rtn resolved"
+    assert_eq "8" "$(echo "${resolved}" | jq -r '.param1')" "quant_rtn bits"
+    assert_eq "128" "$(echo "${resolved}" | jq -r '.param2')" "quant_rtn group_size"
 
-    fixture_write "python3.stub" ""
-    fixture_write "python3.rc" "1"
+    resolved=$(resolve_edit_params "${model_output_dir}" "fp8_quant:clean:ffn" "clean")
+    assert_eq "selected" "$(echo "${resolved}" | jq -r '.status')" "fp8_quant resolved"
+    assert_eq "e4m3fn" "$(echo "${resolved}" | jq -r '.param1')" "fp8_quant format"
 
-    local out="${TEST_TMPDIR}/out"
-    local model_name="m"
-    local model_output_dir="${out}/${model_name}"
-    local baseline_dir="${model_output_dir}/models/baseline"
-    local log_file="${TEST_TMPDIR}/log.txt"
-    mkdir -p "${baseline_dir}" "${model_output_dir}/evals" "$(dirname "${log_file}")"
-    echo "{}" > "${baseline_dir}/config.json"
-    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
-    echo "id" > "${model_output_dir}/.model_id"
-    : > "${log_file}"
-
-    run task_calibrate_clean_edits "${model_name}" 0 "${out}" "${log_file}"
-    assert_rc "1" "${RUN_RC}" "baseline calibration failure returns non-zero"
-}
-
-test_task_calibrate_clean_edits_candidate_selection_branches() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
-
-    local out="${TEST_TMPDIR}/out"
-    local model_name="m"
-    local model_output_dir="${out}/${model_name}"
-    local baseline_dir="${model_output_dir}/models/baseline"
-    local log_file="${TEST_TMPDIR}/log.txt"
-    mkdir -p "${baseline_dir}" "${model_output_dir}/evals" "$(dirname "${log_file}")"
-    echo "{}" > "${baseline_dir}/config.json"
-    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
-    echo "meta-llama/Llama-2-13b-hf" > "${model_output_dir}/.model_id"
-    echo "{}" > "${model_output_dir}/evals/baseline_results.json"
-    : > "${log_file}"
-
-    CLEAN_QUANT_BITS=8
-    CLEAN_QUANT_GROUP_SIZES="128,64"
-    CLEAN_FP8_FORMATS="e4m3fn"
-    CLEAN_PRUNE_LEVELS="0.1"
-    CLEAN_SVD_RANK_RATIOS="0.001"
-    CLEAN_EVAL_LIMIT=200
-    TASK_ID="calib"
-
-    local baseline_path="${baseline_dir}"
-    _cmd_python() {
-        if [[ "$*" == *"-m"*"lm_eval"* ]]; then
-            local out_dir=""
-            local args=("$@");
-            local i=0
-            while [[ ${i} -lt ${#args[@]} ]]; do
-                if [[ "${args[$i]}" == "--output_path" ]]; then
-                    out_dir="${args[$((i + 1))]}"
-                    break
-                fi
-                i=$((i + 1))
-            done
-            mkdir -p "${out_dir}"
-            echo '{"results": {"mmlu": {"acc": 0.5}}}' > "${out_dir}/results.json"
-            return 0
-        fi
-        if [[ "${1:-}" == "-" && "${2:-}" == "${baseline_path}" ]]; then
-            echo "4"
-            return 0
-        fi
-        if [[ "${1:-}" == "-" && "${2:-}" == "${model_output_dir}/state/clean_edit_params.jsonl" ]]; then
-            local output_path="${3:-}"
-            if [[ -n "${output_path}" ]]; then
-                mkdir -p "$(dirname "${output_path}")"
-                echo '{}' > "${output_path}"
-            fi
-            return 0
-        fi
-        return 0
-    }
-
-    local calib_tmp_dir="${model_output_dir}/evals/.clean_calib"
-    mkdir -p "${calib_tmp_dir}"
-    echo "{}" > "${calib_tmp_dir}/quant_8bit_clean_calib.json"
-
-    task_calibrate_clean_edits "${model_name}" 0 "${out}" "${log_file}"
-}
-
-
-test_task_calibrate_clean_edits_candidate_failure_and_rejection_branches() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
-
-    local out="${TEST_TMPDIR}/out"
-    local model_name="m"
-    local model_output_dir="${out}/${model_name}"
-    local baseline_dir="${model_output_dir}/models/baseline"
-    local log_file="${TEST_TMPDIR}/log.txt"
-    mkdir -p "${baseline_dir}" "${model_output_dir}/evals" "$(dirname "${log_file}")"
-    echo "{}" > "${baseline_dir}/config.json"
-    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
-    echo "meta-llama/Llama-2-13b-hf" > "${model_output_dir}/.model_id"
-    echo "{}" > "${model_output_dir}/evals/baseline_results.json"
-    : > "${log_file}"
-
-    CLEAN_QUANT_BITS=8
-    CLEAN_QUANT_GROUP_SIZES="128,64"
-    CLEAN_FP8_FORMATS="e4m3fn"
-    CLEAN_PRUNE_LEVELS="0.1"
-    CLEAN_SVD_RANK_RATIOS="0.25"
-    CLEAN_EVAL_LIMIT=200
-    TASK_ID="calib"
-
-    create_edited_model() { mkdir -p "$2"; }
-    create_fp8_model() { mkdir -p "$2"; }
-    create_pruned_model() { mkdir -p "$2"; }
-    create_lowrank_model() { mkdir -p "$2"; }
-    check_no_regression() { return 1; }
-
-    local eval_calls=0
-    _cmd_python() {
-        if [[ "$*" == *"-m"*"lm_eval"* ]]; then
-            local out_dir=""
-            local args=("$@");
-            local i=0
-            while [[ ${i} -lt ${#args[@]} ]]; do
-                if [[ "${args[$i]}" == "--output_path" ]]; then
-                    out_dir="${args[$((i + 1))]}"
-                    break
-                fi
-                i=$((i + 1))
-            done
-            mkdir -p "${out_dir}"
-            if [[ "${out_dir}" == *"baseline_calib"* ]]; then
-                echo '{"results": {"mmlu": {"acc": 0.5}}}' > "${out_dir}/results.json"
-                return 0
-            fi
-            eval_calls=$((eval_calls + 1))
-            if [[ ${eval_calls} -eq 1 ]]; then
-                return 1
-            fi
-            echo '{"results": {"mmlu": {"acc": 0.5}}}' > "${out_dir}/results.json"
-            return 0
-        fi
-        if [[ "${1:-}" == "-" && "${2:-}" == "${baseline_dir}" ]]; then
-            echo "4"
-            return 0
-        fi
-        if [[ "${1:-}" == "-" && "${2:-}" == *"baseline_calibration_results.json" ]]; then
-            return 1
-        fi
-        if [[ "${1:-}" == "-" && "${2:-}" == "${model_output_dir}/state/clean_edit_params.jsonl" ]]; then
-            echo "{}" > "${3}"
-            return 0
-        fi
-        return 0
-    }
-
-    task_calibrate_clean_edits "${model_name}" 0 "${out}" "${log_file}"
-    assert_file_exists "${model_output_dir}/state/clean_edit_params.json" "clean params written"
-}
-
-
-test_task_calibrate_clean_edits_selects_all_families_and_unknown_family_branch() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
-
-    local out="${TEST_TMPDIR}/out"
-    local model_name="m"
-    local model_output_dir="${out}/${model_name}"
-    local baseline_dir="${model_output_dir}/models/baseline"
-    local log_file="${TEST_TMPDIR}/log.txt"
-    mkdir -p "${baseline_dir}" "${model_output_dir}/evals" "$(dirname "${log_file}")"
-    echo "{}" > "${baseline_dir}/config.json"
-    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
-    echo "meta-llama/Llama-2-13b-hf" > "${model_output_dir}/.model_id"
-    echo "{}" > "${model_output_dir}/evals/baseline_results.json"
-    : > "${log_file}"
-
-    CLEAN_QUANT_BITS=8
-    CLEAN_QUANT_GROUP_SIZES="128"
-    CLEAN_FP8_FORMATS="e4m3fn"
-    CLEAN_PRUNE_LEVELS="0.1"
-    CLEAN_SVD_RANK_RATIOS="0.25"
-    CLEAN_EVAL_LIMIT=200
-    TASK_ID="calib"
-
-    create_edited_model() { mkdir -p "$2"; }
-    create_fp8_model() { mkdir -p "$2"; }
-    create_pruned_model() { mkdir -p "$2"; }
-    create_lowrank_model() { mkdir -p "$2"; }
-
-    local calib_tmp_dir="${model_output_dir}/evals/.clean_calib"
-    mkdir -p "${calib_tmp_dir}"
-    echo '{"results": {"mmlu": {"acc": 0.5}}}' > "${calib_tmp_dir}/quant_8bit_clean_calib.json"
-
-    _cmd_python() {
-        if [[ "$*" == *"-m"*"lm_eval"* ]]; then
-            local out_dir=""
-            local args=("$@");
-            local i=0
-            while [[ ${i} -lt ${#args[@]} ]]; do
-                if [[ "${args[$i]}" == "--output_path" ]]; then
-                    out_dir="${args[$((i + 1))]}"
-                    break
-                fi
-                i=$((i + 1))
-            done
-            mkdir -p "${out_dir}"
-            echo '{"results": {"mmlu": {"acc": 0.5}}}' > "${out_dir}/results.json"
-            return 0
-        fi
-        if [[ "${1:-}" == "-" && "${2:-}" == "${baseline_dir}" ]]; then
-            echo "4"
-            return 0
-        fi
-        if [[ "${1:-}" == "-" && "${2:-}" == *"baseline_calibration_results.json" ]]; then
-            return 0
-        fi
-        if [[ "${1:-}" == "-" && "${2:-}" == "${model_output_dir}/state/clean_edit_params.jsonl" ]]; then
-            echo "{}" > "${3}"
-            return 0
-        fi
-        return 0
-    }
-
-    task_calibrate_clean_edits "${model_name}" 0 "${out}" "${log_file}"
-    assert_file_exists "${model_output_dir}/state/clean_edit_params.json" "clean params written"
-
-    local unknown_params="${TEST_TMPDIR}/unknown.jsonl"
-    : > "${unknown_params}"
-    params_jsonl="${unknown_params}"
-    select_candidate "mystery" "ffn" "noop"
-    assert_match "skipped" "$(cat "${unknown_params}")" "unknown family recorded"
-}
-
-test_task_calibrate_clean_edits_skips_when_no_candidate_selected() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
-
-    local out="${TEST_TMPDIR}/out"
-    local model_name="m"
-    local model_output_dir="${out}/${model_name}"
-    local baseline_dir="${model_output_dir}/models/baseline"
-    local log_file="${TEST_TMPDIR}/log.txt"
-    mkdir -p "${baseline_dir}" "${model_output_dir}/evals" "$(dirname "${log_file}")"
-    echo "{}" > "${baseline_dir}/config.json"
-    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
-    echo "meta-llama/Llama-2-13b-hf" > "${model_output_dir}/.model_id"
-    echo "{}" > "${model_output_dir}/evals/baseline_results.json"
-    : > "${log_file}"
-
-    CLEAN_QUANT_BITS=8
-    CLEAN_QUANT_GROUP_SIZES="128"
-    CLEAN_FP8_FORMATS="e4m3fn"
-    CLEAN_PRUNE_LEVELS="0.1"
-    CLEAN_SVD_RANK_RATIOS="0.25"
-    CLEAN_EVAL_LIMIT=200
-
-    _cmd_python() {
-        if [[ "$*" == *"-m"*"lm_eval"* ]]; then
-            local out_dir=""
-            local args=("$@");
-            local i=0
-            while [[ ${i} -lt ${#args[@]} ]]; do
-                if [[ "${args[$i]}" == "--output_path" ]]; then
-                    out_dir="${args[$((i + 1))]}"
-                    break
-                fi
-                i=$((i + 1))
-            done
-            mkdir -p "${out_dir}"
-            echo '{"results": {"mmlu": {"acc": 0.5}}}' > "${out_dir}/results.json"
-            return 0
-        fi
-        if [[ "${1:-}" == "-" && "${2:-}" == "${baseline_dir}" ]]; then
-            echo "4"
-            return 0
-        fi
-        if [[ "${1:-}" == "-" && "${2:-}" == *"baseline_calibration_results.json" ]]; then
-            return 1
-        fi
-        if [[ "${1:-}" == "-" && "${2:-}" == "${model_output_dir}/state/clean_edit_params.jsonl" ]]; then
-            echo "{}" > "${3}"
-            return 0
-        fi
-        return 0
-    }
-
-    task_calibrate_clean_edits "${model_name}" 0 "${out}" "${log_file}"
+    PACK_TUNED_EDIT_PARAMS_FILE="${TEST_TMPDIR}/missing.json"
+    export PACK_TUNED_EDIT_PARAMS_FILE
+    resolved=$(resolve_edit_params "${model_output_dir}" "lowrank_svd:clean:ffn" "clean")
+    assert_eq "missing" "$(echo "${resolved}" | jq -r '.status')" "missing tuned params file returns missing"
 }
 
 
@@ -1545,5 +1166,5 @@ EOF
 
     PACK_GUARDS_ORDER=" , "
     task_calibration_run "${model_name}" 0 "2" "43" "${out}" "${log_file}"
-    assert_match "invariants" "$(cat "${model_output_dir}/certificates/calibration/run_2/calibration_config.yaml")" "default guard order used"
+    assert_match "spectral" "$(cat "${model_output_dir}/certificates/calibration/run_2/calibration_config.yaml")" "default guard order used"
 }

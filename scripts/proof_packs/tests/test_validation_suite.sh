@@ -52,6 +52,8 @@ test_pack_validation_bash4_guard_reports_error_on_bash3() {
     mock_reset
 
     source ./scripts/proof_packs/lib/validation_suite.sh
+    # Simulate bash3 (non-bash4) regardless of the host bash version.
+    pack_is_bash4() { return 1; }
     local rc=0
     if pack_require_bash4; then
         rc=0
@@ -1847,12 +1849,9 @@ test_pack_validation_process_model_clean_and_stress_skip_branches() {
     EDIT_TYPES_STRESS=("quant_rtn:4:32:ffn")
     RUN_ERROR_INJECTION="false"
 
-    CALIBRATE_CLEAN_EDITS="true"
     CLEAN_EDIT_RUNS=1
     STRESS_EDIT_RUNS=1
-    task_calibrate_clean_edits() { echo "calibrate" > "${TEST_TMPDIR}/cal.calls"; }
     process_model "model/a" "0"
-    assert_file_exists "${TEST_TMPDIR}/cal.calls" "clean calibration invoked"
 
     CLEAN_EDIT_RUNS=0
     STRESS_EDIT_RUNS=1
@@ -2037,6 +2036,10 @@ test_pack_validation_pack_run_suite_branches() {
 
     cleanup() { return 0; }
     pack_apply_network_mode() { :; }
+    pack_prepare_tuned_edit_params() { :; }
+    pack_validate_tuned_edit_params() { :; }
+    pack_prepare_calibration_presets() { :; }
+    pack_validate_guard_calibration() { :; }
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
     PACK_NET="0"
@@ -2223,4 +2226,35 @@ EOF
     if [[ -f "${TEST_TMPDIR}/curl.calls" ]]; then
         t_fail "curl should not be invoked when HF_ENDPOINT is already set"
     fi
+}
+
+test_pack_prepare_tuned_edit_params_resolves_default_from_scripts_dir_and_copies_into_state() {
+    mock_reset
+
+    local fake_repo
+    fake_repo="$(mktemp -d "${TEST_TMPDIR}/fake_repo.XXXXXX")"
+    mkdir -p "${fake_repo}/scripts/proof_packs/lib"
+    cp "${TEST_ROOT}/scripts/proof_packs/lib/"*.sh "${fake_repo}/scripts/proof_packs/lib/"
+    mkdir -p "${fake_repo}/scripts/proof_packs"
+
+    cat > "${fake_repo}/scripts/proof_packs/tuned_edit_params.json" <<'JSON'
+{
+  "_meta": {"schema": "tuned_edit_params_v1"},
+  "models": {}
+}
+JSON
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    CLEAN_EDIT_RUNS="1"
+    unset PACK_TUNED_EDIT_PARAMS_FILE
+
+    # shellcheck source=../lib/validation_suite.sh
+    source "${fake_repo}/scripts/proof_packs/lib/validation_suite.sh"
+    pack_setup_output_dirs
+
+    pack_prepare_tuned_edit_params
+
+    assert_file_exists "${OUTPUT_DIR}/state/tuned_edit_params.json" "tuned file copied into run state"
+    assert_match "\"tuned_edit_params_v1\"" "$(cat "${OUTPUT_DIR}/state/tuned_edit_params.json")" "copied content preserved"
+    assert_eq "${OUTPUT_DIR}/state/tuned_edit_params.json" "${PACK_TUNED_EDIT_PARAMS_FILE}" "env updated to copied path"
 }
