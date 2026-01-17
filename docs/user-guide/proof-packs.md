@@ -27,7 +27,8 @@ that can fit the selected models.
 
 ```bash
 # RECOMMENDED: Full proof pack with verification artifacts
-./scripts/proof_packs/run_pack.sh --suite subset --net 1
+PACK_TUNED_EDIT_PARAMS_FILE=./scripts/proof_packs/tuned_edit_params.json \
+  ./scripts/proof_packs/run_pack.sh --suite subset --net 1
 
 # Development/debugging only (runs the suite, but does not build a proof pack)
 ./scripts/proof_packs/run_suite.sh --suite subset --resume
@@ -35,6 +36,10 @@ that can fit the selected models.
 # Verify an existing proof pack
 ./scripts/proof_packs/verify_pack.sh --pack ./proof_pack_runs/subset_20250101_000000/proof_pack
 ```
+
+Note: clean edits require tuned preset parameters. Either set
+`PACK_TUNED_EDIT_PARAMS_FILE` or place the file at
+`scripts/proof_packs/tuned_edit_params.json`.
 
 ## How It Works
 

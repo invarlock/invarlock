@@ -712,9 +712,6 @@ estimate_model_memory() {
             "EVAL_BASELINE")
                 multiplier="1.1"
                 ;;
-            "CALIBRATE_CLEAN")
-                multiplier="1.2"
-                ;;
             "CALIBRATION_RUN")
                 multiplier="1.05"
                 ;;
@@ -747,9 +744,6 @@ estimate_model_memory() {
                 ;;
             "EVAL_BASELINE")
                 multiplier="1.2"
-                ;;
-            "CALIBRATE_CLEAN")
-                multiplier="1.4"
                 ;;
             "CALIBRATION_RUN")
                 multiplier="1.1"

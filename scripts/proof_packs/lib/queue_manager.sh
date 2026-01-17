@@ -1009,23 +1009,15 @@ generate_model_tasks() {
     task_ids+=("${eval_base_id}")
     echo "Created: ${eval_base_id}"
 
-    # 2.5 CALIBRATE_CLEAN (depends on setup + baseline eval)
-    local clean_cal_id=""
-    local calibrate_clean="${CALIBRATE_CLEAN_EDITS:-true}"
-    if [[ "${calibrate_clean}" == "true" && ${CLEAN_EDIT_RUNS:-0} -gt 0 ]]; then
-        :
-        clean_cal_id=$(add_task "CALIBRATE_CLEAN" "${model_id}" "${model_name}" \
-            "$(estimate_model_memory "${model_id}" "CALIBRATE_CLEAN")" \
-            "${setup_id},${eval_base_id}" '{}' 82)
-        task_ids+=("${clean_cal_id}")
-        echo "Created: ${clean_cal_id}"
-    fi
-
     # 3. CALIBRATION_RUN × N (depend on setup)
     local cal_ids=()
     local calibration_runs="${DRIFT_CALIBRATION_RUNS:-5}"
     if ! [[ "${calibration_runs}" =~ ^[0-9]+$ ]]; then
         calibration_runs=5
+    fi
+    local preset_ready="${PACK_PRESET_READY:-false}"
+    if [[ "${preset_ready}" == "1" ]]; then
+        preset_ready="true"
     fi
     if [[ ${calibration_runs} -gt 0 ]]; then
         for run in $(seq 1 "${calibration_runs}"); do
@@ -1050,8 +1042,13 @@ generate_model_tasks() {
         echo "Skipping GENERATE_PRESET (calibration_runs=0)"
     fi
 
+    local use_preset="false"
+    if [[ ${calibration_runs} -gt 0 || "${preset_ready}" == "true" ]]; then
+        use_preset="true"
+    fi
+
     # 5/6. Edit creation + eval/certify
-    # Clean edits (3 certify runs each); params calibrated per model using lm-eval.
+    # Clean edits use tuned presets supplied outside the run.
     local clean_edits=("quant_rtn:clean:ffn" "fp8_quant:clean:ffn" "magnitude_prune:clean:ffn" "lowrank_svd:clean:ffn")
     # Stress edits (2 certify runs each)
     local stress_edits=("quant_rtn:4:32:all" "fp8_quant:e5m2:all" "magnitude_prune:0.5:all" "lowrank_svd:32:all")
@@ -1077,16 +1074,13 @@ generate_model_tasks() {
         ]'
 
         local edit_deps="${setup_id}"
-        if [[ -n "${clean_cal_id}" ]]; then
-            edit_deps="${setup_id},${clean_cal_id}"
-        fi
         local edits_id=$(add_task "CREATE_EDITS_BATCH" "${model_id}" "${model_name}" \
             "$(estimate_model_memory "${model_id}" "CREATE_EDITS_BATCH")" \
             "${edit_deps}" '{"edit_specs": '"${all_edit_specs}"', "use_batch": true}' 70)
         task_ids+=("${edits_id}")
         echo "Created: ${edits_id}"
 
-        if [[ ${calibration_runs} -gt 0 ]]; then
+        if [[ "${use_preset}" == "true" ]]; then
             for edit_spec in "${clean_edits[@]}"; do
                 local clean_runs=${CLEAN_EDIT_RUNS}
                 if ! [[ "${clean_runs}" =~ ^-?[0-9]+$ ]]; then
@@ -1123,16 +1117,13 @@ generate_model_tasks() {
                     "${stress_runs}"
             done
         else
-            echo "Skipping edit certify tasks (calibration_runs=0)"
+            echo "Skipping edit certify tasks (no calibrated preset available)"
         fi
 
     else
         # CREATE_EDIT - Create single edits (one task per edit) and enqueue eval/certify
         for edit_spec in "${clean_edits[@]}"; do
             local edit_deps="${setup_id}"
-            if [[ -n "${clean_cal_id}" ]]; then
-                edit_deps="${setup_id},${clean_cal_id}"
-            fi
             local edit_id=$(add_task "CREATE_EDIT" "${model_id}" "${model_name}" \
                 "$(estimate_model_memory "${model_id}" "CREATE_EDIT")" \
                 "${edit_deps}" '{"edit_spec": "'"${edit_spec}"'", "version": "clean", "model_idx": '"${model_idx}"'}' 70)
@@ -1147,11 +1138,15 @@ generate_model_tasks() {
             echo "Created: ${eval_id}"
 
             # CERTIFY_EDIT runs for clean edits (3 by default)
-            if [[ ${CLEAN_EDIT_RUNS:-0} -gt 0 && ${calibration_runs} -gt 0 ]]; then
+            if [[ ${CLEAN_EDIT_RUNS:-0} -gt 0 && "${use_preset}" == "true" ]]; then
                 for run in $(seq 1 "${CLEAN_EDIT_RUNS}"); do
+                    local cert_deps="${edit_id}"
+                    if [[ -n "${preset_id}" ]]; then
+                        cert_deps="${edit_id},${preset_id}"
+                    fi
                     local cert_id=$(add_task "CERTIFY_EDIT" "${model_id}" "${model_name}" \
                         "$(estimate_model_memory "${model_id}" "CERTIFY_EDIT")" \
-                        "${edit_id},${preset_id}" '{"edit_spec": "'"${edit_spec}"'", "version": "clean", "run": '"${run}"'}' 65)
+                        "${cert_deps}" '{"edit_spec": "'"${edit_spec}"'", "version": "clean", "run": '"${run}"'}' 65)
                     task_ids+=("${cert_id}")
                     echo "Created: ${cert_id}"
                 done
@@ -1171,11 +1166,15 @@ generate_model_tasks() {
             task_ids+=("${eval_id}")
             echo "Created: ${eval_id}"
 
-            if [[ ${STRESS_EDIT_RUNS:-0} -gt 0 && ${calibration_runs} -gt 0 ]]; then
+            if [[ ${STRESS_EDIT_RUNS:-0} -gt 0 && "${use_preset}" == "true" ]]; then
                 for run in $(seq 1 "${STRESS_EDIT_RUNS}"); do
+                    local cert_deps="${edit_id}"
+                    if [[ -n "${preset_id}" ]]; then
+                        cert_deps="${edit_id},${preset_id}"
+                    fi
                     local cert_id=$(add_task "CERTIFY_EDIT" "${model_id}" "${model_name}" \
                         "$(estimate_model_memory "${model_id}" "CERTIFY_EDIT")" \
-                        "${edit_id},${preset_id}" '{"edit_spec": "'"${edit_spec}"'", "version": "stress", "run": '"${run}"'}' 65)
+                        "${cert_deps}" '{"edit_spec": "'"${edit_spec}"'", "version": "stress", "run": '"${run}"'}' 65)
                     task_ids+=("${cert_id}")
                     echo "Created: ${cert_id}"
                 done
@@ -1194,14 +1193,17 @@ generate_model_tasks() {
             echo "Created: ${error_create_id}"
 
             # CERTIFY_ERROR (only if preset exists)
-            if [[ ${calibration_runs} -gt 0 ]]; then
-                :
+            if [[ "${use_preset}" == "true" ]]; then
+                local cert_deps="${error_create_id}"
+                if [[ -n "${preset_id}" ]]; then
+                    cert_deps="${error_create_id},${preset_id}"
+                fi
                 local error_cert_id=$(add_task "CERTIFY_ERROR" "${model_id}" "${model_name}" \
                     "$(estimate_model_memory "${model_id}" "CERTIFY_ERROR")" \
-                    "${error_create_id},${preset_id}" '{"error_type": "'"${error_type}"'"}' 55)
+                    "${cert_deps}" '{"error_type": "'"${error_type}"'"}' 55)
                 echo "Created: ${error_cert_id}"
             else
-                echo "Skipping CERTIFY_ERROR (${error_type}) because calibration_runs=0"
+                echo "Skipping CERTIFY_ERROR (${error_type}) because no calibrated preset is available"
             fi
         done
     else
@@ -1248,9 +1250,13 @@ generate_eval_certify_tasks() {
     # Certification uses pre-computed reference values, not eval results
     if [[ ${cert_runs} -gt 0 ]]; then
         for run in $(seq 1 "${cert_runs}"); do
+            local cert_deps="${batch_edit_id}"
+            if [[ -n "${preset_id}" ]]; then
+                cert_deps="${batch_edit_id},${preset_id}"
+            fi
             local cert_id=$(add_task "CERTIFY_EDIT" "${model_id}" "${model_name}" \
                 "$(estimate_model_memory "${model_id}" "CERTIFY_EDIT")" \
-                "${batch_edit_id},${preset_id}" '{"edit_spec": "'"${edit_spec}"'", "version": "'"${version}"'", "run": '"${run}"'}' 65)
+                "${cert_deps}" '{"edit_spec": "'"${edit_spec}"'", "version": "'"${version}"'", "run": '"${run}"'}' 65)
             echo "Created: ${cert_id}"
         done
     fi
@@ -1291,9 +1297,13 @@ generate_edit_tasks() {
     # CERTIFY_EDIT × cert_runs
     if [[ ${cert_runs} -gt 0 ]]; then
         for run in $(seq 1 "${cert_runs}"); do
+            local cert_deps="${edit_id}"
+            if [[ -n "${preset_id}" ]]; then
+                cert_deps="${edit_id},${preset_id}"
+            fi
             local cert_id=$(add_task "CERTIFY_EDIT" "${model_id}" "${model_name}" \
                 "$(estimate_model_memory "${model_id}" "CERTIFY_EDIT")" \
-                "${edit_id},${preset_id}" '{"edit_spec": "'"${edit_spec}"'", "version": "'"${version}"'", "run": '"${run}"'}' 65)
+                "${cert_deps}" '{"edit_spec": "'"${edit_spec}"'", "version": "'"${version}"'", "run": '"${run}"'}' 65)
             echo "Created: ${cert_id}"
         done
     fi
