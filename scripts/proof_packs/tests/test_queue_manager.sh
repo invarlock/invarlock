@@ -807,6 +807,15 @@ test_generate_eval_certify_tasks_and_generate_edit_tasks_create_expected_tasks()
     pending_count="$(ls "${QUEUE_DIR}/pending"/*.task 2>/dev/null | wc -l | tr -d ' ')"
     assert_eq "5" "${pending_count}" "4 split eval + 1 certify task"
 
+    local task_file task_type version
+    for task_file in "${QUEUE_DIR}/pending"/*.task; do
+        task_type="$(jq -r '.task_type' "${task_file}")"
+        if [[ "${task_type}" == EVAL_* ]]; then
+            version="$(jq -r '.params.version // ""' "${task_file}")"
+            assert_eq "clean" "${version}" "split eval tasks carry version hint"
+        fi
+    done
+
     run generate_edit_tasks "org/model" "m" "setup1" "preset1" "quant_rtn:8:128:ffn" "clean" "1"
     assert_match 'deprecated' "${RUN_ERR}" "generate_edit_tasks warns"
 }

@@ -585,13 +585,15 @@ execute_task() {
                 ;;
             EVAL_EDIT)
                 local edit_spec=$(echo "${params}" | jq -r '.edit_spec // ""')
-                task_eval_edit "${model_name}" "${gpu_id}" "${edit_spec}" "${output_dir}" "${task_log}" || exit_code=$?
+                local version=$(echo "${params}" | jq -r '.version // ""')
+                task_eval_edit "${model_name}" "${gpu_id}" "${edit_spec}" "${output_dir}" "${task_log}" "${version}" || exit_code=$?
                 ;;
             EVAL_MMLU|EVAL_HELLASWAG|EVAL_ARC|EVAL_WINOGRANDE)
                 # v2.1.0: Split eval tasks - individual benchmarks for better parallelism
                 local edit_spec=$(echo "${params}" | jq -r '.edit_spec // ""')
                 local benchmark=$(echo "${params}" | jq -r '.benchmark // ""')
-                task_eval_single_benchmark "${model_name}" "${gpu_id}" "${edit_spec}" "${benchmark}" "${output_dir}" "${task_log}" || exit_code=$?
+                local version=$(echo "${params}" | jq -r '.version // ""')
+                task_eval_single_benchmark "${model_name}" "${gpu_id}" "${edit_spec}" "${benchmark}" "${output_dir}" "${task_log}" "${version}" || exit_code=$?
                 ;;
             CERTIFY_EDIT)
                 local edit_spec=$(echo "${params}" | jq -r '.edit_spec // ""')
@@ -1618,13 +1620,14 @@ BATCH_EDIT_EOF
 # ============ TASK: EVAL_EDIT ============
 
 # Run lm-eval on edited model
-# Usage: task_eval_edit <model_name> <gpu_id> <edit_spec> <output_dir> <log_file>
+# Usage: task_eval_edit <model_name> <gpu_id> <edit_spec> <output_dir> <log_file> [version_hint]
 task_eval_edit() {
     local model_name="$1"
     local gpu_id="$2"
     local edit_spec="$3"
     local output_dir="$4"
     local log_file="$5"
+    local version_hint="${6:-}"
 
     local model_output_dir="${output_dir}/${model_name}"
 
@@ -1650,7 +1653,24 @@ task_eval_edit() {
         edit_dir_name=$(echo "${resolved}" | jq -r '.edit_dir_name')
         edit_path="${model_output_dir}/models/${edit_dir_name}"
     else
+        if [[ "${version_hint}" == "clean" || "${version_hint}" == "stress" ]]; then
+            local resolved
+            resolved=$(resolve_edit_params "${model_output_dir}" "${edit_spec}" "${version_hint}")
+            local status
+            status=$(echo "${resolved}" | jq -r '.status')
+            if [[ "${status}" == "selected" ]]; then
+                local edit_dir_name
+                edit_dir_name=$(echo "${resolved}" | jq -r '.edit_dir_name')
+                local potential_path="${model_output_dir}/models/${edit_dir_name}"
+                if [[ -d "${potential_path}" ]]; then
+                    edit_path="${potential_path}"
+                fi
+            fi
+        fi
         for version in clean stress; do
+            if [[ -n "${edit_path}" ]]; then
+                break
+            fi
             local resolved
             resolved=$(resolve_edit_params "${model_output_dir}" "${edit_spec}" "${version}")
             local status
@@ -1742,7 +1762,7 @@ task_eval_edit() {
 # Run a single lm-eval benchmark on edited model (Split Eval optimization)
 # This runs one benchmark (MMLU, HellaSwag, ARC, or WinoGrande) instead of all 4
 # Enables 4× parallelism: each benchmark can run on a different GPU
-# Usage: task_eval_single_benchmark <model_name> <gpu_id> <edit_spec> <benchmark> <output_dir> <log_file>
+# Usage: task_eval_single_benchmark <model_name> <gpu_id> <edit_spec> <benchmark> <output_dir> <log_file> [version_hint]
 task_eval_single_benchmark() {
     local model_name="$1"
     local gpu_id="$2"
@@ -1750,6 +1770,7 @@ task_eval_single_benchmark() {
     local benchmark="$4"
     local output_dir="$5"
     local log_file="$6"
+    local version_hint="${7:-}"
 
     local model_output_dir="${output_dir}/${model_name}"
 
@@ -1775,7 +1796,24 @@ task_eval_single_benchmark() {
         edit_dir_name=$(echo "${resolved}" | jq -r '.edit_dir_name')
         edit_path="${model_output_dir}/models/${edit_dir_name}"
     else
+        if [[ "${version_hint}" == "clean" || "${version_hint}" == "stress" ]]; then
+            local resolved
+            resolved=$(resolve_edit_params "${model_output_dir}" "${edit_spec}" "${version_hint}")
+            local status
+            status=$(echo "${resolved}" | jq -r '.status')
+            if [[ "${status}" == "selected" ]]; then
+                local edit_dir_name
+                edit_dir_name=$(echo "${resolved}" | jq -r '.edit_dir_name')
+                local potential_path="${model_output_dir}/models/${edit_dir_name}"
+                if [[ -d "${potential_path}" ]]; then
+                    edit_path="${potential_path}"
+                fi
+            fi
+        fi
         for version in clean stress; do
+            if [[ -n "${edit_path}" ]]; then
+                break
+            fi
             local resolved
             resolved=$(resolve_edit_params "${model_output_dir}" "${edit_spec}" "${version}")
             local status

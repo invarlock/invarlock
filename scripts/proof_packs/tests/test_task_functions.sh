@@ -1188,3 +1188,35 @@ EOF
     task_calibration_run "${model_name}" 0 "2" "43" "${out}" "${log_file}"
     assert_match "spectral" "$(cat "${model_output_dir}/certificates/calibration/run_2/calibration_config.yaml")" "default guard order used"
 }
+
+
+test_task_eval_single_benchmark_prefers_explicit_version_hint_when_both_edits_exist() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+    stub_resolve_edit_params
+
+    local out="${TEST_TMPDIR}/out"
+    local model_name="m"
+    local model_output_dir="${out}/${model_name}"
+    local log_file="${TEST_TMPDIR}/log.txt"
+    mkdir -p "${model_output_dir}/models/quant_4bit_clean" \
+        "${model_output_dir}/models/quant_4bit_stress" \
+        "${model_output_dir}/evals" \
+        "$(dirname "${log_file}")"
+    : > "${log_file}"
+
+    echo "{}" > "${model_output_dir}/evals/quant_4bit_stress_mmlu_results.json"
+
+    task_eval_single_benchmark \
+        "${model_name}" \
+        0 \
+        "quant_rtn:4:32:all" \
+        "mmlu" \
+        "${out}" \
+        "${log_file}" \
+        "stress"
+
+    assert_match "quant_4bit_stress" "$(cat "${log_file}")" "version hint selects stress edit"
+    [[ "$(cat "${log_file}")" != *"quant_4bit_clean"* ]] || t_fail "unexpected clean edit selection"
+}

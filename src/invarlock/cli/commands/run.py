@@ -355,6 +355,89 @@ def _resolve_pm_acceptance_range(
     return {"min": float(min_val), "max": float(max_val)}
 
 
+def _resolve_pm_drift_band(
+    cfg: InvarLockConfig | dict[str, Any] | None,
+) -> dict[str, float]:
+    """Resolve preview→final drift band from config/env with safe defaults.
+
+    The drift band governs the Preview Final Drift Acceptable gate. By default,
+    certificates enforce 0.95–1.05 unless an explicit band is provided.
+    """
+
+    base_min = 0.95
+    base_max = 1.05
+
+    cfg_min = None
+    cfg_max = None
+    try:
+        cfg_map = _coerce_mapping(cfg) if cfg is not None else {}
+        pm_section = cfg_map.get("primary_metric") if isinstance(cfg_map, dict) else {}
+        pm_map = _coerce_mapping(pm_section)
+        drift_band = pm_map.get("drift_band") if isinstance(pm_map, dict) else None
+        if isinstance(drift_band, dict):
+            if drift_band.get("min") is not None:
+                try:
+                    cfg_min = float(drift_band["min"])
+                except (TypeError, ValueError):
+                    cfg_min = None
+            if drift_band.get("max") is not None:
+                try:
+                    cfg_max = float(drift_band["max"])
+                except (TypeError, ValueError):
+                    cfg_max = None
+        elif isinstance(drift_band, list | tuple) and len(drift_band) == 2:
+            try:
+                cfg_min = float(drift_band[0])
+                cfg_max = float(drift_band[1])
+            except (TypeError, ValueError):
+                cfg_min = None
+                cfg_max = None
+    except Exception:
+        cfg_min = None
+        cfg_max = None
+
+    def _parse_env(name: str) -> float | None:
+        try:
+            raw = os.environ.get(name, "")
+            if raw is None or str(raw).strip() == "":
+                return None
+            return float(raw)
+        except Exception:
+            return None
+
+    env_min = _parse_env("INVARLOCK_PM_DRIFT_MIN")
+    env_max = _parse_env("INVARLOCK_PM_DRIFT_MAX")
+
+    has_explicit = any(v is not None for v in (cfg_min, cfg_max, env_min, env_max))
+    if not has_explicit:
+        return {}
+
+    min_val = (
+        env_min if env_min is not None else cfg_min if cfg_min is not None else base_min
+    )
+    max_val = (
+        env_max if env_max is not None else cfg_max if cfg_max is not None else base_max
+    )
+
+    try:
+        if min_val is not None and min_val <= 0:
+            min_val = base_min
+    except Exception:
+        min_val = base_min
+    try:
+        if max_val is not None and max_val <= 0:
+            max_val = base_max
+    except Exception:
+        max_val = base_max
+    try:
+        if min_val is not None and max_val is not None and min_val >= max_val:
+            min_val, max_val = base_min, base_max
+    except Exception:
+        min_val, max_val = base_min, base_max
+
+    return {"min": float(min_val), "max": float(max_val)}
+
+
 def _free_model_memory(model: object | None) -> None:
     """Best-effort cleanup to release GPU memory for a model object."""
     if model is None:
@@ -2616,6 +2699,7 @@ def run_command(
             "guards": guard_metadata,
         }
         pm_acceptance_range = _resolve_pm_acceptance_range(cfg)
+        pm_drift_band = _resolve_pm_drift_band(cfg)
 
         _event(
             console,
@@ -2687,6 +2771,9 @@ def run_command(
             pm_acceptance_range
         )
         run_context["pm_acceptance_range"] = pm_acceptance_range
+        if pm_drift_band:
+            run_context.setdefault("primary_metric", {})["drift_band"] = pm_drift_band
+            run_context["pm_drift_band"] = pm_drift_band
         run_context["model_profile"] = {
             "family": model_profile.family,
             "default_loss": model_profile.default_loss,
@@ -4047,6 +4134,8 @@ def run_command(
             report["meta"].update(meta_payload)
             if pm_acceptance_range:
                 report["meta"]["pm_acceptance_range"] = pm_acceptance_range
+            if pm_drift_band:
+                report["meta"]["pm_drift_band"] = pm_drift_band
             report["meta"]["model_profile"] = {
                 "family": model_profile.family,
                 "default_loss": model_profile.default_loss,

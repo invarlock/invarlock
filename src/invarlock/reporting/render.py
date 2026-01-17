@@ -890,6 +890,31 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
             )
         )
         status = "✅ PASS" if ok else "❌ FAIL"
+        drift_min = 0.95
+        drift_max = 1.05
+        try:
+            drift_band = (
+                pm_block.get("drift_band") if isinstance(pm_block, dict) else None
+            )
+            if isinstance(drift_band, dict):
+                lo = drift_band.get("min")
+                hi = drift_band.get("max")
+                if isinstance(lo, int | float) and isinstance(hi, int | float):
+                    lo_f = float(lo)
+                    hi_f = float(hi)
+                    if math.isfinite(lo_f) and math.isfinite(hi_f) and 0 < lo_f < hi_f:
+                        drift_min = lo_f
+                        drift_max = hi_f
+            elif isinstance(drift_band, list | tuple) and len(drift_band) == 2:
+                lo_raw, hi_raw = drift_band[0], drift_band[1]
+                if isinstance(lo_raw, int | float) and isinstance(hi_raw, int | float):
+                    lo_f = float(lo_raw)
+                    hi_f = float(hi_raw)
+                    if math.isfinite(lo_f) and math.isfinite(hi_f) and 0 < lo_f < hi_f:
+                        drift_min = lo_f
+                        drift_max = hi_f
+        except Exception:
+            pass
         # Compute drift from PM preview/final when available
         try:
             pv = (
@@ -910,8 +935,9 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
         except Exception:
             drift = float("nan")
         measured = f"{drift:.3f}x" if math.isfinite(drift) else "N/A"
+        band_label = f"{drift_min:.2f}–{drift_max:.2f}x"
         lines.append(
-            f"| Preview Final Drift Acceptable | {status} | {measured} | 0.95–1.05x | point | Final/Preview ratio stability |"
+            f"| Preview Final Drift Acceptable | {status} | {measured} | {band_label} | point | Final/Preview ratio stability |"
         )
 
     # Helper to emit Guard Overhead Acceptable row (only when evaluated)
