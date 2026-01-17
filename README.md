@@ -21,7 +21,20 @@ For guidance on where to ask questions, how to report bugs, and what to expect i
 
 ## 🚀 Quick start (no repo clone)
 
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_quickstart_cpu.ipynb)
+Notebooks (Colab):
+
+- [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_quickstart_cpu.ipynb)
+  `invarlock_quickstart_cpu.ipynb` — install + certify + verify + HTML export (CPU-friendly)
+- [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_compare_certify.ipynb)
+  `invarlock_compare_certify.ipynb` — Compare & Certify (BYOE) end-to-end
+- [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_certificate_deep_dive.ipynb)
+  `invarlock_certificate_deep_dive.ipynb` — reading and interpreting certificates
+- [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_custom_datasets.ipynb)
+  `invarlock_custom_datasets.ipynb` — Bring Your Own Data (BYOD) with `local_jsonl`
+- [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_python_api.ipynb)
+  `invarlock_python_api.ipynb` — programmatic Python API usage
+- [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_policy_tiers.ipynb)
+  `invarlock_policy_tiers.ipynb` — Conservative vs Balanced vs Aggressive tier comparison
 
 ```bash
 # Install with HF adapters
