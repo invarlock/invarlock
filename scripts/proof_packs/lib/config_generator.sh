@@ -486,20 +486,27 @@ def calibrate_drift(recs):
         ratios = []
         for rec in recs:
             pm = rec.get("primary_metric", {}) or {}
-            ratio = pm.get("ratio_vs_baseline") or pm.get("drift")
-            if ratio is None:
-                preview = pm.get("preview")
-                final = pm.get("final")
-                if preview is not None and final is not None:
-                    try:
-                        ratio = float(final) / max(float(preview), 1e-10)
-                    except Exception:
-                        ratio = None
-            if ratio is not None:
+            ratio = None
+
+            def _finite(val):
                 try:
-                    ratios.append(float(ratio))
+                    if val is None:
+                        return None
+                    parsed = float(val)
                 except Exception:
-                    pass
+                    return None
+                return parsed if math.isfinite(parsed) else None
+
+            ratio = _finite(pm.get("preview_final_ratio"))
+            if ratio is None:
+                ratio = _finite(pm.get("drift"))
+            if ratio is None:
+                preview = _finite(pm.get("preview"))
+                final = _finite(pm.get("final"))
+                if preview is not None and final is not None and preview > 0:
+                    ratio = float(final) / max(float(preview), 1e-10)
+            if ratio is not None:
+                ratios.append(float(ratio))
 
         ratios = [r for r in ratios if math.isfinite(r)]
         if len(ratios) < 2:
@@ -879,6 +886,20 @@ spectral_summary, spectral_caps = calibrate_spectral(records)
 rmt_summary, rmt_epsilon = calibrate_rmt(records)
 variance_config = calibrate_variance(records)
 
+drift_band_cfg = None
+try:
+    band = drift_stats.get("suggested_band")
+except Exception:
+    band = None
+if isinstance(band, (list, tuple)) and len(band) == 2:
+    try:
+        lo = float(band[0])
+        hi = float(band[1])
+    except Exception:
+        lo, hi = float("nan"), float("nan")
+    if math.isfinite(lo) and math.isfinite(hi) and 0 < lo < hi:
+        drift_band_cfg = {"min": lo, "max": hi}
+
 spectral_max_caps_override = (os.environ.get("PACK_SPECTRAL_MAX_CAPS") or "").strip()
 try:
     spectral_max_caps_override = int(spectral_max_caps_override) if spectral_max_caps_override else None
@@ -927,6 +948,8 @@ preset = {
     },
     "guards": {"order": guards_order},
 }
+if drift_band_cfg is not None:
+    preset["primary_metric"] = {"drift_band": drift_band_cfg}
 
 if isinstance(assurance_cfg, dict) and assurance_cfg:
     preset["assurance"] = assurance_cfg

@@ -77,6 +77,20 @@ def test_verify_counts_and_drift_errors(tmp_path: Path, capsys) -> None:
     assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 1
 
 
+def test_verify_drift_band_override_allows_wider_drift(tmp_path: Path, capsys) -> None:
+    c = _cert_min()
+    c["primary_metric"]["preview"] = 5.0
+    c["primary_metric"]["final"] = 6.0  # drift 1.2
+    c["primary_metric"]["ratio_vs_baseline"] = 0.6
+    c["primary_metric"]["drift_band"] = {"min": 0.9, "max": 1.3}
+    p = _w(tmp_path / "c.json", c)
+    with pytest.raises(typer.Exit) as ei:
+        verify_command([p], baseline=None, profile="dev", json_out=True)
+    out = json.loads(capsys.readouterr().out)
+    assert out["resolution"]["exit_code"] == 0
+    assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 0
+
+
 def test_verify_json_results_handle_load_error_in_summary(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
