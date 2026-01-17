@@ -549,18 +549,38 @@ test_task_certify_edit_and_error_cover_preset_discovery_overrides_and_certificat
     export INVARLOCK_BOOTSTRAP_N="1234"
     _estimate_model_size() { echo "7"; }
 
+    mkdir -p "${out}/presets"
+    cat > "${out}/presets/calibrated_preset_${model_name}__quant_rtn.yaml" <<'YAML'
+dataset:
+  provider: wikitext2
+  split: validation
+  seq_len: 2048
+  stride: 1024
+guards:
+  spectral:
+    max_caps: 15
+YAML
+
     task_certify_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean 1 "${out}" "${log_file}"
-    local override_preset="${cert_dir}/oom_override_preset.yaml"
-    assert_file_exists "${override_preset}" "override preset created"
-    local override_contents
-    override_contents="$(cat "${override_preset}")"
-    assert_match "seq_len: 100" "${override_contents}" "override preset seq_len"
-    assert_match "stride: 100" "${override_contents}" "override preset stride uses pairing"
+    local profile_yaml="${cert_dir}/config_root/runtime/profiles/ci.yaml"
+    assert_file_exists "${profile_yaml}" "profile override created"
+    local profile_contents
+    profile_contents="$(cat "${profile_yaml}")"
+    assert_match "seq_len: 100" "${profile_contents}" "profile override seq_len"
+    assert_match "stride: 100" "${profile_contents}" "profile override stride uses pairing"
+    assert_match "preview_n: 192" "${profile_contents}" "profile override preview_n"
+    assert_match "final_n: 192" "${profile_contents}" "profile override final_n"
+
+    local calls
+    calls="$(cat "${TEST_TMPDIR}/fixtures/invarlock.calls")"
+    assert_match "calibrated_preset_${model_name}__quant_rtn\\.yaml" "${calls}" "uses edit-type preset"
+    if [[ "${calls}" =~ oom_override_preset\.yaml ]]; then
+        t_fail "expected certify to avoid override preset file"
+    fi
     # Skip branch when cert already exists.
     task_certify_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean 1 "${out}" "${log_file}"
 
     # Preset discovery branch when preset exists.
-    mkdir -p "${out}/presets"
     echo "{}" > "${out}/presets/calibrated_preset_${model_name}.yaml"
     task_certify_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean 2 "${out}" "${log_file}"
 
