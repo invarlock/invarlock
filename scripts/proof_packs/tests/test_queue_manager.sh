@@ -1115,7 +1115,7 @@ test_generate_model_tasks_additional_batch_branches() {
     assert_match "CALIBRATION_RUN" "$(cat "${calls}")" "calibration task created"
     local error_count
     error_count="$(awk '/^CERTIFY_ERROR$/ {c++} END {print c+0}' "${calls}")"
-    assert_eq "5" "${error_count}" "certify error tasks created"
+    assert_eq "9" "${error_count}" "certify error tasks created"
 
     : > "${calls}"
     CLEAN_EDIT_RUNS=""

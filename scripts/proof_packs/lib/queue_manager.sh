@@ -1202,7 +1202,17 @@ generate_model_tasks() {
             )
         fi
         if [[ ${#error_types[@]} -eq 0 ]]; then
-            error_types=("nan_injection" "inf_injection" "extreme_quant" "scale_explosion" "weight_tying_break")
+            error_types=(
+                "nan_injection"
+                "inf_injection"
+                "shape_mismatch"
+                "missing_tensors"
+                "extreme_quant"
+                "scale_explosion"
+                "rank_collapse"
+                "norm_collapse"
+                "weight_tying_break"
+            )
         fi
         for error_type in "${error_types[@]}"; do
             # CREATE_ERROR
