@@ -161,3 +161,23 @@ def test_verify_release_requires_overhead_ratio_when_evaluated(
     out = json.loads(capsys.readouterr().out)
     assert out["resolution"]["exit_code"] == 1
     assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 1
+
+
+def test_verify_release_passes_when_overhead_ratio_present(
+    tmp_path: Path, capsys
+) -> None:
+    cert = _release_ready_cert(include_guard_overhead=False)
+    cert["guard_overhead"] = {
+        "mode": "measured",
+        "overhead_threshold": 0.01,
+        "evaluated": True,
+        "overhead_ratio": 1.0,
+    }
+    path = _write_cert(tmp_path, cert, "with_ratio.json")
+
+    with pytest.raises(typer.Exit) as ei:
+        verify_command([path], baseline=None, profile="release", json_out=True)
+
+    out = json.loads(capsys.readouterr().out)
+    assert out["resolution"]["exit_code"] == 0
+    assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 0

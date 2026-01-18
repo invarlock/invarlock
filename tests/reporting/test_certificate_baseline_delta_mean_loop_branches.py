@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import copy
+
 from invarlock.reporting.certificate import make_certificate, validate_certificate
 from invarlock.reporting.report_types import RunReport, create_empty_report
 
@@ -89,3 +91,74 @@ def test_make_certificate_handles_bad_window_entries_in_weighted_mean_loop(
     baseline = _mk_baseline()
     cert = make_certificate(report, baseline)
     assert validate_certificate(cert)
+
+
+def test_make_certificate_handles_nonfinite_token_counts_in_weights(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        "invarlock.reporting.certificate.compute_paired_delta_log_ci",
+        lambda *_a, **_k: (-0.01, 0.01),
+    )
+    report = _mk_report_with_bad_window_entries()
+    report = copy.deepcopy(report)
+    report["evaluation_windows"]["final"]["token_counts"][0] = float("nan")
+    baseline = _mk_baseline()
+    cert = make_certificate(report, baseline)
+    assert validate_certificate(cert)
+
+
+def test_make_certificate_handles_empty_token_counts_path(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        "invarlock.reporting.certificate.compute_paired_delta_log_ci",
+        lambda *_a, **_k: (-0.01, 0.01),
+    )
+    report = _mk_report_with_bad_window_entries()
+    report = copy.deepcopy(report)
+    report["evaluation_windows"]["final"]["token_counts"] = []
+    baseline = _mk_baseline()
+    cert = make_certificate(report, baseline)
+    assert validate_certificate(cert)
+
+
+def test_make_certificate_derives_window_counts_from_stats_and_coverage(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        "invarlock.reporting.certificate.compute_paired_delta_log_ci",
+        lambda *_a, **_k: (-0.01, 0.01),
+    )
+    report = _mk_report_with_bad_window_entries()
+    report = copy.deepcopy(report)
+
+    report["metrics"]["stats"] = {
+        "requested_preview": True,
+        "requested_final": -1,
+        "actual_preview": 1.2,
+        "actual_final": None,
+    }
+    report["data"]["preview_n"] = 2.0
+    report["data"]["final_n"] = 1.2
+
+    report["evaluation_windows"]["preview"] = {"window_ids": [1, 2, 3]}
+    report["evaluation_windows"]["final"].pop("window_ids", None)
+
+    report["metrics"]["bootstrap"]["coverage"] = {
+        "final": "not-dict",
+        "used": 2.0,
+        "preview": {"used": 0},
+    }
+
+    baseline = _mk_baseline()
+    cert = make_certificate(report, baseline)
+    assert validate_certificate(cert)
+
+    ds = cert.get("dataset") if isinstance(cert, dict) else None
+    windows = ds.get("windows") if isinstance(ds, dict) else None
+    stats = windows.get("stats", {}) if isinstance(windows, dict) else {}
+    assert isinstance(stats, dict)
+    assert isinstance(stats.get("requested_preview"), int)
+    assert isinstance(stats.get("actual_preview"), int)
+    assert isinstance(stats.get("actual_final"), int)
