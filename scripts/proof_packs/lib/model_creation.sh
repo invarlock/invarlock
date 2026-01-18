@@ -812,6 +812,82 @@ try:
         error_info["quantized_params"] = count
         print(f"Applied extreme 2-bit quantization to {count} params")
 
+    elif error_type == "shape_mismatch":
+        # Resize token embeddings without updating tokenizer files. This should
+        # trip invariants' tokenizer/vocab alignment checks during certify.
+        try:
+            emb = model.get_input_embeddings()
+            old_vocab = int(getattr(emb, "num_embeddings", emb.weight.shape[0]))
+            delta = 8
+            new_vocab = old_vocab + delta
+            model.resize_token_embeddings(new_vocab)
+            error_info["injected"] = True
+            error_info["old_vocab_size"] = old_vocab
+            error_info["new_vocab_size"] = int(new_vocab)
+            error_info["delta"] = int(delta)
+            print(f"Resized token embeddings: {old_vocab} -> {new_vocab}")
+        except Exception as e:
+            print(f"WARNING: shape_mismatch not injected ({e})")
+
+    elif error_type == "missing_tensors":
+        # Simulate a missing-checkpoint scenario by shrinking the transformer
+        # stack (drop the final block) and updating config accordingly.
+        def _shrink_layers(container, attr):
+            layers = getattr(container, attr, None)
+            if layers is None:
+                return False, 0, 0
+            try:
+                total = len(layers)
+            except Exception:
+                return False, 0, 0
+            if total < 2:
+                return False, total, total
+            keep = total - 1
+            try:
+                if isinstance(layers, torch.nn.ModuleList):
+                    new_layers = torch.nn.ModuleList(list(layers)[:keep])
+                else:
+                    new_layers = list(layers)[:keep]
+                setattr(container, attr, new_layers)
+                return True, total, keep
+            except Exception:
+                return False, total, total
+
+        injected = False
+        total_layers = 0
+        kept_layers = 0
+
+        # LLaMA/Mistral-style
+        base = getattr(model, "model", None)
+        if base is not None and hasattr(base, "layers"):
+            injected, total_layers, kept_layers = _shrink_layers(base, "layers")
+            if injected:
+                error_info["arch"] = "llama"
+
+        # GPT-2-style
+        if not injected:
+            tr = getattr(model, "transformer", None)
+            if tr is not None and hasattr(tr, "h"):
+                injected, total_layers, kept_layers = _shrink_layers(tr, "h")
+                if injected:
+                    error_info["arch"] = "gpt2"
+
+        if injected:
+            cfg = getattr(model, "config", None)
+            for key in ("num_hidden_layers", "n_layer", "num_layers"):
+                if cfg is not None and hasattr(cfg, key):
+                    try:
+                        setattr(cfg, key, int(kept_layers))
+                    except Exception:
+                        pass
+            error_info["injected"] = True
+            error_info["dropped_layers"] = int(total_layers - kept_layers)
+            error_info["layers_before"] = int(total_layers)
+            error_info["layers_after"] = int(kept_layers)
+            print(f"Dropped transformer blocks: {total_layers} -> {kept_layers}")
+        else:
+            print("WARNING: missing_tensors not injected (no layer stack found)")
+
     elif error_type == "scale_explosion":
         # Target MLP/FFN in first block
         for name, param in model.named_parameters():
@@ -823,6 +899,110 @@ try:
                 error_info["scale_factor"] = 100.0
                 print(f"Scaled by 100x: {name}")
                 break
+
+    elif error_type == "rank_collapse":
+        # Force multiple weight matrices to become rank-1 to trigger the spectral
+        # degeneracy checks (stable-rank drop) across > max_caps modules.
+        target_names = []
+        patterns = (
+            "q_proj.weight",
+            "k_proj.weight",
+            "v_proj.weight",
+            "o_proj.weight",
+            "c_attn.weight",
+            "c_proj.weight",
+            "out_proj.weight",
+            "query_key_value.weight",
+        )
+        for name, param in model.named_parameters():
+            if len(target_names) >= 8:
+                break
+            if param.dim() != 2 or "weight" not in name.lower():
+                continue
+            lname = name.lower()
+            if any(p in lname for p in patterns):
+                target_names.append((name, param))
+
+        if not target_names:
+            for name, param in model.named_parameters():
+                if param.dim() == 2 and "weight" in name.lower():
+                    target_names.append((name, param))
+                if len(target_names) >= 8:
+                    break
+
+        applied = 0
+        for name, param in target_names:
+            with torch.no_grad():
+                w = param.data
+                if w.numel() < 4:
+                    continue
+                u = w[:, 0].clone()
+                v = w[0, :].clone()
+                w_new = u.unsqueeze(1) * v.unsqueeze(0)
+                # Preserve Frobenius norm to avoid pure scale effects.
+                denom = torch.norm(w_new) + 1e-12
+                scale = torch.norm(w) / denom
+                w.copy_(w_new * scale)
+            applied += 1
+            if applied <= 3:
+                print(f"Rank-collapsed: {name}")
+
+        if applied:
+            error_info["injected"] = True
+            error_info["rank_collapsed_params"] = applied
+            error_info["targets"] = [n for n, _ in target_names[:applied]]
+            print(f"Applied rank collapse to {applied} weight matrices")
+        else:
+            print("WARNING: rank_collapse not injected (no eligible weights found)")
+
+    elif error_type == "norm_collapse":
+        # Zero out at least one full row across multiple weight matrices to
+        # trigger norm-collapse degeneracy across > max_caps modules.
+        target_names = []
+        patterns = (
+            "q_proj.weight",
+            "k_proj.weight",
+            "v_proj.weight",
+            "o_proj.weight",
+            "c_attn.weight",
+            "c_proj.weight",
+            "out_proj.weight",
+            "query_key_value.weight",
+        )
+        for name, param in model.named_parameters():
+            if len(target_names) >= 8:
+                break
+            if param.dim() != 2 or "weight" not in name.lower():
+                continue
+            lname = name.lower()
+            if any(p in lname for p in patterns):
+                target_names.append((name, param))
+
+        if not target_names:
+            for name, param in model.named_parameters():
+                if param.dim() == 2 and "weight" in name.lower():
+                    target_names.append((name, param))
+                if len(target_names) >= 8:
+                    break
+
+        applied = 0
+        for name, param in target_names:
+            with torch.no_grad():
+                w = param.data
+                if w.shape[0] < 1:
+                    continue
+                w[0, :] = 0.0
+            applied += 1
+            if applied <= 3:
+                print(f"Zeroed row0: {name}")
+
+        if applied:
+            error_info["injected"] = True
+            error_info["norm_collapsed_params"] = applied
+            error_info["targets"] = [n for n, _ in target_names[:applied]]
+            print(f"Applied norm collapse to {applied} weight matrices")
+        else:
+            print("WARNING: norm_collapse not injected (no eligible weights found)")
 
     elif error_type == "weight_tying_break":
         def _data_ptr(t):
