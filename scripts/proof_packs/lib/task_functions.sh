@@ -243,6 +243,281 @@ _get_eval_batch_size() {
     fi
 }
 
+# Resolve the concrete InvarLock adapter name for a model path/ID.
+_resolve_invarlock_adapter() {
+    local model_id="$1"
+    if [[ -z "${model_id}" ]]; then
+        return 1
+    fi
+    _cmd_python - "${model_id}" <<'PY'
+from invarlock.cli.adapter_auto import resolve_auto_adapter
+import sys
+
+model_id = sys.argv[1] if len(sys.argv) > 1 else ""
+print(resolve_auto_adapter(model_id) if model_id else "")
+PY
+}
+
+_validate_certify_baseline_report() {
+    local report_path="$1"
+    local expected_adapter="$2"
+    local expected_profile="$3"
+    local expected_tier="$4"
+
+    if [[ -z "${report_path}" || ! -f "${report_path}" ]]; then
+        return 1
+    fi
+
+    _cmd_python - "${report_path}" "${expected_adapter}" "${expected_profile}" "${expected_tier}" <<'PY'
+import json
+import sys
+
+report_path, expected_adapter, expected_profile, expected_tier = sys.argv[1:5]
+try:
+    payload = json.loads(open(report_path, "r", encoding="utf-8").read())
+except Exception as exc:
+    print(f"baseline_report_invalid_json:{exc}", file=sys.stderr)
+    raise SystemExit(1)
+
+if not isinstance(payload, dict):
+    print("baseline_report_not_object", file=sys.stderr)
+    raise SystemExit(1)
+
+edit = payload.get("edit")
+edit_name = edit.get("name") if isinstance(edit, dict) else None
+if edit_name != "noop":
+    print(f"baseline_report_edit_not_noop:{edit_name!r}", file=sys.stderr)
+    raise SystemExit(1)
+
+meta = payload.get("meta")
+adapter = meta.get("adapter") if isinstance(meta, dict) else None
+if isinstance(adapter, str) and adapter != expected_adapter:
+    print(
+        f"baseline_report_adapter_mismatch:{adapter!r}!={expected_adapter!r}",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+
+context = payload.get("context")
+if isinstance(context, dict):
+    prof = context.get("profile")
+    if isinstance(prof, str) and prof.strip().lower() != expected_profile.strip().lower():
+        print(
+            f"baseline_report_profile_mismatch:{prof!r}!={expected_profile!r}",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+    auto = context.get("auto")
+    if isinstance(auto, dict):
+        tier = auto.get("tier")
+        if isinstance(tier, str) and tier != expected_tier:
+            print(
+                f"baseline_report_tier_mismatch:{tier!r}!={expected_tier!r}",
+                file=sys.stderr,
+            )
+            raise SystemExit(1)
+
+windows = payload.get("evaluation_windows")
+if not isinstance(windows, dict):
+    print("baseline_report_missing_evaluation_windows", file=sys.stderr)
+    raise SystemExit(1)
+
+for phase_name in ("preview", "final"):
+    phase = windows.get(phase_name)
+    if not isinstance(phase, dict):
+        print(f"baseline_report_missing_phase:{phase_name}", file=sys.stderr)
+        raise SystemExit(1)
+    window_ids = phase.get("window_ids")
+    input_ids = phase.get("input_ids")
+    if not isinstance(window_ids, list) or not window_ids:
+        print(f"baseline_report_missing_window_ids:{phase_name}", file=sys.stderr)
+        raise SystemExit(1)
+    if not isinstance(input_ids, list) or not input_ids:
+        print(f"baseline_report_missing_input_ids:{phase_name}", file=sys.stderr)
+        raise SystemExit(1)
+    if len(window_ids) != len(input_ids):
+        print(f"baseline_report_mismatched_windows:{phase_name}", file=sys.stderr)
+        raise SystemExit(1)
+PY
+}
+
+_ensure_certify_baseline_report() {
+    local baseline_root="$1"
+    local abs_baseline_path="$2"
+    local profile_flag="$3"
+    local tier="$4"
+    local seq_len="$5"
+    local stride="$6"
+    local preview_n="$7"
+    local final_n="$8"
+    local eval_batch="$9"
+    local bootstrap_replicates="${10}"
+    local model_size="${11}"
+    local log_file="${12}"
+
+    mkdir -p "${baseline_root}"
+    local abs_baseline_root
+    abs_baseline_root="$(cd "${baseline_root}" && pwd)"
+
+    local baseline_report_file="${abs_baseline_root}/baseline_report.json"
+
+    local adapter_name
+    adapter_name="$(_resolve_invarlock_adapter "${abs_baseline_path}" 2>/dev/null || true)"
+    adapter_name="$(printf '%s' "${adapter_name}" | xargs)"
+    if [[ -z "${adapter_name}" ]]; then
+        # Fallback for odd environments; must match what invarlock certify will resolve.
+        adapter_name="hf_gpt2"
+    fi
+
+    if [[ -f "${baseline_report_file}" ]]; then
+        if _validate_certify_baseline_report "${baseline_report_file}" "${adapter_name}" "${profile_flag}" "${tier}" 2>/dev/null; then
+            echo "${baseline_report_file}"
+            return 0
+        fi
+        rm -f "${baseline_report_file}"
+    fi
+
+    local lock_dir="${abs_baseline_root}/.baseline_lock"
+    if mkdir "${lock_dir}" 2>/dev/null; then
+        # Re-check after acquiring the lock.
+        if [[ -f "${baseline_report_file}" ]]; then
+            if _validate_certify_baseline_report "${baseline_report_file}" "${adapter_name}" "${profile_flag}" "${tier}" 2>/dev/null; then
+                rmdir "${lock_dir}" 2>/dev/null || true
+                echo "${baseline_report_file}"
+                return 0
+            fi
+            rm -f "${baseline_report_file}"
+        fi
+
+        echo "  Generating reusable baseline report (adapter=${adapter_name}, tier=${tier})" >> "${log_file}"
+
+        local baseline_config_root="${abs_baseline_root}/config_root"
+        mkdir -p "${baseline_config_root}/runtime/profiles"
+        cat > "${baseline_config_root}/runtime/profiles/ci.yaml" << YAML
+model:
+  device_map: "auto"
+dataset:
+  seq_len: ${seq_len}
+  stride: ${stride}
+  preview_n: ${preview_n}
+  final_n: ${final_n}
+eval:
+  bootstrap:
+    replicates: ${bootstrap_replicates}
+    alpha: 0.05
+YAML
+
+        local guards_order_csv="${PACK_GUARDS_ORDER:-}"
+        local -a raw_guards_order=()
+        if [[ -n "${guards_order_csv}" ]]; then
+            IFS=',' read -ra raw_guards_order <<< "${guards_order_csv}"
+        fi
+        local -a guards_order=()
+        local g
+        for g in "${raw_guards_order[@]}"; do
+            g="$(echo "${g}" | xargs)"
+            [[ -z "${g}" ]] && continue
+            guards_order+=("${g}")
+        done
+        if [[ ${#guards_order[@]} -eq 0 ]]; then
+            guards_order=("invariants" "spectral" "rmt" "variance" "invariants")
+        fi
+        local guards_order_yaml=""
+        for g in "${guards_order[@]}"; do
+            guards_order_yaml+=$'    - '"${g}"$'\n'
+        done
+
+        local baseline_yaml="${abs_baseline_root}/baseline_noop.yaml"
+        cat > "${baseline_yaml}" << YAML
+model:
+  id: "${abs_baseline_path}"
+  adapter: "${adapter_name}"
+  device: "auto"
+  device_map: "auto"
+  torch_dtype: "bfloat16"
+  trust_remote_code: true
+  low_cpu_mem_usage: true
+
+dataset:
+  provider: "${INVARLOCK_DATASET:-wikitext2}"
+  split: validation
+  seq_len: ${seq_len}
+  stride: ${stride}
+  preview_n: ${preview_n}
+  final_n: ${final_n}
+  seed: 42
+
+edit:
+  name: "noop"
+  plan: {}
+
+guards:
+  order:
+${guards_order_yaml}
+
+auto:
+  enabled: true
+  tier: "${tier}"
+
+eval:
+  bootstrap:
+    replicates: ${bootstrap_replicates}
+    alpha: 0.05
+  batch_size: ${eval_batch}
+YAML
+
+        local baseline_out="${abs_baseline_root}/runs"
+        mkdir -p "${baseline_out}"
+
+        local -a extra_env=()
+        if _is_large_model "${model_size}"; then
+            extra_env+=(INVARLOCK_SKIP_OVERHEAD_CHECK=1)
+        fi
+        extra_env+=(INVARLOCK_STORE_EVAL_WINDOWS=1)
+        extra_env+=("INVARLOCK_CONFIG_ROOT=${baseline_config_root}")
+
+        local exit_code=0
+        env "${extra_env[@]}" invarlock run \
+            --config "${baseline_yaml}" \
+            --profile "${profile_flag}" \
+            --tier "${tier}" \
+            --out "${baseline_out}" \
+            --edit-label "noop" >> "${log_file}" 2>&1 || exit_code=$?
+
+        if [[ ${exit_code} -eq 0 ]]; then
+            local report_file
+            report_file=$(find "${baseline_out}" -mindepth 2 -maxdepth 2 -name "report.json" -type f 2>/dev/null | sort | tail -1)
+            if [[ -n "${report_file}" && -f "${report_file}" ]]; then
+                local tmp_report="${baseline_report_file}.tmp"
+                cp "${report_file}" "${tmp_report}" 2>/dev/null || true
+                if [[ -f "${tmp_report}" ]]; then
+                    mv "${tmp_report}" "${baseline_report_file}" 2>/dev/null || true
+                fi
+            fi
+        fi
+
+        rmdir "${lock_dir}" 2>/dev/null || true
+
+        if [[ -f "${baseline_report_file}" ]] && _validate_certify_baseline_report "${baseline_report_file}" "${adapter_name}" "${profile_flag}" "${tier}" 2>/dev/null; then
+            echo "${baseline_report_file}"
+            return 0
+        fi
+        rm -f "${baseline_report_file}"
+        return 1
+    fi
+
+    echo "  Waiting for baseline report to be generated by another worker..." >> "${log_file}"
+    for _ in $(seq 1 120); do
+        if [[ -f "${baseline_report_file}" ]] && _validate_certify_baseline_report "${baseline_report_file}" "${adapter_name}" "${profile_flag}" "${tier}" 2>/dev/null; then
+            echo "${baseline_report_file}"
+            return 0
+        fi
+        _sleep 2
+    done
+
+    return 1
+}
+
 # Resolve an edit spec to concrete parameters and directory name.
 # Returns JSON with status, edit_dir_name, and resolved params.
 resolve_edit_params() {
@@ -2049,6 +2324,33 @@ task_certify_edit() {
         bootstrap_replicates="${INVARLOCK_BOOTSTRAP_N}"
     fi
 
+    local tier="${INVARLOCK_TIER:-balanced}"
+    local baseline_report_root="${model_output_dir}/baseline_reports/${profile_flag}_${tier}_seq${seq_len}_pv${preview_n}_fn${final_n}"
+    local baseline_report_file=""
+    baseline_report_file=$(
+        _ensure_certify_baseline_report \
+            "${baseline_report_root}" \
+            "${abs_baseline_path}" \
+            "${profile_flag}" \
+            "${tier}" \
+            "${seq_len}" \
+            "${stride}" \
+            "${preview_n}" \
+            "${final_n}" \
+            "${eval_batch}" \
+            "${bootstrap_replicates}" \
+            "${model_size}" \
+            "${log_file}" \
+            || true
+    )
+    local -a baseline_report_args=()
+    if [[ -n "${baseline_report_file}" && -f "${baseline_report_file}" ]]; then
+        baseline_report_args=(--baseline-report "${baseline_report_file}")
+        echo "  Reusing baseline report: ${baseline_report_file}" >> "${log_file}"
+    else
+        echo "  WARNING: Baseline report unavailable; will run per-cert baseline evaluation" >> "${log_file}"
+    fi
+
     local -a extra_env=()
     if _is_large_model "${model_size}"; then
         extra_env+=(INVARLOCK_SKIP_OVERHEAD_CHECK=1)
@@ -2142,10 +2444,11 @@ PRESET_YAML
         cd "${work_dir}" || exit 1
         env "${extra_env[@]}" invarlock certify \
             --source "${abs_baseline_path}" \
+            "${baseline_report_args[@]}" \
             --edited "${abs_edit_path}" \
             --edit-label "${edit_label}" \
             --profile "${profile_flag}" \
-            --tier "${INVARLOCK_TIER:-balanced}" \
+            --tier "${tier}" \
             --out "${cert_dir}" \
             --cert-out "${cert_dir}" \
             --preset "${abs_preset_file}" >> "${log_file}" 2>&1
@@ -2317,6 +2620,33 @@ task_certify_error() {
         bootstrap_replicates="${INVARLOCK_BOOTSTRAP_N}"
     fi
 
+    local tier="${INVARLOCK_TIER:-balanced}"
+    local baseline_report_root="${model_output_dir}/baseline_reports/${profile_flag}_${tier}_seq${seq_len}_pv${preview_n}_fn${final_n}"
+    local baseline_report_file=""
+    baseline_report_file=$(
+        _ensure_certify_baseline_report \
+            "${baseline_report_root}" \
+            "${abs_baseline_path}" \
+            "${profile_flag}" \
+            "${tier}" \
+            "${seq_len}" \
+            "${stride}" \
+            "${preview_n}" \
+            "${final_n}" \
+            "${eval_batch}" \
+            "${bootstrap_replicates}" \
+            "${model_size}" \
+            "${log_file}" \
+            || true
+    )
+    local -a baseline_report_args=()
+    if [[ -n "${baseline_report_file}" && -f "${baseline_report_file}" ]]; then
+        baseline_report_args=(--baseline-report "${baseline_report_file}")
+        echo "  Reusing baseline report: ${baseline_report_file}" >> "${log_file}"
+    else
+        echo "  WARNING: Baseline report unavailable; will run per-cert baseline evaluation" >> "${log_file}"
+    fi
+
     local -a extra_env=()
     if _is_large_model "${model_size}"; then
         extra_env+=(INVARLOCK_SKIP_OVERHEAD_CHECK=1)
@@ -2388,9 +2718,10 @@ PRESET_YAML
         cd "${work_dir}" || exit 1
         env "${extra_env[@]}" invarlock certify \
             --source "${abs_baseline_path}" \
+            "${baseline_report_args[@]}" \
             --edited "${abs_error_path}" \
             --profile "${profile_flag}" \
-            --tier "${INVARLOCK_TIER:-balanced}" \
+            --tier "${tier}" \
             --out "${cert_dir}" \
             --cert-out "${cert_dir}" \
             --preset "${abs_preset_file}" >> "${log_file}" 2>&1
