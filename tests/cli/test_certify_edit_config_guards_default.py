@@ -52,8 +52,10 @@ def test_certify_edit_config_includes_guard_order(tmp_path: Path, monkeypatch):
             guards = payload.get("guards")
             assert isinstance(guards, dict)
             order = guards.get("order")
-            assert isinstance(order, list) and order and all(
-                isinstance(item, str) for item in order
+            assert (
+                isinstance(order, list)
+                and order
+                and all(isinstance(item, str) for item in order)
             )
 
         # Create a minimal report.json so certify can locate it via _latest_run_report().
