@@ -22,7 +22,7 @@
 # 1. Optional preflight to pin model revisions
 # 2. Launch models across available GPUs
 # 3. Each GPU runs: calibration → edits → error injection
-# 4. Correlation analysis (lm-eval vs InvarLock) → verdict
+# 4. Compile reports → final verdict
 # ==========================================================
 
 # Dynamic scheduling is always enabled.
@@ -55,8 +55,6 @@ else
 fi
 unset _pack_prev_script_dir_was_set _pack_prev_script_dir_value
 
-# shellcheck source=lmeval_runner.sh
-source "${_PACK_VALIDATION_LIB_DIR}/lmeval_runner.sh"
 # shellcheck source=config_generator.sh
 source "${_PACK_VALIDATION_LIB_DIR}/config_generator.sh"
 # shellcheck source=result_compiler.sh
@@ -124,11 +122,6 @@ case "${PACK_DETERMINISM}" in
         ;;
 esac
 export PACK_DETERMINISM
-if [[ "${PACK_DETERMINISM}" == "strict" ]]; then
-    export LMEVAL_TORCH_COMPILE=0
-else
-    export LMEVAL_TORCH_COMPILE=1
-fi
 
 PACK_SUITE="${PACK_SUITE:-subset}"
 PACK_NET="${PACK_NET:-0}"
@@ -345,18 +338,6 @@ EDIT_TYPES_STRESS=(
     "lowrank_svd:32:all"         # rank-32 SVD on all
 )
 
-# Eval Configuration - conservative batch sizes for large GPUs
-# Using lm-eval's "auto:N" feature: auto-detect with max cap of N
-# This prevents OOM by letting lm-eval find optimal batch size bounded by max
-EVAL_TASKS="${EVAL_TASKS:-mmlu,hellaswag,arc_challenge,winogrande}"
-EVAL_NUM_FEWSHOT="${EVAL_NUM_FEWSHOT:-5}"
-EVAL_BATCH_SIZE="${EVAL_BATCH_SIZE:-auto}"
-EVAL_BATCH_SIZE_SMALL="${EVAL_BATCH_SIZE_SMALL:-auto:16}"   # 7B-14B models - auto with max 16
-EVAL_BATCH_SIZE_MEDIUM="${EVAL_BATCH_SIZE_MEDIUM:-auto:8}"  # 30B-40B models - auto with max 8
-EVAL_BATCH_SIZE_LARGE="${EVAL_BATCH_SIZE_LARGE:-auto:4}"    # 70B+ models - auto with max 4
-EVAL_BATCH_SIZE_MOE="${EVAL_BATCH_SIZE_MOE:-auto:6}"        # MoE models (Mixtral) - auto with max 6
-EVAL_CONTEXT_LEN="${EVAL_CONTEXT_LEN:-2048}"
-
 # Tuned edit presets (external inputs; required for clean edits)
 PACK_TUNED_EDIT_PARAMS_FILE="${PACK_TUNED_EDIT_PARAMS_FILE:-}"
 # Optional calibration preset reuse (skip calibration runs, copy presets in)
@@ -385,7 +366,6 @@ RUN_ERROR_INJECTION="${RUN_ERROR_INJECTION:-true}"
 MODEL_LOAD_OVERHEAD_GB="${MODEL_LOAD_OVERHEAD_GB:-4}"
 EDIT_OVERHEAD_GB="${EDIT_OVERHEAD_GB:-8}"
 BATCH_EDIT_OVERHEAD_GB="${BATCH_EDIT_OVERHEAD_GB:-8}"
-EVAL_OVERHEAD_GB="${EVAL_OVERHEAD_GB:-6}"
 INVARLOCK_OVERHEAD_GB="${INVARLOCK_OVERHEAD_GB:-6}"
 
 # Task timeout (seconds). Set to 0 or empty to disable.
@@ -1276,7 +1256,7 @@ estimate_planned_model_storage_gb() {
     local edits_total=$(( ${#EDIT_TYPES_CLEAN[@]} + ${#EDIT_TYPES_STRESS[@]} ))
     local errors_total=0
     if [[ "${RUN_ERROR_INJECTION}" == "true" ]]; then
-        errors_total=5  # nan_injection, inf_injection, extreme_quant, scale_explosion, zero_layer
+        errors_total=5  # nan_injection, inf_injection, extreme_quant, scale_explosion, weight_tying_break
     fi
 
     local baseline_mode="${PACK_BASELINE_STORAGE_MODE:-snapshot_symlink}"
@@ -1616,9 +1596,6 @@ check_dependencies() {
         log "Installing sentencepiece..."
         python3 -m pip install sentencepiece
     fi
-
-    # Check lm-eval-harness (package name is lm_eval, not lm-eval)
-    python3 -c "import lm_eval" 2>/dev/null || python3 -m pip install lm_eval
 
     # Check InvarLock (Python module and CLI)
     python3 -c "import invarlock" 2>/dev/null || missing+=("invarlock")
@@ -2029,224 +2006,6 @@ export -f get_model_invarlock_config
 
 # GPU placement is handled by the dynamic scheduler (required_gpus + reservations).
 # There is no fixed GPU→model mapping.
-
-# ============ PROCESS EDIT - DISPATCHER ============
-process_edit() {
-    local baseline_path="$1"
-    local edit_spec="$2"     # Format: "type:param1:param2[:scope]" - scope optional
-    local version="$3"       # clean or stress
-    local model_name="$4"
-    local gpu_id="$5"
-    local output_dir="$6"
-
-    local resolved
-    resolved=$(resolve_edit_params "${output_dir}" "${edit_spec}" "${version}")
-    local status
-    status=$(echo "${resolved}" | jq -r '.status')
-    if [[ "${status}" == "skipped" ]]; then
-        log "  Clean edit skipped by tuned preset: ${edit_spec}"
-        return 0
-    fi
-    if [[ "${status}" != "selected" ]]; then
-        log "  ERROR: Unable to resolve edit spec (${edit_spec}): ${status}"
-        return 1
-    fi
-
-    local edit_type param1 param2 scope edit_dir_name
-    edit_type=$(echo "${resolved}" | jq -r '.edit_type')
-    param1=$(echo "${resolved}" | jq -r '.param1')
-    param2=$(echo "${resolved}" | jq -r '.param2')
-    scope=$(echo "${resolved}" | jq -r '.scope')
-    edit_dir_name=$(echo "${resolved}" | jq -r '.edit_dir_name')
-
-    local edit_path="${output_dir}/models/${edit_dir_name}"
-
-    # Check if already exists (resume mode)
-    if [[ "${RESUME_MODE}" == "true" && -d "${edit_path}" && -f "${edit_path}/config.json" ]]; then
-        log "  Edit ${edit_dir_name} exists, skipping creation"
-        echo "${edit_path}"
-        return 0
-    fi
-
-    local create_result=0
-    create_model_variant "${baseline_path}" "${edit_path}" "${edit_type}" "${param1}" "${param2}" "${scope}" "${gpu_id}" || create_result=$?
-
-    # Only output path if creation succeeded
-    if [[ ${create_result} -eq 0 && -d "${edit_path}" ]]; then
-        echo "${edit_path}"
-    else
-        log "  ERROR: Failed to create edit ${edit_dir_name} (exit code: ${create_result})"
-        return 1
-    fi
-}
-export -f process_edit
-
-# ============ PROCESS MODEL ON SINGLE GPU ============
-process_model() {
-    local model_id="$1"
-    local gpu_id="${2:-0}"
-
-    local model_name
-    model_name=$(sanitize_model_name "${model_id}")
-    local model_output_dir="${OUTPUT_DIR}/${model_name}"
-    local preset_dir="${OUTPUT_DIR}/presets"
-    local gpu_log="${OUTPUT_DIR}/logs/gpu_${gpu_id}.log"
-
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Starting ${model_id}" >> "${gpu_log}"
-
-    mkdir -p "${model_output_dir}"/{models,evals,certificates}
-
-    # Step 1: Setup baseline
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Setting up baseline..." >> "${gpu_log}"
-    local baseline_path
-    baseline_path=$(setup_model "${model_id}" "${gpu_id}")
-    local setup_exit_code=$?
-
-    # Validate baseline path - must be non-empty and a valid directory
-    if [[ ${setup_exit_code} -ne 0 || -z "${baseline_path}" || ! -d "${baseline_path}" ]]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: ERROR - Failed to setup baseline for ${model_id}" >> "${gpu_log}"
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: baseline_path='${baseline_path}', exit_code=${setup_exit_code}" >> "${gpu_log}"
-        return 1
-    fi
-
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Baseline ready at ${baseline_path}" >> "${gpu_log}"
-
-    # Step 2: Baseline eval
-    local baseline_eval="${model_output_dir}/evals/baseline_results.json"
-    if [[ "${RESUME_MODE}" != "true" || ! -f "${baseline_eval}" ]]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Running baseline lm-eval..." >> "${gpu_log}"
-        run_lmeval \
-            "${baseline_path}" \
-            "${baseline_eval}" \
-            "${EVAL_TASKS}" \
-            "${EVAL_BATCH_SIZE}" \
-            "${EVAL_NUM_FEWSHOT}" \
-            "${gpu_id}"
-    fi
-
-    # Step 3: Calibration
-    local calibration_stats="${model_output_dir}/certificates/calibration/calibration_stats.json"
-    if [[ "${RESUME_MODE}" != "true" || ! -f "${calibration_stats}" ]]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Running calibration..." >> "${gpu_log}"
-        run_invarlock_calibration \
-            "${baseline_path}" \
-            "${model_name}" \
-            "${model_output_dir}/certificates/calibration" \
-            "${DRIFT_CALIBRATION_RUNS}" \
-            "${preset_dir}" \
-            "${gpu_id}"
-    fi
-
-    # Step 4: Clean edits (only when requested)
-    if [[ ${CLEAN_EDIT_RUNS:-0} -gt 0 ]]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Processing clean edits..." >> "${gpu_log}"
-        for edit_spec in "${EDIT_TYPES_CLEAN[@]}"; do
-            local edit_path=$(process_edit "${baseline_path}" "${edit_spec}" "clean" "${model_name}" "${gpu_id}" "${model_output_dir}")
-
-            if [[ -n "${edit_path}" && -d "${edit_path}" ]]; then
-                # Run eval for this edit
-                local edit_name=$(basename "${edit_path}")
-                local edit_eval="${model_output_dir}/evals/${edit_name}_results.json"
-
-                if [[ "${RESUME_MODE}" != "true" || ! -f "${edit_eval}" ]]; then
-                    run_lmeval \
-                        "${edit_path}" \
-                        "${edit_eval}" \
-                        "${EVAL_TASKS}" \
-                        "${EVAL_BATCH_SIZE}" \
-                        "${EVAL_NUM_FEWSHOT}" \
-                        "${gpu_id}"
-                fi
-
-                # Run InvarLock certify
-                for run in $(seq 1 "${CLEAN_EDIT_RUNS}"); do
-                    local cert_file="${model_output_dir}/certificates/${edit_name}/run_${run}/evaluation.cert.json"
-                    if [[ "${RESUME_MODE}" != "true" || ! -f "${cert_file}" ]]; then
-                        run_invarlock_certify \
-                            "${edit_path}" \
-                            "${baseline_path}" \
-                            "${model_output_dir}/certificates/${edit_name}" \
-                            "run_${run}" \
-                            "${preset_dir}" \
-                            "${model_name}" \
-                            "${gpu_id}"
-                    fi
-                done
-            fi
-        done
-    else
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Skipping clean edits (CLEAN_EDIT_RUNS=0)" >> "${gpu_log}"
-    fi
-
-    # Step 5: Stress edits (only when requested)
-    if [[ ${STRESS_EDIT_RUNS:-0} -gt 0 ]]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Processing stress edits..." >> "${gpu_log}"
-        for edit_spec in "${EDIT_TYPES_STRESS[@]}"; do
-            local edit_path=$(process_edit "${baseline_path}" "${edit_spec}" "stress" "${model_name}" "${gpu_id}" "${model_output_dir}")
-
-            if [[ -n "${edit_path}" && -d "${edit_path}" ]]; then
-                local edit_name=$(basename "${edit_path}")
-                local edit_eval="${model_output_dir}/evals/${edit_name}_results.json"
-
-                if [[ "${RESUME_MODE}" != "true" || ! -f "${edit_eval}" ]]; then
-                    run_lmeval \
-                        "${edit_path}" \
-                        "${edit_eval}" \
-                        "${EVAL_TASKS}" \
-                        "${EVAL_BATCH_SIZE}" \
-                        "${EVAL_NUM_FEWSHOT}" \
-                        "${gpu_id}"
-                fi
-
-                for run in $(seq 1 "${STRESS_EDIT_RUNS}"); do
-                    local cert_file="${model_output_dir}/certificates/${edit_name}/run_${run}/evaluation.cert.json"
-                    if [[ "${RESUME_MODE}" != "true" || ! -f "${cert_file}" ]]; then
-                        run_invarlock_certify \
-                            "${edit_path}" \
-                            "${baseline_path}" \
-                            "${model_output_dir}/certificates/${edit_name}" \
-                            "run_${run}" \
-                            "${preset_dir}" \
-                            "${model_name}" \
-                            "${gpu_id}"
-                    fi
-                done
-            fi
-        done
-    else
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Skipping stress edits (STRESS_EDIT_RUNS=0)" >> "${gpu_log}"
-    fi
-
-    # Step 6: Error injection
-    if [[ "${RUN_ERROR_INJECTION}" == "true" ]]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Running error injection tests..." >> "${gpu_log}"
-        local errors=("nan_injection" "inf_injection" "extreme_quant" "scale_explosion" "zero_layer")
-
-        for error_type in "${errors[@]}"; do
-            local error_path="${model_output_dir}/models/error_${error_type}"
-            local cert_file="${model_output_dir}/certificates/errors/${error_type}/evaluation.cert.json"
-
-            if [[ "${RESUME_MODE}" == "true" && -f "${cert_file}" ]]; then
-                continue
-            fi
-
-            if [[ ! -d "${error_path}" || ! -f "${error_path}/config.json" ]]; then
-                create_error_model "${baseline_path}" "${error_path}" "${error_type}" "${gpu_id}"
-            fi
-
-            run_invarlock_certify \
-                "${error_path}" \
-                "${baseline_path}" \
-                "${model_output_dir}/certificates/errors" \
-                "${error_type}" \
-                "${preset_dir}" \
-                "${model_name}" \
-                "${gpu_id}"
-        done
-    fi
-
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] GPU ${gpu_id}: Model ${model_name} complete" >> "${gpu_log}"
-}
 
 # ============ MAIN - DYNAMIC GPU SCHEDULING (v2.0) ============
 main_dynamic() {
