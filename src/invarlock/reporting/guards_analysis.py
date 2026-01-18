@@ -23,7 +23,9 @@ def _measurement_contract_digest(contract: Any) -> str | None:
 
 
 @no_type_check
-def _extract_invariants(report: RunReport) -> dict[str, Any]:
+def _extract_invariants(
+    report: RunReport, baseline: RunReport | None = None
+) -> dict[str, Any]:
     """Extract invariant check results (matches the shape used in tests)."""
     invariants_data = (report.get("metrics", {}) or {}).get("invariants", {})
     failures: list[dict[str, Any]] = []
@@ -81,6 +83,108 @@ def _extract_invariants(report: RunReport) -> dict[str, Any]:
             guard_entry = guard
             break
 
+    baseline_guard_entry = None
+    if baseline is not None:
+        for guard in baseline.get("guards", []) or []:
+            if str(guard.get("name", "")).lower() == "invariants":
+                baseline_guard_entry = guard
+                break
+
+    def _coerce_checks(value: Any) -> dict[str, Any] | None:
+        return value if isinstance(value, dict) else None
+
+    def _extract_guard_checks(
+        entry: Any,
+    ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+        if not isinstance(entry, dict):
+            return None, None
+        details = entry.get("details")
+        if not isinstance(details, dict):
+            return None, None
+        return _coerce_checks(details.get("baseline_checks")), _coerce_checks(
+            details.get("current_checks")
+        )
+
+    def _compare_invariants(
+        baseline_checks: dict[str, Any],
+        current_checks: dict[str, Any],
+    ) -> tuple[list[dict[str, Any]], int, int]:
+        violations: list[dict[str, Any]] = []
+
+        # LayerNorm coverage check
+        baseline_layer_norms = set(baseline_checks.get("layer_norm_paths", ()))
+        current_layer_norms = set(current_checks.get("layer_norm_paths", ()))
+        missing_layer_norms = sorted(baseline_layer_norms - current_layer_norms)
+        if missing_layer_norms:
+            violations.append(
+                {
+                    "type": "layer_norm_missing",
+                    "missing": missing_layer_norms,
+                    "message": "Expected LayerNorm modules are missing vs baseline",
+                }
+            )
+
+        # Tokenizer / vocab alignment
+        baseline_vocab_sizes = baseline_checks.get("embedding_vocab_sizes")
+        current_vocab_sizes = current_checks.get("embedding_vocab_sizes")
+        if isinstance(baseline_vocab_sizes, dict):
+            for module_name, baseline_size in baseline_vocab_sizes.items():
+                current_size = None
+                if isinstance(current_vocab_sizes, dict):
+                    current_size = current_vocab_sizes.get(module_name)
+                if current_size is None or int(current_size) != int(baseline_size):
+                    mismatch = {
+                        "module": module_name,
+                        "baseline": int(baseline_size),
+                        "current": None if current_size is None else int(current_size),
+                    }
+                    violations.append(
+                        {
+                            "type": "tokenizer_mismatch",
+                            "message": "Embedding vocabulary size changed vs baseline",
+                            **mismatch,
+                        }
+                    )
+
+        handled_keys = {
+            "layer_norm_paths",
+            "embedding_vocab_sizes",
+            "config_vocab_size",
+        }
+        for check_name, baseline_value in baseline_checks.items():
+            if check_name in handled_keys:
+                continue
+            current_value = current_checks.get(check_name)
+            if current_value != baseline_value:
+                violations.append(
+                    {
+                        "type": "invariant_violation",
+                        "check": check_name,
+                        "baseline": baseline_value,
+                        "current": current_value,
+                        "message": (
+                            f"Invariant {check_name} changed from {baseline_value} to {current_value}"
+                        ),
+                    }
+                )
+
+        fatal_violation_types = {"tokenizer_mismatch"}
+        fatal_count = 0
+        warning_count = 0
+        annotated: list[dict[str, Any]] = []
+        for violation in violations:
+            violation_type = str(violation.get("type") or "")
+            severity = "fatal" if violation_type in fatal_violation_types else "warning"
+            annotated_violation = dict(violation)
+            annotated_violation.setdefault("severity", severity)
+            annotated.append(annotated_violation)
+            if severity == "fatal":
+                fatal_count += 1
+            else:
+                warning_count += 1
+
+        return annotated, fatal_count, warning_count
+
     severity_status = "pass"
     if guard_entry:
         gm = guard_entry.get("metrics", {}) or {}
@@ -108,9 +212,51 @@ def _extract_invariants(report: RunReport) -> dict[str, Any]:
                 if detail:
                     row["detail"] = detail
                 failures.append(row)
-        if fatal_count > 0:
+        base_fatal = 0
+        base_warn = 0
+        baseline_failures: list[dict[str, Any]] = []
+        if baseline_guard_entry is not None:
+            baseline_pre, baseline_post = _extract_guard_checks(baseline_guard_entry)
+            current_pre, current_post = _extract_guard_checks(guard_entry)
+            baseline_snapshot = baseline_pre or baseline_post
+            current_snapshot = current_post or current_pre
+            if isinstance(baseline_snapshot, dict) and isinstance(
+                current_snapshot, dict
+            ):
+                baseline_failures, base_fatal, base_warn = _compare_invariants(
+                    baseline_snapshot, current_snapshot
+                )
+                for violation in baseline_failures:
+                    check_name = violation.get("check")
+                    if not check_name:
+                        check_name = (
+                            violation.get("module")
+                            or violation.get("type")
+                            or "invariant"
+                        )
+                    row = {
+                        "check": str(check_name),
+                        "type": str(violation.get("type") or "violation"),
+                        "severity": str(violation.get("severity") or "warning"),
+                    }
+                    detail = {k: v for k, v in violation.items() if k not in row}
+                    if detail:
+                        detail.setdefault("source", "baseline_compare")
+                        row["detail"] = detail
+                    failures.append(row)
+
+        fatal_total = fatal_count + base_fatal
+        warn_total = warning_count + base_warn
+        try:
+            summary["fatal_violations"] = fatal_total
+            summary["warning_violations"] = warn_total
+            summary["violations_found"] = fatal_total + warn_total
+        except Exception:
+            pass
+
+        if fatal_total > 0:
             severity_status = "fail"
-        elif warning_count > 0 or violations:
+        elif warn_total > 0 or violations:
             severity_status = "warn"
 
     # If any error-severity entry exists among failures, escalate to fail
@@ -130,12 +276,16 @@ def _extract_invariants(report: RunReport) -> dict[str, Any]:
             "warning_violations": len(failures),
         }
 
+    details_out = invariants_data
+    if not details_out and guard_entry and isinstance(guard_entry.get("details"), dict):
+        details_out = guard_entry.get("details", {})
+
     return {
         "pre": "pass",
         "post": status,
         "status": status,
         "summary": summary,
-        "details": invariants_data,
+        "details": details_out,
         "failures": failures,
     }
 

@@ -5,6 +5,7 @@ InvarLock Guards - Invariants
 Invariant checking for model edits to ensure structural integrity.
 """
 
+import hashlib
 from typing import Any
 
 import torch
@@ -33,6 +34,7 @@ class InvariantsGuard(Guard):
         self.on_fail = on_fail
         self.prepared = False
         self.baseline_checks: dict[str, Any] = {}
+        self.last_current_checks: dict[str, Any] = {}
         self.profile_checks: tuple[str, ...] = ()
 
     def prepare(
@@ -102,6 +104,10 @@ class InvariantsGuard(Guard):
             "action": outcome.action,
             "violations": outcome.violations,
             "metrics": outcome.metrics,
+            "details": {
+                "baseline_checks": self.baseline_checks,
+                "current_checks": self.last_current_checks,
+            },
         }
 
     def finalize(self, model: Any) -> GuardOutcome:
@@ -125,6 +131,7 @@ class InvariantsGuard(Guard):
 
         # Check current invariants
         current_checks = self._capture_invariants(model, None)
+        self.last_current_checks = current_checks
         violations: list[dict[str, Any]] = []
         tokenizer_mismatches: list[dict[str, Any]] = []
 
@@ -376,8 +383,10 @@ class InvariantsGuard(Guard):
             structure_items = []
             for name, module in model.named_modules():
                 structure_items.append(f"{name}:{type(module).__name__}")
-            structure_hash = hash(tuple(structure_items))
-            checks["structure_hash"] = structure_hash
+            canonical = "\n".join(sorted(structure_items))
+            checks["structure_hash"] = hashlib.sha256(
+                canonical.encode("utf-8")
+            ).hexdigest()[:16]
         except Exception:
             checks["structure_hash"] = 0
 
