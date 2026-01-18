@@ -24,4 +24,3 @@ def test_proof_pack_does_not_depend_on_lmeval() -> None:
     assert "EVAL_BASELINE" not in combined
     assert "EVAL_EDIT" not in combined
     assert "EVAL_SINGLE_BENCHMARK" not in combined
-
