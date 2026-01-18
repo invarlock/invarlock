@@ -824,18 +824,71 @@ try:
                 print(f"Scaled by 100x: {name}")
                 break
 
-    elif error_type == "zero_layer":
-        # Target middle block - architecture agnostic
-        target_block = middle_block
-        for name, param in block_params.get(target_block, []):
-            if 'weight' in name.lower() and param.dim() >= 2:
-                with torch.no_grad():
-                    param.data.zero_()
-                error_info["injected"] = True
-                error_info["target_param"] = name
-                error_info["target_block"] = target_block
-                print(f"Zeroed: {name} (block {target_block})")
-                break
+    elif error_type == "weight_tying_break":
+        def _data_ptr(t):
+            try:
+                return int(t.data_ptr())
+            except Exception:
+                return None
+
+        def _try_flip_tying(embed_weight, head_weight, label):
+            if embed_weight is None or head_weight is None:
+                return False
+            embed_ptr = _data_ptr(embed_weight)
+            head_ptr = _data_ptr(head_weight)
+            if embed_ptr is None or head_ptr is None:
+                return False
+
+            try:
+                is_tied = embed_ptr == head_ptr
+            except Exception:
+                is_tied = False
+
+            cfg = getattr(model, "config", None)
+            with torch.no_grad():
+                if is_tied:
+                    # Untie by cloning the head weight.
+                    model.lm_head.weight = torch.nn.Parameter(head_weight.detach().clone())
+                    if cfg is not None and hasattr(cfg, "tie_word_embeddings"):
+                        cfg.tie_word_embeddings = False
+                    error_info["mode"] = "untie"
+                else:
+                    # Tie by re-aliasing head weight to embeddings.
+                    model.lm_head.weight = embed_weight
+                    if cfg is not None and hasattr(cfg, "tie_word_embeddings"):
+                        cfg.tie_word_embeddings = True
+                    error_info["mode"] = "tie"
+
+            error_info["injected"] = True
+            error_info["target"] = label
+            error_info["embed_ptr_before"] = embed_ptr
+            error_info["head_ptr_before"] = head_ptr
+            error_info["embed_ptr_after"] = _data_ptr(embed_weight)
+            error_info["head_ptr_after"] = _data_ptr(getattr(getattr(model, "lm_head", None), "weight", None))
+            print(f"Flipped weight tying ({label}): {error_info['mode']}")
+            return True
+
+        injected = False
+
+        # LLaMA/Mistral style (model.embed_tokens <-> lm_head)
+        try:
+            llama_model = getattr(model, "model", None)
+            embed_tokens = getattr(llama_model, "embed_tokens", None)
+            injected = _try_flip_tying(getattr(embed_tokens, "weight", None), getattr(getattr(model, "lm_head", None), "weight", None), "llama")
+        except Exception:
+            injected = False
+
+        # GPT-2 style (transformer.wte <-> lm_head)
+        if not injected:
+            try:
+                transformer = getattr(model, "transformer", None)
+                wte = getattr(transformer, "wte", None)
+                injected = _try_flip_tying(getattr(wte, "weight", None), getattr(getattr(model, "lm_head", None), "weight", None), "gpt2")
+            except Exception:
+                injected = False
+
+        if not injected:
+            print("WARNING: Could not locate tied weights; weight_tying_break not injected")
 
     # Move to CPU for saving if loaded on GPU
     if use_gpu:

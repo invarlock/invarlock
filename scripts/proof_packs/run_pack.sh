@@ -19,7 +19,7 @@ Options:
   --determinism MODE   Determinism mode (strict|throughput)
   --repeats N          Determinism repeat count metadata (default: 0)
   --calibrate-only     Only run calibration tasks (implies PACK_SUITE_MODE=calibrate-only)
-  --run-only           Run edits/evals only (implies resume)
+  --run-only           Run edits/certs only (implies resume)
   --resume             Resume an existing run directory
   --help               Show this help message
 EOF
@@ -206,7 +206,7 @@ pack_write_readme() {
 # InvarLock Proof Pack
 
 This proof pack bundles certificates, summary reports, and metadata for offline
-verification. No model weights or raw lm-eval logs are included.
+verification. No model weights are included.
 
 ## Verify
 
@@ -275,9 +275,6 @@ pack_build_pack() {
 
     pack_copy_file "${run_dir}/reports/final_verdict.txt" "${verdicts_dir}/final_verdict.txt"
     pack_copy_file "${run_dir}/reports/final_verdict.json" "${verdicts_dir}/final_verdict.json"
-    pack_copy_file "${run_dir}/analysis/eval_results.csv" "${analysis_dir}/eval_results.csv"
-    pack_copy_optional "${run_dir}/analysis/eval_results.jsonl" "${analysis_dir}/eval_results.jsonl"
-    pack_copy_optional "${run_dir}/analysis/guard_sensitivity_matrix.csv" "${analysis_dir}/guard_sensitivity_matrix.csv"
     pack_copy_optional "${run_dir}/analysis/determinism_repeats.json" "${analysis_dir}/determinism_repeats.json"
 
     pack_copy_optional "${run_dir}/state/model_revisions.json" "${revisions_dest}"

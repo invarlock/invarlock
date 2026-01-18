@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # task_functions.sh - Atomic task implementations for dynamic scheduling
 # Version: proof-packs-v1 (InvarLock Proof Pack Suite)
-# Dependencies: jq, python3, invarlock CLI, lm_eval, task_serialization.sh
+# Dependencies: jq, python3, invarlock CLI, task_serialization.sh
 # Usage: sourced by gpu_worker.sh/validation_suite.sh for per-task execution
 #
 # Each function executes a single atomic task type with explicit parameters.
@@ -183,27 +183,6 @@ print(revision)
 PY
 }
 
-# Build lm-eval model_args with optional multi-GPU parallelization.
-_get_lmeval_model_args() {
-    local model_path="$1"
-    local model_args="pretrained=${model_path},trust_remote_code=True,dtype=bfloat16"
-    local parallelize_flag="${LM_EVAL_PARALLELIZE:-true}"
-    parallelize_flag=$(printf '%s' "${parallelize_flag}" | tr '[:upper:]' '[:lower:]')
-    local multi_gpu="false"
-    if [[ "${CUDA_VISIBLE_DEVICES:-}" == *","* ]]; then
-        multi_gpu="true"
-    fi
-
-    if [[ "${multi_gpu}" == "true" ]]; then
-        model_args="${model_args},device_map=auto"
-        if [[ "${parallelize_flag}" != "false" && "${parallelize_flag}" != "0" ]]; then
-            model_args="${model_args},parallelize=True"
-        fi
-    fi
-
-    echo "${model_args}"
-}
-
 # Check if model is large (30B+) and needs special handling.
 # Changed threshold from 70 to 30 to fix hang on 30-40B models:
 # - Skips overhead check (avoids loading model twice, which can exceed 180GB)
@@ -217,30 +196,6 @@ _is_large_model() {
         return
     fi
     [[ "${model_size}" =~ 30 || "${model_size}" =~ 32 || "${model_size}" =~ 34 || "${model_size}" =~ 40 || "${model_size}" =~ 70 || "${model_size}" =~ 72 || "${model_size}" =~ 65 || "${model_size}" =~ 80 || "${model_size}" =~ 90 ]]
-}
-
-# Select lm-eval batch size caps based on model size.
-_get_eval_batch_size() {
-    local model_size="$1"
-
-    case "${model_size}" in
-        moe|MoE|MOE)
-            echo "${EVAL_BATCH_SIZE_MOE:-auto:6}"
-            return
-            ;;
-    esac
-
-    if [[ "${model_size}" =~ ^[0-9]+$ ]]; then
-        if [[ ${model_size} -ge 70 ]]; then
-            echo "${EVAL_BATCH_SIZE_LARGE:-auto:4}"
-        elif [[ ${model_size} -ge 30 ]]; then
-            echo "${EVAL_BATCH_SIZE_MEDIUM:-auto:8}"
-        else
-            echo "${EVAL_BATCH_SIZE_SMALL:-auto:16}"
-        fi
-    else
-        echo "${EVAL_BATCH_SIZE_SMALL:-auto:16}"
-    fi
 }
 
 # Resolve the concrete InvarLock adapter name for a model path/ID.
@@ -840,9 +795,6 @@ execute_task() {
             SETUP_BASELINE)
                 task_setup_baseline "${model_id}" "${model_name}" "${gpu_id}" "${output_dir}" "${task_log}" || exit_code=$?
                 ;;
-            EVAL_BASELINE)
-                task_eval_baseline "${model_name}" "${gpu_id}" "${output_dir}" "${task_log}" || exit_code=$?
-                ;;
             CALIBRATION_RUN)
                 local run=$(echo "${params}" | jq -r '.run // 1')
                 local seed=$(echo "${params}" | jq -r '.seed // 42')
@@ -857,18 +809,6 @@ execute_task() {
                 # v2.1.0: Batch edit creation - loads model once, creates all 8 edits
                 local edit_specs=$(echo "${params}" | jq -r '.edit_specs // "[]"')
                 task_create_edits_batch "${model_name}" "${gpu_id}" "${edit_specs}" "${output_dir}" "${task_log}" || exit_code=$?
-                ;;
-            EVAL_EDIT)
-                local edit_spec=$(echo "${params}" | jq -r '.edit_spec // ""')
-                local version=$(echo "${params}" | jq -r '.version // ""')
-                task_eval_edit "${model_name}" "${gpu_id}" "${edit_spec}" "${output_dir}" "${task_log}" "${version}" || exit_code=$?
-                ;;
-            EVAL_MMLU|EVAL_HELLASWAG|EVAL_ARC|EVAL_WINOGRANDE)
-                # v2.1.0: Split eval tasks - individual benchmarks for better parallelism
-                local edit_spec=$(echo "${params}" | jq -r '.edit_spec // ""')
-                local benchmark=$(echo "${params}" | jq -r '.benchmark // ""')
-                local version=$(echo "${params}" | jq -r '.version // ""')
-                task_eval_single_benchmark "${model_name}" "${gpu_id}" "${edit_spec}" "${benchmark}" "${output_dir}" "${task_log}" "${version}" || exit_code=$?
                 ;;
             CERTIFY_EDIT)
                 local edit_spec=$(echo "${params}" | jq -r '.edit_spec // ""')
@@ -1082,89 +1022,6 @@ SETUP_EOF
         fi
         return 1
     fi
-}
-
-# ============ TASK: EVAL_BASELINE ============
-
-# Run lm-eval on baseline model
-# Usage: task_eval_baseline <model_name> <gpu_id> <output_dir> <log_file>
-task_eval_baseline() {
-    local model_name="$1"
-    local gpu_id="$2"
-    local output_dir="$3"
-    local log_file="$4"
-
-    local model_output_dir="${output_dir}/${model_name}"
-    local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null || true)
-    local model_id=$(cat "${model_output_dir}/.model_id" 2>/dev/null || true)
-    local result_file="${model_output_dir}/evals/baseline_results.json"
-
-    if [[ -z "${baseline_path}" || ! -d "${baseline_path}" ]]; then
-        echo "ERROR: Baseline path not found for ${model_name}" >> "${log_file}"
-        return 1
-    fi
-
-    if [[ -f "${result_file}" ]]; then
-        echo "  Baseline eval already exists, skipping" >> "${log_file}"
-        return 0
-    fi
-
-    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Running baseline lm-eval" >> "${log_file}"
-
-    mkdir -p "$(dirname "${result_file}")"
-
-    # Determine batch size based on model size
-    local model_size
-    model_size=$(_estimate_model_size "${baseline_path}")
-    if [[ -z "${model_size}" || "${model_size}" == "7" ]] && [[ -n "${model_id}" ]]; then
-        model_size=$(_get_model_size_from_name "${model_id}")
-    fi
-    local batch_size
-    batch_size=$(_get_eval_batch_size "${model_size}")
-    local params_json="${TASK_PARAMS:-}"
-    if [[ -n "${params_json}" && "${params_json}" != "null" ]]; then
-        local override_batch
-        override_batch=$(echo "${params_json}" | jq -r '.batch_size // empty' 2>/dev/null)
-        if [[ -n "${override_batch}" && "${override_batch}" != "null" ]]; then
-            batch_size="${override_batch}"
-            echo "  OOM override: batch_size=${batch_size}" >> "${log_file}"
-        fi
-    fi
-
-    local model_args
-    model_args=$(_get_lmeval_model_args "${baseline_path}")
-    local torch_compile="${LMEVAL_TORCH_COMPILE:-0}"
-
-    local tmp_eval_dir="${model_output_dir}/evals/.tmp/${TASK_ID:-baseline_$$}"
-    mkdir -p "${tmp_eval_dir}"
-
-    # CUDA_VISIBLE_DEVICES is inherited from execute_task() for multi-GPU support
-    local exit_code=0
-    TORCH_COMPILE="${torch_compile}" _cmd_python -m lm_eval \
-        --model hf \
-        --model_args "${model_args}" \
-        --tasks "${EVAL_TASKS:-mmlu,hellaswag,arc_challenge,winogrande}" \
-        --batch_size "${batch_size}" \
-        --num_fewshot "${EVAL_NUM_FEWSHOT:-5}" \
-        --output_path "${tmp_eval_dir}" \
-        --log_samples \
-        >> "${log_file}" 2>&1 || exit_code=$?
-
-    # Move results file to expected location
-    local found_results=$(find "${tmp_eval_dir}" -name "results*.json" -type f 2>/dev/null | head -1)
-    if [[ -n "${found_results}" && -f "${found_results}" ]]; then
-        mv "${found_results}" "${result_file}" 2>/dev/null || {
-            echo "  ERROR: Failed to move results to: ${result_file}" >> "${log_file}"
-            return 1
-        }
-        rm -rf "${tmp_eval_dir}" 2>/dev/null || true
-        echo "  Results saved to: ${result_file}" >> "${log_file}"
-    else
-        echo "  ERROR: No results found in ${tmp_eval_dir}" >> "${log_file}"
-        [[ ${exit_code} -eq 0 ]] && exit_code=1
-    fi
-
-        return ${exit_code}
 }
 
 # ============ TASK: CALIBRATION_RUN ==========
@@ -1887,310 +1744,6 @@ BATCH_EDIT_EOF
         echo "  Batch edit creation complete" >> "${log_file}"
     else
         echo "  ERROR: Batch edit creation failed" >> "${log_file}"
-    fi
-
-    return ${exit_code}
-}
-
-# ============ TASK: EVAL_EDIT ============
-
-# Run lm-eval on edited model
-# Usage: task_eval_edit <model_name> <gpu_id> <edit_spec> <output_dir> <log_file> [version_hint]
-task_eval_edit() {
-    local model_name="$1"
-    local gpu_id="$2"
-    local edit_spec="$3"
-    local output_dir="$4"
-    local log_file="$5"
-    local version_hint="${6:-}"
-
-    local model_output_dir="${output_dir}/${model_name}"
-
-    # Parse edit spec to find path
-    local edit_type param1
-    IFS=':' read -r edit_type param1 _ _ <<< "${edit_spec}"
-
-    local edit_path=""
-    if [[ "${param1}" == "clean" ]]; then
-        local resolved
-        resolved=$(resolve_edit_params "${model_output_dir}" "${edit_spec}" "clean")
-        local status
-        status=$(echo "${resolved}" | jq -r '.status')
-        if [[ "${status}" == "skipped" ]]; then
-            echo "  Clean edit skipped by tuned preset: ${edit_spec}" >> "${log_file}"
-            return 0
-        fi
-        if [[ "${status}" != "selected" ]]; then
-            echo "ERROR: Unable to resolve tuned clean edit for ${edit_spec} (${status})" >> "${log_file}"
-            return 1
-        fi
-        local edit_dir_name
-        edit_dir_name=$(echo "${resolved}" | jq -r '.edit_dir_name')
-        edit_path="${model_output_dir}/models/${edit_dir_name}"
-    else
-        if [[ "${version_hint}" == "clean" || "${version_hint}" == "stress" ]]; then
-            local resolved
-            resolved=$(resolve_edit_params "${model_output_dir}" "${edit_spec}" "${version_hint}")
-            local status
-            status=$(echo "${resolved}" | jq -r '.status')
-            if [[ "${status}" == "selected" ]]; then
-                local edit_dir_name
-                edit_dir_name=$(echo "${resolved}" | jq -r '.edit_dir_name')
-                local potential_path="${model_output_dir}/models/${edit_dir_name}"
-                if [[ -d "${potential_path}" ]]; then
-                    edit_path="${potential_path}"
-                fi
-            fi
-        fi
-        for version in clean stress; do
-            if [[ -n "${edit_path}" ]]; then
-                break
-            fi
-            local resolved
-            resolved=$(resolve_edit_params "${model_output_dir}" "${edit_spec}" "${version}")
-            local status
-            status=$(echo "${resolved}" | jq -r '.status')
-            if [[ "${status}" != "selected" ]]; then
-                continue
-            fi
-            local edit_dir_name
-            edit_dir_name=$(echo "${resolved}" | jq -r '.edit_dir_name')
-            local potential_path="${model_output_dir}/models/${edit_dir_name}"
-            if [[ -d "${potential_path}" ]]; then
-                edit_path="${potential_path}"
-                break
-            fi
-        done
-    fi
-
-    if [[ -z "${edit_path}" || ! -d "${edit_path}" ]]; then
-        echo "ERROR: Edit model not found for spec: ${edit_spec}" >> "${log_file}"
-        return 1
-    fi
-
-    local edit_name=$(basename "${edit_path}")
-    local result_file="${model_output_dir}/evals/${edit_name}_results.json"
-
-    if [[ -f "${result_file}" ]]; then
-        echo "  Eval for ${edit_name} already exists, skipping" >> "${log_file}"
-        return 0
-    fi
-
-    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Running lm-eval on: ${edit_name}" >> "${log_file}"
-
-    mkdir -p "$(dirname "${result_file}")"
-
-    local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null || true)
-    local model_id=$(cat "${model_output_dir}/.model_id" 2>/dev/null || true)
-    local model_size
-    model_size=$(_estimate_model_size "${baseline_path}")
-    if [[ -z "${model_size}" || "${model_size}" == "7" ]] && [[ -n "${model_id}" ]]; then
-        model_size=$(_get_model_size_from_name "${model_id}")
-    fi
-    local batch_size
-    batch_size=$(_get_eval_batch_size "${model_size}")
-    local params_json="${TASK_PARAMS:-}"
-    if [[ -n "${params_json}" && "${params_json}" != "null" ]]; then
-        local override_batch
-        override_batch=$(echo "${params_json}" | jq -r '.batch_size // empty' 2>/dev/null)
-        if [[ -n "${override_batch}" && "${override_batch}" != "null" ]]; then
-            batch_size="${override_batch}"
-            echo "  OOM override: batch_size=${batch_size}" >> "${log_file}"
-        fi
-    fi
-    local model_args
-    model_args=$(_get_lmeval_model_args "${edit_path}")
-    local torch_compile="${LMEVAL_TORCH_COMPILE:-0}"
-    local tmp_eval_dir="${model_output_dir}/evals/.tmp/${TASK_ID:-${edit_name}_$$}"
-    mkdir -p "${tmp_eval_dir}"
-
-    # CUDA_VISIBLE_DEVICES is inherited from execute_task() for multi-GPU support
-    local exit_code=0
-    TORCH_COMPILE="${torch_compile}" _cmd_python -m lm_eval \
-        --model hf \
-        --model_args "${model_args}" \
-        --tasks "${EVAL_TASKS:-mmlu,hellaswag,arc_challenge,winogrande}" \
-        --batch_size "${batch_size}" \
-        --num_fewshot "${EVAL_NUM_FEWSHOT:-5}" \
-        --output_path "${tmp_eval_dir}" \
-        --log_samples \
-        >> "${log_file}" 2>&1 || exit_code=$?
-
-    local found_results=$(find "${tmp_eval_dir}" -name "results*.json" -type f 2>/dev/null | head -1)
-    if [[ -n "${found_results}" && -f "${found_results}" ]]; then
-        mv "${found_results}" "${result_file}" 2>/dev/null || {
-            echo "  ERROR: Failed to move results to: ${result_file}" >> "${log_file}"
-            return 1
-        }
-        rm -rf "${tmp_eval_dir}" 2>/dev/null || true
-        echo "  Results saved to: ${result_file}" >> "${log_file}"
-    else
-        echo "  ERROR: No results found in ${tmp_eval_dir}" >> "${log_file}"
-        [[ ${exit_code} -eq 0 ]] && exit_code=1
-    fi
-
-    return ${exit_code}
-}
-
-# ============ TASK: EVAL_SINGLE_BENCHMARK ============
-
-# Run a single lm-eval benchmark on edited model (Split Eval optimization)
-# This runs one benchmark (MMLU, HellaSwag, ARC, or WinoGrande) instead of all 4
-# Enables 4× parallelism: each benchmark can run on a different GPU
-# Usage: task_eval_single_benchmark <model_name> <gpu_id> <edit_spec> <benchmark> <output_dir> <log_file> [version_hint]
-task_eval_single_benchmark() {
-    local model_name="$1"
-    local gpu_id="$2"
-    local edit_spec="$3"
-    local benchmark="$4"
-    local output_dir="$5"
-    local log_file="$6"
-    local version_hint="${7:-}"
-
-    local model_output_dir="${output_dir}/${model_name}"
-
-    # Parse edit spec to find path
-    local edit_type param1
-    IFS=':' read -r edit_type param1 _ _ <<< "${edit_spec}"
-
-    local edit_path=""
-    if [[ "${param1}" == "clean" ]]; then
-        local resolved
-        resolved=$(resolve_edit_params "${model_output_dir}" "${edit_spec}" "clean")
-        local status
-        status=$(echo "${resolved}" | jq -r '.status')
-        if [[ "${status}" == "skipped" ]]; then
-            echo "  Clean edit skipped by tuned preset: ${edit_spec}" >> "${log_file}"
-            return 0
-        fi
-        if [[ "${status}" != "selected" ]]; then
-            echo "ERROR: Unable to resolve tuned clean edit for ${edit_spec} (${status})" >> "${log_file}"
-            return 1
-        fi
-        local edit_dir_name
-        edit_dir_name=$(echo "${resolved}" | jq -r '.edit_dir_name')
-        edit_path="${model_output_dir}/models/${edit_dir_name}"
-    else
-        if [[ "${version_hint}" == "clean" || "${version_hint}" == "stress" ]]; then
-            local resolved
-            resolved=$(resolve_edit_params "${model_output_dir}" "${edit_spec}" "${version_hint}")
-            local status
-            status=$(echo "${resolved}" | jq -r '.status')
-            if [[ "${status}" == "selected" ]]; then
-                local edit_dir_name
-                edit_dir_name=$(echo "${resolved}" | jq -r '.edit_dir_name')
-                local potential_path="${model_output_dir}/models/${edit_dir_name}"
-                if [[ -d "${potential_path}" ]]; then
-                    edit_path="${potential_path}"
-                fi
-            fi
-        fi
-        for version in clean stress; do
-            if [[ -n "${edit_path}" ]]; then
-                break
-            fi
-            local resolved
-            resolved=$(resolve_edit_params "${model_output_dir}" "${edit_spec}" "${version}")
-            local status
-            status=$(echo "${resolved}" | jq -r '.status')
-            if [[ "${status}" != "selected" ]]; then
-                continue
-            fi
-            local edit_dir_name
-            edit_dir_name=$(echo "${resolved}" | jq -r '.edit_dir_name')
-            local potential_path="${model_output_dir}/models/${edit_dir_name}"
-            if [[ -d "${potential_path}" ]]; then
-                edit_path="${potential_path}"
-                break
-            fi
-        done
-    fi
-
-    if [[ -z "${edit_path}" || ! -d "${edit_path}" ]]; then
-        echo "ERROR: Edit model not found for spec: ${edit_spec}" >> "${log_file}"
-        return 1
-    fi
-
-    local edit_name=$(basename "${edit_path}")
-    local result_file="${model_output_dir}/evals/${edit_name}_${benchmark}_results.json"
-
-    if [[ -f "${result_file}" ]]; then
-        echo "  Eval ${benchmark} for ${edit_name} already exists, skipping" >> "${log_file}"
-        return 0
-    fi
-
-    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Running lm-eval ${benchmark} on: ${edit_name}" >> "${log_file}"
-
-    mkdir -p "$(dirname "${result_file}")"
-
-    local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null || true)
-    local model_id=$(cat "${model_output_dir}/.model_id" 2>/dev/null || true)
-    local model_size
-    model_size=$(_estimate_model_size "${baseline_path}")
-    if [[ -z "${model_size}" || "${model_size}" == "7" ]] && [[ -n "${model_id}" ]]; then
-        model_size=$(_get_model_size_from_name "${model_id}")
-    fi
-    local batch_size
-    batch_size=$(_get_eval_batch_size "${model_size}")
-    local params_json="${TASK_PARAMS:-}"
-    if [[ -n "${params_json}" && "${params_json}" != "null" ]]; then
-        local override_batch
-        override_batch=$(echo "${params_json}" | jq -r '.batch_size // empty' 2>/dev/null)
-        if [[ -n "${override_batch}" && "${override_batch}" != "null" ]]; then
-            batch_size="${override_batch}"
-            echo "  OOM override: batch_size=${batch_size}" >> "${log_file}"
-        fi
-    fi
-    local model_args
-    model_args=$(_get_lmeval_model_args "${edit_path}")
-    local torch_compile="${LMEVAL_TORCH_COMPILE:-0}"
-    local tmp_eval_dir="${model_output_dir}/evals/.tmp/${TASK_ID:-${edit_name}_${benchmark}_$$}"
-    mkdir -p "${tmp_eval_dir}"
-
-    # Map benchmark names to lm-eval task names
-    local task_name
-    case "${benchmark}" in
-        "mmlu")
-            task_name="mmlu"
-            ;;
-        "hellaswag")
-            task_name="hellaswag"
-            ;;
-        "arc")
-            task_name="arc_challenge"
-            ;;
-        "winogrande")
-            task_name="winogrande"
-            ;;
-        *)
-            task_name="${benchmark}"
-            ;;
-    esac
-
-    # CUDA_VISIBLE_DEVICES is inherited from execute_task() for multi-GPU support
-    local exit_code=0
-    TORCH_COMPILE="${torch_compile}" _cmd_python -m lm_eval \
-        --model hf \
-        --model_args "${model_args}" \
-        --tasks "${task_name}" \
-        --batch_size "${batch_size}" \
-        --num_fewshot "${EVAL_NUM_FEWSHOT:-5}" \
-        --output_path "${tmp_eval_dir}" \
-        --log_samples \
-        >> "${log_file}" 2>&1 || exit_code=$?
-
-    # Move results file to expected location
-    local found_results=$(find "${tmp_eval_dir}" -name "results*.json" -type f 2>/dev/null | head -1)
-    if [[ -n "${found_results}" && -f "${found_results}" ]]; then
-        mv "${found_results}" "${result_file}" 2>/dev/null || {
-            echo "  ERROR: Failed to move results to: ${result_file}" >> "${log_file}"
-            return 1
-        }
-        rm -rf "${tmp_eval_dir}" 2>/dev/null || true
-        echo "  Results saved to: ${result_file}" >> "${log_file}"
-    else
-        echo "  ERROR: No results found in ${tmp_eval_dir}" >> "${log_file}"
-        [[ ${exit_code} -eq 0 ]] && exit_code=1
     fi
 
     return ${exit_code}

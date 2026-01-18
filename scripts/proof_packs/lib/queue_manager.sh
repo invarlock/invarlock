@@ -965,7 +965,7 @@ generate_model_tasks() {
     local model_name="$3"
 
     # Calculate model size for memory estimation
-    local base_size=$(estimate_model_memory "${model_id}" "EVAL_BASELINE")
+    local base_size=$(estimate_model_memory "${model_id}" "CERTIFY_EDIT")
 
     # Decide whether to use batch edit creation or per-edit tasks.
     # Deep-copying a 70B+ model for batch edits can exceed per-GPU memory,
@@ -977,7 +977,7 @@ generate_model_tasks() {
     if [[ "${model_lower}" =~ 70b || "${model_lower}" =~ 72b || "${model_lower}" =~ 65b || "${model_lower}" =~ mixtral || "${model_lower}" =~ 8x7b || "${model_lower}" =~ moe ]]; then
         use_batch="false"
     elif [[ -n "${base_size}" ]]; then
-        # For very large models, EVAL_BASELINE estimates can still be high.
+        # For very large models, certify memory estimates can still be high.
         # Treat anything >=170GB as "large" and avoid batch edits.
         if [[ "${base_size}" -ge 170 ]]; then
             use_batch="false"
@@ -1002,14 +1002,7 @@ generate_model_tasks() {
     task_ids+=("${setup_id}")
     echo "Created: ${setup_id}"
 
-    # 2. EVAL_BASELINE (depends on setup)
-    local eval_base_id=$(add_task "EVAL_BASELINE" "${model_id}" "${model_name}" \
-        "$(estimate_model_memory "${model_id}" "EVAL_BASELINE")" \
-        "${setup_id}" '{}' 80)
-    task_ids+=("${eval_base_id}")
-    echo "Created: ${eval_base_id}"
-
-    # 3. CALIBRATION_RUN × N (depend on setup)
+    # 2. CALIBRATION_RUN × N (depend on setup)
     local cal_ids=()
     local calibration_runs="${DRIFT_CALIBRATION_RUNS:-5}"
     if ! [[ "${calibration_runs}" =~ ^[0-9]+$ ]]; then
@@ -1030,7 +1023,7 @@ generate_model_tasks() {
         done
     fi
 
-    # 4. GENERATE_PRESET (depends on all calibration runs)
+    # 3. GENERATE_PRESET (depends on all calibration runs)
     local preset_id=""
     if [[ ${calibration_runs} -gt 0 ]]; then
         local cal_deps=$(IFS=','; echo "${cal_ids[*]}")
@@ -1047,10 +1040,10 @@ generate_model_tasks() {
         use_preset="true"
     fi
 
-    # 5/6. Edit creation + eval/certify
+    # 4. Edit creation + certify
     # Clean edits use tuned presets supplied outside the run.
     local clean_edits=("quant_rtn:clean:ffn" "fp8_quant:clean:ffn" "magnitude_prune:clean:ffn" "lowrank_svd:clean:ffn")
-    # Stress edits (2 certify runs each)
+    # Stress edits
     local stress_edits=("quant_rtn:4:32:all" "fp8_quant:e5m2:all" "magnitude_prune:0.5:all" "lowrank_svd:32:all")
 
     # Ensure use_batch is defined (defensive for set -u)
@@ -1089,7 +1082,7 @@ generate_model_tasks() {
                 if [[ ${clean_runs} -lt 0 ]]; then
                     clean_runs=0
                 fi
-                generate_eval_certify_tasks \
+                generate_certify_tasks \
                     "${model_id}" \
                     "${model_name}" \
                     "${edits_id}" \
@@ -1107,7 +1100,7 @@ generate_model_tasks() {
                 if [[ ${stress_runs} -lt 0 ]]; then
                     stress_runs=0
                 fi
-                generate_eval_certify_tasks \
+                generate_certify_tasks \
                     "${model_id}" \
                     "${model_name}" \
                     "${edits_id}" \
@@ -1129,13 +1122,6 @@ generate_model_tasks() {
                 "${edit_deps}" '{"edit_spec": "'"${edit_spec}"'", "version": "clean", "model_idx": '"${model_idx}"'}' 70)
             task_ids+=("${edit_id}")
             echo "Created: ${edit_id}"
-
-            # EVAL_EDIT (monolithic) depends on this edit
-            local eval_id=$(add_task "EVAL_EDIT" "${model_id}" "${model_name}" \
-                "$(estimate_model_memory "${model_id}" "EVAL_EDIT")" \
-                "${edit_id}" '{"edit_spec": "'"${edit_spec}"'", "version": "clean"}' 65)
-            task_ids+=("${eval_id}")
-            echo "Created: ${eval_id}"
 
             # CERTIFY_EDIT runs for clean edits (3 by default)
             if [[ ${CLEAN_EDIT_RUNS:-0} -gt 0 && "${use_preset}" == "true" ]]; then
@@ -1160,12 +1146,6 @@ generate_model_tasks() {
             task_ids+=("${edit_id}")
             echo "Created: ${edit_id}"
 
-            local eval_id=$(add_task "EVAL_EDIT" "${model_id}" "${model_name}" \
-                "$(estimate_model_memory "${model_id}" "EVAL_EDIT")" \
-                "${edit_id}" '{"edit_spec": "'"${edit_spec}"'", "version": "stress"}' 65)
-            task_ids+=("${eval_id}")
-            echo "Created: ${eval_id}"
-
             if [[ ${STRESS_EDIT_RUNS:-0} -gt 0 && "${use_preset}" == "true" ]]; then
                 for run in $(seq 1 "${STRESS_EDIT_RUNS}"); do
                     local cert_deps="${edit_id}"
@@ -1182,9 +1162,9 @@ generate_model_tasks() {
         done
     fi
 
-    # 7. Error injection tests (5 types)
+    # 5. Error injection tests (5 types)
     if [[ "${RUN_ERROR_INJECTION:-true}" == "true" ]]; then
-        local error_types=("nan_injection" "inf_injection" "extreme_quant" "scale_explosion" "zero_layer")
+        local error_types=("nan_injection" "inf_injection" "extreme_quant" "scale_explosion" "weight_tying_break")
         for error_type in "${error_types[@]}"; do
             # CREATE_ERROR
             local error_create_id=$(add_task "CREATE_ERROR" "${model_id}" "${model_name}" \
@@ -1214,13 +1194,12 @@ generate_model_tasks() {
 }
 
 
-# Generate eval and certify tasks for an edit (Split Eval optimization)
-# Usage: generate_eval_certify_tasks <model_id> <model_name> <batch_edit_id> <preset_id> <edit_spec> <version> <cert_runs>
-# Note: Edit creation is handled by CREATE_EDITS_BATCH; this function creates eval+certify tasks
-generate_eval_certify_tasks() {
+# Generate certify tasks for an edit after it exists on disk.
+# Usage: generate_certify_tasks <model_id> <model_name> <edit_dep_id> <preset_id> <edit_spec> <version> <cert_runs>
+generate_certify_tasks() {
     local model_id="$1"
     local model_name="$2"
-    local batch_edit_id="$3"
+    local edit_dep_id="$3"
     local preset_id="$4"
     local edit_spec="$5"
     local version="$6"
@@ -1232,27 +1211,12 @@ generate_eval_certify_tasks() {
         cert_runs=0
     fi
 
-    # Split Eval: 4 parallel benchmark tasks instead of 1 monolithic EVAL_EDIT
-    # This enables better parallelization across GPUs (4× parallelism opportunity)
-    local benchmarks=("mmlu" "hellaswag" "arc" "winogrande")
-    local eval_ids=()
-
-    for benchmark in "${benchmarks[@]}"; do
-        local task_type="EVAL_$(printf '%s' "${benchmark}" | tr '[:lower:]' '[:upper:]')"  # uppercase: EVAL_MMLU, EVAL_HELLASWAG, etc.
-        local eval_id=$(add_task "${task_type}" "${model_id}" "${model_name}" \
-            "$(estimate_model_memory "${model_id}" "EVAL_EDIT")" \
-            "${batch_edit_id}" '{"edit_spec": "'"${edit_spec}"'", "benchmark": "'"${benchmark}"'", "version": "'"${version}"'"}' 65)
-        eval_ids+=("${eval_id}")
-        echo "Created: ${eval_id} (${benchmark} eval)"
-    done
-
-    # CERTIFY_EDIT depends on batch edit creation + preset (not on evals - they run in parallel)
-    # Certification uses pre-computed reference values, not eval results
+    # CERTIFY_EDIT depends on edit creation + preset.
     if [[ ${cert_runs} -gt 0 ]]; then
         for run in $(seq 1 "${cert_runs}"); do
-            local cert_deps="${batch_edit_id}"
+            local cert_deps="${edit_dep_id}"
             if [[ -n "${preset_id}" ]]; then
-                cert_deps="${batch_edit_id},${preset_id}"
+                cert_deps="${edit_dep_id},${preset_id}"
             fi
             local cert_id=$(add_task "CERTIFY_EDIT" "${model_id}" "${model_name}" \
                 "$(estimate_model_memory "${model_id}" "CERTIFY_EDIT")" \
@@ -1262,7 +1226,7 @@ generate_eval_certify_tasks() {
     fi
 }
 
-# Legacy: Generate tasks for an edit type (deprecated - use generate_eval_certify_tasks)
+# Legacy: Generate tasks for an edit type (deprecated).
 # Kept for backwards compatibility with external scripts
 # Usage: generate_edit_tasks <model_id> <model_name> <setup_id> <preset_id> <edit_spec> <version> <cert_runs>
 generate_edit_tasks() {
@@ -1280,19 +1244,13 @@ generate_edit_tasks() {
         cert_runs=0
     fi
 
-    echo "WARNING: generate_edit_tasks is deprecated; use CREATE_EDITS_BATCH + generate_eval_certify_tasks" >&2
+    echo "WARNING: generate_edit_tasks is deprecated; use CREATE_EDIT + CERTIFY_EDIT" >&2
 
     # CREATE_EDIT (single edit)
     local edit_id=$(add_task "CREATE_EDIT" "${model_id}" "${model_name}" \
         "$(estimate_model_memory "${model_id}" "CREATE_EDIT")" \
         "${setup_id}" '{"edit_spec": "'"${edit_spec}"'", "version": "'"${version}"'"}' 70)
     echo "Created: ${edit_id}"
-
-    # EVAL_EDIT (monolithic eval)
-    local eval_id=$(add_task "EVAL_EDIT" "${model_id}" "${model_name}" \
-        "$(estimate_model_memory "${model_id}" "EVAL_EDIT")" \
-        "${edit_id}" '{"edit_spec": "'"${edit_spec}"'"}' 65)
-    echo "Created: ${eval_id}"
 
     # CERTIFY_EDIT × cert_runs
     if [[ ${cert_runs} -gt 0 ]]; then
@@ -1524,12 +1482,10 @@ elif task_type == "CREATE_EDITS_BATCH":
     required = (weights_gb * 2.0) + batch_overhead
 elif task_type in ("CREATE_EDIT", "CREATE_ERROR"):
     required = weights_gb + edit_overhead
-elif task_type in ("EVAL_BASELINE", "EVAL_EDIT", "EVAL_MMLU", "EVAL_HELLASWAG", "EVAL_ARC", "EVAL_WINOGRANDE"):
-    required = weights_gb + kv_cache_gb(eval_batch, seq_len_eval) + eval_overhead
 elif task_type in ("CALIBRATION_RUN", "CERTIFY_EDIT", "CERTIFY_ERROR"):
     required = weights_gb + kv_cache_gb(batch_invarlock, seq_len_invarlock) + inv_overhead
 else:
-    required = weights_gb + eval_overhead
+    required = weights_gb + inv_overhead
 
 per_device = int(os.environ.get("GPU_MEMORY_PER_DEVICE", "180"))
 max_gpus = int(os.environ.get("NUM_GPUS", "8"))
