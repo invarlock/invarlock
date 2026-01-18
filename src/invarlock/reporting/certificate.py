@@ -1440,7 +1440,7 @@ def make_certificate(
         ppl_analysis["window_plan"] = window_plan_ctx
 
     # Extract invariant status
-    invariants = _extract_invariants(report)
+    invariants = _extract_invariants(report, baseline=baseline_normalized)
 
     # Extract spectral analysis
     spectral = _extract_spectral_analysis(report, baseline_normalized)

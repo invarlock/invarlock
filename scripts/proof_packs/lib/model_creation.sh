@@ -956,8 +956,9 @@ try:
             print("WARNING: rank_collapse not injected (no eligible weights found)")
 
     elif error_type == "norm_collapse":
-        # Zero out at least one full row across multiple weight matrices to
-        # trigger norm-collapse degeneracy across > max_caps modules.
+        # Zero out entire matrices across multiple weight matrices to trigger
+        # norm-collapse degeneracy (and typically a primary-metric failure)
+        # across > max_caps modules.
         target_names = []
         patterns = (
             "q_proj.weight",
@@ -970,7 +971,7 @@ try:
             "query_key_value.weight",
         )
         for name, param in model.named_parameters():
-            if len(target_names) >= 8:
+            if len(target_names) >= 32:
                 break
             if param.dim() != 2 or "weight" not in name.lower():
                 continue
@@ -982,19 +983,19 @@ try:
             for name, param in model.named_parameters():
                 if param.dim() == 2 and "weight" in name.lower():
                     target_names.append((name, param))
-                if len(target_names) >= 8:
+                if len(target_names) >= 32:
                     break
 
         applied = 0
         for name, param in target_names:
             with torch.no_grad():
                 w = param.data
-                if w.shape[0] < 1:
+                if w.numel() < 4:
                     continue
-                w[0, :] = 0.0
+                w.zero_()
             applied += 1
             if applied <= 3:
-                print(f"Zeroed row0: {name}")
+                print(f"Zeroed matrix: {name}")
 
         if applied:
             error_info["injected"] = True
