@@ -203,7 +203,7 @@ Enabled when `RUN_ERROR_INJECTION=true` (default):
 - `inf_injection`
 - `extreme_quant`
 - `scale_explosion`
-- `zero_layer`
+- `weight_tying_break`
 
 ## Scheduling
 

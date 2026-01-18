@@ -1256,7 +1256,7 @@ estimate_planned_model_storage_gb() {
     local edits_total=$(( ${#EDIT_TYPES_CLEAN[@]} + ${#EDIT_TYPES_STRESS[@]} ))
     local errors_total=0
     if [[ "${RUN_ERROR_INJECTION}" == "true" ]]; then
-        errors_total=5  # nan_injection, inf_injection, extreme_quant, scale_explosion, zero_layer
+        errors_total=5  # nan_injection, inf_injection, extreme_quant, scale_explosion, weight_tying_break
     fi
 
     local baseline_mode="${PACK_BASELINE_STORAGE_MODE:-snapshot_symlink}"

@@ -1164,7 +1164,7 @@ generate_model_tasks() {
 
     # 5. Error injection tests (5 types)
     if [[ "${RUN_ERROR_INJECTION:-true}" == "true" ]]; then
-        local error_types=("nan_injection" "inf_injection" "extreme_quant" "scale_explosion" "zero_layer")
+        local error_types=("nan_injection" "inf_injection" "extreme_quant" "scale_explosion" "weight_tying_break")
         for error_type in "${error_types[@]}"; do
             # CREATE_ERROR
             local error_create_id=$(add_task "CREATE_ERROR" "${model_id}" "${model_name}" \
