@@ -31,8 +31,8 @@ _task_serialization_require_jq() {
 # ============ TASK FIELD DEFINITIONS ============
 # Task record format (stored as JSON):
 #   task_id:         Unique identifier (e.g., "model0_SETUP_BASELINE_001_abcd")
-#   task_type:       One of: SETUP_BASELINE, EVAL_BASELINE, CALIBRATION_RUN,
-#                    CREATE_EDIT, EVAL_EDIT, CERTIFY_EDIT, CREATE_ERROR,
+#   task_type:       One of: SETUP_BASELINE, CALIBRATION_RUN,
+#                    CREATE_EDIT, CREATE_EDITS_BATCH, CERTIFY_EDIT, CREATE_ERROR,
 #                    CERTIFY_ERROR, GENERATE_PRESET
 #   model_id:        Full HuggingFace model ID (e.g., "mistralai/Mistral-7B-v0.1")
 #   model_name:      Sanitized name for paths (e.g., "mistral-7b-v0.1")
@@ -565,8 +565,7 @@ validate_task() {
 
     # Validate task_type
     local task_type=$(get_task_type "${task_file}")
-    # v2.1.0: Added CREATE_EDITS_BATCH and split eval benchmarks (EVAL_MMLU, etc.)
-    local valid_types="SETUP_BASELINE EVAL_BASELINE CALIBRATION_RUN CREATE_EDIT CREATE_EDITS_BATCH EVAL_EDIT EVAL_MMLU EVAL_HELLASWAG EVAL_ARC EVAL_WINOGRANDE CERTIFY_EDIT CREATE_ERROR CERTIFY_ERROR GENERATE_PRESET"
+    local valid_types="SETUP_BASELINE CALIBRATION_RUN CREATE_EDIT CREATE_EDITS_BATCH CERTIFY_EDIT CREATE_ERROR CERTIFY_ERROR GENERATE_PRESET"
     if [[ ! " ${valid_types} " =~ " ${task_type} " ]]; then
         echo "ERROR: Invalid task_type '${task_type}' in: ${task_file}" >&2
         return 1
@@ -633,7 +632,7 @@ print_queue_summary() {
 # - Local paths (e.g., "/path/to/model") - can use config.json if available
 estimate_model_memory() {
     local model_id="$1"
-    local task_type="${2:-EVAL_BASELINE}"
+    local task_type="${2:-SETUP_BASELINE}"
 
     # Determine model size bucket
     # IMPORTANT: Initialize with empty string to avoid "unbound variable" error with set -u
@@ -709,17 +708,14 @@ estimate_model_memory() {
             "SETUP_BASELINE")
                 multiplier="1.0"
                 ;;
-            "EVAL_BASELINE")
-                multiplier="1.1"
-                ;;
             "CALIBRATION_RUN")
                 multiplier="1.05"
                 ;;
             "CREATE_EDIT")
                 multiplier="1.2"
                 ;;
-            "EVAL_EDIT")
-                multiplier="1.1"
+            "CREATE_EDITS_BATCH")
+                multiplier="1.3"
                 ;;
             "CERTIFY_EDIT")
                 multiplier="1.05"
@@ -742,17 +738,14 @@ estimate_model_memory() {
             "SETUP_BASELINE")
                 multiplier="1.0"
                 ;;
-            "EVAL_BASELINE")
-                multiplier="1.2"
-                ;;
             "CALIBRATION_RUN")
                 multiplier="1.1"
                 ;;
             "CREATE_EDIT")
                 multiplier="1.5"
                 ;;
-            "EVAL_EDIT")
-                multiplier="1.2"
+            "CREATE_EDITS_BATCH")
+                multiplier="1.8"
                 ;;
             "CERTIFY_EDIT")
                 multiplier="1.1"
