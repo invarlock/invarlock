@@ -55,6 +55,8 @@ def normalize_run_report(report: Mapping[str, Any] | RunReport) -> RunReport:
     }
     # Preserve additional provenance knobs used by certificate/digests.
     for key in (
+        "pm_acceptance_range",
+        "pm_drift_band",
         "policy_overrides",
         "overrides",
         "plugins",
