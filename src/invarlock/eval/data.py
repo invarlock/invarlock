@@ -965,7 +965,8 @@ class SyntheticProvider:
         self, split: str = "validation", max_samples: int = 500, **kwargs
     ) -> list[str]:
         """Generate synthetic text samples."""
-        # Expand base samples to meet requirement
+        # Expand base samples to meet requirement, preferring unique variations
+        # to avoid duplicate-token windows (important for stratified pairing).
         expanded_samples: list[str] = []
         variations = [
             lambda s: s,
@@ -975,18 +976,25 @@ class SyntheticProvider:
             lambda s: f"Furthermore, {s.lower()}",
             lambda s: f"In addition, {s.lower()}",
         ]
-
-        # Use a deterministic approach based on max_samples
-        rng = np.random.RandomState(42)  # Fixed seed for reproducibility
-
-        while len(expanded_samples) < max_samples:
+        # Deterministic coverage of (variation × base sample) combinations first.
+        for variation in variations:
             for base_text in self.base_samples:
-                if len(expanded_samples) >= max_samples:
-                    break
-                variation = rng.choice(variations)
                 expanded_samples.append(variation(base_text))
+                if len(expanded_samples) >= max_samples:
+                    return expanded_samples
 
-        return expanded_samples[:max_samples]
+        # If callers request more than the unique combination space, keep
+        # extending deterministically while ensuring uniqueness via a suffix.
+        idx = 0
+        while len(expanded_samples) < max_samples:
+            base_text = self.base_samples[idx % len(self.base_samples)]
+            variation = variations[(idx // len(self.base_samples)) % len(variations)]
+            expanded_samples.append(
+                f"{variation(base_text)} [synthetic #{len(expanded_samples)}]"
+            )
+            idx += 1
+
+        return expanded_samples
 
     def windows(
         self,
