@@ -2073,7 +2073,71 @@ main_dynamic() {
     local model_count
     model_count=$(pack_model_list | wc -l | tr -d ' ')
     log "Models: ${model_count} (PACK_SUITE=${PACK_SUITE})"
-    log "Edit Types: 4 x 2 versions = 8 per model"
+    local scenarios_file="${OUTPUT_DIR}/state/scenarios.json"
+    local clean_scenarios=0
+    local stress_scenarios=0
+    local error_scenarios=0
+    local edit_scenarios_source="defaults"
+    local error_scenarios_source="defaults"
+
+    if command -v jq >/dev/null 2>&1 && [[ -f "${scenarios_file}" ]]; then
+        clean_scenarios="$(jq -r '[.scenarios[] | select(.generation.kind=="edit" and .generation.version=="clean")] | length' "${scenarios_file}" 2>/dev/null || echo 0)"
+        stress_scenarios="$(jq -r '[.scenarios[] | select(.generation.kind=="edit" and .generation.version=="stress")] | length' "${scenarios_file}" 2>/dev/null || echo 0)"
+        error_scenarios="$(jq -r '[.scenarios[] | select(.generation.kind=="error")] | length' "${scenarios_file}" 2>/dev/null || echo 0)"
+        edit_scenarios_source="state/scenarios.json"
+        error_scenarios_source="state/scenarios.json"
+    fi
+
+    if ! [[ "${clean_scenarios}" =~ ^[0-9]+$ ]]; then
+        clean_scenarios=0
+    fi
+    if ! [[ "${stress_scenarios}" =~ ^[0-9]+$ ]]; then
+        stress_scenarios=0
+    fi
+    if ! [[ "${error_scenarios}" =~ ^[0-9]+$ ]]; then
+        error_scenarios=0
+    fi
+
+    # Match queue_manager fallback behavior when the manifest is missing or incomplete.
+    if [[ ${clean_scenarios} -le 0 || ${stress_scenarios} -le 0 ]]; then
+        clean_scenarios=4
+        stress_scenarios=4
+        edit_scenarios_source="defaults"
+    fi
+
+    local clean_runs="${CLEAN_EDIT_RUNS:-0}"
+    if ! [[ "${clean_runs}" =~ ^-?[0-9]+$ ]]; then
+        clean_runs=0
+    fi
+    if [[ ${clean_runs} -lt 0 ]]; then
+        clean_runs=0
+    fi
+
+    local stress_runs="${STRESS_EDIT_RUNS:-0}"
+    if ! [[ "${stress_runs}" =~ ^-?[0-9]+$ ]]; then
+        stress_runs=0
+    fi
+    if [[ ${stress_runs} -lt 0 ]]; then
+        stress_runs=0
+    fi
+
+    local edit_scenarios_total=$((clean_scenarios + stress_scenarios))
+    local edit_certify_clean=$((clean_scenarios * clean_runs))
+    local edit_certify_stress=$((stress_scenarios * stress_runs))
+    local edit_certify_total=$((edit_certify_clean + edit_certify_stress))
+
+    log "Edit scenarios: ${clean_scenarios} clean + ${stress_scenarios} stress = ${edit_scenarios_total} per model (${edit_scenarios_source})"
+    log "Edit certify runs: clean=${clean_scenarios}×${clean_runs}=${edit_certify_clean}, stress=${stress_scenarios}×${stress_runs}=${edit_certify_stress} (total=${edit_certify_total} per model)"
+
+    if [[ "${RUN_ERROR_INJECTION:-true}" == "true" ]]; then
+        if [[ ${error_scenarios} -le 0 ]]; then
+            error_scenarios=9
+            error_scenarios_source="defaults"
+        fi
+        log "Error scenarios: ${error_scenarios} (RUN_ERROR_INJECTION=true) (${error_scenarios_source})"
+    else
+        log "Error scenarios: disabled (RUN_ERROR_INJECTION=false)"
+    fi
     log "Tuned edit presets: ${PACK_TUNED_EDIT_PARAMS_FILE:-<unset>}"
     if [[ "${PACK_PRESET_READY:-false}" == "true" ]]; then
         log "Calibration presets: reuse (${OUTPUT_DIR}/presets)"
