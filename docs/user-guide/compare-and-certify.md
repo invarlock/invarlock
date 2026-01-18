@@ -44,6 +44,45 @@ Outputs:
 - JSON certificate: `reports/cert_smoke/evaluation.cert.json`
 - Markdown report: `reports/cert_smoke/evaluation_certificate.md`
 
+## Reuse a baseline report (skip baseline evaluation)
+
+When certifying many subjects against the same baseline, you can reuse a single
+baseline `report.json` and skip Phase 1/3 (baseline evaluation) by passing
+`--baseline-report`.
+
+Requirements:
+
+- Baseline report must be from a no-op run (`edit.name == "noop"`).
+- Baseline report must include stored evaluation windows (set `INVARLOCK_STORE_EVAL_WINDOWS=1` when generating it).
+- The baseline report must match the intended `--profile`, `--tier`, and adapter family.
+
+Example:
+
+```bash
+# 1) Produce a reusable baseline report once (writes runs/baseline_once/source/<timestamp>/report.json)
+INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_STORE_EVAL_WINDOWS=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
+  --baseline sshleifer/tiny-gpt2 \
+  --subject sshleifer/tiny-gpt2 \
+  --adapter auto \
+  --profile ci \
+  --tier balanced \
+  --preset configs/presets/causal_lm/wikitext2_512.yaml \
+  --out runs/baseline_once \
+  --cert-out reports/cert_baseline_once
+
+# 2) Reuse it for many subjects (skips baseline evaluation)
+INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
+  --baseline-report runs/baseline_once/source \
+  --baseline sshleifer/tiny-gpt2 \
+  --subject /path/to/your/edited-model \
+  --adapter auto \
+  --profile ci \
+  --tier balanced \
+  --preset configs/presets/causal_lm/wikitext2_512.yaml \
+  --out runs/cert_subject_1 \
+  --cert-out reports/cert_subject_1
+```
+
 ## Pairing invariants
 
 - InvarLock pairs windows from the baseline run and the edited run. For

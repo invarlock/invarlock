@@ -598,6 +598,32 @@ Behavior:
 - Runs the subject model with windows pinned via `--baseline` pairing.
 - Emits a certificate JSON under `--cert-out`.
 
+Baseline reuse (skip Phase 1/3):
+
+- Provide `--baseline-report <path>` to reuse a previously generated baseline `report.json` and skip the baseline evaluation phase.
+- The baseline report must be from a no-op run (`edit.name == "noop"`) and must include stored evaluation windows (set `INVARLOCK_STORE_EVAL_WINDOWS=1` when producing it).
+
+```bash
+# 1) Produce a reusable baseline report once
+INVARLOCK_STORE_EVAL_WINDOWS=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
+  --source <hf_dir_or_id> \
+  --edited <hf_dir_or_id> \
+  --adapter auto \
+  --profile ci \
+  --tier balanced \
+  --out runs/baseline_once \
+  --cert-out reports/cert_baseline_once
+
+# 2) Reuse it for many subjects (skips baseline evaluation)
+INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
+  --baseline-report runs/baseline_once/source \
+  --source <hf_dir_or_id> \
+  --edited <hf_dir_or_id> \
+  --adapter auto \
+  --profile ci \
+  --tier balanced
+```
+
 See also: User Guide → Scripts & Utilities for preparing checkpoints
 (state_dict → HF, GPTQ/AWQ export).
 
@@ -618,6 +644,7 @@ See also: User Guide → Scripts & Utilities for preparing checkpoints
 | --profile {ci,release,ci_cpu}                    | Selects evaluation window counts and bootstrap depth.             |
 | --probes N                                       | Enables micro-probes for exploratory analysis (default 0 for CI). |
 | --out PATH                                       | Overrides the run output directory.                               |
+| --baseline-report PATH                            | Reuse baseline `report.json` and skip baseline evaluation (pinned windows required). |
 | --device {cpu,cuda,mps,auto}                     | Overrides device selection.                                       |
 
 `--device auto` mirrors the default CLI behavior and attempts CUDA, then MPS
