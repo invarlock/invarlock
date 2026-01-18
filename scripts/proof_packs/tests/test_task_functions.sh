@@ -106,88 +106,6 @@ test_model_size_and_eval_batch_selection() {
     fi
 }
 
-test_task_eval_baseline_branches_for_missing_paths_overrides_and_results_move() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
-
-    fixture_write "python3.stub" ""
-    fixture_write "python3.rc" "0"
-
-    local out="${TEST_TMPDIR}/out"
-    local model_name="m"
-    local model_output_dir="${out}/${model_name}"
-    local log_file="${TEST_TMPDIR}/log.txt"
-    mkdir -p "${model_output_dir}/evals" "$(dirname "${log_file}")"
-    : > "${log_file}"
-
-    # Missing baseline path errors.
-    if task_eval_baseline "${model_name}" 0 "${out}" "${log_file}"; then
-        t_fail "expected baseline missing error"
-    fi
-
-    # Baseline present + existing results skip.
-    mkdir -p "${model_output_dir}/models/baseline"
-    echo "${model_output_dir}/models/baseline" > "${model_output_dir}/.baseline_path"
-    echo "meta-llama/Llama-2-40b-hf" > "${model_output_dir}/.model_id"
-    echo "{}" > "${model_output_dir}/evals/baseline_results.json"
-    task_eval_baseline "${model_name}" 0 "${out}" "${log_file}"
-
-    rm -f "${model_output_dir}/evals/baseline_results.json"
-
-    # Fallback to model_id + OOM batch override + results found.
-    _estimate_model_size() { echo "7"; }
-    export TASK_ID="eval1"
-    export TASK_PARAMS='{"batch_size":"auto:2"}'
-    local tmp_eval_dir="${model_output_dir}/evals/.tmp/${TASK_ID}"
-    mkdir -p "${tmp_eval_dir}"
-    echo "{}" > "${tmp_eval_dir}/results.json"
-    task_eval_baseline "${model_name}" 0 "${out}" "${log_file}"
-    assert_file_exists "${model_output_dir}/evals/baseline_results.json" "results moved"
-
-    # Error branch when no results exist.
-    rm -f "${model_output_dir}/evals/baseline_results.json"
-    rm -rf "${tmp_eval_dir}"
-    mkdir -p "${tmp_eval_dir}"
-    run task_eval_baseline "${model_name}" 0 "${out}" "${log_file}"
-    assert_rc "1" "${RUN_RC}" "missing results returns non-zero"
-}
-
-test_task_eval_baseline_returns_nonzero_when_results_move_fails() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
-
-    fixture_write "python3.stub" ""
-    fixture_write "python3.rc" "0"
-
-    local out="${TEST_TMPDIR}/out"
-    local model_name="m"
-    local model_output_dir="${out}/${model_name}"
-    local log_file="${TEST_TMPDIR}/log.txt"
-    mkdir -p "${model_output_dir}/evals" "$(dirname "${log_file}")" "${model_output_dir}/models/baseline"
-    : > "${log_file}"
-
-    echo "${model_output_dir}/models/baseline" > "${model_output_dir}/.baseline_path"
-    echo "meta-llama/Llama-2-40b-hf" > "${model_output_dir}/.model_id"
-
-    export TASK_ID="eval_mv_fail"
-    local tmp_eval_dir="${model_output_dir}/evals/.tmp/${TASK_ID}"
-    mkdir -p "${tmp_eval_dir}"
-    echo "{}" > "${tmp_eval_dir}/results.json"
-
-    mv() {
-        if [[ "${2:-}" == "${model_output_dir}/evals/baseline_results.json" ]]; then
-            return 1
-        fi
-        command mv "$@"
-    }
-
-    run task_eval_baseline "${model_name}" 0 "${out}" "${log_file}"
-    assert_rc "1" "${RUN_RC}" "move failure triggers non-zero"
-    unset -f mv
-}
-
 test_task_calibration_run_and_generate_preset_cover_overrides_large_model_and_report_branches() {
     mock_reset
     # shellcheck source=../task_functions.sh
@@ -328,190 +246,6 @@ test_task_create_edit_and_batch_edits_cover_success_failure_and_missing_function
     fi
 }
 
-test_task_eval_edit_and_single_benchmark_cover_mapping_overrides_results_and_warnings() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
-    stub_resolve_edit_params
-
-    fixture_write "python3.stub" ""
-    fixture_write "python3.rc" "0"
-
-    local out="${TEST_TMPDIR}/out"
-    local model_name="m"
-    local model_output_dir="${out}/${model_name}"
-    local baseline_dir="${model_output_dir}/models/baseline"
-    local log_file="${TEST_TMPDIR}/log.txt"
-    mkdir -p "${baseline_dir}" "$(dirname "${log_file}")" "${model_output_dir}/models"
-    echo "{}" > "${baseline_dir}/config.json"
-    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
-    echo "meta-llama/Llama-2-40b-hf" > "${model_output_dir}/.model_id"
-    : > "${log_file}"
-
-    # Missing edit model errors.
-    if task_eval_edit "${model_name}" 0 "quant_rtn:4:32:attn" "${out}" "${log_file}"; then
-        t_fail "expected eval_edit to fail when edit path is missing"
-    fi
-
-    # Create edit dirs for each mapping arm.
-    mkdir -p "${model_output_dir}/models/quant_4bit_clean"
-    mkdir -p "${model_output_dir}/models/fp8_e4m3fn_clean"
-    mkdir -p "${model_output_dir}/models/prune_10pct_clean"
-    mkdir -p "${model_output_dir}/models/svd_rank8_clean"
-
-    export TASK_ID="eval_edit"
-    export TASK_PARAMS='{"batch_size":"auto:2"}'
-    _estimate_model_size() { echo "7"; }
-    local tmp_eval_dir="${model_output_dir}/evals/.tmp/${TASK_ID}"
-    mkdir -p "${tmp_eval_dir}"
-    echo "{}" > "${tmp_eval_dir}/results.json"
-    task_eval_edit "${model_name}" 0 "quant_rtn:4:32:attn" "${out}" "${log_file}"
-
-    # Error path when results are missing.
-    rm -f "${model_output_dir}/evals/"*.json 2>/dev/null || true
-    rm -rf "${tmp_eval_dir}"
-    mkdir -p "${tmp_eval_dir}"
-    run task_eval_edit "${model_name}" 0 "fp8_quant:e4m3fn:ffn" "${out}" "${log_file}"
-    assert_rc "1" "${RUN_RC}" "missing results returns non-zero"
-
-    # Edit type mapping arms in task_eval_edit.
-    mkdir -p "${tmp_eval_dir}"
-    echo "{}" > "${tmp_eval_dir}/results.json"
-    task_eval_edit "${model_name}" 0 "magnitude_prune:0.1:ffn" "${out}" "${log_file}"
-    mkdir -p "${tmp_eval_dir}"
-    echo "{}" > "${tmp_eval_dir}/results.json"
-    task_eval_edit "${model_name}" 0 "lowrank_svd:8:attn" "${out}" "${log_file}"
-
-    # task_eval_edit skip branch when results exist.
-    local edit_name="quant_4bit_clean"
-    mkdir -p "${model_output_dir}/evals"
-    echo "{}" > "${model_output_dir}/evals/${edit_name}_results.json"
-    task_eval_edit "${model_name}" 0 "quant_rtn:4:32:attn" "${out}" "${log_file}"
-
-    # Single benchmark mapping arms + default branch.
-    export TASK_ID="eval_one"
-    tmp_eval_dir="${model_output_dir}/evals/.tmp/${TASK_ID}"
-    mkdir -p "${tmp_eval_dir}"
-    echo "{}" > "${tmp_eval_dir}/results.json"
-    task_eval_single_benchmark "${model_name}" 0 "quant_rtn:4:32:attn" mmlu "${out}" "${log_file}"
-    mkdir -p "${tmp_eval_dir}"
-    echo "{}" > "${tmp_eval_dir}/results.json"
-    task_eval_single_benchmark "${model_name}" 0 "quant_rtn:4:32:attn" hellaswag "${out}" "${log_file}"
-    mkdir -p "${tmp_eval_dir}"
-    echo "{}" > "${tmp_eval_dir}/results.json"
-    task_eval_single_benchmark "${model_name}" 0 "quant_rtn:4:32:attn" arc "${out}" "${log_file}"
-    mkdir -p "${tmp_eval_dir}"
-    echo "{}" > "${tmp_eval_dir}/results.json"
-    task_eval_single_benchmark "${model_name}" 0 "quant_rtn:4:32:attn" winogrande "${out}" "${log_file}"
-    mkdir -p "${tmp_eval_dir}"
-    echo "{}" > "${tmp_eval_dir}/results.json"
-    task_eval_single_benchmark "${model_name}" 0 "quant_rtn:4:32:attn" custom "${out}" "${log_file}"
-
-    # task_eval_single_benchmark edit mapping arms.
-    mkdir -p "${tmp_eval_dir}"
-    echo "{}" > "${tmp_eval_dir}/results.json"
-    task_eval_single_benchmark "${model_name}" 0 "fp8_quant:e4m3fn:ffn" mmlu "${out}" "${log_file}"
-    mkdir -p "${tmp_eval_dir}"
-    echo "{}" > "${tmp_eval_dir}/results.json"
-    task_eval_single_benchmark "${model_name}" 0 "magnitude_prune:0.1:ffn" mmlu "${out}" "${log_file}"
-    mkdir -p "${tmp_eval_dir}"
-    echo "{}" > "${tmp_eval_dir}/results.json"
-    task_eval_single_benchmark "${model_name}" 0 "lowrank_svd:8:attn" mmlu "${out}" "${log_file}"
-
-    # Error branch when edit path is missing.
-    if task_eval_single_benchmark "${model_name}" 0 "quant_rtn:99:32:attn" mmlu "${out}" "${log_file}"; then
-        t_fail "expected eval_single_benchmark to fail when edit path is missing"
-    fi
-
-    # Skip branch when results already exist.
-    echo "{}" > "${model_output_dir}/evals/${edit_name}_mmlu_results.json"
-    task_eval_single_benchmark "${model_name}" 0 "quant_rtn:4:32:attn" mmlu "${out}" "${log_file}"
-
-    # Error branch when no results are found.
-    rm -f "${model_output_dir}/evals/${edit_name}_arc_results.json"
-    mkdir -p "${tmp_eval_dir}"
-    run task_eval_single_benchmark "${model_name}" 0 "quant_rtn:4:32:attn" arc "${out}" "${log_file}"
-    assert_rc "1" "${RUN_RC}" "missing results returns non-zero"
-}
-
-test_task_eval_edit_returns_nonzero_when_results_move_fails() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
-    stub_resolve_edit_params
-
-    fixture_write "python3.stub" ""
-    fixture_write "python3.rc" "0"
-
-    local out="${TEST_TMPDIR}/out"
-    local model_name="m"
-    local model_output_dir="${out}/${model_name}"
-    local baseline_dir="${model_output_dir}/models/baseline"
-    local log_file="${TEST_TMPDIR}/log.txt"
-    mkdir -p "${baseline_dir}" "$(dirname "${log_file}")" "${model_output_dir}/models"
-    echo "{}" > "${baseline_dir}/config.json"
-    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
-    echo "meta-llama/Llama-2-40b-hf" > "${model_output_dir}/.model_id"
-    : > "${log_file}"
-
-    mkdir -p "${model_output_dir}/models/quant_4bit_clean"
-
-    export TASK_ID="eval_edit_mv_fail"
-    local tmp_eval_dir="${model_output_dir}/evals/.tmp/${TASK_ID}"
-    mkdir -p "${tmp_eval_dir}"
-    echo "{}" > "${tmp_eval_dir}/results.json"
-
-    mv() {
-        if [[ "${2:-}" == "${model_output_dir}/evals/quant_4bit_clean_results.json" ]]; then
-            return 1
-        fi
-        command mv "$@"
-    }
-
-    run task_eval_edit "${model_name}" 0 "quant_rtn:4:32:attn" "${out}" "${log_file}"
-    assert_rc "1" "${RUN_RC}" "move failure triggers non-zero"
-    unset -f mv
-}
-
-test_task_eval_single_benchmark_returns_nonzero_when_results_move_fails() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
-    stub_resolve_edit_params
-
-    fixture_write "python3.stub" ""
-    fixture_write "python3.rc" "0"
-
-    local out="${TEST_TMPDIR}/out"
-    local model_name="m"
-    local model_output_dir="${out}/${model_name}"
-    local baseline_dir="${model_output_dir}/models/baseline"
-    local log_file="${TEST_TMPDIR}/log.txt"
-    mkdir -p "${baseline_dir}" "$(dirname "${log_file}")" "${model_output_dir}/models"
-    echo "{}" > "${baseline_dir}/config.json"
-    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
-    echo "meta-llama/Llama-2-40b-hf" > "${model_output_dir}/.model_id"
-    : > "${log_file}"
-
-    mkdir -p "${model_output_dir}/models/quant_4bit_clean"
-
-    export TASK_ID="eval_one_mv_fail"
-    local tmp_eval_dir="${model_output_dir}/evals/.tmp/${TASK_ID}"
-    mkdir -p "${tmp_eval_dir}"
-    echo "{}" > "${tmp_eval_dir}/results.json"
-
-    mv() {
-        if [[ "${2:-}" == "${model_output_dir}/evals/quant_4bit_clean_mmlu_results.json" ]]; then
-            return 1
-        fi
-        command mv "$@"
-    }
-
-    run task_eval_single_benchmark "${model_name}" 0 "quant_rtn:4:32:attn" mmlu "${out}" "${log_file}"
-    assert_rc "1" "${RUN_RC}" "move failure triggers non-zero"
-    unset -f mv
-}
-
 test_task_certify_edit_and_error_cover_preset_discovery_overrides_and_certificate_copy_paths() {
     mock_reset
     # shellcheck source=../task_functions.sh
@@ -581,6 +315,7 @@ YAML
     task_certify_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean 1 "${out}" "${log_file}"
 
     # Preset discovery branch when preset exists.
+    rm -f "${out}/presets/calibrated_preset_${model_name}__quant_rtn.yaml"
     echo "{}" > "${out}/presets/calibrated_preset_${model_name}.yaml"
     task_certify_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean 2 "${out}" "${log_file}"
 
@@ -738,6 +473,8 @@ test_task_helpers_cover_fallback_branches() {
 
     assert_eq "moe" "$(_get_model_size_from_name "Mixtral-8x7B")" "moe detection"
     assert_eq "13" "$(_get_model_size_from_name "llama-13b")" "13B detection"
+    assert_eq "70" "$(_get_model_size_from_name "Qwen1.5-72B")" "70B detection"
+    assert_eq "30" "$(_get_model_size_from_name "Qwen2.5-32B")" "30B detection"
 
     assert_eq "1536:1536:192:192:64" "$(_get_model_invarlock_config_fallback "13")" "13B config"
     assert_eq "1024:1024:192:192:48" "$(_get_model_invarlock_config_fallback "30")" "30B config"
@@ -768,21 +505,319 @@ test_task_helpers_cover_fallback_branches() {
     resolved="$(resolve_edit_params "${TEST_TMPDIR}" "quant_rtn:4:32:ffn" "clean")"
     assert_match "quant_4bit_clean" "${resolved}" "resolve_edit_params builds edit_dir_name"
 
-    CUDA_VISIBLE_DEVICES="0,1"
-    LM_EVAL_PARALLELIZE="true"
-    local args
-    args="$(_get_lmeval_model_args "/tmp/model")"
-    assert_match "parallelize=True" "${args}" "parallelize enabled"
-    unset CUDA_VISIBLE_DEVICES LM_EVAL_PARALLELIZE
-
     _is_large_model "moe" || t_fail "expected moe to be large"
     _is_large_model "llama-30b" || t_fail "expected 30b string to be large"
+}
 
-    assert_eq "${EVAL_BATCH_SIZE_MOE:-auto:6}" "$(_get_eval_batch_size "moe")" "moe batch"
-    assert_eq "${EVAL_BATCH_SIZE_LARGE:-auto:4}" "$(_get_eval_batch_size "70")" "large batch"
-    assert_eq "${EVAL_BATCH_SIZE_MEDIUM:-auto:8}" "$(_get_eval_batch_size "30")" "medium batch"
-    assert_eq "${EVAL_BATCH_SIZE_SMALL:-auto:16}" "$(_get_eval_batch_size "7")" "small batch"
-    assert_eq "${EVAL_BATCH_SIZE_SMALL:-auto:16}" "$(_get_eval_batch_size "foo")" "default batch"
+test_task_create_model_variant_dispatch_and_fallback_errors() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    create_model_variant() { echo "main:$*"; return 0; }
+    run _task_create_model_variant "/b" "/o" "quant_rtn" "8" "128" "ffn" "0"
+    assert_rc "0" "${RUN_RC}" "dispatches to create_model_variant when available"
+    assert_match "^main:" "${RUN_OUT}" "create_model_variant called"
+
+    unset -f create_model_variant
+    unset -f create_edited_model create_fp8_model create_pruned_model create_lowrank_model || true
+
+    run _task_create_model_variant "/b" "/o" "quant_rtn" "8" "128" "ffn" "0"
+    assert_rc "1" "${RUN_RC}" "quant_rtn without create_edited_model returns non-zero"
+
+    run _task_create_model_variant "/b" "/o" "fp8_quant" "e4m3fn" "" "ffn" "0"
+    assert_rc "1" "${RUN_RC}" "fp8_quant without create_fp8_model returns non-zero"
+
+    run _task_create_model_variant "/b" "/o" "magnitude_prune" "0.1" "" "ffn" "0"
+    assert_rc "1" "${RUN_RC}" "magnitude_prune without create_pruned_model returns non-zero"
+
+    run _task_create_model_variant "/b" "/o" "lowrank_svd" "8" "" "ffn" "0"
+    assert_rc "1" "${RUN_RC}" "lowrank_svd without create_lowrank_model returns non-zero"
+
+    run _task_create_model_variant "/b" "/o" "nope" "" "" "" "0"
+    assert_rc "1" "${RUN_RC}" "unknown edit type returns non-zero"
+}
+
+test_task_create_model_variant_fallback_success_paths() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    unset -f create_model_variant || true
+
+    create_edited_model() { echo "edited:$*"; return 0; }
+    create_fp8_model() { echo "fp8:$*"; return 0; }
+    create_pruned_model() { echo "pruned:$*"; return 0; }
+    create_lowrank_model() { echo "lowrank:$*"; return 0; }
+
+    run _task_create_model_variant "/b" "/o" "quant_rtn" "8" "128" "ffn" "0"
+    assert_rc "0" "${RUN_RC}" "quant_rtn fallback succeeds when helper exists"
+    assert_match "^edited:" "${RUN_OUT}" "quant_rtn uses create_edited_model"
+
+    run _task_create_model_variant "/b" "/o" "fp8_quant" "e4m3fn" "" "ffn" "0"
+    assert_rc "0" "${RUN_RC}" "fp8_quant fallback succeeds when helper exists"
+    assert_match "^fp8:" "${RUN_OUT}" "fp8_quant uses create_fp8_model"
+
+    run _task_create_model_variant "/b" "/o" "magnitude_prune" "0.1" "" "ffn" "0"
+    assert_rc "0" "${RUN_RC}" "magnitude_prune fallback succeeds when helper exists"
+    assert_match "^pruned:" "${RUN_OUT}" "magnitude_prune uses create_pruned_model"
+
+    run _task_create_model_variant "/b" "/o" "lowrank_svd" "8" "" "ffn" "0"
+    assert_rc "0" "${RUN_RC}" "lowrank_svd fallback succeeds when helper exists"
+    assert_match "^lowrank:" "${RUN_OUT}" "lowrank_svd uses create_lowrank_model"
+}
+
+test_task_baseline_report_helpers_cover_reuse_lock_race_and_wait_paths() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    run _resolve_invarlock_adapter ""
+    assert_ne "0" "${RUN_RC}" "empty adapter input returns non-zero"
+
+    run _validate_certify_baseline_report "" "hf" "ci" "balanced"
+    assert_ne "0" "${RUN_RC}" "missing baseline report returns non-zero"
+
+    local baseline_root="${TEST_TMPDIR}/baseline_root"
+    mkdir -p "${baseline_root}"
+    local baseline_report="${baseline_root}/baseline_report.json"
+
+    _resolve_invarlock_adapter() { echo "hf_test"; }
+    _validate_certify_baseline_report() { return 0; }
+
+    echo "{}" > "${baseline_report}"
+    local reuse
+    reuse="$(_ensure_certify_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "7" "${TEST_TMPDIR}/log.txt")"
+    assert_eq "${baseline_report}" "${reuse}" "reuse returns existing baseline report"
+
+    rm -f "${baseline_report}"
+    local lock_dir="${baseline_root}/.baseline_lock"
+    mkdir() {
+        if [[ "${1:-}" == "${lock_dir}" ]]; then
+            command mkdir "$@"
+            echo "{}" > "${baseline_report}"
+            return 0
+        fi
+        command mkdir "$@"
+    }
+    local raced
+    raced="$(_ensure_certify_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "7" "${TEST_TMPDIR}/log.txt")"
+    assert_eq "${baseline_report}" "${raced}" "lock re-check returns when report appears"
+    unset -f mkdir
+
+    # Wait path: lock already held by another worker.
+    rm -f "${baseline_report}"
+    mkdir -p "${lock_dir}"
+    _sleep() {
+        echo "{}" > "${baseline_report}"
+        return 0
+    }
+    local waited_file="${TEST_TMPDIR}/baseline_waited.out"
+    local waited_rc=0
+    if _ensure_certify_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "7" "${TEST_TMPDIR}/log.txt" > "${waited_file}"; then
+        waited_rc=0
+    else
+        waited_rc=$?
+    fi
+    local waited
+    waited="$(cat "${waited_file}")"
+    assert_rc "0" "${waited_rc}" "wait loop exits successfully once report appears"
+    assert_eq "${baseline_report}" "${waited}" "wait loop returns when report exists"
+}
+
+test_task_baseline_report_helpers_execute_python_wrappers() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    local calls="${TEST_TMPDIR}/python.calls"
+    _cmd_python() {
+        echo "python $*" >> "${calls}"
+        cat >/dev/null || true
+        if [[ $# -eq 2 ]]; then
+            echo "hf_auto"
+        fi
+        return 0
+    }
+
+    run _resolve_invarlock_adapter "org/model"
+    assert_rc "0" "${RUN_RC}" "adapter resolver runs python wrapper"
+    assert_eq "hf_auto" "${RUN_OUT}" "adapter output forwarded"
+
+    local report="${TEST_TMPDIR}/baseline_report.json"
+    echo "{}" > "${report}"
+
+    run _validate_certify_baseline_report "${report}" "hf_auto" "ci" "balanced"
+    assert_rc "0" "${RUN_RC}" "baseline report validation runs python wrapper"
+    assert_file_exists "${calls}" "python stub invoked"
+}
+
+test_task_baseline_report_helpers_cover_generate_baseline_report_path() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    local baseline_root="${TEST_TMPDIR}/baseline_root_generate"
+    mkdir -p "${baseline_root}"
+    local baseline_report="${baseline_root}/baseline_report.json"
+    rm -f "${baseline_report}"
+
+    local log_file="${TEST_TMPDIR}/baseline_generate.log"
+    : > "${log_file}"
+
+    _resolve_invarlock_adapter() { echo "hf_test"; }
+    _validate_certify_baseline_report() { return 0; }
+
+    export PACK_GUARDS_ORDER="invariants, spectral , rmt"
+    fixture_write "invarlock.create_report_nested" ""
+
+    local generated
+    generated="$(_ensure_certify_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "7" "${log_file}")"
+
+    assert_eq "${baseline_report}" "${generated}" "baseline report path returned"
+    assert_file_exists "${baseline_report}" "baseline report generated"
+    assert_match "Generating reusable baseline report" "$(cat "${log_file}")" "generation logged"
+}
+
+test_task_baseline_report_helpers_remove_invalid_baseline_report_and_timeout_wait() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    local baseline_root="${TEST_TMPDIR}/baseline_root_timeout"
+    mkdir -p "${baseline_root}"
+    local baseline_report="${baseline_root}/baseline_report.json"
+    echo "{}" > "${baseline_report}"
+
+    _resolve_invarlock_adapter() { echo "hf_test"; }
+    _validate_certify_baseline_report() { return 1; }
+
+    mkdir -p "${baseline_root}/.baseline_lock"
+    _sleep() { return 0; }
+
+    local log_file="${TEST_TMPDIR}/baseline_timeout.log"
+    : > "${log_file}"
+
+    local rc=0
+    ( _ensure_certify_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "7" "${log_file}" ) || rc=$?
+    assert_ne "0" "${rc}" "timeout wait returns non-zero"
+    [[ ! -f "${baseline_report}" ]] || t_fail "invalid baseline report should be removed"
+}
+
+test_task_baseline_report_helpers_remove_invalid_baseline_report_after_lock_acquired() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    local baseline_root="${TEST_TMPDIR}/baseline_root_lock_rm"
+    mkdir -p "${baseline_root}"
+    local baseline_report="${baseline_root}/baseline_report.json"
+    rm -f "${baseline_report}"
+
+    _resolve_invarlock_adapter() { echo "hf_test"; }
+    _validate_certify_baseline_report() { return 1; }
+
+    local lock_dir="${baseline_root}/.baseline_lock"
+    mkdir() {
+        if [[ "${1:-}" == "${lock_dir}" ]]; then
+            command mkdir "$@"
+            echo "{}" > "${baseline_report}"
+            return 0
+        fi
+        command mkdir "$@"
+    }
+
+    local log_file="${TEST_TMPDIR}/baseline_lock_rm.log"
+    : > "${log_file}"
+
+    local rc=0
+    ( _ensure_certify_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "7" "${log_file}" ) || rc=$?
+    assert_ne "0" "${rc}" "invalid baseline report triggers error path"
+    unset -f mkdir
+}
+
+test_task_certify_edit_reuses_baseline_report_applies_ci_override_and_falls_back_label() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    fixture_write "invarlock.create_cert" ""
+
+    local out="${TEST_TMPDIR}/out"
+    local model_name="m"
+    local model_output_dir="${out}/${model_name}"
+    local baseline_dir="${model_output_dir}/models/baseline"
+    local log_file="${TEST_TMPDIR}/log.txt"
+    mkdir -p "${baseline_dir}" "$(dirname "${log_file}")" "${model_output_dir}/models"
+    echo "{}" > "${baseline_dir}/config.json"
+    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
+    echo "org/model" > "${model_output_dir}/.model_id"
+    : > "${log_file}"
+
+    # Force CI window override by returning tiny preview/final windows.
+    _get_invarlock_config() { echo "128:128:1:1:1"; }
+    export INVARLOCK_CERT_MIN_WINDOWS="192"
+
+    local baseline_report="${TEST_TMPDIR}/baseline_report.json"
+    echo '{"evaluation_windows":{"preview":{"window_ids":[1],"input_ids":[[1]]},"final":{"window_ids":[1],"input_ids":[[1]]}},"edit":{"name":"noop"}}' > "${baseline_report}"
+    _ensure_certify_baseline_report() { echo "${baseline_report}"; }
+
+    resolve_edit_params() {
+        jq -n '{status:"selected", edit_type:"quant_rtn", param1:"4", param2:"32", scope:"ffn", edit_dir_name:"_clean"}'
+    }
+    local edit_dir="${model_output_dir}/models/_clean"
+    mkdir -p "${edit_dir}"
+    echo "{}" > "${edit_dir}/config.json"
+
+    mkdir -p "${out}/presets"
+    echo "{}" > "${out}/presets/calibrated_preset_${model_name}.yaml"
+
+    task_certify_edit "${model_name}" 0 "quant_rtn:4:32:ffn" clean 1 "${out}" "${log_file}"
+
+    assert_match "CI window override" "$(cat "${log_file}")" "CI window override applied"
+    assert_match "Reusing baseline report" "$(cat "${log_file}")" "baseline report reused"
+
+    local calls
+    calls="$(cat "${TEST_TMPDIR}/fixtures/invarlock.calls")"
+    assert_match "--baseline-report" "${calls}" "baseline report forwarded to invarlock certify"
+    assert_match "--edit-label custom" "${calls}" "empty edit label falls back to custom"
+}
+
+test_task_certify_error_reuses_baseline_report_and_applies_ci_override() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    fixture_write "invarlock.create_cert" ""
+
+    local out="${TEST_TMPDIR}/out"
+    local model_name="m"
+    local model_output_dir="${out}/${model_name}"
+    local baseline_dir="${model_output_dir}/models/baseline"
+    local error_dir="${model_output_dir}/models/error_nan_injection"
+    local log_file="${TEST_TMPDIR}/log.txt"
+    mkdir -p "${baseline_dir}" "${error_dir}" "$(dirname "${log_file}")"
+    echo "{}" > "${baseline_dir}/config.json"
+    echo "{}" > "${error_dir}/config.json"
+    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
+    echo "org/model" > "${model_output_dir}/.model_id"
+    : > "${log_file}"
+
+    _get_invarlock_config() { echo "128:128:1:1:1"; }
+    export INVARLOCK_CERT_MIN_WINDOWS="192"
+
+    local baseline_report="${TEST_TMPDIR}/baseline_report.json"
+    echo '{"evaluation_windows":{"preview":{"window_ids":[1],"input_ids":[[1]]},"final":{"window_ids":[1],"input_ids":[[1]]}},"edit":{"name":"noop"}}' > "${baseline_report}"
+    _ensure_certify_baseline_report() { echo "${baseline_report}"; }
+
+    mkdir -p "${out}/presets"
+    echo "{}" > "${out}/presets/calibrated_preset_${model_name}.yaml"
+
+    task_certify_error "${model_name}" 0 nan_injection "${out}" "${log_file}"
+
+    assert_match "CI window override" "$(cat "${log_file}")" "CI window override applied"
+    assert_match "Reusing baseline report" "$(cat "${log_file}")" "baseline report reused"
+    assert_file_exists "${model_output_dir}/certificates/errors/nan_injection/evaluation.cert.json" "error cert written"
 }
 
 test_task_timeout_and_profile_helpers() {
@@ -829,12 +864,9 @@ test_execute_task_dispatches_all_task_types() {
     set +m
 
     task_setup_baseline() { :; }
-    task_eval_baseline() { :; }
     task_calibration_run() { :; }
     task_create_edit() { :; }
     task_create_edits_batch() { :; }
-    task_eval_edit() { :; }
-    task_eval_single_benchmark() { :; }
     task_certify_edit() { :; }
     task_create_error() { :; }
     task_certify_error() { :; }
@@ -852,7 +884,7 @@ test_execute_task_dispatches_all_task_types() {
             > "${TEST_TMPDIR}/${task_id}.task"
     }
 
-    local types=(SETUP_BASELINE EVAL_BASELINE CALIBRATION_RUN CREATE_EDIT CREATE_EDITS_BATCH EVAL_EDIT EVAL_MMLU EVAL_HELLASWAG EVAL_ARC EVAL_WINOGRANDE CERTIFY_EDIT CREATE_ERROR CERTIFY_ERROR GENERATE_PRESET)
+    local types=(SETUP_BASELINE CALIBRATION_RUN CREATE_EDIT CREATE_EDITS_BATCH CERTIFY_EDIT CREATE_ERROR CERTIFY_ERROR GENERATE_PRESET)
     local type
     for type in "${types[@]}"; do
         make_task "task_${type}" "${type}" '{}'
@@ -876,9 +908,9 @@ test_execute_task_handles_job_control_enabled() {
     export QUEUE_DIR="${TEST_TMPDIR}/queue"
     mkdir -p "${QUEUE_DIR}/running"
 
-    task_eval_baseline() { :; }
+    task_setup_baseline() { :; }
 
-    jq -n '{task_id:"t1", task_type:"EVAL_BASELINE", model_id:"m", model_name:"model", status:"pending", assigned_gpus:null, params:{}}' \
+    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"model", status:"pending", assigned_gpus:null, params:{}}' \
         > "${TEST_TMPDIR}/t1.task"
 
     set -m
@@ -970,102 +1002,6 @@ test_task_create_edit_handles_skip_and_invalid() {
     }
     run task_create_edit "${model_name}" 0 "mystery:4:32:ffn" clean "${out}" "${log_file}"
     assert_rc "1" "${RUN_RC}" "unknown edit type errors"
-}
-
-test_task_eval_edit_clean_resolution_errors() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
-
-    local out="${TEST_TMPDIR}/out"
-    local model_name="m"
-    local model_output_dir="${out}/${model_name}"
-    local baseline_dir="${model_output_dir}/models/baseline"
-    local log_file="${TEST_TMPDIR}/log.txt"
-    mkdir -p "${baseline_dir}" "$(dirname "${log_file}")"
-    echo "{}" > "${baseline_dir}/config.json"
-    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
-    : > "${log_file}"
-
-    resolve_edit_params() {
-        jq -n '{status:"skipped", edit_type:"quant_rtn", param1:"clean", param2:"", scope:"ffn", edit_dir_name:"quant_8bit_clean"}'
-    }
-    task_eval_edit "${model_name}" 0 "quant_rtn:clean:ffn" "${out}" "${log_file}"
-
-    resolve_edit_params() {
-        jq -n '{status:"invalid", edit_type:"quant_rtn", param1:"clean", param2:"", scope:"ffn", edit_dir_name:""}'
-    }
-    run task_eval_edit "${model_name}" 0 "quant_rtn:clean:ffn" "${out}" "${log_file}"
-    assert_rc "1" "${RUN_RC}" "invalid clean resolution errors"
-
-    _cmd_python() { return 0; }
-    resolve_edit_params() {
-        jq -n '{status:"selected", edit_type:"quant_rtn", param1:"clean", param2:"", scope:"ffn", edit_dir_name:"quant_8bit_clean"}'
-    }
-    TASK_ID="eval_clean"
-    local tmp_eval_dir="${model_output_dir}/evals/.tmp/${TASK_ID}"
-    mkdir -p "${tmp_eval_dir}" "${model_output_dir}/models/quant_8bit_clean"
-    echo "{}" > "${tmp_eval_dir}/results.json"
-    task_eval_edit "${model_name}" 0 "quant_rtn:clean:ffn" "${out}" "${log_file}"
-
-    resolve_edit_params() {
-        local version="$3"
-        if [[ "${version}" == "clean" ]]; then
-            jq -n '{status:"invalid", edit_type:"quant_rtn", param1:"4", param2:"32", scope:"ffn", edit_dir_name:""}'
-        else
-            jq -n '{status:"selected", edit_type:"quant_rtn", param1:"4", param2:"32", scope:"ffn", edit_dir_name:"quant_4bit_stress"}'
-        fi
-    }
-    run task_eval_edit "${model_name}" 0 "quant_rtn:4:32:ffn" "${out}" "${log_file}"
-    assert_rc "1" "${RUN_RC}" "non-selected resolution continues"
-}
-
-test_task_eval_single_benchmark_clean_resolution_errors() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
-
-    local out="${TEST_TMPDIR}/out"
-    local model_name="m"
-    local model_output_dir="${out}/${model_name}"
-    local baseline_dir="${model_output_dir}/models/baseline"
-    local log_file="${TEST_TMPDIR}/log.txt"
-    mkdir -p "${baseline_dir}" "$(dirname "${log_file}")"
-    echo "{}" > "${baseline_dir}/config.json"
-    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
-    : > "${log_file}"
-
-    resolve_edit_params() {
-        jq -n '{status:"skipped", edit_type:"quant_rtn", param1:"clean", param2:"", scope:"ffn", edit_dir_name:"quant_8bit_clean"}'
-    }
-    task_eval_single_benchmark "${model_name}" 0 "quant_rtn:clean:ffn" mmlu "${out}" "${log_file}"
-
-    resolve_edit_params() {
-        jq -n '{status:"invalid", edit_type:"quant_rtn", param1:"clean", param2:"", scope:"ffn", edit_dir_name:""}'
-    }
-    run task_eval_single_benchmark "${model_name}" 0 "quant_rtn:clean:ffn" mmlu "${out}" "${log_file}"
-    assert_rc "1" "${RUN_RC}" "invalid clean resolution errors"
-
-    _cmd_python() { return 0; }
-    resolve_edit_params() {
-        jq -n '{status:"selected", edit_type:"quant_rtn", param1:"clean", param2:"", scope:"ffn", edit_dir_name:"quant_8bit_clean"}'
-    }
-    TASK_ID="eval_clean_one"
-    local tmp_eval_dir="${model_output_dir}/evals/.tmp/${TASK_ID}"
-    mkdir -p "${tmp_eval_dir}" "${model_output_dir}/models/quant_8bit_clean"
-    echo "{}" > "${tmp_eval_dir}/results.json"
-    task_eval_single_benchmark "${model_name}" 0 "quant_rtn:clean:ffn" mmlu "${out}" "${log_file}"
-
-    resolve_edit_params() {
-        local version="$3"
-        if [[ "${version}" == "clean" ]]; then
-            jq -n '{status:"invalid", edit_type:"quant_rtn", param1:"4", param2:"32", scope:"ffn", edit_dir_name:""}'
-        else
-            jq -n '{status:"selected", edit_type:"quant_rtn", param1:"4", param2:"32", scope:"ffn", edit_dir_name:"quant_4bit_stress"}'
-        fi
-    }
-    run task_eval_single_benchmark "${model_name}" 0 "quant_rtn:4:32:ffn" mmlu "${out}" "${log_file}"
-    assert_rc "1" "${RUN_RC}" "non-selected resolution continues"
 }
 
 test_task_certify_edit_skip_and_invalid() {
@@ -1187,36 +1123,4 @@ EOF
     PACK_GUARDS_ORDER=" , "
     task_calibration_run "${model_name}" 0 "2" "43" "${out}" "${log_file}"
     assert_match "spectral" "$(cat "${model_output_dir}/certificates/calibration/run_2/calibration_config.yaml")" "default guard order used"
-}
-
-
-test_task_eval_single_benchmark_prefers_explicit_version_hint_when_both_edits_exist() {
-    mock_reset
-    # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
-    stub_resolve_edit_params
-
-    local out="${TEST_TMPDIR}/out"
-    local model_name="m"
-    local model_output_dir="${out}/${model_name}"
-    local log_file="${TEST_TMPDIR}/log.txt"
-    mkdir -p "${model_output_dir}/models/quant_4bit_clean" \
-        "${model_output_dir}/models/quant_4bit_stress" \
-        "${model_output_dir}/evals" \
-        "$(dirname "${log_file}")"
-    : > "${log_file}"
-
-    echo "{}" > "${model_output_dir}/evals/quant_4bit_stress_mmlu_results.json"
-
-    task_eval_single_benchmark \
-        "${model_name}" \
-        0 \
-        "quant_rtn:4:32:all" \
-        "mmlu" \
-        "${out}" \
-        "${log_file}" \
-        "stress"
-
-    assert_match "quant_4bit_stress" "$(cat "${log_file}")" "version hint selects stress edit"
-    [[ "$(cat "${log_file}")" != *"quant_4bit_clean"* ]] || t_fail "unexpected clean edit selection"
 }

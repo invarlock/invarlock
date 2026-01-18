@@ -115,3 +115,45 @@ test_create_model_variant_dispatches_and_rejects_unknown_type() {
     fi
     assert_ne "0" "${rc}" "unknown type returns non-zero"
 }
+
+test_create_model_variant_dispatches_success_paths_for_other_edit_types() {
+    mock_reset
+    # shellcheck source=../model_creation.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/model_creation.sh"
+
+    local calls="${TEST_TMPDIR}/python.calls"
+    _cmd_python() { echo "python $*" >> "${calls}"; cat >/dev/null || true; return 0; }
+
+    create_model_variant "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/out/quant" "quant_rtn" "8" "128" "ffn" "0"
+    create_model_variant "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/out/fp8" "fp8_quant" "e4m3fn" "" "ffn" "0"
+    create_model_variant "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/out/lowrank" "lowrank_svd" "256" "" "ffn" "0"
+    create_model_variant "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/out/error" "error_injection" "nan_injection" "" "" "0"
+
+    local logged
+    logged="$(cat "${calls}")"
+    assert_match "python - ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/quant 8 128 ffn" "${logged}" "quant_rtn dispatch calls python"
+    assert_match "python - ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/fp8 e4m3fn ffn" "${logged}" "fp8_quant dispatch calls python"
+    assert_match "python - ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/lowrank 256 ffn" "${logged}" "lowrank_svd dispatch calls python"
+    assert_match "python - ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/error nan_injection" "${logged}" "error_injection dispatch calls python"
+}
+
+test_create_model_variant_requires_params_for_each_edit_type() {
+    mock_reset
+    # shellcheck source=../model_creation.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/model_creation.sh"
+
+    run create_model_variant "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/out/quant" "quant_rtn" "" "" "" "0"
+    assert_ne "0" "${RUN_RC}" "quant_rtn missing params returns non-zero"
+
+    run create_model_variant "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/out/fp8" "fp8_quant" "" "" "" "0"
+    assert_ne "0" "${RUN_RC}" "fp8_quant missing params returns non-zero"
+
+    run create_model_variant "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/out/prune" "magnitude_prune" "" "" "ffn" "0"
+    assert_ne "0" "${RUN_RC}" "magnitude_prune missing params returns non-zero"
+
+    run create_model_variant "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/out/lowrank" "lowrank_svd" "" "" "ffn" "0"
+    assert_ne "0" "${RUN_RC}" "lowrank_svd missing params returns non-zero"
+
+    run create_model_variant "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/out/error" "error_injection" "" "" "" "0"
+    assert_ne "0" "${RUN_RC}" "error_injection missing params returns non-zero"
+}

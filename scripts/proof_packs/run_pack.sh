@@ -265,10 +265,12 @@ pack_build_pack() {
     local verdicts_dir="${results_dir}"
     local analysis_dir="${results_dir}"
     local revisions_dest="${pack_dir}/state/model_revisions.json"
+    local scenarios_dest="${pack_dir}/state/scenarios.json"
     if [[ "${layout}" == "v2" ]]; then
         verdicts_dir="${results_dir}/verdicts"
         analysis_dir="${results_dir}/analysis"
         revisions_dest="${pack_dir}/metadata/model_revisions.json"
+        scenarios_dest="${pack_dir}/metadata/scenarios.json"
     fi
 
     mkdir -p "${results_dir}" "${verdicts_dir}" "${analysis_dir}"
@@ -278,6 +280,7 @@ pack_build_pack() {
     pack_copy_optional "${run_dir}/analysis/determinism_repeats.json" "${analysis_dir}/determinism_repeats.json"
 
     pack_copy_optional "${run_dir}/state/model_revisions.json" "${revisions_dest}"
+    pack_copy_optional "${run_dir}/state/scenarios.json" "${scenarios_dest}"
 
     local cert
     while IFS= read -r cert; do

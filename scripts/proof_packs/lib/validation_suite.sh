@@ -452,14 +452,27 @@ pack_run_determinism_repeats() {
         return 1
     fi
 
-    local edit_path
-    edit_path=$(process_edit "${baseline_path}" "${edit_spec}" "${repeat_mode}" "${model_name}" "0" "${model_output_dir}") || return 1
-    if [[ -z "${edit_path}" || ! -d "${edit_path}" ]]; then
-        echo "ERROR: Failed to prepare edit for determinism repeats." >&2
+    local resolved=""
+    resolved="$(resolve_edit_params "${model_output_dir}" "${edit_spec}" "${repeat_mode}" 2>/dev/null || echo "")"
+
+    local status=""
+    local edit_dir_name=""
+    if [[ -n "${resolved}" ]]; then
+        status="$(printf '%s' "${resolved}" | jq -r '.status // ""' 2>/dev/null || echo "")"
+        edit_dir_name="$(printf '%s' "${resolved}" | jq -r '.edit_dir_name // ""' 2>/dev/null || echo "")"
+    fi
+
+    if [[ "${status}" != "selected" || -z "${edit_dir_name}" ]]; then
+        echo "ERROR: Determinism repeats requires a selected edit spec (status=${status:-<unset>})." >&2
         return 1
     fi
-    local edit_name
-    edit_name=$(basename "${edit_path}")
+
+    local edit_path="${model_output_dir}/models/${edit_dir_name}"
+    if [[ ! -d "${edit_path}" ]]; then
+        echo "ERROR: Determinism repeats requires an existing edit dir: ${edit_path}" >&2
+        return 1
+    fi
+    local edit_name="${edit_dir_name}"
 
     local preset_dir="${OUTPUT_DIR}/presets"
     local det_dir="${OUTPUT_DIR}/determinism/${model_name}/${edit_name}"
@@ -731,15 +744,17 @@ pack_source_libs() {
 
 # Fallback resolver for clean edit specs using tuned presets when task_functions isn't sourced.
 if ! declare -F resolve_edit_params >/dev/null 2>&1; then
+    :  # xtrace marker for branch coverage (function defs are not traced)
 resolve_edit_params() {
     local model_output_dir="$1"
     local edit_spec="$2"
     local version_hint="${3:-}"
 
-    python3 - "${model_output_dir}" "${edit_spec}" "${version_hint}" <<'PY'
-import json
-import sys
-from pathlib import Path
+    python3 - "${model_output_dir}" "${edit_spec}" "${version_hint}" <<-'PY'
+	import json
+	import os
+	import sys
+	from pathlib import Path
 
 model_output_dir = Path(sys.argv[1])
 edit_spec = sys.argv[2] if len(sys.argv) > 2 else ""
@@ -897,6 +912,16 @@ pack_setup_output_dirs() {
     # Create a lock file for thread-safe logging
     LOG_LOCK="${OUTPUT_DIR}/logs/.log_lock"
     return 0
+}
+
+pack_prepare_scenarios_manifest() {
+    local repo_root
+    repo_root="$(cd "${_PACK_VALIDATION_LIB_DIR}/../../.." && pwd)"
+    local src="${repo_root}/scripts/proof_packs/scenarios.json"
+    if [[ -f "${src}" ]]; then
+        mkdir -p "${OUTPUT_DIR}/state"
+        cp "${src}" "${OUTPUT_DIR}/state/scenarios.json"
+    fi
 }
 
 pack_resolve_tuned_edit_params_file() {
@@ -2461,6 +2486,7 @@ pack_run_suite() {
     pack_apply_network_mode "${PACK_NET}"
     pack_source_libs || return 1
     pack_setup_output_dirs || return 1
+    pack_prepare_scenarios_manifest || return 1
     pack_setup_hf_cache_dirs || return 1
 
     pack_model_list_array
