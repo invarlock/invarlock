@@ -35,7 +35,9 @@ test_pack_validation_determinism_strict_sets_compile_off() {
     source ./scripts/proof_packs/lib/validation_suite.sh
 
     assert_eq "strict" "${PACK_DETERMINISM}" "strict preserved"
-    assert_eq "0" "${LMEVAL_TORCH_COMPILE}" "strict disables torch compile"
+    assert_eq "0" "${NVIDIA_TF32_OVERRIDE}" "strict disables TF32"
+    assert_eq "0" "${CUDNN_BENCHMARK}" "strict disables cuDNN benchmark"
+    assert_eq ":4096:8" "${CUBLAS_WORKSPACE_CONFIG-}" "strict forces cublas workspace"
 }
 
 test_pack_validation_determinism_invalid_defaults_to_throughput() {
@@ -45,7 +47,9 @@ test_pack_validation_determinism_invalid_defaults_to_throughput() {
     source ./scripts/proof_packs/lib/validation_suite.sh
 
     assert_eq "throughput" "${PACK_DETERMINISM}" "invalid preset coerces to throughput"
-    assert_eq "1" "${LMEVAL_TORCH_COMPILE}" "throughput enables torch compile"
+    assert_eq "1" "${NVIDIA_TF32_OVERRIDE}" "throughput enables TF32"
+    assert_eq "1" "${CUDNN_BENCHMARK}" "throughput enables cuDNN benchmark"
+    assert_eq "" "${CUBLAS_WORKSPACE_CONFIG-}" "throughput unsets cublas workspace"
 }
 
 test_pack_validation_bash4_guard_reports_error_on_bash3() {
@@ -70,6 +74,14 @@ test_pack_validation_bash4_guard_succeeds_when_bash4_is_reported() {
 
     pack_is_bash4() { return 0; }
     pack_require_bash4
+}
+
+test_pack_validation_pack_is_bash4_default_impl_executes() {
+    mock_reset
+
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    pack_is_bash4 || true
 }
 
 test_pack_validation_setup_hf_cache_dirs_errors_when_home_is_file() {
@@ -125,10 +137,10 @@ test_pack_validation_run_determinism_repeats_writes_summary() {
 
     PACK_MODEL_LIST=("${model_id}")
 
-    process_edit() {
-        mkdir -p "${TEST_TMPDIR}/edit"
-        echo "${TEST_TMPDIR}/edit"
+    resolve_edit_params() {
+        jq -n '{status:"selected", edit_dir_name:"edit_for_repeats"}'
     }
+    mkdir -p "${OUTPUT_DIR}/${model_name}/models/edit_for_repeats"
 
     run_invarlock_certify() {
         local output_dir="$3"
@@ -474,70 +486,6 @@ test_pack_validation_estimate_model_weights_default_case_returns_nonzero() {
     set -e
     assert_ne "0" "${rc}" "unknown model id returns non-zero"
     assert_eq "" "${out}" "unknown model id prints no estimate"
-}
-
-test_pack_validation_process_edit_parses_specs_dispatches_creators_and_covers_resume_and_failure_paths() {
-    mock_reset
-
-    OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/proof_packs/lib/validation_suite.sh
-    pack_setup_output_dirs
-
-    local baseline="${TEST_TMPDIR}/baseline"
-    mkdir -p "${baseline}"
-    local model_out="${TEST_TMPDIR}/model_out"
-    mkdir -p "${model_out}"
-
-    create_edited_model() { mkdir -p "${2}"; : > "${2}/config.json"; return "${CREATE_RC:-0}"; }
-    create_fp8_model() { mkdir -p "${2}"; : > "${2}/config.json"; return 0; }
-    create_pruned_model() { mkdir -p "${2}"; : > "${2}/config.json"; return 0; }
-    create_lowrank_model() { mkdir -p "${2}"; : > "${2}/config.json"; return 0; }
-
-    RESUME_MODE="false"
-
-    # 3-part spec parsing + fp8_quant dir naming + case dispatch + success echo
-    local fp8_path
-    fp8_path="$(process_edit "${baseline}" "fp8_quant:e4m3fn:ffn" "clean" "m" "0" "${model_out}")"
-    assert_dir_exists "${fp8_path}" "fp8 edit created"
-
-    # quant_rtn dir naming + case dispatch
-    local quant_path
-    quant_path="$(process_edit "${baseline}" "quant_rtn:8:128:ffn" "stress" "m" "0" "${model_out}")"
-    assert_dir_exists "${quant_path}" "quant edit created"
-
-    # magnitude_prune invalid sparsity triggers validation error
-    local rc=0
-    ( process_edit "${baseline}" "magnitude_prune:notnum:ffn" "clean" "m" "0" "${model_out}" ) || rc=$?
-    assert_ne "0" "${rc}" "invalid prune sparsity returns non-zero"
-
-    # magnitude_prune valid path hits prune dir naming + case dispatch
-    local prune_path
-    prune_path="$(process_edit "${baseline}" "magnitude_prune:0.1:ffn" "clean" "m" "0" "${model_out}")"
-    assert_dir_exists "${prune_path}" "prune edit created"
-
-    # lowrank_svd dir naming + case dispatch
-    local svd_path
-    svd_path="$(process_edit "${baseline}" "lowrank_svd:256:ffn" "clean" "m" "0" "${model_out}")"
-    assert_dir_exists "${svd_path}" "svd edit created"
-
-    # Resume mode skips creation when directory + config exist
-    RESUME_MODE="true"
-    local resume_dir="${model_out}/models/fp8_e4m3fn_clean"
-    mkdir -p "${resume_dir}"
-    : > "${resume_dir}/config.json"
-    assert_eq "${resume_dir}" "$(process_edit "${baseline}" "fp8_quant:e4m3fn:ffn" "clean" "m" "0" "${model_out}" | tail -n 1)" "resume echoes existing path"
-
-    # Unknown edit type case arm
-    rc=0
-    ( process_edit "${baseline}" "unknown_type:1:2:3" "clean" "m" "0" "${model_out}" ) || rc=$?
-    assert_ne "0" "${rc}" "unknown edit type returns non-zero"
-
-    # Failure branch when creator returns non-zero
-    RESUME_MODE="false"
-    CREATE_RC=5
-    rc=0
-    ( process_edit "${baseline}" "quant_rtn:8:128:ffn" "clean" "m" "0" "${model_out}" ) || rc=$?
-    assert_eq "1" "${rc}" "failed creator propagates as 1"
 }
 
 test_pack_validation_edit_creators_run_offline_with_stubbed_python() {
@@ -1006,75 +954,6 @@ test_pack_validation_create_edited_model_quant_rtn_and_unknown_edit_type_branche
     assert_eq "4" "${rc}" "unknown edit type aborts via error_exit"
 }
 
-test_pack_validation_run_lmeval_batch_size_selection_flash_attention_and_results_handling() {
-    mock_reset
-
-    OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/proof_packs/lib/validation_suite.sh
-    pack_setup_output_dirs
-
-    fixture_write "python3.stub" ""
-
-    estimate_model_params() { echo "${MODEL_SIZE_RETURN}"; }
-
-    CUDA_VISIBLE_DEVICES="0,1"
-    LM_EVAL_PARALLELIZE="true"
-    FLASH_ATTENTION_AVAILABLE="true"
-
-    local sizes=("70" "40" "30" "moe" "7")
-    local size
-    for size in "${sizes[@]}"; do
-        MODEL_SIZE_RETURN="${size}"
-        local dir="${TEST_TMPDIR}/eval_${size}"
-        mkdir -p "${dir}"
-        printf '{"ok":true}\n' > "${dir}/results.json"
-        run_lmeval "${TEST_TMPDIR}/model_${size}" "${dir}/out.json" "mmlu" "auto" "0" "0"
-        assert_file_exists "${dir}/out.json" "results moved into output file"
-    done
-
-    # Flash Attention disabled pattern branch
-    MODEL_SIZE_RETURN="7"
-    local falcon_dir="${TEST_TMPDIR}/eval_falcon"
-    mkdir -p "${falcon_dir}"
-    printf '{"ok":true}\n' > "${falcon_dir}/results.json"
-    run_lmeval "falcon-model" "${falcon_dir}/out.json" "mmlu" "auto" "0" "0"
-}
-
-test_pack_validation_run_lmeval_logs_warning_when_results_missing() {
-    mock_reset
-
-    OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/proof_packs/lib/validation_suite.sh
-    pack_setup_output_dirs
-
-    fixture_write "python3.stub" ""
-    estimate_model_params() { echo "7"; }
-
-    local dir="${TEST_TMPDIR}/eval_empty"
-    mkdir -p "${dir}"
-    run run_lmeval "${TEST_TMPDIR}/model" "${dir}/out.json" "mmlu" "auto" "0" "0"
-    assert_ne "0" "${RUN_RC}" "missing results returns non-zero"
-}
-
-test_pack_validation_run_lmeval_returns_nonzero_when_results_move_fails() {
-    mock_reset
-
-    OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/proof_packs/lib/validation_suite.sh
-    pack_setup_output_dirs
-
-    fixture_write "python3.stub" ""
-    estimate_model_params() { echo "7"; }
-
-    local dir="${TEST_TMPDIR}/eval_move_fail"
-    mkdir -p "${dir}"
-    printf '{"ok":true}\n' > "${dir}/results.json"
-
-    mv() { return 1; }
-    run run_lmeval "${TEST_TMPDIR}/model" "${dir}/out.json" "mmlu" "auto" "0" "0"
-    assert_ne "0" "${RUN_RC}" "results move failure returns non-zero"
-}
-
 test_pack_validation_generate_invarlock_config_attn_and_strict_accelerator_flags() {
     mock_reset
 
@@ -1163,35 +1042,6 @@ test_pack_validation_run_invarlock_certify_preset_optional_and_cert_copy_paths()
     printf '{"ok":true}\n' > "${cert_dir}/evaluation.cert.json"
     MODEL_SIZE_RETURN="7"
     run_invarlock_certify "subject" "baseline" "${TEST_TMPDIR}/certs" "run_alt" "${preset_dir}" "model" "0"
-}
-
-test_pack_validation_process_model_branches_across_baseline_edits_and_error_injection() {
-    mock_reset
-
-    OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/proof_packs/lib/validation_suite.sh
-    pack_setup_output_dirs
-
-    setup_model() { return 1; }
-    local rc=0
-    ( process_model "bad/model" "0" ) || rc=$?
-    assert_ne "0" "${rc}" "baseline setup failure returns non-zero"
-
-    # Happy path: stub heavy steps but still exercise orchestration branches.
-    setup_model() { mkdir -p "${TEST_TMPDIR}/baseline"; echo "${TEST_TMPDIR}/baseline"; }
-    run_lmeval() { :; }
-    run_invarlock_calibration() { :; }
-    process_edit() { mkdir -p "${TEST_TMPDIR}/editdir"; echo "${TEST_TMPDIR}/editdir"; }
-    run_invarlock_certify() { :; }
-    create_error_model() { mkdir -p "${2}"; : > "${2}/config.json"; }
-
-    local model_name
-    model_name="$(sanitize_model_name "ok/model")"
-    local model_output_dir="${OUTPUT_DIR}/${model_name}"
-    mkdir -p "${model_output_dir}/certificates/errors/nan_injection"
-    printf '{"ok":true}\n' > "${model_output_dir}/certificates/errors/nan_injection/evaluation.cert.json"
-
-    process_model "ok/model" "0"
 }
 
 test_pack_validation_main_dynamic_resume_and_monitoring_branches_offline() {
@@ -1519,8 +1369,10 @@ test_pack_validation_pack_model_list_and_revisions_branches() {
 
     MODEL_1="org/model1"
     MODEL_2=""
+    enable -n mapfile 2>/dev/null || true
     pack_model_list_array
     assert_eq "org/model1" "${PACK_MODEL_LIST[0]}" "fallback populates model list"
+    enable mapfile 2>/dev/null || true
 
     mapfile() {
         local flag="$1"
@@ -1561,6 +1413,19 @@ test_pack_validation_pack_model_list_and_revisions_branches() {
     echo '{"models":{"org/model1":{"gated":true}}}' > "${OUTPUT_DIR}/state/model_revisions.json"
     run pack_load_model_revisions
     assert_rc "1" "${RUN_RC}" "gated model revisions fail"
+}
+
+test_pack_validation_fallback_resolve_edit_params_executes_python() {
+    mock_reset
+
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    local model_output_dir="${TEST_TMPDIR}/model_out"
+    mkdir -p "${model_output_dir}"
+
+    run resolve_edit_params "${model_output_dir}" "quant_rtn:4:32:ffn" "stress"
+    assert_rc "0" "${RUN_RC}" "resolve_edit_params succeeds"
+    assert_match "\"status\": \"selected\"" "${RUN_OUT}" "resolver returns selected status"
 }
 
 
@@ -1663,21 +1528,6 @@ test_pack_validation_setup_model_revision_branches() {
 }
 
 
-test_pack_validation_process_edit_skipped_status() {
-    mock_reset
-
-    OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/proof_packs/lib/validation_suite.sh
-
-    resolve_edit_params() { jq -n '{status:"skipped"}'; }
-    log() { :; }
-
-    run process_edit "baseline" "quant_rtn:clean:ffn" "clean" "model" "0" "${TEST_TMPDIR}/out"
-    assert_rc "0" "${RUN_RC}" "skipped edit returns success"
-    assert_eq "" "${RUN_OUT}" "skipped edit returns empty output"
-}
-
-
 test_pack_validation_generate_invarlock_config_guard_order() {
     mock_reset
 
@@ -1748,26 +1598,33 @@ test_pack_validation_run_determinism_repeats_branch_coverage() {
 
     declare -a EDIT_TYPES_CLEAN=()
     EDIT_TYPES_STRESS=("quant_rtn:4:32:ffn")
-    process_edit() { return 1; }
+    resolve_edit_params() { return 1; }
     run pack_run_determinism_repeats
-    assert_rc "1" "${RUN_RC}" "process_edit failure returns non-zero"
+    assert_rc "1" "${RUN_RC}" "resolve_edit_params failure returns non-zero"
 
-    EDIT_TYPES_CLEAN=("quant_rtn:clean:ffn")
-    EDIT_TYPES_STRESS=()
-    process_edit() { echo ""; return 0; }
+    resolve_edit_params() {
+        jq -n '{status:"skipped", edit_dir_name:""}'
+    }
     run pack_run_determinism_repeats
-    assert_rc "1" "${RUN_RC}" "empty edit path fails"
+    assert_rc "1" "${RUN_RC}" "non-selected edit spec fails"
 
-    process_edit() { return 1; }
+    resolve_edit_params() {
+        jq -n '{status:"selected", edit_dir_name:"missing_edit_dir"}'
+    }
     run pack_run_determinism_repeats
-    assert_rc "1" "${RUN_RC}" "process_edit failure returns non-zero"
+    assert_rc "1" "${RUN_RC}" "missing edit dir fails"
 
-    process_edit() { mkdir -p "${TEST_TMPDIR}/edit2"; echo "${TEST_TMPDIR}/edit2"; }
+    mkdir -p "${model_output_dir}/models/existing_edit"
+    resolve_edit_params() {
+        jq -n '{status:"selected", edit_dir_name:"existing_edit"}'
+    }
     run_invarlock_certify() { return 1; }
     run pack_run_determinism_repeats
     assert_rc "1" "${RUN_RC}" "certify failure returns non-zero"
 
-    process_edit() { mkdir -p "${TEST_TMPDIR}/edit3"; echo "${TEST_TMPDIR}/edit3"; }
+    resolve_edit_params() {
+        jq -n '{status:"selected", edit_dir_name:"existing_edit"}'
+    }
     run_invarlock_certify() { return 0; }
     mkdir() {
         for arg in "$@"; do
@@ -1781,7 +1638,9 @@ test_pack_validation_run_determinism_repeats_branch_coverage() {
     assert_rc "1" "${RUN_RC}" "determinism mkdir failure returns non-zero"
     unset -f mkdir
 
-    process_edit() { mkdir -p "${TEST_TMPDIR}/edit4"; echo "${TEST_TMPDIR}/edit4"; }
+    resolve_edit_params() {
+        jq -n '{status:"selected", edit_dir_name:"existing_edit"}'
+    }
     run_invarlock_certify() { return 0; }
     mkdir() {
         for arg in "$@"; do
@@ -1831,38 +1690,6 @@ test_pack_validation_source_libs_uses_parent_lib_dir() {
 }
 
 
-test_pack_validation_process_model_clean_and_stress_skip_branches() {
-    mock_reset
-
-    OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/proof_packs/lib/validation_suite.sh
-    pack_setup_output_dirs
-
-    setup_model() { mkdir -p "${TEST_TMPDIR}/baseline"; echo "${TEST_TMPDIR}/baseline"; }
-    run_lmeval() { :; }
-    run_invarlock_calibration() { :; }
-    process_edit() { :; }
-    run_invarlock_certify() { :; }
-    create_error_model() { :; }
-
-    EDIT_TYPES_CLEAN=("quant_rtn:clean:ffn")
-    EDIT_TYPES_STRESS=("quant_rtn:4:32:ffn")
-    RUN_ERROR_INJECTION="false"
-
-    CLEAN_EDIT_RUNS=1
-    STRESS_EDIT_RUNS=1
-    process_model "model/a" "0"
-
-    CLEAN_EDIT_RUNS=0
-    STRESS_EDIT_RUNS=1
-    process_model "model/b" "0"
-
-    CLEAN_EDIT_RUNS=1
-    STRESS_EDIT_RUNS=0
-    process_model "model/c" "0"
-}
-
-
 test_pack_validation_main_dynamic_demote_ready_tasks_for_calibration_only() {
     mock_reset
 
@@ -1899,6 +1726,10 @@ test_pack_validation_main_dynamic_demote_ready_tasks_for_calibration_only() {
     }
     get_free_disk_gb() { echo "999"; }
 
+    PACK_PRESET_READY="true"
+    log() { echo "$*" >> "${TEST_TMPDIR}/log.msg"; }
+    log_section() { :; }
+
     local stub_lib="${TEST_TMPDIR}/stub_lib"
     mkdir -p "${stub_lib}"
     for f in task_serialization.sh queue_manager.sh scheduler.sh task_functions.sh fault_tolerance.sh; do
@@ -1913,6 +1744,7 @@ EOF
 
     main_dynamic
     assert_file_exists "${TEST_TMPDIR}/demote.calls" "demote_ready_tasks_for_calibration_only invoked"
+    assert_match "Calibration presets: reuse" "$(cat "${TEST_TMPDIR}/log.msg")" "preset reuse logged"
 }
 
 
@@ -1966,9 +1798,12 @@ EOF
     run_analysis() { :; }
     generate_verdict() { :; }
     get_free_disk_gb() { echo "999"; }
+    get_queue_stats() { echo "0:0:0:1:0:1"; }
 
     main_dynamic
     assert_file_exists "${OUTPUT_DIR}/workers/SHUTDOWN" "touch shutdown when signal_shutdown missing"
+    assert_file_exists "${OUTPUT_DIR}/state/progress.json" "progress.json written when summary stats are present"
+    assert_match "\"status\": \"complete\"" "$(cat "${OUTPUT_DIR}/state/progress.json")" "complete progress state recorded"
 }
 
 
@@ -2068,6 +1903,13 @@ test_pack_validation_pack_run_suite_branches() {
     trap - EXIT INT TERM HUP QUIT
 
     pack_setup_output_dirs() { return 0; }
+    pack_prepare_scenarios_manifest() { return 1; }
+    pack_setup_hf_cache_dirs() { return 0; }
+    run pack_run_suite
+    assert_rc "1" "${RUN_RC}" "pack_prepare_scenarios_manifest failure returns non-zero"
+    trap - EXIT INT TERM HUP QUIT
+
+    pack_prepare_scenarios_manifest() { return 0; }
     pack_setup_hf_cache_dirs() { return 1; }
     run pack_run_suite
     assert_rc "1" "${RUN_RC}" "pack_setup_hf_cache_dirs failure returns non-zero"
@@ -2078,13 +1920,45 @@ test_pack_validation_pack_run_suite_branches() {
     pack_load_model_revisions() { return 0; }
     main_dynamic() { :; }
     PACK_OUTPUT_DIR_ABSOLUTE="true"
+    local original_dir
+    original_dir="$(pwd)"
+    cd "${TEST_TMPDIR}"
     OUTPUT_DIR="rel_out"
     PACK_NET="0"
     run pack_run_suite
+    cd "${original_dir}"
     assert_rc "0" "${RUN_RC}" "absolute output dir path succeeds"
     assert_match '^/' "${OUTPUT_DIR}" "output dir normalized to absolute"
     trap - EXIT INT TERM HUP QUIT
     PACK_OUTPUT_DIR_ABSOLUTE="false"
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out_fail_prep_tuned"
+    pack_prepare_tuned_edit_params() { return 1; }
+    run pack_run_suite
+    assert_rc "1" "${RUN_RC}" "pack_prepare_tuned_edit_params failure returns non-zero"
+    trap - EXIT INT TERM HUP QUIT
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out_fail_validate_tuned"
+    pack_prepare_tuned_edit_params() { return 0; }
+    pack_validate_tuned_edit_params() { return 1; }
+    run pack_run_suite
+    assert_rc "1" "${RUN_RC}" "pack_validate_tuned_edit_params failure returns non-zero"
+    trap - EXIT INT TERM HUP QUIT
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out_fail_prepare_calibration"
+    pack_validate_tuned_edit_params() { return 0; }
+    pack_prepare_calibration_presets() { return 1; }
+    run pack_run_suite
+    assert_rc "1" "${RUN_RC}" "pack_prepare_calibration_presets failure returns non-zero"
+    trap - EXIT INT TERM HUP QUIT
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out_fail_validate_calibration"
+    pack_prepare_calibration_presets() { return 0; }
+    pack_validate_guard_calibration() { return 1; }
+    run pack_run_suite
+    assert_rc "1" "${RUN_RC}" "pack_validate_guard_calibration failure returns non-zero"
+    trap - EXIT INT TERM HUP QUIT
+    pack_validate_guard_calibration() { return 0; }
 
     pack_model_list_array() { PACK_MODEL_LIST=(); }
     local error_log="${TEST_TMPDIR}/error.calls"
@@ -2199,6 +2073,85 @@ EOF
     assert_file_exists "${TEST_TMPDIR}/curl.calls" "curl invoked for endpoint probe"
 }
 
+test_pack_configure_hf_access_chooses_primary_when_primary_succeeds() {
+    mock_reset
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/curl" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+url="${!#}"
+echo "${url}" >> "${TEST_TMPDIR}/curl.calls"
+
+if [[ "${url}" == "https://huggingface.co/api/whoami-v2" ]]; then
+    exit 0
+fi
+
+exit 1
+EOF
+    chmod +x "${bin_dir}/curl"
+    export PATH="${bin_dir}:$PATH"
+    hash -r 2>/dev/null || true
+
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    PACK_NET="1"
+    unset HF_ENDPOINT HF_PRIMARY_ENDPOINT HF_MIRROR_ENDPOINT HF_ENDPOINT_TEST_PATH
+    export HF_ENDPOINT_TEST_PATH="/api/whoami-v2"
+
+    pack_configure_hf_access
+    assert_eq "https://huggingface.co" "${HF_ENDPOINT}" "primary endpoint chosen when probe succeeds"
+    assert_file_exists "${TEST_TMPDIR}/curl.calls" "curl invoked for endpoint probe"
+}
+
+test_pack_configure_hf_access_falls_back_to_primary_when_both_endpoints_fail() {
+    mock_reset
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/curl" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+url="${!#}"
+echo "${url}" >> "${TEST_TMPDIR}/curl.calls"
+exit 1
+EOF
+    chmod +x "${bin_dir}/curl"
+    export PATH="${bin_dir}:$PATH"
+    hash -r 2>/dev/null || true
+
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    PACK_NET="1"
+    unset HF_ENDPOINT HF_PRIMARY_ENDPOINT HF_MIRROR_ENDPOINT HF_ENDPOINT_TEST_PATH
+    export HF_ENDPOINT_TEST_PATH="/api/whoami-v2"
+
+    pack_configure_hf_access
+    assert_eq "https://huggingface.co" "${HF_ENDPOINT}" "defaults to primary when both probes fail"
+    assert_file_exists "${TEST_TMPDIR}/curl.calls" "curl invoked for endpoint probe"
+}
+
+test_pack_configure_hf_access_falls_back_to_primary_when_curl_missing() {
+    mock_reset
+
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    PACK_NET="1"
+    unset HF_ENDPOINT HF_PRIMARY_ENDPOINT HF_MIRROR_ENDPOINT HF_ENDPOINT_TEST_PATH
+    export HF_ENDPOINT_TEST_PATH="/api/whoami-v2"
+
+    local empty_bin="${TEST_TMPDIR}/emptybin"
+    mkdir -p "${empty_bin}"
+    export PATH="${empty_bin}"
+    hash -r 2>/dev/null || true
+
+    pack_configure_hf_access
+    assert_eq "https://huggingface.co" "${HF_ENDPOINT}" "defaults to primary when curl is missing"
+}
+
 test_pack_configure_hf_access_respects_existing_hf_endpoint() {
     mock_reset
 
@@ -2257,4 +2210,293 @@ JSON
     assert_file_exists "${OUTPUT_DIR}/state/tuned_edit_params.json" "tuned file copied into run state"
     assert_match "\"tuned_edit_params_v1\"" "$(cat "${OUTPUT_DIR}/state/tuned_edit_params.json")" "copied content preserved"
     assert_eq "${OUTPUT_DIR}/state/tuned_edit_params.json" "${PACK_TUNED_EDIT_PARAMS_FILE}" "env updated to copied path"
+}
+
+test_pack_resolve_tuned_edit_params_file_returns_early_when_env_set() {
+    mock_reset
+
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    PACK_TUNED_EDIT_PARAMS_FILE="/tmp/already_set.json"
+    export PACK_TUNED_EDIT_PARAMS_FILE
+    run pack_resolve_tuned_edit_params_file
+    assert_rc "0" "${RUN_RC}" "returns zero when PACK_TUNED_EDIT_PARAMS_FILE already set"
+    assert_eq "/tmp/already_set.json" "${PACK_TUNED_EDIT_PARAMS_FILE}" "env preserved"
+}
+
+test_pack_prepare_tuned_edit_params_skips_when_clean_edit_runs_zero() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    CLEAN_EDIT_RUNS="0"
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    run pack_prepare_tuned_edit_params
+    assert_rc "0" "${RUN_RC}" "clean presets skipped when CLEAN_EDIT_RUNS=0"
+}
+
+test_pack_prepare_tuned_edit_params_uses_repo_root_override_and_copies_to_state() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    CLEAN_EDIT_RUNS="1"
+    unset PACK_TUNED_EDIT_PARAMS_FILE
+
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
+
+    local fake_root="${TEST_TMPDIR}/fake_root"
+    mkdir -p "${fake_root}/scripts/proof_packs/lib" "${fake_root}/scripts/proof_packs"
+    cat > "${fake_root}/scripts/proof_packs/tuned_edit_params.json" <<'JSON'
+{"defaults":{"quant_rtn":{"status":"selected"}},"models":{}}
+JSON
+
+    _PACK_VALIDATION_LIB_DIR="${fake_root}/scripts/proof_packs/lib"
+    pack_prepare_tuned_edit_params
+
+    assert_file_exists "${OUTPUT_DIR}/state/tuned_edit_params.json" "tuned file copied into run state"
+    assert_eq "${OUTPUT_DIR}/state/tuned_edit_params.json" "${PACK_TUNED_EDIT_PARAMS_FILE}" "env updated to copied path"
+}
+
+test_pack_prepare_tuned_edit_params_errors_when_missing_preset_file() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    CLEAN_EDIT_RUNS="1"
+    unset PACK_TUNED_EDIT_PARAMS_FILE
+
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
+
+    local fake_root="${TEST_TMPDIR}/fake_root_missing"
+    mkdir -p "${fake_root}/scripts/proof_packs/lib" "${fake_root}/scripts/proof_packs"
+    _PACK_VALIDATION_LIB_DIR="${fake_root}/scripts/proof_packs/lib"
+
+    local rc=0
+    ( pack_prepare_tuned_edit_params ) || rc=$?
+    assert_ne "0" "${rc}" "missing tuned preset file triggers failure"
+    assert_match "Missing PACK_TUNED_EDIT_PARAMS_FILE" "$(cat "${OUTPUT_DIR}/logs/main.log")" "error logged"
+}
+
+test_pack_prepare_tuned_edit_params_errors_when_file_missing() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    CLEAN_EDIT_RUNS="1"
+    PACK_TUNED_EDIT_PARAMS_FILE="${TEST_TMPDIR}/does_not_exist.json"
+    export PACK_TUNED_EDIT_PARAMS_FILE
+
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
+
+    local rc=0
+    ( pack_prepare_tuned_edit_params ) || rc=$?
+    assert_ne "0" "${rc}" "missing tuned preset file triggers error_exit"
+    assert_match "Tuned edit preset file not found" "$(cat "${OUTPUT_DIR}/logs/main.log")" "error logged"
+}
+
+test_pack_validate_tuned_edit_params_skips_when_clean_edit_runs_zero() {
+    mock_reset
+
+    CLEAN_EDIT_RUNS="0"
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    run pack_validate_tuned_edit_params
+    assert_rc "0" "${RUN_RC}" "validation skipped when CLEAN_EDIT_RUNS=0"
+}
+
+test_pack_validate_tuned_edit_params_builds_model_names_csv_and_succeeds() {
+    mock_reset
+
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    CLEAN_EDIT_RUNS="1"
+    EDIT_TYPES_CLEAN=("quant_rtn:clean:ffn")
+    PACK_MODEL_LIST=("org/model1" "org/model2")
+
+    PACK_TUNED_EDIT_PARAMS_FILE="${TEST_TMPDIR}/tuned.json"
+    export PACK_TUNED_EDIT_PARAMS_FILE
+    cat > "${PACK_TUNED_EDIT_PARAMS_FILE}" <<'JSON'
+{"defaults":{"quant_rtn":{"status":"selected"}},"models":{}}
+JSON
+
+    run pack_validate_tuned_edit_params
+    assert_rc "0" "${RUN_RC}" "tuned edit params validated"
+}
+
+test_pack_validate_tuned_edit_params_returns_nonzero_when_python_fails() {
+    mock_reset
+
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    CLEAN_EDIT_RUNS="1"
+    EDIT_TYPES_CLEAN=("quant_rtn:clean:ffn")
+    PACK_MODEL_LIST=("org/model1")
+
+    PACK_TUNED_EDIT_PARAMS_FILE="${TEST_TMPDIR}/tuned.json"
+    export PACK_TUNED_EDIT_PARAMS_FILE
+    echo '{"defaults":{"quant_rtn":{"status":"selected"}},"models":{}}' > "${PACK_TUNED_EDIT_PARAMS_FILE}"
+
+    fixture_write "python3.stub" ""
+    fixture_write "python3.rc" "1"
+
+    local rc=0
+    if pack_validate_tuned_edit_params; then
+        rc=0
+    else
+        rc=$?
+    fi
+    assert_ne "0" "${rc}" "python failure returns non-zero"
+}
+
+test_pack_prepare_calibration_presets_skips_when_no_preset_dir_or_file() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    PACK_MODEL_LIST=("org/model")
+    unset PACK_CALIBRATION_PRESET_DIR PACK_CALIBRATION_PRESET_FILE
+
+    run pack_prepare_calibration_presets
+    assert_rc "0" "${RUN_RC}" "calibration presets skipped when unset"
+}
+
+test_pack_prepare_calibration_presets_errors_when_preset_file_missing() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
+
+    PACK_MODEL_LIST=("org/model")
+    PACK_CALIBRATION_PRESET_FILE="${TEST_TMPDIR}/missing_preset.yaml"
+    export PACK_CALIBRATION_PRESET_FILE
+
+    local rc=0
+    ( pack_prepare_calibration_presets ) || rc=$?
+    assert_ne "0" "${rc}" "missing PACK_CALIBRATION_PRESET_FILE triggers error_exit"
+    assert_match "Calibration preset file not found" "$(cat "${OUTPUT_DIR}/logs/main.log")" "error logged"
+}
+
+test_pack_prepare_calibration_presets_uses_preset_file_for_all_models() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
+
+    PACK_MODEL_LIST=("org/model")
+    local preset_file="${TEST_TMPDIR}/preset.yaml"
+    echo "guards: {}" > "${preset_file}"
+    PACK_CALIBRATION_PRESET_FILE="${preset_file}"
+    export PACK_CALIBRATION_PRESET_FILE
+    unset PACK_CALIBRATION_PRESET_DIR
+
+    pack_prepare_calibration_presets
+
+    assert_file_exists "${OUTPUT_DIR}/presets/calibrated_preset_org__model.yaml" "preset copied to per-model output dir"
+    assert_eq "true" "${PACK_PRESET_READY}" "PACK_PRESET_READY set"
+    assert_eq "0" "${DRIFT_CALIBRATION_RUNS}" "DRIFT_CALIBRATION_RUNS disabled when presets reused"
+}
+
+test_pack_prepare_calibration_presets_uses_preset_dir_candidates() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
+
+    PACK_MODEL_LIST=("org/model")
+    local preset_dir="${TEST_TMPDIR}/preset_dir"
+    mkdir -p "${preset_dir}"
+    echo "guards: {}" > "${preset_dir}/calibrated_preset_org__model.yaml"
+    PACK_CALIBRATION_PRESET_DIR="${preset_dir}"
+    export PACK_CALIBRATION_PRESET_DIR
+    unset PACK_CALIBRATION_PRESET_FILE
+
+    pack_prepare_calibration_presets
+
+    assert_file_exists "${OUTPUT_DIR}/presets/calibrated_preset_org__model.yaml" "preset copied from dir candidate"
+    assert_eq "true" "${PACK_PRESET_READY}" "PACK_PRESET_READY set"
+    assert_eq "0" "${DRIFT_CALIBRATION_RUNS}" "DRIFT_CALIBRATION_RUNS disabled when presets reused"
+}
+
+test_pack_prepare_calibration_presets_errors_when_candidate_missing() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
+
+    PACK_MODEL_LIST=("org/model")
+    local preset_dir="${TEST_TMPDIR}/preset_dir"
+    mkdir -p "${preset_dir}"
+    PACK_CALIBRATION_PRESET_DIR="${preset_dir}"
+    export PACK_CALIBRATION_PRESET_DIR
+    unset PACK_CALIBRATION_PRESET_FILE
+
+    local rc=0
+    ( pack_prepare_calibration_presets ) || rc=$?
+    assert_ne "0" "${rc}" "missing candidate preset triggers error_exit"
+    assert_match "Missing calibration preset" "$(cat "${OUTPUT_DIR}/logs/main.log")" "error logged"
+}
+
+test_pack_validate_guard_calibration_sanitizes_non_numeric_runs() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
+
+    DRIFT_CALIBRATION_RUNS="not-a-number"
+    unset PACK_CALIBRATION_PRESET_DIR PACK_CALIBRATION_PRESET_FILE
+
+    run pack_validate_guard_calibration
+    assert_rc "0" "${RUN_RC}" "non-numeric DRIFT_CALIBRATION_RUNS coerces to default"
+}
+
+test_pack_validate_guard_calibration_errors_when_disabled_without_preset() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
+
+    DRIFT_CALIBRATION_RUNS="0"
+    unset PACK_CALIBRATION_PRESET_DIR PACK_CALIBRATION_PRESET_FILE
+
+    local rc=0
+    ( pack_validate_guard_calibration ) || rc=$?
+    assert_ne "0" "${rc}" "DRIFT_CALIBRATION_RUNS=0 without preset triggers error_exit"
+    assert_match "Guard calibration disabled" "$(cat "${OUTPUT_DIR}/logs/main.log")" "error logged"
+}
+
+test_pack_validation_estimate_planned_model_storage_falls_back_when_mapfile_disabled() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    EDIT_TYPES_CLEAN=("quant_rtn:clean:ffn")
+    EDIT_TYPES_STRESS=()
+    RUN_ERROR_INJECTION="false"
+
+    pack_model_list() { printf '%s\n' "org/model"; }
+    estimate_model_weights_gb() { echo "10"; }
+
+    enable -n mapfile
+
+    local total
+    total="$(estimate_planned_model_storage_gb)"
+    assert_eq "20" "${total}" "planned storage sums weights and edits without mapfile"
+}
+
+test_pack_prepare_scenarios_manifest_copies_repo_manifest_into_state() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    pack_prepare_scenarios_manifest
+
+    assert_file_exists "${OUTPUT_DIR}/state/scenarios.json" "scenarios manifest copied into run state"
 }

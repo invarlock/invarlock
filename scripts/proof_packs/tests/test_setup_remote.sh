@@ -68,12 +68,23 @@ test_setup_remote_clone_and_torch_check_branches() {
 #!/usr/bin/env bash
 set -euo pipefail
 if [[ "\${1:-}" == "-" ]]; then
-  echo "called" > "${TEST_TMPDIR}/python.called"
+  echo "called" >> "${TEST_TMPDIR}/python.called"
   exit 0
 fi
 exit 0
 EOF
     chmod +x "${bin_dir}/python"
+
+    cat > "${bin_dir}/nvidia-smi" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ "$*" == *"--query-gpu=name"* ]]; then
+  echo "NVIDIA B200"
+  exit 0
+fi
+exit 0
+EOF
+    chmod +x "${bin_dir}/nvidia-smi"
 
     PATH="${bin_dir}:${PATH}"
     export PATH
@@ -83,6 +94,9 @@ EOF
 
     install_torch
     assert_file_exists "${TEST_TMPDIR}/python.called" "torch check executed"
+    local call_count
+    call_count="$(wc -l < "${TEST_TMPDIR}/python.called" | tr -d ' ')"
+    assert_eq "2" "${call_count}" "B200 torch arch warning branch executed"
 }
 
 test_setup_remote_main_runs_with_stubbed_commands() {

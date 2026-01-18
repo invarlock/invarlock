@@ -7,13 +7,18 @@ from typing import Any
 
 
 def _write_cert(
-    path: Path, *, validation: dict[str, Any], degraded: bool = False
+    path: Path,
+    *,
+    validation: dict[str, Any],
+    degraded: bool = False,
+    invariants_status: str = "pass",
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload: dict[str, Any] = {
         "validation": validation,
         "primary_metric": {"degraded": degraded, "invalid": degraded},
         "guard_overhead": {"evaluated": True},
+        "invariants": {"status": invariants_status},
     }
     path.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -29,10 +34,10 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
 
     # Clean edits (4) => must PASS.
     for edit in (
-        "quant_8bit_clean",
-        "fp8_e4m3_clean",
+        "quant_4bit_clean",
+        "fp8_e5m2_clean",
         "prune_12pct_clean",
-        "svd_rank256_clean",
+        "svd_rank32_l31_clean",
     ):
         _write_cert(
             model_dir / "certificates" / edit / "run_1" / "evaluation.cert.json",
@@ -80,6 +85,9 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
         "scale_explosion",
         "weight_tying_break",
     ):
+        invariants_status = "fail"
+        if error_type == "weight_tying_break":
+            invariants_status = "warn"
         _write_cert(
             model_dir / "certificates" / "errors" / error_type / "evaluation.cert.json",
             validation={
@@ -90,6 +98,7 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
                 "preview_final_drift_acceptable": False,
                 "guard_overhead_acceptable": True,
             },
+            invariants_status=invariants_status,
         )
 
     script = repo_root / "scripts/proof_packs/python/verdict_generator.py"
