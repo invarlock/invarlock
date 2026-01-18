@@ -35,3 +35,21 @@ def test_normalize_run_report_vqa_kind_inference():
     }
     rep = normalize_run_report(raw)
     assert rep["metrics"]["primary_metric"]["kind"] == "vqa_accuracy"
+
+
+def test_normalize_run_report_preserves_pm_drift_band_and_acceptance_range():
+    raw = {
+        "meta": {
+            "model_id": "m",
+            "adapter": "hf",
+            "seed": 1,
+            "device": "cpu",
+            "pm_acceptance_range": {"min": 0.9, "max": 1.2},
+            "pm_drift_band": {"min": 0.9, "max": 1.3},
+        },
+        "data": {"dataset": "ds"},
+        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
+    }
+    rep = normalize_run_report(raw)
+    assert rep["meta"].get("pm_acceptance_range") == {"min": 0.9, "max": 1.2}
+    assert rep["meta"].get("pm_drift_band") == {"min": 0.9, "max": 1.3}
