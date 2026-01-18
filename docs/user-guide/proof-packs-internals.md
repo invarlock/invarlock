@@ -62,9 +62,8 @@ task graph, scheduling, and artifact generation. It complements
 - `lib/gpu_worker.sh`: worker loop, heartbeats, task execution glue.
 - `lib/task_functions.sh`: implementations for each task type.
 - `lib/model_creation.sh`: edit and error-model creation helpers (`create_model_variant` dispatcher).
-- `lib/lmeval_runner.sh`: lm-eval orchestration helper.
 - `lib/config_generator.sh`: InvarLock config generation and wrapper helpers.
-- `lib/result_compiler.sh`: analysis, correlation, and verdict compilation.
+- `lib/result_compiler.sh`: analysis and verdict compilation.
 - `lib/fault_tolerance.sh`: error classification and retry/backoff logic.
 - `scripts/proof_packs/python/manifest_writer.py`: proof pack `manifest.json` writer.
 - `scripts/proof_packs/python/preset_generator.py`: calibrated preset + edit-type variants.
@@ -110,7 +109,7 @@ task graph, scheduling, and artifact generation. It complements
 │  ├─ CALIBRATION_RUN       │
 │  ├─ GENERATE_PRESET       │
 │  ├─ CREATE_EDITS(_BATCH)  │
-│  ├─ EVAL_* (split)        │
+│  ├─ CREATE_ERROR          │
 │  └─ CERTIFY_*             │
 └──────────────────────────┘
 ```
@@ -133,7 +132,7 @@ Proof pack issues?
 ├─ OOM errors?
 │  ├─ Lower GPU_MEMORY_PER_DEVICE / GPU_MEMORY_GB
 │  ├─ Disable batching: PACK_USE_BATCH_EDITS=false
-│  └─ Reduce eval batch sizes (EVAL_BATCH_SIZE_*)
+│  └─ Reduce InvarLock batch/seq_len (INVARLOCK_EVAL_BATCH, INVARLOCK_SEQ_LEN)
 │
 └─ Disk pressure / ENOSPC?
    ├─ Check OUTPUT_DIR filesystem free space
@@ -172,17 +171,18 @@ Notes:
 Each model runs 8 edit experiments (4 types × 2 versions) plus optional error
 injection tests.
 
-### Clean edits (calibrated)
+### Clean edits (tuned)
 
-Clean edits are calibrated per model using lm-eval only. Candidates are accepted
-only if none of the benchmarks regress more than 2×SE vs baseline.
+Clean edits use tuned parameters supplied via `PACK_TUNED_EDIT_PARAMS_FILE`.
+The suite uses `:clean:` as a sentinel in the edit spec and resolves concrete
+parameters at runtime.
 
 | Edit Type | Parameters | Scope |
 | --- | --- | --- |
-| Quantization RTN | `CLEAN_QUANT_BITS` (default 8) + `CLEAN_QUANT_GROUP_SIZES` (128/64/32) | FFN only |
-| FP8 Quantization | `CLEAN_FP8_FORMATS` (default `e4m3fn`) | FFN only |
-| Magnitude Pruning | `CLEAN_PRUNE_LEVELS` (0.1/0.05/0.02) | FFN only |
-| Low-Rank SVD | `CLEAN_SVD_RANK_RATIOS` (0.25/0.35/0.5) × min(hidden, ffn) | FFN only |
+| Quantization RTN | tuned (`bits`, `group_size`) from tuned params file | FFN only |
+| FP8 Quantization | tuned (`format`) from tuned params file | FFN only |
+| Magnitude Pruning | tuned (`prune_level`) from tuned params file | FFN only |
+| Low-Rank SVD | tuned (`rank`) from tuned params file | FFN only |
 
 ### Stress edits
 
@@ -221,10 +221,9 @@ Priority (base)     Task type
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   90 ┤ SETUP_BASELINE
   85 ┤ CALIBRATION_RUN
-  80 ┤ EVAL_BASELINE
   75 ┤ GENERATE_PRESET
   70 ┤ CREATE_EDITS_BATCH / CREATE_EDIT
-  65 ┤ EVAL_* / CERTIFY_EDIT
+  65 ┤ CERTIFY_EDIT
   60 ┤ CREATE_ERROR
   55 ┤ CERTIFY_ERROR
 ```
@@ -281,7 +280,7 @@ GPU 2: 80GB total, 28GB free
 
 Ready queue scan (highest-priority fit):
   qwen-14b_CALIBRATION_RUN_002  req=24GB  pri=85  FITS ✓
-  mixtral_EVAL_MMLU_004         req=92GB  pri=65  SKIP ✗
+  mixtral_CREATE_EDITS_BATCH_001 req=92GB pri=70  SKIP ✗
   yi-34b_CERTIFY_EDIT_001       req=72GB  pri=65  SKIP ✗
 ```
 
@@ -336,53 +335,26 @@ START gpu_worker
   └─ update heartbeat/status → loop
 ```
 
-## Batch + split optimizations
+## Batch optimizations
 
-Small/medium models use two key optimizations:
+Small/medium models default to batch edit creation:
 
 - **Batch edit creation**: `CREATE_EDITS_BATCH` loads a model once and creates
   all 8 edits (cuts repeated model loads).
-- **Split eval**: each edit spawns four tasks (`EVAL_MMLU`, `EVAL_HELLASWAG`,
-  `EVAL_ARC`, `EVAL_WINOGRANDE`) for parallelism.
-
-```text
-Optimization impact (illustrative)
-Before (per-edit):
-  8× CREATE_EDIT + 8× EVAL_EDIT (monolithic benchmarks)
-After (batch + split):
-  1× CREATE_EDITS_BATCH + 32× EVAL_* (4 benchmarks × 8 edits)
-```
 
 Large or MoE models disable batch edits automatically (or via
 `PACK_USE_BATCH_EDITS=false`) and fall back to per-edit tasks
-(`CREATE_EDIT → EVAL_EDIT → CERTIFY_EDIT`).
+(`CREATE_EDIT → CERTIFY_EDIT`).
 
 ### Task dependency graphs
 
-Batch + split (default):
+Batch (default):
 
 ```text
-                     ┌────────────────────┐
-                     │   SETUP_BASELINE   │
-                     └─────────┬──────────┘
-                               │
-          ┌────────────────────┼──────────────────────┐
-          ▼                    ▼                      ▼
-   ┌─────────────┐     ┌────────────────┐     ┌─────────────────────┐
-   │EVAL_BASELINE│     │CALIBRATION_RUN │     │ CREATE_EDITS_BATCH  │
-   │ (lm-eval)   │     │    × N runs    │     │ (8 edits, 1 load)   │
-   └─────────────┘     └──────┬─────────┘     └─────────┬───────────┘
-                               │                        │
-                               ▼                        │
-                        ┌────────────────┐               │
-                        │GENERATE_PRESET │               │
-                        └─────────┬──────┘               │
-                                  │                      │
-                       ┌──────────┴──────────┐           │
-                       ▼                     ▼           ▼
-                ┌──────────────┐    ┌───────────────────────────┐
-                │ CERTIFY_EDIT │    │ EVAL_* (4 benchmarks/edit) │
-                └──────────────┘    └───────────────────────────┘
+SETUP_BASELINE
+  ├─ CALIBRATION_RUN × N ──> GENERATE_PRESET ──┐
+  ├─ CREATE_EDITS_BATCH ------------------------┴─> CERTIFY_EDIT × runs
+  └─ CREATE_ERROR × types ----------------------┴─> CERTIFY_ERROR × types
 ```
 
 Notes:
@@ -394,9 +366,9 @@ Per-edit path (large/MoE or `PACK_USE_BATCH_EDITS=false`):
 
 ```text
 SETUP_BASELINE
-  ├─ EVAL_BASELINE
   ├─ CALIBRATION_RUN × N ──> GENERATE_PRESET ──┐
-  └─ CREATE_EDIT ──> EVAL_EDIT ────────────────┴─> CERTIFY_EDIT
+  ├─ CREATE_EDIT × edits -----------------------┴─> CERTIFY_EDIT × runs
+  └─ CREATE_ERROR × types ----------------------┴─> CERTIFY_ERROR × types
 ```
 
 ## Task breakdown per model (defaults)
@@ -406,24 +378,23 @@ Defaults: `DRIFT_CALIBRATION_RUNS=5`, `CLEAN_EDIT_RUNS=3`,
 
 Batch path (default for small/medium):
 
-- Setup + baseline eval: 2 tasks
+- Setup baseline: 1 task
 - Calibration runs + preset: 6 tasks
 - Batch edits: 1 task
-- Split eval tasks: 32 tasks
 - Certify edits: 20 tasks
 - Error injection: 10 tasks
 
-Total: ~71 tasks/model (varies with overrides).
+Total: ~38 tasks/model (varies with overrides).
 
 Per-edit path (large/MoE or `PACK_USE_BATCH_EDITS=false`):
 
-- Setup + baseline eval: 2 tasks
+- Setup baseline: 1 task
 - Calibration runs + preset: 6 tasks
-- Per-edit create/eval: 16 tasks
+- Create edits: 8 tasks
 - Certify edits: 20 tasks
 - Error injection: 10 tasks
 
-Total: ~54 tasks/model (varies with overrides).
+Total: ~45 tasks/model (varies with overrides).
 
 ## Execution phases
 
@@ -434,8 +405,8 @@ PHASE 1: Task queue initialization
   - Generate tasks for all models, resolve initial dependencies
 PHASE 2: GPU worker launch
   - Spawn one worker per GPU, dynamic scheduling in loop
-PHASE 3: Analysis + verdict
-  - Correlation analysis, final verdict reports
+PHASE 3: Reports + verdict
+  - Compile certificates into final verdict reports
 ```
 
 ## Run directory layout
@@ -443,18 +414,16 @@ PHASE 3: Analysis + verdict
 ```text
 OUTPUT_DIR/
   analysis/
-    correlation_analysis.json
-    eval_results.csv
-    guard_sensitivity_matrix.csv
-    determinism_repeats.json
+    determinism_repeats.json          # optional (when --repeats is used)
   reports/
     final_verdict.txt
     final_verdict.json
   presets/
   state/
-    model_revisions.json
+    model_revisions.json              # pinned HF revisions (when --net 1)
     progress.json
     disk_pressure.json
+    tuned_edit_params.json            # copy of PACK_TUNED_EDIT_PARAMS_FILE
   queue/
     pending/ ready/ running/ completed/ failed/
     queue.lock
@@ -468,21 +437,11 @@ OUTPUT_DIR/
     gpu_<id>.status
     gpu_reservations/
     SHUTDOWN
-  state/
-    model_revisions.json
-    progress.json
-    tuned_edit_params.json
-  models/         # top-level cache dirs created by the suite
-  evals/          # top-level cache dirs created by the suite
-  certificates/   # top-level cache dirs created by the suite
   <model_name>/
     models/
       baseline/
       <edit_name>/
       error_<type>/
-    evals/
-      baseline_results.json
-      <edit_name>_results.json
     certificates/
       calibration/
       <edit_name>/run_<n>/
@@ -493,7 +452,7 @@ OUTPUT_DIR/
 
 - `--calibrate-only` / `PACK_SUITE_MODE=calibrate-only`
   - Only promotes `SETUP_BASELINE`, `CALIBRATION_RUN`, and `GENERATE_PRESET`
-    tasks. It intentionally skips `EVAL_BASELINE`.
+    tasks.
   - The monitor exits after all `GENERATE_PRESET` tasks complete.
 - `--run-only`
   - Continue a prior run after calibration. This is effectively `--resume` with
@@ -513,10 +472,9 @@ PACK_DETERMINISM=throughput ./scripts/proof_packs/run_suite.sh --suite subset
 PACK_DETERMINISM=strict ./scripts/proof_packs/run_suite.sh --suite subset
 ```
 
-- Throughput: `NVIDIA_TF32_OVERRIDE=1`, `CUDNN_BENCHMARK=1`,
-  `LMEVAL_TORCH_COMPILE=1`.
+- Throughput: `NVIDIA_TF32_OVERRIDE=1`, `CUDNN_BENCHMARK=1`.
 - Strict: `NVIDIA_TF32_OVERRIDE=0`, `CUDNN_BENCHMARK=0`,
-  `LMEVAL_TORCH_COMPILE=0`, `CUBLAS_WORKSPACE_CONFIG=:4096:8`.
+  `CUBLAS_WORKSPACE_CONFIG=:4096:8`.
 
 ## Network mode and model revisions
 
@@ -619,19 +577,6 @@ Common knobs for the setup script:
 | --- | --- | --- |
 | `MODEL_1`–`MODEL_8` | suite-defined | Override model slots; empty disables |
 
-### Evaluation settings
-
-| Variable | Default | Description |
-| --- | --- | --- |
-| `EVAL_TASKS` | `mmlu,hellaswag,arc_challenge,winogrande` | lm-eval tasks |
-| `EVAL_NUM_FEWSHOT` | `5` | Few-shot examples |
-| `EVAL_BATCH_SIZE` | `auto` | lm-eval batch auto-detect |
-| `EVAL_BATCH_SIZE_SMALL` | `auto:16` | 7B–14B cap |
-| `EVAL_BATCH_SIZE_MEDIUM` | `auto:8` | 30B–40B cap |
-| `EVAL_BATCH_SIZE_LARGE` | `auto:4` | 70B+ cap |
-| `EVAL_BATCH_SIZE_MOE` | `auto:6` | MoE cap |
-| `EVAL_CONTEXT_LEN` | `2048` | Context length cap |
-
 ### InvarLock settings
 
 | Variable | Default | Description |
@@ -680,7 +625,6 @@ Common knobs for the setup script:
 | `MODEL_LOAD_OVERHEAD_GB` | `4` | Load overhead for planning |
 | `EDIT_OVERHEAD_GB` | `8` | Per-edit overhead for planning |
 | `BATCH_EDIT_OVERHEAD_GB` | `8` | Batch edit overhead |
-| `EVAL_OVERHEAD_GB` | `6` | Eval overhead |
 | `INVARLOCK_OVERHEAD_GB` | `6` | InvarLock overhead |
 
 ### Worker + reliability controls
@@ -720,7 +664,7 @@ Or point to an existing revisions file with `PACK_MODEL_REVISIONS_FILE`.
 
 - Lower `GPU_MEMORY_PER_DEVICE` so the planner requests more GPUs.
 - Disable batch edits: `PACK_USE_BATCH_EDITS=false`.
-- Reduce eval batch caps (e.g., `EVAL_BATCH_SIZE_LARGE=auto:2`).
+- Reduce InvarLock batch/seq_len (e.g., `INVARLOCK_EVAL_BATCH=16 INVARLOCK_SEQ_LEN=256`).
 - Increase memory overhead knobs (`MODEL_LOAD_OVERHEAD_GB`, `EDIT_OVERHEAD_GB`).
 
 ### Disk pressure / preflight failures
