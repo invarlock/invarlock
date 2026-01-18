@@ -1041,10 +1041,49 @@ generate_model_tasks() {
     fi
 
     # 4. Edit creation + certify
-    # Clean edits use tuned presets supplied outside the run.
-    local clean_edits=("quant_rtn:clean:ffn" "fp8_quant:clean:ffn" "magnitude_prune:clean:ffn" "lowrank_svd:clean:ffn")
-    # Stress edits
-    local stress_edits=("quant_rtn:4:32:all" "fp8_quant:e5m2:all" "magnitude_prune:0.5:all" "lowrank_svd:32:all")
+    # Load edit specs from scenarios.json when available to keep the task graph
+    # and verdict contract in sync.
+    local pack_root
+    pack_root="$(cd "${SCRIPT_DIR}/.." && pwd)"
+    local scenarios_file="${pack_root}/scenarios.json"
+
+    local clean_edits=()
+    local stress_edits=()
+    local all_edit_specs=""
+
+    if command -v jq >/dev/null 2>&1 && [[ -f "${scenarios_file}" ]]; then
+        mapfile -t clean_edits < <(
+            jq -r '.scenarios[]
+                | select(.generation.kind=="edit" and .generation.version=="clean")
+                | .generation.edit_spec' "${scenarios_file}"
+        )
+        mapfile -t stress_edits < <(
+            jq -r '.scenarios[]
+                | select(.generation.kind=="edit" and .generation.version=="stress")
+                | .generation.edit_spec' "${scenarios_file}"
+        )
+        all_edit_specs="$(
+            jq -c '[.scenarios[]
+                | select(.generation.kind=="edit")
+                | {spec: .generation.edit_spec, version: .generation.version}]' "${scenarios_file}"
+        )"
+    fi
+
+    if [[ ${#clean_edits[@]} -eq 0 || ${#stress_edits[@]} -eq 0 || -z "${all_edit_specs}" ]]; then
+        # Fallback defaults (kept for standalone script use).
+        clean_edits=("quant_rtn:clean:ffn" "fp8_quant:clean:ffn" "magnitude_prune:clean:ffn" "lowrank_svd:clean:ffn")
+        stress_edits=("quant_rtn:4:32:all" "fp8_quant:e5m2:all" "magnitude_prune:0.5:all" "lowrank_svd:32:all")
+        all_edit_specs='[
+            {"spec": "quant_rtn:clean:ffn", "version": "clean"},
+            {"spec": "fp8_quant:clean:ffn", "version": "clean"},
+            {"spec": "magnitude_prune:clean:ffn", "version": "clean"},
+            {"spec": "lowrank_svd:clean:ffn", "version": "clean"},
+            {"spec": "quant_rtn:4:32:all", "version": "stress"},
+            {"spec": "fp8_quant:e5m2:all", "version": "stress"},
+            {"spec": "magnitude_prune:0.5:all", "version": "stress"},
+            {"spec": "lowrank_svd:32:all", "version": "stress"}
+        ]'
+    fi
 
     # Ensure use_batch is defined (defensive for set -u)
     use_batch=${use_batch:-true}
@@ -1055,16 +1094,6 @@ generate_model_tasks() {
     elif [[ "${use_batch}" == "true" ]]; then
         # CREATE_EDITS_BATCH - Create edits with a single model load (Batch optimization)
         :
-        local all_edit_specs='[
-            {"spec": "quant_rtn:clean:ffn", "version": "clean"},
-            {"spec": "fp8_quant:clean:ffn", "version": "clean"},
-            {"spec": "magnitude_prune:clean:ffn", "version": "clean"},
-            {"spec": "lowrank_svd:clean:ffn", "version": "clean"},
-            {"spec": "quant_rtn:4:32:all", "version": "stress"},
-            {"spec": "fp8_quant:e5m2:all", "version": "stress"},
-            {"spec": "magnitude_prune:0.5:all", "version": "stress"},
-            {"spec": "lowrank_svd:32:all", "version": "stress"}
-        ]'
 
         local edit_deps="${setup_id}"
         local edits_id=$(add_task "CREATE_EDITS_BATCH" "${model_id}" "${model_name}" \
@@ -1162,9 +1191,19 @@ generate_model_tasks() {
         done
     fi
 
-    # 5. Error injection tests (5 types)
+    # 5. Error injection tests
     if [[ "${RUN_ERROR_INJECTION:-true}" == "true" ]]; then
-        local error_types=("nan_injection" "inf_injection" "extreme_quant" "scale_explosion" "weight_tying_break")
+        local error_types=()
+        if command -v jq >/dev/null 2>&1 && [[ -f "${scenarios_file}" ]]; then
+            mapfile -t error_types < <(
+                jq -r '.scenarios[]
+                    | select(.generation.kind=="error")
+                    | .generation.error_type' "${scenarios_file}"
+            )
+        fi
+        if [[ ${#error_types[@]} -eq 0 ]]; then
+            error_types=("nan_injection" "inf_injection" "extreme_quant" "scale_explosion" "weight_tying_break")
+        fi
         for error_type in "${error_types[@]}"; do
             # CREATE_ERROR
             local error_create_id=$(add_task "CREATE_ERROR" "${model_id}" "${model_name}" \

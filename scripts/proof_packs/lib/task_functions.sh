@@ -1171,9 +1171,6 @@ YAML
     for g in "${guards_order[@]}"; do
         guards_order_yaml+=$'    - '"${g}"$'\n'
     done
-    if [[ -z "${guards_order_yaml}" ]]; then
-        guards_order_yaml=$'    - invariants\n    - spectral\n    - rmt\n    - variance\n    - invariants\n'
-    fi
 
     cat > "${config_yaml}" << YAML_EOF
 model:
