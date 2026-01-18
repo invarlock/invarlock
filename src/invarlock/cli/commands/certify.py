@@ -21,7 +21,7 @@ import math
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 import typer
 from rich.console import Console
@@ -229,6 +229,14 @@ def certify_command(
     edited: str = typer.Option(
         ..., "--edited", "--subject", help="Subject model dir or Hub ID"
     ),
+    baseline_report: str | None = typer.Option(
+        None,
+        "--baseline-report",
+        help=(
+            "Reuse an existing baseline run report.json (skips baseline evaluation). "
+            "Must include stored evaluation windows (e.g., set INVARLOCK_STORE_EVAL_WINDOWS=1)."
+        ),
+    ),
     adapter: str = typer.Option(
         "auto", "--adapter", help="Adapter name or 'auto' to resolve"
     ),
@@ -296,6 +304,7 @@ def certify_command(
 
     source = _coerce_option(source)
     edited = _coerce_option(edited)
+    baseline_report = _coerce_option(baseline_report)
     adapter = _coerce_option(adapter, "auto")
     device = _coerce_option(device)
     profile = _coerce_option(profile, "ci")
@@ -346,6 +355,10 @@ def certify_command(
     def _debug(msg: str) -> None:
         if verbosity >= VERBOSITY_VERBOSE:
             console.print(msg, markup=False)
+
+    def _fail(message: str, *, exit_code: int = 2) -> NoReturn:
+        print_event(console, "FAIL", message, style=output_style, emoji="❌")
+        raise typer.Exit(exit_code)
 
     def _phase(index: int, total: int, title: str) -> None:
         if verbosity >= VERBOSITY_DEFAULT:
@@ -433,6 +446,108 @@ def certify_command(
     if guards_order is None:
         guards_order = list(default_guards_order)
 
+    def _load_and_validate_baseline_report(
+        report_path: Path,
+        *,
+        expected_profile: str,
+        expected_tier: str,
+        expected_adapter: str,
+    ) -> Path:
+        candidate = Path(report_path).expanduser()
+        if not candidate.exists():
+            _fail(f"Baseline report not found: {candidate}")
+        resolved_report: Path | None = None
+        if candidate.is_dir():
+            direct = candidate / "report.json"
+            if direct.is_file():
+                resolved_report = direct
+            else:
+                resolved_report = _latest_run_report(candidate)
+        elif candidate.is_file():
+            resolved_report = candidate
+        if resolved_report is None or not resolved_report.is_file():
+            _fail(f"Baseline report not found: {candidate}")
+        resolved_report = resolved_report.resolve()
+        try:
+            with resolved_report.open("r", encoding="utf-8") as fh:
+                payload = json.load(fh)
+        except Exception as exc:  # noqa: BLE001
+            _fail(f"Baseline report is not valid JSON: {resolved_report} ({exc})")
+        if not isinstance(payload, dict):
+            _fail(f"Baseline report must be a JSON object: {resolved_report}")
+
+        edit_block = payload.get("edit")
+        edit_name = edit_block.get("name") if isinstance(edit_block, dict) else None
+        if edit_name != "noop":
+            _fail(
+                "Baseline report must be a no-op run (edit.name == 'noop'). "
+                f"Got edit.name={edit_name!r} in {resolved_report}"
+            )
+
+        meta = payload.get("meta")
+        if isinstance(meta, dict):
+            baseline_adapter = meta.get("adapter")
+            if (
+                isinstance(baseline_adapter, str)
+                and baseline_adapter != expected_adapter
+            ):
+                _fail(
+                    "Baseline report adapter mismatch. "
+                    f"Expected {expected_adapter!r}, got {baseline_adapter!r} in {resolved_report}"
+                )
+
+        context = payload.get("context")
+        if isinstance(context, dict):
+            baseline_profile = context.get("profile")
+            if (
+                isinstance(baseline_profile, str)
+                and baseline_profile.strip().lower() != expected_profile.strip().lower()
+            ):
+                _fail(
+                    "Baseline report profile mismatch. "
+                    f"Expected {expected_profile!r}, got {baseline_profile!r} in {resolved_report}"
+                )
+            auto_ctx = context.get("auto")
+            if isinstance(auto_ctx, dict):
+                baseline_tier = auto_ctx.get("tier")
+                if isinstance(baseline_tier, str) and baseline_tier != expected_tier:
+                    _fail(
+                        "Baseline report tier mismatch. "
+                        f"Expected {expected_tier!r}, got {baseline_tier!r} in {resolved_report}"
+                    )
+
+        eval_windows = payload.get("evaluation_windows")
+        if not isinstance(eval_windows, dict):
+            _fail(
+                "Baseline report missing evaluation window payloads. "
+                "Re-run baseline with INVARLOCK_STORE_EVAL_WINDOWS=1."
+            )
+
+        for phase_name in ("preview", "final"):
+            phase = eval_windows.get(phase_name)
+            if not isinstance(phase, dict):
+                _fail(
+                    f"Baseline report missing evaluation_windows.{phase_name} payloads. "
+                    "Re-run baseline with INVARLOCK_STORE_EVAL_WINDOWS=1."
+                )
+            window_ids = phase.get("window_ids")
+            input_ids = phase.get("input_ids")
+            if not isinstance(window_ids, list) or not window_ids:
+                _fail(
+                    f"Baseline report missing evaluation_windows.{phase_name}.window_ids."
+                )
+            if not isinstance(input_ids, list) or not input_ids:
+                _fail(
+                    f"Baseline report missing evaluation_windows.{phase_name}.input_ids."
+                )
+            if len(input_ids) != len(window_ids):
+                _fail(
+                    "Baseline report has inconsistent evaluation window payloads "
+                    f"for {phase_name}: input_ids={len(input_ids)} window_ids={len(window_ids)}."
+                )
+
+        return resolved_report
+
     # Create temp baseline config (no-op edit)
     # Normalize possible "hf:" prefixes for HF adapters
     norm_src_id = _normalize_model_id(src_id, eff_adapter)
@@ -462,53 +577,63 @@ def certify_command(
 
     tmp_dir = Path(".certify_tmp")
     tmp_dir.mkdir(parents=True, exist_ok=True)
-    baseline_yaml = tmp_dir / "baseline_noop.yaml"
-    _dump_yaml(baseline_yaml, baseline_cfg)
 
-    _phase(1, 3, "BASELINE EVALUATION")
-    _info("Running baseline (no-op edit)", tag="EXEC", emoji="🏁")
-    _debug(f"Baseline config: {baseline_yaml}")
-    from .run import run_command as _run
-
-    with _suppress_child_output(verbosity == VERBOSITY_QUIET) as quiet_buffer:
-        try:
-            with timed_step(
-                console=console,
-                style=output_style,
-                timings=timings,
-                key="baseline",
-                tag="EXEC",
-                message="Baseline",
-                emoji="🏁",
-            ):
-                _run(
-                    config=str(baseline_yaml),
-                    profile=profile,
-                    out=str(Path(out) / "source"),
-                    tier=tier,
-                    device=device,
-                    edit_label=baseline_label,
-                    style=output_style.name,
-                    progress=progress,
-                    timing=False,
-                    no_color=no_color,
-                )
-        except Exception:
-            if quiet_buffer is not None:
-                console.print(quiet_buffer.getvalue(), markup=False)
-            raise
-
-    baseline_report = _latest_run_report(Path(out) / "source")
-    if not baseline_report:
-        print_event(
-            console,
-            "FAIL",
-            "Could not locate baseline report after run",
-            style=output_style,
-            emoji="❌",
+    baseline_report_path: Path
+    if baseline_report:
+        _info(
+            "Using provided baseline report (skipping baseline evaluation)",
+            tag="EXEC",
+            emoji="♻️",
         )
-        raise typer.Exit(1)
-    _debug(f"Baseline report: {baseline_report}")
+        baseline_report_path = _load_and_validate_baseline_report(
+            Path(baseline_report),
+            expected_profile=profile,
+            expected_tier=tier,
+            expected_adapter=str(eff_adapter),
+        )
+        _debug(f"Baseline report: {baseline_report_path}")
+    else:
+        baseline_yaml = tmp_dir / "baseline_noop.yaml"
+        _dump_yaml(baseline_yaml, baseline_cfg)
+
+        _phase(1, 3, "BASELINE EVALUATION")
+        _info("Running baseline (no-op edit)", tag="EXEC", emoji="🏁")
+        _debug(f"Baseline config: {baseline_yaml}")
+        from .run import run_command as _run
+
+        with _suppress_child_output(verbosity == VERBOSITY_QUIET) as quiet_buffer:
+            try:
+                with timed_step(
+                    console=console,
+                    style=output_style,
+                    timings=timings,
+                    key="baseline",
+                    tag="EXEC",
+                    message="Baseline",
+                    emoji="🏁",
+                ):
+                    _run(
+                        config=str(baseline_yaml),
+                        profile=profile,
+                        out=str(Path(out) / "source"),
+                        tier=tier,
+                        device=device,
+                        edit_label=baseline_label,
+                        style=output_style.name,
+                        progress=progress,
+                        timing=False,
+                        no_color=no_color,
+                    )
+            except Exception:
+                if quiet_buffer is not None:
+                    console.print(quiet_buffer.getvalue(), markup=False)
+                raise
+
+        baseline_report_path_candidate = _latest_run_report(Path(out) / "source")
+        if not baseline_report_path_candidate:
+            _fail("Could not locate baseline report after run", exit_code=1)
+        baseline_report_path = baseline_report_path_candidate
+        _debug(f"Baseline report: {baseline_report_path}")
 
     # Edited run: either no-op (Compare & Certify) or provided edit_config (demo edit)
     _phase(2, 3, "SUBJECT EVALUATION")
@@ -603,7 +728,7 @@ def certify_command(
                         profile=profile,
                         out=str(Path(out) / "edited"),
                         tier=tier,
-                        baseline=str(baseline_report),
+                        baseline=str(baseline_report_path),
                         device=device,
                         edit_label=subject_label if edit_label else None,
                         style=output_style.name,
@@ -649,7 +774,7 @@ def certify_command(
                         profile=profile,
                         out=str(Path(out) / "edited"),
                         tier=tier,
-                        baseline=str(baseline_report),
+                        baseline=str(baseline_report_path),
                         device=device,
                         edit_label=subject_label,
                         style=output_style.name,
@@ -692,7 +817,7 @@ def certify_command(
                     report_kwargs = {
                         "run": str(edited_report),
                         "format": "cert",
-                        "baseline": str(baseline_report),
+                        "baseline": str(baseline_report_path),
                         "output": cert_out,
                         "style": output_style.name,
                         "no_color": no_color,
