@@ -46,9 +46,9 @@ def _evaluate_certificate(cert: dict[str, Any]) -> CertOutcome:
     primary_metric = cert.get("primary_metric") or {}
     pm_degraded = False
     if isinstance(primary_metric, dict):
-        pm_degraded = _as_bool(primary_metric.get("degraded"), default=False) or _as_bool(
-            primary_metric.get("invalid"), default=False
-        )
+        pm_degraded = _as_bool(
+            primary_metric.get("degraded"), default=False
+        ) or _as_bool(primary_metric.get("invalid"), default=False)
 
     passed = (
         invariants_ok
@@ -156,6 +156,13 @@ def generate_verdict(*, output_dir: Path) -> dict[str, Any]:
         if not isinstance(cert, dict):
             continue
         outcome = _evaluate_certificate(cert)
+        if category == "error_injection" and outcome.passed:
+            invariants = cert.get("invariants")
+            status = invariants.get("status") if isinstance(invariants, dict) else None
+            if isinstance(status, str) and status.lower() != "pass":
+                outcome = CertOutcome(
+                    passed=False, reasons=outcome.reasons + ("invariants_not_pass",)
+                )
         records.append(
             {
                 "model": model_name,
@@ -188,8 +195,12 @@ def generate_verdict(*, output_dir: Path) -> dict[str, Any]:
         "catastrophic_required": [],
     }
 
-    catastrophic_records = {r["name"]: r for r in stress if r["name"] in catastrophic_required}
-    missing["catastrophic_required"] = sorted(catastrophic_required - set(catastrophic_records))
+    catastrophic_records = {
+        r["name"]: r for r in stress if r["name"] in catastrophic_required
+    }
+    missing["catastrophic_required"] = sorted(
+        catastrophic_required - set(catastrophic_records)
+    )
 
     failed_requirements: list[dict[str, Any]] = []
     if missing["clean_families"]:
@@ -244,9 +255,7 @@ def generate_verdict(*, output_dir: Path) -> dict[str, Any]:
         )
 
     catastrophic_failed = [
-        r
-        for r in stress
-        if r["name"] in catastrophic_required and r["passed"]
+        r for r in stress if r["name"] in catastrophic_required and r["passed"]
     ]
     if catastrophic_failed:
         failed_requirements.append(
@@ -379,4 +388,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
