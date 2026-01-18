@@ -77,17 +77,19 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
             },
         )
 
-    # Error injections (5) => must be detected (not PASS).
+    # Error injections (9) => must be detected (not PASS).
     for error_type in (
         "nan_injection",
         "inf_injection",
+        "shape_mismatch",
+        "missing_tensors",
         "extreme_quant",
         "scale_explosion",
+        "rank_collapse",
+        "norm_collapse",
         "weight_tying_break",
     ):
         invariants_status = "fail"
-        if error_type == "weight_tying_break":
-            invariants_status = "warn"
         _write_cert(
             model_dir / "certificates" / "errors" / error_type / "evaluation.cert.json",
             validation={
