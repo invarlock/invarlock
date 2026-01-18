@@ -70,3 +70,52 @@ def test_verify_accuracy_recompute_missing_ci_profile(tmp_path: Path) -> None:
     with pytest.raises(typer.Exit) as ei:
         verify_command([p], baseline=None, profile="ci", json_out=True)
     assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) != 0
+
+
+def test_verify_accuracy_skips_recompute_when_final_missing(
+    tmp_path: Path, capsys
+) -> None:
+    cert = {
+        "schema_version": "v1",
+        "run_id": "r",
+        "artifacts": {"generated_at": "t"},
+        "plugins": {},
+        "meta": {},
+        "dataset": {
+            "provider": "p",
+            "seq_len": 8,
+            "windows": {
+                "preview": 1,
+                "final": 1,
+                "stats": {
+                    "window_match_fraction": 1.0,
+                    "window_overlap_fraction": 0.0,
+                    "coverage": {"preview": {"used": 1}, "final": {"used": 1}},
+                    "paired_windows": 1,
+                    "window_pairing_reason": None,
+                },
+            },
+        },
+        "primary_metric": {
+            "kind": "accuracy",
+            "ratio_vs_baseline": 0.0,
+            "display_ci": [0.8, 0.8],
+        },
+        "metrics": {"classification": {"n_correct": 8, "n_total": 10}},
+        "baseline_ref": {"primary_metric": {"kind": "accuracy", "final": 0.8}},
+        "validation": {
+            "primary_metric_acceptable": True,
+            "preview_final_drift_acceptable": True,
+            "invariants_pass": True,
+            "spectral_stable": True,
+            "rmt_stable": True,
+        },
+    }
+    p = _write(tmp_path / "c.json", cert)
+
+    with pytest.raises(typer.Exit) as ei:
+        verify_command([p], baseline=None, profile="dev", json_out=True)
+
+    out = json.loads(capsys.readouterr().out)
+    assert out["resolution"]["exit_code"] == 0
+    assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 0
