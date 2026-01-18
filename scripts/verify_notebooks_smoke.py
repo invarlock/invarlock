@@ -164,9 +164,10 @@ def run_script(*, script_path: Path, cwd: Path, timeout_s: int) -> None:
     env = _env_for_run()
     stdout_path = cwd / "stdout.txt"
     stderr_path = cwd / "stderr.txt"
-    with stdout_path.open("w", encoding="utf-8") as out, stderr_path.open(
-        "w", encoding="utf-8"
-    ) as err:
+    with (
+        stdout_path.open("w", encoding="utf-8") as out,
+        stderr_path.open("w", encoding="utf-8") as err,
+    ):
         proc = subprocess.run(
             [sys.executable, str(script_path)],
             cwd=str(cwd),

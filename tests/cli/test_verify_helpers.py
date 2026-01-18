@@ -186,6 +186,33 @@ def test_validate_drift_band_boundaries_and_missing_values() -> None:
     )
 
 
+def test_validate_drift_band_parses_override_shapes() -> None:
+    verify_mod = _import_verify_module()
+
+    cert_dict = {
+        "primary_metric": {
+            "preview": 10.0,
+            "final": 12.0,
+            "drift_band": {"min": 0.9, "max": 1.3},
+        }
+    }
+    assert verify_mod._validate_drift_band(cert_dict) == []
+
+    cert_list = {
+        "primary_metric": {"preview": 10.0, "final": 12.0, "drift_band": [0.9, 1.3]}
+    }
+    assert verify_mod._validate_drift_band(cert_list) == []
+
+    cert_invalid = {
+        "primary_metric": {
+            "preview": 10.0,
+            "final": 12.0,
+            "drift_band": {"min": "bad", "max": "1.3"},
+        }
+    }
+    assert verify_mod._validate_drift_band(cert_invalid)
+
+
 def test_coercion_helpers_and_measurement_contract_digest() -> None:
     verify_mod = _import_verify_module()
 
