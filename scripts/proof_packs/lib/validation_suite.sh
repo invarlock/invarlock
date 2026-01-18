@@ -22,7 +22,7 @@
 # 1. Optional preflight to pin model revisions
 # 2. Launch models across available GPUs
 # 3. Each GPU runs: calibration → edits → error injection
-# 4. Correlation analysis (lm-eval vs InvarLock) → verdict
+# 4. Compile reports → final verdict
 # ==========================================================
 
 # Dynamic scheduling is always enabled.

@@ -23,7 +23,7 @@ Options:
   --determinism MODE   Determinism mode (strict|throughput)
   --repeats N          Determinism repeat count metadata (default: 0)
   --calibrate-only     Only run calibration tasks (implies PACK_SUITE_MODE=calibrate-only)
-  --run-only           Run edits/evals only (implies resume)
+  --run-only           Run edits/certs only (implies resume)
   --resume             Resume an existing run directory
   --help               Show this help message
 EOF
@@ -41,12 +41,10 @@ pack_apply_entrypoint_determinism() {
     export PACK_DETERMINISM
 
     if [[ "${PACK_DETERMINISM}" == "strict" ]]; then
-        export LMEVAL_TORCH_COMPILE=0
         export NVIDIA_TF32_OVERRIDE=0
         export CUDNN_BENCHMARK=0
         export CUBLAS_WORKSPACE_CONFIG=:4096:8
     else
-        export LMEVAL_TORCH_COMPILE=1
         export NVIDIA_TF32_OVERRIDE=1
         export CUDNN_BENCHMARK=1
         unset CUBLAS_WORKSPACE_CONFIG 2>/dev/null || true

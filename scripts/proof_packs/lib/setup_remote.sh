@@ -115,12 +115,12 @@ PY
 }
 
 install_invarlock_stack() {
-    log "Installing InvarLock + eval stack"
+    log "Installing InvarLock + proof pack dependencies"
     pack_activate_venv
     cd "${REPO_DIR}"
 
     pack_run_cmd python -m pip install -e ".[hf]"
-    pack_run_cmd python -m pip install lm_eval accelerate sentencepiece protobuf safetensors
+    pack_run_cmd python -m pip install accelerate sentencepiece protobuf safetensors
 }
 
 post_setup() {
