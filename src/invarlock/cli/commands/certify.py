@@ -563,6 +563,20 @@ def certify_command(
                 "context": {"profile": profile, "tier": tier},
             },
         )
+        # Ensure the edited run always has a guard chain. Presets/edit configs
+        # often omit it, but `invarlock run` expects guards.order.
+        guards_block = merged_edited_cfg.get("guards")
+        guards_order_cfg = (
+            guards_block.get("order") if isinstance(guards_block, dict) else None
+        )
+        if not (
+            isinstance(guards_order_cfg, list)
+            and guards_order_cfg
+            and all(isinstance(item, str) for item in guards_order_cfg)
+        ):
+            merged_edited_cfg = _merge(
+                merged_edited_cfg, {"guards": {"order": guards_order}}
+            )
 
         # Persist a temporary merged config for traceability
         tmp_dir = Path(".certify_tmp")
