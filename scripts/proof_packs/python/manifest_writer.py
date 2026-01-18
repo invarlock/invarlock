@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -103,7 +103,7 @@ def write_manifest(
 
     payload: dict[str, Any] = {
         "format": "proof-pack-v1",
-        "generated_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "suite": suite,
         "network_mode": "online"
         if str(net) in {"1", "true", "yes", "on"}
