@@ -6,7 +6,9 @@ from pathlib import Path
 from typing import Any
 
 
-def _write_cert(path: Path, *, validation: dict[str, Any], degraded: bool = False) -> None:
+def _write_cert(
+    path: Path, *, validation: dict[str, Any], degraded: bool = False
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload: dict[str, Any] = {
         "validation": validation,
@@ -100,4 +102,3 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
     verdict_path = output_dir / "reports" / "final_verdict.json"
     verdict = json.loads(verdict_path.read_text(encoding="utf-8"))
     assert verdict["verdict"] == "PASS"
-

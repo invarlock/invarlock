@@ -12,9 +12,9 @@ def test_error_injection_set_includes_weight_tying_break() -> None:
     queue_manager = (repo_root / "scripts/proof_packs/lib/queue_manager.sh").read_text(
         encoding="utf-8"
     )
-    internals_doc = (
-        repo_root / "docs/user-guide/proof-packs-internals.md"
-    ).read_text(encoding="utf-8")
+    internals_doc = (repo_root / "docs/user-guide/proof-packs-internals.md").read_text(
+        encoding="utf-8"
+    )
 
     assert "weight_tying_break" in validation_suite
     assert "weight_tying_break" in queue_manager
@@ -23,4 +23,3 @@ def test_error_injection_set_includes_weight_tying_break() -> None:
     assert "zero_layer" not in validation_suite
     assert "zero_layer" not in queue_manager
     assert "zero_layer" not in internals_doc
-
