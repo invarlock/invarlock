@@ -116,7 +116,7 @@ def _stub_certificate_extractors(
         cert, "_extract_dataset_info", lambda *_: deepcopy(dataset_info), raising=False
     )
     monkeypatch.setattr(
-        cert, "_extract_invariants", lambda *_: invariants, raising=False
+        cert, "_extract_invariants", lambda *args, **kwargs: invariants, raising=False
     )
     monkeypatch.setattr(
         cert, "_extract_spectral_analysis", lambda *_: spectral, raising=False
@@ -309,7 +309,7 @@ def test_make_certificate_populates_optional_sections(monkeypatch):
         cert, "_extract_dataset_info", lambda *_: deepcopy(dataset_info), raising=False
     )
     monkeypatch.setattr(
-        cert, "_extract_invariants", lambda *_: invariants, raising=False
+        cert, "_extract_invariants", lambda *args, **kwargs: invariants, raising=False
     )
     monkeypatch.setattr(
         cert, "_extract_spectral_analysis", lambda *_: spectral, raising=False
