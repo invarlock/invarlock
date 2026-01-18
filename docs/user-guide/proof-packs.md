@@ -70,14 +70,14 @@ Proof packs require pinned model revisions for reproducibility:
 A suite run writes artifacts under `OUTPUT_DIR` (default: `./proof_pack_runs/<suite>_<timestamp>`):
 
 - `reports/final_verdict.txt` + `reports/final_verdict.json`
-- `analysis/eval_results.csv` + `analysis/guard_sensitivity_matrix.csv`
+- `analysis/determinism_repeats.json` (when `--repeats` is used)
 - `*/certificates/**/evaluation.cert.json`
 
 `run_pack.sh` copies curated artifacts into a pack directory (default
 `OUTPUT_DIR/proof_pack`) and organizes them as:
 
 - `results/final_verdict.txt` + `results/final_verdict.json`
-- `results/eval_results.csv` + `results/guard_sensitivity_matrix.csv` (if present)
+- `results/**/determinism_repeats.json` (if present)
 - `certs/<model>/<edit>/<run>/evaluation.cert.json`
 - `certs/**/evaluation.html` + `certs/**/verify.json`
 - `README.md`, `manifest.json`, `checksums.sha256`
