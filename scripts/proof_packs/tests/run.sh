@@ -54,6 +54,7 @@ REAL_PYTHON3="$(command -v python3 2>/dev/null || true)"
 coverage_owner_hint() {
     local rel="$1"
     case "${rel}" in
+        scripts/proof_packs/lib/config_generator.sh) echo "scripts/proof_packs/tests/test_config_generator.sh" ;;
         scripts/proof_packs/lib/task_serialization.sh) echo "scripts/proof_packs/tests/test_task_serialization.sh" ;;
         scripts/proof_packs/lib/queue_manager.sh) echo "scripts/proof_packs/tests/test_queue_manager.sh" ;;
         scripts/proof_packs/lib/scheduler.sh) echo "scripts/proof_packs/tests/test_scheduler.sh" ;;
@@ -542,8 +543,10 @@ function ends_with_backslash(s) {
 	    if (tmp !~ /(^|[[:space:]])[A-Za-z_][A-Za-z0-9_]*(\+)?=[[:space:]]*\(/) return 0
 	    # Single-line array literal (closes on the same line) is traced on this line.
 	    if (tmp ~ /\)[[:space:]]*$/) return 0
-	    # Multi-line array literal: bash xtrace attributes to the closing ")" line.
-	    return 1
+	    # Multi-line array literal: bash xtrace attribution differs depending on whether the
+	    # assignment is wrapped in `local`/`declare` (which traces the opener line).
+	    if (tmp ~ /^(local|declare|typeset)[[:space:]]/) return 1
+	    return 2
 	}
 	function find_multiline_quote_start(s,    i, ch, prev, state, start, kind) {
 	    state = 0
@@ -575,14 +578,11 @@ function ends_with_backslash(s) {
 	    if (state != 0 && start > 0) return start "\t" kind
 	    return ""
 	}
-	function should_shift_quote_to_close(line, start,    prev_ch, prefix) {
-	    if (start <= 1) return 1
+	function should_shift_quote_to_close(line, start,    prev_ch) {
+	    if (start <= 1) return 0
 	    prev_ch = substr(line, start - 1, 1)
 	    # Quotes that begin mid-word (e.g., var='a\nb') are attributed to the closing line.
-	    if (prev_ch !~ /[[:space:]]/) return 1
-	    # Quotes that begin as the first argument (cmd 'a\nb') are attributed to the closing line.
-	    prefix = trim(substr(line, 1, start - 1))
-	    return (prefix != "" && prefix !~ /[[:space:]]/)
+	    return (prev_ch !~ /[[:space:]]/)
 	}
 	function update_quote_state(s,    i, ch, prev) {
 	    for (i = 1; i <= length(s); i++) {
@@ -602,8 +602,8 @@ function ends_with_backslash(s) {
         if (ch == "'\''") { sq = 1; continue }
         if (ch == "\"") { dq = 1; continue }
 
-        # Multi-line command substitutions: xtrace attributes the enclosing command to the line
-        # where the "$(" closes. Track depth across lines so we can inventory the closing line.
+        # Track multi-line command substitutions across lines; xtrace attribution depends on
+        # whether the opener is wrapped in `local`/`declare` (see END block logic).
         if (ch == "$" && i < length(s) && substr(s, i + 1, 1) == "(") {
             # Ignore arithmetic expansion "$((".
             if (i + 2 <= length(s) && substr(s, i + 2, 1) == "(") continue
@@ -623,16 +623,17 @@ function ends_with_backslash(s) {
         }
     }
 }
-BEGIN {
-    OFS = "\t"
-    sq = 0
-    dq = 0
-    cmdsub_depth = 0
-    hd_active = 0
-    hd_pending = 0
-    hd_delim = ""
-    hd_strip_tabs = 0
-}
+	BEGIN {
+	    OFS = "\t"
+	    sq = 0
+	    dq = 0
+	    cmdsub_depth = 0
+	    cmdsub_trace_mode = 0
+	    hd_active = 0
+	    hd_pending = 0
+	    hd_delim = ""
+	    hd_strip_tabs = 0
+	}
 {
     line = $0
     lines[NR] = line
@@ -681,6 +682,7 @@ BEGIN {
 		    cont_mode = 0
 		    quote_shift = 0
 		    in_array = 0
+		    array_trace_close = 0
 		    in_proc_sub = 0
 
 	    for (i = 1; i <= NR; i++) {
@@ -706,8 +708,6 @@ BEGIN {
         }
 
 	        if (in_array) {
-	            # For multi-line array literals, bash xtrace attributes the assignment to the
-	            # line where the array closes (a line ending with ")").
 	            if (t == "" || t ~ /^#/) {
 	                update_quote_state(line)
 	                continue
@@ -716,8 +716,11 @@ BEGIN {
 	            sub(/[[:space:]]+#.*/, "", t2)
 	            t2 = trim(t2)
 	            if (t2 ~ /\)[[:space:]]*$/) {
-	                print rel ":" i, rel, i, hint
+	                if (array_trace_close) {
+	                    print rel ":" i, rel, i, hint
+	                }
 	                in_array = 0
+	                array_trace_close = 0
 	            }
 	            update_quote_state(line)
 	            continue
@@ -728,9 +731,27 @@ BEGIN {
 	        prev_cmdsub = cmdsub_depth
 	        update_quote_state(line)
 
-	        # Multi-line "$(" ... ")" command substitutions: inventory the closing line.
+	        # Multi-line "$(" ... ")" command substitutions: inventory either the opener line
+	        # (for `local`/`declare` assignments) or the closing line (default).
+	        if (prev_cmdsub == 0 && cmdsub_depth > 0) {
+	            cmdsub_trace_mode = 2
+	            t_cmd = trim(line)
+	            sub(/[[:space:]]+#.*/, "", t_cmd)
+	            t_cmd = trim(t_cmd)
+		            if (t_cmd ~ /^(local|declare|typeset)[[:space:]]/ && t_cmd ~ /=[[:space:]]*[$][(]/) {
+	                cmdsub_trace_mode = 1
+	                if (t != "" && t !~ /^#/ && !is_keyword_only(line) && !(is_case_pattern_line(line) && !case_pattern_has_inline_cmd(line)) && !is_function_def_line(line)) {
+	                    print rel ":" i, rel, i, hint
+	                }
+	            }
+	            cont_mode = 0
+	            continue
+	        }
 	        if (prev_cmdsub > 0 && cmdsub_depth == 0) {
-	            print rel ":" i, rel, i, hint
+	            if (cmdsub_trace_mode == 2) {
+	                print rel ":" i, rel, i, hint
+	            }
+	            cmdsub_trace_mode = 0
 	            cont_mode = 0
 	            quote_shift = 0
 	            continue
@@ -769,16 +790,8 @@ BEGIN {
 	            continue
 	        }
 
-	        # Backslash continuations: when the opener line is just the command word ("cmd \"),
-	        # bash xtrace attributes to the first continuation line; otherwise it attributes
-	        # to the opener line.
+	        # Backslash continuations: bash xtrace attributes to the opener line.
 	        if (cont_mode != 0) {
-	            if (cont_mode == 2) {
-	                if (t != "" && t !~ /^#/ && !is_keyword_only(line) && !(is_case_pattern_line(line) && !case_pattern_has_inline_cmd(line)) && !is_function_def_line(line)) {
-	                    print rel ":" i, rel, i, hint
-	                    cont_mode = 1
-	                }
-	            }
 	            if (!ends_with_backslash(line)) cont_mode = 0
 	            continue
 	        }
@@ -788,29 +801,21 @@ BEGIN {
 	        if (is_case_pattern_line(line) && !case_pattern_has_inline_cmd(line)) continue
 	        if (is_function_def_line(line)) continue
 
-	        if (is_array_start(line)) {
+	        arr_mode = is_array_start(line)
+	        if (arr_mode != 0) {
+	            if (arr_mode == 1) {
+	                print rel ":" i, rel, i, hint
+	                array_trace_close = 0
+	            } else {
+	                array_trace_close = 1
+	            }
 	            in_array = 1
 	            continue
 	        }
 
 	        if (ends_with_backslash(line)) {
-	            base = trim(line)
-	            sub(/\\[[:space:]]*$/, "", base)
-	            base = trim(base)
-	            while (base ~ /^if[[:space:]]+/) sub(/^if[[:space:]]+/, "", base)
-	            while (base ~ /^![[:space:]]+/) sub(/^![[:space:]]+/, "", base)
-	            if (base !~ /[[:space:]]/) {
-	                # "NAME=value \\" env assignments are traced at the opener line (not the first continuation).
-	                if (base ~ /^[A-Za-z_][A-Za-z0-9_]*=/) {
-	                    print rel ":" i, rel, i, hint
-	                    cont_mode = 1
-	                } else {
-	                    cont_mode = 2
-	                }
-	            } else {
-	                print rel ":" i, rel, i, hint
-	                cont_mode = 1
-	            }
+	            print rel ":" i, rel, i, hint
+	            cont_mode = 1
 	            continue
 	        }
 
@@ -904,10 +909,10 @@ run_one_test() {
     trace_file="${tmp_dir}/xtrace.log"
     local rc=0
 
-    if [[ "${DO_BRANCH_COVERAGE}" == "true" || "${DO_LINE_COVERAGE}" == "true" ]]; then
-        bash -c '
-set -euo pipefail
-cd "$1"
+	if [[ "${DO_BRANCH_COVERAGE}" == "true" || "${DO_LINE_COVERAGE}" == "true" ]]; then
+	    bash -c '
+	set -euo pipefail
+	cd "$1"
 export TEST_ROOT="."
 export TEST_TMPDIR="$2"
 export TEST_REAL_PYTHON3="$3"
@@ -918,11 +923,11 @@ source "$6"
 # Note: bash 3.2 truncates long PS4 expansions; we rely on shorter prod script paths
 # and ignore malformed trace lines from very long absolute paths (e.g., temp dirs).
 export PS4="__XTRACE__:\${BASH_SOURCE[0]:-}:\${LINENO}: "
-set -x
-"$7"
-        ' -- "${ROOT_DIR}" "${tmp_dir}" "${REAL_PYTHON3}" "${MOCK_BIN_DIR}" "${HELPERS_SH}" "${file}" "${fn}" >"${out_file}" 2>"${err_file}"
-        rc=$?
-        if [[ ${rc} -eq 0 ]]; then
+	set -x
+	"$7"
+	        ' -- "${ROOT_DIR}" "${tmp_dir}" "${REAL_PYTHON3}" "${MOCK_BIN_DIR}" "${HELPERS_SH}" "${file}" "${fn}" >"${out_file}" 2>"${err_file}" </dev/null
+	    rc=$?
+	    if [[ ${rc} -eq 0 ]]; then
             local safe_id trace_copy
             safe_id="$(echo "${id}" | tr -c 'A-Za-z0-9._-' '_')"
             trace_copy="${COVERAGE_DIR}/trace_${safe_id}.log"
@@ -933,20 +938,20 @@ set -x
             echo "ok  ${id}"
             return 0
         fi
-    else
-        bash -c '
-set -euo pipefail
-cd "$1"
+	else
+	    bash -c '
+	set -euo pipefail
+	cd "$1"
 export TEST_ROOT="."
 export TEST_TMPDIR="$2"
 export TEST_REAL_PYTHON3="$3"
 export PATH="$4:$PATH"
-source "$5"
-source "$6"
-"$7"
-        ' -- "${ROOT_DIR}" "${tmp_dir}" "${REAL_PYTHON3}" "${MOCK_BIN_DIR}" "${HELPERS_SH}" "${file}" "${fn}" >"${out_file}" 2>"${err_file}"
-        rc=$?
-        if [[ ${rc} -eq 0 ]]; then
+	source "$5"
+	source "$6"
+	"$7"
+	        ' -- "${ROOT_DIR}" "${tmp_dir}" "${REAL_PYTHON3}" "${MOCK_BIN_DIR}" "${HELPERS_SH}" "${file}" "${fn}" >"${out_file}" 2>"${err_file}" </dev/null
+	    rc=$?
+	    if [[ ${rc} -eq 0 ]]; then
             rm -rf "${tmp_dir}"
             echo "ok  ${id}"
             return 0

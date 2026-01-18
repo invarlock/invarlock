@@ -542,6 +542,57 @@ test_generate_model_tasks_sanitizes_invalid_calibration_runs() {
     assert_eq "5" "${cal_count}" "invalid calibration runs default to 5"
 }
 
+test_generate_model_tasks_disables_batch_for_large_memory_and_uses_manifest_fallbacks() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
+
+    local calls="${TEST_TMPDIR}/calls"
+    : > "${calls}"
+
+    add_task() {
+        local task_type="$1"
+        local deps="$5"
+        local params_json="$6"
+        printf '%s|%s|%s\n' "${task_type}" "${deps}" "${params_json}" >> "${calls}"
+        local count
+        count=$(wc -l < "${calls}" | tr -d ' ')
+        echo "t${count}"
+    }
+
+    # Simulate a large model memory estimate (>=170GB) without tripping the name heuristics.
+    estimate_model_memory() { echo "200"; }
+
+    # Force manifest fallbacks by making `command -v jq` report jq missing.
+    command() {
+        if [[ "${1:-}" == "-v" && "${2:-}" == "jq" ]]; then
+            return 1
+        fi
+        builtin command "$@"
+    }
+
+    CLEAN_EDIT_RUNS=1
+    STRESS_EDIT_RUNS=1
+    DRIFT_CALIBRATION_RUNS=0
+    PACK_PRESET_READY=1
+    RUN_ERROR_INJECTION=true
+    export CLEAN_EDIT_RUNS STRESS_EDIT_RUNS DRIFT_CALIBRATION_RUNS PACK_PRESET_READY RUN_ERROR_INJECTION
+
+    generate_model_tasks "1" "org/Thing-40B" "model" >/dev/null
+
+    local all_calls
+    all_calls="$(cat "${calls}")"
+    [[ "${all_calls}" != *"CREATE_EDITS_BATCH"* ]] || t_fail "expected large memory to disable batch edits"
+    assert_match "CREATE_EDIT\\|" "${all_calls}" "per-edit create tasks emitted"
+
+    # preset_ready=1 should be normalized to true so certify tasks are emitted even with DRIFT_CALIBRATION_RUNS=0.
+    assert_match "CERTIFY_EDIT\\|" "${all_calls}" "certify tasks emitted when preset_ready=1"
+
+    # scenarios.json + jq fallback defaults should be used.
+    assert_match "quant_rtn:clean:ffn" "${all_calls}" "fallback clean edit spec used"
+    assert_match "weight_tying_break" "${all_calls}" "fallback error type used"
+}
+
 test_generate_edit_tasks_sanitizes_cert_runs() {
     mock_reset
     # shellcheck source=../queue_manager.sh
@@ -559,39 +610,33 @@ test_generate_edit_tasks_sanitizes_cert_runs() {
     }
     estimate_model_memory() { echo "14"; }
 
-    : > "${calls}"
-    generate_eval_certify_tasks "m" "n" "batch" "preset" "spec" "clean" "bad" >/dev/null
-    local eval_count
     local cert_count
-    eval_count="$(awk '/^EVAL_/ {c++} END {print c+0}' "${calls}")"
     cert_count="$(awk '/^CERTIFY_EDIT$/ {c++} END {print c+0}' "${calls}")"
-    assert_eq "4" "${eval_count}" "eval tasks created for split benchmarks"
+    assert_eq "0" "${cert_count}" "precondition: no certify tasks yet"
+
+    : > "${calls}"
+    generate_certify_tasks "m" "n" "edit" "preset" "spec" "clean" "bad" >/dev/null
+    cert_count="$(awk '/^CERTIFY_EDIT$/ {c++} END {print c+0}' "${calls}")"
     assert_eq "1" "${cert_count}" "invalid cert_runs defaults to 1"
 
     : > "${calls}"
-    generate_eval_certify_tasks "m" "n" "batch" "preset" "spec" "clean" "-2" >/dev/null
-    eval_count="$(awk '/^EVAL_/ {c++} END {print c+0}' "${calls}")"
+    generate_certify_tasks "m" "n" "edit" "preset" "spec" "clean" "-2" >/dev/null
     cert_count="$(awk '/^CERTIFY_EDIT$/ {c++} END {print c+0}' "${calls}")"
-    assert_eq "4" "${eval_count}" "eval tasks still created when cert_runs negative"
     assert_eq "0" "${cert_count}" "negative cert_runs clamps to 0"
 
     : > "${calls}"
     generate_edit_tasks "m" "n" "setup" "preset" "spec" "clean" "bad" >/dev/null
-    eval_count="$(awk '/^EVAL_/ {c++} END {print c+0}' "${calls}")"
     cert_count="$(awk '/^CERTIFY_EDIT$/ {c++} END {print c+0}' "${calls}")"
     local create_count
     create_count="$(awk '/^CREATE_EDIT$/ {c++} END {print c+0}' "${calls}")"
     assert_eq "1" "${create_count}" "create_edit task still created"
-    assert_eq "1" "${eval_count}" "eval_edit created"
     assert_eq "1" "${cert_count}" "invalid cert_runs defaults to 1"
 
     : > "${calls}"
     generate_edit_tasks "m" "n" "setup" "preset" "spec" "clean" "-1" >/dev/null
-    eval_count="$(awk '/^EVAL_/ {c++} END {print c+0}' "${calls}")"
     cert_count="$(awk '/^CERTIFY_EDIT$/ {c++} END {print c+0}' "${calls}")"
     create_count="$(awk '/^CREATE_EDIT$/ {c++} END {print c+0}' "${calls}")"
     assert_eq "1" "${create_count}" "create_edit task created with negative cert_runs"
-    assert_eq "1" "${eval_count}" "eval_edit task created with negative cert_runs"
     assert_eq "0" "${cert_count}" "negative cert_runs clamps to 0"
 }
 
@@ -788,7 +833,7 @@ test_check_dependencies_met_returns_nonzero_when_task_file_missing() {
     assert_rc "1" "${RUN_RC}" "missing task file treated as unmet dependencies"
 }
 
-test_generate_eval_certify_tasks_and_generate_edit_tasks_create_expected_tasks() {
+test_generate_certify_tasks_and_generate_edit_tasks_create_expected_tasks() {
     mock_reset
     # shellcheck source=../queue_manager.sh
     source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
@@ -800,20 +845,19 @@ test_generate_eval_certify_tasks_and_generate_edit_tasks_create_expected_tasks()
     init_queue "${out_dir}" >/dev/null
 
     local out
-    out="$(generate_eval_certify_tasks "org/model" "m" "batch1" "preset1" "quant_rtn:8:128:ffn" "clean" "1")"
-    assert_match 'Created: ' "${out}" "creates eval/certify tasks"
+    out="$(generate_certify_tasks "org/model" "m" "edit1" "preset1" "quant_rtn:8:128:ffn" "clean" "1")"
+    assert_match 'Created: ' "${out}" "creates certify tasks"
 
     local pending_count
     pending_count="$(ls "${QUEUE_DIR}/pending"/*.task 2>/dev/null | wc -l | tr -d ' ')"
-    assert_eq "5" "${pending_count}" "4 split eval + 1 certify task"
+    assert_eq "1" "${pending_count}" "creates 1 certify task"
 
     local task_file task_type version
     for task_file in "${QUEUE_DIR}/pending"/*.task; do
         task_type="$(jq -r '.task_type' "${task_file}")"
-        if [[ "${task_type}" == EVAL_* ]]; then
-            version="$(jq -r '.params.version // ""' "${task_file}")"
-            assert_eq "clean" "${version}" "split eval tasks carry version hint"
-        fi
+        assert_eq "CERTIFY_EDIT" "${task_type}" "certify task type"
+        version="$(jq -r '.params.version // ""' "${task_file}")"
+        assert_eq "clean" "${version}" "certify task carries version hint"
     done
 
     run generate_edit_tasks "org/model" "m" "setup1" "preset1" "quant_rtn:8:128:ffn" "clean" "1"

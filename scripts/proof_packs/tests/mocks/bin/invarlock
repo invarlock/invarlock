@@ -41,9 +41,15 @@ get_flag_val() {
 case "${subcmd}" in
     run)
         out_dir="$(get_flag_val --out "$@" || true)"
-        if [[ -n "${out_dir:-}" && -n "${TEST_TMPDIR:-}" && -f "${fixtures}/invarlock.create_report" ]]; then
-            mkdir -p "${out_dir}"
-            printf '{"ok":true}\n' > "${out_dir}/report.json"
+        if [[ -n "${out_dir:-}" && -n "${TEST_TMPDIR:-}" ]]; then
+            if [[ -f "${fixtures}/invarlock.create_report_nested" ]]; then
+                nested_dir="${out_dir}/run_1"
+                mkdir -p "${nested_dir}"
+                printf '{"ok":true}\n' > "${nested_dir}/report.json"
+            elif [[ -f "${fixtures}/invarlock.create_report" ]]; then
+                mkdir -p "${out_dir}"
+                printf '{"ok":true}\n' > "${out_dir}/report.json"
+            fi
         fi
         ;;
     certify)

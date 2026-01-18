@@ -11,9 +11,8 @@ test_run_pack_build_pack_collects_artifacts() {
 
     echo "verdict" > "${run_dir}/reports/final_verdict.txt"
     echo "{}" > "${run_dir}/reports/final_verdict.json"
-    echo "model,score" > "${run_dir}/analysis/eval_results.csv"
-    echo "model,metric" > "${run_dir}/analysis/guard_sensitivity_matrix.csv"
     echo '{"model_list": ["org/model"], "models": {"org/model": {"revision": "abc"}}}' > "${run_dir}/state/model_revisions.json"
+    echo '{"schema":"proof_pack_scenarios_v1","schema_version":1,"scenarios":[]}' > "${run_dir}/state/scenarios.json"
     echo "{}" > "${run_dir}/modelA/certificates/edit/run_1/evaluation.cert.json"
 
     local bin_dir="${TEST_TMPDIR}/bin"
@@ -60,7 +59,8 @@ EOF
     pack_build_pack "${run_dir}" "${pack_dir}"
 
     assert_file_exists "${pack_dir}/results/final_verdict.txt" "verdict copied"
-    assert_file_exists "${pack_dir}/results/eval_results.csv" "eval results copied"
+    assert_file_exists "${pack_dir}/state/model_revisions.json" "revisions copied"
+    assert_file_exists "${pack_dir}/state/scenarios.json" "scenarios manifest copied"
     assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/evaluation.cert.json" "cert copied"
     assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/verify.json" "verify output captured"
     assert_file_exists "${pack_dir}/manifest.json" "manifest written"
@@ -80,8 +80,8 @@ test_run_pack_build_pack_layout_v2_nests_results_and_metadata() {
 
     echo "verdict" > "${run_dir}/reports/final_verdict.txt"
     echo "{}" > "${run_dir}/reports/final_verdict.json"
-    echo "model,score" > "${run_dir}/analysis/eval_results.csv"
     echo '{"model_list": ["org/model"], "models": {"org/model": {"revision": "abc"}}}' > "${run_dir}/state/model_revisions.json"
+    echo '{"schema":"proof_pack_scenarios_v1","schema_version":1,"scenarios":[]}' > "${run_dir}/state/scenarios.json"
     echo "{}" > "${run_dir}/modelA/certificates/edit/run_1/evaluation.cert.json"
 
     local bin_dir="${TEST_TMPDIR}/bin"
@@ -124,16 +124,44 @@ EOF
 
     PACK_GPG_SIGN=0
     PACK_PACK_LAYOUT="v2"
+    pack_sign_manifest() {
+        local pack_dir="$1"
+        echo "sig" > "${pack_dir}/manifest.json.asc"
+    }
 
     local pack_dir="${TEST_TMPDIR}/pack"
     pack_build_pack "${run_dir}" "${pack_dir}"
 
     assert_file_exists "${pack_dir}/results/verdicts/final_verdict.txt" "verdict nested"
-    assert_file_exists "${pack_dir}/results/analysis/eval_results.csv" "eval results nested"
     assert_file_exists "${pack_dir}/metadata/model_revisions.json" "revisions moved to metadata"
+    assert_file_exists "${pack_dir}/metadata/scenarios.json" "scenarios manifest moved to metadata"
     assert_file_exists "${pack_dir}/metadata/manifest.json" "manifest copied to metadata"
+    assert_file_exists "${pack_dir}/metadata/manifest.json.asc" "manifest signature copied to metadata"
     assert_file_exists "${pack_dir}/metadata/checksums.sha256" "checksums copied to metadata"
     [[ ! -f "${pack_dir}/results/final_verdict.txt" ]] || t_fail "legacy verdict path should not exist under v2 layout"
+}
+
+test_run_pack_build_pack_rejects_unknown_layout() {
+    mock_reset
+
+    source ./scripts/proof_packs/run_pack.sh
+
+    local run_dir="${TEST_TMPDIR}/run"
+    mkdir -p "${run_dir}"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/invarlock" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+    chmod +x "${bin_dir}/invarlock"
+    PATH="${bin_dir}:${PATH}"
+    export PATH
+
+    PACK_PACK_LAYOUT="nope"
+    run pack_build_pack "${run_dir}" "${TEST_TMPDIR}/pack"
+    assert_rc "2" "${RUN_RC}" "unknown layout returns 2"
 }
 
 test_run_pack_build_pack_ignores_error_injection_verify_failures() {
@@ -475,6 +503,9 @@ test_run_pack_entrypoint_errors_on_invalid_args() {
     run pack_run_pack --pack-dir
     assert_rc "2" "${RUN_RC}" "missing pack-dir value"
 
+    run pack_run_pack --layout
+    assert_rc "2" "${RUN_RC}" "missing layout value"
+
     run pack_run_pack --determinism
     assert_rc "2" "${RUN_RC}" "missing determinism value"
 
@@ -497,9 +528,10 @@ test_run_pack_entrypoint_parses_suite_determinism_and_repeats() {
     pack_entrypoint() { printf '%s\n' "$@" > "${TEST_TMPDIR}/run.args"; }
     pack_build_pack() { :; }
 
-    pack_run_pack --suite full --net 1 --determinism strict --repeats 2 --out "${TEST_TMPDIR}/out"
+    pack_run_pack --suite full --net 1 --layout v2 --determinism strict --repeats 2 --out "${TEST_TMPDIR}/out"
 
     assert_match "--suite[[:space:]]+full" "$(cat "${TEST_TMPDIR}/run.args")" "suite forwarded"
+    assert_eq "v2" "${PACK_PACK_LAYOUT}" "layout forwarded"
     assert_match "--determinism[[:space:]]+strict" "$(cat "${TEST_TMPDIR}/run.args")" "determinism forwarded"
     assert_match "--repeats[[:space:]]+2" "$(cat "${TEST_TMPDIR}/run.args")" "repeats forwarded"
 }
