@@ -116,6 +116,14 @@ def _certify_lazy(
     edited: str = typer.Option(
         ..., "--edited", "--subject", help="Subject model dir or Hub ID"
     ),
+    baseline_report: str | None = typer.Option(
+        None,
+        "--baseline-report",
+        help=(
+            "Reuse an existing baseline run report.json (skips baseline evaluation). "
+            "Must include stored evaluation windows (e.g., set INVARLOCK_STORE_EVAL_WINDOWS=1)."
+        ),
+    ),
     adapter: str = typer.Option(
         "auto", "--adapter", help="Adapter name or 'auto' to resolve"
     ),
@@ -170,6 +178,7 @@ def _certify_lazy(
     return _cert(
         source=source,
         edited=edited,
+        baseline_report=baseline_report,
         adapter=adapter,
         device=device,
         profile=profile,
