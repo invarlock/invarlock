@@ -54,6 +54,10 @@ EOF
     export PATH="${bin_dir}:${PATH}"
 
     PACK_GPG_SIGN=0
+    # run_suite.sh/validation_suite.sh may clobber SCRIPT_DIR at runtime; ensure
+    # run_pack.sh packaging does not depend on it.
+    SCRIPT_DIR="${TEST_TMPDIR}/bogus"
+    export SCRIPT_DIR
 
     local pack_dir="${TEST_TMPDIR}/pack"
     pack_build_pack "${run_dir}" "${pack_dir}"
