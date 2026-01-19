@@ -189,26 +189,16 @@ pack_load_model_revisions() {
     if [[ -f "${path}" ]]; then
         PACK_MODEL_REVISIONS_FILE="${path}"
         export PACK_MODEL_REVISIONS_FILE
+        local gated_models
+        if ! gated_models="$(
+            jq -r '.models | to_entries[]? | select((.value.gated==true) or (.value.private==true)) | .key' \
+                "${path}" 2>/dev/null
+        )"; then
+            echo "ERROR: Failed to parse model revisions file: ${path}" >&2
+            return 1
+        fi
         local gated
-        gated=$(python3 - "${path}" <<'PY' 2>/dev/null || echo "1"
-import json
-import os
-import sys
-
-path = sys.argv[1]
-try:
-    data = json.loads(open(path).read())
-except Exception:
-    raise SystemExit(1)
-
-models = data.get("models", {})
-for model_id, entry in models.items():
-    if entry.get("gated") or entry.get("private"):
-        print(model_id)
-        raise SystemExit(0)
-print("")
-PY
-)
+        gated="$(printf '%s\n' "${gated_models}" | head -n 1)"
         if [[ -n "${gated}" ]]; then
             echo "ERROR: model_revisions.json includes gated/private models; proof packs require ungated models." >&2
             return 1
@@ -223,20 +213,7 @@ pack_model_revision() {
     local path
     path="$(pack_model_revisions_path)"
     [[ -f "${path}" ]] || return 1
-    python3 - "${path}" "${model_id}" <<'PY' 2>/dev/null
-import json
-import sys
-
-path = sys.argv[1]
-model_id = sys.argv[2]
-try:
-    data = json.loads(open(path).read())
-except Exception:
-    raise SystemExit(0)
-
-revision = data.get("models", {}).get(model_id, {}).get("revision") or ""
-print(revision)
-PY
+    jq -r --arg model_id "${model_id}" '.models[$model_id].revision // ""' "${path}" 2>/dev/null
 }
 
 pack_preflight_models() {
@@ -252,66 +229,9 @@ pack_preflight_models() {
 
     mkdir -p "${output_dir}/state"
     local out_file="${output_dir}/state/model_revisions.json"
-
-    python3 - "${out_file}" "${models[@]}" <<'PY'
-import json
-import os
-import sys
-from datetime import datetime
-from pathlib import Path
-
-try:
-    from huggingface_hub import HfApi
-    from huggingface_hub.utils import HfHubHTTPError
-except Exception as exc:
-    print("ERROR: huggingface_hub is required for preflight; install it before running with --net 1.", file=sys.stderr)
-    sys.exit(2)
-
-out_file = Path(sys.argv[1])
-model_ids = sys.argv[2:]
-api = HfApi(token=False)
-
-payload = {
-    "generated_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-    "suite": os.environ.get("PACK_SUITE", ""),
-    "model_list": model_ids,
-    "models": {},
-}
-
-errors = []
-for model_id in model_ids:
-    try:
-        info = api.model_info(model_id, token=False)
-    except Exception as err:
-        status = getattr(getattr(err, "response", None), "status_code", None)
-        if status in (401, 403):
-            msg = "requires authentication (gated/private)"
-        else:
-            msg = str(err)
-        print(f"ERROR: {model_id} is not publicly accessible ({msg})", file=sys.stderr)
-        errors.append(model_id)
-        continue
-
-    gated = bool(getattr(info, "gated", False))
-    private = bool(getattr(info, "private", False))
-    if gated or private:
-        print(f"ERROR: {model_id} is gated/private; proof packs require ungated models.", file=sys.stderr)
-        errors.append(model_id)
-        continue
-
-    payload["models"][model_id] = {
-        "revision": info.sha,
-        "resolved_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "gated": gated,
-        "private": private,
-    }
-
-if errors:
-    sys.exit(2)
-
-out_file.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
-print(f"Wrote model revisions to {out_file}")
-PY
+    local repo_root
+    repo_root="$(cd "${_PACK_VALIDATION_LIB_DIR}/../../.." && pwd)"
+    python3 "${repo_root}/scripts/proof_packs/python/preflight_models.py" "${out_file}" "${models[@]}" || return 1
     PACK_MODEL_REVISIONS_FILE="${out_file}"
     export PACK_MODEL_REVISIONS_FILE
 }
@@ -489,78 +409,16 @@ pack_run_determinism_repeats() {
     done
 
     mkdir -p "${OUTPUT_DIR}/analysis" || return 1
-    python3 - "${OUTPUT_DIR}/analysis/determinism_repeats.json" "${model_id}" "${edit_name}" "${repeats}" "${PACK_DETERMINISM}" "${PACK_SUITE}" "${certs[@]}" <<'PY'
-import hashlib
-import json
-import sys
-from datetime import datetime
-from pathlib import Path
-
-out_path = Path(sys.argv[1])
-model_id = sys.argv[2]
-edit_name = sys.argv[3]
-try:
-    requested = int(sys.argv[4])
-except Exception:
-    requested = 0
-mode = sys.argv[5]
-suite = sys.argv[6]
-cert_paths = [Path(p) for p in sys.argv[7:]]
-
-hashes = []
-ratios = []
-errors = []
-
-for path in cert_paths:
-    try:
-        raw = path.read_bytes()
-        hashes.append(hashlib.sha256(raw).hexdigest())
-        data = json.loads(raw.decode("utf-8"))
-    except Exception as exc:
-        errors.append(f"{path}: {exc}")
-        continue
-
-    ratio = None
-    verdict = data.get("verdict") or {}
-    metrics = data.get("metrics") or {}
-    for candidate in (
-        verdict.get("primary_metric_ratio"),
-        verdict.get("primary_metric_ratio_raw"),
-        verdict.get("primary_metric_ratio_mean"),
-        metrics.get("primary_metric_ratio"),
-        metrics.get("primary_metric_ratio_mean"),
-    ):
-        if isinstance(candidate, (int, float)):
-            ratio = float(candidate)
-            break
-    if ratio is not None:
-        ratios.append(ratio)
-
-hashes_match = bool(hashes) and len(set(hashes)) == 1
-ratio_summary = None
-if ratios:
-    ratio_summary = {
-        "min": min(ratios),
-        "max": max(ratios),
-        "delta": max(ratios) - min(ratios),
-    }
-
-payload = {
-    "requested": requested,
-    "completed": len(cert_paths),
-    "mode": mode,
-    "suite": suite,
-    "model_id": model_id,
-    "edit_name": edit_name,
-    "cert_hashes_match": hashes_match,
-    "cert_hashes": hashes,
-    "primary_metric_ratio": ratio_summary,
-    "errors": errors,
-    "generated_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-}
-
-out_path.write_text(json.dumps(payload, indent=2) + "\n")
-PY
+    local repo_root
+    repo_root="$(cd "${_PACK_VALIDATION_LIB_DIR}/../../.." && pwd)"
+    python3 "${repo_root}/scripts/proof_packs/python/determinism_repeats_summary.py" \
+        "${OUTPUT_DIR}/analysis/determinism_repeats.json" \
+        "${model_id}" \
+        "${edit_name}" \
+        "${repeats}" \
+        "${PACK_DETERMINISM}" \
+        "${PACK_SUITE}" \
+        "${certs[@]}"
 }
 
 # Resume support - skip completed steps if output files exist
@@ -983,49 +841,13 @@ pack_validate_tuned_edit_params() {
     done
     local edit_types_csv
     edit_types_csv=$(printf '%s\n' "${EDIT_TYPES_CLEAN[@]}" | awk -F: '{print $1}' | sort -u | paste -sd "," -)
-    PACK_MODEL_LIST_CSV="${model_csv}" PACK_MODEL_NAMES_CSV="${model_names_csv}" EDIT_TYPES_CSV="${edit_types_csv}" python3 - <<'PY' || return 1
-import json
-import os
-
-path = os.environ.get("PACK_TUNED_EDIT_PARAMS_FILE", "")
-models = [m for m in os.environ.get("PACK_MODEL_LIST_CSV", "").split(",") if m]
-model_names = [m for m in os.environ.get("PACK_MODEL_NAMES_CSV", "").split(",") if m]
-required = [t for t in os.environ.get("EDIT_TYPES_CSV", "").split(",") if t]
-
-if not path or not os.path.exists(path):
-    raise SystemExit("Missing tuned edit preset file.")
-
-with open(path, "r") as f:
-    data = json.load(f)
-
-if not isinstance(data, dict):
-    raise SystemExit("Invalid tuned edit preset file (expected JSON object).")
-
-defaults = data.get("defaults") if isinstance(data.get("defaults"), dict) else {}
-models_map = data.get("models") if isinstance(data.get("models"), dict) else {}
-
-def _get_entry(model_id, model_name, edit_type):
-    entry_map = {}
-    if isinstance(models_map, dict):
-        entry_map = models_map.get(model_id) or models_map.get(model_name) or {}
-    if not entry_map and isinstance(data.get(edit_type), dict):
-        entry_map = data
-    entry = entry_map.get(edit_type) or defaults.get(edit_type) or {}
-    return entry if isinstance(entry, dict) else {}
-
-missing = []
-for idx, model in enumerate(models):
-    model_name = model_names[idx] if idx < len(model_names) else ""
-    for edit_type in required:
-        entry = _get_entry(model, model_name, edit_type)
-        status = str(entry.get("status") or "missing")
-        if status != "selected":
-            missing.append(f"{model}:{edit_type}:{status}")
-
-if missing:
-    msg = "Missing tuned edit presets: " + ", ".join(missing)
-    raise SystemExit(msg)
-PY
+    local repo_root
+    repo_root="$(cd "${_PACK_VALIDATION_LIB_DIR}/../../.." && pwd)"
+    python3 "${repo_root}/scripts/proof_packs/python/validate_tuned_edit_params.py" \
+        --file "${PACK_TUNED_EDIT_PARAMS_FILE}" \
+        --models "${model_csv}" \
+        --model-names "${model_names_csv}" \
+        --edit-types "${edit_types_csv}" || return 1
 }
 
 pack_prepare_calibration_presets() {
@@ -1420,111 +1242,9 @@ setup_pack_environment() {
     log_section "PHASE 0: GPU ENVIRONMENT SETUP"
 
     local env_report
-    env_report=$(python3 - <<'PY'
-import os
-import sys
-import torch
-
-print("=== Proof Pack Environment Configuration ===\n")
-
-if not torch.cuda.is_available():
-    print("ERROR: CUDA not available!")
-    sys.exit(1)
-
-num_gpus = torch.cuda.device_count()
-print(f"GPUs Detected: {num_gpus}")
-
-mode = str(os.environ.get("PACK_DETERMINISM", "throughput")).strip().lower()
-if mode not in {"throughput", "strict"}:
-    mode = "throughput"
-
-fp8_support = hasattr(torch, "float8_e4m3fn")
-
-gpu_names = []
-gpu_mem_gb = []
-total_vram = 0.0
-
-for i in range(num_gpus):
-    name = torch.cuda.get_device_name(i)
-    mem = torch.cuda.get_device_properties(i).total_memory / (1024**3)
-    gpu_names.append(name)
-    gpu_mem_gb.append(mem)
-    total_vram += mem
-    print(f"  GPU {i}: {name} ({mem:.1f} GB)")
-
-min_vram = min(gpu_mem_gb) if gpu_mem_gb else 0.0
-primary_name = gpu_names[0] if gpu_names else ""
-print(f"\nTotal VRAM: {total_vram:.1f} GB")
-print(f"Min GPU VRAM: {min_vram:.1f} GB")
-print(f"FP8 Support: {fp8_support}")
-
-if mode == "strict":
-    print("\nDeterminism mode: strict (PACK_DETERMINISM=strict)")
-    try:
-        if hasattr(torch, "use_deterministic_algorithms"):
-            torch.use_deterministic_algorithms(True, warn_only=False)
-    except Exception:
-        print("WARNING: deterministic algorithms could not be fully enabled")
-    try:
-        cudnn_mod = getattr(torch.backends, "cudnn", None)
-        if cudnn_mod is not None:
-            cudnn_mod.benchmark = False
-            cudnn_mod.enabled = True
-            if hasattr(cudnn_mod, "deterministic"):
-                cudnn_mod.deterministic = True
-            if hasattr(cudnn_mod, "allow_tf32"):
-                cudnn_mod.allow_tf32 = False
-    except Exception:
-        pass
-    try:
-        matmul = getattr(getattr(torch.backends, "cuda", object()), "matmul", None)
-        if matmul is not None and hasattr(matmul, "allow_tf32"):
-            matmul.allow_tf32 = False
-    except Exception:
-        pass
-    print("\nTF32 enabled: False")
-    print("cuDNN benchmark: False")
-else:
-    print("\nDeterminism mode: throughput (PACK_DETERMINISM=throughput)")
-    torch.backends.cuda.matmul.allow_tf32 = True
-    try:
-        cudnn_mod = getattr(torch.backends, "cudnn", None)
-        if cudnn_mod is not None:
-            cudnn_mod.allow_tf32 = True
-            cudnn_mod.benchmark = True
-            cudnn_mod.enabled = True
-    except Exception:
-        pass
-    print("\nTF32 enabled: True")
-    print("cuDNN benchmark: True")
-
-if torch.cuda.is_bf16_supported():
-    torch.set_default_dtype(torch.bfloat16)
-    print("Default dtype: bfloat16")
-else:
-    print("Default dtype: float16 (BF16 not supported)")
-
-try:
-    from transformers.utils import is_flash_attn_2_available
-    flash_avail = is_flash_attn_2_available()
-    print(f"\nFlash Attention 2: {flash_avail}")
-except Exception:
-    print("\nFlash Attention 2: Unknown (transformers too old)")
-
-compile_avail = hasattr(torch, "compile")
-print(f"torch.compile: {compile_avail}")
-
-print(f"\n[PACK_GPU_NAME={primary_name}]")
-print(f"[PACK_GPU_MEM_GB={int(round(min_vram))}]")
-print(f"[PACK_GPU_COUNT={num_gpus}]")
-if fp8_support:
-    print("[FP8_NATIVE_SUPPORT=true]")
-else:
-    print("[FP8_NATIVE_SUPPORT=false]")
-
-print("\n=== Environment Ready for Proof Pack Runs ===")
-PY
-)
+    local repo_root
+    repo_root="$(cd "${_PACK_VALIDATION_LIB_DIR}/../../.." && pwd)"
+    env_report=$(python3 "${repo_root}/scripts/proof_packs/python/env_report.py")
     local setup_rc=$?
     if [[ ${setup_rc} -ne 0 ]]; then
         printf '%s\n' "${env_report}"
@@ -2564,7 +2284,7 @@ pack_run_suite() {
     pack_validate_guard_calibration || return 1
 
     if [[ "${PACK_NET}" == "1" ]]; then
-        pack_preflight_models "${OUTPUT_DIR}" "${PACK_MODEL_LIST[@]}"
+        pack_preflight_models "${OUTPUT_DIR}" "${PACK_MODEL_LIST[@]}" || return 1
     else
         if ! pack_load_model_revisions; then
             error_exit "Offline mode requires model revisions. Run with --net 1 to preflight."

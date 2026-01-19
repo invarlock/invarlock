@@ -62,6 +62,31 @@ def test_primary_metric_validation_ppl_and_non_ppl() -> None:
     cert_np = {"primary_metric": {"kind": "accuracy", "final": 0.9}}
     assert verify_mod._validate_primary_metric(cert_np)
 
+    # Invalid primary metric (e.g., NaN/Inf weights during error injection) should not
+    # be treated as malformed for integrity verification.
+    cert_invalid = {
+        "primary_metric": {
+            "kind": "ppl_causal",
+            "final": float("nan"),
+            "ratio_vs_baseline": float("nan"),
+            "invalid": True,
+            "degraded_reason": "non_finite_pm",
+        },
+        "baseline_ref": {"primary_metric": {"final": 10.0}},
+    }
+    assert verify_mod._validate_primary_metric(cert_invalid) == []
+
+    cert_nonfinite_undeclared = {
+        "primary_metric": {
+            "kind": "ppl_causal",
+            "final": float("nan"),
+            "ratio_vs_baseline": float("nan"),
+            "invalid": False,
+        },
+        "baseline_ref": {"primary_metric": {"final": 10.0}},
+    }
+    assert verify_mod._validate_primary_metric(cert_nonfinite_undeclared)
+
 
 def test_primary_metric_validation_rejects_baseline_zero_and_missing_ratio() -> None:
     verify_mod = _import_verify_module()
@@ -105,6 +130,19 @@ def test_pairing_counts_and_drift_band() -> None:
     cert_pm = {"primary_metric": {"preview": 1.0, "final": 1.2}}
     errs = verify_mod._validate_drift_band(cert_pm)
     assert errs and "out of band" in errs[0]
+    # Drift band is undefined for invalid primary metrics
+    assert (
+        verify_mod._validate_drift_band(
+            {
+                "primary_metric": {
+                    "preview": float("nan"),
+                    "final": float("nan"),
+                    "invalid": True,
+                }
+            }
+        )
+        == []
+    )
 
 
 def test_pairing_rejects_low_match_high_overlap_and_missing_values() -> None:

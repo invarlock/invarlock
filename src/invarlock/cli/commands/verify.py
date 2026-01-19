@@ -66,9 +66,25 @@ def _validate_primary_metric(certificate: dict[str, Any]) -> list[str]:
         errors.append("Certificate missing primary_metric block.")
         return errors
 
+    def _is_finite_number(value: Any) -> bool:
+        return isinstance(value, (int, float)) and math.isfinite(float(value))
+
+    def _declares_invalid_primary_metric(metric: dict[str, Any]) -> bool:
+        if bool(metric.get("invalid")):
+            return True
+        reason = metric.get("degraded_reason")
+        if isinstance(reason, str):
+            r = reason.strip().lower()
+            return r.startswith("non_finite") or r in {
+                "primary_metric_invalid",
+                "evaluation_error",
+            }
+        return False
+
     kind = str(pm.get("kind", "")).lower()
     ratio_vs_baseline = pm.get("ratio_vs_baseline")
     final = pm.get("final")
+    pm_invalid = _declares_invalid_primary_metric(pm)
 
     if kind.startswith("ppl"):
         baseline_ref = certificate.get("baseline_ref", {}) or {}
@@ -82,16 +98,14 @@ def _validate_primary_metric(certificate: dict[str, Any]) -> list[str]:
             bv = baseline_pm.get("final")
             if isinstance(bv, (int | float)):
                 baseline_final = float(bv)
-        if isinstance(final, int | float) and isinstance(baseline_final, int | float):
-            if baseline_final <= 0.0:
+        if _is_finite_number(final) and _is_finite_number(baseline_final):
+            if float(baseline_final) <= 0.0:
                 errors.append(
                     f"Baseline final must be > 0.0 to compute ratio (found {baseline_final})."
                 )
             else:
                 expected_ratio = float(final) / float(baseline_final)
-                if not isinstance(ratio_vs_baseline, int | float) or not math.isfinite(
-                    float(ratio_vs_baseline)
-                ):
+                if not _is_finite_number(ratio_vs_baseline):
                     errors.append(
                         "Certificate is missing a finite primary_metric.ratio_vs_baseline value."
                     )
@@ -102,7 +116,18 @@ def _validate_primary_metric(certificate: dict[str, Any]) -> list[str]:
                         "Primary metric ratio mismatch: "
                         f"recorded={float(ratio_vs_baseline):.12f}, expected={expected_ratio:.12f}"
                     )
+        else:
+            # If the primary metric is non-finite, it must be explicitly marked invalid.
+            # This is expected for structural error-injection runs (NaN/Inf weights).
+            if (isinstance(final, (int | float)) and not _is_finite_number(final)) and (
+                not pm_invalid
+            ):
+                errors.append(
+                    "Primary metric final is non-finite but primary_metric.invalid is not set."
+                )
     else:
+        if pm_invalid:
+            return errors
         if ratio_vs_baseline is None or not isinstance(ratio_vs_baseline, int | float):
             errors.append(
                 "Certificate missing primary_metric.ratio_vs_baseline for non-ppl metric."
@@ -200,11 +225,23 @@ def _validate_drift_band(certificate: dict[str, Any]) -> list[str]:
     """
     errors: list[str] = []
     pm = certificate.get("primary_metric", {}) or {}
+    if not isinstance(pm, dict) or not pm:
+        errors.append("Certificate missing primary_metric block.")
+        return errors
+    if bool(pm.get("invalid")):
+        # Drift is undefined when the primary metric is invalid (e.g., NaN/Inf weights).
+        return errors
     drift_ratio = None
     try:
         prev = pm.get("preview")
         fin = pm.get("final")
-        if isinstance(prev, int | float) and isinstance(fin, int | float) and prev > 0:
+        if (
+            isinstance(prev, int | float)
+            and isinstance(fin, int | float)
+            and math.isfinite(float(prev))
+            and math.isfinite(float(fin))
+            and prev > 0
+        ):
             drift_ratio = float(fin) / float(prev)
     except Exception:
         drift_ratio = None
