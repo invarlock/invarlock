@@ -242,7 +242,7 @@ def _force_local_python(cmd_str: str) -> str:
     cmd = (m.group("cmd") or "").strip()
     py = shlex.quote(sys.executable)
     if cmd.startswith("invarlock "):
-        return f"{prefix}{py} -m invarlock {cmd[len('invarlock '):]}"
+        return f"{prefix}{py} -m invarlock {cmd[len('invarlock ') :]}"
     if cmd.startswith("python -m invarlock"):
         rest = cmd[len("python -m invarlock") :].lstrip()
         return f"{prefix}{py} -m invarlock {rest}".rstrip()
