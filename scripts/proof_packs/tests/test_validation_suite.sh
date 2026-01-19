@@ -1198,6 +1198,81 @@ EOF
     assert_file_exists "${OUTPUT_DIR}/workers/SHUTDOWN" "touch shutdown when signal_shutdown missing"
 }
 
+test_pack_validation_main_dynamic_scenario_summary_branch_coverage() {
+    mock_reset
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/jq" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+echo "bogus"
+EOF
+    chmod +x "${bin_dir}/jq"
+    export PATH="${bin_dir}:$PATH"
+    hash -r 2>/dev/null || true
+
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    check_dependencies() { :; }
+    configure_gpu_pool() { NUM_GPUS=1; GPU_ID_LIST="0"; export NUM_GPUS GPU_ID_LIST; }
+    disk_preflight() { :; }
+    setup_pack_environment() { :; }
+    handle_disk_pressure() { return 0; }
+
+    init_queue() {
+        QUEUE_DIR="${OUTPUT_DIR}/queue"
+        mkdir -p "${QUEUE_DIR}"/{pending,ready,running,completed,failed} "${OUTPUT_DIR}/workers" "${OUTPUT_DIR}/logs"
+        export QUEUE_DIR
+    }
+    generate_all_tasks() { :; }
+    resolve_dependencies() { echo 0; }
+    count_tasks() { echo 0; }
+    print_queue_stats() { :; }
+    compile_results() { :; }
+    run_analysis() { :; }
+    generate_verdict() { :; }
+    list_run_gpu_ids() { printf ''; }
+    is_queue_empty() { return 0; }
+    get_free_disk_gb() { echo "999"; }
+
+    local stub_lib="${TEST_TMPDIR}/stub_lib"
+    mkdir -p "${stub_lib}"
+    for f in task_serialization.sh queue_manager.sh scheduler.sh task_functions.sh fault_tolerance.sh; do
+        printf '%s\n' "#!/usr/bin/env bash" > "${stub_lib}/${f}"
+    done
+    cat > "${stub_lib}/gpu_worker.sh" <<'EOF'
+#!/usr/bin/env bash
+gpu_worker() { return 0; }
+EOF
+    LIB_DIR="${stub_lib}"
+    export LIB_DIR
+
+    local scenarios_json='{"schema":"proof_pack_scenarios_v1","schema_version":1,"scenarios":[]}'
+
+    # Non-numeric runs + error injection enabled
+    OUTPUT_DIR="${TEST_TMPDIR}/out_scenario_1"
+    pack_setup_output_dirs
+    mkdir -p "${OUTPUT_DIR}/state"
+    printf '%s\n' "${scenarios_json}" > "${OUTPUT_DIR}/state/scenarios.json"
+    CLEAN_EDIT_RUNS="bogus"
+    STRESS_EDIT_RUNS="bogus"
+    RUN_ERROR_INJECTION="true"
+    RESUME_FLAG="false"
+    main_dynamic
+
+    # Negative runs + error injection disabled (covers else branch)
+    OUTPUT_DIR="${TEST_TMPDIR}/out_scenario_2"
+    pack_setup_output_dirs
+    mkdir -p "${OUTPUT_DIR}/state"
+    printf '%s\n' "${scenarios_json}" > "${OUTPUT_DIR}/state/scenarios.json"
+    CLEAN_EDIT_RUNS="-1"
+    STRESS_EDIT_RUNS="-1"
+    RUN_ERROR_INJECTION="false"
+    RESUME_FLAG="false"
+    main_dynamic
+}
+
 test_pack_validation_main_dynamic_calibrate_only_stops_after_presets_even_with_pending_tasks() {
     mock_reset
 
@@ -1410,6 +1485,11 @@ test_pack_validation_pack_model_list_and_revisions_branches() {
     assert_rc "0" "${RUN_RC}" "revision lookup succeeds"
     assert_eq "abc" "${RUN_OUT}" "revision returned"
 
+    echo '{not_json' > "${OUTPUT_DIR}/state/model_revisions.json"
+    run pack_load_model_revisions
+    assert_rc "1" "${RUN_RC}" "invalid revisions file fails"
+    assert_match "Failed to parse model revisions file" "${RUN_ERR}" "parse failure reported"
+
     echo '{"models":{"org/model1":{"gated":true}}}' > "${OUTPUT_DIR}/state/model_revisions.json"
     run pack_load_model_revisions
     assert_rc "1" "${RUN_RC}" "gated model revisions fail"
@@ -1451,6 +1531,10 @@ test_pack_validation_preflight_models_error_branches() {
     run pack_preflight_models "${OUTPUT_DIR}"
     set -u
     assert_match "No models provided" "$(cat "${error_log}")" "preflight requires models"
+
+    fixture_write "python3.rc" "2"
+    run pack_preflight_models "${OUTPUT_DIR}" "org/model"
+    assert_rc "1" "${RUN_RC}" "python failure returns non-zero"
 }
 
 
@@ -1977,6 +2061,13 @@ test_pack_validation_pack_run_suite_branches() {
     run pack_run_suite
     assert_rc "0" "${RUN_RC}" "preflight path succeeds"
     assert_file_exists "${TEST_TMPDIR}/preflight.calls" "preflight invoked"
+    trap - EXIT INT TERM HUP QUIT
+
+    pack_preflight_models() { return 1; }
+    OUTPUT_DIR="${TEST_TMPDIR}/out3_fail_preflight"
+    PACK_NET="1"
+    run pack_run_suite
+    assert_rc "1" "${RUN_RC}" "preflight failure returns non-zero"
     trap - EXIT INT TERM HUP QUIT
 
     PACK_NET="0"
