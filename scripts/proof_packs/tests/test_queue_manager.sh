@@ -1087,6 +1087,65 @@ test_generate_model_tasks_branch_coverage() {
     generate_model_tasks "5" "org/model" "model" >/dev/null
 }
 
+test_generate_model_tasks_defaults_error_types_when_manifest_missing_errors() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
+
+    local calls="${TEST_TMPDIR}/calls_default_errors"
+    : > "${calls}"
+    add_task() {
+        local task_type="$1"
+        local params="${6:-}"
+        printf '%s\t%s\n' "${task_type}" "${params}" >> "${calls}"
+        local count
+        count=$(wc -l < "${calls}" | tr -d ' ')
+        echo "t${count}"
+    }
+    estimate_model_memory() { echo "14"; }
+    generate_eval_certify_tasks() { :; }
+    generate_edit_tasks() { :; }
+    jq() { :; }
+
+    # Point SCRIPT_DIR at a temporary pack root that has a manifest without any
+    # error-injection scenarios so generate_model_tasks falls back to defaults.
+    local pack_root="${TEST_TMPDIR}/pack_no_errors"
+    mkdir -p "${pack_root}/lib"
+    SCRIPT_DIR="${pack_root}/lib"
+
+    cat > "${pack_root}/scenarios.json" <<'EOF'
+{
+  "schema": "proof_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {
+      "id": "quant_4bit_clean",
+      "generation": {"kind": "edit", "edit_spec": "quant_rtn:clean:ffn", "version": "clean"}
+    },
+    {
+      "id": "quant_4bit_stress",
+      "generation": {"kind": "edit", "edit_spec": "quant_rtn:4:32:all", "version": "stress"}
+    }
+  ]
+}
+EOF
+
+    PACK_USE_BATCH_EDITS="true"
+    CLEAN_EDIT_RUNS="1"
+    STRESS_EDIT_RUNS="1"
+    DRIFT_CALIBRATION_RUNS=1
+    RUN_ERROR_INJECTION="true"
+    generate_model_tasks "1" "org/model" "model" >/dev/null
+
+    assert_match "CREATE_ERROR" "$(cat "${calls}")" "default error tasks created"
+    assert_match "\"error_type\": \"nan_injection\"" "$(cat "${calls}")" "includes nan injection"
+    assert_match "\"error_type\": \"inf_injection\"" "$(cat "${calls}")" "includes inf injection"
+
+    local created
+    created="$(grep -c '^CREATE_ERROR' "${calls}" || true)"
+    assert_eq "9" "${created}" "fallback creates 9 default error injections"
+}
+
 
 test_generate_model_tasks_additional_batch_branches() {
     mock_reset
