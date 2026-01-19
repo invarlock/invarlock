@@ -1194,19 +1194,20 @@ generate_model_tasks() {
     # 5. Error injection tests
     if [[ "${RUN_ERROR_INJECTION:-true}" == "true" ]]; then
         local error_types=()
-        if command -v jq >/dev/null 2>&1 && [[ -f "${scenarios_file}" ]]; then
-            mapfile -t error_types < <(
-                jq -r '.scenarios[]
-                    | select(.generation.kind=="error")
-                    | .generation.error_type' "${scenarios_file}"
-            )
-        fi
-        if [[ ${#error_types[@]} -eq 0 ]]; then
-            error_types=(
-                "nan_injection"
-                "inf_injection"
-                "shape_mismatch"
-                "missing_tensors"
+	        if command -v jq >/dev/null 2>&1 && [[ -f "${scenarios_file}" ]]; then
+	            mapfile -t error_types < <(
+	                jq -r '.scenarios[]
+	                    | select(.generation.kind=="error")
+	                    | .generation.error_type' "${scenarios_file}"
+	            )
+	        fi
+	        if [[ ${#error_types[@]} -eq 0 ]]; then
+	            :
+	            error_types=(
+	                "nan_injection"
+	                "inf_injection"
+	                "shape_mismatch"
+	                "missing_tensors"
                 "extreme_quant"
                 "scale_explosion"
                 "rank_collapse"
