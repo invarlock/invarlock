@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # run_pack.sh - Run a proof pack suite and package artifacts.
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RUN_PACK_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # shellcheck source=run_suite.sh
-source "${SCRIPT_DIR}/run_suite.sh"
+source "${RUN_PACK_SCRIPT_DIR}/run_suite.sh"
 
 pack_usage() {
     cat <<'EOF'
@@ -167,7 +167,7 @@ pack_write_manifest() {
     local determinism="$5"
     local repeats="$6"
 
-    python3 "${SCRIPT_DIR}/python/manifest_writer.py" \
+    python3 "${RUN_PACK_SCRIPT_DIR}/python/manifest_writer.py" \
         --pack-dir "${pack_dir}" \
         --run-dir "${run_dir}" \
         --suite "${suite}" \
