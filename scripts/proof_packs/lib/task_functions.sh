@@ -55,7 +55,9 @@ _get_model_invarlock_config_fallback() {
     # if workers start without the main suite wrapper.
     case "${model_size}" in
         "7")
-            echo "2048:2048:192:192:96"
+            # Shorter sequences are substantially faster on WT-2 (many samples are
+            # short, so longer seq_len mostly pads).
+            echo "512:512:192:192:96"
             ;;
         "13")
             echo "1536:1536:192:192:64"
@@ -1107,7 +1109,9 @@ task_calibration_run() {
     # For large models, use INVARLOCK_SKIP_OVERHEAD_CHECK to avoid loading
     # both baseline and edited models simultaneously (which would exceed 180GB).
     local profile_flag="ci"
-    local min_windows="${INVARLOCK_CERT_MIN_WINDOWS:-192}"
+    # Default to a higher floor so balanced-tier token minimums (50k) are met
+    # on short-text datasets like WikiText-2 (where many windows are padding).
+    local min_windows="${INVARLOCK_CERT_MIN_WINDOWS:-256}"
     if [[ "${profile_flag}" == "ci" && "${min_windows}" =~ ^[0-9]+$ && "${min_windows}" -gt 0 ]]; then
         if [[ "${preview_n}" -lt "${min_windows}" || "${final_n}" -lt "${min_windows}" ]]; then
             preview_n="${min_windows}"
@@ -1857,7 +1861,9 @@ task_certify_edit() {
     # For large models, use INVARLOCK_SKIP_OVERHEAD_CHECK to avoid loading
     # both baseline and edited models simultaneously.
     local profile_flag="ci"
-    local min_windows="${INVARLOCK_CERT_MIN_WINDOWS:-192}"
+    # Default to a higher floor so balanced-tier token minimums (50k) are met
+    # on short-text datasets like WikiText-2 (where many windows are padding).
+    local min_windows="${INVARLOCK_CERT_MIN_WINDOWS:-256}"
     if [[ "${profile_flag}" == "ci" && "${min_windows}" =~ ^[0-9]+$ && "${min_windows}" -gt 0 ]]; then
         if [[ "${preview_n}" -lt "${min_windows}" || "${final_n}" -lt "${min_windows}" ]]; then
             preview_n="${min_windows}"
@@ -2153,7 +2159,9 @@ task_certify_error() {
     # For large models, use INVARLOCK_SKIP_OVERHEAD_CHECK to avoid loading
     # both baseline and edited models simultaneously (which would exceed 180GB).
     local profile_flag="ci"
-    local min_windows="${INVARLOCK_CERT_MIN_WINDOWS:-192}"
+    # Default to a higher floor so balanced-tier token minimums (50k) are met
+    # on short-text datasets like WikiText-2 (where many windows are padding).
+    local min_windows="${INVARLOCK_CERT_MIN_WINDOWS:-256}"
     if [[ "${profile_flag}" == "ci" && "${min_windows}" =~ ^[0-9]+$ && "${min_windows}" -gt 0 ]]; then
         if [[ "${preview_n}" -lt "${min_windows}" || "${final_n}" -lt "${min_windows}" ]]; then
             preview_n="${min_windows}"

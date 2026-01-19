@@ -1711,7 +1711,9 @@ get_model_invarlock_config() {
     case "${model_size}" in
         "7")
             # 7B models: ~14GB, can use longer sequences and more windows
-            echo "2048:1024:64:64:96"
+            # Use shorter sequences for throughput: WT-2 samples are often short, so
+            # longer seq_len mostly pads and wastes compute.
+            echo "512:512:64:64:96"
             ;;
         "13")
             # 13-14B models: ~26-28GB, moderate settings
