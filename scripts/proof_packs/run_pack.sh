@@ -85,7 +85,9 @@ pack_generate_html() {
     while IFS= read -r cert; do
         [[ -n "${cert}" ]] || continue
         local html="${cert%.cert.json}.html"
-        invarlock report html --input "${cert}" --output "${html}" --force >/dev/null
+        if ! invarlock report html --input "${cert}" --output "${html}" --force >/dev/null; then
+            echo "WARNING: Failed to render HTML report for ${cert}" >&2
+        fi
     done < <(find "${pack_dir}/certs" -type f -name "evaluation.cert.json" | sort)
 }
 
@@ -147,7 +149,7 @@ payload = {
 }
 
 with open(out_path, "w", encoding="utf-8") as f:
-    f.write(json.dumps(payload, indent=2, sort_keys=True) + "\\n")
+    f.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 PY
 
     echo "Verified: ${count_clean} clean, ${count_error} error-injection (expected fail), ${count_failed} unexpected failures"
@@ -180,7 +182,10 @@ pack_sign_manifest() {
         return 0
     fi
     if command -v gpg >/dev/null 2>&1; then
-        gpg --armor --detach-sign --output "${pack_dir}/manifest.json.asc" "${pack_dir}/manifest.json"
+        if ! gpg --armor --detach-sign --output "${pack_dir}/manifest.json.asc" "${pack_dir}/manifest.json"; then
+            rm -f "${pack_dir}/manifest.json.asc"
+            echo "WARNING: gpg signing failed; skipping manifest signature." >&2
+        fi
     else
         echo "WARNING: gpg not found; skipping manifest signature." >&2
     fi

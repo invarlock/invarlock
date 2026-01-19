@@ -63,6 +63,9 @@ EOF
     assert_file_exists "${pack_dir}/state/scenarios.json" "scenarios manifest copied"
     assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/evaluation.cert.json" "cert copied"
     assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/verify.json" "verify output captured"
+    assert_file_exists "${pack_dir}/results/verification_summary.json" "verification summary written"
+    run python3 -c 'import json,sys; json.load(open(sys.argv[1], encoding="utf-8"))' "${pack_dir}/results/verification_summary.json"
+    assert_rc "0" "${RUN_RC}" "verification summary is valid JSON"
     assert_file_exists "${pack_dir}/manifest.json" "manifest written"
     assert_file_exists "${pack_dir}/checksums.sha256" "checksums written"
     assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/evaluation.html" "html rendered"
@@ -230,9 +233,60 @@ EOF
     assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/verify.json" "clean verify output captured"
     assert_file_exists "${pack_dir}/certs/modelA/errors/nan_injection/verify.json" "error injection verify output captured"
     assert_file_exists "${pack_dir}/results/verification_summary.json" "verification summary written"
+    run python3 -c 'import json,sys; json.load(open(sys.argv[1], encoding="utf-8"))' "${pack_dir}/results/verification_summary.json"
+    assert_rc "0" "${RUN_RC}" "verification summary is valid JSON"
     assert_match "\"clean_certs\": 1" "$(cat "${pack_dir}/results/verification_summary.json")" "clean count recorded"
     assert_match "\"error_injection_certs\": 1" "$(cat "${pack_dir}/results/verification_summary.json")" "error injection count recorded"
     assert_match "\"failed_certs\": 0" "$(cat "${pack_dir}/results/verification_summary.json")" "failed count recorded"
+}
+
+test_run_pack_build_pack_continues_when_html_report_fails() {
+    mock_reset
+
+    source ./scripts/proof_packs/run_pack.sh
+
+    local run_dir="${TEST_TMPDIR}/run"
+    mkdir -p "${run_dir}/reports" "${run_dir}/analysis" "${run_dir}/state"
+    mkdir -p "${run_dir}/modelA/certificates/edit/run_1"
+
+    echo "verdict" > "${run_dir}/reports/final_verdict.txt"
+    echo "{}" > "${run_dir}/reports/final_verdict.json"
+    echo '{"model_list": ["org/model"], "models": {"org/model": {"revision": "abc"}}}' > "${run_dir}/state/model_revisions.json"
+    echo '{"schema":"proof_pack_scenarios_v1","schema_version":1,"scenarios":[]}' > "${run_dir}/state/scenarios.json"
+    echo "{}" > "${run_dir}/modelA/certificates/edit/run_1/evaluation.cert.json"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/invarlock" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+cmd="${1:-}"
+shift || true
+case "${cmd}" in
+    report)
+        sub="${1:-}"
+        if [[ "${sub}" == "html" ]]; then
+            exit 1
+        fi
+        ;;
+    verify)
+        echo '{"ok": true}'
+        exit 0
+        ;;
+esac
+echo '{}'
+EOF
+    chmod +x "${bin_dir}/invarlock"
+    export PATH="${bin_dir}:${PATH}"
+
+    PACK_GPG_SIGN=0
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    run pack_build_pack "${run_dir}" "${pack_dir}"
+    assert_rc "0" "${RUN_RC}" "pack build succeeds when html render fails"
+    assert_match "Failed to render HTML" "${RUN_ERR}" "warns when html render fails"
+    assert_file_exists "${pack_dir}/manifest.json" "manifest still written"
+    assert_file_exists "${pack_dir}/checksums.sha256" "checksums still written"
 }
 
 test_run_pack_build_pack_writes_pack_files_on_unexpected_verify_failure() {
@@ -459,6 +513,53 @@ EOF
 
     pack_sign_manifest "${pack_dir}"
     assert_file_exists "${pack_dir}/manifest.json.asc" "gpg signature created"
+
+    PATH="${original_path}"
+}
+
+test_run_pack_sign_manifest_warns_and_cleans_when_gpg_fails() {
+    mock_reset
+
+    source ./scripts/proof_packs/run_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}"
+    echo "{}" > "${pack_dir}/manifest.json"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/gpg" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+out=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --output)
+            out="$2"
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
+if [[ -n "${out}" ]]; then
+    printf 'partial' > "${out}"
+fi
+
+exit 2
+EOF
+    chmod +x "${bin_dir}/gpg"
+
+    local original_path="${PATH}"
+    PATH="${bin_dir}:${PATH}"
+
+    run pack_sign_manifest "${pack_dir}"
+    assert_rc "0" "${RUN_RC}" "sign manifest returns 0 when gpg fails"
+    [[ ! -f "${pack_dir}/manifest.json.asc" ]] || t_fail "failed signature should be removed"
+    assert_match "gpg signing failed" "${RUN_ERR}" "warns when gpg signing fails"
 
     PATH="${original_path}"
 }
