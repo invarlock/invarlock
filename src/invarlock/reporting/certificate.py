@@ -764,6 +764,17 @@ def make_certificate(
     # Normalize baseline input
     baseline_raw = baseline
     baseline_normalized = _normalize_baseline(baseline_raw)
+    baseline_report: RunReport | None = None
+    try:
+        if (
+            isinstance(baseline_raw, dict)
+            and "meta" in baseline_raw
+            and "metrics" in baseline_raw
+            and "edit" in baseline_raw
+        ):
+            baseline_report = _normalize_and_validate_report(baseline_raw)
+    except Exception:  # pragma: no cover - baseline compare is best-effort
+        baseline_report = None
 
     # Extract core metadata with full seed bundle
     meta = _extract_certificate_meta(report)
@@ -1440,7 +1451,7 @@ def make_certificate(
         ppl_analysis["window_plan"] = window_plan_ctx
 
     # Extract invariant status
-    invariants = _extract_invariants(report, baseline=baseline_normalized)
+    invariants = _extract_invariants(report, baseline=baseline_report)
 
     # Extract spectral analysis
     spectral = _extract_spectral_analysis(report, baseline_normalized)
