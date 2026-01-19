@@ -278,10 +278,23 @@ def _run_typed(
     ),
     out: str | None = typer.Option(None, "--out", help="Output directory override"),
     edit: str | None = typer.Option(None, "--edit", help="Edit kind (quant|mixed)"),
+    edit_label: str | None = typer.Option(
+        None,
+        "--edit-label",
+        help=(
+            "Edit algorithm label for BYOE models. Use 'noop' for baseline, "
+            "'quant_rtn' etc. for built-in edits, 'custom' for pre-edited models."
+        ),
+    ),
     tier: str | None = typer.Option(
         None,
         "--tier",
         help="Auto-tuning tier override (conservative|balanced|aggressive)",
+    ),
+    metric_kind: str | None = typer.Option(
+        None,
+        "--metric-kind",
+        help="Primary metric kind override (ppl_causal|ppl_mlm|accuracy|etc.)",
     ),
     probes: int | None = typer.Option(
         None, "--probes", help="Number of micro-probes (0=deterministic, >0=adaptive)"
@@ -322,7 +335,9 @@ def _run_typed(
         profile=profile,
         out=out,
         edit=edit,
+        edit_label=edit_label,
         tier=tier,
+        metric_kind=metric_kind,
         probes=probes,
         until_pass=until_pass,
         max_attempts=max_attempts,
