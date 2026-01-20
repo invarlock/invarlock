@@ -67,7 +67,7 @@ balanced:
 def _make_min_report(*, tier: str, ratio_vs_baseline: float) -> dict:
     report = create_empty_report()
     report["meta"]["model_id"] = "m"
-    report["meta"]["adapter"] = "hf_gpt2"
+    report["meta"]["adapter"] = "hf_causal"
     report["meta"]["commit"] = "deadbeef"
     report["meta"]["seed"] = 1
     report["meta"]["auto"] = {"enabled": True, "tier": tier}

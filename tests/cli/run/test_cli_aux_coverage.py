@@ -56,12 +56,12 @@ def test_doctor_helpers_get_adapter_rows(monkeypatch) -> None:
     class DummyRegistry:
         def list_adapters(self):  # noqa: ANN001
             return [
-                "hf_gpt2",
+                "hf_causal",
                 "hf_gptq",
                 "hf_awq",
                 "hf_bnb",
-                "hf_onnx",
-                "hf_causal_auto",
+                "hf_causal_onnx",
+                "hf_auto",
                 "plugin_adapter",
             ]
 
@@ -80,7 +80,7 @@ def test_doctor_helpers_get_adapter_rows(monkeypatch) -> None:
     assert by_name["hf_gptq"]["status"] == "unsupported"
     assert by_name["hf_gptq"]["enable"] == "Linux-only"
     assert by_name["hf_awq"]["status"] == "unsupported"
-    assert by_name["hf_onnx"]["status"] == "needs_extra"
-    assert "invarlock[onnx]" in by_name["hf_onnx"]["enable"]
-    assert by_name["hf_causal_auto"]["mode"] == "auto-matcher"
+    assert by_name["hf_causal_onnx"]["status"] == "needs_extra"
+    assert "invarlock[onnx]" in by_name["hf_causal_onnx"]["enable"]
+    assert by_name["hf_auto"]["mode"] == "auto-matcher"
     assert by_name["plugin_adapter"]["origin"] == "plugin"

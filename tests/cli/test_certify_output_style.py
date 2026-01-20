@@ -10,7 +10,7 @@ def _stub_run(out_dir: Path) -> None:
     ts_dir = out_dir / "20250101_000000"
     ts_dir.mkdir(parents=True, exist_ok=True)
     report = {
-        "meta": {"model_id": "stub", "adapter": "hf_gpt2"},
+        "meta": {"model_id": "stub", "adapter": "hf_causal"},
         "edit": {"name": "noop"},
         "metrics": {
             "primary_metric": {"preview": 1.0, "final": 1.0, "ratio_vs_baseline": 1.0}

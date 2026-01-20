@@ -13,7 +13,7 @@ def _basic_yaml(tmp_path: Path, extra: str = "") -> Path:
     cfg = tmp_path / "config.yaml"
     base = """
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:
@@ -179,7 +179,7 @@ def _cfg_gfm(tmp_path: Path, extra: str = "") -> Path:
     p = tmp_path / "config.yaml"
     base = """
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:

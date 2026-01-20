@@ -21,7 +21,7 @@ def test_certify_hf_id_normalization_and_preset_fallback(monkeypatch, tmp_path: 
         captured.append((Path(path), data))
 
     monkeypatch.setattr(cert_mod, "_dump_yaml", _dump_yaml_capture)
-    monkeypatch.setattr(cert_mod, "resolve_auto_adapter", lambda src: "hf_gpt2")
+    monkeypatch.setattr(cert_mod, "resolve_auto_adapter", lambda src: "hf_causal")
 
     # Provide fake latest report paths post-run
     baseline_rep = tmp_path / "baseline.json"
@@ -100,7 +100,7 @@ def test_certify_ci_aborts_on_nonfinite_pm(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(cert_mod, "_latest_run_report", _fake_latest)
     # No-op report emitter
     monkeypatch.setattr(cert_mod, "_report", lambda **kwargs: None)
-    monkeypatch.setattr(cert_mod, "resolve_auto_adapter", lambda src: "hf_gpt2")
+    monkeypatch.setattr(cert_mod, "resolve_auto_adapter", lambda src: "hf_causal")
 
     r = CliRunner().invoke(
         app,

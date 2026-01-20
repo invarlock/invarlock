@@ -17,7 +17,7 @@ def _write_cfg(tmp_path: Path, preview=2, final=2, loss_type="auto") -> Path:
     p.write_text(
         f"""
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:
@@ -410,7 +410,7 @@ def test_mlm_mask_prob_zero_sets_labels_and_zero_counts(tmp_path: Path):
         # Force mask_prob 0 via load_config replacement
         class Cfg:
             def __init__(self):
-                self.model = SimpleNamespace(adapter="hf_gpt2", id="gpt2", device="cpu")
+                self.model = SimpleNamespace(adapter="hf_causal", id="gpt2", device="cpu")
                 self.edit = SimpleNamespace(name="quant_rtn", plan={})
                 self.dataset = SimpleNamespace(
                     provider="synthetic",
@@ -1171,7 +1171,7 @@ def test_snapshot_auto_prefers_bytes_when_supported(tmp_path: Path):
     cfg = _write_cfg(tmp_path)
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def __init__(self):
             self.restored = 0

@@ -8,7 +8,7 @@ from invarlock.reporting.report import save_report
 
 def _minimal_run_report() -> dict:
     return {
-        "meta": {"model_id": "stub", "adapter": "hf_gpt2", "device": "cpu", "seed": 7},
+        "meta": {"model_id": "stub", "adapter": "hf_causal", "device": "cpu", "seed": 7},
         "data": {
             "dataset": "dummy",
             "split": "validation",

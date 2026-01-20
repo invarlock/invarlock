@@ -22,7 +22,7 @@ from invarlock.cli.config import (
 
 def test_resolve_edit_kind_and_apply_override_roundtrip():
     cfg = InvarLockConfig(
-        model={"id": "gpt2", "adapter": "hf_gpt2"},
+        model={"id": "gpt2", "adapter": "hf_causal"},
         edit={"name": "quant_rtn", "plan": {}},
     )
     name = resolve_edit_kind("quant")
@@ -63,7 +63,7 @@ def test_load_config_with_include_and_defaults_merge(tmp_path: Path):
             """
             model:
               id: gpt2
-              adapter: hf_gpt2
+              adapter: hf_causal
             edit:
               name: quant_rtn
               plan: {}
@@ -124,7 +124,7 @@ def test_load_config_guard_mode_overrides_reject_invalid(tmp_path: Path) -> None
 def test_load_config_raises_on_bad_defaults_type(tmp_path: Path):
     cfg_path = tmp_path / "bad.yaml"
     cfg_path.write_text(
-        "defaults: 123\nmodel: {id: gpt2, adapter: hf_gpt2}\nedit: {name: quant_rtn, plan: {}}\n"
+        "defaults: 123\nmodel: {id: gpt2, adapter: hf_causal}\nedit: {name: quant_rtn, plan: {}}\n"
     )
     with pytest.raises(ValueError):
         load_config(cfg_path)
@@ -132,7 +132,7 @@ def test_load_config_raises_on_bad_defaults_type(tmp_path: Path):
 
 def test_apply_profile_ci_cpu_and_unknown_profile():
     cfg = InvarLockConfig(
-        model={"id": "gpt2", "adapter": "hf_gpt2"},
+        model={"id": "gpt2", "adapter": "hf_causal"},
         edit={"name": "quant_rtn", "plan": {}},
     )
     ci_cpu = apply_profile(cfg, "ci_cpu")
@@ -144,7 +144,7 @@ def test_apply_profile_ci_cpu_and_unknown_profile():
 
 def test_apply_profile_ci_and_release():
     cfg = InvarLockConfig(
-        model={"id": "gpt2", "adapter": "hf_gpt2"},
+        model={"id": "gpt2", "adapter": "hf_causal"},
         edit={"name": "quant_rtn", "plan": {}},
     )
     ci = apply_profile(cfg, "ci")
@@ -156,7 +156,7 @@ def test_apply_profile_ci_and_release():
 def test_load_config_include_missing_file(tmp_path: Path):
     cfg_path = tmp_path / "cfg.yaml"
     cfg_path.write_text(
-        "defaults: !include does_not_exist.yaml\nmodel: {id: gpt2, adapter: hf_gpt2}\nedit: {name: quant_rtn, plan: {}}\n"
+        "defaults: !include does_not_exist.yaml\nmodel: {id: gpt2, adapter: hf_causal}\nedit: {name: quant_rtn, plan: {}}\n"
     )
     with pytest.raises(FileNotFoundError):
         load_config(cfg_path)

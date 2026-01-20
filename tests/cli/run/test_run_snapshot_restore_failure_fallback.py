@@ -14,7 +14,7 @@ def _base_cfg(tmp_path: Path, preview=1, final=1) -> Path:
     p.write_text(
         f"""
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:
@@ -73,7 +73,7 @@ def test_until_pass_restore_failure_discards_model_and_reloads_next_attempt(
     captured: dict[str, object] = {}
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def __init__(self) -> None:
             self.load_calls = 0

@@ -9,7 +9,7 @@ def test_certificate_schema_requires_primary_metric_and_window_stats() -> None:
         "run_id": "run-1234",
         "artifacts": {},
         "plugins": {"adapters": [], "edits": [], "guards": []},
-        "meta": {"model_id": "m", "adapter": "hf_gpt2", "seed": 1, "device": "cpu"},
+        "meta": {"model_id": "m", "adapter": "hf_causal", "seed": 1, "device": "cpu"},
         "dataset": {
             "provider": "synthetic",
             "seq_len": 8,

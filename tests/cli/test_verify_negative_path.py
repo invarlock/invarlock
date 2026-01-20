@@ -11,7 +11,7 @@ from invarlock.reporting.certificate import make_certificate
 
 def _mk_basic_reports() -> tuple[dict, dict]:
     report = {
-        "meta": {"model_id": "m", "adapter": "hf_gpt2", "device": "cpu", "seed": 1},
+        "meta": {"model_id": "m", "adapter": "hf_causal", "device": "cpu", "seed": 1},
         "metrics": {
             "primary_metric": {
                 "kind": "ppl_causal",

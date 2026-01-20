@@ -102,7 +102,7 @@ def create_mock_run_report(
     report = {
         "meta": {
             "model_id": model_id,
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "device": "cpu",
             "ts": "2023-10-01T12:00:00",
             "commit": "abcd1234567890abcdef",
@@ -110,11 +110,11 @@ def create_mock_run_report(
             "seeds": {"python": 42, "numpy": 42, "torch": 42},
             "plugins": {
                 "adapter": {
-                    "name": "hf_gpt2",
-                    "module": "invarlock.adapters.hf_gpt2",
+                    "name": "hf_causal",
+                    "module": "invarlock.adapters.hf_causal",
                     "version": INVARLOCK_VERSION,
                     "available": True,
-                    "entry_point": "hf_gpt2",
+                    "entry_point": "hf_causal",
                     "entry_point_group": "invarlock.adapters",
                 },
                 "edit": {
@@ -1074,7 +1074,7 @@ class TestEffectivePoliciesAndResolution:
         report = {
             "meta": {
                 "model_id": "m",
-                "adapter": "hf_gpt2",
+                "adapter": "hf_causal",
                 "commit": "abc",
                 "ts": "2024",
             },

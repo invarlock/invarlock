@@ -9,7 +9,7 @@ def _mk_run_with_windows(final_vals: list[float], token_counts: list[int]) -> di
     assert len(final_vals) == len(token_counts) and len(final_vals) > 0
     # Use identical preview/final for simplicity; only final is used for baseline pairing
     return {
-        "meta": {"model_id": "model", "adapter": "hf_gpt2", "seed": 42},
+        "meta": {"model_id": "model", "adapter": "hf_causal", "seed": 42},
         "metrics": {
             # Leave ppl_* absent to exercise pair-based recompute/identity
             "primary_metric": {

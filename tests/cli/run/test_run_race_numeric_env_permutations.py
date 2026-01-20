@@ -18,7 +18,7 @@ def _base_cfg(tmp_path: Path, preview=1, final=1) -> Path:
     p.write_text(
         f"""
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:
@@ -178,7 +178,7 @@ def test_memoryerror_on_model_load(tmp_path: Path):
     cfg = _base_cfg(tmp_path)
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def load_model(self, model_id, device=None):
             raise MemoryError("OOM")
@@ -220,7 +220,7 @@ def test_vars_failure_in_to_serialisable_dict(tmp_path: Path):
 
     class Cfg:
         def __init__(self):
-            self.model = SimpleNamespace(id="gpt2", adapter="hf_gpt2", device="cpu")
+            self.model = SimpleNamespace(id="gpt2", adapter="hf_causal", device="cpu")
             self.edit = SimpleNamespace(name="structured", plan={})
             self.auto = SimpleNamespace(enabled=False, tier="balanced", probes=0)
             self.guards = SimpleNamespace(order=[])
@@ -315,7 +315,7 @@ def test_env_var_poisoning_for_tmpdir_and_debug(tmp_path: Path, monkeypatch):
     cfg = _base_cfg(tmp_path)
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def __init__(self):
             self.rest_chunked = 0
@@ -520,7 +520,7 @@ def test_mlm_probability_inversion(tmp_path: Path):
 
     class Cfg:
         def __init__(self):
-            self.model = SimpleNamespace(adapter="hf_gpt2", id="gpt2", device="cpu")
+            self.model = SimpleNamespace(adapter="hf_causal", id="gpt2", device="cpu")
             self.edit = SimpleNamespace(name="structured", plan={})
             self.dataset = SimpleNamespace(
                 provider="synthetic",
@@ -635,7 +635,7 @@ def test_baseline_mlm_no_masked_tokens_exit(tmp_path: Path):
 
     class Cfg:
         def __init__(self):
-            self.model = SimpleNamespace(adapter="hf_gpt2", id="gpt2", device="cpu")
+            self.model = SimpleNamespace(adapter="hf_causal", id="gpt2", device="cpu")
             self.edit = SimpleNamespace(name="structured", plan={})
             self.dataset = SimpleNamespace(
                 provider="synthetic",
@@ -751,7 +751,7 @@ def test_guard_order_permutations(tmp_path: Path, order):
 
     class DummyCfg:
         def __init__(self):
-            self.model = SimpleNamespace(id="gpt2", adapter="hf_gpt2", device="cpu")
+            self.model = SimpleNamespace(id="gpt2", adapter="hf_causal", device="cpu")
             self.edit = SimpleNamespace(name="structured", plan={})
             self.auto = SimpleNamespace(enabled=False, tier="balanced", probes=0)
             self.guards = SimpleNamespace(order=list(order))

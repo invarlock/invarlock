@@ -16,7 +16,7 @@ def _base_cfg(tmp_path: Path, preview=1, final=1) -> Path:
     p.write_text(
         f"""
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:
@@ -185,7 +185,7 @@ def test_mask_flags_do_not_error(tmp_path: Path):
     captured = {}
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def load_model(self, model_id, device=None):  # noqa: D401
             return object()
@@ -254,7 +254,7 @@ def test_snapshot_mode_bytes_restore_called(tmp_path: Path, monkeypatch):
     cfg = _base_cfg(tmp_path, 1, 1)
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def __init__(self):
             self.loaded = 0
@@ -331,7 +331,7 @@ def test_snapshot_mode_bytes_falls_back_to_chunked_on_failure(
     cfg = _base_cfg(tmp_path, 1, 1)
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def __init__(self):
             self.loaded = 0
@@ -422,7 +422,7 @@ def test_snapshot_mode_chunked_restore_called(tmp_path: Path, monkeypatch):
     cfg = _base_cfg(tmp_path, 1, 1)
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def __init__(self):
             self.loaded = 0
@@ -498,7 +498,7 @@ def test_snapshot_mode_reload_loads_each_attempt(tmp_path: Path, monkeypatch):
     cfg = _base_cfg(tmp_path, 1, 1)
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def __init__(self):
             self.loaded = 0

@@ -57,7 +57,7 @@ def _build_sample_certificate() -> dict:
         "run_id": "run-001",
         "meta": {
             "model_id": "gpt2-small",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "device": "cpu",
             "ts": "2025-01-01T00:00:00",
             "commit": "abcdef1234567890",
@@ -143,10 +143,10 @@ def _build_sample_certificate() -> dict:
         },
         "plugins": {
             "adapter": {
-                "name": "hf_gpt2",
-                "module": "invarlock.adapters.hf_gpt2",
+                "name": "hf_causal",
+                "module": "invarlock.adapters.hf_causal",
                 "version": "1.0.0",
-                "entry_point": "hf_gpt2",
+                "entry_point": "hf_causal",
                 "entry_point_group": "invarlock.adapters",
                 "available": True,
             },

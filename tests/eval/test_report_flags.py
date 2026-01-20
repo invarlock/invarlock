@@ -7,7 +7,7 @@ def _base_report():
     rep["meta"].update(
         {
             "model_id": "gpt2",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "device": "cpu",
             "commit": "deadbeef",
         }

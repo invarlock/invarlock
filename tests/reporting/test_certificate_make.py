@@ -7,7 +7,7 @@ def test_make_certificate_with_secondary_and_subgroups():
     report["meta"].update(
         {
             "model_id": "model-x",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "commit": "abc",
             "device": "cpu",
             "ts": "now",
@@ -95,7 +95,7 @@ def test_make_certificate_with_secondary_and_subgroups():
     baseline["meta"].update(
         {
             "model_id": "model-x",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "commit": "abc",
             "device": "cpu",
             "ts": "now",

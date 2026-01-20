@@ -5,7 +5,7 @@ def test_cert_provenance_records_tiny_relax(monkeypatch):
     monkeypatch.setenv("INVARLOCK_TINY_RELAX", "1")
     # Minimal report that passes relaxed path
     report = {
-        "meta": {"model_id": "m", "adapter": "hf_gpt2", "device": "cpu", "seed": 1},
+        "meta": {"model_id": "m", "adapter": "hf_causal", "device": "cpu", "seed": 1},
         "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [2.3]}},
     }

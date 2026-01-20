@@ -11,7 +11,7 @@ def test_run_command_release_profile_with_capacity(tmp_path: Path):
     config_path.write_text(
         """
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:
