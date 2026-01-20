@@ -76,7 +76,7 @@ class TestInvariantsGuardComprehensive:
             )
         return model
 
-    def _create_llama_like_model(self, tied: bool = True) -> nn.Module:
+    def _create_embed_tokens_model(self, tied: bool = True) -> nn.Module:
         model = nn.Module()
         model.model = nn.Module()
         model.model.embed_tokens = nn.Embedding(64, 32)
@@ -224,19 +224,19 @@ class TestInvariantsGuardComprehensive:
         assert arch_flags_untied.get("bert") is False
         assert untied_invariants["weight_tying"] in {False, None}
 
-    def test_capture_invariants_llama_weight_tying(self):
-        """Weight tying detection should cover LLaMA-style architectures."""
-        llama_model = self._create_llama_like_model(tied=True)
-        invariants = self.guard._capture_invariants(llama_model, None)
+    def test_capture_invariants_embed_tokens_weight_tying(self):
+        """Weight tying detection should cover embed_tokens-style architectures."""
+        embed_tokens_model = self._create_embed_tokens_model(tied=True)
+        invariants = self.guard._capture_invariants(embed_tokens_model, None)
 
         assert invariants["weight_tying"] is True
         arch_flags = invariants.get("weight_tying_arches", {})
-        assert arch_flags.get("llama") is True
+        assert arch_flags.get("embed_tokens") is True
 
-        untied = self._create_llama_like_model(tied=False)
+        untied = self._create_embed_tokens_model(tied=False)
         untied_invariants = self.guard._capture_invariants(untied, None)
         arch_flags_untied = untied_invariants.get("weight_tying_arches", {})
-        assert arch_flags_untied.get("llama") is False
+        assert arch_flags_untied.get("embed_tokens") is False
         assert untied_invariants["weight_tying"] in {False, None}
 
 
@@ -2714,11 +2714,11 @@ class TestRMTEnhancedCoverage:
         layers = list(_iter_transformer_layers(self.model))
         assert len(layers) == 3
 
-        # Test LLaMA style model
-        llama_model = nn.Module()
-        llama_model.model = nn.Module()
-        llama_model.model.layers = nn.ModuleList([nn.Module() for _ in range(2)])
-        layers = list(_iter_transformer_layers(llama_model))
+        # Test model.layers style model
+        model_layers_model = nn.Module()
+        model_layers_model.model = nn.Module()
+        model_layers_model.model.layers = nn.ModuleList([nn.Module() for _ in range(2)])
+        layers = list(_iter_transformer_layers(model_layers_model))
         assert len(layers) == 2
 
         # Test BERT style model
@@ -2829,18 +2829,18 @@ class TestRMTEnhancedCoverage:
         """Test rmt_detect_with_names with different model styles (lines 648-660, 681-691)."""
         from invarlock.guards.rmt import rmt_detect_with_names
 
-        # Test LLaMA style model (lines 648-660)
-        llama_model = nn.Module()
-        llama_model.model = nn.Module()
-        llama_model.model.layers = nn.ModuleList()
+        # Test model.layers style model (lines 648-660)
+        model_layers_model = nn.Module()
+        model_layers_model.model = nn.Module()
+        model_layers_model.model.layers = nn.ModuleList()
         layer = nn.Module()
         layer.attn = nn.Module()
         layer.attn.c_attn = nn.Linear(64, 192)
         layer.mlp = nn.Module()
         layer.mlp.c_fc = nn.Linear(64, 256)
-        llama_model.model.layers.append(layer)
+        model_layers_model.model.layers.append(layer)
 
-        result = rmt_detect_with_names(llama_model, threshold=1.5, verbose=True)
+        result = rmt_detect_with_names(model_layers_model, threshold=1.5, verbose=True)
         assert isinstance(result, dict)
         assert "per_layer" in result
         assert "outliers" in result

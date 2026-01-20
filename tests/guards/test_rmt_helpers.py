@@ -114,7 +114,7 @@ def test_iter_transformer_layers_transformer_h_without_iter_len() -> None:
     assert layers == []
 
 
-def test_iter_transformer_layers_llama_style_yields_layers() -> None:
+def test_iter_transformer_layers_model_layers_style_yields_layers() -> None:
     class _Model(nn.Module):
         def __init__(self) -> None:
             super().__init__()
@@ -125,7 +125,7 @@ def test_iter_transformer_layers_llama_style_yields_layers() -> None:
     assert len(layers) == 2
 
 
-def test_iter_transformer_layers_llama_style_handles_iteration_error() -> None:
+def test_iter_transformer_layers_model_layers_style_handles_iteration_error() -> None:
     class _BadIterable:
         def __len__(self) -> int:
             return 1

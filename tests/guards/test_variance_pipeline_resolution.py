@@ -38,8 +38,8 @@ class TinyGPT2Style(nn.Module):
         return x
 
 
-class TinyLLaMAStyle(nn.Module):
-    """Minimal LLaMA style model with model.layers structure."""
+class TinyModelLayersStyle(nn.Module):
+    """Minimal model with model.layers structure."""
 
     def __init__(self, n_layers: int = 2):
         super().__init__()
@@ -215,9 +215,9 @@ def test_iter_gpt2_style():
     assert len(layers) == 3
 
 
-def test_iter_llama_style():
-    """_iter_transformer_layers handles LLaMA (model.layers) structure."""
-    model = TinyLLaMAStyle(n_layers=3)
+def test_iter_model_layers_style():
+    """_iter_transformer_layers handles model.layers structure."""
+    model = TinyModelLayersStyle(n_layers=3)
     layers = list(_iter_transformer_layers(model))
     assert len(layers) == 3
 
