@@ -155,23 +155,6 @@ class CoreRegistry:
             required_deps=["optimum"],
         )
         _fallback(self._adapters, "hf_auto", "invarlock.adapters", "HF_Auto_Adapter")
-        _fallback(self._adapters, "hf_gpt2", "invarlock.adapters", "HF_GPT2_Adapter")
-        _fallback(self._adapters, "hf_bert", "invarlock.adapters", "HF_BERT_Adapter")
-        _fallback(self._adapters, "hf_llama", "invarlock.adapters", "HF_LLaMA_Adapter")
-        _fallback(self._adapters, "hf_t5", "invarlock.adapters", "HF_T5_Adapter")
-        _fallback(
-            self._adapters, "hf_onnx", "invarlock.adapters", "HF_ORT_CausalLM_Adapter"
-        )
-        # Convenience auto adapters (delegate to built-ins)
-        _fallback(
-            self._adapters,
-            "hf_causal_auto",
-            "invarlock.adapters",
-            "HF_Causal_Auto_Adapter",
-        )
-        _fallback(
-            self._adapters, "hf_mlm_auto", "invarlock.adapters", "HF_MLM_Auto_Adapter"
-        )
         # Optional plugin adapters (verify runtime dependencies)
         _fallback(
             self._adapters,
