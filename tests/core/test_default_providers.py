@@ -3,16 +3,16 @@ import importlib
 
 def test_default_provider_known_for_gpt2():
     mp = importlib.import_module("invarlock.model_profile")
-    prof = mp.detect_model_profile("sshleifer/tiny-gpt2", adapter="hf_gpt2")
+    prof = mp.detect_model_profile("sshleifer/tiny-gpt2", adapter="hf_causal")
     assert prof.default_provider in {"wikitext2", "hf_text", "synthetic"}
     # GPT-style should prefer WT2
     assert prof.default_provider == "wikitext2"
 
 
-def test_default_provider_known_for_llama_like():
+def test_default_provider_known_for_mistral():
     mp = importlib.import_module("invarlock.model_profile")
     prof = mp.detect_model_profile(
-        "TinyLlama/TinyLlama-1.1B-Chat-v1.0", adapter="hf_llama"
+        "mistralai/Mistral-7B-v0.1", adapter="hf_causal"
     )
     assert prof.default_provider in {"wikitext2", "hf_text", "synthetic"}
     assert prof.default_provider == "wikitext2"
@@ -20,7 +20,7 @@ def test_default_provider_known_for_llama_like():
 
 def test_default_provider_known_for_bert():
     mp = importlib.import_module("invarlock.model_profile")
-    prof = mp.detect_model_profile("prajjwal1/bert-tiny", adapter="hf_bert")
+    prof = mp.detect_model_profile("prajjwal1/bert-tiny", adapter="hf_mlm")
     assert prof.default_provider in {"wikitext2", "hf_text", "synthetic"}
     # BERT/MLM should default to hf_text
     assert prof.default_provider == "hf_text"
