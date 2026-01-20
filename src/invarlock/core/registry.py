@@ -140,23 +140,21 @@ class CoreRegistry:
                 )
 
         # Register built-in adapters
-        _fallback(self._adapters, "hf_gpt2", "invarlock.adapters", "HF_GPT2_Adapter")
-        _fallback(self._adapters, "hf_bert", "invarlock.adapters", "HF_BERT_Adapter")
-        _fallback(self._adapters, "hf_llama", "invarlock.adapters", "HF_LLaMA_Adapter")
-        _fallback(self._adapters, "hf_t5", "invarlock.adapters", "HF_T5_Adapter")
         _fallback(
-            self._adapters, "hf_onnx", "invarlock.adapters", "HF_ORT_CausalLM_Adapter"
+            self._adapters, "hf_causal", "invarlock.adapters", "HF_Causal_Adapter"
         )
-        # Convenience auto adapters (delegate to built-ins)
+        _fallback(self._adapters, "hf_mlm", "invarlock.adapters", "HF_MLM_Adapter")
+        _fallback(
+            self._adapters, "hf_seq2seq", "invarlock.adapters", "HF_Seq2Seq_Adapter"
+        )
         _fallback(
             self._adapters,
-            "hf_causal_auto",
+            "hf_causal_onnx",
             "invarlock.adapters",
-            "HF_Causal_Auto_Adapter",
+            "HF_Causal_ONNX_Adapter",
+            required_deps=["optimum"],
         )
-        _fallback(
-            self._adapters, "hf_mlm_auto", "invarlock.adapters", "HF_MLM_Auto_Adapter"
-        )
+        _fallback(self._adapters, "hf_auto", "invarlock.adapters", "HF_Auto_Adapter")
         # Optional plugin adapters (verify runtime dependencies)
         _fallback(
             self._adapters,

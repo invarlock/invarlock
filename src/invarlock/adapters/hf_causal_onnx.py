@@ -22,7 +22,7 @@ from invarlock.core.error_utils import wrap_errors
 from invarlock.core.exceptions import DependencyError, ModelLoadError
 
 
-class HF_ORT_CausalLM_Adapter(ModelAdapter):
+class HF_Causal_ONNX_Adapter(ModelAdapter):
     """Optimum/ONNXRuntime causal LM adapter.
 
     Provides a lightweight bridge that loads an ORTModelForCausalLM and
@@ -31,7 +31,7 @@ class HF_ORT_CausalLM_Adapter(ModelAdapter):
     back to reload in the CLI runner.
     """
 
-    name = "hf_onnx"
+    name = "hf_causal_onnx"
 
     # --- Loading ---------------------------------------------------------
     def load_model(self, model_id: str, device: str = "cpu", **kwargs: Any):  # type: ignore[override]
@@ -109,4 +109,4 @@ class HF_ORT_CausalLM_Adapter(ModelAdapter):
         raise NotImplementedError("restore not supported for ONNXRuntime models")
 
 
-__all__ = ["HF_ORT_CausalLM_Adapter"]
+__all__ = ["HF_Causal_ONNX_Adapter"]

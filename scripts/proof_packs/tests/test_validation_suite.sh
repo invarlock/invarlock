@@ -465,11 +465,11 @@ test_pack_validation_estimate_model_weights_covers_known_patterns_and_local_path
 
     assert_eq "90" "$(estimate_model_weights_gb "mistralai/Mixtral-8x7B-v0.1")" "MoE special-case"
     assert_eq "144" "$(estimate_model_weights_gb "Qwen/Qwen1.5-72B")" "72B"
-    assert_eq "140" "$(estimate_model_weights_gb "NousResearch/Llama-2-70b-hf")" "70B"
+    assert_eq "144" "$(estimate_model_weights_gb "Qwen/Qwen2.5-72B")" "72B alt"
     assert_eq "68" "$(estimate_model_weights_gb "01-ai/Yi-34B")" "34B"
     assert_eq "64" "$(estimate_model_weights_gb "Qwen/Qwen2.5-32B")" "32B"
     assert_eq "28" "$(estimate_model_weights_gb "Qwen/Qwen2.5-14B")" "14B"
-    assert_eq "26" "$(estimate_model_weights_gb "meta-llama/Llama-2-13b-hf")" "13B"
+    assert_eq "14" "$(estimate_model_weights_gb "Qwen/Qwen2.5-7B")" "7B alt"
     assert_eq "14" "$(estimate_model_weights_gb "mistralai/Mistral-7B-v0.1")" "7B"
 }
 

@@ -18,33 +18,33 @@ def _write_cfg(tmp_path: Path, model_type: str, arch: str) -> Path:
     return d
 
 
-def test_resolve_auto_adapter_llama(tmp_path):
-    model_dir = _write_cfg(tmp_path, "llama", "LlamaForCausalLM")
-    assert resolve_auto_adapter(str(model_dir)) == "hf_llama"
+def test_resolve_auto_adapter_mistral(tmp_path):
+    model_dir = _write_cfg(tmp_path, "mistral", "MistralForCausalLM")
+    assert resolve_auto_adapter(str(model_dir)) == "hf_causal"
 
 
 def test_resolve_auto_adapter_qwen(tmp_path):
     model_dir = _write_cfg(tmp_path, "qwen2", "Qwen2ForCausalLM")
-    assert resolve_auto_adapter(str(model_dir)) == "hf_llama"
+    assert resolve_auto_adapter(str(model_dir)) == "hf_causal"
 
 
 def test_resolve_auto_adapter_mixtral(tmp_path):
     model_dir = _write_cfg(tmp_path, "mixtral", "MixtralForCausalLM")
-    assert resolve_auto_adapter(str(model_dir)) == "hf_llama"
+    assert resolve_auto_adapter(str(model_dir)) == "hf_causal"
 
 
 def test_resolve_auto_adapter_bert(tmp_path):
     model_dir = _write_cfg(tmp_path, "bert", "BertForMaskedLM")
-    assert resolve_auto_adapter(str(model_dir)) == "hf_bert"
+    assert resolve_auto_adapter(str(model_dir)) == "hf_mlm"
 
 
 def test_resolve_auto_adapter_gpt_fallback(tmp_path):
     model_dir = _write_cfg(tmp_path, "gpt2", "GPT2LMHeadModel")
-    assert resolve_auto_adapter(str(model_dir)) == "hf_gpt2"
+    assert resolve_auto_adapter(str(model_dir)) == "hf_causal"
 
 
 def test_apply_auto_adapter_if_needed_updates_cfg(tmp_path):
-    model_dir = _write_cfg(tmp_path, "llama", "LlamaForCausalLM")
+    model_dir = _write_cfg(tmp_path, "mistral", "MistralForCausalLM")
     cfg = InvarLockConfig(
         {
             "model": {"id": str(model_dir), "adapter": "auto", "device": "cpu"},
@@ -56,4 +56,4 @@ def test_apply_auto_adapter_if_needed_updates_cfg(tmp_path):
         }
     )
     new_cfg = apply_auto_adapter_if_needed(cfg)
-    assert new_cfg.model.adapter == "hf_llama"
+    assert new_cfg.model.adapter == "hf_causal"

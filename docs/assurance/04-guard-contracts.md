@@ -233,7 +233,7 @@ Detailed derivations are in the calibration appendix (`09-tier-v1-calibration.md
 - No adversarial robustness or gradient masking guarantees.
 - CUDA kernels outside deterministic mode may exceed drift tolerances.
 - Reference mask-based flows are conservative; stronger compression requires plugins.
-- Calibration data currently covers GPT-2, BERT, and TinyLLaMA profiles.
+- Calibration data currently covers GPT-2 and BERT profiles.
   Contributions for additional model families are welcome—attach pilot certs
   and summary CSVs (typically written under `reports/calibration/` when running
   the calibration scripts) to change proposals or release artifacts.

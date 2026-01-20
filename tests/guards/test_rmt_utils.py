@@ -114,13 +114,13 @@ def test_iter_transformer_layers_covers_common_model_layouts():
     )()
     assert list(_iter_transformer_layers(gpt2_style)) == gpt_layers
 
-    llama_layers = [object()]
-    llama_style = type(
-        "_LlamaStyle",
+    model_layers = [object()]
+    model_layers_style = type(
+        "_ModelLayersStyle",
         (),
-        {"model": type("_M", (), {"layers": llama_layers})()},
+        {"model": type("_M", (), {"layers": model_layers})()},
     )()
-    assert list(_iter_transformer_layers(llama_style)) == llama_layers
+    assert list(_iter_transformer_layers(model_layers_style)) == model_layers
 
     bert_layers = [object(), object(), object()]
     bert_style = type(

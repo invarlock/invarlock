@@ -47,7 +47,7 @@ class ScenarioConfig:
     probes: int
     profile: str = "ci"  # "ci" or "release"
     model_id: str = "gpt2"
-    adapter: str = "hf_gpt2"
+    adapter: str = "hf_causal"
     device: str = "auto"
     seq_len: int = 512
     stride: int = 128
@@ -81,7 +81,7 @@ class BenchmarkConfig:
     profile: str = "ci"  # "ci" or "release"
     dataset: str = "wikitext2"
     model_id: str = "gpt2"
-    adapter: str = "hf_gpt2"
+    adapter: str = "hf_causal"
     device: str = "auto"
     seq_len: int = 512
     stride: int = 128
@@ -1423,7 +1423,7 @@ def main():
         "--dataset", default="wikitext2", help="Dataset to use for benchmarking"
     )
     parser.add_argument("--model-id", default="gpt2", help="Model identifier")
-    parser.add_argument("--adapter", default="hf_gpt2", help="Model adapter to use")
+    parser.add_argument("--adapter", default="hf_causal", help="Model adapter to use")
     parser.add_argument(
         "--device", default="auto", help="Device to use (auto|cuda|mps|cpu)"
     )

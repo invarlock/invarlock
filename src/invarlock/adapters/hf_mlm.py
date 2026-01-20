@@ -1,15 +1,8 @@
 """
-HuggingFace BERT Model Adapter
+HuggingFace masked LM adapter.
 ==============================
 
-ModelAdapter implementation for HuggingFace BERT architecture models.
-
-This adapter provides BERT-specific integration including:
-- Support for BERT, RoBERTa, DistilBERT, and other BERT variants
-- Proper handling of bidirectional attention layers
-- Support for classification heads and pooling layers
-- Token type embeddings and position embeddings handling
-- Proper device-aware state serialization
+ModelAdapter implementation for HuggingFace masked language models.
 """
 
 from typing import Any
@@ -27,7 +20,7 @@ TensorType = torch.Tensor
 ModuleType = nn.Module
 
 
-class HF_BERT_Adapter(HFAdapterMixin, ModelAdapter):
+class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
     """
     HuggingFace-specific ModelAdapter implementation for BERT models.
 
@@ -39,7 +32,7 @@ class HF_BERT_Adapter(HFAdapterMixin, ModelAdapter):
     - Device-aware state serialization
     """
 
-    name = "hf_bert"
+    name = "hf_mlm"
 
     def load_model(
         self, model_id: str, device: str = "auto", **kwargs: Any

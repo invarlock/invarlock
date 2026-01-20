@@ -30,7 +30,7 @@ def test_bnb_missing_transformers_dependency(monkeypatch: pytest.MonkeyPatch) ->
     assert "DEPENDENCY-MISSING" in str(err)
 
 
-def test_hf_gpt2_invalid_model_id_maps_to_model_load_error(
+def test_hf_causal_invalid_model_id_maps_to_model_load_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # Provide a lightweight transformers stub so import works
@@ -44,9 +44,9 @@ def test_hf_gpt2_invalid_model_id_maps_to_model_load_error(
     tr.AutoModelForCausalLM = _Auto  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "transformers", tr)
 
-    from invarlock.adapters.hf_gpt2 import HF_GPT2_Adapter
+    from invarlock.adapters.hf_causal import HF_Causal_Adapter
 
-    adapter = HF_GPT2_Adapter()
+    adapter = HF_Causal_Adapter()
     with pytest.raises(Exception) as ei:
         adapter.load_model("bad-id")
     err = ei.value

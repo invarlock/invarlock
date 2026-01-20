@@ -17,7 +17,7 @@ def _cfg(tmp_path: Path, preview=4, final=4) -> Path:
     p.write_text(
         f"""
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:
@@ -232,7 +232,7 @@ def test_unknown_guards_skipped_and_known_kept(tmp_path: Path):
 
     class DummyCfg:
         def __init__(self):
-            self.model = SimpleNamespace(id="gpt2", adapter="hf_gpt2", device="cpu")
+            self.model = SimpleNamespace(id="gpt2", adapter="hf_causal", device="cpu")
             self.edit = SimpleNamespace(name="structured", plan={})
             self.auto = SimpleNamespace(enabled=False, tier="balanced", probes=0)
             self.guards = SimpleNamespace(order=["foo", "bar"])
@@ -635,7 +635,7 @@ def test_plugin_provenance_counts_present(tmp_path: Path):
 
     class DummyCfg:
         def __init__(self):
-            self.model = SimpleNamespace(id="gpt2", adapter="hf_gpt2", device="cpu")
+            self.model = SimpleNamespace(id="gpt2", adapter="hf_causal", device="cpu")
             self.edit = SimpleNamespace(name="structured", plan={})
             self.auto = SimpleNamespace(enabled=False, tier="balanced", probes=0)
             self.guards = SimpleNamespace(order=["a", "b"])

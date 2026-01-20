@@ -36,7 +36,7 @@ def test_render_includes_primary_metric_section():
         "plugins": {},
         "meta": {
             "model_id": "gpt2",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "device": "cpu",
             "ts": "now",
             "seed": 42,

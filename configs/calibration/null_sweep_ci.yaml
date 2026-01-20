@@ -3,7 +3,7 @@
 
 model:
   id: "gpt2"                  # Small model for calibration sweeps
-  adapter: "hf_gpt2"
+  adapter: "hf_causal"
   device: "cpu"               # Use CPU for determinism
 
 dataset:

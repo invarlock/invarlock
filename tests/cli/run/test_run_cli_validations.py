@@ -137,7 +137,7 @@ def test_run_command_fails_when_guard_overhead_exceeds_budget(
 ):
     mock_config = Mock()
     mock_config.model.device = "auto"
-    mock_config.model.adapter = "hf_gpt2"
+    mock_config.model.adapter = "hf_causal"
     mock_config.model.id = "gpt2"
     mock_config.output.dir = Path("./output")
     mock_config.eval.spike_threshold = 2.0
@@ -156,7 +156,7 @@ def test_run_command_fails_when_guard_overhead_exceeds_budget(
     mock_apply_profile.return_value = mock_config
 
     mock_adapter = Mock()
-    mock_adapter.name = "hf_gpt2"
+    mock_adapter.name = "hf_causal"
     bare_model = Mock(name="bare_model")
     guarded_model = Mock(name="guarded_model")
     mock_adapter.load_model.side_effect = [bare_model, guarded_model]

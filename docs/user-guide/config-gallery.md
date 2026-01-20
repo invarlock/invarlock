@@ -19,11 +19,11 @@ core install (`pip install invarlock`) remains torch‑free.
 
 ## Presets (Runnable)
 
-### Causal LM (GPT-2, LLaMA, etc.)
+### Causal LM (decoder-only)
 
 | Preset | Use Case | Model Type | Dataset |
 | --- | --- | --- | --- |
-| `configs/presets/causal_lm/wikitext2_512.yaml` | Standard certification | GPT-2/LLaMA | WikiText-2 |
+| `configs/presets/causal_lm/wikitext2_512.yaml` | Standard certification | Decoder-only causal | WikiText-2 |
 
 **When to use:** Primary preset for causal language models. 512-token sequences
 provide good coverage while keeping runtime reasonable.

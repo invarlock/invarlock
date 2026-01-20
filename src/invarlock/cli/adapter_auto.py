@@ -2,7 +2,8 @@
 Auto adapter resolution utilities.
 
 These helpers map a model identifier (HF directory or Hub ID) to a
-concrete built-in adapter name (hf_gpt2, hf_llama, hf_bert) without
+concrete built-in adapter name (hf_causal, hf_mlm, hf_seq2seq, hf_causal_onnx)
+without
 adding a hard dependency on Transformers.
 """
 
@@ -58,15 +59,15 @@ def _detect_quant_family_from_cfg(cfg: dict[str, Any]) -> str | None:
 
 
 def resolve_auto_adapter(
-    model_id: str | os.PathLike[str], default: str = "hf_gpt2"
+    model_id: str | os.PathLike[str], default: str = "hf_causal"
 ) -> str:
     """Resolve an appropriate built-in adapter name for a model.
 
     Heuristics:
       - Prefer local config.json (no network). Inspect `model_type` and
-        `architectures` to classify LLaMA/Mistral vs BERT vs GPT-like.
+        `architectures` to classify causal vs masked-LM vs seq2seq.
       - Fallback to simple name heuristics on the model_id string.
-      - Default to `hf_gpt2` when unsure.
+      - Default to `hf_causal` when unsure.
     """
     cfg = _read_local_hf_config(model_id)
     model_id_str = str(model_id)
@@ -77,34 +78,41 @@ def resolve_auto_adapter(
         if fam:
             return fam
         mt = str(c.get("model_type", "")).lower()
+        if bool(c.get("is_encoder_decoder", False)):
+            return "hf_seq2seq"
         archs = [str(a) for a in c.get("architectures", []) if isinstance(a, str)]
         arch_blob = " ".join(archs)
-        if (
-            mt in {"llama", "mistral", "mixtral", "qwen", "qwen2", "qwen2_moe", "yi"}
-            or "Llama" in arch_blob
-            or "Mistral" in arch_blob
-            or "Mixtral" in arch_blob
-            or "Qwen" in arch_blob
-        ):
-            return "hf_llama"
+        if "ConditionalGeneration" in arch_blob or "Seq2SeqLM" in arch_blob:
+            return "hf_seq2seq"
         # Treat masked-LM families as BERT-like
         if (
             mt in {"bert", "roberta", "distilbert", "albert", "deberta", "deberta-v2"}
             or "MaskedLM" in arch_blob
         ):
-            return "hf_bert"
-        # Generic causal LM
-        if "CausalLM" in arch_blob or mt in {
+            return "hf_mlm"
+        # Causal LM families (best-effort; structural validation happens in the adapter).
+        if "CausalLM" in arch_blob or "ForCausalLM" in arch_blob:
+            return "hf_causal"
+        if mt in {
+            "mistral",
+            "mixtral",
+            "qwen",
+            "qwen2",
+            "qwen2_moe",
+            "yi",
             "gpt2",
             "gpt_neox",
             "opt",
             "gptj",
-            "gptj8bit",
+            "phi",
+            "falcon",
+            "glm",
+            "deepseek",
         }:
-            return "hf_gpt2"
+            return "hf_causal"
         return None
 
-    # If local directory contains ONNX model files, prefer hf_onnx
+    # If local directory contains ONNX model files, prefer the ONNX causal adapter.
     try:
         p = Path(model_id)
         if p.exists() and p.is_dir():
@@ -116,7 +124,7 @@ def resolve_auto_adapter(
                 "encoder_model.onnx",
             ]
             if any((p / fname).exists() for fname in onnx_files):
-                return "hf_onnx"
+                return "hf_causal_onnx"
     except Exception:
         pass
 
@@ -136,10 +144,10 @@ def resolve_auto_adapter(
         k in lower_id for k in ["bnb", "bitsandbytes", "-4bit", "-8bit", "4bit", "8bit"]
     ):
         return "hf_bnb"
-    if any(k in lower_id for k in ["llama", "mistral", "mixtral", "qwen", "yi"]):
-        return "hf_llama"
+    if any(k in lower_id for k in ["t5", "bart"]):
+        return "hf_seq2seq"
     if any(k in lower_id for k in ["bert", "roberta", "albert", "deberta"]):
-        return "hf_bert"
+        return "hf_mlm"
     return default
 
 
@@ -150,7 +158,7 @@ def apply_auto_adapter_if_needed(cfg: Any) -> Any:
     """
     try:
         adapter = str(getattr(cfg.model, "adapter", ""))
-        if adapter.strip().lower() not in {"auto", "hf_auto", "auto_hf"}:
+        if adapter.strip().lower() not in {"auto", "auto_hf"}:
             return cfg
         model_id = str(getattr(cfg.model, "id", ""))
         resolved = resolve_auto_adapter(model_id)

@@ -16,7 +16,7 @@ def _cfg(tmp_path: Path, preview=2, final=2) -> Path:
     p.write_text(
         f"""
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:
@@ -252,7 +252,7 @@ def test_snapshot_auto_bytes_and_chunked_paths(tmp_path: Path):
             return []
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def __init__(self):
             self.snapshots = []
@@ -332,7 +332,7 @@ def test_bytes_only_adapter_path(tmp_path: Path):
     cfg = _cfg(tmp_path, 1, 1)
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def load_model(self, model_id, device=None):
             class M:
@@ -394,7 +394,7 @@ def test_chunked_only_adapter_path(tmp_path: Path):
     cfg = _cfg(tmp_path, 1, 1)
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def load_model(self, model_id, device=None):
             class M:

@@ -12,7 +12,7 @@ def _mk_base_report() -> dict:
     return {
         "meta": {
             "model_id": "moe-test",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "device": "cpu",
             "seed": 42,
             "ts": "now",

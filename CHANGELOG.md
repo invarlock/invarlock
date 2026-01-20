@@ -147,7 +147,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Test documentation** - README files for `tests/guards/` and `tests/observability/`
 
 ### Changed
-- `hf_llama.py`: Uses `_safe_to_device()` instead of direct `model.to()` call
+- `hf_causal.py`: Uses `_safe_to_device()` instead of direct `model.to()` call
 - `hf_awq_adapter.py`: Uses `_safe_to_device()` with AWQ capabilities
 - `hf_gptq_adapter.py`: Uses `_safe_to_device()` with GPTQ capabilities
 

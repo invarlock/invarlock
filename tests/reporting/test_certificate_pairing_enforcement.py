@@ -11,7 +11,7 @@ def _base_ci_report_and_baseline():
     report["meta"].update(
         {
             "model_id": "model-x",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "commit": "abc",
             "device": "cpu",
             "ts": "now",
@@ -65,7 +65,7 @@ def _base_ci_report_and_baseline():
     baseline["meta"].update(
         {
             "model_id": "model-x",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "commit": "abc",
             "device": "cpu",
             "ts": "now",

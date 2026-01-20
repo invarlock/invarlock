@@ -1,11 +1,11 @@
 """
-HuggingFace T5 Model Adapter
-============================
+HuggingFace encoder-decoder adapter.
+===================================
 
-ModelAdapter implementation for HuggingFace T5 encoder-decoder models.
+ModelAdapter implementation for HuggingFace encoder-decoder (seq2seq) models.
 
-Loads AutoModelForSeq2SeqLM (e.g., t5-small/base/large) and exposes a minimal
-describe() sufficient for guard policies and reporting.
+Loads AutoModelForSeq2SeqLM and exposes a minimal describe() sufficient for
+guard policies and reporting.
 """
 
 from __future__ import annotations
@@ -25,10 +25,10 @@ TensorType = torch.Tensor
 ModuleType = nn.Module
 
 
-class HF_T5_Adapter(HFAdapterMixin, ModelAdapter):
-    """HuggingFace T5 adapter using AutoModelForSeq2SeqLM."""
+class HF_Seq2Seq_Adapter(HFAdapterMixin, ModelAdapter):
+    """HuggingFace encoder-decoder adapter using AutoModelForSeq2SeqLM."""
 
-    name = "hf_t5"
+    name = "hf_seq2seq"
 
     def load_model(  # type: ignore[override]
         self, model_id: str, device: str = "auto", **kwargs: Any
@@ -136,4 +136,4 @@ class HF_T5_Adapter(HFAdapterMixin, ModelAdapter):
         return super().restore(model, blob)
 
 
-__all__ = ["HF_T5_Adapter"]
+__all__ = ["HF_Seq2Seq_Adapter"]

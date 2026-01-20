@@ -142,7 +142,7 @@ fi
 # Small models (fit on a single high-memory GPU under typical settings)
 # Note: leave a MODEL_N unset to use the default below; set it to an empty string to disable.
 if [[ ! ${MODEL_1+x} ]]; then MODEL_1="mistralai/Mistral-7B-v0.1"; fi           # ~14 GB
-if [[ ! ${MODEL_2+x} ]]; then MODEL_2="NousResearch/Llama-2-13b-hf"; fi         # ~26 GB
+if [[ ! ${MODEL_2+x} ]]; then MODEL_2="Qwen/Qwen2.5-7B"; fi                     # ~14 GB
 if [[ ! ${MODEL_3+x} ]]; then MODEL_3="Qwen/Qwen2.5-14B"; fi                    # ~28 GB
 
 # Medium/MoE models
@@ -151,7 +151,7 @@ if [[ ! ${MODEL_5+x} ]]; then MODEL_5="01-ai/Yi-34B"; fi                        
 if [[ ! ${MODEL_6+x} ]]; then MODEL_6="mistralai/Mixtral-8x7B-v0.1"; fi         # ~90 GB
 
 # Large models
-if [[ ! ${MODEL_7+x} ]]; then MODEL_7="NousResearch/Llama-2-70b-hf"; fi         # ~140 GB
+if [[ ! ${MODEL_7+x} ]]; then MODEL_7="Qwen/Qwen2.5-72B"; fi                    # ~144 GB
 if [[ ! ${MODEL_8+x} ]]; then MODEL_8="Qwen/Qwen1.5-72B"; fi                    # ~144 GB
 
 pack_model_list() {

@@ -9,7 +9,7 @@ def _mock_report_with_seed_and_device() -> dict[str, Any]:
     return {
         "meta": {
             "model_id": "stub",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "device": "cpu",
             "seed": 11,
             "seeds": {"python": 11},

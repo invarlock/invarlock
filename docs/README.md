@@ -204,7 +204,7 @@ invarlock verify reports/cert/evaluation.cert.json
 ```yaml
 model:
   id: gpt2
-  adapter: hf_gpt2
+  adapter: hf_causal
   device: auto
 dataset:
   provider: wikitext2

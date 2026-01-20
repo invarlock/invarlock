@@ -34,7 +34,7 @@ class MetaData(TypedDict):
     """Metadata about the model and execution environment."""
 
     model_id: str  # Model identifier (e.g., "gpt2", "path/to/model")
-    adapter: str  # Adapter name (e.g., "hf_gpt2")
+    adapter: str  # Adapter name (e.g., "hf_causal")
     commit: str  # Git commit SHA
     seed: int  # Random seed used for evaluation
     device: str  # Device used ("cpu", "cuda", "mps")

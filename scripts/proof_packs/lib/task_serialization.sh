@@ -628,7 +628,7 @@ print_queue_summary() {
 # We MUST parse the model name to estimate size.
 #
 # This function handles both:
-# - HuggingFace model IDs (e.g., "Qwen/Qwen1.5-72B", "NousResearch/Llama-2-70b-hf")
+# - HuggingFace model IDs (e.g., "Qwen/Qwen1.5-72B", "mistralai/Mixtral-8x7B-v0.1")
 # - Local paths (e.g., "/path/to/model") - can use config.json if available
 estimate_model_memory() {
     local model_id="$1"

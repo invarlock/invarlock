@@ -28,7 +28,7 @@ class DummyBlock(nn.Module):
         self.mlp = DummyMLP()
 
 
-class LLaMAStyle(nn.Module):
+class ModelLayersStyle(nn.Module):
     def __init__(self):
         super().__init__()
         self.model = nn.Module()
@@ -42,10 +42,10 @@ class BertStyle(nn.Module):
         self.encoder.layer = nn.ModuleList([DummyBlock()])
 
 
-def test_iter_layers_llama_and_bert_styles_allow_empty():
+def test_iter_layers_model_layers_and_bert_styles_allow_empty():
     # Both architectures should be iterable; allow_empty skips data collection
     out1 = equalise_residual_variance(
-        LLaMAStyle(), dataloader=[], allow_empty=True, windows=1
+        ModelLayersStyle(), dataloader=[], allow_empty=True, windows=1
     )
     out2 = equalise_residual_variance(
         BertStyle(), dataloader=[], allow_empty=True, windows=1

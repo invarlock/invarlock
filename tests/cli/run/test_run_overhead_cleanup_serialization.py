@@ -19,7 +19,7 @@ def _base_cfg(tmp_path: Path, preview=1, final=1) -> Path:
     p.write_text(
         f"""
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:
@@ -83,7 +83,7 @@ def test_cleanup_rmtree_exception_is_swallowed(tmp_path: Path, monkeypatch):
     cfg = _base_cfg(tmp_path)
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def load_model(self, model_id, device=None):
             return SimpleNamespace(
@@ -101,7 +101,9 @@ def test_cleanup_rmtree_exception_is_swallowed(tmp_path: Path, monkeypatch):
     def load_cfg(p):
         class Cfg:
             def __init__(self):
-                self.model = SimpleNamespace(id="gpt2", adapter="hf_gpt2", device="cpu")
+                self.model = SimpleNamespace(
+                    id="gpt2", adapter="hf_causal", device="cpu"
+                )
                 self.edit = SimpleNamespace(name="quant_rtn", plan={})
                 self.auto = SimpleNamespace(enabled=False, tier="balanced", probes=0)
                 self.guards = SimpleNamespace(order=[])
@@ -292,7 +294,7 @@ def test_until_pass_baseline_disappears_between_attempts(tmp_path: Path):
     attempts = {"exec": 0, "cert": 0}
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def load_model(self, model_id, device=None):
             return object()
@@ -397,7 +399,7 @@ def test_restore_chunked_missing_dir_causes_exit(tmp_path: Path):
     cfg = _base_cfg(tmp_path)
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def load_model(self, model_id, device=None):
             return object()
@@ -413,7 +415,9 @@ def test_restore_chunked_missing_dir_causes_exit(tmp_path: Path):
     def load_cfg(p):
         class Cfg:
             def __init__(self):
-                self.model = SimpleNamespace(id="gpt2", adapter="hf_gpt2", device="cpu")
+                self.model = SimpleNamespace(
+                    id="gpt2", adapter="hf_causal", device="cpu"
+                )
                 self.edit = SimpleNamespace(name="quant_rtn", plan={})
                 self.auto = SimpleNamespace(enabled=False, tier="balanced", probes=0)
                 self.guards = SimpleNamespace(order=[])
@@ -714,7 +718,7 @@ def test_psutil_virtual_memory_failure(tmp_path: Path):
     cfg = _base_cfg(tmp_path)
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def __init__(self):
             self.restored = 0

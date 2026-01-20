@@ -116,7 +116,7 @@ def test_rmt_guard_finalize_hydrates_edge_risk_from_calibration_batches(
     assert guard.edge_risk_by_family.get("attn") == 0.1
 
 
-def test_iter_transformer_layers_skips_non_iterable_llama_layers() -> None:
+def test_iter_transformer_layers_skips_non_iterable_decoder_layers() -> None:
     class Model(nn.Module):
         def __init__(self) -> None:
             super().__init__()
@@ -147,7 +147,7 @@ def test_rmt_detect_with_names_skips_non_iterable_gpt2_layers() -> None:
     assert out["n_layers_flagged"] == 0
 
 
-def test_rmt_detect_with_names_skips_non_iterable_llama_layers() -> None:
+def test_rmt_detect_with_names_skips_non_iterable_decoder_layers() -> None:
     class Model(nn.Module):
         def __init__(self) -> None:
             super().__init__()

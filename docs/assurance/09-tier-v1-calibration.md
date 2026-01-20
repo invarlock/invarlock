@@ -1,7 +1,7 @@
 # Tier v1.0 Calibration (Pilot + Method)
 
 > **Plain language:** This appendix has two roles:
-> (1) the **pilot numbers** we measured for GPT-2 small, BERT base, and TinyLLaMA (Nov 2025) that underpin the **Balanced** and **Conservative** tiers; and
+> (1) the **pilot numbers** we measured for GPT-2 small and BERT base (Nov 2025) that underpin the **Balanced** and **Conservative** tiers; and
 > (2) the **exact recipe** to recalibrate from scratch on your setup (weight-based Spectral κ, activation-based RMT ε, VE min-effect, and window sizing).
 > Every knob is surfaced in run reports and certificates so reviewers can audit or recompute.
 >
@@ -168,7 +168,7 @@ $$
 \text{half-width} \approx z \cdot \frac{\hat{\sigma}}{\sqrt{n}}
 $$
 
-* **Balanced pilot target:** ±0.001 on GPT-2/TinyLLaMA release profile (CI profile uses fewer windows).
+* **Balanced pilot target:** ±0.001 on GPT-2 release profile (CI profile uses fewer windows).
 * Sweep $n$ to find the “coverage vs cost” knee; enforce **non-overlap** (`stride = seq_len`) and reuse baseline window IDs for perfect pairing.
 
 **Window sizing provenance.** Window counts are controlled by the selected runtime

@@ -199,7 +199,7 @@ def test_run_command_until_pass_retry_flow(tmp_path: Path):
     cfg.write_text(
         """
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:
@@ -350,7 +350,7 @@ def test_until_pass_retry_summary_printed(tmp_path: Path):
         textwrap.dedent(
             """
             model:
-              adapter: hf_gpt2
+              adapter: hf_causal
               id: gpt2
               device: cpu
             edit:
@@ -512,7 +512,7 @@ def _cfg(tmp_path: Path) -> str:
         textwrap.dedent(
             """
             model:
-              adapter: hf_gpt2
+              adapter: hf_causal
               id: gpt2
               device: auto
             edit:

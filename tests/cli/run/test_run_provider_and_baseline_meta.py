@@ -17,7 +17,7 @@ def _base_cfg(tmp_path: Path, preview=2, final=2) -> Path:
     p.write_text(
         f"""
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:

@@ -150,7 +150,7 @@ fields produced by `invarlock.assurance.make_certificate`.
   "run_id": "20251013T012233Z-quant8-balanced",
   "meta": {
     "model_id": "gpt2",
-    "adapter": "hf_gpt2",
+    "adapter": "hf_causal",
     "device": "cpu",
     "seeds": {
       "python": 1337,

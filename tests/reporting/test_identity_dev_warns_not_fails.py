@@ -6,7 +6,7 @@ from invarlock.reporting.certificate import make_certificate
 def test_identity_deviation_in_dev_does_not_raise() -> None:
     # Construct a minimal report with drift ratio 1.0 but paired delta implying a different ratio
     report = {
-        "meta": {"model_id": "bert-tiny", "adapter": "hf_bert", "seed": 42},
+        "meta": {"model_id": "bert-tiny", "adapter": "hf_mlm", "seed": 42},
         "metrics": {
             "paired_delta_summary": {
                 "mean": 0.5,

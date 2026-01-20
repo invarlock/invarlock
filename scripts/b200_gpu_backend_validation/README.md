@@ -32,11 +32,11 @@ Model-based (runs a forward pass and hooks a few linear modules):
 ```bash
 CUDA_VISIBLE_DEVICES=0 INVARLOCK_ALLOW_NETWORK=1 \
 python3 scripts/b200_gpu_backend_validation/validate_svd_backend_equivalence.py \
-  --model NousResearch/Llama-2-13b-hf \
+  --model Qwen/Qwen2.5-14B \
   --max-modules 4 \
   --seq-len 1024 \
   --strict-determinism \
-  --out results/svd_backend_llama13b.json
+  --out results/svd_backend_qwen14b.json
 ```
 
 ## Multi-GPU runner (8× B200)
@@ -51,12 +51,12 @@ bash scripts/b200_gpu_backend_validation/run_multi_gpu.sh \
   --out-dir "$OUT_DIR" \
   --strict-determinism \
   --model mistralai/Mistral-7B-v0.1 \
-  --model NousResearch/Llama-2-13b-hf \
+  --model Qwen/Qwen2.5-7B \
   --model Qwen/Qwen2.5-14B \
   --model Qwen/Qwen2.5-32B \
   --model 01-ai/Yi-34B \
   --model mistralai/Mixtral-8x7B-v0.1 \
-  --model NousResearch/Llama-2-70b-hf \
+  --model Qwen/Qwen2.5-72B \
   --model Qwen/Qwen1.5-72B
 ```
 
@@ -70,4 +70,3 @@ Each run writes `*.json` + `*.log` under `--out-dir`.
   - to keep CPU as the canonical backend for strict claims.
 
 If you want this harness to enforce a specific tolerance, use the `--fail-*` flags so CI can gate backend changes automatically.
-

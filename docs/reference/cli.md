@@ -271,13 +271,13 @@ Evidence debug
 
 - Name and version (when known)
 - Module path
-- Entry point group/name (e.g., `invarlock.adapters:hf_gpt2`)
+- Entry point group/name (e.g., `invarlock.adapters:hf_causal`)
 - Status and any extras hints (e.g., `invarlock[adapters]`)
 
 Built-in entry points include:
 
-- Adapters: `hf_gpt2`, `hf_bert`, `hf_llama`
-  - Convenience: `adapter: auto` resolves to a concrete adapter (`hf_gpt2`/`hf_llama`/`hf_bert`) from the model's `config.json`.
+- Adapters: `hf_causal`, `hf_mlm`, `hf_causal`
+  - Convenience: `adapter: auto` resolves to a concrete adapter (`hf_causal`/`hf_causal`/`hf_mlm`) from the model's `config.json`.
 - Edits: `quant_rtn`
   - Guards: `invariants`, `spectral`, `rmt`, `variance`
 
@@ -416,10 +416,10 @@ Adapters example:
   "category": "adapters",
   "items": [
     {
-      "name": "hf_gpt2",
+      "name": "hf_causal",
       "kind": "adapter",
-      "module": "invarlock.adapters.hf_gpt2",
-      "entry_point": "invarlock.adapters.hf_gpt2:Adapter",
+      "module": "invarlock.adapters.hf_causal",
+      "entry_point": "invarlock.adapters.hf_causal:Adapter",
       "origin": "builtin",
       "backend": { "name": "transformers", "version": "4.43.0" }
     }
@@ -482,14 +482,14 @@ $ invarlock plugins list
 ┏━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃ Adapter        ┃ Origin ┃ Mode         ┃ Backend      ┃ Version  ┃ Status / Action                     ┃
 ┡━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ hf_bert        │ Core   │ Adapter      │ transformers │ ==<ver>  │ ✅ Ready                            │
-│ hf_gpt2        │ Core   │ Adapter      │ transformers │ ==<ver>  │ ✅ Ready                            │
-│ hf_llama       │ Core   │ Adapter      │ transformers │ ==<ver>  │ ✅ Ready                            │
-│ hf_onnx        │ Core   │ Adapter      │ transformers │ ==<ver>  │ ✅ Ready                            │
-│ hf_t5          │ Core   │ Adapter      │ transformers │ ==<ver>  │ ✅ Ready                            │
+│ hf_mlm        │ Core   │ Adapter      │ transformers │ ==<ver>  │ ✅ Ready                            │
+│ hf_causal        │ Core   │ Adapter      │ transformers │ ==<ver>  │ ✅ Ready                            │
+│ hf_causal       │ Core   │ Adapter      │ transformers │ ==<ver>  │ ✅ Ready                            │
+│ hf_causal_onnx        │ Core   │ Adapter      │ transformers │ ==<ver>  │ ✅ Ready                            │
+│ hf_seq2seq          │ Core   │ Adapter      │ transformers │ ==<ver>  │ ✅ Ready                            │
 ├────────────────┼────────┼──────────────┼──────────────┼──────────┼─────────────────────────────────────┤
-│ hf_causal_auto │ Core   │ Auto‑matcher │ transformers │ ==<ver>  │ 🧩 Auto (selects best hf_* adapter) │
-│ hf_mlm_auto    │ Core   │ Auto‑matcher │ transformers │ ==<ver>  │ 🧩 Auto (selects best hf_* adapter) │
+│ hf_auto │ Core   │ Auto‑matcher │ transformers │ ==<ver>  │ 🧩 Auto (selects best hf_* adapter) │
+│ hf_auto    │ Core   │ Auto‑matcher │ transformers │ ==<ver>  │ 🧩 Auto (selects best hf_* adapter) │
 └────────────────┴────────┴──────────────┴──────────────┴──────────┴─────────────────────────────────────┘
 Hints: add --only ready|core|optional|auto|unsupported · use --json for scripting · use adapters (plural)
                           Dataset Providers
@@ -548,7 +548,7 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
 ```yaml
 model:
   id: gpt2
-  adapter: hf_gpt2
+  adapter: hf_causal
 dataset:
   provider: wikitext2
   seq_len: 768

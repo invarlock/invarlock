@@ -1329,7 +1329,7 @@ generate_all_tasks() {
         local model_id="${models[$idx]}"
         if [[ -n "${model_id}" ]]; then
             # Use full model id (including org) for filesystem-safe name to avoid collisions
-            # Example: meta-llama/Llama-2-7b-hf -> meta-llama__llama-2-7b-hf
+            # Example: mistralai/Mistral-7B-v0.1 -> mistralai__mistral-7b-v0.1
             local model_name
             model_name=$(printf '%s' "${model_id}" \
                 | tr '[:upper:]' '[:lower:]' \

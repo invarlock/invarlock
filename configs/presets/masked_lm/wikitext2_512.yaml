@@ -2,7 +2,7 @@
 
 model:
   id: "prajjwal1/bert-tiny"
-  adapter: "hf_bert"
+  adapter: "hf_mlm"
   device: "auto"
 
 dataset:

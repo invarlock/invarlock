@@ -28,7 +28,6 @@ artifacts, their maintainers, and license terms as of 2025-12-01.
 |-------|-----------|--------|---------|
 | `gpt2` | OpenAI | [Hugging Face](https://huggingface.co/gpt2) | [Modified MIT](https://huggingface.co/gpt2/resolve/main/README.md) |
 | `bert-base-uncased` | Google | [Hugging Face](https://huggingface.co/bert-base-uncased) | [Apache License 2.0](https://huggingface.co/bert-base-uncased/resolve/main/README.md) |
-| `TinyLlama/TinyLlama-1.1B-Chat-v1.0` | TinyLlama team | [Hugging Face](https://huggingface.co/TinyLlama/TinyLlama-1.1B-Chat-v1.0) | [Apache License 2.0](https://huggingface.co/TinyLlama/TinyLlama-1.1B-Chat-v1.0/resolve/main/LICENSE) |
 
 Users are responsible for ensuring they comply with the upstream model licenses when redistributing weights
 or deploying downstream products.

@@ -9,7 +9,7 @@ from invarlock.cli.commands.explain_gates import explain_gates_command
 def _mk_pairable_reports(ratio: float = 1.101) -> tuple[dict, dict]:
     # Baseline with finite ppl_final
     base = {
-        "meta": {"model_id": "m", "adapter": "hf_gpt2", "device": "cpu", "seed": 42},
+        "meta": {"model_id": "m", "adapter": "hf_causal", "device": "cpu", "seed": 42},
         "metrics": {
             "primary_metric": {"kind": "ppl_causal", "final": 50.0},
             "bootstrap": {"replicates": 400, "alpha": 0.05},
@@ -32,7 +32,7 @@ def _mk_pairable_reports(ratio: float = 1.101) -> tuple[dict, dict]:
     sub = {
         "meta": {
             "model_id": "m",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "device": "cpu",
             "seed": 42,
             "auto": {"tier": "balanced"},

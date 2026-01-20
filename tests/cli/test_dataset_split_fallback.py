@@ -31,7 +31,7 @@ def test_choose_dataset_split_logic():
 def test_certificate_telemetry_includes_split(tmp_path: Path):
     # Minimal, valid-enough report/baseline pair
     report = {
-        "meta": {"model_id": "m", "adapter": "hf_gpt2", "device": "cpu", "seed": 42},
+        "meta": {"model_id": "m", "adapter": "hf_causal", "device": "cpu", "seed": 42},
         "metrics": {
             "primary_metric": {"kind": "ppl_causal", "preview": 10.0, "final": 10.0},
         },
@@ -84,7 +84,7 @@ def test_dataset_split_provenance_matches_data_when_both_present():
     # If both report["data"]["split"] and provenance.dataset_split are present,
     # they should match. This keeps provenance as the source‑of‑truth while mirroring to data.
     report = {
-        "meta": {"model_id": "m", "adapter": "hf_gpt2", "device": "cpu", "seed": 42},
+        "meta": {"model_id": "m", "adapter": "hf_causal", "device": "cpu", "seed": 42},
         "data": {
             "dataset": "dummy",
             "split": "eval",

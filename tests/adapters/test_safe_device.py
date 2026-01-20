@@ -104,7 +104,7 @@ class TestSafeToDevice:
         mock_model = MagicMock(spec=nn.Module)
         mock_model.config = MagicMock()
         mock_model.config.quantization_config = None
-        mock_model.config.model_type = "llama"
+        mock_model.config.model_type = "mistral"
         mock_model.config.architectures = []
         mock_model.to = MagicMock(return_value=mock_model)
 
@@ -120,7 +120,7 @@ class TestSafeToDevice:
         mock_model = MagicMock(spec=nn.Module)
         mock_model.config = MagicMock()
         mock_model.config.quantization_config = {"load_in_8bit": True}
-        mock_model.config.model_type = "llama"
+        mock_model.config.model_type = "mistral"
         mock_model.config.architectures = []
         mock_model.to = MagicMock(return_value=mock_model)
 
@@ -228,7 +228,7 @@ class TestDetectCapabilities:
         mock_model = MagicMock()
         mock_model.config = MagicMock()
         mock_model.config.quantization_config = None
-        mock_model.config.model_type = "llama"
+        mock_model.config.model_type = "mistral"
         mock_model.config.architectures = []
 
         caps = mixin._detect_capabilities(mock_model)

@@ -201,9 +201,9 @@ def plugins_command(
                 entry = info.get("entry_point")
                 # Classify support level independent of origin
                 if module.startswith("invarlock.adapters"):
-                    if n in {"hf_causal_auto", "hf_mlm_auto"}:
+                    if n in {"hf_auto"}:
                         support = "auto"
-                    elif n in {"hf_onnx"}:
+                    elif n in {"hf_causal_onnx"}:
                         # ONNX relies on optional extras (optimum + onnxruntime)
                         support = "optional"
                     else:
@@ -236,7 +236,7 @@ def plugins_command(
                 if backend_name in {"auto-gptq", "autoawq"} and not is_linux:
                     status = "unsupported"
                     enable = "Linux-only"
-                # Extras completeness for certain adapters (e.g., hf_onnx needs optimum + onnxruntime)
+                # Extras completeness for certain adapters (e.g., hf_causal_onnx needs optimum + onnxruntime)
                 try:
                     extras_status = _check_plugin_extras(n, "adapters")
                 except Exception:
@@ -883,10 +883,14 @@ def _check_plugin_extras(plugin_name: str, plugin_type: str) -> str:
         "variance": {"packages": [], "extra": ""},
         "rmt": {"packages": [], "extra": ""},
         # Adapter plugins (baked-in only)
-        "hf_gpt2": {"packages": ["transformers"], "extra": "invarlock[adapters]"},
-        "hf_bert": {"packages": ["transformers"], "extra": "invarlock[adapters]"},
-        "hf_llama": {"packages": ["transformers"], "extra": "invarlock[adapters]"},
-        "hf_onnx": {"packages": ["optimum", "onnxruntime"], "extra": "invarlock[onnx]"},
+        "hf_causal": {"packages": ["transformers"], "extra": "invarlock[adapters]"},
+        "hf_mlm": {"packages": ["transformers"], "extra": "invarlock[adapters]"},
+        "hf_seq2seq": {"packages": ["transformers"], "extra": "invarlock[adapters]"},
+        "hf_auto": {"packages": ["transformers"], "extra": "invarlock[adapters]"},
+        "hf_causal_onnx": {
+            "packages": ["optimum", "onnxruntime"],
+            "extra": "invarlock[onnx]",
+        },
         # Optional adapter plugins
         "hf_gptq": {"packages": ["auto_gptq"], "extra": "invarlock[gptq]"},
         "hf_awq": {"packages": ["autoawq"], "extra": "invarlock[awq]"},
@@ -971,7 +975,7 @@ def _resolve_uninstall_targets(target: str) -> list[str]:
         "bitsandbytes": ["bitsandbytes"],
         # ONNX/Optimum family
         "onnx": ["onnxruntime"],
-        "hf_onnx": ["onnxruntime"],
+        "hf_causal_onnx": ["onnxruntime"],
         "optimum": ["optimum"],
     }
     return mapping.get(name, [])
@@ -1010,7 +1014,7 @@ def _resolve_install_targets(target: str) -> list[str]:
         "transformers": ["invarlock[adapters]"],
         # ONNX/Optimum
         "onnx": ["invarlock[onnx]"],
-        "hf_onnx": ["invarlock[onnx]"],
+        "hf_causal_onnx": ["invarlock[onnx]"],
         "optimum": ["invarlock[onnx]"],
         # Direct packages passthrough
         "bitsandbytes": ["bitsandbytes"],

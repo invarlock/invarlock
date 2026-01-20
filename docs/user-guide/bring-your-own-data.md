@@ -23,7 +23,7 @@ Config snippet:
 ```yaml
 model:
   id: gpt2
-  adapter: hf_gpt2
+  adapter: hf_causal
 
 dataset:
   provider: { kind: local_jsonl }
@@ -53,7 +53,7 @@ Requires `pip install datasets` and network only when first fetching data.
 ```yaml
 model:
   id: gpt2
-  adapter: hf_gpt2
+  adapter: hf_causal
 
 dataset:
   provider: { kind: hf_text }

@@ -10,7 +10,7 @@ def _mk_min_report(tier: str = "balanced") -> dict:
     return {
         "meta": {
             "model_id": "gpt2",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "commit": "deadbeef",
             "device": "cpu",
             "seed": 42,

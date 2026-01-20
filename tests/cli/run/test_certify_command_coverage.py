@@ -10,7 +10,7 @@ def _stub_run(out_dir: Path) -> None:
     ts_dir = out_dir / "20250101_000000"
     ts_dir.mkdir(parents=True, exist_ok=True)
     report = {
-        "meta": {"model_id": "stub", "adapter": "hf_gpt2", "device": "cpu"},
+        "meta": {"model_id": "stub", "adapter": "hf_causal", "device": "cpu"},
         "edit": {"name": "noop"},
         "metrics": {"primary_metric": {"preview": 1.0, "final": 1.0}},
         "data": {"preview_n": 1, "final_n": 1},
@@ -82,7 +82,7 @@ def test_certify_command_reuses_baseline_report_for_coverage(monkeypatch, tmp_pa
     baseline_report.write_text(
         json.dumps(
             {
-                "meta": {"model_id": "stub", "adapter": "hf_gpt2", "device": "cpu"},
+                "meta": {"model_id": "stub", "adapter": "hf_causal", "device": "cpu"},
                 "context": {"profile": "ci", "auto": {"tier": "balanced"}},
                 "edit": {"name": "noop"},
                 "evaluation_windows": {

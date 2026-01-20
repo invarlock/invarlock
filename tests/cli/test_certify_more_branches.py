@@ -104,7 +104,7 @@ def test_certify_uses_inline_preset_when_repo_preset_missing(monkeypatch, tmp_pa
     mod.certify_command(
         source=str(src),
         edited=str(edt),
-        adapter="hf_gpt2",
+        adapter="hf_causal",
         out=str(runs),
         cert_out=str(Path("certs")),
         profile="dev",
@@ -154,7 +154,7 @@ def test_certify_edit_config_successfully_merges_subject(monkeypatch, tmp_path):
     mod.certify_command(
         source=str(src),
         edited=str(edt),
-        adapter="hf_gpt2",
+        adapter="hf_causal",
         preset=str(preset),
         edit_config=str(edit_cfg),
         out=str(Path("runs")),
@@ -166,7 +166,7 @@ def test_certify_edit_config_successfully_merges_subject(monkeypatch, tmp_path):
         Path(".certify_tmp/edited_merged.yaml").read_text(encoding="utf-8")
     )
     assert merged["model"]["id"] == str(edt)
-    assert merged["model"]["adapter"] == "hf_gpt2"
+    assert merged["model"]["adapter"] == "hf_causal"
     assert calls["runs"] == 2
 
 
@@ -194,7 +194,7 @@ def test_certify_edit_config_invalid_yaml_exits(monkeypatch, tmp_path):
         mod.certify_command(
             source=str(src),
             edited=str(edt),
-            adapter="hf_gpt2",
+            adapter="hf_causal",
             edit_config=str(edit_cfg),
             out=str(Path("runs")),
         )
@@ -223,7 +223,7 @@ def test_certify_ci_profile_invalid_json_exits(monkeypatch, tmp_path):
         mod.certify_command(
             source=str(src),
             edited=str(edt),
-            adapter="hf_gpt2",
+            adapter="hf_causal",
             out=str(Path("runs")),
             profile="ci",
         )
@@ -242,7 +242,7 @@ def test_certify_ci_nonfinite_primary_metric_exits(monkeypatch, tmp_path):
     edited_report.write_text(
         json.dumps(
             {
-                "meta": {"device": "cpu", "adapter": "hf_gpt2"},
+                "meta": {"device": "cpu", "adapter": "hf_causal"},
                 "edit": {"name": "quant_rtn"},
                 "metrics": {"primary_metric": {"final": {"bad": "value"}}},
             }
@@ -264,7 +264,7 @@ def test_certify_ci_nonfinite_primary_metric_exits(monkeypatch, tmp_path):
         mod.certify_command(
             source=str(src),
             edited=str(edt),
-            adapter="hf_gpt2",
+            adapter="hf_causal",
             out=str(Path("runs")),
             profile="ci",
         )
@@ -283,7 +283,7 @@ def test_certify_missing_baseline_report_exits(monkeypatch, tmp_path: Path):
         mod.certify_command(
             source=str(src),
             edited=str(edt),
-            adapter="hf_gpt2",
+            adapter="hf_causal",
             out=str(tmp_path / "runs"),
         )
 
@@ -306,7 +306,7 @@ def test_certify_missing_edited_report_exits(monkeypatch, tmp_path: Path):
         mod.certify_command(
             source=str(src),
             edited=str(edt),
-            adapter="hf_gpt2",
+            adapter="hf_causal",
             out=str(runs),
         )
 
@@ -324,7 +324,7 @@ def test_certify_edit_config_missing_exits(monkeypatch, tmp_path: Path):
         mod.certify_command(
             source=str(src),
             edited=str(edt),
-            adapter="hf_gpt2",
+            adapter="hf_causal",
             edit_config=str(tmp_path / "missing_edit.yaml"),
             out=str(tmp_path / "runs"),
         )
