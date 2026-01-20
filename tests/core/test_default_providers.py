@@ -11,9 +11,7 @@ def test_default_provider_known_for_gpt2():
 
 def test_default_provider_known_for_mistral():
     mp = importlib.import_module("invarlock.model_profile")
-    prof = mp.detect_model_profile(
-        "mistralai/Mistral-7B-v0.1", adapter="hf_causal"
-    )
+    prof = mp.detect_model_profile("mistralai/Mistral-7B-v0.1", adapter="hf_causal")
     assert prof.default_provider in {"wikitext2", "hf_text", "synthetic"}
     assert prof.default_provider == "wikitext2"
 

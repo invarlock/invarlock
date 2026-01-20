@@ -558,7 +558,9 @@ def test_provider_kwargs_propagated(tmp_path: Path):
         # Patch load_config to include extra dataset kwargs
         class DummyCfg:
             def __init__(self, outdir):
-                self.model = SimpleNamespace(id="gpt2", adapter="hf_causal", device="cpu")
+                self.model = SimpleNamespace(
+                    id="gpt2", adapter="hf_causal", device="cpu"
+                )
                 self.edit = SimpleNamespace(name="quant_rtn", plan={})
                 self.auto = SimpleNamespace(
                     enabled=False, tier="balanced", probes=0, target_pm_ratio=None
@@ -802,7 +804,9 @@ def test_skip_missing_guard_branch(tmp_path: Path):
         # Bypass config validation to allow unknown guard
         class DummyCfg:
             def __init__(self, outdir):
-                self.model = SimpleNamespace(id="gpt2", adapter="hf_causal", device="cpu")
+                self.model = SimpleNamespace(
+                    id="gpt2", adapter="hf_causal", device="cpu"
+                )
                 self.edit = SimpleNamespace(name="quant_rtn", plan={})
                 self.auto = SimpleNamespace(
                     enabled=False, tier="balanced", probes=0, target_pm_ratio=None

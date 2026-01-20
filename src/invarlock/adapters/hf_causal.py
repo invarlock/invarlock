@@ -153,7 +153,11 @@ class _MoEDecoderSpec(_CausalSpec):
         moe = getattr(layer, "block_sparse_moe", None)
         experts = getattr(moe, "experts", None) if moe is not None else None
         expert0 = _first_item(experts) if experts is not None else None
-        has_moe = bool(expert0 is not None and _has_set_attr(expert0, "w1") and _has_set_attr(expert0, "w2"))
+        has_moe = bool(
+            expert0 is not None
+            and _has_set_attr(expert0, "w1")
+            and _has_set_attr(expert0, "w2")
+        )
         has_norms = _has_set_attr(layer, "input_layernorm") and _has_set_attr(
             layer, "post_attention_layernorm"
         )
@@ -405,7 +409,9 @@ class HF_Causal_Adapter(HFAdapterMixin, ModelAdapter):
             "spec": spec.spec_name,
         }
 
-    def get_layer_modules(self, model: ModuleType | Any, layer_idx: int) -> dict[str, Any]:
+    def get_layer_modules(
+        self, model: ModuleType | Any, layer_idx: int
+    ) -> dict[str, Any]:
         base, layers, _cfg = self._unwrap(model)
         spec = self._select_spec(model, base, layers)
         layer = layers[layer_idx]
