@@ -9,7 +9,7 @@ def _report_with_pm(final_value: float):
     rep["meta"].update(
         {
             "model_id": "gpt2",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "device": "cpu",
             "commit": "deadbeefcafebabe",
             "ts": "2025-01-01T00:00:00",

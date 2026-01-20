@@ -19,7 +19,7 @@ def test_run_report_pm_only_no_ppl_keys(tmp_path: Path, metric_kind: str):
     cfg.write_text(
         f"""
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:

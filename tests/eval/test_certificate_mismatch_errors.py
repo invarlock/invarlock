@@ -10,7 +10,7 @@ def test_certificate_raises_on_drift_ratio_inconsistency():
     report = {
         "meta": {
             "model_id": "gpt2",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "device": "cpu",
             "ts": "2025-01-01T00:00:00",
             "commit": "dead",

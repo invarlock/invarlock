@@ -8,7 +8,7 @@ from typing import Any
 def get_adapter_rows() -> list[dict[str, Any]]:
     """Build adapter rows similar to doctor output for testing.
 
-    Applies optional-extra detection for hf_onnx (optimum/onnxruntime) even if
+    Applies optional-extra detection for hf_causal_onnx (optimum/onnxruntime) even if
     registered as a core adapter, so missing extras are surfaced.
     """
     from invarlock.core.registry import get_registry
@@ -29,13 +29,12 @@ def get_adapter_rows() -> list[dict[str, Any]]:
         module = str(info.get("module") or "")
         support = (
             "auto"
-            if module.startswith("invarlock.adapters")
-            and name in {"hf_causal_auto", "hf_mlm_auto"}
+            if module.startswith("invarlock.adapters") and name in {"hf_auto"}
             else ("core" if module.startswith("invarlock.adapters") else "optional")
         )
         backend, status, enable = None, "ready", ""
 
-        if name in {"hf_gpt2", "hf_bert", "hf_llama", "hf_causal_auto", "hf_mlm_auto"}:
+        if name in {"hf_causal", "hf_mlm", "hf_seq2seq", "hf_auto"}:
             backend = "transformers"
         elif name == "hf_gptq":
             backend = "auto-gptq"
@@ -49,7 +48,7 @@ def get_adapter_rows() -> list[dict[str, Any]]:
             backend = "bitsandbytes"
             if not has_cuda:
                 status, enable = "unsupported", "Requires CUDA"
-        elif name == "hf_onnx":
+        elif name == "hf_causal_onnx":
             backend = "onnxruntime"
             present = (
                 importlib.util.find_spec("optimum.onnxruntime") is not None

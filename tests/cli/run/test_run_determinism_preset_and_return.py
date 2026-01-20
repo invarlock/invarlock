@@ -13,7 +13,7 @@ def _cfg(tmp_path: Path) -> Path:
     p.write_text(
         """
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 

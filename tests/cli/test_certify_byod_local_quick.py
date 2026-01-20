@@ -20,7 +20,7 @@ def _cfg(tmp_path: Path, data_file: Path) -> str:
     p.write_text(
         f"""
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: auto
 edit:

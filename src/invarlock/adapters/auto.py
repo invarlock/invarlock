@@ -110,21 +110,26 @@ class _DelegatingAdapter(ModelAdapter):
 
     def _load_adapter(self, adapter_name: str) -> ModelAdapter:
         """Load an adapter by name."""
-        if adapter_name == "hf_llama":
-            HF_LLaMA_Adapter = _importlib.import_module(
-                ".hf_llama", __package__
-            ).HF_LLaMA_Adapter
-            return HF_LLaMA_Adapter()
-        elif adapter_name == "hf_bert":
-            HF_BERT_Adapter = _importlib.import_module(
-                ".hf_bert", __package__
-            ).HF_BERT_Adapter
-            return HF_BERT_Adapter()
-        elif adapter_name == "hf_gpt2":
-            HF_GPT2_Adapter = _importlib.import_module(
-                ".hf_gpt2", __package__
-            ).HF_GPT2_Adapter
-            return HF_GPT2_Adapter()
+        if adapter_name == "hf_causal":
+            HF_Causal_Adapter = _importlib.import_module(
+                ".hf_causal", __package__
+            ).HF_Causal_Adapter
+            return HF_Causal_Adapter()
+        if adapter_name == "hf_mlm":
+            HF_MLM_Adapter = _importlib.import_module(
+                ".hf_mlm", __package__
+            ).HF_MLM_Adapter
+            return HF_MLM_Adapter()
+        if adapter_name == "hf_seq2seq":
+            HF_Seq2Seq_Adapter = _importlib.import_module(
+                ".hf_seq2seq", __package__
+            ).HF_Seq2Seq_Adapter
+            return HF_Seq2Seq_Adapter()
+        if adapter_name == "hf_causal_onnx":
+            HF_Causal_ONNX_Adapter = _importlib.import_module(
+                ".hf_causal_onnx", __package__
+            ).HF_Causal_ONNX_Adapter
+            return HF_Causal_ONNX_Adapter()
         elif adapter_name == "hf_bnb":
             HF_BNB_Adapter = _importlib.import_module(
                 "invarlock.plugins.hf_bnb_adapter"
@@ -141,11 +146,11 @@ class _DelegatingAdapter(ModelAdapter):
             ).HF_GPTQ_Adapter
             return HF_GPTQ_Adapter()
         else:
-            # Default to GPT2 adapter
-            HF_GPT2_Adapter = _importlib.import_module(
-                ".hf_gpt2", __package__
-            ).HF_GPT2_Adapter
-            return HF_GPT2_Adapter()
+            # Default to causal adapter
+            HF_Causal_Adapter = _importlib.import_module(
+                ".hf_causal", __package__
+            ).HF_Causal_Adapter
+            return HF_Causal_Adapter()
 
     def _ensure_delegate_from_id(self, model_id: str) -> ModelAdapter:
         if self._delegate is not None:
@@ -172,14 +177,16 @@ class _DelegatingAdapter(ModelAdapter):
             self._delegate = self._load_adapter(quant_adapter)
             return self._delegate
 
-        # Fall back to class name inspection
+        # Fall back to lightweight class-name inspection (no transformers import).
         cls_name = getattr(model, "__class__", type(model)).__name__.lower()
-        if any(k in cls_name for k in ["llama", "mistral", "mixtral", "qwen", "yi"]):
-            self._delegate = self._load_adapter("hf_llama")
-        elif any(k in cls_name for k in ["bert", "roberta", "albert", "deberta"]):
-            self._delegate = self._load_adapter("hf_bert")
+        if any(k in cls_name for k in ["bert", "roberta", "albert", "deberta"]):
+            self._delegate = self._load_adapter("hf_mlm")
         else:
-            self._delegate = self._load_adapter("hf_gpt2")
+            cfg = getattr(model, "config", None)
+            if getattr(cfg, "is_encoder_decoder", False):
+                self._delegate = self._load_adapter("hf_seq2seq")
+            else:
+                self._delegate = self._load_adapter("hf_causal")
         return self._delegate
 
     def can_handle(self, model: Any) -> bool:  # pragma: no cover - trivial
@@ -206,21 +213,9 @@ class _DelegatingAdapter(ModelAdapter):
         raise AttributeError(item)
 
 
-class HF_Causal_Auto_Adapter(_DelegatingAdapter):
-    name = "hf_causal_auto"
+class HF_Auto_Adapter(_DelegatingAdapter):
+    name = "hf_auto"
 
     def load_model(self, model_id: str, device: str = "auto", **kwargs: Any) -> Any:
         delegate = self._ensure_delegate_from_id(model_id)
         return delegate.load_model(model_id, device=device, **kwargs)
-
-
-class HF_MLM_Auto_Adapter(_DelegatingAdapter):
-    name = "hf_mlm_auto"
-
-    def load_model(self, model_id: str, device: str = "auto", **kwargs: Any) -> Any:
-        # Force BERT-like adapter for MLM families
-        HF_BERT_Adapter = _importlib.import_module(
-            ".hf_bert", __package__
-        ).HF_BERT_Adapter
-        self._delegate = HF_BERT_Adapter()
-        return self._delegate.load_model(model_id, device=device, **kwargs)

@@ -14,7 +14,7 @@ def minimal_cfg(tmp_path: Path) -> Path:
     cfg_path.write_text(
         """
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
 edit:
   name: quant_rtn

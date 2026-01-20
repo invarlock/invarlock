@@ -5,7 +5,7 @@ def _report_with_meta_pm_drift_band():
     return {
         "meta": {
             "model_id": "m",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "seed": 7,
             "device": "cpu",
             "pm_drift_band": {"min": 0.9, "max": 1.3},

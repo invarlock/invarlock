@@ -9,7 +9,7 @@ def test_plugin_adapters_present_in_registry():
     reg = get_registry()
     adapters = set(reg.list_adapters())
     # Built-ins
-    for name in {"hf_gpt2", "hf_bert", "hf_llama"}:
+    for name in {"hf_causal", "hf_mlm", "hf_seq2seq", "hf_causal_onnx", "hf_auto"}:
         assert name in adapters
     # Optional plugins should be discoverable (even if not importable)
     for name in {"hf_gptq", "hf_awq", "hf_bnb"}:

@@ -387,7 +387,7 @@ def _iter_transformer_layers(model: nn.Module):
             except (TypeError, AttributeError):
                 pass
     elif hasattr(model, "model") and hasattr(model.model, "layers"):
-        # LLaMA style
+        # RoPE decoder style
         layers = model.model.layers
         if hasattr(layers, "__iter__") and hasattr(layers, "__len__"):
             try:
@@ -746,7 +746,7 @@ def rmt_detect_with_names(
             for idx, layer in enumerate(h_layers):
                 layer_modules.append((f"transformer.h.{idx}", layer))
     elif hasattr(model, "model") and hasattr(model.model, "layers"):
-        # LLaMA style
+        # RoPE decoder style
         layers = model.model.layers
         if hasattr(layers, "__iter__"):
             for idx, layer in enumerate(layers):

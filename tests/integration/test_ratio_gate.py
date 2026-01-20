@@ -9,7 +9,7 @@ def _ratio_report(preview: float, final: float, tier: str) -> dict:
     report["meta"].update(
         {
             "model_id": "gpt2",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "commit": "deadbeef",
             "device": "cpu",
             "auto": {

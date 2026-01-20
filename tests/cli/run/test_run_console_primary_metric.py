@@ -15,7 +15,7 @@ def test_run_prints_primary_metric_not_ppl_table(tmp_path: Path, capsys):
     cfg.write_text(
         """
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:

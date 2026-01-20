@@ -27,9 +27,9 @@ def test_doctor_helpers_rows(monkeypatch):
     assert isinstance(rows, list) and rows
     names = {r["name"] for r in rows}
     # Expect some known adapters
-    assert {"hf_gpt2", "hf_onnx"}.issubset(names)
-    # When extras missing, hf_onnx should show needs_extra
-    onnx_row = next((r for r in rows if r["name"] == "hf_onnx"), None)
+    assert {"hf_causal", "hf_causal_onnx"}.issubset(names)
+    # When extras missing, hf_causal_onnx should show needs_extra
+    onnx_row = next((r for r in rows if r["name"] == "hf_causal_onnx"), None)
     assert onnx_row is not None
     # status can be ready if extras installed; tolerate both
     assert onnx_row["status"] in {"needs_extra", "ready"}

@@ -39,7 +39,7 @@ def test_apply_profile_uses_packaged_runtime_when_configs_absent(
     rel = apply_profile(
         # minimal base cfg
         cfg=__import__("invarlock.cli.config").cli.config.InvarLockConfig(
-            model={"id": "gpt2", "adapter": "hf_gpt2"},
+            model={"id": "gpt2", "adapter": "hf_causal"},
             edit={"name": "noop", "plan": {}},
         ),
         profile="release",
@@ -49,7 +49,7 @@ def test_apply_profile_uses_packaged_runtime_when_configs_absent(
     # And CI CPU profile forces CPU device and stride
     ci_cpu = apply_profile(
         cfg=__import__("invarlock.cli.config").cli.config.InvarLockConfig(
-            model={"id": "gpt2", "adapter": "hf_gpt2"},
+            model={"id": "gpt2", "adapter": "hf_causal"},
             edit={"name": "noop", "plan": {}},
         ),
         profile="ci_cpu",

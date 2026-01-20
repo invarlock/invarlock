@@ -28,6 +28,6 @@ def test_plugins_adapters_compact_and_verbose_tables(monkeypatch):
 
 def test_plugins_adapter_explain(monkeypatch):
     # Explain a core adapter
-    r = CliRunner().invoke(app, ["plugins", "adapters", "--explain", "hf_gpt2"])
+    r = CliRunner().invoke(app, ["plugins", "adapters", "--explain", "hf_causal"])
     assert r.exit_code == 0
     assert "Support" in r.stdout and "Module" in r.stdout

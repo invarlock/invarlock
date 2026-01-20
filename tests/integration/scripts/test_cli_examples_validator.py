@@ -14,7 +14,7 @@ def test_cli_examples_validator_accepts_valid_commands(tmp_path: Path) -> None:
                 "```bash",
                 "invarlock version",
                 "INVARLOCK_ALLOW_NETWORK=0 invarlock doctor",
-                "invarlock certify --baseline foo --subject bar --adapter hf_gpt2 --profile ci --tier none",
+                "invarlock certify --baseline foo --subject bar --adapter hf_causal --profile ci --tier none",
                 "python -m invarlock version",
                 "```",
                 "",

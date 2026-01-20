@@ -92,7 +92,7 @@ def test_plugins_adapters_json_with_optioninfo(monkeypatch, capsys):
     """
     adapters = {
         "hf_bnb": {"module": "invarlock.plugins.bitsandbytes", "entry_point": "ep"},
-        "hf_causal_auto": {"module": "invarlock.adapters.hf", "entry_point": "auto"},
+        "hf_auto": {"module": "invarlock.adapters.hf", "entry_point": "auto"},
     }
     _patch_registry(monkeypatch, adapters)
 
@@ -139,7 +139,7 @@ def test_plugins_adapters_json_with_optioninfo(monkeypatch, capsys):
 
 def test_plugins_adapters_json_statuses(monkeypatch, capsys):
     adapters = {
-        "hf_causal_auto": {"module": "invarlock.adapters.hf", "entry_point": "auto"},
+        "hf_auto": {"module": "invarlock.adapters.hf", "entry_point": "auto"},
         "hf_bnb": {"module": "invarlock.plugins.bitsandbytes", "entry_point": "bnb"},
         "hf_gptq": {"module": "invarlock.plugins.gptq", "entry_point": "gptq"},
     }
@@ -168,7 +168,7 @@ def test_plugins_adapters_json_statuses(monkeypatch, capsys):
     lines = capsys.readouterr().out.strip().splitlines()
     payload = json.loads(lines[-1])
     statuses = {item["name"]: item["status"] for item in payload["items"]}
-    assert statuses["hf_causal_auto"] == "ready"
+    assert statuses["hf_auto"] == "ready"
     assert statuses["hf_gptq"] == "needs_extra"
 
 
@@ -376,7 +376,7 @@ def test_check_plugin_extras_missing(monkeypatch):
 
 def test_plugins_adapters_verbose_console(monkeypatch):
     adapters = {
-        "hf_causal_auto": {"module": "invarlock.adapters.hf", "entry_point": "auto"},
+        "hf_auto": {"module": "invarlock.adapters.hf", "entry_point": "auto"},
         "hf_bnb": {"module": "invarlock.plugins.bitsandbytes", "entry_point": "bnb"},
         "hf_gptq": {"module": "invarlock.plugins.gptq", "entry_point": "gptq"},
     }
@@ -669,7 +669,7 @@ def test_plugins_guards_verbose_json_and_explain(monkeypatch, capsys):
 def test_plugins_adapters_explain_variants(monkeypatch):
     """Test explain output for different adapter types."""
     adapters = {
-        "hf_causal_auto": {"module": "invarlock.adapters.hf", "entry_point": "auto"},
+        "hf_auto": {"module": "invarlock.adapters.hf", "entry_point": "auto"},
         "hf_core": {"module": "invarlock.adapters.core", "entry_point": "core"},
         "hf_bnb": {"module": "invarlock.plugins.bitsandbytes", "entry_point": "bnb"},
     }
@@ -695,8 +695,8 @@ def test_plugins_adapters_explain_variants(monkeypatch):
     dummy_console = DummyConsole()
     monkeypatch.setattr(plugins_mod, "console", dummy_console, raising=False)
 
-    plugins_command(category="adapters", explain="hf_causal_auto")
-    assert any("hf_causal_auto" in line for line in dummy_console.lines)
+    plugins_command(category="adapters", explain="hf_auto")
+    assert any("hf_auto" in line for line in dummy_console.lines)
 
     dummy_console.lines.clear()
     plugins_command(category="adapters", explain="hf_core")

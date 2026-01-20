@@ -11,7 +11,7 @@ def test_run_command_metrics_loss_type_fallback_set(tmp_path: Path):
     cfg.write_text(
         """
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:

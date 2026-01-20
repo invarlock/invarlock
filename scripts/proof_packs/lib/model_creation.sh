@@ -174,7 +174,7 @@ try:
         """Check if parameter should be quantized based on name and scope.
 
         Supports multiple architectures:
-        - LLaMA/Mistral: q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj
+        - RoPE decoder-only: q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj
         - MPT: Wqkv, out_proj, up_proj, down_proj
         - Falcon: query_key_value, dense_h_to_4h, dense_4h_to_h
         - Generic: linear, dense, proj, fc, mlp, attn
@@ -292,7 +292,7 @@ try:
         """Check if parameter should be pruned based on name and scope.
 
         Supports multiple architectures:
-        - LLaMA/Mistral: q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj
+        - RoPE decoder-only: q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj
         - MPT: Wqkv, out_proj, up_proj, down_proj
         - Falcon: query_key_value, dense_h_to_4h, dense_4h_to_h
         """
@@ -465,7 +465,7 @@ try:
         """Check if parameter should have low-rank approximation.
 
         Supports multiple architectures:
-        - LLaMA/Mistral: q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj
+        - RoPE decoder-only: q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj
         - MPT: Wqkv, out_proj, up_proj, down_proj
         - Falcon: query_key_value, dense_h_to_4h, dense_4h_to_h
         """
@@ -751,7 +751,7 @@ try:
     error_info = {"error_type": error_type, "injected": False}
 
     # Build list of transformer blocks for index-based targeting
-    # This works across architectures (LLaMA, MPT, Falcon, Qwen, etc.)
+    # This works across architectures (decoder-only, MPT, Falcon, Qwen, etc.)
     import re
     block_params = {}  # {block_idx: [(name, param), ...]}
     block_pattern = re.compile(r'(?:layers|blocks|h)\.(\d+)\.')
@@ -857,12 +857,12 @@ try:
         total_layers = 0
         kept_layers = 0
 
-        # LLaMA/Mistral-style
+        # model.layers style (decoder-only)
         base = getattr(model, "model", None)
         if base is not None and hasattr(base, "layers"):
             injected, total_layers, kept_layers = _shrink_layers(base, "layers")
             if injected:
-                error_info["arch"] = "llama"
+                error_info["arch"] = "model_layers"
 
         # GPT-2-style
         if not injected:
@@ -1051,11 +1051,15 @@ try:
 
         injected = False
 
-        # LLaMA/Mistral style (model.embed_tokens <-> lm_head)
+        # model.embed_tokens style (model.embed_tokens <-> lm_head)
         try:
-            llama_model = getattr(model, "model", None)
-            embed_tokens = getattr(llama_model, "embed_tokens", None)
-            injected = _try_flip_tying(getattr(embed_tokens, "weight", None), getattr(getattr(model, "lm_head", None), "weight", None), "llama")
+            decoder_model = getattr(model, "model", None)
+            embed_tokens = getattr(decoder_model, "embed_tokens", None)
+            injected = _try_flip_tying(
+                getattr(embed_tokens, "weight", None),
+                getattr(getattr(model, "lm_head", None), "weight", None),
+                "embed_tokens",
+            )
         except Exception:
             injected = False
 

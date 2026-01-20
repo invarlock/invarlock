@@ -371,7 +371,7 @@ def certify_command(
     # Resolve adapter when requested
     eff_adapter = adapter
     adapter_auto = False
-    if str(adapter).strip().lower() in {"auto", "hf_auto", "auto_hf"}:
+    if str(adapter).strip().lower() in {"auto", "auto_hf"}:
         eff_adapter = resolve_auto_adapter(src_id)
         adapter_auto = True
 
@@ -394,7 +394,7 @@ def certify_command(
     # flag-only quick start works without cloning the repo.
     default_universal = (
         Path("configs/presets/masked_lm/wikitext2_128.yaml")
-        if eff_adapter == "hf_bert"
+        if eff_adapter == "hf_mlm"
         else Path("configs/presets/causal_lm/wikitext2_512.yaml")
     )
     preset_path = Path(preset) if preset is not None else default_universal

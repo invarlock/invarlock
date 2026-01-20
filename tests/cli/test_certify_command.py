@@ -17,7 +17,7 @@ def _stub_run(out_dir: Path, baseline: Path | None = None):
     ts_dir = out_dir / "20250101_000000"
     ts_dir.mkdir(parents=True, exist_ok=True)
     report = {
-        "meta": {"model_id": "stub", "adapter": "hf_gpt2"},
+        "meta": {"model_id": "stub", "adapter": "hf_causal"},
         "edit": {"name": "quant_rtn"},
         "metrics": {"ppl_ratio": 1.0, "ppl_final": 10.0},
         "data": {"preview_n": 1, "final_n": 1},
@@ -108,7 +108,7 @@ def test_certify_reuses_baseline_report_skipping_baseline_run(monkeypatch, tmp_p
     baseline_report.write_text(
         json.dumps(
             {
-                "meta": {"model_id": "stub", "adapter": "hf_gpt2"},
+                "meta": {"model_id": "stub", "adapter": "hf_causal"},
                 "context": {"profile": "ci", "auto": {"tier": "balanced"}},
                 "edit": {"name": "noop"},
                 "evaluation_windows": {
@@ -183,7 +183,7 @@ def test_certify_baseline_report_requires_windows(monkeypatch, tmp_path):
     baseline_report.write_text(
         json.dumps(
             {
-                "meta": {"model_id": "stub", "adapter": "hf_gpt2"},
+                "meta": {"model_id": "stub", "adapter": "hf_causal"},
                 "context": {"profile": "ci", "auto": {"tier": "balanced"}},
                 "edit": {"name": "noop"},
                 "evaluation_windows": {"final": {"window_ids": [1]}},
@@ -210,7 +210,7 @@ def test_certify_baseline_report_requires_windows(monkeypatch, tmp_path):
 
 def test_certify_autogen_uses_device_auto(monkeypatch, tmp_path):
     """Auto-generated certify presets should not hard-code CPU device."""
-    # Arrange HF-like source/edited dirs so auto adapter resolves to hf_gpt2
+    # Arrange HF-like source/edited dirs so auto adapter resolves to hf_causal
     src = tmp_path / "src_model"
     edt = tmp_path / "edt_model"
     src.mkdir()

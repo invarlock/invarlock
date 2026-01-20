@@ -13,7 +13,7 @@ def _mk_report() -> dict[str, Any]:
     return {
         "meta": {
             "model_id": "gpt2",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "device": "cpu",
             "seed": 42,
             "seeds": {"python": 42, "numpy": 42, "torch": 42},
