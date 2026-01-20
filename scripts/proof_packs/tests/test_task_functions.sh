@@ -122,7 +122,7 @@ test_task_calibration_run_and_generate_preset_cover_overrides_large_model_and_re
     mkdir -p "${baseline_dir}" "$(dirname "${log_file}")"
     echo "{}" > "${baseline_dir}/config.json"
     echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
-    echo "meta-llama/Llama-2-40b-hf" > "${model_output_dir}/.model_id"
+    echo "Qwen/Qwen2.5-32B" > "${model_output_dir}/.model_id"
     : > "${log_file}"
 
     # Baseline missing error.
@@ -260,7 +260,7 @@ test_task_certify_edit_and_error_cover_preset_discovery_overrides_and_certificat
     mkdir -p "${baseline_dir}" "$(dirname "${log_file}")" "${model_output_dir}/models"
     echo "{}" > "${baseline_dir}/config.json"
     echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
-    echo "meta-llama/Llama-2-40b-hf" > "${model_output_dir}/.model_id"
+    echo "Qwen/Qwen2.5-32B" > "${model_output_dir}/.model_id"
     : > "${log_file}"
 
     # Baseline missing error.
@@ -472,7 +472,7 @@ test_task_helpers_cover_fallback_branches() {
     source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
 
     assert_eq "moe" "$(_get_model_size_from_name "Mixtral-8x7B")" "moe detection"
-    assert_eq "13" "$(_get_model_size_from_name "llama-13b")" "13B detection"
+    assert_eq "13" "$(_get_model_size_from_name "model-13b")" "13B detection"
     assert_eq "70" "$(_get_model_size_from_name "Qwen1.5-72B")" "70B detection"
     assert_eq "30" "$(_get_model_size_from_name "Qwen2.5-32B")" "30B detection"
 
@@ -506,7 +506,7 @@ test_task_helpers_cover_fallback_branches() {
     assert_match "quant_4bit_clean" "${resolved}" "resolve_edit_params builds edit_dir_name"
 
     _is_large_model "moe" || t_fail "expected moe to be large"
-    _is_large_model "llama-30b" || t_fail "expected 30b string to be large"
+    _is_large_model "model-30b" || t_fail "expected 30b string to be large"
 }
 
 test_task_create_model_variant_dispatch_and_fallback_errors() {

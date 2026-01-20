@@ -86,7 +86,7 @@ for PRESET in \
 do
   tag="gpt2_cert_${PRESET##*/}"
   [ "$PRESET" = "omit" ] && tag="gpt2_cert_auto"
-  cmd=(invarlock certify --baseline "$GPT2_ID" --subject "$GPT2_ID" --adapter hf_gpt2 --profile "$PROFILE" --tier balanced)
+  cmd=(invarlock certify --baseline "$GPT2_ID" --subject "$GPT2_ID" --adapter hf_causal --profile "$PROFILE" --tier balanced)
   [ "$PRESET" != "omit" ] && cmd+=(--preset "$PRESET")
   append "$tag" "${cmd[*]}"
   if [ "$RUN" = "1" ]; then eval "${cmd[*]}" || true; fi
@@ -95,7 +95,7 @@ done
 echo >> "$TMP_DIR/checklist.md"
 echo "### GPT-2 Quant (demo edit)" >> "$TMP_DIR/checklist.md"
 QCFG="configs/overlays/edits/quant_rtn/tiny_demo.yaml"
-cmd=(invarlock certify --baseline "$GPT2_ID" --subject "$GPT2_ID" --adapter hf_gpt2 --profile "$PROFILE" --tier balanced --preset configs/presets/causal_lm/wikitext2_512.yaml --edit-config "$QCFG")
+cmd=(invarlock certify --baseline "$GPT2_ID" --subject "$GPT2_ID" --adapter hf_causal --profile "$PROFILE" --tier balanced --preset configs/presets/causal_lm/wikitext2_512.yaml --edit-config "$QCFG")
 append "gpt2_editcert_quant8" "${cmd[*]}"
 [ "$RUN" = "1" ] && eval "${cmd[*]}" || true
 
@@ -104,7 +104,7 @@ echo >> "$TMP_DIR/checklist.md"
 # 2) BERT-tiny: masked LM
 BERT_ID=${BERT_ID:-"prajjwal1/bert-tiny"}
 echo "## BERT (masked LM)" >> "$TMP_DIR/checklist.md"
-cmd=(invarlock certify --baseline "$BERT_ID" --subject "$BERT_ID" --adapter hf_bert --profile "$PROFILE" --tier balanced --preset configs/presets/masked_lm/wikitext2_128.yaml)
+cmd=(invarlock certify --baseline "$BERT_ID" --subject "$BERT_ID" --adapter hf_mlm --profile "$PROFILE" --tier balanced --preset configs/presets/masked_lm/wikitext2_128.yaml)
 append "bert_mlm_cert" "${cmd[*]}"
 [ "$RUN" = "1" ] && eval "${cmd[*]}" || true
 
@@ -113,7 +113,7 @@ echo >> "$TMP_DIR/checklist.md"
 # 3) DistilBERT SST-2: classification smoke
 CLS_ID=${CLS_ID:-"distilbert-base-uncased-finetuned-sst-2-english"}
 echo "## DistilBERT (classification)" >> "$TMP_DIR/checklist.md"
-cmd=(invarlock certify --baseline "$CLS_ID" --subject "$CLS_ID" --adapter hf_bert --profile "$PROFILE" --tier balanced --preset configs/presets/masked_lm/wikitext2_128.yaml)
+cmd=(invarlock certify --baseline "$CLS_ID" --subject "$CLS_ID" --adapter hf_mlm --profile "$PROFILE" --tier balanced --preset configs/presets/masked_lm/wikitext2_128.yaml)
 append "distilbert_cls_cert" "${cmd[*]}"
 [ "$RUN" = "1" ] && eval "${cmd[*]}" || true
 
@@ -121,7 +121,7 @@ append "distilbert_cls_cert" "${cmd[*]}"
 if [ "$NET" = "1" ] && [ "${INCLUDE_MEASURED_CLS:-0}" = "1" ]; then
   echo >> "$TMP_DIR/checklist.md"
   echo "## DistilBERT (classification, measured)" >> "$TMP_DIR/checklist.md"
-  cmd=(invarlock certify --baseline "$CLS_ID" --subject "$CLS_ID" --adapter hf_bert --profile "$PROFILE" --tier balanced --preset configs/presets/masked_lm/wikitext2_128.yaml)
+  cmd=(invarlock certify --baseline "$CLS_ID" --subject "$CLS_ID" --adapter hf_mlm --profile "$PROFILE" --tier balanced --preset configs/presets/masked_lm/wikitext2_128.yaml)
   append "distilbert_cls_measured" "${cmd[*]}"
   if [ "$RUN" = "1" ]; then eval "${cmd[*]}" || true; fi
 fi

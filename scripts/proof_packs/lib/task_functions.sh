@@ -364,7 +364,7 @@ _ensure_certify_baseline_report() {
     adapter_name="$(printf '%s' "${adapter_name}" | xargs)"
     if [[ -z "${adapter_name}" ]]; then
         # Fallback for odd environments; must match what invarlock certify will resolve.
-        adapter_name="hf_gpt2"
+        adapter_name="hf_causal"
     fi
 
     if [[ -f "${baseline_report_file}" ]]; then
@@ -1220,7 +1220,7 @@ YAML
     cat > "${config_yaml}" << YAML_EOF
 model:
   id: "${baseline_path}"
-  adapter: "hf_causal_auto"
+  adapter: "hf_auto"
   device: "auto"
   device_map: "auto"
   torch_dtype: "bfloat16"
