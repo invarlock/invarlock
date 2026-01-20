@@ -2,7 +2,7 @@
 
 model:
   id: "mistralai/Mistral-7B-v0.1"
-  adapter: "hf_llama"
+  adapter: "hf_causal"
   device: "auto"
 
 dataset:

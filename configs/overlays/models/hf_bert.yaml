@@ -1,5 +1,0 @@
-# Model overlay: HuggingFace BERT (masked LM)
-
-model:
-  id: "prajjwal1/bert-tiny"
-  adapter: "hf_bert"

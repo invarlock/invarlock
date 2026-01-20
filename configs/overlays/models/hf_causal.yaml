@@ -1,0 +1,5 @@
+# Model overlay: HuggingFace causal LM
+
+model:
+  id: "sshleifer/tiny-gpt2"
+  adapter: "hf_causal"
