@@ -205,7 +205,9 @@ def test_snapshot_cfg_mode_overrides_env(tmp_path: Path, monkeypatch):
     def load_cfg(p):
         class Cfg:
             def __init__(self):
-                self.model = SimpleNamespace(id="gpt2", adapter="hf_causal", device="cpu")
+                self.model = SimpleNamespace(
+                    id="gpt2", adapter="hf_causal", device="cpu"
+                )
                 self.edit = SimpleNamespace(name="quant_rtn", plan={})
                 self.auto = SimpleNamespace(enabled=False, tier="balanced", probes=0)
                 self.guards = SimpleNamespace(order=[])

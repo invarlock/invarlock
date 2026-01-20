@@ -1042,8 +1042,7 @@ def doctor_command(
                 module = str(info.get("module") or "")
                 support = (
                     "auto"
-                    if module.startswith("invarlock.adapters")
-                    and n in {"hf_auto"}
+                    if module.startswith("invarlock.adapters") and n in {"hf_auto"}
                     else (
                         "core"
                         if module.startswith("invarlock.adapters")

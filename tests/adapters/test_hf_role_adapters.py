@@ -144,13 +144,15 @@ class TestHFCausalAdapter:
         assert all(dim == model.config.intermediate_size for dim in desc["mlp_dims"])
 
         modules = adapter.get_layer_modules(model, 0)
-        assert modules["mlp.gate_proj"] is model.model.layers[0].block_sparse_moe.experts[
-            0
-        ].w1
-        assert modules["mlp.down_proj"] is model.model.layers[0].block_sparse_moe.experts[
-            0
-        ].w2
-        assert modules["mlp.up_proj"] is model.model.layers[0].block_sparse_moe.experts[
-            0
-        ].w3
-
+        assert (
+            modules["mlp.gate_proj"]
+            is model.model.layers[0].block_sparse_moe.experts[0].w1
+        )
+        assert (
+            modules["mlp.down_proj"]
+            is model.model.layers[0].block_sparse_moe.experts[0].w2
+        )
+        assert (
+            modules["mlp.up_proj"]
+            is model.model.layers[0].block_sparse_moe.experts[0].w3
+        )

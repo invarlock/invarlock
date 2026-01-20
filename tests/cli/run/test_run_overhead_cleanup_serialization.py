@@ -101,7 +101,9 @@ def test_cleanup_rmtree_exception_is_swallowed(tmp_path: Path, monkeypatch):
     def load_cfg(p):
         class Cfg:
             def __init__(self):
-                self.model = SimpleNamespace(id="gpt2", adapter="hf_causal", device="cpu")
+                self.model = SimpleNamespace(
+                    id="gpt2", adapter="hf_causal", device="cpu"
+                )
                 self.edit = SimpleNamespace(name="quant_rtn", plan={})
                 self.auto = SimpleNamespace(enabled=False, tier="balanced", probes=0)
                 self.guards = SimpleNamespace(order=[])
@@ -413,7 +415,9 @@ def test_restore_chunked_missing_dir_causes_exit(tmp_path: Path):
     def load_cfg(p):
         class Cfg:
             def __init__(self):
-                self.model = SimpleNamespace(id="gpt2", adapter="hf_causal", device="cpu")
+                self.model = SimpleNamespace(
+                    id="gpt2", adapter="hf_causal", device="cpu"
+                )
                 self.edit = SimpleNamespace(name="quant_rtn", plan={})
                 self.auto = SimpleNamespace(enabled=False, tier="balanced", probes=0)
                 self.guards = SimpleNamespace(order=[])

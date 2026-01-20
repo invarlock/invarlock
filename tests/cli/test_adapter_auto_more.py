@@ -31,9 +31,7 @@ def test_resolve_auto_adapter_from_config_and_string(tmp_path: Path):
     rope_model = tmp_path / "rope"
     rope_model.mkdir()
     (rope_model / "config.json").write_text(
-        json.dumps(
-            {"model_type": "mistral", "architectures": ["MistralForCausalLM"]}
-        ),
+        json.dumps({"model_type": "mistral", "architectures": ["MistralForCausalLM"]}),
         encoding="utf-8",
     )
     assert resolve_auto_adapter(rope_model) == "hf_causal"
@@ -66,9 +64,7 @@ def test_apply_auto_adapter_if_needed_changes_only_when_auto(tmp_path: Path):
     rope_model = tmp_path / "rope"
     rope_model.mkdir()
     (rope_model / "config.json").write_text(
-        json.dumps(
-            {"model_type": "mistral", "architectures": ["MistralForCausalLM"]}
-        ),
+        json.dumps({"model_type": "mistral", "architectures": ["MistralForCausalLM"]}),
         encoding="utf-8",
     )
 

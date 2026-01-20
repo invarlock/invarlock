@@ -29,8 +29,7 @@ def get_adapter_rows() -> list[dict[str, Any]]:
         module = str(info.get("module") or "")
         support = (
             "auto"
-            if module.startswith("invarlock.adapters")
-            and name in {"hf_auto"}
+            if module.startswith("invarlock.adapters") and name in {"hf_auto"}
             else ("core" if module.startswith("invarlock.adapters") else "optional")
         )
         backend, status, enable = None, "ready", ""

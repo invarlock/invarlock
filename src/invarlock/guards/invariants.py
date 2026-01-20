@@ -368,9 +368,7 @@ class InvariantsGuard(Guard):
             embed_weight = getattr(embed_tokens, "weight", None)
             head_weight = getattr(getattr(model, "lm_head", None), "weight", None)
             if embed_weight is not None and head_weight is not None:
-                weight_tying_flags["embed_tokens"] = _is_tied(
-                    embed_weight, head_weight
-                )
+                weight_tying_flags["embed_tokens"] = _is_tied(embed_weight, head_weight)
         except Exception:
             pass
 
