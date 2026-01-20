@@ -9,17 +9,17 @@ def test_provider_network_wikitext2_label() -> None:
     assert PROVIDER_NETWORK.get("wikitext2") == "cache"
 
 
-def test_hf_onnx_adapter_needs_extra_when_missing(monkeypatch) -> None:
-    # Monkeypatch registry to expose only hf_onnx as a core adapter
+def test_hf_causal_onnx_adapter_needs_extra_when_missing(monkeypatch) -> None:
+    # Monkeypatch registry to expose only hf_causal_onnx as a core adapter
     class _FakeRegistry:
         def list_adapters(self):
-            return ["hf_onnx"]
+            return ["hf_causal_onnx"]
 
         def get_plugin_info(self, name: str, kind: str):
             assert kind == "adapters"
             return {
-                "module": "invarlock.adapters.hf_onnx",
-                "entry_point": "HF_ORT_CausalLM_Adapter",
+                "module": "invarlock.adapters.hf_causal_onnx",
+                "entry_point": "HF_Causal_ONNX_Adapter",
             }
 
         def list_guards(self):
@@ -47,9 +47,9 @@ def test_hf_onnx_adapter_needs_extra_when_missing(monkeypatch) -> None:
     from invarlock.cli import doctor_helpers as doctor_mod
 
     rows = doctor_mod.get_adapter_rows()
-    # Expect exactly one row for hf_onnx and that it needs extras with an enable hint
+    # Expect exactly one row for hf_causal_onnx and that it needs extras with an enable hint
     assert len(rows) == 1
     row = rows[0]
-    assert row["name"] == "hf_onnx"
+    assert row["name"] == "hf_causal_onnx"
     assert row["status"] == "needs_extra"
     assert "invarlock[onnx]" in (row.get("enable") or "")

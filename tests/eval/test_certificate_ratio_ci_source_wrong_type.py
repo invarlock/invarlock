@@ -12,7 +12,7 @@ def test_certificate_ratio_ci_source_run_metrics_on_wrong_type_return():
     report = {
         "meta": {
             "model_id": "gpt2",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "device": "cpu",
             "ts": "2025-01-01T00:00:00",
             "commit": "dead",

@@ -11,7 +11,7 @@ def test_extract_adapter_provenance_known_families():
             ("hf_gptq", "gptq"),
             ("hf_awq", "awq"),
             ("hf_bnb", "bnb"),
-            ("hf_gpt2", "hf"),
+            ("hf_causal", "hf"),
         ):
             prov = extract_adapter_provenance(name).to_dict()
             assert prov["family"] == family

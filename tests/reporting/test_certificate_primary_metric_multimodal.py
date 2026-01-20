@@ -38,7 +38,7 @@ def test_primary_metric_vqa_accuracy_gating_and_render():
         "plugins": {},
         "meta": {
             "model_id": "gpt2",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "device": "cpu",
             "ts": "now",
             "seed": 42,

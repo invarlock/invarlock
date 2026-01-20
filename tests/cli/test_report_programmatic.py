@@ -14,7 +14,7 @@ def test_report_command_programmatic_json_only(tmp_path: Path):
     report_path = run_dir / "report.json"
     report = create_empty_report()
     report["meta"]["model_id"] = "test"
-    report["meta"]["adapter"] = "hf_gpt2"
+    report["meta"]["adapter"] = "hf_causal"
     report["metrics"]["ppl_ratio"] = 1.0
     report["metrics"]["ppl_final"] = 1.0
     report["metrics"]["ppl_preview"] = 1.0

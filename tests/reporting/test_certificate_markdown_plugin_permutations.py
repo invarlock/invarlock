@@ -50,9 +50,9 @@ def test_plugin_provenance_adapter_edit_only():
     cert = make_certificate(rep, base)
     cert["plugins"] = {
         "adapter": {
-            "name": "HF_GPT2",
+            "name": "HF_Causal",
             "version": "1.0",
-            "module": "invarlock.adapters.hf_gpt2",
+            "module": "invarlock.adapters.hf_causal",
         },
         "edit": {
             "name": "quant_rtn",

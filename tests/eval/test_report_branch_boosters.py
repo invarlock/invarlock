@@ -20,7 +20,7 @@ def _minimal_report():
     r["meta"].update(
         {
             "model_id": "demo-model",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "commit": "deadbeefcafebabe",
             "device": "cpu",
         }

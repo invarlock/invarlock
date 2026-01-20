@@ -723,7 +723,7 @@ def test_doctor_non_json_device_and_optional_paths(monkeypatch):
     )
 
     fake_registry = SimpleNamespace(
-        list_adapters=lambda: ["hf_gpt2", "hf_bnb"],
+        list_adapters=lambda: ["hf_causal", "hf_bnb"],
         list_edits=lambda: ["quant_rtn"],
         list_guards=lambda: ["spectral"],
         get_plugin_info=lambda name, kind: {

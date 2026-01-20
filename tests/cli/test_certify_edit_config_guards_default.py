@@ -73,7 +73,7 @@ def test_certify_edit_config_includes_guard_order(tmp_path: Path, monkeypatch):
     certify_mod.certify_command(
         source="gpt2",
         edited="gpt2",
-        adapter="hf_gpt2",
+        adapter="hf_causal",
         profile="dev",
         tier="balanced",
         preset=str(preset),

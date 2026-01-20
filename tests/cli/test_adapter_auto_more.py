@@ -27,14 +27,16 @@ def test_read_local_hf_config_variants(tmp_path: Path):
 
 
 def test_resolve_auto_adapter_from_config_and_string(tmp_path: Path):
-    # From config.json (LLaMA)
-    llama = tmp_path / "llama"
-    llama.mkdir()
-    (llama / "config.json").write_text(
-        json.dumps({"model_type": "llama", "architectures": ["LlamaForCausalLM"]}),
+    # From config.json (RoPE causal)
+    rope_model = tmp_path / "rope"
+    rope_model.mkdir()
+    (rope_model / "config.json").write_text(
+        json.dumps(
+            {"model_type": "mistral", "architectures": ["MistralForCausalLM"]}
+        ),
         encoding="utf-8",
     )
-    assert resolve_auto_adapter(llama) == "hf_llama"
+    assert resolve_auto_adapter(rope_model) == "hf_causal"
 
     # From config.json (BERT)
     bert = tmp_path / "bert"
@@ -43,7 +45,7 @@ def test_resolve_auto_adapter_from_config_and_string(tmp_path: Path):
         json.dumps({"model_type": "bert", "architectures": ["BertForMaskedLM"]}),
         encoding="utf-8",
     )
-    assert resolve_auto_adapter(bert) == "hf_bert"
+    assert resolve_auto_adapter(bert) == "hf_mlm"
 
     # From config.json (GPT-like)
     gpt = tmp_path / "gpt"
@@ -52,19 +54,21 @@ def test_resolve_auto_adapter_from_config_and_string(tmp_path: Path):
         json.dumps({"model_type": "gpt2", "architectures": ["GPT2LMHeadModel"]}),
         encoding="utf-8",
     )
-    assert resolve_auto_adapter(gpt) == "hf_gpt2"
+    assert resolve_auto_adapter(gpt) == "hf_causal"
 
     # String heuristic (name contains bert)
-    assert resolve_auto_adapter("some/roberta-checkpoint") == "hf_bert"
+    assert resolve_auto_adapter("some/roberta-checkpoint") == "hf_mlm"
     # String heuristic (default)
-    assert resolve_auto_adapter("unknown/thing") == "hf_gpt2"
+    assert resolve_auto_adapter("unknown/thing") == "hf_causal"
 
 
 def test_apply_auto_adapter_if_needed_changes_only_when_auto(tmp_path: Path):
-    llama = tmp_path / "llama"
-    llama.mkdir()
-    (llama / "config.json").write_text(
-        json.dumps({"model_type": "llama", "architectures": ["LlamaForCausalLM"]}),
+    rope_model = tmp_path / "rope"
+    rope_model.mkdir()
+    (rope_model / "config.json").write_text(
+        json.dumps(
+            {"model_type": "mistral", "architectures": ["MistralForCausalLM"]}
+        ),
         encoding="utf-8",
     )
 
@@ -82,10 +86,10 @@ def test_apply_auto_adapter_if_needed_changes_only_when_auto(tmp_path: Path):
         def __class__(self, data):  # type: ignore[override]
             return Cfg(data)
 
-    cfg_auto = Cfg({"model": {"adapter": "auto", "id": str(llama)}})
+    cfg_auto = Cfg({"model": {"adapter": "auto", "id": str(rope_model)}})
     out = apply_auto_adapter_if_needed(cfg_auto)
-    assert out.model.adapter == "hf_llama"
+    assert out.model.adapter == "hf_causal"
 
-    cfg_noauto = Cfg({"model": {"adapter": "hf_gpt2", "id": "gpt2"}})
+    cfg_noauto = Cfg({"model": {"adapter": "hf_causal", "id": "gpt2"}})
     out2 = apply_auto_adapter_if_needed(cfg_noauto)
     assert out2 is cfg_noauto

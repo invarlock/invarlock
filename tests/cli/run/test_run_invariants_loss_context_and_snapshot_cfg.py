@@ -17,7 +17,7 @@ def _base_cfg(tmp_path: Path, preview=1, final=1) -> Path:
     p.write_text(
         f"""
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:
@@ -115,7 +115,7 @@ def test_invariants_existing_checks_as_scalar_becomes_list(tmp_path: Path):
 
     class DummyCfg:
         def __init__(self):
-            self.model = SimpleNamespace(id="gpt2", adapter="hf_gpt2", device="cpu")
+            self.model = SimpleNamespace(id="gpt2", adapter="hf_causal", device="cpu")
             self.edit = SimpleNamespace(name="quant_rtn", plan={})
             self.auto = SimpleNamespace(enabled=False, tier="balanced", probes=0)
             self.guards = SimpleNamespace(
@@ -193,7 +193,7 @@ def test_invariants_existing_checks_set_becomes_list(tmp_path: Path):
 
     class DummyCfg:
         def __init__(self):
-            self.model = SimpleNamespace(id="gpt2", adapter="hf_gpt2", device="cpu")
+            self.model = SimpleNamespace(id="gpt2", adapter="hf_causal", device="cpu")
             self.edit = SimpleNamespace(name="quant_rtn", plan={})
             self.auto = SimpleNamespace(enabled=False, tier="balanced", probes=0)
             self.guards = SimpleNamespace(
@@ -274,7 +274,7 @@ def test_invariants_existing_checks_tuple_becomes_list(tmp_path: Path):
 
     class DummyCfg:
         def __init__(self):
-            self.model = SimpleNamespace(id="gpt2", adapter="hf_gpt2", device="cpu")
+            self.model = SimpleNamespace(id="gpt2", adapter="hf_causal", device="cpu")
             self.edit = SimpleNamespace(name="quant_rtn", plan={})
             self.auto = SimpleNamespace(enabled=False, tier="balanced", probes=0)
             self.guards = SimpleNamespace(
@@ -339,7 +339,7 @@ def test_loss_cfg_nan_values_coerced(tmp_path: Path):
 
     class DummyCfg:
         def __init__(self):
-            self.model = SimpleNamespace(id="gpt2", adapter="hf_gpt2", device="cpu")
+            self.model = SimpleNamespace(id="gpt2", adapter="hf_causal", device="cpu")
             self.edit = SimpleNamespace(name="quant_rtn", plan={})
             self.auto = SimpleNamespace(enabled=False, tier="balanced", probes=0)
             self.guards = SimpleNamespace(order=[])
@@ -416,7 +416,7 @@ def test_snapshot_auto_ram_fraction_env(tmp_path: Path, monkeypatch):
     cfg = _base_cfg(tmp_path)
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def __init__(self):
             self.rest_chunked = 0
@@ -489,7 +489,7 @@ def test_snapshot_cfg_threshold_and_tempdir(tmp_path: Path, monkeypatch):
     cfg = _base_cfg(tmp_path)
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def __init__(self):
             self.rest_chunked = 0
@@ -524,7 +524,7 @@ def test_snapshot_cfg_threshold_and_tempdir(tmp_path: Path, monkeypatch):
     def load_cfg(p):
         class Cfg:
             def __init__(self):
-                self.model = SimpleNamespace(id="gpt2", adapter="hf_gpt2", device="cpu")
+                self.model = SimpleNamespace(id="gpt2", adapter="hf_causal", device="cpu")
                 self.edit = SimpleNamespace(name="quant_rtn", plan={})
                 self.auto = SimpleNamespace(enabled=False, tier="balanced", probes=0)
                 self.guards = SimpleNamespace(order=[])

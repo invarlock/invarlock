@@ -26,7 +26,7 @@ def _mock_report_with_windows() -> dict[str, Any]:
     report = {
         "meta": {
             "model_id": "stub",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "device": "cpu",
             "seed": 7,
             "seeds": {"python": 7, "numpy": 7, "torch": 7},

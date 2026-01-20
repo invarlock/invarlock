@@ -63,7 +63,7 @@ def test_run_cli_profile_and_edit_override_paths(
         """
         model:
           id: gpt2
-          adapter: hf_gpt2
+          adapter: hf_causal
         dataset:
           provider: wikitext2
           seq_len: 8
@@ -106,7 +106,7 @@ def test_run_cli_adapter_auto_noop_then_exit(
         """
         model:
           id: gpt2
-          adapter: hf_gpt2    # concrete; auto-adapter path is a no-op
+          adapter: hf_causal    # concrete; auto-adapter path is a no-op
         edit:
           name: quant_rtn
         dataset:

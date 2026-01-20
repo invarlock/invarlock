@@ -16,7 +16,7 @@ def _minimal_cert(token_hash_edited: str, token_hash_baseline: str) -> dict:
         "run_id": "run-tokenizer-hash-test",
         "meta": {
             "model_id": "gpt2-small",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "device": "cpu",
             "ts": "2025-01-01T00:00:00",
             "commit": "abcdef1234567890",

@@ -119,7 +119,7 @@ class _Cfg:
         edit_parameters: object | None = None,
         output: dict[str, object] | None = None,
     ) -> None:
-        self.model = SimpleNamespace(id="gpt2", adapter="hf_gpt2", device="cpu")
+        self.model = SimpleNamespace(id="gpt2", adapter="hf_causal", device="cpu")
         self.edit = SimpleNamespace(name="quant_rtn", plan=(edit_plan or {}))
         if edit_parameters is not None:
             self.edit.parameters = edit_parameters
@@ -192,7 +192,7 @@ def _run_with_common_patches(
     run_kwargs = run_kwargs or {}
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def load_model(self, model_id: str, device: str | None = None):  # noqa: ARG002
             return object()
@@ -514,7 +514,7 @@ def test_run_command_baseline_token_counts_provider_parity_export_and_classifica
     )
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def load_model(self, model_id: str, device: str | None = None):  # noqa: ARG002
             return object()
@@ -655,7 +655,7 @@ def test_run_command_classification_pseudo_counts_and_export_env_dir(
     captured: dict[str, object] = {}
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def load_model(self, model_id: str, device: str | None = None):  # noqa: ARG002
             return object()
@@ -785,7 +785,7 @@ def test_run_command_until_pass_auto_tune_head_budget_paths(tmp_path: Path) -> N
     )
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def load_model(self, model_id: str, device: str | None = None):  # noqa: ARG002
             return object()

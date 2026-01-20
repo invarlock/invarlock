@@ -18,7 +18,7 @@ def _cfg(tmp_path: Path, preview=2, final=2) -> Path:
     p.write_text(
         f"""
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:
@@ -111,7 +111,7 @@ def test_snapshot_auto_chunked_selected_when_large_and_disk_ok(
     cfg = _cfg(tmp_path, 1, 1)
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def __init__(self):
             self.rest_chunked = 0
@@ -186,7 +186,7 @@ def test_snapshot_cfg_mode_overrides_env(tmp_path: Path, monkeypatch):
     cfg = _cfg(tmp_path, 1, 1)
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def __init__(self):
             self.restored = 0
@@ -205,7 +205,7 @@ def test_snapshot_cfg_mode_overrides_env(tmp_path: Path, monkeypatch):
     def load_cfg(p):
         class Cfg:
             def __init__(self):
-                self.model = SimpleNamespace(id="gpt2", adapter="hf_gpt2", device="cpu")
+                self.model = SimpleNamespace(id="gpt2", adapter="hf_causal", device="cpu")
                 self.edit = SimpleNamespace(name="quant_rtn", plan={})
                 self.auto = SimpleNamespace(enabled=False, tier="balanced", probes=0)
                 self.guards = SimpleNamespace(order=[])
@@ -288,7 +288,7 @@ def test_until_pass_materialize_sets_flags_and_retries_once(
     calls = {"exec": 0, "edit_configs": []}
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def load_model(self, model_id, device=None):
             return SmallModel()
@@ -479,7 +479,7 @@ def test_snapshot_auto_bytes_when_small_model(tmp_path: Path, monkeypatch):
     cfg = _cfg(tmp_path, 1, 1)
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def __init__(self):
             self.restored = 0
@@ -551,7 +551,7 @@ def test_snapshot_no_support_uses_reload(tmp_path: Path, monkeypatch):
     cfg = _cfg(tmp_path, 1, 1)
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def __init__(self):
             self.loaded = 0
@@ -619,7 +619,7 @@ def test_snapshot_env_mode_overrides(tmp_path: Path, monkeypatch):
     cfg = _cfg(tmp_path, 1, 1)
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def __init__(self):
             self.restored = 0
