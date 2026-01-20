@@ -82,6 +82,47 @@ _get_model_invarlock_config_fallback() {
     esac
 }
 
+_bootstrap_replicates_floor_for_tier() {
+    local tier="${1:-balanced}"
+    case "${tier}" in
+        conservative)
+            echo "1500"
+            ;;
+        balanced)
+            echo "1200"
+            ;;
+        aggressive)
+            echo "800"
+            ;;
+        *)
+            echo "1200"
+            ;;
+    esac
+}
+
+_resolve_bootstrap_replicates() {
+    local model_size="$1"
+    local tier="${2:-balanced}"
+
+    local bootstrap_replicates=2000
+    if _is_large_model "${model_size}"; then
+        bootstrap_replicates=1000
+    fi
+    if [[ -n "${INVARLOCK_BOOTSTRAP_N:-}" ]]; then
+        bootstrap_replicates="${INVARLOCK_BOOTSTRAP_N}"
+    fi
+
+    local floor=""
+    floor="$(_bootstrap_replicates_floor_for_tier "${tier}")"
+    if [[ "${bootstrap_replicates}" =~ ^[0-9]+$ && "${floor}" =~ ^[0-9]+$ ]]; then
+        if [[ "${bootstrap_replicates}" -lt "${floor}" ]]; then
+            bootstrap_replicates="${floor}"
+        fi
+    fi
+
+    echo "${bootstrap_replicates}"
+}
+
 # Wrapper to get model size - tries main script function first, then fallback
 _estimate_model_size() {
     local model_path="$1"
@@ -1872,15 +1913,9 @@ task_certify_edit() {
             echo "  CI window override: preview=${preview_n}, final=${final_n}" >> "${log_file}"
         fi
     fi
-    local bootstrap_replicates=2000
-    if _is_large_model "${model_size}"; then
-        bootstrap_replicates=1000
-    fi
-    if [[ -n "${INVARLOCK_BOOTSTRAP_N:-}" ]]; then
-        bootstrap_replicates="${INVARLOCK_BOOTSTRAP_N}"
-    fi
-
     local tier="${INVARLOCK_TIER:-balanced}"
+    local bootstrap_replicates
+    bootstrap_replicates="$(_resolve_bootstrap_replicates "${model_size}" "${tier}")"
     local baseline_report_root="${model_output_dir}/baseline_reports/${profile_flag}_${tier}_seq${seq_len}_pv${preview_n}_fn${final_n}"
     local baseline_report_file=""
     baseline_report_file=$(
@@ -2170,15 +2205,9 @@ task_certify_error() {
             echo "  CI window override: preview=${preview_n}, final=${final_n}" >> "${log_file}"
         fi
     fi
-    local bootstrap_replicates=2000
-    if _is_large_model "${model_size}"; then
-        bootstrap_replicates=1000
-    fi
-    if [[ -n "${INVARLOCK_BOOTSTRAP_N:-}" ]]; then
-        bootstrap_replicates="${INVARLOCK_BOOTSTRAP_N}"
-    fi
-
     local tier="${INVARLOCK_TIER:-balanced}"
+    local bootstrap_replicates
+    bootstrap_replicates="$(_resolve_bootstrap_replicates "${model_size}" "${tier}")"
     local baseline_report_root="${model_output_dir}/baseline_reports/${profile_flag}_${tier}_seq${seq_len}_pv${preview_n}_fn${final_n}"
     local baseline_report_file=""
     baseline_report_file=$(
