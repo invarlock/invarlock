@@ -332,13 +332,31 @@ class HF_Causal_Adapter(HFAdapterMixin, ModelAdapter):
         except Exception:
             n_layers = sum(1 for _ in iter(layers))
 
-        n_heads = getattr(config, "num_attention_heads", None) or getattr(
-            config, "n_head", None
-        )
-        hidden_size = getattr(config, "hidden_size", None) or getattr(
-            config, "n_embd", None
-        )
-        vocab_size = getattr(config, "vocab_size", None)
+        def _coerce_int(value: Any) -> int | None:
+            try:
+                if isinstance(value, bool):
+                    return None
+                if isinstance(value, int):
+                    return int(value)
+                if isinstance(value, float):
+                    return int(value)
+                if isinstance(value, str):
+                    stripped = value.strip()
+                    if stripped and stripped.isdigit():
+                        return int(stripped)
+            except Exception:
+                return None
+            return None
+
+        n_heads = _coerce_int(getattr(config, "num_attention_heads", None))
+        if n_heads is None:
+            n_heads = _coerce_int(getattr(config, "n_head", None))
+
+        hidden_size = _coerce_int(getattr(config, "hidden_size", None))
+        if hidden_size is None:
+            hidden_size = _coerce_int(getattr(config, "n_embd", None))
+
+        vocab_size = _coerce_int(getattr(config, "vocab_size", None))
 
         if n_heads is None or hidden_size is None:
             raise AdapterError(
@@ -392,4 +410,3 @@ class HF_Causal_Adapter(HFAdapterMixin, ModelAdapter):
         spec = self._select_spec(model, base, layers)
         layer = layers[layer_idx]
         return spec.layer_modules(model, layer)
-
