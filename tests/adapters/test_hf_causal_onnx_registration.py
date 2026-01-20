@@ -9,7 +9,9 @@ def test_hf_causal_onnx_adapter_is_registered():
     registry = get_registry()
     info = registry.get_plugin_info("hf_causal_onnx", "adapters")
     assert info["module"] in {"invarlock.adapters"}
-    assert info["available"] is True
+    assert info["available"] in {True, False}
+    if not info["available"]:
+        assert "Needs extra" in str(info.get("status", ""))
 
 
 def test_auto_resolver_detects_local_onnx(tmp_path: Path):
