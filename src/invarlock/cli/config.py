@@ -415,7 +415,7 @@ def _deep_merge_dicts(a: dict, b: dict) -> dict:  # pragma: no cover - trivial a
 
 def create_example_config() -> InvarLockConfig:  # pragma: no cover - test helper
     return InvarLockConfig(
-        model={"id": "gpt2", "adapter": "hf_gpt2", "device": "auto"},
+        model={"id": "gpt2", "adapter": "hf_causal", "device": "auto"},
         edit={"name": "quant_rtn", "plan": {}},
         dataset={"provider": "wikitext2", "seq_len": 512, "stride": 512},
         output={"dir": "runs"},

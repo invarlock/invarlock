@@ -359,7 +359,7 @@ def _detect_weight_tying(model: Any) -> dict[str, str]:
     tying: dict[str, str] = {}
 
     # Common weight tying patterns
-    # LLaMA/Mistral: lm_head.weight ↔ model.embed_tokens.weight
+    # Decoder embed_tokens style: lm_head.weight ↔ model.embed_tokens.weight
     if hasattr(model, "lm_head") and hasattr(model, "model"):
         inner = model.model
         if hasattr(inner, "embed_tokens"):
@@ -408,7 +408,7 @@ def _detect_primary_metric(model: Any) -> str:
             return "rouge"
         return "ppl_seq2seq"
 
-    # Decoder-only models (GPT-like, LLaMA-like)
+    # Decoder-only models (GPT-like, RoPE-style)
     return "ppl_causal"
 
 

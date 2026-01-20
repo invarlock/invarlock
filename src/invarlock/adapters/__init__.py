@@ -34,13 +34,6 @@ _LAZY_MAP = {
     "HF_Seq2Seq_Adapter": ".hf_seq2seq",
     "HF_Causal_ONNX_Adapter": ".hf_causal_onnx",
     "HF_Auto_Adapter": ".auto",
-    "HF_BERT_Adapter": ".hf_bert",
-    "HF_GPT2_Adapter": ".hf_gpt2",
-    "HF_LLaMA_Adapter": ".hf_llama",
-    "HF_T5_Adapter": ".hf_t5",
-    "HF_ORT_CausalLM_Adapter": ".hf_onnx",
-    "HF_Causal_Auto_Adapter": ".auto",
-    "HF_MLM_Auto_Adapter": ".auto",
 }
 
 
@@ -101,13 +94,6 @@ __all__ = [
     "HF_Seq2Seq_Adapter",
     "HF_Causal_ONNX_Adapter",
     "HF_Auto_Adapter",
-    "HF_GPT2_Adapter",
-    "HF_BERT_Adapter",
-    "HF_LLaMA_Adapter",
-    "HF_T5_Adapter",
-    "HF_ORT_CausalLM_Adapter",
-    "HF_Causal_Auto_Adapter",
-    "HF_MLM_Auto_Adapter",
     "BaseAdapter",
     "AdapterConfig",
     "AdapterInterface",

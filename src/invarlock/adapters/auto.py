@@ -213,26 +213,6 @@ class _DelegatingAdapter(ModelAdapter):
         raise AttributeError(item)
 
 
-class HF_Causal_Auto_Adapter(_DelegatingAdapter):
-    name = "hf_causal_auto"
-
-    def load_model(self, model_id: str, device: str = "auto", **kwargs: Any) -> Any:
-        delegate = self._ensure_delegate_from_id(model_id)
-        return delegate.load_model(model_id, device=device, **kwargs)
-
-
-class HF_MLM_Auto_Adapter(_DelegatingAdapter):
-    name = "hf_mlm_auto"
-
-    def load_model(self, model_id: str, device: str = "auto", **kwargs: Any) -> Any:
-        # Force BERT-like adapter for MLM families
-        HF_BERT_Adapter = _importlib.import_module(
-            ".hf_bert", __package__
-        ).HF_BERT_Adapter
-        self._delegate = HF_BERT_Adapter()
-        return self._delegate.load_model(model_id, device=device, **kwargs)
-
-
 class HF_Auto_Adapter(_DelegatingAdapter):
     name = "hf_auto"
 
