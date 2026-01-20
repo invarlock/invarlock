@@ -327,7 +327,7 @@ InvarLock supports extension via entry points without modifying core code.
 
 | Extension Type | Entry Point Group | Example |
 | --- | --- | --- |
-| Adapters | `invarlock.adapters` | `hf_llama`, `hf_bert`, `hf_gpt2` |
+| Adapters | `invarlock.adapters` | `hf_causal`, `hf_mlm`, `hf_causal` |
 | Guards | `invarlock.guards` | `invariants`, `spectral`, `rmt`, `variance` |
 | Edits | `invarlock.edits` | `quant_rtn`, `noop` |
 

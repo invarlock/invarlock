@@ -7,7 +7,7 @@
 | **Purpose** | Load models, describe structure, and snapshot/restore state for edits and guards. |
 | **Audience** | CLI users choosing `model.adapter` and Python callers instantiating adapters. |
 | **Supported surface** | Core HF adapters, auto-match adapters, and Linux-only quantized adapters. |
-| **Requires** | `invarlock[adapters]` or `invarlock[hf]` for core HF adapters; `invarlock[onnx]` for `hf_onnx`; `invarlock[gpu]`, `invarlock[awq]`, `invarlock[gptq]` for quantized adapters. |
+| **Requires** | `invarlock[adapters]` or `invarlock[hf]` for core HF adapters; `invarlock[onnx]` for `hf_causal_onnx`; `invarlock[gpu]`, `invarlock[awq]`, `invarlock[gptq]` for quantized adapters. |
 | **Network** | Offline by default; set `INVARLOCK_ALLOW_NETWORK=1` for model downloads. |
 | **Inputs** | `model.id` (HF repo or local path), adapter name, device. |
 | **Outputs / Artifacts** | Loaded model object; optional snapshots; exported model directories when enabled. |
@@ -30,9 +30,9 @@ INVARLOCK_ALLOW_NETWORK=1 invarlock certify \
 ```
 
 ```python
-from invarlock.adapters import HF_Causal_Auto_Adapter
+from invarlock.adapters import HF_Auto_Adapter
 
-adapter = HF_Causal_Auto_Adapter()
+adapter = HF_Auto_Adapter()
 model = adapter.load_model("gpt2", device="auto")
 print(adapter.describe(model)["model_type"])
 ```
@@ -41,9 +41,11 @@ print(adapter.describe(model)["model_type"])
 
 - **Adapters hide model-specific logic**: they handle loading, structure description,
   and snapshot/restore so edits/guards stay model-agnostic.
-- **Auto adapters** (`hf_causal_auto`, `hf_mlm_auto`) resolve a concrete adapter
-  from the model’s `config.json`. Remote models still require network to fetch
-  the config on first use.
+- **Auto selection**: use `adapter: auto` (config/CLI shortcut) or `--adapter hf_auto`
+  (adapter plugin) to choose a concrete role adapter (`hf_causal`, `hf_mlm`,
+  `hf_seq2seq`, `hf_causal_onnx`) plus quant adapters when detected. Local paths
+  can use `config.json`; remote IDs fall back to name heuristics and default to
+  `hf_causal` when unsure.
 - **Quantized adapters** (`hf_bnb`, `hf_awq`, `hf_gptq`) handle their own device
   placement; avoid calling `.to(...)` on the loaded model.
 - **Snapshot strategy**: HF adapters expose `snapshot`/`restore` and
@@ -54,9 +56,10 @@ print(adapter.describe(model)["model_type"])
 
 | `model_type` family | Adapter |
 | --- | --- |
-| llama / mistral / qwen / yi | `hf_llama` |
-| gpt2 / opt / neo-x | `hf_gpt2` |
-| bert / roberta | `hf_bert` |
+| mistral / mixtral / qwen / yi | `hf_causal` |
+| gpt2 / opt / neo-x / phi | `hf_causal` |
+| bert / roberta | `hf_mlm` |
+| t5 / bart | `hf_seq2seq` |
 
 Auto inspects `config.model_type`; remote models may need network for config.
 
@@ -64,9 +67,9 @@ Capability matrix (at a glance)
 
 | Adapter family | Snapshot/restore | Guard compatibility | Platform |
 | --- | --- | --- | --- |
-| HF PyTorch (`hf_gpt2`, `hf_llama`, `hf_bert`, `hf_t5`) | Yes | Full | All |
+| HF PyTorch (`hf_causal`, `hf_mlm`, `hf_seq2seq`) | Yes | Full | All |
 | Quantized (`hf_bnb`, `hf_awq`, `hf_gptq`) | Best-effort | Full when modules exposed | Linux |
-| ONNX (`hf_onnx`) | No | Eval-only | All |
+| ONNX (`hf_causal_onnx`) | No | Eval-only | All |
 
 ## Reference
 
@@ -74,13 +77,11 @@ Capability matrix (at a glance)
 
 | Adapter | Models / Purpose | Requires | Platform support | Notes |
 | --- | --- | --- | --- | --- |
-| `hf_gpt2` | GPT-2/OPT/GPT‑Neo-X style causal LMs | `invarlock[adapters]` | All platforms with torch | Default causal LM adapter. |
-| `hf_llama` | LLaMA/Mistral/Qwen/Yi causal LMs | `invarlock[adapters]` | All platforms with torch | Handles RMSNorm + RoPE/GQA. |
-| `hf_bert` | BERT/RoBERTa/DeBERTa MLMs | `invarlock[adapters]` | All platforms with torch | Loads `AutoModelForMaskedLM` when possible. |
-| `hf_t5` | T5/encoder‑decoder models | `invarlock[adapters]` | All platforms with torch | For seq2seq evaluation. |
-| `hf_onnx` | Optimum/ONNXRuntime causal LMs | `invarlock[onnx]` | All platforms | Inference-only; snapshot/restore not supported. |
-| `hf_causal_auto` | Auto-select causal adapter | `invarlock[adapters]` | All platforms with torch | Resolves to `hf_gpt2`/`hf_llama`. |
-| `hf_mlm_auto` | Auto-select MLM adapter | `invarlock[adapters]` | All platforms with torch | Resolves to `hf_bert`. |
+| `hf_causal` | Decoder-only causal LMs (dense + MoE + GPT2-like) | `invarlock[adapters]` | All platforms with torch | Default causal LM adapter. |
+| `hf_mlm` | BERT/RoBERTa/DeBERTa MLMs | `invarlock[adapters]` | All platforms with torch | Loads `AutoModelForMaskedLM` when possible. |
+| `hf_seq2seq` | T5/encoder‑decoder models | `invarlock[adapters]` | All platforms with torch | For seq2seq evaluation. |
+| `hf_causal_onnx` | Optimum/ONNXRuntime causal LMs | `invarlock[onnx]` | All platforms | Inference-only; snapshot/restore not supported. |
+| `hf_auto` | Auto-select HF adapter | `invarlock[adapters]` | All platforms with torch | Delegates to a role adapter; prefers quant adapters when detected. |
 | `hf_bnb` | Bitsandbytes quantized LMs | `invarlock[gpu]` | Linux only | Uses `device_map="auto"`; no `.to()`. |
 | `hf_awq` | AWQ quantized LMs | `invarlock[awq]` | Linux only | Requires `autoawq`/`triton`. |
 | `hf_gptq` | GPTQ quantized LMs | `invarlock[gptq]` | Linux only | Requires `auto-gptq`/`triton`. |
@@ -89,23 +90,22 @@ Capability matrix (at a glance)
 
 | Adapter class | Snapshot/restore | Guard compatibility | Notes |
 | --- | --- | --- | --- |
-| PyTorch HF adapters (`hf_gpt2`, `hf_llama`, `hf_bert`, `hf_t5`) | Yes | Full (module access) | Uses `HFAdapterMixin` snapshots. |
+| PyTorch HF adapters (`hf_causal`, `hf_causal`, `hf_mlm`, `hf_seq2seq`) | Yes | Full (module access) | Uses `HFAdapterMixin` snapshots. |
 | Quantized HF adapters (`hf_bnb`, `hf_awq`, `hf_gptq`) | Yes (best-effort) | Full when modules are exposed | Avoid explicit `.to()` calls. |
-| ONNX adapter (`hf_onnx`) | No | Eval-only | Use `edit: noop` and expect guard limitations. |
+| ONNX adapter (`hf_causal_onnx`) | No | Eval-only | Use `edit: noop` and expect guard limitations. |
 
 ### Adapter selection (`adapter: auto`)
 
-Automatic resolution uses the model’s `config.model_type` and structure checks.
-The CLI’s `adapter: auto` shortcut resolves to `hf_causal_auto` or `hf_mlm_auto`
-before plugin discovery.
+Automatic resolution uses local `config.json` (if `model.id` is a directory) and
+simple heuristics to choose a concrete built-in adapter name.
 
-- LLaMA/Mistral/Qwen/Yi → `hf_llama`
-- BERT/RoBERTa/DeBERTa/ALBERT → `hf_bert`
-- GPT‑2/OPT/GPT‑Neo-X → `hf_gpt2`
+- Decoder-only causal → `hf_causal`
+- BERT/RoBERTa/DeBERTa/ALBERT → `hf_mlm`
+- T5/BART → `hf_seq2seq`
 
 ```yaml
 model:
-  id: meta-llama/Llama-2-7b-hf
+  id: mistralai/Mistral-7B-v0.1
   adapter: auto
   device: auto
 ```
@@ -116,7 +116,7 @@ model:
 # Standard causal LM run
 model:
   id: gpt2
-  adapter: hf_gpt2
+  adapter: hf_causal
   device: auto
 ```
 
@@ -132,7 +132,7 @@ model:
 # ONNX Runtime inference-only adapter (use with edit: noop)
 model:
   id: /path/to/onnx-model
-  adapter: hf_onnx
+  adapter: hf_causal_onnx
 edit:
   name: noop
 ```
@@ -187,7 +187,7 @@ finally:
   only published for Linux in `pyproject.toml`.
 - **Quantized model `.to()` errors**: avoid explicit `.to()`; load with the adapter
   and let it manage device placement.
-- **ONNX adapter guard failures**: `hf_onnx` is inference-only; use `edit: noop`
+- **ONNX adapter guard failures**: `hf_causal_onnx` is inference-only; use `edit: noop`
   and avoid guards that require PyTorch module access.
 
 ## Observability

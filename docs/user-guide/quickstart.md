@@ -119,7 +119,7 @@ Create a YAML configuration file:
 ```yaml
 model:
   id: "gpt2"
-  adapter: "hf_gpt2"
+  adapter: "hf_causal"
   device: "auto"  # mirrors the CLI default (--device auto)
 
 dataset:

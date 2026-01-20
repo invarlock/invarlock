@@ -53,8 +53,8 @@ This produces `reports/.../evaluation.cert.json` with paired metrics
 (ppl/accuracy), structural deltas, spectral/RMT stats, variance‑estimator
 provenance, seeds/hashes, pairing metrics, and a policy digest.
 
-> **Calibration note:** tier thresholds and window sizes are piloted on GPT‑2 small,
-> BERT base, and TinyLLaMA (see `docs/assurance/09-tier-v1-calibration.md`). For
+> **Calibration note:** tier thresholds and window sizes are piloted on GPT‑2 small
+> and BERT base (see `docs/assurance/09-tier-v1-calibration.md`). For
 > calibrated Balanced/Conservative certs, use the preset‑based CI/Release examples
 > below. `INVARLOCK_TINY_RELAX` dev runs relax sample‑size floors and are intended
 > only for small smoke tests (not release evidence).
@@ -347,7 +347,7 @@ Key checks enforced by balanced policy (summary):
 ```yaml
 model:
   id: "<set-your-model-id>"   # e.g., gpt2
-  adapter: "hf_gpt2"
+  adapter: "hf_causal"
   device: "cpu"
 dataset:
   provider: "wikitext2"
@@ -412,7 +412,7 @@ invarlock/
 │  ├─ invarlock/                 # core + unified namespace
 │  │  ├─ core/               # runner, registry, contracts, events, ABI
 │  │  ├─ cli/                # console app + command wrappers (unified import path)
-│  │  ├─ adapters/           # adapter wrappers (HF GPT‑2/BERT/LLaMA)
+│  │  ├─ adapters/           # model adapters (HF causal/MLM/seq2seq/onnx)
 │  │  ├─ edits/              # quant_rtn
 │  │  ├─ guards/             # invariants, spectral, rmt, variance
 │  │  ├─ eval/               # evaluation metrics and helpers

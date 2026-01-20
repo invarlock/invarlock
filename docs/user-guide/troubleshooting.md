@@ -365,7 +365,7 @@ List available adapters/guards/edits:
 
 ```bash
 invarlock plugins list --verbose
-invarlock plugins adapters --explain hf_gpt2
+invarlock plugins adapters --explain hf_causal
 ```
 
 ## Related Documentation
