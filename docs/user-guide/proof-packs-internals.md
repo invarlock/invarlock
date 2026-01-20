@@ -163,8 +163,8 @@ Default full-suite model sizes (weights-only, approximate):
 Notes:
 
 - Override models via `MODEL_1`–`MODEL_8`; set an empty string to disable a slot.
-- `validation_suite.sh` includes a fallback list (including Llama-2-13B/70B) if
-  it is run directly without `suites.sh`.
+- `validation_suite.sh` includes a fallback list of large causal models if it is
+  run directly without `suites.sh`.
 
 ## Edit Types
 

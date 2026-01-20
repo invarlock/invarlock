@@ -509,9 +509,9 @@ python -c "from my_plugin.my_guard import NaNCheckGuard; print('OK')"
 ```python
 # test_integration.py
 from my_plugin.my_guard import NaNCheckGuard
-from invarlock.adapters import HF_GPT2_Adapter
+from invarlock.adapters import HF_Causal_Adapter
 
-adapter = HF_GPT2_Adapter()
+adapter = HF_Causal_Adapter()
 model = adapter.load_model("gpt2", device="cpu")
 
 guard = NaNCheckGuard()
