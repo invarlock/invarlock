@@ -40,8 +40,8 @@ from invarlock.adapters.base_types import (
     MonitorConfig,
     PerformanceMetrics,
 )
-from invarlock.adapters.hf_mlm import HF_MLM_Adapter
 from invarlock.adapters.hf_causal import HF_Causal_Adapter
+from invarlock.adapters.hf_mlm import HF_MLM_Adapter
 
 
 class MockGPT2Model(nn.Module):
