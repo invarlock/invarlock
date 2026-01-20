@@ -2082,6 +2082,35 @@ test_pack_validation_pack_run_suite_branches() {
     trap - EXIT INT TERM HUP QUIT
 }
 
+test_pack_validation_pack_run_suite_calibrate_only_skips_tuned_edit_params_validation() {
+    mock_reset
+
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    cleanup() { return 0; }
+    pack_require_bash4() { return 0; }
+    pack_apply_network_mode() { :; }
+    pack_source_libs() { return 0; }
+    pack_prepare_scenarios_manifest() { return 0; }
+    pack_setup_hf_cache_dirs() { return 0; }
+
+    # Ensure the model list would fail tuned preset validation if it ran.
+    pack_model_list_array() { PACK_MODEL_LIST=("Qwen/Qwen2.5-14B"); }
+
+    PACK_SUITE_MODE="calibrate-only"
+    PACK_SUITE="full"
+    PACK_NET="0"
+    OUTPUT_DIR="${TEST_TMPDIR}/out_calib_only"
+    export PACK_SUITE_MODE PACK_SUITE PACK_NET OUTPUT_DIR
+
+    pack_load_model_revisions() { return 0; }
+    main_dynamic() { :; }
+
+    run pack_run_suite
+    assert_rc "0" "${RUN_RC}" "calibrate-only skips tuned edit preset validation"
+    trap - EXIT INT TERM HUP QUIT
+}
+
 
 test_pack_apply_network_mode_sets_env_flags() {
     mock_reset
