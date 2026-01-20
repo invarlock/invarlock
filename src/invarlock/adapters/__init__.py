@@ -29,6 +29,11 @@ from .capabilities import (
 )
 
 _LAZY_MAP = {
+    "HF_Causal_Adapter": ".hf_causal",
+    "HF_MLM_Adapter": ".hf_mlm",
+    "HF_Seq2Seq_Adapter": ".hf_seq2seq",
+    "HF_Causal_ONNX_Adapter": ".hf_causal_onnx",
+    "HF_Auto_Adapter": ".auto",
     "HF_BERT_Adapter": ".hf_bert",
     "HF_GPT2_Adapter": ".hf_gpt2",
     "HF_LLaMA_Adapter": ".hf_llama",
@@ -91,6 +96,11 @@ run_invarlock = _RemovedComponent("run_invarlock", "invarlock.cli.run")
 quick_prune_gpt2 = _RemovedComponent("quick_prune_gpt2")
 
 __all__ = [
+    "HF_Causal_Adapter",
+    "HF_MLM_Adapter",
+    "HF_Seq2Seq_Adapter",
+    "HF_Causal_ONNX_Adapter",
+    "HF_Auto_Adapter",
     "HF_GPT2_Adapter",
     "HF_BERT_Adapter",
     "HF_LLaMA_Adapter",
