@@ -80,9 +80,10 @@ def resolve_auto_adapter(
         archs = [str(a) for a in c.get("architectures", []) if isinstance(a, str)]
         arch_blob = " ".join(archs)
         if (
-            mt in {"llama", "mistral", "qwen", "qwen2", "qwen2_moe", "yi"}
+            mt in {"llama", "mistral", "mixtral", "qwen", "qwen2", "qwen2_moe", "yi"}
             or "Llama" in arch_blob
             or "Mistral" in arch_blob
+            or "Mixtral" in arch_blob
             or "Qwen" in arch_blob
         ):
             return "hf_llama"
@@ -135,7 +136,7 @@ def resolve_auto_adapter(
         k in lower_id for k in ["bnb", "bitsandbytes", "-4bit", "-8bit", "4bit", "8bit"]
     ):
         return "hf_bnb"
-    if any(k in lower_id for k in ["llama", "mistral", "qwen", "yi"]):
+    if any(k in lower_id for k in ["llama", "mistral", "mixtral", "qwen", "yi"]):
         return "hf_llama"
     if any(k in lower_id for k in ["bert", "roberta", "albert", "deberta"]):
         return "hf_bert"

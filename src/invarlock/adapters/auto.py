@@ -174,7 +174,7 @@ class _DelegatingAdapter(ModelAdapter):
 
         # Fall back to class name inspection
         cls_name = getattr(model, "__class__", type(model)).__name__.lower()
-        if any(k in cls_name for k in ["llama", "mistral", "qwen", "yi"]):
+        if any(k in cls_name for k in ["llama", "mistral", "mixtral", "qwen", "yi"]):
             self._delegate = self._load_adapter("hf_llama")
         elif any(k in cls_name for k in ["bert", "roberta", "albert", "deberta"]):
             self._delegate = self._load_adapter("hf_bert")
