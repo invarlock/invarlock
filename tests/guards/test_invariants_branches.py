@@ -179,7 +179,7 @@ def test_invariants_validate_when_prepared():
 
 
 def test_profile_rotary_embedding_detected():
-    # Build a minimal LLaMA-like structure with rotary_emb present
+    # Build a minimal RoPE-style structure with rotary_emb present
     class SelfAttn:
         def __init__(self):
             self.rotary_emb = object()
@@ -188,14 +188,14 @@ def test_profile_rotary_embedding_detected():
         def __init__(self):
             self.self_attn = SelfAttn()
 
-    class LLamaModel:
+    class RopeModel:
         def __init__(self):
             self.layers = [Layer()]
 
     class M(nn.Module):
         def __init__(self):
             super().__init__()
-            self.model = LLamaModel()
+            self.model = RopeModel()
 
     model = M()
     guard = InvariantsGuard()

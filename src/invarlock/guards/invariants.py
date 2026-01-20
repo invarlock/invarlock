@@ -361,14 +361,16 @@ class InvariantsGuard(Guard):
         except Exception:
             pass
 
-        # LLaMA style (model.embed_tokens <-> lm_head)
+        # Decoder embed_tokens style (model.embed_tokens <-> lm_head)
         try:
-            llama_model = getattr(model, "model", None)
-            embed_tokens = getattr(llama_model, "embed_tokens", None)
+            decoder_model = getattr(model, "model", None)
+            embed_tokens = getattr(decoder_model, "embed_tokens", None)
             embed_weight = getattr(embed_tokens, "weight", None)
-            llama_head_weight = getattr(getattr(model, "lm_head", None), "weight", None)
-            if embed_weight is not None and llama_head_weight is not None:
-                weight_tying_flags["llama"] = _is_tied(embed_weight, llama_head_weight)
+            head_weight = getattr(getattr(model, "lm_head", None), "weight", None)
+            if embed_weight is not None and head_weight is not None:
+                weight_tying_flags["embed_tokens"] = _is_tied(
+                    embed_weight, head_weight
+                )
         except Exception:
             pass
 
@@ -433,7 +435,7 @@ class InvariantsGuard(Guard):
             return "bert" in model_type or has_cls_decoder
 
         if name in {"rope_rotary_embedding", "rotary_embedding"}:
-            # Detect rotary embeddings used by LLaMA-style models
+            # Detect rotary embeddings used by RoPE-style models
             if hasattr(model, "model") and hasattr(model.model, "layers"):
                 first_layer = model.model.layers[0] if model.model.layers else None
             else:
@@ -452,7 +454,7 @@ class InvariantsGuard(Guard):
             model_type = getattr(config, "model_type", "") if config else ""
             return any(
                 keyword in model_type
-                for keyword in ("gpt", "llama", "mistral", "opt", "phi")
+                for keyword in ("gpt", "mistral", "mixtral", "qwen", "opt", "phi")
             )
 
         return True

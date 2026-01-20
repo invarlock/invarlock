@@ -200,7 +200,7 @@ class TestBatchDimensionWithRealModel:
         not torch.cuda.is_available() and not hasattr(torch.backends, "mps"),
         reason="Skip without GPU/MPS available (optional test)",
     )
-    def test_hf_gpt2_compatible_input(self):
+    def test_hf_causal_compatible_input(self):
         """Test that input format is compatible with HF GPT-2."""
         # This test would use actual HF GPT-2 if available
         # For CI, we skip if no accelerator is present
