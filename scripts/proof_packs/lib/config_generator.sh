@@ -14,8 +14,8 @@ generate_invarlock_config() {
     local stride="${9:-${INVARLOCK_STRIDE}}"
     local eval_batch="${10:-${INVARLOCK_EVAL_BATCH}}"
 
-    # Use auto adapter for generic causal LM support (LLaMA, Mistral, Qwen, MPT, Falcon, etc.)
-    local adapter="hf_causal_auto"
+    # Use auto adapter for generic causal LM support (Mistral, Mixtral, Qwen, MPT, Falcon, etc.)
+    local adapter="hf_auto"
     local dataset_provider="${INVARLOCK_DATASET}"
 
     local attn_impl_yaml=""
