@@ -2280,6 +2280,15 @@ pack_run_suite() {
         error_exit "No models configured for PACK_SUITE=${PACK_SUITE}."
     fi
 
+    # Calibration-only runs do not execute clean/stress/error scenarios.
+    # Avoid requiring tuned edit presets during this phase.
+    if [[ "${PACK_SUITE_MODE:-full}" == "calibrate-only" ]]; then
+        CLEAN_EDIT_RUNS=0
+        STRESS_EDIT_RUNS=0
+        RUN_ERROR_INJECTION="false"
+        export CLEAN_EDIT_RUNS STRESS_EDIT_RUNS RUN_ERROR_INJECTION
+    fi
+
     pack_prepare_tuned_edit_params || return 1
     pack_validate_tuned_edit_params || return 1
     pack_prepare_calibration_presets || return 1
