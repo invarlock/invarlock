@@ -28,6 +28,11 @@ def test_resolve_auto_adapter_qwen(tmp_path):
     assert resolve_auto_adapter(str(model_dir)) == "hf_llama"
 
 
+def test_resolve_auto_adapter_mixtral(tmp_path):
+    model_dir = _write_cfg(tmp_path, "mixtral", "MixtralForCausalLM")
+    assert resolve_auto_adapter(str(model_dir)) == "hf_llama"
+
+
 def test_resolve_auto_adapter_bert(tmp_path):
     model_dir = _write_cfg(tmp_path, "bert", "BertForMaskedLM")
     assert resolve_auto_adapter(str(model_dir)) == "hf_bert"
