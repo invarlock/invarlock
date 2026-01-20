@@ -104,12 +104,19 @@ class HF_LLaMA_Adapter(HFAdapterMixin, ModelAdapter):
                     return True
             return False
 
-        # Check for HuggingFace LLaMA class names
+        # Check for HuggingFace LLaMA/Mistral/Mixtral class names
         model_name = model.__class__.__name__
-        if model_name in ["LlamaModel", "LlamaForCausalLM"]:
+        if model_name in [
+            "LlamaModel",
+            "LlamaForCausalLM",
+            "MistralModel",
+            "MistralForCausalLM",
+            "MixtralModel",
+            "MixtralForCausalLM",
+        ]:
             # Verify it has HF config
             if hasattr(model, "config") and hasattr(model.config, "model_type"):
-                return model.config.model_type == "llama"
+                return str(model.config.model_type) in {"llama", "mistral", "mixtral"}
 
         # Early bare-structure acceptance (no wrapper), minimal checks for tests
         if hasattr(model, "layers"):
@@ -166,18 +173,52 @@ class HF_LLaMA_Adapter(HFAdapterMixin, ModelAdapter):
                     if layer is None:
                         return False
 
-                    # Check for LLaMA layer structure (strict: only count explicitly set attributes)
-                    if (
+                    # Check for LLaMA/Mistral layer structure (strict: only count explicitly
+                    # set attributes). Mixtral uses MoE blocks (block_sparse_moe) instead of
+                    # a single `mlp` module per layer.
+                    has_attn = (
                         hasattr(layer, "self_attn")
-                        and hasattr(layer, "mlp")
                         and _has_set_attr(layer.self_attn, "q_proj")
                         and _has_set_attr(layer.self_attn, "k_proj")
                         and _has_set_attr(layer.self_attn, "v_proj")
                         and _has_set_attr(layer.self_attn, "o_proj")
+                    )
+                    has_mlp = (
+                        hasattr(layer, "mlp")
                         and _has_set_attr(layer.mlp, "gate_proj")
                         and _has_set_attr(layer.mlp, "up_proj")
                         and _has_set_attr(layer.mlp, "down_proj")
+                    )
+                    has_moe = False
+                    if hasattr(layer, "block_sparse_moe") and _has_set_attr(
+                        layer, "block_sparse_moe"
                     ):
+                        moe = getattr(layer, "block_sparse_moe", None)
+                        experts = (
+                            getattr(moe, "experts", None) if moe is not None else None
+                        )
+                        expert0 = None
+                        try:
+                            if (
+                                experts is not None
+                                and hasattr(experts, "__len__")
+                                and len(experts) > 0
+                            ):  # type: ignore[arg-type]
+                                expert0 = experts[0]  # type: ignore[index]
+                        except Exception:
+                            expert0 = None
+                        if expert0 is None and experts is not None:
+                            try:
+                                expert0 = next(iter(experts))
+                            except Exception:
+                                expert0 = None
+                        if expert0 is not None:
+                            # Common Mixtral expert naming: w1/w2/w3
+                            has_moe = _has_set_attr(expert0, "w1") and _has_set_attr(
+                                expert0, "w2"
+                            )
+
+                    if has_attn and (has_mlp or has_moe):
                         # Check for RMSNorm (characteristic of LLaMA)
                         if _has_set_attr(layer, "input_layernorm") and _has_set_attr(
                             layer, "post_attention_layernorm"
@@ -315,12 +356,44 @@ class HF_LLaMA_Adapter(HFAdapterMixin, ModelAdapter):
             # For LLaMA, all layers have the same head count
             heads_per_layer.append(n_heads)
 
-            # Get MLP intermediate dimension (gate_proj/up_proj output size)
-            if hasattr(layer.mlp.gate_proj, "weight"):
-                # Linear layer: (out_features, in_features)
-                mlp_dim = layer.mlp.gate_proj.weight.shape[0]
-            else:
-                # Fallback to config
+            # Get MLP intermediate dimension (gate_proj/up_proj output size).
+            # Mixtral layers use an MoE block instead of a single `mlp` module.
+            mlp_dim = getattr(config, "intermediate_size", hidden_size * 4)
+            try:
+                mlp = getattr(layer, "mlp", None)
+                if mlp is not None:
+                    gate_proj = getattr(mlp, "gate_proj", None)
+                    if gate_proj is not None and hasattr(gate_proj, "weight"):
+                        mlp_dim = int(gate_proj.weight.shape[0])
+                    else:
+                        up_proj = getattr(mlp, "up_proj", None)
+                        if up_proj is not None and hasattr(up_proj, "weight"):
+                            mlp_dim = int(up_proj.weight.shape[0])
+                else:
+                    moe = getattr(layer, "block_sparse_moe", None)
+                    experts = getattr(moe, "experts", None) if moe is not None else None
+                    expert0 = None
+                    try:
+                        if (
+                            experts is not None
+                            and hasattr(experts, "__len__")
+                            and len(experts) > 0  # type: ignore[arg-type]
+                        ):
+                            expert0 = experts[0]  # type: ignore[index]
+                    except Exception:
+                        expert0 = None
+                    if expert0 is None and experts is not None:
+                        try:
+                            expert0 = next(iter(experts))
+                        except Exception:
+                            expert0 = None
+                    if expert0 is not None:
+                        for attr in ("w1", "gate_proj", "up_proj", "fc1"):
+                            mod = getattr(expert0, attr, None)
+                            if mod is not None and hasattr(mod, "weight"):
+                                mlp_dim = int(mod.weight.shape[0])
+                                break
+            except Exception:
                 mlp_dim = getattr(config, "intermediate_size", hidden_size * 4)
 
             mlp_dims.append(mlp_dim)
@@ -434,17 +507,52 @@ class HF_LLaMA_Adapter(HFAdapterMixin, ModelAdapter):
         else:
             layer = model.layers[layer_idx]
 
-        modules = {
+        modules: dict[str, ModuleType | Any] = {
             "self_attn.q_proj": layer.self_attn.q_proj,  # Query projection
             "self_attn.k_proj": layer.self_attn.k_proj,  # Key projection
             "self_attn.v_proj": layer.self_attn.v_proj,  # Value projection
             "self_attn.o_proj": layer.self_attn.o_proj,  # Output projection
-            "mlp.gate_proj": layer.mlp.gate_proj,  # Gate projection (SwiGLU)
-            "mlp.up_proj": layer.mlp.up_proj,  # Up projection (SwiGLU)
-            "mlp.down_proj": layer.mlp.down_proj,  # Down projection
             "input_layernorm": layer.input_layernorm,  # RMSNorm before attention
-            "post_attention_layernorm": layer.post_attention_layernorm,  # RMSNorm before MLP
+            "post_attention_layernorm": layer.post_attention_layernorm,  # RMSNorm before MLP/MoE
         }
+
+        mlp = getattr(layer, "mlp", None)
+        if mlp is not None:
+            modules.update(
+                {
+                    "mlp.gate_proj": mlp.gate_proj,
+                    "mlp.up_proj": mlp.up_proj,
+                    "mlp.down_proj": mlp.down_proj,
+                }
+            )
+        else:
+            moe = getattr(layer, "block_sparse_moe", None)
+            experts = getattr(moe, "experts", None) if moe is not None else None
+            expert0 = None
+            try:
+                if (
+                    experts is not None
+                    and hasattr(experts, "__len__")
+                    and len(experts) > 0  # type: ignore[arg-type]
+                ):
+                    expert0 = experts[0]  # type: ignore[index]
+            except Exception:
+                expert0 = None
+            if expert0 is None and experts is not None:
+                try:
+                    expert0 = next(iter(experts))
+                except Exception:
+                    expert0 = None
+            if expert0 is not None:
+                # Best-effort mapping to the LLaMA MLP naming used elsewhere.
+                for name, attr in (
+                    ("mlp.gate_proj", "w1"),
+                    ("mlp.down_proj", "w2"),
+                    ("mlp.up_proj", "w3"),
+                ):
+                    mod = getattr(expert0, attr, None)
+                    if mod is not None:
+                        modules[name] = mod
 
         return modules
 
