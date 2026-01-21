@@ -123,6 +123,24 @@ _resolve_bootstrap_replicates() {
     echo "${bootstrap_replicates}"
 }
 
+_default_ci_min_windows() {
+    local seq_len="${1:-}"
+
+    if [[ -n "${INVARLOCK_CERT_MIN_WINDOWS:-}" ]]; then
+        echo "${INVARLOCK_CERT_MIN_WINDOWS}"
+        return
+    fi
+
+    local default_windows=256
+    # The balanced tier enforces a 50k token minimum; short seq_len on short-text
+    # datasets (e.g., WikiText-2) can fall below that floor due to padding.
+    if [[ "${seq_len}" =~ ^[0-9]+$ && "${seq_len}" -le 256 ]]; then
+        default_windows=352
+    fi
+
+    echo "${default_windows}"
+}
+
 # Wrapper to get model size - tries main script function first, then fallback
 _estimate_model_size() {
     local model_path="$1"
@@ -1166,9 +1184,8 @@ task_calibration_run() {
     # For large models, use INVARLOCK_SKIP_OVERHEAD_CHECK to avoid loading
     # both baseline and edited models simultaneously (which would exceed 180GB).
     local profile_flag="ci"
-    # Default to a higher floor so balanced-tier token minimums (50k) are met
-    # on short-text datasets like WikiText-2 (where many windows are padding).
-    local min_windows="${INVARLOCK_CERT_MIN_WINDOWS:-256}"
+    local min_windows
+    min_windows="$(_default_ci_min_windows "${seq_len}")"
     if [[ "${profile_flag}" == "ci" && "${min_windows}" =~ ^[0-9]+$ && "${min_windows}" -gt 0 ]]; then
         if [[ "${preview_n}" -lt "${min_windows}" || "${final_n}" -lt "${min_windows}" ]]; then
             preview_n="${min_windows}"
@@ -1918,9 +1935,8 @@ task_certify_edit() {
     # For large models, use INVARLOCK_SKIP_OVERHEAD_CHECK to avoid loading
     # both baseline and edited models simultaneously.
     local profile_flag="ci"
-    # Default to a higher floor so balanced-tier token minimums (50k) are met
-    # on short-text datasets like WikiText-2 (where many windows are padding).
-    local min_windows="${INVARLOCK_CERT_MIN_WINDOWS:-256}"
+    local min_windows
+    min_windows="$(_default_ci_min_windows "${seq_len}")"
     if [[ "${profile_flag}" == "ci" && "${min_windows}" =~ ^[0-9]+$ && "${min_windows}" -gt 0 ]]; then
         if [[ "${preview_n}" -lt "${min_windows}" || "${final_n}" -lt "${min_windows}" ]]; then
             preview_n="${min_windows}"
@@ -2210,9 +2226,8 @@ task_certify_error() {
     # For large models, use INVARLOCK_SKIP_OVERHEAD_CHECK to avoid loading
     # both baseline and edited models simultaneously (which would exceed 180GB).
     local profile_flag="ci"
-    # Default to a higher floor so balanced-tier token minimums (50k) are met
-    # on short-text datasets like WikiText-2 (where many windows are padding).
-    local min_windows="${INVARLOCK_CERT_MIN_WINDOWS:-256}"
+    local min_windows
+    min_windows="$(_default_ci_min_windows "${seq_len}")"
     if [[ "${profile_flag}" == "ci" && "${min_windows}" =~ ^[0-9]+$ && "${min_windows}" -gt 0 ]]; then
         if [[ "${preview_n}" -lt "${min_windows}" || "${final_n}" -lt "${min_windows}" ]]; then
             preview_n="${min_windows}"

@@ -10,9 +10,12 @@ def test_proof_pack_default_cert_min_windows_is_high_enough() -> None:
     )
 
     # Proof-pack runs rely on balanced-tier token floors (min_tokens=50k). WT-2
-    # windows can be short, so keep a conservative default floor when the caller
-    # doesn't set INVARLOCK_CERT_MIN_WINDOWS explicitly.
-    assert "INVARLOCK_CERT_MIN_WINDOWS:-256" in text
+    # windows can be short (padding), so the CI defaults should scale up for
+    # short sequence lengths unless the caller overrides INVARLOCK_CERT_MIN_WINDOWS.
+    assert "_default_ci_min_windows" in text
+    assert "default_windows=256" in text
+    assert "default_windows=352" in text
+    assert "INVARLOCK_CERT_MIN_WINDOWS" in text
 
 
 def test_proof_pack_7b_uses_short_seq_len_for_throughput() -> None:
