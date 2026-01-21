@@ -53,8 +53,11 @@ _task_serialization_require_jq() {
 
 # ============ MULTI-GPU CALCULATION ============
 
-# GPU memory per device (defaults to GPU_MEMORY_GB when available)
-GPU_MEMORY_PER_DEVICE="${GPU_MEMORY_PER_DEVICE:-${GPU_MEMORY_GB:-80}}"
+# GPU memory per device:
+# - Prefer the explicit `GPU_MEMORY_PER_DEVICE` override when set.
+# - Otherwise defer to `GPU_MEMORY_GB` (populated by env_report in validation_suite.sh).
+#   IMPORTANT: do not eagerly default this at import time, because GPU detection
+#   happens after libs are sourced; eager defaults cause under-sizing on large VRAM GPUs.
 
 # Calculate required GPUs based on model memory size.
 # Usage: calculate_required_gpus <model_size_gb>
@@ -66,7 +69,7 @@ GPU_MEMORY_PER_DEVICE="${GPU_MEMORY_PER_DEVICE:-${GPU_MEMORY_GB:-80}}"
 #
 calculate_required_gpus() {
     local model_size_gb="$1"
-    local per_device="${GPU_MEMORY_PER_DEVICE:-80}"
+    local per_device="${GPU_MEMORY_PER_DEVICE:-${GPU_MEMORY_GB:-80}}"
     local max_gpus="${NUM_GPUS:-8}"
 
     if ! [[ "${model_size_gb}" =~ ^[0-9]+$ ]]; then
