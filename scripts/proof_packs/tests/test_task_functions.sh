@@ -302,8 +302,8 @@ YAML
     profile_contents="$(cat "${profile_yaml}")"
     assert_match "seq_len: 100" "${profile_contents}" "profile override seq_len"
     assert_match "stride: 100" "${profile_contents}" "profile override stride uses pairing"
-    assert_match "preview_n: 192" "${profile_contents}" "profile override preview_n"
-    assert_match "final_n: 192" "${profile_contents}" "profile override final_n"
+    assert_match "preview_n: 256" "${profile_contents}" "profile override preview_n"
+    assert_match "final_n: 256" "${profile_contents}" "profile override final_n"
 
     local calls
     calls="$(cat "${TEST_TMPDIR}/fixtures/invarlock.calls")"
