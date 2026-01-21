@@ -12,6 +12,11 @@ test_calculate_required_gpus_basic() {
 
     GPU_MEMORY_PER_DEVICE=100 NUM_GPUS=3
     assert_eq "3" "$(calculate_required_gpus "250")" "caps at NUM_GPUS"
+
+    unset GPU_MEMORY_PER_DEVICE
+    GPU_MEMORY_GB=268 NUM_GPUS=8
+    assert_eq "1" "$(calculate_required_gpus "135")" "falls back to GPU_MEMORY_GB when per-device unset"
+    assert_eq "2" "$(calculate_required_gpus "269")" "rounds up using GPU_MEMORY_GB fallback"
 }
 
 test_task_serialization_requires_jq_when_missing() {
