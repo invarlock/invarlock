@@ -1,53 +1,324 @@
 {
   "_meta": {
-    "generated_at": "2026-01-17T07:00:24Z",
-    "notes": "Generated via external tuning; lowrank scope may include layer filters (e.g., ffn@layer=31).",
+    "generated_at": "2026-01-21T20:28:07Z",
+    "notes": "Generated via certify-pass tuning (temporary).",
     "schema": "tuned_edit_params_v1"
   },
   "models": {
-    "mistralai/Mistral-7B-v0.1": {
+    "01-ai/Yi-34B": {
       "_meta": {
-        "baseline_mean_by_limit": {
-          "100": 0.6464473684210527,
-          "200": 0.6450714635739954
-        },
-        "limits": [
-          100,
-          200
-        ],
-        "tasks": [
-          "mmlu",
-          "hellaswag",
-          "arc_challenge",
-          "winogrande"
-        ]
+        "baseline_dir": "/root/invarlock-public/proof_pack_runs/full_calib_debug/models/01-ai__yi-34b/baseline",
+        "preset_file": "/root/invarlock-public/proof_pack_runs/full_calib_debug/presets/calibrated_preset_01-ai__yi-34b.yaml",
+        "tuned_at": "2026-01-20T10:21:10Z",
+        "tuned_by": "tmp/proof_packs/python/tune_clean_edits.py"
       },
       "fp8_quant": {
+        "_certify": {
+          "cert_path": "/root/invarlock-public/tmp/tune_full_20260120_014730/runs/01-ai__yi-34b_20260120_082606/work/01-ai__yi-34b/certificates/fp8_e5m2_clean/run_1/evaluation.cert.json",
+          "passed_at": "2026-01-20T09:25:48Z"
+        },
         "edit_dir_name": "fp8_e5m2_clean",
         "format": "e5m2",
-        "reason": "selected_by_lmeval_no_regression",
+        "reason": "selected_by_certify_pass:e5m2_ffn",
         "scope": "ffn",
         "status": "selected"
       },
       "lowrank_svd": {
+        "_certify": {
+          "cert_path": "/root/invarlock-public/tmp/tune_full_20260120_014730/runs/01-ai__yi-34b_20260120_082606/work/01-ai__yi-34b/certificates/svd_rank32_l31_clean/run_1/evaluation.cert.json",
+          "passed_at": "2026-01-20T10:21:10Z"
+        },
         "edit_dir_name": "svd_rank32_l31_clean",
         "rank": 32,
-        "reason": "manual_selected_no_regression_lmeval",
+        "reason": "selected_by_certify_pass:rank32_ffn_layer31",
         "scope": "ffn@layer=31",
         "status": "selected"
       },
       "magnitude_prune": {
+        "_certify": {
+          "cert_path": "/root/invarlock-public/tmp/tune_full_20260120_014730/runs/01-ai__yi-34b_20260120_082606/work/01-ai__yi-34b/certificates/prune_12pct_clean/run_1/evaluation.cert.json",
+          "passed_at": "2026-01-20T09:54:17Z"
+        },
         "edit_dir_name": "prune_12pct_clean",
-        "reason": "selected_by_lmeval_no_regression",
+        "reason": "selected_by_certify_pass:sparsity120_ffn",
         "scope": "ffn",
-        "sparsity": 0.115,
+        "sparsity": 0.12,
         "status": "selected"
       },
       "quant_rtn": {
+        "_certify": {
+          "cert_path": "/root/invarlock-public/tmp/tune_full_20260120_014730/runs/01-ai__yi-34b_20260120_082606/work/01-ai__yi-34b/certificates/quant_4bit_clean/run_1/evaluation.cert.json",
+          "passed_at": "2026-01-20T08:58:48Z"
+        },
         "bits": 4,
         "edit_dir_name": "quant_4bit_clean",
         "group_size": 32,
-        "reason": "selected_by_lmeval_no_regression",
+        "reason": "selected_by_certify_pass:bits4_g32_ffn",
+        "scope": "ffn",
+        "status": "selected"
+      }
+    },
+    "Qwen/Qwen1.5-72B": {
+      "_meta": {
+        "baseline_dir": "proof_pack_runs/full_20260121_164152/models/qwen__qwen15-72b/baseline",
+        "preset_file": "proof_pack_runs/full_20260121_164152/presets/calibrated_preset_qwen__qwen15-72b.yaml",
+        "tuned_at": "2026-01-21T20:03:13Z",
+        "tuned_by": "tmp/proof_packs/python/tune_clean_edits.py"
+      },
+      "fp8_quant": {
+        "_certify": {
+          "cert_path": "/root/invarlock-public/tmp/tune_72b/qwen__qwen15-72b_20260121_200313/work/qwen__qwen15-72b/certificates/fp8_e5m2_clean/run_1/evaluation.cert.json",
+          "passed_at": "2026-01-21T20:25:05Z"
+        },
+        "edit_dir_name": "fp8_e5m2_clean",
+        "format": "e5m2",
+        "reason": "selected_by_certify_pass:e5m2_ffn",
+        "scope": "ffn",
+        "status": "selected"
+      },
+      "lowrank_svd": {
+        "_certify": {
+          "cert_path": "/root/invarlock-public/tmp/tune_72b/qwen__qwen15-72b_20260121_200313/work/qwen__qwen15-72b/certificates/svd_rank32_l31_clean/run_1/evaluation.cert.json",
+          "passed_at": "2026-01-21T20:25:06Z"
+        },
+        "edit_dir_name": "svd_rank32_l31_clean",
+        "rank": 32,
+        "reason": "selected_by_certify_pass:rank32_ffn_layer31",
+        "scope": "ffn@layer=31",
+        "status": "selected"
+      },
+      "magnitude_prune": {
+        "_certify": {
+          "cert_path": "/root/invarlock-public/tmp/tune_72b/qwen__qwen15-72b_20260121_200313/work/qwen__qwen15-72b/certificates/prune_12pct_clean/run_1/evaluation.cert.json",
+          "passed_at": "2026-01-21T20:27:57Z"
+        },
+        "edit_dir_name": "prune_12pct_clean",
+        "reason": "selected_by_certify_pass:sparsity120_ffn",
+        "scope": "ffn",
+        "sparsity": 0.12,
+        "status": "selected"
+      },
+      "quant_rtn": {
+        "_certify": {
+          "cert_path": "/root/invarlock-public/tmp/tune_72b/qwen__qwen15-72b_20260121_200313/work/qwen__qwen15-72b/certificates/quant_4bit_clean/run_1/evaluation.cert.json",
+          "passed_at": "2026-01-21T20:25:07Z"
+        },
+        "bits": 4,
+        "edit_dir_name": "quant_4bit_clean",
+        "group_size": 32,
+        "reason": "selected_by_certify_pass:bits4_g32_ffn",
+        "scope": "ffn",
+        "status": "selected"
+      }
+    },
+    "Qwen/Qwen2.5-14B": {
+      "_meta": {
+        "baseline_dir": "/root/invarlock-public/proof_pack_runs/full_calib_debug/models/qwen__qwen25-14b/baseline",
+        "preset_file": "/root/invarlock-public/proof_pack_runs/full_calib_debug/presets/calibrated_preset_qwen__qwen25-14b.yaml",
+        "tuned_at": "2026-01-20T02:39:24Z",
+        "tuned_by": "tmp/proof_packs/python/tune_clean_edits.py"
+      },
+      "fp8_quant": {
+        "_certify": {
+          "cert_path": "/root/invarlock-public/tmp/tune_full_20260120_014730/runs/qwen__qwen25-14b_20260120_014730/work/qwen__qwen25-14b/certificates/fp8_e5m2_clean/run_1/evaluation.cert.json",
+          "passed_at": "2026-01-20T02:18:11Z"
+        },
+        "edit_dir_name": "fp8_e5m2_clean",
+        "format": "e5m2",
+        "reason": "selected_by_certify_pass:e5m2_ffn",
+        "scope": "ffn",
+        "status": "selected"
+      },
+      "lowrank_svd": {
+        "_certify": {
+          "cert_path": "/root/invarlock-public/tmp/tune_full_20260120_014730/runs/qwen__qwen25-14b_20260120_014730/work/qwen__qwen25-14b/certificates/svd_rank32_l31_clean/run_1/evaluation.cert.json",
+          "passed_at": "2026-01-20T02:39:24Z"
+        },
+        "edit_dir_name": "svd_rank32_l31_clean",
+        "rank": 32,
+        "reason": "selected_by_certify_pass:rank32_ffn_layer31",
+        "scope": "ffn@layer=31",
+        "status": "selected"
+      },
+      "magnitude_prune": {
+        "_certify": {
+          "cert_path": "/root/invarlock-public/tmp/tune_full_20260120_014730/runs/qwen__qwen25-14b_20260120_014730/work/qwen__qwen25-14b/certificates/prune_12pct_clean/run_1/evaluation.cert.json",
+          "passed_at": "2026-01-20T02:18:11Z"
+        },
+        "edit_dir_name": "prune_12pct_clean",
+        "reason": "selected_by_certify_pass:sparsity120_ffn",
+        "scope": "ffn",
+        "sparsity": 0.12,
+        "status": "selected"
+      },
+      "quant_rtn": {
+        "_certify": {
+          "cert_path": "/root/invarlock-public/tmp/tune_full_20260120_014730/runs/qwen__qwen25-14b_20260120_014730/work/qwen__qwen25-14b/certificates/quant_4bit_clean/run_1/evaluation.cert.json",
+          "passed_at": "2026-01-20T02:39:24Z"
+        },
+        "bits": 4,
+        "edit_dir_name": "quant_4bit_clean",
+        "group_size": 32,
+        "reason": "selected_by_certify_pass:bits4_g32_ffn",
+        "scope": "ffn",
+        "status": "selected"
+      }
+    },
+    "Qwen/Qwen2.5-32B": {
+      "_meta": {
+        "baseline_dir": "/root/invarlock-public/proof_pack_runs/full_calib_debug/models/qwen__qwen25-32b/baseline",
+        "preset_file": "/root/invarlock-public/proof_pack_runs/full_calib_debug/presets/calibrated_preset_qwen__qwen25-32b.yaml",
+        "tuned_at": "2026-01-20T10:17:30Z",
+        "tuned_by": "tmp/proof_packs/python/tune_clean_edits.py"
+      },
+      "fp8_quant": {
+        "_certify": {
+          "cert_path": "/root/invarlock-public/tmp/tune_full_20260120_014730/runs/qwen__qwen25-32b_20260120_082606/work/qwen__qwen25-32b/certificates/fp8_e5m2_clean/run_1/evaluation.cert.json",
+          "passed_at": "2026-01-20T09:23:29Z"
+        },
+        "edit_dir_name": "fp8_e5m2_clean",
+        "format": "e5m2",
+        "reason": "selected_by_certify_pass:e5m2_ffn",
+        "scope": "ffn",
+        "status": "selected"
+      },
+      "lowrank_svd": {
+        "_certify": {
+          "cert_path": "/root/invarlock-public/tmp/tune_full_20260120_014730/runs/qwen__qwen25-32b_20260120_082606/work/qwen__qwen25-32b/certificates/svd_rank32_l31_clean/run_1/evaluation.cert.json",
+          "passed_at": "2026-01-20T10:17:30Z"
+        },
+        "edit_dir_name": "svd_rank32_l31_clean",
+        "rank": 32,
+        "reason": "selected_by_certify_pass:rank32_ffn_layer31",
+        "scope": "ffn@layer=31",
+        "status": "selected"
+      },
+      "magnitude_prune": {
+        "_certify": {
+          "cert_path": "/root/invarlock-public/tmp/tune_full_20260120_014730/runs/qwen__qwen25-32b_20260120_082606/work/qwen__qwen25-32b/certificates/prune_12pct_clean/run_1/evaluation.cert.json",
+          "passed_at": "2026-01-20T09:51:32Z"
+        },
+        "edit_dir_name": "prune_12pct_clean",
+        "reason": "selected_by_certify_pass:sparsity120_ffn",
+        "scope": "ffn",
+        "sparsity": 0.12,
+        "status": "selected"
+      },
+      "quant_rtn": {
+        "_certify": {
+          "cert_path": "/root/invarlock-public/tmp/tune_full_20260120_014730/runs/qwen__qwen25-32b_20260120_082606/work/qwen__qwen25-32b/certificates/quant_4bit_clean/run_1/evaluation.cert.json",
+          "passed_at": "2026-01-20T08:57:31Z"
+        },
+        "bits": 4,
+        "edit_dir_name": "quant_4bit_clean",
+        "group_size": 32,
+        "reason": "selected_by_certify_pass:bits4_g32_ffn",
+        "scope": "ffn",
+        "status": "selected"
+      }
+    },
+    "mistralai/Mistral-7B-v0.1": {
+      "_meta": {
+        "baseline_dir": "/root/invarlock-public/proof_pack_runs/full_calib_debug/models/mistralai__mistral-7b-v01/baseline",
+        "preset_file": "/root/invarlock-public/proof_pack_runs/full_calib_debug/presets/calibrated_preset_mistralai__mistral-7b-v01.yaml",
+        "tuned_at": "2026-01-20T02:03:09Z",
+        "tuned_by": "tmp/proof_packs/python/tune_clean_edits.py"
+      },
+      "fp8_quant": {
+        "_certify": {
+          "cert_path": "/root/invarlock-public/tmp/tune_full_20260120_014730/runs/mistralai__mistral-7b-v01_20260120_014730/work/mistralai__mistral-7b-v01/certificates/fp8_e5m2_clean/run_1/evaluation.cert.json",
+          "passed_at": "2026-01-20T01:56:57Z"
+        },
+        "edit_dir_name": "fp8_e5m2_clean",
+        "format": "e5m2",
+        "reason": "selected_by_certify_pass:e5m2_ffn",
+        "scope": "ffn",
+        "status": "selected"
+      },
+      "lowrank_svd": {
+        "_certify": {
+          "cert_path": "/root/invarlock-public/tmp/tune_full_20260120_014730/runs/mistralai__mistral-7b-v01_20260120_014730/work/mistralai__mistral-7b-v01/certificates/svd_rank32_l31_clean/run_1/evaluation.cert.json",
+          "passed_at": "2026-01-20T02:03:09Z"
+        },
+        "edit_dir_name": "svd_rank32_l31_clean",
+        "rank": 32,
+        "reason": "selected_by_certify_pass:rank32_ffn_layer15",
+        "scope": "ffn@layer=15",
+        "status": "selected"
+      },
+      "magnitude_prune": {
+        "_certify": {
+          "cert_path": "/root/invarlock-public/tmp/tune_full_20260120_014730/runs/mistralai__mistral-7b-v01_20260120_014730/work/mistralai__mistral-7b-v01/certificates/prune_12pct_clean/run_1/evaluation.cert.json",
+          "passed_at": "2026-01-20T01:56:54Z"
+        },
+        "edit_dir_name": "prune_12pct_clean",
+        "reason": "selected_by_certify_pass:sparsity120_ffn",
+        "scope": "ffn",
+        "sparsity": 0.12,
+        "status": "selected"
+      },
+      "quant_rtn": {
+        "_certify": {
+          "cert_path": "/root/invarlock-public/tmp/tune_full_20260120_014730/runs/mistralai__mistral-7b-v01_20260120_014730/work/mistralai__mistral-7b-v01/certificates/quant_4bit_clean/run_1/evaluation.cert.json",
+          "passed_at": "2026-01-20T01:56:51Z"
+        },
+        "bits": 4,
+        "edit_dir_name": "quant_4bit_clean",
+        "group_size": 32,
+        "reason": "selected_by_certify_pass:bits4_g32_ffn",
+        "scope": "ffn",
+        "status": "selected"
+      }
+    },
+    "mistralai/Mixtral-8x7B-v0.1": {
+      "_meta": {
+        "baseline_dir": "proof_pack_runs/full_20260121_164152/models/mistralai__mixtral-8x7b-v01/baseline",
+        "preset_file": "proof_pack_runs/full_20260121_164152/presets/calibrated_preset_mistralai__mixtral-8x7b-v01.yaml",
+        "tuned_at": "2026-01-21T19:43:46Z",
+        "tuned_by": "tmp/proof_packs/python/tune_clean_edits.py"
+      },
+      "fp8_quant": {
+        "_certify": {
+          "cert_path": "/root/invarlock-public/tmp/tune_mixtral/mistralai__mixtral-8x7b-v01_20260121_194346/work/mistralai__mixtral-8x7b-v01/certificates/fp8_e5m2_clean/run_1/evaluation.cert.json",
+          "passed_at": "2026-01-21T20:02:42Z"
+        },
+        "edit_dir_name": "fp8_e5m2_clean",
+        "format": "e5m2",
+        "reason": "selected_by_certify_pass:e5m2_ffn",
+        "scope": "ffn",
+        "status": "selected"
+      },
+      "lowrank_svd": {
+        "_certify": {
+          "cert_path": "/root/invarlock-public/tmp/tune_mixtral/mistralai__mixtral-8x7b-v01_20260121_194346/work/mistralai__mixtral-8x7b-v01/certificates/svd_rank32_l31_clean/run_1/evaluation.cert.json",
+          "passed_at": "2026-01-21T20:02:37Z"
+        },
+        "edit_dir_name": "svd_rank32_l31_clean",
+        "rank": 32,
+        "reason": "selected_by_certify_pass:rank32_ffn_layer31",
+        "scope": "ffn@layer=31",
+        "status": "selected"
+      },
+      "magnitude_prune": {
+        "_certify": {
+          "cert_path": "/root/invarlock-public/tmp/tune_mixtral/mistralai__mixtral-8x7b-v01_20260121_194346/work/mistralai__mixtral-8x7b-v01/certificates/prune_12pct_clean/run_1/evaluation.cert.json",
+          "passed_at": "2026-01-21T20:02:49Z"
+        },
+        "edit_dir_name": "prune_12pct_clean",
+        "reason": "selected_by_certify_pass:sparsity120_ffn",
+        "scope": "ffn",
+        "sparsity": 0.12,
+        "status": "selected"
+      },
+      "quant_rtn": {
+        "_certify": {
+          "cert_path": "/root/invarlock-public/tmp/tune_mixtral/mistralai__mixtral-8x7b-v01_20260121_194346/work/mistralai__mixtral-8x7b-v01/certificates/quant_4bit_clean/run_1/evaluation.cert.json",
+          "passed_at": "2026-01-21T20:02:47Z"
+        },
+        "bits": 4,
+        "edit_dir_name": "quant_4bit_clean",
+        "group_size": 32,
+        "reason": "selected_by_certify_pass:bits4_g32_ffn",
         "scope": "ffn",
         "status": "selected"
       }
