@@ -51,6 +51,19 @@ stub_resolve_edit_params() {
     }
 }
 
+test_default_ci_min_windows_accounts_for_padding() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    unset INVARLOCK_CERT_MIN_WINDOWS
+    assert_eq "256" "$(_default_ci_min_windows "512")" "default is 256 for longer sequences"
+    assert_eq "352" "$(_default_ci_min_windows "128")" "small seq_len uses higher default to meet token floors"
+
+    INVARLOCK_CERT_MIN_WINDOWS="300"
+    assert_eq "300" "$(_default_ci_min_windows "128")" "env override wins"
+}
+
 test_model_size_and_eval_batch_selection() {
     mock_reset
     # shellcheck source=../task_functions.sh
@@ -281,6 +294,7 @@ test_task_certify_edit_and_error_cover_preset_discovery_overrides_and_certificat
 
     export TASK_PARAMS='{"seq_len":100,"stride":200}'
     export INVARLOCK_BOOTSTRAP_N="1234"
+    export INVARLOCK_CERT_MIN_WINDOWS="256"
     _estimate_model_size() { echo "7"; }
 
     mkdir -p "${out}/presets"
