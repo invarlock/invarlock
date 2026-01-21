@@ -928,7 +928,7 @@ test_pack_validation_get_model_invarlock_config_covers_all_case_arms() {
 
     source ./scripts/proof_packs/lib/validation_suite.sh
 
-    assert_eq "2048:1024:64:64:96" "$(get_model_invarlock_config 7)" "7B config"
+    assert_eq "512:512:64:64:96" "$(get_model_invarlock_config 7)" "7B config"
     assert_eq "1536:768:48:48:64" "$(get_model_invarlock_config 13)" "13B config"
     assert_eq "1024:512:40:40:48" "$(get_model_invarlock_config 30)" "30B config"
     assert_eq "1024:512:36:36:32" "$(get_model_invarlock_config 40)" "40B config"
