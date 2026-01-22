@@ -83,32 +83,13 @@ install_torch() {
     pack_run_cmd "${cmd[@]}"
 
     if [[ "${PACK_SKIP_TORCH_CHECK}" != "1" ]]; then
-        python - <<'PY'
-import torch
-print("torch", torch.__version__)
-if not torch.cuda.is_available():
-    raise SystemExit("CUDA not available in torch")
-print("cuda", torch.version.cuda)
-print("gpus", torch.cuda.device_count())
-print("gpu0", torch.cuda.get_device_name(0))
-print("cc0", torch.cuda.get_device_capability(0))
-PY
+        python "${REPO_DIR}/scripts/proof_packs/python/torch_env_check.py"
 
         if command -v nvidia-smi >/dev/null 2>&1; then
             local gpu_name=""
             gpu_name="$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 || true)"
             if [[ "${gpu_name}" == *"B200"* ]]; then
-                python - <<'PY' || true
-import torch
-
-arch_list = torch.cuda.get_arch_list() if torch.cuda.is_available() else []
-has_sm100 = any(("sm_100" in a) or ("compute_100" in a) for a in arch_list)
-
-if not has_sm100:
-    print("WARNING: PyTorch does not report sm_100 (B200) support.")
-    print("Install a build with CUDA 12.8+ / sm_100 support, for example:")
-    print("  pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu128")
-PY
+                python "${REPO_DIR}/scripts/proof_packs/python/torch_sm100_warning.py" || true
             fi
         fi
     fi

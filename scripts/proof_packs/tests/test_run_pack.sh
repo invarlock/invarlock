@@ -406,47 +406,13 @@ test_run_pack_sha256_cmd_fallback_and_sign_warning() {
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
-    cat > "${bin_dir}/shasum" <<'EOF'
+    local repo_root
+    repo_root="$(pwd)"
+    cat > "${bin_dir}/shasum" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ "${1:-}" == "-a" ]]; then
-    shift 2
-fi
-
-if [[ "${1:-}" == "-c" ]]; then
-    shift
-    python3 - "$1" <<'PY'
-import hashlib
-import sys
-from pathlib import Path
-
-checksums = Path(sys.argv[1]).read_text().splitlines()
-ok = True
-for line in checksums:
-    if not line.strip():
-        continue
-    parts = line.split()
-    expected = parts[0]
-    filename = parts[-1]
-    actual = hashlib.sha256(Path(filename).read_bytes()).hexdigest()
-    if actual != expected:
-        ok = False
-if not ok:
-    sys.exit(1)
-PY
-    exit $?
-fi
-
-python3 - "$@" <<'PY'
-import hashlib
-import sys
-from pathlib import Path
-
-for filename in sys.argv[1:]:
-    digest = hashlib.sha256(Path(filename).read_bytes()).hexdigest()
-    print(f"{digest}  {filename}")
-PY
+exec python3 "${repo_root}/scripts/proof_packs/python/shasum_mock.py" "\$@"
 EOF
     chmod +x "${bin_dir}/shasum"
 

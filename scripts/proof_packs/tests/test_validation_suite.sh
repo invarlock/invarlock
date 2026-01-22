@@ -466,9 +466,11 @@ test_pack_validation_estimate_model_weights_covers_known_patterns_and_local_path
     assert_eq "90" "$(estimate_model_weights_gb "mistralai/Mixtral-8x7B-v0.1")" "MoE special-case"
     assert_eq "144" "$(estimate_model_weights_gb "Qwen/Qwen1.5-72B")" "72B"
     assert_eq "144" "$(estimate_model_weights_gb "Qwen/Qwen2.5-72B")" "72B alt"
+    assert_eq "140" "$(estimate_model_weights_gb "Qwen/Qwen2.5-70B")" "70B"
     assert_eq "68" "$(estimate_model_weights_gb "01-ai/Yi-34B")" "34B"
     assert_eq "64" "$(estimate_model_weights_gb "Qwen/Qwen2.5-32B")" "32B"
     assert_eq "28" "$(estimate_model_weights_gb "Qwen/Qwen2.5-14B")" "14B"
+    assert_eq "26" "$(estimate_model_weights_gb "Qwen/Qwen2.5-13B")" "13B"
     assert_eq "14" "$(estimate_model_weights_gb "Qwen/Qwen2.5-7B")" "7B alt"
     assert_eq "14" "$(estimate_model_weights_gb "mistralai/Mistral-7B-v0.1")" "7B"
 }
@@ -804,29 +806,36 @@ test_pack_validation_setup_model_cleans_incomplete_baseline_dir_on_download_fail
     model_name="$(sanitize_model_name "${model_id}")"
     local baseline_path="${OUTPUT_DIR}/models/${model_name}/baseline"
 
-    local bin_dir="${TEST_TMPDIR}/bin"
-    mkdir -p "${bin_dir}"
-    cat > "${bin_dir}/python3" <<'EOF'
+	local bin_dir="${TEST_TMPDIR}/bin"
+	mkdir -p "${bin_dir}"
+	cat > "${bin_dir}/python3" <<'EOF'
 #!/usr/bin/env bash
-set -euo pipefail
+	set -euo pipefail
 
 count_file="${TEST_TMPDIR:-}/python3.count"
 count=0
 if [[ -f "${count_file}" ]]; then
     count="$(cat "${count_file}" 2>/dev/null || echo "0")"
 fi
-count=$((count + 1))
-printf '%s\n' "${count}" > "${count_file}"
+	count=$((count + 1))
+	printf '%s\n' "${count}" > "${count_file}"
 
-stdin_file="${TEST_TMPDIR:-}/python3.stdin"
-mkdir -p "${TEST_TMPDIR:-}" 2>/dev/null || true
-cat > "${stdin_file}"
+	output_dir=""
+	while [[ $# -gt 0 ]]; do
+	    case "$1" in
+	        --output-dir)
+	            output_dir="${2:-}"
+	            shift 2
+	            ;;
+	        *)
+	            shift
+	            ;;
+	    esac
+	done
+	[[ -n "${output_dir}" ]] && mkdir -p "${output_dir}"
 
-output_dir="$(awk -F'"' '$0 ~ /^output_dir = Path/ { print $2; exit }' "${stdin_file}")"
-[[ -n "${output_dir}" ]] && mkdir -p "${output_dir}"
-
-# Simulate a download failure by not creating the success marker.
-exit 1
+	# Simulate a download failure by not creating the success marker.
+	exit 1
 EOF
     chmod +x "${bin_dir}/python3"
     export PATH="${bin_dir}:$PATH"
@@ -863,23 +872,33 @@ test_pack_validation_setup_model_succeeds_when_python_stub_creates_success_marke
     PACK_NET=1
     pack_model_revision() { echo "rev"; }
 
-    local bin_dir="${TEST_TMPDIR}/bin"
-    mkdir -p "${bin_dir}"
-    cat > "${bin_dir}/python3" <<'EOF'
+	local bin_dir="${TEST_TMPDIR}/bin"
+	mkdir -p "${bin_dir}"
+	cat > "${bin_dir}/python3" <<'EOF'
 #!/usr/bin/env bash
-set -euo pipefail
+	set -euo pipefail
 
-stdin_file="${TEST_TMPDIR:-}/python3.stdin"
-mkdir -p "${TEST_TMPDIR:-}" 2>/dev/null || true
-cat > "${stdin_file}"
+	output_dir=""
+	marker=""
+	while [[ $# -gt 0 ]]; do
+	    case "$1" in
+	        --output-dir)
+	            output_dir="${2:-}"
+	            shift 2
+	            ;;
+	        --success-marker)
+	            marker="${2:-}"
+	            shift 2
+	            ;;
+	        *)
+	            shift
+	            ;;
+	    esac
+	done
 
-output_dir="$(awk -F'"' '$0 ~ /^output_dir = Path/ { print $2; exit }' "${stdin_file}")"
-marker="$(awk -F'"' '$0 ~ /^success_marker = Path/ { print $2; exit }' "${stdin_file}")"
-printf 'output_dir=%s\nmarker=%s\n' "${output_dir}" "${marker}" > "${TEST_TMPDIR:-}/python3.parsed" 2>/dev/null || true
-
-[[ -n "${output_dir}" ]] && mkdir -p "${output_dir}"
-[[ -n "${marker}" ]] && : > "${marker}"
-exit 0
+	[[ -n "${output_dir}" ]] && mkdir -p "${output_dir}"
+	[[ -n "${marker}" ]] && : > "${marker}"
+	exit 0
 EOF
     chmod +x "${bin_dir}/python3"
     export PATH="${bin_dir}:$PATH"
@@ -1382,10 +1401,6 @@ test_pack_validation_main_wrapper_parses_progress_and_reports_failed_tasks_offli
 
     python3() {
         echo "python3 $*" >> "${TEST_TMPDIR}/python3.calls"
-        case "${1:-}" in
-            -c|-m) return 0 ;;
-        esac
-        cat >/dev/null || true
         return 0
     }
 
