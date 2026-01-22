@@ -18,7 +18,6 @@ test_config_generator_run_single_calibration_large_model_emits_log_and_captures_
     cat > "${bin_dir}/python3" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-cat >/dev/null || true
 exit 0
 EOF
     chmod +x "${bin_dir}/python3"
@@ -104,7 +103,6 @@ test_config_generator_run_invarlock_calibration_logs_moe_and_all_runs_failed() {
     cat > "${bin_dir}/python3" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-cat >/dev/null || true
 exit 0
 EOF
     chmod +x "${bin_dir}/python3"

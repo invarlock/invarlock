@@ -190,19 +190,47 @@ def main(argv: list[str]) -> int:
             print("WARNING: missing_tensors not injected (no layer stack found)")
 
     elif error_type == "scale_explosion":
-        for name, param in model.named_parameters():
-            if "mlp" in name.lower() and "weight" in name.lower() and param.dim() >= 2:
-                with torch.no_grad():
-                    param.data = param.data * 100.0
-                error_info.update(
-                    {
-                        "injected": True,
-                        "target_param": name,
-                        "scale_factor": 100.0,
-                    }
-                )
-                print(f"Scaled by 100x: {name}")
+        target: tuple[str, torch.Tensor] | None = None
+        patterns = (
+            # Dense decoder-only families (Mistral/Qwen/Yi/etc.)
+            "mlp",
+            "ffn",
+            "feed_forward",
+            # MoE families (Mixtral-style)
+            "block_sparse_moe.experts",
+            "moe.experts",
+            "experts",
+        )
+
+        for pattern in patterns:
+            for name, param in model.named_parameters():
+                lname = name.lower()
+                if pattern in lname and "weight" in lname and param.dim() >= 2:
+                    target = (name, param)
+                    break
+            if target is not None:
                 break
+
+        if target is None:
+            for name, param in model.named_parameters():
+                if "weight" in name.lower() and param.dim() >= 2:
+                    target = (name, param)
+                    break
+
+        if target is None:
+            raise SystemExit("scale_explosion: no 2D weight parameter found")
+
+        target_name, target_param = target
+        with torch.no_grad():
+            target_param.data = target_param.data * 100.0
+        error_info.update(
+            {
+                "injected": True,
+                "target_param": target_name,
+                "scale_factor": 100.0,
+            }
+        )
+        print(f"Scaled by 100x: {target_name}")
 
     elif error_type == "rank_collapse":
         target_names: list[tuple[str, torch.Tensor]] = []

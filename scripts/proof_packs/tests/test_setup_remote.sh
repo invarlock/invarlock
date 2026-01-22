@@ -64,13 +64,10 @@ test_setup_remote_clone_and_torch_check_branches() {
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
-    cat > "${bin_dir}/python" <<EOF
+    cat > "${bin_dir}/python" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-if [[ "\${1:-}" == "-" ]]; then
-  echo "called" >> "${TEST_TMPDIR}/python.called"
-  exit 0
-fi
+echo "called" >> "${TEST_TMPDIR}/python.called"
 exit 0
 EOF
     chmod +x "${bin_dir}/python"
