@@ -49,6 +49,17 @@ if ! declare -F _cmd_python >/dev/null 2>&1; then
     _cmd_python() { command python3 "$@"; }
 fi
 
+if ! declare -F _runtime_python >/dev/null 2>&1; then
+    :
+    _runtime_python() {
+        local script="$1"
+        shift
+        local lib_dir
+        lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        _cmd_python "${lib_dir}/../python/${script}" "$@"
+    }
+fi
+
 if ! declare -F _cmd_stat >/dev/null 2>&1; then
     :
     _cmd_stat() { command stat "$@"; }
@@ -166,18 +177,7 @@ if ! declare -F _iso_to_epoch >/dev/null 2>&1; then
         out=$(_cmd_date -d "${iso}" +%s 2>/dev/null) && [[ "${out}" =~ ^[0-9]+$ ]] && { echo "${out}"; return 0; }
         out=$(_cmd_date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "${iso}" +%s 2>/dev/null) && [[ "${out}" =~ ^[0-9]+$ ]] && { echo "${out}"; return 0; }
         # Fallback to python (portable).
-        _cmd_python - "${iso}" <<'PY' 2>/dev/null || echo "0"
-import datetime, sys
-iso = sys.argv[1] if len(sys.argv) > 1 else ""
-if not iso:
-    print("0")
-    raise SystemExit(0)
-try:
-    dt = datetime.datetime.strptime(iso, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc)
-    print(int(dt.timestamp()))
-except Exception:
-    print("0")
-PY
+        _runtime_python runtime_tools.py iso-to-epoch "${iso}" 2>/dev/null || echo "0"
     }
 fi
 
@@ -202,11 +202,6 @@ if ! declare -F _now_iso_plus_seconds >/dev/null 2>&1; then
         out=$(_cmd_date -u "${delta_v}" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null) && { echo "${out}"; return 0; }
 
         # Fallback to python (portable).
-        _cmd_python - "${seconds}" <<'PY' 2>/dev/null || _now_iso
-import datetime, sys
-seconds = int(sys.argv[1]) if len(sys.argv) > 1 else 0
-dt = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=seconds)
-print(dt.strftime("%Y-%m-%dT%H:%M:%SZ"))
-PY
+        _runtime_python runtime_tools.py now-iso-plus-seconds "${seconds}" 2>/dev/null || _now_iso
     }
 fi

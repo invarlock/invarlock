@@ -131,26 +131,12 @@ pack_verify_certs() {
 
     local results_dir="${pack_dir}/results"
     mkdir -p "${results_dir}"
-    python3 - "${results_dir}/verification_summary.json" "${count_clean}" "${count_error}" "${count_failed}" "${profile}" <<'PY'
-import json
-import sys
-
-out_path = sys.argv[1]
-count_clean = int(sys.argv[2])
-count_error = int(sys.argv[3])
-count_failed = int(sys.argv[4])
-profile = sys.argv[5]
-
-payload = {
-    "clean_certs": count_clean,
-    "error_injection_certs": count_error,
-    "failed_certs": count_failed,
-    "policy_profile": profile,
-}
-
-with open(out_path, "w", encoding="utf-8") as f:
-    f.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
-PY
+    python3 "${RUN_PACK_SCRIPT_DIR}/python/write_verification_summary.py" \
+        "${results_dir}/verification_summary.json" \
+        "${count_clean}" \
+        "${count_error}" \
+        "${count_failed}" \
+        "${profile}"
 
     echo "Verified: ${count_clean} clean, ${count_error} error-injection (expected fail), ${count_failed} unexpected failures"
 

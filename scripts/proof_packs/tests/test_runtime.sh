@@ -10,6 +10,26 @@ test_rand_jitter_ms_invalid_input_returns_zero() {
     assert_eq "0" "$(_rand_jitter_ms "-1")" "negative jitter clamps to 0"
 }
 
+test_runtime_python_wrapper_invokes_repo_helper() {
+    mock_reset
+    # shellcheck source=../runtime.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/runtime.sh"
+
+    local calls="${TEST_TMPDIR}/python.calls"
+    : >"${calls}"
+    _cmd_python() {
+        printf '%s\n' "$*" > "${calls}"
+        echo "ok"
+        return 0
+    }
+
+    run _runtime_python runtime_tools.py now_iso_plus_seconds 10
+    assert_rc "0" "${RUN_RC}" "_runtime_python returns success"
+    assert_match "proof_packs/.*/python/runtime_tools\\.py" "$(cat "${calls}")" "invokes python helper"
+    assert_match "now_iso_plus_seconds 10" "$(cat "${calls}")" "forwards args"
+    assert_eq "ok" "${RUN_OUT}" "forwards helper stdout"
+}
+
 test_rand_jitter_ms_positive_returns_value_in_range() {
     mock_reset
     # shellcheck source=../runtime.sh
