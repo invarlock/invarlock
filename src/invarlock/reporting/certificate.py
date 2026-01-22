@@ -1,8 +1,9 @@
 """
-InvarLock Safety Certificate Generation
-==================================
+InvarLock Evaluation Certificate Generation
+==========================================
 
-Generate standardized safety certificates from RunReport and baseline comparison.
+Generate standardized evaluation certificates from RunReport and baseline
+comparison.
 Certificates are standalone, portable verification artifacts that can be used
 for CI/CD gates and regulatory compliance.
 """
@@ -743,7 +744,7 @@ def make_certificate(
     baseline: RunReport | dict[str, Any],
 ) -> dict[str, Any]:
     """
-    Generate a safety certificate from a RunReport and baseline comparison.
+    Generate an evaluation certificate from a RunReport and baseline comparison.
 
     The certificate is a standalone, portable artifact that contains all
     essential metrics and comparisons needed for safety verification.

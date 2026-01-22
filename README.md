@@ -4,7 +4,7 @@ In short: certify that weight edits (e.g., quantization) preserve quality. If
 they don’t, roll back safely.
 
 Technical: edit‑agnostic guard pipeline (invariants → spectral → RMT →
-variance) producing a machine‑readable Safety Certificate.
+variance) producing a machine‑readable Evaluation Certificate.
 
 > **Status:** 0.3.6 (pre‑1.0). Until 1.0, **minor** releases may be
 > breaking. See CLI help and the CHANGELOG for updates.
@@ -226,7 +226,7 @@ needed (e.g., `CUDA_VISIBLE_DEVICES`).
   3. **RMT** (ε-band on outliers; monitor or gate per tier)
   4. **Variance (VE)** (predictive paired ΔlogNLL gate; tiered sidedness)
 
-- **Safety Certificate (schema v1, PM‑only)**: Primary Metric (ppl or
+- **Evaluation Certificate (schema v1, PM‑only)**: Primary Metric (ppl or
   accuracy) with paired statistics, structural deltas, spectral/RMT stats, VE
   provenance, seeds/hashes, pairing metrics, and **policy digest**. Canonical
   artifact: `reports/.../evaluation.cert.json`.

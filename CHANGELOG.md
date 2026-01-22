@@ -167,7 +167,7 @@ First public release on GitHub and PyPI.
 
 ### Added
 - Core compare & certify pipeline and guard chain for edit‑agnostic robustness certificates.
-- Safety Certificate schema v1 and CLI entry points (including `invarlock certify`).
+- Evaluation Certificate schema v1 and CLI entry points (including `invarlock certify`).
 - Torch‑optional core install with optional extras (e.g., `invarlock[hf]`, `invarlock[adapters]`).
 - Initial documentation set: quickstart, user guides, and CLI reference.
 

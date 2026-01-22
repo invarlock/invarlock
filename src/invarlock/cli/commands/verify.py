@@ -2,7 +2,7 @@
 invarlock verify command
 ====================
 
-Validates generated safety certificates for internal consistency. The command
+Validates generated evaluation certificates for internal consistency. The command
 ensures schema compliance, checks that the primary metric ratio agrees with the
 baseline reference, and enforces paired-window guarantees (match=1.0,
 overlap=0.0).

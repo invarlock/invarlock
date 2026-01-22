@@ -736,7 +736,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
     edit_name = str(certificate.get("edit_name") or "").lower()
 
     # Header
-    lines.append("# InvarLock Safety Certificate")
+    lines.append("# InvarLock Evaluation Certificate")
     lines.append("")
     lines.append(
         "> *Basis: “point” gates check the point estimate; “upper” gates check the CI "
@@ -1854,7 +1854,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
     lines.append("---")
     lines.append("")
     lines.append(
-        "*This InvarLock safety certificate provides a comprehensive assessment of model compression safety.*"
+        "*This InvarLock evaluation certificate provides a comprehensive assessment of model compression safety.*"
     )
     lines.append(
         "*All metrics are compared against the uncompressed baseline model for safety validation.*"

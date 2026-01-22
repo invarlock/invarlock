@@ -72,7 +72,7 @@ def test_certificate_system_overhead_table_and_primary_metric_metadata():
     cert = make_certificate(report, baseline)
     md = render_certificate_markdown(cert)
     # System Overhead section may be omitted; rendering should still succeed
-    assert "# InvarLock Safety Certificate" in md
+    assert "# InvarLock Evaluation Certificate" in md
 
     # Primary Metric metadata present
     assert "## Primary Metric" in md
