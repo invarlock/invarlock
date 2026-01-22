@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.7] - 2026-01-22
+
+### Added
+- Role-based HuggingFace adapters with updated auto-routing (replaces model-name adapters).
+- Proof packs: v2 pack layout, scenarios manifest, and assurance verdict generation.
+- CLI flags: `invarlock run --edit-label` and `invarlock certify --baseline-report`.
+- CI notebook smoke runner (`scripts/verify_notebooks_smoke.py`).
+
+### Changed
+- Proof pack workflows hardened: baseline-report reuse, calibrate-only behavior, tuned-params hygiene, and improved task sizing/memory planning.
+- Certificate reporting refreshed: revamped certificate markdown, enhanced HTML output + glossary, and “Safety Certificate” renamed to “Evaluation Certificate”.
+- Presets/overlays updated for new adapter roles and additional model families.
+- CI: bump `actions/download-artifact` to v7; remove the legacy B200 backend validation harness.
+
+### Fixed
+- Adapters: Mixtral support, improved auto-detection, and hardened causal describe/weight tying.
+- Proof packs: enforce CI floor constraints, mitigate OOM/missing-tensors cases, and make verification more resilient.
+- Reporting/eval: avoid duplicate synthetic samples and preserve primary-metric drift band handling.
+
+### Documentation
+- Expanded and consolidated guides across CLI, configs, datasets, guards, proof packs, and notebooks.
+
 ## [0.3.6] - 2026-01-13
 
 ### Added

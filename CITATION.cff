@@ -9,8 +9,8 @@ abstract: >
 repository-code: https://github.com/invarlock/invarlock
 repository-artifact: https://github.com/invarlock/invarlock/releases
 license: Apache-2.0
-version: 0.3.6
-date-released: 2026-01-13
+version: 0.3.7
+date-released: 2026-01-22
 authors:
   - name: "InvarLock Maintainers"
     affiliation: "InvarLock"
@@ -33,8 +33,8 @@ preferred-citation:
     - name: "InvarLock Maintainers"
   repository-code: https://github.com/invarlock/invarlock
   url: https://github.com/invarlock/invarlock
-  version: 0.3.6
-  date-released: 2026-01-13
+  version: 0.3.7
+  date-released: 2026-01-22
   license: Apache-2.0
   # identifiers:
   #   - type: doi
