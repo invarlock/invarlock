@@ -497,7 +497,7 @@ test_pack_validation_edit_creators_run_offline_with_stubbed_python() {
 
     log() { :; }
     log_section() { :; }
-    _cmd_python() { cat >/dev/null || true; return 0; }
+    _cmd_python() { return 0; }
 
     create_pruned_model "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/edits/prune/model" "0.1" "ffn" "0"
     create_lowrank_model "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/edits/svd/model" "256" "ffn" "0"
@@ -2308,6 +2308,7 @@ test_pack_prepare_tuned_edit_params_resolves_default_from_scripts_dir_and_copies
     fake_repo="$(mktemp -d "${TEST_TMPDIR}/fake_repo.XXXXXX")"
     mkdir -p "${fake_repo}/scripts/proof_packs/lib"
     cp "${TEST_ROOT}/scripts/proof_packs/lib/"*.sh "${fake_repo}/scripts/proof_packs/lib/"
+    mkdir -p "${fake_repo}/scripts/proof_packs/python"
     mkdir -p "${fake_repo}/scripts/proof_packs"
 
     cat > "${fake_repo}/scripts/proof_packs/tuned_edit_params.json" <<'JSON'
