@@ -200,7 +200,7 @@ Exhaustive command map with brief descriptions and notable options.
   - Tip: enable downloads per command with `INVARLOCK_ALLOW_NETWORK=1`.
 
 - `invarlock certify`
-  - Purpose: Compare & Certify (BYOE). Emits a safety certificate.
+  - Purpose: Compare & Certify (BYOE). Emits an evaluation certificate.
   - Options: `--baseline/--source`, `--subject/--edited`, `--adapter`,
     `--profile`, `--tier`, `--preset`, `--out`, `--cert-out`, `--edit-config`.
 

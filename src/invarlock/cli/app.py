@@ -105,7 +105,7 @@ Order: certify → report → run → plugins → doctor → version
 @app.command(
     name="certify",
     help=(
-        "Certify a subject model against a baseline and generate a safety certificate. "
+        "Certify a subject model against a baseline and generate an evaluation certificate. "
         "Use when you have two model snapshots and want pass/fail gating."
     ),
 )
@@ -272,7 +272,7 @@ def _verify_typed(
     name="run",
     help=(
         "Execute an end-to-end run from a YAML config (edit + guards + reports). "
-        "Writes run artifacts and optionally a safety certificate."
+        "Writes run artifacts and optionally an evaluation certificate."
     ),
 )
 def _run_typed(

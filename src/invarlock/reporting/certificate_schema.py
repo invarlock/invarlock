@@ -20,7 +20,7 @@ CERTIFICATE_SCHEMA_VERSION = "v1"
 # separately in metric-specific logic.
 CERTIFICATE_JSON_SCHEMA: dict[str, Any] = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "title": "InvarLock Safety Certificate",
+    "title": "InvarLock Evaluation Certificate",
     "type": "object",
     "required": [
         "schema_version",

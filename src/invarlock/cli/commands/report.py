@@ -179,7 +179,7 @@ def _generate_reports(
                 raise typer.Exit(1)
             _event(
                 "EXEC",
-                "Generating safety certificate with baseline comparison",
+                "Generating evaluation certificate with baseline comparison",
                 emoji="📜",
             )
 

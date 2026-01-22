@@ -5140,7 +5140,7 @@ def run_command(
                     _event(
                         console,
                         "EXEC",
-                        "Generating safety certificate...",
+                        "Generating evaluation certificate...",
                         emoji="📜",
                         profile=profile_normalized,
                     )
