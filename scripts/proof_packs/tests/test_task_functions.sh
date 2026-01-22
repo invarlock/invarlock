@@ -488,10 +488,12 @@ test_task_helpers_cover_fallback_branches() {
     assert_eq "moe" "$(_get_model_size_from_name "Mixtral-8x7B")" "moe detection"
     assert_eq "13" "$(_get_model_size_from_name "model-13b")" "13B detection"
     assert_eq "70" "$(_get_model_size_from_name "Qwen1.5-72B")" "70B detection"
+    assert_eq "40" "$(_get_model_size_from_name "01-ai/Yi-34B")" "40B detection"
     assert_eq "30" "$(_get_model_size_from_name "Qwen2.5-32B")" "30B detection"
 
     assert_eq "1536:1536:192:192:64" "$(_get_model_invarlock_config_fallback "13")" "13B config"
     assert_eq "1024:1024:192:192:48" "$(_get_model_invarlock_config_fallback "30")" "30B config"
+    assert_eq "1024:1024:192:192:32" "$(_get_model_invarlock_config_fallback "40")" "40B config"
     assert_eq "1024:1024:192:192:24" "$(_get_model_invarlock_config_fallback "moe")" "moe config"
     assert_eq "128:128:192:192:2" "$(_get_model_invarlock_config_fallback "70")" "70B config"
     assert_eq "1024:1024:192:192:32" "$(_get_model_invarlock_config_fallback "unknown")" "fallback config"
@@ -521,6 +523,110 @@ test_task_helpers_cover_fallback_branches() {
 
     _is_large_model "moe" || t_fail "expected moe to be large"
     _is_large_model "model-30b" || t_fail "expected 30b string to be large"
+}
+
+test_task_helpers_cover_bootstrap_replicates_floor_logic() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    assert_eq "1500" "$(_bootstrap_replicates_floor_for_tier conservative)" "conservative floor"
+    assert_eq "1200" "$(_bootstrap_replicates_floor_for_tier balanced)" "balanced floor"
+    assert_eq "800" "$(_bootstrap_replicates_floor_for_tier aggressive)" "aggressive floor"
+    assert_eq "1200" "$(_bootstrap_replicates_floor_for_tier unknown)" "default floor"
+
+    export INVARLOCK_BOOTSTRAP_N="500"
+    assert_eq "1500" "$(_resolve_bootstrap_replicates "7" conservative)" "floor clamps low bootstrap replicates"
+    unset INVARLOCK_BOOTSTRAP_N
+}
+
+test_task_baseline_report_helpers_wait_sanitizes_interval_and_large_timeout() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    local baseline_root="${TEST_TMPDIR}/baseline_root_sanitize_wait"
+    mkdir -p "${baseline_root}"
+    local baseline_report="${baseline_root}/baseline_report.json"
+    rm -f "${baseline_report}"
+    mkdir -p "${baseline_root}/.baseline_lock"
+
+    _resolve_invarlock_adapter() { echo "hf_test"; }
+    _validate_certify_baseline_report() { return 0; }
+
+    export PACK_BASELINE_REPORT_WAIT_INTERVAL_SECS="0"
+    export PACK_BASELINE_REPORT_WAIT_SECS_LARGE="nope"
+
+    _sleep() {
+        echo "{}" > "${baseline_report}"
+        return 0
+    }
+
+    local log_file="${TEST_TMPDIR}/baseline_wait_sanitize.log"
+    : > "${log_file}"
+    local waited
+    waited="$(_ensure_certify_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "moe" "${log_file}")"
+    assert_eq "${baseline_report}" "${waited}" "wait loop returns once report appears"
+
+    unset PACK_BASELINE_REPORT_WAIT_INTERVAL_SECS PACK_BASELINE_REPORT_WAIT_SECS_LARGE
+}
+
+test_task_baseline_report_helpers_wait_iters_floor_to_one() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    local baseline_root="${TEST_TMPDIR}/baseline_root_wait_iters"
+    mkdir -p "${baseline_root}"
+    local baseline_report="${baseline_root}/baseline_report.json"
+    rm -f "${baseline_report}"
+
+    local lock_dir="${baseline_root}/.baseline_lock"
+
+    _resolve_invarlock_adapter() { echo "hf_test"; }
+    _validate_certify_baseline_report() { return 0; }
+
+    export PACK_BASELINE_REPORT_WAIT_INTERVAL_SECS="10"
+    export PACK_BASELINE_REPORT_WAIT_SECS="1"
+
+    mkdir() {
+        if [[ "${1:-}" == "${lock_dir}" ]]; then
+            echo "{}" > "${baseline_report}"
+            return 1
+        fi
+        command mkdir "$@"
+    }
+
+    local log_file="${TEST_TMPDIR}/baseline_wait_iters.log"
+    : > "${log_file}"
+    local waited
+    waited="$(_ensure_certify_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "7" "${log_file}")"
+    assert_eq "${baseline_report}" "${waited}" "wait_iters clamped to 1 still returns report"
+
+    unset -f mkdir
+    unset PACK_BASELINE_REPORT_WAIT_INTERVAL_SECS PACK_BASELINE_REPORT_WAIT_SECS
+}
+
+test_task_certify_error_repairs_missing_tensors_config_when_available() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    fixture_write "invarlock.create_cert" ""
+
+    local out="${TEST_TMPDIR}/out"
+    local model_name="m"
+    local model_output_dir="${out}/${model_name}"
+    local baseline_dir="${model_output_dir}/models/baseline"
+    local error_dir="${model_output_dir}/models/error_missing_tensors"
+    local log_file="${TEST_TMPDIR}/log.txt"
+    mkdir -p "${baseline_dir}" "${error_dir}" "$(dirname "${log_file}")"
+    echo '{"num_hidden_layers": 32}' > "${baseline_dir}/config.json"
+    echo '{"num_hidden_layers": 16}' > "${error_dir}/config.json"
+    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
+    : > "${log_file}"
+
+    task_certify_error "${model_name}" 0 missing_tensors "${out}" "${log_file}"
 }
 
 test_task_create_model_variant_dispatch_and_fallback_errors() {
@@ -647,7 +753,6 @@ test_task_baseline_report_helpers_execute_python_wrappers() {
     local calls="${TEST_TMPDIR}/python.calls"
     _cmd_python() {
         echo "python $*" >> "${calls}"
-        cat >/dev/null || true
         if [[ $# -eq 2 ]]; then
             echo "hf_auto"
         fi
