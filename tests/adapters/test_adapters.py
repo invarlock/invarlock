@@ -40,9 +40,8 @@ from invarlock.adapters.base_types import (
     MonitorConfig,
     PerformanceMetrics,
 )
-from invarlock.adapters.hf_bert import HF_BERT_Adapter
-from invarlock.adapters.hf_gpt2 import HF_GPT2_Adapter
-from invarlock.adapters.hf_llama import HF_LLaMA_Adapter
+from invarlock.adapters.hf_causal import HF_Causal_Adapter
+from invarlock.adapters.hf_mlm import HF_MLM_Adapter
 
 
 class MockGPT2Model(nn.Module):
@@ -163,8 +162,8 @@ class MockBertModel(nn.Module):
             self.cls.predictions.decoder.weight = self.embeddings.word_embeddings.weight
 
 
-class MockLLaMALayer(nn.Module):
-    """Minimal LLaMA block for adapter testing."""
+class MockRopeDecoderLayer(nn.Module):
+    """Minimal RoPE decoder-only block for adapter testing."""
 
     def __init__(self, hidden_size: int):
         super().__init__()
@@ -183,8 +182,8 @@ class MockLLaMALayer(nn.Module):
         self.post_attention_layernorm = nn.LayerNorm(hidden_size)
 
 
-class MockLLaMAModel(nn.Module):
-    """Mock LLaMA model with tying support."""
+class MockRopeDecoderModel(nn.Module):
+    """Mock RoPE decoder-only model with tying support."""
 
     def __init__(
         self,
@@ -195,7 +194,7 @@ class MockLLaMAModel(nn.Module):
     ):
         super().__init__()
         self.config = Mock()
-        self.config.model_type = "llama"
+        self.config.model_type = "mistral"
         self.config.num_hidden_layers = n_layer
         self.config.hidden_size = hidden_size
         self.config.num_attention_heads = 4
@@ -207,7 +206,73 @@ class MockLLaMAModel(nn.Module):
 
         self.model = nn.Module()
         self.model.layers = nn.ModuleList(
-            [MockLLaMALayer(hidden_size) for _ in range(n_layer)]
+            [MockRopeDecoderLayer(hidden_size) for _ in range(n_layer)]
+        )
+        self.model.embed_tokens = nn.Embedding(vocab_size, hidden_size)
+        self.model.norm = nn.LayerNorm(hidden_size)
+
+        self.lm_head = nn.Linear(hidden_size, vocab_size, bias=False)
+
+        if tie_weights:
+            self.lm_head.weight = self.model.embed_tokens.weight
+
+
+class MockMixtralExpert(nn.Module):
+    """Minimal Mixtral MoE expert module for adapter testing."""
+
+    def __init__(self, hidden_size: int, intermediate_size: int):
+        super().__init__()
+        self.w1 = nn.Linear(hidden_size, intermediate_size)
+        self.w2 = nn.Linear(intermediate_size, hidden_size)
+        self.w3 = nn.Linear(hidden_size, intermediate_size)
+
+
+class MockMixtralLayer(nn.Module):
+    """Minimal Mixtral block for adapter testing (MoE instead of MLP)."""
+
+    def __init__(self, hidden_size: int, intermediate_size: int):
+        super().__init__()
+        self.self_attn = nn.Module()
+        self.self_attn.q_proj = nn.Linear(hidden_size, hidden_size)
+        self.self_attn.k_proj = nn.Linear(hidden_size, hidden_size)
+        self.self_attn.v_proj = nn.Linear(hidden_size, hidden_size)
+        self.self_attn.o_proj = nn.Linear(hidden_size, hidden_size)
+
+        self.block_sparse_moe = nn.Module()
+        self.block_sparse_moe.experts = nn.ModuleList(
+            [MockMixtralExpert(hidden_size, intermediate_size)]
+        )
+
+        self.input_layernorm = nn.LayerNorm(hidden_size)
+        self.post_attention_layernorm = nn.LayerNorm(hidden_size)
+
+
+class MockMixtralModel(nn.Module):
+    """Mock Mixtral model with tying support."""
+
+    def __init__(
+        self,
+        n_layer: int = 2,
+        hidden_size: int = 32,
+        intermediate_size: int = 128,
+        vocab_size: int = 64,
+        tie_weights: bool = False,
+    ):
+        super().__init__()
+        self.config = Mock()
+        self.config.model_type = "mixtral"
+        self.config.num_hidden_layers = n_layer
+        self.config.hidden_size = hidden_size
+        self.config.num_attention_heads = 4
+        self.config.num_key_value_heads = 2
+        self.config.intermediate_size = intermediate_size
+        self.config.vocab_size = vocab_size
+        self.config.max_position_embeddings = 32768
+        self.config.rms_norm_eps = 1e-6
+
+        self.model = nn.Module()
+        self.model.layers = nn.ModuleList(
+            [MockMixtralLayer(hidden_size, intermediate_size) for _ in range(n_layer)]
         )
         self.model.embed_tokens = nn.Embedding(vocab_size, hidden_size)
         self.model.norm = nn.LayerNorm(hidden_size)
@@ -836,12 +901,12 @@ class TestHFGPT2Adapter:
 
     def test_hf_adapter_creation(self):
         """Test adapter creation."""
-        adapter = HF_GPT2_Adapter()
-        assert adapter.name == "hf_gpt2"
+        adapter = HF_Causal_Adapter()
+        assert adapter.name == "hf_causal"
 
     def test_hf_adapter_can_handle_mock(self):
         """Test can_handle with mock models."""
-        adapter = HF_GPT2_Adapter()
+        adapter = HF_Causal_Adapter()
 
         # Test with mock GPT-2 model - adjust the mock to be more realistic
         model = MockGPT2Model()
@@ -856,7 +921,7 @@ class TestHFGPT2Adapter:
 
     def test_hf_adapter_describe(self):
         """Test model description."""
-        adapter = HF_GPT2_Adapter()
+        adapter = HF_Causal_Adapter()
         model = MockGPT2Model(n_layer=2, n_head=4, hidden_size=16)
 
         desc = adapter.describe(model)
@@ -875,7 +940,7 @@ class TestHFGPT2Adapter:
 
     def test_hf_adapter_describe_with_tying(self):
         """Test description with weight tying."""
-        adapter = HF_GPT2_Adapter()
+        adapter = HF_Causal_Adapter()
         model = MockGPT2Model()
 
         # Create weight tying
@@ -887,7 +952,7 @@ class TestHFGPT2Adapter:
 
     def test_hf_adapter_snapshot_restore(self):
         """Test snapshot and restore functionality."""
-        adapter = HF_GPT2_Adapter()
+        adapter = HF_Causal_Adapter()
         model = MockGPT2Model(n_layer=1, n_head=2, hidden_size=8)
 
         # Get original weights
@@ -915,22 +980,9 @@ class TestHFGPT2Adapter:
             original_weight, model.transformer.h[0].attn.c_attn.weight, atol=1e-6
         )
 
-    def test_hf_adapter_validate_split_size(self):
-        """Test split size validation."""
-        adapter = HF_GPT2_Adapter()
-        model = MockGPT2Model()
-
-        # Should pass validation (no split_size specified)
-        assert adapter.validate_split_size(model) is True
-
-        # Test with split_size in config
-        model.config.split_size = 16
-        result = adapter.validate_split_size(model)
-        assert isinstance(result, bool)
-
     def test_hf_adapter_get_layer_modules(self):
         """Test layer module retrieval."""
-        adapter = HF_GPT2_Adapter()
+        adapter = HF_Causal_Adapter()
         model = MockGPT2Model(n_layer=2)
 
         modules = adapter.get_layer_modules(model, 0)
@@ -950,7 +1002,7 @@ class TestHFGPT2Adapter:
 
     def test_hf_adapter_weight_tying_extraction(self):
         """Test weight tying extraction."""
-        adapter = HF_GPT2_Adapter()
+        adapter = HF_Causal_Adapter()
         model = MockGPT2Model()
 
         # No tying initially
@@ -965,7 +1017,7 @@ class TestHFGPT2Adapter:
 
     def test_hf_adapter_error_handling(self):
         """Test error handling in adapter methods."""
-        adapter = HF_GPT2_Adapter()
+        adapter = HF_Causal_Adapter()
 
         # Test with invalid model structure
         invalid_model = nn.Module()
@@ -984,7 +1036,7 @@ class TestHFBERTAdapter:
     """Tests specific to the HuggingFace BERT adapter."""
 
     def test_bert_adapter_snapshot_preserves_weight_tying(self):
-        adapter = HF_BERT_Adapter()
+        adapter = HF_MLM_Adapter()
         model = MockBertModel(tie_weights=True)
 
         assert adapter.can_handle(model) is True
@@ -1011,17 +1063,17 @@ class TestHFBERTAdapter:
         )
 
 
-class TestHFLLaMAAdapter:
-    """Tests specific to the HuggingFace LLaMA adapter."""
+class TestHFCausalAdapterRopeDecoder:
+    """Tests causal adapter behavior on RoPE decoder-only structures."""
 
-    def test_llama_adapter_snapshot_preserves_weight_tying(self):
-        adapter = HF_LLaMA_Adapter()
-        model = MockLLaMAModel(tie_weights=True)
+    def test_causal_adapter_snapshot_preserves_weight_tying(self):
+        adapter = HF_Causal_Adapter()
+        model = MockRopeDecoderModel(tie_weights=True)
 
         assert adapter.can_handle(model) is True
 
         desc = adapter.describe(model)
-        assert desc["model_type"] == "llama"
+        assert desc["model_type"] == "mistral"
         tying = adapter._extract_weight_tying_info(model)
         assert tying == {"lm_head.weight": "model.embed_tokens.weight"}
 
@@ -1034,6 +1086,32 @@ class TestHFLLaMAAdapter:
         adapter.restore(model, snapshot)
         assert torch.allclose(model.model.embed_tokens.weight, original)
         assert model.lm_head.weight is model.model.embed_tokens.weight
+
+    def test_causal_adapter_describe_supports_mixtral_structure(self):
+        adapter = HF_Causal_Adapter()
+        model = MockMixtralModel(tie_weights=True)
+
+        assert adapter.can_handle(model) is True
+
+        desc = adapter.describe(model)
+        assert desc["hf_model_type"] == "mixtral"
+        assert desc["n_layer"] == model.config.num_hidden_layers
+        assert len(desc["mlp_dims"]) == model.config.num_hidden_layers
+        assert all(dim == model.config.intermediate_size for dim in desc["mlp_dims"])
+
+        modules = adapter.get_layer_modules(model, 0)
+        assert (
+            modules["mlp.gate_proj"]
+            is model.model.layers[0].block_sparse_moe.experts[0].w1
+        )
+        assert (
+            modules["mlp.down_proj"]
+            is model.model.layers[0].block_sparse_moe.experts[0].w2
+        )
+        assert (
+            modules["mlp.up_proj"]
+            is model.model.layers[0].block_sparse_moe.experts[0].w3
+        )
 
 
 class TestInitModule:
@@ -1058,9 +1136,9 @@ class TestInitModule:
         with pytest.raises(NotImplementedError):
             invarlock.adapters.HF_Pythia_Adapter()
 
-        # Note: HF_LLaMA_Adapter is now implemented, not a placeholder
+        # Note: HF_Causal_Adapter is now implemented, not a placeholder
         # Test that it can be instantiated without error
-        adapter = invarlock.adapters.HF_LLaMA_Adapter()
+        adapter = invarlock.adapters.HF_Causal_Adapter()
         assert adapter is not None
 
         # Test auto-tuning placeholders
@@ -1113,7 +1191,7 @@ class TestIntegration:
     def test_module_imports(self):
         """Test that main module imports work."""
         # Test adapter classes
-        assert hasattr(invarlock_adapters, "HF_GPT2_Adapter")
+        assert hasattr(invarlock_adapters, "HF_Causal_Adapter")
         assert hasattr(invarlock_adapters, "BaseAdapter")
         assert hasattr(invarlock_adapters, "AdapterConfig")
 
@@ -1131,7 +1209,7 @@ class TestIntegration:
         assert config.validate()["valid"] is True
 
         # Create HF adapter
-        hf_adapter = HF_GPT2_Adapter()
+        hf_adapter = HF_Causal_Adapter()
 
         # Test with mock model
         model = MockGPT2Model()

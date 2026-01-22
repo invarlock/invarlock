@@ -34,7 +34,7 @@ class MetaData(TypedDict):
     """Metadata about the model and execution environment."""
 
     model_id: str  # Model identifier (e.g., "gpt2", "path/to/model")
-    adapter: str  # Adapter name (e.g., "hf_gpt2")
+    adapter: str  # Adapter name (e.g., "hf_causal")
     commit: str  # Git commit SHA
     seed: int  # Random seed used for evaluation
     device: str  # Device used ("cpu", "cuda", "mps")
@@ -107,6 +107,11 @@ class EvalMetrics(TypedDict, total=False):
     # Optional aux fields retained for guard telemetry and debug
     latency_ms_per_tok: float  # Average latency per token in milliseconds
     memory_mb_peak: float  # Peak memory usage in MB
+    gpu_memory_mb_peak: float  # Peak GPU memory usage in MB
+    gpu_memory_reserved_mb_peak: float  # Peak GPU reserved memory in MB
+    timings: dict[str, float]  # Phase timing breakdown (seconds)
+    guard_timings: dict[str, float]  # Per-guard timings (seconds)
+    memory_snapshots: list[dict[str, Any]]  # Phase memory snapshots
     spectral: dict[str, Any]  # Spectral norm summaries
     rmt: dict[str, Any]  # RMT statistics
     invariants: dict[str, Any]  # Model invariant check results

@@ -55,6 +55,8 @@ def normalize_run_report(report: Mapping[str, Any] | RunReport) -> RunReport:
     }
     # Preserve additional provenance knobs used by certificate/digests.
     for key in (
+        "pm_acceptance_range",
+        "pm_drift_band",
         "policy_overrides",
         "overrides",
         "plugins",
@@ -179,6 +181,11 @@ def normalize_run_report(report: Mapping[str, Any] | RunReport) -> RunReport:
         "latency_ms_p50",
         "latency_ms_p95",
         "memory_mb_peak",
+        "gpu_memory_mb_peak",
+        "gpu_memory_reserved_mb_peak",
+        "timings",
+        "guard_timings",
+        "memory_snapshots",
         "throughput_sps",
         "spectral",
         "rmt",

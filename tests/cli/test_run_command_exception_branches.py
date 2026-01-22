@@ -55,7 +55,7 @@ def test_run_command_invarlock_error_in_ci(
 ) -> None:
     run_mod = _import_run_module()
     cfg = tmp_path / "cfg.yaml"
-    cfg.write_text("model: {id: gpt2, adapter: hf_gpt2}\n")
+    cfg.write_text("model: {id: gpt2, adapter: hf_causal}\n")
     import invarlock.cli.config as cfg_mod
     from invarlock.cli.errors import InvarlockError
 
@@ -73,7 +73,7 @@ def test_run_command_schema_invalid_value_error(
 ) -> None:
     run_mod = _import_run_module()
     cfg = tmp_path / "cfg.yaml"
-    cfg.write_text("model: {id: gpt2, adapter: hf_gpt2}\n")
+    cfg.write_text("model: {id: gpt2, adapter: hf_causal}\n")
 
     def _raise_val(*a, **k):
         raise ValueError("Invalid RunReport blah")

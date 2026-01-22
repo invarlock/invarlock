@@ -1,5 +1,14 @@
 # Example Reports
 
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Show how to generate and interpret InvarLock reports. |
+| **Audience** | Users learning the certification workflow. |
+| **Outputs** | `evaluation.cert.json`, `evaluation_certificate.md`, `report.json`. |
+| **Requires** | `invarlock[hf]` for HF adapter workflows. |
+
 InvarLock emits both machine-readable certificates and human-friendly summaries.
 Use the steps below to reproduce representative artifacts from the current release.
 

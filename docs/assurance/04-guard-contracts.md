@@ -4,7 +4,18 @@
 > thresholds we enforce, and how those decisions appear in the certificate so
 > reviewers can trace every PASS or FAIL.
 
-This handbook captures the practical guarantees that underpin InvarLock’s guard
+**Contents:**
+
+- [1. Guard Contracts](#1-guard-contracts) — what each guard checks and how it fails
+- [2. Statistical Method Primer](#2-statistical-method-primer) — paired Δlog perplexity and bootstrap CIs
+- [3. Calibration & Evaluation Slice Requirements](#3-calibration--evaluation-slice-requirements) — acceptance criteria for evaluation schedules
+- [4. Reproducibility Kit](#4-reproducibility-kit) — how to reproduce a certificate
+- [5. Device Tolerance Guidance](#5-device-tolerance-guidance) — expected drift across backends
+- [6. Threshold Rationale (Defaults)](#6-threshold-rationale-defaults) — why the defaults are what they are
+- [7. Known Limitations](#7-known-limitations) — what the safety case does not cover
+- [8. Coverage Reference](#8-coverage-reference) — tests that underpin this handbook
+
+This handbook captures the practical guarantees that underpin InvarLock's guard
 pipeline. It consolidates the guard contracts, statistical assumptions, and
 calibration data that accompany the InvarLock assurance notes.
 
@@ -164,7 +175,7 @@ To reproduce a certificate:
    to regenerate the certificate; when seeds, config, and backend match, the
    resulting certificate is bit-for-bit identical.
 
-Explainers for each field live in `docs/reference/certificate-schema.md`.
+Explainers for each field live in [`docs/reference/certificates.md`](../reference/certificates.md).
 
 ## 5. Device Tolerance Guidance
 
@@ -222,7 +233,7 @@ Detailed derivations are in the calibration appendix (`09-tier-v1-calibration.md
 - No adversarial robustness or gradient masking guarantees.
 - CUDA kernels outside deterministic mode may exceed drift tolerances.
 - Reference mask-based flows are conservative; stronger compression requires plugins.
-- Calibration data currently covers GPT-2, BERT, and TinyLLaMA profiles.
+- Calibration data currently covers GPT-2 and BERT profiles.
   Contributions for additional model families are welcome—attach pilot certs
   and summary CSVs (typically written under `reports/calibration/` when running
   the calibration scripts) to change proposals or release artifacts.

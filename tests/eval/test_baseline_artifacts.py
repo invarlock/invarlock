@@ -19,7 +19,7 @@ def _build_baseline_report(ppl_final: float) -> dict:
     report["meta"].update(
         {
             "model_id": "gpt2",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "device": "cpu",
             "ts": "2024-01-01T00:00:00",
             "commit": "abc123deadbeef",

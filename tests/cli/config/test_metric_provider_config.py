@@ -8,7 +8,7 @@ from invarlock.model_profile import detect_model_profile
 def test_config_provider_kind_mapping_from_dict():
     cfg = InvarLockConfig(
         {
-            "model": {"id": "t5-small", "adapter": "hf_llama"},
+            "model": {"id": "t5-small", "adapter": "hf_seq2seq"},
             "dataset": {"provider": {"kind": "seq2seq"}},
             "eval": {"metric": {"kind": "ppl_seq2seq"}},
         }
@@ -22,7 +22,7 @@ def test_config_provider_kind_mapping_from_dict():
 def test_metric_resolution_defaults_to_profile_when_auto():
     cfg = InvarLockConfig(
         {
-            "model": {"id": "bert-base-uncased", "adapter": "hf_bert"},
+            "model": {"id": "bert-base-uncased", "adapter": "hf_mlm"},
             "dataset": {"provider": {"kind": "text_lm"}},
             "eval": {"metric": {"kind": "auto"}},
         }
@@ -37,7 +37,7 @@ def test_config_overrides_env_flag_for_metric_kind(monkeypatch):
     monkeypatch.setenv("INVARLOCK_METRIC_V1", "1")
     cfg = InvarLockConfig(
         {
-            "model": {"id": "gpt2", "adapter": "hf_gpt2"},
+            "model": {"id": "gpt2", "adapter": "hf_causal"},
             "dataset": {"provider": "text_lm"},
             "eval": {"metric": {"kind": "accuracy", "reps": 1234, "ci_level": 0.9}},
         }

@@ -1,30 +1,19 @@
 # Dataset Providers
 
-InvarLock uses pluggable dataset providers with deterministic windowing:
+## Overview
 
-| Provider   | Description                                                                                                                                  |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `wikitext2`| Default language modeling dataset used for certification examples (downloads via HuggingFace `datasets` if allowed).                         |
-| `synthetic`| Minimal random-text provider for smoke tests and offline CI flows.                                                                           |
-| `hf_text`  | Generic HuggingFace text dataset provider (set `dataset_name`, optional `config_name`, and `text_field`).                                    |
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Deterministic dataset providers for preview/final evaluation windows. |
+| **Audience** | CLI users configuring `dataset` blocks and Python callers building evaluation windows. |
+| **Supported providers** | `wikitext2`, `synthetic`, `hf_text`, `local_jsonl`, `hf_seq2seq`, `local_jsonl_pairs`, `seq2seq`. |
+| **Requires** | `invarlock[eval]` or `invarlock[hf]` for Hugging Face datasets providers. |
+| **Network** | Offline by default; HF-backed providers need `INVARLOCK_ALLOW_NETWORK=1` for first download. |
+| **Inputs** | Dataset provider name plus provider-specific fields. |
+| **Outputs / Artifacts** | Evaluation windows stored in `report.evaluation_windows` and dataset metadata in `report.data.*`. |
+| **Source of truth** | `src/invarlock/eval/data.py` and `src/invarlock/eval/providers/*`. |
 
-The `wikitext2` provider uses a fixed byte‑level n‑gram difficulty scorer to
-stratify candidate windows. It is deterministic, offline, and tokenizer‑agnostic
-to keep window selection consistent across model families.
-
-## Online vs Offline
-
-- Online: set `dataset.provider: wikitext2` and export `INVARLOCK_ALLOW_NETWORK=1`
-  so the HuggingFace `datasets` library can fetch the data on first use.
-- Offline:
-  - Pre-download the dataset (e.g., using `datasets` in a connected
-    environment), so it exists in the local cache.
-  - Unset `INVARLOCK_ALLOW_NETWORK` and optionally set `HF_DATASETS_OFFLINE=1` to
-    enforce offline reads.
-  - For completely synthetic/offline smoke tests, set `dataset.provider:
-    synthetic`.
-
-## Example (CI preset)
+## Quick Start
 
 ```yaml
 dataset:
@@ -37,98 +26,130 @@ dataset:
   seed: 42
 ```
 
-> Use the same `dataset` section for both baseline and edited runs; pass
-> `--baseline <baseline report.json>` on the edit run to pair windows.
->
-> Baseline pairing is evidence-based: the baseline `report.json` must preserve
-> `evaluation_windows` (tokenized window inputs/masks + stable window IDs). In
-> `--profile ci` / `--profile release`, `--baseline` fails closed with
-> `[INVARLOCK:E001]` if the baseline is missing or has invalid window evidence.
-> In dev profile, InvarLock may fall back to an unpaired schedule with a loud
-> warning.
+For Compare & Certify, reuse the same `dataset` block in baseline and subject runs.
 
-Inspect providers through the library API:
+## Concepts
 
-```python
-from invarlock.eval import data as eval_data
+- **Preview vs final windows**: the runner computes the primary metric on two
+  deterministic splits; counts are recorded in reports and certificates.
+- **Pairing**: `invarlock certify` requires baseline window evidence to pair
+  windows. Missing/invalid evidence fails closed in CI/Release profiles.
+- **Offline-first**: downloads are opt-in via `INVARLOCK_ALLOW_NETWORK=1`. Cached
+  datasets can be enforced via `HF_DATASETS_OFFLINE=1`.
+- **Dedupe & capacity**: `INVARLOCK_DEDUP_TEXTS=1` removes exact duplicates;
+  `INVARLOCK_CAPACITY_FAST=1` speeds up capacity checks for quick runs.
 
-print(eval_data.list_providers())
-provider = eval_data.get_provider("wikitext2")
-preview, final = provider.windows(
-    tokenizer,
-    preview_n=64,
-    final_n=64,
-    seq_len=512,
-    stride=512,
-)
-```
+### Pairing invariants (E001)
 
-This matches the registry the runner uses, so programmatic experiments and
-scripts see the same providers as CLI runs.
+| Invariant | Failure condition |
+| --- | --- |
+| `window_pairing_reason` | Must be empty / `None`. |
+| `paired_windows` | Must be > 0. |
+| `window_match_fraction` | Must be 1.0. |
+| `window_overlap_fraction` | Must be 0.0. |
 
-## Generic HF Text Dataset
+Counts mismatches are enforced via `coverage.preview.used`,
+`coverage.final.used`, and `paired_windows` in `dataset.windows.stats`.
 
-Use the `hf_text` provider to load a HuggingFace dataset by name:
+## Reference
+
+### Provider matrix
+
+| Provider | Kind | Network | Required keys | Notes |
+| --- | --- | --- | --- | --- |
+| `wikitext2` | text | Cache/Net | `provider`, `seq_len`, `stride`, `preview_n`, `final_n` | Deterministic n‑gram stratification; requires `datasets`. |
+| `synthetic` | text | Offline | `provider`, `seq_len`, `preview_n`, `final_n` | Generated text; good for smoke tests. |
+| `hf_text` | text | Cache/Net | `dataset_name`, `text_field` | Generic HF dataset loader; uses first N rows. |
+| `local_jsonl` | text | Offline | `file`/`path`/`data_files`, `text_field` | Reads JSONL from disk; default `text_field: text`. |
+| `hf_seq2seq` | seq2seq | Cache/Net | `dataset_name`, `src_field`, `tgt_field` | Provides encoder ids + decoder labels. |
+| `local_jsonl_pairs` | seq2seq | Offline | `file`/`path`/`data_files`, `src_field`, `tgt_field` | Paired JSONL for seq2seq. |
+| `seq2seq` | seq2seq | Offline | optional `n`, `src_len`, `tgt_len` | Synthetic seq2seq generator. |
+
+### Provider field map
+
+| Provider | Required keys | Evidence fields (report/cert) |
+| --- | --- | --- |
+| `wikitext2` | `provider`, `seq_len`, `stride`, `preview_n`, `final_n` | `report.data.*` + `certificate.dataset.windows.stats` |
+| `synthetic` | `provider`, `seq_len`, `preview_n`, `final_n` | `report.data.*` + `certificate.dataset.windows.stats` |
+| `hf_text` | `dataset_name`, `text_field` | `report.data.*` + `certificate.dataset.windows.stats` |
+| `local_jsonl` | `file`/`path`/`data_files`, `text_field` | `report.data.*` + `certificate.dataset.windows.stats` |
+| `hf_seq2seq` | `dataset_name`, `src_field`, `tgt_field` | `report.data.*` + `certificate.dataset.windows.stats` |
+| `local_jsonl_pairs` | `file`/`path`/`data_files`, `src_field`, `tgt_field` | `report.data.*` + `certificate.dataset.windows.stats` |
+| `seq2seq` | optional `n`, `src_len`, `tgt_len` | `report.data.*` + `certificate.dataset.windows.stats` |
+
+Provider-specific config fields (dataset name, paths, fields) are recorded under
+`report.data` when available.
+
+### Pairing evidence matrix
+
+| Config keys | Report fields | Certificate fields | Verify gate |
+| --- | --- | --- | --- |
+| `dataset.provider`, `seq_len`, `stride`, `split` | `report.data.{dataset,seq_len,stride,split}` | `certificate.dataset.{provider,seq_len,windows}` | Schema + pairing context. |
+| `dataset.preview_n/final_n` | `report.data.{preview_n,final_n}`, `report.evaluation_windows` | `certificate.dataset.windows.{preview,final}` | Pairing + count checks. |
+| Pairing stats (derived) | `report.dataset.windows.stats` | `certificate.dataset.windows.stats` | `_validate_pairing` + `_validate_counts`. |
+| Provider digest | `report.provenance.provider_digest` | `certificate.provenance.provider_digest` | Required in CI/Release. |
+
+### HF text provider example
 
 ```yaml
 dataset:
   provider: hf_text
-  dataset_name: wikitext          # any HF dataset name
-  config_name: wikitext-2-raw-v1  # optional
-  text_field: text                # defaults to 'text'
+  dataset_name: wikitext
+  config_name: wikitext-2-raw-v1
+  text_field: text
   split: validation
   preview_n: 64
   final_n: 64
 ```
 
-Notes:
+### Local JSONL provider example
 
-- Online mode requires `INVARLOCK_ALLOW_NETWORK=1` on first use; subsequent runs
-  read from HF cache.
-- `hf_text` uses a simple deterministic selection (first N for preview and next
-  N for final) and a straightforward tokenizer pass.
-
-### Pre-download snippet (offline cache)
-
-Use the `datasets` library to pre-download data in a connected environment:
-
-```python
-from datasets import load_dataset
-
-# Pick dataset/config/split
-ds = load_dataset("wikitext", name="wikitext-2-raw-v1", split="validation")
-
-# Access a few rows to force materialization/caching
-_ = [row["text"] for row in ds.select(range(10))]
-
-print("Cached at:", ds.cache_files)
+```yaml
+dataset:
+  provider: local_jsonl
+  path: /data/my_corpus
+  text_field: text
+  preview_n: 64
+  final_n: 64
 ```
 
-Then move the HF cache directory to your offline machine (or set
-`HF_HOME`/`HF_DATASETS_CACHE` to a persistent location). Run InvarLock with
-`INVARLOCK_ALLOW_NETWORK` unset and optionally `HF_DATASETS_OFFLINE=1`.
+### Seq2seq provider example (HF)
 
----
+```yaml
+dataset:
+  provider: hf_seq2seq
+  dataset_name: wmt14
+  src_field: translation.en
+  tgt_field: translation.de
+  preview_n: 32
+  final_n: 32
+```
 
-## Environment Variables
+### Environment variables
 
-- INVARLOCK_CAPACITY_FAST=1 — approximate capacity estimator that skips the full
-  capacity/dedupe pass to speed up pilots and smoke tests.
-  This is intended for experiments and quick checks, not certification runs.
+- `INVARLOCK_ALLOW_NETWORK=1` — allow dataset downloads.
+- `HF_DATASETS_OFFLINE=1` — force cached-only datasets.
+- `INVARLOCK_DEDUP_TEXTS=1` — exact-text dedupe before tokenization.
+- `INVARLOCK_CAPACITY_FAST=1` — approximate capacity estimation for quick runs.
 
-  Example:
+## Troubleshooting
 
-  ```bash
-  INVARLOCK_CAPACITY_FAST=1 invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci
-  ```
+- **`DEPENDENCY-MISSING: datasets`**: install `invarlock[eval]` or `invarlock[hf]`.
+- **`NO-SAMPLES` / `NO-PAIRS` errors**: verify dataset fields and split names.
+- **Pairing failures (`E001`)**: ensure baseline `report.json` contains
+  `evaluation_windows` and was produced with matching dataset settings.
 
-  Note: use for quick checks; not suitable for release evidence.
+## Observability
 
-- INVARLOCK_DEDUP_TEXTS=1 — exact-text dedupe before tokenization to reduce
-  duplicate windows and stabilize overlap metrics; preserves first occurrence order.
+- `report.data.*` stores provider name, split, and window counts.
+- `report.evaluation_windows` stores preview/final token windows.
+- Certificates preserve dataset metadata and window pairing stats under `dataset.*`.
 
-  Example:
+## Related Documentation
 
-  ```bash
-  INVARLOCK_DEDUP_TEXTS=1 invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci
-  ```
+- [Configuration Schema](config-schema.md)
+- [Environment Variables](env-vars.md)
+- [CLI Reference](cli.md)
+- [Certificates](certificates.md) — Schema, telemetry, and HTML export
+- [Coverage & Pairing](../assurance/02-coverage-and-pairing.md) — Window requirements and pairing math
+- [Bring Your Own Data](../user-guide/bring-your-own-data.md) — Custom dataset workflows

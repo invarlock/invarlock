@@ -241,8 +241,8 @@ class TestDetectCapabilitiesFromModel:
         mock_model = MagicMock()
         mock_model.config = MagicMock()
         mock_model.config.quantization_config = None
-        mock_model.config.model_type = "llama"
-        mock_model.config.architectures = ["LlamaForCausalLM"]
+        mock_model.config.model_type = "mistral"
+        mock_model.config.architectures = ["MistralForCausalLM"]
 
         caps = detect_capabilities_from_model(mock_model)
         assert caps.device_movable is True
@@ -254,8 +254,8 @@ class TestDetectCapabilitiesFromModel:
         mock_model = MagicMock()
         mock_model.config = MagicMock()
         mock_model.config.quantization_config = {"load_in_8bit": True}
-        mock_model.config.model_type = "llama"
-        mock_model.config.architectures = ["LlamaForCausalLM"]
+        mock_model.config.model_type = "mistral"
+        mock_model.config.architectures = ["MistralForCausalLM"]
 
         caps = detect_capabilities_from_model(mock_model)
         assert caps.device_movable is False
@@ -270,7 +270,7 @@ class TestDetectCapabilitiesFromModel:
             "bits": 4,
             "group_size": 128,
         }
-        mock_model.config.model_type = "llama"
+        mock_model.config.model_type = "mistral"
 
         caps = detect_capabilities_from_model(mock_model)
         assert caps.device_movable is False
@@ -298,12 +298,12 @@ class TestDetectCapabilitiesFromModel:
         caps = detect_capabilities_from_model(mock_model)
         assert caps.primary_metric_kind == "ppl_seq2seq"
 
-    def test_weight_tying_llama(self):
-        """Weight tying should be detected for LLaMA models."""
+    def test_weight_tying_embed_tokens(self):
+        """Weight tying should be detected for embed_tokens-style models."""
         mock_model = MagicMock()
         mock_model.config = MagicMock()
         mock_model.config.quantization_config = None
-        mock_model.config.model_type = "llama"
+        mock_model.config.model_type = "mistral"
         mock_model.config.architectures = []
 
         # Create shared weight tensor

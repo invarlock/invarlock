@@ -13,7 +13,7 @@ def _cfg(tmp_path: Path) -> str:
         textwrap.dedent(
             """
             model:
-              adapter: hf_gpt2
+              adapter: hf_causal
               id: gpt2
               device: auto
             edit:

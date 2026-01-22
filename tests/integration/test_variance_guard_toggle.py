@@ -52,7 +52,7 @@ def _build_run_report(
     report: dict[str, Any] = {
         "meta": {
             "model_id": "gpt2-small",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "commit": "abcdef1234567890",
             "seed": 42,
             "device": "cpu",

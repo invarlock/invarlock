@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "invarlock"
-version = "0.3.6"
+version = "0.3.7"
 description = "Edit‑agnostic robustness certificates for weight edits (InvarLock framework)"
 authors = [{ name = "InvarLock Team", email = "oss@invarlock.dev" }]
 maintainers = [{ name = "InvarLock Maintainers", email = "support@invarlock.dev" }]
@@ -35,6 +35,7 @@ dependencies = [
     "pydantic>=2.0",
     "rich>=13.0",
     "pyyaml>=6.0",
+    "markdown>=3.5",
     "psutil>=5.9",
     "hypothesis>=6.98",
     "typing_extensions>=4.7",
@@ -161,9 +162,11 @@ invariants = "invarlock.guards:InvariantsGuard"
 hello_guard = "invarlock.plugins:HelloGuard"
 
 [project.entry-points."invarlock.adapters"]
-hf_gpt2 = "invarlock.adapters:HF_GPT2_Adapter"
-hf_bert = "invarlock.adapters:HF_BERT_Adapter"
-hf_llama = "invarlock.adapters:HF_LLaMA_Adapter"
+hf_causal = "invarlock.adapters:HF_Causal_Adapter"
+hf_mlm = "invarlock.adapters:HF_MLM_Adapter"
+hf_seq2seq = "invarlock.adapters:HF_Seq2Seq_Adapter"
+hf_causal_onnx = "invarlock.adapters:HF_Causal_ONNX_Adapter"
+hf_auto = "invarlock.adapters:HF_Auto_Adapter"
 hf_gptq = "invarlock.plugins.hf_gptq_adapter:HF_GPTQ_Adapter"
 hf_awq = "invarlock.plugins.hf_awq_adapter:HF_AWQ_Adapter"
 hf_bnb = "invarlock.plugins.hf_bnb_adapter:HF_BNB_Adapter"

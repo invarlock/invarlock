@@ -3,7 +3,7 @@ from invarlock.reporting.certificate import make_certificate
 
 def _minimal_pm_report():
     return {
-        "meta": {"model_id": "m", "adapter": "hf_gpt2", "seed": 7, "device": "cpu"},
+        "meta": {"model_id": "m", "adapter": "hf_causal", "seed": 7, "device": "cpu"},
         "data": {
             "dataset": "dummy",
             "split": "validation",

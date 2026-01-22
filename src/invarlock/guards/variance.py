@@ -121,7 +121,7 @@ def _iter_transformer_layers(model: nn.Module):
         # GPT-2 style
         yield from model.transformer.h
     elif hasattr(model, "model") and hasattr(model.model, "layers"):
-        # LLaMA style
+        # RoPE decoder style
         yield from model.model.layers
     elif hasattr(model, "encoder") and hasattr(model.encoder, "layer"):
         # BERT style
@@ -214,7 +214,7 @@ def equalise_residual_variance(
                 hooks[name] = attn_proj.register_forward_hook(_branch_hook(name))
 
         if hasattr(blk, "mlp"):
-            # Check for c_proj (GPT-2) or down_proj (LLaMA) or fc2 (generic)
+            # Check for c_proj (GPT-2) or down_proj (RoPE decoder) or fc2 (generic)
             mlp_proj = (
                 getattr(blk.mlp, "c_proj", None)
                 or getattr(blk.mlp, "down_proj", None)

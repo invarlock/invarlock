@@ -7,13 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.7] - 2026-01-22
+
+### Added
+- Role-based HuggingFace adapters with updated auto-routing (replaces model-name adapters).
+- Proof packs: v2 pack layout, scenarios manifest, and assurance verdict generation.
+- CLI flags: `invarlock run --edit-label` and `invarlock certify --baseline-report`.
+- CI notebook smoke runner (`scripts/verify_notebooks_smoke.py`).
+
+### Changed
+- Proof pack workflows hardened: baseline-report reuse, calibrate-only behavior, tuned-params hygiene, and improved task sizing/memory planning.
+- Certificate reporting refreshed: revamped certificate markdown, enhanced HTML output + glossary, and “Safety Certificate” renamed to “Evaluation Certificate”.
+- Presets/overlays updated for new adapter roles and additional model families.
+- CI: bump `actions/download-artifact` to v7; remove the legacy B200 backend validation harness.
+
+### Fixed
+- Adapters: Mixtral support, improved auto-detection, and hardened causal describe/weight tying.
+- Proof packs: enforce CI floor constraints, mitigate OOM/missing-tensors cases, and make verification more resilient.
+- Reporting/eval: avoid duplicate synthetic samples and preserve primary-metric drift band handling.
+
+### Documentation
+- Expanded and consolidated guides across CLI, configs, datasets, guards, proof packs, and notebooks.
+
 ## [0.3.6] - 2026-01-13
 
 ### Added
 - Measurement contracts for guard estimators (approximation-only, GPU/MPS-first) recorded in certificates and enforced by `invarlock verify --profile ci|release`.
-- B200 validation suite workflow split: `scripts/b200_validation_suite.sh --calibrate-only` (stop after preset generation) and `--run-only` (resume remaining tasks).
-- B200 backend revalidation harness for CPU vs CUDA SVD deltas (`scripts/b200_gpu_backend_validation/validate_svd_backend_equivalence.py`) plus a multi-GPU runner (`scripts/b200_gpu_backend_validation/run_multi_gpu.sh`).
-- B200 suite knob for controlled experiments: `B200_GUARDS_ORDER`.
+- Proof pack suite workflow split: `scripts/proof_packs/run_suite.sh --calibrate-only` (stop after preset generation) and `--run-only` (resume remaining tasks).
+- Proof pack suite knob for controlled experiments: `PACK_GUARDS_ORDER`.
 
 ### Changed
 - B200 calibration configs now default to `guards.order: [invariants, variance, invariants]` (drops spectral/rmt) to avoid CPU-bound SVD (`torch.linalg.svdvals` / MKL `sgesdd`) dominating wall time and making GPUs appear idle during calibration.
@@ -28,8 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.5] - 2026-01-02
 
 ### Added
-- B200 validation bash test suite (`scripts/lib/tests/*`, `scripts/lib/tests/run.sh`) with deterministic command mocks and optional branch/line coverage checks.
-- B200 runtime helpers (`scripts/lib/runtime.sh`) plus a snapshot/diagnostics helper (`scripts/b200_invarlock_snapshot.sh`) to capture queue/worker/GPU state during long runs.
+- Proof pack bash test suite (`scripts/proof_packs/tests/*`, `scripts/proof_packs/tests/run.sh`) with deterministic command mocks and optional branch/line coverage checks.
+- Proof pack runtime helpers (`scripts/proof_packs/lib/runtime.sh`) plus pack build/verify helpers (`scripts/proof_packs/run_pack.sh`, `scripts/proof_packs/verify_pack.sh`) to capture artifacts during long runs.
 - Perplexity token-id sanitization to mask out-of-range IDs (and ignore them in labels) instead of triggering device-side asserts.
 
 ### Changed
@@ -51,7 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Chunked snapshot/restore support for HF adapters to reduce peak memory during retries.
-- B200 validation workflow helpers (bootstrap + scheduler/queue utilities + model creation tooling).
+- Proof pack workflow helpers (run_suite + scheduler/queue utilities + model creation tooling).
 
 ### Changed
 - CI/Release baseline pairing is fail-closed: `invarlock run --baseline ...` now requires valid `evaluation_windows` evidence and enforces dataset/tokenizer/masking parity.
@@ -115,7 +136,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **INVARLOCK_SKIP_OVERHEAD_CHECK env var** - Skip guard overhead measurement even with ci/release profiles for large models.
 - **Configurable PM acceptance range** - Set via preset config or `INVARLOCK_PM_ACCEPTANCE_MIN/MAX` environment variables.
-- **Comprehensive B200 validation guide** - New documentation at `docs/user-guide/b200-validation.md`.
+- **Comprehensive proof pack guide** - New documentation at `docs/user-guide/proof-packs.md`.
 
 ### Changed
 - B200 validation scripts updated to v2.0.1 with improved cleanup traps and progress monitoring.
@@ -147,7 +168,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Test documentation** - README files for `tests/guards/` and `tests/observability/`
 
 ### Changed
-- `hf_llama.py`: Uses `_safe_to_device()` instead of direct `model.to()` call
+- `hf_causal.py`: Uses `_safe_to_device()` instead of direct `model.to()` call
 - `hf_awq_adapter.py`: Uses `_safe_to_device()` with AWQ capabilities
 - `hf_gptq_adapter.py`: Uses `_safe_to_device()` with GPTQ capabilities
 
@@ -168,7 +189,7 @@ First public release on GitHub and PyPI.
 
 ### Added
 - Core compare & certify pipeline and guard chain for edit‑agnostic robustness certificates.
-- Safety Certificate schema v1 and CLI entry points (including `invarlock certify`).
+- Evaluation Certificate schema v1 and CLI entry points (including `invarlock certify`).
 - Torch‑optional core install with optional extras (e.g., `invarlock[hf]`, `invarlock[adapters]`).
 - Initial documentation set: quickstart, user guides, and CLI reference.
 

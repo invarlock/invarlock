@@ -6,13 +6,13 @@ Core runtime package — torch-independent utilities, configuration, and interfa
 
 This package provides the foundation for the InvarLock GuardChain without heavy dependencies.
 For torch-dependent functionality, see subpackages under `invarlock.*`:
-- `invarlock.adapters`: Model adapters (HF GPT-2/BERT/LLaMA, auto)
+- `invarlock.adapters`: Model adapters (HF causal/MLM/seq2seq + auto)
 - `invarlock.guards`: Safety mechanisms (invariants, spectral, RMT, variance)
 - `invarlock.edits`: Built-in quantization and edit interfaces
 - `invarlock.eval`: Metrics, guard-overhead checks, and certification
 """
 
-__version__ = "0.3.6"
+__version__ = "0.3.7"
 
 # Core exports - torch-independent
 from .config import CFG, Defaults, get_default_config

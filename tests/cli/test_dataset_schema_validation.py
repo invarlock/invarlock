@@ -29,7 +29,7 @@ def test_doctor_reports_missing_local_jsonl_file(tmp_path: Path) -> None:
         """
 model:
   id: gpt2
-  adapter: hf_gpt2
+  adapter: hf_causal
 dataset:
   provider:
     kind: local_jsonl

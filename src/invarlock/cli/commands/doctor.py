@@ -1042,8 +1042,7 @@ def doctor_command(
                 module = str(info.get("module") or "")
                 support = (
                     "auto"
-                    if module.startswith("invarlock.adapters")
-                    and n in {"hf_causal_auto", "hf_mlm_auto"}
+                    if module.startswith("invarlock.adapters") and n in {"hf_auto"}
                     else (
                         "core"
                         if module.startswith("invarlock.adapters")
@@ -1058,11 +1057,10 @@ def doctor_command(
 
                 # Heuristic backend mapping without heavy imports
                 if n in {
-                    "hf_gpt2",
-                    "hf_bert",
-                    "hf_llama",
-                    "hf_causal_auto",
-                    "hf_mlm_auto",
+                    "hf_causal",
+                    "hf_mlm",
+                    "hf_seq2seq",
+                    "hf_auto",
                 }:
                     # Transformers-based
                     backend = "transformers"
@@ -1097,8 +1095,8 @@ def doctor_command(
                         }.get(n)
                         if hint:
                             enable = f"pip install '{hint}'"
-                # Special-case: hf_onnx is a core adapter but requires Optimum/ONNXRuntime
-                if n == "hf_onnx":
+                # Special-case: ONNX causal adapter is core but requires Optimum/ONNXRuntime
+                if n == "hf_causal_onnx":
                     backend = backend or "onnxruntime"
                     present = (
                         importlib.util.find_spec("optimum.onnxruntime") is not None
@@ -1322,7 +1320,7 @@ def doctor_command(
         if "optimum" in str(e).lower():
             if not json_out:
                 console.print(
-                    "  [yellow]⚠️  Optional Optimum/ONNXRuntime missing; hf_onnx will be shown as needs_extra[/yellow]"
+                    "  [yellow]⚠️  Optional Optimum/ONNXRuntime missing; hf_causal_onnx will be shown as needs_extra[/yellow]"
                 )
             # Do not mark overall health as failed for optional extras
         else:

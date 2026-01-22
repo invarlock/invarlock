@@ -1,5 +1,15 @@
 # Bring Your Own Data (BYOD)
 
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Run InvarLock on custom datasets with offline-capable providers. |
+| **Audience** | Users with proprietary or custom text corpora for evaluation. |
+| **Supported providers** | `local_jsonl` (hermetic, no deps), `hf_text` (requires `datasets`). |
+| **Network** | `local_jsonl` is fully offline; `hf_text` needs network on first fetch only. |
+| **Source of truth** | `src/invarlock/eval/providers/text_lm.py`. |
+
 Run InvarLock on your own small text files with zero network access. Two options:
 
 
@@ -13,7 +23,7 @@ Config snippet:
 ```yaml
 model:
   id: gpt2
-  adapter: hf_gpt2
+  adapter: hf_causal
 
 dataset:
   provider: { kind: local_jsonl }
@@ -43,7 +53,7 @@ Requires `pip install datasets` and network only when first fetching data.
 ```yaml
 model:
   id: gpt2
-  adapter: hf_gpt2
+  adapter: hf_causal
 
 dataset:
   provider: { kind: hf_text }

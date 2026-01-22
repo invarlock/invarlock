@@ -1,7 +1,7 @@
 """
 Comprehensive test coverage for invarlock.reporting.certificate module.
 
-Tests for safety certificate generation, validation, and rendering.
+Tests for evaluation certificate generation, validation, and rendering.
 """
 
 import copy
@@ -102,7 +102,7 @@ def create_mock_run_report(
     report = {
         "meta": {
             "model_id": model_id,
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "device": "cpu",
             "ts": "2023-10-01T12:00:00",
             "commit": "abcd1234567890abcdef",
@@ -110,11 +110,11 @@ def create_mock_run_report(
             "seeds": {"python": 42, "numpy": 42, "torch": 42},
             "plugins": {
                 "adapter": {
-                    "name": "hf_gpt2",
-                    "module": "invarlock.adapters.hf_gpt2",
+                    "name": "hf_causal",
+                    "module": "invarlock.adapters.hf_causal",
                     "version": INVARLOCK_VERSION,
                     "available": True,
-                    "entry_point": "hf_gpt2",
+                    "entry_point": "hf_causal",
                     "entry_point_group": "invarlock.adapters",
                 },
                 "edit": {
@@ -1074,7 +1074,7 @@ class TestEffectivePoliciesAndResolution:
         report = {
             "meta": {
                 "model_id": "m",
-                "adapter": "hf_gpt2",
+                "adapter": "hf_causal",
                 "commit": "abc",
                 "ts": "2024",
             },
@@ -2063,7 +2063,7 @@ class TestRenderCertificateMarkdown:
 
         markdown = render_certificate_markdown(certificate)
 
-        assert "# InvarLock Safety Certificate" in markdown
+        assert "# InvarLock Evaluation Certificate" in markdown
         assert "test-model" in markdown
         assert "structured" in markdown
         assert "Overall Status:" in markdown
@@ -2138,7 +2138,7 @@ class TestRenderCertificateMarkdown:
         markdown = render_certificate_markdown(cert)
 
         assert "Quality Gates" in markdown
-        assert "Resolved Policy" in markdown
+        assert "Policy Configuration" in markdown
 
     def test_render_markdown_includes_guard_overhead_details(self):
         report = create_mock_run_report()
@@ -2174,7 +2174,7 @@ class TestRenderCertificateMarkdown:
         markdown = render_certificate_markdown(certificate)
         # Guard Overhead section may be omitted if normalization dropped the measure
         assert ("Guard Overhead" in markdown) or ("Executive Summary" in markdown)
-        assert "## Inference" in markdown
+        assert "Inference Diagnostics" in markdown
 
     def test_render_markdown_includes_basis_and_spectral_tables(self):
         report = create_mock_run_report()
@@ -2209,7 +2209,7 @@ class TestRenderCertificateMarkdown:
             "| Gate | Status | Measured | Threshold | Basis | Description |" in markdown
         )
         assert "> *Basis:" in markdown
-        assert "| Family | q95 | q99 | Max | Samples |" in markdown
+        assert "| Family | κ | q95 | Max |z| | Violations |" in markdown
         assert "Top |z| per family:" in markdown
 
     def test_render_markdown_with_invariant_failures(self):
@@ -2244,7 +2244,7 @@ class TestRenderCertificateMarkdown:
 
         markdown = render_certificate_markdown(certificate)
 
-        assert "## Resolved Policy" in markdown
+        assert "## Policy Configuration" in markdown
         assert "```yaml" in markdown
         assert "spectral:" in markdown
 
@@ -2373,7 +2373,7 @@ class TestRenderCertificateMarkdown:
 
         markdown = render_certificate_markdown(certificate)
         # Generic edit paths may vary; ensure certificate header renders
-        assert "# InvarLock Safety Certificate" in markdown
+        assert "# InvarLock Evaluation Certificate" in markdown
 
     # Low-rank branch tests removed (no low-rank edit in this profile)
 
@@ -2480,7 +2480,7 @@ class TestRenderCertificateMarkdown:
         markdown = render_certificate_markdown(certificate)
 
         assert "Spectral Guard" in markdown
-        assert "| Family | κ | Violations |" in markdown
+        assert "| Family | κ | q95 | Max |z| | Violations |" in markdown
         assert "Top |z| per family" in markdown
         assert "| Family | ε_f | Bare | Guarded |" in markdown
         assert "Bare Primary Metric: 118.000" in markdown
@@ -2920,7 +2920,7 @@ class TestIntegrationAndEdgeCases:
             # Render to markdown
             markdown = render_certificate_markdown(certificate)
             assert len(markdown) > 100
-            assert "InvarLock Safety Certificate" in markdown
+            assert "InvarLock Evaluation Certificate" in markdown
 
     def test_certificate_with_edge_case_values(self):
         """Test certificate creation with edge case values."""

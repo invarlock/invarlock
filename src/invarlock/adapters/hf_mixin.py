@@ -490,18 +490,39 @@ class HFAdapterMixin:
         """Return mapping of tied parameter names to source parameter names."""
 
         tying: dict[str, str] = {}
-        param_names = set(dict(model.named_parameters()).keys())
+        try:
+            named = model.named_parameters(remove_duplicate=False)  # type: ignore[call-arg]
+        except TypeError:  # pragma: no cover - torch version dependent
+            named = model.named_parameters()
+        params = dict(named)
 
-        if "lm_head.weight" in param_names and "transformer.wte.weight" in param_names:
+        def _is_tied(name_a: str, name_b: str) -> bool:
+            a = params.get(name_a)
+            b = params.get(name_b)
+            if a is None or b is None:
+                return False
+            try:
+                if a is b:
+                    return True
+                if hasattr(a, "data_ptr") and hasattr(b, "data_ptr"):
+                    return int(a.data_ptr()) == int(b.data_ptr())
+            except Exception:
+                return False
+            return False
+
+        if _is_tied("lm_head.weight", "transformer.wte.weight"):
             tying["lm_head.weight"] = "transformer.wte.weight"
 
+        if _is_tied("lm_head.weight", "model.embed_tokens.weight"):
+            tying["lm_head.weight"] = "model.embed_tokens.weight"
+
         decoder_name = "cls.predictions.decoder.weight"
-        if decoder_name in param_names:
+        if decoder_name in params:
             for candidate in (
                 "bert.embeddings.word_embeddings.weight",
                 "embeddings.word_embeddings.weight",
             ):
-                if candidate in param_names:
+                if _is_tied(decoder_name, candidate):
                     tying[decoder_name] = candidate
                     break
 

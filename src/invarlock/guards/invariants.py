@@ -5,6 +5,7 @@ InvarLock Guards - Invariants
 Invariant checking for model edits to ensure structural integrity.
 """
 
+import hashlib
 from typing import Any
 
 import torch
@@ -33,6 +34,7 @@ class InvariantsGuard(Guard):
         self.on_fail = on_fail
         self.prepared = False
         self.baseline_checks: dict[str, Any] = {}
+        self.last_current_checks: dict[str, Any] = {}
         self.profile_checks: tuple[str, ...] = ()
 
     def prepare(
@@ -102,6 +104,10 @@ class InvariantsGuard(Guard):
             "action": outcome.action,
             "violations": outcome.violations,
             "metrics": outcome.metrics,
+            "details": {
+                "baseline_checks": self.baseline_checks,
+                "current_checks": self.last_current_checks,
+            },
         }
 
     def finalize(self, model: Any) -> GuardOutcome:
@@ -125,6 +131,7 @@ class InvariantsGuard(Guard):
 
         # Check current invariants
         current_checks = self._capture_invariants(model, None)
+        self.last_current_checks = current_checks
         violations: list[dict[str, Any]] = []
         tokenizer_mismatches: list[dict[str, Any]] = []
 
@@ -354,14 +361,14 @@ class InvariantsGuard(Guard):
         except Exception:
             pass
 
-        # LLaMA style (model.embed_tokens <-> lm_head)
+        # Decoder embed_tokens style (model.embed_tokens <-> lm_head)
         try:
-            llama_model = getattr(model, "model", None)
-            embed_tokens = getattr(llama_model, "embed_tokens", None)
+            decoder_model = getattr(model, "model", None)
+            embed_tokens = getattr(decoder_model, "embed_tokens", None)
             embed_weight = getattr(embed_tokens, "weight", None)
-            llama_head_weight = getattr(getattr(model, "lm_head", None), "weight", None)
-            if embed_weight is not None and llama_head_weight is not None:
-                weight_tying_flags["llama"] = _is_tied(embed_weight, llama_head_weight)
+            head_weight = getattr(getattr(model, "lm_head", None), "weight", None)
+            if embed_weight is not None and head_weight is not None:
+                weight_tying_flags["embed_tokens"] = _is_tied(embed_weight, head_weight)
         except Exception:
             pass
 
@@ -376,8 +383,10 @@ class InvariantsGuard(Guard):
             structure_items = []
             for name, module in model.named_modules():
                 structure_items.append(f"{name}:{type(module).__name__}")
-            structure_hash = hash(tuple(structure_items))
-            checks["structure_hash"] = structure_hash
+            canonical = "\n".join(sorted(structure_items))
+            checks["structure_hash"] = hashlib.sha256(
+                canonical.encode("utf-8")
+            ).hexdigest()[:16]
         except Exception:
             checks["structure_hash"] = 0
 
@@ -424,7 +433,7 @@ class InvariantsGuard(Guard):
             return "bert" in model_type or has_cls_decoder
 
         if name in {"rope_rotary_embedding", "rotary_embedding"}:
-            # Detect rotary embeddings used by LLaMA-style models
+            # Detect rotary embeddings used by RoPE-style models
             if hasattr(model, "model") and hasattr(model.model, "layers"):
                 first_layer = model.model.layers[0] if model.model.layers else None
             else:
@@ -443,7 +452,7 @@ class InvariantsGuard(Guard):
             model_type = getattr(config, "model_type", "") if config else ""
             return any(
                 keyword in model_type
-                for keyword in ("gpt", "llama", "mistral", "opt", "phi")
+                for keyword in ("gpt", "mistral", "mixtral", "qwen", "opt", "phi")
             )
 
         return True

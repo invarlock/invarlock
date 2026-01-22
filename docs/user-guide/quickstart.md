@@ -1,9 +1,20 @@
 # InvarLock Quickstart Guide
 
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Get started with InvarLock certification in minutes. |
+| **Audience** | New users running their first certification. |
+| **Requires** | `invarlock[hf]` for HF adapter workflows. |
+| **Network** | `INVARLOCK_ALLOW_NETWORK=1` for model/dataset downloads. |
+| **Next step** | [Compare & Certify](compare-and-certify.md) for production workflows. |
+
 This guide helps you get started with InvarLock (Edit‑agnostic robustness certificates for weight edits)
 quickly. Every run flows through the **GuardChain**
 (invariants → spectral → RMT → variance) and produces a machine-readable safety
 certificate with drift, guard-overhead, and policy digests.
+If any terms are unfamiliar, see the [Glossary](../assurance/glossary.md).
 
 Note: For installation and environment setup, see Getting Started. This page focuses on core commands and workflow.
 
@@ -74,7 +85,7 @@ invarlock report --run runs/20240118_143022 --format json
 # Generate all formats
 invarlock report --run runs/20240118_143022 --format all
 
-# Generate safety certificate (requires baseline)
+# Generate evaluation certificate (requires baseline)
 invarlock report --run runs/20240118_143022 --format cert --baseline runs/baseline
 ```
 
@@ -108,7 +119,7 @@ Create a YAML configuration file:
 ```yaml
 model:
   id: "gpt2"
-  adapter: "hf_gpt2"
+  adapter: "hf_causal"
   device: "auto"  # mirrors the CLI default (--device auto)
 
 dataset:
@@ -135,9 +146,10 @@ etc.) when validating portability or troubleshooting driver issues.
 
 - See [CLI Reference](../reference/cli.md) for detailed command options
 - Check [Configuration Schema](../reference/config-schema.md) for all config options
-- Review [Certificate Schema](../reference/certificate-schema.md) for validation details
+- Review [Certificates](../reference/certificates.md) for schema and validation details
 - See [Reading a Certificate](reading-certificate.md) for guidance
- - Read the [Device Support note](getting-started.md#device-support) if you plan to run on CPU or Apple Silicon.
+- Read the [Device Support note](getting-started.md#device-support) if you plan to run on CPU or Apple Silicon
+- Learn about [Guard Contracts](../assurance/04-guard-contracts.md) for guard behavior details
 
 > Note: presets and the tiny-matrix script are repo-first assets (not shipped in wheels)
 > Clone the repository if you want to reference presets under `configs/` or use the matrix script

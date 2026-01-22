@@ -29,7 +29,7 @@ def test_to_certificate_json_and_markdown(tmp_path) -> None:
     js = to_certificate(rp, base, format="json")
     assert "schema_version" in js
     md = to_certificate(rp, base, format="markdown")
-    assert "Safety Certificate" in md
+    assert "Evaluation Certificate" in md
 
 
 def test_to_certificate_unsupported_format(tmp_path) -> None:

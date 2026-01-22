@@ -25,7 +25,7 @@ def _mock_report_with_primary_metric() -> dict[str, Any]:
     report = {
         "meta": {
             "model_id": "m",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "device": "cpu",
             "seed": 42,
             "seeds": {"python": 42, "numpy": 42, "torch": 42},

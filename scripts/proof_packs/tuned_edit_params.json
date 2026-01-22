@@ -1,0 +1,195 @@
+{
+  "_meta": {
+    "generated_at": "2026-01-21T20:28:07Z",
+    "notes": "Tuned clean edit parameters for proof-pack clean scenarios. Only the fields consumed by proof-pack scripts are included; host-specific paths are omitted.",
+    "schema": "tuned_edit_params_v1"
+  },
+  "models": {
+    "01-ai/Yi-34B": {
+      "fp8_quant": {
+        "edit_dir_name": "fp8_e5m2_clean",
+        "format": "e5m2",
+        "reason": "selected_by_certify_pass:e5m2_ffn",
+        "scope": "ffn",
+        "status": "selected"
+      },
+      "lowrank_svd": {
+        "edit_dir_name": "svd_rank32_l31_clean",
+        "rank": 32,
+        "reason": "selected_by_certify_pass:rank32_ffn_layer31",
+        "scope": "ffn@layer=31",
+        "status": "selected"
+      },
+      "magnitude_prune": {
+        "edit_dir_name": "prune_12pct_clean",
+        "reason": "selected_by_certify_pass:sparsity120_ffn",
+        "scope": "ffn",
+        "sparsity": 0.12,
+        "status": "selected"
+      },
+      "quant_rtn": {
+        "bits": 4,
+        "edit_dir_name": "quant_4bit_clean",
+        "group_size": 32,
+        "reason": "selected_by_certify_pass:bits4_g32_ffn",
+        "scope": "ffn",
+        "status": "selected"
+      }
+    },
+    "Qwen/Qwen1.5-72B": {
+      "fp8_quant": {
+        "edit_dir_name": "fp8_e5m2_clean",
+        "format": "e5m2",
+        "reason": "selected_by_certify_pass:e5m2_ffn",
+        "scope": "ffn",
+        "status": "selected"
+      },
+      "lowrank_svd": {
+        "edit_dir_name": "svd_rank32_l31_clean",
+        "rank": 32,
+        "reason": "selected_by_certify_pass:rank32_ffn_layer31",
+        "scope": "ffn@layer=31",
+        "status": "selected"
+      },
+      "magnitude_prune": {
+        "edit_dir_name": "prune_12pct_clean",
+        "reason": "selected_by_certify_pass:sparsity120_ffn",
+        "scope": "ffn",
+        "sparsity": 0.12,
+        "status": "selected"
+      },
+      "quant_rtn": {
+        "bits": 4,
+        "edit_dir_name": "quant_4bit_clean",
+        "group_size": 32,
+        "reason": "selected_by_certify_pass:bits4_g32_ffn",
+        "scope": "ffn",
+        "status": "selected"
+      }
+    },
+    "Qwen/Qwen2.5-14B": {
+      "fp8_quant": {
+        "edit_dir_name": "fp8_e5m2_clean",
+        "format": "e5m2",
+        "reason": "selected_by_certify_pass:e5m2_ffn",
+        "scope": "ffn",
+        "status": "selected"
+      },
+      "lowrank_svd": {
+        "edit_dir_name": "svd_rank32_l31_clean",
+        "rank": 32,
+        "reason": "selected_by_certify_pass:rank32_ffn_layer31",
+        "scope": "ffn@layer=31",
+        "status": "selected"
+      },
+      "magnitude_prune": {
+        "edit_dir_name": "prune_12pct_clean",
+        "reason": "selected_by_certify_pass:sparsity120_ffn",
+        "scope": "ffn",
+        "sparsity": 0.12,
+        "status": "selected"
+      },
+      "quant_rtn": {
+        "bits": 4,
+        "edit_dir_name": "quant_4bit_clean",
+        "group_size": 32,
+        "reason": "selected_by_certify_pass:bits4_g32_ffn",
+        "scope": "ffn",
+        "status": "selected"
+      }
+    },
+    "Qwen/Qwen2.5-32B": {
+      "fp8_quant": {
+        "edit_dir_name": "fp8_e5m2_clean",
+        "format": "e5m2",
+        "reason": "selected_by_certify_pass:e5m2_ffn",
+        "scope": "ffn",
+        "status": "selected"
+      },
+      "lowrank_svd": {
+        "edit_dir_name": "svd_rank32_l31_clean",
+        "rank": 32,
+        "reason": "selected_by_certify_pass:rank32_ffn_layer31",
+        "scope": "ffn@layer=31",
+        "status": "selected"
+      },
+      "magnitude_prune": {
+        "edit_dir_name": "prune_12pct_clean",
+        "reason": "selected_by_certify_pass:sparsity120_ffn",
+        "scope": "ffn",
+        "sparsity": 0.12,
+        "status": "selected"
+      },
+      "quant_rtn": {
+        "bits": 4,
+        "edit_dir_name": "quant_4bit_clean",
+        "group_size": 32,
+        "reason": "selected_by_certify_pass:bits4_g32_ffn",
+        "scope": "ffn",
+        "status": "selected"
+      }
+    },
+    "mistralai/Mistral-7B-v0.1": {
+      "fp8_quant": {
+        "edit_dir_name": "fp8_e5m2_clean",
+        "format": "e5m2",
+        "reason": "selected_by_certify_pass:e5m2_ffn",
+        "scope": "ffn",
+        "status": "selected"
+      },
+      "lowrank_svd": {
+        "edit_dir_name": "svd_rank32_l31_clean",
+        "rank": 32,
+        "reason": "selected_by_certify_pass:rank32_ffn_layer15",
+        "scope": "ffn@layer=15",
+        "status": "selected"
+      },
+      "magnitude_prune": {
+        "edit_dir_name": "prune_12pct_clean",
+        "reason": "selected_by_certify_pass:sparsity120_ffn",
+        "scope": "ffn",
+        "sparsity": 0.12,
+        "status": "selected"
+      },
+      "quant_rtn": {
+        "bits": 4,
+        "edit_dir_name": "quant_4bit_clean",
+        "group_size": 32,
+        "reason": "selected_by_certify_pass:bits4_g32_ffn",
+        "scope": "ffn",
+        "status": "selected"
+      }
+    },
+    "mistralai/Mixtral-8x7B-v0.1": {
+      "fp8_quant": {
+        "edit_dir_name": "fp8_e5m2_clean",
+        "format": "e5m2",
+        "reason": "selected_by_certify_pass:e5m2_ffn",
+        "scope": "ffn",
+        "status": "selected"
+      },
+      "lowrank_svd": {
+        "edit_dir_name": "svd_rank32_l31_clean",
+        "rank": 32,
+        "reason": "selected_by_certify_pass:rank32_ffn_layer31",
+        "scope": "ffn@layer=31",
+        "status": "selected"
+      },
+      "magnitude_prune": {
+        "edit_dir_name": "prune_12pct_clean",
+        "reason": "selected_by_certify_pass:sparsity120_ffn",
+        "scope": "ffn",
+        "sparsity": 0.12,
+        "status": "selected"
+      },
+      "quant_rtn": {
+        "bits": 4,
+        "edit_dir_name": "quant_4bit_clean",
+        "group_size": 32,
+        "reason": "selected_by_certify_pass:bits4_g32_ffn",
+        "scope": "ffn",
+        "status": "selected"
+      }
+    }
+  }
+}

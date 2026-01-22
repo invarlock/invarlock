@@ -81,7 +81,7 @@ def test_run_edit_name_missing_exits(
         """
         model:
           id: gpt2
-          adapter: hf_gpt2
+          adapter: hf_causal
         dataset:
           provider: wikitext2
           seq_len: 8
@@ -124,7 +124,7 @@ def test_run_command_missing_torch_shows_extra_hint(
         """
         model:
           id: gpt2
-          adapter: hf_gpt2
+          adapter: hf_causal
         edit:
           name: quant_rtn
         dataset:
@@ -165,7 +165,7 @@ def test_run_baseline_schedule_absent_release_exits(
         """
         model:
           id: gpt2
-          adapter: hf_gpt2
+          adapter: hf_causal
         edit:
           name: quant_rtn
         dataset:
@@ -207,7 +207,7 @@ def test_run_baseline_schedule_mismatch_release_exits(
         """
         model:
           id: gpt2
-          adapter: hf_gpt2
+          adapter: hf_causal
         edit:
           name: quant_rtn
         dataset:
@@ -265,7 +265,7 @@ def test_run_device_validation_error_exits(
         """
         model:
           id: gpt2
-          adapter: hf_gpt2
+          adapter: hf_causal
         edit:
           name: quant_rtn
         dataset:

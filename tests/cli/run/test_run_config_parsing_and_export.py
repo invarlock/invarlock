@@ -119,7 +119,7 @@ class _Cfg:
         edit_parameters: object | None = None,
         output: dict[str, object] | None = None,
     ) -> None:
-        self.model = SimpleNamespace(id="gpt2", adapter="hf_gpt2", device="cpu")
+        self.model = SimpleNamespace(id="gpt2", adapter="hf_causal", device="cpu")
         self.edit = SimpleNamespace(name="quant_rtn", plan=(edit_plan or {}))
         if edit_parameters is not None:
             self.edit.parameters = edit_parameters
@@ -186,9 +186,13 @@ class _Cfg:
         }
 
 
-def _run_with_common_patches(*, cfg: _Cfg, exec_stub, post_stub, extra_patches=()):
+def _run_with_common_patches(
+    *, cfg: _Cfg, exec_stub, post_stub, extra_patches=(), run_kwargs=None
+):
+    run_kwargs = run_kwargs or {}
+
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def load_model(self, model_id: str, device: str | None = None):  # noqa: ARG002
             return object()
@@ -239,6 +243,7 @@ def _run_with_common_patches(*, cfg: _Cfg, exec_stub, post_stub, extra_patches=(
             profile=None,
             out=str(cfg.output.dir),
             until_pass=False,
+            **run_kwargs,
         )
 
 
@@ -425,6 +430,56 @@ def test_run_command_extracts_edit_config_from_plan_and_parameters(
     assert captured[2] == {"delta": 4}
 
 
+def test_run_command_writes_telemetry_report(tmp_path: Path) -> None:
+    def resolver(*_a, **_k):
+        return (
+            SimpleNamespace(
+                windows=lambda **kw: _provider_windows(
+                    int(kw.get("preview_n", 0) or 0), int(kw.get("final_n", 0) or 0)
+                )
+            ),
+            "validation",
+            False,
+        )
+
+    def exec_stub(**kwargs):  # noqa: ANN001
+        report = _core_report(evaluation_windows={})
+        report.metrics["timings"] = {"guards": 0.1}
+        report.metrics["memory_mb_peak"] = 12.0
+        return report, kwargs.get("model")
+
+    def post_stub(**kwargs):  # noqa: ANN001
+        return {"json": str(tmp_path / "report.json")}
+
+    cfg = _Cfg(
+        outdir=tmp_path / "runs",
+        dataset_provider="synthetic",
+        edit_plan={},
+    )
+
+    extra = (
+        patch("invarlock.cli.commands.run._resolve_provider_and_split", resolver),
+        patch(
+            "invarlock.eval.data.get_provider",
+            lambda *_a, **_k: SimpleNamespace(
+                windows=lambda **_kw: _provider_windows(1, 1)
+            ),
+        ),
+    )
+    _run_with_common_patches(
+        cfg=cfg,
+        exec_stub=exec_stub,
+        post_stub=post_stub,
+        extra_patches=extra,
+        run_kwargs={"telemetry": True, "timing": True},
+    )
+
+    telemetry_files = list((tmp_path / "runs").rglob("telemetry.json"))
+    assert telemetry_files, "telemetry.json was not written"
+    payload = json.loads(telemetry_files[0].read_text(encoding="utf-8"))
+    assert payload["timings"]["guards"] == 0.1
+
+
 def test_run_command_baseline_token_counts_provider_parity_export_and_classification(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -459,7 +514,7 @@ def test_run_command_baseline_token_counts_provider_parity_export_and_classifica
     )
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def load_model(self, model_id: str, device: str | None = None):  # noqa: ARG002
             return object()
@@ -600,7 +655,7 @@ def test_run_command_classification_pseudo_counts_and_export_env_dir(
     captured: dict[str, object] = {}
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def load_model(self, model_id: str, device: str | None = None):  # noqa: ARG002
             return object()
@@ -730,7 +785,7 @@ def test_run_command_until_pass_auto_tune_head_budget_paths(tmp_path: Path) -> N
     )
 
     class Adapter:
-        name = "hf_gpt2"
+        name = "hf_causal"
 
         def load_model(self, model_id: str, device: str | None = None):  # noqa: ARG002
             return object()

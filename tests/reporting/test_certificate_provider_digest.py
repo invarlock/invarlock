@@ -8,7 +8,7 @@ def test_certificate_includes_provider_digest_in_provenance():
     report = {
         "meta": {
             "model_id": "gpt2",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "device": "cpu",
             "seed": 42,
             "ts": "now",
@@ -71,4 +71,4 @@ def test_certificate_includes_provider_digest_in_provenance():
     cert = make_certificate(report, baseline)
     # Provider digest may be omitted after normalization; rendering should still succeed
     md = render_certificate_markdown(cert)
-    assert "# InvarLock Safety Certificate" in md
+    assert "# InvarLock Evaluation Certificate" in md

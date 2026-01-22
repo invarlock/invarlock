@@ -16,25 +16,27 @@ nav:
       - Configuration Gallery: user-guide/config-gallery.md
       - Example Reports: user-guide/example-reports.md
       - Reading a Certificate: user-guide/reading-certificate.md
-      - B200 Validation: user-guide/b200-validation.md
+      - Proof Packs: user-guide/proof-packs.md
+      - Proof Pack Internals: user-guide/proof-packs-internals.md
   - CLI Reference:
       - CLI Overview: reference/cli.md
   - Reference:
+      - Index: reference/index.md
+      - Architecture: reference/architecture.md
       - API Guide: reference/api-guide.md
       - Programmatic Quickstart: reference/programmatic-quickstart.md
       - Guards: reference/guards.md
-      - GPU/MPS-First Guards (Decision Memo): reference/gpu-mps-first-guards.md
+      - Certificates: reference/certificates.md
       - Environment Variables: reference/env-vars.md
       - Model Adapters: reference/model-adapters.md
-      - Exporting Certificates (HTML): reference/exporting-certificates-html.md
-      - Certificate Schema (v1): reference/certificate-schema.md
-      - Certificate Telemetry: reference/certificate_telemetry.md
       - Configuration Schema: reference/config-schema.md
       - Tier Policy Catalog: reference/tier-policy-catalog.md
       - Datasets: reference/datasets.md
       - Artifact Layout: reference/artifacts.md
+      - Observability: reference/observability.md
   - Assurance:
       - Safety Case: assurance/00-safety-case.md
+      - Glossary: assurance/glossary.md
       # Merged into Evaluation Math
       - Evaluation Math: assurance/01-eval-math-proof.md
       - Coverage & Pairing Plan: assurance/02-coverage-and-pairing.md
@@ -48,6 +50,7 @@ nav:
       - Guard Overhead Method: assurance/10-guard-overhead-method.md
       - Policy Provenance & Digest: assurance/11-policy-provenance.md
       - Device Drift Bands: assurance/12-device-drift-bands.md
+      - GPU/MPS-First Guards: assurance/13-gpu-mps-first-guards.md
   - Security:
       - Best Practices: security/best-practices.md
       - Threat Model: security/threat-model.md

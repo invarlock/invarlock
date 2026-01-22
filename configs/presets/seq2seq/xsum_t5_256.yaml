@@ -2,7 +2,7 @@
 
 model:
   id: "t5-small"
-  adapter: "hf_t5"
+  adapter: "hf_seq2seq"
   device: "auto"
 
 dataset:

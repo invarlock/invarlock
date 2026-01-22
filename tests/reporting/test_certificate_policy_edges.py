@@ -9,7 +9,7 @@ def _mk_report_with_tokens(
     return {
         "meta": {
             "model_id": "gpt2",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "device": "cpu",
             "seed": 42,
             "ts": "now",

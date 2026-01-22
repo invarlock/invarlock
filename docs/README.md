@@ -1,4 +1,4 @@
-# InvarLock Documentation (0.3.6)
+# InvarLock Documentation (0.3.7)
 
 The OSS core is edit‑agnostic (BYOE). A small built‑in quantization demo
 (`quant_rtn`, 8‑bit) exists for CI/quickstart. See
@@ -49,20 +49,28 @@ Tip: enable Hub downloads per command when fetching models/datasets:
 - [Configuration Gallery](user-guide/config-gallery.md)
 - [Example Reports](user-guide/example-reports.md)
 - [Reading a Certificate](user-guide/reading-certificate.md)
+- [Troubleshooting](user-guide/troubleshooting.md) — Error codes and common fixes
+- [Plugins](user-guide/plugins.md) — Extending adapters and guards
+- [Bring Your Own Data](user-guide/bring-your-own-data.md) — Custom datasets
+- [Proof Packs](user-guide/proof-packs.md) — Validation suite bundles
+- [Proof Packs Internals](user-guide/proof-packs-internals.md) — Suite architecture
 
 ### Reference
 
+- [Reference Index](reference/index.md)
 - [CLI Reference](reference/cli.md)
+- [Calibration CLI](reference/calibration.md) — `invarlock calibrate` for tier policy sweeps
 - [Configuration Schema](reference/config-schema.md)
 - [Guards](reference/guards.md)
-- [GPU/MPS-First Guards (Decision Memo)](reference/gpu-mps-first-guards.md)
 - [Model Adapters](reference/model-adapters.md)
-- [Exporting Certificates (HTML)](reference/exporting-certificates-html.md)
-- [Certificate Schema (v1)](reference/certificate-schema.md)
-- [Certificate Telemetry](reference/certificate_telemetry.md)
+- [Certificates](reference/certificates.md) — Schema, telemetry, and HTML export
 - [Tier Policy Catalog (runtime tiers.yaml)](reference/tier-policy-catalog.md)
 - [Datasets](reference/datasets.md)
 - [Artifact Layout](reference/artifacts.md)
+- [Observability](reference/observability.md)
+- [API Guide](reference/api-guide.md)
+- [Programmatic Quickstart](reference/programmatic-quickstart.md)
+- [Environment Variables](reference/env-vars.md)
 
 <!-- Runbooks removed in minimal OSS footprint -->
 
@@ -83,6 +91,7 @@ Tip: enable Hub downloads per command when fetching models/datasets:
 - [Guard Overhead Method](assurance/10-guard-overhead-method.md)
 - [Policy Provenance & Digest](assurance/11-policy-provenance.md)
 - [Device Drift Bands](assurance/12-device-drift-bands.md)
+- [GPU/MPS-First Guards (Decision Memo)](assurance/13-gpu-mps-first-guards.md)
 
 Note: Every safety claim is backed by automated tests and cross-referenced in
 the docs. See Guard Contracts → Coverage Reference
@@ -97,6 +106,9 @@ to change proposals or releases when you update calibration.
 
 ### Security
 
+- [Threat Model](security/threat-model.md) — Assets and adversaries
+- [Security Architecture](security/architecture.md) — Components and defaults
+- [Best Practices](security/best-practices.md) — Operational recommendations
 - [pip-audit Allowlist](security/pip-audit-allowlist.md)
 
 ### Governance
@@ -192,7 +204,7 @@ invarlock verify reports/cert/evaluation.cert.json
 ```yaml
 model:
   id: gpt2
-  adapter: hf_gpt2
+  adapter: hf_causal
   device: auto
 dataset:
   provider: wikitext2
