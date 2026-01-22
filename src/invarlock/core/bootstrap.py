@@ -6,7 +6,7 @@ Numerically stable bootstrap helpers for evaluation metrics.
 
 This module provides bias-corrected and accelerated (BCa) confidence
 intervals tailored for paired log-loss statistics used by the runner
-and safety certificate reports.
+and evaluation certificate reports.
 """
 
 from __future__ import annotations

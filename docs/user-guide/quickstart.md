@@ -85,7 +85,7 @@ invarlock report --run runs/20240118_143022 --format json
 # Generate all formats
 invarlock report --run runs/20240118_143022 --format all
 
-# Generate safety certificate (requires baseline)
+# Generate evaluation certificate (requires baseline)
 invarlock report --run runs/20240118_143022 --format cert --baseline runs/baseline
 ```
 

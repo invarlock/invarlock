@@ -53,7 +53,7 @@ def test_quality_overhead_ppl_ratio_shows():
 
     # quality_overhead may be omitted; markdown should still render
     md = render_certificate_markdown(cert)
-    assert "# InvarLock Safety Certificate" in md
+    assert "# InvarLock Evaluation Certificate" in md
 
 
 def test_quality_overhead_accuracy_delta_near_zero():
@@ -98,4 +98,4 @@ def test_quality_overhead_accuracy_delta_near_zero():
         cert = make_certificate(report, baseline)
 
     md = render_certificate_markdown(cert)
-    assert "# InvarLock Safety Certificate" in md
+    assert "# InvarLock Evaluation Certificate" in md

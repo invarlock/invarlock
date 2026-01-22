@@ -89,7 +89,7 @@ def test_to_certificate_and_save_report(tmp_path: Path, monkeypatch) -> None:
     cert_json = to_certificate(report, base, format="json")
     assert json.loads(cert_json)["schema_version"]
     cert_md = to_certificate(report, base, format="markdown")
-    assert "Safety Certificate" in cert_md
+    assert "Evaluation Certificate" in cert_md
 
     # save_report without baseline for cert should error
     out = tmp_path / "out"
