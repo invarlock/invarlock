@@ -165,7 +165,7 @@ def test_render_certificate_markdown_full_envelope() -> None:
     # Render
     md = render_certificate_markdown(cert)
     # Sanity check headings
-    assert "InvarLock Safety Certificate" in md
+    assert "InvarLock Evaluation Certificate" in md
     assert "Executive Summary" in md
     assert "Primary Metric" in md
     assert "System Overhead" in md

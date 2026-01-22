@@ -70,7 +70,7 @@ reports/
 | Artifact | Why archive | Required for verify |
 | --- | --- | --- |
 | `report.json` (baseline + subject) | Metrics, windows, provenance | Yes |
-| `evaluation.cert.json` | Safety certificate snapshot | Yes |
+| `evaluation.cert.json` | Evaluation certificate snapshot | Yes |
 | `events.jsonl` | Debugging timeline | No |
 | `evaluation.html` | Human review | No |
 

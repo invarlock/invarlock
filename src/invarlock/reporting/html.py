@@ -52,7 +52,7 @@ def render_certificate_html(certificate: dict[str, Any]) -> str:
         body = f'<div class="invarlock-md">{html_body}</div>'
     return (
         '<!DOCTYPE html><html><head><meta charset="utf-8">'
-        "<title>InvarLock Safety Certificate</title>"
+        "<title>InvarLock Evaluation Certificate</title>"
         "<style>"
         ":root{--pass:#2da44e;--fail:#cf222e;--warn:#bf8700;--ink:#1f2328;"
         "--muted:#57606a;--panel:#f6f8fa;--border:#d0d7de}"

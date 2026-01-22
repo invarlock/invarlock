@@ -87,7 +87,7 @@ def test_to_certificate_markdown_path():
         "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 100.0}},
     }
     md = to_certificate(rep, baseline, format="markdown")
-    assert isinstance(md, str) and "InvarLock Safety Certificate" in md
+    assert isinstance(md, str) and "InvarLock Evaluation Certificate" in md
 
 
 def test_validate_baseline_or_report_helper():

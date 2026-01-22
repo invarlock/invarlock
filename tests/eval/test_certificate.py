@@ -1,7 +1,7 @@
 """
 Comprehensive test coverage for invarlock.reporting.certificate module.
 
-Tests for safety certificate generation, validation, and rendering.
+Tests for evaluation certificate generation, validation, and rendering.
 """
 
 import copy
@@ -2063,7 +2063,7 @@ class TestRenderCertificateMarkdown:
 
         markdown = render_certificate_markdown(certificate)
 
-        assert "# InvarLock Safety Certificate" in markdown
+        assert "# InvarLock Evaluation Certificate" in markdown
         assert "test-model" in markdown
         assert "structured" in markdown
         assert "Overall Status:" in markdown
@@ -2373,7 +2373,7 @@ class TestRenderCertificateMarkdown:
 
         markdown = render_certificate_markdown(certificate)
         # Generic edit paths may vary; ensure certificate header renders
-        assert "# InvarLock Safety Certificate" in markdown
+        assert "# InvarLock Evaluation Certificate" in markdown
 
     # Low-rank branch tests removed (no low-rank edit in this profile)
 
@@ -2920,7 +2920,7 @@ class TestIntegrationAndEdgeCases:
             # Render to markdown
             markdown = render_certificate_markdown(certificate)
             assert len(markdown) > 100
-            assert "InvarLock Safety Certificate" in markdown
+            assert "InvarLock Evaluation Certificate" in markdown
 
     def test_certificate_with_edge_case_values(self):
         """Test certificate creation with edge case values."""
