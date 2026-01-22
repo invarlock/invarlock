@@ -20,11 +20,11 @@ test_create_pruned_model_invokes_python_wrapper() {
     source "${TEST_ROOT}/scripts/proof_packs/lib/model_creation.sh"
 
     local calls="${TEST_TMPDIR}/python.calls"
-    _cmd_python() { echo "python $*" >> "${calls}"; cat >/dev/null || true; return 0; }
+    _cmd_python() { echo "python $*" >> "${calls}"; return 0; }
 
     create_pruned_model "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/out/pruned" "0.1" "ffn" "0"
     assert_file_exists "${calls}" "python called"
-    assert_match "python - ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/pruned 0.1 ffn" "$(cat "${calls}")" "args passed via argv"
+    assert_match "python .*scripts/proof_packs/python/create_pruned_model\\.py ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/pruned 0.1 ffn" "$(cat "${calls}")" "args passed via argv"
 }
 
 test_create_pruned_model_returns_nonzero_when_parent_dir_is_file() {
@@ -33,7 +33,7 @@ test_create_pruned_model_returns_nonzero_when_parent_dir_is_file() {
     source "${TEST_ROOT}/scripts/proof_packs/lib/model_creation.sh"
 
     local calls="${TEST_TMPDIR}/python.calls"
-    _cmd_python() { echo "python $*" >> "${calls}"; cat >/dev/null || true; return 0; }
+    _cmd_python() { echo "python $*" >> "${calls}"; return 0; }
 
     local out_file="${TEST_TMPDIR}/out_file"
     echo "not a directory" > "${out_file}"
@@ -49,11 +49,11 @@ test_create_edited_model_quant_rtn_invokes_python_wrapper() {
     source "${TEST_ROOT}/scripts/proof_packs/lib/model_creation.sh"
 
     local calls="${TEST_TMPDIR}/python.calls"
-    _cmd_python() { echo "python $*" >> "${calls}"; cat >/dev/null || true; return 0; }
+    _cmd_python() { echo "python $*" >> "${calls}"; return 0; }
 
     create_edited_model "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/out/edited" "quant_rtn" "8" "128" "ffn" "0"
     assert_file_exists "${calls}" "python called for quant_rtn"
-    assert_match "python - ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/edited 8 128 ffn" "$(cat "${calls}")" "args passed via argv"
+    assert_match "python .*scripts/proof_packs/python/create_quant_rtn_model\\.py ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/edited 8 128 ffn" "$(cat "${calls}")" "args passed via argv"
 }
 
 test_create_lowrank_model_invokes_python_wrapper() {
@@ -62,11 +62,11 @@ test_create_lowrank_model_invokes_python_wrapper() {
     source "${TEST_ROOT}/scripts/proof_packs/lib/model_creation.sh"
 
     local calls="${TEST_TMPDIR}/python.calls"
-    _cmd_python() { echo "python $*" >> "${calls}"; cat >/dev/null || true; return 0; }
+    _cmd_python() { echo "python $*" >> "${calls}"; return 0; }
 
     create_lowrank_model "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/out/lowrank" "256" "ffn" "0"
     assert_file_exists "${calls}" "python called for lowrank"
-    assert_match "python - ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/lowrank 256 ffn" "$(cat "${calls}")" "args passed via argv"
+    assert_match "python .*scripts/proof_packs/python/create_lowrank_model\\.py ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/lowrank 256 ffn" "$(cat "${calls}")" "args passed via argv"
 }
 
 test_create_fp8_model_invokes_python_wrapper() {
@@ -75,11 +75,11 @@ test_create_fp8_model_invokes_python_wrapper() {
     source "${TEST_ROOT}/scripts/proof_packs/lib/model_creation.sh"
 
     local calls="${TEST_TMPDIR}/python.calls"
-    _cmd_python() { echo "python $*" >> "${calls}"; cat >/dev/null || true; return 0; }
+    _cmd_python() { echo "python $*" >> "${calls}"; return 0; }
 
     create_fp8_model "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/out/fp8" "e4m3fn" "ffn" "0"
     assert_file_exists "${calls}" "python called for fp8"
-    assert_match "python - ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/fp8 e4m3fn ffn" "$(cat "${calls}")" "args passed via argv"
+    assert_match "python .*scripts/proof_packs/python/create_fp8_model\\.py ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/fp8 e4m3fn ffn" "$(cat "${calls}")" "args passed via argv"
 }
 
 test_create_error_model_invokes_python_wrapper() {
@@ -88,11 +88,11 @@ test_create_error_model_invokes_python_wrapper() {
     source "${TEST_ROOT}/scripts/proof_packs/lib/model_creation.sh"
 
     local calls="${TEST_TMPDIR}/python.calls"
-    _cmd_python() { echo "python $*" >> "${calls}"; cat >/dev/null || true; return 0; }
+    _cmd_python() { echo "python $*" >> "${calls}"; return 0; }
 
     create_error_model "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/out/error" "nan_injection" "0"
     assert_file_exists "${calls}" "python called for error model"
-    assert_match "python - ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/error nan_injection" "$(cat "${calls}")" "args passed via argv"
+    assert_match "python .*scripts/proof_packs/python/create_error_model\\.py ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/error nan_injection" "$(cat "${calls}")" "args passed via argv"
 }
 
 test_create_model_variant_dispatches_and_rejects_unknown_type() {
@@ -101,11 +101,11 @@ test_create_model_variant_dispatches_and_rejects_unknown_type() {
     source "${TEST_ROOT}/scripts/proof_packs/lib/model_creation.sh"
 
     local calls="${TEST_TMPDIR}/python.calls"
-    _cmd_python() { echo "python $*" >> "${calls}"; cat >/dev/null || true; return 0; }
+    _cmd_python() { echo "python $*" >> "${calls}"; return 0; }
 
     create_model_variant "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/out/pruned" "magnitude_prune" "0.1" "" "ffn" "0"
     assert_file_exists "${calls}" "python called via create_model_variant"
-    assert_match "python - ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/pruned 0.1 ffn" "$(cat "${calls}")" "dispatch args passed via argv"
+    assert_match "python .*scripts/proof_packs/python/create_pruned_model\\.py ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/pruned 0.1 ffn" "$(cat "${calls}")" "dispatch args passed via argv"
 
     local rc=0
     if create_model_variant "/b" "${TEST_TMPDIR}/out/nope" "nope" "1" "2" "ffn" "0"; then
@@ -122,7 +122,7 @@ test_create_model_variant_dispatches_success_paths_for_other_edit_types() {
     source "${TEST_ROOT}/scripts/proof_packs/lib/model_creation.sh"
 
     local calls="${TEST_TMPDIR}/python.calls"
-    _cmd_python() { echo "python $*" >> "${calls}"; cat >/dev/null || true; return 0; }
+    _cmd_python() { echo "python $*" >> "${calls}"; return 0; }
 
     create_model_variant "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/out/quant" "quant_rtn" "8" "128" "ffn" "0"
     create_model_variant "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/out/fp8" "fp8_quant" "e4m3fn" "" "ffn" "0"
@@ -131,10 +131,10 @@ test_create_model_variant_dispatches_success_paths_for_other_edit_types() {
 
     local logged
     logged="$(cat "${calls}")"
-    assert_match "python - ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/quant 8 128 ffn" "${logged}" "quant_rtn dispatch calls python"
-    assert_match "python - ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/fp8 e4m3fn ffn" "${logged}" "fp8_quant dispatch calls python"
-    assert_match "python - ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/lowrank 256 ffn" "${logged}" "lowrank_svd dispatch calls python"
-    assert_match "python - ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/error nan_injection" "${logged}" "error_injection dispatch calls python"
+    assert_match "python .*scripts/proof_packs/python/create_quant_rtn_model\\.py ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/quant 8 128 ffn" "${logged}" "quant_rtn dispatch calls python"
+    assert_match "python .*scripts/proof_packs/python/create_fp8_model\\.py ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/fp8 e4m3fn ffn" "${logged}" "fp8_quant dispatch calls python"
+    assert_match "python .*scripts/proof_packs/python/create_lowrank_model\\.py ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/lowrank 256 ffn" "${logged}" "lowrank_svd dispatch calls python"
+    assert_match "python .*scripts/proof_packs/python/create_error_model\\.py ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/error nan_injection" "${logged}" "error_injection dispatch calls python"
 }
 
 test_create_model_variant_requires_params_for_each_edit_type() {
