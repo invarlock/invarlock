@@ -69,7 +69,7 @@ def test_adapter_family_warning_swallows_internal_errors(
         "plugins": {
             "adapter": {
                 "name": "hf",
-                "module": "invarlock.adapters.hf_gpt2",
+                "module": "invarlock.adapters.hf_causal",
                 "version": "0",
                 "provenance": {
                     "family": "hf",

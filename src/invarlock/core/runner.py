@@ -19,6 +19,11 @@ from typing import Any
 import numpy as np
 
 from invarlock.eval.tail_stats import evaluate_metric_tail
+from invarlock.observability.metrics import (
+    capture_memory_snapshot,
+    reset_peak_memory_stats,
+    summarize_memory_snapshots,
+)
 
 from .api import (
     EditLike,
@@ -190,6 +195,18 @@ class CoreRunner:
                     pass
 
         report.status = RunStatus.RUNNING.value
+        timings: dict[str, float] = {}
+        guard_timings: dict[str, float] = {}
+        memory_snapshots: list[dict[str, Any]] = []
+        total_start = time.perf_counter()
+
+        def _record_timing(key: str, start: float) -> None:
+            timings[key] = max(0.0, float(time.perf_counter() - start))
+
+        def _capture_memory(phase: str) -> None:
+            snapshot = capture_memory_snapshot(phase)
+            if snapshot:
+                memory_snapshots.append(snapshot)
 
         try:
             # Log start
@@ -205,40 +222,78 @@ class CoreRunner:
             )
 
             # Phase 1: Prepare (describe model, create checkpoint)
-            model_desc = self._prepare_phase(model, adapter, report)
+            reset_peak_memory_stats()
+            phase_start = time.perf_counter()
+            try:
+                model_desc = self._prepare_phase(model, adapter, report)
+            finally:
+                _record_timing("prepare", phase_start)
+                _capture_memory("prepare")
 
             # Phase 2: Prepare guards (must happen before edit)
-            self._prepare_guards_phase(
-                model,
-                adapter,
-                guards,
-                calibration_data,
-                report,
-                auto_config,
-                config,
-            )
+            reset_peak_memory_stats()
+            phase_start = time.perf_counter()
+            try:
+                self._prepare_guards_phase(
+                    model,
+                    adapter,
+                    guards,
+                    calibration_data,
+                    report,
+                    auto_config,
+                    config,
+                )
+            finally:
+                _record_timing("prepare_guards", phase_start)
+                _capture_memory("prepare_guards")
 
             # Phase 3: Apply edit
-            self._edit_phase(model, adapter, edit, model_desc, report, edit_config)
+            reset_peak_memory_stats()
+            phase_start = time.perf_counter()
+            try:
+                self._edit_phase(model, adapter, edit, model_desc, report, edit_config)
+            finally:
+                _record_timing("edit", phase_start)
+                _capture_memory("edit")
 
             # Phase 4: Run guards
-            guard_results = self._guard_phase(model, adapter, guards, report)
+            reset_peak_memory_stats()
+            phase_start = time.perf_counter()
+            try:
+                guard_results = self._guard_phase(
+                    model, adapter, guards, report, guard_timings=guard_timings
+                )
+            finally:
+                _record_timing("guards", phase_start)
+                _capture_memory("guards")
 
             # Phase 5: Evaluate final metrics
-            metrics = self._eval_phase(
-                model,
-                adapter,
-                calibration_data,
-                report,
-                preview_n,
-                final_n,
-                config,
-            )
+            reset_peak_memory_stats()
+            phase_start = time.perf_counter()
+            try:
+                metrics = self._eval_phase(
+                    model,
+                    adapter,
+                    calibration_data,
+                    report,
+                    preview_n,
+                    final_n,
+                    config,
+                )
+            finally:
+                _record_timing("eval", phase_start)
+                _capture_memory("eval")
 
             # Phase 6: Finalize or rollback
-            final_status = self._finalize_phase(
-                model, adapter, guard_results, metrics, config, report
-            )
+            reset_peak_memory_stats()
+            phase_start = time.perf_counter()
+            try:
+                final_status = self._finalize_phase(
+                    model, adapter, guard_results, metrics, config, report
+                )
+            finally:
+                _record_timing("finalize", phase_start)
+                _capture_memory("finalize")
 
             report.status = final_status
             report.meta["end_time"] = time.time()
@@ -260,6 +315,25 @@ class CoreRunner:
             return report
 
         finally:
+            _record_timing("total", total_start)
+            if not isinstance(report.metrics, dict):
+                report.metrics = {}
+            if timings:
+                report.metrics.setdefault("timings", {}).update(timings)
+            if guard_timings:
+                report.metrics["guard_timings"] = guard_timings
+            if memory_snapshots:
+                report.metrics["memory_snapshots"] = memory_snapshots
+                summary = summarize_memory_snapshots(memory_snapshots)
+                if summary:
+                    mem_peak = summary.get("memory_mb_peak")
+                    if isinstance(mem_peak, (int | float)):
+                        existing = report.metrics.get("memory_mb_peak")
+                        if isinstance(existing, (int | float)):
+                            summary["memory_mb_peak"] = max(
+                                float(existing), float(mem_peak)
+                            )
+                    report.metrics.update(summary)
             self._active_model = None
             self._active_adapter = None
             self._cleanup_services()
@@ -455,7 +529,13 @@ class CoreRunner:
         )
 
     def _guard_phase(
-        self, model: Any, adapter: ModelAdapter, guards: list[Guard], report: RunReport
+        self,
+        model: Any,
+        adapter: ModelAdapter,
+        guards: list[Guard],
+        report: RunReport,
+        *,
+        guard_timings: dict[str, float] | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Phase 4: Run safety guards."""
         self._log_event("guards", "start", LogLevel.INFO, {"count": len(guards)})
@@ -464,6 +544,7 @@ class CoreRunner:
 
         for guard in guards:
             self._log_event("guard", "start", LogLevel.INFO, {"guard": guard.name})
+            guard_start = time.perf_counter()
 
             if isinstance(guard, GuardWithContext):
                 try:
@@ -497,6 +578,11 @@ class CoreRunner:
                     LogLevel.ERROR,
                     {"guard": guard.name, "error": str(e)},
                 )
+            finally:
+                if guard_timings is not None:
+                    guard_timings[guard.name] = max(
+                        0.0, float(time.perf_counter() - guard_start)
+                    )
 
         report.guards = guard_results
 

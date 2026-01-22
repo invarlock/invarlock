@@ -5,7 +5,7 @@ from invarlock.reporting.certificate import make_certificate
 
 def _mk_pm_only(final_val: float) -> dict:
     return {
-        "meta": {"model_id": "model", "adapter": "hf_gpt2", "seed": 42},
+        "meta": {"model_id": "model", "adapter": "hf_causal", "seed": 42},
         "metrics": {
             # No ppl_* keys; only primary_metric present
             "primary_metric": {

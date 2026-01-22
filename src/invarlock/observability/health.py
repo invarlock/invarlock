@@ -374,15 +374,15 @@ class InvarLockHealthChecker(HealthChecker):
             """Check adapter availability."""
             try:
                 from invarlock.adapters import (
-                    HF_BERT_Adapter,
-                    HF_GPT2_Adapter,
-                    HF_LLaMA_Adapter,
+                    HF_Causal_Adapter,
+                    HF_MLM_Adapter,
+                    HF_Seq2Seq_Adapter,
                 )
 
                 adapters = {
-                    "hf_gpt2": HF_GPT2_Adapter,
-                    "hf_llama": HF_LLaMA_Adapter,
-                    "hf_bert": HF_BERT_Adapter,
+                    "hf_causal": HF_Causal_Adapter,
+                    "hf_mlm": HF_MLM_Adapter,
+                    "hf_seq2seq": HF_Seq2Seq_Adapter,
                 }
 
                 available_adapters = []

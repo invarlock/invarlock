@@ -18,7 +18,7 @@ def test_run_command_baseline_pairing_ce_without_attention_masks(tmp_path: Path)
     cfg.write_text(
         """
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:
@@ -200,7 +200,7 @@ def _write_cfg(tmp_path: Path) -> Path:
     cfg.write_text(
         """
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:

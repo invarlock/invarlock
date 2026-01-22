@@ -109,6 +109,11 @@
     "Hella",
     "MMLU",
     "Narasimhan",
-    "TFLOPS"
+    "TFLOPS",
+    "ONNX",
+    "standardised",
+    "matvec",
+    "unprofiled",
+    "ungated"
   ]
 }

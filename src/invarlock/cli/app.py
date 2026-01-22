@@ -105,7 +105,7 @@ Order: certify → report → run → plugins → doctor → version
 @app.command(
     name="certify",
     help=(
-        "Certify a subject model against a baseline and generate a safety certificate. "
+        "Certify a subject model against a baseline and generate an evaluation certificate. "
         "Use when you have two model snapshots and want pass/fail gating."
     ),
 )
@@ -115,6 +115,14 @@ def _certify_lazy(
     ),
     edited: str = typer.Option(
         ..., "--edited", "--subject", help="Subject model dir or Hub ID"
+    ),
+    baseline_report: str | None = typer.Option(
+        None,
+        "--baseline-report",
+        help=(
+            "Reuse an existing baseline run report.json (skips baseline evaluation). "
+            "Must include stored evaluation windows (e.g., set INVARLOCK_STORE_EVAL_WINDOWS=1)."
+        ),
     ),
     adapter: str = typer.Option(
         "auto", "--adapter", help="Adapter name or 'auto' to resolve"
@@ -139,12 +147,38 @@ def _certify_lazy(
     edit_config: str | None = typer.Option(
         None, "--edit-config", help="Edit preset to apply a demo edit (quant_rtn)"
     ),
+    edit_label: str | None = typer.Option(
+        None,
+        "--edit-label",
+        help=(
+            "Edit algorithm label for BYOE models. Use 'noop' for baseline, "
+            "'quant_rtn' etc. for built-in edits, 'custom' for pre-edited models."
+        ),
+    ),
+    quiet: bool = typer.Option(
+        False, "--quiet", "-q", help="Minimal output (suppress run/report detail)"
+    ),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Verbose output (include debug details)"
+    ),
+    banner: bool = typer.Option(
+        True, "--banner/--no-banner", help="Show header banner"
+    ),
+    style: str = typer.Option("audit", "--style", help="Output style (audit|friendly)"),
+    timing: bool = typer.Option(False, "--timing", help="Show timing summary"),
+    progress: bool = typer.Option(
+        True, "--progress/--no-progress", help="Show progress done messages"
+    ),
+    no_color: bool = typer.Option(
+        False, "--no-color", help="Disable ANSI colors (respects NO_COLOR=1)"
+    ),
 ):
     from .commands.certify import certify_command as _cert
 
     return _cert(
         source=source,
         edited=edited,
+        baseline_report=baseline_report,
         adapter=adapter,
         device=device,
         profile=profile,
@@ -153,6 +187,14 @@ def _certify_lazy(
         out=out,
         cert_out=cert_out,
         edit_config=edit_config,
+        edit_label=edit_label,
+        quiet=quiet,
+        verbose=verbose,
+        banner=banner,
+        style=style,
+        timing=timing,
+        progress=progress,
+        no_color=no_color,
     )
 
 
@@ -230,7 +272,7 @@ def _verify_typed(
     name="run",
     help=(
         "Execute an end-to-end run from a YAML config (edit + guards + reports). "
-        "Writes run artifacts and optionally a safety certificate."
+        "Writes run artifacts and optionally an evaluation certificate."
     ),
 )
 def _run_typed(
@@ -245,10 +287,23 @@ def _run_typed(
     ),
     out: str | None = typer.Option(None, "--out", help="Output directory override"),
     edit: str | None = typer.Option(None, "--edit", help="Edit kind (quant|mixed)"),
+    edit_label: str | None = typer.Option(
+        None,
+        "--edit-label",
+        help=(
+            "Edit algorithm label for BYOE models. Use 'noop' for baseline, "
+            "'quant_rtn' etc. for built-in edits, 'custom' for pre-edited models."
+        ),
+    ),
     tier: str | None = typer.Option(
         None,
         "--tier",
         help="Auto-tuning tier override (conservative|balanced|aggressive)",
+    ),
+    metric_kind: str | None = typer.Option(
+        None,
+        "--metric-kind",
+        help="Primary metric kind override (ppl_causal|ppl_mlm|accuracy|etc.)",
     ),
     probes: int | None = typer.Option(
         None, "--probes", help="Number of micro-probes (0=deterministic, >0=adaptive)"
@@ -270,6 +325,16 @@ def _run_typed(
     no_cleanup: bool = typer.Option(
         False, "--no-cleanup", help="Skip cleanup of temporary artifacts"
     ),
+    style: str | None = typer.Option(
+        None, "--style", help="Output style (audit|friendly)"
+    ),
+    progress: bool = typer.Option(
+        False, "--progress", help="Show progress done messages"
+    ),
+    timing: bool = typer.Option(False, "--timing", help="Show timing summary"),
+    no_color: bool = typer.Option(
+        False, "--no-color", help="Disable ANSI colors (respects NO_COLOR=1)"
+    ),
 ):
     from .commands.run import run_command as _run
 
@@ -279,13 +344,19 @@ def _run_typed(
         profile=profile,
         out=out,
         edit=edit,
+        edit_label=edit_label,
         tier=tier,
+        metric_kind=metric_kind,
         probes=probes,
         until_pass=until_pass,
         max_attempts=max_attempts,
         timeout=timeout,
         baseline=baseline,
         no_cleanup=no_cleanup,
+        style=style,
+        progress=progress,
+        timing=timing,
+        no_color=no_color,
     )
 
 

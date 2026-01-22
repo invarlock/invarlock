@@ -6,7 +6,7 @@ from pathlib import Path
 
 def test_reference_uses_canonical_labels_only():
     # Load the v1 schema reference JSON example and validate its validation keys
-    p = Path("docs/reference/certificate-schema.md")
+    p = Path("docs/reference/certificates.md")
     text = p.read_text("utf-8")
     # Extract the JSON block delimited by ```json ... ```
     start = text.find("```json")

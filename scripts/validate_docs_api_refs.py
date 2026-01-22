@@ -31,6 +31,22 @@ SRC = ROOT / "src"
 TMP = ROOT / "tmp"
 TMP.mkdir(parents=True, exist_ok=True)
 
+EXCLUDE_TOP_LEVEL_DIRS = {
+    # Internal planning docs may reference future APIs; exclude from checks.
+    "plans",
+    # Generated/artifact dirs.
+    "tmp",
+    "runs",
+    "reports",
+    ".certify_tmp",
+    # Tooling caches / VCS.
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    "venv",
+}
 
 REF_PATTERN = re.compile(r"\b(invarlock(?:\.[A-Za-z_][A-Za-z0-9_]*)+)\b")
 IGNORE_LAST_SEGMENT = {
@@ -134,7 +150,14 @@ def resolve_ref(symbol: str) -> tuple[bool, str | None]:
 def main() -> int:
     # Ensure `src/` is importable
     sys.path.insert(0, str(SRC))
-    md_files = list(ROOT.glob("**/*.md"))
+    md_files: list[Path] = []
+    for path in ROOT.glob("**/*.md"):
+        if not path.is_file():
+            continue
+        rel_parts = path.relative_to(ROOT).parts
+        if rel_parts and rel_parts[0] in EXCLUDE_TOP_LEVEL_DIRS:
+            continue
+        md_files.append(path)
     md_files.sort(key=lambda p: str(p))
     refs = iter_refs(md_files)
     # De-duplicate exact (file, line, text) tuples

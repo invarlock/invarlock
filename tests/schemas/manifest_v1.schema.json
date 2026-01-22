@@ -19,7 +19,11 @@
       "properties": {
         "run_model": {"type": ["string", "null"]},
         "device": {"type": ["string", "null"]},
-        "seed": {"type": ["integer", "null"]}
+        "seed": {"type": ["integer", "null"]},
+        "overall_status": {"type": ["string", "null"]},
+        "primary_metric_ratio": {"type": ["number", "null"]},
+        "gates_passed": {"type": ["integer", "null"]},
+        "gates_total": {"type": ["integer", "null"]}
       },
       "additionalProperties": true
     },

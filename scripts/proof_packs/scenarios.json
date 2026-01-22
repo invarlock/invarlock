@@ -1,0 +1,211 @@
+{
+  "schema": "proof_pack_scenarios_v1",
+  "schema_version": 1,
+  "_meta": {
+    "purpose": "Single source of truth for proof-pack scenarios and their assurance expectations.",
+    "notes": [
+      "Scenario IDs must match the directory names under <model>/certificates/ in proof pack runs.",
+      "Strictness drives verdict gating: must_* scenarios are gating; informational scenarios never fail the pack."
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "quant_4bit_clean",
+      "category": "clean",
+      "failure_class": "common_edit.quant_rtn",
+      "strictness": "must_pass",
+      "generation": {"kind": "edit", "edit_spec": "quant_rtn:clean:ffn", "version": "clean"}
+    },
+    {
+      "id": "fp8_e5m2_clean",
+      "category": "clean",
+      "failure_class": "common_edit.fp8_quant",
+      "strictness": "must_pass",
+      "generation": {"kind": "edit", "edit_spec": "fp8_quant:clean:ffn", "version": "clean"}
+    },
+    {
+      "id": "prune_12pct_clean",
+      "category": "clean",
+      "failure_class": "common_edit.magnitude_prune",
+      "strictness": "must_pass",
+      "generation": {"kind": "edit", "edit_spec": "magnitude_prune:clean:ffn", "version": "clean"}
+    },
+    {
+      "id": "svd_rank32_l31_clean",
+      "category": "clean",
+      "failure_class": "common_edit.lowrank_svd",
+      "strictness": "must_pass",
+      "generation": {"kind": "edit", "edit_spec": "lowrank_svd:clean:ffn", "version": "clean"}
+    },
+    {
+      "id": "prune_50pct_stress",
+      "category": "stress",
+      "failure_class": "catastrophic_edit.magnitude_prune",
+      "strictness": "must_fail",
+      "generation": {"kind": "edit", "edit_spec": "magnitude_prune:0.5:all", "version": "stress"},
+      "requirements": {
+        "catastrophic_required": true,
+        "detectors_any_of": [
+          {"kind": "validation_flag", "flag": "primary_metric_acceptable", "expected": false},
+          {"kind": "primary_metric", "field": "degraded", "expected": true}
+        ]
+      }
+    },
+    {
+      "id": "svd_rank32_stress",
+      "category": "stress",
+      "failure_class": "catastrophic_edit.lowrank_svd",
+      "strictness": "must_fail",
+      "generation": {"kind": "edit", "edit_spec": "lowrank_svd:32:all", "version": "stress"},
+      "requirements": {
+        "catastrophic_required": true,
+        "detectors_any_of": [
+          {"kind": "validation_flag", "flag": "primary_metric_acceptable", "expected": false},
+          {"kind": "primary_metric", "field": "degraded", "expected": true}
+        ]
+      }
+    },
+    {
+      "id": "quant_4bit_stress",
+      "category": "stress",
+      "failure_class": "stress_edit.quant_rtn",
+      "strictness": "informational",
+      "generation": {"kind": "edit", "edit_spec": "quant_rtn:4:32:all", "version": "stress"},
+      "requirements": {
+        "detectors_any_of": [
+          {"kind": "validation_flag", "flag": "primary_metric_acceptable", "expected": false},
+          {"kind": "validation_flag", "flag": "spectral_stable", "expected": false}
+        ]
+      }
+    },
+    {
+      "id": "fp8_e5m2_stress",
+      "category": "stress",
+      "failure_class": "stress_edit.fp8_quant",
+      "strictness": "informational",
+      "generation": {"kind": "edit", "edit_spec": "fp8_quant:e5m2:all", "version": "stress"},
+      "requirements": {
+        "detectors_any_of": [
+          {"kind": "validation_flag", "flag": "primary_metric_acceptable", "expected": false},
+          {"kind": "validation_flag", "flag": "spectral_stable", "expected": false}
+        ]
+      }
+    },
+    {
+      "id": "nan_injection",
+      "category": "error_injection",
+      "failure_class": "structural.non_finite",
+      "strictness": "must_detect",
+      "generation": {"kind": "error", "error_type": "nan_injection"},
+      "requirements": {
+        "detectors_any_of": [
+          {"kind": "invariants_status", "allowed": ["fail", "error"]}
+        ]
+      }
+    },
+    {
+      "id": "inf_injection",
+      "category": "error_injection",
+      "failure_class": "structural.non_finite",
+      "strictness": "must_detect",
+      "generation": {"kind": "error", "error_type": "inf_injection"},
+      "requirements": {
+        "detectors_any_of": [
+          {"kind": "invariants_status", "allowed": ["fail", "error"]}
+        ]
+      }
+    },
+    {
+      "id": "shape_mismatch",
+      "category": "error_injection",
+      "failure_class": "structural.shape_mismatch",
+      "strictness": "must_detect",
+      "generation": {"kind": "error", "error_type": "shape_mismatch"},
+      "requirements": {
+        "detectors_any_of": [
+          {"kind": "invariants_status", "allowed": ["fail", "error"]}
+        ]
+      }
+    },
+    {
+      "id": "missing_tensors",
+      "category": "error_injection",
+      "failure_class": "structural.missing_tensors",
+      "strictness": "must_detect",
+      "generation": {"kind": "error", "error_type": "missing_tensors"},
+      "requirements": {
+        "detectors_any_of": [
+          {"kind": "invariants_status", "allowed": ["warn", "fail", "error"]}
+        ]
+      }
+    },
+    {
+      "id": "extreme_quant",
+      "category": "error_injection",
+      "failure_class": "structural.extreme_quantization",
+      "strictness": "must_detect",
+      "generation": {"kind": "error", "error_type": "extreme_quant"},
+      "requirements": {
+        "detectors_any_of": [
+          {"kind": "validation_flag", "flag": "primary_metric_acceptable", "expected": false},
+          {"kind": "primary_metric", "field": "degraded", "expected": true},
+          {"kind": "validation_flag", "flag": "spectral_stable", "expected": false}
+        ]
+      }
+    },
+    {
+      "id": "scale_explosion",
+      "category": "error_injection",
+      "failure_class": "structural.scale_explosion",
+      "strictness": "must_detect",
+      "generation": {"kind": "error", "error_type": "scale_explosion"},
+      "requirements": {
+        "detectors_any_of": [
+          {"kind": "validation_flag", "flag": "spectral_stable", "expected": false},
+          {"kind": "validation_flag", "flag": "primary_metric_acceptable", "expected": false},
+          {"kind": "primary_metric", "field": "degraded", "expected": true}
+        ]
+      }
+    },
+    {
+      "id": "rank_collapse",
+      "category": "error_injection",
+      "failure_class": "spectral.rank_collapse",
+      "strictness": "must_detect",
+      "generation": {"kind": "error", "error_type": "rank_collapse"},
+      "requirements": {
+        "detectors_any_of": [
+          {"kind": "validation_flag", "flag": "spectral_stable", "expected": false},
+          {"kind": "validation_flag", "flag": "primary_metric_acceptable", "expected": false},
+          {"kind": "primary_metric", "field": "degraded", "expected": true}
+        ]
+      }
+    },
+    {
+      "id": "norm_collapse",
+      "category": "error_injection",
+      "failure_class": "spectral.norm_collapse",
+      "strictness": "must_detect",
+      "generation": {"kind": "error", "error_type": "norm_collapse"},
+      "requirements": {
+        "detectors_any_of": [
+          {"kind": "validation_flag", "flag": "spectral_stable", "expected": false},
+          {"kind": "validation_flag", "flag": "primary_metric_acceptable", "expected": false},
+          {"kind": "primary_metric", "field": "degraded", "expected": true}
+        ]
+      }
+    },
+    {
+      "id": "weight_tying_break",
+      "category": "error_injection",
+      "failure_class": "structural.weight_tying",
+      "strictness": "must_detect",
+      "generation": {"kind": "error", "error_type": "weight_tying_break"},
+      "requirements": {
+        "detectors_any_of": [
+          {"kind": "invariants_status", "allowed": ["warn", "fail", "error"]}
+        ]
+      }
+    }
+  ]
+}

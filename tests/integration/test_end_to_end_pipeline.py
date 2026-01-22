@@ -36,7 +36,7 @@ with patch.dict(
     try:  # noqa: I001
         from invarlock.core.config import RunConfig
         from invarlock.core.runner import CoreRunner
-        from invarlock.adapters.hf_gpt2 import HF_GPT2_Adapter
+        from invarlock.adapters.hf_causal import HF_Causal_Adapter
 
         pass
         from invarlock.guards.invariants import InvariantsGuard
@@ -49,7 +49,7 @@ with patch.dict(
         SpectralGuard = Mock
         RMTGuard = Mock
         InvariantsGuard = Mock
-        HF_GPT2_Adapter = Mock
+        HF_Causal_Adapter = Mock
 
 
 class MockGPT2Model(nn.Module):
@@ -167,7 +167,7 @@ class TestEndToEndPipeline:
         """Set up test fixtures."""
         self.temp_dir = tempfile.mkdtemp()
         self.model = MockGPT2Model()
-        self.adapter = HF_GPT2_Adapter()
+        self.adapter = HF_Causal_Adapter()
         self.dataloader = MockDataLoader()
 
     def teardown_method(self):
@@ -493,7 +493,7 @@ class TestEndToEndPipeline:
 
         assert config["dataset"]["split"] == "validation"
         # Adapter should be present; model id may be a placeholder in repo presets
-        assert config["model"]["adapter"] == "hf_gpt2"
+        assert config["model"]["adapter"] == "hf_causal"
 
     def test_device_handling(self):
         """Test device handling across pipeline."""
@@ -562,7 +562,7 @@ class TestPipelineErrorScenarios:
         """Set up test fixtures."""
         self.temp_dir = tempfile.mkdtemp()
         self.model = MockGPT2Model()
-        self.adapter = HF_GPT2_Adapter()
+        self.adapter = HF_Causal_Adapter()
 
     def teardown_method(self):
         """Clean up test fixtures."""
@@ -696,7 +696,7 @@ class TestPipelinePerformance:
     def setup_method(self):
         """Set up test fixtures."""
         self.model = MockGPT2Model(n_layers=4, hidden_size=256)  # Larger model
-        self.adapter = HF_GPT2_Adapter()
+        self.adapter = HF_Causal_Adapter()
         self.large_dataloader = MockDataLoader(batch_size=4, seq_len=64, num_batches=20)
 
     def test_pipeline_timing(self):

@@ -10,7 +10,7 @@ def test_run_command_happy_path(tmp_path: Path):
     # Minimal config via patch; avoid reading YAML
     class DummyCfg:
         def __init__(self, outdir):
-            self.model = SimpleNamespace(id="gpt2", adapter="hf_gpt2", device="cpu")
+            self.model = SimpleNamespace(id="gpt2", adapter="hf_causal", device="cpu")
             self.edit = SimpleNamespace(name="quant_rtn", plan={})
             self.auto = SimpleNamespace(
                 enabled=False, tier="balanced", probes=0, target_pm_ratio=None
@@ -112,7 +112,7 @@ def test_run_command_happy_path(tmp_path: Path):
     config_path.write_text(
         """
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:

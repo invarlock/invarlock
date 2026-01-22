@@ -15,7 +15,7 @@ def _write_min_config(tmp_path: Path) -> Path:
     cfg.write_text(
         """
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:
@@ -231,7 +231,7 @@ def test_missing_edit_name_exits(tmp_path: Path):
     cfg.write_text(
         """
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:

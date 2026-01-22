@@ -44,7 +44,7 @@ def test_registry_fallback_on_entry_points_error(monkeypatch, tmp_path):
 
     assert any("Plugin discovery failed" in m for m in captured)
     # Fallback should register a set of built-ins
-    assert "hf_gpt2" in adapters
+    assert "hf_causal" in adapters
     assert "hello_guard" in guards
     # Only quant_rtn (and internal noop) remain as core edits
     assert "quant_rtn" in edits
@@ -180,15 +180,15 @@ def test_registry_additional_branches(monkeypatch):
         r.get_guard("not_guard")
 
     # Validate configuration success path
-    ok, msg = r.validate_configuration("hf_gpt2", "quant_rtn", ["hello_guard"])
+    ok, msg = r.validate_configuration("hf_causal", "quant_rtn", ["hello_guard"])
     assert ok and msg.endswith("valid")
 
     # Validate configuration unavailable paths
     # Temporarily mark certain built-ins as unavailable
-    r._adapters["hf_gpt2"] = reg.PluginInfo(
-        name="hf_gpt2",
-        module="invarlock.adapters.hf_gpt2",
-        class_name="HF_GPT2_Adapter",
+    r._adapters["hf_causal"] = reg.PluginInfo(
+        name="hf_causal",
+        module="invarlock.adapters.hf_causal",
+        class_name="HF_Causal_Adapter",
         available=False,
         status="disabled",
     )
@@ -206,7 +206,7 @@ def test_registry_additional_branches(monkeypatch):
         available=False,
         status="disabled",
     )
-    ok, msg = r.validate_configuration("hf_gpt2", "quant_rtn", ["hello_guard"])
+    ok, msg = r.validate_configuration("hf_causal", "quant_rtn", ["hello_guard"])
     assert not ok
     assert (
         "Adapter unavailable" in msg
@@ -257,7 +257,7 @@ def test_registry_get_paths_cover_unavailable_and_type_mismatch_branches(monkeyp
     r._adapters["unavailable_adapter"] = reg.PluginInfo(
         name="unavailable_adapter",
         module="invarlock.adapters",
-        class_name="HF_GPT2_Adapter",
+        class_name="HF_Causal_Adapter",
         available=False,
         status="disabled",
         entry_point=None,

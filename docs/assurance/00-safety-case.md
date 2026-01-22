@@ -1,10 +1,15 @@
 # Assurance Case Overview (v1.0)
 
+> **TL;DR:** InvarLock certifies that **weight edits** (quantization, pruning, etc.) don't regress a model beyond defined bounds. It does **not** certify content safety, alignment, or deployment security. The safety case covers: (1) paired primary metrics with bootstrap CIs, (2) four guards (invariants, spectral, RMT, variance), (3) deterministic evaluation with full provenance. Each claim has tests and certificate evidence.
+
 > **Plain language:** This overview lists every safety claim, the evidence we ship with the repo, and the runtime contracts that enforce each claim in production.
 
 This note enumerates the explicit **safety claims** the toolkit makes, the
 **evidence** shipped in-tree, and the **runtime contracts** that enforce each
 claim. Each claim must have:
+
+If you need definitions for guard terms (kappa threshold, epsilon band, window
+pairing), see the [Glossary](glossary.md).
 
 1) a short argument/derivation (“Evidence”), and
 2) a **test or contract** that fails fast when assumptions are violated

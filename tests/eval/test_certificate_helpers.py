@@ -45,7 +45,7 @@ def test_make_certificate_uses_paired_baseline_ratio_ci():
     report = {
         "meta": {
             "model_id": "gpt2",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "device": "cpu",
             "ts": "2025-01-01T00:00:00",
             "commit": "deadbeef",
@@ -113,7 +113,7 @@ def test_make_certificate_uses_paired_baseline_ratio_ci():
     # Validate and render markdown to cover certificate branches
     assert validate_certificate(cert) is True
     md = render_certificate_markdown(cert)
-    assert isinstance(md, str) and "InvarLock Safety Certificate" in md
+    assert isinstance(md, str) and "InvarLock Evaluation Certificate" in md
 
     # Negative schema version path
     cert_bad = dict(cert)

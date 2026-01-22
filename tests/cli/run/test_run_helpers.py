@@ -129,7 +129,7 @@ def test_run_command_baseline_pairing_generates_attention_masks(tmp_path: Path):
     cfg.write_text(
         """
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:
@@ -334,7 +334,7 @@ def _cfg_path(tmp_path: Path) -> Path:
     p.write_text(
         """
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:
@@ -381,7 +381,7 @@ def test_to_serialisable_dict_uses_dict_method(tmp_path: Path):
 
     class Cfg:
         def __init__(self):
-            self.model = SimpleNamespace(adapter="hf_gpt2", id="gpt2", device="cpu")
+            self.model = SimpleNamespace(adapter="hf_causal", id="gpt2", device="cpu")
             self.edit = SimpleNamespace(name="quant_rtn", plan={})
             self.dataset = SimpleNamespace(
                 provider="synthetic",

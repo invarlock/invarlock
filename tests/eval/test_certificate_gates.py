@@ -7,7 +7,7 @@ def _make_report(preview: float, final: float, tier: str = "balanced"):
     report["meta"].update(
         {
             "model_id": "gpt2",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "commit": "deadbeef",
             "device": "cpu",
             "auto": {
@@ -36,7 +36,7 @@ def _make_baseline(ppl: float):
     base["meta"].update(
         {
             "model_id": "gpt2",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "commit": "cafebabe",
             "device": "cpu",
         }

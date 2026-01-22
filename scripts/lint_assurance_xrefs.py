@@ -248,6 +248,8 @@ def _sample_certificates() -> list[dict[str, Any]]:
                     "caps_applied": 0,
                     "caps_exceeded": False,
                     "modules_checked": 1,
+                    "top_z_scores": {"ffn": [{"module": "mlp.c_proj", "z": 2.3}]},
+                    "measurement_contract": {"kind": "spectral", "version": 1},
                 },
             },
             {
@@ -258,7 +260,11 @@ def _sample_certificates() -> list[dict[str, Any]]:
                     "epsilon_default": 0.10,
                     "epsilon_by_family": {"ffn": 0.10},
                 },
-                "metrics": {"outliers": 0, "stable": True},
+                "metrics": {
+                    "outliers": 0,
+                    "stable": True,
+                    "measurement_contract": {"kind": "rmt", "version": 1},
+                },
             },
             {
                 "name": "variance",

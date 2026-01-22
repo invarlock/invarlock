@@ -36,7 +36,7 @@ def _build_paired_run_and_baseline(
     report = {
         "meta": {
             "model_id": "gpt2-small",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "device": "cpu",
             "ts": "2025-10-10T00:00:00",
             "commit": "deadbeefcafebabe",
@@ -158,7 +158,7 @@ def _make_ratio_report(
     report["meta"].update(
         {
             "model_id": "gpt2",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "commit": "deadbeef",
             "device": "cpu",
             "auto": {

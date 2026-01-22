@@ -106,7 +106,7 @@ def _gpt2_selectors() -> dict[str, list[str]]:
     }
 
 
-def _llama_selectors() -> dict[str, list[str]]:
+def _rope_decoder_selectors() -> dict[str, list[str]]:
     return {
         "attention": [
             "self_attn.q_proj",
@@ -191,11 +191,11 @@ def _make_gpt2_tokenizer(model_id: str):
     return factory
 
 
-def _make_llama_tokenizer(model_id: str):
+def _make_causal_auto_tokenizer(model_id: str):
     def factory() -> tuple[PreTrainedTokenizerBase, str]:
         if AutoTokenizer is None and GPT2Tokenizer is None:
             raise RuntimeError(
-                "LLaMA-style tokenizers require the 'transformers' extra. "
+                "Causal tokenizers require the 'transformers' extra. "
                 "Install it with: pip install 'invarlock[adapters]'."
             )
         # Try offline-first to respect InvarLock network guard; fall back to a
@@ -227,7 +227,7 @@ def _make_llama_tokenizer(model_id: str):
             eos_token = getattr(tokenizer, "eos_token", None)
             if eos_token is not None:
                 tokenizer.pad_token = eos_token
-        # Some LLaMA tokenizers default to not adding a BOS token on encode;
+        # Some causal tokenizers default to not adding a BOS token on encode;
         # enable it to guarantee at least one non-pad, non-zero token id.
         if hasattr(tokenizer, "add_bos_token"):
             try:
@@ -289,7 +289,7 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
     model_lower = (model_id or "").lower()
 
     if any(
-        keyword in adapter_lower for keyword in ("bert", "roberta", "deberta")
+        keyword in adapter_lower for keyword in ("hf_mlm", "bert", "roberta", "deberta")
     ) or any(keyword in model_lower for keyword in ("bert", "roberta", "deberta")):
         return ModelProfile(
             family="bert",
@@ -302,38 +302,31 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
             cert_lints=(
                 {
                     "type": "equals",
-                    "path": "metrics.loss_type",
-                    "value": "mlm",
-                    "message": "BERT cert must record MLM loss type.",
+                    "path": "primary_metric.kind",
+                    "value": "ppl_mlm",
+                    "message": "BERT cert must use MLM metric.",
                 },
                 {
                     "type": "gte",
-                    "path": "metrics.masked_tokens_total",
+                    "path": "telemetry.masked_tokens_total",
                     "value": "1",
                     "message": "BERT cert must report masked tokens.",
                 },
             ),
         )
 
-    if any(keyword in adapter_lower for keyword in ("llama", "mistral", "qwen")) or any(
-        keyword in model_lower for keyword in ("llama", "mistral", "qwen")
+    if any(keyword in adapter_lower for keyword in ("hf_seq2seq", "t5", "bart")) or any(
+        keyword in model_lower for keyword in ("t5", "bart")
     ):
         return ModelProfile(
-            family="llama",
-            default_loss="causal",
-            make_tokenizer=_make_llama_tokenizer(model_id),
-            default_metric="ppl_causal",
+            family="seq2seq",
+            default_loss="seq2seq",
+            make_tokenizer=_make_unknown_tokenizer(model_id),
+            default_metric="ppl_seq2seq",
             default_provider="wikitext2",
-            module_selectors=_llama_selectors(),
-            invariants=("rope_rotary_embedding",),
-            cert_lints=(
-                {
-                    "type": "equals",
-                    "path": "metrics.loss_type",
-                    "value": "causal",
-                    "message": "LLaMA cert should report causal loss.",
-                },
-            ),
+            module_selectors=_unknown_selectors(),
+            invariants=(),
+            cert_lints=(),
         )
 
     if any(
@@ -350,9 +343,37 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
             cert_lints=(
                 {
                     "type": "equals",
-                    "path": "metrics.loss_type",
-                    "value": "causal",
-                    "message": "GPT-style cert should record causal loss.",
+                    "path": "primary_metric.kind",
+                    "value": "ppl_causal",
+                    "message": "GPT-style cert must use causal ppl metric.",
+                },
+            ),
+        )
+
+    if any(
+        keyword in adapter_lower for keyword in ("mistral", "mixtral", "qwen", "yi")
+    ) or any(
+        keyword in model_lower for keyword in ("mistral", "mixtral", "qwen", "yi")
+    ):
+        family = "causal"
+        for keyword in ("mixtral", "mistral", "qwen", "yi"):
+            if keyword in adapter_lower or keyword in model_lower:
+                family = keyword
+                break
+        return ModelProfile(
+            family=family,
+            default_loss="causal",
+            make_tokenizer=_make_causal_auto_tokenizer(model_id),
+            default_metric="ppl_causal",
+            default_provider="wikitext2",
+            module_selectors=_rope_decoder_selectors(),
+            invariants=("rope_rotary_embedding",),
+            cert_lints=(
+                {
+                    "type": "equals",
+                    "path": "primary_metric.kind",
+                    "value": "ppl_causal",
+                    "message": "Causal cert must use causal ppl metric.",
                 },
             ),
         )

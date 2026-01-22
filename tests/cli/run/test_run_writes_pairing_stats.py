@@ -93,7 +93,7 @@ def test_run_report_has_dataset_windows_stats(tmp_path: Path, monkeypatch):
         textwrap.dedent(
             f"""
             model:
-              adapter: hf_gpt2
+              adapter: hf_causal
               id: gpt2
               device: cpu
             edit:

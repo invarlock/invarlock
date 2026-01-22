@@ -185,7 +185,7 @@ def test_run_macro_dev_flow_quick_exit(
     cfg = _write_cfg(
         tmp_path / "cfg.yaml",
         {
-            "model": {"id": "gpt2", "adapter": "hf_gpt2"},
+            "model": {"id": "gpt2", "adapter": "hf_causal"},
             "edit": {"name": "quant_rtn"},
             "dataset": {"provider": "wikitext2", "seq_len": 4, "stride": 4},
             "eval": {},
@@ -206,7 +206,7 @@ def test_run_macro_release_flow_with_capacity(
     cfg = _write_cfg(
         tmp_path / "cfg.yaml",
         {
-            "model": {"id": "gpt2", "adapter": "hf_gpt2"},
+            "model": {"id": "gpt2", "adapter": "hf_causal"},
             "edit": {"name": "quant_rtn"},
             "dataset": {
                 "provider": "wikitext2",
@@ -236,7 +236,7 @@ def test_run_macro_with_baseline_schedule(
     cfg = _write_cfg(
         tmp_path / "cfg.yaml",
         {
-            "model": {"id": "gpt2", "adapter": "hf_gpt2"},
+            "model": {"id": "gpt2", "adapter": "hf_causal"},
             "edit": {"name": "quant_rtn"},
             "dataset": {"provider": "wikitext2", "seq_len": 4, "stride": 4},
             "eval": {},

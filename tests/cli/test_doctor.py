@@ -23,7 +23,7 @@ def test_doctor_command_healthy():
             "auto_selected": "cuda",
         }
         mock_reg = Mock()
-        mock_reg.list_adapters.return_value = ["hf_gpt2", "hf_causal_auto"]
+        mock_reg.list_adapters.return_value = ["hf_causal", "hf_auto"]
         mock_reg.list_edits.return_value = ["structured", "gptq"]
         mock_reg.list_guards.return_value = ["invariants", "spectral"]
         mock_reg.get_plugin_info.side_effect = lambda name, kind: {

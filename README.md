@@ -4,9 +4,9 @@ In short: certify that weight edits (e.g., quantization) preserve quality. If
 they don’t, roll back safely.
 
 Technical: edit‑agnostic guard pipeline (invariants → spectral → RMT →
-variance) producing a machine‑readable Safety Certificate.
+variance) producing a machine‑readable Evaluation Certificate.
 
-> **Status:** 0.3.6 (pre‑1.0). Until 1.0, **minor** releases may be
+> **Status:** 0.3.7 (pre‑1.0). Until 1.0, **minor** releases may be
 > breaking. See CLI help and the CHANGELOG for updates.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/invarlock/invarlock/ci.yml?branch=main&logo=github&label=CI)](https://github.com/invarlock/invarlock/actions/workflows/ci.yml)
@@ -21,7 +21,20 @@ For guidance on where to ask questions, how to report bugs, and what to expect i
 
 ## 🚀 Quick start (no repo clone)
 
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_quickstart_cpu.ipynb)
+Notebooks (Colab):
+
+- [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_quickstart_cpu.ipynb)
+  `invarlock_quickstart_cpu.ipynb` — install + certify + verify + HTML export (CPU-friendly)
+- [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_compare_certify.ipynb)
+  `invarlock_compare_certify.ipynb` — Compare & Certify (BYOE) end-to-end
+- [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_certificate_deep_dive.ipynb)
+  `invarlock_certificate_deep_dive.ipynb` — reading and interpreting certificates
+- [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_custom_datasets.ipynb)
+  `invarlock_custom_datasets.ipynb` — Bring Your Own Data (BYOD) with `local_jsonl`
+- [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_python_api.ipynb)
+  `invarlock_python_api.ipynb` — programmatic Python API usage
+- [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_policy_tiers.ipynb)
+  `invarlock_policy_tiers.ipynb` — Conservative vs Balanced vs Aggressive tier comparison
 
 ```bash
 # Install with HF adapters
@@ -40,8 +53,8 @@ This produces `reports/.../evaluation.cert.json` with paired metrics
 (ppl/accuracy), structural deltas, spectral/RMT stats, variance‑estimator
 provenance, seeds/hashes, pairing metrics, and a policy digest.
 
-> **Calibration note:** tier thresholds and window sizes are piloted on GPT‑2 small,
-> BERT base, and TinyLLaMA (see `docs/assurance/09-tier-v1-calibration.md`). For
+> **Calibration note:** tier thresholds and window sizes are piloted on GPT‑2 small
+> and BERT base (see `docs/assurance/09-tier-v1-calibration.md`). For
 > calibrated Balanced/Conservative certs, use the preset‑based CI/Release examples
 > below. `INVARLOCK_TINY_RELAX` dev runs relax sample‑size floors and are intended
 > only for small smoke tests (not release evidence).
@@ -213,7 +226,7 @@ needed (e.g., `CUDA_VISIBLE_DEVICES`).
   3. **RMT** (ε-band on outliers; monitor or gate per tier)
   4. **Variance (VE)** (predictive paired ΔlogNLL gate; tiered sidedness)
 
-- **Safety Certificate (schema v1, PM‑only)**: Primary Metric (ppl or
+- **Evaluation Certificate (schema v1, PM‑only)**: Primary Metric (ppl or
   accuracy) with paired statistics, structural deltas, spectral/RMT stats, VE
   provenance, seeds/hashes, pairing metrics, and **policy digest**. Canonical
   artifact: `reports/.../evaluation.cert.json`.
@@ -334,7 +347,7 @@ Key checks enforced by balanced policy (summary):
 ```yaml
 model:
   id: "<set-your-model-id>"   # e.g., gpt2
-  adapter: "hf_gpt2"
+  adapter: "hf_causal"
   device: "cpu"
 dataset:
   provider: "wikitext2"
@@ -399,7 +412,7 @@ invarlock/
 │  ├─ invarlock/                 # core + unified namespace
 │  │  ├─ core/               # runner, registry, contracts, events, ABI
 │  │  ├─ cli/                # console app + command wrappers (unified import path)
-│  │  ├─ adapters/           # adapter wrappers (HF GPT‑2/BERT/LLaMA)
+│  │  ├─ adapters/           # model adapters (HF causal/MLM/seq2seq/onnx)
 │  │  ├─ edits/              # quant_rtn
 │  │  ├─ guards/             # invariants, spectral, rmt, variance
 │  │  ├─ eval/               # evaluation metrics and helpers

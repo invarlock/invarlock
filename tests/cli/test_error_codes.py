@@ -73,7 +73,7 @@ def test_run_command_emits_e003_prefix_and_exit_code(tmp_path: Path):
         """
 model:
   id: gpt2
-  adapter: hf_gpt2
+  adapter: hf_causal
 dataset:
   provider: dummy
   seq_len: 8

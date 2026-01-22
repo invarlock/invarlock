@@ -24,7 +24,7 @@ def _cfg(tmp_path: Path, preview=1, final=1) -> Path:
     p.write_text(
         f"""
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:
@@ -331,7 +331,7 @@ def _basic_cfg(tmp_path: Path, preview: int = 1, final: int = 1) -> Path:
     p.write_text(
         f"""
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:

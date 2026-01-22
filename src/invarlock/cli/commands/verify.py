@@ -2,7 +2,7 @@
 invarlock verify command
 ====================
 
-Validates generated safety certificates for internal consistency. The command
+Validates generated evaluation certificates for internal consistency. The command
 ensures schema compliance, checks that the primary metric ratio agrees with the
 baseline reference, and enforces paired-window guarantees (match=1.0,
 overlap=0.0).
@@ -66,9 +66,25 @@ def _validate_primary_metric(certificate: dict[str, Any]) -> list[str]:
         errors.append("Certificate missing primary_metric block.")
         return errors
 
+    def _is_finite_number(value: Any) -> bool:
+        return isinstance(value, (int, float)) and math.isfinite(float(value))
+
+    def _declares_invalid_primary_metric(metric: dict[str, Any]) -> bool:
+        if bool(metric.get("invalid")):
+            return True
+        reason = metric.get("degraded_reason")
+        if isinstance(reason, str):
+            r = reason.strip().lower()
+            return r.startswith("non_finite") or r in {
+                "primary_metric_invalid",
+                "evaluation_error",
+            }
+        return False
+
     kind = str(pm.get("kind", "")).lower()
     ratio_vs_baseline = pm.get("ratio_vs_baseline")
     final = pm.get("final")
+    pm_invalid = _declares_invalid_primary_metric(pm)
 
     if kind.startswith("ppl"):
         baseline_ref = certificate.get("baseline_ref", {}) or {}
@@ -82,16 +98,14 @@ def _validate_primary_metric(certificate: dict[str, Any]) -> list[str]:
             bv = baseline_pm.get("final")
             if isinstance(bv, (int | float)):
                 baseline_final = float(bv)
-        if isinstance(final, int | float) and isinstance(baseline_final, int | float):
-            if baseline_final <= 0.0:
+        if _is_finite_number(final) and _is_finite_number(baseline_final):
+            if float(baseline_final) <= 0.0:
                 errors.append(
                     f"Baseline final must be > 0.0 to compute ratio (found {baseline_final})."
                 )
             else:
                 expected_ratio = float(final) / float(baseline_final)
-                if not isinstance(ratio_vs_baseline, int | float) or not math.isfinite(
-                    float(ratio_vs_baseline)
-                ):
+                if not _is_finite_number(ratio_vs_baseline):
                     errors.append(
                         "Certificate is missing a finite primary_metric.ratio_vs_baseline value."
                     )
@@ -102,7 +116,18 @@ def _validate_primary_metric(certificate: dict[str, Any]) -> list[str]:
                         "Primary metric ratio mismatch: "
                         f"recorded={float(ratio_vs_baseline):.12f}, expected={expected_ratio:.12f}"
                     )
+        else:
+            # If the primary metric is non-finite, it must be explicitly marked invalid.
+            # This is expected for structural error-injection runs (NaN/Inf weights).
+            if (isinstance(final, (int | float)) and not _is_finite_number(final)) and (
+                not pm_invalid
+            ):
+                errors.append(
+                    "Primary metric final is non-finite but primary_metric.invalid is not set."
+                )
     else:
+        if pm_invalid:
+            return errors
         if ratio_vs_baseline is None or not isinstance(ratio_vs_baseline, int | float):
             errors.append(
                 "Certificate missing primary_metric.ratio_vs_baseline for non-ppl metric."
@@ -194,14 +219,29 @@ def _validate_counts(certificate: dict[str, Any]) -> list[str]:
 
 
 def _validate_drift_band(certificate: dict[str, Any]) -> list[str]:
-    """Validate preview→final drift stays within the configured band (0.95–1.05)."""
+    """Validate preview→final drift stays within the configured band.
+
+    Defaults to 0.95–1.05 unless the certificate provides `primary_metric.drift_band`.
+    """
     errors: list[str] = []
     pm = certificate.get("primary_metric", {}) or {}
+    if not isinstance(pm, dict) or not pm:
+        errors.append("Certificate missing primary_metric block.")
+        return errors
+    if bool(pm.get("invalid")):
+        # Drift is undefined when the primary metric is invalid (e.g., NaN/Inf weights).
+        return errors
     drift_ratio = None
     try:
         prev = pm.get("preview")
         fin = pm.get("final")
-        if isinstance(prev, int | float) and isinstance(fin, int | float) and prev > 0:
+        if (
+            isinstance(prev, int | float)
+            and isinstance(fin, int | float)
+            and math.isfinite(float(prev))
+            and math.isfinite(float(fin))
+            and prev > 0
+        ):
             drift_ratio = float(fin) / float(prev)
     except Exception:
         drift_ratio = None
@@ -210,9 +250,33 @@ def _validate_drift_band(certificate: dict[str, Any]) -> list[str]:
         errors.append("Certificate missing preview/final to compute drift ratio.")
         return errors
 
-    if not 0.95 <= float(drift_ratio) <= 1.05:
+    drift_min = 0.95
+    drift_max = 1.05
+    band = pm.get("drift_band")
+    try:
+        if isinstance(band, dict):
+            lo = band.get("min")
+            hi = band.get("max")
+            if isinstance(lo, int | float) and isinstance(hi, int | float):
+                lo_f = float(lo)
+                hi_f = float(hi)
+                if math.isfinite(lo_f) and math.isfinite(hi_f) and 0 < lo_f < hi_f:
+                    drift_min = lo_f
+                    drift_max = hi_f
+        elif isinstance(band, list | tuple) and len(band) == 2:
+            lo_raw, hi_raw = band[0], band[1]
+            if isinstance(lo_raw, int | float) and isinstance(hi_raw, int | float):
+                lo_f = float(lo_raw)
+                hi_f = float(hi_raw)
+                if math.isfinite(lo_f) and math.isfinite(hi_f) and 0 < lo_f < hi_f:
+                    drift_min = lo_f
+                    drift_max = hi_f
+    except Exception:
+        pass
+
+    if not drift_min <= float(drift_ratio) <= drift_max:
         errors.append(
-            f"Preview→final drift ratio out of band (0.95–1.05): observed {drift_ratio:.6f}."
+            f"Preview→final drift ratio out of band ({drift_min:.2f}–{drift_max:.2f}): observed {drift_ratio:.6f}."
         )
 
     return errors
@@ -406,7 +470,8 @@ def _validate_certificate_payload(
         )
     except Exception:
         prof = "dev"
-    # Enforce drift band only for CI/Release; skip in dev profile
+    # Drift band is a CI/Release enforcement check; dev profile should not
+    # fail verification due to preview→final drift.
     if prof in {"ci", "release"}:
         errors.extend(_validate_drift_band(certificate))
     errors.extend(_apply_profile_lints(certificate))

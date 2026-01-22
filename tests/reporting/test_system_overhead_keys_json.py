@@ -5,7 +5,7 @@ from invarlock.reporting.certificate import make_certificate
 
 def _mk_report_with_overhead(metrics: dict) -> dict:
     return {
-        "meta": {"model_id": "m", "adapter": "hf_gpt2", "device": "cpu", "seed": 42},
+        "meta": {"model_id": "m", "adapter": "hf_causal", "device": "cpu", "seed": 42},
         "metrics": {
             # primary metric and overhead metrics
             "primary_metric": {

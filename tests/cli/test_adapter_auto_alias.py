@@ -35,5 +35,6 @@ def test_resolve_auto_adapter_name_heuristics() -> None:
     assert resolve_auto_adapter("company/model-gptq") == "hf_gptq"
     assert resolve_auto_adapter("org/model-awq") == "hf_awq"
     assert resolve_auto_adapter("org/model-8bit") == "hf_bnb"
-    assert resolve_auto_adapter("org/llama-7b") == "hf_llama"
-    assert resolve_auto_adapter("org/awesome-bert") == "hf_bert"
+    assert resolve_auto_adapter("org/decoder-7b") == "hf_causal"
+    assert resolve_auto_adapter("mistralai/Mixtral-8x7B-v0.1") == "hf_causal"
+    assert resolve_auto_adapter("org/awesome-bert") == "hf_mlm"

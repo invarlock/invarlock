@@ -24,7 +24,7 @@ def _write_run_report(
     report = {
         "meta": {
             "model_id": "stub",
-            "adapter": "hf_gpt2",
+            "adapter": "hf_causal",
             "seed": 7,
             "device": "cpu",
             "ts": "2025-01-01T00:00:00",

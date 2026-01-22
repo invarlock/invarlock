@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+subcmd="${1:-}"
+shift || true
+
+fixtures="${TEST_TMPDIR:-}/fixtures"
+
+if [[ -n "${TEST_TMPDIR:-}" && -f "${fixtures}/invarlock.stub" ]]; then
+    [[ -f "${fixtures}/invarlock.stdout" ]] && cat "${fixtures}/invarlock.stdout"
+    [[ -f "${fixtures}/invarlock.stderr" ]] && cat "${fixtures}/invarlock.stderr" >&2
+    if [[ -f "${fixtures}/invarlock.rc" ]]; then
+        rc="$(cat "${fixtures}/invarlock.rc" 2>/dev/null || echo "0")"
+        exit "${rc}"
+    fi
+    exit 0
+fi
+
+# Best-effort offline stub:
+# - Records calls for debugging
+# - Optionally creates output files when requested by fixtures
+if [[ -n "${TEST_TMPDIR:-}" ]]; then
+    mkdir -p "${fixtures}"
+    echo "invarlock ${subcmd} $*" >> "${fixtures}/invarlock.calls" 2>/dev/null || true
+fi
+
+get_flag_val() {
+    local flag="$1"
+    shift
+    local -a args=("$@")
+    local i
+    for ((i=0; i<${#args[@]}; i++)); do
+        if [[ "${args[$i]}" == "${flag}" ]]; then
+            echo "${args[$((i+1))]:-}"
+            return 0
+        fi
+    done
+    return 1
+}
+
+case "${subcmd}" in
+    run)
+        out_dir="$(get_flag_val --out "$@" || true)"
+        if [[ -n "${out_dir:-}" && -n "${TEST_TMPDIR:-}" ]]; then
+            if [[ -f "${fixtures}/invarlock.create_report_nested" ]]; then
+                nested_dir="${out_dir}/run_1"
+                mkdir -p "${nested_dir}"
+                printf '{"ok":true}\n' > "${nested_dir}/report.json"
+            elif [[ -f "${fixtures}/invarlock.create_report" ]]; then
+                mkdir -p "${out_dir}"
+                printf '{"ok":true}\n' > "${out_dir}/report.json"
+            fi
+        fi
+        ;;
+    certify)
+        cert_out="$(get_flag_val --cert-out "$@" || true)"
+        out_dir="$(get_flag_val --out "$@" || true)"
+        target="${cert_out:-${out_dir:-}}"
+        if [[ -n "${target:-}" && -n "${TEST_TMPDIR:-}" && -f "${fixtures}/invarlock.create_cert" ]]; then
+            mkdir -p "${target}"
+            printf '{"ok":true}\n' > "${target}/evaluation.cert.json"
+        fi
+        ;;
+esac
+
+exit 0

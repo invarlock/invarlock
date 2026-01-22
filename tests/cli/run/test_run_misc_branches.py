@@ -19,7 +19,7 @@ def _write_base_cfg(tmp_path: Path, preview_n=2, final_n=2) -> Path:
     cfg.write_text(
         f"""
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:
@@ -175,7 +175,7 @@ def _supp_cfg(tmp_path: Path, preview=1, final=1) -> Path:
     p.write_text(
         f"""
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:
@@ -471,7 +471,7 @@ def test_invalid_edit_name_triggers_exit(tmp_path: Path):
     cfg.write_text(
         """
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:
@@ -558,7 +558,9 @@ def test_provider_kwargs_propagated(tmp_path: Path):
         # Patch load_config to include extra dataset kwargs
         class DummyCfg:
             def __init__(self, outdir):
-                self.model = SimpleNamespace(id="gpt2", adapter="hf_gpt2", device="cpu")
+                self.model = SimpleNamespace(
+                    id="gpt2", adapter="hf_causal", device="cpu"
+                )
                 self.edit = SimpleNamespace(name="quant_rtn", plan={})
                 self.auto = SimpleNamespace(
                     enabled=False, tier="balanced", probes=0, target_pm_ratio=None
@@ -696,7 +698,7 @@ def test_module_selectors_not_overridden_when_present(tmp_path: Path):
     cfg.write_text(
         """
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:
@@ -802,7 +804,9 @@ def test_skip_missing_guard_branch(tmp_path: Path):
         # Bypass config validation to allow unknown guard
         class DummyCfg:
             def __init__(self, outdir):
-                self.model = SimpleNamespace(id="gpt2", adapter="hf_gpt2", device="cpu")
+                self.model = SimpleNamespace(
+                    id="gpt2", adapter="hf_causal", device="cpu"
+                )
                 self.edit = SimpleNamespace(name="quant_rtn", plan={})
                 self.auto = SimpleNamespace(
                     enabled=False, tier="balanced", probes=0, target_pm_ratio=None
@@ -1104,7 +1108,7 @@ def test_noop_guard_is_ignored(tmp_path: Path):
     cfg.write_text(
         """
 model:
-  adapter: hf_gpt2
+  adapter: hf_causal
   id: gpt2
   device: cpu
 edit:
