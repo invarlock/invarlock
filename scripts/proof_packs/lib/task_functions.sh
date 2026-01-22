@@ -412,6 +412,9 @@ _ensure_certify_baseline_report() {
         cat > "${baseline_config_root}/runtime/profiles/ci.yaml" << YAML
 model:
   device_map: "auto"
+  torch_dtype: "bfloat16"
+  trust_remote_code: true
+  low_cpu_mem_usage: true
 dataset:
   seq_len: ${seq_len}
   stride: ${stride}
@@ -1217,6 +1220,9 @@ task_calibration_run() {
     cat > "${config_root}/runtime/profiles/ci.yaml" << YAML
 model:
   device_map: "auto"
+  torch_dtype: "bfloat16"
+  trust_remote_code: true
+  low_cpu_mem_usage: true
 dataset:
   preview_n: ${preview_n}
   final_n: ${final_n}
@@ -1988,6 +1994,9 @@ task_certify_edit() {
     cat > "${config_root}/runtime/profiles/ci.yaml" << YAML
 model:
   device_map: "auto"
+  torch_dtype: "bfloat16"
+  trust_remote_code: true
+  low_cpu_mem_usage: true
 dataset:
   seq_len: ${seq_len}
   stride: ${stride}
@@ -2171,6 +2180,14 @@ task_certify_error() {
         return 0
     fi
 
+    # Repair known config inconsistencies for missing_tensors error models created by older pack versions.
+    if [[ "${error_type}" == "missing_tensors" ]]; then
+        local repair_script="${SCRIPT_DIR}/../python/repair_missing_tensors_config.py"
+        if [[ -f "${repair_script}" && -f "${abs_baseline_path}/config.json" && -f "${abs_error_path}/config.json" ]]; then
+            _cmd_python "${repair_script}" "${abs_baseline_path}/config.json" "${abs_error_path}/config.json" >> "${log_file}" 2>&1 || true
+        fi
+    fi
+
     echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Certifying error model: ${error_type}" >> "${log_file}"
 
     mkdir -p "${cert_dir}"
@@ -2279,6 +2296,9 @@ task_certify_error() {
     cat > "${config_root}/runtime/profiles/ci.yaml" << YAML
 model:
   device_map: "auto"
+  torch_dtype: "bfloat16"
+  trust_remote_code: true
+  low_cpu_mem_usage: true
 dataset:
   seq_len: ${seq_len}
   stride: ${stride}
