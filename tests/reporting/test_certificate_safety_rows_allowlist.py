@@ -57,9 +57,9 @@ def test_quality_gates_do_not_include_rmt_epsilon_rule() -> None:
 
 def test_safety_rows_follow_allowlist() -> None:
     md = render_certificate_markdown(_cert())
-    # Safety detail rows should include exactly these labels
-    assert "## Safety Check Details" in md
-    block = md.split("## Safety Check Details", 1)[1]
+    # Guard check detail rows should include exactly these labels
+    assert "## Guard Check Details" in md
+    block = md.split("## Guard Check Details", 1)[1]
     assert "| Invariants |" in block
     assert "| Spectral Stability |" in block
     assert "| RMT Health |" in block
