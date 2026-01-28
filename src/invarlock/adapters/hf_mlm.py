@@ -63,27 +63,7 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
                 "MODEL-LOAD-FAILED: transformers AutoModelForMaskedLM",
                 lambda e: {"model_id": model_id},
             ):
-                dtype_value = kwargs.pop("dtype", None)
-                if dtype_value is None and "torch_dtype" in kwargs:
-                    dtype_value = kwargs.pop("torch_dtype", None)
-                if dtype_value is not None:
-                    kwargs["dtype"] = dtype_value
-                try:
-                    model = AutoModelForMaskedLM.from_pretrained(model_id, **kwargs)
-                except TypeError as exc:
-                    msg = str(exc)
-                    if (
-                        dtype_value is not None
-                        and "unexpected keyword argument" in msg
-                        and "'dtype'" in msg
-                    ):
-                        kwargs.pop("dtype", None)
-                        kwargs["torch_dtype"] = dtype_value
-                        model = AutoModelForMaskedLM.from_pretrained(
-                            model_id, **kwargs
-                        )
-                    else:
-                        raise
+                model = AutoModelForMaskedLM.from_pretrained(model_id, **kwargs)
         except Exception:
             with wrap_errors(
                 ModelLoadError,
@@ -91,25 +71,7 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
                 "MODEL-LOAD-FAILED: transformers AutoModel",
                 lambda e: {"model_id": model_id},
             ):
-                dtype_value = kwargs.pop("dtype", None)
-                if dtype_value is None and "torch_dtype" in kwargs:
-                    dtype_value = kwargs.pop("torch_dtype", None)
-                if dtype_value is not None:
-                    kwargs["dtype"] = dtype_value
-                try:
-                    model = AutoModel.from_pretrained(model_id, **kwargs)
-                except TypeError as exc:
-                    msg = str(exc)
-                    if (
-                        dtype_value is not None
-                        and "unexpected keyword argument" in msg
-                        and "'dtype'" in msg
-                    ):
-                        kwargs.pop("dtype", None)
-                        kwargs["torch_dtype"] = dtype_value
-                        model = AutoModel.from_pretrained(model_id, **kwargs)
-                    else:
-                        raise
+                model = AutoModel.from_pretrained(model_id, **kwargs)
 
         return self._safe_to_device(model, device)
 

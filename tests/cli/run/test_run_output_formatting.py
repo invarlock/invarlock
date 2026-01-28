@@ -1,6 +1,8 @@
 import warnings
 from types import SimpleNamespace
 
+import pytest
+
 from invarlock.cli.commands import certify as certify_mod
 from invarlock.cli.commands import run as run_mod
 
@@ -44,15 +46,12 @@ def test_suppress_noisy_warnings_dev_filters_known_messages(monkeypatch) -> None
         warnings.simplefilter("error")
         with run_mod._suppress_noisy_warnings("dev"):
             warnings.warn(
-                "`torch_dtype` is deprecated and will be removed",
-                UserWarning,
-                stacklevel=2,
-            )
-            warnings.warn(
                 "loss_type=None is unrecognized by this model",
                 UserWarning,
                 stacklevel=2,
             )
+            with pytest.raises(UserWarning):
+                warnings.warn("some other warning", UserWarning, stacklevel=2)
 
 
 def test_certify_helpers_cover_banner_and_ratio() -> None:

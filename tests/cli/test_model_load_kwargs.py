@@ -32,7 +32,7 @@ def test_extract_model_load_kwargs_excludes_core_fields():
                 "id": "foo",
                 "adapter": "dummy",
                 "device": "cuda",
-                "torch_dtype": "float16",
+                "dtype": "float16",
                 "trust_remote_code": True,
             }
         }

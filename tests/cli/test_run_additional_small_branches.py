@@ -77,7 +77,7 @@ def test_extract_model_load_kwargs_dtype_aliasing_and_normalization():
                     "id": "foo",
                     "adapter": "dummy",
                     "device": "cpu",
-                    "torch_dtype": "custom_dtype",
+                    "dtype": "custom_dtype",
                 }
             }
 
