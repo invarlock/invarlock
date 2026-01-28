@@ -60,16 +60,42 @@ class HF_Causal_ONNX_Adapter(ModelAdapter):
             "MODEL-LOAD-FAILED: optimum ORTModelForCausalLM",
             lambda e: {"model_id": model_id},
         ):
-            model = ORTModelForCausalLM.from_pretrained(
-                model_id,
-                file_name=file_name,
-                provider="CPUExecutionProvider"
-                if providers == ["CPUExecutionProvider"]
-                else None,
-                providers=providers,
-                trust_remote_code=trust_remote_code,
-                **kwargs,
-            )
+            dtype_value = kwargs.pop("dtype", None)
+            if dtype_value is None and "torch_dtype" in kwargs:
+                dtype_value = kwargs.pop("torch_dtype", None)
+            if dtype_value is not None:
+                kwargs["dtype"] = dtype_value
+            try:
+                model = ORTModelForCausalLM.from_pretrained(
+                    model_id,
+                    file_name=file_name,
+                    provider="CPUExecutionProvider"
+                    if providers == ["CPUExecutionProvider"]
+                    else None,
+                    providers=providers,
+                    trust_remote_code=trust_remote_code,
+                    **kwargs,
+                )
+            except TypeError as exc:
+                msg = str(exc)
+                if (
+                    dtype_value is not None
+                    and "unexpected keyword argument" in msg
+                    and "'dtype'" in msg
+                ):
+                    kwargs.pop("dtype", None)
+                    model = ORTModelForCausalLM.from_pretrained(
+                        model_id,
+                        file_name=file_name,
+                        provider="CPUExecutionProvider"
+                        if providers == ["CPUExecutionProvider"]
+                        else None,
+                        providers=providers,
+                        trust_remote_code=trust_remote_code,
+                        **kwargs,
+                    )
+                else:
+                    raise
         # ORT models manage device internally; return as-is
         return model
 
