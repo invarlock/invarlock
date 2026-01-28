@@ -119,6 +119,27 @@ def test_resolve_exit_code_cases():
     assert run_mod._resolve_exit_code(RuntimeError("x"), profile=BadProfile()) == 1
 
 
+def test_extract_model_load_kwargs_rejects_removed_keys():
+    from invarlock.cli.config import InvarLockConfig
+
+    cfg = InvarLockConfig(
+        {
+            "model": {
+                "id": "foo",
+                "adapter": "dummy",
+                "device": "cuda",
+                "torch_dtype": "float16",
+            }
+        }
+    )
+
+    with pytest.raises(run_mod.InvarlockError) as excinfo:
+        _ = run_mod._extract_model_load_kwargs(cfg)
+
+    assert excinfo.value.code == "E007"
+    assert excinfo.value.details.get("removed_keys") == ["torch_dtype"]
+
+
 def test_hash_and_mask_digests():
     digest = run_mod._hash_sequences([[1, 2, 3], [4, 5]])
     assert digest == "e08215eb1a73f6d493dfb9f17c0de613"
