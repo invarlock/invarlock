@@ -52,16 +52,16 @@ Changelog = "https://github.com/invarlock/invarlock/blob/main/CHANGELOG.md"
 # Core torch dependencies for adapters
 adapters = [
   "torch>=2.1.0",
-  "transformers>=4.53.0",
+  "transformers>=5.0.0",
 ]
 
 # Hugging Face workflow (adapters + evaluation stack)
 hf = [
   "torch>=2.1.0",
-  "transformers>=4.53.0",
+  "transformers>=5.0.0",
   "datasets>=3.0",
   "numpy>=1.24",
-  "huggingface_hub>=0.23",
+  "huggingface_hub>=1.0.0",
   "aiohttp>=3.12.14",
   "h2>=4.3.0",
   "pillow>=11.3.0",
@@ -89,14 +89,14 @@ gptq = [
   "torch>=2.1.0",
   "auto-gptq>=0.7.0; platform_system == \"Linux\"",
   "triton>=2.3.0; platform_system == \"Linux\"",
-  "transformers>=4.53.0",
+  "transformers>=5.0.0",
 ]
 
 
 awq = [
   "torch>=2.1.0",
   "autoawq>=0.2.0; platform_system == \"Linux\"",
-  "transformers>=4.53.0",
+  "transformers>=5.0.0",
   "triton>=2.3.0; platform_system == \"Linux\"",
 ]
 
@@ -111,10 +111,10 @@ gpu = [
 # Complete installation with all features
 all = [
   "torch>=2.1.0",
-  "transformers>=4.53.0",
+  "transformers>=5.0.0",
   "datasets>=3.0",
   "numpy>=1.24",
-  "huggingface_hub>=0.23",
+  "huggingface_hub>=1.0.0",
   "accelerate>=0.27",
   "bitsandbytes>=0.41; platform_system == \"Linux\"",
   "auto-gptq>=0.7.0; platform_system == \"Linux\"",

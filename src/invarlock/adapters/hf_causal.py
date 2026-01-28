@@ -280,27 +280,7 @@ class HF_Causal_Adapter(HFAdapterMixin, ModelAdapter):
                 "MODEL-LOAD-FAILED: transformers AutoModelForCausalLM",
                 lambda e: {"model_id": model_id},
             ):
-                dtype_value = kwargs.pop("dtype", None)
-                if dtype_value is None and "torch_dtype" in kwargs:
-                    dtype_value = kwargs.pop("torch_dtype", None)
-                if dtype_value is not None:
-                    kwargs["dtype"] = dtype_value
-                try:
-                    model = AutoModelForCausalLM.from_pretrained(model_id, **kwargs)
-                except TypeError as exc:
-                    msg = str(exc)
-                    if (
-                        dtype_value is not None
-                        and "unexpected keyword argument" in msg
-                        and "'dtype'" in msg
-                    ):
-                        kwargs.pop("dtype", None)
-                        kwargs["torch_dtype"] = dtype_value
-                        model = AutoModelForCausalLM.from_pretrained(
-                            model_id, **kwargs
-                        )
-                    else:
-                        raise
+                model = AutoModelForCausalLM.from_pretrained(model_id, **kwargs)
 
             return self._safe_to_device(model, device)
         except DependencyError:

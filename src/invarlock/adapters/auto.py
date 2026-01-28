@@ -38,11 +38,7 @@ def _detect_quantization_from_path(model_id: str) -> str | None:
             return "hf_awq"
         elif quant_method == "gptq":
             return "hf_gptq"
-        elif (
-            quant_method == "bitsandbytes"
-            or quant_cfg.get("load_in_8bit")
-            or quant_cfg.get("load_in_4bit")
-        ):
+        elif "bitsandbytes" in quant_method or "bnb" in quant_method:
             return "hf_bnb"
 
     except Exception:
@@ -78,11 +74,7 @@ def _detect_quantization_from_model(model: Any) -> str | None:
             return "hf_awq"
         elif quant_method == "gptq":
             return "hf_gptq"
-        elif (
-            quant_method == "bitsandbytes"
-            or quant_cfg.get("load_in_8bit")
-            or quant_cfg.get("load_in_4bit")
-        ):
+        elif "bitsandbytes" in quant_method or "bnb" in quant_method:
             return "hf_bnb"
     else:
         # Object-style config
