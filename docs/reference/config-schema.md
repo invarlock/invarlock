@@ -87,9 +87,12 @@ model:
   adapter: auto
   device: auto
   # extra adapter kwargs (passed to load_model)
-  dtype: float16  # alias: torch_dtype
+  dtype: float16
   trust_remote_code: false
-  load_in_8bit: false
+  # Optional: v5-native HF quantization config (e.g., bitsandbytes)
+  # quantization_config:
+  #   quant_method: bitsandbytes
+  #   bits: 8
 ```
 
 ### Dataset
