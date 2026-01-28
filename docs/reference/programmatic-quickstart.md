@@ -13,13 +13,13 @@
 ## Quick Start
 
 ```python
-from invarlock.adapters import HF_Causal_Auto_Adapter
+from invarlock.adapters import HF_Auto_Adapter
 from invarlock.core.api import RunConfig
 from invarlock.core.runner import CoreRunner
 from invarlock.edits import RTNQuantEdit
 from invarlock.guards import InvariantsGuard
 
-adapter = HF_Causal_Auto_Adapter()
+adapter = HF_Auto_Adapter()
 model = adapter.load_model("gpt2", device="auto")
 
 edit = RTNQuantEdit(bitwidth=8, per_channel=True, group_size=128, clamp_ratio=0.005)

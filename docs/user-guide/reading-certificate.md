@@ -6,14 +6,14 @@
 | --- | --- |
 | **Purpose** | Understand and interpret InvarLock v1 certificates. |
 | **Audience** | Reviewers validating certification evidence. |
-| **Key sections** | Safety Dashboard, Quality Gates, Primary Metric, Provenance, Measurement contracts. |
+| **Key sections** | Evaluation Dashboard, Quality Gates, Primary Metric, Provenance, Measurement contracts. |
 | **Validation** | Use `invarlock verify <cert.json>` to check schema and pairing. |
 | **Source of truth** | [Certificates](../reference/certificates.md) for full schema. |
 
 This guide highlights the key sections of a v1 certificate and how to
 interpret them.
 
-- Safety Dashboard
+- Evaluation Dashboard
   - First-screen summary of overall PASS/FAIL plus key gates (primary metric, drift, invariants, guards, overhead when evaluated).
 - Primary Metric row
   - Shows the task‑appropriate metric (ppl_* or accuracy), its point estimates,
@@ -46,7 +46,7 @@ interpret them.
 
 Tip: Use `invarlock verify` to recheck schema, pairing, and ratio math.
 
-### Safety Dashboard Interpretation
+### Evaluation Dashboard Interpretation
 
 - **Overall** mirrors the canonical gate allow-list. A FAIL means at least one gate failed.
 - **Primary Metric** shows ratio/Δpp vs baseline; compare to tier thresholds in the gate table.

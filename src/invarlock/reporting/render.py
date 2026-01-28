@@ -172,7 +172,7 @@ def _append_safety_dashboard_section(
     pm_status = (
         f"{'✅' if pm_ok else '❌'} {measured}"
         if isinstance(pm_ok, bool)
-        else f"🛈 {measured}"
+        else f"ℹ️ {measured}"
     )
 
     # Drift summary (final/preview ratio) when preview/final are numeric
@@ -205,7 +205,7 @@ def _append_safety_dashboard_section(
     drift_status = (
         f"{'✅' if drift_ok else '❌'} {drift_val}"
         if isinstance(drift_ok, bool)
-        else f"🛈 {drift_val}"
+        else f"ℹ️ {drift_val}"
     )
 
     def _gate_cell(key: str, ok_default: bool | None = None) -> str:
@@ -217,7 +217,7 @@ def _append_safety_dashboard_section(
         else:
             ok = bool(validation.get(key))
         if ok is None:
-            return "🛈 N/A"
+            return "ℹ️ N/A"
         return "✅ PASS" if ok else "❌ FAIL"
 
     overhead_ctx = certificate.get("guard_overhead", {}) or {}
@@ -247,11 +247,11 @@ def _append_safety_dashboard_section(
             "Overhead",
             f"{'✅' if bool(validation.get('guard_overhead_acceptable', True)) else '❌'} {overhead_measured}"
             if isinstance(validation, dict)
-            else f"🛈 {overhead_measured}",
+            else f"ℹ️ {overhead_measured}",
             threshold_str,
         )
 
-    lines.append("## Safety Dashboard")
+    lines.append("## Evaluation Dashboard")
     lines.append("")
     lines.append("| Check | Status | Quick Summary |")
     lines.append("|-------|--------|---------------|")
@@ -822,9 +822,9 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
 
     lines.append("## Contents")
     lines.append("")
-    lines.append("- [Safety Dashboard](#safety-dashboard)")
+    lines.append("- [Evaluation Dashboard](#evaluation-dashboard)")
     lines.append("- [Quality Gates](#quality-gates)")
-    lines.append("- [Safety Check Details](#safety-check-details)")
+    lines.append("- [Guard Check Details](#guard-check-details)")
     lines.append("- [Primary Metric](#primary-metric)")
     lines.append("- [Guard Observability](#guard-observability)")
     lines.append("- [Model Information](#model-information)")
@@ -985,7 +985,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
         warned = bool(pm_tail.get("warned", False))
 
         if not evaluated:
-            status = "🛈 INFO"
+            status = "ℹ️ INFO"
         elif passed:
             status = "✅ PASS"
         elif mode == "fail":
@@ -1046,9 +1046,9 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
         lines.append("- Note: hysteresis applied to gate boundary")
 
     lines.append("")
-    lines.append("## Safety Check Details")
+    lines.append("## Guard Check Details")
     lines.append("")
-    lines.append("| Safety Check | Status | Measured | Threshold | Description |")
+    lines.append("| Guard Check | Status | Measured | Threshold | Description |")
     lines.append("|--------------|--------|----------|-----------|-------------|")
 
     inv_summary = certificate["invariants"]
@@ -1095,7 +1095,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
         pm_ratio = certificate.get("primary_metric", {}).get("ratio_vs_baseline")
         if isinstance(pm_ratio, int | float):
             lines.append(
-                f"| Catastrophic Spike Gate (safety stop) | {'✅ PASS' if pm_ok else '❌ FAIL'} | {pm_ratio:.3f}x | ≤ 2.0x | Hard stop @ 2.0× |"
+                f"| Catastrophic Spike Gate (hard stop) | {'✅ PASS' if pm_ok else '❌ FAIL'} | {pm_ratio:.3f}x | ≤ 2.0x | Hard stop @ 2.0× |"
             )
 
     # Include RMT Health row for compatibility and clarity
@@ -1138,7 +1138,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
                 parts.append(f"{float(overlap_frac) * 100.0:.1f}% overlap")
             elif overlap_frac is not None:
                 parts.append(f"overlap={overlap_frac}")
-            lines.append(f"✅ Pairing: {', '.join(parts) if parts else 'N/A'}")
+            lines.append(f"- ✅ Pairing: {', '.join(parts) if parts else 'N/A'}")
         if isinstance(bootstrap, dict):
             reps = bootstrap.get("replicates")
             bseed = bootstrap.get("seed")
@@ -1154,7 +1154,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
                         bits.append(f"seed={int(bseed)}")
                     except Exception:
                         bits.append(f"seed={bseed}")
-                lines.append(f"✅ Bootstrap: {', '.join(bits) if bits else 'N/A'}")
+                lines.append(f"- ✅ Bootstrap: {', '.join(bits) if bits else 'N/A'}")
         # Optional: show log-space paired Δ CI next to ratio CI for clarity
         delta_ci = certificate.get("primary_metric", {}).get("ci") or certificate.get(
             "ppl", {}
@@ -1164,7 +1164,9 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
             and len(delta_ci) == 2
             and all(isinstance(x, int | float) for x in delta_ci)
         ):
-            lines.append(f"🛈 Log Δ (paired) CI: [{delta_ci[0]:.6f}, {delta_ci[1]:.6f}]")
+            lines.append(
+                f"- ℹ️ Log Δ (paired) CI: [{delta_ci[0]:.6f}, {delta_ci[1]:.6f}]"
+            )
     except Exception:
         pass
 
@@ -1260,7 +1262,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
             if max_module:
                 max_val += f" – {max_module}"
             if kappa_f is None:
-                max_status = "🛈 No κ"
+                max_status = "ℹ️ No κ"
             elif max_abs_z <= kappa_f:
                 max_status = f"✅ Within κ={kappa_f:.3f}"
             else:
@@ -1280,7 +1282,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
             if isinstance(mt_m, int | float) and math.isfinite(float(mt_m)):
                 parts.append(f"m={int(mt_m)}")
             lines.append(
-                f"| Multiple Testing | {', '.join(parts) if parts else '—'} | 🛈 INFO |"
+                f"| Multiple Testing | {', '.join(parts) if parts else '—'} | ℹ️ INFO |"
             )
 
         lines.append("")
@@ -1854,10 +1856,10 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
     lines.append("---")
     lines.append("")
     lines.append(
-        "*This InvarLock evaluation certificate provides a comprehensive assessment of model compression safety.*"
+        "*This InvarLock Evaluation Certificate summarizes baseline‑paired evaluation results for a subject model relative to the provided baseline snapshot under the configured profile/preset.*"
     )
     lines.append(
-        "*All metrics are compared against the uncompressed baseline model for safety validation.*"
+        "*It reports regression-risk indicators for the measured signals; it is not a broad AI safety, alignment, or content-safety guarantee.*"
     )
 
     return "\n".join(lines)

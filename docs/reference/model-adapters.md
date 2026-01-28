@@ -143,7 +143,7 @@ Adapter loaders pass through standard Hugging Face `from_pretrained` arguments:
 
 | Key | Common use | Applies to |
 | --- | --- | --- |
-| `torch_dtype` | Force `float16`/`bfloat16` | HF adapters |
+| `dtype` | Force `float16`/`bfloat16` (alias: `torch_dtype`) | HF adapters |
 | `device_map` | Sharding/placement | HF adapters |
 | `trust_remote_code` | Enable custom model code | HF adapters |
 | `revision` | Pin model revision | HF adapters |

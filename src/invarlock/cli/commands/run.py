@@ -1185,13 +1185,15 @@ def _extract_model_load_kwargs(cfg: InvarLockConfig) -> dict[str, Any]:
         for key, value in model.items()
         if key not in {"id", "adapter", "device"} and value is not None
     }
-    # Backwards-compatible aliasing: config `dtype` → HF `torch_dtype`.
-    if "dtype" in extra and "torch_dtype" not in extra:
-        extra["torch_dtype"] = extra.pop("dtype")
+    # Backwards-compatible aliasing: config `torch_dtype` → HF `dtype`.
+    if "torch_dtype" in extra and "dtype" not in extra:
+        extra["dtype"] = extra.pop("torch_dtype")
+    else:
+        extra.pop("torch_dtype", None)
 
-    # Normalize torch_dtype when present (keep as string for JSON-ability).
-    if "torch_dtype" in extra and isinstance(extra.get("torch_dtype"), str):
-        dtype_str = str(extra.get("torch_dtype") or "").strip().lower()
+    # Normalize dtype when present (keep as string for JSON-ability).
+    if "dtype" in extra and isinstance(extra.get("dtype"), str):
+        dtype_str = str(extra.get("dtype") or "").strip().lower()
         aliases = {
             "fp16": "float16",
             "half": "float16",
@@ -1199,9 +1201,9 @@ def _extract_model_load_kwargs(cfg: InvarLockConfig) -> dict[str, Any]:
             "fp32": "float32",
         }
         if dtype_str in aliases:
-            extra["torch_dtype"] = aliases[dtype_str]
+            extra["dtype"] = aliases[dtype_str]
         elif dtype_str:
-            extra["torch_dtype"] = dtype_str
+            extra["dtype"] = dtype_str
 
     return extra
 

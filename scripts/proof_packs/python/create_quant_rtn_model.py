@@ -115,7 +115,7 @@ def main(argv: list[str]) -> int:
     flash_available = os.environ.get("FLASH_ATTENTION_AVAILABLE", "false") == "true"
 
     model_kwargs: dict[str, object] = {
-        "torch_dtype": torch.bfloat16,
+        "dtype": torch.bfloat16,
         "trust_remote_code": True,
         "device_map": "auto",
         "low_cpu_mem_usage": True,

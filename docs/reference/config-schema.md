@@ -87,7 +87,7 @@ model:
   adapter: auto
   device: auto
   # extra adapter kwargs (passed to load_model)
-  torch_dtype: float16
+  dtype: float16  # alias: torch_dtype
   trust_remote_code: false
   load_in_8bit: false
 ```
