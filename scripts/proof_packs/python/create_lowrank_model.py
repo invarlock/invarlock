@@ -117,7 +117,7 @@ def main(argv: list[str]) -> int:
     tokenizer = AutoTokenizer.from_pretrained(baseline_path, trust_remote_code=True)
     model = AutoModelForCausalLM.from_pretrained(
         baseline_path,
-        torch_dtype=torch.bfloat16,
+        dtype=torch.bfloat16,
         trust_remote_code=True,
         device_map="auto",
         low_cpu_mem_usage=True,

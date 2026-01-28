@@ -64,7 +64,7 @@ def main(argv: list[str]) -> int:
 
     print(f"Loading baseline from {baseline_path}...")
     model_kwargs = {
-        "torch_dtype": torch.bfloat16,
+        "dtype": torch.bfloat16,
         "trust_remote_code": True,
         "device_map": "auto",
         "low_cpu_mem_usage": True,

@@ -16,7 +16,7 @@ telemetry fields, and HTML export.
 
 - [Quick Start](#quick-start)
 - [Certificate Layout](#certificate-layout)
-  - [Safety Dashboard Interpretation](#safety-dashboard-interpretation)
+  - [Evaluation Dashboard Interpretation](#evaluation-dashboard-interpretation)
 - [Schema](#schema)
   - [Minimal v1 Certificate Example](#minimal-v1-certificate-example)
   - [Schema Summary](#schema-summary-validator-view)
@@ -47,17 +47,17 @@ invarlock report html -i reports/cert/evaluation.cert.json -o reports/cert/evalu
 
 ## Certificate Layout
 
-The markdown certificate is structured to highlight safety outcomes first:
+The markdown certificate is structured to highlight evaluation outcomes first:
 
-- **Safety Dashboard**: one-line PASS/FAIL + core gates (primary metric, drift, invariants, spectral, RMT, overhead).
+- **Evaluation Dashboard**: one-line PASS/FAIL + core gates (primary metric, drift, invariants, spectral, RMT, overhead).
 - **Quality Gates**: table of canonical gating checks with measured values.
-- **Safety Check Details**: invariants, spectral stability, RMT health, and pairing snapshots.
+- **Guard Check Details**: invariants, spectral stability, RMT health, and pairing snapshots.
 - **Primary Metric**: task-specific metric summary with CI + baseline comparison.
 - **Guard Observability**: compact summaries with expandable guard details.
 - **Policy Configuration**: tier + digest summary with resolved policy details in `<details>`.
 - **Appendix**: environment, inference diagnostics, and variance guard details.
 
-### Safety Dashboard Interpretation
+### Evaluation Dashboard Interpretation
 
 | Row | Meaning | Action |
 | --- | --- | --- |
@@ -436,7 +436,7 @@ html = render_certificate_html(certificate)
 - `primary_metric_tail` appears only for ppl-like metrics with paired windows.
 - The rendered HTML is derived from the Markdown report. If values look wrong,
   inspect the underlying `evaluation.cert.json`.
-- The Markdown certificate is a human-readable view (starts with a Safety Dashboard + Contents); the JSON certificate is the canonical evidence artifact.
+- The Markdown certificate is a human-readable view (starts with an Evaluation Dashboard + Contents); the JSON certificate is the canonical evidence artifact.
 
 ---
 

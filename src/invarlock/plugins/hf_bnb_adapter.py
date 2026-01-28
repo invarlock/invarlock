@@ -84,6 +84,12 @@ class HF_BNB_Adapter(HFAdapterMixin, ModelAdapter):
         ):
             from transformers import AutoModelForCausalLM
 
+        dtype_value = kwargs.pop("dtype", None)
+        if dtype_value is None and "torch_dtype" in kwargs:
+            dtype_value = kwargs.pop("torch_dtype", None)
+        if dtype_value is not None:
+            kwargs["dtype"] = dtype_value
+
         # Check if this is a pre-quantized checkpoint
         is_pre_quantized, pre_quant_bits = _detect_pre_quantized_bnb(model_id)
 
@@ -95,17 +101,36 @@ class HF_BNB_Adapter(HFAdapterMixin, ModelAdapter):
                 "MODEL-LOAD-FAILED: bitsandbytes/transformers (pre-quantized)",
                 lambda e: {"model_id": model_id, "pre_quantized_bits": pre_quant_bits},
             ):
-                model = AutoModelForCausalLM.from_pretrained(
-                    model_id,
-                    device_map="auto",
-                    trust_remote_code=True,
-                    # Do NOT pass load_in_8bit/load_in_4bit for pre-quantized
-                    **{
-                        k: v
-                        for k, v in kwargs.items()
-                        if k not in ("load_in_8bit", "load_in_4bit")
-                    },
-                )
+                load_kwargs = {
+                    k: v
+                    for k, v in kwargs.items()
+                    if k not in ("load_in_8bit", "load_in_4bit")
+                }
+                try:
+                    model = AutoModelForCausalLM.from_pretrained(
+                        model_id,
+                        device_map="auto",
+                        trust_remote_code=True,
+                        # Do NOT pass load_in_8bit/load_in_4bit for pre-quantized
+                        **load_kwargs,
+                    )
+                except TypeError as exc:
+                    msg = str(exc)
+                    if (
+                        dtype_value is not None
+                        and "unexpected keyword argument" in msg
+                        and "'dtype'" in msg
+                    ):
+                        load_kwargs.pop("dtype", None)
+                        load_kwargs["torch_dtype"] = dtype_value
+                        model = AutoModelForCausalLM.from_pretrained(
+                            model_id,
+                            device_map="auto",
+                            trust_remote_code=True,
+                            **load_kwargs,
+                        )
+                    else:
+                        raise
         else:
             # Fresh quantization of FP16 model
             load_in_8bit = bool(kwargs.pop("load_in_8bit", True))
@@ -120,14 +145,34 @@ class HF_BNB_Adapter(HFAdapterMixin, ModelAdapter):
                 "MODEL-LOAD-FAILED: bitsandbytes/transformers",
                 lambda e: {"model_id": model_id},
             ):
-                model = AutoModelForCausalLM.from_pretrained(
-                    model_id,
-                    device_map="auto",
-                    load_in_8bit=load_in_8bit,
-                    load_in_4bit=load_in_4bit,
-                    trust_remote_code=True,
-                    **kwargs,
-                )
+                try:
+                    model = AutoModelForCausalLM.from_pretrained(
+                        model_id,
+                        device_map="auto",
+                        load_in_8bit=load_in_8bit,
+                        load_in_4bit=load_in_4bit,
+                        trust_remote_code=True,
+                        **kwargs,
+                    )
+                except TypeError as exc:
+                    msg = str(exc)
+                    if (
+                        dtype_value is not None
+                        and "unexpected keyword argument" in msg
+                        and "'dtype'" in msg
+                    ):
+                        kwargs.pop("dtype", None)
+                        kwargs["torch_dtype"] = dtype_value
+                        model = AutoModelForCausalLM.from_pretrained(
+                            model_id,
+                            device_map="auto",
+                            load_in_8bit=load_in_8bit,
+                            load_in_4bit=load_in_4bit,
+                            trust_remote_code=True,
+                            **kwargs,
+                        )
+                    else:
+                        raise
 
         # BNB models handle their own device placement via device_map="auto"
         # Do NOT call .to() on BNB models - it will raise an error

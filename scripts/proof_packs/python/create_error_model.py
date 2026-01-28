@@ -29,7 +29,7 @@ def main(argv: list[str]) -> int:
     try:
         model = AutoModelForCausalLM.from_pretrained(
             baseline_path,
-            torch_dtype=torch.bfloat16,
+            dtype=torch.bfloat16,
             trust_remote_code=True,
             device_map="auto",
             low_cpu_mem_usage=True,
@@ -41,7 +41,7 @@ def main(argv: list[str]) -> int:
         )
         model = AutoModelForCausalLM.from_pretrained(
             baseline_path,
-            torch_dtype=torch.bfloat16,
+            dtype=torch.bfloat16,
             trust_remote_code=True,
             device_map="cpu",
             low_cpu_mem_usage=True,
