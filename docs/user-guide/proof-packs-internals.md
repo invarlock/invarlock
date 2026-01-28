@@ -498,7 +498,7 @@ Large runs can be storage-heavy (baseline + edits + error models):
 - `PACK_BASELINE_STORAGE_MODE=snapshot_symlink` stores baseline weights as
   symlinks to HF cache files to reduce duplication.
 - HF caches default to `OUTPUT_DIR/.hf` (override with `HF_HOME`, `HF_HUB_CACHE`,
-  `HF_DATASETS_CACHE`, `TRANSFORMERS_CACHE`).
+  `HF_DATASETS_CACHE`).
 
 ## Proof pack packaging and verification
 
@@ -536,7 +536,7 @@ Common knobs for the setup script:
 
 - `REPO_DIR`, `REPO_URL`, `BRANCH`, `PYTHON_BIN`, `VENV_DIR`.
 - `TORCH_INDEX_URL`, `TORCH_PACKAGES`, `PACK_SKIP_TORCH_CHECK`.
-- `HF_HOME`, `HF_HUB_CACHE`, `HF_DATASETS_CACHE`, `TRANSFORMERS_CACHE`.
+- `HF_HOME`, `HF_HUB_CACHE`, `HF_DATASETS_CACHE`.
 
 ## Tuning reference
 
