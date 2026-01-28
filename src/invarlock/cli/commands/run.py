@@ -125,9 +125,7 @@ RELEASE_CALIBRATION_MAX = 24
 GUARD_OVERHEAD_THRESHOLD = 0.01
 KV_LABEL_WIDTH = 10
 
-_NOISY_WARNING_PATTERNS = (
-    r".*loss_type=None.*unrecognized.*",
-)
+_NOISY_WARNING_PATTERNS = (r".*loss_type=None.*unrecognized.*",)
 
 
 def _resolve_warning_suppression(profile: str | None) -> tuple[bool, bool]:

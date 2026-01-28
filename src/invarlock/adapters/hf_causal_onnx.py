@@ -63,7 +63,9 @@ class HF_Causal_ONNX_Adapter(ModelAdapter):
             model = ORTModelForCausalLM.from_pretrained(
                 model_id,
                 file_name=file_name,
-                provider="CPUExecutionProvider" if providers == ["CPUExecutionProvider"] else None,
+                provider="CPUExecutionProvider"
+                if providers == ["CPUExecutionProvider"]
+                else None,
                 providers=providers,
                 trust_remote_code=trust_remote_code,
                 **kwargs,
