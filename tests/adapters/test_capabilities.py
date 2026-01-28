@@ -155,8 +155,8 @@ class TestDetectQuantizationFromConfig:
         """Dict-style BNB 8-bit config should be detected."""
         mock_config = MagicMock()
         mock_config.quantization_config = {
-            "load_in_8bit": True,
-            "load_in_4bit": False,
+            "quant_method": "bitsandbytes",
+            "bits": 8,
         }
         cfg = detect_quantization_from_config(mock_config)
         assert cfg.method == QuantizationMethod.BNB_8BIT
@@ -167,8 +167,8 @@ class TestDetectQuantizationFromConfig:
         """Dict-style BNB 4-bit config should be detected."""
         mock_config = MagicMock()
         mock_config.quantization_config = {
-            "load_in_8bit": False,
-            "load_in_4bit": True,
+            "quant_method": "bitsandbytes",
+            "bits": 4,
             "bnb_4bit_use_double_quant": True,
             "bnb_4bit_compute_dtype": "float16",
         }
@@ -253,7 +253,10 @@ class TestDetectCapabilitiesFromModel:
         """BNB 8-bit model should have non-movable capabilities."""
         mock_model = MagicMock()
         mock_model.config = MagicMock()
-        mock_model.config.quantization_config = {"load_in_8bit": True}
+        mock_model.config.quantization_config = {
+            "quant_method": "bitsandbytes",
+            "bits": 8,
+        }
         mock_model.config.model_type = "mistral"
         mock_model.config.architectures = ["MistralForCausalLM"]
 
