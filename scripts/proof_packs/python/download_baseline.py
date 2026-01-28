@@ -107,7 +107,6 @@ def download_snapshot(
         local_dir=str(model_dir),
         local_dir_use_symlinks=local_dir_use_symlinks,
         cache_dir=os.environ.get("HF_HUB_CACHE"),
-        resume_download=True,
         revision=revision,
     )
 

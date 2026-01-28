@@ -60,7 +60,6 @@ def test_tokenizer_factory_produces_non_zero_tokens(monkeypatch):
             return DummyTokenizer()
 
     monkeypatch.setattr(mp, "AutoTokenizer", DummyTokenizerFactory, raising=False)
-    monkeypatch.setattr(mp, "GPT2Tokenizer", DummyTokenizerFactory, raising=False)
 
     profile = detect_model_profile(
         model_id="mistralai/Mistral-7B-v0.1", adapter="hf_causal"

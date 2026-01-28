@@ -50,7 +50,7 @@ def resolve_trust_remote_code(
     return default
 
 
-def default_torch_dtype() -> torch.dtype:
+def default_dtype() -> torch.dtype:
     """Pick a safe default dtype for HF loads based on hardware."""
     if torch.cuda.is_available():
         try:
@@ -69,10 +69,10 @@ def default_torch_dtype() -> torch.dtype:
     return torch.float32
 
 
-def resolve_torch_dtype(kwargs: dict[str, Any] | None = None) -> torch.dtype | str:
-    """Resolve torch_dtype from kwargs or choose a hardware-aware default."""
-    if kwargs and "torch_dtype" in kwargs:
-        val = kwargs.get("torch_dtype")
+def resolve_dtype(kwargs: dict[str, Any] | None = None) -> torch.dtype | str:
+    """Resolve dtype from kwargs or choose a hardware-aware default."""
+    if kwargs and "dtype" in kwargs:
+        val = kwargs.get("dtype")
         if isinstance(val, torch.dtype):
             return val
         if isinstance(val, str):
@@ -91,7 +91,7 @@ def resolve_torch_dtype(kwargs: dict[str, Any] | None = None) -> torch.dtype | s
             if s in mapping:
                 return mapping[s]
 
-    return default_torch_dtype()
+    return default_dtype()
 
 
-__all__ = ["resolve_trust_remote_code", "default_torch_dtype", "resolve_torch_dtype"]
+__all__ = ["resolve_trust_remote_code", "default_dtype", "resolve_dtype"]

@@ -37,16 +37,13 @@ def test_suppress_noisy_warnings_release_profile() -> None:
         warnings.simplefilter("always")
         run_mod._apply_warning_filters("release")
         warnings.warn(
-            "`torch_dtype` is deprecated! Use `dtype` instead!",
-            UserWarning,
-            stacklevel=2,
-        )
-        warnings.warn(
             "`loss_type=None` was set in the config but it is unrecognized.",
             UserWarning,
             stacklevel=2,
         )
-    assert records == []
+        warnings.warn("some other warning", UserWarning, stacklevel=2)
+    assert len(records) == 1
+    assert "some other warning" in str(records[0].message)
 
 
 def test_resolve_metric_override_takes_precedence() -> None:

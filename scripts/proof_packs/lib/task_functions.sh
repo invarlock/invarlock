@@ -323,7 +323,7 @@ _ensure_certify_baseline_report() {
         cat > "${baseline_config_root}/runtime/profiles/ci.yaml" << YAML
 model:
   device_map: "auto"
-  torch_dtype: "bfloat16"
+  dtype: "bfloat16"
   trust_remote_code: true
   low_cpu_mem_usage: true
 dataset:
@@ -364,7 +364,7 @@ model:
   adapter: "${adapter_name}"
   device: "auto"
   device_map: "auto"
-  torch_dtype: "bfloat16"
+  dtype: "bfloat16"
   trust_remote_code: true
   low_cpu_mem_usage: true
 
@@ -890,7 +890,7 @@ task_calibration_run() {
     cat > "${config_root}/runtime/profiles/ci.yaml" << YAML
 model:
   device_map: "auto"
-  torch_dtype: "bfloat16"
+  dtype: "bfloat16"
   trust_remote_code: true
   low_cpu_mem_usage: true
 dataset:
@@ -932,7 +932,7 @@ model:
   adapter: "hf_auto"
   device: "auto"
   device_map: "auto"
-  torch_dtype: "bfloat16"
+  dtype: "bfloat16"
   trust_remote_code: true
   low_cpu_mem_usage: true
 
@@ -1329,7 +1329,7 @@ task_certify_edit() {
     cat > "${config_root}/runtime/profiles/ci.yaml" << YAML
 model:
   device_map: "auto"
-  torch_dtype: "bfloat16"
+  dtype: "bfloat16"
   trust_remote_code: true
   low_cpu_mem_usage: true
 dataset:
@@ -1631,7 +1631,7 @@ task_certify_error() {
     cat > "${config_root}/runtime/profiles/ci.yaml" << YAML
 model:
   device_map: "auto"
-  torch_dtype: "bfloat16"
+  dtype: "bfloat16"
   trust_remote_code: true
   low_cpu_mem_usage: true
 dataset:

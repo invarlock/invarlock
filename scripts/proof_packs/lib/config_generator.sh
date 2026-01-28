@@ -69,7 +69,7 @@ model:
   adapter: "${adapter}"
   device: "auto"
   device_map: "auto"
-  torch_dtype: "bfloat16"
+  dtype: "bfloat16"
   trust_remote_code: true
   low_cpu_mem_usage: true
   ${attn_impl_yaml}
