@@ -37,16 +37,13 @@ def test_suppress_noisy_warnings_release_profile() -> None:
         warnings.simplefilter("always")
         run_mod._apply_warning_filters("release")
         warnings.warn(
-            "`torch_dtype` is deprecated! Use `dtype` instead!",
-            UserWarning,
-            stacklevel=2,
-        )
-        warnings.warn(
             "`loss_type=None` was set in the config but it is unrecognized.",
             UserWarning,
             stacklevel=2,
         )
-    assert records == []
+        warnings.warn("some other warning", UserWarning, stacklevel=2)
+    assert len(records) == 1
+    assert "some other warning" in str(records[0].message)
 
 
 def test_resolve_metric_override_takes_precedence() -> None:
@@ -120,6 +117,27 @@ def test_resolve_exit_code_cases():
             return True
 
     assert run_mod._resolve_exit_code(RuntimeError("x"), profile=BadProfile()) == 1
+
+
+def test_extract_model_load_kwargs_rejects_removed_keys():
+    from invarlock.cli.config import InvarLockConfig
+
+    cfg = InvarLockConfig(
+        {
+            "model": {
+                "id": "foo",
+                "adapter": "dummy",
+                "device": "cuda",
+                "torch_dtype": "float16",
+            }
+        }
+    )
+
+    with pytest.raises(run_mod.InvarlockError) as excinfo:
+        _ = run_mod._extract_model_load_kwargs(cfg)
+
+    assert excinfo.value.code == "E007"
+    assert excinfo.value.details.get("removed_keys") == ["torch_dtype"]
 
 
 def test_hash_and_mask_digests():

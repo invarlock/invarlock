@@ -125,10 +125,7 @@ RELEASE_CALIBRATION_MAX = 24
 GUARD_OVERHEAD_THRESHOLD = 0.01
 KV_LABEL_WIDTH = 10
 
-_NOISY_WARNING_PATTERNS = (
-    r".*`torch_dtype` is deprecated.*",
-    r".*loss_type=None.*unrecognized.*",
-)
+_NOISY_WARNING_PATTERNS = (r".*loss_type=None.*unrecognized.*",)
 
 
 def _resolve_warning_suppression(profile: str | None) -> tuple[bool, bool]:
@@ -1185,11 +1182,20 @@ def _extract_model_load_kwargs(cfg: InvarLockConfig) -> dict[str, Any]:
         for key, value in model.items()
         if key not in {"id", "adapter", "device"} and value is not None
     }
-    # Backwards-compatible aliasing: config `torch_dtype` → HF `dtype`.
-    if "torch_dtype" in extra and "dtype" not in extra:
-        extra["dtype"] = extra.pop("torch_dtype")
-    else:
-        extra.pop("torch_dtype", None)
+    removed_keys: list[str] = []
+    for key in ("torch_dtype", "load_in_8bit", "load_in_4bit"):
+        if key in extra:
+            removed_keys.append(key)
+    if removed_keys:
+        raise InvarlockError(
+            code="E007",
+            message=(
+                "CONFIG-KEY-REMOVED: "
+                + ", ".join(removed_keys)
+                + ". Use model.dtype and/or model.quantization_config."
+            ),
+            details={"removed_keys": removed_keys},
+        )
 
     # Normalize dtype when present (keep as string for JSON-ability).
     if "dtype" in extra and isinstance(extra.get("dtype"), str):

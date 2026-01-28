@@ -722,7 +722,7 @@ Notes:
 - **`DEPENDENCY-MISSING` errors**: install the required extras (see Quick Start).
 - **Pairing failures (`E001`)**: ensure baseline `report.json` preserves
   `evaluation_windows` and uses the same dataset settings.
-- **Non-finite metrics**: lower batch size or force `dtype=float32` (alias: `torch_dtype`).
+- **Non-finite metrics**: lower batch size or force `dtype=float32`.
 
 ## Observability
 

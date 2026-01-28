@@ -27,7 +27,7 @@ def test_resolve_auto_adapter_detects_quant_families_from_config(
 
     # BitsAndBytes 8-bit
     bnb_dir = tmp_path / "bnb8"
-    _write_cfg(bnb_dir, {"quantization_config": {"load_in_8bit": True}})
+    _write_cfg(bnb_dir, {"quantization_config": {"quant_method": "bitsandbytes"}})
     assert resolve_auto_adapter(str(bnb_dir)) == "hf_bnb"
 
 

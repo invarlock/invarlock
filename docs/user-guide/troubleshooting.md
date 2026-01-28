@@ -222,7 +222,7 @@ These errors relate to window pairing, tokenizer consistency, and evidence integ
 
 **Fixes:**
 
-1. Force `dtype: float32` in model config (alias: `torch_dtype`)
+1. Force `dtype: float32` in model config
 2. Reduce batch size if memory-constrained
 3. Use an accelerator (CUDA/MPS) for better precision
 4. Lower `plan.max_modules` to reduce edit scope
@@ -338,7 +338,7 @@ INVARLOCK_GUARD_PREPARE_STRICT=0 invarlock run -c <config.yaml>
 **Fixes:**
 
 1. Use an accelerator when available: `--device cuda` or `--device mps`
-2. Force higher precision: `dtype: float32` in config (alias: `torch_dtype`)
+2. Force higher precision: `dtype: float32` in config
 3. Reduce edit scope or batch size
 
 ## Debug Tools

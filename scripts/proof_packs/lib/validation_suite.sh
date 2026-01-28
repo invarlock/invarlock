@@ -306,8 +306,8 @@ OUTPUT_DIR="${OUTPUT_DIR:-}"
 # Default behavior for this suite: co-locate caches under OUTPUT_DIR so they land
 # on the same (usually large) filesystem as the run artifacts.
 #
-# Override by exporting HF_HOME / HF_HUB_CACHE / HF_DATASETS_CACHE /
-# TRANSFORMERS_CACHE before running this script.
+# Override by exporting HF_HOME / HF_HUB_CACHE / HF_DATASETS_CACHE before running
+# this script.
 pack_setup_hf_cache_dirs() {
     if [[ -z "${OUTPUT_DIR:-}" ]]; then
         echo "ERROR: OUTPUT_DIR is not set; use --out or PACK_OUTPUT_DIR." >&2
@@ -316,8 +316,7 @@ pack_setup_hf_cache_dirs() {
     export HF_HOME="${HF_HOME:-${OUTPUT_DIR}/.hf}"
     export HF_HUB_CACHE="${HF_HUB_CACHE:-${HF_HOME}/hub}"
     export HF_DATASETS_CACHE="${HF_DATASETS_CACHE:-${HF_HOME}/datasets}"
-    export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-${HF_HOME}/transformers}"
-    if ! mkdir -p "${HF_HOME}" "${HF_HUB_CACHE}" "${HF_DATASETS_CACHE}" "${TRANSFORMERS_CACHE}"; then
+    if ! mkdir -p "${HF_HOME}" "${HF_HUB_CACHE}" "${HF_DATASETS_CACHE}"; then
         echo "ERROR: Failed to create HuggingFace cache directories under: ${HF_HOME}" >&2
         return 1
     fi

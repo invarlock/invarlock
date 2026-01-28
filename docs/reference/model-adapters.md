@@ -125,7 +125,9 @@ model:
 model:
   id: mistralai/Mistral-7B-v0.1
   adapter: hf_bnb
-  load_in_8bit: true
+  quantization_config:
+    quant_method: bitsandbytes
+    bits: 8
 ```
 
 ```yaml
@@ -143,7 +145,7 @@ Adapter loaders pass through standard Hugging Face `from_pretrained` arguments:
 
 | Key | Common use | Applies to |
 | --- | --- | --- |
-| `dtype` | Force `float16`/`bfloat16` (alias: `torch_dtype`) | HF adapters |
+| `dtype` | Force `float16`/`bfloat16` | HF adapters |
 | `device_map` | Sharding/placement | HF adapters |
 | `trust_remote_code` | Enable custom model code | HF adapters |
 | `revision` | Pin model revision | HF adapters |

@@ -24,7 +24,6 @@ PACK_SKIP_TORCH_CHECK="${PACK_SKIP_TORCH_CHECK:-0}"
 export HF_HOME="${HF_HOME:-${REPO_DIR}/hf_home}"
 export HF_HUB_CACHE="${HF_HUB_CACHE:-${HF_HOME}/hub}"
 export HF_DATASETS_CACHE="${HF_DATASETS_CACHE:-${HF_HOME}/datasets}"
-export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-${HF_HOME}/transformers}"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
