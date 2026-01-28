@@ -115,6 +115,12 @@ test_pack_validation_setup_hf_cache_dirs_creates_directories_and_returns_zero() 
     pack_setup_hf_cache_dirs
     assert_dir_exists "${HF_HOME}" "HF_HOME created"
     assert_dir_exists "${HF_HOME}/hub" "HF_HUB_CACHE created"
+    if [[ -n "${TRANSFORMERS_CACHE:-}" ]]; then
+        t_fail "TRANSFORMERS_CACHE should remain unset (Transformers v5 uses HF_HOME)"
+    fi
+    if [[ -d "${HF_HOME}/transformers" ]]; then
+        t_fail "TRANSFORMERS_CACHE directory should not be created under HF_HOME"
+    fi
 }
 
 test_pack_validation_run_determinism_repeats_writes_summary() {
