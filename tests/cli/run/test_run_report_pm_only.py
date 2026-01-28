@@ -135,6 +135,10 @@ output:
         ),
         patch("invarlock.core.runner.CoreRunner", lambda: DummyRunner()),
         patch("invarlock.eval.data.get_provider", lambda *a, **k: StubProvider()),
+        patch(
+            "invarlock.cli.commands.run.resolve_tokenizer",
+            lambda _profile: (SimpleNamespace(name_or_path="test"), "tokhash"),
+        ),
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
