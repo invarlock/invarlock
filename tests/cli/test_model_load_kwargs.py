@@ -4,6 +4,7 @@ import pytest
 
 from invarlock.cli.commands import run as run_mod
 from invarlock.cli.config import InvarLockConfig
+from invarlock.core.exceptions import InvarlockError
 
 
 class DummyKwAdapter:
@@ -42,6 +43,26 @@ def test_extract_model_load_kwargs_excludes_core_fields():
         "dtype": "float16",
         "trust_remote_code": True,
     }
+
+
+@pytest.mark.unit
+def test_extract_model_load_kwargs_rejects_removed_keys():
+    cfg = InvarLockConfig(
+        {
+            "model": {
+                "id": "foo",
+                "adapter": "dummy",
+                "device": "cuda",
+                "torch_dtype": "float16",
+            }
+        }
+    )
+
+    with pytest.raises(InvarlockError) as excinfo:
+        _ = run_mod._extract_model_load_kwargs(cfg)
+
+    assert excinfo.value.code == "E007"
+    assert excinfo.value.details.get("removed_keys") == ["torch_dtype"]
 
 
 @pytest.mark.unit
