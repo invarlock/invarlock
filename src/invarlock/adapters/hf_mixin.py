@@ -583,22 +583,45 @@ class HFAdapterMixin:
     def _serialize_config(self, config: Any) -> dict[str, Any]:
         """Serialize HuggingFace config fields into simple Python types."""
 
+        def _collect(data: dict[str, Any]) -> dict[str, Any]:
+            out: dict[str, Any] = {}
+            for key, value in data.items():
+                if key.startswith("_") or key in {"method_calls"}:
+                    continue
+                if value is None or isinstance(value, SCALAR_TYPES):
+                    out[key] = value
+                elif isinstance(value, list | dict):
+                    out[key] = value
+            return out
+
+        to_dict = getattr(config, "to_dict", None)
+        if callable(to_dict):
+            try:
+                data = to_dict()
+            except Exception:
+                data = None
+            if isinstance(data, dict):
+                return _collect(data)
+
+        try:
+            data = vars(config)
+        except TypeError:
+            data = None
+        if isinstance(data, dict):
+            return _collect(data)
+
         result: dict[str, Any] = {}
         for key in dir(config):
-            if key.startswith("_"):
+            if key.startswith("_") or key in {"torch_dtype"}:
                 continue
-
             try:
                 value = getattr(config, key)
             except AttributeError:
                 continue
-
             if callable(value):
                 continue
-
             if value is None or isinstance(value, SCALAR_TYPES):
                 result[key] = value
             elif isinstance(value, list | dict):
                 result[key] = value
-
         return result
