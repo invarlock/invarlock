@@ -60,7 +60,7 @@ def _report_and_base():
     return rep, base
 
 
-def test_save_report_cert_without_evidence(tmp_path: Path):
+def test_save_report_without_evidence(tmp_path: Path):
     rep, base = _report_and_base()
     out = save_report(
         rep, tmp_path, formats=["report"], baseline=base, filename_prefix="r"

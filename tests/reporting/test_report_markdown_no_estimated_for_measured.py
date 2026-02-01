@@ -3,7 +3,7 @@ from invarlock.reporting.report_builder import REPORT_SCHEMA_VERSION
 
 
 def test_markdown_excludes_estimated_suffix_for_measured_accuracy():
-    cert = {
+    evaluation_report = {
         "schema_version": REPORT_SCHEMA_VERSION,
         "run_id": "abc",
         "artifacts": {"generated_at": "now"},
@@ -42,5 +42,5 @@ def test_markdown_excludes_estimated_suffix_for_measured_accuracy():
         "resolved_policy": {},
         "policy_provenance": {},
     }
-    md = render_report_markdown(cert)
+    md = render_report_markdown(evaluation_report)
     assert "(estimated)" not in md

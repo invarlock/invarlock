@@ -36,8 +36,8 @@ def test_small_workflow_configs_present() -> None:
         # Presets carry tier context via profile; auto tier may not be set at top-level
 
 
-def test_cert_script_is_executable() -> None:
+def test_eval_script_is_executable() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "cert_once.sh"
-    assert script_path.exists(), "Expected scripts/cert_once.sh to exist"
-    assert os.access(script_path, os.X_OK), "cert_once.sh should be executable"
+    script_path = repo_root / "scripts" / "eval_once.sh"
+    assert script_path.exists(), "Expected scripts/eval_once.sh to exist"
+    assert os.access(script_path, os.X_OK), "eval_once.sh should be executable"

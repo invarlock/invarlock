@@ -35,9 +35,7 @@ def _mk_simple_report() -> RunReport:
     return r
 
 
-def test_save_report_cert_outputs(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_save_report_outputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     rp = _mk_simple_report()
     base = _mk_simple_report()
     # Gate evidence emission on env

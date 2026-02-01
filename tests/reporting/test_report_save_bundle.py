@@ -92,9 +92,7 @@ def _baseline_v1() -> dict:
     }
 
 
-def test_save_report_cert_bundle_writes_manifest_and_evidence(
-    tmp_path: Path, monkeypatch
-):
+def test_save_report_bundle_writes_manifest_and_evidence(tmp_path: Path, monkeypatch):
     rep = _minimal_run_report()
     base = _baseline_v1()
     # Gate small debug evidence emission via env
@@ -111,7 +109,7 @@ def test_save_report_cert_bundle_writes_manifest_and_evidence(
     assert (tmp_path / "guards_evidence.json").exists()
 
 
-def test_save_report_cert_requires_baseline(tmp_path: Path):
+def test_save_report_requires_baseline(tmp_path: Path):
     rep = _minimal_run_report()
     with pytest.raises(ValueError):
         save_report(rep, tmp_path, formats=["report"], baseline=None)

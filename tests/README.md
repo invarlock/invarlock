@@ -32,8 +32,8 @@ pytest -q \
   tests/cli/test_doctor_json_tiny_relax_note.py \
   tests/integration/scripts/test_tiny_matrix_checklist.py \
   tests/reporting/test_report_schema_v1_accuracy_tags.py \
-  tests/reporting/test_cert_markdown_estimated_suffix.py \
-  tests/reporting/test_cert_markdown_no_estimated_for_measured.py
+  tests/reporting/test_report_markdown_estimated_suffix.py \
+  tests/reporting/test_report_markdown_no_estimated_for_measured.py
 ```
 
 ## Runtime artifacts

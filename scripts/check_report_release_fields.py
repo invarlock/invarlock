@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 
-def validate_cert(path: Path) -> list[str]:
+def validate_report(path: Path) -> list[str]:
     errors: list[str] = []
     if not path.exists():
         return [f"report not found: {path}"]
@@ -38,16 +38,19 @@ def validate_cert(path: Path) -> list[str]:
 
 def main(argv: list[str]) -> int:
     if len(argv) != 2:
-        print("usage: check_cert_release_fields.py <cert.json>", file=sys.stderr)
+        print(
+            "usage: check_report_release_fields.py <evaluation.report.json>",
+            file=sys.stderr,
+        )
         return 1
 
-    errors = validate_cert(Path(argv[1]))
+    errors = validate_report(Path(argv[1]))
     if errors:
         for err in errors:
-            print(f"[cert-check] {err}", file=sys.stderr)
+            print(f"[report-check] {err}", file=sys.stderr)
         return 1
 
-    print("[cert-check] release cert fields present")
+    print("[report-check] release report fields present")
     return 0
 
 
