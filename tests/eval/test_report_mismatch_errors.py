@@ -4,7 +4,7 @@ from unittest.mock import patch
 from invarlock.reporting.report_builder import make_report
 
 
-def test_certificate_raises_on_drift_ratio_inconsistency():
+def test_evaluation_report_raises_on_drift_ratio_inconsistency():
     window_ids = list(range(1, 181))
     logloss_vals = [1.0] * len(window_ids)
     report = {
@@ -82,7 +82,7 @@ def test_certificate_raises_on_drift_ratio_inconsistency():
         },
     }
 
-    # After normalization, this inconsistency is tolerated; certificate still returned
+    # After normalization, this inconsistency is tolerated; evaluation_report still returned
     report.setdefault("metrics", {}).setdefault("window_plan", {}).update(
         {"profile": "ci", "preview_n": 180, "final_n": 180}
     )

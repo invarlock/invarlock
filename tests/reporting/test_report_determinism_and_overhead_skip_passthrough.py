@@ -78,7 +78,7 @@ def _mk_minimal_baseline() -> dict:
     }
 
 
-def test_certificate_propagates_determinism_and_overhead_skip_fields() -> None:
+def test_evaluation_report_propagates_determinism_and_overhead_skip_fields() -> None:
     report = _mk_minimal_report()
     baseline = _mk_minimal_baseline()
     report["meta"]["determinism"] = {

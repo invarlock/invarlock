@@ -20,7 +20,7 @@ def _stub_run(out_dir: Path) -> None:
     (ts_dir / "report.json").write_text(json.dumps(report), encoding="utf-8")
 
 
-def test_certify_timing_block_printed(monkeypatch, tmp_path, capsys) -> None:
+def test_evaluate_timing_block_printed(monkeypatch, tmp_path, capsys) -> None:
     src = tmp_path / "src_model"
     edt = tmp_path / "edt_model"
     src.mkdir()

@@ -2,7 +2,7 @@
 InvarLock HTML Export
 =================
 
- Thin wrapper over the HTML certificate renderer to make exporting
+ Thin wrapper over the HTML evaluation report renderer to make exporting
  discoverable and scriptable.
 """
 
@@ -20,7 +20,9 @@ console = Console()
 
 
 def export_html_command(
-    input: str = typer.Option(..., "--input", "-i", help="Path to certificate JSON"),
+    input: str = typer.Option(
+        ..., "--input", "-i", help="Path to evaluation report JSON"
+    ),
     output: str = typer.Option(..., "--output", "-o", help="Path to output HTML file"),
     embed_css: bool = typer.Option(
         True,
@@ -31,12 +33,12 @@ def export_html_command(
         False, "--force", help="Overwrite output file if it already exists"
     ),
 ) -> None:
-    """Render a certificate JSON to HTML.
+    """Render an evaluation report JSON to HTML.
 
     Exit codes:
     - 0: success
     - 1: generic failure (IO or overwrite refusal)
-    - 2: validation failure (invalid certificate schema)
+    - 2: validation failure (invalid evaluation report schema)
     """
     # When called programmatically, Typer's Option defaults can be OptionInfo
     try:  # pragma: no cover - defensive, matches other commands' pattern
@@ -74,8 +76,8 @@ def export_html_command(
 
         html = render_report_html(payload)
     except ValueError as exc:
-        # Certificate validation failed upstream
-        console.print(f"[red]❌ Certificate validation failed: {exc}[/red]")
+        # Evaluation report validation failed upstream
+        console.print(f"[red]❌ Evaluation report validation failed: {exc}[/red]")
         raise typer.Exit(2) from exc
     except Exception as exc:
         console.print(f"[red]❌ Failed to render HTML: {exc}[/red]")
@@ -94,7 +96,7 @@ def export_html_command(
         console.print(f"[red]❌ Failed to write output file: {exc}[/red]")
         raise typer.Exit(1) from exc
 
-    console.print(f"✅ Exported certificate HTML → {out_path}")
+    console.print(f"✅ Exported evaluation report HTML → {out_path}")
 
 
 __all__ = ["export_html_command"]

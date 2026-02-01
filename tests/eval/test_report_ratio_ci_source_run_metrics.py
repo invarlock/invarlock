@@ -3,7 +3,7 @@ from unittest.mock import patch
 from invarlock.reporting.report_builder import make_report
 
 
-def test_certificate_ratio_ci_source_run_metrics_on_compute_failure():
+def test_evaluation_report_ratio_ci_source_run_metrics_on_compute_failure():
     report = {
         "meta": {
             "model_id": "gpt2",

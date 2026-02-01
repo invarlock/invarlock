@@ -36,7 +36,9 @@ def test_spectral_top_z_non_numeric_formats_as_na():
         "ppl_final": 10.0,
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
-    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+    with patch(
+        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+    ):
         cert = make_report(report, baseline)
 
     cert.setdefault("spectral", {})["top_z_scores"] = {

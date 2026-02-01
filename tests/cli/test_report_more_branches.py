@@ -8,8 +8,8 @@ import typer
 from typer.models import OptionInfo
 
 import invarlock.cli.commands.report as report_mod
-import invarlock.reporting.report_builder as cert_mod
 import invarlock.reporting.report as report_lib
+import invarlock.reporting.report_builder as cert_mod
 
 
 def _make_primary_report():
@@ -56,7 +56,7 @@ def test_generate_reports_coerces_optioninfo_and_all_formats(monkeypatch):
     assert saved["formats"] == ["json", "markdown", "html"]
 
 
-def test_generate_reports_certificate_validation_block(monkeypatch):
+def test_generate_reports_evaluation_report_validation_block(monkeypatch):
     primary = _make_primary_report()
     baseline = _make_primary_report()
 
@@ -104,7 +104,7 @@ def test_generate_reports_certificate_validation_block(monkeypatch):
     )
 
 
-def test_generate_reports_certificate_validation_error(monkeypatch):
+def test_generate_reports_evaluation_report_validation_error(monkeypatch):
     monkeypatch.setattr(
         report_mod, "_load_run_report", lambda path: _make_primary_report()
     )

@@ -3,7 +3,7 @@ from unittest.mock import patch
 from invarlock.reporting.report_builder import make_report
 
 
-def test_certificate_ratio_ci_source_run_metrics_on_wrong_type_return():
+def test_evaluation_report_ratio_ci_source_run_metrics_on_wrong_type_return():
     """
     If compute_paired_delta_log_ci returns a wrong type (non-tuple),
     the conversion to ratio CI should fail inside the try-block and

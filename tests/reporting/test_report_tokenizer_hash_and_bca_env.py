@@ -6,7 +6,7 @@ from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.report_types import create_empty_report
 
 
-def test_certificate_baseline_ref_includes_tokenizer_hash() -> None:
+def test_evaluation_report_baseline_ref_includes_tokenizer_hash() -> None:
     report = create_empty_report()
     report["meta"]["model_id"] = "m"
     report["meta"]["adapter"] = "hf"
@@ -72,7 +72,7 @@ def test_certificate_baseline_ref_includes_tokenizer_hash() -> None:
     assert cert["baseline_ref"]["tokenizer_hash"] == "tokhash-abc"
 
 
-def test_certificate_uses_bca_when_env_enabled_and_many_paired_windows(
+def test_evaluation_report_uses_bca_when_env_enabled_and_many_paired_windows(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("INVARLOCK_BOOTSTRAP_BCA", "1")

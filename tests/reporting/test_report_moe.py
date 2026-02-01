@@ -52,7 +52,7 @@ def _mk_base_report() -> dict:
     }
 
 
-def test_certificate_includes_moe_families_when_present():
+def test_evaluation_report_includes_moe_families_when_present():
     report = _mk_base_report()
     baseline = _mk_base_report()
     # Inject spectral guard metrics with MoE families
@@ -107,7 +107,7 @@ def test_certificate_includes_moe_families_when_present():
     assert {"router", "expert_ffn"}.issubset(rmt_families)
 
 
-def test_certificate_moe_section_uses_normalized_baseline(monkeypatch):
+def test_evaluation_report_moe_section_uses_normalized_baseline(monkeypatch):
     report = _mk_base_report()
     baseline = deepcopy(report)
     report["metrics"]["moe"] = {

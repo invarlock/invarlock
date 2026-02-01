@@ -26,8 +26,8 @@ def test_quality_overhead_accuracy_delta_pp_basis() -> None:
     assert abs(float(out.get("value", 0.0)) + 2.0) < 1e-6  # negative 2.0 pp
 
 
-def test_make_certificate_attaches_quality_overhead_for_accuracy() -> None:
-    # Prepare a certificate where primary_metric is accuracy and guard has bare/guarded
+def test_make_evaluation_report_attaches_quality_overhead_for_accuracy() -> None:
+    # Prepare a evaluation_report where primary_metric is accuracy and guard has bare/guarded
     report = {
         "meta": {"model_id": "m", "adapter": "hf", "device": "cpu", "seed": 1},
         "metrics": {

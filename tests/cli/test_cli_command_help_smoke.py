@@ -26,8 +26,8 @@ def test_cli_top_level_help_smoke(monkeypatch):
 def test_command_wrappers_importable():
     # Ensure import surface remains stable
     from invarlock.cli.commands import (
-        evaluate_command,
         doctor_command,
+        evaluate_command,
         explain_gates_command,
         export_html_command,
         plugins_command,

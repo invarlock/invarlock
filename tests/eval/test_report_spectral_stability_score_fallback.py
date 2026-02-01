@@ -42,7 +42,9 @@ def test_spectral_stability_score_from_generic_key():
         "ppl_final": 10.0,
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
-    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+    with patch(
+        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+    ):
         cert = make_report(report, baseline)
     summary = cert.get("spectral", {}).get("summary", {})
     assert summary.get("stability_score") == 0.77

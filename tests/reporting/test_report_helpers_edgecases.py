@@ -25,7 +25,7 @@ def test_is_ppl_kind_handles_str_exception() -> None:
 
 
 def test_get_ppl_final_handles_bad_metrics_get() -> None:
-    # Legacy _get_ppl_final removed; rely on primary_metric parsing in certificate generation.
+    # Legacy _get_ppl_final removed; rely on primary_metric parsing in evaluation_report generation.
     assert True
 
 

@@ -3,7 +3,7 @@ from unittest.mock import patch
 from invarlock.reporting.report_builder import make_report
 
 
-def test_certificate_ppl_both_invalid_fallback_default():
+def test_evaluation_report_ppl_both_invalid_fallback_default():
     report = {
         "meta": {"model_id": "m", "seed": 1},
         "metrics": {
@@ -35,7 +35,9 @@ def test_certificate_ppl_both_invalid_fallback_default():
         "model_id": "m",
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
-    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+    with patch(
+        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+    ):
         cert = make_report(report, baseline)
     pm = cert.get("primary_metric", {})
     # Baseline reference now stores PM-only; ensure it's present and numeric when computable

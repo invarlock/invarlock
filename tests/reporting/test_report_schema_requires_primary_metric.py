@@ -3,7 +3,7 @@ from __future__ import annotations
 import invarlock.reporting.report_schema as schema_mod
 
 
-def test_certificate_schema_requires_primary_metric_and_window_stats() -> None:
+def test_evaluation_report_schema_requires_primary_metric_and_window_stats() -> None:
     cert = {
         "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
         "run_id": "run-1234",

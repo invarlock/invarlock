@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
-from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.report_builder import make_report
 
 
 def test_render_markdown_plugin_provenance_missing_fields_and_na_overhead():
@@ -48,7 +48,9 @@ def test_render_markdown_plugin_provenance_missing_fields_and_na_overhead():
         "ppl_final": 10.0,
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
-    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+    with patch(
+        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+    ):
         cert = make_report(report, baseline)
 
     md = render_report_markdown(cert)

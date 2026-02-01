@@ -84,14 +84,14 @@ def _base_ci_report_and_baseline():
     return report, baseline
 
 
-def test_make_certificate_ci_rejects_non_none_window_pairing_reason() -> None:
+def test_make_evaluation_report_ci_rejects_non_none_window_pairing_reason() -> None:
     report, baseline = _base_ci_report_and_baseline()
     report["metrics"]["window_pairing_reason"] = "no_baseline_reference"
     with pytest.raises(ValueError):
         make_report(report, baseline)
 
 
-def test_make_certificate_ci_rejects_zero_paired_windows() -> None:
+def test_make_evaluation_report_ci_rejects_zero_paired_windows() -> None:
     report, baseline = _base_ci_report_and_baseline()
     report["metrics"]["paired_windows"] = 0
     report["metrics"]["window_pairing_reason"] = None

@@ -89,7 +89,7 @@ def _patch_common(monkeypatch, report, baseline):
     )
 
 
-def _stub_certificate_extractors(
+def _stub_evaluation_report_extractors(
     monkeypatch,
     *,
     dataset_info=None,
@@ -151,7 +151,7 @@ def _stub_certificate_extractors(
     )
 
 
-def test_make_certificate_raises_on_drift_identity(monkeypatch):
+def test_make_evaluation_report_raises_on_drift_identity(monkeypatch):
     report = _base_report()
     baseline = _base_baseline()
     report["metrics"]["primary_metric"].update(
@@ -182,7 +182,7 @@ def test_make_certificate_raises_on_drift_identity(monkeypatch):
         cert.make_report({}, {})
 
 
-def test_make_certificate_raises_on_ratio_ci_mismatch(monkeypatch):
+def test_make_evaluation_report_raises_on_ratio_ci_mismatch(monkeypatch):
     report = _base_report()
     baseline = _base_baseline()
     report["metrics"]["window_plan"]["profile"] = "ci"
@@ -208,7 +208,7 @@ def test_make_certificate_raises_on_ratio_ci_mismatch(monkeypatch):
         cert.make_report({}, {})
 
 
-def test_make_certificate_uses_coverage_fallback(monkeypatch):
+def test_make_evaluation_report_uses_coverage_fallback(monkeypatch):
     report = _base_report()
     baseline = _base_baseline()
     report["metrics"]["bootstrap"]["coverage"] = {"preview": {"used": 5}}
@@ -216,12 +216,12 @@ def test_make_certificate_uses_coverage_fallback(monkeypatch):
     _patch_common(monkeypatch, report, baseline)
     monkeypatch.setattr(cert, "_pair_logloss_windows", lambda *_: None, raising=False)
 
-    certificate = cert.make_report(report, baseline)
-    stats = certificate["dataset"]["windows"]["stats"]
+    evaluation_report = cert.make_report(report, baseline)
+    stats = evaluation_report["dataset"]["windows"]["stats"]
     assert stats["paired_windows"] == 5
 
 
-def test_make_certificate_populates_optional_sections(monkeypatch):
+def test_make_evaluation_report_populates_optional_sections(monkeypatch):
     report = _base_report()
     baseline = _base_baseline()
 
@@ -282,8 +282,8 @@ def test_make_certificate_populates_optional_sections(monkeypatch):
 
     _patch_common(monkeypatch, report, baseline)
 
-    def _attach_pm_stub(certificate: dict, *_args, **_kwargs) -> None:
-        certificate["primary_metric"] = {
+    def _attach_pm_stub(evaluation_report: dict, *_args, **_kwargs) -> None:
+        evaluation_report["primary_metric"] = {
             "kind": "ppl_causal",
             "ratio_vs_baseline": 1.02,
             "display_ci": (1.0, 1.04),
@@ -343,77 +343,83 @@ def test_make_certificate_populates_optional_sections(monkeypatch):
         cert, "_compute_policy_digest", lambda *_: "resolved-digest", raising=False
     )
 
-    certificate = cert.make_report(report, baseline)
+    evaluation_report = cert.make_report(report, baseline)
 
-    assert certificate["secondary_metrics"][0]["kind"] == "accuracy"
-    subgroup = certificate["classification"]["subgroups"]["alpha"]
+    assert evaluation_report["secondary_metrics"][0]["kind"] == "accuracy"
+    subgroup = evaluation_report["classification"]["subgroups"]["alpha"]
     assert subgroup["delta_pp"] == pytest.approx(10.0)
-    assert certificate["guard_overhead"]["evaluated"] is True
-    assert certificate["guard_overhead"]["passed"] is False
-    assert certificate["system_overhead"]["latency_ms_p50"]["ratio"] == pytest.approx(
-        0.8
+    assert evaluation_report["guard_overhead"]["evaluated"] is True
+    assert evaluation_report["guard_overhead"]["passed"] is False
+    assert evaluation_report["system_overhead"]["latency_ms_p50"][
+        "ratio"
+    ] == pytest.approx(0.8)
+    assert evaluation_report["policy_digest"]["policy_version"] == cert.POLICY_VERSION
+    assert evaluation_report["telemetry"]["summary_line"].startswith(
+        "INVARLOCK_TELEMETRY"
     )
-    assert certificate["policy_digest"]["policy_version"] == cert.POLICY_VERSION
-    assert certificate["telemetry"]["summary_line"].startswith("INVARLOCK_TELEMETRY")
 
 
-def test_make_certificate_populates_dataset_stats_when_absent(monkeypatch):
+def test_make_evaluation_report_populates_dataset_stats_when_absent(monkeypatch):
     report = _base_report()
     baseline = _base_baseline()
     _patch_common(monkeypatch, report, baseline)
 
     dataset_stub = {"hash": {}, "windows": {}}
-    _stub_certificate_extractors(
+    _stub_evaluation_report_extractors(
         monkeypatch,
         dataset_info=dataset_stub,
         resolved_policy={"spectral": {}, "variance": {}},
     )
 
-    certificate = cert.make_report(report, baseline)
-    stats = certificate["dataset"]["windows"]["stats"]
+    evaluation_report = cert.make_report(report, baseline)
+    stats = evaluation_report["dataset"]["windows"]["stats"]
     assert "pairing" in stats
     assert stats["paired_windows"] >= 1
 
 
-def test_make_certificate_policy_digest_marks_tier_change(monkeypatch):
+def test_make_evaluation_report_policy_digest_marks_tier_change(monkeypatch):
     report = _base_report()
     baseline = _base_baseline()
     report["meta"]["auto"]["tier"] = "balanced"
     baseline["meta"]["auto"] = {"tier": "conservative"}
 
     _patch_common(monkeypatch, report, baseline)
-    _stub_certificate_extractors(
+    _stub_evaluation_report_extractors(
         monkeypatch,
         dataset_info={"hash": {}, "windows": {"stats": {}}},
         resolved_policy={"spectral": {}, "variance": {}},
     )
 
-    certificate = cert.make_report(report, baseline)
-    assert certificate["policy_digest"]["changed"] is True
+    evaluation_report = cert.make_report(report, baseline)
+    assert evaluation_report["policy_digest"]["changed"] is True
 
 
-def test_make_certificate_policy_digest_handles_missing_baseline_tier(monkeypatch):
+def test_make_evaluation_report_policy_digest_handles_missing_baseline_tier(
+    monkeypatch,
+):
     report = _base_report()
     baseline = _base_baseline()
     report["meta"]["auto"]["tier"] = "balanced"
     baseline["meta"].pop("auto", None)
 
     _patch_common(monkeypatch, report, baseline)
-    _stub_certificate_extractors(
+    _stub_evaluation_report_extractors(
         monkeypatch,
         dataset_info={"hash": {}, "windows": {"stats": {}}},
         resolved_policy={"spectral": {}, "variance": {}},
     )
 
-    certificate = cert.make_report(report, baseline)
-    assert certificate["policy_digest"]["changed"] is False
+    evaluation_report = cert.make_report(report, baseline)
+    assert evaluation_report["policy_digest"]["changed"] is False
 
 
-def test_make_certificate_policy_digest_detects_threshold_hash_change(monkeypatch):
+def test_make_evaluation_report_policy_digest_detects_threshold_hash_change(
+    monkeypatch,
+):
     report = _base_report()
     baseline = _base_baseline()
     _patch_common(monkeypatch, report, baseline)
-    _stub_certificate_extractors(
+    _stub_evaluation_report_extractors(
         monkeypatch,
         dataset_info={"hash": {}, "windows": {"stats": {}}},
         resolved_policy={"spectral": {}, "variance": {}},
@@ -433,11 +439,11 @@ def test_make_certificate_policy_digest_detects_threshold_hash_change(monkeypatc
     )
     monkeypatch.setattr(cert, "_compute_thresholds_hash", fake_hash, raising=False)
 
-    certificate = cert.make_report(report, baseline)
-    assert certificate["policy_digest"]["changed"] is True
+    evaluation_report = cert.make_report(report, baseline)
+    assert evaluation_report["policy_digest"]["changed"] is True
 
 
-def test_make_certificate_copies_meta_environment_flags(monkeypatch):
+def test_make_evaluation_report_copies_meta_environment_flags(monkeypatch):
     report = _base_report()
     baseline = _base_baseline()
     report["meta"]["env_flags"] = {"tf32": False}
@@ -450,15 +456,15 @@ def test_make_certificate_copies_meta_environment_flags(monkeypatch):
     )
     monkeypatch.setattr(cert, "_normalize_baseline", lambda value: value, raising=False)
 
-    certificate = cert.make_report(report, baseline)
-    meta = certificate["meta"]
+    evaluation_report = cert.make_report(report, baseline)
+    meta = evaluation_report["meta"]
     assert meta["env_flags"]["tf32"] is False
     assert meta["tokenizer_hash"] == "tok-data"
     assert meta["model_profile"]["arch"] == "gpt"
     assert meta["cuda_flags"]["tf32"] is True
 
 
-def test_make_certificate_uses_meta_tokenizer_hash(monkeypatch):
+def test_make_evaluation_report_uses_meta_tokenizer_hash(monkeypatch):
     report = _base_report()
     baseline = _base_baseline()
     report["meta"]["tokenizer_hash"] = "tok-meta"
@@ -468,11 +474,11 @@ def test_make_certificate_uses_meta_tokenizer_hash(monkeypatch):
     )
     monkeypatch.setattr(cert, "_normalize_baseline", lambda value: value, raising=False)
 
-    certificate = cert.make_report(report, baseline)
-    assert certificate["meta"]["tokenizer_hash"] == "tok-meta"
+    evaluation_report = cert.make_report(report, baseline)
+    assert evaluation_report["meta"]["tokenizer_hash"] == "tok-meta"
 
 
-def test_make_certificate_handles_missing_dataset_section(monkeypatch):
+def test_make_evaluation_report_handles_missing_dataset_section(monkeypatch):
     report = _base_report()
     baseline = _base_baseline()
     report["meta"].pop("tokenizer_hash", None)
@@ -489,5 +495,5 @@ def test_make_certificate_handles_missing_dataset_section(monkeypatch):
         raising=False,
     )
 
-    certificate = cert.make_report(report, baseline)
-    assert "tokenizer_hash" not in certificate["meta"]
+    evaluation_report = cert.make_report(report, baseline)
+    assert "tokenizer_hash" not in evaluation_report["meta"]

@@ -16,10 +16,10 @@ def _write_cert(tmp_path: Path, payload: dict, name: str = "cert.json") -> Path:
     return p
 
 
-def _minimal_ppl_certificate(
+def _minimal_ppl_evaluation_report(
     *, ratio: float = 1.0, final: float = 10.0, baseline_final: float = 10.0
 ) -> dict:
-    # Minimal schema-valid certificate for ppl-like metric
+    # Minimal schema-valid evaluation_report for ppl-like metric
     spectral_contract = {
         "estimator": {"type": "power_iter", "iters": 4, "init": "ones"}
     }
@@ -93,9 +93,9 @@ def _minimal_ppl_certificate(
 def test_verify_json_success_and_failure(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    ok = _minimal_ppl_certificate(ratio=1.0, final=10.0, baseline_final=10.0)
+    ok = _minimal_ppl_evaluation_report(ratio=1.0, final=10.0, baseline_final=10.0)
     ok["primary_metric"]["preview"] = 10.0  # ensure drift ratio == 1.0
-    bad = _minimal_ppl_certificate(ratio=1.2, final=10.0, baseline_final=10.0)
+    bad = _minimal_ppl_evaluation_report(ratio=1.2, final=10.0, baseline_final=10.0)
 
     ok_path = _write_cert(tmp_path, ok, "ok.json")
     bad_path = _write_cert(tmp_path, bad, "bad.json")
@@ -127,7 +127,7 @@ def test_verify_recompute_dev_warning_json(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     # PPL-like cert with missing evaluation_windows triggers dev-mode recompute warning path
-    cert = _minimal_ppl_certificate()
+    cert = _minimal_ppl_evaluation_report()
     cert_path = _write_cert(tmp_path, cert)
 
     with pytest.raises(typer.Exit) as ei:
@@ -141,7 +141,7 @@ def test_verify_recompute_dev_warning_json(
 def test_verify_human_success_line(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    ok = _minimal_ppl_certificate(ratio=1.0, final=10.0, baseline_final=10.0)
+    ok = _minimal_ppl_evaluation_report(ratio=1.0, final=10.0, baseline_final=10.0)
     ok["primary_metric"]["preview"] = 10.0
     p = _write_cert(tmp_path, ok)
     # Human mode should not raise; prints a single-line success summary
@@ -153,7 +153,7 @@ def test_verify_human_success_line(
 def test_verify_ci_profile_enforces_provider_digest(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    cert = _minimal_ppl_certificate()
+    cert = _minimal_ppl_evaluation_report()
     path = _write_cert(tmp_path, cert)
     # In CI profile, provider_digest is required and should raise with non-zero exit
     with pytest.raises(typer.Exit) as ei:
@@ -167,8 +167,8 @@ def test_verify_ci_profile_enforces_provider_digest(
 def test_verify_json_failure_envelope_multiple(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    bad1 = _minimal_ppl_certificate(ratio=float("nan"))
-    bad2 = _minimal_ppl_certificate(ratio=1.2)
+    bad1 = _minimal_ppl_evaluation_report(ratio=float("nan"))
+    bad2 = _minimal_ppl_evaluation_report(ratio=1.2)
     p1 = _write_cert(tmp_path, bad1, "c1.json")
     p2 = _write_cert(tmp_path, bad2, "c2.json")
     with pytest.raises(typer.Exit) as ei:
@@ -185,9 +185,9 @@ def test_verify_json_failure_envelope_multiple(
 def test_verify_json_mixed_success_and_failure(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    ok = _minimal_ppl_certificate(ratio=1.0, final=10.0, baseline_final=10.0)
+    ok = _minimal_ppl_evaluation_report(ratio=1.0, final=10.0, baseline_final=10.0)
     ok["primary_metric"]["preview"] = 10.0
-    bad = _minimal_ppl_certificate(ratio=1.2, final=10.0, baseline_final=10.0)
+    bad = _minimal_ppl_evaluation_report(ratio=1.2, final=10.0, baseline_final=10.0)
     p1 = _write_cert(tmp_path, ok, "ok.json")
     p2 = _write_cert(tmp_path, bad, "bad.json")
     with pytest.raises(typer.Exit) as ei:
@@ -200,8 +200,8 @@ def test_verify_json_mixed_success_and_failure(
 def test_verify_ci_tokenizer_mismatch_parity(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    # Subject certificate includes provider_digest; baseline has different tokenizer hash
-    cert = _minimal_ppl_certificate()
+    # Subject evaluation_report includes provider_digest; baseline has different tokenizer hash
+    cert = _minimal_ppl_evaluation_report()
     cert.setdefault("provenance", {})["provider_digest"] = {
         "ids_sha256": "ID123",
         "tokenizer_sha256": "TOK-B",
@@ -233,7 +233,7 @@ def test_validate_primary_metric_missing_block_direct() -> None:
 
 
 def test_verify_ppl_recompute_missing_windows_ci_profile(tmp_path: Path) -> None:
-    cert = _minimal_ppl_certificate()
+    cert = _minimal_ppl_evaluation_report()
     # Provide provider_digest so CI profile reaches ppl recompute path
     cert.setdefault("provenance", {})["provider_digest"] = {
         "ids_sha256": "ID123",

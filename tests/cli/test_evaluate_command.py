@@ -25,7 +25,7 @@ def _stub_run(out_dir: Path, baseline: Path | None = None):
     (ts_dir / "report.json").write_text(json.dumps(report), encoding="utf-8")
 
 
-def test_certify_orchestrates_runs_and_cert(monkeypatch, tmp_path):
+def test_evaluate_orchestrates_runs_and_cert(monkeypatch, tmp_path):
     # Arrange: create HF-like dirs for source/edited
     src = tmp_path / "src_model"
     edt = tmp_path / "edt_model"
@@ -90,7 +90,7 @@ def test_certify_orchestrates_runs_and_cert(monkeypatch, tmp_path):
     assert rep["baseline"] is not None and rep["run"] is not None
 
 
-def test_certify_reuses_baseline_report_skipping_baseline_run(monkeypatch, tmp_path):
+def test_evaluate_reuses_baseline_report_skipping_baseline_run(monkeypatch, tmp_path):
     src = tmp_path / "src_model"
     edt = tmp_path / "edt_model"
     src.mkdir()
@@ -165,7 +165,7 @@ def test_certify_reuses_baseline_report_skipping_baseline_run(monkeypatch, tmp_p
     assert Path(rep["baseline"]).resolve() == baseline_report.resolve()
 
 
-def test_certify_baseline_report_requires_windows(monkeypatch, tmp_path):
+def test_evaluate_baseline_report_requires_windows(monkeypatch, tmp_path):
     src = tmp_path / "src_model"
     edt = tmp_path / "edt_model"
     src.mkdir()
@@ -208,7 +208,7 @@ def test_certify_baseline_report_requires_windows(monkeypatch, tmp_path):
         )
 
 
-def test_certify_autogen_uses_device_auto(monkeypatch, tmp_path):
+def test_evaluate_autogen_uses_device_auto(monkeypatch, tmp_path):
     """Auto-generated evaluate presets should not hard-code CPU device."""
     # Arrange HF-like source/edited dirs so auto adapter resolves to hf_causal
     src = tmp_path / "src_model"
@@ -266,7 +266,7 @@ def test_certify_autogen_uses_device_auto(monkeypatch, tmp_path):
     assert calls and calls[0]["device"] is None
 
 
-def test_certify_quiet_summary_emits_status(monkeypatch, tmp_path, capsys):
+def test_evaluate_quiet_summary_emits_status(monkeypatch, tmp_path, capsys):
     src = tmp_path / "src_model"
     edt = tmp_path / "edt_model"
     src.mkdir()

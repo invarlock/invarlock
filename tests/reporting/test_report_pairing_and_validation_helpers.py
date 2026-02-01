@@ -6,9 +6,9 @@ from copy import deepcopy
 
 import pytest
 
+from invarlock.reporting import primary_metric_utils
 from invarlock.reporting import report_builder as cert_mod
 from invarlock.reporting import report_schema as cert_schema_mod
-from invarlock.reporting import primary_metric_utils
 from invarlock.reporting.report_builder import make_report, validate_report
 from invarlock.reporting.report_types import create_empty_report
 
@@ -55,7 +55,9 @@ def _mk_baseline() -> dict:
     return b
 
 
-def test_make_certificate_covers_baseline_ratio_identity_branches(monkeypatch) -> None:
+def test_make_evaluation_report_covers_baseline_ratio_identity_branches(
+    monkeypatch,
+) -> None:
     # Avoid heavy bootstrap compute while still exercising the paired-window CI path.
     monkeypatch.setattr(
         "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
@@ -114,12 +116,14 @@ def test_make_certificate_covers_baseline_ratio_identity_branches(monkeypatch) -
         assert validate_report(cert)
 
 
-def test_make_certificate_synthesizes_display_ci_from_ratio_or_defaults(
+def test_make_evaluation_report_synthesizes_display_ci_from_ratio_or_defaults(
     monkeypatch,
 ) -> None:
     baseline = _mk_baseline()
 
-    def attach_stub(certificate, report, baseline_raw, baseline_ref, ppl_analysis):  # noqa: ANN001,ARG001
+    def attach_stub(
+        evaluation_report, report, baseline_raw, baseline_ref, ppl_analysis
+    ):  # noqa: ANN001,ARG001
         pm = (
             report.get("metrics", {}).get("primary_metric")
             if isinstance(report.get("metrics"), dict)
@@ -128,7 +132,7 @@ def test_make_certificate_synthesizes_display_ci_from_ratio_or_defaults(
         pm = dict(pm) if isinstance(pm, dict) else {"kind": "accuracy"}
         pm.pop("display_ci", None)
         pm.pop("ci", None)
-        certificate["primary_metric"] = pm
+        evaluation_report["primary_metric"] = pm
 
     # Ensure our test payload survives normalization and triggers the local fallback block.
     monkeypatch.setattr(
@@ -319,14 +323,16 @@ def test_enforce_pairing_and_coverage_branch_matrix() -> None:
 
 
 def test_propagate_pairing_stats_early_returns() -> None:
-    cert_mod._propagate_pairing_stats(certificate=None, ppl_analysis=None)  # type: ignore[arg-type]
-    cert_mod._propagate_pairing_stats(certificate={}, ppl_analysis=None)
-    cert_mod._propagate_pairing_stats(certificate={"dataset": None}, ppl_analysis={})
+    cert_mod._propagate_pairing_stats(evaluation_report=None, ppl_analysis=None)  # type: ignore[arg-type]
+    cert_mod._propagate_pairing_stats(evaluation_report={}, ppl_analysis=None)
     cert_mod._propagate_pairing_stats(
-        certificate={"dataset": {"windows": None}}, ppl_analysis={}
+        evaluation_report={"dataset": None}, ppl_analysis={}
     )
     cert_mod._propagate_pairing_stats(
-        certificate={"dataset": {"windows": {"stats": None}}}, ppl_analysis={}
+        evaluation_report={"dataset": {"windows": None}}, ppl_analysis={}
+    )
+    cert_mod._propagate_pairing_stats(
+        evaluation_report={"dataset": {"windows": {"stats": None}}}, ppl_analysis={}
     )
 
 
@@ -390,7 +396,7 @@ def test_compute_validation_flags_acceptance_bounds_and_accuracy_tiny_relax(
     assert flags2.get("primary_metric_acceptable") is True
 
 
-def test_certificate_module_schema_tightening_branches(monkeypatch) -> None:
+def test_evaluation_report_module_schema_tightening_branches(monkeypatch) -> None:
     original_schema = cert_schema_mod.REPORT_JSON_SCHEMA
     try:
         monkeypatch.setattr(
@@ -409,7 +415,9 @@ def test_certificate_module_schema_tightening_branches(monkeypatch) -> None:
         importlib.reload(cert_mod)
 
 
-def test_make_certificate_ratio_ci_fallback_skips_non_interval(monkeypatch) -> None:
+def test_make_evaluation_report_ratio_ci_fallback_skips_non_interval(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(
         "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
         lambda *_a, **_k: (-0.01, 0.01),

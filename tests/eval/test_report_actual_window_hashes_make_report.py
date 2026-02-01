@@ -5,7 +5,7 @@ from invarlock.reporting.report_builder import make_report
 
 def test_dataset_hash_uses_actual_evaluation_windows_ids():
     # Build report with explicit token IDs in evaluation windows so that
-    # certificate computes actual hashes (sha256) rather than config fallback.
+    # evaluation_report computes actual hashes (sha256) rather than config fallback.
     report = {
         "meta": {"model_id": "m", "seed": 123},
         "metrics": {"ppl_preview": 10.0, "ppl_final": 10.0},
@@ -34,7 +34,9 @@ def test_dataset_hash_uses_actual_evaluation_windows_ids():
     }
     baseline = {"run_id": "b", "model_id": "m", "ppl_final": 10.0}
 
-    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+    with patch(
+        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+    ):
         cert = make_report(report, baseline)
 
     dataset_hash = cert["dataset"]["hash"]

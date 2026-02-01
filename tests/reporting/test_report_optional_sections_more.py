@@ -102,7 +102,7 @@ def _optional_sections_report() -> tuple[dict, dict]:
 
 
 @pytest.mark.usefixtures("_clear_env_vars")
-def test_make_certificate_populates_optional_sections(monkeypatch):
+def test_make_evaluation_report_populates_optional_sections(monkeypatch):
     report, baseline = _optional_sections_report()
 
     # ensure normalization helpers do not short-circuit rich payload
@@ -111,20 +111,20 @@ def test_make_certificate_populates_optional_sections(monkeypatch):
     )
     monkeypatch.setattr(cert, "_normalize_baseline", lambda value: value, raising=False)
 
-    certificate = cert.make_report(report, baseline)
+    evaluation_report = cert.make_report(report, baseline)
 
-    sec = certificate.get("secondary_metrics")
+    sec = evaluation_report.get("secondary_metrics")
     assert isinstance(sec, list) and len(sec) == 1
     assert sec[0]["kind"] == "accuracy_aux"
-    cls = certificate.get("classification", {}).get("subgroups", {})
+    cls = evaluation_report.get("classification", {}).get("subgroups", {})
     assert "A" in cls and "C" in cls
-    system = certificate.get("system_overhead", {})
+    system = evaluation_report.get("system_overhead", {})
     assert "latency_ms_p50" in system and "delta" in system["latency_ms_p50"]
     # Latency p95 lacks baseline; ensure fallback only reports edited value
     assert "baseline" not in system["latency_ms_p95"]
 
 
-def test_make_certificate_policy_digest_marks_changed(monkeypatch):
+def test_make_evaluation_report_policy_digest_marks_changed(monkeypatch):
     report, baseline = _optional_sections_report()
     report = deepcopy(report)
     report["guards"] = [
@@ -138,8 +138,8 @@ def test_make_certificate_policy_digest_marks_changed(monkeypatch):
     )
     monkeypatch.setattr(cert, "_normalize_baseline", lambda value: value, raising=False)
 
-    certificate = cert.make_report(report, baseline)
-    digest = certificate["policy_digest"]
+    evaluation_report = cert.make_report(report, baseline)
+    digest = evaluation_report["policy_digest"]
     assert digest["tier_policy_name"] == "balanced"
     assert digest["changed"] is True
 

@@ -50,7 +50,7 @@ def _make_baseline(ppl: float):
     return base
 
 
-def test_certificate_enforces_tighter_ppl_ratio_gate():
+def test_evaluation_report_enforces_tighter_ppl_ratio_gate():
     report = _make_report(preview=40.0, final=44.0, tier="balanced")  # 1.10 ratio
     baseline = _make_baseline(ppl=40.0)
 
@@ -64,7 +64,7 @@ def test_certificate_enforces_tighter_ppl_ratio_gate():
     assert failing_cert["validation"]["primary_metric_acceptable"] is False
 
 
-def test_certificate_uses_tier_specific_thresholds():
+def test_evaluation_report_uses_tier_specific_thresholds():
     balanced_report = _make_report(preview=40.0, final=46.0, tier="balanced")  # 1.15
     conservative_report = _make_report(
         preview=40.0, final=42.0, tier="conservative"

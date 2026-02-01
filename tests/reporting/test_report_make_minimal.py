@@ -89,7 +89,7 @@ def _mk_minimal_baseline() -> dict:
     }
 
 
-def test_make_certificate_minimal_paths() -> None:
+def test_make_evaluation_report_minimal_paths() -> None:
     report = _mk_minimal_report()
     baseline = _mk_minimal_baseline()
     cert = make_report(report, baseline)
@@ -101,7 +101,7 @@ def test_make_certificate_minimal_paths() -> None:
     assert isinstance(cert.get("confidence"), dict)
 
 
-def test_make_certificate_tiny_relax_flag(monkeypatch) -> None:
+def test_make_evaluation_report_tiny_relax_flag(monkeypatch) -> None:
     report = _mk_minimal_report()
     baseline = _mk_minimal_baseline()
     # Enable tiny-relax to exercise relaxed gating and provenance flags

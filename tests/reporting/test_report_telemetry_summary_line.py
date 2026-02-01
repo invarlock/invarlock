@@ -40,8 +40,8 @@ def _mk_minimal_report() -> dict:
     }
 
 
-def test_certificate_embeds_telemetry_summary_line(monkeypatch):
-    # Ensure telemetry emission path runs (printing is optional; we inspect certificate payload)
+def test_evaluation_report_embeds_telemetry_summary_line(monkeypatch):
+    # Ensure telemetry emission path runs (printing is optional; we inspect evaluation_report payload)
     monkeypatch.setenv("INVARLOCK_TELEMETRY", "1")
     rep = _mk_minimal_report()
     base = _mk_minimal_report()

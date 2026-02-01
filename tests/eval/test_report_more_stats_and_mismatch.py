@@ -41,7 +41,7 @@ def _base_baseline():
     }
 
 
-def test_certificate_ratio_ci_mismatch_raises(monkeypatch):
+def test_evaluation_report_ratio_ci_mismatch_raises(monkeypatch):
     report = _base_report()
     baseline = _base_baseline()
 
@@ -69,14 +69,15 @@ def test_certificate_ratio_ci_mismatch_raises(monkeypatch):
     )
     # Force mismatch by overriding the ratio_ci computation from delta_ci
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.logspace_to_ratio_ci", lambda _: (1.05, 1.06)
+        "invarlock.reporting.report_builder.logspace_to_ratio_ci",
+        lambda _: (1.05, 1.06),
     )
 
     with pytest.raises(ValueError):
         _ = make_report(report, baseline)
 
 
-def test_certificate_metrics_stats_passthrough(monkeypatch):
+def test_evaluation_report_metrics_stats_passthrough(monkeypatch):
     report = _base_report()
     baseline = _base_baseline()
 

@@ -70,7 +70,7 @@ def _base_baseline() -> dict:
     return base
 
 
-def test_make_certificate_compares_invariants_against_baseline_report() -> None:
+def test_make_evaluation_report_compares_invariants_against_baseline_report() -> None:
     report = _base_report()
     baseline = _base_baseline()
 
@@ -117,10 +117,10 @@ def test_make_certificate_compares_invariants_against_baseline_report() -> None:
         }
     ]
 
-    certificate = cert.make_report(report, baseline)
-    assert certificate["invariants"]["status"] == "fail"
-    assert certificate["validation"]["invariants_pass"] is False
+    evaluation_report = cert.make_report(report, baseline)
+    assert evaluation_report["invariants"]["status"] == "fail"
+    assert evaluation_report["validation"]["invariants_pass"] is False
     assert any(
         entry.get("type") == "tokenizer_mismatch"
-        for entry in (certificate["invariants"].get("failures") or [])
+        for entry in (evaluation_report["invariants"].get("failures") or [])
     )

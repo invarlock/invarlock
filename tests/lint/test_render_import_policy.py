@@ -4,8 +4,8 @@ import os
 from pathlib import Path
 
 
-def test_no_render_helpers_imported_from_certificate():
-    """Ensure code imports render helpers from invarlock.reporting.render, not certificate.
+def test_no_render_helpers_imported_from_evaluation_report():
+    """Ensure code imports render helpers from invarlock.reporting.render, not evaluation_report.
 
     This guards future modules from re-introducing imports like:
     from invarlock.reporting.report_builder import render_report_markdown

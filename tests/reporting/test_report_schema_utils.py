@@ -3,7 +3,7 @@ from __future__ import annotations
 from invarlock.reporting import report_schema as schema_mod
 
 
-def _base_certificate() -> dict:
+def _base_evaluation_report() -> dict:
     return {
         "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
         "run_id": "run-1234",
@@ -27,7 +27,7 @@ def _base_certificate() -> dict:
 
 
 def test_validate_report_accepts_valid_payload():
-    cert = _base_certificate()
+    cert = _base_evaluation_report()
     assert schema_mod.validate_report(cert) is True
 
 
@@ -44,11 +44,11 @@ def test_validate_report_fallback_when_schema_fails(monkeypatch):
 
 
 def test_validate_report_rejects_bad_validation_values():
-    cert = _base_certificate()
+    cert = _base_evaluation_report()
     cert["validation"]["primary_metric_acceptable"] = "yes"
     assert schema_mod.validate_report(cert) is False
 
 
 def test_validate_with_jsonschema_handles_missing_library(monkeypatch):
     monkeypatch.setattr(schema_mod, "jsonschema", None, raising=False)
-    assert schema_mod._validate_with_jsonschema(_base_certificate()) is True
+    assert schema_mod._validate_with_jsonschema(_base_evaluation_report()) is True

@@ -29,15 +29,15 @@ def test_compute_edit_digest_quantization_and_fallback():
 
 
 def test_compute_confidence_label_respects_custom_thresholds():
-    certificate = {
+    evaluation_report = {
         "validation": {"primary_metric_acceptable": True},
         "primary_metric": {"kind": "accuracy", "display_ci": (0.50, 0.55)},
         "resolved_policy": {"confidence": {"accuracy_delta_pp_width_max": 0.1}},
     }
-    label = cert._compute_confidence_label(certificate)
+    label = cert._compute_confidence_label(evaluation_report)
     assert label["label"] == "High"
-    certificate["primary_metric"]["unstable"] = True
-    label_unstable = cert._compute_confidence_label(certificate)
+    evaluation_report["primary_metric"]["unstable"] = True
+    label_unstable = cert._compute_confidence_label(evaluation_report)
     assert label_unstable["label"] == "Medium"
 
 

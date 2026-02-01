@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import math
 
+from invarlock.reporting.policy_utils import (
+    _compute_thresholds_payload,
+    _compute_variance_policy_digest,
+)
 from invarlock.reporting.report_builder import (
     TIER_RATIO_LIMITS,
     _compute_confidence_label,
     _compute_edit_digest,
     _is_ppl_kind,
-)
-from invarlock.reporting.policy_utils import (
-    _compute_thresholds_payload,
-    _compute_variance_policy_digest,
 )
 from invarlock.reporting.utils import (
     _coerce_int,
@@ -29,7 +29,7 @@ def test_ppl_helpers_and_edit_digest() -> None:
         and _is_ppl_kind("ppl_seq2seq")
     )
     assert not _is_ppl_kind("accuracy")
-    # Legacy _get_ppl_final removed; rely on primary_metric parsing in certificates.
+    # Legacy _get_ppl_final removed; rely on primary_metric parsing in evaluation_reports.
     # Edit digest
     ed = _compute_edit_digest({"edit": {"name": "quant_rtn", "config": {"k": 1}}})
     assert ed["family"] == "quantization" and ed["impl_hash"]

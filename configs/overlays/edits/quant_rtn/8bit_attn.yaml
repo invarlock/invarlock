@@ -1,6 +1,6 @@
 # Edit overlay: RTN quantization, 8-bit, attention-only scope.
 #
-# Intended for `invarlock certify --edit-config ...` (merged with a preset),
+# Intended for `invarlock evaluate --edit-config ...` (merged with a preset),
 # or manual merge into a full run config.
 
 edit:

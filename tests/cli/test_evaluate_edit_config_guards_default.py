@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 
-def test_certify_edit_config_includes_guard_order(tmp_path: Path, monkeypatch):
+def test_evaluate_edit_config_includes_guard_order(tmp_path: Path, monkeypatch):
     """`invarlock evaluate --edit-config` should not require guards.order in YAML."""
     monkeypatch.chdir(tmp_path)
     preset = tmp_path / "preset.yaml"
@@ -63,14 +63,14 @@ def test_certify_edit_config_includes_guard_order(tmp_path: Path, monkeypatch):
         out_dir.mkdir(parents=True, exist_ok=True)
         (out_dir / "report.json").write_text("{}", encoding="utf-8")
 
-    from invarlock.cli.commands import evaluate as certify_mod
+    from invarlock.cli.commands import evaluate as evaluate_mod
     from invarlock.cli.commands import run as run_mod
 
     monkeypatch.setattr(run_mod, "run_command", _fake_run_command)
-    monkeypatch.setattr(certify_mod, "_report", lambda **_: None)
+    monkeypatch.setattr(evaluate_mod, "_report", lambda **_: None)
 
     # Should not raise; the edited merged config must include guards.order.
-    certify_mod.evaluate_command(
+    evaluate_mod.evaluate_command(
         source="gpt2",
         edited="gpt2",
         adapter="hf_causal",

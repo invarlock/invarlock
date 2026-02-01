@@ -143,7 +143,7 @@ def _rich_run_report() -> tuple[dict, dict]:
     return report, baseline
 
 
-def test_make_certificate_rich_context_generates_diagnostics(monkeypatch):
+def test_make_evaluation_report_rich_context_generates_diagnostics(monkeypatch):
     def fake_compute(report, *, kind, baseline=None):
         metrics = (report.get("metrics") or {}).get("primary_metric", {})
         return {"final": metrics.get("final", 1.0), "direction": "lower"}
@@ -163,7 +163,7 @@ def test_make_certificate_rich_context_generates_diagnostics(monkeypatch):
     assert cert_obj["provenance"]["edit_digest"]["family"] == "quantization"
 
 
-def test_make_certificate_surfaces_pairing_and_policy_digest():
+def test_make_evaluation_report_surfaces_pairing_and_policy_digest():
     report, baseline = _rich_run_report()
     cert_obj = cert.make_report(report, baseline)
     stats = cert_obj["dataset"]["windows"]["stats"]
@@ -174,7 +174,7 @@ def test_make_certificate_surfaces_pairing_and_policy_digest():
     assert policy_digest["thresholds_hash"]
 
 
-def test_make_certificate_end_to_end_populates_optional_sections_and_validations(
+def test_make_evaluation_report_end_to_end_populates_optional_sections_and_validations(
     monkeypatch,
 ):
     monkeypatch.setattr(
@@ -276,16 +276,16 @@ def test_make_certificate_end_to_end_populates_optional_sections_and_validations
     report["metrics"]["spectral"]["caps_exceeded"] = True
     report["metrics"]["rmt"]["stable"] = False
 
-    certificate = cert.make_report(report, baseline)
+    evaluation_report = cert.make_report(report, baseline)
 
-    stats = certificate["dataset"]["windows"]["stats"]
+    stats = evaluation_report["dataset"]["windows"]["stats"]
     assert stats["pairing"]
     assert stats["paired_windows"] >= 1
     assert stats["coverage"]["preview"]["used"] == 3
     assert stats["window_match_fraction"] == pytest.approx(0.92)
     assert stats["window_pairing_reason"] == "id_match"
 
-    system_overhead = certificate["system_overhead"]
+    system_overhead = evaluation_report["system_overhead"]
     lat_entry = system_overhead["latency_ms_p50"]
     assert lat_entry["edited"] == 12.0
     assert lat_entry["baseline"] == 10.0
@@ -296,28 +296,28 @@ def test_make_certificate_end_to_end_populates_optional_sections_and_validations
     assert throughput_entry["ratio"] == pytest.approx(95.0 / 110.0)
     assert "baseline" not in system_overhead["latency_ms_p95"]  # baseline lacked p95
 
-    subgroups = certificate["classification"]["subgroups"]
+    subgroups = evaluation_report["classification"]["subgroups"]
     assert subgroups["A"]["delta_pp"] == pytest.approx(-10.0)
     assert subgroups["B"]["delta_pp"] == pytest.approx(5.0)
     assert math.isnan(subgroups["C"]["preview"])
 
-    secondary = certificate["secondary_metrics"]
+    secondary = evaluation_report["secondary_metrics"]
     assert len(secondary) == 1 and secondary[0]["kind"] == "valid_metric"
 
-    validation = certificate["validation"]
+    validation = evaluation_report["validation"]
     assert validation["spectral_stable"] is False
     assert validation["rmt_stable"] is False
     assert validation.get("moe_observed") is True
     assert validation.get("moe_identity_ok") is True
 
-    guard = certificate["guard_overhead"]
+    guard = evaluation_report["guard_overhead"]
     assert guard["evaluated"] is True
     assert guard["passed"] is True
     assert guard["bare_ppl"] == pytest.approx(10.0)
     assert guard["guarded_ppl"] == pytest.approx(10.05)
 
 
-def test_make_certificate_policy_digest_changes_when_policy_override_differs(
+def test_make_evaluation_report_policy_digest_changes_when_policy_override_differs(
     monkeypatch,
 ):
     monkeypatch.setattr(
@@ -333,12 +333,12 @@ def test_make_certificate_policy_digest_changes_when_policy_override_differs(
     baseline["guards"] = []
     baseline["meta"]["auto"]["tier"] = "conservative"
 
-    certificate = cert.make_report(report, baseline)
+    evaluation_report = cert.make_report(report, baseline)
 
-    assert certificate["policy_digest"]["changed"] is True
+    assert evaluation_report["policy_digest"]["changed"] is True
 
 
-def test_make_certificate_provenance_and_guard_schedule_fallback(monkeypatch):
+def test_make_evaluation_report_provenance_and_guard_schedule_fallback(monkeypatch):
     monkeypatch.setattr(
         cert, "_normalize_and_validate_report", lambda value: value, raising=False
     )
@@ -351,18 +351,18 @@ def test_make_certificate_provenance_and_guard_schedule_fallback(monkeypatch):
     report["guard_overhead"] = {}
     report["metrics"]["window_plan"]["profile"] = "dev"
 
-    certificate = cert.make_report(report, baseline)
+    evaluation_report = cert.make_report(report, baseline)
 
-    prov = certificate["provenance"]
+    prov = evaluation_report["provenance"]
     assert "provider_digest" in prov
     assert (
         prov.get("window_ids_digest")
-        == certificate["guard_overhead"]["schedule_digest"]
+        == evaluation_report["guard_overhead"]["schedule_digest"]
         == prov["provider_digest"]["ids_sha256"]
     )
 
 
-def test_make_certificate_emits_telemetry_summary(monkeypatch, capsys):
+def test_make_evaluation_report_emits_telemetry_summary(monkeypatch, capsys):
     monkeypatch.setattr(
         cert, "_normalize_and_validate_report", lambda value: value, raising=False
     )

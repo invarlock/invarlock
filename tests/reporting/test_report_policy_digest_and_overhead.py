@@ -54,7 +54,7 @@ def _mk_pm_report(
     }
 
 
-def test_certificate_policy_digest_changed_and_hysteresis_applied() -> None:
+def test_evaluation_report_policy_digest_changed_and_hysteresis_applied() -> None:
     # Subject is balanced; baseline conservative; ratio slightly above base limit but within hysteresis
     rep = _mk_pm_report(ratio=1.101)
     base = {
@@ -73,7 +73,7 @@ def test_certificate_policy_digest_changed_and_hysteresis_applied() -> None:
     assert val.get("hysteresis_applied") is True
 
 
-def test_certificate_guard_overhead_not_evaluated_soft_pass() -> None:
+def test_evaluation_report_guard_overhead_not_evaluated_soft_pass() -> None:
     rep = _mk_pm_report(ratio=1.0)
     # Provide guard_overhead payload without bare/guarded metrics → not evaluated branch
     rep["guard_overhead"] = {"messages": ["noop"]}
@@ -85,7 +85,7 @@ def test_certificate_guard_overhead_not_evaluated_soft_pass() -> None:
     assert any("unavailable" in m.lower() for m in (go.get("errors") or []))
 
 
-def test_certificate_quality_overhead_from_guard_ratio() -> None:
+def test_evaluation_report_quality_overhead_from_guard_ratio() -> None:
     # Build guard context with bare/guarded reports so quality_overhead can be computed
     bare = _mk_pm_report(ratio=1.0)
     guarded = _mk_pm_report(ratio=1.0)

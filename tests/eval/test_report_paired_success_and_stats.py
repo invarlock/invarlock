@@ -4,7 +4,7 @@ from unittest.mock import patch
 from invarlock.reporting.report_builder import make_report
 
 
-def test_certificate_paired_ci_success_and_stats_passthrough():
+def test_evaluation_report_paired_ci_success_and_stats_passthrough():
     # Report with consistent preview/final and window data
     window_ids = list(range(1, 181))
     logloss_vals = [1.0] * len(window_ids)

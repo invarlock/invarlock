@@ -472,11 +472,11 @@ def test_tokenizer_hash_and_profile_lints() -> None:
     assert verify_mod._resolve_path(payload, "a.b.missing") is None
 
 
-def test_validate_certificate_payload_schema_failure(tmp_path: Path) -> None:
+def test_validate_evaluation_report_payload_schema_failure(tmp_path: Path) -> None:
     verify_mod = _import_verify_module()
     bad = tmp_path / "bad_cert.json"
     bad.write_text("{}\n")
-    errs = verify_mod._validate_certificate_payload(bad)
+    errs = verify_mod._validate_evaluation_report_payload(bad)
     assert errs and "schema" in errs[0].lower()
 
 

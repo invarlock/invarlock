@@ -4,7 +4,7 @@ from invarlock.reporting.report_builder import (
 )
 
 
-def test_validate_certificate_accepts_pm_only_without_ppl_block():
+def test_validate_evaluation_report_accepts_pm_only_without_ppl_block():
     cert = {
         "schema_version": REPORT_SCHEMA_VERSION,
         "run_id": "r1",

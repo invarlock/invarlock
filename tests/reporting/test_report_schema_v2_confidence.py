@@ -55,7 +55,7 @@ def _mk_report() -> dict[str, Any]:
     }
 
 
-def test_certificate_schema_includes_confidence_block():
+def test_evaluation_report_schema_includes_confidence_block():
     # Schema should expose a confidence object with the documented fields
     props = REPORT_JSON_SCHEMA["properties"]
     assert "confidence" in props, "schema must include confidence block"
@@ -70,13 +70,13 @@ def test_certificate_schema_includes_confidence_block():
     assert set(conf["required"]) == {"label", "basis"}
 
 
-def test_generated_certificate_populates_confidence_fields():
+def test_generated_evaluation_report_populates_confidence_fields():
     report = _mk_report()
     baseline = _mk_report()
     cert = make_report(report, baseline)
     conf = cert.get("confidence", {})
     assert isinstance(conf, dict) and conf, (
-        "confidence should be present on certificate"
+        "confidence should be present on evaluation_report"
     )
     assert conf.get("label") in {"High", "Medium", "Low"}
     assert conf.get("basis") in {"ppl_ratio", "accuracy", "vqa_accuracy"}

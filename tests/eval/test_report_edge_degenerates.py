@@ -1,9 +1,9 @@
 import pytest
 
-from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.guards_analysis import _extract_invariants
 from invarlock.reporting.policy_utils import _build_resolved_policies
 from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.utils import _infer_scope_from_modules, _pair_logloss_windows
 
 
@@ -77,8 +77,8 @@ def test_extract_invariants_ignores_non_dict_violations_and_non_dict_values():
     )  # only dict violations kept
 
 
-def test_render_certificate_markdown_guard_overhead_na(monkeypatch):
-    # Minimal valid report/baseline to build a certificate
+def test_render_report_markdown_guard_overhead_na(monkeypatch):
+    # Minimal valid report/baseline to build a evaluation_report
     report = {
         "meta": {"model_id": "m", "seed": 1},
         "metrics": {"ppl_preview": 10.0, "ppl_final": 10.0},

@@ -38,7 +38,9 @@ def test_ppl_reduction_value_passthrough():
         "ppl_final": 10.0,
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
-    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+    with patch(
+        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+    ):
         cert = make_report(report, baseline)
     # PM-only: reduction is internal analysis context; presence of primary_metric is sufficient
     assert "primary_metric" in cert

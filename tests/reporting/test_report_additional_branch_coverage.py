@@ -99,7 +99,7 @@ def test_is_ppl_kind_accepts_aliases_and_handles_bad_str() -> None:
     assert not _is_ppl_kind(_Bad())
 
 
-def test_make_certificate_replicates_zero_keeps_run_metrics_pairing_and_fills_counts(
+def test_make_evaluation_report_replicates_zero_keeps_run_metrics_pairing_and_fills_counts(
     monkeypatch,
 ) -> None:
     report = _mk_report(replicates=0)
@@ -120,7 +120,7 @@ def test_make_certificate_replicates_zero_keeps_run_metrics_pairing_and_fills_co
     assert stats["requested_final"] == 2
 
 
-def test_make_certificate_uses_bca_when_method_explicit(monkeypatch) -> None:
+def test_make_evaluation_report_uses_bca_when_method_explicit(monkeypatch) -> None:
     report = _mk_report(replicates=10, bootstrap_method="bca")
     baseline = _mk_baseline()
 
@@ -138,7 +138,9 @@ def test_make_certificate_uses_bca_when_method_explicit(monkeypatch) -> None:
     assert seen.get("method") == "bca"
 
 
-def test_make_certificate_env_bca_flag_ignored_when_windows_small(monkeypatch) -> None:
+def test_make_evaluation_report_env_bca_flag_ignored_when_windows_small(
+    monkeypatch,
+) -> None:
     report = _mk_report(replicates=10, bootstrap_method="percentile")
     baseline = _mk_baseline()
     monkeypatch.setenv("INVARLOCK_BOOTSTRAP_BCA", "1")
@@ -157,7 +159,9 @@ def test_make_certificate_env_bca_flag_ignored_when_windows_small(monkeypatch) -
     assert seen.get("method") == "percentile"
 
 
-def test_make_certificate_marks_unstable_when_token_floor_violated(monkeypatch) -> None:
+def test_make_evaluation_report_marks_unstable_when_token_floor_violated(
+    monkeypatch,
+) -> None:
     report = _mk_report(replicates=200)
     baseline = _mk_baseline()
     report["metrics"]["preview_total_tokens"] = 10

@@ -42,7 +42,9 @@ def test_meta_device_empty_and_stats_window_plan_non_dict():
         "ppl_final": 10.0,
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
-    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+    with patch(
+        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+    ):
         cert = make_report(report, baseline)
     # Telemetry should not include device key
     assert "telemetry" not in cert or "device" not in cert.get("telemetry", {})

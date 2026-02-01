@@ -76,7 +76,7 @@ def _write_run_report(
 
 
 @pytest.mark.unit
-def test_certify_local_paths_pm_and_digests(monkeypatch, tmp_path: Path):
+def test_evaluate_local_paths_pm_and_digests(monkeypatch, tmp_path: Path):
     src = tmp_path / "src_model"
     edt = tmp_path / "edt_model"
     src.mkdir()
@@ -188,7 +188,7 @@ def test_certify_local_paths_pm_and_digests(monkeypatch, tmp_path: Path):
 
 
 @pytest.mark.unit
-def test_certify_local_paths_quantized_subject_overheads(monkeypatch, tmp_path: Path):
+def test_evaluate_local_paths_quantized_subject_overheads(monkeypatch, tmp_path: Path):
     src = tmp_path / "src_model"
     edt = tmp_path / "edt_model"
     src.mkdir()

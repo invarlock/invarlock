@@ -49,7 +49,7 @@ def _mk_report_for_ci() -> dict:
     }
 
 
-def test_certificate_includes_analysis_basis_cis_for_ppl():
+def test_evaluation_report_includes_analysis_basis_cis_for_ppl():
     report = _mk_report_for_ci()
     baseline = _mk_report_for_ci()
     cert = make_report(report, baseline)

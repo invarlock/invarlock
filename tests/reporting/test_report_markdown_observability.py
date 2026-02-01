@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.report_builder import make_report
 
 
-def test_render_certificate_markdown_observability_sections():
+def test_render_report_markdown_observability_sections():
     rep = {
         "meta": {
             "model_id": "m",

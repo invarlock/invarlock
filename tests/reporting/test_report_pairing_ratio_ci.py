@@ -3,7 +3,7 @@ from __future__ import annotations
 from invarlock.reporting.report_builder import make_report
 
 
-def test_make_certificate_paired_baseline_ratio_ci():
+def test_make_evaluation_report_paired_baseline_ratio_ci():
     # Prepare subject and baseline with matching window_ids so paired_baseline path is used
     rep = {
         "meta": {

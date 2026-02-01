@@ -51,7 +51,9 @@ def test_paired_path_skips_ci_when_zero_replicates():
         },
     }
 
-    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+    with patch(
+        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+    ):
         cert = make_report(report, baseline)
     stats = cert.get("dataset", {}).get("windows", {}).get("stats", {})
     # Paired windows detected, but with zero replicates we keep ratio_ci_source as run_metrics

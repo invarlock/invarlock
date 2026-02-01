@@ -3,7 +3,7 @@ from unittest.mock import patch
 from invarlock.reporting.report_builder import make_report
 
 
-def test_certificate_includes_top_level_window_plan():
+def test_evaluation_report_includes_top_level_window_plan():
     report = {
         "meta": {"model_id": "m", "seed": 1},
         "metrics": {
@@ -37,7 +37,9 @@ def test_certificate_includes_top_level_window_plan():
         "ppl_final": 10.0,
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
-    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+    with patch(
+        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+    ):
         cert = make_report(report, baseline)
     # Window plan may be omitted; assert dataset stats are available
     stats = cert.get("dataset", {}).get("windows", {}).get("stats", {})

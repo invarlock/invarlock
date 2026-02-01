@@ -4,7 +4,7 @@ InvarLock CLI Run Command
 
 Run a guarded pipeline from a YAML config. Intended for local smokes,
 plugin demos, and development. Advanced: for pairwise certification,
-prefer Compare & Certify via `invarlock certify --baseline ... --subject ...`.
+prefer Compare & Evaluate via `invarlock evaluate --baseline ... --subject ...`.
 """
 
 import copy
@@ -358,7 +358,7 @@ def _resolve_pm_drift_band(
     """Resolve preview→final drift band from config/env with safe defaults.
 
     The drift band governs the Preview Final Drift Acceptable gate. By default,
-    certificates enforce 0.95–1.05 unless an explicit band is provided.
+    evaluation reports enforce 0.95–1.05 unless an explicit band is provided.
     """
 
     base_min = 0.95
@@ -2234,7 +2234,9 @@ def run_command(
         None, "--probes", help="Number of micro-probes (0=deterministic, >0=adaptive)"
     ),
     until_pass: bool = typer.Option(
-        False, "--until-pass", help="Retry until certificate passes (max 3 attempts)"
+        False,
+        "--until-pass",
+        help="Retry until evaluation report passes gates (max 3 attempts)",
     ),
     max_attempts: int = typer.Option(
         3, "--max-attempts", help="Maximum retry attempts for --until-pass mode"
@@ -2245,7 +2247,7 @@ def run_command(
     baseline: str | None = typer.Option(
         None,
         "--baseline",
-        help="Path to baseline report.json for certificate validation",
+        help="Path to baseline report.json for evaluation report validation",
     ),
     no_cleanup: bool = typer.Option(
         False, "--no-cleanup", help="Skip cleanup of temporary artifacts"
@@ -2270,7 +2272,7 @@ def run_command(
     The command assembles non-overlapping preview/final windows, executes the
     GuardChain (invariants → spectral → RMT → variance), checks pairing/overlap
     invariants, enforces guard-overhead ≤1 %, and emits a run report plus JSONL
-    events suitable for certificate generation.
+    events suitable for evaluation report generation.
     """
 
     try:
@@ -4032,7 +4034,7 @@ def run_command(
             # Convert CoreRunner report to evaluation report
             report = create_empty_report()
 
-            # Persist minimal run context for certificate/report provenance.
+            # Persist minimal run context for evaluation report provenance.
             try:
                 report["context"] = {
                     "profile": profile_normalized,
@@ -5129,9 +5131,9 @@ def run_command(
                             f"(>{threshold_fraction * 100:.1f}% increase)"
                         )
 
-            # Drift gate status is no longer surfaced in console; rely on certificate gates
+            # Drift gate status is no longer surfaced in console; rely on evaluation report gates
 
-            # Certificate validation for --until-pass mode
+            # Evaluation report validation for --until-pass mode
             if retry_controller and baseline:
                 from invarlock.reporting.report_builder import make_report
 
@@ -5148,18 +5150,18 @@ def run_command(
                     _event(
                         console,
                         "EXEC",
-                        "Generating evaluation certificate...",
+                        "Generating evaluation report...",
                         emoji="📜",
                         profile=profile_normalized,
                     )
-                    certificate = make_report(report, baseline_report)
+                    evaluation_report = make_report(report, baseline_report)
 
-                    validation = certificate.get("validation", {})
-                    certificate_passed = all(validation.values())
+                    validation = evaluation_report.get("validation", {})
+                    report_passed = all(validation.values())
 
                     failed_gates = [k for k, v in validation.items() if not v]
                     result_summary = {
-                        "passed": certificate_passed,
+                        "passed": report_passed,
                         "failures": failed_gates,
                         "validation": validation,
                     }
@@ -5167,11 +5169,11 @@ def run_command(
                         attempt, result_summary, edit_config
                     )
 
-                    if certificate_passed:
+                    if report_passed:
                         _event(
                             console,
                             "PASS",
-                            "Certificate PASSED all gates!",
+                            "Evaluation report PASSED all gates!",
                             emoji="✅",
                             profile=profile_normalized,
                         )
@@ -5180,7 +5182,7 @@ def run_command(
                         _event(
                             console,
                             "FAIL",
-                            f"Certificate FAILED gates: {', '.join(failed_gates)}",
+                            f"Evaluation report FAILED gates: {', '.join(failed_gates)}",
                             emoji="⚠️",
                             profile=profile_normalized,
                         )
@@ -5237,7 +5239,7 @@ def run_command(
                         except Exception:
                             pass
 
-                        if retry_controller.should_retry(certificate_passed):
+                        if retry_controller.should_retry(report_passed):
                             attempt += 1
                             continue
                         else:
@@ -5250,11 +5252,11 @@ def run_command(
                             )
                             break
 
-                except Exception as cert_error:
+                except Exception as report_error:
                     _event(
                         console,
                         "WARN",
-                        f"Certificate validation failed: {cert_error}",
+                        f"Evaluation report validation failed: {report_error}",
                         emoji="⚠️",
                         profile=profile_normalized,
                     )
@@ -5263,7 +5265,7 @@ def run_command(
                             attempt,
                             {
                                 "passed": False,
-                                "failures": ["certificate_error"],
+                                "failures": ["report_error"],
                                 "validation": {},
                             },
                             edit_config,

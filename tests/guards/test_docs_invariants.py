@@ -30,10 +30,10 @@ def test_docs_invariants_pm_first_strings():
     offenders: list[str] = []
     skip_files = {
         "cli.md",
-        "exporting-certificates-html.md",
-        "certificate-schema-v2.md",
-        "certificate-schema-v3.md",
-        "certificate_telemetry.md",
+        "exporting-evaluation_reports-html.md",
+        "evaluation_report-schema-v2.md",
+        "evaluation_report-schema-v3.md",
+        "evaluation_report_telemetry.md",
     }
     for path in _iter_doc_files(docs_root):
         if path.name in skip_files:

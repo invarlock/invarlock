@@ -60,7 +60,7 @@ def _rep_with_subgroups_and_sys() -> tuple[dict, dict]:
     return rep, base
 
 
-def test_make_certificate_classification_and_system_overhead_blocks():
+def test_make_evaluation_report_classification_and_system_overhead_blocks():
     rep, base = _rep_with_subgroups_and_sys()
     cert = make_report(rep, base)
     # Classification subgroup summary present

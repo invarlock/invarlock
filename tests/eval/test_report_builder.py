@@ -1,7 +1,7 @@
 """
 Comprehensive test coverage for invarlock.reporting.report_builder module.
 
-Tests for evaluation certificate generation, validation, and rendering.
+Tests for evaluation evaluation_report generation, validation, and rendering.
 """
 
 import copy
@@ -12,20 +12,6 @@ from unittest.mock import Mock, patch
 import pytest
 
 from invarlock import __version__ as INVARLOCK_VERSION
-from invarlock.reporting.report_builder import (
-    REPORT_SCHEMA_VERSION,
-    _analyze_bitwidth_map,
-    _compute_report_digest,
-    _compute_savings_summary,
-    _compute_validation_flags,
-    _extract_rank_information,
-    _extract_structural_deltas,
-    _generate_run_id,
-    _normalize_baseline,
-    _prepare_guard_overhead_section,
-    make_report,
-    validate_report,
-)
 from invarlock.reporting.dataset_hashing import (
     _compute_actual_window_hashes,
     _extract_dataset_info,
@@ -51,6 +37,20 @@ from invarlock.reporting.render import (
     _compute_report_hash,
     render_report_markdown,
 )
+from invarlock.reporting.report_builder import (
+    REPORT_SCHEMA_VERSION,
+    _analyze_bitwidth_map,
+    _compute_report_digest,
+    _compute_savings_summary,
+    _compute_validation_flags,
+    _extract_rank_information,
+    _extract_structural_deltas,
+    _generate_run_id,
+    _normalize_baseline,
+    _prepare_guard_overhead_section,
+    make_report,
+    validate_report,
+)
 from invarlock.reporting.utils import (
     _coerce_int,
     _coerce_interval,
@@ -61,14 +61,16 @@ from invarlock.reporting.utils import (
 )
 
 
-def _load_local_certificate() -> dict[str, Any]:
-    """Construct a representative certificate locally for rendering tests.
+def _load_local_evaluation_report() -> dict[str, Any]:
+    """Construct a representative evaluation_report locally for rendering tests.
 
     Avoids relying on repo-level sample artifacts under reports/.
     """
     report = create_mock_run_report(include_guards=True, include_auto=True)
     baseline = create_mock_baseline()
-    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+    with patch(
+        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+    ):
         cert = make_report(report, baseline)
     # Ensure expected branches exist for rendering variations
     cert.setdefault(
@@ -323,7 +325,7 @@ def _build_spectral_guard_with_z_scores() -> dict[str, Any]:
     }
 
 
-class TestCertificateHelpers:
+class TestEvaluationReportHelpers:
     """Direct tests for low-level helper utilities."""
 
     @pytest.mark.parametrize(
@@ -1207,8 +1209,8 @@ class TestExtractStructuralDeltas:
         }
 
 
-class TestCertificateAnalyticsHelpers:
-    """Cover remaining analytics helpers in certificate module."""
+class TestEvaluationReportAnalyticsHelpers:
+    """Cover remaining analytics helpers in report_builder module."""
 
     def test_analyze_bitwidth_map(self):
         bitwidth_map = {
@@ -1270,43 +1272,43 @@ class TestCertificateAnalyticsHelpers:
         report = {"meta": {"run_id": "existing-run-id"}}
         assert _generate_run_id(report) == "existing-run-id"
 
-    def test_compute_certificate_hash_ignores_artifacts(self):
-        certificate = {
+    def test_compute_evaluation_report_hash_ignores_artifacts(self):
+        evaluation_report = {
             "schema_version": "v1",
             "run_id": "abc123",
             "meta": {"model_id": "m"},
             "artifacts": {"generated_at": "now"},
         }
-        hash_with_artifacts = _compute_report_hash(certificate)
-        certificate.pop("artifacts")
-        hash_without_artifacts = _compute_report_hash(certificate)
+        hash_with_artifacts = _compute_report_hash(evaluation_report)
+        evaluation_report.pop("artifacts")
+        hash_without_artifacts = _compute_report_hash(evaluation_report)
         assert hash_with_artifacts == hash_without_artifacts
 
 
-class TestMakeCertificate:
+class TestMakeEvaluationReport:
     """Test make_report function."""
 
-    def test_basic_certificate_creation(self):
-        """Test basic certificate creation with valid inputs."""
+    def test_basic_evaluation_report_creation(self):
+        """Test basic evaluation_report creation with valid inputs."""
         report = create_mock_run_report()
         baseline = create_mock_baseline()
 
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
 
-        assert certificate["schema_version"] == REPORT_SCHEMA_VERSION
-        assert "run_id" in certificate
-        assert certificate["meta"]["model_id"] == "test-model"
-        assert certificate["primary_metric"]["final"] == 10.5
-        assert certificate["edit_name"] == "structured"
-        assert certificate["meta"]["seeds"]["python"] == 42
+        assert evaluation_report["schema_version"] == REPORT_SCHEMA_VERSION
+        assert "run_id" in evaluation_report
+        assert evaluation_report["meta"]["model_id"] == "test-model"
+        assert evaluation_report["primary_metric"]["final"] == 10.5
+        assert evaluation_report["edit_name"] == "structured"
+        assert evaluation_report["meta"]["seeds"]["python"] == 42
         # Plugin provenance is optional after report normalization; ensure structure present
-        plugins = certificate["plugins"]
+        plugins = evaluation_report["plugins"]
         assert isinstance(plugins, dict)
 
-    def test_make_certificate_invalid_preview_no_longer_raises(self):
+    def test_make_evaluation_report_invalid_preview_no_longer_raises(self):
         report = create_mock_run_report()
         report["metrics"]["ppl_preview"] = 0.5
         report["data"]["stride"] = report["data"]["seq_len"]
@@ -1337,10 +1339,10 @@ class TestMakeCertificate:
                 "actual_preview": 180,
                 "actual_final": 180,
             }
-            certificate = make_report(report, baseline)
-        assert isinstance(certificate, dict)
+            evaluation_report = make_report(report, baseline)
+        assert isinstance(evaluation_report, dict)
 
-    def test_make_certificate_double_invalid_ppl_falls_back(self):
+    def test_make_evaluation_report_double_invalid_ppl_falls_back(self):
         report = create_mock_run_report(ppl_final=0.5)
         report["metrics"]["ppl_preview"] = 0.5
         report["metrics"]["ppl_final"] = 0.5
@@ -1348,11 +1350,11 @@ class TestMakeCertificate:
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
         # Normalized path keeps PM snapshot as provided; fallback applies internally for gating
-        assert isinstance(certificate.get("primary_metric"), dict)
+        assert isinstance(evaluation_report.get("primary_metric"), dict)
 
-    def test_certificate_includes_guard_overhead_metrics(self):
+    def test_evaluation_report_includes_guard_overhead_metrics(self):
         report = create_mock_run_report()
         report["guard_overhead"] = {
             "bare_ppl": 100.0,
@@ -1363,23 +1365,23 @@ class TestMakeCertificate:
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
         # Guard overhead is optional when not preserved by normalization
-        guard_overhead = certificate.get("guard_overhead", {})
+        guard_overhead = evaluation_report.get("guard_overhead", {})
         assert isinstance(guard_overhead, dict)
 
-    def test_certificate_with_evaluation_windows_hashes(self):
+    def test_evaluation_report_with_evaluation_windows_hashes(self):
         report = create_mock_run_report(include_evaluation_windows=True)
         baseline = create_mock_baseline()
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
-        dataset_hash = certificate["dataset"]["hash"]
+            evaluation_report = make_report(report, baseline)
+        dataset_hash = evaluation_report["dataset"]["hash"]
         assert dataset_hash["preview"].startswith("sha256:")
         assert dataset_hash["final"].startswith("sha256:")
 
-    def test_make_certificate_detects_delta_ratio_mismatch(self):
+    def test_make_evaluation_report_detects_delta_ratio_mismatch(self):
         report = create_mock_run_report()
         baseline = create_mock_run_report()
         window_payload = {"window_ids": [1, 2, 3], "logloss": [0.2, 0.21, 0.19]}
@@ -1429,7 +1431,7 @@ class TestMakeCertificate:
                 cert = make_report(report, baseline)
                 assert isinstance(cert, dict)
 
-    def test_make_certificate_uses_paired_delta_ci_when_available(self):
+    def test_make_evaluation_report_uses_paired_delta_ci_when_available(self):
         report = create_mock_run_report()
         baseline = create_mock_run_report()
         report["evaluation_windows"] = {
@@ -1452,34 +1454,34 @@ class TestMakeCertificate:
                 "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
                 return_value=(-0.005, 0.010),
             ):
-                certificate = make_report(report, baseline)
+                evaluation_report = make_report(report, baseline)
 
         # PM-only: pairing lives under dataset.windows.stats; CI is mapped to display_ci
-        stats = certificate.get("dataset", {}).get("windows", {}).get("stats", {})
+        stats = evaluation_report.get("dataset", {}).get("windows", {}).get("stats", {})
         assert stats.get("pairing") == "paired_baseline"
         assert stats.get("paired_windows") == 2
-        pm = certificate.get("primary_metric", {})
+        pm = evaluation_report.get("primary_metric", {})
         dci = pm.get("display_ci") if isinstance(pm, dict) else None
         # Normalized path may collapse CI to point; ensure it’s a 2-tuple/list of numbers
         assert isinstance(dci, (tuple | list)) and len(dci) == 2
         assert all(isinstance(x, (int | float)) for x in dci)
 
-    def test_certificate_with_auto_config(self):
-        """Test certificate creation with auto-tuning configuration."""
+    def test_evaluation_report_with_auto_config(self):
+        """Test evaluation_report creation with auto-tuning configuration."""
         report = create_mock_run_report(include_auto=True)
         baseline = create_mock_baseline()
 
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
 
-        auto = certificate["auto"]
+        auto = evaluation_report["auto"]
         assert auto["tier"] == "aggressive"
         assert auto["probes_used"] == 5
         assert auto["target_pm_ratio"] == 1.5
 
-    def test_make_certificate_records_policy_overrides_and_variance_digest(self):
+    def test_make_evaluation_report_records_policy_overrides_and_variance_digest(self):
         report = create_mock_run_report()
         report["meta"]["policy_overrides"] = ["configs/overrides/spectral.yaml"]
         report["meta"]["overrides"] = "configs/overrides/variance.yaml"
@@ -1504,53 +1506,53 @@ class TestMakeCertificate:
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
 
-        provenance = certificate["policy_provenance"]
+        provenance = evaluation_report["policy_provenance"]
         # Policy provenance includes an ordered, de-duped override list.
         assert provenance["overrides"] == [
             "configs/overrides/spectral.yaml",
             "configs/overrides/variance.yaml",
             "configs/overrides/rmt.yaml",
         ]
-        variance_policy = certificate["policies"]["variance"]
+        variance_policy = evaluation_report["policies"]["variance"]
         assert variance_policy.get("policy_digest")
-        assert certificate["auto"]["policy_digest"] == provenance["policy_digest"]
+        assert evaluation_report["auto"]["policy_digest"] == provenance["policy_digest"]
 
-    def test_certificate_without_auto_config(self):
-        """Test certificate creation without auto-tuning."""
+    def test_evaluation_report_without_auto_config(self):
+        """Test evaluation_report creation without auto-tuning."""
         report = create_mock_run_report(include_auto=False)
         baseline = create_mock_baseline()
 
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
 
-        auto = certificate["auto"]
+        auto = evaluation_report["auto"]
         assert auto["tier"] == "none"
         assert auto["probes_used"] == 0
         assert auto["target_pm_ratio"] is None
 
-    def test_certificate_with_baseline_v1(self):
-        """Test certificate creation with baseline-v1 schema."""
+    def test_evaluation_report_with_baseline_v1(self):
+        """Test evaluation_report creation with baseline-v1 schema."""
         report = create_mock_run_report()
         baseline = create_mock_baseline(schema_type="baseline-v1")
 
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
 
-        baseline_ref = certificate["baseline_ref"]
+        baseline_ref = evaluation_report["baseline_ref"]
         # PM-only baseline reference includes primary_metric with final point
         assert isinstance(
             baseline_ref.get("primary_metric", {}).get("final"), int | float
         )
         assert baseline_ref["model_id"] == "test-model"
 
-    def test_certificate_includes_structured_edit_metadata(self):
-        """Structured reference metadata should be surfaced in the certificate."""
+    def test_evaluation_report_includes_structured_edit_metadata(self):
+        """Structured reference metadata should be surfaced in the evaluation_report."""
         report = create_mock_run_report()
         report["edit"].update(
             {
@@ -1581,16 +1583,16 @@ class TestMakeCertificate:
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
 
-        edit_meta = certificate["edit"]
+        edit_meta = evaluation_report["edit"]
         assert edit_meta["name"] == "structured"
         assert edit_meta["algorithm"] == "quant_rtn" or edit_meta["algorithm"] == ""
         # Normalized reports do not carry extended edit metadata; ensure minimal presence only
         assert edit_meta["name"] == "structured"
 
-    def test_certificate_records_variance_section(self):
-        """Variance guard summary should be propagated into the certificate."""
+    def test_evaluation_report_records_variance_section(self):
+        """Variance guard summary should be propagated into the evaluation_report."""
         report = create_mock_run_report()
         report["guards"] = []
         report["metrics"]["variance"] = {
@@ -1604,12 +1606,14 @@ class TestMakeCertificate:
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
 
-        # Variance section may be omitted after normalization; ensure certificate contains a variance block (possibly empty)
-        assert "variance" in certificate and isinstance(certificate["variance"], dict)
+        # Variance section may be omitted after normalization; ensure evaluation_report contains a variance block (possibly empty)
+        assert "variance" in evaluation_report and isinstance(
+            evaluation_report["variance"], dict
+        )
 
-    def test_certificate_ratio_matches_weighted_log_delta(self):
+    def test_evaluation_report_ratio_matches_weighted_log_delta(self):
         """PPL ratio must equal exp(weighted mean ΔlogNLL)."""
         report = create_mock_run_report()
         report["metrics"]["paired_delta_samples"] = {
@@ -1621,9 +1625,9 @@ class TestMakeCertificate:
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
 
-        pm = certificate.get("primary_metric", {})
+        pm = evaluation_report.get("primary_metric", {})
         # Drift identity: final/preview ≈ exp(Δlog)
         final = float(pm.get("final"))
         preview = float(pm.get("preview"))
@@ -1647,12 +1651,12 @@ class TestMakeCertificate:
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
-        # Normalized certificate may omit guard_overhead; validate the decision logic directly
+            evaluation_report = make_report(report, baseline)
+        # Normalized evaluation_report may omit guard_overhead; validate the decision logic directly
         sanitized, _ = _prepare_guard_overhead_section(report["guard_overhead"])  # type: ignore[index]
         flags = _compute_validation_flags(
             ppl={
-                "ratio_vs_baseline": certificate.get("primary_metric", {}).get(
+                "ratio_vs_baseline": evaluation_report.get("primary_metric", {}).get(
                     "ratio_vs_baseline", 1.0
                 )
             },
@@ -1672,12 +1676,12 @@ class TestMakeCertificate:
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
 
-        assert certificate["validation"]["guard_overhead_acceptable"] is True
+        assert evaluation_report["validation"]["guard_overhead_acceptable"] is True
 
-    def test_certificate_records_invariant_failures(self):
-        """Certificate should surface invariants guard failures with details."""
+    def test_evaluation_report_records_invariant_failures(self):
+        """Evaluation Report should surface invariants guard failures with details."""
         report = create_mock_run_report()
         report["metrics"]["invariants"] = {
             "nan_check": {
@@ -1697,9 +1701,9 @@ class TestMakeCertificate:
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
 
-        invariants_section = certificate["invariants"]
+        invariants_section = evaluation_report["invariants"]
         assert invariants_section["status"] == "warn"
         assert invariants_section["failures"] == [
             {
@@ -1713,10 +1717,10 @@ class TestMakeCertificate:
             }
         ]
         # Non-fatal invariant warnings should not fail the invariants gate
-        assert certificate["validation"]["invariants_pass"] is True
+        assert evaluation_report["validation"]["invariants_pass"] is True
 
     def test_policy_digest_included_for_variance_guard(self):
-        """Certificate records both full-policy + variance-policy digests."""
+        """Evaluation Report records both full-policy + variance-policy digests."""
         report = create_mock_run_report(include_auto=True, include_guards=False)
         variance_policy = {
             "deadband": 0.02,
@@ -1739,19 +1743,19 @@ class TestMakeCertificate:
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
 
         expected_variance_digest = _compute_variance_policy_digest(variance_policy)
         assert (
-            certificate["policies"]["variance"]["policy_digest"]
+            evaluation_report["policies"]["variance"]["policy_digest"]
             == expected_variance_digest
         )
         assert (
-            certificate["auto"]["policy_digest"]
-            == certificate["policy_provenance"]["policy_digest"]
+            evaluation_report["auto"]["policy_digest"]
+            == evaluation_report["policy_provenance"]["policy_digest"]
         )
 
-    def test_certificate_captures_spectral_and_rmt_targets(self):
+    def test_evaluation_report_captures_spectral_and_rmt_targets(self):
         """Spectral and RMT policies should surface sigma quantile and epsilon targets."""
         report = create_mock_run_report(include_guards=False)
         report["guards"] = [
@@ -1788,17 +1792,17 @@ class TestMakeCertificate:
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
 
-        spectral_policy = certificate["policies"]["spectral"]
+        spectral_policy = evaluation_report["policies"]["spectral"]
         assert spectral_policy["sigma_quantile"] == pytest.approx(0.95)
         assert "contraction" not in spectral_policy
 
-        rmt_policy = certificate["policies"]["rmt"]
+        rmt_policy = evaluation_report["policies"]["rmt"]
         assert rmt_policy["epsilon_default"] == pytest.approx(0.1)
         assert rmt_policy["epsilon_by_family"]["ffn"] == pytest.approx(0.1)
 
-    def test_variance_metadata_embedded_in_certificate(self):
+    def test_variance_metadata_embedded_in_evaluation_report(self):
         """Variance section should carry tap, targets, predictive gate, and A/B provenance."""
         report = create_mock_run_report(include_guards=False)
         report["guards"] = [
@@ -1831,9 +1835,9 @@ class TestMakeCertificate:
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
 
-        variance = certificate["variance"]
+        variance = evaluation_report["variance"]
         assert variance["tap"] == "transformer.h.*.mlp.c_proj"
         assert variance["target_modules"] == [
             "transformer.h.4.mlp.c_proj",
@@ -1842,17 +1846,17 @@ class TestMakeCertificate:
         assert variance["predictive_gate"]["evaluated"] is True
         assert variance["ab_test"]["seed"] == 1337
 
-    def test_certificate_with_evaluation_windows(self):
-        """Test certificate creation with actual evaluation windows."""
+    def test_evaluation_report_with_evaluation_windows(self):
+        """Test evaluation_report creation with actual evaluation windows."""
         report = create_mock_run_report(include_evaluation_windows=True)
         baseline = create_mock_baseline()
 
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
 
-        dataset = certificate["dataset"]
+        dataset = evaluation_report["dataset"]
         assert "hash" in dataset
         assert dataset["hash"]["total_tokens"] == 16  # 4 tokens * 4 sequences
 
@@ -1875,10 +1879,10 @@ class TestMakeCertificate:
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
         from tests.utils.pm import pm as _pm
 
-        M = _pm(certificate)
+        M = _pm(evaluation_report)
         assert isinstance(M.get("preview"), int | float)
         assert isinstance(M.get("final"), int | float)
         expected = (
@@ -1897,16 +1901,16 @@ class TestMakeCertificate:
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
-        assert isinstance(certificate, dict)
+            evaluation_report = make_report(report, baseline)
+        assert isinstance(evaluation_report, dict)
 
 
-class TestValidateCertificate:
+class TestValidateEvaluationReport:
     """Test validate_report function."""
 
-    def test_valid_certificate(self):
-        """Test validation of a valid certificate (PM-only)."""
-        certificate = {
+    def test_valid_evaluation_report(self):
+        """Test validation of a valid evaluation_report (PM-only)."""
+        evaluation_report = {
             "schema_version": REPORT_SCHEMA_VERSION,
             "run_id": "test123",
             "meta": {"model_id": "m"},
@@ -1942,27 +1946,27 @@ class TestValidateCertificate:
             },
         }
 
-        assert validate_report(certificate) is True
+        assert validate_report(evaluation_report) is True
 
     def test_invalid_schema_version(self):
         """Test validation fails with wrong schema version."""
-        certificate = {"schema_version": "wrong-version", "run_id": "test123"}
+        evaluation_report = {"schema_version": "wrong-version", "run_id": "test123"}
 
-        assert validate_report(certificate) is False
+        assert validate_report(evaluation_report) is False
 
     def test_missing_required_fields(self):
         """Test validation fails with missing required fields."""
-        certificate = {
+        evaluation_report = {
             "schema_version": REPORT_SCHEMA_VERSION,
             "run_id": "test123",
             # Missing other required fields
         }
 
-        assert validate_report(certificate) is False
+        assert validate_report(evaluation_report) is False
 
     def test_invalid_ppl_metrics(self):
         """Test validation fails with invalid PPL metrics."""
-        certificate = {
+        evaluation_report = {
             "schema_version": REPORT_SCHEMA_VERSION,
             "run_id": "test123",
             "meta": {},
@@ -1991,11 +1995,11 @@ class TestValidateCertificate:
             },
         }
 
-        assert validate_report(certificate) is False
+        assert validate_report(evaluation_report) is False
 
     def test_invalid_validation_flags(self):
         """Test validation fails with invalid validation flags."""
-        certificate = {
+        evaluation_report = {
             "schema_version": REPORT_SCHEMA_VERSION,
             "run_id": "test123",
             "meta": {},
@@ -2026,18 +2030,18 @@ class TestValidateCertificate:
             },
         }
 
-        assert validate_report(certificate) is False
+        assert validate_report(evaluation_report) is False
 
     def test_exception_handling(self):
         """Test validation handles exceptions gracefully."""
         # Invalid structure that would raise exceptions in try-except block
         # Test with dict that raises KeyError/TypeError/ValueError (caught exceptions)
-        certificate = {"invalid": "structure"}
-        assert validate_report(certificate) is False
+        evaluation_report = {"invalid": "structure"}
+        assert validate_report(evaluation_report) is False
 
         # Test with malformed dictionary structure
-        certificate = {"schema_version": "v1", "ppl": "not_a_dict"}
-        assert validate_report(certificate) is False
+        evaluation_report = {"schema_version": "v1", "ppl": "not_a_dict"}
+        assert validate_report(evaluation_report) is False
 
         # Test AttributeError case (None input) - should raise AttributeError
         with pytest.raises(AttributeError):
@@ -2048,7 +2052,7 @@ class TestValidateCertificate:
             validate_report("not_a_dict")
 
 
-class TestRenderCertificateMarkdown:
+class TestRenderEvaluationReportMarkdown:
     """Test render_report_markdown function."""
 
     def test_basic_markdown_rendering(self):
@@ -2059,9 +2063,9 @@ class TestRenderCertificateMarkdown:
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
 
-        markdown = render_report_markdown(certificate)
+        markdown = render_report_markdown(evaluation_report)
 
         assert "# InvarLock Evaluation Report" in markdown
         assert "test-model" in markdown
@@ -2078,13 +2082,13 @@ class TestRenderCertificateMarkdown:
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
 
-        markdown = render_report_markdown(certificate)
+        markdown = render_report_markdown(evaluation_report)
 
         assert "Auto-Tuning Configuration" in markdown
         assert "aggressive" in markdown
-        # Current certificate markdown omits explicit target ratio label
+        # Current evaluation_report markdown omits explicit target ratio label
         # but should still include auto-tuning tier detail.
         assert "Auto-Tuning Configuration" in markdown
 
@@ -2096,9 +2100,9 @@ class TestRenderCertificateMarkdown:
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
 
-        markdown = render_report_markdown(certificate)
+        markdown = render_report_markdown(evaluation_report)
 
         assert "Auto-Tuning Configuration" not in markdown
 
@@ -2110,25 +2114,25 @@ class TestRenderCertificateMarkdown:
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
 
-        markdown = render_report_markdown(certificate)
+        markdown = render_report_markdown(evaluation_report)
 
         # Quality gates table present; section titles may vary across releases
         assert "Quality Gates" in markdown
         # Guard Overhead section may be omitted when not evaluated; ensure RMT section present
         assert "RMT" in markdown
 
-    def test_invalid_certificate_raises_error(self):
-        """Test that invalid certificate raises ValueError."""
-        invalid_certificate = {"schema_version": "wrong"}
+    def test_invalid_evaluation_report_raises_error(self):
+        """Test that invalid evaluation_report raises ValueError."""
+        invalid_evaluation_report = {"schema_version": "wrong"}
 
-        with pytest.raises(ValueError, match="Invalid certificate structure"):
-            render_report_markdown(invalid_certificate)
+        with pytest.raises(ValueError, match="Invalid evaluation report structure"):
+            render_report_markdown(invalid_evaluation_report)
 
-    def test_render_sample_certificate_fixture(self):
-        """Ensure sample certificate renders without error and validates."""
-        # Build a small synthetic certificate via API to avoid stale fixtures
+    def test_render_sample_evaluation_report_fixture(self):
+        """Ensure sample evaluation_report renders without error and validates."""
+        # Build a small synthetic evaluation_report via API to avoid stale fixtures
         report = create_mock_run_report()
         baseline = create_mock_baseline()
         with patch(
@@ -2153,15 +2157,15 @@ class TestRenderCertificateMarkdown:
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
 
         # Add provenance window plan and inference metadata to cover markdown branches
-        certificate.setdefault("provenance", {})["window_plan"] = {
+        evaluation_report.setdefault("provenance", {})["window_plan"] = {
             "profile": "release",
             "preview_n": 203,
             "final_n": 203,
         }
-        certificate.setdefault("structure", {}).setdefault(
+        evaluation_report.setdefault("structure", {}).setdefault(
             "compression_diagnostics", {}
         ).update(
             {
@@ -2171,7 +2175,7 @@ class TestRenderCertificateMarkdown:
             }
         )
 
-        markdown = render_report_markdown(certificate)
+        markdown = render_report_markdown(evaluation_report)
         # Guard Overhead section may be omitted if normalization dropped the measure
         assert ("Guard Overhead" in markdown) or ("Executive Summary" in markdown)
         assert "Inference Diagnostics" in markdown
@@ -2201,9 +2205,9 @@ class TestRenderCertificateMarkdown:
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
 
-        markdown = render_report_markdown(certificate)
+        markdown = render_report_markdown(evaluation_report)
 
         assert (
             "| Gate | Status | Measured | Threshold | Basis | Description |" in markdown
@@ -2213,10 +2217,10 @@ class TestRenderCertificateMarkdown:
         assert "Top |z| per family:" in markdown
 
     def test_render_markdown_with_invariant_failures(self):
-        certificate = _load_local_certificate()
+        evaluation_report = _load_local_evaluation_report()
 
-        certificate["invariants"]["summary"]["warning_violations"] = 2
-        certificate["invariants"]["failures"] = [
+        evaluation_report["invariants"]["summary"]["warning_violations"] = 2
+        evaluation_report["invariants"]["failures"] = [
             {
                 "message": "LayerNorm missing",
                 "severity": "warning",
@@ -2224,15 +2228,15 @@ class TestRenderCertificateMarkdown:
             }
         ]
 
-        markdown = render_report_markdown(certificate)
+        markdown = render_report_markdown(evaluation_report)
 
         assert "Non-fatal" in markdown
         assert "LayerNorm missing" in markdown
 
     def test_render_markdown_quality_gates_basis_note(self):
-        certificate = _load_local_certificate()
+        evaluation_report = _load_local_evaluation_report()
 
-        markdown = render_report_markdown(certificate)
+        markdown = render_report_markdown(evaluation_report)
 
         assert (
             "> *Basis: “point” gates check the point estimate; “upper” gates check the CI upper bound; "
@@ -2240,19 +2244,19 @@ class TestRenderCertificateMarkdown:
         )
 
     def test_render_markdown_resolved_policy_yaml_block(self):
-        certificate = _load_local_certificate()
+        evaluation_report = _load_local_evaluation_report()
 
-        markdown = render_report_markdown(certificate)
+        markdown = render_report_markdown(evaluation_report)
 
         assert "## Policy Configuration" in markdown
         assert "```yaml" in markdown
         assert "spectral:" in markdown
 
-    def test_render_markdown_with_rich_certificate(self):
-        certificate = _load_local_certificate()
+    def test_render_markdown_with_rich_evaluation_report(self):
+        evaluation_report = _load_local_evaluation_report()
 
-        certificate["meta"]["commit"] = ""
-        cert_copy = copy.deepcopy(certificate)
+        evaluation_report["meta"]["commit"] = ""
+        cert_copy = copy.deepcopy(evaluation_report)
         cert_copy["policy_provenance"]["overrides"] = []
         cert_copy["policy_provenance"].pop("policy_digest", None)
         cert_copy["policy_provenance"]["resolved_at"] = "2025-10-15T00:00:00Z"
@@ -2351,8 +2355,8 @@ class TestRenderCertificateMarkdown:
         assert "RMT Guard" in markdown or "RMT ε" in markdown
 
     def test_render_markdown_variance_disabled_branch(self):
-        certificate = _load_local_certificate()
-        var = certificate["variance"]
+        evaluation_report = _load_local_evaluation_report()
+        var = evaluation_report["variance"]
         var["enabled"] = False
         var["gain"] = 0.001
         var["ppl_no_ve"] = 50.0
@@ -2360,19 +2364,21 @@ class TestRenderCertificateMarkdown:
         var["ratio_ci"] = (0.99, 1.02)
         var["calibration"] = {"coverage": 12, "requested": 16, "status": "insufficient"}
 
-        markdown = render_report_markdown(certificate)
+        markdown = render_report_markdown(evaluation_report)
         assert "Primary metric without VE" in markdown
         assert "Ratio CI" in markdown
 
     def test_render_markdown_generic_edit_paths(self):
-        certificate = _load_local_certificate()
-        certificate["edit_name"] = "custom_edit"
-        certificate["structure"]["bitwidths"] = []
-        certificate["structure"]["ranks"] = []
-        certificate["structure"]["compression_diagnostics"]["parameter_analysis"] = {}
+        evaluation_report = _load_local_evaluation_report()
+        evaluation_report["edit_name"] = "custom_edit"
+        evaluation_report["structure"]["bitwidths"] = []
+        evaluation_report["structure"]["ranks"] = []
+        evaluation_report["structure"]["compression_diagnostics"][
+            "parameter_analysis"
+        ] = {}
 
-        markdown = render_report_markdown(certificate)
-        # Generic edit paths may vary; ensure certificate header renders
+        markdown = render_report_markdown(evaluation_report)
+        # Generic edit paths may vary; ensure evaluation_report header renders
         assert "# InvarLock Evaluation Report" in markdown
 
     # Low-rank branch tests removed (no low-rank edit in this profile)
@@ -2386,9 +2392,9 @@ class TestRenderCertificateMarkdown:
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
 
-        certificate["spectral"] = {
+        evaluation_report["spectral"] = {
             "caps_applied": 3,
             "max_caps": 5,
             "summary": {
@@ -2411,7 +2417,7 @@ class TestRenderCertificateMarkdown:
                 "attn": [{"module": "layers.0.attn.c_proj", "z": 2.4}],
             },
         }
-        certificate["rmt"] = {
+        evaluation_report["rmt"] = {
             "families": {
                 "ffn": {"epsilon": 0.1, "bare": 1, "guarded": 2},
                 "attn": {"epsilon": 0.08, "bare": 0, "guarded": 0},
@@ -2425,21 +2431,21 @@ class TestRenderCertificateMarkdown:
             "status": "stable",
             "stable": True,
         }
-        certificate["guard_overhead"] = {
+        evaluation_report["guard_overhead"] = {
             "bare_ppl": 118.0,
             "guarded_ppl": 120.5,
             "overhead_ratio": 1.021,
             "overhead_percent": 2.1,
             "source": "regression",
         }
-        certificate["variance"] = {
+        evaluation_report["variance"] = {
             "enabled": True,
             "gain": 0.002,
             "scope": "ffn",
             "tap": "mlp.c_proj",
             "predictive_gate": {"ci": (0.001, 0.003)},
         }
-        certificate.setdefault("structure", {}).setdefault(
+        evaluation_report.setdefault("structure", {}).setdefault(
             "compression_diagnostics", {}
         ).update(
             {
@@ -2457,7 +2463,7 @@ class TestRenderCertificateMarkdown:
                 "warnings": ["Check clamp coverage"],
             }
         )
-        certificate["dataset"]["hash"].update(
+        evaluation_report["dataset"]["hash"].update(
             {
                 "preview_tokens": 6400,
                 "final_tokens": 6400,
@@ -2465,7 +2471,7 @@ class TestRenderCertificateMarkdown:
                 "dataset": "hash123",
             }
         )
-        certificate["dataset"]["tokenizer"].update(
+        evaluation_report["dataset"]["tokenizer"].update(
             {
                 "name": "gpt2-tokenizer",
                 "hash": "tokhash",
@@ -2477,7 +2483,7 @@ class TestRenderCertificateMarkdown:
             }
         )
 
-        markdown = render_report_markdown(certificate)
+        markdown = render_report_markdown(evaluation_report)
 
         assert "Spectral Guard" in markdown
         assert "| Family | κ | q95 | Max |z| | Violations |" in markdown
@@ -2867,21 +2873,21 @@ class TestPrivateHelperFunctions:
 
         assert run_id1 == run_id2
 
-    def test_compute_certificate_hash(self):
+    def test_compute_evaluation_report_hash(self):
         """Test _compute_report_hash function."""
-        certificate = {
+        evaluation_report = {
             "schema_version": REPORT_SCHEMA_VERSION,
             "run_id": "test123",
             "artifacts": {"path": "/some/path"},  # Should be excluded
         }
 
-        cert_hash = _compute_report_hash(certificate)
+        cert_hash = _compute_report_hash(evaluation_report)
 
         assert isinstance(cert_hash, str)
         assert len(cert_hash) == 16
 
-    def test_compute_certificate_hash_excludes_artifacts(self):
-        """Test that certificate hash excludes artifacts section."""
+    def test_compute_evaluation_report_hash_excludes_artifacts(self):
+        """Test that evaluation_report hash excludes artifacts section."""
         cert1 = {
             "schema_version": REPORT_SCHEMA_VERSION,
             "run_id": "test123",
@@ -2903,27 +2909,27 @@ class TestPrivateHelperFunctions:
 class TestIntegrationAndEdgeCases:
     """Integration tests and edge cases."""
 
-    def test_end_to_end_certificate_workflow(self):
-        """Test complete certificate creation and validation workflow."""
+    def test_end_to_end_evaluation_report_workflow(self):
+        """Test complete evaluation_report creation and validation workflow."""
         report = create_mock_run_report(include_auto=True, include_guards=True)
         baseline = create_mock_baseline()
 
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            # Create certificate
-            certificate = make_report(report, baseline)
+            # Create evaluation_report
+            evaluation_report = make_report(report, baseline)
 
-            # Validate certificate
-            assert validate_report(certificate) is True
+            # Validate evaluation_report
+            assert validate_report(evaluation_report) is True
 
             # Render to markdown
-            markdown = render_report_markdown(certificate)
+            markdown = render_report_markdown(evaluation_report)
             assert len(markdown) > 100
             assert "InvarLock Evaluation Report" in markdown
 
-    def test_certificate_with_edge_case_values(self):
-        """Test certificate creation with edge case values."""
+    def test_evaluation_report_with_edge_case_values(self):
+        """Test evaluation_report creation with edge case values."""
         report = create_mock_run_report()
         report["metrics"]["ppl_preview"] = float("inf")
         report["metrics"]["ppl_final"] = float("nan")
@@ -2932,10 +2938,10 @@ class TestIntegrationAndEdgeCases:
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
 
         # Should handle inf/nan gracefully; primary_metric present
-        assert "primary_metric" in certificate
+        assert "primary_metric" in evaluation_report
 
     def test_missing_optional_fields(self):
         """Test handling of missing optional fields."""
@@ -2950,10 +2956,10 @@ class TestIntegrationAndEdgeCases:
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
 
-            # Should still create valid certificate
-            assert validate_report(certificate) is True
+            # Should still create valid evaluation_report
+            assert validate_report(evaluation_report) is True
 
 
 class TestDriftValidationGates:
@@ -2972,9 +2978,9 @@ class TestDriftValidationGates:
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
 
-        validation = certificate["validation"]
+        validation = evaluation_report["validation"]
         # Compression gate should fail; drift flag is optional under normalization
         assert validation["primary_metric_acceptable"] is False
 
@@ -2991,14 +2997,14 @@ class TestDriftValidationGates:
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
 
-        validation = certificate["validation"]
+        validation = evaluation_report["validation"]
         assert validation["preview_final_drift_acceptable"] is True
         assert validation["primary_metric_acceptable"] is True
         from tests.utils.pm import pm as _pm
 
-        M = _pm(certificate)
+        M = _pm(evaluation_report)
         assert (float(M["final"]) / float(M["preview"])) == pytest.approx(
             1.02, rel=1e-6
         )
@@ -3032,9 +3038,9 @@ class TestDriftValidationGates:
         with patch(
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_report(report, baseline)
+            evaluation_report = make_report(report, baseline)
 
-        validation = certificate["validation"]
+        validation = evaluation_report["validation"]
         # Acceptance may rely on ratio point when CI is not surfaced; ensure boolean present
         assert isinstance(validation.get("primary_metric_acceptable"), bool)
 

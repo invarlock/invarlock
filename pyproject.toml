@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "invarlock"
 version = "0.3.7"
-description = "Edit‑agnostic robustness certificates for weight edits (InvarLock framework)"
+description = "Edit‑agnostic robustness evaluation reports for weight edits (InvarLock framework)"
 authors = [{ name = "InvarLock Team", email = "oss@invarlock.dev" }]
 maintainers = [{ name = "InvarLock Maintainers", email = "support@invarlock.dev" }]
 license = "Apache-2.0"

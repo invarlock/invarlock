@@ -8,7 +8,7 @@ from invarlock.cli.app import app
 runner = CliRunner()
 
 
-def test_cli_certify_help():
+def test_cli_evaluate_help():
     result = runner.invoke(app, ["evaluate", "--help"])
     assert result.exit_code == 0
     assert "--baseline" in result.stdout and "--subject" in result.stdout

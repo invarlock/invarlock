@@ -28,7 +28,7 @@ def test_choose_dataset_split_logic():
     assert s == "validation" and fb is True
 
 
-def test_certificate_telemetry_includes_split(tmp_path: Path):
+def test_evaluation_report_telemetry_includes_split(tmp_path: Path):
     # Minimal, valid-enough report/baseline pair
     report = {
         "meta": {"model_id": "m", "adapter": "hf_causal", "device": "cpu", "seed": 42},

@@ -4,7 +4,7 @@ from invarlock.reporting.report_builder import make_report
 
 
 def test_meta_tokenizer_hash_fallback_from_dataset_section():
-    # No tokenizer_hash in meta; present in data → should propagate into certificate.meta
+    # No tokenizer_hash in meta; present in data → should propagate into evaluation_report.meta
     report = {
         "meta": {"model_id": "m", "seed": 1},
         "metrics": {"ppl_preview": 10.0, "ppl_final": 10.0},
@@ -35,6 +35,8 @@ def test_meta_tokenizer_hash_fallback_from_dataset_section():
         "ppl_final": 10.0,
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
-    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+    with patch(
+        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+    ):
         cert = make_report(report, baseline)
     assert cert["meta"].get("tokenizer_hash") == "tok-dataset-xyz"

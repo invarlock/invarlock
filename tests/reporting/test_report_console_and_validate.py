@@ -39,7 +39,7 @@ def test_compute_console_validation_block_guard_omitted_and_included():
     assert blk3["overall_pass"] is False
 
 
-def test_validate_certificate_fallback_and_flag_types(monkeypatch):
+def test_validate_evaluation_report_fallback_and_flag_types(monkeypatch):
     # Force JSON schema validator to fail to exercise fallback path
     monkeypatch.setattr(C, "_validate_with_jsonschema", lambda c: False)
     good = {

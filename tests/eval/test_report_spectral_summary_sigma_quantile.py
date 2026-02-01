@@ -3,8 +3,8 @@ from unittest.mock import patch
 import pytest
 
 from invarlock.core.auto_tuning import TIER_POLICIES
-from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.guards_analysis import _extract_spectral_analysis
+from invarlock.reporting.report_builder import make_report
 
 
 def _minimal_report():
@@ -47,12 +47,14 @@ def test_spectral_summary_sigma_quantile_from_tier_defaults(tier: str):
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
     # Ensure report passes structure validation
-    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+    with patch(
+        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+    ):
         cert = make_report(report, baseline)
 
     spectral = cert.get("spectral", {})
     # Sanity: spectral section present
-    assert spectral, "spectral analysis missing from certificate"
+    assert spectral, "spectral analysis missing from evaluation_report"
 
     # summary.sigma_quantile should be present and reflect tier defaults
     summary = spectral.get("summary", {})

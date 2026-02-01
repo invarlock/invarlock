@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from invarlock.cli.commands.verify import _validate_certificate_payload
+from invarlock.cli.commands.verify import _validate_evaluation_report_payload
 from invarlock.reporting.report_builder import make_report
 
 
@@ -65,5 +65,5 @@ def test_verify_smoke_recompute_and_consistency(tmp_path: Path):
     cert = make_report(report, baseline)
     p = tmp_path / "cert.json"
     p.write_text(json.dumps(cert))
-    errors = _validate_certificate_payload(p)
+    errors = _validate_evaluation_report_payload(p)
     assert errors == []

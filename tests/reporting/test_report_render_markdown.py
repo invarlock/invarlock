@@ -34,7 +34,7 @@ def _mk_cert() -> dict:
     }
 
 
-def test_render_certificate_markdown_invalid_raises() -> None:
+def test_render_report_markdown_invalid_raises() -> None:
     cert = _mk_cert()
     # Break schema version to make it invalid; validate_report should be False
     cert["schema_version"] = "invalid"
@@ -47,7 +47,7 @@ def test_render_certificate_markdown_invalid_raises() -> None:
         raise AssertionError("Expected ValueError for invalid cert")
 
 
-def test_validate_certificate_rejects_unknown_validation_keys() -> None:
+def test_validate_evaluation_report_rejects_unknown_validation_keys() -> None:
     cert = _mk_cert()
     # Add an unexpected key; JSONSchema validation should fail and fallback minimal check should still accept structure
     cert["validation"]["unexpected_key_for_test"] = True  # type: ignore[index]

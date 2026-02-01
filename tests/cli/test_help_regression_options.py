@@ -26,7 +26,7 @@ def test_run_help_exposes_typed_options(monkeypatch):
     assert "--out" in out
 
 
-def test_certify_help_exposes_baseline_and_subject(monkeypatch):
+def test_evaluate_help_exposes_baseline_and_subject(monkeypatch):
     app = _load_app(monkeypatch)
     runner = CliRunner()
     res = runner.invoke(app, ["evaluate", "--help"])

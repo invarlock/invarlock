@@ -13,23 +13,23 @@ def _slice_section(text: str, start_marker: str, end_marker: str | None) -> str:
     return text[start:end]
 
 
-def test_task_certify_edit_passes_baseline_report() -> None:
+def test_task_evaluate_edit_passes_baseline_report() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     text = (repo_root / "scripts/proof_packs/lib/task_functions.sh").read_text(
         encoding="utf-8"
     )
     section = _slice_section(
         text,
-        "task_certify_edit() {",
+        "task_evaluate_edit() {",
         "# ============ TASK: CREATE_ERROR",
     )
     assert "--baseline-report" in section
 
 
-def test_task_certify_error_passes_baseline_report() -> None:
+def test_task_evaluate_error_passes_baseline_report() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     text = (repo_root / "scripts/proof_packs/lib/task_functions.sh").read_text(
         encoding="utf-8"
     )
-    section = _slice_section(text, "task_certify_error() {", None)
+    section = _slice_section(text, "task_evaluate_error() {", None)
     assert "--baseline-report" in section

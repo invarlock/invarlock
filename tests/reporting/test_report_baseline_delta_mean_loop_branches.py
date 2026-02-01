@@ -80,7 +80,7 @@ def _mk_baseline() -> dict:
     }
 
 
-def test_make_certificate_handles_bad_window_entries_in_weighted_mean_loop(
+def test_make_evaluation_report_handles_bad_window_entries_in_weighted_mean_loop(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
@@ -93,7 +93,7 @@ def test_make_certificate_handles_bad_window_entries_in_weighted_mean_loop(
     assert validate_report(cert)
 
 
-def test_make_certificate_handles_nonfinite_token_counts_in_weights(
+def test_make_evaluation_report_handles_nonfinite_token_counts_in_weights(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
@@ -108,7 +108,7 @@ def test_make_certificate_handles_nonfinite_token_counts_in_weights(
     assert validate_report(cert)
 
 
-def test_make_certificate_handles_empty_token_counts_path(
+def test_make_evaluation_report_handles_empty_token_counts_path(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
@@ -123,7 +123,7 @@ def test_make_certificate_handles_empty_token_counts_path(
     assert validate_report(cert)
 
 
-def test_make_certificate_derives_window_counts_from_stats_and_coverage(
+def test_make_evaluation_report_derives_window_counts_from_stats_and_coverage(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(

@@ -1,16 +1,16 @@
 """
-InvarLock Evaluation Certificate Generation
-==========================================
+InvarLock Evaluation Report Generation
+=====================================
 
-Generate standardized evaluation certificates from RunReport and baseline
+Generate standardized evaluation reports from RunReport and baseline
 comparison.
-Certificates are standalone, portable verification artifacts that can be used
-for CI/CD gates and regulatory compliance.
+Evaluation reports are standalone, portable artifacts that record statistical
+gates and evidence for CI/CD checks and audits (not formal verification).
 """
 
 from __future__ import annotations
 
-## Core certificate generation and analysis orchestration lives here.
+## Core evaluation report building and analysis orchestration lives here.
 # mypy: ignore-errors
 import copy
 import hashlib
@@ -40,10 +40,6 @@ from invarlock.eval.tail_stats import evaluate_metric_tail
 from invarlock.utils.digest import hash_json
 
 from . import report_schema as _report_schema
-from .report_schema import (
-    REPORT_JSON_SCHEMA,
-    REPORT_SCHEMA_VERSION,
-)
 from .dataset_hashing import (
     _extract_dataset_info,
 )
@@ -53,10 +49,15 @@ from .guards_analysis import (
     _extract_spectral_analysis,
     _extract_variance_analysis,
 )
-from .report_types import RunReport, validate_report as validate_run_report
+from .report_schema import (
+    REPORT_JSON_SCHEMA,
+    REPORT_SCHEMA_VERSION,
+)
+from .report_types import RunReport
+from .report_types import validate_report as validate_run_report
 
 # Expose compute_window_hash for tests that monkeypatch it
-# compute_window_hash used to be exposed via certificate; tests now patch
+# compute_window_hash used to be exposed via the evaluation report builder; tests now patch
 # dataset_hashing.compute_window_hash directly, so this import is no longer needed.
 from .utils import (
     _coerce_int,
@@ -1602,7 +1603,7 @@ def make_report(
     if device_name:
         telemetry.setdefault("device", device_name)
 
-    # Build the certificate
+    # Build the evaluation report
     window_capacity_ctx = (
         report.get("metrics", {}).get("window_capacity")
         if isinstance(report.get("metrics"), dict)
@@ -2623,7 +2624,7 @@ def _extract_structural_deltas(report: RunReport) -> dict[str, Any]:
 def _extract_edit_metadata(
     report: RunReport, plugin_provenance: dict[str, Any]
 ) -> dict[str, Any]:
-    """Extract edit-level provenance and configuration metadata for the certificate."""
+    """Extract edit-level provenance and configuration metadata for the evaluation report."""
 
     edit_section = _get_mapping(report, "edit")
     if not edit_section:
@@ -3020,12 +3021,12 @@ def _compute_quality_overhead_from_guard(
 
 
 def _propagate_pairing_stats(
-    certificate: dict[str, Any], ppl_analysis: dict[str, Any] | None
+    evaluation_report: dict[str, Any], ppl_analysis: dict[str, Any] | None
 ) -> None:
-    """Surface pairing statistics inside certificate.dataset.windows.stats."""
-    if not isinstance(certificate, dict):
+    """Surface pairing statistics inside evaluation_report.dataset.windows.stats."""
+    if not isinstance(evaluation_report, dict):
         return
-    ds = certificate.get("dataset", {})
+    ds = evaluation_report.get("dataset", {})
     if not isinstance(ds, dict):
         return
     windows = ds.get("windows", {})
@@ -3079,7 +3080,7 @@ def _propagate_pairing_stats(
         windows["stats"] = stats
     if windows is not ds.get("windows"):
         ds["windows"] = windows
-    certificate["dataset"] = ds
+    evaluation_report["dataset"] = ds
 
 
 def _build_provenance_block(
@@ -3372,7 +3373,7 @@ def _compute_validation_flags(
     pm_drift_band: dict[str, float] | None = None,
     pm_tail: dict[str, Any] | None = None,
 ) -> dict[str, bool]:
-    """Compute validation flags for the certificate including canonical gates."""
+    """Compute validation flags for the evaluation report including canonical gates."""
     tier = (tier or "balanced").lower()
     # Dev-only tiny relax: widen gates and lower floors when explicitly requested
     import os as _os
@@ -3613,7 +3614,7 @@ def _compute_validation_flags(
             if _tiny_relax and threshold_val < 0.10:
                 threshold_val = 0.10
             if not math.isfinite(ratio_val):
-                # In dev/Compare-&-Certify flows we often lack a bare run; treat missing metric as pass
+                # In dev/Compare-&-Evaluate flows we often lack a bare run; treat missing metric as pass
                 guard_overhead_pass = True
             else:
                 guard_overhead_pass = ratio_val <= (1.0 + max(0.0, threshold_val))
@@ -4129,7 +4130,9 @@ except Exception:  # pragma: no cover - defensive fallback
             "render_report_markdown is unavailable; rendering dependencies missing"
         )
 
-    def compute_console_validation_block(evaluation_report: dict[str, Any]) -> dict[str, Any]:  # type: ignore
+    def compute_console_validation_block(
+        evaluation_report: dict[str, Any],
+    ) -> dict[str, Any]:  # type: ignore
         raise ImportError(
             "compute_console_validation_block is unavailable; rendering dependencies missing"
         )

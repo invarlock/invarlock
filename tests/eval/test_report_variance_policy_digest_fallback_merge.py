@@ -8,7 +8,7 @@ from invarlock.reporting.report_builder import (
 
 def test_variance_policy_digest_fallback_merges_guard_policy_keys():
     # Build a report where effective policies likely omit variance canonical knobs,
-    # but the guard entry contains a full variance policy. Certificate should
+    # but the guard entry contains a full variance policy. Evaluation Report should
     # compute digest from the guard policy and merge missing keys back into policies.variance.
     variance_policy = {
         "deadband": 0.02,
@@ -56,7 +56,9 @@ def test_variance_policy_digest_fallback_merges_guard_policy_keys():
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
 
-    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+    with patch(
+        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+    ):
         cert = make_report(report, baseline)
 
     expected_variance = _compute_variance_policy_digest(variance_policy)

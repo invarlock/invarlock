@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_builder import _compute_validation_flags
 from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.report_builder import _compute_validation_flags
 
 
 def test_primary_metric_vqa_accuracy_gating_and_render():
@@ -49,7 +49,7 @@ def test_primary_metric_vqa_accuracy_gating_and_render():
             "windows": {"preview": 1, "final": 1, "seed": 42},
             "hash": {"preview_tokens": None, "final_tokens": None, "total_tokens": 0},
         },
-        # PM-only certificate: no top-level ppl block
+        # PM-only evaluation_report: no top-level ppl block
         "invariants": {"status": "pass"},
         "spectral": {"caps_applied": 0, "max_caps": 5},
         "rmt": {"stable": True},

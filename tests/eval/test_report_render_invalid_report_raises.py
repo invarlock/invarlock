@@ -3,8 +3,8 @@ import pytest
 from invarlock.reporting.render import render_report_markdown
 
 
-def test_render_certificate_markdown_rejects_invalid_schema():
-    # Minimal malformed certificate to exercise validate_report(False) path
+def test_render_report_markdown_rejects_invalid_schema():
+    # Minimal malformed evaluation_report to exercise validate_report(False) path
     cert = {
         "schema_version": "bad-version",
         "run_id": "r1",

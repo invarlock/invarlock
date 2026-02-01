@@ -5,7 +5,7 @@ from copy import deepcopy
 from invarlock.reporting import render as render_mod
 
 
-def _base_certificate() -> dict[str, object]:
+def _base_evaluation_report() -> dict[str, object]:
     return {
         "schema_version": "v1",
         "run_id": "run-guard",
@@ -39,8 +39,8 @@ def _base_certificate() -> dict[str, object]:
     }
 
 
-def test_render_certificate_markdown_includes_guard_sections():
-    cert = deepcopy(_base_certificate())
+def test_render_report_markdown_includes_guard_sections():
+    cert = deepcopy(_base_evaluation_report())
     cert["plugins"]["guards"] = [
         {"name": "spectral", "version": "1.0", "module": "invarlock.guards.spectral"}
     ]
@@ -75,8 +75,8 @@ def test_render_certificate_markdown_includes_guard_sections():
     assert "| Family | ε_f" in report
 
 
-def test_render_certificate_markdown_handles_sparse_spectral_sections():
-    cert = deepcopy(_base_certificate())
+def test_render_report_markdown_handles_sparse_spectral_sections():
+    cert = deepcopy(_base_evaluation_report())
     cert["plugins"]["guards"] = [
         {"name": "spectral", "version": "1.0", "module": "invarlock.guards.spectral"}
     ]
@@ -99,8 +99,8 @@ def test_render_certificate_markdown_handles_sparse_spectral_sections():
     assert "attn.block (|z|=n/a)" in rendered
 
 
-def test_render_certificate_markdown_rmt_handles_non_numeric_counts():
-    cert = deepcopy(_base_certificate())
+def test_render_report_markdown_rmt_handles_non_numeric_counts():
+    cert = deepcopy(_base_evaluation_report())
     cert["plugins"]["guards"] = [
         {"name": "rmt", "version": "1.0", "module": "invarlock.guards.rmt"}
     ]

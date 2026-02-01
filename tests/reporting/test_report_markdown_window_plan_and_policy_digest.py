@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.report_builder import make_report
 
 
 def test_markdown_window_plan_line_and_policy_digest_changed():
-    # Build a valid certificate via make_report
+    # Build a valid evaluation_report via make_report
     report = {
         "meta": {"model_id": "m", "adapter": "hf", "device": "cpu", "seed": 1},
         "data": {

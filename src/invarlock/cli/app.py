@@ -254,18 +254,18 @@ def _register_subapps() -> None:
 @app.command(
     name="verify",
     help=(
-        "Verify certificate JSON(s) against schema, pairing math, and gates. "
+        "Verify evaluation report JSON(s) against schema, pairing math, and gates. "
         "Use --json for a single-line machine-readable envelope."
     ),
 )
 def _verify_typed(
-    certificates: list[str] = typer.Argument(
-        ..., help="One or more certificate JSON files to verify."
+    reports: list[str] = typer.Argument(
+        ..., help="One or more evaluation report JSON files to verify."
     ),
     baseline: str | None = typer.Option(
         None,
         "--baseline",
-        help="Optional baseline certificate/report JSON to enforce provider parity.",
+        help="Optional baseline evaluation report JSON to enforce provider parity.",
     ),
     tolerance: float = typer.Option(
         1e-9, "--tolerance", help="Tolerance for analysis-basis comparisons."
@@ -285,10 +285,10 @@ def _verify_typed(
 
     from .commands.verify import verify_command as _verify
 
-    cert_paths = [_Path(c) for c in certificates]
+    report_paths = [_Path(p) for p in reports]
     baseline_path = _Path(baseline) if isinstance(baseline, str) else None
     return _verify(
-        certificates=cert_paths,
+        reports=report_paths,
         baseline=baseline_path,
         tolerance=tolerance,
         profile=profile,
@@ -300,7 +300,7 @@ def _verify_typed(
     name="run",
     help=(
         "Execute an end-to-end run from a YAML config (edit + guards + reports). "
-        "Writes run artifacts and optionally an evaluation certificate."
+        "Writes run artifacts and optionally an evaluation report."
     ),
 )
 def _run_typed(
@@ -337,7 +337,9 @@ def _run_typed(
         None, "--probes", help="Number of micro-probes (0=deterministic, >0=adaptive)"
     ),
     until_pass: bool = typer.Option(
-        False, "--until-pass", help="Retry until certificate passes (max 3 attempts)"
+        False,
+        "--until-pass",
+        help="Retry until evaluation report passes gates (max 3 attempts)",
     ),
     max_attempts: int = typer.Option(
         3, "--max-attempts", help="Maximum retry attempts for --until-pass mode"
@@ -348,7 +350,7 @@ def _run_typed(
     baseline: str | None = typer.Option(
         None,
         "--baseline",
-        help="Path to baseline report.json for certificate validation",
+        help="Path to baseline report.json for evaluation report validation",
     ),
     no_cleanup: bool = typer.Option(
         False, "--no-cleanup", help="Skip cleanup of temporary artifacts"

@@ -77,7 +77,9 @@ def _mk_reports_with_tail_policy(*, mode: str) -> tuple[dict, dict]:
 def test_tail_gate_warn_does_not_fail_validation():
     report, baseline = _mk_reports_with_tail_policy(mode="warn")
 
-    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+    with patch(
+        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+    ):
         cert = make_report(report, baseline)
 
     assert cert["validation"]["primary_metric_tail_acceptable"] is True
@@ -92,7 +94,9 @@ def test_tail_gate_warn_does_not_fail_validation():
 def test_tail_gate_fail_sets_validation_false():
     report, baseline = _mk_reports_with_tail_policy(mode="fail")
 
-    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+    with patch(
+        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+    ):
         cert = make_report(report, baseline)
 
     assert cert["validation"]["primary_metric_tail_acceptable"] is False

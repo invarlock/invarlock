@@ -1,7 +1,7 @@
-"""Built-in no-op edit used for baseline and Compare & Certify (BYOE).
+"""Built-in no-op edit used for baseline and Compare & Evaluate (BYOE).
 
 This edit does not modify the model and reports zero deltas. It exists to
-support baseline runs and Compare & Certify certification where the subject
+support baseline runs and Compare & Evaluate workflows where the subject
 checkpoint is produced outside of InvarLock.
 """
 

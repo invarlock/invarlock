@@ -150,9 +150,7 @@ def test_variance_toggle_balanced_vs_conservative():
     )
 
     balanced_cert = make_report(deepcopy(balanced_report), deepcopy(baseline))
-    conservative_cert = make_report(
-        deepcopy(conservative_report), deepcopy(baseline)
-    )
+    conservative_cert = make_report(deepcopy(conservative_report), deepcopy(baseline))
 
     assert balanced_cert["auto"]["tier"] == "balanced"
     assert balanced_cert["variance"]["enabled"] is True

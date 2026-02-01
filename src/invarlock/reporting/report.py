@@ -16,9 +16,9 @@ from typing import Any, cast
 
 from invarlock.cli._evidence import maybe_dump_guard_evidence
 
-from .report_builder import make_report
 from .normalizer import normalize_run_report
 from .render import render_report_markdown
+from .report_builder import make_report
 from .report_types import RunReport, validate_report
 
 
@@ -273,7 +273,7 @@ def save_report(
                 },
             }
 
-            # Surface quick triage fields without opening the certificate.
+            # Surface quick triage fields without opening the evaluation report.
             try:
                 from .render import compute_console_validation_block
 

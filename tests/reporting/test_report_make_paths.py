@@ -50,7 +50,7 @@ def _mk_min_report_pm(kind: str = "ppl_causal") -> dict:
     }
 
 
-def test_make_certificate_ratio_ci_from_run_metrics():
+def test_make_evaluation_report_ratio_ci_from_run_metrics():
     rep = _mk_min_report_pm()
     # Provide a logloss_delta_ci to trigger run-metrics ratio_ci derivation path
     rep["metrics"]["logloss_delta_ci"] = (-0.02, 0.03)
@@ -69,7 +69,7 @@ def test_make_certificate_ratio_ci_from_run_metrics():
     assert isinstance(lo, float) and isinstance(hi, float)
 
 
-def test_make_certificate_pairing_and_dataset_stats_injection():
+def test_make_evaluation_report_pairing_and_dataset_stats_injection():
     # Matching windows → paired_baseline path
     rep = _mk_min_report_pm()
     rep.setdefault("evaluation_windows", {})["final"] = {
@@ -88,7 +88,7 @@ def test_make_certificate_pairing_and_dataset_stats_injection():
     assert stats.get("paired_windows") == 2
 
 
-def test_make_certificate_policy_digest_changed_with_tier_difference():
+def test_make_evaluation_report_policy_digest_changed_with_tier_difference():
     rep = _mk_min_report_pm()
     base = {
         "meta": {"auto": {"tier": "conservative"}},
@@ -99,7 +99,7 @@ def test_make_certificate_policy_digest_changed_with_tier_difference():
     assert isinstance(pd, dict) and pd.get("changed") in {True, False}
 
 
-def test_make_certificate_guard_overhead_integration():
+def test_make_evaluation_report_guard_overhead_integration():
     rep = _mk_min_report_pm()
     # Provide direct ratio path for overhead section
     rep["guard_overhead"] = {

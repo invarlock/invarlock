@@ -77,4 +77,4 @@ def test_verify_json_success_multiple_certs(tmp_path: Path):
     lines = [ln for ln in res.stdout.splitlines() if ln.strip()]
     assert len(lines) == 1
     obj = json.loads(lines[0])
-    assert obj.get("certificate", {}).get("count") == 2
+    assert obj.get("evaluation_report", {}).get("count") == 2

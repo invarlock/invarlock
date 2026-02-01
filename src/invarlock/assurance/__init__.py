@@ -7,11 +7,10 @@ from typing import Any
 from invarlock.reporting.report_types import RunReport
 
 try:  # pragma: no cover - shim to reporting modules
-    from invarlock.reporting.report_builder import make_report
-    from invarlock.reporting.report_schema import REPORT_SCHEMA_VERSION, validate_report
-
     # Prefer direct import from render for rendering APIs
     from invarlock.reporting.render import render_report_markdown
+    from invarlock.reporting.report_builder import make_report
+    from invarlock.reporting.report_schema import REPORT_SCHEMA_VERSION, validate_report
 except Exception:  # pragma: no cover - provide soft stubs
     REPORT_SCHEMA_VERSION = "v1"
 
@@ -24,7 +23,7 @@ except Exception:  # pragma: no cover - provide soft stubs
     def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
         raise ImportError("invarlock.reporting.report_builder not available")
 
-    def validate_report(evaluation_report: dict[str, Any]) -> bool:
+    def validate_report(report: dict[str, Any]) -> bool:
         raise ImportError("invarlock.reporting.report_schema not available")
 
 

@@ -1,9 +1,9 @@
 import math
 from types import SimpleNamespace
 
-from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.dataset_hashing import _extract_dataset_info
 from invarlock.reporting.policy_utils import _resolve_policy_tier
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.utils import (
     _coerce_int,
     _get_mapping,
@@ -77,7 +77,7 @@ def test_resolve_policy_tier_exception_path():
     assert _resolve_policy_tier(report) == "balanced"
 
 
-def test_make_certificate_raises_on_drift_vs_delta_mismatch(monkeypatch):
+def test_make_evaluation_report_raises_on_drift_vs_delta_mismatch(monkeypatch):
     # Minimal report with preview/final and paired windows
     window_ids = list(range(1, 181))
     logloss_vals = [0.1] * len(window_ids)
@@ -163,7 +163,7 @@ def test_make_certificate_raises_on_drift_vs_delta_mismatch(monkeypatch):
         lambda *_a, **_k: (-0.01, 0.01),
     )
 
-    # After normalization, this inconsistency no longer raises here; proceed and return a certificate
+    # After normalization, this inconsistency no longer raises here; proceed and return a evaluation_report
     report.setdefault("metrics", {}).setdefault("window_plan", {}).update(
         {"profile": "ci", "preview_n": 180, "final_n": 180}
     )
@@ -171,7 +171,7 @@ def test_make_certificate_raises_on_drift_vs_delta_mismatch(monkeypatch):
     assert isinstance(cert, dict)
 
 
-def test_make_certificate_primary_seed_defaulted_when_missing(monkeypatch):
+def test_make_evaluation_report_primary_seed_defaulted_when_missing(monkeypatch):
     report = {
         "meta": {
             "model_id": "m",
@@ -222,7 +222,7 @@ def test_make_certificate_primary_seed_defaulted_when_missing(monkeypatch):
     assert cert["meta"]["seed"] == 0
 
 
-def test_make_certificate_uses_tokenizer_hash_from_data(monkeypatch):
+def test_make_evaluation_report_uses_tokenizer_hash_from_data(monkeypatch):
     report = {
         "meta": {"model_id": "m", "seed": 123},
         "metrics": {"ppl_preview": 9.9, "ppl_final": 10.0},
@@ -259,7 +259,7 @@ def test_make_certificate_uses_tokenizer_hash_from_data(monkeypatch):
     assert cert["meta"]["tokenizer_hash"] == "tok-abc"
 
 
-def test_make_certificate_includes_cuda_flags_and_model_profile(monkeypatch):
+def test_make_evaluation_report_includes_cuda_flags_and_model_profile(monkeypatch):
     report = {
         "meta": {
             "model_id": "m",
@@ -301,7 +301,7 @@ def test_make_certificate_includes_cuda_flags_and_model_profile(monkeypatch):
     assert isinstance(cert.get("meta"), dict)
 
 
-def test_make_certificate_carries_window_plan(monkeypatch):
+def test_make_evaluation_report_carries_window_plan(monkeypatch):
     report = {
         "meta": {"model_id": "m", "seed": 9},
         "metrics": {

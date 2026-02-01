@@ -1,5 +1,5 @@
-from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.policy_utils import _resolve_policy_tier
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.utils import _infer_scope_from_modules
 
 
@@ -14,7 +14,7 @@ def test_resolve_policy_tier_from_context_auto():
     assert _resolve_policy_tier(report) == "conservative"
 
 
-def test_make_certificate_invalid_preview_only_no_longer_raises(monkeypatch):
+def test_make_evaluation_report_invalid_preview_only_no_longer_raises(monkeypatch):
     # Invalid preview but valid final no longer raises after normalization
     report = {
         "meta": {"model_id": "m", "seed": 1},

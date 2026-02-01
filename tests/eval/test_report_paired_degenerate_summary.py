@@ -51,7 +51,9 @@ def test_paired_delta_summary_degenerate_skips_ratio_from_delta():
         },
     }
 
-    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+    with patch(
+        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+    ):
         cert = make_report(report, baseline)
     stats = cert.get("dataset", {}).get("windows", {}).get("stats", {})
     # With replicates=0, pairing remains run_metrics; degenerate path still valid

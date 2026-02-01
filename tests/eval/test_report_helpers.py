@@ -1,8 +1,8 @@
 import math
 
-from invarlock.reporting.report_builder import make_report, validate_report
 from invarlock.reporting.policy_utils import _compute_variance_policy_digest
 from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.report_builder import make_report, validate_report
 from invarlock.reporting.utils import (
     _coerce_interval,
     _pair_logloss_windows,
@@ -10,7 +10,7 @@ from invarlock.reporting.utils import (
 )
 
 
-def test_certificate_interval_and_seed_sanitizers():
+def test_evaluation_report_interval_and_seed_sanitizers():
     # _coerce_interval string and bad values
     assert _coerce_interval("(0.1, 0.2)") == (0.1, 0.2)
     bad_lo, bad_hi = _coerce_interval("not-a-tuple")
@@ -41,7 +41,7 @@ def test_variance_policy_digest_and_pairing():
     assert r == [1.0, 3.0] and b == [0.7, 2.5]
 
 
-def test_make_certificate_uses_paired_baseline_ratio_ci():
+def test_make_evaluation_report_uses_paired_baseline_ratio_ci():
     report = {
         "meta": {
             "model_id": "gpt2",
@@ -110,7 +110,7 @@ def test_make_certificate_uses_paired_baseline_ratio_ci():
     dci = pm.get("display_ci")
     assert isinstance(dci, tuple | list) and len(dci) == 2
 
-    # Validate and render markdown to cover certificate branches
+    # Validate and render markdown to cover evaluation_report branches
     assert validate_report(cert) is True
     md = render_report_markdown(cert)
     assert isinstance(md, str) and "InvarLock Evaluation Report" in md

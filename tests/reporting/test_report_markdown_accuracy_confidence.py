@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.report_builder import make_report
 
 
 def test_markdown_accuracy_low_baseline_note_and_confidence():
-    # Build a valid certificate via make_report, then tweak PM for the note
+    # Build a valid evaluation_report via make_report, then tweak PM for the note
     report = {
         "meta": {"model_id": "m", "adapter": "hf", "device": "cpu", "seed": 1},
         "metrics": {

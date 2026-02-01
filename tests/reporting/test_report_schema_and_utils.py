@@ -2,18 +2,18 @@ from __future__ import annotations
 
 import json
 
-from invarlock.reporting.report_schema import (
-    REPORT_SCHEMA_VERSION,
-    validate_report,
-)
 from invarlock.reporting.dataset_hashing import (
     _compute_actual_window_hashes,
     _extract_dataset_info,
 )
+from invarlock.reporting.report_schema import (
+    REPORT_SCHEMA_VERSION,
+    validate_report,
+)
 
 
-def test_certificate_schema_valid_and_fallback(monkeypatch):
-    # Valid minimal certificate (JSON schema path)
+def test_evaluation_report_schema_valid_and_fallback(monkeypatch):
+    # Valid minimal evaluation_report (JSON schema path)
     cert = {
         "schema_version": REPORT_SCHEMA_VERSION,
         "run_id": "RID1234",

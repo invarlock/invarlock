@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import re
 
-from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.report_builder import make_report
 
 
 def _mk_min_report(tier: str = "balanced") -> dict:
@@ -57,12 +57,12 @@ def _mk_min_report(tier: str = "balanced") -> dict:
     }
 
 
-def test_certificate_includes_policy_digest_fields():
+def test_evaluation_report_includes_policy_digest_fields():
     report = _mk_min_report(tier="balanced")
     baseline = _mk_min_report(tier="balanced")
     cert = make_report(report, baseline)
 
-    assert "policy_digest" in cert, "certificate should include policy_digest"
+    assert "policy_digest" in cert, "evaluation_report should include policy_digest"
     pd = cert["policy_digest"]
     assert isinstance(pd.get("policy_version"), str) and pd[
         "policy_version"

@@ -13,7 +13,7 @@ def test_compute_console_validation_block_handles_guard(monkeypatch):
         render_mod, "_load_console_labels", lambda: labels, raising=False
     )
 
-    certificate = {
+    evaluation_report = {
         "validation": {
             "primary_metric_acceptable": True,
             "invariants_pass": False,
@@ -21,12 +21,12 @@ def test_compute_console_validation_block_handles_guard(monkeypatch):
         },
         "guard_overhead": {"evaluated": False, "ok": True},
     }
-    block = render_mod.compute_console_validation_block(certificate)
+    block = render_mod.compute_console_validation_block(evaluation_report)
     assert "Guard Overhead Acceptable" not in block["labels"]
     assert block["overall_pass"] is False
 
-    certificate["guard_overhead"]["evaluated"] = True
-    block2 = render_mod.compute_console_validation_block(certificate)
+    evaluation_report["guard_overhead"]["evaluated"] = True
+    block2 = render_mod.compute_console_validation_block(evaluation_report)
     guard_rows = [row for row in block2["rows"] if "Guard Overhead" in row["label"]]
     assert guard_rows and guard_rows[0]["ok"] is True
     assert block2["overall_pass"] is False

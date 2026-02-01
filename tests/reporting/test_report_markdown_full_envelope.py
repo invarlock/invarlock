@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.report_builder import make_report
 
 
 def _mk_base_report() -> dict:
@@ -45,12 +45,12 @@ def _mk_base_report() -> dict:
     }
 
 
-def test_render_certificate_markdown_full_envelope() -> None:
+def test_render_report_markdown_full_envelope() -> None:
     rep = _mk_base_report()
     base = _mk_base_report()
     cert = make_report(rep, base)
 
-    # Enrich certificate with many optional sections to stimulate rendering branches
+    # Enrich evaluation_report with many optional sections to stimulate rendering branches
     cert.setdefault("meta", {}).update(
         {
             "invarlock_version": "0.2.0",

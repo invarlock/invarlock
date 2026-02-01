@@ -3,7 +3,7 @@ from unittest.mock import patch
 from invarlock.reporting.report_builder import make_report
 
 
-def test_certificate_metrics_loss_type_passthrough():
+def test_evaluation_report_metrics_loss_type_passthrough():
     report = {
         "meta": {"model_id": "m", "seed": 1},
         "metrics": {"ppl_preview": 10.0, "ppl_final": 10.0, "loss_type": "mlm"},
@@ -33,7 +33,9 @@ def test_certificate_metrics_loss_type_passthrough():
         "ppl_final": 10.0,
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
-    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+    with patch(
+        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+    ):
         cert = make_report(report, baseline)
     # Loss type passthrough may be omitted after normalization
     assert isinstance(cert, dict)

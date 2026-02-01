@@ -7,7 +7,7 @@ from typer.testing import CliRunner
 from invarlock.cli.app import app
 
 
-def test_certify_missing_torch_shows_extra_hint_via_cli(
+def test_evaluate_missing_torch_shows_extra_hint_via_cli(
     monkeypatch,
 ) -> None:
     """Ensure CLI surfaces a clear extras hint when torch is missing."""

@@ -40,5 +40,5 @@ def test_pair_logloss_windows_insufficient_and_none() -> None:
 
 
 def test_get_ppl_final_missing_and_present() -> None:
-    # Legacy _get_ppl_final removed; rely on primary_metric parsing in certificates.
+    # Legacy _get_ppl_final removed; rely on primary_metric parsing in evaluation_reports.
     assert True

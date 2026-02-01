@@ -95,11 +95,11 @@ def test_verify_json_results_handle_load_error_in_summary(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     cert = _cert_min()
-    # Make certificate fail policy (ratio mismatch) so summary path is exercised
+    # Make evaluation_report fail policy (ratio mismatch) so summary path is exercised
     cert["primary_metric"]["ratio_vs_baseline"] = 2.0
     cert_path = _w(tmp_path / "c.json", cert)
 
-    orig_load = verify_mod._load_certificate
+    orig_load = verify_mod._load_evaluation_report
     call_count = {"n": 0}
 
     def _wrapped_load(path: Path) -> dict:
@@ -108,7 +108,9 @@ def test_verify_json_results_handle_load_error_in_summary(
             return orig_load(path)
         raise json.JSONDecodeError("boom", "{}", 0)
 
-    monkeypatch.setattr(verify_mod, "_load_certificate", _wrapped_load, raising=True)
+    monkeypatch.setattr(
+        verify_mod, "_load_evaluation_report", _wrapped_load, raising=True
+    )
 
     with pytest.raises(typer.Exit) as ei:
         verify_command([cert_path], baseline=None, profile="dev", json_out=True)

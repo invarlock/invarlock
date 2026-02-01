@@ -47,8 +47,8 @@ def test_pairing_invariants_ci_profile():
     baseline_report = _build_report()
     run_report = _build_report()
 
-    certificate = make_report(run_report, baseline_report)
-    stats = certificate.get("dataset", {}).get("windows", {}).get("stats", {})
+    evaluation_report = make_report(run_report, baseline_report)
+    stats = evaluation_report.get("dataset", {}).get("windows", {}).get("stats", {})
 
     assert stats["window_match_fraction"] == pytest.approx(1.0)
     assert stats["window_overlap_fraction"] == pytest.approx(0.0)

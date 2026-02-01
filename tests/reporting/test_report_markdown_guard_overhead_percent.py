@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.report_builder import make_report
 
 
 def test_markdown_guard_overhead_percent_format():

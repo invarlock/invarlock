@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from invarlock.reporting import report_builder as C
 
 
-def test_validate_certificate_jsonschema_true(monkeypatch):
+def test_validate_evaluation_report_jsonschema_true(monkeypatch):
     # Provide a dummy jsonschema with validate() that returns success
     monkeypatch.setattr(
         C, "jsonschema", SimpleNamespace(validate=lambda instance, schema: None)

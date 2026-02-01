@@ -2,7 +2,7 @@
 invarlock verify command
 ====================
 
-Validates generated evaluation certificates for internal consistency. The command
+Validates generated evaluation reports for internal consistency. The command
 ensures schema compliance, checks that the primary metric ratio agrees with the
 baseline reference, and enforces paired-window guarantees (match=1.0,
 overlap=0.0).
@@ -52,18 +52,18 @@ def _coerce_int(value: Any) -> int | None:
     return out if out >= 0 else None
 
 
-def _load_certificate(path: Path) -> dict[str, Any]:
-    """Load certificate JSON from disk."""
+def _load_evaluation_report(path: Path) -> dict[str, Any]:
+    """Load an evaluation report JSON from disk."""
     with path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
 
 
-def _validate_primary_metric(certificate: dict[str, Any]) -> list[str]:
+def _validate_primary_metric(report: dict[str, Any]) -> list[str]:
     """Validate primary metric ratio consistency with baseline reference."""
     errors: list[str] = []
-    pm = certificate.get("primary_metric", {}) or {}
+    pm = report.get("primary_metric", {}) or {}
     if not isinstance(pm, dict) or not pm:
-        errors.append("Certificate missing primary_metric block.")
+        errors.append("report missing primary_metric block.")
         return errors
 
     def _is_finite_number(value: Any) -> bool:
@@ -87,7 +87,7 @@ def _validate_primary_metric(certificate: dict[str, Any]) -> list[str]:
     pm_invalid = _declares_invalid_primary_metric(pm)
 
     if kind.startswith("ppl"):
-        baseline_ref = certificate.get("baseline_ref", {}) or {}
+        baseline_ref = report.get("baseline_ref", {}) or {}
         baseline_pm = (
             baseline_ref.get("primary_metric")
             if isinstance(baseline_ref, dict)
@@ -107,7 +107,7 @@ def _validate_primary_metric(certificate: dict[str, Any]) -> list[str]:
                 expected_ratio = float(final) / float(baseline_final)
                 if not _is_finite_number(ratio_vs_baseline):
                     errors.append(
-                        "Certificate is missing a finite primary_metric.ratio_vs_baseline value."
+                        "report is missing a finite primary_metric.ratio_vs_baseline value."
                     )
                 elif not math.isclose(
                     float(ratio_vs_baseline), expected_ratio, rel_tol=1e-6, abs_tol=1e-6
@@ -130,16 +130,16 @@ def _validate_primary_metric(certificate: dict[str, Any]) -> list[str]:
             return errors
         if ratio_vs_baseline is None or not isinstance(ratio_vs_baseline, int | float):
             errors.append(
-                "Certificate missing primary_metric.ratio_vs_baseline for non-ppl metric."
+                "report missing primary_metric.ratio_vs_baseline for non-ppl metric."
             )
 
     return errors
 
 
-def _validate_pairing(certificate: dict[str, Any]) -> list[str]:
+def _validate_pairing(report: dict[str, Any]) -> list[str]:
     """Validate window pairing metrics (PM-only location)."""
     errors: list[str] = []
-    stats = certificate.get("dataset", {}).get("windows", {}).get("stats", {})
+    stats = report.get("dataset", {}).get("windows", {}).get("stats", {})
 
     match_fraction = stats.get("window_match_fraction")
     overlap_fraction = stats.get("window_overlap_fraction")
@@ -148,23 +148,23 @@ def _validate_pairing(certificate: dict[str, Any]) -> list[str]:
 
     if pairing_reason is not None:
         errors.append(
-            "window_pairing_reason must be null/None for paired certificates "
+            "window_pairing_reason must be null/None for paired reports "
             f"(found {pairing_reason!r})."
         )
     if paired_windows is None:
-        errors.append("Certificate missing paired_windows metric.")
+        errors.append("report missing paired_windows metric.")
     elif paired_windows == 0:
-        errors.append("paired_windows must be > 0 for paired certificates (found 0).")
+        errors.append("paired_windows must be > 0 for paired reports (found 0).")
 
     if match_fraction is None:
-        errors.append("Certificate missing window_match_fraction metric.")
+        errors.append("report missing window_match_fraction metric.")
     elif match_fraction < 0.999999:
         errors.append(
             f"window_match_fraction must be 1.0 for paired runs (found {match_fraction:.6f})."
         )
 
     if overlap_fraction is None:
-        errors.append("Certificate missing window_overlap_fraction metric.")
+        errors.append("report missing window_overlap_fraction metric.")
     elif overlap_fraction > 1e-9:
         errors.append(
             f"window_overlap_fraction must be 0.0 (found {overlap_fraction:.6f})."
@@ -173,10 +173,10 @@ def _validate_pairing(certificate: dict[str, Any]) -> list[str]:
     return errors
 
 
-def _validate_counts(certificate: dict[str, Any]) -> list[str]:
+def _validate_counts(report: dict[str, Any]) -> list[str]:
     """Validate preview/final window counts align with dataset configuration."""
     errors: list[str] = []
-    dataset = certificate.get("dataset", {})
+    dataset = report.get("dataset", {})
     dataset_windows = dataset.get("windows", {})
     expected_preview = dataset_windows.get("preview")
     expected_final = dataset_windows.get("final")
@@ -190,9 +190,7 @@ def _validate_counts(certificate: dict[str, Any]) -> list[str]:
 
     if expected_preview is not None:
         if preview_used is None:
-            errors.append(
-                "Certificate missing coverage.preview.used for preview windows."
-            )
+            errors.append("report missing coverage.preview.used for preview windows.")
         elif int(preview_used) != int(expected_preview):
             errors.append(
                 f"Preview window count mismatch: expected {expected_preview}, observed {preview_used}."
@@ -200,7 +198,7 @@ def _validate_counts(certificate: dict[str, Any]) -> list[str]:
 
     if expected_final is not None:
         if final_used is None:
-            errors.append("Certificate missing coverage.final.used for final windows.")
+            errors.append("report missing coverage.final.used for final windows.")
         elif int(final_used) != int(expected_final):
             errors.append(
                 f"Final window count mismatch: expected {expected_final}, observed {final_used}."
@@ -218,15 +216,15 @@ def _validate_counts(certificate: dict[str, Any]) -> list[str]:
     return errors
 
 
-def _validate_drift_band(certificate: dict[str, Any]) -> list[str]:
+def _validate_drift_band(report: dict[str, Any]) -> list[str]:
     """Validate preview→final drift stays within the configured band.
 
-    Defaults to 0.95–1.05 unless the certificate provides `primary_metric.drift_band`.
+    Defaults to 0.95–1.05 unless the report provides `primary_metric.drift_band`.
     """
     errors: list[str] = []
-    pm = certificate.get("primary_metric", {}) or {}
+    pm = report.get("primary_metric", {}) or {}
     if not isinstance(pm, dict) or not pm:
-        errors.append("Certificate missing primary_metric block.")
+        errors.append("report missing primary_metric block.")
         return errors
     if bool(pm.get("invalid")):
         # Drift is undefined when the primary metric is invalid (e.g., NaN/Inf weights).
@@ -247,7 +245,7 @@ def _validate_drift_band(certificate: dict[str, Any]) -> list[str]:
         drift_ratio = None
 
     if not isinstance(drift_ratio, int | float):
-        errors.append("Certificate missing preview/final to compute drift ratio.")
+        errors.append("report missing preview/final to compute drift ratio.")
         return errors
 
     drift_min = 0.95
@@ -282,15 +280,15 @@ def _validate_drift_band(certificate: dict[str, Any]) -> list[str]:
     return errors
 
 
-def _validate_tokenizer_hash(certificate: dict[str, Any]) -> list[str]:
+def _validate_tokenizer_hash(report: dict[str, Any]) -> list[str]:
     """Validate tokenizer hash consistency between baseline and edited runs.
 
     The check is enforced only when both hashes are present. When present and
     different, the verification fails.
     """
     errors: list[str] = []
-    meta = certificate.get("meta", {}) or {}
-    dataset = certificate.get("dataset", {}) or {}
+    meta = report.get("meta", {}) or {}
+    dataset = report.get("dataset", {}) or {}
     edited_hash = None
     try:
         # Prefer meta.tokenizer_hash; fall back to dataset.tokenizer.hash
@@ -302,7 +300,7 @@ def _validate_tokenizer_hash(certificate: dict[str, Any]) -> list[str]:
     except Exception:
         edited_hash = None
 
-    baseline_ref = certificate.get("baseline_ref", {}) or {}
+    baseline_ref = report.get("baseline_ref", {}) or {}
     baseline_hash = baseline_ref.get("tokenizer_hash")
 
     if isinstance(edited_hash, str) and isinstance(baseline_hash, str):
@@ -334,15 +332,15 @@ def _measurement_contract_digest(contract: Any) -> str | None:
 
 
 def _validate_measurement_contracts(
-    certificate: dict[str, Any], *, profile: str
+    report: dict[str, Any], *, profile: str
 ) -> list[str]:
     """Enforce measurement-contract presence and baseline pairing for guards."""
     errors: list[str] = []
     prof = (profile or "").strip().lower()
-    resolved_policy = certificate.get("resolved_policy") or {}
+    resolved_policy = report.get("resolved_policy") or {}
 
     for guard_key in ("spectral", "rmt"):
-        block = certificate.get(guard_key) or {}
+        block = report.get(guard_key) or {}
         if not isinstance(block, dict):
             continue
         evaluated = bool(block.get("evaluated", True))
@@ -353,14 +351,14 @@ def _validate_measurement_contracts(
         mc_hash = _measurement_contract_digest(mc)
         expected_hash = block.get("measurement_contract_hash")
         if not isinstance(mc, dict) or not mc:
-            errors.append(f"Certificate missing {guard_key}.measurement_contract.")
+            errors.append(f"report missing {guard_key}.measurement_contract.")
         elif isinstance(expected_hash, str) and expected_hash:
             if mc_hash and mc_hash != expected_hash:
                 errors.append(
                     f"{guard_key}.measurement_contract_hash mismatch: expected={expected_hash}, computed={mc_hash}."
                 )
         else:
-            errors.append(f"Certificate missing {guard_key}.measurement_contract_hash.")
+            errors.append(f"report missing {guard_key}.measurement_contract_hash.")
 
         rp_guard = (
             resolved_policy.get(guard_key)
@@ -373,7 +371,7 @@ def _validate_measurement_contracts(
         rp_hash = _measurement_contract_digest(rp_mc)
         if not isinstance(rp_mc, dict) or not rp_mc:
             errors.append(
-                f"Certificate missing resolved_policy.{guard_key}.measurement_contract."
+                f"report missing resolved_policy.{guard_key}.measurement_contract."
             )
         elif mc_hash and rp_hash and mc_hash != rp_hash:
             errors.append(
@@ -391,10 +389,10 @@ def _validate_measurement_contracts(
     return errors
 
 
-def _apply_profile_lints(certificate: dict[str, Any]) -> list[str]:
-    """Apply model-profile specific lint rules embedded in the certificate."""
+def _apply_profile_lints(report: dict[str, Any]) -> list[str]:
+    """Apply model-profile specific lint rules embedded in the report."""
     errors: list[str] = []
-    meta = certificate.get("meta", {})
+    meta = report.get("meta", {})
     profile = meta.get("model_profile") if isinstance(meta, dict) else None
     if not isinstance(profile, dict):
         return errors
@@ -410,7 +408,7 @@ def _apply_profile_lints(certificate: dict[str, Any]) -> list[str]:
         path = lint.get("path")
         expected = lint.get("value")
         message = lint.get("message") or "Model profile lint failed."
-        actual = _resolve_path(certificate, path) if isinstance(path, str) else None
+        actual = _resolve_path(report, path) if isinstance(path, str) else None
 
         if lint_type == "equals":
             if actual != expected:
@@ -447,21 +445,21 @@ def _apply_profile_lints(certificate: dict[str, Any]) -> list[str]:
     return errors
 
 
-def _validate_certificate_payload(
+def _validate_evaluation_report_payload(
     path: Path, *, profile: str | None = None
 ) -> list[str]:
-    """Run all verification checks for a single certificate."""
+    """Run all verification checks for a single evaluation report."""
     errors: list[str] = []
-    certificate = _load_certificate(path)
+    report = _load_evaluation_report(path)
 
     # Always surface schema validation failures for this payload
-    if not validate_report(certificate):
-        errors.append("Certificate schema validation failed.")
+    if not validate_report(report):
+        errors.append("report schema validation failed.")
         return errors
 
-    errors.extend(_validate_primary_metric(certificate))
-    errors.extend(_validate_pairing(certificate))
-    errors.extend(_validate_counts(certificate))
+    errors.extend(_validate_primary_metric(report))
+    errors.extend(_validate_pairing(report))
+    errors.extend(_validate_counts(report))
     try:
         prof = (
             (profile or "").strip().lower()
@@ -473,22 +471,22 @@ def _validate_certificate_payload(
     # Drift band is a CI/Release enforcement check; dev profile should not
     # fail verification due to preview→final drift.
     if prof in {"ci", "release"}:
-        errors.extend(_validate_drift_band(certificate))
-    errors.extend(_apply_profile_lints(certificate))
-    errors.extend(_validate_tokenizer_hash(certificate))
+        errors.extend(_validate_drift_band(report))
+    errors.extend(_apply_profile_lints(report))
+    errors.extend(_validate_tokenizer_hash(report))
     if prof in {"ci", "release"}:
-        errors.extend(_validate_measurement_contracts(certificate, profile=prof))
+        errors.extend(_validate_measurement_contracts(report, profile=prof))
 
     # strict/fast assurance mode checks were removed; verification gates rely on
     # structural schema + guard metric contracts instead.
 
     # Release-only enforcement: guard overhead must be measured or explicitly skipped.
     if prof == "release":
-        go = certificate.get("guard_overhead")
+        go = report.get("guard_overhead")
         if not isinstance(go, dict) or not go:
             errors.append(
                 "Release verification requires guard_overhead (missing). "
-                "Set INVARLOCK_SKIP_OVERHEAD_CHECK=1 to explicitly skip during certification."
+                "Set INVARLOCK_SKIP_OVERHEAD_CHECK=1 to explicitly skip during evaluation."
             )
         else:
             skipped = bool(go.get("skipped", False)) or (
@@ -499,7 +497,7 @@ def _validate_certificate_payload(
                 if evaluated is not True:
                     errors.append(
                         "Release verification requires evaluated guard_overhead (not evaluated). "
-                        "Set INVARLOCK_SKIP_OVERHEAD_CHECK=1 to explicitly skip during certification."
+                        "Set INVARLOCK_SKIP_OVERHEAD_CHECK=1 to explicitly skip during evaluation."
                     )
                 ratio = go.get("overhead_ratio")
                 if ratio is None:
@@ -511,14 +509,14 @@ def _validate_certificate_payload(
     return errors
 
 
-def _warn_adapter_family_mismatch(cert_path: Path, certificate: dict[str, Any]) -> None:
+def _warn_adapter_family_mismatch(cert_path: Path, report: dict[str, Any]) -> None:
     """Emit a soft warning if adapter families differ between baseline and edited.
 
     This is a non-fatal hint to catch inadvertent cross-family comparisons.
-    Tries to load the baseline report referenced in the certificate provenance.
+    Tries to load the baseline report referenced in the report provenance.
     """
     try:
-        plugins = certificate.get("plugins") or {}
+        plugins = report.get("plugins") or {}
         adapter_meta = plugins.get("adapter") if isinstance(plugins, dict) else None
         edited_family = None
         edited_lib = None
@@ -531,8 +529,8 @@ def _warn_adapter_family_mismatch(cert_path: Path, certificate: dict[str, Any]) 
                 edited_ver = prov.get("version") or None
 
         baseline_prov = (
-            certificate.get("provenance")
-            if isinstance(certificate.get("provenance"), dict)
+            report.get("provenance")
+            if isinstance(report.get("provenance"), dict)
             else {}
         )
         baseline_report_path = None
@@ -582,7 +580,7 @@ def _warn_adapter_family_mismatch(cert_path: Path, certificate: dict[str, Any]) 
                 f"[yellow]   • edited  : family={edited_family}, backend={edited_backend} {edited_version}[/yellow]"
             )
             console.print(
-                "[yellow]   Ensure this cross-family comparison is intentional (Compare & Certify flows should normally match families).[/yellow]"
+                "[yellow]   Ensure this cross-family comparison is intentional (Compare & Evaluate flows should normally match families).[/yellow]"
             )
     except Exception:
         # Non-fatal and best-effort; suppress errors
@@ -590,18 +588,18 @@ def _warn_adapter_family_mismatch(cert_path: Path, certificate: dict[str, Any]) 
 
 
 def verify_command(
-    certificates: list[Path] = typer.Argument(
+    reports: list[Path] = typer.Argument(
         ...,
         exists=True,
         dir_okay=False,
         readable=True,
         resolve_path=True,
-        help="One or more certificate JSON files to verify.",
+        help="One or more evaluation report JSON files to verify.",
     ),
     baseline: Path | None = typer.Option(
         None,
         "--baseline",
-        help="Optional baseline certificate/report JSON to enforce provider parity.",
+        help="Optional baseline evaluation report (or run report) JSON to enforce provider parity.",
     ),
     tolerance: float = typer.Option(
         1e-9,
@@ -620,9 +618,9 @@ def verify_command(
     ),
 ) -> None:
     """
-    Verify certificate integrity.
+    Verify evaluation report integrity.
 
-    Ensures each certificate passes schema validation, ratio consistency checks,
+    Ensures each evaluation report passes schema validation, ratio consistency checks,
     and strict pairing requirements (match=1.0, overlap=0.0).
     """
 
@@ -638,7 +636,7 @@ def verify_command(
     try:
         if baseline is not None:
             bdata = json.loads(baseline.read_text(encoding="utf-8"))
-            # Accept either a certificate or a raw report; look under provenance when present
+            # Accept either an evaluation report or a run report (report.json); look under provenance when present.
             prov = bdata.get("provenance") if isinstance(bdata, dict) else None
             if isinstance(prov, dict):
                 pd = prov.get("provider_digest")
@@ -650,8 +648,8 @@ def verify_command(
 
     malformed_any = False
     try:
-        for cert_path in certificates:
-            cert_obj = _load_certificate(cert_path)
+        for cert_path in reports:
+            cert_obj = _load_evaluation_report(cert_path)
 
             # Enforce provider digest presence in CI/Release profiles
             try:
@@ -679,24 +677,21 @@ def verify_command(
                     )
 
             # Structural checks
-            errors = _validate_certificate_payload(cert_path, profile=profile)
+            errors = _validate_evaluation_report_payload(cert_path, profile=profile)
             # JSON path: emit a typed ValidationError for schema failures to include error.code
             if json_out and any(
                 "schema validation failed" in str(e).lower() for e in errors
             ):
                 raise _ValidationError(
                     code="E601",
-                    message="CERTIFICATE-SCHEMA-INVALID: schema validation failed",
+                    message="REPORT-SCHEMA-INVALID: schema validation failed",
                     details={"path": str(cert_path)},
                 )
             # Determine malformed vs policy-fail for this cert
             is_malformed = any(
                 ("schema validation failed" in e.lower())
                 or ("missing primary_metric.ratio_vs_baseline" in e)
-                or (
-                    "Certificate is missing a finite primary_metric.ratio_vs_baseline"
-                    in e
-                )
+                or ("report is missing a finite primary_metric.ratio_vs_baseline" in e)
                 for e in errors
             )
             malformed_any = malformed_any or is_malformed
@@ -813,7 +808,7 @@ def verify_command(
                 )
                 raise _MetricsError(
                     code="E602",
-                    message="RECOMPUTE-MISMATCH: certificate values disagree with recomputation",
+                    message="RECOMPUTE-MISMATCH: report values disagree with recomputation",
                     details={"example": str(first)},
                 )
 
@@ -835,11 +830,11 @@ def verify_command(
         if not overall_ok:
             code = 2 if malformed_any else 1
             if json_out:
-                # Build per-certificate results payload
+                # Build per-report results payload
                 results: list[dict[str, Any]] = []
-                for cert_path in certificates:
+                for cert_path in reports:
                     try:
-                        cert_obj = _load_certificate(cert_path)
+                        cert_obj = _load_evaluation_report(cert_path)
                     except Exception:
                         cert_obj = {}
                     pm = (
@@ -980,7 +975,7 @@ def verify_command(
                         "ok": False,
                         "reason": "malformed" if malformed_any else "policy_fail",
                     },
-                    "certificate": {"count": len(certificates)},
+                    "evaluation_report": {"count": len(reports)},
                     "results": results,
                     "resolution": {"exit_code": code},
                 }
@@ -989,11 +984,11 @@ def verify_command(
 
         # Success emission
         if json_out:
-            # Build per-certificate success results payload
+            # Build per-report success results payload
             results: list[dict[str, Any]] = []
-            for cert_path in certificates:
+            for cert_path in reports:
                 try:
-                    cert_obj = _load_certificate(cert_path)
+                    cert_obj = _load_evaluation_report(cert_path)
                 except Exception:
                     cert_obj = {}
                 pm = (
@@ -1122,7 +1117,7 @@ def verify_command(
             payload = {
                 "format_version": FORMAT_VERIFY,
                 "summary": {"ok": True, "reason": "ok"},
-                "certificate": {"count": len(certificates)},
+                "evaluation_report": {"count": len(reports)},
                 "results": results,
                 "resolution": {"exit_code": 0},
             }
@@ -1130,7 +1125,7 @@ def verify_command(
         else:
             # Human-friendly success line
             try:
-                last = _load_certificate(certificates[-1]) if certificates else {}
+                last = _load_evaluation_report(reports[-1]) if reports else {}
                 pm = last.get("primary_metric", {}) if isinstance(last, dict) else {}
                 kind = str(pm.get("kind") or "").strip()
                 ppl = last.get("ppl", {}) if isinstance(last, dict) else {}
@@ -1181,7 +1176,7 @@ def verify_command(
                 "summary": {"ok": False, "reason": reason},
                 "results": [
                     {
-                        "id": str(certificates[0]) if certificates else "",
+                        "id": str(reports[0]) if reports else "",
                         "schema_version": "v1",
                         "kind": "",
                         "ok": False,
@@ -1213,7 +1208,7 @@ def verify_command(
                 "summary": {"ok": False, "reason": reason},
                 "results": [
                     {
-                        "id": str(certificates[0]) if certificates else "",
+                        "id": str(reports[0]) if reports else "",
                         "schema_version": "v1",
                         "kind": "",
                         "ok": False,

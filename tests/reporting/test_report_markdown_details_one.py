@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.report_builder import make_report
 
 
 def _mk_base_report(commit: str | None) -> dict:
@@ -92,7 +92,7 @@ def test_markdown_tokenizer_add_prefix_space_and_secondary_metrics_dash() -> Non
             "add_prefix_space": True,
         }
     )
-    # Inject secondary_metrics in certificate surface for markdown path
+    # Inject secondary_metrics in evaluation_report surface for markdown path
     cert["secondary_metrics"] = [
         {"kind": "accuracy", "preview": 0.7, "final": 0.71, "ratio_vs_baseline": +0.01}
     ]  # no display_ci → dash branch

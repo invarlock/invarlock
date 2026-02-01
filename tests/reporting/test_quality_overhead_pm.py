@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.report_builder import make_report
 
 
 def test_quality_overhead_ppl_ratio_shows():
@@ -48,7 +48,9 @@ def test_quality_overhead_ppl_ratio_shows():
     }
     baseline = {"run_id": "b", "model_id": "m", "ppl_final": 10.0}
 
-    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+    with patch(
+        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+    ):
         cert = make_report(report, baseline)
 
     # quality_overhead may be omitted; markdown should still render
@@ -94,7 +96,9 @@ def test_quality_overhead_accuracy_delta_near_zero():
     }
     baseline = {"run_id": "b", "model_id": "m", "ppl_final": 10.0}
 
-    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+    with patch(
+        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+    ):
         cert = make_report(report, baseline)
 
     md = render_report_markdown(cert)

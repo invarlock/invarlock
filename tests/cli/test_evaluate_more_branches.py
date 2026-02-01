@@ -58,7 +58,7 @@ def test_load_yaml_rejects_non_mapping(tmp_path: Path):
         mod._load_yaml(p)
 
 
-def test_certify_missing_preset_exits(monkeypatch, tmp_path: Path):
+def test_evaluate_missing_preset_exits(monkeypatch, tmp_path: Path):
     src = tmp_path / "src"
     edt = tmp_path / "edt"
     src.mkdir()
@@ -74,7 +74,7 @@ def test_certify_missing_preset_exits(monkeypatch, tmp_path: Path):
         )
 
 
-def test_certify_uses_inline_preset_when_repo_preset_missing(monkeypatch, tmp_path):
+def test_evaluate_uses_inline_preset_when_repo_preset_missing(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     src = Path("src")
     edt = Path("edt")
@@ -116,7 +116,7 @@ def test_certify_uses_inline_preset_when_repo_preset_missing(monkeypatch, tmp_pa
     assert calls["runs"] == 2 and calls["reports"] == 1
 
 
-def test_certify_edit_config_successfully_merges_subject(monkeypatch, tmp_path):
+def test_evaluate_edit_config_successfully_merges_subject(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     src = Path("src")
     edt = Path("edt")
@@ -170,7 +170,7 @@ def test_certify_edit_config_successfully_merges_subject(monkeypatch, tmp_path):
     assert calls["runs"] == 2
 
 
-def test_certify_edit_config_invalid_yaml_exits(monkeypatch, tmp_path):
+def test_evaluate_edit_config_invalid_yaml_exits(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     src = Path("src")
     edt = Path("edt")
@@ -200,7 +200,7 @@ def test_certify_edit_config_invalid_yaml_exits(monkeypatch, tmp_path):
         )
 
 
-def test_certify_ci_profile_invalid_json_exits(monkeypatch, tmp_path):
+def test_evaluate_ci_profile_invalid_json_exits(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     src = Path("src")
     edt = Path("edt")
@@ -229,7 +229,7 @@ def test_certify_ci_profile_invalid_json_exits(monkeypatch, tmp_path):
         )
 
 
-def test_certify_ci_nonfinite_primary_metric_exits(monkeypatch, tmp_path):
+def test_evaluate_ci_nonfinite_primary_metric_exits(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     src = Path("src")
     edt = Path("edt")
@@ -272,7 +272,7 @@ def test_certify_ci_nonfinite_primary_metric_exits(monkeypatch, tmp_path):
     assert exc.value.exit_code == 9
 
 
-def test_certify_missing_baseline_report_exits(monkeypatch, tmp_path: Path):
+def test_evaluate_missing_baseline_report_exits(monkeypatch, tmp_path: Path):
     src = tmp_path / "src"
     edt = tmp_path / "edt"
     src.mkdir()
@@ -288,7 +288,7 @@ def test_certify_missing_baseline_report_exits(monkeypatch, tmp_path: Path):
         )
 
 
-def test_certify_missing_edited_report_exits(monkeypatch, tmp_path: Path):
+def test_evaluate_missing_edited_report_exits(monkeypatch, tmp_path: Path):
     src = tmp_path / "src"
     edt = tmp_path / "edt"
     src.mkdir()
@@ -311,7 +311,7 @@ def test_certify_missing_edited_report_exits(monkeypatch, tmp_path: Path):
         )
 
 
-def test_certify_edit_config_missing_exits(monkeypatch, tmp_path: Path):
+def test_evaluate_edit_config_missing_exits(monkeypatch, tmp_path: Path):
     src = tmp_path / "src"
     edt = tmp_path / "edt"
     src.mkdir()
@@ -330,7 +330,7 @@ def test_certify_edit_config_missing_exits(monkeypatch, tmp_path: Path):
         )
 
 
-def test_certify_happy_path_with_preset_and_auto_adapter(monkeypatch, tmp_path: Path):
+def test_evaluate_happy_path_with_preset_and_auto_adapter(monkeypatch, tmp_path: Path):
     # Create a minimal fake preset
     preset = tmp_path / "preset.yaml"
     preset.write_text(

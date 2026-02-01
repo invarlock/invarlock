@@ -99,8 +99,8 @@ def _cert_skeleton() -> dict:
     }
 
 
-def test_render_certificate_markdown_general_sections() -> None:
-    # Build and render a real certificate; spot-check core headings render
+def test_render_report_markdown_general_sections() -> None:
+    # Build and render a real evaluation_report; spot-check core headings render
     report = _mk_report()
     baseline = _mk_report()
     cert = C.make_report(report, baseline)

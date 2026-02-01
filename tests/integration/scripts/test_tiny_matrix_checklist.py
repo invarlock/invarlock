@@ -16,14 +16,14 @@ def test_tiny_gpt2_matrix_dry_run(tmp_path: Path):
     assert checklist.exists()
     text = checklist.read_text()
     assert "Certification Matrix" in text
-    # Basic sanity: contains at least one invarlock certify command
-    assert "invarlock certify" in text
+    # Basic sanity: contains at least one invarlock evaluate command
+    assert "invarlock evaluate" in text
 
 
 def _read_profile_from_checklist(path: str) -> str:
     txt = Path(path).read_text()
     for line in txt.splitlines():
-        if "invarlock certify" in line and "--profile" in line:
+        if "invarlock evaluate" in line and "--profile" in line:
             parts = line.strip().split()
             for i, p in enumerate(parts):
                 if p == "--profile" and i + 1 < len(parts):

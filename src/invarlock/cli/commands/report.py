@@ -16,8 +16,8 @@ import typer
 from rich.console import Console
 
 from invarlock.cli.output import print_event, resolve_output_style
-from invarlock.reporting import report_builder as certificate_lib
 from invarlock.reporting import report as report_lib
+from invarlock.reporting import report_builder as report_builder
 
 console = Console()
 
@@ -210,10 +210,10 @@ def _generate_reports(
 
         if "report" in formats and baseline_report:
             try:
-                evaluation_report = certificate_lib.make_report(
+                evaluation_report = report_builder.make_report(
                     primary_report, baseline_report
                 )
-                certificate_lib.validate_report(evaluation_report)
+                report_builder.validate_report(evaluation_report)
                 from invarlock.reporting.render import (
                     compute_console_validation_block as _console_block,
                 )
@@ -295,8 +295,8 @@ def _generate_reports(
                 # CI gating should be handled by dedicated verify commands.
 
             except Exception as e:
-                _event("WARN", f"Certificate validation error: {e}", emoji="⚠️")
-                # Exit non-zero on certificate generation error
+                _event("WARN", f"Evaluation report validation error: {e}", emoji="⚠️")
+                # Exit non-zero on evaluation report generation error
                 raise typer.Exit(1) from e
         else:
             console.print(_format_kv_line("Output", str(output_dir)))
@@ -421,7 +421,7 @@ def _load_run_report(path: str) -> dict:
     name="verify", help="Recompute and verify metrics for evaluation reports."
 )
 def report_verify_command(
-    certificates: list[str] = typer.Argument(
+    reports: list[str] = typer.Argument(
         ..., help="One or more evaluation report JSON files to verify."
     ),
     baseline: str | None = typer.Option(
@@ -442,10 +442,10 @@ def report_verify_command(
 
     from .verify import verify_command as _verify_command
 
-    cert_paths = [_Path(c) for c in certificates]
+    report_paths = [_Path(p) for p in reports]
     baseline_path = _Path(baseline) if isinstance(baseline, str) else None
     return _verify_command(
-        certificates=cert_paths,
+        reports=report_paths,
         baseline=baseline_path,
         tolerance=tolerance,
         profile=profile,
@@ -467,9 +467,11 @@ def report_explain(
     return _explain(report=report, baseline=baseline)
 
 
-@report_app.command(name="html", help="Render a certificate JSON to HTML.")
+@report_app.command(name="html", help="Render an evaluation report JSON to HTML.")
 def report_html(
-    input: str = typer.Option(..., "--input", "-i", help="Path to certificate JSON"),
+    input: str = typer.Option(
+        ..., "--input", "-i", help="Path to evaluation report JSON"
+    ),
     output: str = typer.Option(..., "--output", "-o", help="Path to output HTML file"),
     embed_css: bool = typer.Option(
         True, "--embed-css/--no-embed-css", help="Inline a minimal static stylesheet"
@@ -486,10 +488,10 @@ def report_html(
 @report_app.command("validate")
 def report_validate(
     report: str = typer.Argument(
-        ..., help="Path to certificate JSON to validate against schema v1"
+        ..., help="Path to evaluation report JSON to validate against schema v1"
     ),
 ):
-    """Validate a certificate JSON against the current schema (v1)."""
+    """Validate an evaluation report JSON against the current schema (v1)."""
     output_style = resolve_output_style(
         style="audit",
         profile="ci",
@@ -513,11 +515,11 @@ def report_validate(
 
         ok = validate_report(payload)
         if not ok:
-            _event("FAIL", "Certificate schema validation failed", emoji="❌")
+            _event("FAIL", "Evaluation report schema validation failed", emoji="❌")
             raise typer.Exit(2)
-        _event("PASS", "Certificate schema is valid", emoji="✅")
+        _event("PASS", "Evaluation report schema is valid", emoji="✅")
     except ValueError as exc:
-        _event("FAIL", f"Certificate validation error: {exc}", emoji="❌")
+        _event("FAIL", f"Evaluation report validation error: {exc}", emoji="❌")
         raise typer.Exit(2) from exc
     except typer.Exit:
         raise

@@ -8,7 +8,7 @@ from typer.testing import CliRunner
 from invarlock.cli.app import app
 
 
-def test_certify_hf_id_normalization_and_preset_fallback(monkeypatch, tmp_path: Path):
+def test_evaluate_hf_id_normalization_and_preset_fallback(monkeypatch, tmp_path: Path):
     # Patch auto adapter and run/report commands to be no-ops
     import invarlock.cli.commands.evaluate as cert_mod
     import invarlock.cli.commands.run as run_mod
@@ -70,7 +70,7 @@ def test_certify_hf_id_normalization_and_preset_fallback(monkeypatch, tmp_path: 
     assert baseline_cfg["model"]["id"] == "org/modelA"
 
 
-def test_certify_ci_aborts_on_nonfinite_pm(monkeypatch, tmp_path: Path):
+def test_evaluate_ci_aborts_on_nonfinite_pm(monkeypatch, tmp_path: Path):
     import invarlock.cli.commands.evaluate as cert_mod
     import invarlock.cli.commands.run as run_mod
 

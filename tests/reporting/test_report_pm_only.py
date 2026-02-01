@@ -5,7 +5,7 @@ from unittest.mock import patch
 from invarlock.reporting.report_builder import make_report
 
 
-def test_certificate_has_no_ppl_block_pm_only():
+def test_evaluation_report_has_no_ppl_block_pm_only():
     report = {
         "meta": {"model_id": "m", "seed": 1},
         "metrics": {
@@ -31,10 +31,12 @@ def test_certificate_has_no_ppl_block_pm_only():
     }
     baseline = {"run_id": "b", "model_id": "m", "ppl_final": 10.0}
 
-    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+    with patch(
+        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+    ):
         cert = make_report(report, baseline)
 
-    # PM-only: no 'ppl' key should be present in the certificate
+    # PM-only: no 'ppl' key should be present in the evaluation_report
     assert "ppl" not in cert
     # Primary metric should exist
     assert isinstance(cert.get("primary_metric"), dict) and cert["primary_metric"]

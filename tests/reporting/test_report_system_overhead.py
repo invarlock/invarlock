@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.report_builder import make_report
 
 
 def _mk_minimal_report(metrics: dict) -> dict:
@@ -50,7 +50,7 @@ def _mk_minimal_report(metrics: dict) -> dict:
     }
 
 
-def test_certificate_system_overhead_table_and_primary_metric_metadata():
+def test_evaluation_report_system_overhead_table_and_primary_metric_metadata():
     report = _mk_minimal_report({})
     baseline = _mk_minimal_report(
         {"latency_ms_per_tok": 1.6, "throughput_tok_per_s": 60.0}

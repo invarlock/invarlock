@@ -1,10 +1,10 @@
-from invarlock.reporting.report_builder import _prepare_guard_overhead_section
 from invarlock.reporting.policy_utils import (
     _extract_policy_overrides,
     _format_epsilon_map,
     _format_family_caps,
     _resolve_policy_tier,
 )
+from invarlock.reporting.report_builder import _prepare_guard_overhead_section
 
 
 def test_extract_policy_overrides_dedup_and_sources():

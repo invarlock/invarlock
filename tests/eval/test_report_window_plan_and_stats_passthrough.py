@@ -44,7 +44,9 @@ def test_window_plan_and_stats_passthrough():
         "ppl_final": 10.0,
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
-    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+    with patch(
+        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+    ):
         cert = make_report(report, baseline)
     # Window plan may be omitted; ensure dataset stats propagated
     stats = cert.get("dataset", {}).get("windows", {}).get("stats", {})

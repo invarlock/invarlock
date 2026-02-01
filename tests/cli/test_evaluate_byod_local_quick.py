@@ -121,7 +121,7 @@ def _stub_runtime(monkeypatch, tmp_path: Path):
     )
 
 
-def test_certify_byod_local_quick(tmp_path: Path, monkeypatch) -> None:
+def test_evaluate_byod_local_quick(tmp_path: Path, monkeypatch) -> None:
     # Prepare a small JSONL with a few text samples
     data_file = tmp_path / "byod.jsonl"
     _write_jsonl(

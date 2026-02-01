@@ -45,7 +45,9 @@ def test_spectral_baseline_extracted_from_baseline_metrics_block():
         },
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
-    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+    with patch(
+        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+    ):
         cert = make_report(report, baseline)
     spectral = cert.get("spectral", {})
     summary = spectral.get("summary", {})

@@ -115,7 +115,7 @@ def _baseline_v1_windows_only() -> dict:
     }
 
 
-def test_make_certificate_uses_pairing_and_marks_unstable_with_low_replicates(
+def test_make_evaluation_report_uses_pairing_and_marks_unstable_with_low_replicates(
     monkeypatch,
 ):
     rep = _simple_report_with_windows()

@@ -490,7 +490,7 @@ def test_compute_edit_digest_defaults_when_missing():
 
 
 def test_compute_confidence_label_accuracy_medium():
-    certificate = {
+    evaluation_report = {
         "validation": {"primary_metric_acceptable": True},
         "primary_metric": {
             "kind": "accuracy",
@@ -499,17 +499,17 @@ def test_compute_confidence_label_accuracy_medium():
         },
         "resolved_policy": {"confidence": {"accuracy_delta_pp_width_max": 0.5}},
     }
-    label = cert._compute_confidence_label(certificate)
+    label = cert._compute_confidence_label(evaluation_report)
     assert label["basis"] == "accuracy"
     assert label["label"] == "Medium"
 
 
 def test_compute_confidence_label_low_when_gate_fails():
-    certificate = {
+    evaluation_report = {
         "validation": {"primary_metric_acceptable": False},
         "primary_metric": {"kind": "ppl_causal", "display_ci": (1.0, 1.02)},
     }
-    label = cert._compute_confidence_label(certificate)
+    label = cert._compute_confidence_label(evaluation_report)
     assert label["basis"] == "ppl_ratio"
     assert label["label"] == "Low"
 
@@ -814,7 +814,7 @@ def test_compute_validation_flags_accuracy_passes_with_hysteresis(monkeypatch):
     assert flags["hysteresis_applied"] is True
 
 
-def test_validate_certificate_uses_jsonschema(monkeypatch):
+def test_validate_evaluation_report_uses_jsonschema(monkeypatch):
     class DummySchema:
         def __init__(self):
             self.calls = 0
@@ -824,40 +824,40 @@ def test_validate_certificate_uses_jsonschema(monkeypatch):
 
     dummy = DummySchema()
     monkeypatch.setattr(cert, "jsonschema", dummy, raising=False)
-    certificate = {
+    evaluation_report = {
         "schema_version": cert.REPORT_SCHEMA_VERSION,
         "run_id": "run-1",
         "primary_metric": {"kind": "ppl_causal"},
         "validation": {"primary_metric_acceptable": True},
     }
-    assert cert.validate_report(certificate) is True
+    assert cert.validate_report(evaluation_report) is True
     assert dummy.calls == 1
 
 
-def test_validate_certificate_falls_back_when_jsonschema_fails(monkeypatch):
+def test_validate_evaluation_report_falls_back_when_jsonschema_fails(monkeypatch):
     class FailingSchema:
         def validate(self, instance, schema):
             raise ValueError("boom")
 
     monkeypatch.setattr(cert, "jsonschema", FailingSchema(), raising=False)
-    certificate = {
+    evaluation_report = {
         "schema_version": cert.REPORT_SCHEMA_VERSION,
         "run_id": "run-2",
         "primary_metric": {"final": 1.0},
         "validation": {"primary_metric_acceptable": True},
     }
-    assert cert.validate_report(certificate) is True
+    assert cert.validate_report(evaluation_report) is True
 
 
-def test_validate_certificate_rejects_invalid_flags(monkeypatch):
+def test_validate_evaluation_report_rejects_invalid_flags(monkeypatch):
     monkeypatch.setattr(cert, "jsonschema", None, raising=False)
-    certificate = {
+    evaluation_report = {
         "schema_version": cert.REPORT_SCHEMA_VERSION,
         "run_id": "run-3",
         "primary_metric": {"final": 1.0},
         "validation": {"primary_metric_acceptable": "yes"},
     }
-    assert cert.validate_report(certificate) is False
+    assert cert.validate_report(evaluation_report) is False
 
 
 def test_load_validation_allowlist_prefers_contracts_file(tmp_path, monkeypatch):
@@ -882,18 +882,18 @@ def test_load_validation_allowlist_prefers_contracts_file(tmp_path, monkeypatch)
             key_file.write_text(original, encoding="utf-8")
 
 
-def test_validate_certificate_handles_mapping_errors() -> None:
+def test_validate_evaluation_report_handles_mapping_errors() -> None:
     class ExplodingMapping(dict):
         def get(self, *_args, **_kwargs):
             raise ValueError("boom")
 
-    certificate = ExplodingMapping()
+    evaluation_report = ExplodingMapping()
     # ValueError raised inside validate_report should be caught and return False.
-    assert cert.validate_report(certificate) is False
+    assert cert.validate_report(evaluation_report) is False
 
 
 def test_propagate_pairing_stats_adds_missing_fields():
-    certificate = {"dataset": {"windows": {}}}
+    evaluation_report = {"dataset": {"windows": {}}}
     ppl_analysis = {
         "stats": {
             "pairing": "paired_baseline",
@@ -909,8 +909,8 @@ def test_propagate_pairing_stats_adds_missing_fields():
             "coverage_ok": True,
         }
     }
-    cert._propagate_pairing_stats(certificate, ppl_analysis)
-    stats = certificate["dataset"]["windows"]["stats"]
+    cert._propagate_pairing_stats(evaluation_report, ppl_analysis)
+    stats = evaluation_report["dataset"]["windows"]["stats"]
     assert stats["pairing"] == "paired_baseline"
     assert stats["paired_windows"] == 4
     assert stats["coverage"]["preview"]["used"] == 3
@@ -1025,12 +1025,12 @@ def test_compute_edit_digest_handles_faulty_mapping():
 
 
 def test_compute_confidence_label_accuracy_high():
-    certificate = {
+    evaluation_report = {
         "validation": {"primary_metric_acceptable": True},
         "primary_metric": {"kind": "accuracy", "display_ci": (0.7, 0.72)},
         "resolved_policy": {"confidence": {"accuracy_delta_pp_width_max": 0.05}},
     }
-    label = cert._compute_confidence_label(certificate)
+    label = cert._compute_confidence_label(evaluation_report)
     assert label["label"] == "High"
     assert label["basis"] == "accuracy"
 
@@ -1309,11 +1309,11 @@ def test_build_provenance_block_transfers_dataset_split_and_window_plan():
 
 
 def test_compute_confidence_label_handles_unknown_metric_kind():
-    certificate = {
+    evaluation_report = {
         "validation": {"primary_metric_acceptable": True},
         "primary_metric": {"kind": "custom_metric", "display_ci": (2.0, 2.5)},
         "resolved_policy": {},
     }
-    label = cert._compute_confidence_label(certificate)
+    label = cert._compute_confidence_label(evaluation_report)
     assert label["basis"] == "primary_metric"
     assert label["label"] == "Low"

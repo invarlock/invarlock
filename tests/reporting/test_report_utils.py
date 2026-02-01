@@ -8,7 +8,7 @@ def test_is_ppl_kind_and_get_ppl_final() -> None:
     assert cert._is_ppl_kind("ppl_causal")
     assert not cert._is_ppl_kind("accuracy")
 
-    # Legacy _get_ppl_final removed; rely on normalized primary_metric in certificates.
+    # Legacy _get_ppl_final removed; rely on normalized primary_metric in evaluation_reports.
 
 
 def test_compute_edit_digest_quant_and_default() -> None:
@@ -46,7 +46,7 @@ def test_confidence_label_branches() -> None:
     assert out2["label"] in {"Medium", "Low"}
 
 
-def test_validate_certificate_rejects_non_boolean_flags() -> None:
+def test_validate_evaluation_report_rejects_non_boolean_flags() -> None:
     bad = {
         "schema_version": cert.REPORT_SCHEMA_VERSION,
         "run_id": "r",
@@ -64,7 +64,7 @@ def test_validate_certificate_rejects_non_boolean_flags() -> None:
     assert cert.validate_report(bad) is False
 
 
-def test_validate_certificate_fallback_ok_and_schema_minimal() -> None:
+def test_validate_evaluation_report_fallback_ok_and_schema_minimal() -> None:
     # Force minimal fallback path: missing many properties, but minimal fields present
     minimal = {
         "schema_version": cert.REPORT_SCHEMA_VERSION,

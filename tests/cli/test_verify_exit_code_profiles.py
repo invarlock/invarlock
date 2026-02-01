@@ -16,7 +16,7 @@ def _write_cert(tmp_path: Path, payload: dict, name: str) -> Path:
     return path
 
 
-def _ppl_certificate(
+def _ppl_evaluation_report(
     *,
     preview: float = 10.0,
     final: float = 10.0,
@@ -127,7 +127,7 @@ def test_verify_drift_band_exit_code_varies_by_profile(
     expected_ok: bool,
 ) -> None:
     # Drift is only enforced in CI/Release; dev should ignore it.
-    cert = _ppl_certificate(
+    cert = _ppl_evaluation_report(
         preview=10.0,
         final=12.0,
         ratio=1.2,
@@ -165,7 +165,7 @@ def test_verify_guard_overhead_exit_code_varies_by_profile(
     expected_ok: bool,
 ) -> None:
     # guard_overhead is release-only enforcement.
-    cert = _ppl_certificate(
+    cert = _ppl_evaluation_report(
         preview=10.0,
         final=10.0,
         ratio=1.0,
@@ -201,7 +201,7 @@ def test_verify_provider_digest_exit_code_varies_by_profile(
     profile: str,
     expected_exit_code: int,
 ) -> None:
-    cert = _ppl_certificate(
+    cert = _ppl_evaluation_report(
         preview=10.0,
         final=10.0,
         ratio=1.0,
@@ -223,12 +223,12 @@ def test_verify_provider_digest_exit_code_varies_by_profile(
 
 
 @pytest.mark.parametrize("profile", ["dev", "ci", "release"])
-def test_verify_exit_code_2_when_any_certificate_is_malformed(
+def test_verify_exit_code_2_when_any_evaluation_report_is_malformed(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
     profile: str,
 ) -> None:
-    bad = _ppl_certificate(
+    bad = _ppl_evaluation_report(
         preview=10.0,
         final=10.0,
         ratio=float("nan"),
@@ -236,7 +236,7 @@ def test_verify_exit_code_2_when_any_certificate_is_malformed(
         include_provider_digest=True,
         include_guard_overhead=True,
     )
-    good = _ppl_certificate(
+    good = _ppl_evaluation_report(
         preview=10.0,
         final=10.0,
         ratio=1.0,

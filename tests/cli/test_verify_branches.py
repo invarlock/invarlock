@@ -83,11 +83,11 @@ def test_apply_profile_lints_equals_mismatch_and_numeric_conversion_errors():
     assert any("Expected numeric comparison" in e for e in errs)
 
 
-def test_validate_certificate_payload_schema_fail(tmp_path: Path):
+def test_validate_evaluation_report_payload_schema_fail(tmp_path: Path):
     cert_path = tmp_path / "c.json"
     cert_path.write_text(json.dumps(_base_cert()))
     with patch("invarlock.cli.commands.verify.validate_report", lambda c: False):
-        errs = V._validate_certificate_payload(cert_path)
+        errs = V._validate_evaluation_report_payload(cert_path)
         assert any("schema validation failed" in e for e in errs)
 
 
@@ -102,6 +102,6 @@ def test_verify_command_multiple_files_mixed_results(tmp_path: Path, capsys):
     p2.write_text(json.dumps(bad))
 
     with patch("invarlock.cli.commands.verify.validate_report", lambda c: True):
-        errs1 = V._validate_certificate_payload(p1)
-        errs2 = V._validate_certificate_payload(p2)
+        errs1 = V._validate_evaluation_report_payload(p1)
+        errs2 = V._validate_evaluation_report_payload(p2)
         assert errs1 == [] and errs2 != []

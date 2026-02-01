@@ -37,7 +37,7 @@ def _mk_pm_report(*, ratio: float, pm_final: float = 10.0) -> dict:
             "bootstrap": {"replicates": 10, "alpha": 0.05},
             "preview_total_tokens": 1000,
             "final_total_tokens": 1000,
-            # Inject ratio_ci at ppl-level via stats pairing in certificate internals
+            # Inject ratio_ci at ppl-level via stats pairing in evaluation_report internals
             "stats": {"pairing": "run_metrics"},
         },
         "artifacts": {"events_path": "", "logs_path": "", "checkpoint_path": None},

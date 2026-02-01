@@ -31,12 +31,12 @@ pytest -q \
   tests/cli/test_doctor_json_cls_measured_no_d012.py \
   tests/cli/test_doctor_json_tiny_relax_note.py \
   tests/integration/scripts/test_tiny_matrix_checklist.py \
-  tests/reporting/test_certificate_schema_v1_accuracy_tags.py \
+  tests/reporting/test_report_schema_v1_accuracy_tags.py \
   tests/reporting/test_cert_markdown_estimated_suffix.py \
   tests/reporting/test_cert_markdown_no_estimated_for_measured.py
 ```
 
 ## Runtime artifacts
 
-- CLI commands and scripts write run artifacts under `runs/` and certificates under `reports/` at the repository (or working directory) root.
+- CLI commands and scripts write run artifacts under `runs/` and evaluation reports under `reports/eval/` at the repository (or working directory) root.
 - Test fixtures should live under `tests/fixtures` (or per-area test dirs), not under `tests/runs` or `tests/reports`.

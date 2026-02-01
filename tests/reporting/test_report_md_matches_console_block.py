@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_builder import REPORT_SCHEMA_VERSION
 from invarlock.reporting.render import (
     compute_console_validation_block,
     render_report_markdown,
 )
+from invarlock.reporting.report_builder import REPORT_SCHEMA_VERSION
 
 
 def _minimal_cert(pm_kind: str = "ppl_causal", guard_evaluated: bool = False) -> dict:
-    # Minimal, structurally valid certificate focused on validation/MD rendering
+    # Minimal, structurally valid evaluation_report focused on validation/MD rendering
     cert = {
         "schema_version": REPORT_SCHEMA_VERSION,
         "run_id": "run-xyz",

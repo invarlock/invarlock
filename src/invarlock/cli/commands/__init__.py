@@ -5,8 +5,8 @@ Import-time work is minimal; subcommands themselves may perform heavier imports
 only when invoked.
 """
 
-from .evaluate import evaluate_command
 from .doctor import doctor_command
+from .evaluate import evaluate_command
 from .explain_gates import explain_gates_command
 from .export_html import export_html_command
 from .plugins import plugins_command

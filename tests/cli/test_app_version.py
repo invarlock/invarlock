@@ -48,9 +48,7 @@ def test_version_includes_schema_when_available(capsys, monkeypatch):
 
     import invarlock.reporting.report_builder as cert_mod
 
-    monkeypatch.setattr(
-        cert_mod, "REPORT_SCHEMA_VERSION", "schema-test", raising=False
-    )
+    monkeypatch.setattr(cert_mod, "REPORT_SCHEMA_VERSION", "schema-test", raising=False)
     version_fn()
     out = capsys.readouterr().out
     assert "1.2.3" in out
@@ -61,7 +59,9 @@ def test_version_handles_schema_import_failure(capsys, monkeypatch):
     import builtins
 
     real_import = builtins.__import__
-    monkeypatch.delitem(sys.modules, "invarlock.reporting.report_builder", raising=False)
+    monkeypatch.delitem(
+        sys.modules, "invarlock.reporting.report_builder", raising=False
+    )
     monkeypatch.delitem(sys.modules, "invarlock.reporting", raising=False)
 
     def fake_import(name, *args, **kwargs):

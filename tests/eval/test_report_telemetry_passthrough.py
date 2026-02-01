@@ -3,7 +3,7 @@ from unittest.mock import patch
 from invarlock.reporting.report_builder import make_report
 
 
-def test_certificate_telemetry_fields_and_device_default():
+def test_evaluation_report_telemetry_fields_and_device_default():
     report = {
         "meta": {"model_id": "m", "seed": 1, "device": "cpu"},
         "metrics": {
@@ -46,7 +46,9 @@ def test_certificate_telemetry_fields_and_device_default():
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
 
-    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+    with patch(
+        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+    ):
         cert = make_report(report, baseline)
     tel = cert.get("telemetry", {})
     assert tel.get("latency_ms_per_tok") == 1.23

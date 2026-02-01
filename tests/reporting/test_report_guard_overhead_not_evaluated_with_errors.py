@@ -13,7 +13,7 @@ def test_guard_overhead_not_evaluated_with_errors_soft_pass() -> None:
         tier="balanced",
         _ppl_metrics={"preview_total_tokens": 1000, "final_total_tokens": 1000},
         target_ratio=None,
-        # Non-finite ratio treated as pass in best-effort Compare & Certify flows
+        # Non-finite ratio treated as pass in best-effort Compare & Evaluate flows
         guard_overhead={
             "evaluated": False,
             "errors": ["missing"],
