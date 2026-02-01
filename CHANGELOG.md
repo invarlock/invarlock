@@ -10,18 +10,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - CLI: `--version` / `-V` flag (alias of `invarlock version`) to print the InvarLock version (plus report schema version when available).
 - `invarlock evaluate` summary now includes total runtime and confidence interval.
+- Proof packs: `verify_pack.sh --strict` (or `PACK_STRICT_MODE=1`) to fail closed on missing/invalid GPG signatures and unexpected pack contents.
 
 ### Changed
 - **Breaking:** Rename “certificate” → “report” across artifacts, docs, scripts, notebooks, and Python API surfaces.
 - **Breaking:** CLI terminology unified on `evaluate` (replaces `certify`).
 - Config: reject legacy HF v4 load keys `model.torch_dtype`, `model.load_in_8bit`, and `model.load_in_4bit`; use `model.dtype` and/or `model.quantization_config`.
 - Evaluation report bundle filenames updated (JSON: `evaluation.report.json`, Markdown: `evaluation_report.md`).
+- Proof packs: `manifest.json` records `checksums_sha256_digest` (sha256 of `checksums.sha256`) and may record `signing_key_fingerprint` when signed.
 
 ### Fixed
 - HuggingFace/Transformers v5 compatibility: migrate load contracts and use `dtype=` where required.
 - Reduce noisy HuggingFace/Transformers warnings in `ci`/`release` CLI output.
 - Adapters: snapshot config serialization no longer emits deprecated attributes.
 - Scripts: CLI example validator ignores internal tool dirs and supports external paths.
+- Proof packs: fix `verify_pack.sh` cert discovery to verify `certs/**/evaluation.report.json`.
+- Proof packs: close a tamper-evidence gap by binding `checksums.sha256` to the signed manifest (and enforcing “no extra files” in strict verification).
 
 ### Dependencies
 - Require `transformers>=5.0.0` and `huggingface_hub>=1.0.0`.
