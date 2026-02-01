@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from invarlock.cli.commands import certify as certify_mod
+from invarlock.cli.commands import evaluate as certify_mod
 from invarlock.cli.commands import run as run_mod
 
 

@@ -24,7 +24,7 @@ def test_certify_missing_torch_shows_extra_hint_via_cli(
     result = runner.invoke(
         app,
         [
-            "certify",
+            "evaluate",
             "--baseline",
             "gpt2",
             "--subject",

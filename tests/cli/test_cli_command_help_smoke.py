@@ -12,7 +12,7 @@ def test_cli_top_level_help_smoke(monkeypatch):
     runner = CliRunner()
     for args in (
         ["--help"],
-        ["certify", "--help"],
+        ["evaluate", "--help"],
         ["calibrate", "--help"],
         ["report", "--help"],
         ["run", "--help"],
@@ -26,7 +26,7 @@ def test_cli_top_level_help_smoke(monkeypatch):
 def test_command_wrappers_importable():
     # Ensure import surface remains stable
     from invarlock.cli.commands import (
-        certify_command,
+        evaluate_command,
         doctor_command,
         explain_gates_command,
         export_html_command,
@@ -39,7 +39,7 @@ def test_command_wrappers_importable():
 
     # Basic type checks – they should be callables or Typer callbacks
     for obj in (
-        certify_command,
+        evaluate_command,
         calibrate_app,
         doctor_command,
         explain_gates_command,

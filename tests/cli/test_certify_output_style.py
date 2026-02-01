@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from invarlock.cli.commands.certify import certify_command
+from invarlock.cli.commands.evaluate import evaluate_command
 
 
 def _stub_run(out_dir: Path) -> None:
@@ -35,7 +35,7 @@ def test_certify_timing_block_printed(monkeypatch, tmp_path, capsys) -> None:
     )
 
     import invarlock.cli.commands.run as run_mod
-    from invarlock.cli.commands import certify as cert_mod
+    from invarlock.cli.commands import evaluate as cert_mod
 
     monkeypatch.setattr(
         run_mod,
@@ -45,19 +45,19 @@ def test_certify_timing_block_printed(monkeypatch, tmp_path, capsys) -> None:
     )
     monkeypatch.setattr(cert_mod, "_report", lambda **_kwargs: None, raising=False)
 
-    # Deterministic time progression for: total, baseline, subject, cert.
+    # Deterministic time progression for: total, baseline, subject, evaluation report.
     from invarlock.cli import output as out_mod
 
     ticks = iter([0.0, 0.0, 1.0, 1.0, 3.0, 3.0, 3.5, 3.5])
     monkeypatch.setattr(out_mod, "perf_counter", lambda: next(ticks))
 
-    certify_command(
+    evaluate_command(
         source=str(src),
         edited=str(edt),
         adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
-        cert_out=str(tmp_path / "reports"),
+        report_out=str(tmp_path / "reports"),
         timing=True,
         style="audit",
         progress=False,
@@ -67,5 +67,5 @@ def test_certify_timing_block_printed(monkeypatch, tmp_path, capsys) -> None:
     assert "TIMING SUMMARY" in out
     assert "Baseline" in out and "1.00s" in out
     assert "Subject" in out and "2.00s" in out
-    assert "Certificate" in out and "0.50s" in out
+    assert "Evaluation Report" in out and "0.50s" in out
     assert "Total" in out and "3.50s" in out

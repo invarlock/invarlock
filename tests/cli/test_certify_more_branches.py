@@ -10,7 +10,7 @@ import pytest
 import yaml
 
 import invarlock.cli.commands.run as run_mod
-from invarlock.cli.commands import certify as mod
+from invarlock.cli.commands import evaluate as mod
 
 
 def _stub_run_dir(out_dir: Path, name: str = "report.json") -> Path:
@@ -66,7 +66,7 @@ def test_certify_missing_preset_exits(monkeypatch, tmp_path: Path):
     # Patch to prevent actual run invocation
     monkeypatch.setattr(run_mod, "run_command", lambda **k: None, raising=False)
     with pytest.raises(click.exceptions.Exit):
-        mod.certify_command(
+        mod.evaluate_command(
             source=str(src),
             edited=str(edt),
             preset=str(tmp_path / "no_such_preset.yaml"),
@@ -101,16 +101,16 @@ def test_certify_uses_inline_preset_when_repo_preset_missing(monkeypatch, tmp_pa
     monkeypatch.setattr(mod, "_latest_run_report", fake_latest)
     monkeypatch.setattr(mod, "_report", fake_report, raising=False)
 
-    mod.certify_command(
+    mod.evaluate_command(
         source=str(src),
         edited=str(edt),
         adapter="hf_causal",
         out=str(runs),
-        cert_out=str(Path("certs")),
+        report_out=str(Path("certs")),
         profile="dev",
     )
 
-    cfg_path = Path(".certify_tmp/baseline_noop.yaml")
+    cfg_path = Path(".evaluate_tmp/baseline_noop.yaml")
     cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     assert cfg["dataset"]["provider"] == "wikitext2"
     assert calls["runs"] == 2 and calls["reports"] == 1
@@ -151,19 +151,19 @@ def test_certify_edit_config_successfully_merges_subject(monkeypatch, tmp_path):
     monkeypatch.setattr(mod, "_latest_run_report", fake_latest)
     monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
 
-    mod.certify_command(
+    mod.evaluate_command(
         source=str(src),
         edited=str(edt),
         adapter="hf_causal",
         preset=str(preset),
         edit_config=str(edit_cfg),
         out=str(Path("runs")),
-        cert_out=str(Path("certs")),
+        report_out=str(Path("certs")),
         profile="dev",
     )
 
     merged = yaml.safe_load(
-        Path(".certify_tmp/edited_merged.yaml").read_text(encoding="utf-8")
+        Path(".evaluate_tmp/edited_merged.yaml").read_text(encoding="utf-8")
     )
     assert merged["model"]["id"] == str(edt)
     assert merged["model"]["adapter"] == "hf_causal"
@@ -191,7 +191,7 @@ def test_certify_edit_config_invalid_yaml_exits(monkeypatch, tmp_path):
     )
 
     with pytest.raises(click.exceptions.Exit):
-        mod.certify_command(
+        mod.evaluate_command(
             source=str(src),
             edited=str(edt),
             adapter="hf_causal",
@@ -220,7 +220,7 @@ def test_certify_ci_profile_invalid_json_exits(monkeypatch, tmp_path):
     monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
 
     with pytest.raises(click.exceptions.Exit):
-        mod.certify_command(
+        mod.evaluate_command(
             source=str(src),
             edited=str(edt),
             adapter="hf_causal",
@@ -261,7 +261,7 @@ def test_certify_ci_nonfinite_primary_metric_exits(monkeypatch, tmp_path):
     )
 
     with pytest.raises(click.exceptions.Exit) as exc:
-        mod.certify_command(
+        mod.evaluate_command(
             source=str(src),
             edited=str(edt),
             adapter="hf_causal",
@@ -280,7 +280,7 @@ def test_certify_missing_baseline_report_exits(monkeypatch, tmp_path: Path):
     # Fake run does not create any reports
     monkeypatch.setattr(run_mod, "run_command", lambda **k: None, raising=False)
     with pytest.raises(click.exceptions.Exit):
-        mod.certify_command(
+        mod.evaluate_command(
             source=str(src),
             edited=str(edt),
             adapter="hf_causal",
@@ -303,7 +303,7 @@ def test_certify_missing_edited_report_exits(monkeypatch, tmp_path: Path):
 
     monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
     with pytest.raises(click.exceptions.Exit):
-        mod.certify_command(
+        mod.evaluate_command(
             source=str(src),
             edited=str(edt),
             adapter="hf_causal",
@@ -321,7 +321,7 @@ def test_certify_edit_config_missing_exits(monkeypatch, tmp_path: Path):
     # Make sure there is at least some baseline report to bypass first exit
     _stub_run_dir(Path(tmp_path / "runs" / "source"))
     with pytest.raises(click.exceptions.Exit):
-        mod.certify_command(
+        mod.evaluate_command(
             source=str(src),
             edited=str(edt),
             adapter="hf_causal",
@@ -361,13 +361,13 @@ def test_certify_happy_path_with_preset_and_auto_adapter(monkeypatch, tmp_path: 
     with ExitStack() as stack:
         stack.enter_context(patch.object(run_mod, "run_command", run_stub))
         stack.enter_context(patch.object(mod, "_report", report_stub))
-        mod.certify_command(
+        mod.evaluate_command(
             source=str(src),
             edited=str(edt),
             adapter="auto",
             preset=str(preset),
             out=str(runs),
-            cert_out=str(certs),
+            report_out=str(certs),
         )
 
     assert calls["runs"] == 2 and calls["reports"] == 1

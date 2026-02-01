@@ -10,7 +10,7 @@ from invarlock.cli.app import app
 
 def test_certify_hf_id_normalization_and_preset_fallback(monkeypatch, tmp_path: Path):
     # Patch auto adapter and run/report commands to be no-ops
-    import invarlock.cli.commands.certify as cert_mod
+    import invarlock.cli.commands.evaluate as cert_mod
     import invarlock.cli.commands.run as run_mod
 
     monkeypatch.setattr(run_mod, "run_command", lambda **kwargs: None)
@@ -48,7 +48,7 @@ def test_certify_hf_id_normalization_and_preset_fallback(monkeypatch, tmp_path: 
     r = CliRunner().invoke(
         app,
         [
-            "certify",
+            "evaluate",
             "--source",
             "hf:org/modelA",
             "--edited",
@@ -59,7 +59,7 @@ def test_certify_hf_id_normalization_and_preset_fallback(monkeypatch, tmp_path: 
             "dev",
             "--out",
             str(tmp_path / "runs"),
-            "--cert-out",
+            "--report-out",
             str(tmp_path / "cert"),
         ],
     )
@@ -71,7 +71,7 @@ def test_certify_hf_id_normalization_and_preset_fallback(monkeypatch, tmp_path: 
 
 
 def test_certify_ci_aborts_on_nonfinite_pm(monkeypatch, tmp_path: Path):
-    import invarlock.cli.commands.certify as cert_mod
+    import invarlock.cli.commands.evaluate as cert_mod
     import invarlock.cli.commands.run as run_mod
 
     monkeypatch.setattr(run_mod, "run_command", lambda **kwargs: None)
@@ -105,7 +105,7 @@ def test_certify_ci_aborts_on_nonfinite_pm(monkeypatch, tmp_path: Path):
     r = CliRunner().invoke(
         app,
         [
-            "certify",
+            "evaluate",
             "--source",
             "hf:org/modelA",
             "--edited",
@@ -116,7 +116,7 @@ def test_certify_ci_aborts_on_nonfinite_pm(monkeypatch, tmp_path: Path):
             "ci",
             "--out",
             str(tmp_path / "runs"),
-            "--cert-out",
+            "--report-out",
             str(tmp_path / "cert"),
         ],
     )

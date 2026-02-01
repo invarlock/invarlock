@@ -5,7 +5,7 @@ import click
 import pytest
 import yaml
 
-from invarlock.cli.commands.certify import certify_command
+from invarlock.cli.commands.evaluate import evaluate_command
 
 
 class _StubCLIExit(Exception):
@@ -55,22 +55,22 @@ def test_certify_orchestrates_runs_and_cert(monkeypatch, tmp_path):
     # Patch in our fakes
     # Patch the lazily imported run command at its source module
     import invarlock.cli.commands.run as run_mod
-    from invarlock.cli.commands import certify as mod
+    from invarlock.cli.commands import evaluate as mod
 
     monkeypatch.setattr(
         run_mod, "run_command", lambda **kwargs: fake_run(**kwargs), raising=False
     )
-    # Patch the report entry already imported as _report in certify module
+    # Patch the report entry already imported as _report in evaluate module
     monkeypatch.setattr(mod, "_report", fake_report, raising=False)
 
     # Act
-    certify_command(
+    evaluate_command(
         source=str(src),
         edited=str(edt),
         adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
-        cert_out=str(tmp_path / "reports"),
+        report_out=str(tmp_path / "reports"),
     )
 
     # Assert: two runs and one report
@@ -141,19 +141,19 @@ def test_certify_reuses_baseline_report_skipping_baseline_run(monkeypatch, tmp_p
         calls["reports"].append(kwargs)
 
     import invarlock.cli.commands.run as run_mod
-    from invarlock.cli.commands import certify as mod
+    from invarlock.cli.commands import evaluate as mod
 
     monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
     monkeypatch.setattr(mod, "_report", fake_report, raising=False)
 
-    certify_command(
+    evaluate_command(
         source=str(src),
         edited=str(edt),
         baseline_report=str(baseline_report),
         adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
-        cert_out=str(tmp_path / "reports"),
+        report_out=str(tmp_path / "reports"),
     )
 
     assert len(calls["runs"]) == 1
@@ -197,19 +197,19 @@ def test_certify_baseline_report_requires_windows(monkeypatch, tmp_path):
     monkeypatch.setattr(run_mod, "run_command", lambda **_: None, raising=False)
 
     with pytest.raises(click.exceptions.Exit):
-        certify_command(
+        evaluate_command(
             source=str(src),
             edited=str(edt),
             baseline_report=str(baseline_report),
             adapter="auto",
             profile="ci",
             out=str(tmp_path / "runs"),
-            cert_out=str(tmp_path / "reports"),
+            report_out=str(tmp_path / "reports"),
         )
 
 
 def test_certify_autogen_uses_device_auto(monkeypatch, tmp_path):
-    """Auto-generated certify presets should not hard-code CPU device."""
+    """Auto-generated evaluate presets should not hard-code CPU device."""
     # Arrange HF-like source/edited dirs so auto adapter resolves to hf_causal
     src = tmp_path / "src_model"
     edt = tmp_path / "edt_model"
@@ -238,7 +238,7 @@ def test_certify_autogen_uses_device_auto(monkeypatch, tmp_path):
         return None
 
     import invarlock.cli.commands.run as run_mod
-    from invarlock.cli.commands import certify as mod
+    from invarlock.cli.commands import evaluate as mod
 
     monkeypatch.setattr(
         run_mod, "run_command", lambda **kwargs: fake_run(**kwargs), raising=False
@@ -246,17 +246,17 @@ def test_certify_autogen_uses_device_auto(monkeypatch, tmp_path):
     monkeypatch.setattr(mod, "_report", fake_report, raising=False)
 
     # Act
-    certify_command(
+    evaluate_command(
         source=str(src),
         edited=str(edt),
         adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
-        cert_out=str(tmp_path / "reports"),
+        report_out=str(tmp_path / "reports"),
     )
 
     # Assert: temp baseline config exists and does not pin device=cpu
-    baseline_yaml = Path(".certify_tmp") / "baseline_noop.yaml"
+    baseline_yaml = Path(".evaluate_tmp") / "baseline_noop.yaml"
     assert baseline_yaml.exists()
     data = yaml.safe_load(baseline_yaml.read_text(encoding="utf-8")) or {}
     model_block = data.get("model") or {}
@@ -302,20 +302,20 @@ def test_certify_quiet_summary_emits_status(monkeypatch, tmp_path, capsys):
         )
 
     import invarlock.cli.commands.run as run_mod
-    from invarlock.cli.commands import certify as mod
+    from invarlock.cli.commands import evaluate as mod
 
     monkeypatch.setattr(
         run_mod, "run_command", lambda **kwargs: fake_run(**kwargs), raising=False
     )
     monkeypatch.setattr(mod, "_report", fake_report, raising=False)
 
-    certify_command(
+    evaluate_command(
         source=str(src),
         edited=str(edt),
         adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
-        cert_out=str(tmp_path / "reports"),
+        report_out=str(tmp_path / "reports"),
         quiet=True,
     )
 

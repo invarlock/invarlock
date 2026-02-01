@@ -1,15 +1,15 @@
 """
-InvarLock CLI Certify Command
+InvarLock CLI Evaluate Command
 =========================
 
-Hero path: Compare & Certify (BYOE). Provide baseline (`--baseline`) and
+Hero path: Compare & Evaluate (BYOE). Provide baseline (`--baseline`) and
 subject (`--subject`) checkpoints and InvarLock will run paired windows and emit a
-certificate. Optionally, pass `--edit-config` to run the built‑in quant_rtn demo.
+evaluation report. Optionally, pass `--edit-config` to run the built‑in quant_rtn demo.
 
 Steps:
   1) Baseline (no-op edit) on baseline model
   2) Subject (no-op or provided edit config) on subject model with --baseline pairing
-  3) Emit certificate via `invarlock report --format cert`
+  3) Emit evaluation report via `invarlock report --format cert`
 """
 
 from __future__ import annotations
@@ -60,7 +60,7 @@ def _render_banner_lines(title: str, context: str) -> list[str]:
 def _print_header_banner(
     console: Console, *, version: str, profile: str, tier: str, adapter: str
 ) -> None:
-    title = f"INVARLOCK v{version} · Certification Pipeline"
+    title = f"INVARLOCK v{version} · Evaluation Pipeline"
     context = f"Profile: {profile} · Tier: {tier} · Adapter: {adapter}"
     for line in _render_banner_lines(title, context):
         console.print(line)
@@ -128,32 +128,32 @@ def _suppress_child_output(enabled: bool) -> Iterator[io.StringIO | None]:
 
 def _print_quiet_summary(
     *,
-    cert_out: Path,
+    report_out: Path,
     source: str,
     edited: str,
     profile: str,
 ) -> None:
-    cert_path = cert_out / "evaluation.cert.json"
-    console.print(f"INVARLOCK v{INVARLOCK_VERSION} · CERTIFY")
+    report_path = report_out / "evaluation.cert.json"
+    console.print(f"INVARLOCK v{INVARLOCK_VERSION} · EVALUATE")
     console.print(f"Baseline: {source} -> Subject: {edited} · Profile: {profile}")
-    if not cert_path.exists():
-        console.print(f"Output: {cert_out}")
+    if not report_path.exists():
+        console.print(f"Output: {report_out}")
         return
     try:
-        with cert_path.open("r", encoding="utf-8") as fh:
-            certificate = json.load(fh)
+        with report_path.open("r", encoding="utf-8") as fh:
+            evaluation_report = json.load(fh)
     except Exception:
-        console.print(f"Output: {cert_path}")
+        console.print(f"Output: {report_path}")
         return
-    if not isinstance(certificate, dict):
-        console.print(f"Output: {cert_path}")
+    if not isinstance(evaluation_report, dict):
+        console.print(f"Output: {report_path}")
         return
     try:
         from invarlock.reporting.render import (
             compute_console_validation_block as _console_block,
         )
 
-        block = _console_block(certificate)
+        block = _console_block(evaluation_report)
         rows = block.get("rows", [])
         total = len(rows) if isinstance(rows, list) else 0
         passed = (
@@ -165,13 +165,13 @@ def _print_quiet_summary(
         passed = 0
         status = "UNKNOWN"
     pm_ratio = _format_ratio(
-        (certificate.get("primary_metric") or {}).get("ratio_vs_baseline")
+        (evaluation_report.get("primary_metric") or {}).get("ratio_vs_baseline")
     )
     gate_summary = f"{passed}/{total} passed" if total else "N/A"
     console.print(f"Status: {status} · Gates: {gate_summary}")
     if pm_ratio != "N/A":
         console.print(f"Primary metric ratio: {pm_ratio}")
-    console.print(f"Output: {cert_path}")
+    console.print(f"Output: {report_path}")
 
 
 def _latest_run_report(run_root: Path) -> Path | None:
@@ -221,7 +221,7 @@ def _normalize_model_id(model_id: str, adapter_name: str) -> str:
     return mid
 
 
-def certify_command(
+def evaluate_command(
     # Primary names for programmatic/test compatibility
     source: str = typer.Option(
         ..., "--source", "--baseline", help="Baseline model dir or Hub ID"
@@ -258,8 +258,8 @@ def certify_command(
         ),
     ),
     out: str = typer.Option("runs", "--out", help="Base output directory"),
-    cert_out: str = typer.Option(
-        "reports/cert", "--cert-out", help="Certificate output directory"
+    report_out: str = typer.Option(
+        "reports/eval", "--report-out", help="Evaluation report output directory"
     ),
     edit_config: str | None = typer.Option(
         None, "--edit-config", help="Edit preset to apply a demo edit (quant_rtn)"
@@ -290,7 +290,7 @@ def certify_command(
         False, "--no-color", help="Disable ANSI colors (respects NO_COLOR=1)"
     ),
 ):
-    """Certify two checkpoints (baseline vs subject) with pinned windows."""
+    """Evaluate two checkpoints (baseline vs subject) with pinned windows."""
     # Support programmatic calls and Typer-invoked calls uniformly
     try:
         from typer.models import OptionInfo as _TyperOptionInfo
@@ -311,7 +311,7 @@ def certify_command(
     tier = _coerce_option(tier, "balanced")
     preset = _coerce_option(preset)
     out = _coerce_option(out, "runs")
-    cert_out = _coerce_option(cert_out, "reports/cert")
+    report_out = _coerce_option(report_out, "reports/eval")
     edit_config = _coerce_option(edit_config)
     edit_label = _coerce_option(edit_label)
     quiet = _coerce_option(quiet, False)
@@ -424,7 +424,7 @@ def certify_command(
             )
             raise typer.Exit(1)
         preset_data = _load_yaml(preset_path)
-        # Do not hard-code device from presets in auto-generated certify configs;
+        # Do not hard-code device from presets in auto-generated evaluate configs;
         # allow device resolution to pick CUDA/MPS/CPU via 'auto' or CLI overrides.
         model_block = preset_data.get("model")
         if isinstance(model_block, dict) and "device" in model_block:
@@ -575,7 +575,7 @@ def certify_command(
     elif not edit_config:
         subject_label = "custom" if norm_src_id != norm_edt_id else "noop"
 
-    tmp_dir = Path(".certify_tmp")
+    tmp_dir = Path(".evaluate_tmp")
     tmp_dir.mkdir(parents=True, exist_ok=True)
 
     baseline_report_path: Path
@@ -635,7 +635,7 @@ def certify_command(
         baseline_report_path = baseline_report_path_candidate
         _debug(f"Baseline report: {baseline_report_path}")
 
-    # Edited run: either no-op (Compare & Certify) or provided edit_config (demo edit)
+    # Edited run: either no-op (Compare & Evaluate) or provided edit_config (demo edit)
     _phase(2, 3, "SUBJECT EVALUATION")
     if edit_config:
         edited_yaml = Path(edit_config)
@@ -704,7 +704,7 @@ def certify_command(
             )
 
         # Persist a temporary merged config for traceability
-        tmp_dir = Path(".certify_tmp")
+        tmp_dir = Path(".evaluate_tmp")
         tmp_dir.mkdir(parents=True, exist_ok=True)
         edited_merged_yaml = tmp_dir / "edited_merged.yaml"
         _dump_yaml(edited_merged_yaml, merged_edited_cfg)
@@ -754,7 +754,7 @@ def certify_command(
         )
         edited_yaml = tmp_dir / "edited_noop.yaml"
         _dump_yaml(edited_yaml, edited_cfg)
-        _info("Running edited (no-op, Compare & Certify)", tag="EXEC", emoji="🧪")
+        _info("Running edited (no-op, Compare & Evaluate)", tag="EXEC", emoji="🧪")
         _debug(f"Edited config: {edited_yaml}")
         from .run import run_command as _run
 
@@ -799,26 +799,26 @@ def certify_command(
         raise typer.Exit(1)
     _debug(f"Edited report: {edited_report}")
 
-    _phase(3, 3, "CERTIFICATE GENERATION")
+    _phase(3, 3, "EVALUATION REPORT GENERATION")
 
-    def _emit_certificate() -> None:
-        _info("Emitting certificate", tag="EXEC", emoji="📜")
+    def _emit_evaluation_report() -> None:
+        _info("Emitting evaluation report", tag="EXEC", emoji="📜")
         with _suppress_child_output(verbosity == VERBOSITY_QUIET) as quiet_buffer:
             try:
                 with timed_step(
                     console=console,
                     style=output_style,
                     timings=timings,
-                    key="certificate",
+                    key="evaluation_report",
                     tag="EXEC",
-                    message="Certificate",
+                    message="Evaluation Report",
                     emoji="📜",
                 ):
                     report_kwargs = {
                         "run": str(edited_report),
                         "format": "cert",
                         "baseline": str(baseline_report_path),
-                        "output": cert_out,
+                        "output": report_out,
                         "style": output_style.name,
                         "no_color": no_color,
                     }
@@ -890,7 +890,7 @@ def certify_command(
             else None
         ) or "unknown"
 
-        # Enforce only when a primary_metric block is present; allow degraded-but-flagged metrics to emit certificates, but fail the task.
+        # Enforce only when a primary_metric block is present; allow degraded-but-flagged metrics to emit evaluation reports, but fail the task.
         has_metric_block = isinstance(pm, dict) and bool(pm)
         if has_metric_block:
             degraded = bool(pm.get("invalid") or pm.get("degraded"))
@@ -906,7 +906,7 @@ def certify_command(
                 print_event(
                     console,
                     "WARN",
-                    "Primary metric degraded or non-finite; emitting certificate and marking task degraded. Primary metric computation failed.",
+                    "Primary metric degraded or non-finite; emitting evaluation report and marking task degraded. Primary metric computation failed.",
                     style=output_style,
                     emoji="⚠️",
                 )
@@ -919,8 +919,8 @@ def certify_command(
                 metrics["primary_metric"] = pm
                 edited_payload.setdefault("metrics", {}).update(metrics)
 
-                # Emit the certificate for inspection, then exit with a CI-visible error.
-                _emit_certificate()
+                # Emit the evaluation report for inspection, then exit with a CI-visible error.
+                _emit_evaluation_report()
                 err = MetricsError(
                     code="E111",
                     message=f"Primary metric degraded or non-finite ({degraded_reason}).",
@@ -933,7 +933,7 @@ def certify_command(
                 )
                 raise typer.Exit(_resolve_exit_code(err, profile=profile))
 
-    _emit_certificate()
+    _emit_evaluation_report()
     if timing:
         if total_start is not None:
             timings["total"] = max(0.0, float(perf_counter() - total_start))
@@ -941,7 +941,7 @@ def certify_command(
             timings["total"] = (
                 float(timings.get("baseline", 0.0))
                 + float(timings.get("subject", 0.0))
-                + float(timings.get("certificate", 0.0))
+                + float(timings.get("evaluation_report", 0.0))
             )
         print_timing_summary(
             console,
@@ -950,13 +950,13 @@ def certify_command(
             order=[
                 ("Baseline", "baseline"),
                 ("Subject", "subject"),
-                ("Certificate", "certificate"),
+                ("Evaluation Report", "evaluation_report"),
                 ("Total", "total"),
             ],
         )
     if verbosity == VERBOSITY_QUIET:
         _print_quiet_summary(
-            cert_out=Path(cert_out),
+            report_out=Path(report_out),
             source=src_id,
             edited=edt_id,
             profile=profile,

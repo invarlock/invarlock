@@ -37,7 +37,7 @@ LIGHT_IMPORT = os.getenv("INVARLOCK_LIGHT_IMPORT", "").strip().lower() in {
 class OrderedGroup(TyperGroup):
     def list_commands(self, ctx):  # type: ignore[override]
         return [
-            "certify",
+            "evaluate",
             "calibrate",
             "report",
             "verify",
@@ -52,8 +52,8 @@ class OrderedGroup(TyperGroup):
 app = typer.Typer(
     name="invarlock",
     help=(
-        "InvarLock — certify model changes with deterministic pairing and safety gates.\n"
-        "Quick path: invarlock certify --baseline <MODEL> --subject <MODEL>\n"
+        "InvarLock — evaluate model changes with deterministic pairing and safety gates.\n"
+        "Quick path: invarlock evaluate --baseline <MODEL> --subject <MODEL>\n"
         "Hint: use --edit-config to run the built-in quant_rtn demo.\n"
         "Tip: enable downloads with INVARLOCK_ALLOW_NETWORK=1 when fetching.\n"
         "Exit codes:\n"
@@ -126,18 +126,18 @@ def version():
 
 """Register command modules and groups in the desired help order.
 
-Order: certify → report → run → plugins → doctor → version
+Order: evaluate → report → run → plugins → doctor → version
 """
 
 
 @app.command(
-    name="certify",
+    name="evaluate",
     help=(
-        "Certify a subject model against a baseline and generate an evaluation certificate. "
+        "Evaluate a subject model against a baseline and generate an evaluation report. "
         "Use when you have two model snapshots and want pass/fail gating."
     ),
 )
-def _certify_lazy(
+def _evaluate_lazy(
     source: str = typer.Option(
         ..., "--source", "--baseline", help="Baseline model dir or Hub ID"
     ),
@@ -169,8 +169,8 @@ def _certify_lazy(
         ),
     ),
     out: str = typer.Option("runs", "--out", help="Base output directory"),
-    cert_out: str = typer.Option(
-        "reports/cert", "--cert-out", help="Certificate output directory"
+    report_out: str = typer.Option(
+        "reports/eval", "--report-out", help="Evaluation report output directory"
     ),
     edit_config: str | None = typer.Option(
         None, "--edit-config", help="Edit preset to apply a demo edit (quant_rtn)"
@@ -201,9 +201,9 @@ def _certify_lazy(
         False, "--no-color", help="Disable ANSI colors (respects NO_COLOR=1)"
     ),
 ):
-    from .commands.certify import certify_command as _cert
+    from .commands.evaluate import evaluate_command as _eval
 
-    return _cert(
+    return _eval(
         source=source,
         edited=edited,
         baseline_report=baseline_report,
@@ -213,7 +213,7 @@ def _certify_lazy(
         tier=tier,
         preset=preset,
         out=out,
-        cert_out=cert_out,
+        report_out=report_out,
         edit_config=edit_config,
         edit_label=edit_label,
         quiet=quiet,

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from invarlock.cli.commands.certify import certify_command
+from invarlock.cli.commands.evaluate import evaluate_command
 
 
 def _write_run_report(
@@ -116,9 +116,9 @@ def test_certify_local_paths_pm_and_digests(monkeypatch, tmp_path: Path):
                 provider_ids_digest="baseline1234",
             )
 
-    # Patch certify workflow to use our fake run via the run module; bind _report to the programmatic wrapper
+    # Patch evaluate workflow to use our fake run via the run module; bind _report to the programmatic wrapper
     import invarlock.cli.commands.run as run_mod
-    from invarlock.cli.commands import certify as mod
+    from invarlock.cli.commands import evaluate as mod
 
     monkeypatch.setattr(
         run_mod, "run_command", lambda **kwargs: fake_run(**kwargs), raising=False
@@ -152,13 +152,13 @@ def test_certify_local_paths_pm_and_digests(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(mod, "_report", _report_wrapper, raising=False)
 
     cert_dir = tmp_path / "certs"
-    certify_command(
+    evaluate_command(
         source=str(src),
         edited=str(edt),
         adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
-        cert_out=str(cert_dir),
+        report_out=str(cert_dir),
     )
 
     # The report.save_report writes cert JSON into cert_dir; locate it
@@ -248,7 +248,7 @@ def test_certify_local_paths_quantized_subject_overheads(monkeypatch, tmp_path: 
             path.write_text(json.dumps(data), encoding="utf-8")
 
     import invarlock.cli.commands.run as run_mod
-    from invarlock.cli.commands import certify as mod
+    from invarlock.cli.commands import evaluate as mod
 
     monkeypatch.setattr(
         run_mod, "run_command", lambda **kwargs: fake_run(**kwargs), raising=False
@@ -282,13 +282,13 @@ def test_certify_local_paths_quantized_subject_overheads(monkeypatch, tmp_path: 
     monkeypatch.setattr(mod, "_report", _report_wrapper, raising=False)
 
     cert_dir = tmp_path / "certs"
-    certify_command(
+    evaluate_command(
         source=str(src),
         edited=str(edt),
         adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
-        cert_out=str(cert_dir),
+        report_out=str(cert_dir),
     )
 
     cert_path = Path(cert_dir) / "evaluation.cert.json"

@@ -29,7 +29,7 @@ def test_run_help_exposes_typed_options(monkeypatch):
 def test_certify_help_exposes_baseline_and_subject(monkeypatch):
     app = _load_app(monkeypatch)
     runner = CliRunner()
-    res = runner.invoke(app, ["certify", "--help"])
+    res = runner.invoke(app, ["evaluate", "--help"])
     assert res.exit_code == 0, res.output
     out = res.stdout
     assert "--baseline" in out or "--source" in out

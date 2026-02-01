@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from invarlock.cli.commands.certify import certify_command
+from invarlock.cli.commands.evaluate import evaluate_command
 
 
 def _stub_run(out_dir: Path) -> None:
@@ -42,18 +42,18 @@ def test_certify_command_smoke_for_coverage(monkeypatch, tmp_path) -> None:
         calls["reports"] += 1
 
     import invarlock.cli.commands.run as run_mod
-    from invarlock.cli.commands import certify as cert_mod
+    from invarlock.cli.commands import evaluate as cert_mod
 
     monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
     monkeypatch.setattr(cert_mod, "_report", fake_report, raising=False)
 
-    certify_command(
+    evaluate_command(
         source=str(src),
         edited=str(edt),
         adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
-        cert_out=str(tmp_path / "reports"),
+        report_out=str(tmp_path / "reports"),
         timing=False,
         progress=False,
     )
@@ -112,19 +112,19 @@ def test_certify_command_reuses_baseline_report_for_coverage(monkeypatch, tmp_pa
         calls["reports"].append(kwargs)
 
     import invarlock.cli.commands.run as run_mod
-    from invarlock.cli.commands import certify as cert_mod
+    from invarlock.cli.commands import evaluate as cert_mod
 
     monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
     monkeypatch.setattr(cert_mod, "_report", fake_report, raising=False)
 
-    certify_command(
+    evaluate_command(
         source=str(src),
         edited=str(edt),
         baseline_report=str(baseline_dir),
         adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
-        cert_out=str(tmp_path / "reports"),
+        report_out=str(tmp_path / "reports"),
         timing=False,
         progress=False,
     )
