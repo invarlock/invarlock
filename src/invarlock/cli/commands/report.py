@@ -10,6 +10,7 @@ Provides the `invarlock report` group with:
 import json
 import math
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 import typer
@@ -27,10 +28,22 @@ GATE_LABEL_WIDTH = 32
 ARTIFACT_LABEL_WIDTH = 18
 
 
-def _print_section_header(console: Console, title: str) -> None:
+def _format_section_title(title: str, *, suffix: str | None = None) -> str:
+    if not suffix:
+        return title
+    combined = f"{title} {suffix}"
+    if len(combined) > SECTION_WIDTH:
+        return combined
+    pad = max(1, SECTION_WIDTH - len(title) - len(suffix))
+    return f"{title}{' ' * pad}{suffix}"
+
+
+def _print_section_header(
+    console: Console, title: str, *, suffix: str | None = None
+) -> None:
     bar = "═" * SECTION_WIDTH
     console.print(bar)
-    console.print(title)
+    console.print(_format_section_title(title, suffix=suffix))
     console.print(bar)
 
 
@@ -103,6 +116,9 @@ def _generate_reports(
     output: str | None = None,
     style: str = "audit",
     no_color: bool = False,
+    summary_baseline_seconds: float | None = None,
+    summary_subject_seconds: float | None = None,
+    summary_report_start: float | None = None,
 ) -> None:
     # This callback runs only when invoked without subcommand (default Click behavior)
     try:
@@ -127,6 +143,9 @@ def _generate_reports(
         output = _coerce_option(output)
         style = _coerce_option(style, "audit")
         no_color = bool(_coerce_option(no_color, False))
+        summary_baseline_seconds = _coerce_option(summary_baseline_seconds)
+        summary_subject_seconds = _coerce_option(summary_subject_seconds)
+        summary_report_start = _coerce_option(summary_report_start)
 
         output_style = resolve_output_style(
             style=str(style),
@@ -223,7 +242,30 @@ def _generate_reports(
                 status_text = _format_status(overall_pass)
 
                 console.print("")
-                _print_section_header(console, "EVALUATION REPORT SUMMARY")
+                summary_suffix: str | None = None
+                if summary_report_start is not None:
+                    try:
+                        base = (
+                            float(summary_baseline_seconds)
+                            if summary_baseline_seconds is not None
+                            else 0.0
+                        )
+                        subject = (
+                            float(summary_subject_seconds)
+                            if summary_subject_seconds is not None
+                            else 0.0
+                        )
+                        report_elapsed = max(
+                            0.0, float(perf_counter() - float(summary_report_start))
+                        )
+                        summary_suffix = f"[{(base + subject + report_elapsed):.2f}s]"
+                    except Exception:
+                        summary_suffix = None
+                _print_section_header(
+                    console,
+                    "EVALUATION REPORT SUMMARY",
+                    suffix=summary_suffix,
+                )
                 console.print(_format_kv_line("Status", status_text))
 
                 schema_version = evaluation_report.get("schema_version")
@@ -392,6 +434,9 @@ def report_command(
     output: str | None = None,
     style: str = "audit",
     no_color: bool = False,
+    summary_baseline_seconds: float | None = None,
+    summary_subject_seconds: float | None = None,
+    summary_report_start: float | None = None,
 ):
     return _generate_reports(
         run=run,
@@ -401,6 +446,9 @@ def report_command(
         output=output,
         style=style,
         no_color=no_color,
+        summary_baseline_seconds=summary_baseline_seconds,
+        summary_subject_seconds=summary_subject_seconds,
+        summary_report_start=summary_report_start,
     )
 
 
