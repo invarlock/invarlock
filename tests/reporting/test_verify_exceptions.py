@@ -9,7 +9,7 @@ from invarlock.cli.app import app
 
 
 def test_verify_json_malformed_schema_raises_validation_error(tmp_path: Path) -> None:
-    # Minimal JSON that parses but violates certificate schema/shape
+    # Minimal JSON that parses but violates evaluation_report schema/shape
     bad = {"schema_version": "v1", "run_id": "", "primary_metric": {}}
     p = tmp_path / "bad_cert.json"
     p.write_text(json.dumps(bad))
@@ -26,7 +26,7 @@ def test_verify_json_malformed_schema_raises_validation_error(tmp_path: Path) ->
 
 
 def test_verify_json_recompute_mismatch_metrics_error_in_ci(tmp_path: Path) -> None:
-    # Construct a certificate with ppl kind and mismatched ratio vs baseline
+    # Construct a evaluation_report with ppl kind and mismatched ratio vs baseline
     cert = {
         "schema_version": "v1",
         "run_id": "r1",

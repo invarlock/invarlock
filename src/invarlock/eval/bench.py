@@ -976,17 +976,21 @@ def execute_scenario(
     except Exception:
         pass
 
-    # Generate certificate artifact when both runs produced reports
+    # Generate evaluation report artifact when both runs produced reports
     try:
         if bare_result.success and guarded_result.success:
-            from invarlock.reporting.certificate import make_certificate
+            from invarlock.reporting.report_builder import make_report
 
-            cert = make_certificate(guarded_result.report, bare_result.report)
-            cert_path = scenario_dir / "certificate.json"
-            cert_path.write_text(json.dumps(cert, indent=2), encoding="utf-8")
-            artifacts["certificate"] = str(cert_path)
+            evaluation_report = make_report(guarded_result.report, bare_result.report)
+            report_path = scenario_dir / "evaluation.report.json"
+            report_path.write_text(
+                json.dumps(evaluation_report, indent=2), encoding="utf-8"
+            )
+            artifacts["evaluation_report"] = str(report_path)
     except Exception as exc:
-        logger.warning(f"Certificate generation failed for {scenario_slug}: {exc}")
+        logger.warning(
+            f"Evaluation report generation failed for {scenario_slug}: {exc}"
+        )
 
     # Resolve epsilon from runtime or use config
     epsilon_used = config.epsilon

@@ -5,7 +5,7 @@
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Consolidated error code reference and troubleshooting guide. |
-| **Audience** | Users encountering errors during `certify`, `run`, or `verify` commands. |
+| **Audience** | Users encountering errors during `evaluate`, `run`, or `verify` commands. |
 | **Exit codes** | `0=success`, `1=generic failure`, `2=schema/config invalid`, `3=hard abort (CI/Release)`. |
 | **Source of truth** | `src/invarlock/cli/commands/run.py`, `src/invarlock/cli/commands/verify.py`. |
 
@@ -15,8 +15,8 @@
 # Check environment and configuration
 invarlock doctor --config <config.yaml> --profile ci
 
-# Validate a certificate
-invarlock verify reports/cert/evaluation.cert.json --profile ci
+# Validate a report
+invarlock verify reports/eval/evaluation.report.json --profile ci
 
 # Enable debug output for detailed traces
 INVARLOCK_DEBUG_TRACE=1 invarlock run -c <config.yaml>
@@ -205,7 +205,7 @@ These errors relate to window pairing, tokenizer consistency, and evidence integ
 | --- | --- |
 | **Code** | `E111` |
 | **Category** | Quality |
-| **Severity** | Certificate emitted, then hard abort in CI/Release |
+| **Severity** | report emitted, then hard abort in CI/Release |
 | **Exit code** | `3` (CI/Release) |
 
 **Triggers:**
@@ -236,14 +236,14 @@ These errors relate to window pairing, tokenizer consistency, and evidence integ
 
 **Notes:**
 
-- `invarlock certify` always emits a certificate before exiting on E111
+- `invarlock evaluate` always emits a report before exiting on E111
 - `invarlock run` logs a warning for non-finite PM but does not raise E111
 
 ---
 
 ### Verification Errors (E601)
 
-#### E601 — Certificate Verification Failed
+#### E601 — report Verification Failed
 
 | Field | Value |
 | --- | --- |
@@ -254,26 +254,26 @@ These errors relate to window pairing, tokenizer consistency, and evidence integ
 
 **Triggers:**
 
-- Certificate fails schema validation
+- report fails schema validation
 - Pairing math recomputation fails
 - Gate checks fail in CI/Release profile
 
 **Common causes:**
 
-- Certificate JSON corrupted or hand-edited
+- report JSON corrupted or hand-edited
 - Schema version mismatch (`schema_version` ≠ `v1`)
 - Missing required fields (`run_id`, `meta`, `dataset`, etc.)
 
 **Fixes:**
 
-1. Regenerate certificate via `invarlock report --format cert`
-2. Ensure certificate is unmodified from generation
+1. Regenerate report via `invarlock report --format report`
+2. Ensure report is unmodified from generation
 3. Check `schema_version` is `"v1"`
 
 **Example error:**
 
 ```text
-[INVARLOCK:E601] Certificate schema validation failed
+[INVARLOCK:E601] report schema validation failed
 ```
 
 ---
@@ -296,7 +296,7 @@ These errors relate to window pairing, tokenizer consistency, and evidence integ
 **Fix:**
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 invarlock certify --baseline gpt2 --subject gpt2
+INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --baseline gpt2 --subject gpt2
 ```
 
 ### Dependency Missing
@@ -374,4 +374,4 @@ invarlock plugins adapters --explain hf_causal
 - [Configuration Schema](../reference/config-schema.md)
 - [Dataset Providers](../reference/datasets.md)
 - [Environment Variables](../reference/env-vars.md)
-- [Certificates](../reference/certificates.md)
+- [reports](../reference/reports.md)

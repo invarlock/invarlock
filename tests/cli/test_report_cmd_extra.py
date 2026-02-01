@@ -23,7 +23,7 @@ def test_report_cert_requires_baseline(tmp_path: Path):
         )
     )
     r = CliRunner().invoke(
-        app, ["report", "--run", str(run), "--format", "cert"]
+        app, ["report", "--run", str(run), "--format", "report"]
     )  # no --baseline
     assert r.exit_code == 1
-    assert "Certificate format requires --baseline" in r.stdout
+    assert "Evaluation report format requires --baseline" in r.stdout

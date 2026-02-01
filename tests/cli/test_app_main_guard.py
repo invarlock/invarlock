@@ -12,6 +12,8 @@ def test_app_main_guard_runs_without_invoking_real_typer(monkeypatch):
         return None
 
     security.enforce_default_security = nosec  # type: ignore[attr-defined]
+    security.enforce_network_policy = nosec  # type: ignore[attr-defined]
+    security.network_policy_allows = lambda: True  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "invarlock", invarlock)
     monkeypatch.setitem(sys.modules, "invarlock.security", security)
 

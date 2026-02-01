@@ -8,13 +8,13 @@ test_verify_pack_validates_checksums_and_certs() {
     local pack_dir="${TEST_TMPDIR}/pack"
     mkdir -p "${pack_dir}/certs"
     echo "{}" > "${pack_dir}/manifest.json"
-    echo "{}" > "${pack_dir}/certs/evaluation.cert.json"
+    echo "{}" > "${pack_dir}/certs/evaluation.report.json"
 
     local sha_cmd
     sha_cmd="$(pack_sha256_cmd)"
     (
         cd "${pack_dir}"
-        ${sha_cmd} manifest.json certs/evaluation.cert.json > checksums.sha256
+        ${sha_cmd} manifest.json certs/evaluation.report.json > checksums.sha256
     )
 
     local bin_dir="${TEST_TMPDIR}/bin"
@@ -78,7 +78,7 @@ test_verify_pack_verify_certs_without_json_out() {
 
     local pack_dir="${TEST_TMPDIR}/pack"
     mkdir -p "${pack_dir}/certs"
-    echo "{}" > "${pack_dir}/certs/evaluation.cert.json"
+    echo "{}" > "${pack_dir}/certs/evaluation.report.json"
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"

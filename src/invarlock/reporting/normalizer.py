@@ -33,7 +33,7 @@ def normalize_run_report(report: Mapping[str, Any] | RunReport) -> RunReport:
     """Coerce an arbitrary report-like mapping into a canonical RunReport.
 
     This is the single entry point for converting pre-canonical or loosely-typed
-    data into the strict PM-only RunReport shape used by certificate/report.
+    data into the strict PM-only RunReport shape used by evaluation report building.
     """
     src = _as_mapping(report)
 
@@ -53,7 +53,7 @@ def normalize_run_report(report: Mapping[str, Any] | RunReport) -> RunReport:
         "ts": ts,
         "auto": meta_in.get("auto") if isinstance(meta_in.get("auto"), dict) else None,
     }
-    # Preserve additional provenance knobs used by certificate/digests.
+    # Preserve additional provenance knobs used by evaluation report digests.
     for key in (
         "pm_acceptance_range",
         "pm_drift_band",

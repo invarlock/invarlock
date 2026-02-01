@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from invarlock.cli.commands.export_html import export_html_command
-from invarlock.reporting.report import to_certificate
+from invarlock.reporting.report import to_evaluation_report
 
 
 def _make_min_report():
@@ -59,10 +59,10 @@ def _make_baseline():
 def test_export_html_happy_and_no_overwrite(tmp_path: Path):
     report = _make_min_report()
     base = _make_baseline()
-    cert_json = to_certificate(report, base, format="json")
+    report_json = to_evaluation_report(report, base, format="json")
     inp = tmp_path / "cert.json"
     out = tmp_path / "out.html"
-    inp.write_text(cert_json, encoding="utf-8")
+    inp.write_text(report_json, encoding="utf-8")
 
     # First export, strip css
     export_html_command(input=str(inp), output=str(out), embed_css=False, force=False)

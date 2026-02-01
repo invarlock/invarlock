@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from invarlock.reporting.certificate import make_certificate
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.report_builder import make_report
 
 
 def test_quality_overhead_ppl_ratio_shows():
@@ -48,12 +48,14 @@ def test_quality_overhead_ppl_ratio_shows():
     }
     baseline = {"run_id": "b", "model_id": "m", "ppl_final": 10.0}
 
-    with patch("invarlock.reporting.certificate.validate_report", return_value=True):
-        cert = make_certificate(report, baseline)
+    with patch(
+        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+    ):
+        cert = make_report(report, baseline)
 
     # quality_overhead may be omitted; markdown should still render
-    md = render_certificate_markdown(cert)
-    assert "# InvarLock Evaluation Certificate" in md
+    md = render_report_markdown(cert)
+    assert "# InvarLock Evaluation Report" in md
 
 
 def test_quality_overhead_accuracy_delta_near_zero():
@@ -94,8 +96,10 @@ def test_quality_overhead_accuracy_delta_near_zero():
     }
     baseline = {"run_id": "b", "model_id": "m", "ppl_final": 10.0}
 
-    with patch("invarlock.reporting.certificate.validate_report", return_value=True):
-        cert = make_certificate(report, baseline)
+    with patch(
+        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+    ):
+        cert = make_report(report, baseline)
 
-    md = render_certificate_markdown(cert)
-    assert "# InvarLock Evaluation Certificate" in md
+    md = render_report_markdown(cert)
+    assert "# InvarLock Evaluation Report" in md

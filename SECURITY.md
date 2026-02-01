@@ -66,10 +66,10 @@ We will not pursue legal action against researchers who:
 When using InvarLock:
 
 1. **Keep dependencies updated**: Run `pip install --upgrade invarlock` regularly
-2. **Review certificates**: Always verify certificate integrity before trusting results
+2. **Review evaluation reports**: Always verify evaluation report integrity before trusting results
 3. **Isolate sensitive workloads**: Use virtual environments or containers
 4. **Network isolation**: Set `INVARLOCK_ALLOW_NETWORK=0` (default) except when needed
-5. **Audit configurations**: Review config files before running certification workflows
+5. **Audit configurations**: Review config files before running evaluation workflows
 
 ## Security Features
 
@@ -77,7 +77,7 @@ InvarLock includes several security features:
 
 - **Network disabled by default**: External network access requires explicit opt-in
 - **Supply chain verification**: SBOM generation and dependency auditing in CI
-- **Certificate integrity**: Cryptographic verification of certification results
+- **Report integrity**: Cryptographic verification of evaluation results
 - **Minimal permissions**: Least-privilege design throughout the codebase
 
 ## Acknowledgments

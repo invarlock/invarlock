@@ -42,7 +42,7 @@ def test_explain_gates_hysteresis_and_overhead_rendering(monkeypatch, tmp_path):
     rep.write_text(json.dumps({}), encoding="utf-8")
     base.write_text(json.dumps({}), encoding="utf-8")
 
-    # Patch make_certificate to a simple, controlled payload
+    # Patch make_report to a simple, controlled payload
     from invarlock.cli.commands import explain_gates as mod
 
     def _fake_cert(_report, _baseline):  # type: ignore[no-untyped-def]
@@ -65,7 +65,7 @@ def test_explain_gates_hysteresis_and_overhead_rendering(monkeypatch, tmp_path):
             "guard_overhead": {"overhead_ratio": 1.015, "overhead_threshold": 0.02},
         }
 
-    monkeypatch.setattr(mod, "make_certificate", _fake_cert)
+    monkeypatch.setattr(mod, "make_report", _fake_cert)
     r = CliRunner().invoke(
         app, ["report", "explain", "--report", str(rep), "--baseline", str(base)]
     )

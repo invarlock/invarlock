@@ -15,7 +15,7 @@ Heuristics:
       INVARLOCK_ALLOW_NETWORK=1, INVARLOCK_DEDUP_TEXTS=1, TRANSFORMERS_NO_TORCHVISION=1,
       TOKENIZERS_PARALLELISM=false
   - Timeout per command: 180s by default; 60s for doctor/help,
-    300s for run/certify, 120s for report/html/verify.
+    300s for run/evaluate, 120s for report/html/verify.
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ EXCLUDE_TOP_LEVEL_DIRS = {
     "tmp",
     "runs",
     "reports",
-    ".certify_tmp",
+    ".evaluate_tmp",
     # Tooling caches / VCS.
     ".git",
     ".mypy_cache",
@@ -222,7 +222,7 @@ def _timeout_for(cmd_str: str) -> int:
         return 60
     if " invarlock calibrate" in s or s.strip().startswith("invarlock calibrate"):
         return 900
-    if " invarlock run" in s or " invarlock certify" in s:
+    if " invarlock run" in s or " invarlock evaluate" in s:
         return 600
     if " invarlock report" in s:
         return 120

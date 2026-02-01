@@ -33,7 +33,7 @@ def test_explain_gates_tokens_below_floor_and_drift_fail(monkeypatch, tmp_path):
             },
         }
 
-    monkeypatch.setattr(mod, "make_certificate", _fake_cert)
+    monkeypatch.setattr(mod, "make_report", _fake_cert)
     r = CliRunner().invoke(
         app, ["report", "explain", "--report", str(rep), "--baseline", str(base)]
     )
@@ -90,7 +90,7 @@ def test_explain_gates_handles_edge_cases(monkeypatch, tmp_path):
             },
         }
 
-    monkeypatch.setattr(mod, "make_certificate", fake_cert)
+    monkeypatch.setattr(mod, "make_report", fake_cert)
     result = CliRunner().invoke(
         app, ["report", "explain", "--report", str(rep), "--baseline", str(base)]
     )
@@ -124,7 +124,7 @@ def test_explain_gates_dataset_split_handles_exception(monkeypatch, tmp_path):
     monkeypatch.setattr(mod.json, "loads", fake_loads)
     monkeypatch.setattr(
         mod,
-        "make_certificate",
+        "make_report",
         lambda *_: {
             "auto": {"tier": "balanced"},
             "validation": {"primary_metric_acceptable": True},

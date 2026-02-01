@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from invarlock.reporting.report import save_report, to_certificate
+from invarlock.reporting.report import save_report, to_evaluation_report
 
 
 def _minimal_report() -> dict:
@@ -52,7 +52,7 @@ def _minimal_report() -> dict:
     }
 
 
-def test_to_certificate_unsupported_format_raises():
+def test_to_evaluation_report_unsupported_format_raises():
     rep = _minimal_report()
     base = {
         "schema_version": "baseline-v1",
@@ -60,7 +60,7 @@ def test_to_certificate_unsupported_format_raises():
         "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 100.0}},
     }
     with pytest.raises(ValueError):
-        to_certificate(rep, base, format="xml")
+        to_evaluation_report(rep, base, format="xml")
 
 
 def test_save_report_with_compare_suffix(tmp_path: Path):

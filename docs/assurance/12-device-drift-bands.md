@@ -28,22 +28,22 @@ Bands were empirically derived on pilot models and are enforced in CI. Actual va
 ## Reproducible Check
 
 ```bash
-# Baseline on CPU → certificate
+# Baseline on CPU → report
 invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml --device cpu --profile ci --out runs/baseline_cpu
-invarlock report --run runs/baseline_cpu --format cert --output runs/baseline_cpu
+invarlock report --run runs/baseline_cpu --format report --output runs/baseline_cpu
 
-# Same schedule on MPS → certificate
+# Same schedule on MPS → report
 invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml --device mps --profile ci --out runs/baseline_mps
-invarlock report --run runs/baseline_mps --format cert --output runs/baseline_mps
+invarlock report --run runs/baseline_mps --format report --output runs/baseline_mps
 
 # Lint cross-device drift (absolute ratio tolerance)
 python scripts/check_device_drift.py \
-  runs/baseline_cpu/evaluation.cert.json \
-  runs/baseline_mps/evaluation.cert.json \
+  runs/baseline_cpu/evaluation.report.json \
+  runs/baseline_mps/evaluation.report.json \
   --tolerance 0.005
 ```
 
-## Runtime Contract (certificate)
+## Runtime Contract (report)
 
 - `primary_metric.ratio_vs_baseline` and `primary_metric.display_ci` report the ratio and CI when ppl‑like.
 - `meta.device`, `meta.seeds` document the device context and seed bundle.

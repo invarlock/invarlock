@@ -6,16 +6,16 @@
 | --- | --- |
 | **Purpose** | Show how to generate and interpret InvarLock reports. |
 | **Audience** | Users learning the certification workflow. |
-| **Outputs** | `evaluation.cert.json`, `evaluation_certificate.md`, `report.json`. |
+| **Outputs** | `evaluation.report.json`, `evaluation_report.md`, `report.json`. |
 | **Requires** | `invarlock[hf]` for HF adapter workflows. |
 
-InvarLock emits both machine-readable certificates and human-friendly summaries.
+InvarLock emits both machine-readable reports and human-friendly summaries.
 Use the steps below to reproduce representative artifacts from the current release.
 
-## 1. Generate a Certificate Bundle
+## 1. Generate a report Bundle
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
+INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
   --baseline sshleifer/tiny-gpt2 \
   --subject  sshleifer/tiny-gpt2 \
   --adapter auto \
@@ -24,11 +24,11 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
   --preset configs/presets/causal_lm/wikitext2_512.yaml \
   --edit-config configs/overlays/edits/quant_rtn/8bit_full.yaml \
   --out runs/quant8_demo \
-  --cert-out reports/quant8_demo
+  --report-out reports/quant8_demo
 ```
 
-The command writes `evaluation.cert.json` and `evaluation_certificate.md` under `reports/quant8_demo/`.
-Each certificate contains:
+The command writes `evaluation.report.json` and `evaluation_report.md` under `reports/quant8_demo/`.
+Each report contains:
 
 - Model and edit metadata (model id, adapter, commit hash, edit plan)
 - Drift / perplexity / RMT verdicts with paired bootstrap confidence intervals
@@ -38,14 +38,14 @@ Each certificate contains:
 ## 2. Create a Narrative Summary
 
 ```bash
-# The certificate already includes a markdown summary:
-cat reports/quant8_demo/evaluation_certificate.md
+# The report already includes a markdown summary:
+cat reports/quant8_demo/evaluation_report.md
 
 # To regenerate markdown from run reports, pass edited + baseline:
 invarlock report --run <edited_report.json> --baseline <baseline_report.json> --format markdown
 ```
 
-The markdown report mirrors the certificate content but highlights:
+The markdown report mirrors the report content but highlights:
 
 - Baseline vs edited perplexity series
 - Guard outcomes with links to supporting metrics
@@ -58,7 +58,7 @@ For audits, collect the following files:
 | File | Purpose |
 |------|---------|
 | `runs/<name>/**/report.json` | Execution log, metrics, and guard telemetry |
-| `reports/<name>/evaluation.cert.json` | Signed compliance payload |
-| `reports/<name>/evaluation_certificate.md` | Human-friendly summary for reviewers |
+| `reports/<name>/evaluation.report.json` | Signed compliance payload |
+| `reports/<name>/evaluation_report.md` | Human-friendly summary for reviewers |
 
-Certificates remain valid as long as `invarlock verify reports/<name>/evaluation.cert.json` passes with the original baseline reference.
+reports remain valid as long as `invarlock verify reports/<name>/evaluation.report.json` passes with the original baseline reference.

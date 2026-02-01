@@ -40,7 +40,11 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
         "svd_rank32_l31_clean",
     ):
         _write_cert(
-            model_dir / "certificates" / edit / "run_1" / "evaluation.cert.json",
+            model_dir
+            / "evaluation_reports"
+            / edit
+            / "run_1"
+            / "evaluation.report.json",
             validation={
                 "invariants_pass": True,
                 "primary_metric_acceptable": True,
@@ -54,7 +58,11 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
     # Stress edits (4): two catastrophic required to FAIL; two informational.
     for edit in ("prune_50pct_stress", "svd_rank32_stress"):
         _write_cert(
-            model_dir / "certificates" / edit / "run_1" / "evaluation.cert.json",
+            model_dir
+            / "evaluation_reports"
+            / edit
+            / "run_1"
+            / "evaluation.report.json",
             validation={
                 "invariants_pass": True,
                 "primary_metric_acceptable": False,
@@ -66,7 +74,11 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
         )
     for edit in ("quant_4bit_stress", "fp8_e5m2_stress"):
         _write_cert(
-            model_dir / "certificates" / edit / "run_1" / "evaluation.cert.json",
+            model_dir
+            / "evaluation_reports"
+            / edit
+            / "run_1"
+            / "evaluation.report.json",
             validation={
                 "invariants_pass": True,
                 "primary_metric_acceptable": True,
@@ -91,7 +103,11 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
     ):
         invariants_status = "fail"
         _write_cert(
-            model_dir / "certificates" / "errors" / error_type / "evaluation.cert.json",
+            model_dir
+            / "evaluation_reports"
+            / "errors"
+            / error_type
+            / "evaluation.report.json",
             validation={
                 "invariants_pass": False,
                 "primary_metric_acceptable": False,

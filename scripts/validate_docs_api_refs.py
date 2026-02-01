@@ -38,7 +38,7 @@ EXCLUDE_TOP_LEVEL_DIRS = {
     "tmp",
     "runs",
     "reports",
-    ".certify_tmp",
+    ".evaluate_tmp",
     # Tooling caches / VCS.
     ".git",
     ".mypy_cache",

@@ -63,7 +63,7 @@ pack_copy_optional() {
 
 pack_collect_certs() {
     local run_dir="$1"
-    find "${run_dir}" -type f -name "evaluation.cert.json" -path "*/certificates/*" ! -path "*/cert/*" | sort
+    find "${run_dir}" -type f -name "evaluation.report.json" -path "*/reports/*" ! -path "*/cert/*" | sort
 }
 
 pack_cert_rel_path() {
@@ -71,8 +71,8 @@ pack_cert_rel_path() {
     local cert_path="$2"
     local rel="${cert_path#"${run_dir}/"}"
     local model="${rel%%/*}"
-    local remainder="${rel#*/certificates/}"
-    remainder="${remainder%/evaluation.cert.json}"
+    local remainder="${rel#*/reports/}"
+    remainder="${remainder%/evaluation.report.json}"
     if [[ -z "${model}" || "${remainder}" == "${rel}" ]]; then
         return 1
     fi
@@ -88,7 +88,7 @@ pack_generate_html() {
         if ! invarlock report html --input "${cert}" --output "${html}" --force >/dev/null; then
             echo "WARNING: Failed to render HTML report for ${cert}" >&2
         fi
-    done < <(find "${pack_dir}/certs" -type f -name "evaluation.cert.json" | sort)
+    done < <(find "${pack_dir}/certs" -type f -name "evaluation.report.json" | sort)
 }
 
 pack_verify_certs() {
@@ -102,7 +102,7 @@ pack_verify_certs() {
         [[ -n "${cert}" ]] || continue
         local cert_dir
         cert_dir="$(dirname "${cert}")"
-        if [[ "${cert}" == */errors/*/evaluation.cert.json ]]; then
+        if [[ "${cert}" == */errors/*/evaluation.report.json ]]; then
             # Error injection certs are expected to fail verify (unsafe edits by design).
             invarlock verify --json --profile "${profile}" "${cert}" > "${cert_dir}/verify.json" || true
             count_error=$((count_error + 1))
@@ -115,11 +115,11 @@ pack_verify_certs() {
             echo "ERROR: Unexpected verify failure: ${cert}" >&2
             count_failed=$((count_failed + 1))
         fi
-    done < <(find "${pack_dir}/certs" -type f -name "evaluation.cert.json" | sort)
+    done < <(find "${pack_dir}/certs" -type f -name "evaluation.report.json" | sort)
 
     local total=$((count_clean + count_error + count_failed))
     if [[ ${total} -eq 0 ]]; then
-        echo "ERROR: No certificates found to verify." >&2
+        echo "ERROR: No reports found to verify." >&2
         return 1
     fi
 
@@ -196,7 +196,7 @@ pack_write_readme() {
     cat > "${pack_dir}/README.md" <<'EOF'
 # InvarLock Proof Pack
 
-This proof pack bundles certificates, summary reports, and metadata for offline
+This proof pack bundles reports, summary reports, and metadata for offline
 verification. No model weights are included.
 
 ## Verify
@@ -208,8 +208,8 @@ verification. No model weights are included.
    sha256sum -c checksums.sha256
    # macOS: shasum -a 256 -c checksums.sha256
 
-3) Verify certificate integrity:
-   invarlock verify --json certs/**/evaluation.cert.json
+3) Verify report integrity:
+   invarlock verify --json certs/**/evaluation.report.json
 
 Or use:
   scripts/proof_packs/verify_pack.sh --pack <pack-dir>
@@ -280,7 +280,7 @@ pack_build_pack() {
         rel="$(pack_cert_rel_path "${run_dir}" "${cert}")" || continue
         local dest_dir="${pack_dir}/certs/${rel}"
         mkdir -p "${dest_dir}"
-        cp "${cert}" "${dest_dir}/evaluation.cert.json"
+        cp "${cert}" "${dest_dir}/evaluation.report.json"
     done < <(pack_collect_certs "${run_dir}")
 
     local verify_rc=0

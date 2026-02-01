@@ -56,7 +56,7 @@ def test_two_tier_policy_enforced(tmp_path: Path) -> None:
                 0.90,
             ),  # core meets floor → PASS
             (
-                "src/invarlock/reporting/certificate.py",
+                "src/invarlock/reporting/report_builder.py",
                 0.91,
                 0.90,
             ),  # override set to 0.90 → PASS
@@ -94,7 +94,7 @@ def test_overrides_take_precedence(tmp_path: Path) -> None:
     # Explicit overrides should win over a stricter core-floor flag.
     xml = tmp_path / "cov.xml"
     json_out = tmp_path / "out.json"
-    _write_cov_xml(xml, [("src/invarlock/reporting/certificate.py", 0.94, 0.90)])
+    _write_cov_xml(xml, [("src/invarlock/reporting/report_builder.py", 0.94, 0.90)])
     proc = _run_checker(xml, json_out, extra_args=["--core-floor", "0.95"])
 
     # Should pass with explicit 90% override applied
@@ -103,5 +103,6 @@ def test_overrides_take_precedence(tmp_path: Path) -> None:
     assert payload["status"] == "ok"
     files = {f["path"]: f for f in payload["files"]}
     assert (
-        abs(files["src/invarlock/reporting/certificate.py"]["threshold"] - 0.90) < 1e-9
+        abs(files["src/invarlock/reporting/report_builder.py"]["threshold"] - 0.90)
+        < 1e-9
     )

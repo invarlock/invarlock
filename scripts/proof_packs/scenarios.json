@@ -4,7 +4,7 @@
   "_meta": {
     "purpose": "Single source of truth for proof-pack scenarios and their assurance expectations.",
     "notes": [
-      "Scenario IDs must match the directory names under <model>/certificates/ in proof pack runs.",
+      "Scenario IDs must match the directory names under <model>/reports/ in proof pack runs.",
       "Strictness drives verdict gating: must_* scenarios are gating; informational scenarios never fail the pack."
     ]
   },

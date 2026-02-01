@@ -336,7 +336,7 @@ def test_until_pass_baseline_disappears_between_attempts(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(patch("invarlock.core.retry.RetryController", RC))
         stack.enter_context(
-            patch("invarlock.reporting.certificate.make_certificate", make_cert)
+            patch("invarlock.reporting.report_builder.make_report", make_cert)
         )
         for target in (
             "invarlock.reporting.validate.validate_guard_overhead",

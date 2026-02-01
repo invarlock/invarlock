@@ -1,7 +1,7 @@
 # Guard Contracts & Statistical Primer
 
 > **Plain language:** This handbook explains what each guard checks, the
-> thresholds we enforce, and how those decisions appear in the certificate so
+> thresholds we enforce, and how those decisions appear in the report so
 > reviewers can trace every PASS or FAIL.
 
 **Contents:**
@@ -9,7 +9,7 @@
 - [1. Guard Contracts](#1-guard-contracts) — what each guard checks and how it fails
 - [2. Statistical Method Primer](#2-statistical-method-primer) — paired Δlog perplexity and bootstrap CIs
 - [3. Calibration & Evaluation Slice Requirements](#3-calibration--evaluation-slice-requirements) — acceptance criteria for evaluation schedules
-- [4. Reproducibility Kit](#4-reproducibility-kit) — how to reproduce a certificate
+- [4. Reproducibility Kit](#4-reproducibility-kit) — how to reproduce a report
 - [5. Device Tolerance Guidance](#5-device-tolerance-guidance) — expected drift across backends
 - [6. Threshold Rationale (Defaults)](#6-threshold-rationale-defaults) — why the defaults are what they are
 - [7. Known Limitations](#7-known-limitations) — what the safety case does not cover
@@ -25,11 +25,11 @@ calibration data that accompany the InvarLock assurance notes.
 |-------|--------|-------------------|-------------------|----------------|
 | **Invariants** | Model weights, adapter metadata | Structural invariants (non-finite scan, weight tying, embedding dims, layer norms) | Abort edit if violated before evaluation | `invarlock.guards.invariants` |
 | **Spectral** | 2‑D layer weights (FFN, attention proj, embeddings) | Compute $z = \frac{\hat{s} - \mu_f}{\sigma_f}$ where $\hat{s}$ is an **iterative estimate** of $\sigma_{\max}$ under a fixed measurement contract; require `abs(z) ≤ κ_f` calibrated for ≤5% WARN FPR. Optional degeneracy proxies (stable-rank drift, norm collapse) may add WARN/ABORT depending on policy. | WARN when cap applied; abort if cap would exceed `max_caps` (and for configured fatal degeneracy thresholds). | `invarlock.guards.spectral` |
-| **RMT** | Token‑weighted activations (sampled) | Compute a per‑module **edge risk score** $r = \hat{\sigma}_{\max}(A') / \sigma_{\mathrm{MP}}(m,n)$ on whitened activations $A'$ under a fixed measurement contract; accept when baseline‑relative growth stays within the calibrated ε-band per family. | Certificate fails on ε‑band violations; catastrophic spikes in the primary metric are gated separately (`spike_threshold` = 2.0× for ppl‑like metrics). | `invarlock.guards.rmt` |
+| **RMT** | Token‑weighted activations (sampled) | Compute a per‑module **edge risk score** $r = \hat{\sigma}_{\max}(A') / \sigma_{\mathrm{MP}}(m,n)$ on whitened activations $A'$ under a fixed measurement contract; accept when baseline‑relative growth stays within the calibrated ε-band per family. | report fails on ε‑band violations; catastrophic spikes in the primary metric are gated separately (`spike_threshold` = 2.0× for ppl‑like metrics). | `invarlock.guards.rmt` |
 | **Variance (VE)** | Paired ΔlogNLL with calibration windows | Enable VE only if the predictive CI upper bound ≤ −`min_effect_lognll` **and** mean Δ ≤ −`min_effect_lognll` (Balanced uses one‑sided CI; Conservative uses two‑sided CI). A CI entirely above +`min_effect_lognll` is treated as regression and VE stays off. | VE disabled, guard records reason; edit continues | `invarlock.guards.variance` |
-| **Bootstrap sanity** | Evaluation windows, token counts | Matching window IDs, zero overlap; BCa replicates ≥ requested | Abort certification and surface reason | `invarlock.reporting.certificate` |
+| **Bootstrap sanity** | Evaluation windows, token counts | Matching window IDs, zero overlap; BCa replicates ≥ requested | Abort certification and surface reason | `invarlock.reporting.report_builder` |
 
-Each guard logs its policy digest, metrics, and **measurement contract**; certificates
+Each guard logs its policy digest, metrics, and **measurement contract**; reports
 mirror those fields under `resolved_policy.*` and `spectral`/`rmt`/`variance` blocks.
 
 ### Invariants: what is checked
@@ -62,17 +62,17 @@ The invariants guard fails fast when any of the following hold:
 **Deadband (δ)** provides a z-score buffer that suppresses WARN “flicker” when
 values hover near the cap. For example, if the relative change in a module’s
 spectral norm is within ±0.10 (Balanced), the guard reports a neutral score.
-The chosen δ is published in certificates as `spectral.summary.deadband`.
+The chosen δ is published in reports as `spectral.summary.deadband`.
 
 **Caps and `max_caps`**: every time a module breaches its family cap the guard
 records a cap. Runs may continue while `caps_applied ≤ max_caps`. Once the
-limit is exceeded the guard returns `action = abort`, and the certificate
+limit is exceeded the guard returns `action = abort`, and the report
 stores both the count and the limit under
 `spectral.{caps_applied,max_caps}`.
 
 ### Quality Gates (Acceptance)
 
-- Primary metric (canonical gate in certificate):
+- Primary metric (canonical gate in report):
   - ppl-like kinds (ppl_causal, ppl_mlm, ppl_seq2seq): require
     `ratio_vs_baseline ≤ tier_limit` where tier limits are 1.05 (Conservative),
     1.10 (Balanced), 1.20 (Aggressive). When a ratio CI is present, the upper
@@ -101,7 +101,7 @@ stores both the count and the limit under
   evaluated. Gate flag: `validation.guard_overhead_acceptable`.
 
 Exceeding any gate flips the corresponding `validation.*` flag to false and the
-certificate fails overall, **except** that the Primary Metric Tail gate can run
+report fails overall, **except** that the Primary Metric Tail gate can run
 in `mode: warn` (staged rollout) where it emits a warning but keeps
 `validation.primary_metric_tail_acceptable = true`. Catastrophic spikes are
 handled during the run: the `spike_threshold` (default 2.0× PPL) triggers
@@ -111,7 +111,7 @@ immediate rollback regardless of other gates. See also
 **Sigma quantile (qσ)** controls the target sigma used for spectral monitoring.
 Balanced uses `sigma_quantile = 0.95`, Conservative `0.90` (see
 the packaged tiers configuration at
-`invarlock._data.runtime/tiers.yaml`). Certificates expose this under
+`invarlock._data.runtime/tiers.yaml`). reports expose this under
 `spectral.sigma_quantile`.
 Per-family z-caps use $\kappa_f$; defaults are defined in the packaged tiers
 configuration and summarized in the Threshold Rationale table below.
@@ -147,7 +147,7 @@ half-width approximation for planning is `half_width ≈ z · σ̂ / √n` with
   140/140 (Aggressive); profiles may request higher counts.
 
 These values are linted by `tests/eval/test_assurance_contracts.py` and surfaced
-in certificates so reviewers can audit reproducibility.
+in reports so reviewers can audit reproducibility.
 
 ## 3. Calibration & Evaluation Slice Requirements
 
@@ -166,16 +166,16 @@ Baseline pairing schedules record the exact windows to preserve determinism.
 
 ## 4. Reproducibility Kit
 
-To reproduce a certificate:
+To reproduce a report:
 
 1. Persist the run config (`config.yaml`), `window_plan`, and `evaluation_windows`.
 2. Record dataset/hash/tokenizer metadata (`invarlock report --run <run_dir> --format json` already saves this).
 3. Capture the seed bundle (`meta.seeds`) and policy digests.
-4. Use `invarlock report --format cert` with the saved baseline/report combination
-   to regenerate the certificate; when seeds, config, and backend match, the
-   resulting certificate is bit-for-bit identical.
+4. Use `invarlock report --format report` with the saved baseline/report combination
+   to regenerate the report; when seeds, config, and backend match, the
+   resulting report is bit-for-bit identical.
 
-Explainers for each field live in [`docs/reference/certificates.md`](../reference/certificates.md).
+Explainers for each field live in [`docs/reference/reports.md`](../reference/reports.md).
 
 ## 5. Device Tolerance Guidance
 
@@ -191,8 +191,8 @@ Automate the check with:
 
 ```bash
 python scripts/check_device_drift.py \
-  artifacts/ci-pack-*/baseline_cpu/evaluation.cert.json \
-  artifacts/ci-pack-*/baseline_mps/evaluation.cert.json \
+  artifacts/ci-pack-*/baseline_cpu/evaluation.report.json \
+  artifacts/ci-pack-*/baseline_mps/evaluation.report.json \
   --tolerance 0.005
 ```
 

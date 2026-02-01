@@ -16,7 +16,7 @@ from invarlock.cli.commands import verify as verify_mod
 runner = CliRunner()
 
 
-def _build_sample_certificate() -> dict:
+def _build_sample_evaluation_report() -> dict:
     """Create a minimal v1 payload suitable for verification tests (PM-only)."""
     baseline_final = 46.5
     ppl_final = 47.3
@@ -214,15 +214,15 @@ def _build_sample_certificate() -> dict:
     return cert
 
 
-def _write_certificate(tmp_path: Path) -> Path:
+def _write_evaluation_report(tmp_path: Path) -> Path:
     cert_path = tmp_path / "cert.json"
-    cert_path.write_text(json.dumps(_build_sample_certificate()))
+    cert_path.write_text(json.dumps(_build_sample_evaluation_report()))
     return cert_path
 
 
 def test_verify_uses_dataset_windows_stats(tmp_path: Path):
     # Cert with pairing/coverage under dataset.windows.stats should verify without using ppl fallbacks
-    cert = _build_sample_certificate()
+    cert = _build_sample_evaluation_report()
     # ensure present
     assert isinstance(cert.get("dataset", {}).get("windows", {}).get("stats", {}), dict)
     cert_path = tmp_path / "cert_stats.json"
@@ -233,7 +233,7 @@ def test_verify_uses_dataset_windows_stats(tmp_path: Path):
 
 def test_verify_delta_basis_matches_pm_direction(tmp_path: Path):
     # Lower-is-better (ppl_*) uses ratio; higher-is-better (accuracy) uses Δpp
-    cert = _build_sample_certificate()
+    cert = _build_sample_evaluation_report()
     # Swap primary metric kind to accuracy and change basis
     cert["primary_metric"] = {
         "kind": "accuracy",
@@ -250,7 +250,7 @@ def test_verify_delta_basis_matches_pm_direction(tmp_path: Path):
 
 
 def test_verify_command_passes(tmp_path: Path):
-    cert_path = _write_certificate(tmp_path)
+    cert_path = _write_evaluation_report(tmp_path)
     result = runner.invoke(app, ["report", "verify", str(cert_path)])
     assert result.exit_code == 0
     # report.verify emits JSON payload; verify success should have ok=true
@@ -260,10 +260,10 @@ def test_verify_command_passes(tmp_path: Path):
 
 
 def test_verify_command_detects_ratio_mismatch(tmp_path: Path):
-    cert_path = _write_certificate(tmp_path)
-    certificate = json.loads(cert_path.read_text())
-    certificate["primary_metric"]["ratio_vs_baseline"] = 2.0  # impossible ratio
-    cert_path.write_text(json.dumps(certificate))
+    cert_path = _write_evaluation_report(tmp_path)
+    evaluation_report = json.loads(cert_path.read_text())
+    evaluation_report["primary_metric"]["ratio_vs_baseline"] = 2.0  # impossible ratio
+    cert_path.write_text(json.dumps(evaluation_report))
 
     result = runner.invoke(app, ["report", "verify", str(cert_path)])
     assert result.exit_code == 1
@@ -273,10 +273,10 @@ def test_verify_command_detects_ratio_mismatch(tmp_path: Path):
 
 
 def test_verify_command_detects_pairing_failure(tmp_path: Path):
-    cert_path = _write_certificate(tmp_path)
-    certificate = json.loads(cert_path.read_text())
-    certificate["dataset"]["windows"]["stats"]["window_match_fraction"] = 0.95
-    cert_path.write_text(json.dumps(certificate))
+    cert_path = _write_evaluation_report(tmp_path)
+    evaluation_report = json.loads(cert_path.read_text())
+    evaluation_report["dataset"]["windows"]["stats"]["window_match_fraction"] = 0.95
+    cert_path.write_text(json.dumps(evaluation_report))
 
     result = runner.invoke(app, ["report", "verify", str(cert_path)])
     assert result.exit_code == 1
@@ -286,10 +286,12 @@ def test_verify_command_detects_pairing_failure(tmp_path: Path):
 
 
 def test_verify_command_detects_count_mismatch(tmp_path: Path):
-    cert_path = _write_certificate(tmp_path)
-    certificate = json.loads(cert_path.read_text())
-    certificate["dataset"]["windows"]["stats"]["coverage"]["preview"]["used"] = 180
-    cert_path.write_text(json.dumps(certificate))
+    cert_path = _write_evaluation_report(tmp_path)
+    evaluation_report = json.loads(cert_path.read_text())
+    evaluation_report["dataset"]["windows"]["stats"]["coverage"]["preview"]["used"] = (
+        180
+    )
+    cert_path.write_text(json.dumps(evaluation_report))
 
     result = runner.invoke(app, ["report", "verify", str(cert_path)])
     assert result.exit_code == 1
@@ -299,12 +301,12 @@ def test_verify_command_detects_count_mismatch(tmp_path: Path):
 
 
 def test_verify_command_detects_drift_band_violation(tmp_path: Path):
-    cert_path = _write_certificate(tmp_path)
-    certificate = json.loads(cert_path.read_text())
+    cert_path = _write_evaluation_report(tmp_path)
+    evaluation_report = json.loads(cert_path.read_text())
     # Raise drift by manipulating PM values
-    certificate["primary_metric"]["preview"] = 10.0
-    certificate["primary_metric"]["final"] = 12.0
-    cert_path.write_text(json.dumps(certificate))
+    evaluation_report["primary_metric"]["preview"] = 10.0
+    evaluation_report["primary_metric"]["final"] = 12.0
+    cert_path.write_text(json.dumps(evaluation_report))
 
     result = runner.invoke(app, ["report", "verify", str(cert_path)])
     assert result.exit_code == 1
@@ -331,8 +333,8 @@ def test_verify_family_mismatch_warning_includes_backends(tmp_path: Path):
     baseline_path = tmp_path / "baseline_report.json"
     baseline_path.write_text(json.dumps(baseline_report))
 
-    # Build a certificate that references baseline and has AWQ in edited provenance
-    cert = _build_sample_certificate()
+    # Build a evaluation_report that references baseline and has AWQ in edited provenance
+    cert = _build_sample_evaluation_report()
     cert.setdefault("plugins", {}).setdefault("adapter", {}).setdefault(
         "provenance", {}
     ).update({"family": "awq", "library": "autoawq", "version": "0.2.0"})
@@ -350,7 +352,7 @@ def test_verify_family_mismatch_warning_includes_backends(tmp_path: Path):
 
 
 def test_validate_pairing_overlap_violation_direct() -> None:
-    cert = _build_sample_certificate()
+    cert = _build_sample_evaluation_report()
     windows = cert.setdefault("dataset", {}).setdefault("windows", {})
     stats = windows.setdefault("stats", {})
     stats["window_overlap_fraction"] = 0.5
@@ -359,7 +361,7 @@ def test_validate_pairing_overlap_violation_direct() -> None:
 
 
 def test_validate_counts_final_mismatch_direct() -> None:
-    cert = _build_sample_certificate()
+    cert = _build_sample_evaluation_report()
     windows = cert.setdefault("dataset", {}).setdefault("windows", {})
     stats = windows.setdefault("stats", {})
     cov = stats.setdefault("coverage", {})

@@ -1,6 +1,6 @@
 from invarlock.cli.commands import run
 from invarlock.cli.config import InvarLockConfig
-from invarlock.reporting import certificate as cert
+from invarlock.reporting import report_builder as cert
 
 
 def test_pm_acceptance_range_env_override(monkeypatch):
@@ -19,7 +19,7 @@ def test_pm_acceptance_range_env_override(monkeypatch):
     monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MAX", raising=False)
 
 
-def test_certificate_acceptance_range_applied():
+def test_evaluation_report_acceptance_range_applied():
     base_kwargs = {
         "ppl": {"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.12},
         "spectral": {},

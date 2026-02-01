@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from invarlock.cli.commands import certify as certify_mod
+from invarlock.cli.commands import evaluate as evaluate_mod
 from invarlock.cli.commands import run as run_mod
 
 
@@ -54,12 +54,14 @@ def test_suppress_noisy_warnings_dev_filters_known_messages(monkeypatch) -> None
                 warnings.warn("some other warning", UserWarning, stacklevel=2)
 
 
-def test_certify_helpers_cover_banner_and_ratio() -> None:
-    lines = certify_mod._render_banner_lines("Title", "Context")
+def test_evaluate_helpers_cover_banner_and_ratio() -> None:
+    lines = evaluate_mod._render_banner_lines("Title", "Context")
     assert len(lines) == 4
     assert "Title" in lines[1]
     assert "Context" in lines[2]
     assert len(lines[0]) == len(lines[1]) == len(lines[2]) == len(lines[3])
-    assert certify_mod._format_ratio(1.23456) == "1.235"
-    assert certify_mod._resolve_verbosity(False, False) == certify_mod.VERBOSITY_DEFAULT
-    assert certify_mod._resolve_verbosity(True, False) == certify_mod.VERBOSITY_QUIET
+    assert evaluate_mod._format_ratio(1.23456) == "1.235"
+    assert (
+        evaluate_mod._resolve_verbosity(False, False) == evaluate_mod.VERBOSITY_DEFAULT
+    )
+    assert evaluate_mod._resolve_verbosity(True, False) == evaluate_mod.VERBOSITY_QUIET

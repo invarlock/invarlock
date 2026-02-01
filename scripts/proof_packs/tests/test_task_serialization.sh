@@ -588,9 +588,9 @@ test_estimate_model_memory_multiplier_case_arms_large_and_small() {
     assert_match '^[0-9]+$' "$(estimate_model_memory "${large}" "CREATE_EDIT")" "large CREATE_EDIT"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${large}" "CREATE_EDITS_BATCH")" "large CREATE_EDITS_BATCH"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${large}" "EVAL_EDIT")" "large EVAL_EDIT"
-    assert_match '^[0-9]+$' "$(estimate_model_memory "${large}" "CERTIFY_EDIT")" "large CERTIFY_EDIT"
+    assert_match '^[0-9]+$' "$(estimate_model_memory "${large}" "evaluate_EDIT")" "large evaluate_EDIT"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${large}" "CREATE_ERROR")" "large CREATE_ERROR"
-    assert_match '^[0-9]+$' "$(estimate_model_memory "${large}" "CERTIFY_ERROR")" "large CERTIFY_ERROR"
+    assert_match '^[0-9]+$' "$(estimate_model_memory "${large}" "evaluate_ERROR")" "large evaluate_ERROR"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${large}" "GENERATE_PRESET")" "large GENERATE_PRESET"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${large}" "UNKNOWN")" "large default"
 
@@ -600,9 +600,9 @@ test_estimate_model_memory_multiplier_case_arms_large_and_small() {
     assert_match '^[0-9]+$' "$(estimate_model_memory "${small}" "CREATE_EDIT")" "small CREATE_EDIT"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${small}" "CREATE_EDITS_BATCH")" "small CREATE_EDITS_BATCH"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${small}" "EVAL_EDIT")" "small EVAL_EDIT"
-    assert_match '^[0-9]+$' "$(estimate_model_memory "${small}" "CERTIFY_EDIT")" "small CERTIFY_EDIT"
+    assert_match '^[0-9]+$' "$(estimate_model_memory "${small}" "evaluate_EDIT")" "small evaluate_EDIT"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${small}" "CREATE_ERROR")" "small CREATE_ERROR"
-    assert_match '^[0-9]+$' "$(estimate_model_memory "${small}" "CERTIFY_ERROR")" "small CERTIFY_ERROR"
+    assert_match '^[0-9]+$' "$(estimate_model_memory "${small}" "evaluate_ERROR")" "small evaluate_ERROR"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${small}" "GENERATE_PRESET")" "small GENERATE_PRESET"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${small}" "UNKNOWN")" "small default"
 }

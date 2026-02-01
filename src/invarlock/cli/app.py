@@ -37,7 +37,7 @@ LIGHT_IMPORT = os.getenv("INVARLOCK_LIGHT_IMPORT", "").strip().lower() in {
 class OrderedGroup(TyperGroup):
     def list_commands(self, ctx):  # type: ignore[override]
         return [
-            "certify",
+            "evaluate",
             "calibrate",
             "report",
             "verify",
@@ -52,8 +52,8 @@ class OrderedGroup(TyperGroup):
 app = typer.Typer(
     name="invarlock",
     help=(
-        "InvarLock — certify model changes with deterministic pairing and safety gates.\n"
-        "Quick path: invarlock certify --baseline <MODEL> --subject <MODEL>\n"
+        "InvarLock — evaluate model changes with deterministic pairing and safety gates.\n"
+        "Quick path: invarlock evaluate --baseline <MODEL> --subject <MODEL>\n"
         "Hint: use --edit-config to run the built-in quant_rtn demo.\n"
         "Tip: enable downloads with INVARLOCK_ALLOW_NETWORK=1 when fetching.\n"
         "Exit codes:\n"
@@ -77,8 +77,8 @@ def _emit_version() -> None:
 
         schema = None
         try:
-            from invarlock.reporting.certificate import (
-                CERTIFICATE_SCHEMA_VERSION as _SCHEMA,
+            from invarlock.reporting.report_builder import (
+                REPORT_SCHEMA_VERSION as _SCHEMA,
             )
 
             schema = _SCHEMA
@@ -126,18 +126,18 @@ def version():
 
 """Register command modules and groups in the desired help order.
 
-Order: certify → report → run → plugins → doctor → version
+Order: evaluate → report → run → plugins → doctor → version
 """
 
 
 @app.command(
-    name="certify",
+    name="evaluate",
     help=(
-        "Certify a subject model against a baseline and generate an evaluation certificate. "
+        "Evaluate a subject model against a baseline and generate an evaluation report. "
         "Use when you have two model snapshots and want pass/fail gating."
     ),
 )
-def _certify_lazy(
+def _evaluate_lazy(
     source: str = typer.Option(
         ..., "--source", "--baseline", help="Baseline model dir or Hub ID"
     ),
@@ -169,8 +169,8 @@ def _certify_lazy(
         ),
     ),
     out: str = typer.Option("runs", "--out", help="Base output directory"),
-    cert_out: str = typer.Option(
-        "reports/cert", "--cert-out", help="Certificate output directory"
+    report_out: str = typer.Option(
+        "reports/eval", "--report-out", help="Evaluation report output directory"
     ),
     edit_config: str | None = typer.Option(
         None, "--edit-config", help="Edit preset to apply a demo edit (quant_rtn)"
@@ -201,9 +201,9 @@ def _certify_lazy(
         False, "--no-color", help="Disable ANSI colors (respects NO_COLOR=1)"
     ),
 ):
-    from .commands.certify import certify_command as _cert
+    from .commands.evaluate import evaluate_command as _eval
 
-    return _cert(
+    return _eval(
         source=source,
         edited=edited,
         baseline_report=baseline_report,
@@ -213,7 +213,7 @@ def _certify_lazy(
         tier=tier,
         preset=preset,
         out=out,
-        cert_out=cert_out,
+        report_out=report_out,
         edit_config=edit_config,
         edit_label=edit_label,
         quiet=quiet,
@@ -254,18 +254,18 @@ def _register_subapps() -> None:
 @app.command(
     name="verify",
     help=(
-        "Verify certificate JSON(s) against schema, pairing math, and gates. "
+        "Verify evaluation report JSON(s) against schema, pairing math, and gates. "
         "Use --json for a single-line machine-readable envelope."
     ),
 )
 def _verify_typed(
-    certificates: list[str] = typer.Argument(
-        ..., help="One or more certificate JSON files to verify."
+    reports: list[str] = typer.Argument(
+        ..., help="One or more evaluation report JSON files to verify."
     ),
     baseline: str | None = typer.Option(
         None,
         "--baseline",
-        help="Optional baseline certificate/report JSON to enforce provider parity.",
+        help="Optional baseline evaluation report JSON to enforce provider parity.",
     ),
     tolerance: float = typer.Option(
         1e-9, "--tolerance", help="Tolerance for analysis-basis comparisons."
@@ -285,10 +285,10 @@ def _verify_typed(
 
     from .commands.verify import verify_command as _verify
 
-    cert_paths = [_Path(c) for c in certificates]
+    report_paths = [_Path(p) for p in reports]
     baseline_path = _Path(baseline) if isinstance(baseline, str) else None
     return _verify(
-        certificates=cert_paths,
+        reports=report_paths,
         baseline=baseline_path,
         tolerance=tolerance,
         profile=profile,
@@ -300,7 +300,7 @@ def _verify_typed(
     name="run",
     help=(
         "Execute an end-to-end run from a YAML config (edit + guards + reports). "
-        "Writes run artifacts and optionally an evaluation certificate."
+        "Writes run artifacts and optionally an evaluation report."
     ),
 )
 def _run_typed(
@@ -337,7 +337,9 @@ def _run_typed(
         None, "--probes", help="Number of micro-probes (0=deterministic, >0=adaptive)"
     ),
     until_pass: bool = typer.Option(
-        False, "--until-pass", help="Retry until certificate passes (max 3 attempts)"
+        False,
+        "--until-pass",
+        help="Retry until evaluation report passes gates (max 3 attempts)",
     ),
     max_attempts: int = typer.Option(
         3, "--max-attempts", help="Maximum retry attempts for --until-pass mode"
@@ -348,7 +350,7 @@ def _run_typed(
     baseline: str | None = typer.Option(
         None,
         "--baseline",
-        help="Path to baseline report.json for certificate validation",
+        help="Path to baseline report.json for evaluation report validation",
     ),
     no_cleanup: bool = typer.Option(
         False, "--no-cleanup", help="Skip cleanup of temporary artifacts"

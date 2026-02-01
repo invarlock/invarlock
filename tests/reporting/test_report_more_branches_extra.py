@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from invarlock.reporting.report import to_certificate, to_html
+from invarlock.reporting.report import to_evaluation_report, to_html
 from invarlock.reporting.report_types import create_empty_report
 
 
@@ -21,7 +21,7 @@ def _mk_report(pm_kind: str = "ppl_causal", pm_final: float = 10.0) -> dict:
     return r
 
 
-def test_to_certificate_bad_format_raises() -> None:
+def test_to_evaluation_report_bad_format_raises() -> None:
     rep = _mk_report()
     base = {
         "schema_version": "baseline-v1",
@@ -29,7 +29,7 @@ def test_to_certificate_bad_format_raises() -> None:
         "metrics": {"primary_metric": {"final": 10.0}},
     }
     with pytest.raises(ValueError):
-        to_certificate(rep, base, format="txt")
+        to_evaluation_report(rep, base, format="txt")
 
 
 def test_comparison_html_one_side_has_guards() -> None:

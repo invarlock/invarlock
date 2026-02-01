@@ -13,7 +13,7 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 | [Guards](guards.md) | Safety check configuration and evidence | Users tuning guards |
 | [Model Adapters](model-adapters.md) | Adapter selection and capabilities | CLI and API users |
 | [Datasets](datasets.md) | Dataset providers and pairing | CLI users |
-| [Certificates](certificates.md) | v1 schema, telemetry, and HTML export | Operators, tool authors |
+| [reports](reports.md) | v1 schema, telemetry, and HTML export | Operators, tool authors |
 | [Architecture](architecture.md) | System layers, data flow, and dependencies | Builders, reviewers |
 | [Tier Policy Catalog](tier-policy-catalog.md) | Guard threshold explanations | Operators auditing policies |
 | [Environment Variables](env-vars.md) | Runtime toggles and flags | Operators |
@@ -24,14 +24,14 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 
 ### Running Certifications
 
-1. [CLI Reference](cli.md) — `certify`, `verify`, `run` commands
+1. [CLI Reference](cli.md) — `evaluate`, `verify`, `run` commands
 2. [Configuration Schema](config-schema.md) — YAML presets and profiles
 3. [Datasets](datasets.md) — Provider configuration
 4. [Model Adapters](model-adapters.md) — Adapter selection
 
-### Understanding Certificates
+### Understanding reports
 
-1. [Certificates](certificates.md) — v1 schema, telemetry, and HTML export
+1. [reports](reports.md) — v1 schema, telemetry, and HTML export
 2. [Artifact Layout](artifacts.md) — File organization
 
 ### Tuning Guards

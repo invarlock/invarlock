@@ -961,7 +961,7 @@ def test_retry_controller_until_pass_two_attempts(tmp_path: Path):
 
         stack.enter_context(patch("invarlock.core.retry.RetryController", RC))
         stack.enter_context(
-            patch("invarlock.reporting.certificate.make_certificate", make_cert)
+            patch("invarlock.reporting.report_builder.make_report", make_cert)
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         stack.enter_context(

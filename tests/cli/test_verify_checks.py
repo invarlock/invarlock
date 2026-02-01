@@ -203,9 +203,11 @@ def test_resolve_path_and_warn_adapter_family(tmp_path: Path):
     v._warn_adapter_family_mismatch(tmp_path / "cert.json", cert)
 
 
-def test_validate_certificate_payload_success_and_fail(tmp_path: Path, monkeypatch):
+def test_validate_evaluation_report_payload_success_and_fail(
+    tmp_path: Path, monkeypatch
+):
     # Monkeypatch schema validator to succeed so we can cover our checks
-    monkeypatch.setattr(v, "validate_certificate", lambda c: True)
+    monkeypatch.setattr(v, "validate_report", lambda c: True)
 
     cert_ok = _cert_base(
         {
@@ -217,10 +219,10 @@ def test_validate_certificate_payload_success_and_fail(tmp_path: Path, monkeypat
     )
     p_ok = tmp_path / "c_ok.json"
     p_ok.write_text(json.dumps(cert_ok))
-    assert v._validate_certificate_payload(p_ok) == []
+    assert v._validate_evaluation_report_payload(p_ok) == []
 
     cert_bad = _cert_base({"kind": "ppl_causal", "final": 101.0})  # missing ratio
     p_bad = tmp_path / "c_bad.json"
     p_bad.write_text(json.dumps(cert_bad))
-    errs = v._validate_certificate_payload(p_bad)
+    errs = v._validate_evaluation_report_payload(p_bad)
     assert errs and any("missing" in e.lower() or "mismatch" in e.lower() for e in errs)

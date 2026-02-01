@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from invarlock.reporting.certificate import _normalize_baseline
+from invarlock.reporting.report_builder import _normalize_baseline
 from invarlock.reporting.report_types import create_empty_report
 from invarlock.reporting.validate import save_baseline as _save_baseline
 

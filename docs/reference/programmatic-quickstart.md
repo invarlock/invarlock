@@ -33,7 +33,7 @@ print("status:", report.status)
 
 ## Concepts
 
-- Prefer the CLI for full workflows (pairing, certificates, reproducibility).
+- Prefer the CLI for full workflows (pairing, reports, reproducibility).
 - Programmatic runs still follow the same pipeline phases and produce a
   `RunReport` object.
 - Pass `calibration_data` to `CoreRunner.execute` for real primary-metric values.
@@ -54,11 +54,11 @@ print("status:", report.status)
 ## Observability
 
 - Inspect `report.meta`, `report.guards`, and `report.metrics`.
-- For certificate generation, use `invarlock.assurance.make_certificate`.
+- For report generation, use `invarlock.assurance.make_report`.
 
 ## Related Documentation
 
 - [API Guide](api-guide.md)
 - [CLI Reference](cli.md)
-- [Compare & Certify (BYOE)](../user-guide/compare-and-certify.md)
+- [Compare & evaluate (BYOE)](../user-guide/compare-and-evaluate.md)
 - [Primary Metric Smoke](../user-guide/primary-metric-smoke.md)

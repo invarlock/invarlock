@@ -27,7 +27,7 @@ def test_export_html_write_error_exit1(monkeypatch, tmp_path: Path):
     # Ensure rendering succeeds then force write failure
     import invarlock.reporting.html as html_mod
 
-    monkeypatch.setattr(html_mod, "render_certificate_html", lambda payload: "<html/>")
+    monkeypatch.setattr(html_mod, "render_report_html", lambda payload: "<html/>")
 
     # Force write failure
     def _boom(*a, **k):  # type: ignore[no-untyped-def]

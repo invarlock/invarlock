@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import _compute_validation_flags
+from invarlock.reporting.report_builder import _compute_validation_flags
 
 
 def test_guard_overhead_missing_ratio_treated_as_pass() -> None:

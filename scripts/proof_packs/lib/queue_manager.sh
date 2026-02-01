@@ -965,7 +965,7 @@ generate_model_tasks() {
     local model_name="$3"
 
     # Calculate model size for memory estimation
-    local base_size=$(estimate_model_memory "${model_id}" "CERTIFY_EDIT")
+    local base_size=$(estimate_model_memory "${model_id}" "evaluate_EDIT")
 
     # Decide whether to use batch edit creation or per-edit tasks.
     # Deep-copying a 70B+ model for batch edits can exceed per-GPU memory,
@@ -977,7 +977,7 @@ generate_model_tasks() {
     if [[ "${model_lower}" =~ 70b || "${model_lower}" =~ 72b || "${model_lower}" =~ 65b || "${model_lower}" =~ mixtral || "${model_lower}" =~ 8x7b || "${model_lower}" =~ moe ]]; then
         use_batch="false"
     elif [[ -n "${base_size}" ]]; then
-        # For very large models, certify memory estimates can still be high.
+        # For very large models, evaluate memory estimates can still be high.
         # Treat anything >=170GB as "large" and avoid batch edits.
         if [[ "${base_size}" -ge 170 ]]; then
             use_batch="false"
@@ -1040,7 +1040,7 @@ generate_model_tasks() {
         use_preset="true"
     fi
 
-    # 4. Edit creation + certify
+    # 4. Edit creation + evaluate
     # Load edit specs from scenarios.json when available to keep the task graph
     # and verdict contract in sync.
     local pack_root
@@ -1111,7 +1111,7 @@ generate_model_tasks() {
                 if [[ ${clean_runs} -lt 0 ]]; then
                     clean_runs=0
                 fi
-                generate_certify_tasks \
+                generate_evaluate_tasks \
                     "${model_id}" \
                     "${model_name}" \
                     "${edits_id}" \
@@ -1129,7 +1129,7 @@ generate_model_tasks() {
                 if [[ ${stress_runs} -lt 0 ]]; then
                     stress_runs=0
                 fi
-                generate_certify_tasks \
+                generate_evaluate_tasks \
                     "${model_id}" \
                     "${model_name}" \
                     "${edits_id}" \
@@ -1139,11 +1139,11 @@ generate_model_tasks() {
                     "${stress_runs}"
             done
         else
-            echo "Skipping edit certify tasks (no calibrated preset available)"
+            echo "Skipping edit evaluate tasks (no calibrated preset available)"
         fi
 
     else
-        # CREATE_EDIT - Create single edits (one task per edit) and enqueue eval/certify
+        # CREATE_EDIT - Create single edits (one task per edit) and enqueue eval/evaluate
         for edit_spec in "${clean_edits[@]}"; do
             local edit_deps="${setup_id}"
             local edit_id=$(add_task "CREATE_EDIT" "${model_id}" "${model_name}" \
@@ -1152,15 +1152,15 @@ generate_model_tasks() {
             task_ids+=("${edit_id}")
             echo "Created: ${edit_id}"
 
-            # CERTIFY_EDIT runs for clean edits (3 by default)
+            # evaluate_EDIT runs for clean edits (3 by default)
             if [[ ${CLEAN_EDIT_RUNS:-0} -gt 0 && "${use_preset}" == "true" ]]; then
                 for run in $(seq 1 "${CLEAN_EDIT_RUNS}"); do
                     local cert_deps="${edit_id}"
                     if [[ -n "${preset_id}" ]]; then
                         cert_deps="${edit_id},${preset_id}"
                     fi
-                    local cert_id=$(add_task "CERTIFY_EDIT" "${model_id}" "${model_name}" \
-                        "$(estimate_model_memory "${model_id}" "CERTIFY_EDIT")" \
+                    local cert_id=$(add_task "evaluate_EDIT" "${model_id}" "${model_name}" \
+                        "$(estimate_model_memory "${model_id}" "evaluate_EDIT")" \
                         "${cert_deps}" '{"edit_spec": "'"${edit_spec}"'", "version": "clean", "run": '"${run}"'}' 65)
                     task_ids+=("${cert_id}")
                     echo "Created: ${cert_id}"
@@ -1181,8 +1181,8 @@ generate_model_tasks() {
                     if [[ -n "${preset_id}" ]]; then
                         cert_deps="${edit_id},${preset_id}"
                     fi
-                    local cert_id=$(add_task "CERTIFY_EDIT" "${model_id}" "${model_name}" \
-                        "$(estimate_model_memory "${model_id}" "CERTIFY_EDIT")" \
+                    local cert_id=$(add_task "evaluate_EDIT" "${model_id}" "${model_name}" \
+                        "$(estimate_model_memory "${model_id}" "evaluate_EDIT")" \
                         "${cert_deps}" '{"edit_spec": "'"${edit_spec}"'", "version": "stress", "run": '"${run}"'}' 65)
                     task_ids+=("${cert_id}")
                     echo "Created: ${cert_id}"
@@ -1222,18 +1222,18 @@ generate_model_tasks() {
                 "${setup_id}" '{"error_type": "'"${error_type}"'"}' 60)
             echo "Created: ${error_create_id}"
 
-            # CERTIFY_ERROR (only if preset exists)
+            # evaluate_ERROR (only if preset exists)
             if [[ "${use_preset}" == "true" ]]; then
                 local cert_deps="${error_create_id}"
                 if [[ -n "${preset_id}" ]]; then
                     cert_deps="${error_create_id},${preset_id}"
                 fi
-                local error_cert_id=$(add_task "CERTIFY_ERROR" "${model_id}" "${model_name}" \
-                    "$(estimate_model_memory "${model_id}" "CERTIFY_ERROR")" \
+                local error_cert_id=$(add_task "evaluate_ERROR" "${model_id}" "${model_name}" \
+                    "$(estimate_model_memory "${model_id}" "evaluate_ERROR")" \
                     "${cert_deps}" '{"error_type": "'"${error_type}"'"}' 55)
                 echo "Created: ${error_cert_id}"
             else
-                echo "Skipping CERTIFY_ERROR (${error_type}) because no calibrated preset is available"
+                echo "Skipping evaluate_ERROR (${error_type}) because no calibrated preset is available"
             fi
         done
     else
@@ -1244,9 +1244,9 @@ generate_model_tasks() {
 }
 
 
-# Generate certify tasks for an edit after it exists on disk.
-# Usage: generate_certify_tasks <model_id> <model_name> <edit_dep_id> <preset_id> <edit_spec> <version> <cert_runs>
-generate_certify_tasks() {
+# Generate evaluate tasks for an edit after it exists on disk.
+# Usage: generate_evaluate_tasks <model_id> <model_name> <edit_dep_id> <preset_id> <edit_spec> <version> <cert_runs>
+generate_evaluate_tasks() {
     local model_id="$1"
     local model_name="$2"
     local edit_dep_id="$3"
@@ -1261,15 +1261,15 @@ generate_certify_tasks() {
         cert_runs=0
     fi
 
-    # CERTIFY_EDIT depends on edit creation + preset.
+    # evaluate_EDIT depends on edit creation + preset.
     if [[ ${cert_runs} -gt 0 ]]; then
         for run in $(seq 1 "${cert_runs}"); do
             local cert_deps="${edit_dep_id}"
             if [[ -n "${preset_id}" ]]; then
                 cert_deps="${edit_dep_id},${preset_id}"
             fi
-            local cert_id=$(add_task "CERTIFY_EDIT" "${model_id}" "${model_name}" \
-                "$(estimate_model_memory "${model_id}" "CERTIFY_EDIT")" \
+            local cert_id=$(add_task "evaluate_EDIT" "${model_id}" "${model_name}" \
+                "$(estimate_model_memory "${model_id}" "evaluate_EDIT")" \
                 "${cert_deps}" '{"edit_spec": "'"${edit_spec}"'", "version": "'"${version}"'", "run": '"${run}"'}' 65)
             echo "Created: ${cert_id}"
         done
@@ -1294,7 +1294,7 @@ generate_edit_tasks() {
         cert_runs=0
     fi
 
-    echo "WARNING: generate_edit_tasks is deprecated; use CREATE_EDIT + CERTIFY_EDIT" >&2
+    echo "WARNING: generate_edit_tasks is deprecated; use CREATE_EDIT + evaluate_EDIT" >&2
 
     # CREATE_EDIT (single edit)
     local edit_id=$(add_task "CREATE_EDIT" "${model_id}" "${model_name}" \
@@ -1302,15 +1302,15 @@ generate_edit_tasks() {
         "${setup_id}" '{"edit_spec": "'"${edit_spec}"'", "version": "'"${version}"'"}' 70)
     echo "Created: ${edit_id}"
 
-    # CERTIFY_EDIT × cert_runs
+    # evaluate_EDIT × cert_runs
     if [[ ${cert_runs} -gt 0 ]]; then
         for run in $(seq 1 "${cert_runs}"); do
             local cert_deps="${edit_id}"
             if [[ -n "${preset_id}" ]]; then
                 cert_deps="${edit_id},${preset_id}"
             fi
-            local cert_id=$(add_task "CERTIFY_EDIT" "${model_id}" "${model_name}" \
-                "$(estimate_model_memory "${model_id}" "CERTIFY_EDIT")" \
+            local cert_id=$(add_task "evaluate_EDIT" "${model_id}" "${model_name}" \
+                "$(estimate_model_memory "${model_id}" "evaluate_EDIT")" \
                 "${cert_deps}" '{"edit_spec": "'"${edit_spec}"'", "version": "'"${version}"'", "run": '"${run}"'}' 65)
             echo "Created: ${cert_id}"
         done

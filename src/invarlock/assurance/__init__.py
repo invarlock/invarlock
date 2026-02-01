@@ -1,8 +1,4 @@
-"""Assurance namespace (`invarlock.assurance`).
-
-This namespace groups safety-certificate related surfaces. For now it forwards
-to `invarlock.eval` and guard modules; future work may move implementations here.
-"""
+"""Assurance namespace (`invarlock.assurance`)."""
 
 from __future__ import annotations
 
@@ -11,33 +7,29 @@ from typing import Any
 from invarlock.reporting.report_types import RunReport
 
 try:  # pragma: no cover - shim to reporting modules
-    from invarlock.reporting.certificate import (
-        CERTIFICATE_SCHEMA_VERSION,
-        make_certificate,
-        validate_certificate,
-    )
-
     # Prefer direct import from render for rendering APIs
-    from invarlock.reporting.render import render_certificate_markdown
+    from invarlock.reporting.render import render_report_markdown
+    from invarlock.reporting.report_builder import make_report
+    from invarlock.reporting.report_schema import REPORT_SCHEMA_VERSION, validate_report
 except Exception:  # pragma: no cover - provide soft stubs
-    CERTIFICATE_SCHEMA_VERSION = "v1"
+    REPORT_SCHEMA_VERSION = "v1"
 
-    def make_certificate(
+    def make_report(
         report: RunReport,
         baseline: RunReport | dict[str, Any],
     ) -> dict[str, Any]:
-        raise ImportError("invarlock.reporting.certificate not available")
+        raise ImportError("invarlock.reporting.report_builder not available")
 
-    def render_certificate_markdown(certificate: dict[str, Any]) -> str:
-        raise ImportError("invarlock.reporting.certificate not available")
+    def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
+        raise ImportError("invarlock.reporting.report_builder not available")
 
-    def validate_certificate(certificate: dict[str, Any]) -> bool:
-        raise ImportError("invarlock.reporting.certificate not available")
+    def validate_report(report: dict[str, Any]) -> bool:
+        raise ImportError("invarlock.reporting.report_schema not available")
 
 
 __all__ = [
-    "CERTIFICATE_SCHEMA_VERSION",
-    "make_certificate",
-    "render_certificate_markdown",
-    "validate_certificate",
+    "REPORT_SCHEMA_VERSION",
+    "make_report",
+    "render_report_markdown",
+    "validate_report",
 ]

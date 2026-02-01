@@ -11,7 +11,7 @@ Recommended practices for research and production deployments.
   locations and implicit directory creation.
 - Treat models/datasets from untrusted sources as potentially malicious; avoid
   unsafe deserialization.
-- Always run `invarlock verify` on certificates before promotion.
+- Always run `invarlock verify` on reports before promotion.
 
 ## Production Deployment Checklist
 
@@ -36,9 +36,9 @@ Copy-paste checklist for production or CI deployments:
 - [ ] Secrets excluded from configs and logs
 
 ## Certification
-- [ ] `invarlock certify` completed with `--profile release`
-- [ ] `invarlock verify` passes on generated certificate
-- [ ] Certificate + baseline report archived together
+- [ ] `invarlock evaluate` completed with `--profile release`
+- [ ] `invarlock verify` passes on generated report
+- [ ] report + baseline report archived together
 - [ ] Evidence artifacts retained per retention policy
 ```
 
@@ -47,7 +47,7 @@ Copy-paste checklist for production or CI deployments:
 - `INVARLOCK_ALLOW_NETWORK=1` — enable downloads for a command.
 - `HF_DATASETS_OFFLINE=1` — force offline reads after warming caches.
 - `INVARLOCK_EVIDENCE_DEBUG=1` — write a small guards_evidence.json next to the
-  certificate (no large arrays; safe for local debugging).
+  report (no large arrays; safe for local debugging).
 
 ## Operational tips
 

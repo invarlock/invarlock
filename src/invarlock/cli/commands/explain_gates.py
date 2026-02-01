@@ -7,7 +7,7 @@ import typer
 from rich.console import Console
 
 from invarlock.core.auto_tuning import get_tier_policies
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 console = Console()
 
@@ -18,9 +18,9 @@ def explain_gates_command(
         ..., "--baseline", help="Path to baseline report.json"
     ),
 ) -> None:
-    """Explain certificate gates for a report vs baseline.
+    """Explain evaluation report gates for a report vs baseline.
 
-    Loads the reports, builds a certificate, and prints gate thresholds,
+    Loads the reports, builds an evaluation report, and prints gate thresholds,
     observed statistics, and pass/fail reasons in a compact, readable form.
     """
     report_path = Path(report)
@@ -36,13 +36,17 @@ def explain_gates_command(
         console.print(f"[red]Failed to load inputs: {exc}[/red]")
         raise typer.Exit(1) from exc
 
-    cert = make_certificate(report_data, baseline_data)
+    evaluation_report = make_report(report_data, baseline_data)
     validation = (
-        cert.get("validation", {}) if isinstance(cert.get("validation"), dict) else {}
+        evaluation_report.get("validation", {})
+        if isinstance(evaluation_report.get("validation"), dict)
+        else {}
     )
 
     # Extract tier + metric policy (floors/hysteresis)
-    tier = str((cert.get("auto", {}) or {}).get("tier", "balanced")).lower()
+    tier = str(
+        (evaluation_report.get("auto", {}) or {}).get("tier", "balanced")
+    ).lower()
     tier_thresholds = {
         "conservative": 1.05,
         "balanced": 1.10,
@@ -50,8 +54,8 @@ def explain_gates_command(
         "none": 1.10,
     }
     resolved_policy = (
-        cert.get("resolved_policy", {})
-        if isinstance(cert.get("resolved_policy"), dict)
+        evaluation_report.get("resolved_policy", {})
+        if isinstance(evaluation_report.get("resolved_policy"), dict)
         else {}
     )
     metrics_policy = (
@@ -83,7 +87,11 @@ def explain_gates_command(
         limit_base = tier_thresholds.get(tier, 1.10)
     limit_with_hyst = limit_base + max(0.0, hysteresis_ratio)
     tokens_ok = True
-    telem = cert.get("telemetry", {}) if isinstance(cert.get("telemetry"), dict) else {}
+    telem = (
+        evaluation_report.get("telemetry", {})
+        if isinstance(evaluation_report.get("telemetry"), dict)
+        else {}
+    )
     try:
         total_tokens = int(telem.get("preview_total_tokens", 0)) + int(
             telem.get("final_total_tokens", 0)
@@ -95,8 +103,8 @@ def explain_gates_command(
     # Primary-metric ratio gate explanation (ppl-like kinds shown as ratios)
     ratio = None
     ratio_ci = None
-    if isinstance(cert.get("primary_metric"), dict):
-        pm = cert.get("primary_metric", {})
+    if isinstance(evaluation_report.get("primary_metric"), dict):
+        pm = evaluation_report.get("primary_metric", {})
         ratio = pm.get("ratio_vs_baseline")
         ratio_ci = pm.get("display_ci")
     hysteresis_applied = bool(validation.get("hysteresis_applied"))
@@ -123,8 +131,8 @@ def explain_gates_command(
 
     # Tail gate explanation (warn/fail; based on per-window Δlog-loss vs baseline)
     pm_tail = (
-        cert.get("primary_metric_tail", {})
-        if isinstance(cert.get("primary_metric_tail"), dict)
+        evaluation_report.get("primary_metric_tail", {})
+        if isinstance(evaluation_report.get("primary_metric_tail"), dict)
         else {}
     )
     if pm_tail:
@@ -194,8 +202,8 @@ def explain_gates_command(
     # Drift gate explanation
     drift = None
     drift_ci = None
-    if isinstance(cert.get("primary_metric"), dict):
-        pm = cert.get("primary_metric", {})
+    if isinstance(evaluation_report.get("primary_metric"), dict):
+        pm = evaluation_report.get("primary_metric", {})
         preview = pm.get("preview")
         final = pm.get("final")
         if isinstance(preview, int | float) and isinstance(final, int | float):
@@ -220,8 +228,8 @@ def explain_gates_command(
 
     # Guard Overhead explanation (if present)
     overhead = (
-        cert.get("guard_overhead", {})
-        if isinstance(cert.get("guard_overhead"), dict)
+        evaluation_report.get("guard_overhead", {})
+        if isinstance(evaluation_report.get("guard_overhead"), dict)
         else {}
     )
     if overhead:

@@ -116,11 +116,11 @@ assert pm_vqa["ratio_vs_baseline"] == pm_acc["ratio_vs_baseline"]
 
 ---
 
-Tip: For CI or smoke demos, these snippets run offline and avoid heavy imports. They exercise the exact paths used by reporting and certificate generation.
+Tip: For CI or smoke demos, these snippets run offline and avoid heavy imports. They exercise the exact paths used by reporting and report generation.
 
 ## Related Documentation
 
 - [Evaluation Math Proof](../assurance/01-eval-math-proof.md) — Mathematical foundations for PM computation
 - [API Guide](../reference/api-guide.md) — Programmatic access to PM computation
-- [Certificates](../reference/certificates.md) — How PM appears in certificates
+- [reports](../reference/reports.md) — How PM appears in reports
 - [Tier Policy Catalog](../reference/tier-policy-catalog.md) — PM gates and thresholds by tier

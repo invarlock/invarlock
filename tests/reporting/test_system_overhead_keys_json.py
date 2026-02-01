@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def _mk_report_with_overhead(metrics: dict) -> dict:
@@ -34,6 +34,6 @@ def test_system_overhead_json_keys():
     baseline = _mk_report_with_overhead(
         {"latency_ms_p50": 1.5, "latency_ms_p95": 3.0, "throughput_sps": 80.0}
     )
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     so = cert.get("system_overhead", {})
     assert isinstance(so, dict)

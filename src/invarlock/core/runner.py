@@ -521,7 +521,7 @@ class CoreRunner:
                         f"Guard '{guard.name}' prepare failed: {e}"
                     ) from e
 
-        # Store resolved policies in report for certificate
+        # Store resolved policies in report for evaluation report generation
         report.meta["tier_policies"] = tier_policies
 
         self._log_event(

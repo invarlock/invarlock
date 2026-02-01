@@ -148,7 +148,7 @@ test_pack_validation_run_determinism_repeats_writes_summary() {
     }
     mkdir -p "${OUTPUT_DIR}/${model_name}/models/edit_for_repeats"
 
-    run_invarlock_certify() {
+    run_invarlock_evaluate() {
         local output_dir="$3"
         local run_name="$4"
         local run_dir="${output_dir}/${run_name}"
@@ -160,7 +160,7 @@ test_pack_validation_run_determinism_repeats_writes_summary() {
         fi
         count=$((count + 1))
         echo "${count}" > "${count_file}"
-        cat > "${run_dir}/evaluation.cert.json" << EOF
+        cat > "${run_dir}/evaluation.report.json" << EOF
 {"verdict": {"primary_metric_ratio": ${count}.01}}
 EOF
     }
@@ -1041,7 +1041,7 @@ test_pack_validation_run_invarlock_calibration_failure_paths_and_labels() {
     assert_ne "0" "${rc}" "all calibration runs failing returns non-zero"
 }
 
-test_pack_validation_run_invarlock_certify_preset_optional_and_cert_copy_paths() {
+test_pack_validation_run_invarlock_evaluate_preset_optional_and_cert_copy_paths() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
@@ -1058,15 +1058,15 @@ test_pack_validation_run_invarlock_certify_preset_optional_and_cert_copy_paths()
 
     fixture_write "invarlock.create_cert" ""
     MODEL_SIZE_RETURN="70"
-    run_invarlock_certify "subject" "baseline" "${TEST_TMPDIR}/certs" "run_ok" "${preset_dir}" "model" "0"
+    run_invarlock_evaluate "subject" "baseline" "${TEST_TMPDIR}/certs" "run_ok" "${preset_dir}" "model" "0"
 
     # alt-cert path when canonical cert missing
     rm -f "${TEST_TMPDIR}/fixtures/invarlock.create_cert"
     local cert_dir="${TEST_TMPDIR}/certs/run_alt/cert/nested"
     mkdir -p "${cert_dir}"
-    printf '{"ok":true}\n' > "${cert_dir}/evaluation.cert.json"
+    printf '{"ok":true}\n' > "${cert_dir}/evaluation.report.json"
     MODEL_SIZE_RETURN="7"
-    run_invarlock_certify "subject" "baseline" "${TEST_TMPDIR}/certs" "run_alt" "${preset_dir}" "model" "0"
+    run_invarlock_evaluate "subject" "baseline" "${TEST_TMPDIR}/certs" "run_alt" "${preset_dir}" "model" "0"
 }
 
 test_pack_validation_main_dynamic_resume_and_monitoring_branches_offline() {
@@ -1723,14 +1723,14 @@ test_pack_validation_run_determinism_repeats_branch_coverage() {
     resolve_edit_params() {
         jq -n '{status:"selected", edit_dir_name:"existing_edit"}'
     }
-    run_invarlock_certify() { return 1; }
+    run_invarlock_evaluate() { return 1; }
     run pack_run_determinism_repeats
-    assert_rc "1" "${RUN_RC}" "certify failure returns non-zero"
+    assert_rc "1" "${RUN_RC}" "evaluate failure returns non-zero"
 
     resolve_edit_params() {
         jq -n '{status:"selected", edit_dir_name:"existing_edit"}'
     }
-    run_invarlock_certify() { return 0; }
+    run_invarlock_evaluate() { return 0; }
     mkdir() {
         for arg in "$@"; do
             if [[ "${arg}" == *"/determinism/"* ]]; then
@@ -1746,7 +1746,7 @@ test_pack_validation_run_determinism_repeats_branch_coverage() {
     resolve_edit_params() {
         jq -n '{status:"selected", edit_dir_name:"existing_edit"}'
     }
-    run_invarlock_certify() { return 0; }
+    run_invarlock_evaluate() { return 0; }
     mkdir() {
         for arg in "$@"; do
             if [[ "${arg}" == *"/analysis" ]]; then

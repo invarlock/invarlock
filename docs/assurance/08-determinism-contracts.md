@@ -3,12 +3,12 @@
 > **Plain language:** If we fix the seed bundle, record dataset/tokenizer
 > hashes, and keep the paired window schedule stable, every evaluation run is
 > reproducible within float tolerance—and we surface those checks in the
-> certificate.
+> report.
 
 ## Claim
 
 With fixed seeds, dataset/tokenizer hashes, and a paired, non‑overlapping
-schedule, evaluation is reproducible (within float tolerance) and certificates
+schedule, evaluation is reproducible (within float tolerance) and reports
 are stable.
 
 ## Derivation (sketch)
@@ -36,7 +36,7 @@ ties the runtime contract back to reproducible maths:
 ## Runtime Contract
 
 - Runs **abort** for CI/Release if pairing < 1.0, overlap > 0.0, or counts differ.
-- Certificate contains seeds/hashes, pairing metrics, and policy tier/digest.
+- report contains seeds/hashes, pairing metrics, and policy tier/digest.
 
 ## Observability
 
@@ -53,13 +53,13 @@ ties the runtime contract back to reproducible maths:
 - Applies to inference-only evaluation loops; training/edit algorithms may
   introduce additional nondeterminism not covered here.
 - Identical seeds, configs, and backend should yield bit-for-bit identical
-  certificates; any divergence is a bug to report.
+  reports; any divergence is a bug to report.
 - Determinism is best-effort on some backends; enforce `|Δ ratio| ≤ 1e-6` when
-  regenerating certificates on the **same backend** (see
-  `tests/eval/test_certificate.py::test_certificate_ratio_matches_weighted_log_delta`).
+  regenerating reports on the **same backend** (see
+  `tests/eval/test_report_builder.py::TestMakeEvaluationReport::test_evaluation_report_ratio_matches_weighted_log_delta`).
 - Cross-device drift must stay within the bands listed in
   `docs/assurance/04-guard-contracts.md`; use `scripts/check_device_drift.py` in
   CI to guard the limit.
 - Some hardware backends (e.g., GPUs without deterministic kernels) may exceed
-  float tolerances despite the flags; document deviations in the certificate
+  float tolerances despite the flags; document deviations in the report
   metadata.

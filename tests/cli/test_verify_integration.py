@@ -70,7 +70,7 @@ def _cert_with_provenance() -> dict:
 
 def test_verify_command_happy_ci_profile(tmp_path: Path, monkeypatch):
     # Monkeypatch schema validator
-    monkeypatch.setattr(v, "validate_certificate", lambda c: True)
+    monkeypatch.setattr(v, "validate_report", lambda c: True)
     cert = _cert_with_provenance()
     cert_path = tmp_path / "c.json"
     cert_path.write_text(json.dumps(cert))
@@ -97,7 +97,7 @@ def test_verify_command_happy_ci_profile(tmp_path: Path, monkeypatch):
 
 
 def test_verify_command_missing_digest_raises_in_ci(tmp_path: Path, monkeypatch):
-    monkeypatch.setattr(v, "validate_certificate", lambda c: True)
+    monkeypatch.setattr(v, "validate_report", lambda c: True)
     cert = _cert_with_provenance()
     # remove provider digest
     cert.pop("provenance", None)

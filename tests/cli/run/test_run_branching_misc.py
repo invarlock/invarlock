@@ -292,7 +292,7 @@ def test_retry_summary_prints_and_snapshot_cleanup(tmp_path: Path, monkeypatch):
         )
         stack.enter_context(patch("invarlock.core.retry.RetryController", RC))
         stack.enter_context(
-            patch("invarlock.reporting.certificate.make_certificate", make_cert)
+            patch("invarlock.reporting.report_builder.make_report", make_cert)
         )
         stack.enter_context(
             patch(
