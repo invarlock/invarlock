@@ -7,15 +7,18 @@ test_verify_pack_validates_checksums_and_certs() {
 
     local pack_dir="${TEST_TMPDIR}/pack"
     mkdir -p "${pack_dir}/certs"
-    echo "{}" > "${pack_dir}/manifest.json"
     echo "{}" > "${pack_dir}/certs/evaluation.report.json"
 
     local sha_cmd
     sha_cmd="$(pack_sha256_cmd)"
     (
         cd "${pack_dir}"
-        ${sha_cmd} manifest.json certs/evaluation.report.json > checksums.sha256
+        ${sha_cmd} certs/evaluation.report.json > checksums.sha256
     )
+
+    local checksums_digest
+    checksums_digest="$(cd "${pack_dir}" && python3 -c 'import hashlib;print(hashlib.sha256(open("checksums.sha256","rb").read()).hexdigest())' < /dev/null)"
+    printf '%s\n' "{\"format\":\"proof-pack-v1\",\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
@@ -138,11 +141,15 @@ EOF
 
     local pack_dir="${TEST_TMPDIR}/pack"
     mkdir -p "${pack_dir}"
-    echo "{}" > "${pack_dir}/manifest.json"
+    echo "payload" > "${pack_dir}/payload.txt"
     (
         cd "${pack_dir}"
-        ${sha_cmd} manifest.json > checksums.sha256
+        ${sha_cmd} payload.txt > checksums.sha256
     )
+
+    local checksums_digest
+    checksums_digest="$(cd "${pack_dir}" && python3 -c 'import hashlib;print(hashlib.sha256(open("checksums.sha256","rb").read()).hexdigest())' < /dev/null)"
+    printf '%s\n' "{\"format\":\"proof-pack-v1\",\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
 
     run pack_verify_pack --pack "${pack_dir}"
     assert_rc "1" "${RUN_RC}" "missing certs fails"
@@ -157,15 +164,19 @@ test_verify_pack_skip_verify_and_gpg_warning() {
 
     local pack_dir="${TEST_TMPDIR}/pack"
     mkdir -p "${pack_dir}"
-    echo "{}" > "${pack_dir}/manifest.json"
+    echo "payload" > "${pack_dir}/payload.txt"
     echo "sig" > "${pack_dir}/manifest.json.asc"
 
     local sha_cmd
     sha_cmd="$(pack_sha256_cmd)"
     (
         cd "${pack_dir}"
-        ${sha_cmd} manifest.json manifest.json.asc > checksums.sha256
+        ${sha_cmd} payload.txt > checksums.sha256
     )
+
+    local checksums_digest
+    checksums_digest="$(cd "${pack_dir}" && python3 -c 'import hashlib;print(hashlib.sha256(open("checksums.sha256","rb").read()).hexdigest())' < /dev/null)"
+    printf '%s\n' "{\"format\":\"proof-pack-v1\",\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
 
     mkdir -p "${TEST_TMPDIR}/bin"
     local repo_root
@@ -203,15 +214,19 @@ test_verify_pack_gpg_present_verifies_signature() {
 
     local pack_dir="${TEST_TMPDIR}/pack"
     mkdir -p "${pack_dir}"
-    echo "{}" > "${pack_dir}/manifest.json"
+    echo "payload" > "${pack_dir}/payload.txt"
     echo "sig" > "${pack_dir}/manifest.json.asc"
 
     local sha_cmd
     sha_cmd="$(pack_sha256_cmd)"
     (
         cd "${pack_dir}"
-        ${sha_cmd} manifest.json manifest.json.asc > checksums.sha256
+        ${sha_cmd} payload.txt > checksums.sha256
     )
+
+    local checksums_digest
+    checksums_digest="$(cd "${pack_dir}" && python3 -c 'import hashlib;print(hashlib.sha256(open("checksums.sha256","rb").read()).hexdigest())' < /dev/null)"
+    printf '%s\n' "{\"format\":\"proof-pack-v1\",\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
@@ -229,6 +244,110 @@ EOF
     run pack_verify_pack --pack "${pack_dir}" --skip-verify
     assert_rc "0" "${RUN_RC}" "verify succeeds with gpg present"
     assert_file_exists "${TEST_TMPDIR}/gpg.calls" "gpg invoked"
+
+    PATH="${original_path}"
+}
+
+
+test_verify_pack_rejects_tampered_checksums_when_manifest_binds_digest() {
+    mock_reset
+
+    source ./scripts/proof_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}"
+    echo "a" > "${pack_dir}/a.txt"
+    echo "b" > "${pack_dir}/b.txt"
+
+    local sha_cmd
+    sha_cmd="$(pack_sha256_cmd)"
+    (
+        cd "${pack_dir}"
+        ${sha_cmd} a.txt b.txt > checksums.sha256
+    )
+
+    local checksums_digest
+    checksums_digest="$(cd "${pack_dir}" && python3 -c 'import hashlib;print(hashlib.sha256(open("checksums.sha256","rb").read()).hexdigest())' < /dev/null)"
+    printf '%s\n' "{\"format\":\"proof-pack-v1\",\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
+
+    run pack_verify_pack --pack "${pack_dir}" --skip-verify
+    assert_rc "0" "${RUN_RC}" "baseline verification succeeds"
+
+    # Reorder checksums lines (valid checksums, but different file digest).
+    (
+        cd "${pack_dir}"
+        tail -n 1 checksums.sha256 > checksums.sha256.tmp
+        head -n 1 checksums.sha256 >> checksums.sha256.tmp
+        mv checksums.sha256.tmp checksums.sha256
+    )
+
+    run pack_verify_pack --pack "${pack_dir}" --skip-verify
+    assert_rc "1" "${RUN_RC}" "tampered checksums must fail when digest is bound"
+}
+
+
+test_verify_pack_strict_requires_manifest_signature() {
+    mock_reset
+
+    source ./scripts/proof_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}"
+    echo "payload" > "${pack_dir}/payload.txt"
+
+    local sha_cmd
+    sha_cmd="$(pack_sha256_cmd)"
+    (
+        cd "${pack_dir}"
+        ${sha_cmd} payload.txt > checksums.sha256
+    )
+
+    local checksums_digest
+    checksums_digest="$(cd "${pack_dir}" && python3 -c 'import hashlib;print(hashlib.sha256(open("checksums.sha256","rb").read()).hexdigest())' < /dev/null)"
+    printf '%s\n' "{\"format\":\"proof-pack-v1\",\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
+
+    run pack_verify_pack --pack "${pack_dir}" --skip-verify --strict
+    assert_rc "1" "${RUN_RC}" "strict mode requires a manifest signature"
+}
+
+
+test_verify_pack_strict_rejects_extra_files() {
+    mock_reset
+
+    source ./scripts/proof_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}"
+    echo "payload" > "${pack_dir}/payload.txt"
+    echo "extra" > "${pack_dir}/extra.txt"
+
+    local sha_cmd
+    sha_cmd="$(pack_sha256_cmd)"
+    (
+        cd "${pack_dir}"
+        ${sha_cmd} payload.txt > checksums.sha256
+    )
+
+    local checksums_digest
+    checksums_digest="$(cd "${pack_dir}" && python3 -c 'import hashlib;print(hashlib.sha256(open("checksums.sha256","rb").read()).hexdigest())' < /dev/null)"
+    printf '%s\n' "{\"format\":\"proof-pack-v1\",\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
+
+    echo "sig" > "${pack_dir}/manifest.json.asc"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/gpg" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+exit 0
+EOF
+    chmod +x "${bin_dir}/gpg"
+
+    local original_path="${PATH}"
+    PATH="${bin_dir}:${PATH}"
+
+    run pack_verify_pack --pack "${pack_dir}" --skip-verify --strict
+    assert_rc "1" "${RUN_RC}" "strict mode rejects extra files"
 
     PATH="${original_path}"
 }

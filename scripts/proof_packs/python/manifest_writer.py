@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -54,6 +55,10 @@ def _collect_artifacts(pack_dir: Path) -> list[str]:
     return sorted(artifacts)
 
 
+def _sha256_hex(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def _maybe_get_invarlock_version() -> str:
     try:
         import invarlock  # type: ignore[import-not-found]
@@ -94,6 +99,14 @@ def write_manifest(
 
     artifacts = _collect_artifacts(pack_dir)
 
+    checksums_digest = ""
+    checksums_path = pack_dir / "checksums.sha256"
+    if checksums_path.is_file():
+        try:
+            checksums_digest = _sha256_hex(checksums_path)
+        except Exception:
+            checksums_digest = ""
+
     used_models: set[str] = set(model_list)
     for item in models:
         model_id = item.get("model_id")
@@ -117,6 +130,7 @@ def write_manifest(
         "models": models,
         "artifacts": artifacts,
         "checksums_sha256": "checksums.sha256",
+        "checksums_sha256_digest": checksums_digest,
     }
 
     if model_licenses:
