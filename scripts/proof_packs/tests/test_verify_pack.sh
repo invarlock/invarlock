@@ -96,6 +96,23 @@ EOF
     assert_rc "0" "${RUN_RC}" "verify without json_out succeeds"
 }
 
+test_verify_pack_manifest_field_reads_values() {
+    mock_reset
+
+    source ./scripts/proof_packs/verify_pack.sh
+
+    local manifest_path="${TEST_TMPDIR}/manifest.json"
+    printf '%s\n' '{"foo":"bar","num":1}' > "${manifest_path}"
+
+    run pack_manifest_field "${manifest_path}" "foo"
+    assert_rc "0" "${RUN_RC}" "string field lookup succeeds"
+    assert_eq "bar" "${RUN_OUT}" "string field returned"
+
+    run pack_manifest_field "${manifest_path}" "num"
+    assert_rc "0" "${RUN_RC}" "numeric field lookup succeeds"
+    assert_eq "1" "${RUN_OUT}" "numeric field returned"
+}
+
 test_verify_pack_reports_missing_pack_dir_and_files() {
     mock_reset
 
@@ -350,6 +367,33 @@ EOF
     assert_rc "1" "${RUN_RC}" "strict mode rejects extra files"
 
     PATH="${original_path}"
+}
+
+test_verify_pack_warns_on_extra_files_in_non_strict_mode() {
+    mock_reset
+
+    source ./scripts/proof_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}"
+    echo "payload" > "${pack_dir}/payload.txt"
+    echo "extra" > "${pack_dir}/extra.txt"
+
+    local sha_cmd
+    sha_cmd="$(pack_sha256_cmd)"
+    (
+        cd "${pack_dir}"
+        ${sha_cmd} payload.txt > checksums.sha256
+    )
+
+    local checksums_digest
+    checksums_digest="$(cd "${pack_dir}" && python3 -c 'import hashlib;print(hashlib.sha256(open("checksums.sha256","rb").read()).hexdigest())' < /dev/null)"
+    printf '%s\n' "{\"format\":\"proof-pack-v1\",\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
+
+    run pack_verify_pack --pack "${pack_dir}" --skip-verify
+    assert_rc "0" "${RUN_RC}" "non-strict mode warns but succeeds"
+    assert_match "Pack contains extra files not covered by checksums\\.sha256" "${RUN_ERR}" "warns on extra files"
+    assert_match "extra\\.txt" "${RUN_ERR}" "lists extra file"
 }
 
 test_verify_pack_rejects_manifest_missing_checksums_digest_field() {

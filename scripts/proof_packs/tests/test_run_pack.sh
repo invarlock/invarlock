@@ -557,6 +557,118 @@ EOF
     PATH="${original_path}"
 }
 
+test_run_pack_sign_manifest_warns_when_gpg_verify_fails() {
+    mock_reset
+
+    source ./scripts/proof_packs/run_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}"
+    echo '{"format":"proof-pack-v1"}' > "${pack_dir}/manifest.json"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/gpg" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+for arg in "$@"; do
+    if [[ "${arg}" == "--verify" ]]; then
+        echo "verify failed" >&2
+        exit 2
+    fi
+done
+
+out=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --output)
+            out="$2"
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
+if [[ -n "${out}" ]]; then
+    printf 'sig' > "${out}"
+fi
+
+exit 0
+EOF
+    chmod +x "${bin_dir}/gpg"
+
+    local original_path="${PATH}"
+    PATH="${bin_dir}:${PATH}"
+    export PATH
+
+    run pack_sign_manifest "${pack_dir}"
+    assert_rc "0" "${RUN_RC}" "non-strict signing continues when verify fails"
+    assert_match "gpg signature verification failed during signing; omitting signer fingerprint" "${RUN_ERR}" "warns on verify failure"
+    assert_file_exists "${pack_dir}/manifest.json.asc" "signature still produced"
+
+    PATH="${original_path}"
+}
+
+test_run_pack_sign_manifest_warns_when_final_signature_fails() {
+    mock_reset
+
+    source ./scripts/proof_packs/run_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}"
+    echo '{"format":"proof-pack-v1"}' > "${pack_dir}/manifest.json"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/gpg" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+for arg in "$@"; do
+    if [[ "${arg}" == "--verify" ]]; then
+        exit 0
+    fi
+done
+
+out=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --output)
+            out="$2"
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
+if [[ -n "${out}" ]]; then
+    printf 'sig' > "${out}"
+    if [[ "${out}" == *manifest.json.asc ]]; then
+        exit 2
+    fi
+fi
+
+exit 0
+EOF
+    chmod +x "${bin_dir}/gpg"
+
+    local original_path="${PATH}"
+    PATH="${bin_dir}:${PATH}"
+    export PATH
+
+    run pack_sign_manifest "${pack_dir}"
+    assert_rc "0" "${RUN_RC}" "non-strict signing returns 0 when final signature fails"
+    assert_match "gpg signing failed; skipping manifest signature" "${RUN_ERR}" "warns on final signing failure"
+    [[ ! -f "${pack_dir}/manifest.json.asc" ]] || t_fail "final signature should be removed on failure"
+
+    PATH="${original_path}"
+}
+
 test_run_pack_sign_manifest_strict_error_paths() {
     mock_reset
 
