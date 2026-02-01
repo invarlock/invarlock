@@ -194,10 +194,11 @@ Exhaustive command map with brief descriptions and notable options.
 #### Top-level
 
 - `invarlock` (global)
-  - Options: `--install-completion`, `--show-completion`, `--help`
+  - Options: `--install-completion`, `--show-completion`, `--version/-V`, `--help`
   - Summary: evaluate model changes with deterministic pairing and safety gates.
   - Quick path: `invarlock evaluate --baseline <MODEL> --subject <MODEL>`.
   - Tip: enable downloads per command with `INVARLOCK_ALLOW_NETWORK=1`.
+  - Version: `invarlock --version` prints the CLI version (and report schema when available) and exits.
 
 - `invarlock evaluate`
   - Purpose: Compare & evaluate (BYOE). Emits an evaluation report.
@@ -257,6 +258,7 @@ Exhaustive command map with brief descriptions and notable options.
 
 - `invarlock version`
   - Purpose: Show version (and schema when available).
+  - Alias: `invarlock --version` / `-V`.
 
 Evidence debug
 
