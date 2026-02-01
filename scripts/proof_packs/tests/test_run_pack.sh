@@ -366,6 +366,12 @@ test_run_pack_checksums_include_files() {
     mkdir -p "${pack_dir}/results"
     echo "verdict" > "${pack_dir}/results/final_verdict.txt"
     echo "{}" > "${pack_dir}/manifest.json"
+    mkdir -p "${pack_dir}/metadata" "${pack_dir}/__MACOSX"
+    echo "{}" > "${pack_dir}/metadata/manifest.json"
+    echo "sig" > "${pack_dir}/metadata/manifest.json.asc"
+    echo "x" > "${pack_dir}/metadata/checksums.sha256"
+    echo "junk" > "${pack_dir}/.DS_Store"
+    echo "junk" > "${pack_dir}/__MACOSX/junk.txt"
 
     pack_write_checksums "${pack_dir}"
 
@@ -376,6 +382,15 @@ test_run_pack_checksums_include_files() {
     assert_match "results/final_verdict.txt" "${checksums}" "checksums include results"
     if [[ "${checksums}" == *manifest.json* ]]; then
         t_fail "checksums must not include manifest.json to avoid signature cycles"
+    fi
+    if [[ "${checksums}" == *metadata/manifest.json* ]]; then
+        t_fail "checksums must not include metadata/manifest.json to avoid signature cycles"
+    fi
+    if [[ "${checksums}" == *.DS_Store* ]]; then
+        t_fail "checksums must ignore .DS_Store artifacts"
+    fi
+    if [[ "${checksums}" == *__MACOSX* ]]; then
+        t_fail "checksums must ignore __MACOSX artifacts"
     fi
 }
 
@@ -540,6 +555,173 @@ EOF
     assert_match "gpg signing failed" "${RUN_ERR}" "warns when gpg signing fails"
 
     PATH="${original_path}"
+}
+
+test_run_pack_sign_manifest_strict_error_paths() {
+    mock_reset
+
+    source ./scripts/proof_packs/run_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack_missing_manifest"
+    mkdir -p "${pack_dir}"
+
+    run pack_sign_manifest "${pack_dir}"
+    assert_rc "1" "${RUN_RC}" "sign fails when manifest missing"
+    assert_match "manifest\\.json missing" "${RUN_ERR}" "missing manifest error"
+
+    local strict_missing_gpg="${TEST_TMPDIR}/pack_strict_missing_gpg"
+    mkdir -p "${strict_missing_gpg}"
+    echo "{}" > "${strict_missing_gpg}/manifest.json"
+
+    PACK_STRICT_MODE=1
+    command() {
+        if [[ "${1:-}" == "-v" && "${2:-}" == "gpg" ]]; then
+            return 1
+        fi
+        builtin command "$@"
+    }
+
+    run pack_sign_manifest "${strict_missing_gpg}"
+    assert_rc "1" "${RUN_RC}" "strict signing fails when gpg missing"
+    assert_match "gpg not found \\(strict mode requires signing\\)" "${RUN_ERR}" "strict gpg missing message"
+
+    unset -f command
+
+    local strict_detach_fail="${TEST_TMPDIR}/pack_strict_detach_fail"
+    mkdir -p "${strict_detach_fail}"
+    echo "{}" > "${strict_detach_fail}/manifest.json"
+
+    local bin_dir_detach_fail="${TEST_TMPDIR}/bin_detach_fail"
+    mkdir -p "${bin_dir_detach_fail}"
+    cat > "${bin_dir_detach_fail}/gpg" <<'EOF'
+#!/usr/bin/env bash
+exit 2
+EOF
+    chmod +x "${bin_dir_detach_fail}/gpg"
+    PATH="${bin_dir_detach_fail}:${PATH}"
+    export PATH
+
+    run pack_sign_manifest "${strict_detach_fail}"
+    assert_rc "1" "${RUN_RC}" "strict signing fails when gpg detach-sign fails"
+    assert_match "gpg signing failed \\(strict mode\\)" "${RUN_ERR}" "strict detach-sign failure message"
+
+    local strict_verify_fail="${TEST_TMPDIR}/pack_strict_verify_fail"
+    mkdir -p "${strict_verify_fail}"
+    echo "{}" > "${strict_verify_fail}/manifest.json"
+
+    local bin_dir_verify_fail="${TEST_TMPDIR}/bin_verify_fail"
+    mkdir -p "${bin_dir_verify_fail}"
+    cat > "${bin_dir_verify_fail}/gpg" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+for arg in "$@"; do
+    if [[ "${arg}" == "--verify" ]]; then
+        echo "verify failed" >&2
+        exit 2
+    fi
+done
+
+out=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --output)
+            out="$2"
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
+if [[ -n "${out}" ]]; then
+    printf 'sig' > "${out}"
+fi
+exit 0
+EOF
+    chmod +x "${bin_dir_verify_fail}/gpg"
+    PATH="${bin_dir_verify_fail}:${PATH}"
+    export PATH
+
+    run pack_sign_manifest "${strict_verify_fail}"
+    assert_rc "1" "${RUN_RC}" "strict signing fails when gpg verify fails"
+    assert_match "signature verification failed during signing" "${RUN_ERR}" "strict verify failure message"
+
+    local strict_final_fail="${TEST_TMPDIR}/pack_strict_final_fail"
+    mkdir -p "${strict_final_fail}"
+    echo "{}" > "${strict_final_fail}/manifest.json"
+
+    local bin_dir_final_fail="${TEST_TMPDIR}/bin_final_fail"
+    mkdir -p "${bin_dir_final_fail}"
+    cat > "${bin_dir_final_fail}/gpg" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+for arg in "$@"; do
+    if [[ "${arg}" == "--verify" ]]; then
+        exit 0
+    fi
+done
+
+out=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --output)
+            out="$2"
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
+if [[ -z "${out}" ]]; then
+    exit 0
+fi
+
+printf 'sig' > "${out}"
+if [[ "${out}" == *manifest.json.asc.tmp ]]; then
+    exit 0
+fi
+exit 2
+EOF
+    chmod +x "${bin_dir_final_fail}/gpg"
+    PATH="${bin_dir_final_fail}:${PATH}"
+    export PATH
+
+    run pack_sign_manifest "${strict_final_fail}"
+    assert_rc "1" "${RUN_RC}" "strict signing fails when final signature write fails"
+    assert_match "gpg signing failed \\(strict mode\\)" "${RUN_ERR}" "strict final signature failure message"
+}
+
+test_run_pack_build_pack_strict_fails_when_signing_required() {
+    mock_reset
+
+    source ./scripts/proof_packs/run_pack.sh
+
+    local run_dir="${TEST_TMPDIR}/run"
+    mkdir -p "${run_dir}/reports" "${run_dir}/analysis" "${run_dir}/state"
+    mkdir -p "${run_dir}/modelA/reports/edit/run_1"
+
+    echo "verdict" > "${run_dir}/reports/final_verdict.txt"
+    echo "{}" > "${run_dir}/reports/final_verdict.json"
+    echo "{}" > "${run_dir}/modelA/reports/edit/run_1/evaluation.report.json"
+
+    PACK_STRICT_MODE=1
+    PACK_SKIP_HTML=1
+    command() {
+        if [[ "${1:-}" == "-v" && "${2:-}" == "gpg" ]]; then
+            return 1
+        fi
+        builtin command "$@"
+    }
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    run pack_build_pack "${run_dir}" "${pack_dir}"
+    assert_rc "1" "${RUN_RC}" "pack build fails when signing required but gpg missing"
+    assert_match "gpg not found \\(strict mode requires signing\\)" "${RUN_ERR}" "strict signing error surfaced"
 }
 
 test_run_pack_build_pack_error_conditions() {

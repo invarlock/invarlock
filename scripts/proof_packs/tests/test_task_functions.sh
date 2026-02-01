@@ -119,6 +119,45 @@ test_model_size_and_eval_batch_selection() {
     fi
 }
 
+test_ensure_evaluate_baseline_report_falls_back_to_hf_causal_adapter_when_resolver_empty() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    _resolve_invarlock_adapter() { echo ""; }
+    _validate_evaluate_baseline_report() {
+        printf '%s\n' "$*" > "${TEST_TMPDIR}/validate.calls"
+        return 0
+    }
+
+    local baseline_root="${TEST_TMPDIR}/baseline"
+    mkdir -p "${baseline_root}"
+    echo "{}" > "${baseline_root}/baseline_report.json"
+
+    local log_file="${TEST_TMPDIR}/log.txt"
+    : > "${log_file}"
+
+    local result
+    result="$(
+        _ensure_evaluate_baseline_report \
+            "${baseline_root}" \
+            "${TEST_TMPDIR}/baseline_path" \
+            "ci" \
+            "ci" \
+            "128" \
+            "64" \
+            "10" \
+            "20" \
+            "1" \
+            "100" \
+            "7" \
+            "${log_file}"
+    )"
+
+    assert_match "baseline_report\\.json" "${result}" "baseline report path returned"
+    assert_match "hf_causal" "$(cat "${TEST_TMPDIR}/validate.calls")" "adapter falls back to hf_causal"
+}
+
 test_task_calibration_run_and_generate_preset_cover_overrides_large_model_and_report_branches() {
     mock_reset
     # shellcheck source=../task_functions.sh
