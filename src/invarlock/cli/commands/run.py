@@ -11,9 +11,11 @@ import copy
 import hashlib
 import inspect
 import json
+import logging
 import math
 import os
 import random
+import re
 import shutil
 import sys as _sys
 import types as _types
@@ -136,7 +138,7 @@ def _resolve_warning_suppression(profile: str | None) -> tuple[bool, bool]:
         "on",
     }
     profile_norm = (profile or "").strip().lower()
-    enabled = bool(suppress_all) or profile_norm in {"ci", "ci_cpu", "release", "dev"}
+    enabled = bool(suppress_all) or profile_norm in {"ci", "ci_cpu", "release"}
     return enabled, suppress_all
 
 
@@ -153,14 +155,124 @@ def _apply_warning_filters(profile: str | None) -> bool:
 
 
 @contextmanager
-def _suppress_noisy_warnings(profile: str | None) -> Iterator[None]:
-    enabled, _suppress_all = _resolve_warning_suppression(profile)
+def _suppress_noisy_warnings(
+    profile: str | None,
+    *,
+    event_path: Path | None = None,
+    context: dict[str, Any] | None = None,
+) -> Iterator[None]:
+    enabled, suppress_all = _resolve_warning_suppression(profile)
     if not enabled:
         yield
         return
-    with warnings.catch_warnings():
-        _apply_warning_filters(profile)
-        yield
+
+    patterns = [re.compile(p) for p in _NOISY_WARNING_PATTERNS]
+    suppressed: list[str] = []
+
+    class _NoisyLogFilter(logging.Filter):
+        def filter(self, record: logging.LogRecord) -> bool:  # noqa: A003
+            try:
+                message = record.getMessage()
+            except Exception:
+                return True
+            if any(p.search(message) for p in patterns):
+                suppressed.append(message)
+                return False
+            return True
+
+    def _iter_handlers() -> list[logging.Handler]:
+        handlers: list[logging.Handler] = []
+        seen: set[int] = set()
+        for logger in (
+            logging.getLogger(),
+            logging.getLogger("transformers"),
+            logging.getLogger("huggingface_hub"),
+            logging.getLogger("datasets"),
+        ):
+            for handler in getattr(logger, "handlers", []) or []:
+                if id(handler) in seen:
+                    continue
+                seen.add(id(handler))
+                handlers.append(handler)
+        return handlers
+
+    log_filter = _NoisyLogFilter()
+    handlers = _iter_handlers()
+
+    def _append_suppressed_warnings() -> None:
+        if not suppressed or event_path is None:
+            return
+        try:
+            path = Path(event_path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            payload = {
+                "timestamp": datetime.now().isoformat(),
+                "component": "warnings",
+                "operation": "suppressed",
+                "level": "WARNING",
+                "data": {
+                    "count": len(suppressed),
+                    "messages": suppressed[:50],
+                    "profile": profile or "",
+                    **(context or {}),
+                },
+            }
+            with path.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(payload) + "\n")
+        except Exception:
+            # Best-effort: suppressed warnings are non-fatal and logging must not
+            # impact model loading.
+            return
+
+    for handler in handlers:
+        handler.addFilter(log_filter)
+
+    try:
+        with warnings.catch_warnings():
+            if suppress_all:
+                warnings.simplefilter("ignore")
+                yield
+            else:
+                original_showwarning = warnings.showwarning
+
+                def _showwarning(
+                    message: Warning | str,
+                    category: type[Warning],
+                    filename: str,
+                    lineno: int,
+                    file: object | None = None,
+                    line: str | None = None,
+                ) -> None:
+                    try:
+                        rendered = warnings.formatwarning(
+                            message, category, filename, lineno, line
+                        )
+                    except Exception:
+                        rendered = str(message)
+                    if any(p.search(rendered) for p in patterns):
+                        suppressed.append(str(message))
+                        return
+                    original_showwarning(
+                        message,
+                        category,
+                        filename,
+                        lineno,
+                        file=file,
+                        line=line,
+                    )
+
+                warnings.showwarning = _showwarning  # type: ignore[assignment]
+                try:
+                    yield
+                finally:
+                    warnings.showwarning = original_showwarning  # type: ignore[assignment]
+    finally:
+        for handler in handlers:
+            try:
+                handler.removeFilter(log_filter)
+            except Exception:
+                pass
+        _append_suppressed_warnings()
 
 
 def _format_kv_line(label: str, value: str, *, width: int = KV_LABEL_WIDTH) -> str:
@@ -1220,6 +1332,8 @@ def _load_model_with_cfg(
     device: str,
     *,
     profile: str | None = None,
+    event_path: Path | None = None,
+    warning_context: dict[str, Any] | None = None,
 ) -> Any:
     """Load a model with config-provided kwargs, filtering for strict adapters."""
     try:
@@ -1233,7 +1347,11 @@ def _load_model_with_cfg(
         raise ValueError("Missing model.id in config")
 
     extra = _extract_model_load_kwargs(cfg)
-    with _suppress_noisy_warnings(profile):
+    with _suppress_noisy_warnings(
+        profile,
+        event_path=event_path,
+        context=warning_context,
+    ):
         try:
             sig = inspect.signature(adapter.load_model)
             accepts_var_kw = any(
@@ -1425,8 +1543,21 @@ def _execute_guarded_run(
             emoji="🔧",
             profile=profile_normalized,
         )
+        warning_context: dict[str, Any] = {"phase": "load_model"}
+        try:
+            if hasattr(run_config, "context") and isinstance(run_config.context, dict):
+                rid = run_config.context.get("run_id")
+                if isinstance(rid, str) and rid:
+                    warning_context["run_id"] = rid
+        except Exception:
+            pass
         model = _load_model_with_cfg(
-            adapter, cfg, resolved_device, profile=profile_normalized
+            adapter,
+            cfg,
+            resolved_device,
+            profile=profile_normalized,
+            event_path=getattr(run_config, "event_path", None),
+            warning_context=warning_context,
         )
         if snapshot_provenance is not None:
             snapshot_provenance["reload_path_used"] = True
@@ -3665,7 +3796,12 @@ def run_command(
                 emoji="🔧",
             ):
                 model = _load_model_with_cfg(
-                    adapter, cfg, resolved_device, profile=profile_normalized
+                    adapter,
+                    cfg,
+                    resolved_device,
+                    profile=profile_normalized,
+                    event_path=run_dir / "events.jsonl",
+                    warning_context={"phase": "load_model", "run_id": run_id},
                 )
 
             # No edit-specific bootstrap logic
