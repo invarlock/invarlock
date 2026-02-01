@@ -4,7 +4,7 @@ import math
 
 import pytest
 
-from invarlock.reporting import certificate as C
+from invarlock.reporting import report_builder as C
 
 
 class _RaisingStr:
@@ -73,7 +73,7 @@ def test_compute_edit_digest_quant_and_default() -> None:
     assert d2["family"] == "cert_only"
 
 
-def test_extract_certificate_meta_prefers_python_seed() -> None:
+def test_extract_report_meta_prefers_python_seed() -> None:
     report = {
         "meta": {
             "model_id": "demo",
@@ -83,14 +83,14 @@ def test_extract_certificate_meta_prefers_python_seed() -> None:
             "seeds": {"python": 9, "numpy": None},
         }
     }
-    meta = C._extract_certificate_meta(report)
+    meta = C._extract_report_meta(report)
     assert meta["seed"] == 9
     assert meta["seeds"]["python"] == 9
 
 
-def test_extract_certificate_meta_defaults_seed_to_zero() -> None:
+def test_extract_report_meta_defaults_seed_to_zero() -> None:
     report = {"meta": {"model_id": "demo", "adapter": "hf", "device": "cpu"}}
-    meta = C._extract_certificate_meta(report)
+    meta = C._extract_report_meta(report)
     assert meta["seed"] == 0
 
 

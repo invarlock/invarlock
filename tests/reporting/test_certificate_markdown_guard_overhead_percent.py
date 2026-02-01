@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_certificate_markdown
 
 
@@ -40,7 +40,7 @@ def test_markdown_guard_overhead_percent_format():
         "meta": {"model_id": "m"},
         "metrics": {"ppl_final": 10.0},
     }
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     # Set guard overhead with explicit ratio and threshold; evaluated True
     cert["guard_overhead"] = {
         "evaluated": True,

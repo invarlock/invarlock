@@ -4,8 +4,8 @@ from copy import deepcopy
 
 import pytest
 
-import invarlock.reporting.certificate as cert
-from invarlock.reporting.certificate import make_certificate
+import invarlock.reporting.report_builder as cert
+from invarlock.reporting.report_builder import make_report
 
 
 def _mk_base_report() -> dict:
@@ -98,7 +98,7 @@ def test_certificate_includes_moe_families_when_present():
         }
     )
 
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     # Spectral families include MoE
     spectral_families = set(cert.get("spectral", {}).get("families", {}).keys())
     assert {"router", "expert_ffn"}.issubset(spectral_families)
@@ -154,7 +154,7 @@ def test_certificate_moe_section_uses_normalized_baseline(monkeypatch):
         cert, "_compute_validation_flags", _capture_flags, raising=False
     )
 
-    cert.make_certificate(report, baseline)
+    cert.make_report(report, baseline)
     moe_section = captured["moe"]
     assert moe_section["delta_load_balance_loss"] == pytest.approx(0.02)
     assert moe_section["delta_router_entropy"] == pytest.approx(0.3)

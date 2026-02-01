@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from invarlock.reporting.certificate import REPORT_SCHEMA_VERSION, make_certificate
+from invarlock.reporting.report_builder import REPORT_SCHEMA_VERSION, make_report
 
 
 def _mock_report_with_windows() -> dict[str, Any]:
@@ -68,7 +68,7 @@ def _mock_baseline(report: dict[str, Any]) -> dict[str, Any]:
 def test_v1_required_keys_and_shapes(tmp_path: Path) -> None:
     report = _mock_report_with_windows()
     baseline = _mock_baseline(report)
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
 
     # schema version present and correct
     assert cert.get("schema_version") == REPORT_SCHEMA_VERSION == "v1"
@@ -94,7 +94,7 @@ def test_v1_required_keys_and_shapes(tmp_path: Path) -> None:
 def test_validation_keys_subset_only() -> None:
     report = _mock_report_with_windows()
     baseline = _mock_baseline(report)
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     vkeys_path = Path.cwd() / "contracts" / "validation_keys.json"
     if not vkeys_path.exists():
         pytest.skip("validation_keys.json contracts file not available")
@@ -109,7 +109,7 @@ def test_validation_keys_subset_only() -> None:
 def test_no_top_level_ppl_keys() -> None:
     report = _mock_report_with_windows()
     baseline = _mock_baseline(report)
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     offenders = [
         k for k in cert.keys() if isinstance(k, str) and k.lower().startswith("ppl")
     ]

@@ -4,7 +4,7 @@ from copy import deepcopy
 
 import pytest
 
-from invarlock.reporting import certificate as cert
+from invarlock.reporting import report_builder as cert
 
 
 def _optional_sections_report() -> tuple[dict, dict]:
@@ -111,7 +111,7 @@ def test_make_certificate_populates_optional_sections(monkeypatch):
     )
     monkeypatch.setattr(cert, "_normalize_baseline", lambda value: value, raising=False)
 
-    certificate = cert.make_certificate(report, baseline)
+    certificate = cert.make_report(report, baseline)
 
     sec = certificate.get("secondary_metrics")
     assert isinstance(sec, list) and len(sec) == 1
@@ -138,7 +138,7 @@ def test_make_certificate_policy_digest_marks_changed(monkeypatch):
     )
     monkeypatch.setattr(cert, "_normalize_baseline", lambda value: value, raising=False)
 
-    certificate = cert.make_certificate(report, baseline)
+    certificate = cert.make_report(report, baseline)
     digest = certificate["policy_digest"]
     assert digest["tier_policy_name"] == "balanced"
     assert digest["changed"] is True

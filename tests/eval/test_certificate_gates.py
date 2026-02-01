@@ -1,4 +1,4 @@
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.report_types import create_empty_report
 
 
@@ -54,13 +54,13 @@ def test_certificate_enforces_tighter_ppl_ratio_gate():
     report = _make_report(preview=40.0, final=44.0, tier="balanced")  # 1.10 ratio
     baseline = _make_baseline(ppl=40.0)
 
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     assert cert["validation"]["primary_metric_acceptable"] is True
 
     failing_report = _make_report(
         preview=40.0, final=46.0, tier="balanced"
     )  # 1.15 ratio
-    failing_cert = make_certificate(failing_report, baseline)
+    failing_cert = make_report(failing_report, baseline)
     assert failing_cert["validation"]["primary_metric_acceptable"] is False
 
 
@@ -75,9 +75,9 @@ def test_certificate_uses_tier_specific_thresholds():
 
     baseline = _make_baseline(ppl=40.0)
 
-    balanced_cert = make_certificate(balanced_report, baseline)
-    conservative_cert = make_certificate(conservative_report, baseline)
-    aggressive_cert = make_certificate(aggressive_report, baseline)
+    balanced_cert = make_report(balanced_report, baseline)
+    conservative_cert = make_report(conservative_report, baseline)
+    aggressive_cert = make_report(aggressive_report, baseline)
 
     assert balanced_cert["validation"]["primary_metric_acceptable"] is False
     assert conservative_cert["validation"]["primary_metric_acceptable"] is True

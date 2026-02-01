@@ -205,7 +205,7 @@ def test_resolve_path_and_warn_adapter_family(tmp_path: Path):
 
 def test_validate_certificate_payload_success_and_fail(tmp_path: Path, monkeypatch):
     # Monkeypatch schema validator to succeed so we can cover our checks
-    monkeypatch.setattr(v, "validate_certificate", lambda c: True)
+    monkeypatch.setattr(v, "validate_report", lambda c: True)
 
     cert_ok = _cert_base(
         {

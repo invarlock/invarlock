@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_certificate_markdown
 
 
@@ -51,13 +51,13 @@ def _mk_cert(edit_name):
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [1.0]}},
     }
     with (
-        patch("invarlock.reporting.certificate.validate_report", return_value=True),
+        patch("invarlock.reporting.report_builder.validate_run_report", return_value=True),
         patch(
-            "invarlock.reporting.certificate.compute_paired_delta_log_ci",
+            "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
             return_value=(-0.1, 0.1),
         ),
     ):
-        cert = make_certificate(report, baseline)
+        cert = make_report(report, baseline)
     return cert
 
 

@@ -1,4 +1,4 @@
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def _minimal_pm_report():
@@ -51,5 +51,5 @@ def _baseline():
 
 
 def test_certificate_has_no_ppl_keys():
-    cert = make_certificate(_minimal_pm_report(), _baseline())
+    cert = make_report(_minimal_pm_report(), _baseline())
     assert "ppl" not in cert

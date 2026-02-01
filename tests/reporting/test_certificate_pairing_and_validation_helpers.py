@@ -6,10 +6,10 @@ from copy import deepcopy
 
 import pytest
 
-from invarlock.reporting import certificate as cert_mod
+from invarlock.reporting import report_builder as cert_mod
 from invarlock.reporting import report_schema as cert_schema_mod
 from invarlock.reporting import primary_metric_utils
-from invarlock.reporting.certificate import make_certificate, validate_certificate
+from invarlock.reporting.report_builder import make_report, validate_report
 from invarlock.reporting.report_types import create_empty_report
 
 
@@ -58,7 +58,7 @@ def _mk_baseline() -> dict:
 def test_make_certificate_covers_baseline_ratio_identity_branches(monkeypatch) -> None:
     # Avoid heavy bootstrap compute while still exercising the paired-window CI path.
     monkeypatch.setattr(
-        "invarlock.reporting.certificate.compute_paired_delta_log_ci",
+        "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
         lambda *_a, **_k: (-0.01, 0.01),
     )
 
@@ -110,8 +110,8 @@ def test_make_certificate_covers_baseline_ratio_identity_branches(monkeypatch) -
             "final": 10.0,
             "ratio_vs_baseline": ratio,
         }
-        cert = make_certificate(run, baseline)
-        assert validate_certificate(cert)
+        cert = make_report(run, baseline)
+        assert validate_report(cert)
 
 
 def test_make_certificate_synthesizes_display_ci_from_ratio_or_defaults(
@@ -181,8 +181,8 @@ def test_make_certificate_synthesizes_display_ci_from_ratio_or_defaults(
         report["config"] = {"guards": guards}
         report["provenance"] = {"dataset_split": "validation", "split_fallback": False}
 
-        cert = make_certificate(report, baseline)
-        assert validate_certificate(cert)
+        cert = make_report(report, baseline)
+        assert validate_report(cert)
 
         pm_out = cert.get("primary_metric", {})
         assert isinstance(pm_out, dict)
@@ -411,7 +411,7 @@ def test_certificate_module_schema_tightening_branches(monkeypatch) -> None:
 
 def test_make_certificate_ratio_ci_fallback_skips_non_interval(monkeypatch) -> None:
     monkeypatch.setattr(
-        "invarlock.reporting.certificate.compute_paired_delta_log_ci",
+        "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
         lambda *_a, **_k: (-0.01, 0.01),
     )
     monkeypatch.setattr(cert_mod, "_coerce_interval", lambda _v: (0.0,))  # type: ignore[assignment]
@@ -458,5 +458,5 @@ def test_make_certificate_ratio_ci_fallback_skips_non_interval(monkeypatch) -> N
         "ratio_vs_baseline": 1.0,
     }
 
-    cert = make_certificate(report, baseline)
-    assert validate_certificate(cert)
+    cert = make_report(report, baseline)
+    assert validate_report(cert)

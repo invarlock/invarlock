@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from invarlock.reporting import certificate as cert
+from invarlock.reporting import report_builder as cert
 
 
 def test_enforce_drift_ratio_identity_raises_for_ci_profile():
@@ -830,7 +830,7 @@ def test_validate_certificate_uses_jsonschema(monkeypatch):
         "primary_metric": {"kind": "ppl_causal"},
         "validation": {"primary_metric_acceptable": True},
     }
-    assert cert.validate_certificate(certificate) is True
+    assert cert.validate_report(certificate) is True
     assert dummy.calls == 1
 
 
@@ -846,7 +846,7 @@ def test_validate_certificate_falls_back_when_jsonschema_fails(monkeypatch):
         "primary_metric": {"final": 1.0},
         "validation": {"primary_metric_acceptable": True},
     }
-    assert cert.validate_certificate(certificate) is True
+    assert cert.validate_report(certificate) is True
 
 
 def test_validate_certificate_rejects_invalid_flags(monkeypatch):
@@ -857,7 +857,7 @@ def test_validate_certificate_rejects_invalid_flags(monkeypatch):
         "primary_metric": {"final": 1.0},
         "validation": {"primary_metric_acceptable": "yes"},
     }
-    assert cert.validate_certificate(certificate) is False
+    assert cert.validate_report(certificate) is False
 
 
 def test_load_validation_allowlist_prefers_contracts_file(tmp_path, monkeypatch):
@@ -888,8 +888,8 @@ def test_validate_certificate_handles_mapping_errors() -> None:
             raise ValueError("boom")
 
     certificate = ExplodingMapping()
-    # ValueError raised inside validate_certificate should be caught and return False.
-    assert cert.validate_certificate(certificate) is False
+    # ValueError raised inside validate_report should be caught and return False.
+    assert cert.validate_report(certificate) is False
 
 
 def test_propagate_pairing_stats_adds_missing_fields():

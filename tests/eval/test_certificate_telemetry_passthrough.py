@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def test_certificate_telemetry_fields_and_device_default():
@@ -46,8 +46,8 @@ def test_certificate_telemetry_fields_and_device_default():
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
 
-    with patch("invarlock.reporting.certificate.validate_report", return_value=True):
-        cert = make_certificate(report, baseline)
+    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+        cert = make_report(report, baseline)
     tel = cert.get("telemetry", {})
     assert tel.get("latency_ms_per_tok") == 1.23
     assert tel.get("memory_mb_peak") == 456.0

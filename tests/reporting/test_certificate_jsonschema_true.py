@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from invarlock.reporting import certificate as C
+from invarlock.reporting import report_builder as C
 
 
 def test_validate_certificate_jsonschema_true(monkeypatch):
@@ -22,4 +22,4 @@ def test_validate_certificate_jsonschema_true(monkeypatch):
             "windows": {"preview": 0, "final": 0},
         },
     }
-    assert C.validate_certificate(cert) is True
+    assert C.validate_report(cert) is True

@@ -84,8 +84,8 @@ def test_report_command_certificate_no_baseline(mock_load):
 
 @patch("invarlock.reporting.report.save_report")
 @patch("invarlock.cli.commands.report._load_run_report")
-@patch("invarlock.reporting.certificate.make_certificate")
-@patch("invarlock.reporting.certificate.validate_certificate")
+@patch("invarlock.reporting.report_builder.make_report")
+@patch("invarlock.reporting.report_builder.validate_report")
 def test_report_command_certificate_with_baseline(
     mock_validate, mock_cert, mock_load, mock_save
 ):

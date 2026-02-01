@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_certificate_markdown
 
 
@@ -68,7 +68,7 @@ def test_certificate_includes_provider_digest_in_provenance():
         "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
     }
 
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     # Provider digest may be omitted after normalization; rendering should still succeed
     md = render_certificate_markdown(cert)
     assert "# InvarLock Evaluation Certificate" in md

@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import compute_console_validation_block
 
 
@@ -75,7 +75,7 @@ def _labels_from_block(cert: dict[str, Any]) -> list[str]:
 def test_labels_subset_of_allow_list_and_ordered(tmp_path: Path) -> None:
     report = _mock_report_with_windows()
     baseline = _mock_baseline(report)
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
 
     observed = _labels_from_block(cert)
     contracts_path = Path.cwd() / "contracts" / "console_labels.json"
@@ -92,7 +92,7 @@ def test_labels_subset_of_allow_list_and_ordered(tmp_path: Path) -> None:
 def test_overall_status_policy_from_canonical_rows_only(tmp_path: Path) -> None:
     report = _mock_report_with_windows()
     baseline = _mock_baseline(report)
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
 
     # Ensure overall status reflects only canonical rows
     block = compute_console_validation_block(cert)
@@ -109,7 +109,7 @@ def test_guard_overhead_row_omitted_when_not_evaluated(tmp_path: Path) -> None:
     report = _mock_report_with_windows()
     baseline = _mock_baseline(report)
     # No guard_overhead context in report → not evaluated
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     block = compute_console_validation_block(cert)
     labels = [row["label"] for row in block.get("rows", [])]
     assert "Guard Overhead Acceptable" not in labels

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import _compute_validation_flags
+from invarlock.reporting.report_builder import _compute_validation_flags
 
 
 def test_accuracy_hysteresis_applied_and_accepts_conservative() -> None:

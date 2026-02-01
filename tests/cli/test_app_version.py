@@ -46,7 +46,7 @@ def test_version_import_error_path(capsys, monkeypatch):
 def test_version_includes_schema_when_available(capsys, monkeypatch):
     monkeypatch.setattr("importlib.metadata.version", lambda _: "1.2.3")
 
-    import invarlock.reporting.certificate as cert_mod
+    import invarlock.reporting.report_builder as cert_mod
 
     monkeypatch.setattr(
         cert_mod, "REPORT_SCHEMA_VERSION", "schema-test", raising=False
@@ -61,11 +61,11 @@ def test_version_handles_schema_import_failure(capsys, monkeypatch):
     import builtins
 
     real_import = builtins.__import__
-    monkeypatch.delitem(sys.modules, "invarlock.reporting.certificate", raising=False)
+    monkeypatch.delitem(sys.modules, "invarlock.reporting.report_builder", raising=False)
     monkeypatch.delitem(sys.modules, "invarlock.reporting", raising=False)
 
     def fake_import(name, *args, **kwargs):
-        if name == "invarlock.reporting.certificate":
+        if name == "invarlock.reporting.report_builder":
             raise ImportError("boom")
         return real_import(name, *args, **kwargs)
 

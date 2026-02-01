@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def _mk_minimal_report_with_windows() -> dict:
@@ -33,7 +33,7 @@ def test_edit_digest_quantization():
         "model_id": "m",
         "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
     }
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     ed = cert.get("provenance", {}).get("edit_digest", {})
     assert ed.get("family") == "quantization"
     ih = ed.get("impl_hash")
@@ -50,7 +50,7 @@ def test_edit_digest_cert_only():
         "model_id": "m",
         "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
     }
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     ed = cert.get("provenance", {}).get("edit_digest", {})
     assert ed.get("family") == "cert_only"
     ih = ed.get("impl_hash")

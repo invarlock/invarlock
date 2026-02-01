@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_certificate_markdown
 
 
@@ -49,7 +49,7 @@ def _mk_base() -> tuple[dict, dict]:
 
 def test_markdown_policy_provenance_and_resolved_policy_blocks() -> None:
     rep, base = _mk_base()
-    cert = make_certificate(rep, base)
+    cert = make_report(rep, base)
     cert.setdefault("policy_provenance", {})
     cert["policy_provenance"].update(
         {

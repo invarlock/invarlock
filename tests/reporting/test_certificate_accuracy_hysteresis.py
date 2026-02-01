@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def test_accuracy_hysteresis_applied_and_pm_ok() -> None:
@@ -49,7 +49,7 @@ def test_accuracy_hysteresis_applied_and_pm_ok() -> None:
         "flags": {"guard_recovered": False, "rollback_reason": None},
     }
     base = {"metrics": {"primary_metric": {"kind": "accuracy", "final": 0.80}}}
-    cert = make_certificate(rep, base)
+    cert = make_report(rep, base)
     val = cert.get("validation", {})
     # Acceptable due to hysteresis with sufficient n_final and mark hysteresis applied
     assert val.get("primary_metric_acceptable") is True

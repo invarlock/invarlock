@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.report_types import create_empty_report
 
 
@@ -71,7 +71,7 @@ def _baseline() -> dict:
 
 
 def _digest(report: dict) -> str:
-    cert = make_certificate(deepcopy(report), deepcopy(_baseline()))
+    cert = make_report(deepcopy(report), deepcopy(_baseline()))
     prov = cert.get("policy_provenance") or {}
     digest = prov.get("policy_digest")
     assert isinstance(digest, str) and digest

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import REPORT_SCHEMA_VERSION
+from invarlock.reporting.report_builder import REPORT_SCHEMA_VERSION
 from invarlock.reporting.render import render_certificate_markdown
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def _mk_rep_base_with_windows(delta: float) -> tuple[dict, dict]:
@@ -82,7 +82,7 @@ def test_paired_ci_identity_holds() -> None:
     # ratio_ci == exp(logloss_delta_ci) for paired_baseline source.
     delta = 0.02
     rep, base = _mk_rep_base_with_windows(delta)
-    cert = make_certificate(rep, base)
+    cert = make_report(rep, base)
     pm = cert.get("primary_metric", {})
     # Expect display_ci present and identity with exp(Δ bounds)
     dci = pm.get("display_ci") if isinstance(pm, dict) else None

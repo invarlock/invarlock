@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting import certificate as C
+from invarlock.reporting import report_builder as C
 from invarlock.reporting.render import compute_console_validation_block
 
 
@@ -51,10 +51,10 @@ def test_validate_certificate_fallback_and_flag_types(monkeypatch):
             "preview_final_drift_acceptable": True,
         },
     }
-    assert C.validate_certificate(good) is True
+    assert C.validate_report(good) is True
 
     bad = {
         **good,
         "validation": {"primary_metric_acceptable": "not-bool"},
     }
-    assert C.validate_certificate(bad) is False
+    assert C.validate_report(bad) is False

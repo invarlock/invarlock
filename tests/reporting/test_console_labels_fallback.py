@@ -18,7 +18,7 @@ def test_console_labels_fallback_when_contract_file_missing(monkeypatch):
         def read_text(self, *args, **kwargs):  # type: ignore[override]
             raise FileNotFoundError
 
-    monkeypatch.setattr("invarlock.reporting.certificate.Path", _PathProxy)
+    monkeypatch.setattr("invarlock.reporting.report_builder.Path", _PathProxy)
 
     labels = _load_console_labels()
     # Default allow-list should include common rows

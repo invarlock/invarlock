@@ -1,6 +1,6 @@
 import pytest
 
-from invarlock.reporting import certificate as cert
+from invarlock.reporting import report_builder as cert
 
 
 def test_resolve_pm_drift_band_from_report_branches(monkeypatch):

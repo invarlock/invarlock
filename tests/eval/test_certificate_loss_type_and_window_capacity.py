@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def test_loss_type_passthrough_and_window_capacity():
@@ -39,8 +39,8 @@ def test_loss_type_passthrough_and_window_capacity():
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
 
-    with patch("invarlock.reporting.certificate.validate_report", return_value=True):
-        cert = make_certificate(report, baseline)
+    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+        cert = make_report(report, baseline)
 
     # loss_type passthrough may be omitted after normalization
     assert isinstance(cert, dict)

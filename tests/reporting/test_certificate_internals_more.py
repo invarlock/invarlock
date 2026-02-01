@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 
-from invarlock.reporting import certificate as C
+from invarlock.reporting import report_builder as C
 from invarlock.reporting.policy_utils import _build_resolved_policies
 from invarlock.reporting.utils import _coerce_int, _sanitize_seed_bundle
 

@@ -1,4 +1,4 @@
-from invarlock.reporting.certificate import _prepare_guard_overhead_section
+from invarlock.reporting.report_builder import _prepare_guard_overhead_section
 from invarlock.reporting.policy_utils import (
     _extract_policy_overrides,
     _format_epsilon_map,

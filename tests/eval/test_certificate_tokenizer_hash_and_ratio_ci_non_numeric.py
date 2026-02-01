@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def _base_report_with_windows():
@@ -58,13 +58,13 @@ def test_meta_tokenizer_hash_propagates_and_ratio_ci_non_numeric_continues():
 
     # Patch paired delta CI computation so ratio_ci_source == 'paired_baseline'
     with (
-        patch("invarlock.reporting.certificate.validate_report", return_value=True),
+        patch("invarlock.reporting.report_builder.validate_run_report", return_value=True),
         patch(
-            "invarlock.reporting.certificate.compute_paired_delta_log_ci",
+            "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
             return_value=(-0.1, 0.05),
         ),
     ):
-        cert = make_certificate(report, baseline)
+        cert = make_report(report, baseline)
 
     # Tokenizer hash propagated under meta
     assert cert["meta"].get("tokenizer_hash") == "tok-123"

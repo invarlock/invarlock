@@ -145,7 +145,7 @@ def test_until_pass_restore_failure_discards_model_and_reloads_next_attempt(
 
     cert_calls = {"n": 0}
 
-    def make_certificate(report, baseline_report):  # type: ignore[no-untyped-def]
+    def make_report(report, baseline_report):  # type: ignore[no-untyped-def]
         cert_calls["n"] += 1
         if cert_calls["n"] == 1:
             return {"validation": {"primary_metric_acceptable": False}}
@@ -193,8 +193,8 @@ def test_until_pass_restore_failure_discards_model_and_reloads_next_attempt(
         )
         stack.enter_context(
             patch(
-                "invarlock.reporting.certificate.make_certificate",
-                make_certificate,
+                "invarlock.reporting.report_builder.make_report",
+                make_report,
             )
         )
         stack.enter_context(

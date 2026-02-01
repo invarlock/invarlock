@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import (
+from invarlock.reporting.report_builder import (
     _compute_confidence_label,
     _compute_edit_digest,
     _is_ppl_kind,

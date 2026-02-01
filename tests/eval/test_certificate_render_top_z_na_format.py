@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
-from invarlock.reporting.certificate import (
-    make_certificate,
+from invarlock.reporting.report_builder import (
+    make_report,
     render_certificate_markdown,
 )
 
@@ -36,8 +36,8 @@ def test_spectral_top_z_non_numeric_formats_as_na():
         "ppl_final": 10.0,
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
-    with patch("invarlock.reporting.certificate.validate_report", return_value=True):
-        cert = make_certificate(report, baseline)
+    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+        cert = make_report(report, baseline)
 
     cert.setdefault("spectral", {})["top_z_scores"] = {
         "ffn": [{"module": "L0", "z": "nan"}]

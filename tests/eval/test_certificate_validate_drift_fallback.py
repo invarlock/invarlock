@@ -1,6 +1,6 @@
-from invarlock.reporting.certificate import (
+from invarlock.reporting.report_builder import (
     REPORT_SCHEMA_VERSION,
-    validate_certificate,
+    validate_report,
 )
 
 
@@ -36,4 +36,4 @@ def test_validate_certificate_accepts_pm_only_without_ppl_block():
             "guard_overhead_acceptable": True,
         },
     }
-    assert validate_certificate(cert) is True
+    assert validate_report(cert) is True

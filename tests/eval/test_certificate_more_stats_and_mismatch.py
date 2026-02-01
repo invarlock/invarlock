@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def _base_report():
@@ -65,15 +65,15 @@ def test_certificate_ratio_ci_mismatch_raises(monkeypatch):
     report["metrics"]["stats"] = {"pairing": "paired_baseline"}
 
     monkeypatch.setattr(
-        "invarlock.reporting.certificate.validate_report", lambda _: True
+        "invarlock.reporting.report_builder.validate_run_report", lambda _: True
     )
     # Force mismatch by overriding the ratio_ci computation from delta_ci
     monkeypatch.setattr(
-        "invarlock.reporting.certificate.logspace_to_ratio_ci", lambda _: (1.05, 1.06)
+        "invarlock.reporting.report_builder.logspace_to_ratio_ci", lambda _: (1.05, 1.06)
     )
 
     with pytest.raises(ValueError):
-        _ = make_certificate(report, baseline)
+        _ = make_report(report, baseline)
 
 
 def test_certificate_metrics_stats_passthrough(monkeypatch):
@@ -90,9 +90,9 @@ def test_certificate_metrics_stats_passthrough(monkeypatch):
     }
 
     monkeypatch.setattr(
-        "invarlock.reporting.certificate.validate_report", lambda _: True
+        "invarlock.reporting.report_builder.validate_run_report", lambda _: True
     )
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     stats = cert.get("dataset", {}).get("windows", {}).get("stats", {})
     # Optional metrics.stats passthrough keys may be omitted after normalization
     assert isinstance(stats, dict)

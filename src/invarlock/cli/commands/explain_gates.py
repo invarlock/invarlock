@@ -7,7 +7,7 @@ import typer
 from rich.console import Console
 
 from invarlock.core.auto_tuning import get_tier_policies
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 console = Console()
 
@@ -36,7 +36,7 @@ def explain_gates_command(
         console.print(f"[red]Failed to load inputs: {exc}[/red]")
         raise typer.Exit(1) from exc
 
-    cert = make_certificate(report_data, baseline_data)
+    cert = make_report(report_data, baseline_data)
     validation = (
         cert.get("validation", {}) if isinstance(cert.get("validation"), dict) else {}
     )

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_certificate_markdown
 
 
@@ -60,7 +60,7 @@ def _mk_min_report(tier: str = "balanced") -> dict:
 def test_certificate_includes_policy_digest_fields():
     report = _mk_min_report(tier="balanced")
     baseline = _mk_min_report(tier="balanced")
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
 
     assert "policy_digest" in cert, "certificate should include policy_digest"
     pd = cert["policy_digest"]
@@ -83,8 +83,8 @@ def test_policy_digest_changes_across_tiers_and_markdown_note():
     report_cons = _mk_min_report(tier="conservative")
     baseline = _mk_min_report(tier="balanced")
 
-    cert_bal = make_certificate(report_bal, baseline)
-    cert_cons = make_certificate(report_cons, baseline)
+    cert_bal = make_report(report_bal, baseline)
+    cert_cons = make_report(report_cons, baseline)
 
     hash_bal = cert_bal["policy_digest"]["thresholds_hash"]
     hash_cons = cert_cons["policy_digest"]["thresholds_hash"]

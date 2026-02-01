@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def _mk_report_with_final_windows() -> dict[str, Any]:
@@ -54,7 +54,7 @@ def _mk_baseline_like(report: dict[str, Any]) -> dict[str, Any]:
 def test_window_ids_digest_and_guard_schedule_digest_present() -> None:
     rep = _mk_report_with_final_windows()
     base = _mk_baseline_like(rep)
-    cert = make_certificate(rep, base)
+    cert = make_report(rep, base)
 
     # Provenance should include a stable digest of the final window IDs
     prov = cert.get("provenance", {})

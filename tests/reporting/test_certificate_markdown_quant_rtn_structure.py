@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_certificate_markdown
 
 
@@ -49,7 +49,7 @@ def _mk_base() -> tuple[dict, dict]:
 
 def test_markdown_quant_rtn_linear_modules_quantized_row() -> None:
     rep, base = _mk_base()
-    cert = make_certificate(rep, base)
+    cert = make_report(rep, base)
     # Provide structure diagnostics to trigger quant_rtn detail line
     cert["structure"] = {
         "params_changed": 10,

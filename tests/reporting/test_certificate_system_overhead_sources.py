@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_certificate_markdown
 
 
@@ -59,7 +59,7 @@ def _mk_baseline_explicit() -> dict:
 def test_system_overhead_sources_mixed_and_markdown_na() -> None:
     rep = _mk_report_latency_fallback()
     base = _mk_baseline_explicit()
-    cert = make_certificate(rep, base)
+    cert = make_report(rep, base)
     sys = cert.get("system_overhead", {})
     # Keys should include p50 latency entry with ratio; throughput may be absent on tiny runs
     assert "latency_ms_p50" in sys

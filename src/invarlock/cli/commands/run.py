@@ -5133,7 +5133,7 @@ def run_command(
 
             # Certificate validation for --until-pass mode
             if retry_controller and baseline:
-                from invarlock.reporting.certificate import make_certificate
+                from invarlock.reporting.report_builder import make_report
 
                 try:
                     baseline_report = baseline_report_data
@@ -5152,7 +5152,7 @@ def run_command(
                         emoji="📜",
                         profile=profile_normalized,
                     )
-                    certificate = make_certificate(report, baseline_report)
+                    certificate = make_report(report, baseline_report)
 
                     validation = certificate.get("validation", {})
                     certificate_passed = all(validation.values())

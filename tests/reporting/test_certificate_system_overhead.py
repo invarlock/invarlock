@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_certificate_markdown
 
 
@@ -69,7 +69,7 @@ def test_certificate_system_overhead_table_and_primary_metric_metadata():
         "ratio_vs_baseline": +0.05,
     }
 
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     md = render_certificate_markdown(cert)
     # System Overhead section may be omitted; rendering should still succeed
     assert "# InvarLock Evaluation Certificate" in md

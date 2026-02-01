@@ -7,10 +7,10 @@ from typing import Any
 from invarlock.reporting.report_types import RunReport
 
 try:  # pragma: no cover - shim to reporting modules
-    from invarlock.reporting.certificate import (
+    from invarlock.reporting.report_builder import (
         REPORT_SCHEMA_VERSION,
-        make_certificate,
-        validate_certificate,
+        make_report,
+        validate_report,
     )
 
     # Prefer direct import from render for rendering APIs
@@ -18,22 +18,22 @@ try:  # pragma: no cover - shim to reporting modules
 except Exception:  # pragma: no cover - provide soft stubs
     REPORT_SCHEMA_VERSION = "v1"
 
-    def make_certificate(
+    def make_report(
         report: RunReport,
         baseline: RunReport | dict[str, Any],
     ) -> dict[str, Any]:
-        raise ImportError("invarlock.reporting.certificate not available")
+        raise ImportError("invarlock.reporting.report_builder not available")
 
     def render_certificate_markdown(certificate: dict[str, Any]) -> str:
-        raise ImportError("invarlock.reporting.certificate not available")
+        raise ImportError("invarlock.reporting.report_builder not available")
 
-    def validate_certificate(certificate: dict[str, Any]) -> bool:
-        raise ImportError("invarlock.reporting.certificate not available")
+    def validate_report(certificate: dict[str, Any]) -> bool:
+        raise ImportError("invarlock.reporting.report_builder not available")
 
 
 __all__ = [
     "REPORT_SCHEMA_VERSION",
-    "make_certificate",
+    "make_report",
     "render_certificate_markdown",
-    "validate_certificate",
+    "validate_report",
 ]

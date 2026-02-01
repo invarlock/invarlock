@@ -1,6 +1,6 @@
 import math
 
-from invarlock.reporting.certificate import (
+from invarlock.reporting.report_builder import (
     _compute_validation_flags,
     _prepare_guard_overhead_section,
 )

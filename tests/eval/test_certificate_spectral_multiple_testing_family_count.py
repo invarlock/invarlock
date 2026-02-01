@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def test_spectral_multiple_testing_family_count_computed_when_missing_m():
@@ -44,8 +44,8 @@ def test_spectral_multiple_testing_family_count_computed_when_missing_m():
         "ppl_final": 10.0,
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
-    with patch("invarlock.reporting.certificate.validate_report", return_value=True):
-        cert = make_certificate(report, baseline)
+    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+        cert = make_report(report, baseline)
 
     spectral = cert.get("spectral", {})
     # Expect the helper to compute m from families_present (from family_caps keys)

@@ -5,7 +5,7 @@ from copy import deepcopy
 
 import pytest
 
-from invarlock.reporting import certificate as cert
+from invarlock.reporting import report_builder as cert
 
 
 def _base_report() -> dict:
@@ -179,7 +179,7 @@ def test_make_certificate_raises_on_drift_identity(monkeypatch):
     )
 
     with pytest.raises(ValueError, match="drift ratio"):
-        cert.make_certificate({}, {})
+        cert.make_report({}, {})
 
 
 def test_make_certificate_raises_on_ratio_ci_mismatch(monkeypatch):
@@ -205,7 +205,7 @@ def test_make_certificate_raises_on_ratio_ci_mismatch(monkeypatch):
     )
 
     with pytest.raises(ValueError, match="CI mismatch"):
-        cert.make_certificate({}, {})
+        cert.make_report({}, {})
 
 
 def test_make_certificate_uses_coverage_fallback(monkeypatch):
@@ -216,7 +216,7 @@ def test_make_certificate_uses_coverage_fallback(monkeypatch):
     _patch_common(monkeypatch, report, baseline)
     monkeypatch.setattr(cert, "_pair_logloss_windows", lambda *_: None, raising=False)
 
-    certificate = cert.make_certificate(report, baseline)
+    certificate = cert.make_report(report, baseline)
     stats = certificate["dataset"]["windows"]["stats"]
     assert stats["paired_windows"] == 5
 
@@ -343,7 +343,7 @@ def test_make_certificate_populates_optional_sections(monkeypatch):
         cert, "_compute_policy_digest", lambda *_: "resolved-digest", raising=False
     )
 
-    certificate = cert.make_certificate(report, baseline)
+    certificate = cert.make_report(report, baseline)
 
     assert certificate["secondary_metrics"][0]["kind"] == "accuracy"
     subgroup = certificate["classification"]["subgroups"]["alpha"]
@@ -369,7 +369,7 @@ def test_make_certificate_populates_dataset_stats_when_absent(monkeypatch):
         resolved_policy={"spectral": {}, "variance": {}},
     )
 
-    certificate = cert.make_certificate(report, baseline)
+    certificate = cert.make_report(report, baseline)
     stats = certificate["dataset"]["windows"]["stats"]
     assert "pairing" in stats
     assert stats["paired_windows"] >= 1
@@ -388,7 +388,7 @@ def test_make_certificate_policy_digest_marks_tier_change(monkeypatch):
         resolved_policy={"spectral": {}, "variance": {}},
     )
 
-    certificate = cert.make_certificate(report, baseline)
+    certificate = cert.make_report(report, baseline)
     assert certificate["policy_digest"]["changed"] is True
 
 
@@ -405,7 +405,7 @@ def test_make_certificate_policy_digest_handles_missing_baseline_tier(monkeypatc
         resolved_policy={"spectral": {}, "variance": {}},
     )
 
-    certificate = cert.make_certificate(report, baseline)
+    certificate = cert.make_report(report, baseline)
     assert certificate["policy_digest"]["changed"] is False
 
 
@@ -433,7 +433,7 @@ def test_make_certificate_policy_digest_detects_threshold_hash_change(monkeypatc
     )
     monkeypatch.setattr(cert, "_compute_thresholds_hash", fake_hash, raising=False)
 
-    certificate = cert.make_certificate(report, baseline)
+    certificate = cert.make_report(report, baseline)
     assert certificate["policy_digest"]["changed"] is True
 
 
@@ -450,7 +450,7 @@ def test_make_certificate_copies_meta_environment_flags(monkeypatch):
     )
     monkeypatch.setattr(cert, "_normalize_baseline", lambda value: value, raising=False)
 
-    certificate = cert.make_certificate(report, baseline)
+    certificate = cert.make_report(report, baseline)
     meta = certificate["meta"]
     assert meta["env_flags"]["tf32"] is False
     assert meta["tokenizer_hash"] == "tok-data"
@@ -468,7 +468,7 @@ def test_make_certificate_uses_meta_tokenizer_hash(monkeypatch):
     )
     monkeypatch.setattr(cert, "_normalize_baseline", lambda value: value, raising=False)
 
-    certificate = cert.make_certificate(report, baseline)
+    certificate = cert.make_report(report, baseline)
     assert certificate["meta"]["tokenizer_hash"] == "tok-meta"
 
 
@@ -489,5 +489,5 @@ def test_make_certificate_handles_missing_dataset_section(monkeypatch):
         raising=False,
     )
 
-    certificate = cert.make_certificate(report, baseline)
+    certificate = cert.make_report(report, baseline)
     assert "tokenizer_hash" not in certificate["meta"]

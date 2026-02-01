@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def _mk_pm_only(final_val: float) -> dict:
@@ -31,7 +31,7 @@ def test_ratio_uses_primary_metric_when_ppl_missing() -> None:
     subj = _mk_pm_only(50.0)
     base = _mk_pm_only(50.0)
 
-    cert = make_certificate(subj, base)
+    cert = make_report(subj, base)
 
     # ratio_vs_baseline should be computable and equal 1.0
     pm = cert.get("primary_metric", {})

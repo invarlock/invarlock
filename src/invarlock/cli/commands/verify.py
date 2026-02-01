@@ -26,7 +26,7 @@ from invarlock.core.exceptions import (
 from invarlock.core.exceptions import (
     ValidationError as _ValidationError,
 )
-from invarlock.reporting.certificate import validate_certificate
+from invarlock.reporting.report_builder import validate_report
 
 from .._json import emit as _emit_json
 from .._json import encode_error as _encode_error
@@ -455,7 +455,7 @@ def _validate_certificate_payload(
     certificate = _load_certificate(path)
 
     # Always surface schema validation failures for this payload
-    if not validate_certificate(certificate):
+    if not validate_report(certificate):
         errors.append("Certificate schema validation failed.")
         return errors
 

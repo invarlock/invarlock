@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import invarlock.reporting.certificate as cert
-from invarlock.reporting.certificate import make_certificate
+import invarlock.reporting.report_builder as cert
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_certificate_markdown
 
 
@@ -58,7 +58,7 @@ def _mk_report(ratio: float = 1.00, reps: int | None = None) -> dict:
 def test_confidence_label_high_when_stable_and_narrow_ci():
     report = _mk_report(ratio=1.02, reps=500)
     baseline = _mk_report(ratio=1.0, reps=500)
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     assert cert.get("confidence", {}).get("label") == "High"
     md = render_certificate_markdown(cert)
     assert "**Confidence:** High" in md
@@ -68,14 +68,14 @@ def test_confidence_label_medium_when_unstable():
     # Low replicates flags unstable
     report = _mk_report(ratio=1.02, reps=50)
     baseline = _mk_report(ratio=1.0, reps=50)
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     assert cert.get("confidence", {}).get("label") == "Medium"
 
 
 def test_confidence_label_low_on_failure():
     report = _mk_report(ratio=1.30, reps=500)
     baseline = _mk_report(ratio=1.0, reps=500)
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     assert cert.get("confidence", {}).get("label") == "Low"
 
 
@@ -98,7 +98,7 @@ def test_confidence_thresholds_can_be_overridden_by_policy(monkeypatch):
 
     report = _mk_report(ratio=1.02, reps=500)
     baseline = _mk_report(ratio=1.0, reps=500)
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     conf = cert.get("confidence", {})
     assert conf.get("basis") == "ppl_ratio"
     assert abs(float(conf.get("threshold")) - 0.02) < 1e-9

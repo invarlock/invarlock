@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from invarlock.reporting import certificate as cert
+from invarlock.reporting import report_builder as cert
 
 
 def test_load_validation_allowlist_prefers_contract_file(tmp_path, monkeypatch):

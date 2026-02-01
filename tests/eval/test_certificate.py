@@ -1,5 +1,5 @@
 """
-Comprehensive test coverage for invarlock.reporting.certificate module.
+Comprehensive test coverage for invarlock.reporting.report_builder module.
 
 Tests for evaluation certificate generation, validation, and rendering.
 """
@@ -12,7 +12,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from invarlock import __version__ as INVARLOCK_VERSION
-from invarlock.reporting.certificate import (
+from invarlock.reporting.report_builder import (
     REPORT_SCHEMA_VERSION,
     _analyze_bitwidth_map,
     _compute_report_digest,
@@ -23,8 +23,8 @@ from invarlock.reporting.certificate import (
     _generate_run_id,
     _normalize_baseline,
     _prepare_guard_overhead_section,
-    make_certificate,
-    validate_certificate,
+    make_report,
+    validate_report,
 )
 from invarlock.reporting.dataset_hashing import (
     _compute_actual_window_hashes,
@@ -68,8 +68,8 @@ def _load_local_certificate() -> dict[str, Any]:
     """
     report = create_mock_run_report(include_guards=True, include_auto=True)
     baseline = create_mock_baseline()
-    with patch("invarlock.reporting.certificate.validate_report", return_value=True):
-        cert = make_certificate(report, baseline)
+    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+        cert = make_report(report, baseline)
     # Ensure expected branches exist for rendering variations
     cert.setdefault(
         "variance",
@@ -460,7 +460,7 @@ class TestCertificateHelpers:
                 self.passed = True
 
         with patch(
-            "invarlock.reporting.certificate.validate_guard_overhead",
+            "invarlock.reporting.report_builder.validate_guard_overhead",
             return_value=FakeResult(),
         ):
             section, passed = _prepare_guard_overhead_section(
@@ -1284,7 +1284,7 @@ class TestCertificateAnalyticsHelpers:
 
 
 class TestMakeCertificate:
-    """Test make_certificate function."""
+    """Test make_report function."""
 
     def test_basic_certificate_creation(self):
         """Test basic certificate creation with valid inputs."""
@@ -1292,9 +1292,9 @@ class TestMakeCertificate:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
 
         assert certificate["schema_version"] == REPORT_SCHEMA_VERSION
         assert "run_id" in certificate
@@ -1314,7 +1314,7 @@ class TestMakeCertificate:
         report["data"]["final_n"] = 180
         baseline = create_mock_baseline()
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
             # Enforce CI profile for hard-fail on invalid metrics
             report.setdefault("metrics", {}).setdefault("window_plan", {})[
@@ -1337,7 +1337,7 @@ class TestMakeCertificate:
                 "actual_preview": 180,
                 "actual_final": 180,
             }
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
         assert isinstance(certificate, dict)
 
     def test_make_certificate_double_invalid_ppl_falls_back(self):
@@ -1346,9 +1346,9 @@ class TestMakeCertificate:
         report["metrics"]["ppl_final"] = 0.5
         baseline = create_mock_baseline(ppl_final=55.0)
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
         # Normalized path keeps PM snapshot as provided; fallback applies internally for gating
         assert isinstance(certificate.get("primary_metric"), dict)
 
@@ -1361,9 +1361,9 @@ class TestMakeCertificate:
         }
         baseline = create_mock_baseline()
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
         # Guard overhead is optional when not preserved by normalization
         guard_overhead = certificate.get("guard_overhead", {})
         assert isinstance(guard_overhead, dict)
@@ -1372,9 +1372,9 @@ class TestMakeCertificate:
         report = create_mock_run_report(include_evaluation_windows=True)
         baseline = create_mock_baseline()
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
         dataset_hash = certificate["dataset"]["hash"]
         assert dataset_hash["preview"].startswith("sha256:")
         assert dataset_hash["final"].startswith("sha256:")
@@ -1394,10 +1394,10 @@ class TestMakeCertificate:
         report["metrics"]["paired_delta_summary"] = {"mean": math.log(1.2)}
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
             with patch(
-                "invarlock.reporting.certificate.compute_paired_delta_log_ci",
+                "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
                 return_value=(-0.01, 0.02),
             ):
                 # Enforce CI profile hard-fail for mismatch
@@ -1426,7 +1426,7 @@ class TestMakeCertificate:
                     "actual_preview": 180,
                     "actual_final": 180,
                 }
-                cert = make_certificate(report, baseline)
+                cert = make_report(report, baseline)
                 assert isinstance(cert, dict)
 
     def test_make_certificate_uses_paired_delta_ci_when_available(self):
@@ -1446,13 +1446,13 @@ class TestMakeCertificate:
         report["metrics"]["logloss_delta_ci"] = (-0.005, 0.010)
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
             with patch(
-                "invarlock.reporting.certificate.compute_paired_delta_log_ci",
+                "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
                 return_value=(-0.005, 0.010),
             ):
-                certificate = make_certificate(report, baseline)
+                certificate = make_report(report, baseline)
 
         # PM-only: pairing lives under dataset.windows.stats; CI is mapped to display_ci
         stats = certificate.get("dataset", {}).get("windows", {}).get("stats", {})
@@ -1470,9 +1470,9 @@ class TestMakeCertificate:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
 
         auto = certificate["auto"]
         assert auto["tier"] == "aggressive"
@@ -1502,9 +1502,9 @@ class TestMakeCertificate:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
 
         provenance = certificate["policy_provenance"]
         # Policy provenance includes an ordered, de-duped override list.
@@ -1523,9 +1523,9 @@ class TestMakeCertificate:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
 
         auto = certificate["auto"]
         assert auto["tier"] == "none"
@@ -1538,9 +1538,9 @@ class TestMakeCertificate:
         baseline = create_mock_baseline(schema_type="baseline-v1")
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
 
         baseline_ref = certificate["baseline_ref"]
         # PM-only baseline reference includes primary_metric with final point
@@ -1579,9 +1579,9 @@ class TestMakeCertificate:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
 
         edit_meta = certificate["edit"]
         assert edit_meta["name"] == "structured"
@@ -1602,9 +1602,9 @@ class TestMakeCertificate:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
 
         # Variance section may be omitted after normalization; ensure certificate contains a variance block (possibly empty)
         assert "variance" in certificate and isinstance(certificate["variance"], dict)
@@ -1619,9 +1619,9 @@ class TestMakeCertificate:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
 
         pm = certificate.get("primary_metric", {})
         # Drift identity: final/preview ≈ exp(Δlog)
@@ -1645,9 +1645,9 @@ class TestMakeCertificate:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
         # Normalized certificate may omit guard_overhead; validate the decision logic directly
         sanitized, _ = _prepare_guard_overhead_section(report["guard_overhead"])  # type: ignore[index]
         flags = _compute_validation_flags(
@@ -1670,9 +1670,9 @@ class TestMakeCertificate:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
 
         assert certificate["validation"]["guard_overhead_acceptable"] is True
 
@@ -1695,9 +1695,9 @@ class TestMakeCertificate:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
 
         invariants_section = certificate["invariants"]
         assert invariants_section["status"] == "warn"
@@ -1737,9 +1737,9 @@ class TestMakeCertificate:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
 
         expected_variance_digest = _compute_variance_policy_digest(variance_policy)
         assert (
@@ -1786,9 +1786,9 @@ class TestMakeCertificate:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
 
         spectral_policy = certificate["policies"]["spectral"]
         assert spectral_policy["sigma_quantile"] == pytest.approx(0.95)
@@ -1829,9 +1829,9 @@ class TestMakeCertificate:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
 
         variance = certificate["variance"]
         assert variance["tap"] == "transformer.h.*.mlp.c_proj"
@@ -1848,9 +1848,9 @@ class TestMakeCertificate:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
 
         dataset = certificate["dataset"]
         assert "hash" in dataset
@@ -1862,10 +1862,10 @@ class TestMakeCertificate:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=False
+            "invarlock.reporting.report_builder.validate_run_report", return_value=False
         ):
             with pytest.raises(ValueError, match="Invalid RunReport structure"):
-                make_certificate(report, baseline)
+                make_report(report, baseline)
 
     def test_pm_preview_final_ratio_identity(self):
         """Primary metric preview→final ratio identity holds (sanity)."""
@@ -1873,9 +1873,9 @@ class TestMakeCertificate:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
         from tests.utils.pm import pm as _pm
 
         M = _pm(certificate)
@@ -1895,14 +1895,14 @@ class TestMakeCertificate:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
         assert isinstance(certificate, dict)
 
 
 class TestValidateCertificate:
-    """Test validate_certificate function."""
+    """Test validate_report function."""
 
     def test_valid_certificate(self):
         """Test validation of a valid certificate (PM-only)."""
@@ -1942,13 +1942,13 @@ class TestValidateCertificate:
             },
         }
 
-        assert validate_certificate(certificate) is True
+        assert validate_report(certificate) is True
 
     def test_invalid_schema_version(self):
         """Test validation fails with wrong schema version."""
         certificate = {"schema_version": "wrong-version", "run_id": "test123"}
 
-        assert validate_certificate(certificate) is False
+        assert validate_report(certificate) is False
 
     def test_missing_required_fields(self):
         """Test validation fails with missing required fields."""
@@ -1958,7 +1958,7 @@ class TestValidateCertificate:
             # Missing other required fields
         }
 
-        assert validate_certificate(certificate) is False
+        assert validate_report(certificate) is False
 
     def test_invalid_ppl_metrics(self):
         """Test validation fails with invalid PPL metrics."""
@@ -1991,7 +1991,7 @@ class TestValidateCertificate:
             },
         }
 
-        assert validate_certificate(certificate) is False
+        assert validate_report(certificate) is False
 
     def test_invalid_validation_flags(self):
         """Test validation fails with invalid validation flags."""
@@ -2026,26 +2026,26 @@ class TestValidateCertificate:
             },
         }
 
-        assert validate_certificate(certificate) is False
+        assert validate_report(certificate) is False
 
     def test_exception_handling(self):
         """Test validation handles exceptions gracefully."""
         # Invalid structure that would raise exceptions in try-except block
         # Test with dict that raises KeyError/TypeError/ValueError (caught exceptions)
         certificate = {"invalid": "structure"}
-        assert validate_certificate(certificate) is False
+        assert validate_report(certificate) is False
 
         # Test with malformed dictionary structure
         certificate = {"schema_version": "v1", "ppl": "not_a_dict"}
-        assert validate_certificate(certificate) is False
+        assert validate_report(certificate) is False
 
         # Test AttributeError case (None input) - should raise AttributeError
         with pytest.raises(AttributeError):
-            validate_certificate(None)
+            validate_report(None)
 
         # Test AttributeError case (string input) - should raise AttributeError
         with pytest.raises(AttributeError):
-            validate_certificate("not_a_dict")
+            validate_report("not_a_dict")
 
 
 class TestRenderCertificateMarkdown:
@@ -2057,9 +2057,9 @@ class TestRenderCertificateMarkdown:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
 
         markdown = render_certificate_markdown(certificate)
 
@@ -2076,9 +2076,9 @@ class TestRenderCertificateMarkdown:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
 
         markdown = render_certificate_markdown(certificate)
 
@@ -2094,9 +2094,9 @@ class TestRenderCertificateMarkdown:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
 
         markdown = render_certificate_markdown(certificate)
 
@@ -2108,9 +2108,9 @@ class TestRenderCertificateMarkdown:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
 
         markdown = render_certificate_markdown(certificate)
 
@@ -2132,9 +2132,9 @@ class TestRenderCertificateMarkdown:
         report = create_mock_run_report()
         baseline = create_mock_baseline()
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            cert = make_certificate(report, baseline)
+            cert = make_report(report, baseline)
         markdown = render_certificate_markdown(cert)
 
         assert "Quality Gates" in markdown
@@ -2151,9 +2151,9 @@ class TestRenderCertificateMarkdown:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
 
         # Add provenance window plan and inference metadata to cover markdown branches
         certificate.setdefault("provenance", {})["window_plan"] = {
@@ -2199,9 +2199,9 @@ class TestRenderCertificateMarkdown:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
 
         markdown = render_certificate_markdown(certificate)
 
@@ -2384,9 +2384,9 @@ class TestRenderCertificateMarkdown:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
 
         certificate["spectral"] = {
             "caps_applied": 3,
@@ -2909,13 +2909,13 @@ class TestIntegrationAndEdgeCases:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
             # Create certificate
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
 
             # Validate certificate
-            assert validate_certificate(certificate) is True
+            assert validate_report(certificate) is True
 
             # Render to markdown
             markdown = render_certificate_markdown(certificate)
@@ -2930,9 +2930,9 @@ class TestIntegrationAndEdgeCases:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
 
         # Should handle inf/nan gracefully; primary_metric present
         assert "primary_metric" in certificate
@@ -2948,12 +2948,12 @@ class TestIntegrationAndEdgeCases:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
 
             # Should still create valid certificate
-            assert validate_certificate(certificate) is True
+            assert validate_report(certificate) is True
 
 
 class TestDriftValidationGates:
@@ -2970,9 +2970,9 @@ class TestDriftValidationGates:
         baseline = create_mock_baseline(ppl_final=30.0, schema_type="baseline-v1")
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
 
         validation = certificate["validation"]
         # Compression gate should fail; drift flag is optional under normalization
@@ -2989,9 +2989,9 @@ class TestDriftValidationGates:
         baseline = create_mock_baseline(ppl_final=30.0, schema_type="baseline-v1")
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
 
         validation = certificate["validation"]
         assert validation["preview_final_drift_acceptable"] is True
@@ -3013,10 +3013,10 @@ class TestDriftValidationGates:
         baseline = create_mock_baseline(ppl_final=30.0, schema_type="baseline-v1")
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
             # Current implementation normalizes invalid metrics; ensure it does not crash
-            cert = make_certificate(report, baseline)
+            cert = make_report(report, baseline)
             assert isinstance(cert, dict)
 
     def test_ratio_ci_above_threshold_fails_quant_gate(self):
@@ -3030,9 +3030,9 @@ class TestDriftValidationGates:
         baseline = create_mock_baseline(ppl_final=40.0, schema_type="baseline-v1")
 
         with patch(
-            "invarlock.reporting.certificate.validate_report", return_value=True
+            "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
-            certificate = make_certificate(report, baseline)
+            certificate = make_report(report, baseline)
 
         validation = certificate["validation"]
         # Acceptance may rely on ratio point when CI is not surfaced; ensure boolean present
@@ -3044,11 +3044,11 @@ class TestModuleExports:
 
     def test_all_exports(self):
         """Test that __all__ contains expected functions."""
-        from invarlock.reporting.certificate import __all__
+        from invarlock.reporting.report_builder import __all__
 
         expected_exports = [
-            "make_certificate",
-            "validate_certificate",
+            "make_report",
+            "validate_report",
             "render_certificate_markdown",
             "REPORT_SCHEMA_VERSION",
         ]

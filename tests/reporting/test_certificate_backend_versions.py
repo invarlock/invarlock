@@ -4,7 +4,7 @@ import builtins
 import os
 from types import SimpleNamespace
 
-from invarlock.reporting import certificate as C
+from invarlock.reporting import report_builder as C
 
 
 def _make_fake_torch(

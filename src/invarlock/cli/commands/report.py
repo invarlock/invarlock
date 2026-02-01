@@ -16,7 +16,7 @@ import typer
 from rich.console import Console
 
 from invarlock.cli.output import print_event, resolve_output_style
-from invarlock.reporting import certificate as certificate_lib
+from invarlock.reporting import report_builder as certificate_lib
 from invarlock.reporting import report as report_lib
 
 console = Console()
@@ -199,10 +199,10 @@ def _generate_reports(
 
         if "cert" in formats and baseline_report:
             try:
-                certificate = certificate_lib.make_certificate(
+                certificate = certificate_lib.make_report(
                     primary_report, baseline_report
                 )
-                certificate_lib.validate_certificate(certificate)
+                certificate_lib.validate_report(certificate)
                 from invarlock.reporting.render import (
                     compute_console_validation_block as _console_block,
                 )
@@ -498,9 +498,9 @@ def report_validate(
         raise typer.Exit(1) from exc
 
     try:
-        from invarlock.reporting.certificate import validate_certificate
+        from invarlock.reporting.report_builder import validate_report
 
-        ok = validate_certificate(payload)
+        ok = validate_report(payload)
         if not ok:
             _event("FAIL", "Certificate schema validation failed", emoji="❌")
             raise typer.Exit(2)

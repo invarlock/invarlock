@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.report_types import RunReport, create_empty_report
 
 
@@ -94,7 +94,7 @@ def test_certificate_propagates_determinism_and_overhead_skip_fields() -> None:
         "overhead_threshold": 0.01,
     }
 
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     meta = cert.get("meta", {})
     assert isinstance(meta, dict)
     assert isinstance(meta.get("determinism"), dict)

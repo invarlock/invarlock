@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def test_identity_deviation_in_dev_does_not_raise() -> None:
@@ -34,5 +34,5 @@ def test_identity_deviation_in_dev_does_not_raise() -> None:
         "metrics": {"primary_metric": {"kind": "ppl_mlm", "final": 50.0}},
     }
     # Should not raise
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     assert isinstance(cert, dict)

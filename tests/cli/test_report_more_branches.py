@@ -8,7 +8,7 @@ import typer
 from typer.models import OptionInfo
 
 import invarlock.cli.commands.report as report_mod
-import invarlock.reporting.certificate as cert_mod
+import invarlock.reporting.report_builder as cert_mod
 import invarlock.reporting.report as report_lib
 
 
@@ -73,12 +73,12 @@ def test_generate_reports_certificate_validation_block(monkeypatch):
     )
     monkeypatch.setattr(
         cert_mod,
-        "make_certificate",
+        "make_report",
         lambda *_, **__: {"validation": {"overall": True}},
         raising=False,
     )
     monkeypatch.setattr(
-        cert_mod, "validate_certificate", lambda cert: True, raising=False
+        cert_mod, "validate_report", lambda cert: True, raising=False
     )
 
     block = {
@@ -120,7 +120,7 @@ def test_generate_reports_certificate_validation_error(monkeypatch):
     def _boom(*_args, **_kwargs):
         raise RuntimeError("bad cert")
 
-    monkeypatch.setattr(cert_mod, "make_certificate", _boom, raising=False)
+    monkeypatch.setattr(cert_mod, "make_report", _boom, raising=False)
     monkeypatch.setattr(
         report_mod, "console", type("C", (), {"print": lambda *_: None})()
     )
@@ -144,7 +144,7 @@ def test_report_validate_success(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(
         cert_mod,
-        "validate_certificate",
+        "validate_report",
         lambda payload: True,
         raising=False,
     )
@@ -159,7 +159,7 @@ def test_report_validate_schema_failure(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(
         cert_mod,
-        "validate_certificate",
+        "validate_report",
         lambda payload: False,
         raising=False,
     )
@@ -178,7 +178,7 @@ def test_report_validate_value_error(monkeypatch, tmp_path):
     def _raise_val(payload):
         raise ValueError("bad schema")
 
-    monkeypatch.setattr(cert_mod, "validate_certificate", _raise_val, raising=False)
+    monkeypatch.setattr(cert_mod, "validate_report", _raise_val, raising=False)
     with pytest.raises(typer.Exit) as exc:
         report_mod.report_validate(report=str(cert))
     assert exc.value.exit_code == 2
@@ -194,7 +194,7 @@ def test_report_validate_generic_error(monkeypatch, tmp_path):
     def _raise(payload):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(cert_mod, "validate_certificate", _raise, raising=False)
+    monkeypatch.setattr(cert_mod, "validate_report", _raise, raising=False)
     with pytest.raises(typer.Exit) as exc:
         report_mod.report_validate(report=str(cert))
     assert exc.value.exit_code == 1

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def _mock_report_with_seed_and_device() -> dict[str, Any]:
@@ -45,7 +45,7 @@ def _mock_report_with_seed_and_device() -> dict[str, Any]:
 def test_device_and_seeds_captured() -> None:
     report = _mock_report_with_seed_and_device()
     baseline = _mock_report_with_seed_and_device()
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     meta = cert.get("meta", {})
     assert meta.get("seed") == 11
     seeds = meta.get("seeds", {})

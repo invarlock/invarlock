@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_certificate_markdown
 
 
@@ -60,10 +60,10 @@ def _base_minimal():
 def test_render_spectral_tables_and_plugins_missing_fields():
     report, baseline = _base_minimal()
     with patch(
-        "invarlock.reporting.certificate.compute_paired_delta_log_ci",
+        "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
         return_value=(-0.1, 0.1),
     ):
-        cert = make_certificate(report, baseline)
+        cert = make_report(report, baseline)
 
     # Inject spectral tables
     cert["spectral"] = {

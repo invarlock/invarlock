@@ -1,4 +1,4 @@
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_certificate_markdown
 
 
@@ -53,9 +53,9 @@ def test_guard_overhead_direct_values_and_unavailable_ratio_path(monkeypatch):
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
     monkeypatch.setattr(
-        "invarlock.reporting.certificate.validate_report", lambda _: True
+        "invarlock.reporting.report_builder.validate_run_report", lambda _: True
     )
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     # Guard overhead section may be omitted; renderer should handle it gracefully
     oh = cert.get("guard_overhead", {})
     assert isinstance(oh, dict)

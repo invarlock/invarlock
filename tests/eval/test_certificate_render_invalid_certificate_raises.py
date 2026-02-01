@@ -4,7 +4,7 @@ from invarlock.reporting.render import render_certificate_markdown
 
 
 def test_render_certificate_markdown_rejects_invalid_schema():
-    # Minimal malformed certificate to exercise validate_certificate(False) path
+    # Minimal malformed certificate to exercise validate_report(False) path
     cert = {
         "schema_version": "bad-version",
         "run_id": "r1",

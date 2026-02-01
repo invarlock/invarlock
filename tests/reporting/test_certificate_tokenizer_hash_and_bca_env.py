@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.report_types import create_empty_report
 
 
@@ -68,7 +68,7 @@ def test_certificate_baseline_ref_includes_tokenizer_hash() -> None:
         "flags": {"guard_recovered": False, "rollback_reason": None},
     }
 
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     assert cert["baseline_ref"]["tokenizer_hash"] == "tokhash-abc"
 
 
@@ -153,20 +153,20 @@ def test_certificate_uses_bca_when_env_enabled_and_many_paired_windows(
         return (0.0, 0.0)
 
     monkeypatch.setattr(
-        "invarlock.reporting.certificate.compute_paired_delta_log_ci", _fake_ci
+        "invarlock.reporting.report_builder.compute_paired_delta_log_ci", _fake_ci
     )
     monkeypatch.setattr(
-        "invarlock.reporting.certificate.logspace_to_ratio_ci",
+        "invarlock.reporting.report_builder.logspace_to_ratio_ci",
         lambda _ci: (1.0, 1.0),
     )
     monkeypatch.setattr(
-        "invarlock.reporting.certificate.compute_primary_metric_from_report",
+        "invarlock.reporting.report_builder.compute_primary_metric_from_report",
         lambda *_a, **_k: {"kind": "ppl_causal", "final": 10.0},
     )
     monkeypatch.setattr(
-        "invarlock.reporting.certificate.get_metric",
+        "invarlock.reporting.report_builder.get_metric",
         lambda *_a, **_k: SimpleNamespace(direction="lower"),
     )
 
-    make_certificate(report, baseline)
+    make_report(report, baseline)
     assert seen.get("method") == "bca"

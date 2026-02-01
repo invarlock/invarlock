@@ -5,7 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 BASELINE_PPL_FINAL = 46.5
 PPL_PREVIEW = 46.8
@@ -149,8 +149,8 @@ def test_variance_toggle_balanced_vs_conservative():
         "conservative", ve_enabled=False, params_changed=2360064
     )
 
-    balanced_cert = make_certificate(deepcopy(balanced_report), deepcopy(baseline))
-    conservative_cert = make_certificate(
+    balanced_cert = make_report(deepcopy(balanced_report), deepcopy(baseline))
+    conservative_cert = make_report(
         deepcopy(conservative_report), deepcopy(baseline)
     )
 

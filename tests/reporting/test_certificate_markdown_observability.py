@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_certificate_markdown
 
 
@@ -56,7 +56,7 @@ def test_render_certificate_markdown_observability_sections():
             "latency_ms_per_tok": 1.6,
         }
     }
-    cert = make_certificate(rep, base)
+    cert = make_report(rep, base)
     md = render_certificate_markdown(cert)
     assert "System Overhead" in md
     assert "Policy Version:" in md and "Thresholds Digest:" in md

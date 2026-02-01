@@ -9,8 +9,8 @@ from typing import Any
 
 import yaml
 
-# Import certificate module for helper access without creating hard cycles
-from . import certificate as C
+# Import report_builder for helper access without creating hard cycles
+from . import report_builder as C
 
 # Console Validation Block helpers (allow-list driven)
 _CONSOLE_LABELS_DEFAULT = [
@@ -726,9 +726,9 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
     module inside the function body.
     """
     # Alias frequently used helpers locally to avoid editing the large body
-    validate_certificate = C.validate_certificate
+    validate_report = C.validate_report
 
-    if not validate_certificate(certificate):
+    if not validate_report(certificate):
         raise ValueError("Invalid certificate structure")
 
     lines: list[str] = []

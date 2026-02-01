@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def _mk_pm_report(
@@ -61,7 +61,7 @@ def test_certificate_policy_digest_changed_and_hysteresis_applied() -> None:
         "meta": {"auto": {"tier": "conservative"}},
         "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
     }
-    cert = make_certificate(rep, base)
+    cert = make_report(rep, base)
     pd = cert.get("policy_digest", {})
     assert isinstance(pd, dict) and pd.get("changed") is True
     # Hysteresis fields present
@@ -78,7 +78,7 @@ def test_certificate_guard_overhead_not_evaluated_soft_pass() -> None:
     # Provide guard_overhead payload without bare/guarded metrics → not evaluated branch
     rep["guard_overhead"] = {"messages": ["noop"]}
     base = {"metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}}}
-    cert = make_certificate(rep, base)
+    cert = make_report(rep, base)
     go = cert.get("guard_overhead", {})
     assert go.get("evaluated") is False
     assert go.get("passed") is True
@@ -104,7 +104,7 @@ def test_certificate_quality_overhead_from_guard_ratio() -> None:
     rep = _mk_pm_report(ratio=1.0)
     rep["guard_overhead"] = {"bare_report": bare, "guarded_report": guarded}
     base = {"metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}}}
-    cert = make_certificate(rep, base)
+    cert = make_report(rep, base)
     qo = cert.get("quality_overhead", {})
     assert qo.get("basis") == "ratio"
     assert isinstance(qo.get("value"), float)

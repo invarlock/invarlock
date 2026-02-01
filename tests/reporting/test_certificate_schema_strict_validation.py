@@ -4,10 +4,10 @@ import math
 
 import pytest
 
-from invarlock.reporting.certificate import (
+from invarlock.reporting.report_builder import (
     REPORT_JSON_SCHEMA,
-    make_certificate,
-    validate_certificate,
+    make_report,
+    validate_report,
 )
 
 
@@ -69,7 +69,7 @@ def _mock_baseline(report):
 def test_validation_schema_rejects_unknown_keys():
     report = _mock_report_with_windows()
     baseline = _mock_baseline(report)
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     # Inject an unknown validation key; strict schema must reject it
     cert.setdefault("validation", {})["foo_acceptable"] = True
     try:
@@ -79,21 +79,21 @@ def test_validation_schema_rejects_unknown_keys():
             jsonschema.validate(instance=cert, schema=REPORT_JSON_SCHEMA)
     except Exception:
         # Fallback to helper which uses jsonschema when present
-        assert validate_certificate(cert) is False
+        assert validate_report(cert) is False
 
 
 @pytest.mark.unit
 def test_validation_schema_accepts_allowlisted_keys():
     report = _mock_report_with_windows()
     baseline = _mock_baseline(report)
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     cert.setdefault("validation", {})["hysteresis_applied"] = False
     # Helper should accept allow-listed keys.
-    assert validate_certificate(cert) is True
+    assert validate_report(cert) is True
     try:
         import jsonschema  # type: ignore
 
         jsonschema.validate(instance=cert, schema=REPORT_JSON_SCHEMA)
     except Exception:
-        # jsonschema optional; validate_certificate already checked above
+        # jsonschema optional; validate_report already checked above
         pass

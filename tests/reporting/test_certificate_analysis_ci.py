@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def _mk_report_for_ci() -> dict:
@@ -52,7 +52,7 @@ def _mk_report_for_ci() -> dict:
 def test_certificate_includes_analysis_basis_cis_for_ppl():
     report = _mk_report_for_ci()
     baseline = _mk_report_for_ci()
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     pm = cert.get("primary_metric", {})
     # Normalized path may omit analysis-basis CIs; ensure kind and display_ci structure
     assert pm.get("kind") in {"ppl_causal", "ppl_mlm", "ppl_seq2seq"}

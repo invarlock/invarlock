@@ -1,4 +1,4 @@
-from invarlock.reporting.certificate import make_certificate, validate_certificate
+from invarlock.reporting.report_builder import make_report, validate_report
 from invarlock.reporting.report_types import create_empty_report
 
 
@@ -118,7 +118,7 @@ def test_make_certificate_with_secondary_and_subgroups():
         "checkpoint_path": None,
     }
 
-    certificate = make_certificate(report, baseline)
+    certificate = make_report(report, baseline)
 
     assert certificate["primary_metric"]["ratio_vs_baseline"] is not None
     assert certificate["policy_digest"]["policy_version"] == "policy-v1"
@@ -126,4 +126,4 @@ def test_make_certificate_with_secondary_and_subgroups():
     assert certificate["validation"]["primary_metric_acceptable"] in {True, False}
 
     # Certificate should validate against schema/allowlist
-    assert validate_certificate(certificate)
+    assert validate_report(certificate)

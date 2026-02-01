@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_certificate_markdown
 
 
@@ -64,13 +64,13 @@ def _mk_baseline() -> dict:
 def test_markdown_commit_present_and_absent() -> None:
     rep1 = _mk_base_report(commit="abcdef0123456789deadbeef")
     base = _mk_baseline()
-    cert1 = make_certificate(rep1, base)
+    cert1 = make_report(rep1, base)
     md1 = render_certificate_markdown(cert1)
     assert "Commit:" in md1
 
     # Still renders Model Information section when commit absent
     rep2 = _mk_base_report(commit=None)
-    cert2 = make_certificate(rep2, base)
+    cert2 = make_report(rep2, base)
     md2 = render_certificate_markdown(cert2)
     assert "Model Information" in md2
 
@@ -78,7 +78,7 @@ def test_markdown_commit_present_and_absent() -> None:
 def test_markdown_tokenizer_add_prefix_space_and_secondary_metrics_dash() -> None:
     rep = _mk_base_report(commit="a1b2c3d4")
     base = _mk_baseline()
-    cert = make_certificate(rep, base)
+    cert = make_report(rep, base)
 
     # Inject tokenizer with add_prefix_space True and no PAD
     cert.setdefault("dataset", {}).setdefault("tokenizer", {})

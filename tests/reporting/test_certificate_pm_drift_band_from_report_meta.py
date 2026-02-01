@@ -1,4 +1,4 @@
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def _report_with_meta_pm_drift_band():
@@ -57,6 +57,6 @@ def _baseline():
 
 
 def test_make_certificate_uses_pm_drift_band_from_report_meta():
-    cert = make_certificate(_report_with_meta_pm_drift_band(), _baseline())
+    cert = make_report(_report_with_meta_pm_drift_band(), _baseline())
     assert cert["primary_metric"]["drift_band"] == {"min": 0.9, "max": 1.3}
     assert cert["validation"]["preview_final_drift_acceptable"] is True

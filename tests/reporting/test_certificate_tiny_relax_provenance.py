@@ -1,4 +1,4 @@
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def test_cert_provenance_records_tiny_relax(monkeypatch):
@@ -14,6 +14,6 @@ def test_cert_provenance_records_tiny_relax(monkeypatch):
         "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [2.3]}},
     }
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     assert cert.get("auto", {}).get("tiny_relax") is True
     assert "tiny_relax" in (cert.get("provenance", {}).get("flags", []))

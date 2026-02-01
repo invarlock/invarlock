@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def _rep_with_subgroups_and_sys() -> tuple[dict, dict]:
@@ -62,7 +62,7 @@ def _rep_with_subgroups_and_sys() -> tuple[dict, dict]:
 
 def test_make_certificate_classification_and_system_overhead_blocks():
     rep, base = _rep_with_subgroups_and_sys()
-    cert = make_certificate(rep, base)
+    cert = make_report(rep, base)
     # Classification subgroup summary present
     cls = cert.get("classification", {})
     assert isinstance(cls, dict)

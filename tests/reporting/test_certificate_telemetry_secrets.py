@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def _mk_report() -> tuple[dict, dict]:
@@ -59,7 +59,7 @@ def _mk_report() -> tuple[dict, dict]:
 
 def test_telemetry_summary_contains_no_paths_or_usernames():
     r, b = _mk_report()
-    cert = make_certificate(r, b)
+    cert = make_report(r, b)
     s = (cert.get("telemetry", {}) or {}).get("summary_line", "")
     assert isinstance(s, str)
     # No obvious path separators or at-signs

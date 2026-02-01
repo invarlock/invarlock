@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import (
+from invarlock.reporting.report_builder import (
     _compute_report_digest,
     _prepare_guard_overhead_section,
 )

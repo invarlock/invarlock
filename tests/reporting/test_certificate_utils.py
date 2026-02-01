@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting import certificate as cert
+from invarlock.reporting import report_builder as cert
 
 
 def test_is_ppl_kind_and_get_ppl_final() -> None:
@@ -61,7 +61,7 @@ def test_validate_certificate_rejects_non_boolean_flags() -> None:
         "primary_metric": {"kind": "ppl_causal", "final": 10.0},
         "validation": {"primary_metric_acceptable": "yes"},  # invalid type
     }
-    assert cert.validate_certificate(bad) is False
+    assert cert.validate_report(bad) is False
 
 
 def test_validate_certificate_fallback_ok_and_schema_minimal() -> None:
@@ -72,7 +72,7 @@ def test_validate_certificate_fallback_ok_and_schema_minimal() -> None:
         "primary_metric": {"kind": "ppl_causal"},
     }
     # JSONSchema may reject; fallback minimal check should pass
-    assert cert.validate_certificate(minimal) is True
+    assert cert.validate_report(minimal) is True
 
 
 def test_console_validation_block_guard_skipped_and_included() -> None:

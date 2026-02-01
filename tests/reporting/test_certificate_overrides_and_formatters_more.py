@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import (
+from invarlock.reporting.report_builder import (
     _format_epsilon_map,
     _format_family_caps,
     _normalize_override_entry,

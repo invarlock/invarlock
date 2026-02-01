@@ -1,4 +1,4 @@
-from invarlock.reporting.certificate import _coerce_int
+from invarlock.reporting.report_builder import _coerce_int
 
 
 def test_coerce_int_near_integer_boundary():

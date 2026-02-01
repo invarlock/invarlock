@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_certificate_markdown
 
 
@@ -43,7 +43,7 @@ def test_guard_overhead_row_na_and_hysteresis_note():
             "deltas": {"params_changed": 0},
         },
     }
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     # Force guard overhead evaluated without measured fields
     cert["guard_overhead"] = {"evaluated": True, "overhead_threshold": 0.012}
     cert.setdefault("validation", {})["guard_overhead_acceptable"] = True

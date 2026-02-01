@@ -12,7 +12,7 @@ import pytest
 # otherwise, drive it via certificate inputs in an integration test.
 from invarlock.core.runner import BOOTSTRAP_COVERAGE_REQUIREMENTS
 from invarlock.guards.variance import VarianceGuard
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.guards_analysis import _extract_rmt_analysis
 from invarlock.reporting.report_types import create_empty_report
 
@@ -125,8 +125,8 @@ def test_bootstrap_coverage_floors_match_assurance_docs():
 
 def test_certificate_enforces_paired_ratio_identity():
     report, baseline = _build_paired_run_and_baseline()
-    with patch("invarlock.reporting.certificate.validate_report", return_value=True):
-        certificate = make_certificate(deepcopy(report), deepcopy(baseline))
+    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+        certificate = make_report(deepcopy(report), deepcopy(baseline))
     delta_mean = report["metrics"]["paired_delta_summary"]["mean"]
     expected_ratio = math.exp(delta_mean)
     pm = certificate.get("primary_metric", {})
@@ -141,13 +141,13 @@ def test_certificate_enforces_paired_ratio_identity():
 def test_certificate_rejects_inconsistent_ratio():
     report, baseline = _build_paired_run_and_baseline()
     report["metrics"]["paired_delta_summary"]["mean"] += 0.1  # Break consistency
-    with patch("invarlock.reporting.certificate.validate_report", return_value=True):
+    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
         # Use dev profile to avoid strict pairing enforcement; inconsistency should not raise
         report.setdefault("metrics", {}).setdefault("window_plan", {})["profile"] = (
             "dev"
         )
         # Normalized certificate generation now degrades this inconsistency without raising
-        cert = make_certificate(report, baseline)
+        cert = make_report(report, baseline)
         assert isinstance(cert, dict)
 
 
@@ -198,9 +198,9 @@ def test_ppl_ratio_gate_enforced():
         preview=40.0, final=46.0, tier="balanced"
     )  # 1.15
 
-    with patch("invarlock.reporting.certificate.validate_report", return_value=True):
-        passing_cert = make_certificate(deepcopy(passing_report), deepcopy(baseline))
-        failing_cert = make_certificate(deepcopy(failing_report), deepcopy(baseline))
+    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+        passing_cert = make_report(deepcopy(passing_report), deepcopy(baseline))
+        failing_cert = make_report(deepcopy(failing_report), deepcopy(baseline))
 
     assert passing_cert["validation"]["primary_metric_acceptable"] is True
     assert failing_cert["validation"]["primary_metric_acceptable"] is False
@@ -208,8 +208,8 @@ def test_ppl_ratio_gate_enforced():
 
 def test_seed_bundle_contract():
     report, baseline = _build_paired_run_and_baseline()
-    with patch("invarlock.reporting.certificate.validate_report", return_value=True):
-        certificate = make_certificate(report, baseline)
+    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+        certificate = make_report(report, baseline)
     # Certificate preserves the full seed bundle for auditability.
     assert certificate["meta"]["seeds"] == {"python": 1337, "numpy": 4242, "torch": 777}
     stats = certificate.get("dataset", {}).get("windows", {}).get("stats", {})
@@ -238,9 +238,9 @@ def test_certificate_rejects_ci_runs_below_bootstrap_floor():
         "replicates": {"used": 100},
     }
     report["metrics"]["bootstrap"]["replicates"] = 100
-    with patch("invarlock.reporting.certificate.validate_report", return_value=True):
+    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
         with pytest.raises(ValueError):
-            make_certificate(deepcopy(report), deepcopy(baseline))
+            make_report(deepcopy(report), deepcopy(baseline))
 
 
 def _apply_ci_pairing_requirements(report: dict[str, Any]) -> None:
@@ -271,18 +271,18 @@ def test_certificate_rejects_ci_overlap():
     report, baseline = _build_paired_run_and_baseline()
     _apply_ci_pairing_requirements(report)
     report["metrics"]["window_overlap_fraction"] = 0.25
-    with patch("invarlock.reporting.certificate.validate_report", return_value=True):
+    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
         with pytest.raises(ValueError):
-            make_certificate(deepcopy(report), deepcopy(baseline))
+            make_report(deepcopy(report), deepcopy(baseline))
 
 
 def test_certificate_rejects_ci_pairing_mismatch():
     report, baseline = _build_paired_run_and_baseline()
     _apply_ci_pairing_requirements(report)
     report["metrics"]["window_match_fraction"] = 0.98
-    with patch("invarlock.reporting.certificate.validate_report", return_value=True):
+    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
         with pytest.raises(ValueError):
-            make_certificate(deepcopy(report), deepcopy(baseline))
+            make_report(deepcopy(report), deepcopy(baseline))
 
 
 def test_infeasible_lowrank_cap_rejected():

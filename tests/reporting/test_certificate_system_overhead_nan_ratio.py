@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def _reports_with_sys_overhead_zero_base() -> tuple[dict, dict]:
@@ -34,7 +34,7 @@ def _reports_with_sys_overhead_zero_base() -> tuple[dict, dict]:
 
 def test_system_overhead_ratio_nan_when_baseline_zero() -> None:
     rep, base = _reports_with_sys_overhead_zero_base()
-    cert = make_certificate(rep, base)
+    cert = make_report(rep, base)
     sys = cert.get("system_overhead", {})
     assert isinstance(sys, dict)
     entry = sys.get("latency_ms_p50") or sys.get("latency_ms_per_tok")

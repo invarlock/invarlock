@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_certificate_markdown
 
 
@@ -44,7 +44,7 @@ def test_system_overhead_na_row_when_both_zero() -> None:
         "meta": {"auto": {"tier": "balanced"}},
         "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
     }
-    cert = make_certificate(rep, base)
+    cert = make_report(rep, base)
     # Force N/A path: both baseline and edited zero for throughput
     cert["system_overhead"] = {"throughput_sps": {"baseline": 0.0, "edited": 0.0}}
     md = render_certificate_markdown(cert)

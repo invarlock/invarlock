@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def _mk_min_report_pm(kind: str = "ppl_causal") -> dict:
@@ -59,7 +59,7 @@ def test_make_certificate_ratio_ci_from_run_metrics():
         "meta": {},
         "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 4.0}},
     }
-    cert = make_certificate(rep, baseline)
+    cert = make_report(rep, baseline)
     pm = cert.get("primary_metric", {})
     assert isinstance(pm, dict)
     dci = pm.get("display_ci")
@@ -82,7 +82,7 @@ def test_make_certificate_pairing_and_dataset_stats_injection():
         "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 4.0}},
         "evaluation_windows": {"final": {"window_ids": [1, 2], "logloss": [4.0, 4.0]}},
     }
-    cert = make_certificate(rep, base)
+    cert = make_report(rep, base)
     stats = cert.get("dataset", {}).get("windows", {}).get("stats", {})
     assert stats.get("pairing") == "paired_baseline"
     assert stats.get("paired_windows") == 2
@@ -94,7 +94,7 @@ def test_make_certificate_policy_digest_changed_with_tier_difference():
         "meta": {"auto": {"tier": "conservative"}},
         "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 4.0}},
     }
-    cert = make_certificate(rep, base)
+    cert = make_report(rep, base)
     pd = cert.get("policy_digest", {})
     assert isinstance(pd, dict) and pd.get("changed") in {True, False}
 
@@ -108,7 +108,7 @@ def test_make_certificate_guard_overhead_integration():
         "overhead_threshold": 0.02,
     }
     base = {"metrics": {"primary_metric": {"kind": "ppl_causal", "final": 4.0}}}
-    cert = make_certificate(rep, base)
+    cert = make_report(rep, base)
     go = cert.get("guard_overhead", {})
     assert go.get("evaluated") is True
     assert go.get("passed") is True

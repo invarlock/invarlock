@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import (
+from invarlock.reporting.report_builder import (
     _compute_quality_overhead_from_guard,
-    make_certificate,
+    make_report,
 )
 
 
@@ -48,7 +48,7 @@ def test_make_certificate_attaches_quality_overhead_for_accuracy() -> None:
     baseline = {
         "metrics": {"primary_metric": {"kind": "accuracy", "final": 0.70}},
     }
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     qo = cert.get("quality_overhead", {})
     assert isinstance(qo, dict) and qo.get("basis") == "delta_pp"
     assert qo.get("kind") in {"accuracy", "vqa_accuracy"}

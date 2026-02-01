@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from invarlock.reporting import certificate as cert
+from invarlock.reporting import report_builder as cert
 
 
 def _basic_pm(final: float) -> dict[str, object]:

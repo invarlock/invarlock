@@ -1,4 +1,4 @@
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.policy_utils import _resolve_policy_tier
 from invarlock.reporting.utils import _infer_scope_from_modules
 
@@ -45,7 +45,7 @@ def test_make_certificate_invalid_preview_only_no_longer_raises(monkeypatch):
     }
     # Bypass schema rigor to focus on branch
     monkeypatch.setattr(
-        "invarlock.reporting.certificate.validate_report", lambda _: True
+        "invarlock.reporting.report_builder.validate_run_report", lambda _: True
     )
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     assert isinstance(cert, dict)

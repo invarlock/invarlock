@@ -1,6 +1,6 @@
 from invarlock.cli.commands import run
 from invarlock.cli.config import InvarLockConfig
-from invarlock.reporting import certificate as cert
+from invarlock.reporting import report_builder as cert
 
 
 def test_pm_acceptance_range_env_override(monkeypatch):

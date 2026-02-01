@@ -53,7 +53,7 @@ from .guards_analysis import (
     _extract_spectral_analysis,
     _extract_variance_analysis,
 )
-from .report_types import RunReport, validate_report
+from .report_types import RunReport, validate_report as validate_run_report
 
 # Expose compute_window_hash for tests that monkeypatch it
 # compute_window_hash used to be exposed via certificate; tests now patch
@@ -103,7 +103,7 @@ def _is_ppl_kind(name: Any) -> bool:
 
 
 ## NOTE: Deprecated helper `_get_ppl_final` was removed; callers should
-## use the normalized primary_metric block directly via make_certificate or
+## use the normalized primary_metric block directly via make_report or
 ## report processing utilities.
 
 
@@ -131,8 +131,8 @@ def _compute_edit_digest(report: dict) -> dict:
     return {"family": family, "impl_hash": impl_hash, "version": 1}
 
 
-def _compute_confidence_label(certificate: dict[str, Any]) -> dict[str, Any]:
-    """Compute certificate confidence label based on stability and CI width.
+def _compute_confidence_label(evaluation_report: dict[str, Any]) -> dict[str, Any]:
+    """Compute evaluation report confidence label based on stability and CI width.
 
     Heuristics:
     - High: ppl_acceptable=True, unstable=False, width <= 0.03 (ratio) or <= 1.0 pp for accuracy
@@ -140,7 +140,7 @@ def _compute_confidence_label(certificate: dict[str, Any]) -> dict[str, Any]:
     - Low: otherwise (floors unmet, failure, or missing bounds)
     Returns a dict with label, basis, width and threshold for transparency.
     """
-    validation = certificate.get("validation", {}) or {}
+    validation = evaluation_report.get("validation", {}) or {}
     pm_ok = bool(validation.get("primary_metric_acceptable", False))
     # Basis label shown in confidence block:
     #  - For ppl-like metrics, use 'ppl_ratio' to reflect ratio width threshold
@@ -149,7 +149,7 @@ def _compute_confidence_label(certificate: dict[str, Any]) -> dict[str, Any]:
     basis = "primary_metric"
     lo = hi = float("nan")
     try:
-        pm = certificate.get("primary_metric", {}) or {}
+        pm = evaluation_report.get("primary_metric", {}) or {}
         kind = str(pm.get("kind", "") or "").lower()
         if isinstance(pm, dict) and pm and pm.get("display_ci"):
             dci = pm.get("display_ci")
@@ -170,7 +170,7 @@ def _compute_confidence_label(certificate: dict[str, Any]) -> dict[str, Any]:
     thr_ratio = 0.03  # 3% width for ratio
     thr_pp = 1.0  # 1.0 percentage point for accuracy kinds
     try:
-        pol = certificate.get("resolved_policy")
+        pol = evaluation_report.get("resolved_policy")
         if isinstance(pol, dict):
             conf_pol = pol.get("confidence")
             if isinstance(conf_pol, dict):
@@ -187,7 +187,7 @@ def _compute_confidence_label(certificate: dict[str, Any]) -> dict[str, Any]:
 
     # Unstable hint from primary metric (if provided)
     try:
-        unstable = bool((certificate.get("primary_metric") or {}).get("unstable"))
+        unstable = bool((evaluation_report.get("primary_metric") or {}).get("unstable"))
     except Exception:  # pragma: no cover
         unstable = False
 
@@ -213,39 +213,39 @@ def _compute_confidence_label(certificate: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-# Minimal JSON Schema describing the canonical shape of a certificate.
+# Minimal JSON Schema describing the canonical shape of an evaluation report.
 # This focuses on structural validity; numerical thresholds are validated
 # separately in metric-specific logic.
-# JSON Schema is provided by certificate_schema; no duplication here.
+# JSON Schema is provided by report_schema; no duplication here.
 
 
 # Mirror jsonschema and structural validator for test monkeypatching compatibility.
 jsonschema = getattr(_report_schema, "jsonschema", None)
 
 
-def _validate_with_jsonschema(certificate: dict[str, Any]) -> bool:
+def _validate_with_jsonschema(evaluation_report: dict[str, Any]) -> bool:
     if jsonschema is None:
         return True
     try:
-        jsonschema.validate(instance=certificate, schema=REPORT_JSON_SCHEMA)
+        jsonschema.validate(instance=evaluation_report, schema=REPORT_JSON_SCHEMA)
         return True
     except Exception:  # pragma: no cover
         return False
 
 
-def validate_certificate(certificate: dict[str, Any]) -> bool:
-    """Validate that a certificate has all required fields and valid data."""
+def validate_report(evaluation_report: dict[str, Any]) -> bool:
+    """Validate that an evaluation report has all required fields and valid data."""
     try:
-        if certificate.get("schema_version") != REPORT_SCHEMA_VERSION:
+        if evaluation_report.get("schema_version") != REPORT_SCHEMA_VERSION:
             return False
         # Prefer JSON Schema structural validation; if unavailable or too strict,
         # fall back to a lenient minimal check used by unit tests.
-        if not _validate_with_jsonschema(certificate):
+        if not _validate_with_jsonschema(evaluation_report):
             # Minimal fallback: require schema version + run_id + primary_metric
-            run_id_ok = isinstance(certificate.get("run_id"), str) and bool(
-                certificate.get("run_id")
+            run_id_ok = isinstance(evaluation_report.get("run_id"), str) and bool(
+                evaluation_report.get("run_id")
             )
-            pm = certificate.get("primary_metric")
+            pm = evaluation_report.get("primary_metric")
             pm_ok = isinstance(pm, dict) and (
                 isinstance(pm.get("final"), int | float)
                 or (isinstance(pm.get("kind"), str) and bool(pm.get("kind")))
@@ -253,7 +253,7 @@ def validate_certificate(certificate: dict[str, Any]) -> bool:
             if not (run_id_ok and pm_ok):
                 return False
 
-        validation = certificate.get("validation", {})
+        validation = evaluation_report.get("validation", {})
         for flag in [
             "preview_final_drift_acceptable",
             "primary_metric_acceptable",
@@ -446,7 +446,7 @@ except Exception:  # pragma: no cover
 def _normalize_and_validate_report(report: RunReport | dict[str, Any]) -> RunReport:
     """Normalize a possibly-minimal report and validate its structure.
 
-    Uses the local normalizer when available, then checks `validate_report`.
+    Uses the local normalizer when available, then checks `validate_run_report`.
     Raises ValueError on invalid input. Returns the normalized RunReport.
     """
     try:
@@ -456,13 +456,13 @@ def _normalize_and_validate_report(report: RunReport | dict[str, Any]) -> RunRep
             report = _norm(report)
     except Exception:  # pragma: no cover
         pass
-    if not validate_report(report):
+    if not validate_run_report(report):
         raise ValueError("Invalid RunReport structure")
     return report
 
 
-def _extract_certificate_meta(report: RunReport) -> dict[str, Any]:
-    """Extract the certificate metadata block with a full seed bundle."""
+def _extract_report_meta(report: RunReport) -> dict[str, Any]:
+    """Extract the evaluation report metadata block with a full seed bundle."""
     meta_section = (
         report.get("meta", {}) if isinstance(report.get("meta"), dict) else {}
     )
@@ -739,22 +739,22 @@ def _fallback_paired_windows(
     return paired_windows
 
 
-def make_certificate(
+def make_report(
     report: RunReport,
     baseline: RunReport | dict[str, Any],
 ) -> dict[str, Any]:
     """
-    Generate an evaluation certificate from a RunReport and baseline comparison.
+    Generate an evaluation report from a RunReport and baseline comparison.
 
-    The certificate is a standalone, portable artifact that contains all
-    essential metrics and comparisons needed for safety verification.
+    The evaluation report is a standalone, portable artifact that contains all
+    essential paired metrics and comparisons used by InvarLock gates.
 
     Args:
-        report: The guarded run report to certify
+        report: The guarded run report to evaluate
         baseline: Step-0 baseline RunReport or baseline metrics dict
 
     Returns:
-        Certificate dictionary with all required fields
+        Evaluation report dictionary with all required fields
 
     Raises:
         ValueError: If inputs are invalid or required data is missing
@@ -778,11 +778,11 @@ def make_certificate(
         baseline_report = None
 
     # Extract core metadata with full seed bundle
-    meta = _extract_certificate_meta(report)
+    meta = _extract_report_meta(report)
 
     # Propagate environment flags captured in the RunReport (e.g., deterministic algos,
     # TF32 controls, MPS/CUDA availability). This is useful for auditability and
-    # reproducibility of certification runs.
+    # reproducibility of evaluation runs.
     try:
         env_flags = (
             report.get("meta", {}).get("env_flags")
@@ -1920,7 +1920,7 @@ def make_certificate(
         k: bool(v) for k, v in validation_flags.items() if k in _allowed_validation
     }
 
-    certificate = {
+    evaluation_report = {
         "schema_version": REPORT_SCHEMA_VERSION,
         "run_id": current_run_id,
         "meta": meta,
@@ -1964,8 +1964,8 @@ def make_certificate(
         _tiny_relax_env = False
     if _tiny_relax_env:
         try:
-            certificate.setdefault("auto", {})["tiny_relax"] = True
-            prov = certificate.setdefault("provenance", {})
+            evaluation_report.setdefault("auto", {})["tiny_relax"] = True
+            prov = evaluation_report.setdefault("provenance", {})
             flags = prov.setdefault("flags", [])
             if "tiny_relax" not in flags:
                 flags.append("tiny_relax")
@@ -1991,12 +1991,12 @@ def make_certificate(
             and "value" in qo
             and math.isfinite(float(qo.get("value", float("nan"))))
         ):
-            certificate["quality_overhead"] = qo
+            evaluation_report["quality_overhead"] = qo
     except Exception:  # pragma: no cover
         pass
 
     try:
-        _propagate_pairing_stats(certificate, ppl_analysis)
+        _propagate_pairing_stats(evaluation_report, ppl_analysis)
     except Exception:  # pragma: no cover
         pass
 
@@ -2057,7 +2057,7 @@ def make_certificate(
         (resolved_policy.get("variance") or {}).get("min_effect_lognll", 0.0) or 0.0
     )
 
-    certificate["policy_digest"] = {
+    evaluation_report["policy_digest"] = {
         "policy_version": POLICY_VERSION,
         "tier_policy_name": cur_tier,
         "thresholds_hash": thresholds_hash,
@@ -2088,7 +2088,7 @@ def make_certificate(
                                 payload[key] = item[key]
                         sanitized.append(payload)
                 if sanitized:
-                    certificate["secondary_metrics"] = sanitized
+                    evaluation_report["secondary_metrics"] = sanitized
     except Exception:  # pragma: no cover
         pass
 
@@ -2136,7 +2136,7 @@ def make_certificate(
                     except Exception:  # pragma: no cover
                         continue
                 if out:
-                    certificate["classification"] = {"subgroups": out}
+                    evaluation_report["classification"] = {"subgroups": out}
     except Exception:  # pragma: no cover
         pass
 
@@ -2152,7 +2152,7 @@ def make_certificate(
                 if isinstance(container.get("metrics"), dict)
                 else {}
             )
-            # Edited report case: also check certificate telemetry keys
+            # Edited report case: also check evaluation_report telemetry keys
             telem = telemetry if isinstance(telemetry, dict) else {}
             # Prefer explicit p50/p95 throughput keys if present
             for key in ("latency_ms_p50", "latency_ms_p95", "throughput_sps"):
@@ -2193,24 +2193,24 @@ def make_certificate(
                     entry["ratio"] = float("nan")
             system_overhead[metric_key] = entry
         if system_overhead:
-            certificate["system_overhead"] = system_overhead
+            evaluation_report["system_overhead"] = system_overhead
     except Exception:  # pragma: no cover
         pass
 
     # Attach/normalize primary metric block (moved to helper)
     from .primary_metric_utils import attach_primary_metric as _attach_pm
 
-    _attach_pm(certificate, report, baseline_raw, baseline_ref, ppl_analysis)
+    _attach_pm(evaluation_report, report, baseline_raw, baseline_ref, ppl_analysis)
     try:
         if isinstance(pm_drift_band, dict) and pm_drift_band:
-            pm_block = certificate.get("primary_metric")
+            pm_block = evaluation_report.get("primary_metric")
             if isinstance(pm_block, dict):
                 pm_block.setdefault("drift_band", dict(pm_drift_band))
     except Exception:  # pragma: no cover
         pass
     _enforce_display_ci_alignment(
         ratio_ci_source,
-        certificate.get("primary_metric"),
+        evaluation_report.get("primary_metric"),
         logloss_delta_ci,
         window_plan_profile,
     )
@@ -2218,8 +2218,8 @@ def make_certificate(
     # Ensure primary_metric has display_ci populated for schema invariants
     try:
         pm = (
-            certificate.get("primary_metric", {})
-            if isinstance(certificate.get("primary_metric"), dict)
+            evaluation_report.get("primary_metric", {})
+            if isinstance(evaluation_report.get("primary_metric"), dict)
             else None
         )
         if isinstance(pm, dict) and pm:
@@ -2259,8 +2259,8 @@ def make_certificate(
         if not kind:
             kind = "ppl"
         windows_cfg = (
-            certificate.get("dataset", {}).get("windows", {})
-            if isinstance(certificate.get("dataset"), dict)
+            evaluation_report.get("dataset", {}).get("windows", {})
+            if isinstance(evaluation_report.get("dataset"), dict)
             else {}
         )
         n_prev = windows_cfg.get("preview")
@@ -2268,7 +2268,7 @@ def make_certificate(
         tokens_total = None
         try:
             tokens_total = (
-                certificate.get("dataset", {}).get("hash", {}).get("total_tokens")
+                evaluation_report.get("dataset", {}).get("hash", {}).get("total_tokens")
             )
         except Exception:  # pragma: no cover
             tokens_total = None
@@ -2276,7 +2276,7 @@ def make_certificate(
         ci_lo = None
         ci_hi = None
         ratio = None
-        pmc = certificate.get("primary_metric", {})
+        pmc = evaluation_report.get("primary_metric", {})
         rci = pmc.get("display_ci") or pmc.get("ci")
         if isinstance(rci, tuple | list) and len(rci) == 2:
             ci_lo, ci_hi = rci[0], rci[1]
@@ -2288,7 +2288,7 @@ def make_certificate(
         except Exception:  # pragma: no cover
             ci_w = None
         # Gate outcome
-        val = certificate.get("validation", {})
+        val = evaluation_report.get("validation", {})
         gate_ok = None
         try:
             gate_ok = bool(val.get("primary_metric_acceptable"))
@@ -2303,10 +2303,10 @@ def make_certificate(
             f"tokens={tokens_total}",
         ]
         try:
-            split = (certificate.get("provenance", {}) or {}).get("dataset_split")
+            split = (evaluation_report.get("provenance", {}) or {}).get("dataset_split")
             if not split:
                 split = (report.get("provenance", {}) or {}).get("dataset_split")
-            sf = (certificate.get("provenance", {}) or {}).get("split_fallback")
+            sf = (evaluation_report.get("provenance", {}) or {}).get("split_fallback")
             if sf is None:
                 sf = (report.get("provenance", {}) or {}).get("split_fallback")
             if split:
@@ -2322,7 +2322,7 @@ def make_certificate(
         if isinstance(gate_ok, bool):
             parts.append(f"gate={'pass' if gate_ok else 'fail'}")
         summary_line = "INVARLOCK_TELEMETRY " + " ".join(parts)
-        certificate.setdefault("telemetry", {})["summary_line"] = summary_line
+        evaluation_report.setdefault("telemetry", {})["summary_line"] = summary_line
         if str(os.environ.get("INVARLOCK_TELEMETRY", "")).strip().lower() in {
             "1",
             "true",
@@ -2335,11 +2335,11 @@ def make_certificate(
 
     # Attach confidence label (non-gating)
     try:
-        certificate["confidence"] = _compute_confidence_label(certificate)
+        evaluation_report["confidence"] = _compute_confidence_label(evaluation_report)
     except Exception:  # pragma: no cover
         pass
 
-    return certificate
+    return evaluation_report
 
 
 # Console Validation Block helpers have moved to invarlock.reporting.render.
@@ -4115,7 +4115,7 @@ def _extract_compression_diagnostics(
 # Re-export rendering API from dedicated module to avoid bloat/cycles
 # Rendering helpers live in invarlock.reporting.render; internal code should import there directly.
 # Tests and public API expect render_certificate_markdown to be available from
-# invarlock.reporting.certificate. Import lazily at module end to avoid cycles with
+# invarlock.reporting.report_builder. Import lazily at module end to avoid cycles with
 # invarlock.reporting.render which imports this module as a namespace.
 try:  # pragma: no cover - simple re-export
     from .render import (
@@ -4137,8 +4137,8 @@ except Exception:  # pragma: no cover - defensive fallback
 
 # Export public API
 __all__ = [
-    "make_certificate",
-    "validate_certificate",
+    "make_report",
+    "validate_report",
     "_validate_with_jsonschema",
     "jsonschema",
     "render_certificate_markdown",

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def test_choose_dataset_split_logic():
@@ -74,7 +74,7 @@ def test_certificate_telemetry_includes_split(tmp_path: Path):
         "preview": 10.0,
     }
 
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     summary = cert.get("telemetry", {}).get("summary_line", "")
     # Expect split=test*, where * denotes fallback
     assert "split=test*" in summary

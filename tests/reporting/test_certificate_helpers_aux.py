@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 
-from invarlock.reporting.certificate import (
+from invarlock.reporting.report_builder import (
     TIER_RATIO_LIMITS,
     _compute_confidence_label,
     _compute_edit_digest,

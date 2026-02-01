@@ -77,7 +77,7 @@ def _emit_version() -> None:
 
         schema = None
         try:
-            from invarlock.reporting.certificate import (
+            from invarlock.reporting.report_builder import (
                 REPORT_SCHEMA_VERSION as _SCHEMA,
             )
 

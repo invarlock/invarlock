@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def test_certificate_has_no_ppl_block_pm_only():
@@ -31,8 +31,8 @@ def test_certificate_has_no_ppl_block_pm_only():
     }
     baseline = {"run_id": "b", "model_id": "m", "ppl_final": 10.0}
 
-    with patch("invarlock.reporting.certificate.validate_report", return_value=True):
-        cert = make_certificate(report, baseline)
+    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+        cert = make_report(report, baseline)
 
     # PM-only: no 'ppl' key should be present in the certificate
     assert "ppl" not in cert

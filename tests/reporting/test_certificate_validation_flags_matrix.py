@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from invarlock.reporting.certificate import (
+from invarlock.reporting.report_builder import (
     _compute_quality_overhead_from_guard,
     _compute_validation_flags,
 )

@@ -2,12 +2,12 @@ from unittest.mock import patch
 
 import pytest
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_certificate_markdown
 
 
 def test_render_rejects_when_preview_final_ratio_not_number():
-    # Start from a valid certificate, then corrupt preview_final_ratio to hit validate_certificate branch
+    # Start from a valid certificate, then corrupt preview_final_ratio to hit validate_report branch
     report = {
         "meta": {"model_id": "m", "seed": 1},
         "metrics": {"ppl_preview": 10.0, "ppl_final": 10.0},
@@ -37,12 +37,12 @@ def test_render_rejects_when_preview_final_ratio_not_number():
         "ppl_final": 10.0,
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
-    with patch("invarlock.reporting.certificate.validate_report", return_value=True):
-        cert = make_certificate(report, baseline)
+    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+        cert = make_report(report, baseline)
     # Seed primary_metric via ppl_ratio for PM-only validation path
     report["metrics"]["ppl_ratio"] = 1.0
-    with patch("invarlock.reporting.certificate.validate_report", return_value=True):
-        cert = make_certificate(report, baseline)
+    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+        cert = make_report(report, baseline)
     # Corrupt schema_version to force validation failure regardless of jsonschema availability
     cert["schema_version"] = "wrong-version"
     with pytest.raises(ValueError):

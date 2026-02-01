@@ -1,7 +1,7 @@
 import math
 from types import SimpleNamespace
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.dataset_hashing import _extract_dataset_info
 from invarlock.reporting.policy_utils import _resolve_policy_tier
 from invarlock.reporting.utils import (
@@ -156,10 +156,10 @@ def test_make_certificate_raises_on_drift_vs_delta_mismatch(monkeypatch):
 
     # Bypass full schema validation to focus on drift consistency branch
     monkeypatch.setattr(
-        "invarlock.reporting.certificate.validate_report", lambda _: True
+        "invarlock.reporting.report_builder.validate_run_report", lambda _: True
     )
     monkeypatch.setattr(
-        "invarlock.reporting.certificate.compute_paired_delta_log_ci",
+        "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
         lambda *_a, **_k: (-0.01, 0.01),
     )
 
@@ -167,7 +167,7 @@ def test_make_certificate_raises_on_drift_vs_delta_mismatch(monkeypatch):
     report.setdefault("metrics", {}).setdefault("window_plan", {}).update(
         {"profile": "ci", "preview_n": 180, "final_n": 180}
     )
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     assert isinstance(cert, dict)
 
 
@@ -207,7 +207,7 @@ def test_make_certificate_primary_seed_defaulted_when_missing(monkeypatch):
         "metrics": {"ppl_final": 10.2, "ppl_preview": 10.1},
     }
     monkeypatch.setattr(
-        "invarlock.reporting.certificate.validate_report", lambda _: True
+        "invarlock.reporting.report_builder.validate_run_report", lambda _: True
     )
     # Ensure minimal acceptance criteria satisfied
     report.setdefault("metrics", {})["ppl_ratio"] = 1.01
@@ -217,7 +217,7 @@ def test_make_certificate_primary_seed_defaulted_when_missing(monkeypatch):
         "final": 10.1,
         "ratio_vs_baseline": 1.0,
     }
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     # Seed=0 is a valid, preserved seed value.
     assert cert["meta"]["seed"] == 0
 
@@ -253,9 +253,9 @@ def test_make_certificate_uses_tokenizer_hash_from_data(monkeypatch):
         "metrics": {"ppl_final": 10.5, "ppl_preview": 10.1},
     }
     monkeypatch.setattr(
-        "invarlock.reporting.certificate.validate_report", lambda _: True
+        "invarlock.reporting.report_builder.validate_run_report", lambda _: True
     )
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     assert cert["meta"]["tokenizer_hash"] == "tok-abc"
 
 
@@ -294,9 +294,9 @@ def test_make_certificate_includes_cuda_flags_and_model_profile(monkeypatch):
         "metrics": {"ppl_final": 10.5, "ppl_preview": 10.1},
     }
     monkeypatch.setattr(
-        "invarlock.reporting.certificate.validate_report", lambda _: True
+        "invarlock.reporting.report_builder.validate_run_report", lambda _: True
     )
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     # Extended meta fields may be omitted after normalization
     assert isinstance(cert.get("meta"), dict)
 
@@ -335,9 +335,9 @@ def test_make_certificate_carries_window_plan(monkeypatch):
         "metrics": {"ppl_final": 10.5, "ppl_preview": 10.1},
     }
     monkeypatch.setattr(
-        "invarlock.reporting.certificate.validate_report", lambda _: True
+        "invarlock.reporting.report_builder.validate_run_report", lambda _: True
     )
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     # Window plan may be omitted; ensure dataset pairing stats are present
     stats = cert.get("dataset", {}).get("windows", {}).get("stats", {})
     assert isinstance(stats, dict)

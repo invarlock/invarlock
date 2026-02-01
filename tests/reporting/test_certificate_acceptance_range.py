@@ -1,6 +1,6 @@
 import pytest
 
-from invarlock.reporting import certificate as cert
+from invarlock.reporting import report_builder as cert
 
 
 def test_resolve_pm_acceptance_range_branches(monkeypatch):

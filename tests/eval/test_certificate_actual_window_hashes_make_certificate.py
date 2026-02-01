@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def test_dataset_hash_uses_actual_evaluation_windows_ids():
@@ -34,8 +34,8 @@ def test_dataset_hash_uses_actual_evaluation_windows_ids():
     }
     baseline = {"run_id": "b", "model_id": "m", "ppl_final": 10.0}
 
-    with patch("invarlock.reporting.certificate.validate_report", return_value=True):
-        cert = make_certificate(report, baseline)
+    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+        cert = make_report(report, baseline)
 
     dataset_hash = cert["dataset"]["hash"]
     assert dataset_hash["preview"].startswith("sha256:")

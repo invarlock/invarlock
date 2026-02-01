@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate, validate_certificate
+from invarlock.reporting.report_builder import make_report, validate_report
 from invarlock.reporting.report_types import RunReport, create_empty_report
 
 
@@ -63,7 +63,7 @@ def _mk_minimal_baseline() -> dict:
                 "token_counts": [100, 100],
             }
         },
-        # Allow make_certificate to compute baseline primary_metric from windows
+        # Allow make_report to compute baseline primary_metric from windows
         "data": {
             "seq_len": 8,
             "preview_n": 2,
@@ -92,8 +92,8 @@ def _mk_minimal_baseline() -> dict:
 def test_make_certificate_minimal_paths() -> None:
     report = _mk_minimal_report()
     baseline = _mk_minimal_baseline()
-    cert = make_certificate(report, baseline)
-    assert validate_certificate(cert)
+    cert = make_report(report, baseline)
+    assert validate_report(cert)
     # Core fields present
     assert cert["schema_version"] == "v1"
     assert isinstance(cert.get("primary_metric"), dict)
@@ -106,5 +106,5 @@ def test_make_certificate_tiny_relax_flag(monkeypatch) -> None:
     baseline = _mk_minimal_baseline()
     # Enable tiny-relax to exercise relaxed gating and provenance flags
     monkeypatch.setenv("INVARLOCK_TINY_RELAX", "1")
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     assert cert.get("auto", {}).get("tiny_relax") is True

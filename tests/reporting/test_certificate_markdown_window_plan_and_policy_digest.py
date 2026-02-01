@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_certificate_markdown
 
 
 def test_markdown_window_plan_line_and_policy_digest_changed():
-    # Build a valid certificate via make_certificate
+    # Build a valid certificate via make_report
     report = {
         "meta": {"model_id": "m", "adapter": "hf", "device": "cpu", "seed": 1},
         "data": {
@@ -44,7 +44,7 @@ def test_markdown_window_plan_line_and_policy_digest_changed():
             "deltas": {"params_changed": 0},
         },
     }
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     # Inject window_plan and policy_digest for rendering branches
     cert["window_plan"] = {"profile": "ci", "actual_preview": 1, "actual_final": 2}
     cert["policy_digest"] = {

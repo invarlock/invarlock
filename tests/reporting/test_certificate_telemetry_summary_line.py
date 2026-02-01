@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def _mk_minimal_report() -> dict:
@@ -46,7 +46,7 @@ def test_certificate_embeds_telemetry_summary_line(monkeypatch):
     rep = _mk_minimal_report()
     base = _mk_minimal_report()
 
-    cert = make_certificate(rep, base)
+    cert = make_report(rep, base)
     tel = cert.get("telemetry", {})
     assert isinstance(tel, dict)
     line = tel.get("summary_line")

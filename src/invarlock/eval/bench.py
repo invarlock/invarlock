@@ -979,9 +979,9 @@ def execute_scenario(
     # Generate certificate artifact when both runs produced reports
     try:
         if bare_result.success and guarded_result.success:
-            from invarlock.reporting.certificate import make_certificate
+            from invarlock.reporting.report_builder import make_report
 
-            cert = make_certificate(guarded_result.report, bare_result.report)
+            cert = make_report(guarded_result.report, bare_result.report)
             cert_path = scenario_dir / "certificate.json"
             cert_path.write_text(json.dumps(cert, indent=2), encoding="utf-8")
             artifacts["certificate"] = str(cert_path)

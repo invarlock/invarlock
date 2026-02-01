@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def _mk_report_with_tokens(
@@ -56,7 +56,7 @@ def test_ppl_hysteresis_applied_near_threshold():
     # Balanced tier ratio limit=1.10; within +0.002 hysteresis → acceptable
     report = _mk_report_with_tokens(ratio=1.101)
     baseline = _mk_report_with_tokens(ratio=1.0)
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     assert cert["validation"]["primary_metric_acceptable"] is True
     assert cert["validation"].get("hysteresis_applied") is True
 
@@ -67,7 +67,7 @@ def test_ppl_min_tokens_floor_blocks_when_insufficient():
         ratio=1.00, preview_tokens=10000, final_tokens=10000
     )
     baseline = _mk_report_with_tokens(ratio=1.0)
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     assert cert["validation"]["primary_metric_acceptable"] is False
 
 
@@ -83,7 +83,7 @@ def test_accuracy_hysteresis_and_min_examples():
         "ratio_vs_baseline": -1.05,
         "n_final": 250,
     }
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     assert cert["validation"]["primary_metric_acceptable"] is True
     assert cert["validation"].get("hysteresis_applied") is True
 
@@ -96,5 +96,5 @@ def test_accuracy_hysteresis_and_min_examples():
         "ratio_vs_baseline": -0.5,
         "n_final": 100,  # below 200 floor
     }
-    cert2 = make_certificate(report2, baseline)
+    cert2 = make_report(report2, baseline)
     assert cert2["validation"]["primary_metric_acceptable"] is False

@@ -4,7 +4,7 @@ import math
 
 import pytest
 
-from invarlock.reporting import certificate as cert
+from invarlock.reporting import report_builder as cert
 
 
 def test_normalize_and_validate_report_raises_on_invalid(monkeypatch):

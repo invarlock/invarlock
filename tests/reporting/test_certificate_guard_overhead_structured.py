@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import (
+from invarlock.reporting.report_builder import (
     compute_console_validation_block,
-    make_certificate,
+    make_report,
 )
 
 
@@ -68,7 +68,7 @@ def test_guard_overhead_structured_pass_and_fail() -> None:
         "guarded_report": guarded,
     }
     base = {"metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}}}
-    cert_pass = make_certificate(rep_pass, base)
+    cert_pass = make_report(rep_pass, base)
     go_pass = cert_pass.get("guard_overhead", {})
     assert go_pass.get("evaluated") is True
     assert go_pass.get("passed") is True
@@ -88,7 +88,7 @@ def test_guard_overhead_structured_pass_and_fail() -> None:
         "bare_report": bare,
         "guarded_report": guarded,
     }
-    cert_fail = make_certificate(rep_fail, base)
+    cert_fail = make_report(rep_fail, base)
     go_fail = cert_fail.get("guard_overhead", {})
     assert go_fail.get("evaluated") is True
     assert go_fail.get("passed") is False

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def _mk_report_with_stats() -> tuple[dict, dict]:
@@ -72,7 +72,7 @@ def _mk_report_with_stats() -> tuple[dict, dict]:
 
 def test_pairing_stats_passthrough_into_dataset_windows_stats() -> None:
     report, base = _mk_report_with_stats()
-    cert = make_certificate(report, base)
+    cert = make_report(report, base)
     ds = cert.get("dataset", {})
     windows = ds.get("windows", {}) if isinstance(ds, dict) else {}
     stats = windows.get("stats", {}) if isinstance(windows, dict) else {}

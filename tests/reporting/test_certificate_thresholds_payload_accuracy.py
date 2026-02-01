@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import _compute_thresholds_payload
+from invarlock.reporting.report_builder import _compute_thresholds_payload
 
 
 def test_thresholds_payload_includes_accuracy_params():

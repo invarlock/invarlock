@@ -1,10 +1,10 @@
 import math
 from typing import Any
 
-from invarlock.reporting.certificate import (
+from invarlock.reporting.report_builder import (
     REPORT_JSON_SCHEMA,
     REPORT_SCHEMA_VERSION,
-    make_certificate,
+    make_report,
 )
 
 
@@ -103,7 +103,7 @@ def test_system_overhead_has_pattern_properties():
 def test_primary_metric_analysis_basis_present_and_consistent():
     report = _mock_report_with_primary_metric()
     baseline = _mock_baseline()
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
 
     pm = cert.get("primary_metric", {})
     assert isinstance(pm, dict)
@@ -130,7 +130,7 @@ def test_ci_instability_annotation_when_low_reps():
     baseline = _mock_baseline()
     baseline["metrics"]["bootstrap"]["replicates"] = 50
 
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     # PM-only: unstable hint should be on primary_metric
     pm = cert.get("primary_metric", {})
     assert isinstance(pm, dict)

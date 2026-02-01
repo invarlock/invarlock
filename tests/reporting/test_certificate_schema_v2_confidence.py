@@ -3,9 +3,9 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from invarlock.reporting.certificate import (
+from invarlock.reporting.report_builder import (
     REPORT_JSON_SCHEMA,
-    make_certificate,
+    make_report,
 )
 
 
@@ -73,7 +73,7 @@ def test_certificate_schema_includes_confidence_block():
 def test_generated_certificate_populates_confidence_fields():
     report = _mk_report()
     baseline = _mk_report()
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     conf = cert.get("confidence", {})
     assert isinstance(conf, dict) and conf, (
         "confidence should be present on certificate"

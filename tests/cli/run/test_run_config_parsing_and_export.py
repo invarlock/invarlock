@@ -872,7 +872,7 @@ def test_run_command_until_pass_auto_tune_head_budget_paths(tmp_path: Path) -> N
                     "invarlock.cli.commands.run._postprocess_and_summarize", post_stub
                 ),
                 patch("invarlock.core.retry.RetryController", RC),
-                patch("invarlock.reporting.certificate.make_certificate", make_cert),
+                patch("invarlock.reporting.report_builder.make_report", make_cert),
             ):
                 stack.enter_context(p)
             run_command(

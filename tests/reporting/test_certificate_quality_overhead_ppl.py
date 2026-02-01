@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import _compute_quality_overhead_from_guard
+from invarlock.reporting.report_builder import _compute_quality_overhead_from_guard
 
 
 def _ppl_report(point: float) -> dict:

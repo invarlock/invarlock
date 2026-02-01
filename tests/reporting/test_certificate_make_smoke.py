@@ -1,6 +1,6 @@
 from typing import Any
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_certificate_markdown
 
 
@@ -67,7 +67,7 @@ def test_make_certificate_smoke_and_render():
     report = _minimal_run_report_with_windows()
     baseline = _minimal_run_report_with_windows()
 
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     assert isinstance(cert, dict)
     assert "primary_metric" in cert and "dataset" in cert
     assert cert.get("meta", {}).get("seed") == 1

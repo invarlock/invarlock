@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
-from invarlock.reporting.certificate import (
-    make_certificate,
+from invarlock.reporting.report_builder import (
+    make_report,
     render_certificate_markdown,
 )
 
@@ -36,8 +36,8 @@ def test_render_omits_rmt_section_when_empty():
         "ppl_final": 10.0,
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
-    with patch("invarlock.reporting.certificate.validate_report", return_value=True):
-        cert = make_certificate(report, baseline)
+    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+        cert = make_report(report, baseline)
     # Ensure rmt section is effectively empty for optional families table
     cert["rmt"] = {}
     md = render_certificate_markdown(cert)

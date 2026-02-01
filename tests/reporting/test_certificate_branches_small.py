@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting import certificate as C
+from invarlock.reporting import report_builder as C
 
 
 def test_pair_logloss_windows_invalid_and_small_samples():

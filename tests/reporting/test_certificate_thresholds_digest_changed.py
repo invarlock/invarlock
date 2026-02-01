@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def _mk_pm_report(*, ratio: float = 1.0, pm_final: float = 10.0) -> dict:
@@ -49,7 +49,7 @@ def test_policy_digest_changed_when_baseline_tier_differs() -> None:
         "meta": {"auto": {"tier": "conservative"}},
         "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
     }
-    cert = make_certificate(rep, base)
+    cert = make_report(rep, base)
     pd = cert.get("policy_digest", {})
     assert isinstance(pd, dict)
     assert pd.get("changed") is True

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_certificate_markdown
 
 
 def _mk_base_report() -> dict:
-    # Minimal viable RunReport for make_certificate
+    # Minimal viable RunReport for make_report
     return {
         "meta": {"model_id": "gpt2", "adapter": "hf", "device": "cpu", "seed": 1},
         "data": {
@@ -48,7 +48,7 @@ def _mk_base_report() -> dict:
 def test_render_certificate_markdown_full_envelope() -> None:
     rep = _mk_base_report()
     base = _mk_base_report()
-    cert = make_certificate(rep, base)
+    cert = make_report(rep, base)
 
     # Enrich certificate with many optional sections to stimulate rendering branches
     cert.setdefault("meta", {}).update(

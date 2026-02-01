@@ -1,6 +1,6 @@
 import pytest
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.report_types import create_empty_report
 
 
@@ -46,8 +46,8 @@ def test_ratio_gate_respects_tier_limits():
     balanced_fail = _ratio_report(40.0, 46.0, tier="balanced")  # 1.15x
     conservative_pass = _ratio_report(40.0, 42.0, tier="conservative")  # 1.05x
 
-    balanced_cert = make_certificate(balanced_fail, baseline)
-    conservative_cert = make_certificate(conservative_pass, baseline)
+    balanced_cert = make_report(balanced_fail, baseline)
+    conservative_cert = make_report(conservative_pass, baseline)
 
     assert balanced_cert["validation"]["primary_metric_acceptable"] is False
     assert conservative_cert["validation"]["primary_metric_acceptable"] is True

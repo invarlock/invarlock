@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def test_spectral_precedence_from_tier_defaults_no_tables():
@@ -37,8 +37,8 @@ def test_spectral_precedence_from_tier_defaults_no_tables():
         "ppl_final": 10.0,
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
-    with patch("invarlock.reporting.certificate.validate_report", return_value=True):
-        cert = make_certificate(report, baseline)
+    with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
+        cert = make_report(report, baseline)
     spectral = cert.get("spectral", {})
     # family_z_quantiles/top_z_scores likely empty; sigma_quantile and family_caps provided
     assert spectral.get("sigma_quantile")

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def test_make_certificate_paired_baseline_ratio_ci():
@@ -61,7 +61,7 @@ def test_make_certificate_paired_baseline_ratio_ci():
         "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 4.0}},
         "evaluation_windows": {"final": {"window_ids": [1, 2], "logloss": [4.0, 4.0]}},
     }
-    cert = make_certificate(rep, base)
+    cert = make_report(rep, base)
     pm = cert.get("primary_metric", {})
     # Expect a display_ci to be present regardless of method choice
     dci = pm.get("display_ci") if isinstance(pm, dict) else None

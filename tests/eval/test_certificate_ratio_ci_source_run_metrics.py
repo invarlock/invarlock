@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def test_certificate_ratio_ci_source_run_metrics_on_compute_failure():
@@ -57,9 +57,9 @@ def test_certificate_ratio_ci_source_run_metrics_on_compute_failure():
     }
 
     with patch(
-        "invarlock.reporting.certificate.compute_paired_delta_log_ci",
+        "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
         side_effect=RuntimeError("fail"),
     ):
-        cert = make_certificate(report, baseline)
+        cert = make_report(report, baseline)
     stats = cert.get("dataset", {}).get("windows", {}).get("stats", {})
     assert stats.get("pairing") == "run_metrics"

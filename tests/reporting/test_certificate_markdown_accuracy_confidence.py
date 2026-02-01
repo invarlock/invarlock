@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_certificate_markdown
 
 
 def test_markdown_accuracy_low_baseline_note_and_confidence():
-    # Build a valid certificate via make_certificate, then tweak PM for the note
+    # Build a valid certificate via make_report, then tweak PM for the note
     report = {
         "meta": {"model_id": "m", "adapter": "hf", "device": "cpu", "seed": 1},
         "metrics": {
@@ -19,7 +19,7 @@ def test_markdown_accuracy_low_baseline_note_and_confidence():
         "artifacts": {"events_path": "", "logs_path": ""},
     }
     baseline = {"metrics": {"primary_metric": {"kind": "accuracy", "final": 0.04}}}
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     # Force confidence label and baseline_point for rendering branches
     cert.setdefault("confidence", {})["label"] = "Medium"
     cert["primary_metric"]["baseline_point"] = 0.04

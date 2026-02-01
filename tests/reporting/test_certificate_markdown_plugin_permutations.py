@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.render import render_certificate_markdown
 
 
@@ -47,7 +47,7 @@ def test_plugin_provenance_adapter_edit_only():
             "deltas": {"params_changed": 0},
         },
     }
-    cert = make_certificate(rep, base)
+    cert = make_report(rep, base)
     cert["plugins"] = {
         "adapter": {
             "name": "HF_Causal",
@@ -78,7 +78,7 @@ def test_plugin_provenance_guards_only():
             "deltas": {"params_changed": 0},
         },
     }
-    cert = make_certificate(rep, base)
+    cert = make_report(rep, base)
     cert["plugins"] = {
         "guards": [
             {

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from invarlock.reporting import certificate as cert
+from invarlock.reporting import report_builder as cert
 
 
 def _rich_run_report() -> tuple[dict, dict]:
@@ -154,7 +154,7 @@ def test_make_certificate_rich_context_generates_diagnostics(monkeypatch):
     )
 
     report, baseline = _rich_run_report()
-    cert_obj = cert.make_certificate(report, baseline)
+    cert_obj = cert.make_report(report, baseline)
     assert cert_obj["quality_overhead"]["basis"] == "ratio"
     stats = cert_obj["dataset"]["windows"]["stats"]
     assert stats["paired_windows"] >= 1
@@ -165,7 +165,7 @@ def test_make_certificate_rich_context_generates_diagnostics(monkeypatch):
 
 def test_make_certificate_surfaces_pairing_and_policy_digest():
     report, baseline = _rich_run_report()
-    cert_obj = cert.make_certificate(report, baseline)
+    cert_obj = cert.make_report(report, baseline)
     stats = cert_obj["dataset"]["windows"]["stats"]
     assert "pairing" in stats and stats["paired_windows"] >= 1
     assert "coverage" in stats and "window_match_fraction" in stats
@@ -276,7 +276,7 @@ def test_make_certificate_end_to_end_populates_optional_sections_and_validations
     report["metrics"]["spectral"]["caps_exceeded"] = True
     report["metrics"]["rmt"]["stable"] = False
 
-    certificate = cert.make_certificate(report, baseline)
+    certificate = cert.make_report(report, baseline)
 
     stats = certificate["dataset"]["windows"]["stats"]
     assert stats["pairing"]
@@ -333,7 +333,7 @@ def test_make_certificate_policy_digest_changes_when_policy_override_differs(
     baseline["guards"] = []
     baseline["meta"]["auto"]["tier"] = "conservative"
 
-    certificate = cert.make_certificate(report, baseline)
+    certificate = cert.make_report(report, baseline)
 
     assert certificate["policy_digest"]["changed"] is True
 
@@ -351,7 +351,7 @@ def test_make_certificate_provenance_and_guard_schedule_fallback(monkeypatch):
     report["guard_overhead"] = {}
     report["metrics"]["window_plan"]["profile"] = "dev"
 
-    certificate = cert.make_certificate(report, baseline)
+    certificate = cert.make_report(report, baseline)
 
     prov = certificate["provenance"]
     assert "provider_digest" in prov
@@ -372,6 +372,6 @@ def test_make_certificate_emits_telemetry_summary(monkeypatch, capsys):
     report = deepcopy(report)
     baseline = deepcopy(baseline)
 
-    cert.make_certificate(report, baseline)
+    cert.make_report(report, baseline)
     out = capsys.readouterr().out
     assert "INVARLOCK_TELEMETRY" in out

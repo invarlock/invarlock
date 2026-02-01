@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import _compute_validation_flags, make_certificate
+from invarlock.reporting.report_builder import _compute_validation_flags, make_report
 
 
 def _mk_pm_report(*, ratio: float, pm_final: float = 10.0) -> dict:
@@ -52,7 +52,7 @@ def test_policy_digest_unchanged_same_tier_thresholds() -> None:
         "meta": {"auto": {"tier": "balanced"}},
         "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
     }
-    cert = make_certificate(rep, base)
+    cert = make_report(rep, base)
     pd = cert.get("policy_digest", {})
     assert isinstance(pd, dict) and pd.get("changed") is False
 
