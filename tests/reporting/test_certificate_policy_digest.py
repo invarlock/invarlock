@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def _mk_min_report(tier: str = "balanced") -> dict:
@@ -91,8 +91,8 @@ def test_policy_digest_changes_across_tiers_and_markdown_note():
     assert hash_bal != hash_cons, "thresholds hash should change with tier"
 
     # Markdown should surface policy version + short hash and note when changed vs baseline
-    md_bal = render_certificate_markdown(cert_bal)
-    md_cons = render_certificate_markdown(cert_cons)
+    md_bal = render_report_markdown(cert_bal)
+    md_cons = render_report_markdown(cert_cons)
     assert "Policy Version:" in md_bal
     assert "Thresholds Digest:" in md_bal
     # Conservative vs balanced baseline should note a policy change

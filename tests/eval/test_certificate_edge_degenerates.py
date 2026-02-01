@@ -3,7 +3,7 @@ import pytest
 from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.guards_analysis import _extract_invariants
 from invarlock.reporting.policy_utils import _build_resolved_policies
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 from invarlock.reporting.utils import _infer_scope_from_modules, _pair_logloss_windows
 
 
@@ -119,5 +119,5 @@ def test_render_certificate_markdown_guard_overhead_na(monkeypatch):
         "overhead_ratio": float("nan"),
         "threshold_percent": 1.0,
     }
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     assert isinstance(md, str) and "Guard Observability" in md

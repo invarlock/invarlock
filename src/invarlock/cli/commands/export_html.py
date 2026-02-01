@@ -70,9 +70,9 @@ def export_html_command(
         raise typer.Exit(1) from exc
 
     try:
-        from invarlock.reporting.html import render_certificate_html
+        from invarlock.reporting.html import render_report_html
 
-        html = render_certificate_html(payload)
+        html = render_report_html(payload)
     except ValueError as exc:
         # Certificate validation failed upstream
         console.print(f"[red]❌ Certificate validation failed: {exc}[/red]")

@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def test_plugins_absent_adapter_and_edit_paths():
@@ -36,7 +36,7 @@ def test_plugins_absent_adapter_and_edit_paths():
     }
     with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
         cert = make_report(report, baseline)
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     assert (
         isinstance(md, str)
         and "## Plugin Provenance" in md

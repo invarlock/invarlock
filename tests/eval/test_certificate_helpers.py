@@ -2,7 +2,7 @@ import math
 
 from invarlock.reporting.report_builder import make_report, validate_report
 from invarlock.reporting.policy_utils import _compute_variance_policy_digest
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 from invarlock.reporting.utils import (
     _coerce_interval,
     _pair_logloss_windows,
@@ -112,8 +112,8 @@ def test_make_certificate_uses_paired_baseline_ratio_ci():
 
     # Validate and render markdown to cover certificate branches
     assert validate_report(cert) is True
-    md = render_certificate_markdown(cert)
-    assert isinstance(md, str) and "InvarLock Evaluation Certificate" in md
+    md = render_report_markdown(cert)
+    assert isinstance(md, str) and "InvarLock Evaluation Report" in md
 
     # Negative schema version path
     cert_bad = dict(cert)

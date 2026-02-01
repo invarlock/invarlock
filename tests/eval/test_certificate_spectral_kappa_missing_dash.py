@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def test_spectral_family_caps_kappa_missing_renders_dash():
@@ -45,7 +45,7 @@ def test_spectral_family_caps_kappa_missing_renders_dash():
         "caps_applied_by_family": {"ffn": 3},
         "family_caps": {"ffn": {"kappa": float("nan")}},
     }
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     # Expect dash in κ column
     assert "| Family | κ | q95 | Max |z| | Violations |" in md
     assert "| ffn | - | - | - | 3 |" in md

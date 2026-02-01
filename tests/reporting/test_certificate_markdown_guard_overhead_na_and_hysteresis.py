@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def test_guard_overhead_row_na_and_hysteresis_note():
@@ -48,6 +48,6 @@ def test_guard_overhead_row_na_and_hysteresis_note():
     cert["guard_overhead"] = {"evaluated": True, "overhead_threshold": 0.012}
     cert.setdefault("validation", {})["guard_overhead_acceptable"] = True
     cert["validation"]["hysteresis_applied"] = True
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     assert "Guard Overhead Acceptable" in md and "N/A" in md
     assert "hysteresis applied" in md

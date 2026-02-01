@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def test_drift_basis_includes_ci_informational_when_ci_present():
@@ -41,6 +41,6 @@ def test_drift_basis_includes_ci_informational_when_ci_present():
     with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
         cert = make_report(report, baseline)
 
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     # PM-first: Basis cell shows 'point' when CI present
     assert "| point |" in md

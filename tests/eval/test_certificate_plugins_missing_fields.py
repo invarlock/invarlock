@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def test_render_markdown_plugin_provenance_missing_fields_and_na_overhead():
@@ -51,7 +51,7 @@ def test_render_markdown_plugin_provenance_missing_fields_and_na_overhead():
     with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
         cert = make_report(report, baseline)
 
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     # Plugin section may be omitted by normalization; ensure overall render is sane
     assert isinstance(md, str) and (
         "## Plugin Provenance" in md or "## Executive Summary" in md

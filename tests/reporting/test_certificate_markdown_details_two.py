@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def _mk_base() -> tuple[dict, dict]:
@@ -62,6 +62,6 @@ def test_markdown_policy_provenance_and_resolved_policy_blocks() -> None:
     )
     cert["resolved_policy"] = {"metrics": {"pm_ratio": {"min_tokens": 50000}}}
 
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     assert "Policy Configuration" in md and "Overrides:" in md and "Digest:" in md
     assert "Resolved Policy YAML" in md and "```yaml" in md

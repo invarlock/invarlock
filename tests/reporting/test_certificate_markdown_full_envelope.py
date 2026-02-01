@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def _mk_base_report() -> dict:
@@ -163,9 +163,9 @@ def test_render_certificate_markdown_full_envelope() -> None:
     }
 
     # Render
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     # Sanity check headings
-    assert "InvarLock Evaluation Certificate" in md
+    assert "InvarLock Evaluation Report" in md
     assert "Executive Summary" in md
     assert "Primary Metric" in md
     assert "System Overhead" in md

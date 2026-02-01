@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def test_markdown_guard_overhead_percent_format():
@@ -48,6 +48,6 @@ def test_markdown_guard_overhead_percent_format():
         "overhead_threshold": 0.02,
     }
     cert.setdefault("validation", {})["guard_overhead_acceptable"] = True
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     # Should render a ratio when percent not precomputed
     assert "Guard Overhead Acceptable" in md and "1.015x" in md

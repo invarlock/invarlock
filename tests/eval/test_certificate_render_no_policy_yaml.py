@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def test_render_spectral_omits_policy_yaml_when_absent():
@@ -42,6 +42,6 @@ def test_render_spectral_omits_policy_yaml_when_absent():
     spectral.pop("policy", None)
     cert["spectral"] = spectral
 
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     # The policy YAML header should not appear when absent
     assert "Family κ (policy):" not in md

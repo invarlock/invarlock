@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def test_invariants_markdown_mixed_severities():
@@ -46,5 +46,5 @@ def test_invariants_markdown_mixed_severities():
             {"check": "param_nan", "type": "violation", "severity": "warning"},
         ],
     }
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     assert "fatal" in md and "warning" in md

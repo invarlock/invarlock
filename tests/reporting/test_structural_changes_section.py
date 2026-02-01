@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.report_builder import REPORT_SCHEMA_VERSION
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def _base_cert() -> dict:
@@ -41,13 +41,13 @@ def _base_cert() -> dict:
 
 def test_structural_changes_hidden_when_empty() -> None:
     cert = _base_cert()
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     assert "## Structural Changes" not in md
 
 
 def test_structural_changes_shown_when_nonzero() -> None:
     cert = _base_cert()
     cert["structure"] = {"layers_modified": 2, "params_changed": 10}
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     assert "## Structural Changes" in md
     assert "Parameters Changed" in md

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def test_render_certificate_markdown_observability_sections():
@@ -57,6 +57,6 @@ def test_render_certificate_markdown_observability_sections():
         }
     }
     cert = make_report(rep, base)
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     assert "System Overhead" in md
     assert "Policy Version:" in md and "Thresholds Digest:" in md

@@ -671,7 +671,7 @@ def _append_accuracy_subgroups(lines: list[str], subgroups: dict[str, Any]) -> N
     lines.append("")
 
 
-def _compute_certificate_hash(certificate: dict[str, Any]) -> str:
+def _compute_report_hash(certificate: dict[str, Any]) -> str:
     """Compute integrity hash for the certificate.
 
     Hash ignores the `artifacts` section for stability across saves.
@@ -717,7 +717,7 @@ def build_console_summary_pack(certificate: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def render_certificate_markdown(certificate: dict[str, Any]) -> str:
+def render_report_markdown(certificate: dict[str, Any]) -> str:
     """
     Render a certificate as a formatted Markdown report with pretty tables.
 
@@ -736,7 +736,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
     edit_name = str(certificate.get("edit_name") or "").lower()
 
     # Header
-    lines.append("# InvarLock Evaluation Certificate")
+    lines.append("# InvarLock Evaluation Report")
     lines.append("")
     lines.append(
         "> *Basis: “point” gates check the point estimate; “upper” gates check the CI "
@@ -749,7 +749,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
     lines.append(f"**Edit Type:** {certificate.get('edit_name', 'Unknown')}")
     lines.append("")
     lines.append(
-        "> Full evidence: see [`evaluation.cert.json`](evaluation.cert.json) for complete provenance, digests, and raw measurements."
+        "> Full evidence: see [`evaluation.report.json`](evaluation.report.json) for complete provenance, digests, and raw measurements."
     )
     lines.append("")
 
@@ -1848,7 +1848,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
         lines.extend(appendix_lines)
 
     # Certificate Hash for Integrity
-    cert_hash = _compute_certificate_hash(certificate)
+    cert_hash = _compute_report_hash(certificate)
     lines.append("## Certificate Integrity")
     lines.append("")
     lines.append(f"**Certificate Hash:** `{cert_hash}`")
@@ -1856,7 +1856,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
     lines.append("---")
     lines.append("")
     lines.append(
-        "*This InvarLock Evaluation Certificate summarizes baseline‑paired evaluation results for a subject model relative to the provided baseline snapshot under the configured profile/preset.*"
+        "*This InvarLock Evaluation Report summarizes baseline‑paired evaluation results for a subject model relative to the provided baseline snapshot under the configured profile/preset.*"
     )
     lines.append(
         "*It reports regression-risk indicators for the measured signals; it is not a broad AI safety, alignment, or content-safety guarantee.*"

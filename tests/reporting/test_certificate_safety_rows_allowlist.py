@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.report_builder import REPORT_SCHEMA_VERSION
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def _cert() -> dict:
@@ -47,7 +47,7 @@ def _cert() -> dict:
 
 
 def test_quality_gates_do_not_include_rmt_epsilon_rule() -> None:
-    md = render_certificate_markdown(_cert())
+    md = render_report_markdown(_cert())
     # Ensure 'RMT ε-rule' is not listed as a Quality Gate row
     assert "## Quality Gates" in md
     # Scan Quality Gates block
@@ -56,7 +56,7 @@ def test_quality_gates_do_not_include_rmt_epsilon_rule() -> None:
 
 
 def test_safety_rows_follow_allowlist() -> None:
-    md = render_certificate_markdown(_cert())
+    md = render_report_markdown(_cert())
     # Guard check detail rows should include exactly these labels
     assert "## Guard Check Details" in md
     block = md.split("## Guard Check Details", 1)[1]

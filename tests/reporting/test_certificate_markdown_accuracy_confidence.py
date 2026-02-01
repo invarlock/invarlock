@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def test_markdown_accuracy_low_baseline_note_and_confidence():
@@ -24,7 +24,7 @@ def test_markdown_accuracy_low_baseline_note_and_confidence():
     cert.setdefault("confidence", {})["label"] = "Medium"
     cert["primary_metric"]["baseline_point"] = 0.04
     cert["primary_metric"]["ratio_vs_baseline"] = 0.02
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     # Confidence label rendered
     assert "Confidence:" in md and "Medium" in md
     # Baseline < 5% note rendered for accuracy

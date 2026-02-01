@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def test_render_rmt_no_baseline_outliers_row():
@@ -42,6 +42,6 @@ def test_render_rmt_no_baseline_outliers_row():
     cert["rmt"].update(
         {"outliers_bare": 0, "outliers_guarded": 0, "stable": True, "epsilon": 0.1}
     )
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     # Render should include an RMT section; relax wording assertion
     assert "RMT" in md

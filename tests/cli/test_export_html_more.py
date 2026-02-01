@@ -14,7 +14,7 @@ def test_export_html_success_and_strip_css(monkeypatch, tmp_path: Path):
     import invarlock.reporting.html as html_mod
 
     html = "<html><head><style>.x{}</style></head><body>ok</body></html>"
-    monkeypatch.setattr(html_mod, "render_certificate_html", lambda payload: html)
+    monkeypatch.setattr(html_mod, "render_report_html", lambda payload: html)
 
     inp = tmp_path / "in.json"
     out = tmp_path / "out.html"
@@ -32,7 +32,7 @@ def test_export_html_validation_error_exit2(monkeypatch, tmp_path: Path):
     def _raise(_):  # type: ignore[no-untyped-def]
         raise ValueError("bad cert")
 
-    monkeypatch.setattr(html_mod, "render_certificate_html", _raise)
+    monkeypatch.setattr(html_mod, "render_report_html", _raise)
     inp = tmp_path / "in.json"
     out = tmp_path / "out.html"
     inp.write_text("{}", encoding="utf-8")
@@ -48,7 +48,7 @@ def test_export_html_force_overwrite(monkeypatch, tmp_path: Path):
     import invarlock.reporting.html as html_mod
 
     monkeypatch.setattr(
-        html_mod, "render_certificate_html", lambda payload: "<html>ok</html>"
+        html_mod, "render_report_html", lambda payload: "<html>ok</html>"
     )
     inp = tmp_path / "in.json"
     out = tmp_path / "out.html"
@@ -63,7 +63,7 @@ def test_export_html_coerces_optioninfo_defaults(monkeypatch, tmp_path: Path):
     import invarlock.reporting.html as html_mod
 
     monkeypatch.setattr(
-        html_mod, "render_certificate_html", lambda payload: "<html>inline</html>"
+        html_mod, "render_report_html", lambda payload: "<html>inline</html>"
     )
     inp = tmp_path / "in.json"
     out = tmp_path / "out.html"
@@ -90,7 +90,7 @@ def test_export_html_render_generic_error(monkeypatch, tmp_path: Path):
     def _raise(_payload):  # type: ignore[no-untyped-def]
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(html_mod, "render_certificate_html", _raise)
+    monkeypatch.setattr(html_mod, "render_report_html", _raise)
     inp = tmp_path / "in.json"
     out = tmp_path / "out.html"
     inp.write_text("{}", encoding="utf-8")

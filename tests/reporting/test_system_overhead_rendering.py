@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.report_builder import REPORT_SCHEMA_VERSION
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def _base_cert() -> dict:
@@ -45,7 +45,7 @@ def test_system_overhead_zero_renders_na() -> None:
         "latency_ms_p50": {"baseline": 0.0, "edited": 0.0},
         "throughput_sps": {"baseline": 0.0, "edited": 0.0},
     }
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     # Expect System Overhead section to render N/A values instead of 0/0/0
     assert "## System Overhead" in md
     assert "N/A" in md

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def _mk_base() -> tuple[dict, dict]:
@@ -52,7 +52,7 @@ def test_variance_guard_enabled_and_disabled_rendering() -> None:
     cert = make_report(rep, base)
     # Enabled path
     cert["variance"] = {"enabled": True, "gain": 0.02}
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     assert "Variance Guard" in md and "Enabled:" in md and "Gain:" in md
 
     # Disabled with policy explanation
@@ -60,5 +60,5 @@ def test_variance_guard_enabled_and_disabled_rendering() -> None:
     cert2["variance"] = {"enabled": False}
     cert2.setdefault("policies", {}).setdefault("variance", {})
     cert2["policies"]["variance"]["min_effect_lognll"] = 0.001
-    md2 = render_certificate_markdown(cert2)
+    md2 = render_report_markdown(cert2)
     assert "Variance Guard" in md2 and "Disabled" in md2 and "Predictive gate" in md2

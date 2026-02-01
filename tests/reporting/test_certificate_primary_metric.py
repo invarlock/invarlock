@@ -4,7 +4,7 @@ from invarlock.reporting.report_builder import (
     REPORT_SCHEMA_VERSION,
     _compute_validation_flags,
 )
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def test_primary_metric_accuracy_gating_balanced_passes():
@@ -79,7 +79,7 @@ def test_render_includes_primary_metric_section():
             "ratio_vs_baseline": +0.05,
         },
     }
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     assert "## Primary Metric" in md
     assert "Kind: accuracy" in md
     # With primary metric present, PPL/Drift rows should be omitted

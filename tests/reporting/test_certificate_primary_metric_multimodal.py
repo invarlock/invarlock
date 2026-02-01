@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.report_builder import _compute_validation_flags
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def test_primary_metric_vqa_accuracy_gating_and_render():
@@ -77,5 +77,5 @@ def test_primary_metric_vqa_accuracy_gating_and_render():
         "auto": {"tier": "balanced", "probes_used": 0, "target_pm_ratio": None},
         "primary_metric": pm,
     }
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     assert "## Primary Metric" in md

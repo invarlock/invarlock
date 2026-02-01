@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.report_builder import (
-    render_certificate_markdown,
+    render_report_markdown,
     validate_report,
 )
 
@@ -40,7 +40,7 @@ def test_render_certificate_markdown_invalid_raises() -> None:
     cert["schema_version"] = "invalid"
     assert validate_report(cert) is False
     try:
-        render_certificate_markdown(cert)
+        render_report_markdown(cert)
     except ValueError:
         pass
     else:

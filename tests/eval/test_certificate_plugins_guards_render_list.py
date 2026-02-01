@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 from invarlock.reporting.report_builder import (
     make_report,
-    render_certificate_markdown,
+    render_report_markdown,
 )
 
 
@@ -49,6 +49,6 @@ def test_plugins_guards_render_with_valid_entries():
     }
     with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
         cert = make_report(report, baseline)
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     # Plugin provenance may be omitted after normalization
     assert ("- Guards:" in md) or ("## Executive Summary" in md)

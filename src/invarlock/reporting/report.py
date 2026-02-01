@@ -18,7 +18,7 @@ from invarlock.cli._evidence import maybe_dump_guard_evidence
 
 from .report_builder import make_report
 from .normalizer import normalize_run_report
-from .render import render_certificate_markdown
+from .render import render_report_markdown
 from .report_types import RunReport, validate_report
 
 
@@ -182,7 +182,7 @@ def to_certificate(report: RunReport, baseline: RunReport, format: str = "json")
     if format == "json":
         return json.dumps(certificate, indent=2, ensure_ascii=False)
     elif format == "markdown":
-        return render_certificate_markdown(certificate)
+        return render_report_markdown(certificate)
     else:
         raise ValueError(f"Unsupported certificate format: {format}")
 

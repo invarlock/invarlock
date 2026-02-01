@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def _mk_minimal_report() -> dict:
@@ -61,7 +61,7 @@ def test_plugin_provenance_adapter_edit_only():
         },
         "guards": [],
     }
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     assert "## Plugin Provenance" in md
     assert "Adapter:" in md and "Edit:" in md
     # No guards list when empty
@@ -94,7 +94,7 @@ def test_plugin_provenance_guards_only():
             },
         ]
     }
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     assert "## Plugin Provenance" in md
     assert "- Guards:" in md
     assert "SpectralGuard" in md and "RMTGuard" in md

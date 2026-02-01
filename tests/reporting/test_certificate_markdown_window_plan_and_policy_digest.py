@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def test_markdown_window_plan_line_and_policy_digest_changed():
@@ -53,7 +53,7 @@ def test_markdown_window_plan_line_and_policy_digest_changed():
         "changed": True,
     }
 
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     # Window plan one-liner includes seq_len and uses actual_* fields
     assert "Window Plan: ci, 1/2, seq_len=128" in md.replace("  ", " ")
     # Policy digest shows version and shortened thresholds hash and change note

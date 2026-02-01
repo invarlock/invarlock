@@ -1,5 +1,5 @@
 from invarlock.reporting.report_builder import REPORT_SCHEMA_VERSION
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def test_markdown_includes_estimated_suffix_and_note_for_accuracy():
@@ -41,6 +41,6 @@ def test_markdown_includes_estimated_suffix_and_note_for_accuracy():
         "resolved_policy": {},
         "policy_provenance": {},
     }
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     assert "(estimated)" in md
     assert "Accuracy derived from pseudo counts" in md

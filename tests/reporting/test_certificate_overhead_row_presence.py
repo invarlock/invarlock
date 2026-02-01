@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.report_builder import REPORT_SCHEMA_VERSION
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def _base_cert() -> dict:
@@ -58,7 +58,7 @@ def _quality_gate_labels(md: str) -> list[str]:
 def test_overhead_row_omitted_when_not_evaluated() -> None:
     cert = _base_cert()
     cert["guard_overhead"] = {}
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     labels = _quality_gate_labels(md)
     assert "Guard Overhead Acceptable" not in labels
 
@@ -70,6 +70,6 @@ def test_overhead_row_present_when_evaluated() -> None:
         "overhead_ratio": 1.002,
         "overhead_threshold": 0.01,
     }
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     labels = _quality_gate_labels(md)
     assert "Guard Overhead Acceptable" in labels

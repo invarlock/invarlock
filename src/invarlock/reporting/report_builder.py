@@ -2345,7 +2345,7 @@ def make_report(
 # Console Validation Block helpers have moved to invarlock.reporting.render.
 
 
-## NOTE: render_certificate_markdown has been moved to invarlock.reporting.render.
+## NOTE: render_report_markdown has been moved to invarlock.reporting.render.
 ## It is re-exported at the bottom of this module to preserve the public API.
 ## Private helper functions
 
@@ -3769,7 +3769,7 @@ def _generate_run_id(report: RunReport) -> str:
     return hashlib.sha256(base_str.encode()).hexdigest()[:16]
 
 
-## NOTE: _compute_certificate_hash moved to invarlock.reporting.render and is re-exported below.
+## NOTE: _compute_report_hash moved to invarlock.reporting.render and is re-exported below.
 
 
 def _analyze_bitwidth_map(bitwidth_map: dict[str, Any]) -> dict[str, Any]:
@@ -4114,22 +4114,22 @@ def _extract_compression_diagnostics(
 
 # Re-export rendering API from dedicated module to avoid bloat/cycles
 # Rendering helpers live in invarlock.reporting.render; internal code should import there directly.
-# Tests and public API expect render_certificate_markdown to be available from
+# Tests and public API expect render_report_markdown to be available from
 # invarlock.reporting.report_builder. Import lazily at module end to avoid cycles with
 # invarlock.reporting.render which imports this module as a namespace.
 try:  # pragma: no cover - simple re-export
     from .render import (
         compute_console_validation_block,  # type: ignore
-        render_certificate_markdown,  # type: ignore
+        render_report_markdown,  # type: ignore
     )
 except Exception:  # pragma: no cover - defensive fallback
 
-    def render_certificate_markdown(certificate: dict[str, Any]) -> str:  # type: ignore
+    def render_report_markdown(evaluation_report: dict[str, Any]) -> str:  # type: ignore
         raise ImportError(
-            "render_certificate_markdown is unavailable; rendering dependencies missing"
+            "render_report_markdown is unavailable; rendering dependencies missing"
         )
 
-    def compute_console_validation_block(certificate: dict[str, Any]) -> dict[str, Any]:  # type: ignore
+    def compute_console_validation_block(evaluation_report: dict[str, Any]) -> dict[str, Any]:  # type: ignore
         raise ImportError(
             "compute_console_validation_block is unavailable; rendering dependencies missing"
         )
@@ -4141,7 +4141,7 @@ __all__ = [
     "validate_report",
     "_validate_with_jsonschema",
     "jsonschema",
-    "render_certificate_markdown",
+    "render_report_markdown",
     "compute_console_validation_block",
     "REPORT_SCHEMA_VERSION",
     "REPORT_JSON_SCHEMA",

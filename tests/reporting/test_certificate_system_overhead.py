@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def _mk_minimal_report(metrics: dict) -> dict:
@@ -70,9 +70,9 @@ def test_certificate_system_overhead_table_and_primary_metric_metadata():
     }
 
     cert = make_report(report, baseline)
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     # System Overhead section may be omitted; rendering should still succeed
-    assert "# InvarLock Evaluation Certificate" in md
+    assert "# InvarLock Evaluation Report" in md
 
     # Primary Metric metadata present
     assert "## Primary Metric" in md

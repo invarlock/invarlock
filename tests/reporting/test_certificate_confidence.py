@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import invarlock.reporting.report_builder as cert
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def _mk_report(ratio: float = 1.00, reps: int | None = None) -> dict:
@@ -60,7 +60,7 @@ def test_confidence_label_high_when_stable_and_narrow_ci():
     baseline = _mk_report(ratio=1.0, reps=500)
     cert = make_report(report, baseline)
     assert cert.get("confidence", {}).get("label") == "High"
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     assert "**Confidence:** High" in md
 
 

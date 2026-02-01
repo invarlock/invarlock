@@ -48,8 +48,8 @@ from invarlock.reporting.policy_utils import (
     _resolve_policy_tier,
 )
 from invarlock.reporting.render import (
-    _compute_certificate_hash,
-    render_certificate_markdown,
+    _compute_report_hash,
+    render_report_markdown,
 )
 from invarlock.reporting.utils import (
     _coerce_int,
@@ -1277,9 +1277,9 @@ class TestCertificateAnalyticsHelpers:
             "meta": {"model_id": "m"},
             "artifacts": {"generated_at": "now"},
         }
-        hash_with_artifacts = _compute_certificate_hash(certificate)
+        hash_with_artifacts = _compute_report_hash(certificate)
         certificate.pop("artifacts")
-        hash_without_artifacts = _compute_certificate_hash(certificate)
+        hash_without_artifacts = _compute_report_hash(certificate)
         assert hash_with_artifacts == hash_without_artifacts
 
 
@@ -2049,7 +2049,7 @@ class TestValidateCertificate:
 
 
 class TestRenderCertificateMarkdown:
-    """Test render_certificate_markdown function."""
+    """Test render_report_markdown function."""
 
     def test_basic_markdown_rendering(self):
         """Test basic markdown rendering."""
@@ -2061,9 +2061,9 @@ class TestRenderCertificateMarkdown:
         ):
             certificate = make_report(report, baseline)
 
-        markdown = render_certificate_markdown(certificate)
+        markdown = render_report_markdown(certificate)
 
-        assert "# InvarLock Evaluation Certificate" in markdown
+        assert "# InvarLock Evaluation Report" in markdown
         assert "test-model" in markdown
         assert "structured" in markdown
         assert "Overall Status:" in markdown
@@ -2080,7 +2080,7 @@ class TestRenderCertificateMarkdown:
         ):
             certificate = make_report(report, baseline)
 
-        markdown = render_certificate_markdown(certificate)
+        markdown = render_report_markdown(certificate)
 
         assert "Auto-Tuning Configuration" in markdown
         assert "aggressive" in markdown
@@ -2098,7 +2098,7 @@ class TestRenderCertificateMarkdown:
         ):
             certificate = make_report(report, baseline)
 
-        markdown = render_certificate_markdown(certificate)
+        markdown = render_report_markdown(certificate)
 
         assert "Auto-Tuning Configuration" not in markdown
 
@@ -2112,7 +2112,7 @@ class TestRenderCertificateMarkdown:
         ):
             certificate = make_report(report, baseline)
 
-        markdown = render_certificate_markdown(certificate)
+        markdown = render_report_markdown(certificate)
 
         # Quality gates table present; section titles may vary across releases
         assert "Quality Gates" in markdown
@@ -2124,7 +2124,7 @@ class TestRenderCertificateMarkdown:
         invalid_certificate = {"schema_version": "wrong"}
 
         with pytest.raises(ValueError, match="Invalid certificate structure"):
-            render_certificate_markdown(invalid_certificate)
+            render_report_markdown(invalid_certificate)
 
     def test_render_sample_certificate_fixture(self):
         """Ensure sample certificate renders without error and validates."""
@@ -2135,7 +2135,7 @@ class TestRenderCertificateMarkdown:
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
             cert = make_report(report, baseline)
-        markdown = render_certificate_markdown(cert)
+        markdown = render_report_markdown(cert)
 
         assert "Quality Gates" in markdown
         assert "Policy Configuration" in markdown
@@ -2171,7 +2171,7 @@ class TestRenderCertificateMarkdown:
             }
         )
 
-        markdown = render_certificate_markdown(certificate)
+        markdown = render_report_markdown(certificate)
         # Guard Overhead section may be omitted if normalization dropped the measure
         assert ("Guard Overhead" in markdown) or ("Executive Summary" in markdown)
         assert "Inference Diagnostics" in markdown
@@ -2203,7 +2203,7 @@ class TestRenderCertificateMarkdown:
         ):
             certificate = make_report(report, baseline)
 
-        markdown = render_certificate_markdown(certificate)
+        markdown = render_report_markdown(certificate)
 
         assert (
             "| Gate | Status | Measured | Threshold | Basis | Description |" in markdown
@@ -2224,7 +2224,7 @@ class TestRenderCertificateMarkdown:
             }
         ]
 
-        markdown = render_certificate_markdown(certificate)
+        markdown = render_report_markdown(certificate)
 
         assert "Non-fatal" in markdown
         assert "LayerNorm missing" in markdown
@@ -2232,7 +2232,7 @@ class TestRenderCertificateMarkdown:
     def test_render_markdown_quality_gates_basis_note(self):
         certificate = _load_local_certificate()
 
-        markdown = render_certificate_markdown(certificate)
+        markdown = render_report_markdown(certificate)
 
         assert (
             "> *Basis: “point” gates check the point estimate; “upper” gates check the CI upper bound; "
@@ -2242,7 +2242,7 @@ class TestRenderCertificateMarkdown:
     def test_render_markdown_resolved_policy_yaml_block(self):
         certificate = _load_local_certificate()
 
-        markdown = render_certificate_markdown(certificate)
+        markdown = render_report_markdown(certificate)
 
         assert "## Policy Configuration" in markdown
         assert "```yaml" in markdown
@@ -2343,7 +2343,7 @@ class TestRenderCertificateMarkdown:
             "window_plan": {"profile": "release", "preview_n": 203, "final_n": 203},
         }
 
-        markdown = render_certificate_markdown(cert_copy)
+        markdown = render_report_markdown(cert_copy)
 
         assert "- **Commit:** (not set)" in markdown
         assert "- **Overrides:** (none)" in markdown
@@ -2360,7 +2360,7 @@ class TestRenderCertificateMarkdown:
         var["ratio_ci"] = (0.99, 1.02)
         var["calibration"] = {"coverage": 12, "requested": 16, "status": "insufficient"}
 
-        markdown = render_certificate_markdown(certificate)
+        markdown = render_report_markdown(certificate)
         assert "Primary metric without VE" in markdown
         assert "Ratio CI" in markdown
 
@@ -2371,9 +2371,9 @@ class TestRenderCertificateMarkdown:
         certificate["structure"]["ranks"] = []
         certificate["structure"]["compression_diagnostics"]["parameter_analysis"] = {}
 
-        markdown = render_certificate_markdown(certificate)
+        markdown = render_report_markdown(certificate)
         # Generic edit paths may vary; ensure certificate header renders
-        assert "# InvarLock Evaluation Certificate" in markdown
+        assert "# InvarLock Evaluation Report" in markdown
 
     # Low-rank branch tests removed (no low-rank edit in this profile)
 
@@ -2477,7 +2477,7 @@ class TestRenderCertificateMarkdown:
             }
         )
 
-        markdown = render_certificate_markdown(certificate)
+        markdown = render_report_markdown(certificate)
 
         assert "Spectral Guard" in markdown
         assert "| Family | κ | q95 | Max |z| | Violations |" in markdown
@@ -2868,14 +2868,14 @@ class TestPrivateHelperFunctions:
         assert run_id1 == run_id2
 
     def test_compute_certificate_hash(self):
-        """Test _compute_certificate_hash function."""
+        """Test _compute_report_hash function."""
         certificate = {
             "schema_version": REPORT_SCHEMA_VERSION,
             "run_id": "test123",
             "artifacts": {"path": "/some/path"},  # Should be excluded
         }
 
-        cert_hash = _compute_certificate_hash(certificate)
+        cert_hash = _compute_report_hash(certificate)
 
         assert isinstance(cert_hash, str)
         assert len(cert_hash) == 16
@@ -2894,8 +2894,8 @@ class TestPrivateHelperFunctions:
             "artifacts": {"path": "/path2"},  # Different artifacts
         }
 
-        hash1 = _compute_certificate_hash(cert1)
-        hash2 = _compute_certificate_hash(cert2)
+        hash1 = _compute_report_hash(cert1)
+        hash2 = _compute_report_hash(cert2)
 
         assert hash1 == hash2  # Should be same since artifacts excluded
 
@@ -2918,9 +2918,9 @@ class TestIntegrationAndEdgeCases:
             assert validate_report(certificate) is True
 
             # Render to markdown
-            markdown = render_certificate_markdown(certificate)
+            markdown = render_report_markdown(certificate)
             assert len(markdown) > 100
-            assert "InvarLock Evaluation Certificate" in markdown
+            assert "InvarLock Evaluation Report" in markdown
 
     def test_certificate_with_edge_case_values(self):
         """Test certificate creation with edge case values."""
@@ -3049,7 +3049,7 @@ class TestModuleExports:
         expected_exports = [
             "make_report",
             "validate_report",
-            "render_certificate_markdown",
+            "render_report_markdown",
             "REPORT_SCHEMA_VERSION",
         ]
 

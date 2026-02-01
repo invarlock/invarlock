@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def test_drift_basis_point_only_when_no_ci():
@@ -37,6 +37,6 @@ def test_drift_basis_point_only_when_no_ci():
     with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
         cert = make_report(report, baseline)
 
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     # PM-first: Basis remains 'point' (no separate drift row)
     assert "| point |" in md

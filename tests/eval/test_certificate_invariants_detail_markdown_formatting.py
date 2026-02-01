@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def test_invariants_markdown_detail_pairs_rendered():
@@ -52,7 +52,7 @@ def test_invariants_markdown_detail_pairs_rendered():
         ],
     }
 
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     # Expect key=value pairs in parentheses
     assert "Invariant Notes" in md
     assert "layer=" in md and "norm=" in md and "note=" in md

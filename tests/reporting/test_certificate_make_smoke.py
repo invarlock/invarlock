@@ -1,7 +1,7 @@
 from typing import Any
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def _minimal_run_report_with_windows(kind: str = "ppl_causal") -> dict[str, Any]:
@@ -74,5 +74,5 @@ def test_make_certificate_smoke_and_render():
     pm = cert.get("primary_metric", {})
     assert isinstance(pm, dict)
     # Markdown render should succeed and contain some baseline info
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     assert isinstance(md, str) and len(md) > 0

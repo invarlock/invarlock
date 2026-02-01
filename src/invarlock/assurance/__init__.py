@@ -14,7 +14,7 @@ try:  # pragma: no cover - shim to reporting modules
     )
 
     # Prefer direct import from render for rendering APIs
-    from invarlock.reporting.render import render_certificate_markdown
+    from invarlock.reporting.render import render_report_markdown
 except Exception:  # pragma: no cover - provide soft stubs
     REPORT_SCHEMA_VERSION = "v1"
 
@@ -24,7 +24,7 @@ except Exception:  # pragma: no cover - provide soft stubs
     ) -> dict[str, Any]:
         raise ImportError("invarlock.reporting.report_builder not available")
 
-    def render_certificate_markdown(certificate: dict[str, Any]) -> str:
+    def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
         raise ImportError("invarlock.reporting.report_builder not available")
 
     def validate_report(certificate: dict[str, Any]) -> bool:
@@ -34,6 +34,6 @@ except Exception:  # pragma: no cover - provide soft stubs
 __all__ = [
     "REPORT_SCHEMA_VERSION",
     "make_report",
-    "render_certificate_markdown",
+    "render_report_markdown",
     "validate_report",
 ]

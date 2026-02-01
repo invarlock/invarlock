@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def _mk_base() -> tuple[dict, dict]:
@@ -59,5 +59,5 @@ def test_markdown_quant_rtn_linear_modules_quantized_row() -> None:
             "target_analysis": {"modules_eligible": 6, "modules_modified": 4}
         },
     }
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     assert "Linear Modules Quantized" in md

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.report_builder import REPORT_SCHEMA_VERSION
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def _cert_with_pm(kind: str, basis: str) -> dict:
@@ -48,7 +48,7 @@ def _cert_with_pm(kind: str, basis: str) -> dict:
 
 def test_pm_basis_coherence_ppl_upper() -> None:
     cert = _cert_with_pm("ppl_causal", "upper")
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     # Basis appears in the PM details and in the Quality Gates row
     assert "- Basis: upper" in md
     # In the Quality Gates table, the Basis column should reflect 'upper'
@@ -57,6 +57,6 @@ def test_pm_basis_coherence_ppl_upper() -> None:
 
 def test_pm_basis_coherence_accuracy_point() -> None:
     cert = _cert_with_pm("accuracy", "point")
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     assert "- Basis: point" in md
     assert "| Primary Metric Acceptable |" in md and "| point |" in md

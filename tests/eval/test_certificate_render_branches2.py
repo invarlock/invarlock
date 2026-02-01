@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def _base_report_and_baseline():
@@ -74,19 +74,19 @@ def test_render_markdown_plugins_overhead_and_rmt_variants():
             {"name": "g2", "version": "2", "module": "x.h"},
         ],
     }
-    _ = render_certificate_markdown(cert)
+    _ = render_report_markdown(cert)
 
     # Empty plugins path (still validates)
     cert["plugins"] = {}
-    _ = render_certificate_markdown(cert)
+    _ = render_report_markdown(cert)
 
     # Guard overhead present with percent
     cert["guard_overhead"] = {"overhead_percent": 0.5, "threshold_percent": 1.0}
-    _ = render_certificate_markdown(cert)
+    _ = render_report_markdown(cert)
 
     # Guard overhead absent path
     cert.pop("guard_overhead")
-    _ = render_certificate_markdown(cert)
+    _ = render_report_markdown(cert)
 
     # RMT with nonzero baseline outliers
     cert["rmt"] = {
@@ -95,7 +95,7 @@ def test_render_markdown_plugins_overhead_and_rmt_variants():
         "outliers_bare": 2,
         "epsilon": 0.1,
     }
-    _ = render_certificate_markdown(cert)
+    _ = render_report_markdown(cert)
 
     # RMT with zero baseline outliers branch
     cert["rmt"] = {
@@ -104,7 +104,7 @@ def test_render_markdown_plugins_overhead_and_rmt_variants():
         "outliers_bare": 0,
         "epsilon": 0.1,
     }
-    _ = render_certificate_markdown(cert)
+    _ = render_report_markdown(cert)
 
     # Policy provenance toggles
     cert["policy_provenance"] = {
@@ -113,10 +113,10 @@ def test_render_markdown_plugins_overhead_and_rmt_variants():
         "policy_digest": "",
         "resolved_at": None,
     }
-    _ = render_certificate_markdown(cert)
+    _ = render_report_markdown(cert)
     cert["policy_provenance"] = {
         "tier": "balanced",
         "overrides": ["p1"],
         "policy_digest": "abcd",
     }
-    _ = render_certificate_markdown(cert)
+    _ = render_report_markdown(cert)

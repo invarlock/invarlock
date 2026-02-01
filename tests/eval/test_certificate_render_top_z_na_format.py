@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 from invarlock.reporting.report_builder import (
     make_report,
-    render_certificate_markdown,
+    render_report_markdown,
 )
 
 
@@ -42,5 +42,5 @@ def test_spectral_top_z_non_numeric_formats_as_na():
     cert.setdefault("spectral", {})["top_z_scores"] = {
         "ffn": [{"module": "L0", "z": "nan"}]
     }
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     assert "n/a" in md

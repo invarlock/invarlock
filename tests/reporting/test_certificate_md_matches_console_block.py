@@ -3,7 +3,7 @@ from __future__ import annotations
 from invarlock.reporting.report_builder import REPORT_SCHEMA_VERSION
 from invarlock.reporting.render import (
     compute_console_validation_block,
-    render_certificate_markdown,
+    render_report_markdown,
 )
 
 
@@ -85,7 +85,7 @@ def _extract_quality_gate_rows(md: str) -> list[str]:
 def test_md_overall_status_matches_console_dev_no_overhead() -> None:
     cert = _minimal_cert(pm_kind="ppl_causal", guard_evaluated=False)
     block = compute_console_validation_block(cert)
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     expected = "PASS" if block["overall_pass"] else "FAIL"
     assert (
         f"**Overall Status:** ✅ {expected}" in md
@@ -96,7 +96,7 @@ def test_md_overall_status_matches_console_dev_no_overhead() -> None:
 def test_md_quality_gates_match_console_presence_with_and_without_overhead() -> None:
     # No overhead evaluated: only Primary Metric and Preview Final Drift gates appear
     cert = _minimal_cert(pm_kind="ppl_causal", guard_evaluated=False)
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     rows = _extract_quality_gate_rows(md)
     assert "Primary Metric Acceptable" in rows
     assert "Preview Final Drift Acceptable" in rows
@@ -104,7 +104,7 @@ def test_md_quality_gates_match_console_presence_with_and_without_overhead() -> 
 
     # With overhead evaluated: Guard Overhead row appears
     cert2 = _minimal_cert(pm_kind="ppl_causal", guard_evaluated=True)
-    md2 = render_certificate_markdown(cert2)
+    md2 = render_report_markdown(cert2)
     rows2 = _extract_quality_gate_rows(md2)
     assert "Primary Metric Acceptable" in rows2
     assert "Preview Final Drift Acceptable" in rows2

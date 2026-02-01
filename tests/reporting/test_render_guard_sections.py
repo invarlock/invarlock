@@ -65,7 +65,7 @@ def test_render_certificate_markdown_includes_guard_sections():
         }
     }
 
-    report = render_mod.render_certificate_markdown(cert)
+    report = render_mod.render_report_markdown(cert)
 
     assert "Spectral Guard" in report
     assert "Multiple Testing" in report
@@ -92,7 +92,7 @@ def test_render_certificate_markdown_handles_sparse_spectral_sections():
         "policy": {},
         "top_z_scores": {"attn": [{"module": "attn.block", "z": None}]},
     }
-    rendered = render_mod.render_certificate_markdown(cert)
+    rendered = render_mod.render_report_markdown(cert)
 
     assert "Spectral Guard" in rendered
     assert "Spectral Summary" not in rendered  # dropped when no numeric knobs
@@ -113,7 +113,7 @@ def test_render_certificate_markdown_rmt_handles_non_numeric_counts():
         "stable": False,
     }
 
-    rendered = render_mod.render_certificate_markdown(cert)
+    rendered = render_mod.render_report_markdown(cert)
 
     assert "| mlp | 0.200 | - | - | - |" in rendered
     assert "- Status: \u274c FAIL" in rendered

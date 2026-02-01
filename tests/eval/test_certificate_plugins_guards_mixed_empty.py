@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 from invarlock.reporting.report_builder import (
     make_report,
-    render_certificate_markdown,
+    render_report_markdown,
 )
 
 
@@ -46,6 +46,6 @@ def test_plugins_guards_list_mixed_non_dict_entries_skips_render():
     }
     with patch("invarlock.reporting.report_builder.validate_run_report", return_value=True):
         cert = make_report(report, baseline)
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     # No guards bullet should render because filtered list is empty
     assert "- Guards:" not in md

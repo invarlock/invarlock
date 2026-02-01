@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def test_system_overhead_na_row_when_both_zero() -> None:
@@ -47,6 +47,6 @@ def test_system_overhead_na_row_when_both_zero() -> None:
     cert = make_report(rep, base)
     # Force N/A path: both baseline and edited zero for throughput
     cert["system_overhead"] = {"throughput_sps": {"baseline": 0.0, "edited": 0.0}}
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     # Row must include N/A columns
     assert "System Overhead" in md and "Throughput (samples/s)" in md and "N/A" in md

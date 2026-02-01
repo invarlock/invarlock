@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.report_builder import REPORT_SCHEMA_VERSION
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def test_autotune_labeling_is_informational() -> None:
@@ -44,6 +44,6 @@ def test_autotune_labeling_is_informational() -> None:
         "policy_provenance": {},
         "guard_overhead": {},
     }
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     assert "Target Ratio vs Baseline:" not in md
     assert "Auto Policy Target Ratio (informational):" in md

@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 from invarlock.reporting.report_builder import (
     make_report,
-    render_certificate_markdown,
+    render_report_markdown,
 )
 
 
@@ -48,4 +48,4 @@ def test_guard_overhead_structured_reports_path():
     oh = cert.get("guard_overhead", {})
     # Guard overhead may be omitted; renderer should still succeed
     assert isinstance(oh, dict)
-    _ = render_certificate_markdown(cert)
+    _ = render_report_markdown(cert)

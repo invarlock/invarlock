@@ -3,7 +3,7 @@ from unittest.mock import patch
 import pytest
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def test_render_rejects_when_preview_final_ratio_not_number():
@@ -46,4 +46,4 @@ def test_render_rejects_when_preview_final_ratio_not_number():
     # Corrupt schema_version to force validation failure regardless of jsonschema availability
     cert["schema_version"] = "wrong-version"
     with pytest.raises(ValueError):
-        render_certificate_markdown(cert)
+        render_report_markdown(cert)

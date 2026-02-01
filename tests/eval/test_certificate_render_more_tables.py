@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def _base_minimal():
@@ -94,5 +94,5 @@ def test_render_spectral_tables_and_plugins_missing_fields():
         },
     }
 
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     assert isinstance(md, str) and "Spectral Guard" in md and "RMT Guard" in md

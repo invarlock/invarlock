@@ -1,5 +1,5 @@
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def test_guard_overhead_direct_values_and_unavailable_ratio_path(monkeypatch):
@@ -59,4 +59,4 @@ def test_guard_overhead_direct_values_and_unavailable_ratio_path(monkeypatch):
     # Guard overhead section may be omitted; renderer should handle it gracefully
     oh = cert.get("guard_overhead", {})
     assert isinstance(oh, dict)
-    _ = render_certificate_markdown(cert)
+    _ = render_report_markdown(cert)

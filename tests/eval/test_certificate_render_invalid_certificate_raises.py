@@ -1,6 +1,6 @@
 import pytest
 
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def test_render_certificate_markdown_rejects_invalid_schema():
@@ -30,4 +30,4 @@ def test_render_certificate_markdown_rejects_invalid_schema():
         "validation": {"primary_metric_acceptable": True},
     }
     with pytest.raises(ValueError):
-        render_certificate_markdown(cert)
+        render_report_markdown(cert)

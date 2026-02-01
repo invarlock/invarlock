@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 from invarlock.reporting.report_builder import (
     make_report,
-    render_certificate_markdown,
+    render_report_markdown,
 )
 
 
@@ -45,5 +45,5 @@ def test_render_spectral_multiple_testing_yaml_block():
         "alpha": 0.05,
         "m": 4,
     }
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     assert "Multiple Testing" in md and "method: bh" in md

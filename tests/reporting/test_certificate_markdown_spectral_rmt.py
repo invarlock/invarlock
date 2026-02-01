@@ -104,7 +104,7 @@ def test_render_certificate_markdown_general_sections() -> None:
     report = _mk_report()
     baseline = _mk_report()
     cert = C.make_report(report, baseline)
-    out = C.render_certificate_markdown(cert)
-    assert "InvarLock Evaluation Certificate" in out
+    out = C.render_report_markdown(cert)
+    assert "InvarLock Evaluation Report" in out
     assert "Executive Summary" in out
     assert "Primary Metric" in out

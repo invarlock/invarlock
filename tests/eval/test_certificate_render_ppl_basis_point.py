@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def test_render_markdown_uses_point_basis_when_no_ratio_ci():
@@ -40,7 +40,7 @@ def test_render_markdown_uses_point_basis_when_no_ratio_ci():
     cert.setdefault("auto", {})["tier"] = "balanced"
     cert["auto"]["target_pm_ratio"] = 1.05
 
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     # Quality gates section present; row headings may vary across versions
     assert "Quality Gates" in md
     assert "| point |" in md

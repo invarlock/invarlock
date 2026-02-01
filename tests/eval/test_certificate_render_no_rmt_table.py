@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 from invarlock.reporting.report_builder import (
     make_report,
-    render_certificate_markdown,
+    render_report_markdown,
 )
 
 
@@ -40,6 +40,6 @@ def test_render_omits_rmt_section_when_empty():
         cert = make_report(report, baseline)
     # Ensure rmt section is effectively empty for optional families table
     cert["rmt"] = {}
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     # Optional families table headers should be absent
     assert "| Family | ε_f | Bare | Guarded |" not in md

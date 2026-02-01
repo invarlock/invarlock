@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 from invarlock.reporting.report_builder import make_report
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
 
 
 def test_render_spectral_no_tables_when_empty():
@@ -44,7 +44,7 @@ def test_render_spectral_no_tables_when_empty():
     spectral.pop("family_z_quantiles", None)
     cert["spectral"] = spectral
 
-    md = render_certificate_markdown(cert)
+    md = render_report_markdown(cert)
     # Headers for spectral tables should be absent
     assert "| Family | κ | Violations |" not in md
     assert "| Family | q95 | q99 | Max | Samples |" not in md
