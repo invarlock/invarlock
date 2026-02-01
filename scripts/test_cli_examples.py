@@ -259,7 +259,9 @@ def _iter_markdown_files(repo_root: Path, *, paths: list[str] | None) -> list[Pa
         try:
             rel_parts = path.resolve().relative_to(repo_root.resolve()).parts
         except Exception:
-            return False
+            # Explicit external file/dir paths are allowed (used by tests and
+            # local validation). Excludes apply only within the repo.
+            return True
         return not rel_parts or rel_parts[0] not in EXCLUDE_TOP_LEVEL_DIRS
 
     return sorted((p for p in candidates if _allowed(p)), key=lambda p: str(p))
