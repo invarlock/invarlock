@@ -374,7 +374,9 @@ test_run_pack_checksums_include_files() {
     local checksums
     checksums="$(cat "${pack_dir}/checksums.sha256")"
     assert_match "results/final_verdict.txt" "${checksums}" "checksums include results"
-    assert_match "manifest.json" "${checksums}" "checksums include manifest"
+    if [[ "${checksums}" == *manifest.json* ]]; then
+        t_fail "checksums must not include manifest.json to avoid signature cycles"
+    fi
 }
 
 
@@ -453,13 +455,18 @@ test_run_pack_sign_manifest_with_gpg() {
 
     local pack_dir="${TEST_TMPDIR}/pack"
     mkdir -p "${pack_dir}"
-    echo "{}" > "${pack_dir}/manifest.json"
+    echo '{"format":"proof-pack-v1"}' > "${pack_dir}/manifest.json"
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
     cat > "${bin_dir}/gpg" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
+if [[ "${1:-}" == "--verify" ]]; then
+    # Simulate gpg --status-fd output for fingerprint extraction.
+    printf '[GNUPG:] VALIDSIG %s 20240101T000000 0 0 0 0 0 0 0 0\n' "0123456789ABCDEF0123456789ABCDEF01234567"
+    exit 0
+fi
 out=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -483,6 +490,7 @@ EOF
 
     pack_sign_manifest "${pack_dir}"
     assert_file_exists "${pack_dir}/manifest.json.asc" "gpg signature created"
+    assert_eq "0123456789ABCDEF0123456789ABCDEF01234567" "$(python3 -c 'import json;print(json.load(open("'"${pack_dir}/manifest.json"'"))["signing_key_fingerprint"])' < /dev/null)" "signer fingerprint recorded"
 
     PATH="${original_path}"
 }
