@@ -74,7 +74,16 @@ def test_generate_reports_evaluation_report_validation_block(monkeypatch):
     monkeypatch.setattr(
         cert_mod,
         "make_report",
-        lambda *_, **__: {"validation": {"overall": True}},
+        lambda *_, **__: {
+            "validation": {"overall": True},
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 45.657,
+                "final": 47.082,
+                "ratio_vs_baseline": 1.0,
+                "display_ci": [0.9981, 1.0019],
+            },
+        },
         raising=False,
     )
     monkeypatch.setattr(cert_mod, "validate_report", lambda cert: True, raising=False)
@@ -91,9 +100,13 @@ def test_generate_reports_evaluation_report_validation_block(monkeypatch):
         "invarlock.reporting.render.compute_console_validation_block",
         fake_console_block,
     )
-    monkeypatch.setattr(
-        report_mod, "console", type("C", (), {"print": lambda *_: None})()
-    )
+    captured: list[str] = []
+
+    class _CaptureConsole:
+        def print(self, *args: object, **kwargs: object) -> None:
+            captured.append(" ".join(str(a) for a in args))
+
+    monkeypatch.setattr(report_mod, "console", _CaptureConsole())
 
     report_mod.report_command(
         run="run.json",
@@ -102,6 +115,10 @@ def test_generate_reports_evaluation_report_validation_block(monkeypatch):
         baseline="baseline.json",
         output="out",
     )
+    out = "\n".join(captured)
+    assert "PRIMARY METRIC" in out
+    assert "CI (95%)" in out
+    assert "[0.998, 1.002]" in out
 
 
 def test_generate_reports_evaluation_report_validation_error(monkeypatch):

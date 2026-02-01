@@ -52,16 +52,16 @@ def _fmt_metric_value(value: Any) -> str:
     return f"{val:.3f}"
 
 
-def _fmt_ci_range(ci: Any) -> str:
+def _fmt_ci_95(ci: Any) -> str | None:
     if isinstance(ci, (list, tuple)) and len(ci) == 2:
         try:
             lo = float(ci[0])
             hi = float(ci[1])
         except (TypeError, ValueError):
-            return "N/A"
+            return None
         if math.isfinite(lo) and math.isfinite(hi):
-            return f"{lo:.3f}–{hi:.3f}"
-    return "N/A"
+            return f"[{lo:.3f}, {hi:.3f}]"
+    return None
 
 
 def _artifact_entries(
@@ -245,7 +245,15 @@ def _generate_reports(
                 if edit_name:
                     console.print(_format_kv_line("Edit", str(edit_name)))
 
-                pm = (primary_report.get("metrics", {}) or {}).get("primary_metric", {})
+                pm = (
+                    (evaluation_report.get("primary_metric") or {})
+                    if isinstance(evaluation_report, dict)
+                    else {}
+                )
+                if not pm:
+                    pm = (primary_report.get("metrics", {}) or {}).get(
+                        "primary_metric", {}
+                    )
                 console.print("  PRIMARY METRIC")
                 pm_entries: list[tuple[str, str]] = []
                 if isinstance(pm, dict) and pm:
@@ -261,8 +269,9 @@ def _generate_reports(
                     if ratio is not None:
                         pm_entries.append(("Ratio", _fmt_metric_value(ratio)))
                     dci = pm.get("display_ci")
-                    if dci is not None:
-                        pm_entries.append(("CI", _fmt_ci_range(dci)))
+                    ci_95 = _fmt_ci_95(dci)
+                    if ci_95 is not None:
+                        pm_entries.append(("CI (95%)", ci_95))
                 if not pm_entries:
                     pm_entries.append(("Status", "Unavailable"))
                 for idx, (label, value) in enumerate(pm_entries):
