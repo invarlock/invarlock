@@ -21,8 +21,8 @@ test_pack_build_pack_and_verify_pack_end_to_end_v2_layout() {
     echo 'm,quant_rtn' >> "${run_dir}/analysis/eval_results.csv"
     echo '{"model_list":["m"],"models":{"m":{"revision":"rev"}}}' > "${run_dir}/state/model_revisions.json"
 
-    mkdir -p "${run_dir}/m/certificates/clean/quant_rtn"
-    echo '{}' > "${run_dir}/m/certificates/clean/quant_rtn/evaluation.report.json"
+    mkdir -p "${run_dir}/m/reports/clean/quant_rtn"
+    echo '{}' > "${run_dir}/m/reports/clean/quant_rtn/evaluation.report.json"
 
     source "${TEST_ROOT}/scripts/proof_packs/run_pack.sh"
 

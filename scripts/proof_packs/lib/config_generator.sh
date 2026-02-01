@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# config_generator.sh - InvarLock config generation + certify helpers for proof packs.
+# config_generator.sh - InvarLock config generation + evaluate helpers for proof packs.
 
 _PACK_CONFIG_GENERATOR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _PACK_CONFIG_GENERATOR_PY_DIR="${_PACK_CONFIG_GENERATOR_DIR}/../python"
@@ -174,12 +174,12 @@ run_single_calibration() {
         --out "${run_dir}" \
         >> "${log_file}" 2>&1 || exit_code=$?
 
-    # Generate certificate from report
+    # Generate report from report
     local report_file
     report_file=$(find "${run_dir}" -name "report*.json" -type f 2>/dev/null | head -1)
     if [[ -n "${report_file}" ]]; then
         cp "${report_file}" "${run_dir}/baseline_report.json" 2>/dev/null || true
-        python3 "${_PACK_CONFIG_GENERATOR_PY_DIR}/certificate_from_report.py" \
+        python3 "${_PACK_CONFIG_GENERATOR_PY_DIR}/report_from_report.py" \
             --report "${report_file}" \
             --out "${run_dir}/evaluation.report.json" >> "${log_file}" 2>&1 || true
     fi
@@ -264,8 +264,8 @@ run_invarlock_calibration() {
         --final-n "${effective_final_n}"
 }
 
-# ============ CERTIFY WITH PROOF PACK SETTINGS ============
-run_invarlock_certify() {
+# ============ evaluate WITH PROOF PACK SETTINGS ============
+run_invarlock_evaluate() {
     local subject_path="$1"
     local baseline_path="$2"
     local output_dir="$3"
@@ -288,7 +288,7 @@ run_invarlock_certify() {
     done
 
     local cmd_args=(
-        "invarlock" "certify"
+        "invarlock" "evaluate"
         "--source" "${baseline_path}"
         "--edited" "${subject_path}"
         "--profile" "ci"
@@ -316,7 +316,7 @@ run_invarlock_certify() {
             >> "${OUTPUT_DIR}/logs/gpu_${gpu_id}.log" 2>&1 || exit_code=$?
     fi
 
-    # Copy certificate to standard location (only the canonical cert)
+    # Copy report to standard location (only the canonical cert)
     local cert_file="${cert_dir}/evaluation.report.json"
     if [[ -f "${cert_file}" ]]; then
         cp "${cert_file}" "${run_dir}/evaluation.report.json" 2>/dev/null || true
@@ -330,4 +330,4 @@ run_invarlock_certify() {
 
     return ${exit_code}
 }
-export -f run_invarlock_certify
+export -f run_invarlock_evaluate

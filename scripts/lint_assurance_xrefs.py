@@ -3,8 +3,8 @@
 
 Validates that:
 - `docs/assurance/*.md` references existing pytest tests via `tests/...::...`
-- `docs/assurance/*.md` cites certificate field paths that exist (against a
-  representative certificate sample).
+- `docs/assurance/*.md` cites report field paths that exist (against a
+  representative report sample).
 """
 
 from __future__ import annotations
@@ -205,8 +205,8 @@ def _path_exists_in_obj(obj: Any, path: str) -> bool:
     return _step(obj, 0)
 
 
-def _sample_certificates() -> list[dict[str, Any]]:
-    from invarlock.reporting.certificate import make_certificate
+def _sample_reports() -> list[dict[str, Any]]:
+    from invarlock.reporting.report_builder import make_report
 
     ppl_report = {
         "meta": {
@@ -306,7 +306,7 @@ def _sample_certificates() -> list[dict[str, Any]]:
                 "preview": 10.0,
                 "final": 10.5,
                 # Intentionally set just above the base tier limit so the sample
-                # certificate exercises `validation.hysteresis_applied`.
+                # report exercises `validation.hysteresis_applied`.
                 # Balanced: ratio_limit_base=1.10, hysteresis_ratio=0.002 → 1.102
                 "ratio_vs_baseline": 1.101,
                 "display_ci": [1.01, 1.09],
@@ -384,8 +384,8 @@ def _sample_certificates() -> list[dict[str, Any]]:
     acc_baseline = {"metrics": {"primary_metric": {"kind": "accuracy", "final": 0.79}}}
 
     return [
-        make_certificate(ppl_report, ppl_baseline),
-        make_certificate(acc_report, acc_baseline),
+        make_report(ppl_report, ppl_baseline),
+        make_report(acc_report, acc_baseline),
     ]
 
 
@@ -419,12 +419,10 @@ def main() -> None:
 
     # ---- field-path xrefs ----
     try:
-        certs = _sample_certificates()
+        certs = _sample_reports()
     except Exception as e:  # pragma: no cover
         errors.append(
-            LintError(
-                Path("docs/assurance"), f"Failed to build sample certificate: {e}"
-            )
+            LintError(Path("docs/assurance"), f"Failed to build sample report: {e}")
         )
         certs = []
 
@@ -439,7 +437,7 @@ def main() -> None:
                 errors.append(
                     LintError(
                         Path("docs/assurance"),
-                        f"Missing certificate field path: `{path}` (from `{expr}`)",
+                        f"Missing report field path: `{path}` (from `{expr}`)",
                     )
                 )
 

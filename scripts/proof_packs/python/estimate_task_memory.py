@@ -103,7 +103,7 @@ def main() -> int:
         required = (float(weights_gb) * 2.0) + batch_overhead
     elif task_type in ("CREATE_EDIT", "CREATE_ERROR"):
         required = float(weights_gb) + edit_overhead
-    elif task_type in ("CALIBRATION_RUN", "CERTIFY_EDIT", "CERTIFY_ERROR"):
+    elif task_type in ("CALIBRATION_RUN", "evaluate_EDIT", "evaluate_ERROR"):
         required = (
             float(weights_gb)
             + kv_cache_gb(int(batch_invarlock), int(seq_len_invarlock))

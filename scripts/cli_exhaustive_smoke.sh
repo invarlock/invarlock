@@ -113,7 +113,7 @@ run_env() {
 # Top-level and core commands (help-only: safe)
 run "invarlock --help"                "$CLI --help"
 run "invarlock version"               "$CLI version"
-run "invarlock certify --help"        "$CLI certify --help"
+run "invarlock evaluate --help"        "$CLI evaluate --help"
 run "invarlock verify --help"         "$CLI verify --help"
 run "invarlock run --help"            "$CLI run --help"
 run "invarlock report --help"         "$CLI report --help"
@@ -153,8 +153,8 @@ run "invarlock plugins uninstall --dry-run awq"  "$CLI plugins uninstall --dry-r
 echo "[done] $(ts) Log captured to: $LOG_FILE"
 echo "$LOG_FILE"
 
-# Extended: verify, certify/run with and without network
-# Create a tiny invalid certificate to exercise verify paths
+# Extended: verify, evaluate/run with and without network
+# Create a tiny invalid report to exercise verify paths
 TMP_DIR="$(mktemp -d -t invarlock_cli_smoke.XXXXXX.dir)"
 echo '{"schema_version": "v1", "primary_metric": {}}' >"$TMP_DIR/cert_invalid.json"
 
@@ -166,15 +166,15 @@ OFFLINE_ENV="HF_DATASETS_OFFLINE=1 TRANSFORMERS_OFFLINE=1 TOKENIZERS_PARALLELISM
 
 if have_adapters_stack; then
   run_to "invarlock run (offline)" 60 "$OFFLINE_ENV $CLI run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --device cpu --out \"$TMP_DIR/run_offline\""
-  run_to "invarlock certify (offline)" 60 "$OFFLINE_ENV $CLI certify --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --out \"$TMP_DIR/cert_offline\" --cert-out \"$TMP_DIR/cert_offline_out\""
+  run_to "invarlock evaluate (offline)" 60 "$OFFLINE_ENV $CLI evaluate --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --out \"$TMP_DIR/cert_offline\" --report-out \"$TMP_DIR/cert_offline_out\""
 else
   {
     echo "\n==== BEGIN invarlock run (offline) ===="
     echo "[skip] adapters stack (torch/transformers) not available"
     echo "==== END invarlock run (offline) ====\n"
-    echo "\n==== BEGIN invarlock certify (offline) ===="
+    echo "\n==== BEGIN invarlock evaluate (offline) ===="
     echo "[skip] adapters stack (torch/transformers) not available"
-    echo "==== END invarlock certify (offline) ====\n"
+    echo "==== END invarlock evaluate (offline) ====\n"
   } >>"$LOG_FILE"
 fi
 
@@ -182,14 +182,14 @@ fi
 NET_ENV="INVARLOCK_ALLOW_NETWORK=1 TOKENIZERS_PARALLELISM=false"
 if have_adapters_stack; then
   run_to "invarlock run (network)" 60 "$NET_ENV $CLI run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --device cpu --out \"$TMP_DIR/run_net\""
-  run_to "invarlock certify (network)" 60 "$NET_ENV $CLI certify --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --out \"$TMP_DIR/cert_net\" --cert-out \"$TMP_DIR/cert_net_out\""
+  run_to "invarlock evaluate (network)" 60 "$NET_ENV $CLI evaluate --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --out \"$TMP_DIR/cert_net\" --report-out \"$TMP_DIR/cert_net_out\""
 else
   {
     echo "\n==== BEGIN invarlock run (network) ===="
     echo "[skip] adapters stack (torch/transformers) not available"
     echo "==== END invarlock run (network) ====\n"
-    echo "\n==== BEGIN invarlock certify (network) ===="
+    echo "\n==== BEGIN invarlock evaluate (network) ===="
     echo "[skip] adapters stack (torch/transformers) not available"
-    echo "==== END invarlock certify (network) ====\n"
+    echo "==== END invarlock evaluate (network) ====\n"
   } >>"$LOG_FILE"
 fi

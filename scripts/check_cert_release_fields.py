@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate that a certificate includes release-profile provenance, guard overhead,
+"""Validate that a report includes release-profile provenance, guard overhead,
 and spectral observability fields."""
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from pathlib import Path
 def validate_cert(path: Path) -> list[str]:
     errors: list[str] = []
     if not path.exists():
-        return [f"certificate not found: {path}"]
+        return [f"report not found: {path}"]
 
     try:
         data = json.loads(path.read_text())

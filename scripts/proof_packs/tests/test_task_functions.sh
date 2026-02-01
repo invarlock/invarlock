@@ -144,7 +144,7 @@ test_task_calibration_run_and_generate_preset_cover_overrides_large_model_and_re
     fi
 
     # Already done skip.
-    local run_dir="${model_output_dir}/certificates/calibration/run_1"
+    local run_dir="${model_output_dir}/reports/calibration/run_1"
     mkdir -p "${run_dir}"
     echo "{}" > "${run_dir}/baseline_report.json"
     task_calibration_run "${model_name}" 0 1 42 "${out}" "${log_file}"
@@ -259,7 +259,7 @@ test_task_create_edit_and_batch_edits_cover_success_failure_and_missing_function
     fi
 }
 
-test_task_certify_edit_and_error_cover_preset_discovery_overrides_and_certificate_copy_paths() {
+test_task_evaluate_edit_and_error_cover_preset_discovery_overrides_and_report_copy_paths() {
     mock_reset
     # shellcheck source=../task_functions.sh
     source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
@@ -277,18 +277,18 @@ test_task_certify_edit_and_error_cover_preset_discovery_overrides_and_certificat
     : > "${log_file}"
 
     # Baseline missing error.
-    if task_certify_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean 1 "${TEST_TMPDIR}/nope" "${log_file}"; then
-        t_fail "expected certify_edit to fail without baseline"
+    if task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean 1 "${TEST_TMPDIR}/nope" "${log_file}"; then
+        t_fail "expected evaluate_edit to fail without baseline"
     fi
 
     # Case arms for edit dir name mapping + missing edit path error.
-    if task_certify_edit "${model_name}" 0 "fp8_quant:e4m3fn:ffn" clean 1 "${out}" "${log_file}"; then :; fi
-    if task_certify_edit "${model_name}" 0 "magnitude_prune:0.1:ffn" clean 1 "${out}" "${log_file}"; then :; fi
-    if task_certify_edit "${model_name}" 0 "lowrank_svd:8:attn" clean 1 "${out}" "${log_file}"; then :; fi
+    if task_evaluate_edit "${model_name}" 0 "fp8_quant:e4m3fn:ffn" clean 1 "${out}" "${log_file}"; then :; fi
+    if task_evaluate_edit "${model_name}" 0 "magnitude_prune:0.1:ffn" clean 1 "${out}" "${log_file}"; then :; fi
+    if task_evaluate_edit "${model_name}" 0 "lowrank_svd:8:attn" clean 1 "${out}" "${log_file}"; then :; fi
 
-    # Full certify flow for quant_rtn with overrides and certificate copy.
+    # Full evaluate flow for quant_rtn with overrides and report copy.
     mkdir -p "${model_output_dir}/models/quant_4bit_clean"
-    local cert_dir="${model_output_dir}/certificates/quant_4bit_clean/run_1"
+    local cert_dir="${model_output_dir}/reports/quant_4bit_clean/run_1"
     mkdir -p "${cert_dir}/nested"
     echo "{}" > "${cert_dir}/nested/evaluation.report.json"
 
@@ -309,7 +309,7 @@ guards:
     max_caps: 15
 YAML
 
-    task_certify_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean 1 "${out}" "${log_file}"
+    task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean 1 "${out}" "${log_file}"
     local profile_yaml="${cert_dir}/config_root/runtime/profiles/ci.yaml"
     assert_file_exists "${profile_yaml}" "profile override created"
     local profile_contents
@@ -323,27 +323,27 @@ YAML
     calls="$(cat "${TEST_TMPDIR}/fixtures/invarlock.calls")"
     assert_match "calibrated_preset_${model_name}__quant_rtn\\.yaml" "${calls}" "uses edit-type preset"
     if [[ "${calls}" =~ oom_override_preset\.yaml ]]; then
-        t_fail "expected certify to avoid override preset file"
+        t_fail "expected evaluate to avoid override preset file"
     fi
     # Skip branch when cert already exists.
-    task_certify_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean 1 "${out}" "${log_file}"
+    task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean 1 "${out}" "${log_file}"
 
     # Preset discovery branch when preset exists.
     rm -f "${out}/presets/calibrated_preset_${model_name}__quant_rtn.yaml"
     echo "{}" > "${out}/presets/calibrated_preset_${model_name}.yaml"
-    task_certify_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean 2 "${out}" "${log_file}"
+    task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean 2 "${out}" "${log_file}"
 
-    # Error model certify mirrors certify_edit branches.
+    # Error model evaluate mirrors evaluate_edit branches.
     local error_path="${model_output_dir}/models/error_cuda_assert"
     mkdir -p "${error_path}"
     echo "{}" > "${error_path}/config.json"
-    cert_dir="${model_output_dir}/certificates/errors/cuda_assert"
+    cert_dir="${model_output_dir}/reports/errors/cuda_assert"
     mkdir -p "${cert_dir}/nested"
     echo "{}" > "${cert_dir}/nested/evaluation.report.json"
-    task_certify_error "${model_name}" 0 cuda_assert "${out}" "${log_file}"
+    task_evaluate_error "${model_name}" 0 cuda_assert "${out}" "${log_file}"
 }
 
-test_task_certify_edit_exits_when_workdir_cd_fails() {
+test_task_evaluate_edit_exits_when_workdir_cd_fails() {
     mock_reset
     # shellcheck source=../task_functions.sh
     source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
@@ -369,11 +369,11 @@ test_task_certify_edit_exits_when_workdir_cd_fails() {
         builtin cd "$@"
     }
 
-    run task_certify_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean 1 "${out}" "${log_file}"
+    run task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean 1 "${out}" "${log_file}"
     assert_rc "1" "${RUN_RC}" "cd failure exits subshell and propagates non-zero"
 }
 
-test_task_certify_error_exits_when_workdir_cd_fails() {
+test_task_evaluate_error_exits_when_workdir_cd_fails() {
     mock_reset
     # shellcheck source=../task_functions.sh
     source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
@@ -398,11 +398,11 @@ test_task_certify_error_exits_when_workdir_cd_fails() {
         builtin cd "$@"
     }
 
-    run task_certify_error "${model_name}" 0 cuda_assert "${out}" "${log_file}"
+    run task_evaluate_error "${model_name}" 0 cuda_assert "${out}" "${log_file}"
     assert_rc "1" "${RUN_RC}" "cd failure exits subshell and propagates non-zero"
 }
 
-test_task_certify_error_missing_baseline_missing_error_model_skip_and_preset_missing_branches() {
+test_task_evaluate_error_missing_baseline_missing_error_model_skip_and_preset_missing_branches() {
     mock_reset
     # shellcheck source=../task_functions.sh
     source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
@@ -416,31 +416,31 @@ test_task_certify_error_missing_baseline_missing_error_model_skip_and_preset_mis
     : > "${log_file}"
 
     # Baseline missing.
-    if task_certify_error "${model_name}" 0 cuda_assert "${TEST_TMPDIR}/nope" "${log_file}"; then
-        t_fail "expected certify_error to fail without baseline"
+    if task_evaluate_error "${model_name}" 0 cuda_assert "${TEST_TMPDIR}/nope" "${log_file}"; then
+        t_fail "expected evaluate_error to fail without baseline"
     fi
 
     # Baseline present, error model missing.
     mkdir -p "${baseline_dir}"
     echo "{}" > "${baseline_dir}/config.json"
     echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
-    if task_certify_error "${model_name}" 0 cuda_assert "${out}" "${log_file}"; then
-        t_fail "expected certify_error to fail without error model"
+    if task_evaluate_error "${model_name}" 0 cuda_assert "${out}" "${log_file}"; then
+        t_fail "expected evaluate_error to fail without error model"
     fi
 
     # Error model present, cert exists skip.
     local error_path="${model_output_dir}/models/error_cuda_assert"
     mkdir -p "${error_path}"
     echo "{}" > "${error_path}/config.json"
-    local cert_dir="${model_output_dir}/certificates/errors/cuda_assert"
+    local cert_dir="${model_output_dir}/reports/errors/cuda_assert"
     mkdir -p "${cert_dir}"
     echo "{}" > "${cert_dir}/evaluation.report.json"
-    task_certify_error "${model_name}" 0 cuda_assert "${out}" "${log_file}"
+    task_evaluate_error "${model_name}" 0 cuda_assert "${out}" "${log_file}"
 
     # Preset missing branch creates a minimal preset.
     rm -f "${cert_dir}/evaluation.report.json"
     rm -rf "${out}/presets"
-    task_certify_error "${model_name}" 0 cuda_assert "${out}" "${log_file}"
+    task_evaluate_error "${model_name}" 0 cuda_assert "${out}" "${log_file}"
 }
 
 test_task_create_error_branches_cover_skip_missing_function_and_verify_paths() {
@@ -552,7 +552,7 @@ test_task_baseline_report_helpers_wait_sanitizes_interval_and_large_timeout() {
     mkdir -p "${baseline_root}/.baseline_lock"
 
     _resolve_invarlock_adapter() { echo "hf_test"; }
-    _validate_certify_baseline_report() { return 0; }
+    _validate_evaluate_baseline_report() { return 0; }
 
     export PACK_BASELINE_REPORT_WAIT_INTERVAL_SECS="0"
     export PACK_BASELINE_REPORT_WAIT_SECS_LARGE="nope"
@@ -565,7 +565,7 @@ test_task_baseline_report_helpers_wait_sanitizes_interval_and_large_timeout() {
     local log_file="${TEST_TMPDIR}/baseline_wait_sanitize.log"
     : > "${log_file}"
     local waited
-    waited="$(_ensure_certify_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "moe" "${log_file}")"
+    waited="$(_ensure_evaluate_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "moe" "${log_file}")"
     assert_eq "${baseline_report}" "${waited}" "wait loop returns once report appears"
 
     unset PACK_BASELINE_REPORT_WAIT_INTERVAL_SECS PACK_BASELINE_REPORT_WAIT_SECS_LARGE
@@ -584,7 +584,7 @@ test_task_baseline_report_helpers_wait_iters_floor_to_one() {
     local lock_dir="${baseline_root}/.baseline_lock"
 
     _resolve_invarlock_adapter() { echo "hf_test"; }
-    _validate_certify_baseline_report() { return 0; }
+    _validate_evaluate_baseline_report() { return 0; }
 
     export PACK_BASELINE_REPORT_WAIT_INTERVAL_SECS="10"
     export PACK_BASELINE_REPORT_WAIT_SECS="1"
@@ -600,14 +600,14 @@ test_task_baseline_report_helpers_wait_iters_floor_to_one() {
     local log_file="${TEST_TMPDIR}/baseline_wait_iters.log"
     : > "${log_file}"
     local waited
-    waited="$(_ensure_certify_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "7" "${log_file}")"
+    waited="$(_ensure_evaluate_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "7" "${log_file}")"
     assert_eq "${baseline_report}" "${waited}" "wait_iters clamped to 1 still returns report"
 
     unset -f mkdir
     unset PACK_BASELINE_REPORT_WAIT_INTERVAL_SECS PACK_BASELINE_REPORT_WAIT_SECS
 }
 
-test_task_certify_error_repairs_missing_tensors_config_when_available() {
+test_task_evaluate_error_repairs_missing_tensors_config_when_available() {
     mock_reset
     # shellcheck source=../task_functions.sh
     source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
@@ -626,7 +626,7 @@ test_task_certify_error_repairs_missing_tensors_config_when_available() {
     echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
     : > "${log_file}"
 
-    task_certify_error "${model_name}" 0 missing_tensors "${out}" "${log_file}"
+    task_evaluate_error "${model_name}" 0 missing_tensors "${out}" "${log_file}"
 }
 
 test_task_create_model_variant_dispatch_and_fallback_errors() {
@@ -695,7 +695,7 @@ test_task_baseline_report_helpers_cover_reuse_lock_race_and_wait_paths() {
     run _resolve_invarlock_adapter ""
     assert_ne "0" "${RUN_RC}" "empty adapter input returns non-zero"
 
-    run _validate_certify_baseline_report "" "hf" "ci" "balanced"
+    run _validate_evaluate_baseline_report "" "hf" "ci" "balanced"
     assert_ne "0" "${RUN_RC}" "missing baseline report returns non-zero"
 
     local baseline_root="${TEST_TMPDIR}/baseline_root"
@@ -703,11 +703,11 @@ test_task_baseline_report_helpers_cover_reuse_lock_race_and_wait_paths() {
     local baseline_report="${baseline_root}/baseline_report.json"
 
     _resolve_invarlock_adapter() { echo "hf_test"; }
-    _validate_certify_baseline_report() { return 0; }
+    _validate_evaluate_baseline_report() { return 0; }
 
     echo "{}" > "${baseline_report}"
     local reuse
-    reuse="$(_ensure_certify_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "7" "${TEST_TMPDIR}/log.txt")"
+    reuse="$(_ensure_evaluate_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "7" "${TEST_TMPDIR}/log.txt")"
     assert_eq "${baseline_report}" "${reuse}" "reuse returns existing baseline report"
 
     rm -f "${baseline_report}"
@@ -721,7 +721,7 @@ test_task_baseline_report_helpers_cover_reuse_lock_race_and_wait_paths() {
         command mkdir "$@"
     }
     local raced
-    raced="$(_ensure_certify_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "7" "${TEST_TMPDIR}/log.txt")"
+    raced="$(_ensure_evaluate_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "7" "${TEST_TMPDIR}/log.txt")"
     assert_eq "${baseline_report}" "${raced}" "lock re-check returns when report appears"
     unset -f mkdir
 
@@ -734,7 +734,7 @@ test_task_baseline_report_helpers_cover_reuse_lock_race_and_wait_paths() {
     }
     local waited_file="${TEST_TMPDIR}/baseline_waited.out"
     local waited_rc=0
-    if _ensure_certify_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "7" "${TEST_TMPDIR}/log.txt" > "${waited_file}"; then
+    if _ensure_evaluate_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "7" "${TEST_TMPDIR}/log.txt" > "${waited_file}"; then
         waited_rc=0
     else
         waited_rc=$?
@@ -766,7 +766,7 @@ test_task_baseline_report_helpers_execute_python_wrappers() {
     local report="${TEST_TMPDIR}/baseline_report.json"
     echo "{}" > "${report}"
 
-    run _validate_certify_baseline_report "${report}" "hf_auto" "ci" "balanced"
+    run _validate_evaluate_baseline_report "${report}" "hf_auto" "ci" "balanced"
     assert_rc "0" "${RUN_RC}" "baseline report validation runs python wrapper"
     assert_file_exists "${calls}" "python stub invoked"
 }
@@ -785,13 +785,13 @@ test_task_baseline_report_helpers_cover_generate_baseline_report_path() {
     : > "${log_file}"
 
     _resolve_invarlock_adapter() { echo "hf_test"; }
-    _validate_certify_baseline_report() { return 0; }
+    _validate_evaluate_baseline_report() { return 0; }
 
     export PACK_GUARDS_ORDER="invariants, spectral , rmt"
     fixture_write "invarlock.create_report_nested" ""
 
     local generated
-    generated="$(_ensure_certify_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "7" "${log_file}")"
+    generated="$(_ensure_evaluate_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "7" "${log_file}")"
 
     assert_eq "${baseline_report}" "${generated}" "baseline report path returned"
     assert_file_exists "${baseline_report}" "baseline report generated"
@@ -809,7 +809,7 @@ test_task_baseline_report_helpers_remove_invalid_baseline_report_and_timeout_wai
     echo "{}" > "${baseline_report}"
 
     _resolve_invarlock_adapter() { echo "hf_test"; }
-    _validate_certify_baseline_report() { return 1; }
+    _validate_evaluate_baseline_report() { return 1; }
 
     mkdir -p "${baseline_root}/.baseline_lock"
     _sleep() { return 0; }
@@ -818,7 +818,7 @@ test_task_baseline_report_helpers_remove_invalid_baseline_report_and_timeout_wai
     : > "${log_file}"
 
     local rc=0
-    ( _ensure_certify_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "7" "${log_file}" ) || rc=$?
+    ( _ensure_evaluate_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "7" "${log_file}" ) || rc=$?
     assert_ne "0" "${rc}" "timeout wait returns non-zero"
     [[ ! -f "${baseline_report}" ]] || t_fail "invalid baseline report should be removed"
 }
@@ -834,7 +834,7 @@ test_task_baseline_report_helpers_remove_invalid_baseline_report_after_lock_acqu
     rm -f "${baseline_report}"
 
     _resolve_invarlock_adapter() { echo "hf_test"; }
-    _validate_certify_baseline_report() { return 1; }
+    _validate_evaluate_baseline_report() { return 1; }
 
     local lock_dir="${baseline_root}/.baseline_lock"
     mkdir() {
@@ -850,12 +850,12 @@ test_task_baseline_report_helpers_remove_invalid_baseline_report_after_lock_acqu
     : > "${log_file}"
 
     local rc=0
-    ( _ensure_certify_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "7" "${log_file}" ) || rc=$?
+    ( _ensure_evaluate_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "7" "${log_file}" ) || rc=$?
     assert_ne "0" "${rc}" "invalid baseline report triggers error path"
     unset -f mkdir
 }
 
-test_task_certify_edit_reuses_baseline_report_applies_ci_override_and_falls_back_label() {
+test_task_evaluate_edit_reuses_baseline_report_applies_ci_override_and_falls_back_label() {
     mock_reset
     # shellcheck source=../task_functions.sh
     source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
@@ -879,7 +879,7 @@ test_task_certify_edit_reuses_baseline_report_applies_ci_override_and_falls_back
 
     local baseline_report="${TEST_TMPDIR}/baseline_report.json"
     echo '{"evaluation_windows":{"preview":{"window_ids":[1],"input_ids":[[1]]},"final":{"window_ids":[1],"input_ids":[[1]]}},"edit":{"name":"noop"}}' > "${baseline_report}"
-    _ensure_certify_baseline_report() { echo "${baseline_report}"; }
+    _ensure_evaluate_baseline_report() { echo "${baseline_report}"; }
 
     resolve_edit_params() {
         jq -n '{status:"selected", edit_type:"quant_rtn", param1:"4", param2:"32", scope:"ffn", edit_dir_name:"_clean"}'
@@ -891,7 +891,7 @@ test_task_certify_edit_reuses_baseline_report_applies_ci_override_and_falls_back
     mkdir -p "${out}/presets"
     echo "{}" > "${out}/presets/calibrated_preset_${model_name}.yaml"
 
-    task_certify_edit "${model_name}" 0 "quant_rtn:4:32:ffn" clean 1 "${out}" "${log_file}"
+    task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:ffn" clean 1 "${out}" "${log_file}"
 
     assert_match "CI window override" "$(cat "${log_file}")" "CI window override applied"
     assert_match "Reusing baseline report" "$(cat "${log_file}")" "baseline report reused"
@@ -902,7 +902,7 @@ test_task_certify_edit_reuses_baseline_report_applies_ci_override_and_falls_back
     assert_match "--edit-label custom" "${calls}" "empty edit label falls back to custom"
 }
 
-test_task_certify_error_reuses_baseline_report_and_applies_ci_override() {
+test_task_evaluate_error_reuses_baseline_report_and_applies_ci_override() {
     mock_reset
     # shellcheck source=../task_functions.sh
     source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
@@ -927,16 +927,16 @@ test_task_certify_error_reuses_baseline_report_and_applies_ci_override() {
 
     local baseline_report="${TEST_TMPDIR}/baseline_report.json"
     echo '{"evaluation_windows":{"preview":{"window_ids":[1],"input_ids":[[1]]},"final":{"window_ids":[1],"input_ids":[[1]]}},"edit":{"name":"noop"}}' > "${baseline_report}"
-    _ensure_certify_baseline_report() { echo "${baseline_report}"; }
+    _ensure_evaluate_baseline_report() { echo "${baseline_report}"; }
 
     mkdir -p "${out}/presets"
     echo "{}" > "${out}/presets/calibrated_preset_${model_name}.yaml"
 
-    task_certify_error "${model_name}" 0 nan_injection "${out}" "${log_file}"
+    task_evaluate_error "${model_name}" 0 nan_injection "${out}" "${log_file}"
 
     assert_match "CI window override" "$(cat "${log_file}")" "CI window override applied"
     assert_match "Reusing baseline report" "$(cat "${log_file}")" "baseline report reused"
-    assert_file_exists "${model_output_dir}/certificates/errors/nan_injection/evaluation.report.json" "error cert written"
+    assert_file_exists "${model_output_dir}/reports/errors/nan_injection/evaluation.report.json" "error cert written"
 }
 
 test_task_timeout_and_profile_helpers() {
@@ -986,9 +986,9 @@ test_execute_task_dispatches_all_task_types() {
     task_calibration_run() { :; }
     task_create_edit() { :; }
     task_create_edits_batch() { :; }
-    task_certify_edit() { :; }
+    task_evaluate_edit() { :; }
     task_create_error() { :; }
-    task_certify_error() { :; }
+    task_evaluate_error() { :; }
     task_generate_preset() { :; }
 
     make_task() {
@@ -1003,7 +1003,7 @@ test_execute_task_dispatches_all_task_types() {
             > "${TEST_TMPDIR}/${task_id}.task"
     }
 
-    local types=(SETUP_BASELINE CALIBRATION_RUN CREATE_EDIT CREATE_EDITS_BATCH CERTIFY_EDIT CREATE_ERROR CERTIFY_ERROR GENERATE_PRESET)
+    local types=(SETUP_BASELINE CALIBRATION_RUN CREATE_EDIT CREATE_EDITS_BATCH evaluate_EDIT CREATE_ERROR evaluate_ERROR GENERATE_PRESET)
     local type
     for type in "${types[@]}"; do
         make_task "task_${type}" "${type}" '{}'
@@ -1123,7 +1123,7 @@ test_task_create_edit_handles_skip_and_invalid() {
     assert_rc "1" "${RUN_RC}" "unknown edit type errors"
 }
 
-test_task_certify_edit_skip_and_invalid() {
+test_task_evaluate_edit_skip_and_invalid() {
     mock_reset
     # shellcheck source=../task_functions.sh
     source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
@@ -1141,12 +1141,12 @@ test_task_certify_edit_skip_and_invalid() {
     resolve_edit_params() {
         jq -n '{status:"skipped", edit_type:"quant_rtn", param1:"4", param2:"32", scope:"ffn", edit_dir_name:"quant_4bit_clean"}'
     }
-    task_certify_edit "${model_name}" 0 "quant_rtn:4:32:ffn" clean 1 "${out}" "${log_file}"
+    task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:ffn" clean 1 "${out}" "${log_file}"
 
     resolve_edit_params() {
         jq -n '{status:"invalid", edit_type:"quant_rtn", param1:"4", param2:"32", scope:"ffn", edit_dir_name:"quant_4bit_clean"}'
     }
-    run task_certify_edit "${model_name}" 0 "quant_rtn:4:32:ffn" clean 1 "${out}" "${log_file}"
+    run task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:ffn" clean 1 "${out}" "${log_file}"
     assert_rc "1" "${RUN_RC}" "invalid resolution errors"
 }
 
@@ -1237,9 +1237,9 @@ EOF
 
     PACK_GUARDS_ORDER="variance"
     task_calibration_run "${model_name}" 0 "1" "42" "${out}" "${log_file}"
-    assert_match "variance" "$(cat "${model_output_dir}/certificates/calibration/run_1/calibration_config.yaml")" "explicit guard order used"
+    assert_match "variance" "$(cat "${model_output_dir}/reports/calibration/run_1/calibration_config.yaml")" "explicit guard order used"
 
     PACK_GUARDS_ORDER=" , "
     task_calibration_run "${model_name}" 0 "2" "43" "${out}" "${log_file}"
-    assert_match "spectral" "$(cat "${model_output_dir}/certificates/calibration/run_2/calibration_config.yaml")" "default guard order used"
+    assert_match "spectral" "$(cat "${model_output_dir}/reports/calibration/run_2/calibration_config.yaml")" "default guard order used"
 }

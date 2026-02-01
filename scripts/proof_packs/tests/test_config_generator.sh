@@ -45,7 +45,7 @@ case "${cmd}" in
         echo '{}' > "${out}/report.json"
         exit 0
         ;;
-    certify)
+    evaluate)
         cert_out=""
         while [[ $# -gt 0 ]]; do
             case "${1}" in
@@ -132,7 +132,7 @@ EOF
     assert_match "\\(7B params\\)" "$(cat "${TEST_TMPDIR}/log.txt")" "non-moe log branch"
 }
 
-test_config_generator_run_invarlock_certify_preset_and_cert_copy_branches() {
+test_config_generator_run_invarlock_evaluate_preset_and_cert_copy_branches() {
     mock_reset
 
     # shellcheck source=../config_generator.sh
@@ -149,7 +149,7 @@ test_config_generator_run_invarlock_certify_preset_and_cert_copy_branches() {
 set -euo pipefail
 cmd="${1:-}"
 shift || true
-if [[ "${cmd}" != "certify" ]]; then
+if [[ "${cmd}" != "evaluate" ]]; then
   exit 0
 fi
 
@@ -195,7 +195,7 @@ EOF
     estimate_model_params() { echo "70"; }
     local out_dir="${TEST_TMPDIR}/certs"
     mkdir -p "${out_dir}"
-    run_invarlock_certify "${TEST_TMPDIR}/subject" "${TEST_TMPDIR}/baseline" "${out_dir}" "run_large" "${preset_dir}" "model" 0
+    run_invarlock_evaluate "${TEST_TMPDIR}/subject" "${TEST_TMPDIR}/baseline" "${out_dir}" "run_large" "${preset_dir}" "model" 0
     assert_file_exists "${out_dir}/run_large/evaluation.report.json" "canonical cert copied"
 
     # Alt cert lookup branch: remove canonical and provide nested evaluation.report.json.
@@ -206,7 +206,7 @@ EOF
 set -euo pipefail
 cmd="${1:-}"
 shift || true
-if [[ "${cmd}" != "certify" ]]; then
+if [[ "${cmd}" != "evaluate" ]]; then
   exit 0
 fi
 
@@ -229,6 +229,6 @@ exit 0
 EOF
     chmod +x "${bin_dir}/invarlock"
 
-    run_invarlock_certify "${TEST_TMPDIR}/subject" "${TEST_TMPDIR}/baseline" "${out_dir}" "run_small" "${preset_dir}" "model" 0
+    run_invarlock_evaluate "${TEST_TMPDIR}/subject" "${TEST_TMPDIR}/baseline" "${out_dir}" "run_small" "${preset_dir}" "model" 0
     assert_file_exists "${out_dir}/run_small/evaluation.report.json" "nested cert copied"
 }

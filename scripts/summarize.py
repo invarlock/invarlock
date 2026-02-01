@@ -23,7 +23,7 @@ def row(cert_path: str) -> dict:
 
 
 def main() -> None:
-    paths = sorted(glob.glob("reports/**/evaluation.cert.json", recursive=True))
+    paths = sorted(glob.glob("reports/**/evaluation.report.json", recursive=True))
     for r in map(row, paths):
         print(r)
 

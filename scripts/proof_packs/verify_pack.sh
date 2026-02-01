@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# verify_pack.sh - Validate proof pack checksums and certificates.
+# verify_pack.sh - Validate proof pack checksums and reports.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -53,7 +53,7 @@ pack_verify_certs() {
         certs+=("${cert}")
     done < <(find "${pack_dir}" -type f -name "*.cert.json" | sort)
     if [[ ${#certs[@]} -eq 0 ]]; then
-        echo "ERROR: No certificates found in pack." >&2
+        echo "ERROR: No reports found in pack." >&2
         return 1
     fi
 

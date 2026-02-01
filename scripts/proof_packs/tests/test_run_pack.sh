@@ -7,13 +7,13 @@ test_run_pack_build_pack_collects_artifacts() {
 
     local run_dir="${TEST_TMPDIR}/run"
     mkdir -p "${run_dir}/reports" "${run_dir}/analysis" "${run_dir}/state"
-    mkdir -p "${run_dir}/modelA/certificates/edit/run_1"
+    mkdir -p "${run_dir}/modelA/reports/edit/run_1"
 
     echo "verdict" > "${run_dir}/reports/final_verdict.txt"
     echo "{}" > "${run_dir}/reports/final_verdict.json"
     echo '{"model_list": ["org/model"], "models": {"org/model": {"revision": "abc"}}}' > "${run_dir}/state/model_revisions.json"
     echo '{"schema":"proof_pack_scenarios_v1","schema_version":1,"scenarios":[]}' > "${run_dir}/state/scenarios.json"
-    echo "{}" > "${run_dir}/modelA/certificates/edit/run_1/evaluation.report.json"
+    echo "{}" > "${run_dir}/modelA/reports/edit/run_1/evaluation.report.json"
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
@@ -83,13 +83,13 @@ test_run_pack_build_pack_layout_v2_nests_results_and_metadata() {
 
     local run_dir="${TEST_TMPDIR}/run"
     mkdir -p "${run_dir}/reports" "${run_dir}/analysis" "${run_dir}/state"
-    mkdir -p "${run_dir}/modelA/certificates/edit/run_1"
+    mkdir -p "${run_dir}/modelA/reports/edit/run_1"
 
     echo "verdict" > "${run_dir}/reports/final_verdict.txt"
     echo "{}" > "${run_dir}/reports/final_verdict.json"
     echo '{"model_list": ["org/model"], "models": {"org/model": {"revision": "abc"}}}' > "${run_dir}/state/model_revisions.json"
     echo '{"schema":"proof_pack_scenarios_v1","schema_version":1,"scenarios":[]}' > "${run_dir}/state/scenarios.json"
-    echo "{}" > "${run_dir}/modelA/certificates/edit/run_1/evaluation.report.json"
+    echo "{}" > "${run_dir}/modelA/reports/edit/run_1/evaluation.report.json"
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
@@ -178,14 +178,14 @@ test_run_pack_build_pack_ignores_error_injection_verify_failures() {
 
     local run_dir="${TEST_TMPDIR}/run"
     mkdir -p "${run_dir}/reports" "${run_dir}/analysis" "${run_dir}/state"
-    mkdir -p "${run_dir}/modelA/certificates/edit/run_1"
-    mkdir -p "${run_dir}/modelA/certificates/errors/nan_injection"
+    mkdir -p "${run_dir}/modelA/reports/edit/run_1"
+    mkdir -p "${run_dir}/modelA/reports/errors/nan_injection"
 
     echo "verdict" > "${run_dir}/reports/final_verdict.txt"
     echo "{}" > "${run_dir}/reports/final_verdict.json"
     echo "model,score" > "${run_dir}/analysis/eval_results.csv"
-    echo "{}" > "${run_dir}/modelA/certificates/edit/run_1/evaluation.report.json"
-    echo "{}" > "${run_dir}/modelA/certificates/errors/nan_injection/evaluation.report.json"
+    echo "{}" > "${run_dir}/modelA/reports/edit/run_1/evaluation.report.json"
+    echo "{}" > "${run_dir}/modelA/reports/errors/nan_injection/evaluation.report.json"
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
@@ -251,13 +251,13 @@ test_run_pack_build_pack_continues_when_html_report_fails() {
 
     local run_dir="${TEST_TMPDIR}/run"
     mkdir -p "${run_dir}/reports" "${run_dir}/analysis" "${run_dir}/state"
-    mkdir -p "${run_dir}/modelA/certificates/edit/run_1"
+    mkdir -p "${run_dir}/modelA/reports/edit/run_1"
 
     echo "verdict" > "${run_dir}/reports/final_verdict.txt"
     echo "{}" > "${run_dir}/reports/final_verdict.json"
     echo '{"model_list": ["org/model"], "models": {"org/model": {"revision": "abc"}}}' > "${run_dir}/state/model_revisions.json"
     echo '{"schema":"proof_pack_scenarios_v1","schema_version":1,"scenarios":[]}' > "${run_dir}/state/scenarios.json"
-    echo "{}" > "${run_dir}/modelA/certificates/edit/run_1/evaluation.report.json"
+    echo "{}" > "${run_dir}/modelA/reports/edit/run_1/evaluation.report.json"
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
@@ -300,12 +300,12 @@ test_run_pack_build_pack_writes_pack_files_on_unexpected_verify_failure() {
 
     local run_dir="${TEST_TMPDIR}/run"
     mkdir -p "${run_dir}/reports" "${run_dir}/analysis"
-    mkdir -p "${run_dir}/modelA/certificates/edit/run_1"
+    mkdir -p "${run_dir}/modelA/reports/edit/run_1"
 
     echo "verdict" > "${run_dir}/reports/final_verdict.txt"
     echo "{}" > "${run_dir}/reports/final_verdict.json"
     echo "model,score" > "${run_dir}/analysis/eval_results.csv"
-    echo "{}" > "${run_dir}/modelA/certificates/edit/run_1/evaluation.report.json"
+    echo "{}" > "${run_dir}/modelA/reports/edit/run_1/evaluation.report.json"
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"

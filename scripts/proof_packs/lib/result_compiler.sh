@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # result_compiler.sh - Analysis and verdict compilation for proof packs.
 #
-# This harness compiles an assurance-focused verdict from InvarLock certificates
+# This harness compiles an assurance-focused verdict from InvarLock reports
 # produced during the run.
 
 _pack_result_compiler_root() {

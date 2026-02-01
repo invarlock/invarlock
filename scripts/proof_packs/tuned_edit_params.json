@@ -9,20 +9,20 @@
       "fp8_quant": {
         "edit_dir_name": "fp8_e5m2_clean",
         "format": "e5m2",
-        "reason": "selected_by_certify_pass:e5m2_ffn",
+        "reason": "selected_by_evaluate_pass:e5m2_ffn",
         "scope": "ffn",
         "status": "selected"
       },
       "lowrank_svd": {
         "edit_dir_name": "svd_rank32_l31_clean",
         "rank": 32,
-        "reason": "selected_by_certify_pass:rank32_ffn_layer31",
+        "reason": "selected_by_evaluate_pass:rank32_ffn_layer31",
         "scope": "ffn@layer=31",
         "status": "selected"
       },
       "magnitude_prune": {
         "edit_dir_name": "prune_12pct_clean",
-        "reason": "selected_by_certify_pass:sparsity120_ffn",
+        "reason": "selected_by_evaluate_pass:sparsity120_ffn",
         "scope": "ffn",
         "sparsity": 0.12,
         "status": "selected"
@@ -31,7 +31,7 @@
         "bits": 4,
         "edit_dir_name": "quant_4bit_clean",
         "group_size": 32,
-        "reason": "selected_by_certify_pass:bits4_g32_ffn",
+        "reason": "selected_by_evaluate_pass:bits4_g32_ffn",
         "scope": "ffn",
         "status": "selected"
       }
@@ -40,20 +40,20 @@
       "fp8_quant": {
         "edit_dir_name": "fp8_e5m2_clean",
         "format": "e5m2",
-        "reason": "selected_by_certify_pass:e5m2_ffn",
+        "reason": "selected_by_evaluate_pass:e5m2_ffn",
         "scope": "ffn",
         "status": "selected"
       },
       "lowrank_svd": {
         "edit_dir_name": "svd_rank32_l31_clean",
         "rank": 32,
-        "reason": "selected_by_certify_pass:rank32_ffn_layer31",
+        "reason": "selected_by_evaluate_pass:rank32_ffn_layer31",
         "scope": "ffn@layer=31",
         "status": "selected"
       },
       "magnitude_prune": {
         "edit_dir_name": "prune_12pct_clean",
-        "reason": "selected_by_certify_pass:sparsity120_ffn",
+        "reason": "selected_by_evaluate_pass:sparsity120_ffn",
         "scope": "ffn",
         "sparsity": 0.12,
         "status": "selected"
@@ -62,7 +62,7 @@
         "bits": 4,
         "edit_dir_name": "quant_4bit_clean",
         "group_size": 32,
-        "reason": "selected_by_certify_pass:bits4_g32_ffn",
+        "reason": "selected_by_evaluate_pass:bits4_g32_ffn",
         "scope": "ffn",
         "status": "selected"
       }
@@ -71,20 +71,20 @@
       "fp8_quant": {
         "edit_dir_name": "fp8_e5m2_clean",
         "format": "e5m2",
-        "reason": "selected_by_certify_pass:e5m2_ffn",
+        "reason": "selected_by_evaluate_pass:e5m2_ffn",
         "scope": "ffn",
         "status": "selected"
       },
       "lowrank_svd": {
         "edit_dir_name": "svd_rank32_l31_clean",
         "rank": 32,
-        "reason": "selected_by_certify_pass:rank32_ffn_layer31",
+        "reason": "selected_by_evaluate_pass:rank32_ffn_layer31",
         "scope": "ffn@layer=31",
         "status": "selected"
       },
       "magnitude_prune": {
         "edit_dir_name": "prune_12pct_clean",
-        "reason": "selected_by_certify_pass:sparsity120_ffn",
+        "reason": "selected_by_evaluate_pass:sparsity120_ffn",
         "scope": "ffn",
         "sparsity": 0.12,
         "status": "selected"
@@ -93,7 +93,7 @@
         "bits": 4,
         "edit_dir_name": "quant_4bit_clean",
         "group_size": 32,
-        "reason": "selected_by_certify_pass:bits4_g32_ffn",
+        "reason": "selected_by_evaluate_pass:bits4_g32_ffn",
         "scope": "ffn",
         "status": "selected"
       }
@@ -102,20 +102,20 @@
       "fp8_quant": {
         "edit_dir_name": "fp8_e5m2_clean",
         "format": "e5m2",
-        "reason": "selected_by_certify_pass:e5m2_ffn",
+        "reason": "selected_by_evaluate_pass:e5m2_ffn",
         "scope": "ffn",
         "status": "selected"
       },
       "lowrank_svd": {
         "edit_dir_name": "svd_rank32_l31_clean",
         "rank": 32,
-        "reason": "selected_by_certify_pass:rank32_ffn_layer31",
+        "reason": "selected_by_evaluate_pass:rank32_ffn_layer31",
         "scope": "ffn@layer=31",
         "status": "selected"
       },
       "magnitude_prune": {
         "edit_dir_name": "prune_12pct_clean",
-        "reason": "selected_by_certify_pass:sparsity120_ffn",
+        "reason": "selected_by_evaluate_pass:sparsity120_ffn",
         "scope": "ffn",
         "sparsity": 0.12,
         "status": "selected"
@@ -124,7 +124,7 @@
         "bits": 4,
         "edit_dir_name": "quant_4bit_clean",
         "group_size": 32,
-        "reason": "selected_by_certify_pass:bits4_g32_ffn",
+        "reason": "selected_by_evaluate_pass:bits4_g32_ffn",
         "scope": "ffn",
         "status": "selected"
       }
@@ -133,20 +133,20 @@
       "fp8_quant": {
         "edit_dir_name": "fp8_e5m2_clean",
         "format": "e5m2",
-        "reason": "selected_by_certify_pass:e5m2_ffn",
+        "reason": "selected_by_evaluate_pass:e5m2_ffn",
         "scope": "ffn",
         "status": "selected"
       },
       "lowrank_svd": {
         "edit_dir_name": "svd_rank32_l31_clean",
         "rank": 32,
-        "reason": "selected_by_certify_pass:rank32_ffn_layer15",
+        "reason": "selected_by_evaluate_pass:rank32_ffn_layer15",
         "scope": "ffn@layer=15",
         "status": "selected"
       },
       "magnitude_prune": {
         "edit_dir_name": "prune_12pct_clean",
-        "reason": "selected_by_certify_pass:sparsity120_ffn",
+        "reason": "selected_by_evaluate_pass:sparsity120_ffn",
         "scope": "ffn",
         "sparsity": 0.12,
         "status": "selected"
@@ -155,7 +155,7 @@
         "bits": 4,
         "edit_dir_name": "quant_4bit_clean",
         "group_size": 32,
-        "reason": "selected_by_certify_pass:bits4_g32_ffn",
+        "reason": "selected_by_evaluate_pass:bits4_g32_ffn",
         "scope": "ffn",
         "status": "selected"
       }
@@ -164,20 +164,20 @@
       "fp8_quant": {
         "edit_dir_name": "fp8_e5m2_clean",
         "format": "e5m2",
-        "reason": "selected_by_certify_pass:e5m2_ffn",
+        "reason": "selected_by_evaluate_pass:e5m2_ffn",
         "scope": "ffn",
         "status": "selected"
       },
       "lowrank_svd": {
         "edit_dir_name": "svd_rank32_l31_clean",
         "rank": 32,
-        "reason": "selected_by_certify_pass:rank32_ffn_layer31",
+        "reason": "selected_by_evaluate_pass:rank32_ffn_layer31",
         "scope": "ffn@layer=31",
         "status": "selected"
       },
       "magnitude_prune": {
         "edit_dir_name": "prune_12pct_clean",
-        "reason": "selected_by_certify_pass:sparsity120_ffn",
+        "reason": "selected_by_evaluate_pass:sparsity120_ffn",
         "scope": "ffn",
         "sparsity": 0.12,
         "status": "selected"
@@ -186,7 +186,7 @@
         "bits": 4,
         "edit_dir_name": "quant_4bit_clean",
         "group_size": 32,
-        "reason": "selected_by_certify_pass:bits4_g32_ffn",
+        "reason": "selected_by_evaluate_pass:bits4_g32_ffn",
         "scope": "ffn",
         "status": "selected"
       }

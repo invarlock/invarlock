@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare two certificates and fail if the PM ratio drift exceeds tolerance."""
+"""Compare two reports and fail if the PM ratio drift exceeds tolerance."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ def _load_cert(path: Path) -> dict:
     try:
         return json.loads(path.read_text())
     except json.JSONDecodeError as exc:  # pragma: no cover - defensive guard
-        raise SystemExit(f"Failed to parse certificate {path}: {exc}") from exc
+        raise SystemExit(f"Failed to parse report {path}: {exc}") from exc
 
 
 def _extract_ratio(payload: dict) -> float:
@@ -22,18 +22,14 @@ def _extract_ratio(payload: dict) -> float:
         if isinstance(ratio, int | float):
             return float(ratio)
     raise SystemExit(
-        "Certificate missing ratio (expected 'primary_metric.ratio_vs_baseline')"
+        "report missing ratio (expected 'primary_metric.ratio_vs_baseline')"
     )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "reference", type=Path, help="Reference certificate (e.g., CPU)"
-    )
-    parser.add_argument(
-        "candidate", type=Path, help="Comparator certificate (e.g., GPU)"
-    )
+    parser.add_argument("reference", type=Path, help="Reference report (e.g., CPU)")
+    parser.add_argument("candidate", type=Path, help="Comparator report (e.g., GPU)")
     parser.add_argument(
         "--tolerance",
         type=float,

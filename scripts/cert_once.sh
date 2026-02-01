@@ -9,4 +9,4 @@ fi
 RUN_DIR="$1"
 BASELINE_DIR="$2"
 
-invarlock report --run "$RUN_DIR" --baseline "$BASELINE_DIR/report.json" --format cert
+invarlock report --run "$RUN_DIR" --baseline "$BASELINE_DIR/report.json" --format report
