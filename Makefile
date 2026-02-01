@@ -1,7 +1,7 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
 
-.PHONY: help install dev-install test lint format clean docsclean deepclean docs docs-ci verify coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry
+.PHONY: help install dev-install test test-assurance lint format clean docsclean deepclean docs docs-ci verify coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry
 
 help:  ## Show this help message
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
@@ -59,11 +59,11 @@ test-ci:
 	PYTHONPATH=src pytest -q tests/ci
 
 test-assurance:  ## Run assurance-related tests only
-	pytest \
-		tests/unit/test_assurance_contracts.py \
-		tests/unit/test_metrics_masked_lm.py \
-		tests/unit/test_structured_edit.py::test_structured_prune_mask_determinism \
-		tests/unit/test_cli.py::test_run_command_successful_execution
+	PYTHONPATH=src pytest -q \
+		tests/api/test_assurance_facade.py \
+		tests/eval/test_assurance_contracts.py \
+		tests/docs/test_assurance_xref_linter.py \
+		tests/reporting/test_policy_utils.py::test_compute_policy_digest_matches_assurance_spec
 
 lint:  ## Run linting
 	$(MAKE) ensure-ruff
