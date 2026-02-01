@@ -6,13 +6,13 @@ Tests for InvarLock's telemetry, logging, and monitoring capabilities.
 
 | Module | Test File | Status | Description |
 |--------|-----------|--------|-------------|
-| `core.py` | `test_observability_core.py` | 🔴 Needs expansion | Event logging, run context |
-| `metrics.py` | `test_observability_metrics.py` | 🔴 Needs expansion | Counters, gauges, histograms |
-| `alerting.py` | `test_observability_alerting.py` | 🔴 Needs expansion | Alert dispatch and formatting |
-| `exporters.py` | `test_observability_exporters.py` | 🔴 Needs expansion | JSONL, OpenTelemetry export |
-| `health.py` | `test_observability_health.py` | 🔴 Needs expansion | System health checks |
-| `utils.py` | `test_observability_utils.py` | 🔴 Needs expansion | Utility functions |
-| exceptions | `test_exceptions.py` | ✅ Exists | Exception handling |
+| `core.py` | `test_observability_core.py` | ✅ Implemented | Event logging, run context |
+| `metrics.py` | `test_observability_metrics.py` | ✅ Implemented | Counters, gauges, histograms |
+| `alerting.py` | `test_observability_alerting.py` | ✅ Implemented | Alert dispatch and formatting |
+| `exporters.py` | `test_observability_exporters.py` | ✅ Implemented | JSONL, OpenTelemetry export |
+| `health.py` | `test_observability_health.py` | ✅ Implemented | System health checks |
+| `utils.py` | `test_observability_utils.py` | ✅ Implemented | Utility functions |
+| exceptions | `test_exceptions.py` | ✅ Implemented | Exception handling |
 
 ## Key Observability Features
 
