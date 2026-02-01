@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.certificate import (
-    CERTIFICATE_SCHEMA_VERSION,
+    REPORT_SCHEMA_VERSION,
     _compute_validation_flags,
 )
 from invarlock.reporting.render import render_certificate_markdown
@@ -30,7 +30,7 @@ def test_primary_metric_accuracy_gating_balanced_passes():
 
 def test_render_includes_primary_metric_section():
     cert = {
-        "schema_version": CERTIFICATE_SCHEMA_VERSION,
+        "schema_version": REPORT_SCHEMA_VERSION,
         "run_id": "abc123",
         "artifacts": {"generated_at": "now"},
         "plugins": {},

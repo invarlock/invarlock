@@ -39,10 +39,10 @@ from invarlock.eval.primary_metric import compute_primary_metric_from_report, ge
 from invarlock.eval.tail_stats import evaluate_metric_tail
 from invarlock.utils.digest import hash_json
 
-from . import certificate_schema as _cert_schema
-from .certificate_schema import (
-    CERTIFICATE_JSON_SCHEMA,
-    CERTIFICATE_SCHEMA_VERSION,
+from . import report_schema as _report_schema
+from .report_schema import (
+    REPORT_JSON_SCHEMA,
+    REPORT_SCHEMA_VERSION,
 )
 from .dataset_hashing import (
     _extract_dataset_info,
@@ -220,14 +220,14 @@ def _compute_confidence_label(certificate: dict[str, Any]) -> dict[str, Any]:
 
 
 # Mirror jsonschema and structural validator for test monkeypatching compatibility.
-jsonschema = getattr(_cert_schema, "jsonschema", None)
+jsonschema = getattr(_report_schema, "jsonschema", None)
 
 
 def _validate_with_jsonschema(certificate: dict[str, Any]) -> bool:
     if jsonschema is None:
         return True
     try:
-        jsonschema.validate(instance=certificate, schema=CERTIFICATE_JSON_SCHEMA)
+        jsonschema.validate(instance=certificate, schema=REPORT_JSON_SCHEMA)
         return True
     except Exception:  # pragma: no cover
         return False
@@ -236,7 +236,7 @@ def _validate_with_jsonschema(certificate: dict[str, Any]) -> bool:
 def validate_certificate(certificate: dict[str, Any]) -> bool:
     """Validate that a certificate has all required fields and valid data."""
     try:
-        if certificate.get("schema_version") != CERTIFICATE_SCHEMA_VERSION:
+        if certificate.get("schema_version") != REPORT_SCHEMA_VERSION:
             return False
         # Prefer JSON Schema structural validation; if unavailable or too strict,
         # fall back to a lenient minimal check used by unit tests.
@@ -428,8 +428,8 @@ def _load_validation_allowlist() -> set[str]:
 # disallow unknown validation keys at schema level.
 try:
     _vkeys = _load_validation_allowlist()
-    if isinstance(CERTIFICATE_JSON_SCHEMA.get("properties"), dict):
-        vspec = CERTIFICATE_JSON_SCHEMA["properties"].get("validation")
+    if isinstance(REPORT_JSON_SCHEMA.get("properties"), dict):
+        vspec = REPORT_JSON_SCHEMA["properties"].get("validation")
         if isinstance(vspec, dict):
             vspec["properties"] = {k: {"type": "boolean"} for k in _vkeys}
             vspec["additionalProperties"] = False
@@ -1921,7 +1921,7 @@ def make_certificate(
     }
 
     certificate = {
-        "schema_version": CERTIFICATE_SCHEMA_VERSION,
+        "schema_version": REPORT_SCHEMA_VERSION,
         "run_id": current_run_id,
         "meta": meta,
         "auto": auto,
@@ -4143,6 +4143,6 @@ __all__ = [
     "jsonschema",
     "render_certificate_markdown",
     "compute_console_validation_block",
-    "CERTIFICATE_SCHEMA_VERSION",
-    "CERTIFICATE_JSON_SCHEMA",
+    "REPORT_SCHEMA_VERSION",
+    "REPORT_JSON_SCHEMA",
 ]

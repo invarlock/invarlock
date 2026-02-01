@@ -2,8 +2,8 @@ import math
 from typing import Any
 
 from invarlock.reporting.certificate import (
-    CERTIFICATE_JSON_SCHEMA,
-    CERTIFICATE_SCHEMA_VERSION,
+    REPORT_JSON_SCHEMA,
+    REPORT_SCHEMA_VERSION,
     make_certificate,
 )
 
@@ -75,10 +75,10 @@ def _mock_baseline() -> dict[str, Any]:
 
 def test_schema_version_bumped_and_ci_arrays_guarded():
     # schema_version is a stable constant; just ensure it's a non-empty string
-    assert isinstance(CERTIFICATE_SCHEMA_VERSION, str)
-    assert len(CERTIFICATE_SCHEMA_VERSION) > 0
+    assert isinstance(REPORT_SCHEMA_VERSION, str)
+    assert len(REPORT_SCHEMA_VERSION) > 0
 
-    pm_props = CERTIFICATE_JSON_SCHEMA["properties"]["primary_metric"]["properties"]
+    pm_props = REPORT_JSON_SCHEMA["properties"]["primary_metric"]["properties"]
     # ci arrays are 2-length number arrays
     for key in ("ci", "display_ci"):
         sch = pm_props[key]
@@ -89,7 +89,7 @@ def test_schema_version_bumped_and_ci_arrays_guarded():
 
 
 def test_system_overhead_has_pattern_properties():
-    sys_over = CERTIFICATE_JSON_SCHEMA["properties"]["system_overhead"]
+    sys_over = REPORT_JSON_SCHEMA["properties"]["system_overhead"]
     assert sys_over["type"] == "object"
     # guard that latency/throughput numeric keys are constrained
     assert "patternProperties" in sys_over

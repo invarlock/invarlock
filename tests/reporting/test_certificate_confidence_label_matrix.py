@@ -5,7 +5,7 @@ from invarlock.reporting import certificate as C
 
 def _base_cert() -> dict:
     return {
-        "schema_version": C.CERTIFICATE_SCHEMA_VERSION,
+        "schema_version": C.REPORT_SCHEMA_VERSION,
         "run_id": "r",
         "artifacts": {"generated_at": "t"},
         "meta": {},

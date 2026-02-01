@@ -4,7 +4,7 @@ import math
 from typing import Any
 
 from invarlock.reporting.certificate import (
-    CERTIFICATE_JSON_SCHEMA,
+    REPORT_JSON_SCHEMA,
     make_certificate,
 )
 
@@ -57,7 +57,7 @@ def _mk_report() -> dict[str, Any]:
 
 def test_certificate_schema_includes_confidence_block():
     # Schema should expose a confidence object with the documented fields
-    props = CERTIFICATE_JSON_SCHEMA["properties"]
+    props = REPORT_JSON_SCHEMA["properties"]
     assert "confidence" in props, "schema must include confidence block"
     conf = props["confidence"]
     assert conf["type"] == "object"

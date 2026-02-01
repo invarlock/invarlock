@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 import json
 
-import invarlock.reporting.certificate_schema as schema_mod
+import invarlock.reporting.report_schema as schema_mod
 
 
 def test_load_validation_allowlist_default(monkeypatch):
@@ -118,20 +118,20 @@ def test_validate_with_jsonschema_failure(monkeypatch):
     assert schema_mod._validate_with_jsonschema({"schema_version": "v1"}) is False
 
 
-def test_validate_certificate_schema_version_mismatch():
-    assert schema_mod.validate_certificate({"schema_version": "v0"}) is False
+def test_validate_report_schema_version_mismatch():
+    assert schema_mod.validate_report({"schema_version": "v0"}) is False
 
 
-def test_validate_certificate_fallback_and_allowlist(monkeypatch):
+def test_validate_report_fallback_and_allowlist(monkeypatch):
     cert = {
-        "schema_version": schema_mod.CERTIFICATE_SCHEMA_VERSION,
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
         "run_id": "run-123",
         "primary_metric": {"final": 1.0},
         "validation": {"custom_flag": True},
     }
 
     orig_schema = copy.deepcopy(
-        schema_mod.CERTIFICATE_JSON_SCHEMA["properties"]["validation"]
+        schema_mod.REPORT_JSON_SCHEMA["properties"]["validation"]
     )
 
     monkeypatch.setattr(
@@ -140,23 +140,23 @@ def test_validate_certificate_fallback_and_allowlist(monkeypatch):
     monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda _: False)
 
     try:
-        assert schema_mod.validate_certificate(cert) is True
-        vspec = schema_mod.CERTIFICATE_JSON_SCHEMA["properties"]["validation"]
+        assert schema_mod.validate_report(cert) is True
+        vspec = schema_mod.REPORT_JSON_SCHEMA["properties"]["validation"]
         assert vspec["properties"] == {"custom_flag": {"type": "boolean"}}
         assert vspec["additionalProperties"] is False
     finally:
-        schema_mod.CERTIFICATE_JSON_SCHEMA["properties"]["validation"] = orig_schema
+        schema_mod.REPORT_JSON_SCHEMA["properties"]["validation"] = orig_schema
 
 
-def test_validate_certificate_rejects_non_boolean_flags(monkeypatch):
+def test_validate_report_rejects_non_boolean_flags(monkeypatch):
     cert = {
-        "schema_version": schema_mod.CERTIFICATE_SCHEMA_VERSION,
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
         "run_id": "run-123",
         "primary_metric": {"final": 1.0},
         "validation": {"primary_metric_acceptable": "yes"},
     }
     monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda _: True)
-    assert schema_mod.validate_certificate(cert) is False
+    assert schema_mod.validate_report(cert) is False
 
 
 def test_load_validation_allowlist_handles_exception(monkeypatch):
@@ -170,9 +170,9 @@ def test_load_validation_allowlist_handles_exception(monkeypatch):
     assert allowlist == set(schema_mod._VALIDATION_ALLOWLIST_DEFAULT)
 
 
-def test_validate_certificate_allowlist_error(monkeypatch):
+def test_validate_report_allowlist_error(monkeypatch):
     cert = {
-        "schema_version": schema_mod.CERTIFICATE_SCHEMA_VERSION,
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
         "run_id": "r1",
         "primary_metric": {"kind": "ppl_causal", "final": 1.0},
     }
@@ -182,15 +182,15 @@ def test_validate_certificate_allowlist_error(monkeypatch):
         lambda: (_ for _ in ()).throw(RuntimeError("boom")),
     )
     monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda _: True)
-    assert schema_mod.validate_certificate(cert) is True
+    assert schema_mod.validate_report(cert) is True
 
 
-def test_validate_certificate_handles_missing_validation_schema(monkeypatch):
+def test_validate_report_handles_missing_validation_schema(monkeypatch):
     cert = {
-        "schema_version": schema_mod.CERTIFICATE_SCHEMA_VERSION,
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
         "run_id": "r2",
         "primary_metric": {"kind": "ppl_causal", "final": 1.0},
     }
-    monkeypatch.setitem(schema_mod.CERTIFICATE_JSON_SCHEMA, "properties", None)
+    monkeypatch.setitem(schema_mod.REPORT_JSON_SCHEMA, "properties", None)
     monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda _: True)
-    assert schema_mod.validate_certificate(cert) is True
+    assert schema_mod.validate_report(cert) is True

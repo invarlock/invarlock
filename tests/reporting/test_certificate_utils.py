@@ -48,7 +48,7 @@ def test_confidence_label_branches() -> None:
 
 def test_validate_certificate_rejects_non_boolean_flags() -> None:
     bad = {
-        "schema_version": cert.CERTIFICATE_SCHEMA_VERSION,
+        "schema_version": cert.REPORT_SCHEMA_VERSION,
         "run_id": "r",
         "artifacts": {"generated_at": "t"},
         "plugins": {},
@@ -67,7 +67,7 @@ def test_validate_certificate_rejects_non_boolean_flags() -> None:
 def test_validate_certificate_fallback_ok_and_schema_minimal() -> None:
     # Force minimal fallback path: missing many properties, but minimal fields present
     minimal = {
-        "schema_version": cert.CERTIFICATE_SCHEMA_VERSION,
+        "schema_version": cert.REPORT_SCHEMA_VERSION,
         "run_id": "r",
         "primary_metric": {"kind": "ppl_causal"},
     }
@@ -77,7 +77,7 @@ def test_validate_certificate_fallback_ok_and_schema_minimal() -> None:
 
 def test_console_validation_block_guard_skipped_and_included() -> None:
     base = {
-        "schema_version": cert.CERTIFICATE_SCHEMA_VERSION,
+        "schema_version": cert.REPORT_SCHEMA_VERSION,
         "run_id": "x",
         "artifacts": {"generated_at": "t"},
         "plugins": {},

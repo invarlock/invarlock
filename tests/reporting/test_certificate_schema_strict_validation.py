@@ -5,7 +5,7 @@ import math
 import pytest
 
 from invarlock.reporting.certificate import (
-    CERTIFICATE_JSON_SCHEMA,
+    REPORT_JSON_SCHEMA,
     make_certificate,
     validate_certificate,
 )
@@ -76,7 +76,7 @@ def test_validation_schema_rejects_unknown_keys():
         import jsonschema  # type: ignore
 
         with pytest.raises(jsonschema.ValidationError):
-            jsonschema.validate(instance=cert, schema=CERTIFICATE_JSON_SCHEMA)
+            jsonschema.validate(instance=cert, schema=REPORT_JSON_SCHEMA)
     except Exception:
         # Fallback to helper which uses jsonschema when present
         assert validate_certificate(cert) is False
@@ -93,7 +93,7 @@ def test_validation_schema_accepts_allowlisted_keys():
     try:
         import jsonschema  # type: ignore
 
-        jsonschema.validate(instance=cert, schema=CERTIFICATE_JSON_SCHEMA)
+        jsonschema.validate(instance=cert, schema=REPORT_JSON_SCHEMA)
     except Exception:
         # jsonschema optional; validate_certificate already checked above
         pass

@@ -1,4 +1,4 @@
-from invarlock.reporting.certificate import CERTIFICATE_JSON_SCHEMA
+from invarlock.reporting.certificate import REPORT_JSON_SCHEMA
 
 
 def test_schema_accepts_counts_source_and_estimated():
@@ -17,7 +17,7 @@ def test_schema_accepts_counts_source_and_estimated():
     }
     # Validate properties exist in JSON schema (shape only; jsonschema checked elsewhere)
     props = (
-        CERTIFICATE_JSON_SCHEMA.get("properties", {})
+        REPORT_JSON_SCHEMA.get("properties", {})
         .get("primary_metric", {})
         .get("properties", {})
     )

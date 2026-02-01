@@ -11,7 +11,7 @@ def test_validate_certificate_jsonschema_true(monkeypatch):
         C, "jsonschema", SimpleNamespace(validate=lambda instance, schema: None)
     )
     cert = {
-        "schema_version": C.CERTIFICATE_SCHEMA_VERSION,
+        "schema_version": C.REPORT_SCHEMA_VERSION,
         "run_id": "rid",
         "artifacts": {"generated_at": "t"},
         "plugins": {},

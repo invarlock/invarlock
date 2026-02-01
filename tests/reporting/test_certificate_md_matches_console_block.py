@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import CERTIFICATE_SCHEMA_VERSION
+from invarlock.reporting.certificate import REPORT_SCHEMA_VERSION
 from invarlock.reporting.render import (
     compute_console_validation_block,
     render_certificate_markdown,
@@ -10,7 +10,7 @@ from invarlock.reporting.render import (
 def _minimal_cert(pm_kind: str = "ppl_causal", guard_evaluated: bool = False) -> dict:
     # Minimal, structurally valid certificate focused on validation/MD rendering
     cert = {
-        "schema_version": CERTIFICATE_SCHEMA_VERSION,
+        "schema_version": REPORT_SCHEMA_VERSION,
         "run_id": "run-xyz",
         "artifacts": {"generated_at": "now"},
         "plugins": {},

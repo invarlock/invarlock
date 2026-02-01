@@ -1,10 +1,10 @@
-from invarlock.reporting.certificate import CERTIFICATE_SCHEMA_VERSION
+from invarlock.reporting.certificate import REPORT_SCHEMA_VERSION
 from invarlock.reporting.render import render_certificate_markdown
 
 
 def test_markdown_excludes_estimated_suffix_for_measured_accuracy():
     cert = {
-        "schema_version": CERTIFICATE_SCHEMA_VERSION,
+        "schema_version": REPORT_SCHEMA_VERSION,
         "run_id": "abc",
         "artifacts": {"generated_at": "now"},
         "plugins": {},

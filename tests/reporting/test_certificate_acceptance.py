@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from invarlock.reporting.certificate import CERTIFICATE_SCHEMA_VERSION, make_certificate
+from invarlock.reporting.certificate import REPORT_SCHEMA_VERSION, make_certificate
 
 
 def _mock_report_with_windows() -> dict[str, Any]:
@@ -71,7 +71,7 @@ def test_v1_required_keys_and_shapes(tmp_path: Path) -> None:
     cert = make_certificate(report, baseline)
 
     # schema version present and correct
-    assert cert.get("schema_version") == CERTIFICATE_SCHEMA_VERSION == "v1"
+    assert cert.get("schema_version") == REPORT_SCHEMA_VERSION == "v1"
 
     # primary metric present with required shape
     pm = cert.get("primary_metric", {})

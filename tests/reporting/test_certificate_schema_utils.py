@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from invarlock.reporting import certificate_schema as schema_mod
+from invarlock.reporting import report_schema as schema_mod
 
 
 def _base_certificate() -> dict:
     return {
-        "schema_version": schema_mod.CERTIFICATE_SCHEMA_VERSION,
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
         "run_id": "run-1234",
         "artifacts": {},
         "plugins": {},
@@ -26,27 +26,27 @@ def _base_certificate() -> dict:
     }
 
 
-def test_validate_certificate_accepts_valid_payload():
+def test_validate_report_accepts_valid_payload():
     cert = _base_certificate()
-    assert schema_mod.validate_certificate(cert) is True
+    assert schema_mod.validate_report(cert) is True
 
 
-def test_validate_certificate_fallback_when_schema_fails(monkeypatch):
+def test_validate_report_fallback_when_schema_fails(monkeypatch):
     monkeypatch.setattr(
         schema_mod, "_validate_with_jsonschema", lambda cert: False, raising=False
     )
     cert = {
-        "schema_version": schema_mod.CERTIFICATE_SCHEMA_VERSION,
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
         "run_id": "fallback",
         "primary_metric": {"kind": "ppl_mlm"},
     }
-    assert schema_mod.validate_certificate(cert) is True
+    assert schema_mod.validate_report(cert) is True
 
 
-def test_validate_certificate_rejects_bad_validation_values():
+def test_validate_report_rejects_bad_validation_values():
     cert = _base_certificate()
     cert["validation"]["primary_metric_acceptable"] = "yes"
-    assert schema_mod.validate_certificate(cert) is False
+    assert schema_mod.validate_report(cert) is False
 
 
 def test_validate_with_jsonschema_handles_missing_library(monkeypatch):

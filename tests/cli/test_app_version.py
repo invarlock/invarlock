@@ -49,7 +49,7 @@ def test_version_includes_schema_when_available(capsys, monkeypatch):
     import invarlock.reporting.certificate as cert_mod
 
     monkeypatch.setattr(
-        cert_mod, "CERTIFICATE_SCHEMA_VERSION", "schema-test", raising=False
+        cert_mod, "REPORT_SCHEMA_VERSION", "schema-test", raising=False
     )
     version_fn()
     out = capsys.readouterr().out

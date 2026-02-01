@@ -13,7 +13,7 @@ import pytest
 
 from invarlock import __version__ as INVARLOCK_VERSION
 from invarlock.reporting.certificate import (
-    CERTIFICATE_SCHEMA_VERSION,
+    REPORT_SCHEMA_VERSION,
     _analyze_bitwidth_map,
     _compute_report_digest,
     _compute_savings_summary,
@@ -1296,7 +1296,7 @@ class TestMakeCertificate:
         ):
             certificate = make_certificate(report, baseline)
 
-        assert certificate["schema_version"] == CERTIFICATE_SCHEMA_VERSION
+        assert certificate["schema_version"] == REPORT_SCHEMA_VERSION
         assert "run_id" in certificate
         assert certificate["meta"]["model_id"] == "test-model"
         assert certificate["primary_metric"]["final"] == 10.5
@@ -1907,7 +1907,7 @@ class TestValidateCertificate:
     def test_valid_certificate(self):
         """Test validation of a valid certificate (PM-only)."""
         certificate = {
-            "schema_version": CERTIFICATE_SCHEMA_VERSION,
+            "schema_version": REPORT_SCHEMA_VERSION,
             "run_id": "test123",
             "meta": {"model_id": "m"},
             "auto": {"tier": "balanced", "probes_used": 0, "target_pm_ratio": None},
@@ -1953,7 +1953,7 @@ class TestValidateCertificate:
     def test_missing_required_fields(self):
         """Test validation fails with missing required fields."""
         certificate = {
-            "schema_version": CERTIFICATE_SCHEMA_VERSION,
+            "schema_version": REPORT_SCHEMA_VERSION,
             "run_id": "test123",
             # Missing other required fields
         }
@@ -1963,7 +1963,7 @@ class TestValidateCertificate:
     def test_invalid_ppl_metrics(self):
         """Test validation fails with invalid PPL metrics."""
         certificate = {
-            "schema_version": CERTIFICATE_SCHEMA_VERSION,
+            "schema_version": REPORT_SCHEMA_VERSION,
             "run_id": "test123",
             "meta": {},
             "auto": {},
@@ -1996,7 +1996,7 @@ class TestValidateCertificate:
     def test_invalid_validation_flags(self):
         """Test validation fails with invalid validation flags."""
         certificate = {
-            "schema_version": CERTIFICATE_SCHEMA_VERSION,
+            "schema_version": REPORT_SCHEMA_VERSION,
             "run_id": "test123",
             "meta": {},
             "auto": {},
@@ -2870,7 +2870,7 @@ class TestPrivateHelperFunctions:
     def test_compute_certificate_hash(self):
         """Test _compute_certificate_hash function."""
         certificate = {
-            "schema_version": CERTIFICATE_SCHEMA_VERSION,
+            "schema_version": REPORT_SCHEMA_VERSION,
             "run_id": "test123",
             "artifacts": {"path": "/some/path"},  # Should be excluded
         }
@@ -2883,13 +2883,13 @@ class TestPrivateHelperFunctions:
     def test_compute_certificate_hash_excludes_artifacts(self):
         """Test that certificate hash excludes artifacts section."""
         cert1 = {
-            "schema_version": CERTIFICATE_SCHEMA_VERSION,
+            "schema_version": REPORT_SCHEMA_VERSION,
             "run_id": "test123",
             "artifacts": {"path": "/path1"},
         }
 
         cert2 = {
-            "schema_version": CERTIFICATE_SCHEMA_VERSION,
+            "schema_version": REPORT_SCHEMA_VERSION,
             "run_id": "test123",
             "artifacts": {"path": "/path2"},  # Different artifacts
         }
@@ -3050,14 +3050,14 @@ class TestModuleExports:
             "make_certificate",
             "validate_certificate",
             "render_certificate_markdown",
-            "CERTIFICATE_SCHEMA_VERSION",
+            "REPORT_SCHEMA_VERSION",
         ]
 
         assert set(expected_exports).issubset(set(__all__))
 
     def test_schema_version_constant(self):
-        """Test that CERTIFICATE_SCHEMA_VERSION is properly defined."""
-        assert CERTIFICATE_SCHEMA_VERSION == "v1"
+        """Test that REPORT_SCHEMA_VERSION is properly defined."""
+        assert REPORT_SCHEMA_VERSION == "v1"
 
 
 if __name__ == "__main__":

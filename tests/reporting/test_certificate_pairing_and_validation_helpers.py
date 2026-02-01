@@ -7,7 +7,7 @@ from copy import deepcopy
 import pytest
 
 from invarlock.reporting import certificate as cert_mod
-from invarlock.reporting import certificate_schema as cert_schema_mod
+from invarlock.reporting import report_schema as cert_schema_mod
 from invarlock.reporting import primary_metric_utils
 from invarlock.reporting.certificate import make_certificate, validate_certificate
 from invarlock.reporting.report_types import create_empty_report
@@ -391,21 +391,21 @@ def test_compute_validation_flags_acceptance_bounds_and_accuracy_tiny_relax(
 
 
 def test_certificate_module_schema_tightening_branches(monkeypatch) -> None:
-    original_schema = cert_schema_mod.CERTIFICATE_JSON_SCHEMA
+    original_schema = cert_schema_mod.REPORT_JSON_SCHEMA
     try:
         monkeypatch.setattr(
-            cert_schema_mod, "CERTIFICATE_JSON_SCHEMA", {"properties": "nope"}
+            cert_schema_mod, "REPORT_JSON_SCHEMA", {"properties": "nope"}
         )
         importlib.reload(cert_mod)
 
         monkeypatch.setattr(
             cert_schema_mod,
-            "CERTIFICATE_JSON_SCHEMA",
+            "REPORT_JSON_SCHEMA",
             {"properties": {"validation": "nope"}},
         )
         importlib.reload(cert_mod)
     finally:
-        monkeypatch.setattr(cert_schema_mod, "CERTIFICATE_JSON_SCHEMA", original_schema)
+        monkeypatch.setattr(cert_schema_mod, "REPORT_JSON_SCHEMA", original_schema)
         importlib.reload(cert_mod)
 
 

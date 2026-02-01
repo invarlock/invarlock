@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from invarlock.reporting.certificate import CERTIFICATE_SCHEMA_VERSION
+from invarlock.reporting.certificate import REPORT_SCHEMA_VERSION
 from invarlock.reporting.render import render_certificate_markdown
 
 
 def _cert_with_pm(kind: str, basis: str) -> dict:
     return {
-        "schema_version": CERTIFICATE_SCHEMA_VERSION,
+        "schema_version": REPORT_SCHEMA_VERSION,
         "run_id": "run-basis",
         "artifacts": {"generated_at": "now"},
         "plugins": {},

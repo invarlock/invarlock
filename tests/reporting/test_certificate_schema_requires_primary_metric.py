@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import invarlock.reporting.certificate_schema as schema_mod
+import invarlock.reporting.report_schema as schema_mod
 
 
 def test_certificate_schema_requires_primary_metric_and_window_stats() -> None:
     cert = {
-        "schema_version": schema_mod.CERTIFICATE_SCHEMA_VERSION,
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
         "run_id": "run-1234",
         "artifacts": {},
         "plugins": {"adapters": [], "edits": [], "guards": []},
@@ -18,4 +18,4 @@ def test_certificate_schema_requires_primary_metric_and_window_stats() -> None:
         # Intentionally omit primary_metric + dataset.windows.stats
     }
 
-    assert schema_mod.validate_certificate(cert) is False
+    assert schema_mod.validate_report(cert) is False

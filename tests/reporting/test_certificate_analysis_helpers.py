@@ -825,7 +825,7 @@ def test_validate_certificate_uses_jsonschema(monkeypatch):
     dummy = DummySchema()
     monkeypatch.setattr(cert, "jsonschema", dummy, raising=False)
     certificate = {
-        "schema_version": cert.CERTIFICATE_SCHEMA_VERSION,
+        "schema_version": cert.REPORT_SCHEMA_VERSION,
         "run_id": "run-1",
         "primary_metric": {"kind": "ppl_causal"},
         "validation": {"primary_metric_acceptable": True},
@@ -841,7 +841,7 @@ def test_validate_certificate_falls_back_when_jsonschema_fails(monkeypatch):
 
     monkeypatch.setattr(cert, "jsonschema", FailingSchema(), raising=False)
     certificate = {
-        "schema_version": cert.CERTIFICATE_SCHEMA_VERSION,
+        "schema_version": cert.REPORT_SCHEMA_VERSION,
         "run_id": "run-2",
         "primary_metric": {"final": 1.0},
         "validation": {"primary_metric_acceptable": True},
@@ -852,7 +852,7 @@ def test_validate_certificate_falls_back_when_jsonschema_fails(monkeypatch):
 def test_validate_certificate_rejects_invalid_flags(monkeypatch):
     monkeypatch.setattr(cert, "jsonschema", None, raising=False)
     certificate = {
-        "schema_version": cert.CERTIFICATE_SCHEMA_VERSION,
+        "schema_version": cert.REPORT_SCHEMA_VERSION,
         "run_id": "run-3",
         "primary_metric": {"final": 1.0},
         "validation": {"primary_metric_acceptable": "yes"},

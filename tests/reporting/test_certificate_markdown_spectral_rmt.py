@@ -51,7 +51,7 @@ def _mk_report() -> dict:
 
 def _cert_skeleton() -> dict:
     return {
-        "schema_version": C.CERTIFICATE_SCHEMA_VERSION,
+        "schema_version": C.REPORT_SCHEMA_VERSION,
         "run_id": "r1",
         "edit_name": "noop",
         "artifacts": {"generated_at": "2024-01-01T00:00:00"},

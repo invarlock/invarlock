@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 
-from invarlock.reporting.certificate_schema import (
-    CERTIFICATE_SCHEMA_VERSION,
-    validate_certificate,
+from invarlock.reporting.report_schema import (
+    REPORT_SCHEMA_VERSION,
+    validate_report,
 )
 from invarlock.reporting.dataset_hashing import (
     _compute_actual_window_hashes,
@@ -15,7 +15,7 @@ from invarlock.reporting.dataset_hashing import (
 def test_certificate_schema_valid_and_fallback(monkeypatch):
     # Valid minimal certificate (JSON schema path)
     cert = {
-        "schema_version": CERTIFICATE_SCHEMA_VERSION,
+        "schema_version": REPORT_SCHEMA_VERSION,
         "run_id": "RID1234",
         "artifacts": {},
         "plugins": {},
@@ -28,13 +28,13 @@ def test_certificate_schema_valid_and_fallback(monkeypatch):
         "primary_metric": {"kind": "ppl_causal", "final": 10.0},
         "validation": {},
     }
-    assert validate_certificate(cert) is True
+    assert validate_report(cert) is True
 
     # Force JSON schema failure by adding an unknown validation key; should fall back to minimal
     cert2 = json.loads(json.dumps(cert))
     cert2["validation"] = {"not_allowed_key": True}
     # Ensure our schema has been tightened by the module code
-    assert validate_certificate(cert2) is True
+    assert validate_report(cert2) is True
 
 
 def test_dataset_hashing_helpers():

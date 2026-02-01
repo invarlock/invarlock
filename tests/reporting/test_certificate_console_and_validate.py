@@ -43,7 +43,7 @@ def test_validate_certificate_fallback_and_flag_types(monkeypatch):
     # Force JSON schema validator to fail to exercise fallback path
     monkeypatch.setattr(C, "_validate_with_jsonschema", lambda c: False)
     good = {
-        "schema_version": C.CERTIFICATE_SCHEMA_VERSION,
+        "schema_version": C.REPORT_SCHEMA_VERSION,
         "run_id": "r1",
         "primary_metric": {"kind": "ppl_causal", "final": 10.0},
         "validation": {
