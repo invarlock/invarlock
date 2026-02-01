@@ -7,7 +7,7 @@ Overview of the core security-related components and defaults.
 - Outbound network is blocked by default. The CLI calls
   `invarlock.security.enforce_default_security()` at startup.
 - Set `INVARLOCK_ALLOW_NETWORK=1` (or `true/yes/on`) to enable downloads per
-  command. Example: `INVARLOCK_ALLOW_NETWORK=1 invarlock certify ...`.
+  command. Example: `INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate ...`.
 - Use `invarlock.security.temporarily_allow_network()` in controlled code blocks
   when you must fetch artifacts during an otherwise offline run.
 
@@ -17,7 +17,7 @@ Overview of the core security-related components and defaults.
   exit. Use for transient artifacts that should not be world-readable.
 - `invarlock.security.is_secure_path(path)` verifies expected permissions.
 
-## Certificate verification
+## report verification
 
 - `invarlock verify` re-checks schema, pairing math (Δlog → ratio), and drift/overhead gates.
 - Use it before promotion or downstream automation to prevent policy regressions.

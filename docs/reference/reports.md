@@ -1,24 +1,24 @@
-# Certificates
+# reports
 
-This document consolidates all certificate-related reference material: schema,
+This document consolidates all report-related reference material: schema,
 telemetry fields, and HTML export.
 
 ## Overview
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Define the v1 certificate contract, telemetry fields, and export formats. |
-| **Audience** | Operators verifying certificates and tool authors parsing them. |
+| **Purpose** | Define the v1 report contract, telemetry fields, and export formats. |
+| **Audience** | Operators verifying reports and tool authors parsing them. |
 | **Schema version** | `schema_version = "v1"` (PM-only). |
-| **Source of truth** | `invarlock.reporting.certificate_schema.CERTIFICATE_JSON_SCHEMA`. |
+| **Source of truth** | `invarlock.reporting.report_schema.REPORT_JSON_SCHEMA`. |
 
 ## Table of Contents
 
 - [Quick Start](#quick-start)
-- [Certificate Layout](#certificate-layout)
+- [report Layout](#report-layout)
   - [Evaluation Dashboard Interpretation](#evaluation-dashboard-interpretation)
 - [Schema](#schema)
-  - [Minimal v1 Certificate Example](#minimal-v1-certificate-example)
+  - [Minimal v1 report Example](#minimal-v1-report-example)
   - [Schema Summary](#schema-summary-validator-view)
   - [Required vs Optional Blocks](#required-vs-optional-blocks)
   - [Primary Metric Tail Gate](#primary-metric-tail-gate-optional)
@@ -32,22 +32,22 @@ telemetry fields, and HTML export.
 ## Quick Start
 
 ```bash
-# Generate a certificate from a run report
-invarlock report --run runs/subject/report.json --baseline runs/baseline/report.json --format cert
+# Generate a report from a run report
+invarlock report --run runs/subject/report.json --baseline runs/baseline/report.json --format report
 
-# Validate certificate structure
-invarlock verify reports/cert/evaluation.cert.json
+# Validate report structure
+invarlock verify reports/eval/evaluation.report.json
 
 # Inspect telemetry fields
-jq '.telemetry' reports/cert/evaluation.cert.json
+jq '.telemetry' reports/eval/evaluation.report.json
 
 # Export to HTML
-invarlock report html -i reports/cert/evaluation.cert.json -o reports/cert/evaluation.html
+invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 ```
 
-## Certificate Layout
+## report Layout
 
-The markdown certificate is structured to highlight evaluation outcomes first:
+The markdown report is structured to highlight evaluation outcomes first:
 
 - **Evaluation Dashboard**: one-line PASS/FAIL + core gates (primary metric, drift, invariants, spectral, RMT, overhead).
 - **Quality Gates**: table of canonical gating checks with measured values.
@@ -102,8 +102,8 @@ The markdown certificate is structured to highlight evaluation outcomes first:
 │                                    │                                    │
 │                                    ▼                                    │
 │   ┌────────────────────────────────────────────────────────────────┐   │
-│   │                    make_certificate()                          │   │
-│   │ baseline_report + subject_report → evaluation.cert.json        │   │
+│   │                    make_report()                          │   │
+│   │ baseline_report + subject_report → evaluation.report.json        │   │
 │   └────────────────────────────────┬───────────────────────────────┘   │
 │                                    │                                    │
 │                                    ▼                                    │
@@ -125,12 +125,12 @@ The markdown certificate is structured to highlight evaluation outcomes first:
   schema-version bump.
 - **Validation allow-list**: only specific `validation.*` flags are accepted by
   the schema validator.
-- **Baseline pairing**: certificates assume paired windows; verification enforces
+- **Baseline pairing**: reports assume paired windows; verification enforces
   pairing in CI/Release profiles.
 
 ### Provenance Map
 
-| Certificate block | Sourced from report | Verify checks |
+| report block | Sourced from report | Verify checks |
 | --- | --- | --- |
 | `meta` | `report.meta` | Schema only. |
 | `dataset` / `evaluation_windows` | `report.data`, `report.dataset.windows.stats` | Pairing + count checks. |
@@ -138,11 +138,11 @@ The markdown certificate is structured to highlight evaluation outcomes first:
 | `spectral` / `rmt` / `variance` | `report.guards[]` | Measurement contracts (CI/Release). |
 | `provenance.provider_digest` | `report.provenance.provider_digest` | Required in CI/Release. |
 
-### Minimal v1 Certificate Example
+### Minimal v1 report Example
 
-The example below shows a realistic, PM‑only certificate envelope. It follows
-the current validator in `invarlock.reporting.certificate_schema` and the
-fields produced by `invarlock.assurance.make_certificate`.
+The example below shows a realistic, PM‑only report envelope. It follows
+the current validator in `invarlock.reporting.report_schema` and the
+fields produced by `invarlock.assurance.make_report`.
 
 ```json
 {
@@ -240,7 +240,7 @@ fields produced by `invarlock.assurance.make_certificate`.
 **Notes:**
 
 - `schema_version` is a string and must be `"v1"` for the current format.
-- `run_id` is a short, opaque identifier; certificates treat it as a stable
+- `run_id` is a short, opaque identifier; reports treat it as a stable
   string key.
 - `primary_metric` is the **canonical** place for PM values.
 - The `validation` object holds boolean flags; only a small allow‑list of
@@ -249,7 +249,7 @@ fields produced by `invarlock.assurance.make_certificate`.
 ### Schema Summary (Validator View)
 
 The v1 validator uses a JSON Schema (draft 2020‑12) embedded in
-`CERTIFICATE_JSON_SCHEMA`. The schema is intentionally permissive around new
+`REPORT_JSON_SCHEMA`. The schema is intentionally permissive around new
 fields while enforcing a small, stable core:
 
 **Required top‑level fields:**
@@ -291,7 +291,7 @@ fields while enforcing a small, stable core:
   - `hysteresis_applied`
   - `moe_observed`
   - `moe_identity_ok`
-- The validator rejects certificates that contain non‑boolean values under
+- The validator rejects reports that contain non‑boolean values under
   any of these keys.
 
 **Policy and structure:**
@@ -311,11 +311,11 @@ fields while enforcing a small, stable core:
   - Optional numeric fields: `width`, `threshold`, `unstable` flag, etc.
 
 The full machine‑readable schema is available at runtime via
-`invarlock.reporting.certificate_schema.CERTIFICATE_JSON_SCHEMA`.
+`invarlock.reporting.report_schema.REPORT_JSON_SCHEMA`.
 
-### Certificate → Verify Matrix
+### report → Verify Matrix
 
-| Certificate block | Derived from | Verify checks |
+| report block | Derived from | Verify checks |
 | --- | --- | --- |
 | `meta` | `report.meta` | Schema only. |
 | `dataset` / `evaluation_windows` | `report.data`, `report.dataset.windows.stats` | Pairing + count checks. |
@@ -329,7 +329,7 @@ The full machine‑readable schema is available at runtime via
 
 | Key | Required | Source | Stability |
 | --- | --- | --- | --- |
-| `schema_version` | Yes | `CERTIFICATE_SCHEMA_VERSION` | PM-only v1 |
+| `schema_version` | Yes | `REPORT_SCHEMA_VERSION` | PM-only v1 |
 | `run_id` | Yes | Run metadata | Stable |
 | `meta` | Yes | `report.meta` | Stable |
 | `dataset` | Yes | `report.dataset` + windows stats | Stable |
@@ -343,7 +343,7 @@ The full machine‑readable schema is available at runtime via
 
 ### Primary Metric Tail Gate (optional)
 
-For ppl-like metrics with paired per-window logloss, certificates may include
+For ppl-like metrics with paired per-window logloss, reports may include
 `primary_metric_tail`, which records tail summaries of per-window ΔlogNLL vs the
 baseline and the tail-gate evaluation outcome:
 
@@ -359,7 +359,7 @@ baseline and the tail-gate evaluation outcome:
 
 ## Telemetry Fields
 
-Telemetry values are copied from `report.json` into certificates and always
+Telemetry values are copied from `report.json` into reports and always
 include the execution device. CPU telemetry sweeps are collected via
 `scripts/run_cpu_telemetry.sh`.
 
@@ -381,7 +381,7 @@ include the execution device. CPU telemetry sweeps are collected via
 
 ## HTML Export
 
-The HTML renderer converts the Markdown certificate into structured HTML
+The HTML renderer converts the Markdown report into structured HTML
 tables (via the `markdown` library when available) and preserves the same
 numeric values (ratios, CIs, deltas). When the dependency is unavailable, the
 renderer falls back to a `<pre>` block. Use `--embed-css` (default) to inline
@@ -402,9 +402,9 @@ invarlock report html -i <cert.json> -o <out.html>
 ### Python API
 
 ```python
-from invarlock.reporting.html import render_certificate_html
+from invarlock.reporting.html import render_report_html
 
-html = render_certificate_html(certificate)
+html = render_report_html(report)
 ```
 
 ---
@@ -416,7 +416,7 @@ html = render_certificate_html(certificate)
 - **Schema validation fails**: check `schema_version` and required top-level
   fields (`run_id`, `meta`, `dataset`, `artifacts`, `primary_metric`).
 - **Unexpected validation keys**: ensure `validation.*` keys match the allow-list
-  in `certificate_schema`.
+  in `report_schema`.
 
 ### Telemetry Issues
 
@@ -425,7 +425,7 @@ html = render_certificate_html(certificate)
 
 ### HTML Export Issues
 
-- **Missing certificate**: generate one first via `invarlock report --format cert`.
+- **Missing report**: generate one first via `invarlock report --format report`.
 - **HTML missing styles**: omit `--no-embed-css` or apply custom CSS downstream.
 
 ---
@@ -435,8 +435,8 @@ html = render_certificate_html(certificate)
 - `validation.*`, `resolved_policy.*`, and `policy_digest.*` capture policy state.
 - `primary_metric_tail` appears only for ppl-like metrics with paired windows.
 - The rendered HTML is derived from the Markdown report. If values look wrong,
-  inspect the underlying `evaluation.cert.json`.
-- The Markdown certificate is a human-readable view (starts with an Evaluation Dashboard + Contents); the JSON certificate is the canonical evidence artifact.
+  inspect the underlying `evaluation.report.json`.
+- The Markdown report is a human-readable view (starts with an Evaluation Dashboard + Contents); the JSON report is the canonical evidence artifact.
 
 ---
 
@@ -444,5 +444,5 @@ html = render_certificate_html(certificate)
 
 - [CLI Reference](cli.md)
 - [Artifact Layout](artifacts.md)
-- [Safety Case](../assurance/00-safety-case.md) — What the certificate guarantees
-- [Reading a Certificate](../user-guide/reading-certificate.md) — User-oriented guide
+- [Safety Case](../assurance/00-safety-case.md) — What the report guarantees
+- [Reading a report](../user-guide/reading-report.md) — User-oriented guide

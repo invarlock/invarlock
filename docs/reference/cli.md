@@ -6,7 +6,7 @@
 | --- | --- |
 | **Purpose** | Command-line interface for certification, verification, and reporting. |
 | **Audience** | Operators running InvarLock from terminal/CI. |
-| **Primary commands** | `certify`, `verify`, `report`, `run`, `plugins`, `doctor`. |
+| **Primary commands** | `evaluate`, `verify`, `report`, `run`, `plugins`, `doctor`. |
 | **Requires** | `invarlock[hf]` for HF workflows; optional extras for quantized adapters. |
 | **Network** | Offline by default; enable per command with `INVARLOCK_ALLOW_NETWORK=1`. |
 | **Source of truth** | `src/invarlock/cli/app.py`, `src/invarlock/cli/commands/*.py`. |
@@ -22,7 +22,7 @@
    - [Command Index](#command-index)
 4. [Quickstart Commands](#quickstart-commands)
 5. [JSON Output](#json-output-verify-and-plugins)
-6. [Compare & Certify](#compare--certify)
+6. [Compare & evaluate](#compare--evaluate)
 7. [Profile Reference](#profile-reference-ci-vs-release)
 8. [Security Defaults](#security-defaults)
 9. [Troubleshooting](#troubleshooting)
@@ -34,16 +34,16 @@
 # Install core HF stack
 pip install "invarlock[hf]"
 
-# Compare & Certify two checkpoints
-INVARLOCK_ALLOW_NETWORK=1 invarlock certify --baseline gpt2 --subject gpt2
+# Compare & evaluate two checkpoints
+INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --baseline gpt2 --subject gpt2
 
-# Validate a certificate
-invarlock verify reports/cert/evaluation.cert.json
+# Validate a report
+invarlock verify reports/eval/evaluation.report.json
 ```
 
 ## Concepts
 
-- **Pairing**: `certify` records baseline windows and enforces pairing in CI/Release.
+- **Pairing**: `evaluate` records baseline windows and enforces pairing in CI/Release.
 - **Profiles**: `--profile ci|release|ci_cpu` controls window counts and determinism.
 - **Tiers**: `--tier balanced|conservative` selects guard thresholds from `tiers.yaml`.
 - **Offline-first**: downloads are opt-in; local paths work without network.
@@ -54,53 +54,53 @@ For definitions of common terms (pairing, tier policy, primary metric), see the
 
 | Task | Command | Output |
 | --- | --- | --- |
-| Compare baseline vs subject | `invarlock certify` | `runs/` reports + `reports/cert` certificate. |
+| Compare baseline vs subject | `invarlock evaluate` | `runs/` reports + `reports/eval` report. |
 | Single-model run report | `invarlock run` | `report.json` + `events.jsonl`. |
-| Validate certificate | `invarlock verify` | Exit code + validation messages. |
-| Explain / HTML / compare | `invarlock report` | Rendered reports/certs. |
+| Validate report | `invarlock verify` | Exit code + validation messages. |
+| Explain / HTML / compare | `invarlock report` | Rendered reports/evals. |
 | Inspect environment | `invarlock plugins` / `invarlock doctor` | Plugin diagnostics. |
 
 ## Reference
 
-InvarLock groups commands by task. The recommended path is Compare & Certify (baseline ↔ subject):
+InvarLock groups commands by task. The recommended path is Compare & evaluate (baseline ↔ subject):
 
 ```bash
-invarlock certify --baseline <BASELINE_MODEL> --subject <SUBJECT_MODEL>
+invarlock evaluate --baseline <BASELINE_MODEL> --subject <SUBJECT_MODEL>
 ```
 
 ### Artifact outputs matrix
 
-| Command | Writes `runs/` | Writes `reports/` | Emits certificate | Notes |
+| Command | Writes `runs/` | Writes `reports/` | Emits report | Notes |
 | --- | --- | --- | --- | --- |
-| `invarlock certify` | Yes (`--out`, default `runs/`) | Yes (`--cert-out`, default `reports/cert`) | Yes | Emits cert even on degraded PM (`E111`). |
+| `invarlock evaluate` | Yes (`--out`, default `runs/`) | Yes (`--report-out`, default `reports/eval`) | Yes | Emits cert even on degraded PM (`E111`). |
 | `invarlock run` | Yes (`--out`) | No | No | Produces `report.json` + `events.jsonl`. |
-| `invarlock report` | No | Yes (`--output`) | Optional (`--format cert/html`) | Renders from existing reports. |
-| `invarlock verify` | No | No | No | Reads certificate JSON(s). |
+| `invarlock report` | No | Yes (`--output`) | Optional (`--format report/html`) | Renders from existing reports. |
+| `invarlock verify` | No | No | No | Reads report JSON(s). |
 | `invarlock plugins` / `doctor` | No | No | No | Diagnostics only. |
 
-### CLI → Report → Certificate → Verify
+### CLI → Report → report → Verify
 
-| Command | Report output | Certificate output | Verify behavior |
+| Command | Report output | report output | Verify behavior |
 | --- | --- | --- | --- |
 | `invarlock run` | `report.json`, `events.jsonl` | None | Use `invarlock report` or `verify` later. |
-| `invarlock certify` | `report.json` (baseline + subject) | `evaluation.cert.json` | Exit `3` in CI/Release on pairing/gate failures. |
-| `invarlock report --format cert` | None (reads reports) | `evaluation.cert.json` | Same verify rules as `certify`. |
+| `invarlock evaluate` | `report.json` (baseline + subject) | `evaluation.report.json` | Exit `3` in CI/Release on pairing/gate failures. |
+| `invarlock report --format report` | None (reads reports) | `evaluation.report.json` | Same verify rules as `evaluate`. |
 | `invarlock verify` | None | None | Schema + pairing + profile gates. |
 
 Note on presets and scripts
 
 - Presets and scripts in this repository (`configs/`, `scripts/`) are not
   shipped in wheels.
-- When installing from PyPI, prefer flag‑only `invarlock certify` (no preset
+- When installing from PyPI, prefer flag‑only `invarlock evaluate` (no preset
   paths), or clone this repo to use presets and matrix scripts.
 
 Top‑level commands:
 
 | Command             | Description                                                               |
 | ------------------- | ------------------------------------------------------------------------- |
-| `invarlock certify` | Certify two checkpoints (baseline vs subject) with pinned windows         |
-| `invarlock verify`  | Verify certificate JSONs against schema and pairing math                  |
-| `invarlock report`  | Operations on reports and certificates (explain, html, validate, compare) |
+| `invarlock evaluate` | evaluate two checkpoints (baseline vs subject) with pinned windows         |
+| `invarlock verify`  | Verify report JSONs against schema and pairing math                  |
+| `invarlock report`  | Operations on reports and reports (explain, html, validate, compare) |
 | `invarlock run`     | Advanced: single‑model evaluation to produce a report                     |
 | `invarlock plugins` | Manage optional backends; list available guards/edits/adapters            |
 | `invarlock doctor`  | Perform environment diagnostics                                           |
@@ -114,10 +114,10 @@ InvarLock stops early in CI/Release profiles when evidence would be invalid,
 failing fast with a profile‑aware exit code (`3`). Dev runs still emit
 artifacts and exit with `1` to aid debugging.
 
-- Primary metric degraded or non‑finite (certify only)
-  - Where: after the edited run in `invarlock certify`.
+- Primary metric degraded or non‑finite (evaluate only)
+  - Where: after the edited run in `invarlock evaluate`.
   - Error: `[INVARLOCK:E111] Primary metric degraded or non‑finite (...)`.
-  - Behavior: emits the certificate, then exits with a profile‑aware code.
+  - Behavior: emits the report, then exits with a profile‑aware code.
   - Action: try an accelerator (mps/cuda), force float32, reduce
     `plan.max_modules`, lower the evaluation batch size.
 
@@ -130,7 +130,7 @@ Notes
 
 - `invarlock run` in CI/Release logs a warning if the bare primary metric is
   non‑finite and continues to produce a report; it does not raise `E111`.
-- `invarlock certify` always emits a certificate before exiting on `E111`.
+- `invarlock evaluate` always emits a report before exiting on `E111`.
 
 For details on windowing, pairing, and tier minima, see
 `docs/assurance/02-coverage-and-pairing.md` and
@@ -139,7 +139,7 @@ For details on windowing, pairing, and tier minima, see
 ### Measurement Contracts (GPU/MPS-first)
 
 InvarLock’s guards are approximation-only and accelerator-first (CUDA/MPS).
-Each certificate records the measurement contract (estimator + sampling policy)
+Each report records the measurement contract (estimator + sampling policy)
 used to produce guard statistics.
 
 - Recorded under:
@@ -164,8 +164,8 @@ pip install "invarlock[gpu]"
 # Optional PTQ backends (install together with hf/gpu extras)
 pip install "invarlock[awq,gptq]"
 
-# Compare & Certify two checkpoints (hero path)
-invarlock certify --baseline gpt2 --subject gpt2-quant
+# Compare & evaluate two checkpoints (hero path)
+invarlock evaluate --baseline gpt2 --subject gpt2-quant
 
 # Force CPU execution when no accelerator is available (baseline smoke)
 invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml \
@@ -174,17 +174,17 @@ invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml \
 # Explain decisions, compare, and render HTML
 invarlock report explain --report runs/subject/report.json --baseline runs/baseline/report.json
 invarlock report --run runs/subject/report.json --compare runs/baseline/report.json -o reports/compare
-invarlock report html -i reports/cert/evaluation.cert.json -o reports/cert/evaluation.html
+invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 
-# Validate a certificate
-invarlock verify reports/cert/evaluation.cert.json
+# Validate a report
+invarlock verify reports/eval/evaluation.report.json
 ```
 
 Use `invarlock plugins` to review available adapters, edits, and guards.
 
 Core installs (`pip install invarlock`) keep the CLI entry points
 (`invarlock --help`, `invarlock version`) torch‑free; adapter‑based flows
-(`invarlock certify`, `invarlock run` with HF adapters) require extras such as
+(`invarlock evaluate`, `invarlock run` with HF adapters) require extras such as
 `"invarlock[hf]"` or `"invarlock[adapters]"`.
 
 ### Command Index
@@ -195,18 +195,18 @@ Exhaustive command map with brief descriptions and notable options.
 
 - `invarlock` (global)
   - Options: `--install-completion`, `--show-completion`, `--help`
-  - Summary: certify model changes with deterministic pairing and safety gates.
-  - Quick path: `invarlock certify --baseline <MODEL> --subject <MODEL>`.
+  - Summary: evaluate model changes with deterministic pairing and safety gates.
+  - Quick path: `invarlock evaluate --baseline <MODEL> --subject <MODEL>`.
   - Tip: enable downloads per command with `INVARLOCK_ALLOW_NETWORK=1`.
 
-- `invarlock certify`
-  - Purpose: Compare & Certify (BYOE). Emits an evaluation certificate.
+- `invarlock evaluate`
+  - Purpose: Compare & evaluate (BYOE). Emits an evaluation report.
   - Options: `--baseline/--source`, `--subject/--edited`, `--adapter`,
-    `--profile`, `--tier`, `--preset`, `--out`, `--cert-out`, `--edit-config`.
+    `--profile`, `--tier`, `--preset`, `--out`, `--report-out`, `--edit-config`.
 
 - `invarlock verify`
-  - Purpose: Verify certificate JSON(s) against schema, pairing math, and gates.
-  - Args: `CERTIFICATES...`
+  - Purpose: Verify report JSON(s) against schema, pairing math, and gates.
+  - Args: `reportS...`
   - Options: `--baseline`, `--tolerance`, `--profile`, `--json`.
 
 - `invarlock run`
@@ -216,20 +216,20 @@ Exhaustive command map with brief descriptions and notable options.
     `--baseline`, `--no-cleanup`, `--timing`, `--telemetry`.
 
 - `invarlock report` (group)
-  - Purpose: Operations on reports/certificates (verify, explain, html, validate).
+  - Purpose: Operations on reports/evalificates (verify, explain, html, validate).
   - Default (no subcommand): generate report(s) from a run.
   - Options (default callback): `--run`, `--format (json|md|html|cert|all)`,
     `--compare`, `--baseline`, `--output/-o`.
   - Subcommands:
     - `invarlock report verify` — recompute/verify metrics for report/cert.
-      - Args: `CERTIFICATES...`
+      - Args: `reportS...`
       - Options: `--baseline`, `--tolerance`, `--profile`, `--json`.
     - `invarlock report explain` — explain gates for report vs baseline (primary metric ratio,
       Primary Metric Tail (ΔlogNLL), drift, and guard overhead when available).
-    - `invarlock report html` — render certificate JSON to HTML.
+    - `invarlock report html` — render report JSON to HTML.
       - Options: `-i/--input`, `-o/--output`, `--embed-css/--no-embed-css`, `--force`.
-    - `invarlock report validate` — validate certificate JSON against current schema (v1).
-      - Args: `report` (path to certificate JSON).
+    - `invarlock report validate` — validate report JSON against current schema (v1).
+      - Args: `report` (path to report JSON).
 
 - `invarlock plugins` (group)
   - Purpose: Manage optional backends; list adapters/guards/edits.
@@ -261,7 +261,7 @@ Exhaustive command map with brief descriptions and notable options.
 Evidence debug
 
 - Set `INVARLOCK_EVIDENCE_DEBUG=1` to write a tiny guards_evidence.json next to the
-  generated certificate and include a pointer in `manifest.json`. This contains
+  generated report and include a pointer in `manifest.json`. This contains
   only small policy knobs (no large arrays) and is safe to enable locally.
 
 #### Plugins & Entry Points
@@ -315,10 +315,10 @@ Envelope example:
 {
   "format_version": "verify-v1",
   "summary": { "ok": true, "reason": "ok" },
-  "certificate": { "count": 1 },
+  "report": { "count": 1 },
   "results": [
     {
-      "id": "reports/cert/evaluation.cert.json",
+      "id": "reports/eval/evaluation.report.json",
       "schema_version": "v1",
       "kind": "ppl_causal",
       "ok": true,
@@ -337,7 +337,7 @@ Notes:
 
 - Exactly one JSON object is printed when `--json` is used.
 - Exit codes: `0=pass`, `1=policy_fail`, `2=malformed`.
-- `results[]` contains one element per input certificate; fields remain present
+- `results[]` contains one element per input report; fields remain present
   with `null` when unknown.
 
 Recompute details
@@ -347,7 +347,7 @@ The verifier includes a best‑effort recompute summary to help debug the primar
 - `recompute.family` — which family was checked: `accuracy` or `ppl` (or `other` if not applicable)
 - `recompute.ok` — `true` when the recomputed value matches `primary_metric.final` within tolerance
 - `recompute.reason` — `"mismatch"` when values differ, `"skipped"` when the
-  certificate lacks the inputs (e.g., no counts or windows)
+  report lacks the inputs (e.g., no counts or windows)
 
 Example (accuracy):
 
@@ -380,21 +380,21 @@ Example (ppl):
 Troubleshooting recompute mismatches
 
 When `recompute.ok` is false (reason `"mismatch"`), the verifier found a
-disagreement between the certificate’s recorded primary metric and what can be
+disagreement between the report’s recorded primary metric and what can be
 derived from the embedded inputs. Common causes and quick fixes:
 
 - Accuracy mismatches:
   - Cause: `metrics.classification.{n_correct,n_total}` don’t match `primary_metric.final`.
   - Fix: ensure counts reflect the same evaluation slice as the PM (preview/final),
     and that the PM kind is `accuracy` (or `vqa_accuracy`). If you changed counts,
-    regenerate the certificate.
+    regenerate the report.
 - PPL mismatches:
   - Cause: `evaluation_windows.final.{logloss,token_counts}` don’t correspond to the
     displayed `primary_metric.final`.
   - Fix: verify the windows used for the PM match those stored in the cert (same
     window IDs and counts). Regenerate the cert if windows changed.
 - Baseline reference drift:
-  - Cause: Certificate’s `baseline_ref.primary_metric.final` doesn’t reflect the baseline
+  - Cause: report’s `baseline_ref.primary_metric.final` doesn’t reflect the baseline
     actually used when computing the ratio.
   - Fix: keep the baseline report next to the cert or regenerate the cert with the
     intended baseline.
@@ -403,7 +403,7 @@ derived from the embedded inputs. Common causes and quick fixes:
   - Fix: pass a slightly larger `--tolerance`; the verifier uses it when comparing
     recomputed vs displayed values.
 
-If recompute is `"skipped"`, the certificate doesn’t include the inputs needed for
+If recompute is `"skipped"`, the report doesn’t include the inputs needed for
 this quick check. The verifier still checks schema and pairing math.
 
 ##### plugins list --json (format: plugins-v1)
@@ -518,15 +518,15 @@ Notes:
   - `invarlock plugins adapters --only auto`
 - Use `--hide-unsupported/--show-unsupported` to toggle platform‑gated adapters.
 
-#### Quant (RTN) or Compare & Certify examples
+#### Quant (RTN) or Compare & evaluate examples
 
 ```bash
 # Baseline (CI, GPT-2 small)
 invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml \
   --profile ci --tier balanced
 
-# Compare & Certify (recommended)
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
+# Compare & evaluate (recommended)
+INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
   --baseline gpt2 \
   --subject /path/to/edited \
   --adapter auto \
@@ -534,7 +534,7 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
   --preset configs/presets/causal_lm/wikitext2_512.yaml
 
 # Demo edit overlay (quant_rtn)
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
+INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
   --baseline gpt2 \
   --subject gpt2 \
   --adapter auto \
@@ -567,24 +567,24 @@ auto:
   probes: 0
 ```
 
-### Compare & Certify
+### Compare & evaluate
 
 Compare a subject against a baseline with pinned windows. This is the single
 recommended workflow. Optionally, you can run the in‑repo demo edit
 (`quant_rtn`) via `--edit-config` to produce a subject for smoke/demos.
 
 ```bash
-# Compare & Certify (BYOE checkpoints)
-INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
+# Compare & evaluate (BYOE checkpoints)
+INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
   --source <hf_dir_or_id> \
   --edited <hf_dir_or_id> \
   --adapter auto \
   --profile ci \
   --out runs \
-  --cert-out reports/cert
+  --report-out reports/eval
 
 # Optional (demo): run the in‑repo quant_rtn edit to produce a subject
-INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
+INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
   --source <hf_dir_or_id> \
   --edited <hf_dir_or_id> \
   --adapter auto \
@@ -596,7 +596,7 @@ Behavior:
 
 - Runs a baseline on `--source` and records windows.
 - Runs the subject model with windows pinned via `--baseline` pairing.
-- Emits a certificate JSON under `--cert-out`.
+- Emits a report JSON under `--report-out`.
 
 Baseline reuse (skip Phase 1/3):
 
@@ -605,17 +605,17 @@ Baseline reuse (skip Phase 1/3):
 
 ```bash
 # 1) Produce a reusable baseline report once
-INVARLOCK_STORE_EVAL_WINDOWS=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
+INVARLOCK_STORE_EVAL_WINDOWS=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
   --source <hf_dir_or_id> \
   --edited <hf_dir_or_id> \
   --adapter auto \
   --profile ci \
   --tier balanced \
   --out runs/baseline_once \
-  --cert-out reports/cert_baseline_once
+  --report-out reports/eval_baseline_once
 
 # 2) Reuse it for many subjects (skips baseline evaluation)
-INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
+INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
   --baseline-report runs/baseline_once/source \
   --source <hf_dir_or_id> \
   --edited <hf_dir_or_id> \
@@ -630,7 +630,7 @@ See also: User Guide → Scripts & Utilities for preparing checkpoints
 #### Expected Outcomes
 
 - Quant RTN edits aim for ≤ 1.10× perplexity drift under the balanced CI profile.
-- Guard verdicts surface in `report.json` and the certificate bundle; run
+- Guard verdicts surface in `report.json` and the report bundle; run
   `invarlock verify` for a one-shot policy check that enforces the schema, ratio
   math, and paired-window guarantees.
 - Typical GPT‑2 small runs complete within ~5 minutes on a modern GPU or Apple
@@ -650,7 +650,7 @@ See also: User Guide → Scripts & Utilities for preparing checkpoints
 `--device auto` mirrors the default CLI behavior and attempts CUDA, then MPS
 (Apple Silicon), then CPU. The resolved device is echoed in the run banner
 (e.g., `Device resolved: auto → mps`) and recorded under `meta.device` in the
-resulting report/certificate for audit trails.
+resulting report/report for audit trails.
 
 ### Profile Reference (CI vs Release)
 
@@ -662,7 +662,7 @@ resulting report/certificate for audit trails.
 
 When a profile is supplied, the values above override the dataset/eval blocks
 in your base config before the run starts. Keep the profile metadata
-(`/context.policy_snapshot`) with the certificate when you archive release
+(`/context.policy_snapshot`) with the report when you archive release
 evidence.
 
 For automation loops see the
@@ -727,7 +727,7 @@ Notes:
 ## Observability
 
 - Reports land under `runs/<name>/<timestamp>/report.json`.
-- Certificates are emitted under `reports/` via `invarlock report --format cert`.
+- reports are emitted under `reports/` via `invarlock report --format report`.
 - JSON output modes (`--json`) provide stable machine-readable envelopes.
 
 ## Related Documentation
@@ -735,4 +735,4 @@ Notes:
 - [Configuration Schema](config-schema.md)
 - [Dataset Providers](datasets.md)
 - [Environment Variables](env-vars.md)
-- [Certificates](certificates.md) — Schema, telemetry, and HTML export
+- [reports](reports.md) — Schema, telemetry, and HTML export

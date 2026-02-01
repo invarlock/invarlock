@@ -22,8 +22,8 @@ pip install "invarlock[hf]"
 # Inspect adapter availability
 invarlock plugins adapters
 
-# Compare & Certify with adapter auto-selection
-INVARLOCK_ALLOW_NETWORK=1 invarlock certify \
+# Compare & evaluate with adapter auto-selection
+INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate \
   --baseline gpt2 \
   --subject gpt2 \
   --adapter auto
@@ -195,7 +195,7 @@ finally:
 ## Observability
 
 - `invarlock plugins adapters --json` reports readiness and missing extras.
-- `report.context["plugins"]` and certificate `plugins.adapters` record adapter
+- `report.context["plugins"]` and report `plugins.adapters` record adapter
   discovery for audit trails.
 
 ## Related Documentation
@@ -204,4 +204,4 @@ finally:
 - [Configuration Schema](config-schema.md)
 - [Dataset Providers](datasets.md)
 - [Environment Variables](env-vars.md)
-- [Certificates](certificates.md) — Schema, telemetry, and HTML export
+- [reports](reports.md) — Schema, telemetry, and HTML export

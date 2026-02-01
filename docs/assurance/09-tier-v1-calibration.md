@@ -3,7 +3,7 @@
 > **Plain language:** This appendix has two roles:
 > (1) the **pilot numbers** we measured for GPT-2 small and BERT base (Nov 2025) that underpin the **Balanced** and **Conservative** tiers; and
 > (2) the **exact recipe** to recalibrate from scratch on your setup (weight-based Spectral κ, activation-based RMT ε, VE min-effect, and window sizing).
-> Every knob is surfaced in run reports and certificates so reviewers can audit or recompute.
+> Every knob is surfaced in run reports and reports so reviewers can audit or recompute.
 >
 > For a key-by-key explanation of every value in the packaged tier file
 > (`runtime/tiers.yaml`), see [Tier Policy Catalog](../reference/tier-policy-catalog.md).
@@ -20,7 +20,7 @@
 - **Conservative** tightens caps and budget:
   `ffn: 3.849`, `attn: 2.6`, `embed: 2.8`, `other: 2.8`, **Bonferroni** (`α=0.000625`), and `max_caps = 3`.
 
-**Runtime visibility.** Certificates record per-family WARNs and effective caps under `spectral.*` (summary, multiple_testing, families, family_caps) and the resolved policy under `resolved_policy.spectral`.
+**Runtime visibility.** reports record per-family WARNs and effective caps under `spectral.*` (summary, multiple_testing, families, family_caps) and the resolved policy under `resolved_policy.spectral`.
 
 ### Window Minima Rationale (counts/power)
 
@@ -28,10 +28,10 @@
 - Release evidence must meet the requested counts; runs that under‑cover preview/final windows or bootstrap replicates fail certification in CI/Release profiles (see Coverage & Pairing Plan).
 
 **Spectral calibration provenance.** Aggregated null-run stats are derived from
-calibration runs. Local tooling can parse certificate JSON files (glob pattern
+calibration runs. Local tooling can parse report JSON files (glob pattern
 `**/cert_*.json`) to extract per-family z-scores and compute summary statistics
 (mean, stdev, quantiles). Persist results in CSV format for reproducibility and
-attach calibration certificates to change proposals.
+attach calibration reports to change proposals.
 
 ---
 
@@ -120,10 +120,10 @@ With 120 total modules distributed as: FFN=40, Attn=40, Embed=8, Other=32.
 Acceptance rule per family $f$: with baseline edge‑risk $r_f^{\text{base}}$ and current edge‑risk $r_f^{\text{cur}}$,
 $r_f^{\text{cur}} \le \left(1+\varepsilon(f)\right)\, r_f^{\text{base}}$.
 
-**Runtime visibility.** Certificate fields under `rmt.*` report baseline/current edge‑risk, ε (default and by family), status, and `validation.rmt_stable`.
+**Runtime visibility.** report fields under `rmt.*` report baseline/current edge‑risk, ε (default and by family), status, and `validation.rmt_stable`.
 
 **RMT calibration provenance.** Aggregated null-run stats are derived from
-calibration certificates. Local tooling can parse certificate JSON files to
+calibration reports. Local tooling can parse report JSON files to
 extract `rmt.families.*.{edge_base,edge_cur,delta}` per family, and report
 quantile summaries of Δ(f) = r_cur(f)/r_base(f) − 1 (skip cases with missing or
 zero baseline).
@@ -145,10 +145,10 @@ zero baseline).
 * **Balanced (one-sided, improvement-only)**: `min_effect_lognll = 0.0`
 * **Conservative (two-sided, improvement-only)**: `min_effect_lognll = 0.016`
 
-**Runtime visibility.** Recorded in certificates under `variance.predictive_gate` (CI, mean Δ, pass/fail reason) and under `resolved_policy.variance.{predictive_one_sided,min_effect_lognll}` (tier knobs).
+**Runtime visibility.** Recorded in reports under `variance.predictive_gate` (CI, mean Δ, pass/fail reason) and under `resolved_policy.variance.{predictive_one_sided,min_effect_lognll}` (tier knobs).
 
 **VE calibration provenance.** Summary stats are derived from calibration
-certificates. Local tooling can parse certificate JSON files to extract
+reports. Local tooling can parse report JSON files to extract
 `variance.predictive_gate.{delta_ci,mean_delta}` and compute the paired Δ
 standard deviation across runs.
 
@@ -175,7 +175,7 @@ $$
 profile (`--profile ...`), defined under `src/invarlock/_data/runtime/profiles/`.
 Repo-only runnable presets under `configs/presets/` set small defaults for
 unprofiled runs.
-**Runtime visibility.** Certificates expose window counts, coverage flags, and CI digests under `dataset.windows.stats` and `primary_metric`.
+**Runtime visibility.** reports expose window counts, coverage flags, and CI digests under `dataset.windows.stats` and `primary_metric`.
 
 ---
 
@@ -186,18 +186,18 @@ unprofiled runs.
 3. **RMT ε.** From null runs, set $\varepsilon(f)$ to the q95–q99 quantile of $\big(g(f)/b(f) - 1\big)$ per family (adjust for small $b(f)$).
 4. **VE min-effect.** ($\approx z\,\hat{\sigma}/\sqrt{n}$) with tier-appropriate sidedness.
 5. **Windows.** Size $n$ to hit the half-width target; enforce non-overlap and pairing.
-6. **Trial via override.** Write calibrated values to a local override YAML (e.g., `configs/overrides/spectral_balanced_local.example.yaml`, copied locally and edited) and merge it into a local run preset under `guards:` instead of editing the global tier. Re-run baseline + edits; pre-screen gates; then build certificates.
+6. **Trial via override.** Write calibrated values to a local override YAML (e.g., `configs/overrides/spectral_balanced_local.example.yaml`, copied locally and edited) and merge it into a local run preset under `guards:` instead of editing the global tier. Re-run baseline + edits; pre-screen gates; then build reports.
 
 ---
 
 > **Note.** These pilot numbers are defaults. Teams are encouraged to re-run
 > calibration on their models/datasets/hardware and attach the resulting
-> certificates and summary statistics to change proposals. The certificate
+> reports and summary statistics to change proposals. The report
 > fields make such updates auditable end-to-end.
 
 ## See Also
 
-- [Tier Policy Catalog](../reference/tier-policy-catalog.md) — Policy keys and where they appear in certificates
+- [Tier Policy Catalog](../reference/tier-policy-catalog.md) — Policy keys and where they appear in reports
 - [Guards Reference](../reference/guards.md) — Guard configuration options
 
 ## References

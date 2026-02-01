@@ -10,10 +10,10 @@
 | **Source** | `configs/presets/` and `configs/overlays/`. |
 
 Pointers to common presets in this repository you can start from. Presets are
-repo assets (not shipped in wheels). Use flag‑only `invarlock certify` when
+repo assets (not shipped in wheels). Use flag‑only `invarlock evaluate` when
 installing from PyPI, or clone this repo to reference these files.
 
-Note: Adapter‑based flows such as `invarlock certify` and `invarlock run` with
+Note: Adapter‑based flows such as `invarlock evaluate` and `invarlock run` with
 HF models require extras like `invarlock[hf]` or `invarlock[adapters]`. The
 core install (`pip install invarlock`) remains torch‑free.
 
@@ -29,7 +29,7 @@ core install (`pip install invarlock`) remains torch‑free.
 provide good coverage while keeping runtime reasonable.
 
 ```bash
-invarlock certify --baseline gpt2 --subject /path/to/edited \
+invarlock evaluate --baseline gpt2 --subject /path/to/edited \
   --preset configs/presets/causal_lm/wikitext2_512.yaml --profile ci
 ```
 
@@ -44,7 +44,7 @@ invarlock certify --baseline gpt2 --subject /path/to/edited \
 network access is unavailable or for CI smoke tests.
 
 ```bash
-invarlock certify --baseline bert-base-uncased --subject /path/to/edited \
+invarlock evaluate --baseline bert-base-uncased --subject /path/to/edited \
   --preset configs/presets/masked_lm/wikitext2_128.yaml --profile ci
 ```
 
@@ -60,7 +60,7 @@ fast for smoke testing.
 ## Edit Overlays (Demo RTN Quantization)
 
 These overlays apply the built-in `quant_rtn` edit for demonstration. For
-production, use [Compare & Certify (BYOE)](compare-and-certify.md) with your
+production, use [Compare & evaluate (BYOE)](compare-and-evaluate.md) with your
 own pre-edited checkpoint instead.
 
 | Overlay | Scope | Use Case |
@@ -72,7 +72,7 @@ own pre-edited checkpoint instead.
 **Example (demo edit):**
 
 ```bash
-invarlock certify --baseline gpt2 --subject gpt2 \
+invarlock evaluate --baseline gpt2 --subject gpt2 \
   --preset configs/presets/causal_lm/wikitext2_512.yaml \
   --edit-config configs/overlays/edits/quant_rtn/8bit_attn.yaml \
   --profile ci
@@ -100,5 +100,5 @@ Profiles control window counts and bootstrap depth:
 
 - [Configuration Schema](../reference/config-schema.md) — All config options
 - [CLI Reference](../reference/cli.md) — Command flags and profiles
-- [Compare & Certify (BYOE)](compare-and-certify.md) — Production workflow
+- [Compare & evaluate (BYOE)](compare-and-evaluate.md) — Production workflow
 - [Dataset Providers](../reference/datasets.md) — Available data sources

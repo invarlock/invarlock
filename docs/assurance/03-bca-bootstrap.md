@@ -28,7 +28,7 @@ Given per‑window token counts `t_i` and log‑losses `ℓ_i^A`, `ℓ_i^B`, def
 - Degenerate Δ (all equal, no pairs, or single pair): mark `degenerate=true`; CI collapses to `[μ, μ]` with `μ = mean(Δ)`.
 - Undefined acceleration (jackknife variance is zero): fall back to a percentile bootstrap CI.
 
-## Runtime Contract (certificate)
+## Runtime Contract (report)
 
 - `primary_metric.ci` — Δlog‑loss CI (log space, ppl-like kinds)
 - `primary_metric.display_ci` — ratio CI = `exp(primary_metric.ci)`
@@ -56,7 +56,7 @@ enforce minima strictly when pairing is established.
 - Paired windows and token weighting are required for the log‑space identities
   to hold.
 - Degenerate Δ cases are rare in practice at tier coverage; when they occur,
-  the certificate records the fallback explicitly.
+  the report records the fallback explicitly.
 
 ## References
 

@@ -4,13 +4,13 @@
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Programmatic interface for running the InvarLock pipeline and generating certificates. |
+| **Purpose** | Programmatic interface for running the InvarLock pipeline and generating reports. |
 | **Audience** | Python callers building scripted workflows or integrations. |
 | **Supported surface** | `CoreRunner.execute`, `RunConfig`, `ModelAdapter`, `ModelEdit`, `Guard`, `invarlock.assurance` helpers. |
 | **Requires** | `invarlock[adapters]` for HF adapters, `invarlock[edits]` for built-in edits, `invarlock[guards]` for guard math, `invarlock[eval]` for dataset providers. |
 | **Network** | Offline by default; set `INVARLOCK_ALLOW_NETWORK=1` to download models or datasets. |
 | **Inputs** | Model instance, adapter, edit, guard list, `RunConfig`, optional calibration data. |
-| **Outputs / Artifacts** | `RunReport` object; optional event logs/checkpoints; certificates via `make_certificate`. |
+| **Outputs / Artifacts** | `RunReport` object; optional event logs/checkpoints; reports via `make_report`. |
 | **Source of truth** | `src/invarlock/core/runner.py`, `src/invarlock/core/api.py`, `src/invarlock/assurance/__init__.py`. |
 
 ## Quick Start
@@ -44,11 +44,11 @@ print("primary metric:", report.metrics.get("primary_metric"))
 - **Calibration data**: indexable batches (list/sequence) with `input_ids`, optional
   `attention_mask`, and optional `labels`. Preview/final windows are sliced from this sequence.
 - **Auto configuration**: `auto_config` controls tier/policy resolution and is recorded
-  under `report.meta["auto"]` for certificate generation.
+  under `report.meta["auto"]` for report generation.
 - **Snapshots**: retries use snapshot/restore; configure via
   `context.snapshot.*` when using YAML configs.
-- **Certificates**: generated from `RunReport` + baseline report via
-  `invarlock.assurance.make_certificate`.
+- **reports**: generated from `RunReport` + baseline report via
+  `invarlock.assurance.make_report`.
 
 ### Responsibility lanes
 
@@ -59,7 +59,7 @@ print("primary metric:", report.metrics.get("primary_metric"))
 | Adapter | Load/describe model, snapshot/restore. |
 | Guards | `prepare`/`validate`, return action (warn/rollback/abort). |
 | Eval | Build windows, compute primary metric + tail metrics. |
-| Certificate | `make_certificate(report, baseline)` for verification. |
+| report | `make_report(report, baseline)` for verification. |
 
 Note: CoreRunner coordinates each lane.
 
@@ -223,14 +223,14 @@ calibration = [
 ]
 ```
 
-### Certificates (assurance helpers)
+### reports (assurance helpers)
 
 ```python
-from invarlock.assurance import make_certificate, render_certificate_markdown, validate_certificate
+from invarlock.assurance import make_report, render_report_markdown, validate_report
 
-certificate = make_certificate(report, baseline_report)
-validate_certificate(certificate)
-print(render_certificate_markdown(certificate))
+report = make_report(report, baseline_report)
+validate_report(report)
+print(render_report_markdown(report))
 ```
 
 ### Exceptions
@@ -257,8 +257,8 @@ Core exceptions live in `invarlock.core.exceptions`:
   `RunReport.evaluation_windows` are the canonical inspection points (windows can
   be omitted when `INVARLOCK_STORE_EVAL_WINDOWS=0`).
 - If `RunConfig.event_path` is set, an event log is written as JSONL.
-- Certificates from `make_certificate` can be validated with
-  `invarlock.assurance.validate_certificate` or the CLI `invarlock verify`.
+- reports from `make_report` can be validated with
+  `invarlock.assurance.validate_report` or the CLI `invarlock verify`.
 
 ## Related Documentation
 
@@ -267,6 +267,6 @@ Core exceptions live in `invarlock.core.exceptions`:
 - [Configuration Schema](config-schema.md)
 - [Dataset Providers](datasets.md)
 - [Guards](guards.md)
-- [Certificates](certificates.md) — Schema, telemetry, and HTML export
+- [reports](reports.md) — Schema, telemetry, and HTML export
 - [Determinism Contracts](../assurance/08-determinism-contracts.md) — Reproducibility guarantees
 - [Observability](observability.md) — Monitoring and telemetry

@@ -1,16 +1,16 @@
-# Reading a Certificate (v1)
+# Reading a report (v1)
 
 ## Overview
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Understand and interpret InvarLock v1 certificates. |
+| **Purpose** | Understand and interpret InvarLock v1 reports. |
 | **Audience** | Reviewers validating certification evidence. |
 | **Key sections** | Evaluation Dashboard, Quality Gates, Primary Metric, Provenance, Measurement contracts. |
 | **Validation** | Use `invarlock verify <cert.json>` to check schema and pairing. |
-| **Source of truth** | [Certificates](../reference/certificates.md) for full schema. |
+| **Source of truth** | [reports](../reference/reports.md) for full schema. |
 
-This guide highlights the key sections of a v1 certificate and how to
+This guide highlights the key sections of a v1 report and how to
 interpret them.
 
 - Evaluation Dashboard
@@ -21,7 +21,7 @@ interpret them.
 - Primary Metric Tail row (when present)
   - Shows tail regression vs baseline for ppl-like metrics using per-window
     ΔlogNLL (e.g., P95 and tail mass above ε). Default policy is `mode: warn`
-    (does not fail the certificate); `mode: fail` sets
+    (does not fail the report); `mode: fail` sets
     `validation.primary_metric_tail_acceptable = false`.
 - System Overhead row (when available)
   - Latency and throughput stats appear separate from quality and reflect the guarded run.
@@ -33,7 +33,7 @@ interpret them.
     (ids/tokenizer/masking), `env_flags`, and `policy_digest` with thresholds
     snapshot.
 - Policy Configuration
-  - Human-readable tier/digest plus collapsible resolved policy YAML; full details remain in `evaluation.cert.json`.
+  - Human-readable tier/digest plus collapsible resolved policy YAML; full details remain in `evaluation.report.json`.
 - Measurement contract
   - `resolved_policy.spectral.measurement_contract` /
     `resolved_policy.rmt.measurement_contract` pin the estimator + sampling
@@ -55,6 +55,6 @@ Tip: Use `invarlock verify` to recheck schema, pairing, and ratio math.
 
 ## Related Documentation
 
-- [Certificates](../reference/certificates.md) — Full v1 schema reference, telemetry, and HTML export
-- [Safety Case](../assurance/00-safety-case.md) — What the certificate does and does not guarantee
+- [reports](../reference/reports.md) — Full v1 schema reference, telemetry, and HTML export
+- [Safety Case](../assurance/00-safety-case.md) — What the report does and does not guarantee
 - [CLI Reference](../reference/cli.md) — `invarlock verify` command details

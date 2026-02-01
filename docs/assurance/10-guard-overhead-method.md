@@ -3,7 +3,7 @@
 > **Plain language:** We measure how much the GuardChain adds to the primary metric
 > using the exact same windows and seeds (paired schedule), then gate against a small budget
 > (≤ 1%). If overhead exceeds the budget or provenance is missing, the
-> certificate fails.
+> report fails.
 
 ## Claim
 
@@ -26,7 +26,7 @@ PM(bare) is computed with guards disabled; PM(guarded) with the full GuardChain 
 
 Rationale: the budget must be small relative to sampling noise and locked to a policy digest so it cannot silently drift.
 
-## Runtime Contract (certificate)
+## Runtime Contract (report)
 
 Fields under `/guard_overhead` and `/validation`:
 
@@ -60,5 +60,5 @@ Fail conditions (gate evaluated):
 
 ## References
 
-- Certificate Schema → Guard Overhead section (field list and example JSON)
+- report Schema → Guard Overhead section (field list and example JSON)
 - Guard Contracts → Overview of guards and expected budgets

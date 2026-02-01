@@ -2,7 +2,7 @@
 
 > **Plain language:** Use non‑overlapping, paired windows with fixed seeds.
 > Baseline and edited runs reuse the exact same windows. Tier‑based minima are
-> validated at runtime and surfaced in the certificate.
+> validated at runtime and surfaced in the report.
 
 ## Claim
 
@@ -21,7 +21,7 @@ insufficient.
 ## Pairing Reuse (baseline → edited)
 
 - The edited run pins windows via the baseline report.
-- Certificate lints pairing and overlap:
+- report lints pairing and overlap:
   - `dataset.windows.stats.window_match_fraction == 1.0`
   - `dataset.windows.stats.window_overlap_fraction == 0.0`
 - CI/Release abort if counts differ, pairing < 1.0, or overlap > 0.0.
@@ -41,7 +41,7 @@ These minima are derived from half‑width targets on paired Δlog‑loss (see
 Tier v1.0 Calibration). CI/Release profiles treat shortfalls as hard errors;
 dev flows surface warnings but still record coverage in the cert.
 
-## Runtime Contract (certificate)
+## Runtime Contract (report)
 
 - Window plan: `dataset.windows.stats.{requested_preview,requested_final,actual_preview,actual_final}`
 - Pairing/overlap: `dataset.windows.stats.{window_match_fraction,window_overlap_fraction,paired_windows}`
@@ -50,7 +50,7 @@ dev flows surface warnings but still record coverage in the cert.
 ## Observability
 
 - Pairing and coverage appear in both the Markdown report and the JSON
-  certificate, enabling auditors to verify schedule integrity.
+  report, enabling auditors to verify schedule integrity.
 
 ## Assumptions & Scope
 

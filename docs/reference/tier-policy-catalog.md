@@ -37,7 +37,7 @@ invarlock report explain --report runs/subject/report.json --baseline runs/basel
 
 - **Calibrated vs policy keys**: calibrated values come from pilot runs; policy
   keys define safety margins and floors.
-- **Resolved policies** are recorded in certificates under `resolved_policy.*`.
+- **Resolved policies** are recorded in reports under `resolved_policy.*`.
 
 **Policy resolution order (highest → lowest)**
 
@@ -88,12 +88,12 @@ same structure:
 - **What it controls** (runtime behavior)
 - **Where documented** (assurance notes / method write-ups)
 - **Keys** (key-by-key meaning)
-- **Observability** (where it appears in reports/certificates)
+- **Observability** (where it appears in reports/evalificates)
 
 #### Primary-metric gates (`metrics.*`)
 
 **What it controls.** Run-level acceptance gates applied when generating/verifying
-a certificate (see “Quality Gates” in `docs/assurance/04-guard-contracts.md`).
+a report (see “Quality Gates” in `docs/assurance/04-guard-contracts.md`).
 
 **Where documented.**
 
@@ -123,7 +123,7 @@ a certificate (see “Quality Gates” in `docs/assurance/04-guard-contracts.md`
   avoids “passing” large datasets using an unrepresentative tiny subset.
 - `hysteresis_ratio` *(policy)* — small additive slack on the ratio gate
   (`ratio_limit_base + hysteresis_ratio`). Rationale: avoids PASS/FAIL flapping
-  when results hover near the boundary; certificates mark when hysteresis was
+  when results hover near the boundary; reports mark when hysteresis was
   needed (`validation.hysteresis_applied`).
 
 **Observability.**
@@ -142,7 +142,7 @@ schedule). It is additive to the mean/CI primary-metric gate.
 **Keys.**
 
 - `mode` *(policy)* — `off|warn|fail`.
-  - `warn` (default): violations are recorded in the certificate but do **not**
+  - `warn` (default): violations are recorded in the report but do **not**
     fail validation (`validation.primary_metric_tail_acceptable` stays true).
   - `fail`: violations fail validation and can trigger rollback in `invarlock run`
     (`rollback_reason = primary_metric_tail_failed`).
@@ -160,7 +160,7 @@ schedule). It is additive to the mean/CI primary-metric gate.
 
 **Observability.**
 
-- Certificate evidence: `primary_metric_tail.{stats,policy,violations}`.
+- report evidence: `primary_metric_tail.{stats,policy,violations}`.
 - Validation flag: `validation.primary_metric_tail_acceptable` (false only in `fail` mode).
 - CLI: `invarlock report explain` prints “Gate: Primary Metric Tail (ΔlogNLL)”.
 
@@ -178,7 +178,7 @@ schedule). It is additive to the mean/CI primary-metric gate.
   `max(min_examples, ceil(examples_available * min_examples_fraction))`.
 - `hysteresis_delta_pp` *(policy)* — small slack on the delta accuracy gate
   (`delta_min_pp - hysteresis_delta_pp`). Rationale: avoids flapping near the
-  boundary; marked in certificates via `validation.hysteresis_applied`.
+  boundary; marked in reports via `validation.hysteresis_applied`.
 
 **Observability.**
 
@@ -263,7 +263,7 @@ gate and min-effect semantics.
 **Keys.**
 
 - `predictive_gate` *(policy)* — when true, VE only enables if the predictive
-  A/B gate passes (certificate records `variance.predictive_gate.*`).
+  A/B gate passes (report records `variance.predictive_gate.*`).
 - `predictive_one_sided` *(calibrated policy)* — one-sided improvement gate
   semantics (Balanced) vs two-sided CI (Conservative); see
   `docs/assurance/07-ve-gate-power.md`.
@@ -298,7 +298,7 @@ gate and min-effect semantics.
 
 ## Observability
 
-- Resolved policies appear under `resolved_policy.*` in certificates.
+- Resolved policies appear under `resolved_policy.*` in reports.
 - The CLI `invarlock report explain` prints gate decisions and policy digests.
 
 ## Related Documentation

@@ -1,10 +1,10 @@
-# InvarLock — Edit‑agnostic robustness certificates for weight edits
+# InvarLock — Edit‑agnostic robustness reports for weight edits
 
-In short: certify that weight edits (e.g., quantization) preserve quality. If
+In short: evaluate that weight edits (e.g., quantization) preserve quality. If
 they don’t, roll back safely.
 
 Technical: edit‑agnostic guard pipeline (invariants → spectral → RMT →
-variance) producing a machine‑readable Evaluation Certificate.
+variance) producing a machine‑readable Evaluation Report.
 
 > **Status:** 0.3.7 (pre‑1.0). Until 1.0, **minor** releases may be
 > breaking. See CLI help and the CHANGELOG for updates.
@@ -24,11 +24,11 @@ For guidance on where to ask questions, how to report bugs, and what to expect i
 Notebooks (Colab):
 
 - [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_quickstart_cpu.ipynb)
-  `invarlock_quickstart_cpu.ipynb` — install + certify + verify + HTML export (CPU-friendly)
-- [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_compare_certify.ipynb)
-  `invarlock_compare_certify.ipynb` — Compare & Certify (BYOE) end-to-end
-- [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_certificate_deep_dive.ipynb)
-  `invarlock_certificate_deep_dive.ipynb` — reading and interpreting certificates
+  `invarlock_quickstart_cpu.ipynb` — install + evaluate + verify + HTML export (CPU-friendly)
+- [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_compare_evaluate.ipynb)
+  `invarlock_compare_evaluate.ipynb` — Compare & Evaluate (BYOE) end-to-end
+- [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_evaluation_report_deep_dive.ipynb)
+  `invarlock_evaluation_report_deep_dive.ipynb` — reading and interpreting evaluation reports
 - [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_custom_datasets.ipynb)
   `invarlock_custom_datasets.ipynb` — Bring Your Own Data (BYOD) with `local_jsonl`
 - [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_python_api.ipynb)
@@ -42,20 +42,20 @@ pip install "invarlock[hf]"
 
 # Fast dev self‑cert on GPT‑2 small (tiny‑relax; downloads require explicit network)
 INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 INVARLOCK_TINY_RELAX=1 \
-invarlock certify \
+invarlock evaluate \
   --baseline gpt2 \
   --subject  gpt2 \
   --adapter auto \
   --profile dev
 ```
 
-This produces `reports/.../evaluation.cert.json` with paired metrics
+This produces `reports/.../evaluation.report.json` with paired metrics
 (ppl/accuracy), structural deltas, spectral/RMT stats, variance‑estimator
 provenance, seeds/hashes, pairing metrics, and a policy digest.
 
 > **Calibration note:** tier thresholds and window sizes are piloted on GPT‑2 small
 > and BERT base (see `docs/assurance/09-tier-v1-calibration.md`). For
-> calibrated Balanced/Conservative certs, use the preset‑based CI/Release examples
+> calibrated Balanced/Conservative evaluation reports, use the preset‑based CI/Release examples
 > below. `INVARLOCK_TINY_RELAX` dev runs relax sample‑size floors and are intended
 > only for small smoke tests (not release evidence).
 
@@ -66,8 +66,8 @@ provenance, seeds/hashes, pairing metrics, and a policy digest.
 ## 📚 Docs & Guides
 
 - Quickstart: <https://github.com/invarlock/invarlock/blob/main/docs/user-guide/quickstart.md>
-- Compare & Certify (BYOE): <https://github.com/invarlock/invarlock/blob/main/docs/user-guide/compare-and-certify.md>
-- Reading a Certificate: <https://github.com/invarlock/invarlock/blob/main/docs/user-guide/reading-certificate.md>
+- Compare & Evaluate (BYOE): <https://github.com/invarlock/invarlock/blob/main/docs/user-guide/compare-and-evaluate.md>
+- Reading a report: <https://github.com/invarlock/invarlock/blob/main/docs/user-guide/reading-report.md>
 - CLI reference: <https://github.com/invarlock/invarlock/blob/main/docs/reference/cli.md>
 
 Quick examples (repo presets, CPU; repo clone required for preset paths):
@@ -81,7 +81,7 @@ invarlock doctor --config configs/presets/causal_lm/wikitext2_512.yaml --json
 
 # Calibrated GPT‑2 small (recommended starting point; repo preset)
 INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 \
-invarlock certify \
+invarlock evaluate \
   --baseline gpt2 \
   --subject  gpt2 \
   --adapter auto \
@@ -90,7 +90,7 @@ invarlock certify \
 
 # Tiny causal LM smoke (out‑of‑calibration, dev‑only)
 INVARLOCK_ALLOW_NETWORK=1 \
-invarlock certify \
+invarlock evaluate \
   --baseline hf:sshleifer/tiny-gpt2 \
   --subject  hf:sshleifer/tiny-gpt2 \
   --profile dev
@@ -99,7 +99,7 @@ invarlock certify \
 Notes:
 
 - Presets and scripts live in this repo (`configs/`, `scripts/`) and are not
-  shipped in wheels. Use flag‑only `certify` when installing from PyPI, or clone
+  shipped in wheels. Use flag‑only `evaluate` when installing from PyPI, or clone
   this repo to use presets and the matrix script.
 - `python -m invarlock` works the same as `invarlock`.
 - InvarLock runs offline by default; enable network per command with `INVARLOCK_ALLOW_NETWORK=1` when fetching.
@@ -121,7 +121,7 @@ pip install "invarlock[dev]"          # dev tooling (ruff, pytest, mkdocs)
 ```
 
 > Minimal core installs with `pip install invarlock`. The OSS core is edit‑agnostic
-> (BYOE): supply baseline and subject checkpoints and run Compare & Certify. A
+> (BYOE): supply baseline and subject checkpoints and run Compare & Evaluate. A
 > small built‑in edit, `quant_rtn`, is provided for CI/quickstart demos only;
 > optional extras (e.g., `gptq`, `awq`, `gpu`) are loaders/runtimes, not edit
 > pipelines. Core installs do not pull in torch/transformers; those are only
@@ -143,7 +143,7 @@ Install extras with: pip install "invarlock[hf]" or "invarlock[adapters]".
 ```
 
 If you see this, install an appropriate extra (for example, `pip install "invarlock[hf]"`)
-before running `invarlock run` or `invarlock certify` with HF adapters.
+before running `invarlock run` or `invarlock evaluate` with HF adapters.
 
 ### Network Access
 
@@ -151,7 +151,7 @@ before running `invarlock run` or `invarlock certify` with HF adapters.
   command) when you need to download models or datasets:
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 invarlock certify \
+INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate \
   --baseline gpt2 \
   --subject  gpt2 \
   --adapter auto \
@@ -226,10 +226,10 @@ needed (e.g., `CUDA_VISIBLE_DEVICES`).
   3. **RMT** (ε-band on outliers; monitor or gate per tier)
   4. **Variance (VE)** (predictive paired ΔlogNLL gate; tiered sidedness)
 
-- **Evaluation Certificate (schema v1, PM‑only)**: Primary Metric (ppl or
+- **Evaluation Report (schema v1, PM‑only)**: Primary Metric (ppl or
   accuracy) with paired statistics, structural deltas, spectral/RMT stats, VE
   provenance, seeds/hashes, pairing metrics, and **policy digest**. Canonical
-  artifact: `reports/.../evaluation.cert.json`.
+  artifact: `reports/.../evaluation.report.json`.
 
 **Scope (what InvarLock does / does not do):**
 
@@ -238,7 +238,7 @@ needed (e.g., `CUDA_VISIBLE_DEVICES`).
 - It focuses on **paired primary metrics** (ppl/accuracy) plus structural and
   guard telemetry (invariants, spectral, RMT, variance) for those edits.
 - It **does not** claim to solve content‑safety problems (toxicity, bias,
-  jailbreaks) or alignment in general, and it does not certify arbitrary
+  jailbreaks) or alignment in general, and it does not evaluate arbitrary
   training changes or new datasets.
 - It is calibrated and tested on Linux/macOS environments using the HF/PyTorch
   stack described in the docs; native Windows is not supported.
@@ -314,7 +314,7 @@ guards:
 ## ✂️ Edits & Plugins
 
 - **Quant RTN** (built‑in): INT8 RTN, per‑channel, group size, percentile clamp
-- **Compare & Certify (BYOE, recommended)**: Bring your baseline + subject checkpoints and certify with InvarLock
+- **Compare & Evaluate (BYOE, recommended)**: Bring your baseline + subject checkpoints and evaluate with InvarLock
 - **Plugins (optional)**: Adapters and guards via entry points. Adapters extend
   model loading/inference (e.g., GPTQ/AWQ formats); plugins do not add edit
   algorithms beyond RTN. List components with:
@@ -358,7 +358,7 @@ dataset:
   final_n: 64
   seed: 42
 edit:
-  # Optional: built-in quant demo. Omit for Compare & Certify/BYOE.
+  # Optional: built-in quant demo. Omit for Compare & Evaluate/BYOE.
   name: quant_rtn
   plan:
     bitwidth: 8
@@ -416,8 +416,8 @@ invarlock/
 │  │  ├─ edits/              # quant_rtn
 │  │  ├─ guards/             # invariants, spectral, rmt, variance
 │  │  ├─ eval/               # evaluation metrics and helpers
-│  │  ├─ reporting/          # report assembly, certificate generation/validation
-│  │  ├─ assurance/          # assurance surface aggregating cert helpers
+│  │  ├─ reporting/          # report assembly, report generation/validation
+│  │  ├─ assurance/          # assurance surface aggregating report helpers
 │  │  ├─ plugins/            # built-in example plugins
 │  │  └─ observability/      # monitoring/metrics/tracing wrappers
 ├─ configs/                  # presets (repo‑only; clone to use)
@@ -434,8 +434,8 @@ Note: The package exposes a single import namespace (`invarlock.*`). Presets/scr
 
 - User Guide: <https://github.com/invarlock/invarlock/blob/main/docs/user-guide/getting-started.md>
 - Quickstart: <https://github.com/invarlock/invarlock/blob/main/docs/user-guide/quickstart.md>
-- Compare & Certify (BYOE): <https://github.com/invarlock/invarlock/blob/main/docs/user-guide/compare-and-certify.md>
-- Reading a Certificate: <https://github.com/invarlock/invarlock/blob/main/docs/user-guide/reading-certificate.md>
+- Compare & Evaluate (BYOE): <https://github.com/invarlock/invarlock/blob/main/docs/user-guide/compare-and-evaluate.md>
+- Reading a report: <https://github.com/invarlock/invarlock/blob/main/docs/user-guide/reading-report.md>
 - Assurance (proof notes): <https://github.com/invarlock/invarlock/tree/main/docs/assurance>
   - eval math, spectral FPR, RMT ε, VE gate power, determinism
 - Config Schema: <https://github.com/invarlock/invarlock/blob/main/docs/reference/config-schema.md>
@@ -462,7 +462,7 @@ Add `INCLUDE_MEASURED_CLS=1` to include a measured classification step (requires
 
 ## 🧪 Determinism & Provenance
 
-- Seeds: `{python, numpy, torch}` recorded in certs
+- Seeds: `{python, numpy, torch}` recorded in evaluation reports
 - Dataset/tokenizer hashes recorded
 - Paired non-overlapping windows (fail-fast if counts mismatch or pairing < 1.0)
 - Cert math checks: `ppl_ratio.point == exp(mean ΔlogNLL)` and CI from the **same** paired Δ array

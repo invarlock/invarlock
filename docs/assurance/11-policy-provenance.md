@@ -1,11 +1,11 @@
 # Policy Provenance & Digest
 
-> **Plain language:** The certificate embeds the exact policy evaluated and a
+> **Plain language:** The report embeds the exact policy evaluated and a
 > short digest so auditors can recompute and verify there was no silent drift.
 
 ## Resolved Policy → Digest
 
-At runtime, the tier base (Balanced/Conservative/Aggressive) is resolved, guard‑level overrides are applied, and the result is materialized as `resolved_policy` in the certificate.
+At runtime, the tier base (Balanced/Conservative/Aggressive) is resolved, guard‑level overrides are applied, and the result is materialized as `resolved_policy` in the report.
 Additionally, a compact `policy_digest` object captures threshold floors and hysteresis knobs for stable auditing.
 
 - Canonicalization: JSON serialize with sorted keys (standard JSON booleans and numbers; no locale‑specific formatting).
@@ -25,14 +25,14 @@ canonical = json.dumps(
 digest = hashlib.sha256(canonical.encode()).hexdigest()[:16]
 ```
 
-## Provenance (certificate fields)
+## Provenance (report fields)
 
 - `resolved_policy`: per‑guard snapshot used during evaluation
 - `policy_provenance`:
   - `tier` — policy tier name (e.g., `balanced`)
   - `overrides` — ordered list of override paths applied
   - `policy_digest` — short digest of `resolved_policy`
-  - `resolved_at` — timestamp synchronized with certificate generation
+  - `resolved_at` — timestamp synchronized with report generation
 - Convenience mirror: `auto.policy_digest`
  - Thresholds digest and knobs: top‑level `policy_digest` with `{policy_version,tier_policy_name,thresholds_hash,hysteresis,min_effective,changed}`
 
@@ -49,7 +49,7 @@ If the digest does not match, treat the evidence as stale or tampered and rerun 
 - The digest guards against silent changes to thresholds/caps between runs.
 - Keep tier tables and schema pages in sync when policy values change.
 
-### Example (certificate fragment)
+### Example (report fragment)
 
 ```json
 {

@@ -66,16 +66,16 @@ Confirm in `report.meta.device`, `report.meta.auto`, and `report.data.preview_n/
 **Worked example**: if YAML sets `preview_n: 64` and you run `--profile ci`, the
 report shows `preview_n=200` because the CI profile overrides the YAML counts.
 
-### Config → Report → Certificate → Verify
+### Config → Report → report → Verify
 
-| Config area | Report fields | Certificate fields | Verify gates |
+| Config area | Report fields | report fields | Verify gates |
 | --- | --- | --- | --- |
-| `model.*` | `report.meta.{model_id,adapter,device}` | `certificate.meta.{model_id,adapter,device}` | Schema only. |
-| `dataset.*` | `report.data.*`, `report.dataset.windows.stats`, `report.provenance.provider_digest` | `certificate.dataset.*`, `certificate.provenance.provider_digest` | Pairing + provider digest checks (CI/Release). |
-| `eval.*` | `report.metrics.primary_metric` | `certificate.primary_metric`, `validation.*`, `primary_metric_tail` | Ratio/counts + drift band (CI/Release). |
-| `guards.*` | `report.guards[]`, `report.guard_overhead` | `certificate.spectral/rmt/variance`, `resolved_policy.*`, `guard_overhead` | Measurement contracts + overhead (Release). |
-| `auto.*` / `--profile` | `report.meta.auto`, `report.context.profile` | `certificate.auto`, `certificate.meta.profile` | Schema only. |
-| `output.*` | `report.artifacts.*` | `certificate.artifacts.*` | Schema only. |
+| `model.*` | `report.meta.{model_id,adapter,device}` | `report.meta.{model_id,adapter,device}` | Schema only. |
+| `dataset.*` | `report.data.*`, `report.dataset.windows.stats`, `report.provenance.provider_digest` | `report.dataset.*`, `report.provenance.provider_digest` | Pairing + provider digest checks (CI/Release). |
+| `eval.*` | `report.metrics.primary_metric` | `report.primary_metric`, `validation.*`, `primary_metric_tail` | Ratio/counts + drift band (CI/Release). |
+| `guards.*` | `report.guards[]`, `report.guard_overhead` | `report.spectral/rmt/variance`, `resolved_policy.*`, `guard_overhead` | Measurement contracts + overhead (Release). |
+| `auto.*` / `--profile` | `report.meta.auto`, `report.context.profile` | `report.auto`, `report.meta.profile` | Schema only. |
+| `output.*` | `report.artifacts.*` | `report.artifacts.*` | Schema only. |
 
 ## Reference
 
@@ -193,7 +193,7 @@ eval:
 
 - `report.meta.config` captures the `RunConfig` applied by the runner.
 - `report.context` records `profile`/`auto` context used for tier resolution.
-- Certificates include resolved policy snapshots under `resolved_policy.*`.
+- reports include resolved policy snapshots under `resolved_policy.*`.
 
 ## Related Documentation
 

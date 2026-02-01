@@ -26,13 +26,13 @@ dataset:
   seed: 42
 ```
 
-For Compare & Certify, reuse the same `dataset` block in baseline and subject runs.
+For Compare & evaluate, reuse the same `dataset` block in baseline and subject runs.
 
 ## Concepts
 
 - **Preview vs final windows**: the runner computes the primary metric on two
-  deterministic splits; counts are recorded in reports and certificates.
-- **Pairing**: `invarlock certify` requires baseline window evidence to pair
+  deterministic splits; counts are recorded in reports and reports.
+- **Pairing**: `invarlock evaluate` requires baseline window evidence to pair
   windows. Missing/invalid evidence fails closed in CI/Release profiles.
 - **Offline-first**: downloads are opt-in via `INVARLOCK_ALLOW_NETWORK=1`. Cached
   datasets can be enforced via `HF_DATASETS_OFFLINE=1`.
@@ -69,25 +69,25 @@ Counts mismatches are enforced via `coverage.preview.used`,
 
 | Provider | Required keys | Evidence fields (report/cert) |
 | --- | --- | --- |
-| `wikitext2` | `provider`, `seq_len`, `stride`, `preview_n`, `final_n` | `report.data.*` + `certificate.dataset.windows.stats` |
-| `synthetic` | `provider`, `seq_len`, `preview_n`, `final_n` | `report.data.*` + `certificate.dataset.windows.stats` |
-| `hf_text` | `dataset_name`, `text_field` | `report.data.*` + `certificate.dataset.windows.stats` |
-| `local_jsonl` | `file`/`path`/`data_files`, `text_field` | `report.data.*` + `certificate.dataset.windows.stats` |
-| `hf_seq2seq` | `dataset_name`, `src_field`, `tgt_field` | `report.data.*` + `certificate.dataset.windows.stats` |
-| `local_jsonl_pairs` | `file`/`path`/`data_files`, `src_field`, `tgt_field` | `report.data.*` + `certificate.dataset.windows.stats` |
-| `seq2seq` | optional `n`, `src_len`, `tgt_len` | `report.data.*` + `certificate.dataset.windows.stats` |
+| `wikitext2` | `provider`, `seq_len`, `stride`, `preview_n`, `final_n` | `report.data.*` + `report.dataset.windows.stats` |
+| `synthetic` | `provider`, `seq_len`, `preview_n`, `final_n` | `report.data.*` + `report.dataset.windows.stats` |
+| `hf_text` | `dataset_name`, `text_field` | `report.data.*` + `report.dataset.windows.stats` |
+| `local_jsonl` | `file`/`path`/`data_files`, `text_field` | `report.data.*` + `report.dataset.windows.stats` |
+| `hf_seq2seq` | `dataset_name`, `src_field`, `tgt_field` | `report.data.*` + `report.dataset.windows.stats` |
+| `local_jsonl_pairs` | `file`/`path`/`data_files`, `src_field`, `tgt_field` | `report.data.*` + `report.dataset.windows.stats` |
+| `seq2seq` | optional `n`, `src_len`, `tgt_len` | `report.data.*` + `report.dataset.windows.stats` |
 
 Provider-specific config fields (dataset name, paths, fields) are recorded under
 `report.data` when available.
 
 ### Pairing evidence matrix
 
-| Config keys | Report fields | Certificate fields | Verify gate |
+| Config keys | Report fields | report fields | Verify gate |
 | --- | --- | --- | --- |
-| `dataset.provider`, `seq_len`, `stride`, `split` | `report.data.{dataset,seq_len,stride,split}` | `certificate.dataset.{provider,seq_len,windows}` | Schema + pairing context. |
-| `dataset.preview_n/final_n` | `report.data.{preview_n,final_n}`, `report.evaluation_windows` | `certificate.dataset.windows.{preview,final}` | Pairing + count checks. |
-| Pairing stats (derived) | `report.dataset.windows.stats` | `certificate.dataset.windows.stats` | `_validate_pairing` + `_validate_counts`. |
-| Provider digest | `report.provenance.provider_digest` | `certificate.provenance.provider_digest` | Required in CI/Release. |
+| `dataset.provider`, `seq_len`, `stride`, `split` | `report.data.{dataset,seq_len,stride,split}` | `report.dataset.{provider,seq_len,windows}` | Schema + pairing context. |
+| `dataset.preview_n/final_n` | `report.data.{preview_n,final_n}`, `report.evaluation_windows` | `report.dataset.windows.{preview,final}` | Pairing + count checks. |
+| Pairing stats (derived) | `report.dataset.windows.stats` | `report.dataset.windows.stats` | `_validate_pairing` + `_validate_counts`. |
+| Provider digest | `report.provenance.provider_digest` | `report.provenance.provider_digest` | Required in CI/Release. |
 
 ### HF text provider example
 
@@ -143,13 +143,13 @@ dataset:
 
 - `report.data.*` stores provider name, split, and window counts.
 - `report.evaluation_windows` stores preview/final token windows.
-- Certificates preserve dataset metadata and window pairing stats under `dataset.*`.
+- reports preserve dataset metadata and window pairing stats under `dataset.*`.
 
 ## Related Documentation
 
 - [Configuration Schema](config-schema.md)
 - [Environment Variables](env-vars.md)
 - [CLI Reference](cli.md)
-- [Certificates](certificates.md) — Schema, telemetry, and HTML export
+- [reports](reports.md) — Schema, telemetry, and HTML export
 - [Coverage & Pairing](../assurance/02-coverage-and-pairing.md) — Window requirements and pairing math
 - [Bring Your Own Data](../user-guide/bring-your-own-data.md) — Custom dataset workflows
