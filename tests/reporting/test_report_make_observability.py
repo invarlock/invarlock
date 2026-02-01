@@ -3,7 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 
 from invarlock.reporting import report_builder as cert
-from tests.reporting.test_certificate_full_context import _rich_run_report
+from tests.reporting.test_report_full_context import _rich_run_report
 
 
 def test_make_certificate_marks_tiny_relax(monkeypatch):

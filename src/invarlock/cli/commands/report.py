@@ -163,6 +163,11 @@ def _generate_reports(
             output_dir = output
 
         # Determine formats
+        allowed_formats = {"json", "md", "markdown", "html", "report", "all"}
+        if format not in allowed_formats:
+            _event("FAIL", f"Unknown --format '{format}'", emoji="❌")
+            raise typer.Exit(2)
+
         if format == "md":
             format = "markdown"
         if format == "all":
