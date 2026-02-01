@@ -28,6 +28,13 @@ def test_invarlock_help_layout_and_exit_codes():
         assert name in out
 
 
+def test_invarlock_version_option():
+    runner = CliRunner()
+    result = runner.invoke(app, ["--version"])
+    assert result.exit_code == 0
+    assert "InvarLock" in result.stdout
+
+
 def test_report_group_help_lists_subcommands():
     runner = CliRunner()
     result = runner.invoke(app, ["report", "--help"])
