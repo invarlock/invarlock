@@ -166,6 +166,12 @@ def _suppress_noisy_warnings(
         yield
         return
 
+    prev_tf_verbosity = os.environ.get("TRANSFORMERS_VERBOSITY")
+    os.environ["TRANSFORMERS_VERBOSITY"] = "error"
+    transformers_logger = logging.getLogger("transformers")
+    prev_tf_level = transformers_logger.level
+    transformers_logger.setLevel(logging.ERROR)
+
     patterns = [re.compile(p) for p in _NOISY_WARNING_PATTERNS]
     suppressed: list[str] = []
 
@@ -310,6 +316,14 @@ def _suppress_noisy_warnings(
                 handler.removeFilter(log_filter)
             except Exception:
                 pass
+        try:
+            transformers_logger.setLevel(prev_tf_level)
+        except Exception:
+            pass
+        if prev_tf_verbosity is None:
+            os.environ.pop("TRANSFORMERS_VERBOSITY", None)
+        else:
+            os.environ["TRANSFORMERS_VERBOSITY"] = prev_tf_verbosity
         _append_suppressed_warnings()
 
 
@@ -1471,18 +1485,23 @@ def _run_bare_control(
             if snapshot_provenance is not None:
                 snapshot_provenance["reload_path_used"] = True
 
-        bare_report = bare_runner.execute(
-            model=bare_target_model,
-            adapter=adapter,
-            edit=edit_op,
-            guards=[],
-            config=bare_config,
-            calibration_data=calibration_data,
-            auto_config=auto_config,
-            edit_config=runtime_edit_config,
-            preview_n=preview_count,
-            final_n=final_count,
-        )
+        with _suppress_noisy_warnings(
+            profile_normalized,
+            event_path=getattr(run_config, "event_path", None),
+            context={"phase": "guard_overhead_bare"},
+        ):
+            bare_report = bare_runner.execute(
+                model=bare_target_model,
+                adapter=adapter,
+                edit=edit_op,
+                guards=[],
+                config=bare_config,
+                calibration_data=calibration_data,
+                auto_config=auto_config,
+                edit_config=runtime_edit_config,
+                preview_n=preview_count,
+                final_n=final_count,
+            )
     finally:
         if private_model_loaded:
             _free_model_memory(bare_target_model)
@@ -1607,18 +1626,23 @@ def _execute_guarded_run(
     )
     runtime_edit_config.setdefault("emit", True)
 
-    core_report = runner.execute(
-        model=model,
-        adapter=adapter,
-        edit=edit_op,
-        guards=guards,
-        config=run_config,
-        calibration_data=calibration_data,
-        auto_config=auto_config,
-        edit_config=runtime_edit_config,
-        preview_n=preview_count,
-        final_n=final_count,
-    )
+    with _suppress_noisy_warnings(
+        profile_normalized,
+        event_path=getattr(run_config, "event_path", None),
+        context={"phase": "core_runner_execute"},
+    ):
+        core_report = runner.execute(
+            model=model,
+            adapter=adapter,
+            edit=edit_op,
+            guards=guards,
+            config=run_config,
+            calibration_data=calibration_data,
+            auto_config=auto_config,
+            edit_config=runtime_edit_config,
+            preview_n=preview_count,
+            final_n=final_count,
+        )
     return core_report, model
 
 
