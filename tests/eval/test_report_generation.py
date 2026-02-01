@@ -8,7 +8,7 @@ from invarlock.reporting.report import (
     _sanitize_for_json,
     _validate_baseline_or_report,
     save_report,
-    to_certificate,
+    to_evaluation_report,
     to_html,
     to_json,
     to_markdown,
@@ -110,23 +110,23 @@ def test_to_markdown_and_html_single_and_compare():
     assert "Compare HTML" in html2
 
 
-def test_certificate_json_and_markdown_and_save(tmp_path: Path):
+def test_evaluation_report_json_and_markdown_and_save(tmp_path: Path):
     rep = _minimal_report()
     # baseline accepted as RunReport
-    cert_json = to_certificate(rep, rep, format="json")
-    assert json.loads(cert_json)
-    cert_md = to_certificate(rep, rep, format="markdown")
-    assert isinstance(cert_md, str) and len(cert_md) > 0
+    report_json = to_evaluation_report(rep, rep, format="json")
+    assert json.loads(report_json)
+    report_md = to_evaluation_report(rep, rep, format="markdown")
+    assert isinstance(report_md, str) and len(report_md) > 0
 
     # save_report writes files for multiple formats
     out = save_report(
-        rep, tmp_path, formats=["json", "markdown", "html", "cert"], baseline=rep
+        rep, tmp_path, formats=["json", "markdown", "html", "report"], baseline=rep
     )
-    assert {"json", "markdown", "html", "cert", "cert_md"}.issubset(out.keys())
+    assert {"json", "markdown", "html", "report", "report_md"}.issubset(out.keys())
 
-    # cert without baseline raises
+    # report without baseline raises
     with pytest.raises(ValueError):
-        save_report(rep, tmp_path, formats=["cert"], baseline=None)
+        save_report(rep, tmp_path, formats=["report"], baseline=None)
 
 
 def test_validate_baseline_or_report_variants():

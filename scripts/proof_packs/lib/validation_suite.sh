@@ -402,7 +402,7 @@ pack_run_determinism_repeats() {
     local run
     for run in $(seq 1 "${repeats}"); do
         run_invarlock_certify "${edit_path}" "${baseline_path}" "${det_dir}" "repeat_${run}" "${preset_dir}" "${model_name}" "0" || return 1
-        local cert_path="${det_dir}/repeat_${run}/evaluation.cert.json"
+        local cert_path="${det_dir}/repeat_${run}/evaluation.report.json"
         if [[ -f "${cert_path}" ]]; then
             certs+=("${cert_path}")
         fi

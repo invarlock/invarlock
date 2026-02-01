@@ -9,7 +9,7 @@ evaluation report. Optionally, pass `--edit-config` to run the built‑in quant_
 Steps:
   1) Baseline (no-op edit) on baseline model
   2) Subject (no-op or provided edit config) on subject model with --baseline pairing
-  3) Emit evaluation report via `invarlock report --format cert`
+  3) Emit evaluation report via `invarlock report --format report`
 """
 
 from __future__ import annotations
@@ -133,7 +133,7 @@ def _print_quiet_summary(
     edited: str,
     profile: str,
 ) -> None:
-    report_path = report_out / "evaluation.cert.json"
+    report_path = report_out / "evaluation.report.json"
     console.print(f"INVARLOCK v{INVARLOCK_VERSION} · EVALUATE")
     console.print(f"Baseline: {source} -> Subject: {edited} · Profile: {profile}")
     if not report_path.exists():
@@ -816,7 +816,7 @@ def evaluate_command(
                 ):
                     report_kwargs = {
                         "run": str(edited_report),
-                        "format": "cert",
+                        "format": "report",
                         "baseline": str(baseline_report_path),
                         "output": report_out,
                         "style": output_style.name,

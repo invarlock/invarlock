@@ -143,7 +143,7 @@ def test_certify_byod_local_quick(tmp_path: Path, monkeypatch) -> None:
     )
     assert r2.exit_code == 0, r2.stdout
 
-    # Generate certificate from runs
+    # Generate evaluation report from runs
     # Each run creates a timestamped subdirectory; pick the only subdir
     def _pick_run_dir(root: Path) -> Path:
         subs = [p for p in root.iterdir() if p.is_dir()]
@@ -161,20 +161,20 @@ def test_certify_byod_local_quick(tmp_path: Path, monkeypatch) -> None:
             "--run",
             str(rep_subj),
             "--format",
-            "cert",
+            "report",
             "--baseline",
             str(rep_base),
             "--output",
-            str(tmp_path / "cert"),
+            str(tmp_path / "reports"),
         ],
     )
     assert rcert.exit_code == 0, rcert.stdout
 
     # Assert artifacts exist and provider digest recorded
-    cert_dir = tmp_path / "cert"
-    assert (cert_dir / "evaluation.cert.json").exists()
-    assert (cert_dir / "evaluation_certificate.md").exists()
-    assert (cert_dir / "manifest.json").exists()
-    cert = json.loads((cert_dir / "evaluation.cert.json").read_text("utf-8"))
-    prov = cert.get("provenance") or {}
+    report_dir = tmp_path / "reports"
+    assert (report_dir / "evaluation.report.json").exists()
+    assert (report_dir / "evaluation_report.md").exists()
+    assert (report_dir / "manifest.json").exists()
+    report = json.loads((report_dir / "evaluation.report.json").read_text("utf-8"))
+    prov = report.get("provenance") or {}
     assert isinstance(prov.get("provider_digest"), dict) and prov["provider_digest"]

@@ -292,7 +292,7 @@ _ensure_certify_baseline_report() {
     adapter_name="$(_resolve_invarlock_adapter "${abs_baseline_path}" 2>/dev/null || true)"
     adapter_name="$(printf '%s' "${adapter_name}" | xargs)"
     if [[ -z "${adapter_name}" ]]; then
-        # Fallback for odd environments; must match what invarlock certify will resolve.
+        # Fallback for odd environments; must match what invarlock evaluate will resolve.
         adapter_name="hf_causal"
     fi
 
@@ -797,7 +797,7 @@ task_calibration_run() {
     fi
 
     # Check if already done
-    if [[ -f "${run_dir}/baseline_report.json" || -f "${run_dir}/evaluation.cert.json" ]]; then
+    if [[ -f "${run_dir}/baseline_report.json" || -f "${run_dir}/evaluation.report.json" ]]; then
         echo "  Calibration run ${run_num} already exists, skipping" >> "${log_file}"
         return 0
     fi
@@ -980,7 +980,7 @@ YAML_EOF
         cp "${report_file}" "${run_dir}/baseline_report.json" 2>/dev/null || true
         _cmd_python "${SCRIPT_DIR}/../python/certificate_from_report.py" \
             --report "${report_file}" \
-            --out "${run_dir}/evaluation.cert.json" >> "${log_file}" 2>&1 || true
+            --out "${run_dir}/evaluation.report.json" >> "${log_file}" 2>&1 || true
     fi
 
     return ${exit_code}
@@ -1167,7 +1167,7 @@ task_create_edits_batch() {
 
 # ============ TASK: CERTIFY_EDIT ============
 
-# Run InvarLock certify on edited model
+# Run InvarLock evaluate on edited model
 # Usage: task_certify_edit <model_name> <gpu_id> <edit_spec> <version> <run_num> <output_dir> <log_file>
 task_certify_edit() {
     local model_name="$1"
@@ -1205,7 +1205,7 @@ task_certify_edit() {
 
     local edit_path="${model_output_dir}/models/${edit_dir_name}"
     local cert_dir="${model_output_dir}/certificates/${edit_dir_name}/run_${run_num}"
-    local cert_file="${cert_dir}/evaluation.cert.json"
+    local cert_file="${cert_dir}/evaluation.report.json"
 
     if [[ ! -d "${edit_path}" ]]; then
         echo "ERROR: Edit model not found: ${edit_path}" >> "${log_file}"
@@ -1231,7 +1231,7 @@ task_certify_edit() {
     local abs_log_file
     abs_log_file="$(cd "$(dirname "${log_file}")" && pwd)/$(basename "${log_file}")"
     cert_dir="${abs_cert_dir}"
-    cert_file="${cert_dir}/evaluation.cert.json"
+    cert_file="${cert_dir}/evaluation.report.json"
     log_file="${abs_log_file}"
 
     # Get model size for config and profile decision
@@ -1409,7 +1409,7 @@ PRESET_YAML
     local exit_code=0
     (
         cd "${work_dir}" || exit 1
-        env "${extra_env[@]}" invarlock certify \
+        env "${extra_env[@]}" invarlock evaluate \
             --source "${abs_baseline_path}" \
             "${baseline_report_args[@]}" \
             --edited "${abs_edit_path}" \
@@ -1417,14 +1417,14 @@ PRESET_YAML
             --profile "${profile_flag}" \
             --tier "${tier}" \
             --out "${cert_dir}" \
-            --cert-out "${cert_dir}" \
+            --report-out "${cert_dir}" \
             --preset "${abs_preset_file}" >> "${log_file}" 2>&1
     ) || exit_code=$?
 
     # Find and copy certificate (only the canonical cert)
     if [[ ! -f "${cert_file}" ]]; then
         local found_cert
-        found_cert=$(find "${cert_dir}" -name "evaluation.cert.json" -type f 2>/dev/null | head -1)
+        found_cert=$(find "${cert_dir}" -name "evaluation.report.json" -type f 2>/dev/null | head -1)
         if [[ -n "${found_cert}" && -f "${found_cert}" && "${found_cert}" != "${cert_file}" ]]; then
             cp "${found_cert}" "${cert_file}" 2>/dev/null || true
         fi
@@ -1492,7 +1492,7 @@ task_certify_error() {
     local model_id=$(cat "${model_output_dir}/.model_id" 2>/dev/null || true)
     local error_path="${model_output_dir}/models/error_${error_type}"
     local cert_dir="${model_output_dir}/certificates/errors/${error_type}"
-    local cert_file="${cert_dir}/evaluation.cert.json"
+    local cert_file="${cert_dir}/evaluation.report.json"
     local preset_dir="${output_dir}/presets"
 
     if [[ -z "${baseline_path}" || ! -d "${baseline_path}" ]]; then
@@ -1532,7 +1532,7 @@ task_certify_error() {
     local abs_log_file
     abs_log_file="$(cd "$(dirname "${log_file}")" && pwd)/$(basename "${log_file}")"
     cert_dir="${abs_cert_dir}"
-    cert_file="${cert_dir}/evaluation.cert.json"
+    cert_file="${cert_dir}/evaluation.report.json"
     log_file="${abs_log_file}"
 
     # Get model size for config and profile decision
@@ -1689,21 +1689,21 @@ PRESET_YAML
     local exit_code=0
     (
         cd "${work_dir}" || exit 1
-        env "${extra_env[@]}" invarlock certify \
+        env "${extra_env[@]}" invarlock evaluate \
             --source "${abs_baseline_path}" \
             "${baseline_report_args[@]}" \
             --edited "${abs_error_path}" \
             --profile "${profile_flag}" \
             --tier "${tier}" \
             --out "${cert_dir}" \
-            --cert-out "${cert_dir}" \
+            --report-out "${cert_dir}" \
             --preset "${abs_preset_file}" >> "${log_file}" 2>&1
     ) || exit_code=$?
 
     # Find and copy certificate (only the canonical cert)
     if [[ ! -f "${cert_file}" ]]; then
         local found_cert
-        found_cert=$(find "${cert_dir}" -name "evaluation.cert.json" -type f 2>/dev/null | head -1)
+        found_cert=$(find "${cert_dir}" -name "evaluation.report.json" -type f 2>/dev/null | head -1)
         if [[ -n "${found_cert}" && -f "${found_cert}" && "${found_cert}" != "${cert_file}" ]]; then
             cp "${found_cert}" "${cert_file}" 2>/dev/null || true
         fi

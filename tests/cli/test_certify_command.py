@@ -85,7 +85,7 @@ def test_certify_orchestrates_runs_and_cert(monkeypatch, tmp_path):
 
     # Report uses the edited run and baseline
     rep = calls["reports"][0]
-    assert rep["format"] == "cert"
+    assert rep["format"] == "report"
     assert Path(rep["output"]).name == "reports"
     assert rep["baseline"] is not None and rep["run"] is not None
 
@@ -287,7 +287,7 @@ def test_certify_quiet_summary_emits_status(monkeypatch, tmp_path, capsys):
     def fake_report(**kwargs):
         output_dir = Path(kwargs.get("output"))
         output_dir.mkdir(parents=True, exist_ok=True)
-        cert = {
+        report = {
             "primary_metric": {"ratio_vs_baseline": 1.01},
             "validation": {
                 "primary_metric_acceptable": True,
@@ -297,8 +297,8 @@ def test_certify_quiet_summary_emits_status(monkeypatch, tmp_path, capsys):
                 "rmt_stable": True,
             },
         }
-        (output_dir / "evaluation.cert.json").write_text(
-            json.dumps(cert), encoding="utf-8"
+        (output_dir / "evaluation.report.json").write_text(
+            json.dumps(report), encoding="utf-8"
         )
 
     import invarlock.cli.commands.run as run_mod

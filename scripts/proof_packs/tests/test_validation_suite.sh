@@ -160,7 +160,7 @@ test_pack_validation_run_determinism_repeats_writes_summary() {
         fi
         count=$((count + 1))
         echo "${count}" > "${count_file}"
-        cat > "${run_dir}/evaluation.cert.json" << EOF
+        cat > "${run_dir}/evaluation.report.json" << EOF
 {"verdict": {"primary_metric_ratio": ${count}.01}}
 EOF
     }
@@ -1064,7 +1064,7 @@ test_pack_validation_run_invarlock_certify_preset_optional_and_cert_copy_paths()
     rm -f "${TEST_TMPDIR}/fixtures/invarlock.create_cert"
     local cert_dir="${TEST_TMPDIR}/certs/run_alt/cert/nested"
     mkdir -p "${cert_dir}"
-    printf '{"ok":true}\n' > "${cert_dir}/evaluation.cert.json"
+    printf '{"ok":true}\n' > "${cert_dir}/evaluation.report.json"
     MODEL_SIZE_RETURN="7"
     run_invarlock_certify "subject" "baseline" "${TEST_TMPDIR}/certs" "run_alt" "${preset_dir}" "model" "0"
 }

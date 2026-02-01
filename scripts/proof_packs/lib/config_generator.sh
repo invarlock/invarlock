@@ -181,7 +181,7 @@ run_single_calibration() {
         cp "${report_file}" "${run_dir}/baseline_report.json" 2>/dev/null || true
         python3 "${_PACK_CONFIG_GENERATOR_PY_DIR}/certificate_from_report.py" \
             --report "${report_file}" \
-            --out "${run_dir}/evaluation.cert.json" >> "${log_file}" 2>&1 || true
+            --out "${run_dir}/evaluation.report.json" >> "${log_file}" 2>&1 || true
     fi
 
     return ${exit_code}
@@ -294,7 +294,7 @@ run_invarlock_certify() {
         "--profile" "ci"
         "--tier" "${INVARLOCK_TIER}"
         "--out" "${run_dir}"
-        "--cert-out" "${cert_dir}"
+        "--report-out" "${cert_dir}"
     )
 
     if [[ -n "${calibrated_preset}" && -f "${calibrated_preset}" ]]; then
@@ -317,14 +317,14 @@ run_invarlock_certify() {
     fi
 
     # Copy certificate to standard location (only the canonical cert)
-    local cert_file="${cert_dir}/evaluation.cert.json"
+    local cert_file="${cert_dir}/evaluation.report.json"
     if [[ -f "${cert_file}" ]]; then
-        cp "${cert_file}" "${run_dir}/evaluation.cert.json" 2>/dev/null || true
+        cp "${cert_file}" "${run_dir}/evaluation.report.json" 2>/dev/null || true
     else
         local alt_cert
-        alt_cert=$(find "${cert_dir}" -name "evaluation.cert.json" -type f 2>/dev/null | head -1)
+        alt_cert=$(find "${cert_dir}" -name "evaluation.report.json" -type f 2>/dev/null | head -1)
         if [[ -n "${alt_cert}" && -f "${alt_cert}" ]]; then
-            cp "${alt_cert}" "${run_dir}/evaluation.cert.json" 2>/dev/null || true
+            cp "${alt_cert}" "${run_dir}/evaluation.report.json" 2>/dev/null || true
         fi
     fi
 

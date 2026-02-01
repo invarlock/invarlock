@@ -68,7 +68,7 @@ def test_generate_reports_certificate_validation_block(monkeypatch):
     monkeypatch.setattr(
         report_lib,
         "save_report",
-        lambda *_, **__: {"cert": "evaluation.cert.json"},
+        lambda *_, **__: {"report": "evaluation.report.json"},
         raising=False,
     )
     monkeypatch.setattr(
@@ -77,9 +77,7 @@ def test_generate_reports_certificate_validation_block(monkeypatch):
         lambda *_, **__: {"validation": {"overall": True}},
         raising=False,
     )
-    monkeypatch.setattr(
-        cert_mod, "validate_report", lambda cert: True, raising=False
-    )
+    monkeypatch.setattr(cert_mod, "validate_report", lambda cert: True, raising=False)
 
     block = {
         "overall_pass": True,
@@ -99,7 +97,7 @@ def test_generate_reports_certificate_validation_block(monkeypatch):
 
     report_mod.report_command(
         run="run.json",
-        format="cert",
+        format="report",
         compare=None,
         baseline="baseline.json",
         output="out",
@@ -113,12 +111,12 @@ def test_generate_reports_certificate_validation_error(monkeypatch):
     monkeypatch.setattr(
         report_lib,
         "save_report",
-        lambda *_, **__: {"cert": "evaluation.cert.json"},
+        lambda *_, **__: {"report": "evaluation.report.json"},
         raising=False,
     )
 
     def _boom(*_args, **_kwargs):
-        raise RuntimeError("bad cert")
+        raise RuntimeError("bad report")
 
     monkeypatch.setattr(cert_mod, "make_report", _boom, raising=False)
     monkeypatch.setattr(
@@ -128,7 +126,7 @@ def test_generate_reports_certificate_validation_error(monkeypatch):
     with pytest.raises(typer.Exit) as exc:
         report_mod.report_command(
             run="run.json",
-            format="cert",
+            format="report",
             compare=None,
             baseline="baseline.json",
             output=None,
@@ -137,8 +135,8 @@ def test_generate_reports_certificate_validation_error(monkeypatch):
 
 
 def test_report_validate_success(monkeypatch, tmp_path):
-    cert = tmp_path / "cert.json"
-    cert.write_text(json.dumps({"ok": True}), encoding="utf-8")
+    report = tmp_path / "report.json"
+    report.write_text(json.dumps({"ok": True}), encoding="utf-8")
     monkeypatch.setattr(
         report_mod, "console", type("C", (), {"print": lambda *_: None})()
     )
@@ -148,12 +146,12 @@ def test_report_validate_success(monkeypatch, tmp_path):
         lambda payload: True,
         raising=False,
     )
-    report_mod.report_validate(report=str(cert))
+    report_mod.report_validate(report=str(report))
 
 
 def test_report_validate_schema_failure(monkeypatch, tmp_path):
-    cert = tmp_path / "cert.json"
-    cert.write_text("{}", encoding="utf-8")
+    report = tmp_path / "report.json"
+    report.write_text("{}", encoding="utf-8")
     monkeypatch.setattr(
         report_mod, "console", type("C", (), {"print": lambda *_: None})()
     )
@@ -164,13 +162,13 @@ def test_report_validate_schema_failure(monkeypatch, tmp_path):
         raising=False,
     )
     with pytest.raises(typer.Exit) as exc:
-        report_mod.report_validate(report=str(cert))
+        report_mod.report_validate(report=str(report))
     assert exc.value.exit_code == 2
 
 
 def test_report_validate_value_error(monkeypatch, tmp_path):
-    cert = tmp_path / "cert.json"
-    cert.write_text("{}", encoding="utf-8")
+    report = tmp_path / "report.json"
+    report.write_text("{}", encoding="utf-8")
     monkeypatch.setattr(
         report_mod, "console", type("C", (), {"print": lambda *_: None})()
     )
@@ -180,13 +178,13 @@ def test_report_validate_value_error(monkeypatch, tmp_path):
 
     monkeypatch.setattr(cert_mod, "validate_report", _raise_val, raising=False)
     with pytest.raises(typer.Exit) as exc:
-        report_mod.report_validate(report=str(cert))
+        report_mod.report_validate(report=str(report))
     assert exc.value.exit_code == 2
 
 
 def test_report_validate_generic_error(monkeypatch, tmp_path):
-    cert = tmp_path / "cert.json"
-    cert.write_text("{}", encoding="utf-8")
+    report = tmp_path / "report.json"
+    report.write_text("{}", encoding="utf-8")
     monkeypatch.setattr(
         report_mod, "console", type("C", (), {"print": lambda *_: None})()
     )
@@ -196,13 +194,13 @@ def test_report_validate_generic_error(monkeypatch, tmp_path):
 
     monkeypatch.setattr(cert_mod, "validate_report", _raise, raising=False)
     with pytest.raises(typer.Exit) as exc:
-        report_mod.report_validate(report=str(cert))
+        report_mod.report_validate(report=str(report))
     assert exc.value.exit_code == 1
 
 
 def test_report_validate_read_failure(monkeypatch, tmp_path):
-    cert = tmp_path / "cert.json"
-    cert.write_text("{}", encoding="utf-8")
+    report = tmp_path / "report.json"
+    report.write_text("{}", encoding="utf-8")
     monkeypatch.setattr(
         report_mod, "console", type("C", (), {"print": lambda *_: None})()
     )
@@ -213,5 +211,5 @@ def test_report_validate_read_failure(monkeypatch, tmp_path):
         raising=False,
     )
     with pytest.raises(typer.Exit) as exc:
-        report_mod.report_validate(report=str(cert))
+        report_mod.report_validate(report=str(report))
     assert exc.value.exit_code == 1

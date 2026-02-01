@@ -63,8 +63,8 @@ def _report_and_base():
 def test_save_report_cert_without_evidence(tmp_path: Path):
     rep, base = _report_and_base()
     out = save_report(
-        rep, tmp_path, formats=["cert"], baseline=base, filename_prefix="r"
+        rep, tmp_path, formats=["report"], baseline=base, filename_prefix="r"
     )
-    assert out["cert"].exists() and out["cert_md"].exists()
+    assert out["report"].exists() and out["report_md"].exists()
     # No debug env flag → evidence file is optional and typically absent
     assert not (tmp_path / "guards_evidence.json").exists()

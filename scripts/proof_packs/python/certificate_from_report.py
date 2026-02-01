@@ -8,7 +8,7 @@ from pathlib import Path
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Generate evaluation.cert.json from report.json."
+        description="Generate evaluation.report.json from report.json."
     )
     parser.add_argument("--report", required=True)
     parser.add_argument("--out", required=True)
@@ -18,28 +18,28 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     report_path = Path(args.report)
-    cert_path = Path(args.out)
+    out_path = Path(args.out)
 
     try:
-        from invarlock.reporting.certificate import make_certificate
+        from invarlock.reporting.report_builder import make_report
     except Exception as exc:
-        print(f"Certificate generation warning: {exc}", file=sys.stderr)
+        print(f"Evaluation report generation warning: {exc}", file=sys.stderr)
         return 1
 
     try:
         report = json.loads(report_path.read_text())
     except Exception as exc:
-        print(f"Certificate generation warning: {exc}", file=sys.stderr)
+        print(f"Evaluation report generation warning: {exc}", file=sys.stderr)
         return 1
 
     try:
-        cert = make_certificate(report, report)
+        evaluation_report = make_report(report, report)
     except Exception as exc:
-        print(f"Certificate generation warning: {exc}", file=sys.stderr)
+        print(f"Evaluation report generation warning: {exc}", file=sys.stderr)
         return 1
 
-    cert_path.parent.mkdir(parents=True, exist_ok=True)
-    cert_path.write_text(json.dumps(cert, indent=2) + "\n")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(evaluation_report, indent=2) + "\n")
     return 0
 
 

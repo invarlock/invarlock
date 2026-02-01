@@ -45,13 +45,13 @@ def test_save_report_cert_outputs(
     out = save_report(
         rp,
         tmp_path,
-        formats=["cert"],
+        formats=["report"],
         compare=None,
         baseline=base,
         filename_prefix="unit",
     )
     # Ensure expected files are produced
-    assert (tmp_path / "evaluation.cert.json").exists()
-    assert out.get("cert") == (tmp_path / "evaluation.cert.json")
-    assert (tmp_path / "unit_certificate.md").exists()
+    assert (tmp_path / "evaluation.report.json").exists()
+    assert out.get("report") == (tmp_path / "evaluation.report.json")
+    assert (tmp_path / "evaluation_report.md").exists()
     assert (tmp_path / "manifest.json").exists()

@@ -4,7 +4,7 @@ from typing import Any
 from invarlock.reporting import report as rpt
 from invarlock.reporting.report import (
     save_report,
-    to_certificate,
+    to_evaluation_report,
     to_html,
     to_json,
     to_markdown,
@@ -79,14 +79,14 @@ def test_save_report_multiple_formats(tmp_path: Path):
     assert out["html"].exists()
 
 
-def test_to_certificate_markdown_path():
+def test_to_evaluation_report_markdown_path():
     rep = _minimal_report()
     baseline = {
         "schema_version": "baseline-v1",
         "meta": {},
         "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 100.0}},
     }
-    md = to_certificate(rep, baseline, format="markdown")
+    md = to_evaluation_report(rep, baseline, format="markdown")
     assert isinstance(md, str) and "InvarLock Evaluation Report" in md
 
 

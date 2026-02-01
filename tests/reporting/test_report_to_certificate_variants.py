@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from invarlock.reporting.report import to_certificate
+from invarlock.reporting.report import to_evaluation_report
 from invarlock.reporting.report_types import RunReport, create_empty_report
 
 
@@ -23,17 +23,17 @@ def _mk_report() -> RunReport:
     return r
 
 
-def test_to_certificate_json_and_markdown(tmp_path) -> None:
+def test_to_evaluation_report_json_and_markdown(tmp_path) -> None:
     rp = _mk_report()
     base = _mk_report()
-    js = to_certificate(rp, base, format="json")
+    js = to_evaluation_report(rp, base, format="json")
     assert "schema_version" in js
-    md = to_certificate(rp, base, format="markdown")
+    md = to_evaluation_report(rp, base, format="markdown")
     assert "Evaluation Report" in md
 
 
-def test_to_certificate_unsupported_format(tmp_path) -> None:
+def test_to_evaluation_report_unsupported_format(tmp_path) -> None:
     rp = _mk_report()
     base = _mk_report()
     with pytest.raises(ValueError):
-        to_certificate(rp, base, format="txt")
+        to_evaluation_report(rp, base, format="txt")

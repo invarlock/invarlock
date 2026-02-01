@@ -101,10 +101,10 @@ def test_save_report_cert_bundle_writes_manifest_and_evidence(
     monkeypatch.setenv("INVARLOCK_EVIDENCE_DEBUG", "1")
 
     out = save_report(
-        rep, tmp_path, formats=["cert"], baseline=base, filename_prefix="r"
+        rep, tmp_path, formats=["report"], baseline=base, filename_prefix="r"
     )
-    assert out["cert"].exists()
-    assert out["cert_md"].exists()
+    assert out["report"].exists()
+    assert out["report_md"].exists()
     # Manifest is best-effort but should exist in this path
     assert (tmp_path / "manifest.json").exists()
     # Evidence file gets created when env is set (even when payload is tiny)
@@ -114,4 +114,4 @@ def test_save_report_cert_bundle_writes_manifest_and_evidence(
 def test_save_report_cert_requires_baseline(tmp_path: Path):
     rep = _minimal_run_report()
     with pytest.raises(ValueError):
-        save_report(rep, tmp_path, formats=["cert"], baseline=None)
+        save_report(rep, tmp_path, formats=["report"], baseline=None)

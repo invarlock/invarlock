@@ -264,7 +264,9 @@ def generate_verdict(*, output_dir: Path) -> dict[str, Any]:
 
     # Pick the newest run for each (model, category, scenario_id).
     latest: dict[tuple[str, str, str], tuple[int, Path]] = {}
-    for cert_path in sorted(output_dir.glob("*/certificates/**/evaluation.cert.json")):
+    for cert_path in sorted(
+        output_dir.glob("*/certificates/**/evaluation.report.json")
+    ):
         cls = _classify_certificate(cert_path, output_dir=output_dir)
         if cls is None:
             continue

@@ -51,7 +51,7 @@ def _write_run_report(
                 "ratio_vs_baseline": ratio_vs_baseline,
                 "display_ci": (pm_final, pm_final),
             },
-            # Legacy fields kept in run reports for CLI printing paths; certs are PM-only
+            # Legacy fields kept in run reports for CLI printing paths; evaluation reports are PM-only
             "ppl_preview": pm_preview,
             "ppl_final": pm_final,
             "ppl_ratio": ratio_vs_baseline,
@@ -144,31 +144,30 @@ def test_certify_local_paths_pm_and_digests(monkeypatch, tmp_path: Path):
         return _save_report(
             primary,
             output,
-            formats=["cert"],
+            formats=["report"],
             baseline=base,
             filename_prefix="evaluation",
         )
 
     monkeypatch.setattr(mod, "_report", _report_wrapper, raising=False)
 
-    cert_dir = tmp_path / "certs"
+    report_dir = tmp_path / "reports"
     evaluate_command(
         source=str(src),
         edited=str(edt),
         adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
-        report_out=str(cert_dir),
+        report_out=str(report_dir),
     )
 
-    # The report.save_report writes cert JSON into cert_dir; locate it
-    cert_path = Path(cert_dir) / "evaluation.cert.json"
-    assert cert_path.exists(), "certificate JSON not written"
-    cert = json.loads(cert_path.read_text())
+    report_path = Path(report_dir) / "evaluation.report.json"
+    assert report_path.exists(), "evaluation report JSON not written"
+    report = json.loads(report_path.read_text())
 
-    # PM-only certificate v1
-    assert cert.get("schema_version") == "v1"
-    pm = cert.get("primary_metric", {})
+    # PM-only evaluation report v1
+    assert report.get("schema_version") == "v1"
+    pm = report.get("primary_metric", {})
     assert isinstance(pm, dict)
     assert pm.get("kind") in {
         "ppl_causal",
@@ -180,11 +179,11 @@ def test_certify_local_paths_pm_and_digests(monkeypatch, tmp_path: Path):
     # ratio should be deterministic at 1.0
     assert abs(float(pm.get("ratio_vs_baseline", 0.0)) - 1.0) < 1e-6
     # provider digest copied through
-    prov = cert.get("provenance", {})
+    prov = report.get("provenance", {})
     pd = prov.get("provider_digest", {})
     assert isinstance(pd, dict)
     # edited provider digest is reflected
-    # Note: certificate copies provider_digest from run report; edited side dominates
+    # Note: evaluation report copies provider_digest from run report; edited side dominates
     assert "ids_sha256" in pd
 
 
@@ -274,33 +273,33 @@ def test_certify_local_paths_quantized_subject_overheads(monkeypatch, tmp_path: 
         return _save_report(
             primary,
             output,
-            formats=["cert"],
+            formats=["report"],
             baseline=base,
             filename_prefix="evaluation",
         )
 
     monkeypatch.setattr(mod, "_report", _report_wrapper, raising=False)
 
-    cert_dir = tmp_path / "certs"
+    report_dir = tmp_path / "reports"
     evaluate_command(
         source=str(src),
         edited=str(edt),
         adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
-        report_out=str(cert_dir),
+        report_out=str(report_dir),
     )
 
-    cert_path = Path(cert_dir) / "evaluation.cert.json"
-    assert cert_path.exists(), "certificate JSON not written"
-    cert = json.loads(cert_path.read_text())
+    report_path = Path(report_dir) / "evaluation.report.json"
+    assert report_path.exists(), "evaluation report JSON not written"
+    report = json.loads(report_path.read_text())
 
     # Quality Overhead (Primary Metric) should be present with ratio basis > 1.0
-    qo = cert.get("quality_overhead", {})
+    qo = report.get("quality_overhead", {})
     assert isinstance(qo, dict) and qo.get("basis") == "ratio"
     assert float(qo["value"]) > 1.0
     # System Overhead exists and carries latency entry
-    sys = cert.get("system_overhead", {})
+    sys = report.get("system_overhead", {})
     lat = sys.get("latency_ms_p50", {})
     assert isinstance(lat, dict)
     assert isinstance(lat.get("edited"), int | float)

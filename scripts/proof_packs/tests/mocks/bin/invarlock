@@ -52,13 +52,13 @@ case "${subcmd}" in
             fi
         fi
         ;;
-    certify)
-        cert_out="$(get_flag_val --cert-out "$@" || true)"
+    evaluate)
+        cert_out="$(get_flag_val --report-out "$@" || true)"
         out_dir="$(get_flag_val --out "$@" || true)"
         target="${cert_out:-${out_dir:-}}"
         if [[ -n "${target:-}" && -n "${TEST_TMPDIR:-}" && -f "${fixtures}/invarlock.create_cert" ]]; then
             mkdir -p "${target}"
-            printf '{"ok":true}\n' > "${target}/evaluation.cert.json"
+            printf '{"ok":true}\n' > "${target}/evaluation.report.json"
         fi
         ;;
 esac

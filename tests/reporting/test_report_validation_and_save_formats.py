@@ -41,16 +41,16 @@ def test_to_html_raises_on_invalid_primary_report() -> None:
         report_mod.to_html({})
 
 
-def test_to_certificate_raises_on_unsupported_format() -> None:
+def test_to_evaluation_report_raises_on_unsupported_format() -> None:
     rp = _valid_run_report()
-    with pytest.raises(ValueError, match="Unsupported certificate format"):
-        report_mod.to_certificate(rp, rp, format="yaml")
+    with pytest.raises(ValueError, match="Unsupported evaluation report format"):
+        report_mod.to_evaluation_report(rp, rp, format="yaml")
 
 
-def test_to_certificate_raises_on_invalid_primary_report() -> None:
+def test_to_evaluation_report_raises_on_invalid_primary_report() -> None:
     rp = _valid_run_report()
     with pytest.raises(ValueError, match="Invalid primary RunReport structure"):
-        report_mod.to_certificate({}, rp)
+        report_mod.to_evaluation_report({}, rp)
 
 
 def test_save_report_defaults_to_json_markdown_html(tmp_path: Path) -> None:
@@ -69,8 +69,8 @@ def test_save_report_cert_manifest_skips_non_dict_guards_and_empty_entries(
         {"policy": "bad"},
     ]
     baseline = _valid_run_report()
-    monkeypatch.setattr(report_mod, "to_certificate", lambda *_a, **_k: "{}")
-    saved = report_mod.save_report(rp, tmp_path, formats=["cert"], baseline=baseline)
-    assert "cert" in saved
-    assert "cert_md" in saved
+    monkeypatch.setattr(report_mod, "to_evaluation_report", lambda *_a, **_k: "{}")
+    saved = report_mod.save_report(rp, tmp_path, formats=["report"], baseline=baseline)
+    assert "report" in saved
+    assert "report_md" in saved
     assert "manifest" in saved

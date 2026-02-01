@@ -47,7 +47,7 @@ def _minimal_report() -> dict:
 def test_manifest_matches_schema(tmp_path: Path):
     primary = _minimal_report()
     baseline = _minimal_report()
-    out_dir = tmp_path / "cert"
+    out_dir = tmp_path / "reports"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # Enable evidence pointer
@@ -56,7 +56,7 @@ def test_manifest_matches_schema(tmp_path: Path):
         save_report(
             primary,
             out_dir,
-            formats=["cert"],
+            formats=["report"],
             baseline=baseline,
             filename_prefix="evaluation",
         )

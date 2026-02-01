@@ -158,17 +158,19 @@ def to_html(
     return "\n".join(html_parts)
 
 
-def to_certificate(report: RunReport, baseline: RunReport, format: str = "json") -> str:
+def to_evaluation_report(
+    report: RunReport, baseline: RunReport, format: str = "json"
+) -> str:
     """
-    Convert RunReport to certificate format.
+    Convert RunReport to evaluation report format.
 
     Args:
-        report: Primary RunReport to certify
+        report: Primary RunReport to evaluate
         baseline: Baseline RunReport for comparison
         format: Output format ("json" or "markdown")
 
     Returns:
-        Formatted certificate string
+        Formatted evaluation report string
     """
     if not validate_report(report):
         raise ValueError("Invalid primary RunReport structure")
@@ -176,15 +178,14 @@ def to_certificate(report: RunReport, baseline: RunReport, format: str = "json")
     if not _validate_baseline_or_report(baseline):
         raise ValueError("Invalid baseline RunReport structure")
 
-    # Generate certificate
-    certificate = make_report(report, baseline)
+    evaluation_report = make_report(report, baseline)
 
     if format == "json":
-        return json.dumps(certificate, indent=2, ensure_ascii=False)
+        return json.dumps(evaluation_report, indent=2, ensure_ascii=False)
     elif format == "markdown":
-        return render_report_markdown(certificate)
+        return render_report_markdown(evaluation_report)
     else:
-        raise ValueError(f"Unsupported certificate format: {format}")
+        raise ValueError(f"Unsupported evaluation report format: {format}")
 
 
 def save_report(
@@ -201,9 +202,9 @@ def save_report(
     Args:
         report: RunReport to save
         output_dir: Directory to save reports in
-        formats: List of formats to generate ("json", "markdown", "html", "cert")
+        formats: List of formats to generate ("json", "markdown", "html", "report")
         compare: Optional comparison report
-        baseline: Optional baseline report for certificate generation
+        baseline: Optional baseline report for evaluation report generation
         filename_prefix: Prefix for generated filenames
 
     Returns:
@@ -236,23 +237,24 @@ def save_report(
             f.write(to_html(report, compare))
         saved_files["html"] = html_path
 
-    if "cert" in formats:
+    if "report" in formats:
         if baseline is None:
-            raise ValueError("Baseline report required for certificate generation")
+            raise ValueError(
+                "Baseline report required for evaluation report generation"
+            )
 
-        # Generate certificate JSON in canonical path/name
-        cert_json = to_certificate(report, baseline, format="json")
-        cert_json_path = output_path / "evaluation.cert.json"
-        with open(cert_json_path, "w", encoding="utf-8") as f:
-            f.write(cert_json)
-        saved_files["cert"] = cert_json_path
+        report_json = to_evaluation_report(report, baseline, format="json")
+        report_json_path = output_path / "evaluation.report.json"
+        with open(report_json_path, "w", encoding="utf-8") as f:
+            f.write(report_json)
+        saved_files["report"] = report_json_path
 
         # Also emit a markdown variant for human consumption
-        cert_md = to_certificate(report, baseline, format="markdown")
-        cert_md_path = output_path / f"{filename_prefix}_certificate.md"
-        with open(cert_md_path, "w", encoding="utf-8") as f:
-            f.write(cert_md)
-        saved_files["cert_md"] = cert_md_path
+        report_md = to_evaluation_report(report, baseline, format="markdown")
+        report_md_path = output_path / "evaluation_report.md"
+        with open(report_md_path, "w", encoding="utf-8") as f:
+            f.write(report_md)
+        saved_files["report_md"] = report_md_path
 
         # Emit a lightweight manifest to serve as an evidence bundle index
         try:
@@ -261,8 +263,8 @@ def save_report(
             manifest: dict[str, Any] = {
                 "generated_at": _dt.now().isoformat(),
                 "files": {
-                    "certificate_json": str(cert_json_path),
-                    "certificate_markdown": str(cert_md_path),
+                    "evaluation_report_json": str(report_json_path),
+                    "evaluation_report_markdown": str(report_md_path),
                 },
                 "summary": {
                     "run_model": (report.get("meta", {}) or {}).get("model_id"),
@@ -275,11 +277,11 @@ def save_report(
             try:
                 from .render import compute_console_validation_block
 
-                certificate_obj = json.loads(cert_json)
-                if not isinstance(certificate_obj, dict):
-                    raise TypeError("certificate JSON did not decode to a dict")
+                evaluation_report_obj = json.loads(report_json)
+                if not isinstance(evaluation_report_obj, dict):
+                    raise TypeError("evaluation report JSON did not decode to a dict")
 
-                block = compute_console_validation_block(certificate_obj)
+                block = compute_console_validation_block(evaluation_report_obj)
                 rows = block.get("rows", []) or []
                 gates_total = len(rows)
                 gates_passed = sum(
@@ -288,7 +290,7 @@ def save_report(
                 overall_status = "PASS" if block.get("overall_pass") else "FAIL"
 
                 pm_ratio = None
-                pm = certificate_obj.get("primary_metric", {}) or {}
+                pm = evaluation_report_obj.get("primary_metric", {}) or {}
                 if isinstance(pm, dict):
                     ratio = pm.get("ratio_vs_baseline")
                     if isinstance(ratio, int | float):
@@ -934,4 +936,10 @@ def _get_default_css() -> str:
 
 
 # Export public API
-__all__ = ["to_json", "to_markdown", "to_html", "to_certificate", "save_report"]
+__all__ = [
+    "to_json",
+    "to_markdown",
+    "to_html",
+    "to_evaluation_report",
+    "save_report",
+]

@@ -22,7 +22,7 @@ test_pack_build_pack_and_verify_pack_end_to_end_v2_layout() {
     echo '{"model_list":["m"],"models":{"m":{"revision":"rev"}}}' > "${run_dir}/state/model_revisions.json"
 
     mkdir -p "${run_dir}/m/certificates/clean/quant_rtn"
-    echo '{}' > "${run_dir}/m/certificates/clean/quant_rtn/evaluation.cert.json"
+    echo '{}' > "${run_dir}/m/certificates/clean/quant_rtn/evaluation.report.json"
 
     source "${TEST_ROOT}/scripts/proof_packs/run_pack.sh"
 
@@ -33,7 +33,7 @@ test_pack_build_pack_and_verify_pack_end_to_end_v2_layout() {
     assert_file_exists "${pack_dir}/checksums.sha256" "checksums written"
     assert_file_exists "${pack_dir}/README.md" "readme written"
     assert_file_exists "${pack_dir}/results/verification_summary.json" "verification summary written"
-    assert_file_exists "${pack_dir}/certs/m/clean/quant_rtn/evaluation.cert.json" "cert copied"
+    assert_file_exists "${pack_dir}/certs/m/clean/quant_rtn/evaluation.report.json" "cert copied"
 
     assert_file_exists "${pack_dir}/metadata/manifest.json" "manifest copied to metadata"
     assert_file_exists "${pack_dir}/metadata/checksums.sha256" "checksums copied to metadata"

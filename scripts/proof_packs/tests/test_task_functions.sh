@@ -290,7 +290,7 @@ test_task_certify_edit_and_error_cover_preset_discovery_overrides_and_certificat
     mkdir -p "${model_output_dir}/models/quant_4bit_clean"
     local cert_dir="${model_output_dir}/certificates/quant_4bit_clean/run_1"
     mkdir -p "${cert_dir}/nested"
-    echo "{}" > "${cert_dir}/nested/evaluation.cert.json"
+    echo "{}" > "${cert_dir}/nested/evaluation.report.json"
 
     export TASK_PARAMS='{"seq_len":100,"stride":200}'
     export INVARLOCK_BOOTSTRAP_N="1234"
@@ -339,7 +339,7 @@ YAML
     echo "{}" > "${error_path}/config.json"
     cert_dir="${model_output_dir}/certificates/errors/cuda_assert"
     mkdir -p "${cert_dir}/nested"
-    echo "{}" > "${cert_dir}/nested/evaluation.cert.json"
+    echo "{}" > "${cert_dir}/nested/evaluation.report.json"
     task_certify_error "${model_name}" 0 cuda_assert "${out}" "${log_file}"
 }
 
@@ -434,11 +434,11 @@ test_task_certify_error_missing_baseline_missing_error_model_skip_and_preset_mis
     echo "{}" > "${error_path}/config.json"
     local cert_dir="${model_output_dir}/certificates/errors/cuda_assert"
     mkdir -p "${cert_dir}"
-    echo "{}" > "${cert_dir}/evaluation.cert.json"
+    echo "{}" > "${cert_dir}/evaluation.report.json"
     task_certify_error "${model_name}" 0 cuda_assert "${out}" "${log_file}"
 
     # Preset missing branch creates a minimal preset.
-    rm -f "${cert_dir}/evaluation.cert.json"
+    rm -f "${cert_dir}/evaluation.report.json"
     rm -rf "${out}/presets"
     task_certify_error "${model_name}" 0 cuda_assert "${out}" "${log_file}"
 }
@@ -898,7 +898,7 @@ test_task_certify_edit_reuses_baseline_report_applies_ci_override_and_falls_back
 
     local calls
     calls="$(cat "${TEST_TMPDIR}/fixtures/invarlock.calls")"
-    assert_match "--baseline-report" "${calls}" "baseline report forwarded to invarlock certify"
+    assert_match "--baseline-report" "${calls}" "baseline report forwarded to invarlock evaluate"
     assert_match "--edit-label custom" "${calls}" "empty edit label falls back to custom"
 }
 
@@ -936,7 +936,7 @@ test_task_certify_error_reuses_baseline_report_and_applies_ci_override() {
 
     assert_match "CI window override" "$(cat "${log_file}")" "CI window override applied"
     assert_match "Reusing baseline report" "$(cat "${log_file}")" "baseline report reused"
-    assert_file_exists "${model_output_dir}/certificates/errors/nan_injection/evaluation.cert.json" "error cert written"
+    assert_file_exists "${model_output_dir}/certificates/errors/nan_injection/evaluation.report.json" "error cert written"
 }
 
 test_task_timeout_and_profile_helpers() {

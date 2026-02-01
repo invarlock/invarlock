@@ -51,25 +51,27 @@ def _minimal_run_report() -> dict:
 def test_manifest_and_expected_files_present(tmp_path: Path) -> None:
     primary = _minimal_run_report()
     baseline = _minimal_run_report()
-    out_dir = tmp_path / "cert"
+    out_dir = tmp_path / "reports"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Use save_report to emit cert + manifest; enable evidence hook
+    # Use save_report to emit evaluation report + manifest; enable evidence hook
     os.environ["INVARLOCK_EVIDENCE_DEBUG"] = "1"
     try:
         _ = save_report(
             primary,
             out_dir,
-            formats=["cert"],
+            formats=["report"],
             baseline=baseline,
             filename_prefix="evaluation",
         )
     finally:
         os.environ.pop("INVARLOCK_EVIDENCE_DEBUG", None)
 
-    assert (out_dir / "evaluation.cert.json").exists(), "certificate JSON missing"
-    assert (out_dir / "evaluation_certificate.md").exists(), (
-        "certificate Markdown missing"
+    assert (out_dir / "evaluation.report.json").exists(), (
+        "evaluation report JSON missing"
+    )
+    assert (out_dir / "evaluation_report.md").exists(), (
+        "evaluation report Markdown missing"
     )
     # Evidence file should be present when debug flag is on
     ev_file = out_dir / "guards_evidence.json"
