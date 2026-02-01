@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- CLI: `--version` / `-V` flag (alias of `invarlock version`) to print the InvarLock version (plus report schema version when available).
+- `invarlock evaluate` summary now includes total runtime and confidence interval.
+
+### Changed
+- **Breaking:** Rename “certificate” → “report” across artifacts, docs, scripts, notebooks, and Python API surfaces.
+- **Breaking:** CLI terminology unified on `evaluate` (replaces `certify`).
+- Config: reject legacy HF v4 load keys `model.torch_dtype`, `model.load_in_8bit`, and `model.load_in_4bit`; use `model.dtype` and/or `model.quantization_config`.
+- Evaluation report bundle filenames updated (JSON: `evaluation.report.json`, Markdown: `evaluation_report.md`).
+
+### Fixed
+- HuggingFace/Transformers v5 compatibility: migrate load contracts and use `dtype=` where required.
+- Reduce noisy HuggingFace/Transformers warnings in `ci`/`release` CLI output.
+- Adapters: snapshot config serialization no longer emits deprecated attributes.
+- Scripts: CLI example validator ignores internal tool dirs and supports external paths.
+
+### Dependencies
+- Require `transformers>=5.0.0` and `huggingface_hub>=1.0.0`.
+
+### Documentation
+- Update guides and notebooks for evaluation reports and renamed commands/pages.
+- Drop legacy Transformers v4 config key documentation and fix minor formatting/typos.
+
 ## [0.3.7] - 2026-01-22
 
 ### Added
