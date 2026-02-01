@@ -410,7 +410,7 @@ def evaluate_command(
                 "stride": 512,
                 "preview_n": 64,
                 "final_n": 64,
-                "seed": 42,
+                "seed": 43,
             }
         }
     else:
