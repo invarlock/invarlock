@@ -17,7 +17,11 @@ import typer
 from rich.console import Console
 from typer.core import TyperGroup
 
-from invarlock.security import enforce_default_security
+from invarlock.security import (
+    enforce_default_security,
+    enforce_network_policy,
+    network_policy_allows,
+)
 
 # Lightweight import mode disables heavy side effects in some modules, but we no
 # longer force plugin discovery off globally here; individual commands may gate
@@ -65,9 +69,8 @@ app = typer.Typer(
 console = Console()
 
 
-@app.command()
-def version():
-    """Show InvarLock version."""
+def _emit_version() -> None:
+    """Emit the InvarLock version string."""
     # Prefer package metadata when available so CLI reflects wheel truth
     try:
         from importlib.metadata import version as _pkg_version
@@ -94,6 +97,31 @@ def version():
         console.print(f"InvarLock {__version__}")
     except Exception:
         console.print("InvarLock version unknown")
+
+
+@app.callback(invoke_without_command=True)
+def _root(
+    ctx: typer.Context,
+    show_version: bool = typer.Option(
+        False,
+        "--version",
+        "-V",
+        help="Show version and exit.",
+        is_eager=True,
+    ),
+) -> None:
+    was_allowed = network_policy_allows()
+    enforce_default_security()
+    ctx.call_on_close(lambda: enforce_network_policy(was_allowed))
+    if show_version:
+        _emit_version()
+        raise typer.Exit()
+
+
+@app.command()
+def version():
+    """Show InvarLock version."""
+    _emit_version()
 
 
 """Register command modules and groups in the desired help order.
