@@ -85,8 +85,8 @@ InvarLock follows a layered architecture with clear separation of concerns:
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                          REPORTING LAYER                                    │
 │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐            │
-│  │   report   │  │report │  │   render   │  │  manifest  │            │
-│  │   (JSON)   │  │   (JSON)   │  │   (MD/HTML)│  │   (JSON)   │            │
+│  │   report   │  │   report   │  │   render   │  │  manifest  │            │
+│  │   (JSON)   │  │   (JSON)   │  │  (MD/HTML) │  │   (JSON)   │            │
 │  └────────────┘  └────────────┘  └────────────┘  └────────────┘            │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘

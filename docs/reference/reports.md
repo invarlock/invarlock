@@ -93,7 +93,7 @@ The markdown report is structured to highlight evaluation outcomes first:
 │   │                                                                │    │
 │   │ ┌─────────────────┐  ┌───────────────────────────────────────┐│    │
 │   │ │ metrics         │  │ policy_resolved                       ││    │
-│   │ │ ─────────────── │  │ ─────────────────────────────────────── ││    │
+│   │ │ ─────────────── │  │ ───────────────────────────────────── ││    │
 │   │ │ primary_metric  │  │ spectral.*, rmt.*, variance.*          ││    │
 │   │ │ ratio_vs_base   │  │ tier_policy_name                       ││    │
 │   │ │ display_ci      │  │ thresholds_hash                        ││    │
@@ -102,8 +102,8 @@ The markdown report is structured to highlight evaluation outcomes first:
 │                                    │                                    │
 │                                    ▼                                    │
 │   ┌────────────────────────────────────────────────────────────────┐   │
-│   │                    make_report()                          │   │
-│   │ baseline_report + subject_report → evaluation.report.json        │   │
+│   │                    make_report()                               │   │
+│   │ baseline_report + subject_report → evaluation.report.json      │   │
 │   └────────────────────────────────┬───────────────────────────────┘   │
 │                                    │                                    │
 │                                    ▼                                    │

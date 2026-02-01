@@ -71,12 +71,12 @@ task graph, scheduling, and artifact generation. It complements
 ### Module dependency graph
 
 ```text
-┌─────────────────────────────────────────────────────────┐
-│                         ENTRYPOINTS                      │
+┌──────────────────────────────────────────────────────────┐
+│                       ENTRYPOINTS                        │
 ├──────────────┬──────────────┬────────────────────────────┤
-│  run_pack.sh  │ run_suite.sh │ verify_pack.sh             │
-│  (pack+run)   │ (run only)   │ (checksums+certs verify)   │
-└──────┬────────┴──────┬───────┴────────────────────────────┘
+│ run_pack.sh  │ run_suite.sh │ verify_pack.sh             │
+│ (pack+run)   │ (run only)   │ (checksums+certs verify)   │
+└──────┬───────┴───────┬──────┴────────────────────────────┘
        │               │
        ▼               ▼
 ┌──────────────────────────────────────────────────────────┐

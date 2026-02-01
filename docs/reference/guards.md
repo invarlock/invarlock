@@ -66,7 +66,7 @@ guards:
 │        │               │               │               │                │
 │        ▼               ▼               ▼               ▼                │
 │   ┌──────────────────────────────────────────────────────────┐         │
-│   │                GUARD RESULTS → report               │         │
+│   │                GUARD RESULTS → report                    │         │
 │   │     (passed/warned/failed + metrics + measurement_hash)  │         │
 │   └──────────────────────────────────────────────────────────┘         │
 │                                                                         │

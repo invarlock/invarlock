@@ -66,7 +66,7 @@ security or alignment.
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │                    EVIDENCE LAYER                               │   │
 │  │  ┌────────────────────────────────────────────────────────────┐ │   │
-│  │  │ evaluation.report.json                                       │ │   │
+│  │  │ evaluation.report.json                                     │ │   │
 │  │  │ ────────────────────────────────                           │ │   │
 │  │  │ • seeds, device, policy_digest                             │ │   │
 │  │  │ • tokenizer_hash, provider_digest                          │ │   │
