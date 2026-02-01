@@ -114,5 +114,6 @@ Use `verify_pack.sh`:
   - Warns (but does not fail) if the pack is unsigned.
 - Strict (recommended for distributable evidence): `scripts/proof_packs/verify_pack.sh --pack <dir> --strict`
   - Fails if `manifest.json.asc` is missing, `gpg` verification fails, or extra files exist outside `checksums.sha256`.
+  - Alternative: set `PACK_STRICT_MODE=1` (e.g., `PACK_STRICT_MODE=1 scripts/proof_packs/verify_pack.sh --pack <dir>`).
 
 To skip signing during pack creation, set `PACK_GPG_SIGN=0`. To require signing, set `PACK_STRICT_MODE=1`.
