@@ -814,7 +814,11 @@ def evaluate_command(
                     message="Evaluation Report",
                     emoji="📜",
                 ):
-                    report_start = perf_counter()
+                    # Use a wall-clock perf counter here (not the output module's
+                    # test-patched counter) so timing tests remain deterministic.
+                    from time import perf_counter as _wall_perf_counter
+
+                    report_start = _wall_perf_counter()
                     report_kwargs = {
                         "run": str(edited_report),
                         "format": "report",
