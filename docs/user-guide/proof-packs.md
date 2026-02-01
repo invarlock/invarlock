@@ -103,6 +103,16 @@ a drift summary in `results/determinism_repeats.json`.
 
 ## Signing & Verification
 
-`run_pack.sh` signs `manifest.json` when `gpg` is available. To skip signing,
-set `PACK_GPG_SIGN=0`. Use `verify_pack.sh` to validate checksums, signatures,
-and report integrity.
+`manifest.json` includes `checksums_sha256_digest` (sha256 of `checksums.sha256`) so a
+signed manifest cryptographically binds the checksums file (and thus all hashed artifacts).
+Signed packs also record `signing_key_fingerprint` for audit trails.
+
+Use `verify_pack.sh`:
+
+- Default: `scripts/proof_packs/verify_pack.sh --pack <dir>`
+  - Verifies `checksums_sha256_digest`, validates `checksums.sha256`, and runs `invarlock verify`.
+  - Warns (but does not fail) if the pack is unsigned.
+- Strict (recommended for distributable evidence): `scripts/proof_packs/verify_pack.sh --pack <dir> --strict`
+  - Fails if `manifest.json.asc` is missing, `gpg` verification fails, or extra files exist outside `checksums.sha256`.
+
+To skip signing during pack creation, set `PACK_GPG_SIGN=0`. To require signing, set `PACK_STRICT_MODE=1`.

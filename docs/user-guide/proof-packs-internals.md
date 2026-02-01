@@ -522,8 +522,10 @@ run_pack.sh
 
 `verify_pack.sh` checks the pack:
 
-- Verifies `checksums.sha256`.
-- Verifies the GPG signature if `manifest.json.asc` exists.
+- Verifies `manifest.json` binds `checksums.sha256` via `checksums_sha256_digest`.
+- Verifies `checksums.sha256` (and thus all hashed artifacts).
+- Verifies the GPG signature when present; `--strict` requires it.
+- Enforces “no extra files” semantics in `--strict` mode.
 - Runs `invarlock verify` across all certs (JSON output optional).
 
 ## Remote setup helper
