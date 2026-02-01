@@ -229,43 +229,81 @@ def _suppress_noisy_warnings(
 
     try:
         with warnings.catch_warnings():
-            if suppress_all:
-                warnings.simplefilter("ignore")
-                yield
-            else:
-                original_showwarning = warnings.showwarning
+            from contextlib import redirect_stderr, redirect_stdout
 
-                def _showwarning(
-                    message: Warning | str,
-                    category: type[Warning],
-                    filename: str,
-                    lineno: int,
-                    file: object | None = None,
-                    line: str | None = None,
-                ) -> None:
+            class _FilteredStream:
+                def __init__(self, raw: Any) -> None:
+                    self._raw = raw
+
+                def __getattr__(self, name: str) -> object:
+                    return getattr(self._raw, name)
+
+                def write(self, s: object) -> int:
                     try:
-                        rendered = warnings.formatwarning(
-                            message, category, filename, lineno, line
-                        )
+                        if isinstance(s, bytes):
+                            text = s.decode("utf-8", errors="replace")
+                        else:
+                            text = str(s)
                     except Exception:
-                        rendered = str(message)
-                    if any(p.search(rendered) for p in patterns):
-                        suppressed.append(str(message))
-                        return
-                    original_showwarning(
-                        message,
-                        category,
-                        filename,
-                        lineno,
-                        file=file,
-                        line=line,
-                    )
+                        return int(self._raw.write(s))
 
-                warnings.showwarning = _showwarning  # type: ignore[assignment]
-                try:
+                    # Preserve progress bars (carriage returns) by passing through
+                    # all non-matching chunks immediately.
+                    pieces = text.splitlines(keepends=True)
+                    for piece in pieces:
+                        if any(p.search(piece) for p in patterns):
+                            suppressed.append(piece.rstrip("\n"))
+                            continue
+                        self._raw.write(piece)
+                    return len(text)
+
+                def flush(self) -> None:
+                    try:
+                        self._raw.flush()
+                    except Exception:
+                        pass
+
+            stdout_proxy = _FilteredStream(_sys.stdout)
+            stderr_proxy = _FilteredStream(_sys.stderr)
+
+            with redirect_stdout(stdout_proxy), redirect_stderr(stderr_proxy):
+                if suppress_all:
+                    warnings.simplefilter("ignore")
                     yield
-                finally:
-                    warnings.showwarning = original_showwarning  # type: ignore[assignment]
+                else:
+                    original_showwarning = warnings.showwarning
+
+                    def _showwarning(
+                        message: Warning | str,
+                        category: type[Warning],
+                        filename: str,
+                        lineno: int,
+                        file: object | None = None,
+                        line: str | None = None,
+                    ) -> None:
+                        try:
+                            rendered = warnings.formatwarning(
+                                message, category, filename, lineno, line
+                            )
+                        except Exception:
+                            rendered = str(message)
+                        if any(p.search(rendered) for p in patterns):
+                            suppressed.append(str(message))
+                            return
+                        original_showwarning(
+                            message,
+                            category,
+                            filename,
+                            lineno,
+                            file=file,
+                            line=line,
+                        )
+
+                    warnings.showwarning = _showwarning  # type: ignore[assignment]
+                    try:
+                        yield
+                    finally:
+                        warnings.showwarning = original_showwarning  # type: ignore[assignment]
     finally:
         for handler in handlers:
             try:

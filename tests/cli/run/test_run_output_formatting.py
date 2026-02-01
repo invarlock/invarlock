@@ -1,5 +1,6 @@
 import io
 import logging
+import sys
 import warnings
 from types import SimpleNamespace
 
@@ -79,6 +80,20 @@ def test_suppress_noisy_warnings_release_suppresses_transformers_logs(
         logger.removeHandler(handler)
         logger.setLevel(prev_level)
         logger.propagate = prev_propagate
+
+
+def test_suppress_noisy_warnings_release_filters_stderr_output(
+    monkeypatch, capsys
+) -> None:
+    monkeypatch.delenv("INVARLOCK_SUPPRESS_WARNINGS", raising=False)
+    with run_mod._suppress_noisy_warnings("release"):
+        print(
+            "`loss_type=None` was set in the config but it is unrecognized. "
+            "Using the default loss: `ForCausalLMLoss`.",
+            file=sys.stderr,
+        )
+    captured = capsys.readouterr()
+    assert "loss_type=None" not in captured.err
 
 
 def test_evaluate_helpers_cover_banner_and_ratio() -> None:
