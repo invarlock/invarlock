@@ -27,8 +27,9 @@ def doc_contains_keys(path: Path) -> bool:
 def main() -> int:
     repo_root = Path(__file__).resolve().parents[1]
     candidates = [
-        repo_root / "README.md",
+        repo_root / "docs" / "reference" / "config-schema.md",
         repo_root / "docs" / "README.md",
+        repo_root / "README.md",
     ]
 
     for candidate in candidates:
