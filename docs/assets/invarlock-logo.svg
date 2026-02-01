@@ -1,0 +1,40 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="960"
+  height="240"
+  viewBox="0 0 960 240"
+  role="img"
+  aria-label="InvarLock"
+>
+  <defs>
+    <linearGradient
+      id="lockGradient"
+      x1="64"
+      y1="128"
+      x2="192"
+      y2="224"
+      gradientUnits="userSpaceOnUse"
+    >
+      <stop offset="0" stop-color="#2563eb" />
+      <stop offset="1" stop-color="#7c3aed" />
+    </linearGradient>
+  </defs>
+  <g fill="none" stroke="#0f172a" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M128 76c-24 0-44 20-44 44v24h88v-24c0-24-20-44-44-44z" />
+    <rect x="84" y="136" width="88" height="76" rx="18" fill="url(#lockGradient)" />
+  </g>
+  <path
+    d="M128 160c-8 0-14 6-14 14 0 6 3 11 8 13v15h12v-15c5-2 8-7 8-13 0-8-6-14-14-14z"
+    fill="#0f172a"
+  />
+  <text
+    x="220"
+    y="176"
+    font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial"
+    font-size="96"
+    font-weight="700"
+    fill="#0f172a"
+  >
+    InvarLock
+  </text>
+</svg>

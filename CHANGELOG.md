@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 - Update guides and notebooks for evaluation reports and renamed commands/pages.
+- README: add logo, community links, citation snippet, limitations, and quickstart output excerpt.
 - Drop legacy Transformers v4 config key documentation and fix minor formatting/typos.
 
 ## [0.3.7] - 2026-01-22

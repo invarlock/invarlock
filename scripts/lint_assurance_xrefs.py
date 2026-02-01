@@ -16,6 +16,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SRC_ROOT = REPO_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
+
 TEST_REF_RE = re.compile(
     r"(tests/[A-Za-z0-9_./-]+\.py::[A-Za-z0-9_]+(?:::[A-Za-z0-9_]+)*)"
 )

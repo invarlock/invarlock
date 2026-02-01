@@ -1,3 +1,11 @@
+<p align="center">
+  <img
+    src="https://raw.githubusercontent.com/invarlock/invarlock/main/docs/assets/invarlock-logo.svg"
+    alt="InvarLock"
+    width="420"
+  />
+</p>
+
 # InvarLock — Edit‑agnostic robustness reports for weight edits
 
 [![CI](https://img.shields.io/github/actions/workflow/status/invarlock/invarlock/ci.yml?branch=main&logo=github&label=CI)](https://github.com/invarlock/invarlock/actions/workflows/ci.yml)
@@ -33,9 +41,14 @@ For guidance on where to ask questions, how to report bugs, and what to expect i
 ## How it works
 
 ```text
-Baseline checkpoint ─┐
-                    ├─► invarlock evaluate (paired windows) ─► guards ─► evaluation.report.json ─► PASS / FAIL
-Subject checkpoint ─┘                                  (invariants → spectral → RMT → variance)
+┌───────────────────┐        ┌──────────────────────────────────────────────┐
+│ Baseline checkpoint│ ─────► │ invarlock evaluate                           │
+└───────────────────┘        │  • Paired eval windows (deterministic)        │
+┌───────────────────┐ ─────► │  • GuardChain: invariants → spectral → RMT → variance │
+│ Subject checkpoint │        │  • Emit: evaluation.report.json              │
+└───────────────────┘        └──────────────────────────────────────────────┘
+                                         │
+                                         └─► PASS (ship) / FAIL (rollback)
 ```
 
 ## Quick start
@@ -55,13 +68,24 @@ INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate \
   --baseline gpt2 \
   --subject  gpt2 \
   --adapter auto \
-  --profile dev
+  --profile dev \
+  --quiet
 
 # Validate the evaluation report
 invarlock verify reports/eval/evaluation.report.json
 
 # Render HTML for sharing
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
+```
+
+Example output (abridged; counts vary by profile/config):
+
+```text
+INVARLOCK v<version> · EVALUATE
+Baseline: gpt2 -> Subject: gpt2 · Profile: dev
+Status: PASS · Gates: <passed>/<total> passed
+Primary metric ratio: <ratio>
+Output: reports/eval/evaluation.report.json
 ```
 
 ## Proof packs (portable evidence bundles)
@@ -95,9 +119,27 @@ Optional extras: `invarlock[gpu]`, `invarlock[awq,gptq]`. Full setup: <https://g
 - Assurance case: <https://github.com/invarlock/invarlock/blob/main/docs/assurance/00-safety-case.md>
 - Threat model: <https://github.com/invarlock/invarlock/blob/main/docs/security/threat-model.md>
 
-## Scope (what it does / doesn’t)
+## Community
 
-- Certifies regression risk from weight edits relative to a baseline under a specific configuration.
+- Questions/ideas: <https://github.com/invarlock/invarlock/discussions>
+- Bug reports: <https://github.com/invarlock/invarlock/issues>
+- Contact: <mailto:support@invarlock.dev>
+
+## Citation
+
+If you use InvarLock in scientific work, please cite it (canonical metadata is in `CITATION.cff`):
+
+```bibtex
+@software{invarlock,
+  title  = {InvarLock: Edit-agnostic robustness evaluation reports for weight edits},
+  author = {{InvarLock Maintainers}},
+  url    = {https://github.com/invarlock/invarlock},
+}
+```
+
+## Limitations
+
+- InvarLock evaluates an edited model relative to a baseline under a specific configuration; results are not “global” guarantees.
 - Not a content-safety/alignment tool.
 - Native Windows is not supported (use WSL2 or Linux).
 
