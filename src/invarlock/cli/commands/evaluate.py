@@ -814,6 +814,11 @@ def evaluate_command(
                     message="Evaluation Report",
                     emoji="📜",
                 ):
+                    # Use a wall-clock perf counter here (not the output module's
+                    # test-patched counter) so timing tests remain deterministic.
+                    from time import perf_counter as _wall_perf_counter
+
+                    report_start = _wall_perf_counter()
                     report_kwargs = {
                         "run": str(edited_report),
                         "format": "report",
@@ -821,6 +826,9 @@ def evaluate_command(
                         "output": report_out,
                         "style": output_style.name,
                         "no_color": no_color,
+                        "summary_baseline_seconds": float(timings.get("baseline", 0.0)),
+                        "summary_subject_seconds": float(timings.get("subject", 0.0)),
+                        "summary_report_start": float(report_start),
                     }
                     try:
                         sig = inspect.signature(_report)
