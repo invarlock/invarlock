@@ -18,6 +18,7 @@ import inspect
 import io
 import json
 import math
+import os
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -204,6 +205,23 @@ def _dump_yaml(path: Path, data: dict[str, Any]) -> None:
 
     with path.open("w", encoding="utf-8") as fh:
         yaml.safe_dump(data, fh, sort_keys=False)
+
+
+def _resolve_evaluate_tmp_dir() -> Path:
+    """Return the on-disk scratch directory for `invarlock evaluate`.
+
+    Evaluate generates merged YAML configs for baseline/subject runs so
+    downstream `invarlock run` flows remain traceable. We keep these files
+    under `./tmp/.evaluate` by default to avoid cluttering the working tree.
+    """
+
+    candidate = os.environ.get("INVARLOCK_EVALUATE_TMP_DIR")
+    if candidate:
+        tmp_dir = Path(candidate).expanduser()
+    else:
+        tmp_dir = Path("tmp") / ".evaluate"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    return tmp_dir
 
 
 def _normalize_model_id(model_id: str, adapter_name: str) -> str:
@@ -575,8 +593,7 @@ def evaluate_command(
     elif not edit_config:
         subject_label = "custom" if norm_src_id != norm_edt_id else "noop"
 
-    tmp_dir = Path(".evaluate_tmp")
-    tmp_dir.mkdir(parents=True, exist_ok=True)
+    tmp_dir = _resolve_evaluate_tmp_dir()
 
     baseline_report_path: Path
     if baseline_report:
@@ -704,8 +721,6 @@ def evaluate_command(
             )
 
         # Persist a temporary merged config for traceability
-        tmp_dir = Path(".evaluate_tmp")
-        tmp_dir.mkdir(parents=True, exist_ok=True)
         edited_merged_yaml = tmp_dir / "edited_merged.yaml"
         _dump_yaml(edited_merged_yaml, merged_edited_cfg)
         _debug(f"Edited config (merged): {edited_merged_yaml}")

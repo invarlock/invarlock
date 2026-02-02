@@ -110,7 +110,7 @@ def test_evaluate_uses_inline_preset_when_repo_preset_missing(monkeypatch, tmp_p
         profile="dev",
     )
 
-    cfg_path = Path(".evaluate_tmp/baseline_noop.yaml")
+    cfg_path = Path("tmp") / ".evaluate" / "baseline_noop.yaml"
     cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     assert cfg["dataset"]["provider"] == "wikitext2"
     assert calls["runs"] == 2 and calls["reports"] == 1
@@ -163,7 +163,7 @@ def test_evaluate_edit_config_successfully_merges_subject(monkeypatch, tmp_path)
     )
 
     merged = yaml.safe_load(
-        Path(".evaluate_tmp/edited_merged.yaml").read_text(encoding="utf-8")
+        (Path("tmp") / ".evaluate" / "edited_merged.yaml").read_text(encoding="utf-8")
     )
     assert merged["model"]["id"] == str(edt)
     assert merged["model"]["adapter"] == "hf_causal"

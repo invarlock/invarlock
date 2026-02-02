@@ -210,6 +210,7 @@ def test_evaluate_baseline_report_requires_windows(monkeypatch, tmp_path):
 
 def test_evaluate_autogen_uses_device_auto(monkeypatch, tmp_path):
     """Auto-generated evaluate presets should not hard-code CPU device."""
+    monkeypatch.chdir(tmp_path)
     # Arrange HF-like source/edited dirs so auto adapter resolves to hf_causal
     src = tmp_path / "src_model"
     edt = tmp_path / "edt_model"
@@ -246,17 +247,21 @@ def test_evaluate_autogen_uses_device_auto(monkeypatch, tmp_path):
     monkeypatch.setattr(mod, "_report", fake_report, raising=False)
 
     # Act
+    repo_root = Path(__file__).resolve().parents[2]
     evaluate_command(
         source=str(src),
         edited=str(edt),
         adapter="auto",
         profile="ci",
+        preset=str(
+            repo_root / "configs" / "presets" / "causal_lm" / "wikitext2_512.yaml"
+        ),
         out=str(tmp_path / "runs"),
         report_out=str(tmp_path / "reports"),
     )
 
     # Assert: temp baseline config exists and does not pin device=cpu
-    baseline_yaml = Path(".evaluate_tmp") / "baseline_noop.yaml"
+    baseline_yaml = tmp_path / "tmp" / ".evaluate" / "baseline_noop.yaml"
     assert baseline_yaml.exists()
     data = yaml.safe_load(baseline_yaml.read_text(encoding="utf-8")) or {}
     model_block = data.get("model") or {}
