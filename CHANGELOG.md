@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reduce noisy HuggingFace/Transformers warnings in `ci`/`release` CLI output.
 - Adapters: snapshot config serialization no longer emits deprecated attributes.
 - Scripts: CLI example validator ignores internal tool dirs and supports external paths.
+- CLI: keep `invarlock calibrate` import-safe so docs/example validation can run without torch installed.
 - Proof packs: fix `verify_pack.sh` cert discovery to verify `certs/**/evaluation.report.json`.
 - Proof packs: close a tamper-evidence gap by binding `checksums.sha256` to the signed manifest (and enforcing “no extra files” in strict verification).
 
