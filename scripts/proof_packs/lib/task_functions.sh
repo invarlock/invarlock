@@ -1392,7 +1392,7 @@ PRESET_YAML
     fi
 
     # Run evaluate in isolated working directory to avoid temp file race conditions
-    # (invarlock creates .evaluate_tmp/ in current directory which conflicts in parallel runs)
+    # (invarlock creates tmp/.evaluate/ in the current directory which conflicts in parallel runs)
     local work_dir="${cert_dir}/.workdir"
     mkdir -p "${work_dir}"
     local abs_preset_file
@@ -1679,7 +1679,7 @@ PRESET_YAML
     fi
 
     # Run evaluate in isolated working directory to avoid temp file race conditions
-    # (invarlock creates .evaluate_tmp/ in current directory which conflicts in parallel runs)
+    # (invarlock creates tmp/.evaluate/ in the current directory which conflicts in parallel runs)
     local work_dir="${cert_dir}/.workdir"
     mkdir -p "${work_dir}"
     local abs_preset_file
