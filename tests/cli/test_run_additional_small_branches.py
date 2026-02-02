@@ -68,7 +68,7 @@ def test_extract_model_load_kwargs_dtype_aliasing_and_normalization():
                 }
             }
 
-    assert run_mod._extract_model_load_kwargs(_Cfg()) == {"torch_dtype": "float16"}
+    assert run_mod._extract_model_load_kwargs(_Cfg()) == {"dtype": "float16"}
 
     class _Cfg2:
         def model_dump(self):
@@ -77,10 +77,8 @@ def test_extract_model_load_kwargs_dtype_aliasing_and_normalization():
                     "id": "foo",
                     "adapter": "dummy",
                     "device": "cpu",
-                    "torch_dtype": "custom_dtype",
+                    "dtype": "custom_dtype",
                 }
             }
 
-    assert run_mod._extract_model_load_kwargs(_Cfg2()) == {
-        "torch_dtype": "custom_dtype"
-    }
+    assert run_mod._extract_model_load_kwargs(_Cfg2()) == {"dtype": "custom_dtype"}

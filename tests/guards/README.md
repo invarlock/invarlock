@@ -5,31 +5,19 @@ that detect and validate model edits.
 
 ## Organization
 
-### Current Structure (Legacy)
+The current structure (many small, focused test modules) is intentional. Guards are a
+critical surface, and the test suite is optimized for targeted coverage and fast
+local iteration rather than a minimal file count.
 
-The current test files are organized by specific functionality, often with one file
-per test case or small feature. This structure is being consolidated.
+### Naming conventions
 
-### Target Structure (Consolidated)
-
-| File | Description |
-|------|-------------|
-| `test_variance_core.py` | Core guard lifecycle and utilities |
-| `test_variance_ab_gate.py` | A/B testing gate logic |
-| `test_variance_calibration.py` | Calibration and PPL computation |
-| `test_variance_scales.py` | Scale computation and filtering |
-| `test_variance_equalise.py` | Variance equalization functions |
-| `test_variance_finalize.py` | Finalization and edge cases |
-| `test_variance_hooks.py` | Hook management (enable/disable) |
-| `test_variance_edge_cases.py` | Edge cases and error paths |
-| `test_spectral_guard.py` | Core spectral guard |
-| `test_spectral_filters.py` | Scope and path filtering |
-| `test_spectral_utils.py` | Utilities and helpers |
-| `test_rmt_guard.py` | Core RMT guard |
-| `test_rmt_corrections.py` | Correction algorithms |
-| `test_rmt_utils.py` | Utilities |
-| `test_invariants_guard.py` | Structural invariants |
-| `test_policies.py` | Guard policy configuration |
+| Area | Pattern | Notes |
+|------|---------|-------|
+| Variance guard | `test_variance_*.py` | Calibration, gates, scale computation, finalize paths, branch coverage |
+| Spectral guard | `test_spectral_*.py` | Prepare/after_edit flows, scope filters, multiple testing enforcement |
+| RMT guard | `test_rmt_*.py` | Detection/correction algorithms, helpers, verbose/edge branches |
+| Invariants guard | `test_invariants_*.py` | Structural checks, API/CLI/docs invariants |
+| Policies/tier config | `test_guard_policies.py`, `test_tier_config.py`, etc. | Runtime policy parsing and validation |
 
 ## Guard Types
 

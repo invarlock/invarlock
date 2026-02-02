@@ -306,8 +306,8 @@ OUTPUT_DIR="${OUTPUT_DIR:-}"
 # Default behavior for this suite: co-locate caches under OUTPUT_DIR so they land
 # on the same (usually large) filesystem as the run artifacts.
 #
-# Override by exporting HF_HOME / HF_HUB_CACHE / HF_DATASETS_CACHE /
-# TRANSFORMERS_CACHE before running this script.
+# Override by exporting HF_HOME / HF_HUB_CACHE / HF_DATASETS_CACHE before running
+# this script.
 pack_setup_hf_cache_dirs() {
     if [[ -z "${OUTPUT_DIR:-}" ]]; then
         echo "ERROR: OUTPUT_DIR is not set; use --out or PACK_OUTPUT_DIR." >&2
@@ -316,8 +316,7 @@ pack_setup_hf_cache_dirs() {
     export HF_HOME="${HF_HOME:-${OUTPUT_DIR}/.hf}"
     export HF_HUB_CACHE="${HF_HUB_CACHE:-${HF_HOME}/hub}"
     export HF_DATASETS_CACHE="${HF_DATASETS_CACHE:-${HF_HOME}/datasets}"
-    export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-${HF_HOME}/transformers}"
-    if ! mkdir -p "${HF_HOME}" "${HF_HUB_CACHE}" "${HF_DATASETS_CACHE}" "${TRANSFORMERS_CACHE}"; then
+    if ! mkdir -p "${HF_HOME}" "${HF_HUB_CACHE}" "${HF_DATASETS_CACHE}"; then
         echo "ERROR: Failed to create HuggingFace cache directories under: ${HF_HOME}" >&2
         return 1
     fi
@@ -402,8 +401,8 @@ pack_run_determinism_repeats() {
     local -a certs=()
     local run
     for run in $(seq 1 "${repeats}"); do
-        run_invarlock_certify "${edit_path}" "${baseline_path}" "${det_dir}" "repeat_${run}" "${preset_dir}" "${model_name}" "0" || return 1
-        local cert_path="${det_dir}/repeat_${run}/evaluation.cert.json"
+        run_invarlock_evaluate "${edit_path}" "${baseline_path}" "${det_dir}" "repeat_${run}" "${preset_dir}" "${model_name}" "0" || return 1
+        local cert_path="${det_dir}/repeat_${run}/evaluation.report.json"
         if [[ -f "${cert_path}" ]]; then
             certs+=("${cert_path}")
         fi
@@ -616,7 +615,7 @@ fi
 
 pack_setup_output_dirs() {
     # ============ SETUP ============
-    mkdir -p "${OUTPUT_DIR}"/{logs,models,evals,certificates,analysis,reports,presets,workers,state} || return 1
+    mkdir -p "${OUTPUT_DIR}"/{logs,models,evals,reports,analysis,reports,presets,workers,state} || return 1
     LOG_FILE="${OUTPUT_DIR}/logs/main.log"
 
     # Create a lock file for thread-safe logging
@@ -1499,12 +1498,12 @@ main_dynamic() {
     fi
 
     local edit_scenarios_total=$((clean_scenarios + stress_scenarios))
-    local edit_certify_clean=$((clean_scenarios * clean_runs))
-    local edit_certify_stress=$((stress_scenarios * stress_runs))
-    local edit_certify_total=$((edit_certify_clean + edit_certify_stress))
+    local edit_evaluate_clean=$((clean_scenarios * clean_runs))
+    local edit_evaluate_stress=$((stress_scenarios * stress_runs))
+    local edit_evaluate_total=$((edit_evaluate_clean + edit_evaluate_stress))
 
     log "Edit scenarios: ${clean_scenarios} clean + ${stress_scenarios} stress = ${edit_scenarios_total} per model (${edit_scenarios_source})"
-    log "Edit certify runs: clean=${clean_scenarios}×${clean_runs}=${edit_certify_clean}, stress=${stress_scenarios}×${stress_runs}=${edit_certify_stress} (total=${edit_certify_total} per model)"
+    log "Edit evaluate runs: clean=${clean_scenarios}×${clean_runs}=${edit_evaluate_clean}, stress=${stress_scenarios}×${stress_runs}=${edit_evaluate_stress} (total=${edit_evaluate_total} per model)"
 
     if [[ "${RUN_ERROR_INJECTION:-true}" == "true" ]]; then
         if [[ ${error_scenarios} -le 0 ]]; then

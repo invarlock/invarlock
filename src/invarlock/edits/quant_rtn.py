@@ -406,7 +406,7 @@ class RTNQuantEdit(ModelEdit):
                         if layer_name not in modified_layers:
                             modified_layers.append(layer_name)
 
-            # Store edit plan for certificate generation
+            # Store edit plan for evaluation report generation
             modules_quantized = [r["module_name"] for r in quantization_results]
 
             edit_plan = {
@@ -424,7 +424,7 @@ class RTNQuantEdit(ModelEdit):
             return {
                 "name": self.name,
                 "plan_digest": f"rtn_quantization_{bitwidth}bit_{scope}",
-                "plan": edit_plan,  # Include the plan for certificate generation
+                "plan": edit_plan,  # Include the plan for evaluation report generation
                 "deltas": {
                     "params_changed": total_params_quantized,
                     "sparsity": None,  # Quantization doesn't create sparsity

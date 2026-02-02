@@ -17,7 +17,7 @@ This is a decision memo; for implementation usage see [Guards](../reference/guar
 
 - **Accelerator-first**: guard math must run on CUDA/MPS without full SVD.
 - **Approximation-only**: iterative estimators and deterministic sampling.
-- **Measurement contracts**: estimator + sampling policy must be recorded in certificates.
+- **Measurement contracts**: estimator + sampling policy must be recorded in reports.
 
 ## Reference
 
@@ -33,12 +33,12 @@ This is a decision memo; for implementation usage see [Guards](../reference/guar
 2. **Spectral contract**: track `σ̂_max` and degeneracy proxies (stable-rank drift,
    row/col norm collapse).
 3. **RMT contract**: activation edge-risk score normalized by MP edge.
-4. **Verification gate**: certificates must record the measurement contract and hash.
+4. **Verification gate**: reports must record the measurement contract and hash.
 
 ### Non-goals
 
 - Full-spectrum or exact SVD computations.
-- Certificates missing measurement contracts.
+- reports missing measurement contracts.
 
 ## Troubleshooting
 
@@ -47,7 +47,7 @@ This is a decision memo; for implementation usage see [Guards](../reference/guar
 ## Observability
 
 - Contract hashes appear under `spectral.measurement_contract_hash` and
-  `rmt.measurement_contract_hash` in certificates.
+  `rmt.measurement_contract_hash` in reports.
 
 ## Related Documentation
 

@@ -206,7 +206,7 @@ def load_records(*, cal_dir: Path) -> list[dict[str, Any]]:
         cert = None
         report = None
 
-        cert_path = run_dir / "evaluation.cert.json"
+        cert_path = run_dir / "evaluation.report.json"
         if cert_path.exists():
             cert = _load_json(cert_path)
 

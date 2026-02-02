@@ -83,8 +83,8 @@ printf '{"text":"hello world"}\n{"text":"custom data"}\n' > /tmp/byod.jsonl
 invarlock run -c byod.yaml --profile dev --out runs/base
 invarlock run -c byod.yaml --profile dev --out runs/subj
 
-# 4) Generate certificate
-invarlock report --run runs/subj --format cert --baseline runs/base -o cert
+# 4) Generate report
+invarlock report --run runs/subj --format report --baseline runs/base -o cert
 ```
 
 Common pitfalls:
@@ -95,4 +95,4 @@ Common pitfalls:
 
 Evidence debug:
 
-- Set `INVARLOCK_EVIDENCE_DEBUG=1` to also emit a small `guards_evidence.json` with decision inputs next to the certificate; the manifest will include a pointer to this file.
+- Set `INVARLOCK_EVIDENCE_DEBUG=1` to also emit a small `guards_evidence.json` with decision inputs next to the report; the manifest will include a pointer to this file.

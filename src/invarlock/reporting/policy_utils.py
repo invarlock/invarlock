@@ -35,7 +35,7 @@ def _compute_thresholds_payload(
     tier: str, resolved_policy: dict[str, Any]
 ) -> dict[str, Any]:
     """Build canonical thresholds payload for digest stability."""
-    from .certificate import TIER_RATIO_LIMITS  # local to avoid cycles
+    from .report_builder import TIER_RATIO_LIMITS  # local to avoid cycles
 
     tier_lc = (tier or "balanced").lower()
     metrics_policy = (

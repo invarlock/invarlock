@@ -93,7 +93,7 @@ def _detector_matches(cert: dict[str, Any], detector: dict[str, Any]) -> bool:
     return False
 
 
-def _evaluate_certificate(cert: dict[str, Any]) -> CertOutcome:
+def _evaluate_report(cert: dict[str, Any]) -> CertOutcome:
     validation = cert.get("validation") or {}
     if not isinstance(validation, dict):
         validation = {}
@@ -159,7 +159,7 @@ def _edit_family(name: str) -> str:
     return "other"
 
 
-def _classify_certificate(
+def _classify_report(
     cert_path: Path, *, output_dir: Path
 ) -> tuple[str, str, str] | None:
     try:
@@ -173,7 +173,7 @@ def _classify_certificate(
 
     model_name = parts[0]
     try:
-        idx = parts.index("certificates")
+        idx = parts.index("reports")
     except ValueError:
         return None
 
@@ -203,7 +203,7 @@ def _extract_run_num(cert_path: Path, *, output_dir: Path) -> int:
         return 0
     parts = rel.parts
     try:
-        idx = parts.index("certificates")
+        idx = parts.index("reports")
     except ValueError:
         return 0
     remainder = parts[idx + 1 :]
@@ -264,8 +264,8 @@ def generate_verdict(*, output_dir: Path) -> dict[str, Any]:
 
     # Pick the newest run for each (model, category, scenario_id).
     latest: dict[tuple[str, str, str], tuple[int, Path]] = {}
-    for cert_path in sorted(output_dir.glob("*/certificates/**/evaluation.cert.json")):
-        cls = _classify_certificate(cert_path, output_dir=output_dir)
+    for cert_path in sorted(output_dir.glob("*/reports/**/evaluation.report.json")):
+        cls = _classify_report(cert_path, output_dir=output_dir)
         if cls is None:
             continue
         model_name, category, scenario_id = cls
@@ -289,7 +289,7 @@ def generate_verdict(*, output_dir: Path) -> dict[str, Any]:
             continue
         if not isinstance(cert, dict):
             continue
-        outcome = _evaluate_certificate(cert)
+        outcome = _evaluate_report(cert)
         spec = scenario_index.get(scenario_id)
         reqs = spec.get("requirements") if isinstance(spec, dict) else None
         detectors = None

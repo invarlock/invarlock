@@ -16,7 +16,7 @@ class TestRetryController:
 
     def test_should_retry_on_pass(self) -> None:
         controller = RetryController(max_attempts=3)
-        assert controller.should_retry(certificate_passed=True) is False
+        assert controller.should_retry(report_passed=True) is False
         assert controller.attempt_history == []
 
     def test_attempt_budget_enforced(self) -> None:
@@ -45,7 +45,7 @@ class TestRetryController:
         controller = RetryController(max_attempts=2)
         controller.record_attempt(1, None, None)
         entry = controller.attempt_history[0]
-        assert entry["certificate_passed"] is False
+        assert entry["report_passed"] is False
         assert entry["failures"] == []
         assert entry["edit_params"] == {}
 

@@ -344,7 +344,7 @@ class SpectralGuard(Guard):
                 self.ignore_preview_inflation = bool(policy["ignore_preview_inflation"])
                 self.config["ignore_preview_inflation"] = self.ignore_preview_inflation
 
-            # Optional hydration of baseline stats from policy (e.g., baseline certificate)
+            # Optional hydration of baseline stats from policy (e.g., baseline evaluation report)
             if "baseline_family_stats" in policy and isinstance(
                 policy["baseline_family_stats"], dict
             ):

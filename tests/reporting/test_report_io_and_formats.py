@@ -5,7 +5,7 @@ from pathlib import Path
 
 from invarlock.reporting.report import (
     save_report,
-    to_certificate,
+    to_evaluation_report,
     to_html,
     to_json,
     to_markdown,
@@ -81,35 +81,35 @@ def test_to_json_markdown_html_variants(tmp_path: Path) -> None:
     assert "<style" not in html2
 
 
-def test_to_certificate_and_save_report(tmp_path: Path, monkeypatch) -> None:
+def test_to_evaluation_report_and_save_report(tmp_path: Path, monkeypatch) -> None:
     report = make_min_report()
     base = make_baseline()
 
-    # to_certificate supports json and markdown
-    cert_json = to_certificate(report, base, format="json")
-    assert json.loads(cert_json)["schema_version"]
-    cert_md = to_certificate(report, base, format="markdown")
-    assert "Evaluation Certificate" in cert_md
+    # to_evaluation_report supports json and markdown
+    report_json = to_evaluation_report(report, base, format="json")
+    assert json.loads(report_json)["schema_version"]
+    report_md = to_evaluation_report(report, base, format="markdown")
+    assert "Evaluation Report" in report_md
 
-    # save_report without baseline for cert should error
+    # save_report without baseline for report should error
     out = tmp_path / "out"
     import pytest
 
     with pytest.raises(ValueError):
-        save_report(report, out, formats=["cert"])  # type: ignore[arg-type]
+        save_report(report, out, formats=["report"])  # type: ignore[arg-type]
 
     # Enable evidence emission
     monkeypatch.setenv("INVARLOCK_EVIDENCE_DEBUG", "1")
     save_report(
-        report, out, formats=["json", "markdown", "html", "cert"], baseline=base
+        report, out, formats=["json", "markdown", "html", "report"], baseline=base
     )  # type: ignore[arg-type]
     # Basic outputs exist
     assert (out / "report.json").exists()
     assert (out / "report.md").exists()
     assert (out / "report.html").exists()
-    # Certificate artifacts
-    assert (out / "evaluation.cert.json").exists()
-    assert (out / "report_certificate.md").exists()
+    # Evaluation report artifacts
+    assert (out / "evaluation.report.json").exists()
+    assert (out / "evaluation_report.md").exists()
     # Manifest present and references evidence when env enabled
     manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
     assert "files" in manifest

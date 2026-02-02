@@ -23,8 +23,8 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock run \
   -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --tier balanced \
   --out runs/baseline
 
-# Compare & Certify (preferred), using an edit overlay
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
+# Compare & Evaluate (preferred), using an edit overlay
+INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
   --baseline sshleifer/tiny-gpt2 --subject sshleifer/tiny-gpt2 --adapter auto \
   --profile ci --tier balanced \
   --preset configs/presets/causal_lm/wikitext2_512.yaml \

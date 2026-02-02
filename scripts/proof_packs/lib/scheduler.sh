@@ -1126,7 +1126,7 @@ calculate_task_priority() {
     if [[ "${task_type}" == "SETUP_BASELINE" ]]; then
         boost=$((boost + 50))  # Always run setup first
     elif [[ "${task_type}" == "CALIBRATION_RUN" ]]; then
-        boost=$((boost + 20))  # Needed before certify
+        boost=$((boost + 20))  # Needed before evaluate
     fi
 
     # Boost tasks that unblock many others.

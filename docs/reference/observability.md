@@ -25,7 +25,7 @@ monitor = MonitoringManager(config)
 monitor.start()
 
 # Record an operation
-monitor.record_operation("certify", duration=45.2, model_id="gpt2")
+monitor.record_operation("evaluate", duration=45.2, model_id="gpt2")
 
 # Get current status
 status = monitor.get_status()
@@ -166,7 +166,7 @@ telemetry = TelemetryCollector(monitor)
 # Start tracking
 op_id = telemetry.start_operation(
     "op-123",
-    "certify",
+    "evaluate",
     model_id="gpt2",
     profile="ci",
 )
@@ -264,7 +264,7 @@ The CLI doesn't start full monitoring by default, but you can enable telemetry:
 
 ```bash
 # Enable single-line telemetry summary
-INVARLOCK_TELEMETRY=1 invarlock certify --baseline gpt2 --subject gpt2
+INVARLOCK_TELEMETRY=1 invarlock evaluate --baseline gpt2 --subject gpt2
 ```
 
 Reports include telemetry under `report.metrics`:
@@ -273,10 +273,10 @@ Reports include telemetry under `report.metrics`:
 - `memory_mb_peak` — peak memory during run
 - `throughput_tok_per_s` — average throughput
 
-Certificates copy these to the `telemetry` block.
+reports copy these to the `telemetry` block.
 
 ## Related Documentation
 
 - [CLI Reference](cli.md)
-- [Certificates](certificates.md) — Schema, telemetry, and HTML export
+- [reports](reports.md) — Schema, telemetry, and HTML export
 - [Environment Variables](env-vars.md)

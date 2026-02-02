@@ -9,7 +9,7 @@ from invarlock.cli.app import app, version
 
 def test_app_initialization():
     assert app.info.name == "invarlock"
-    assert "certify model changes" in app.info.help.lower()
+    assert "evaluate model changes" in app.info.help.lower()
     assert app.info.no_args_is_help
 
 
@@ -44,9 +44,9 @@ def test_cli_help_lists_core_commands():
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
     output = result.stdout
-    assert "certify model changes" in output.lower()
+    assert "evaluate model changes" in output.lower()
     # Verify the new grouped layout mentions key groups
-    for command in ("certify", "report", "run", "plugins", "doctor", "version"):
+    for command in ("evaluate", "report", "run", "plugins", "doctor", "version"):
         assert command in output
 
 

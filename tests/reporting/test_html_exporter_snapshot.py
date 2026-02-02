@@ -3,8 +3,8 @@ from __future__ import annotations
 import html as html_mod
 import re
 
-from invarlock.reporting.certificate import make_certificate
-from invarlock.reporting.render import render_certificate_markdown
+from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.report_builder import make_report
 
 
 def _mk_report() -> dict:
@@ -58,11 +58,11 @@ def _extract_numbers(s: str) -> list[str]:
 
 def test_html_export_contains_same_numbers_as_markdown():
     # Import HTML exporter lazily to avoid circulars
-    from invarlock.reporting.html import render_certificate_html
+    from invarlock.reporting.html import render_report_html
 
-    cert = make_certificate(_mk_report(), _mk_report())
-    md = render_certificate_markdown(cert)
-    html = render_certificate_html(cert)
+    cert = make_report(_mk_report(), _mk_report())
+    md = render_report_markdown(cert)
+    html = render_report_html(cert)
 
     nums_md = _extract_numbers(md)
     # Strip HTML tags from the body and compare number parity
@@ -78,8 +78,8 @@ def test_html_export_contains_same_numbers_as_markdown():
 def test_html_exporter_prefers_markdown_when_available():
     from invarlock.reporting import html as html_mod
 
-    cert = make_certificate(_mk_report(), _mk_report())
-    html = html_mod.render_certificate_html(cert)
+    cert = make_report(_mk_report(), _mk_report())
+    html = html_mod.render_report_html(cert)
     if html_mod._markdown is None:
         assert "<pre" in html
     else:

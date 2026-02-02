@@ -47,11 +47,7 @@ def _detect_quant_family_from_cfg(cfg: dict[str, Any]) -> str | None:
                 return "hf_gptq"
             if any(tok in method for tok in ("awq",)):
                 return "hf_awq"
-            # BitsAndBytes style
-            if any(
-                str(q.get(k, "")).lower() in {"true", "1"}
-                for k in ("load_in_4bit", "load_in_8bit")
-            ) or any("bitsandbytes" in str(v).lower() for v in q.values()):
+            if "bitsandbytes" in method or "bnb" in method:
                 return "hf_bnb"
     except Exception:
         return None

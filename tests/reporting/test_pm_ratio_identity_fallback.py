@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def _mk_run_with_windows(final_vals: list[float], token_counts: list[int]) -> dict:
@@ -46,7 +46,7 @@ def test_pm_ratio_identity_fallback_when_windows_identical(tmp_path: Path) -> No
     subj = _mk_run_with_windows(ll, wc)
     base = _mk_run_with_windows(ll, wc)
 
-    cert = make_certificate(subj, base)
+    cert = make_report(subj, base)
     pm = cert.get("primary_metric", {})
     ratio = pm.get("ratio_vs_baseline")
     assert isinstance(ratio, int | float)

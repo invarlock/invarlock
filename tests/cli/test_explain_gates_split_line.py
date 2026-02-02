@@ -35,7 +35,7 @@ def test_explain_gates_dataset_split_line(monkeypatch, tmp_path):
             },
         }
 
-    monkeypatch.setattr(mod, "make_certificate", _fake_cert)
+    monkeypatch.setattr(mod, "make_report", _fake_cert)
     r = CliRunner().invoke(
         app, ["report", "explain", "--report", str(rep), "--baseline", str(base)]
     )

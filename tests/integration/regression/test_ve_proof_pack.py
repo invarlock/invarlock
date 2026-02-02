@@ -38,7 +38,7 @@ def _load_cert(cert_path: Path) -> dict:
     if sample is not None:
         return sample
 
-    raise AssertionError(f"Certificate missing: {cert_path}")
+    raise AssertionError(f"Evaluation Report missing: {cert_path}")
 
 
 def test_variance_enabled_for_balanced_proof_pack():

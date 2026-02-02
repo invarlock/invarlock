@@ -66,11 +66,11 @@ token‑weighted).
 │            └──────────────┬──────────────┘                           │ │
 │                           ▼                                          │ │
 │            ┌─────────────────────────────────────────────┐           │ │
-│            │               CERTIFICATE                   │           │ │
+│            │                   report                    │           │ │
 │            │  ratio_vs_baseline = exp(Δℓ̄ₓ)               │           │ │
 │            │  display_ci       = [exp(L), exp(U)]        │           │ │
 │            └─────────────────────────────────────────────┘           │ │
-│                                                                      │ │
+│                                                                        │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -140,7 +140,7 @@ InvarLock uses the exponential of the token‑weighted mean ΔlogNLL
 
 ## Runtime Contract
 
-- Certificates must satisfy:
+- reports must satisfy:
   - `primary_metric.display_ci == exp(primary_metric.ci)` (paired baseline path; ppl-like kinds).
   - `dataset.windows.stats.paired_delta_summary` records `{mean,std,degenerate}` for the paired Δ distribution.
   - `dataset.windows.stats.window_match_fraction == 1.0` and `dataset.windows.stats.window_overlap_fraction == 0.0`.
@@ -158,7 +158,7 @@ InvarLock uses the exponential of the token‑weighted mean ΔlogNLL
 ## Edge cases & safeguards
 
 - If all `t_i` equal, weighting reduces to simple mean: implementation can short‑circuit.
-- Degenerate Δ (all equal): mark `degenerate=true` and collapse the CI to `[μ, μ]` with `μ = mean(Δ)`; certificate records the fallback.
+- Degenerate Δ (all equal): mark `degenerate=true` and collapse the CI to `[μ, μ]` with `μ = mean(Δ)`; report records the fallback.
 - Label alignment & padding must not contribute to `t_i` (masked tokens excluded).
 
 ## References

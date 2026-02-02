@@ -14,7 +14,7 @@
 
 ```bash
 # Allow model + dataset downloads for a single command
-INVARLOCK_ALLOW_NETWORK=1 invarlock certify --baseline gpt2 --subject gpt2
+INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --baseline gpt2 --subject gpt2
 
 # Force evaluation device for a one-off run
 INVARLOCK_EVAL_DEVICE=cpu invarlock run -c <config>.yaml --out runs/cpu_smoke
@@ -165,7 +165,7 @@ HF adapters also honor `TRUST_REMOTE_CODE_BOOL` and `ALLOW_REMOTE_CODE` for comp
 ## Observability
 
 - `report.meta.env_flags` records selected env toggles.
-- Certificates capture telemetry and policy digests derived from these flags.
+- reports capture telemetry and policy digests derived from these flags.
 
 ## Related Documentation
 

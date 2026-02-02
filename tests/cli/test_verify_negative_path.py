@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from invarlock.cli.commands.verify import verify_command
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 
 
 def _mk_basic_reports() -> tuple[dict, dict]:
@@ -62,7 +62,7 @@ def _mk_basic_reports() -> tuple[dict, dict]:
 
 def test_verify_negative_path_rejects_tampered_ratio(tmp_path: Path, capsys):
     report, baseline = _mk_basic_reports()
-    cert = make_certificate(report, baseline)
+    cert = make_report(report, baseline)
     # Tamper ratio_vs_baseline to trigger mismatch
     cert["primary_metric"]["ratio_vs_baseline"] = 1.2345
     # Ensure baseline_ref has PM for mismatch detection

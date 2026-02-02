@@ -132,15 +132,15 @@ def test_save_report_cert_requires_baseline(tmp_path):
 
     r = _minimal_report()
     with pytest.raises(ValueError):
-        save_report(r, tmp_path, formats=["cert"])  # missing baseline
+        save_report(r, tmp_path, formats=["report"])  # missing baseline
 
 
-def test_to_certificate_markdown_smoke():
-    from invarlock.reporting.report import to_certificate
+def test_to_evaluation_report_markdown_smoke():
+    from invarlock.reporting.report import to_evaluation_report
 
     r = _minimal_report()
     baseline = _minimal_report()
-    md = to_certificate(r, baseline, format="markdown")
+    md = to_evaluation_report(r, baseline, format="markdown")
     assert isinstance(md, str) and len(md) > 0
 
 

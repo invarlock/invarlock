@@ -34,11 +34,12 @@ TMP.mkdir(parents=True, exist_ok=True)
 EXCLUDE_TOP_LEVEL_DIRS = {
     # Internal planning docs may reference future APIs; exclude from checks.
     "plans",
+    "worktrees",
     # Generated/artifact dirs.
     "tmp",
     "runs",
     "reports",
-    ".certify_tmp",
+    ".evaluate_tmp",
     # Tooling caches / VCS.
     ".git",
     ".mypy_cache",

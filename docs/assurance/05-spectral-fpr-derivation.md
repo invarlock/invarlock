@@ -51,9 +51,9 @@ alongside $\kappa_f$ so auditors can recover the expected per-run WARN rate.
   calibrated budget. Scope is `ffn` in the shipped tier policies, so only FFN
   blocks are actively budgeted under the Conservative spectral guard.
 - Deadband δ suppresses flicker around the cap: Balanced records δ = 0.10,
-  Conservative δ = 0.05, surfaced in certificates via
+  Conservative δ = 0.05, surfaced in reports via
   `spectral.summary.deadband`.
-- Certificates expose the calibrations under
+- reports expose the calibrations under
   `spectral.multiple_testing.{method,alpha,m}`,
   `spectral.summary.{sigma_quantile,max_caps,deadband}`, and
   `spectral.family_caps[*].kappa`.
@@ -62,12 +62,12 @@ alongside $\kappa_f$ so auditors can recover the expected per-run WARN rate.
 
 The deadband δ is a guardrail against flicker: relative changes within ±δ are
 treated as neutral, so WARNs only fire when sustained growth exceeds both δ and
-the family κ cap. Auditors can confirm the chosen δ directly in the certificate
+the family κ cap. Auditors can confirm the chosen δ directly in the report
 summary.
 
-## Runtime Contract (certificate)
+## Runtime Contract (report)
 
-- Certificate exposes
+- report exposes
   `spectral.summary.{sigma_quantile,deadband,modules_checked,max_caps,caps_exceeded}`,
   `spectral.family_caps`, and `spectral.families[family]` with `{max, mean,
   count, violations, kappa}`. `sigma_quantile` is the calibrated baseline
@@ -85,7 +85,7 @@ summary.
 ### Worked example (Balanced tier)
 
 - For FFN modules, `family_caps.ffn.kappa = 3.849`. Suppose a layer reports $z = 3.90$.
-- Certificate records a WARN in `spectral.families.ffn.violations += 1`; `spectral.caps_applied` increments.
+- report records a WARN in `spectral.families.ffn.violations += 1`; `spectral.caps_applied` increments.
 - Balanced `max_caps = 5`. After the fifth WARN the guard continues to WARN;
   the sixth triggers `spectral.caps_exceeded=true` and the run aborts.
 - Multiple-testing metadata shows `spectral.multiple_testing = {method: "bh",

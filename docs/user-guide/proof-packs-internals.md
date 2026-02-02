@@ -71,12 +71,12 @@ task graph, scheduling, and artifact generation. It complements
 ### Module dependency graph
 
 ```text
-┌─────────────────────────────────────────────────────────┐
-│                         ENTRYPOINTS                      │
+┌──────────────────────────────────────────────────────────┐
+│                       ENTRYPOINTS                        │
 ├──────────────┬──────────────┬────────────────────────────┤
-│  run_pack.sh  │ run_suite.sh │ verify_pack.sh             │
-│  (pack+run)   │ (run only)   │ (checksums+certs verify)   │
-└──────┬────────┴──────┬───────┴────────────────────────────┘
+│ run_pack.sh  │ run_suite.sh │ verify_pack.sh             │
+│ (pack+run)   │ (run only)   │ (checksums+certs verify)   │
+└──────┬───────┴───────┬──────┴────────────────────────────┘
        │               │
        ▼               ▼
 ┌──────────────────────────────────────────────────────────┐
@@ -110,7 +110,7 @@ task graph, scheduling, and artifact generation. It complements
 │  ├─ GENERATE_PRESET       │
 │  ├─ CREATE_EDITS(_BATCH)  │
 │  ├─ CREATE_ERROR          │
-│  └─ CERTIFY_*             │
+│  └─ evaluate_*             │
 └──────────────────────────┘
 ```
 
@@ -124,7 +124,7 @@ Proof pack issues?
 │     → Run: ./scripts/proof_packs/run_pack.sh --suite ... --net ...
 │
 ├─ Spectral guard failing “clean” quantization edits?
-│  ├─ Check: caps_exceeded in certificate spectral.summary
+│  ├─ Check: caps_exceeded in report spectral.summary
 │  │  └─ Use edit-type presets (generated from calibration) or increase max_caps
 │  └─ Check: high z-scores in attention layers
 │     └─ Expected for quantization; calibrate or adjust thresholds
@@ -223,9 +223,9 @@ Priority (base)     Task type
   85 ┤ CALIBRATION_RUN
   75 ┤ GENERATE_PRESET
   70 ┤ CREATE_EDITS_BATCH / CREATE_EDIT
-  65 ┤ CERTIFY_EDIT
+  65 ┤ evaluate_EDIT
   60 ┤ CREATE_ERROR
-  55 ┤ CERTIFY_ERROR
+  55 ┤ evaluate_ERROR
 ```
 
 Dynamic boosts (scheduler):
@@ -281,7 +281,7 @@ GPU 2: 80GB total, 28GB free
 Ready queue scan (highest-priority fit):
   qwen-14b_CALIBRATION_RUN_002  req=24GB  pri=85  FITS ✓
   mixtral_CREATE_EDITS_BATCH_001 req=92GB pri=70  SKIP ✗
-  yi-34b_CERTIFY_EDIT_001       req=72GB  pri=65  SKIP ✗
+  yi-34b_evaluate_EDIT_001       req=72GB  pri=65  SKIP ✗
 ```
 
 ### GPU reservation protection
@@ -344,7 +344,7 @@ Small/medium models default to batch edit creation:
 
 Large or MoE models disable batch edits automatically (or via
 `PACK_USE_BATCH_EDITS=false`) and fall back to per-edit tasks
-(`CREATE_EDIT → CERTIFY_EDIT`).
+(`CREATE_EDIT → evaluate_EDIT`).
 
 ### Task dependency graphs
 
@@ -353,13 +353,13 @@ Batch (default):
 ```text
 SETUP_BASELINE
   ├─ CALIBRATION_RUN × N ──> GENERATE_PRESET ──┐
-  ├─ CREATE_EDITS_BATCH ------------------------┴─> CERTIFY_EDIT × runs
-  └─ CREATE_ERROR × types ----------------------┴─> CERTIFY_ERROR × types
+  ├─ CREATE_EDITS_BATCH ------------------------┴─> evaluate_EDIT × runs
+  └─ CREATE_ERROR × types ----------------------┴─> evaluate_ERROR × types
 ```
 
 Notes:
 
-- Error injection tasks (`CREATE_ERROR` → `CERTIFY_ERROR`) branch off
+- Error injection tasks (`CREATE_ERROR` → `evaluate_ERROR`) branch off
   `SETUP_BASELINE` and require the preset for certification.
 
 Per-edit path (large/MoE or `PACK_USE_BATCH_EDITS=false`):
@@ -367,8 +367,8 @@ Per-edit path (large/MoE or `PACK_USE_BATCH_EDITS=false`):
 ```text
 SETUP_BASELINE
   ├─ CALIBRATION_RUN × N ──> GENERATE_PRESET ──┐
-  ├─ CREATE_EDIT × edits -----------------------┴─> CERTIFY_EDIT × runs
-  └─ CREATE_ERROR × types ----------------------┴─> CERTIFY_ERROR × types
+  ├─ CREATE_EDIT × edits -----------------------┴─> evaluate_EDIT × runs
+  └─ CREATE_ERROR × types ----------------------┴─> evaluate_ERROR × types
 ```
 
 ## Task breakdown per model (defaults)
@@ -381,7 +381,7 @@ Batch path (default for small/medium):
 - Setup baseline: 1 task
 - Calibration runs + preset: 6 tasks
 - Batch edits: 1 task
-- Certify edits: 20 tasks
+- evaluate edits: 20 tasks
 - Error injection: 10 tasks
 
 Total: ~38 tasks/model (varies with overrides).
@@ -391,7 +391,7 @@ Per-edit path (large/MoE or `PACK_USE_BATCH_EDITS=false`):
 - Setup baseline: 1 task
 - Calibration runs + preset: 6 tasks
 - Create edits: 8 tasks
-- Certify edits: 20 tasks
+- evaluate edits: 20 tasks
 - Error injection: 10 tasks
 
 Total: ~45 tasks/model (varies with overrides).
@@ -406,7 +406,7 @@ PHASE 1: Task queue initialization
 PHASE 2: GPU worker launch
   - Spawn one worker per GPU, dynamic scheduling in loop
 PHASE 3: Reports + verdict
-  - Compile certificates into final verdict reports
+  - Compile reports into final verdict reports
 ```
 
 ## Run directory layout
@@ -442,7 +442,7 @@ OUTPUT_DIR/
       baseline/
       <edit_name>/
       error_<type>/
-    certificates/
+    reports/
       calibration/
       <edit_name>/run_<n>/
       errors/<type>/
@@ -498,14 +498,14 @@ Large runs can be storage-heavy (baseline + edits + error models):
 - `PACK_BASELINE_STORAGE_MODE=snapshot_symlink` stores baseline weights as
   symlinks to HF cache files to reduce duplication.
 - HF caches default to `OUTPUT_DIR/.hf` (override with `HF_HOME`, `HF_HUB_CACHE`,
-  `HF_DATASETS_CACHE`, `TRANSFORMERS_CACHE`).
+  `HF_DATASETS_CACHE`).
 
 ## Proof pack packaging and verification
 
 `run_pack.sh` builds a portable pack:
 
 - Copies `reports/final_verdict.{txt,json}` and key `analysis/*` artifacts.
-- Collects all certificates into `proof_pack/certs/...`.
+- Collects all reports into `proof_pack/certs/...`.
 - Generates `manifest.json`, `checksums.sha256`, and optional
   `manifest.json.asc`.
 - Optional HTML export can be disabled with `PACK_SKIP_HTML=1`.
@@ -522,8 +522,10 @@ run_pack.sh
 
 `verify_pack.sh` checks the pack:
 
-- Verifies `checksums.sha256`.
-- Verifies the GPG signature if `manifest.json.asc` exists.
+- Verifies `manifest.json` binds `checksums.sha256` via `checksums_sha256_digest`.
+- Verifies `checksums.sha256` (and thus all hashed artifacts).
+- Verifies the GPG signature when present; `--strict` requires it.
+- Enforces “no extra files” semantics in `--strict` mode.
 - Runs `invarlock verify` across all certs (JSON output optional).
 
 ## Remote setup helper
@@ -536,7 +538,7 @@ Common knobs for the setup script:
 
 - `REPO_DIR`, `REPO_URL`, `BRANCH`, `PYTHON_BIN`, `VENV_DIR`.
 - `TORCH_INDEX_URL`, `TORCH_PACKAGES`, `PACK_SKIP_TORCH_CHECK`.
-- `HF_HOME`, `HF_HUB_CACHE`, `HF_DATASETS_CACHE`, `TRANSFORMERS_CACHE`.
+- `HF_HOME`, `HF_HUB_CACHE`, `HF_DATASETS_CACHE`.
 
 ## Tuning reference
 
@@ -610,8 +612,8 @@ Common knobs for the setup script:
 | Variable | Default | Description |
 | --- | --- | --- |
 | `DRIFT_CALIBRATION_RUNS` | `5` | Calibration run count |
-| `CLEAN_EDIT_RUNS` | `3` | Clean edit certify runs |
-| `STRESS_EDIT_RUNS` | `2` | Stress edit certify runs |
+| `CLEAN_EDIT_RUNS` | `3` | Clean edit evaluate runs |
+| `STRESS_EDIT_RUNS` | `2` | Stress edit evaluate runs |
 | `RUN_ERROR_INJECTION` | `true` | Enable error injection |
 
 ### Storage and memory planning

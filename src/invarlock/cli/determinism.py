@@ -5,7 +5,7 @@ Centralizes:
 - Thread caps (OMP/MKL/etc + torch threads)
 - TF32 policy
 - torch deterministic algorithms
-- A structured "determinism level" for certificate provenance
+- A structured "determinism level" for evaluation report provenance
 """
 
 from __future__ import annotations

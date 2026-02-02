@@ -15,8 +15,8 @@ def _script_path() -> Path:
 
 def test_device_drift_checker_pass(tmp_path: Path) -> None:
     script = _script_path()
-    cpu = Path("tests/fixtures/device_drift/cert_cpu.json")
-    mps = Path("tests/fixtures/device_drift/cert_mps.json")
+    cpu = Path("tests/fixtures/device_drift/report_cpu.json")
+    mps = Path("tests/fixtures/device_drift/report_mps.json")
     result = subprocess.run(
         [sys.executable, str(script), str(cpu), str(mps), "--tolerance", "0.005"],
         check=False,
@@ -29,8 +29,8 @@ def test_device_drift_checker_pass(tmp_path: Path) -> None:
 
 def test_device_drift_checker_fail(tmp_path: Path) -> None:
     script = _script_path()
-    cpu = Path("tests/fixtures/device_drift/cert_cpu.json")
-    bad = Path("tests/fixtures/device_drift/cert_bad.json")
+    cpu = Path("tests/fixtures/device_drift/report_cpu.json")
+    bad = Path("tests/fixtures/device_drift/report_bad.json")
     result = subprocess.run(
         [sys.executable, str(script), str(cpu), str(bad), "--tolerance", "0.005"],
         check=False,

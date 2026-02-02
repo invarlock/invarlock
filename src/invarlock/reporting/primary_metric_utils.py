@@ -8,21 +8,21 @@ from .utils import _coerce_interval, _weighted_mean
 
 
 def attach_primary_metric(
-    certificate: dict[str, Any],
+    evaluation_report: dict[str, Any],
     report: dict[str, Any],
     baseline_raw: dict[str, Any] | None,
     baseline_ref: dict[str, Any] | None,
     ppl_analysis: dict[str, Any] | None,
 ) -> None:
-    """Attach/normalize the primary_metric block on the certificate.
+    """Attach/normalize the primary_metric block on the evaluation report.
 
-    Behavior mirrors historical logic in certificate.py and preserves structure:
+    Behavior mirrors historical logic in report_builder.py and preserves structure:
     - Prefer explicit metrics.primary_metric if present
     - Compute missing ratio_vs_baseline, degenerate display_ci
     - ppl window-based analysis info (mean logloss) added when available
     - Fallbacks for classification metrics and eval-window-derived ppl
     - Ensure display_ci always present for schema invariants
-    Mutates the certificate in-place.
+    Mutates the evaluation report in-place.
     """
     # Attach primary metric snapshot when provided in report
     try:
@@ -180,12 +180,12 @@ def attach_primary_metric(
                     ]
             except Exception:
                 pass
-            certificate["primary_metric"] = pm_copy
+            evaluation_report["primary_metric"] = pm_copy
     except Exception:
         pass
 
     def _attach_from_windows() -> None:
-        if isinstance(certificate.get("primary_metric"), dict):
+        if isinstance(evaluation_report.get("primary_metric"), dict):
             return
         try:
             m = (
@@ -212,7 +212,7 @@ def attach_primary_metric(
                 baseline=baseline_raw if isinstance(baseline_raw, dict) else None,
             )
             if isinstance(pm_block, dict) and pm_block:
-                certificate["primary_metric"] = pm_block
+                evaluation_report["primary_metric"] = pm_block
         except Exception:
             pass
 
@@ -220,7 +220,7 @@ def attach_primary_metric(
     _attach_from_windows()
 
     # Minimal fallback for classification-only reports without explicit primary_metric
-    if not isinstance(certificate.get("primary_metric"), dict):
+    if not isinstance(evaluation_report.get("primary_metric"), dict):
         try:
             metrics_map = report.get("metrics", {}) if isinstance(report, dict) else {}
             clf = (
@@ -298,7 +298,7 @@ def attach_primary_metric(
                         acc_pm["ratio_vs_baseline"] = delta_pp
                 except Exception:
                     pass
-                certificate["primary_metric"] = acc_pm
+                evaluation_report["primary_metric"] = acc_pm
         except Exception:
             pass
 
@@ -308,8 +308,8 @@ def attach_primary_metric(
     # Ensure primary_metric has display_ci populated for schema invariants
     try:
         pm = (
-            certificate.get("primary_metric", {})
-            if isinstance(certificate.get("primary_metric"), dict)
+            evaluation_report.get("primary_metric", {})
+            if isinstance(evaluation_report.get("primary_metric"), dict)
             else None
         )
         if isinstance(pm, dict) and pm:

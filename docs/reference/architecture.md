@@ -6,7 +6,7 @@
 | --- | --- |
 | **Purpose** | Edit-agnostic safety certification framework for ML model weight modifications. |
 | **Audience** | Developers extending InvarLock, operators debugging pipelines, security reviewers. |
-| **Core components** | CLI layer, Core runtime, Guard chain, Reporting/certificate subsystem. |
+| **Core components** | CLI layer, Core runtime, Guard chain, Reporting/report subsystem. |
 | **Design goals** | Torch-independent core, edit-agnostic guards, deterministic evaluation, full provenance. |
 | **Source of truth** | `src/invarlock/core/runner.py`, `src/invarlock/cli/commands/*.py`, `src/invarlock/guards/*.py`. |
 
@@ -20,7 +20,7 @@ four-guard pipeline, policy digest, and measurement contract.
 3. [Component Layers](#component-layers)
 4. [Pipeline Flow](#pipeline-flow)
 5. [Guard Chain Architecture](#guard-chain-architecture)
-6. [Certificate Generation Flow](#certificate-generation-flow)
+6. [report Generation Flow](#report-generation-flow)
 7. [Key Design Decisions](#key-design-decisions)
 8. [Module Dependencies](#module-dependencies)
 9. [Extension Points](#extension-points)
@@ -37,8 +37,8 @@ four-guard pipeline, policy digest, and measurement contract.
 │  ─────────                     ──────────                      ──────      │
 │                                                                             │
 │  ┌─────────┐     ┌────────────────────────────────┐     ┌──────────────┐   │
-│  │ Config  │────▶│         CLI LAYER              │────▶│ Certificate  │   │
-│  │ (YAML)  │     │ certify │ run │ verify │ ...   │     │   (JSON)     │   │
+│  │ Config  │────▶│         CLI LAYER              │────▶│ report  │   │
+│  │ (YAML)  │     │ evaluate │ run │ verify │ ...   │     │   (JSON)     │   │
 │  └─────────┘     └───────────────┬────────────────┘     └──────────────┘   │
 │                                  │                                          │
 │  ┌─────────┐     ┌───────────────▼────────────────┐     ┌──────────────┐   │
@@ -62,7 +62,7 @@ InvarLock follows a layered architecture with clear separation of concerns:
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              CLI LAYER                                      │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐          │
-│  │ certify  │ │   run    │ │  verify  │ │  report  │ │  doctor  │          │
+│  │ evaluate  │ │   run    │ │  verify  │ │  report  │ │  doctor  │          │
 │  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘          │
 │       │            │            │            │            │                 │
 ├───────┴────────────┴────────────┴────────────┴────────────┴─────────────────┤
@@ -85,8 +85,8 @@ InvarLock follows a layered architecture with clear separation of concerns:
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                          REPORTING LAYER                                    │
 │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐            │
-│  │   report   │  │certificate │  │   render   │  │  manifest  │            │
-│  │   (JSON)   │  │   (JSON)   │  │   (MD/HTML)│  │   (JSON)   │            │
+│  │   report   │  │   report   │  │   render   │  │  manifest  │            │
+│  │   (JSON)   │  │   (JSON)   │  │  (MD/HTML) │  │   (JSON)   │            │
 │  └────────────┘  └────────────┘  └────────────┘  └────────────┘            │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -100,10 +100,10 @@ Typer-based command-line interface providing user-facing entry points.
 
 | Command | Purpose | Primary Output |
 | --- | --- | --- |
-| `certify` | Compare baseline vs subject with pinned windows | Certificate JSON + MD |
+| `evaluate` | Compare baseline vs subject with pinned windows | report JSON + MD |
 | `run` | Single-model evaluation pipeline | Report JSON + Events JSONL |
-| `verify` | Validate certificate against schema and pairing | Exit code + messages |
-| `report` | Render/compare reports and certificates | MD/HTML/JSON artifacts |
+| `verify` | Validate report against schema and pairing | Exit code + messages |
+| `report` | Render/compare reports and reports | MD/HTML/JSON artifacts |
 | `doctor` | Environment diagnostics | Health check output |
 | `plugins` | List adapters, guards, edits | Plugin inventory |
 
@@ -132,12 +132,12 @@ Four-guard pipeline for edit safety validation.
 
 ### Reporting Layer (`src/invarlock/reporting/`)
 
-Certificate generation, validation, and rendering.
+report generation, validation, and rendering.
 
 | Module | Responsibility |
 | --- | --- |
-| `certificate.py` | Certificate schema and validation |
-| `render.py` | Markdown certificate rendering |
+| `report.py` | report schema and validation |
+| `render.py` | Markdown report rendering |
 | `html.py` | HTML export with styling |
 | `report.py` | Report generation and manifest |
 | `telemetry.py` | Performance metrics collection |
@@ -163,7 +163,7 @@ Certificate generation, validation, and rendering.
 │   │  Model   │    │  Edit    │    │  Paired  │    │  Guards  │             │
 │   └──────────┘    └──────────┘    └──────────┘    └──────────┘             │
 │                                                                             │
-│   PHASE 3: CERTIFICATE GENERATION                                           │
+│   PHASE 3: report GENERATION                                           │
 │   ───────────────────────────────                                           │
 │   ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐             │
 │   │  Pair    │───▶│ Compute  │───▶│  Apply   │───▶│  Render  │             │
@@ -236,11 +236,11 @@ Certificate generation, validation, and rendering.
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Certificate Generation Flow
+## report Generation Flow
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                      CERTIFICATE GENERATION                                 │
+│                      report GENERATION                                 │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │   INPUTS                                                                    │
@@ -253,7 +253,7 @@ Certificate generation, validation, and rendering.
 │                                    │                                        │
 │                                    ▼                                        │
 │   ┌─────────────────────────────────────────────────────────────────┐      │
-│   │                    CERTIFICATE BUILDER                           │      │
+│   │                    report BUILDER                           │      │
 │   │                                                                  │      │
 │   │  1. Pair evaluation windows (baseline ↔ subject)                │      │
 │   │  2. Compute log-space ΔlogNLL with BCa bootstrap                │      │
@@ -361,13 +361,13 @@ my_custom_adapter = "my_adapter:MyAdapter"
   torch-independent; use adapters for torch operations.
 - **Guard preparation failures**: check tier policy compatibility; use
   `INVARLOCK_GUARD_PREPARE_STRICT=0` for debugging.
-- **Certificate generation errors**: verify baseline and subject reports exist
+- **report generation errors**: verify baseline and subject reports exist
   and have compatible window structures.
 
 ## Observability
 
 - Pipeline phases emit timing via `print_timing_summary()` in CLI.
-- Guard results recorded in `report.guards[]` and certificate `validation.*` flags.
+- Guard results recorded in `report.guards[]` and report `validation.*` flags.
 - Telemetry fields include `memory_mb_peak`, `latency_ms_*`, `duration_s`.
 
 ## Related Documentation
@@ -375,5 +375,5 @@ my_custom_adapter = "my_adapter:MyAdapter"
 - [CLI Reference](cli.md) — Command usage and options
 - [Guards Reference](guards.md) — Guard configuration and evidence
 - [Configuration Schema](config-schema.md) — YAML config structure
-- [Certificates](certificates.md) — Certificate schema and verification
+- [reports](reports.md) — report schema and verification
 - [Safety Case Overview](../assurance/00-safety-case.md) — Assurance claims and evidence

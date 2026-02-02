@@ -18,7 +18,7 @@ Choose your path based on your role:
 
 | Persona | Path |
 |---------|------|
-| **First-time user** | Getting Started → [Quickstart](quickstart.md) → [Compare & Certify](compare-and-certify.md) |
+| **First-time user** | Getting Started → [Quickstart](quickstart.md) → [Compare & evaluate](compare-and-evaluate.md) |
 | **Python developer** | Getting Started → [Primary Metric Smoke](primary-metric-smoke.md) → [API Guide](../reference/api-guide.md) |
 | **Custom data user** | Getting Started → [Bring Your Own Data](bring-your-own-data.md) → [Config Gallery](config-gallery.md) |
 | **Plugin developer** | Getting Started → [Plugins](plugins.md) → [Guards Reference](../reference/guards.md) |
@@ -31,7 +31,7 @@ Choose your path based on your role:
 # Minimal core (no torch; CLI + config/schema tools)
 pip install invarlock
 
-# Recommended (HF adapter + evaluation stack for certify/run)
+# Recommended (HF adapter + evaluation stack for evaluate/run)
 pip install "invarlock[hf]"
 
 # Full (all extras)
@@ -82,8 +82,8 @@ make cert-loop
 
 For more hands-on examples, see the [Example Reports](example-reports.md).
 
-See also: [Compare & Certify (BYOE)](compare-and-certify.md) for a universal
-baseline→subject→certificate workflow when you already have two checkpoints.
+See also: [Compare & evaluate (BYOE)](compare-and-evaluate.md) for a universal
+baseline→subject→report workflow when you already have two checkpoints.
 
 ## Fast Smoke Runs
 
@@ -96,10 +96,10 @@ INVARLOCK_CAPACITY_FAST=1 invarlock run -c configs/presets/causal_lm/wikitext2_5
 
 Note: this skips full capacity/dedupe work; don’t use for release evidence.
 
-## Compare & Certify First
+## Compare & evaluate First
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
+INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
   --source gpt2 \
   --edited /path/to/edited \
   --adapter auto \
@@ -109,12 +109,12 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
 
 Notes
 
-- Prefer Compare & Certify (BYOE) for production. Use `--edit-config` overlays for quick smokes.
+- Prefer Compare & evaluate (BYOE) for production. Use `--edit-config` overlays for quick smokes.
 
 ## Device Support
 
 InvarLock defaults to `--device auto`, probing **CUDA → MPS → CPU** in that order.
-All guard calculations and certificates are device-agnostic; we continuously
+All guard calculations and reports are device-agnostic; we continuously
 exercise CPU paths on Linux and macOS runners, document MPS fallbacks for
 Apple Silicon, and treat CUDA as optional-but-recommended for release-tier
 baselines. Native Windows is not supported; use WSL2 or a Linux container
@@ -130,11 +130,11 @@ Choose your path based on your workflow:
 
 | I want to... | Start here |
 |--------------|------------|
-| Certify my own edited model (BYOE) | [Compare & Certify (BYOE)](compare-and-certify.md) |
+| evaluate my own edited model (BYOE) | [Compare & evaluate (BYOE)](compare-and-evaluate.md) |
 | Understand the CLI commands | [Quickstart](quickstart.md) |
 | Bring my own evaluation dataset | [Bring Your Own Data](bring-your-own-data.md) |
 | See example outputs | [Example Reports](example-reports.md) |
-| Understand what's in a certificate | [Reading a Certificate](reading-certificate.md) |
+| Understand what's in a report | [Reading a report](reading-report.md) |
 | Use InvarLock programmatically | [API Guide](../reference/api-guide.md) |
 | Understand the safety guarantees | [Safety Case](../assurance/00-safety-case.md) |
 | Set up secure production deployment | [Security Best Practices](../security/best-practices.md) |

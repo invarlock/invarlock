@@ -5,12 +5,12 @@
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Safety checks that validate edits against baseline-derived contracts. |
-| **Audience** | Users tuning guard behavior and reviewing certificate evidence. |
+| **Audience** | Users tuning guard behavior and reviewing report evidence. |
 | **Supported guards** | `invariants`, `spectral`, `rmt`, `variance` (plus optional plugin guards). |
 | **Requires** | `invarlock[guards]` for torch/numpy guard math. |
 | **Network** | Offline by default; guard logic itself is local. |
 | **Inputs** | Model, adapter, calibration data, tier policy (`--tier`/`auto_config`). |
-| **Outputs / Artifacts** | `report.guards` entries, certificate `resolved_policy`, `validation.*` flags. |
+| **Outputs / Artifacts** | `report.guards` entries, report `resolved_policy`, `validation.*` flags. |
 | **Source of truth** | `src/invarlock/guards/*.py`, `src/invarlock/guards/policies.py`, `src/invarlock/_data/runtime/tiers.yaml`. |
 
 See the [Glossary](../assurance/glossary.md) for definitions of guard terms such
@@ -33,7 +33,7 @@ guards:
 ```
 
 > Most thresholds come from the tier defaults (see `tiers.yaml`). Use overrides
-> sparingly and keep evidence in the certificate.
+> sparingly and keep evidence in the report.
 
 ## Guard Pipeline Flow
 
@@ -66,7 +66,7 @@ guards:
 │        │               │               │               │                │
 │        ▼               ▼               ▼               ▼                │
 │   ┌──────────────────────────────────────────────────────────┐         │
-│   │                GUARD RESULTS → CERTIFICATE               │         │
+│   │                GUARD RESULTS → report                    │         │
 │   │     (passed/warned/failed + metrics + measurement_hash)  │         │
 │   └──────────────────────────────────────────────────────────┘         │
 │                                                                         │
@@ -82,7 +82,7 @@ guards:
 - **Tier policies**: `--tier balanced|conservative|aggressive` resolves a full
   policy bundle from `runtime/tiers.yaml`; overrides in config are merged on top.
 - **Measurement contracts**: Spectral and RMT guards record estimator + sampling
-  contracts in certificates and are enforced by `invarlock verify` in CI/Release.
+  contracts in reports and are enforced by `invarlock verify` in CI/Release.
 
 ### Guard hooks
 
@@ -103,7 +103,7 @@ guards:
 
 ### Guard summary
 
-| Guard | Purpose | Key knobs (override) | Evidence (certificate/report) |
+| Guard | Purpose | Key knobs (override) | Evidence (report/report) |
 | --- | --- | --- | --- |
 | `invariants` | Structural integrity + non-finite checks. | `strict_mode`, `on_fail`, `profile_checks`. | `validation.invariants_pass`, `invariants.*`. |
 | `spectral` | Baseline-relative spectral norm stability. | `sigma_quantile`, `family_caps`, `deadband`, `scope`, `correction_enabled`, `estimator`, `degeneracy`, `multiple_testing`. | `validation.spectral_stable`, `spectral.*`, `resolved_policy.spectral`. |
@@ -112,13 +112,13 @@ guards:
 
 ### Guard evidence matrix
 
-| Guard config | Report evidence | Certificate evidence | Verify gate |
+| Guard config | Report evidence | report evidence | Verify gate |
 | --- | --- | --- | --- |
-| `guards.invariants.*` | `report.guards[name=invariants]` | `certificate.invariants`, `validation.invariants_pass` | Schema only. |
-| `guards.spectral.*` | `report.guards[name=spectral]` | `certificate.spectral`, `resolved_policy.spectral`, `validation.spectral_stable` | Measurement contracts (CI/Release). |
-| `guards.rmt.*` | `report.guards[name=rmt]` | `certificate.rmt`, `resolved_policy.rmt`, `validation.rmt_stable` | Measurement contracts (CI/Release). |
-| `guards.variance.*` | `report.guards[name=variance]` | `certificate.variance`, `resolved_policy.variance` | Schema only. |
-| `--profile release` | `report.guard_overhead` | `certificate.guard_overhead` | Required unless skipped. |
+| `guards.invariants.*` | `report.guards[name=invariants]` | `report.invariants`, `validation.invariants_pass` | Schema only. |
+| `guards.spectral.*` | `report.guards[name=spectral]` | `report.spectral`, `resolved_policy.spectral`, `validation.spectral_stable` | Measurement contracts (CI/Release). |
+| `guards.rmt.*` | `report.guards[name=rmt]` | `report.rmt`, `resolved_policy.rmt`, `validation.rmt_stable` | Measurement contracts (CI/Release). |
+| `guards.variance.*` | `report.guards[name=variance]` | `report.variance`, `resolved_policy.variance` | Schema only. |
+| `--profile release` | `report.guard_overhead` | `report.guard_overhead` | Required unless skipped. |
 
 ### Invariants Guard
 
@@ -196,7 +196,7 @@ packaged presets include it by default; remove a guard from the list to skip it.
 ## Observability
 
 - `report.guards` contains guard results by name.
-- Certificates include `resolved_policy.{spectral,rmt,variance}` and evidence
+- reports include `resolved_policy.{spectral,rmt,variance}` and evidence
   blocks (`spectral.*`, `rmt.*`, `variance.*`).
 - Validation flags are recorded under `validation.*` (`invariants_pass`,
   `spectral_stable`, `rmt_stable`).

@@ -2,7 +2,7 @@
 Primary metric abstraction and minimal ppl_causal implementation (Phase 1).
 
 This module introduces a light-weight, task-agnostic metric interface and a
-registry so the runner/certificate can evolve beyond causal-LM perplexity.
+registry so the runner and evaluation report builder can evolve beyond causal-LM perplexity.
 
 Phase 1 goal: provide a ppl_causal metric and a helper that can compute point
 estimates directly from evaluation window aggregates already present in run

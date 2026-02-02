@@ -6,7 +6,7 @@ Thank you for using InvarLock! This document explains where to ask questions, ho
 
 - **Usage questions, how‑to, and design discussions**
   - Use **GitHub Discussions** (if enabled) or start a thread in the Q&A/Ideas categories.
-  - Example topics: “How do I run certify with my own checkpoints?”, “What profile should I use for CPU‑only runs?”.
+  - Example topics: “How do I run evaluate with my own checkpoints?”, “What profile should I use for CPU‑only runs?”.
 
 - **Bugs and regressions**
   - Open a **GitHub Issue** using the Bug Report template.

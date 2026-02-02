@@ -10,12 +10,12 @@ nav:
       - Getting Started: user-guide/getting-started.md
       - Quickstart: user-guide/quickstart.md
       - Primary Metric Smoke: user-guide/primary-metric-smoke.md
-      - Compare & Certify (BYOE): user-guide/compare-and-certify.md
+      - Compare & Evaluate (BYOE): user-guide/compare-and-evaluate.md
       - Bring Your Own Data: user-guide/bring-your-own-data.md
       - Plugin Workflow: user-guide/plugins.md
       - Configuration Gallery: user-guide/config-gallery.md
       - Example Reports: user-guide/example-reports.md
-      - Reading a Certificate: user-guide/reading-certificate.md
+      - Reading a Report: user-guide/reading-report.md
       - Proof Packs: user-guide/proof-packs.md
       - Proof Pack Internals: user-guide/proof-packs-internals.md
   - CLI Reference:
@@ -26,7 +26,7 @@ nav:
       - API Guide: reference/api-guide.md
       - Programmatic Quickstart: reference/programmatic-quickstart.md
       - Guards: reference/guards.md
-      - Certificates: reference/certificates.md
+      - Reports: reference/reports.md
       - Environment Variables: reference/env-vars.md
       - Model Adapters: reference/model-adapters.md
       - Configuration Schema: reference/config-schema.md

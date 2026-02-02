@@ -22,8 +22,8 @@ pip install "invarlock[hf]"
 # Inspect adapter availability
 invarlock plugins adapters
 
-# Compare & Certify with adapter auto-selection
-INVARLOCK_ALLOW_NETWORK=1 invarlock certify \
+# Compare & evaluate with adapter auto-selection
+INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate \
   --baseline gpt2 \
   --subject gpt2 \
   --adapter auto
@@ -125,7 +125,9 @@ model:
 model:
   id: mistralai/Mistral-7B-v0.1
   adapter: hf_bnb
-  load_in_8bit: true
+  quantization_config:
+    quant_method: bitsandbytes
+    bits: 8
 ```
 
 ```yaml
@@ -143,7 +145,7 @@ Adapter loaders pass through standard Hugging Face `from_pretrained` arguments:
 
 | Key | Common use | Applies to |
 | --- | --- | --- |
-| `torch_dtype` | Force `float16`/`bfloat16` | HF adapters |
+| `dtype` | Force `float16`/`bfloat16` | HF adapters |
 | `device_map` | Sharding/placement | HF adapters |
 | `trust_remote_code` | Enable custom model code | HF adapters |
 | `revision` | Pin model revision | HF adapters |
@@ -193,7 +195,7 @@ finally:
 ## Observability
 
 - `invarlock plugins adapters --json` reports readiness and missing extras.
-- `report.context["plugins"]` and certificate `plugins.adapters` record adapter
+- `report.context["plugins"]` and report `plugins.adapters` record adapter
   discovery for audit trails.
 
 ## Related Documentation
@@ -202,4 +204,4 @@ finally:
 - [Configuration Schema](config-schema.md)
 - [Dataset Providers](datasets.md)
 - [Environment Variables](env-vars.md)
-- [Certificates](certificates.md) — Schema, telemetry, and HTML export
+- [reports](reports.md) — Schema, telemetry, and HTML export

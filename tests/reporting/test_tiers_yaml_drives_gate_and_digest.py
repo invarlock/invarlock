@@ -4,7 +4,7 @@ from copy import deepcopy
 
 import pytest
 
-from invarlock.reporting.certificate import make_certificate
+from invarlock.reporting.report_builder import make_report
 from invarlock.reporting.report_types import create_empty_report
 
 
@@ -102,10 +102,10 @@ def test_tiers_yaml_changes_gate_resolved_policy_and_digest(
     }
 
     monkeypatch.setenv("INVARLOCK_CONFIG_ROOT", str(case_loose))
-    cert_loose = make_certificate(deepcopy(report), deepcopy(baseline))
+    cert_loose = make_report(deepcopy(report), deepcopy(baseline))
 
     monkeypatch.setenv("INVARLOCK_CONFIG_ROOT", str(case_tight))
-    cert_tight = make_certificate(deepcopy(report), deepcopy(baseline))
+    cert_tight = make_report(deepcopy(report), deepcopy(baseline))
 
     assert cert_loose["validation"]["primary_metric_acceptable"] is True
     assert cert_tight["validation"]["primary_metric_acceptable"] is False

@@ -32,7 +32,7 @@ r = \frac{\hat{\sigma}_{\max}(A')}{\sigma_{\mathrm{MP}}(m,n)}
 $$
 
 The contract fixes the estimator budget and the activation sampling policy; those
-knobs are recorded in the certificate.
+knobs are recorded in the report.
 
 ## Derivation (sketch)
 
@@ -55,7 +55,7 @@ knobs are recorded in the certificate.
 - Conservative uses the same per-family ε defaults:
   $\epsilon_f = \{0.01, 0.01, 0.01, 0.01\}$.
   Values are recorded in the packaged `tiers.yaml`
-  (`invarlock._data.runtime/tiers.yaml`) and surfaced in certificates. Provide
+  (`invarlock._data.runtime/tiers.yaml`) and surfaced in reports. Provide
   overrides via `INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml` when needed.
 
 *Example:* with `r_base = 1.20` and ε = 0.01, the guard allows
@@ -72,11 +72,11 @@ To recalibrate, run null baselines (no edit) and compute per-family deltas
 q95–q99 quantile of Δ(f). For small families or tiny sample sizes, use a slightly
 larger ε to avoid spurious failures.
 
-## Runtime Contract (certificate)
+## Runtime Contract (report)
 
-- Certificate reports `rmt.{edge_risk_by_family_base,edge_risk_by_family,epsilon_default,epsilon_by_family,epsilon_violations,stable,status}`.
+- report reports `rmt.{edge_risk_by_family_base,edge_risk_by_family,epsilon_default,epsilon_by_family,epsilon_violations,stable,status}`.
 - Per-family details for rendering live under `rmt.families.*.{edge_base,edge_cur,epsilon,allowed,ratio,delta}`.
-- Certificate lint verifies the inequality and marks violations; `validation.rmt_stable` reflects the ε‑band gate.
+- report lint verifies the inequality and marks violations; `validation.rmt_stable` reflects the ε‑band gate.
 
 ## Observability
 

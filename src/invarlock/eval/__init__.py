@@ -1,7 +1,7 @@
 """Evaluation utilities (`invarlock.eval`).
 
 This package now focuses on evaluation helpers (metrics, data, probes).
-Reporting (report building, certificate, schema validation) has moved to
+Reporting (evaluation report building and schema validation) has moved to
 `invarlock.reporting`.
 """
 

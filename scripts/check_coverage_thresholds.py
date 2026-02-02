@@ -29,13 +29,13 @@ THRESHOLDS = {
     "src/invarlock/calibration/spectral_null.py": 0.90,
     "src/invarlock/calibration/variance_ve.py": 0.90,
     # Reporting
-    "src/invarlock/reporting/certificate.py": 0.90,
+    "src/invarlock/reporting/report_builder.py": 0.90,
     "src/invarlock/reporting/report.py": 0.90,
     "src/invarlock/reporting/validate.py": 0.90,
     # Reporting types
     "src/invarlock/reporting/report_types.py": 0.90,
     "src/invarlock/reporting/dataset_hashing.py": 0.90,
-    "src/invarlock/reporting/certificate_schema.py": 0.90,
+    "src/invarlock/reporting/report_schema.py": 0.90,
     "src/invarlock/reporting/guards_analysis.py": 0.90,
     "src/invarlock/reporting/primary_metric_utils.py": 0.90,
     "src/invarlock/reporting/utils.py": 0.90,
@@ -99,13 +99,13 @@ CORE_FILES = (
     "src/invarlock/reporting/validate.py",
     "src/invarlock/reporting/report_types.py",
     "src/invarlock/reporting/dataset_hashing.py",
-    "src/invarlock/reporting/certificate_schema.py",
+    "src/invarlock/reporting/report_schema.py",
     "src/invarlock/reporting/guards_analysis.py",
     "src/invarlock/reporting/primary_metric_utils.py",
     "src/invarlock/reporting/utils.py",
-    # Certificate is part of the reporting surface but has an explicit
+    # Report builder is part of the reporting surface but has an explicit
     # transitional override below until tests mature
-    "src/invarlock/reporting/certificate.py",
+    "src/invarlock/reporting/report_builder.py",
     # Critical CLI commands
     "src/invarlock/cli/commands/run.py",
     "src/invarlock/cli/commands/verify.py",

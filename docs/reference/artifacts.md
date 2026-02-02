@@ -4,7 +4,7 @@
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Explain where run outputs and certificates live. |
+| **Purpose** | Explain where run outputs and reports live. |
 | **Audience** | Operators archiving evidence and CI outputs. |
 | **Scope** | `runs/` scratch outputs and `reports/` long-lived evidence. |
 | **Source of truth** | CLI run/report commands (`src/invarlock/cli/commands/run.py`). |
@@ -15,22 +15,22 @@
 # Run baseline
 invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml --out runs/baseline
 
-# Generate certificate
-invarlock report --run runs/baseline/report.json --format cert --output reports/baseline
+# Generate report
+invarlock report --run runs/baseline/report.json --format report --output reports/baseline
 ```
 
 ## Concepts
 
 - `runs/` is scratch space: timestamped run directories with `report.json` + `events.jsonl`.
-- `reports/` is evidence: copy `report.json` and certificates for audit.
-- Certificates reference baseline reports; keep them together to preserve pairing.
+- `reports/` is evidence: copy `report.json` and reports for audit.
+- reports reference baseline reports; keep them together to preserve pairing.
 
 ### Command outputs
 
 | Command | Writes | What to archive |
 | --- | --- | --- |
 | `invarlock run` | `runs/<name>/<timestamp>/report.json`, `events.jsonl` | Baseline + subject `report.json`. |
-| `invarlock report --format cert` | `reports/<name>/evaluation.cert.json` | Certificate + baseline report. |
+| `invarlock report --format report` | `reports/<name>/evaluation.report.json` | report + baseline report. |
 | `invarlock report html` | `reports/<name>/evaluation.html` | Optional (can be rebuilt). |
 
 ## Reference
@@ -49,28 +49,28 @@ runs/
       events.jsonl
 ```
 
-### Reports and certificates (`reports/`)
+### Reports and reports (`reports/`)
 
 ```text
 reports/
   baseline/
     report.json
   quant8_balanced/
-    evaluation.cert.json
+    evaluation.report.json
     report.json
 ```
 
 ### Archive checklist
 
 - Move baseline + subject `report.json` into `reports/`.
-- Keep `evaluation.cert.json` with the baseline report.
+- Keep `evaluation.report.json` with the baseline report.
 - Retain `events.jsonl` only if debugging; HTML exports are optional.
 - Prune timestamped `runs/` once evidence is archived.
 
 | Artifact | Why archive | Required for verify |
 | --- | --- | --- |
 | `report.json` (baseline + subject) | Metrics, windows, provenance | Yes |
-| `evaluation.cert.json` | Evaluation certificate snapshot | Yes |
+| `evaluation.report.json` | Evaluation report snapshot | Yes |
 | `events.jsonl` | Debugging timeline | No |
 | `evaluation.html` | Human review | No |
 
@@ -78,19 +78,19 @@ reports/
 
 - `report.meta.seeds` includes Python/NumPy/Torch seeds.
 - `report.meta.tokenizer_hash` and dataset digests support pairing verification.
-- Certificates record `policy_digest` and resolved tier policy snapshots.
+- reports record `policy_digest` and resolved tier policy snapshots.
 
 ### Cleanup checklist
 
-1. Copy `report.json` and `evaluation.cert.json` into `reports/` for retention.
-2. Keep baseline reports alongside derived certificates for pairing checks.
+1. Copy `report.json` and `evaluation.report.json` into `reports/` for retention.
+2. Keep baseline reports alongside derived reports for pairing checks.
 3. Remove stale timestamped runs once evidence is archived.
 
 ## Troubleshooting
 
-- **Missing baseline report**: certificates cannot be validated without the
-  baseline `report.json`; keep it alongside the certificate.
-- **Large run dirs**: prune old timestamped runs after archiving certificates.
+- **Missing baseline report**: reports cannot be validated without the
+  baseline `report.json`; keep it alongside the report.
+- **Large run dirs**: prune old timestamped runs after archiving reports.
 
 ## Observability
 
@@ -99,5 +99,5 @@ reports/
 
 ## Related Documentation
 
-- [Certificates](certificates.md) — Schema, telemetry, and HTML export
+- [reports](reports.md) — Schema, telemetry, and HTML export
 - [CLI Reference](cli.md)

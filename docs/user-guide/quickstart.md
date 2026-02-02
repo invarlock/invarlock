@@ -8,22 +8,22 @@
 | **Audience** | New users running their first certification. |
 | **Requires** | `invarlock[hf]` for HF adapter workflows. |
 | **Network** | `INVARLOCK_ALLOW_NETWORK=1` for model/dataset downloads. |
-| **Next step** | [Compare & Certify](compare-and-certify.md) for production workflows. |
+| **Next step** | [Compare & evaluate](compare-and-evaluate.md) for production workflows. |
 
-This guide helps you get started with InvarLock (Edit‑agnostic robustness certificates for weight edits)
+This guide helps you get started with InvarLock (Edit‑agnostic robustness reports for weight edits)
 quickly. Every run flows through the **GuardChain**
 (invariants → spectral → RMT → variance) and produces a machine-readable safety
-certificate with drift, guard-overhead, and policy digests.
+report with drift, guard-overhead, and policy digests.
 If any terms are unfamiliar, see the [Glossary](../assurance/glossary.md).
 
 Note: For installation and environment setup, see Getting Started. This page focuses on core commands and workflow.
 
 Tip: Enable downloads per command when fetching models/datasets:
-`INVARLOCK_ALLOW_NETWORK=1 invarlock certify ...`
+`INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate ...`
 For offline reads after warming caches: `HF_DATASETS_OFFLINE=1`.
 
 Adapter‑based commands shown below (for example, `invarlock run` on HF
-checkpoints or `invarlock certify` with `--adapter auto`) assume you have
+checkpoints or `invarlock evaluate` with `--adapter auto`) assume you have
 installed an appropriate extra such as `invarlock[hf]` or `invarlock[adapters]`.
 
 ## Quick Start
@@ -40,21 +40,21 @@ invarlock plugins guards
 invarlock plugins adapters
 ```
 
-See [Plugin Workflow](plugins.md) for extending adapters and guards, or use Compare & Certify (BYOE) when you
+See [Plugin Workflow](plugins.md) for extending adapters and guards, or use Compare & evaluate (BYOE) when you
 already have two checkpoints.
 
-**Safety tip:** After any run that produces a certificate, execute
-`invarlock verify reports/cert/evaluation.cert.json`. The verifier re-checks paired
+**Safety tip:** After any run that produces a report, execute
+`invarlock verify reports/eval/evaluation.report.json`. The verifier re-checks paired
 log‑space math, guard‑overhead (<= 1%), drift gates, and schema compliance before
 you promote results.
 
-### 2. Run a Simple Edit or Compare & Certify
+### 2. Run a Simple Edit or Compare & evaluate
 
-Use the built‑in RTN quantization preset (demo), or prefer Compare & Certify (BYOE):
+Use the built‑in RTN quantization preset (demo), or prefer Compare & evaluate (BYOE):
 
 ```bash
 # RTN quantization (smoke, demo edit overlay)
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
+INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
   --baseline gpt2 \
   --subject gpt2 \
   --adapter auto \
@@ -63,8 +63,8 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
   --preset configs/presets/causal_lm/wikitext2_512.yaml \
   --edit-config configs/overlays/edits/quant_rtn/8bit_attn.yaml
 
-# Compare & Certify (recommended)
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
+# Compare & evaluate (recommended)
+INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
   --baseline gpt2 \
   --subject /path/to/edited \
   --adapter auto \
@@ -73,7 +73,7 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
 
 # Explain decisions and render HTML (includes Primary Metric Tail gate details)
 invarlock report explain --report runs/edited/report.json --baseline runs/source/report.json
-invarlock report html -i reports/cert/evaluation.cert.json -o reports/cert/evaluation.html
+invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 ```
 
 ### 3. Generate Reports
@@ -85,8 +85,8 @@ invarlock report --run runs/20240118_143022 --format json
 # Generate all formats
 invarlock report --run runs/20240118_143022 --format all
 
-# Generate evaluation certificate (requires baseline)
-invarlock report --run runs/20240118_143022 --format cert --baseline runs/baseline
+# Generate evaluation report (requires baseline)
+invarlock report --run runs/20240118_143022 --format report --baseline runs/baseline
 ```
 
 ## Core Concepts
@@ -95,7 +95,7 @@ invarlock report --run runs/20240118_143022 --format cert --baseline runs/baseli
 
 - **RTN Quantization** (built‑in, demo): Reduce precision using
   Round‑To‑Nearest quantization
-- **Compare & Certify (BYOE)** (recommended): Provide baseline + subject checkpoints and certify
+- **Compare & evaluate (BYOE)** (recommended): Provide baseline + subject checkpoints and evaluate
 
 ### Guards
 
@@ -105,7 +105,7 @@ invarlock report --run runs/20240118_143022 --format cert --baseline runs/baseli
 - **RMT**: Random Matrix Theory-based validation
 - **Guard Overhead**: Comparison against the bare baseline to ensure the
   GuardChain adds <= 1% perplexity overhead (captured under
-  `validation.guard_overhead_*` in certificates)
+  `validation.guard_overhead_*` in reports)
 
 ### Adapters
 
@@ -146,8 +146,8 @@ etc.) when validating portability or troubleshooting driver issues.
 
 - See [CLI Reference](../reference/cli.md) for detailed command options
 - Check [Configuration Schema](../reference/config-schema.md) for all config options
-- Review [Certificates](../reference/certificates.md) for schema and validation details
-- See [Reading a Certificate](reading-certificate.md) for guidance
+- Review [reports](../reference/reports.md) for schema and validation details
+- See [Reading a report](reading-report.md) for guidance
 - Read the [Device Support note](getting-started.md#device-support) if you plan to run on CPU or Apple Silicon
 - Learn about [Guard Contracts](../assurance/04-guard-contracts.md) for guard behavior details
 

@@ -7,17 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+### Changed
+
+### Fixed
+
+### Dependencies
+
+### Documentation
+
+## [0.3.8] - 2026-02-02
+
+### Added
+- CLI: `--version` / `-V` flag (alias of `invarlock version`) to print the InvarLock version (plus report schema version when available).
+- `invarlock evaluate` summary now includes total runtime and confidence interval.
+- Proof packs: `verify_pack.sh --strict` (or `PACK_STRICT_MODE=1`) to fail closed on missing/invalid GPG signatures and unexpected pack contents.
+
+### Changed
+- **Breaking:** Rename “certificate” → “report” across artifacts, docs, scripts, notebooks, and Python API surfaces.
+- **Breaking:** CLI terminology unified on `evaluate` (replaces `certify`).
+- Config: reject legacy HF v4 load keys `model.torch_dtype`, `model.load_in_8bit`, and `model.load_in_4bit`; use `model.dtype` and/or `model.quantization_config`.
+- Evaluation report bundle filenames updated (JSON: `evaluation.report.json`, Markdown: `evaluation_report.md`).
+- Presets: bump default WikiText-2 dataset seed for the causal LM preset from `42` → `43`.
+- Proof packs: `manifest.json` records `checksums_sha256_digest` (sha256 of `checksums.sha256`) and may record `signing_key_fingerprint` when signed.
+
+### Fixed
+- HuggingFace/Transformers v5 compatibility: migrate load contracts and use `dtype=` where required.
+- Reduce noisy HuggingFace/Transformers warnings in `ci`/`release` CLI output.
+- Adapters: snapshot config serialization no longer emits deprecated attributes.
+- Scripts: CLI example validator ignores internal tool dirs and supports external paths.
+- CLI: keep `invarlock calibrate` import-safe so docs/example validation can run without torch installed.
+- Proof packs: fix `verify_pack.sh` cert discovery to verify `certs/**/evaluation.report.json`.
+- Proof packs: close a tamper-evidence gap by binding `checksums.sha256` to the signed manifest (and enforcing “no extra files” in strict verification).
+
+### Dependencies
+- Require `transformers>=5.0.0` and `huggingface_hub>=1.0.0`.
+
+### Documentation
+- Update guides and notebooks for evaluation reports and renamed commands/pages.
+- README: add logo, community links, citation snippet, limitations, and quickstart output excerpt.
+- Drop legacy Transformers v4 config key documentation and fix minor formatting/typos.
+
 ## [0.3.7] - 2026-01-22
 
 ### Added
 - Role-based HuggingFace adapters with updated auto-routing (replaces model-name adapters).
 - Proof packs: v2 pack layout, scenarios manifest, and assurance verdict generation.
-- CLI flags: `invarlock run --edit-label` and `invarlock certify --baseline-report`.
+- CLI flags: `invarlock run --edit-label` and `invarlock evaluate --baseline-report`.
 - CI notebook smoke runner (`scripts/verify_notebooks_smoke.py`).
 
 ### Changed
 - Proof pack workflows hardened: baseline-report reuse, calibrate-only behavior, tuned-params hygiene, and improved task sizing/memory planning.
-- Certificate reporting refreshed: revamped certificate markdown, enhanced HTML output + glossary, and “Safety Certificate” renamed to “Evaluation Certificate”.
+- report reporting refreshed: revamped report markdown, enhanced HTML output + glossary, and “Safety report” renamed to “Evaluation report”.
 - Presets/overlays updated for new adapter roles and additional model families.
 - CI: bump `actions/download-artifact` to v7; remove the legacy B200 backend validation harness.
 
@@ -32,15 +74,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.6] - 2026-01-13
 
 ### Added
-- Measurement contracts for guard estimators (approximation-only, GPU/MPS-first) recorded in certificates and enforced by `invarlock verify --profile ci|release`.
+- Measurement contracts for guard estimators (approximation-only, GPU/MPS-first) recorded in reports and enforced by `invarlock verify --profile ci|release`.
 - Proof pack suite workflow split: `scripts/proof_packs/run_suite.sh --calibrate-only` (stop after preset generation) and `--run-only` (resume remaining tasks).
 - Proof pack suite knob for controlled experiments: `PACK_GUARDS_ORDER`.
 
 ### Changed
 - B200 calibration configs now default to `guards.order: [invariants, variance, invariants]` (drops spectral/rmt) to avoid CPU-bound SVD (`torch.linalg.svdvals` / MKL `sgesdd`) dominating wall time and making GPUs appear idle during calibration.
 - B200 calibrated presets now include `guards.order`, and only include `guards.spectral` / `guards.rmt` sections when those guards are enabled (run a smaller follow-up calibration pass if you need spectral caps or an RMT ε).
-- B200 bootstrap defaults HuggingFace caches under `${OUTPUT_DIR}/.hf` (override with `HF_HOME` / `HF_HUB_CACHE` / `HF_DATASETS_CACHE` / `TRANSFORMERS_CACHE`) to avoid small `/root` partitions on GPU nodes.
-- `invarlock certify` now honors `guards.order` when provided by `--preset` (instead of always forcing `["invariants", "spectral", "rmt", "variance", "invariants"]`), so certify matches the calibration preset’s intended guard set.
+- B200 bootstrap defaults HuggingFace caches under `${OUTPUT_DIR}/.hf` (override with `HF_HOME` / `HF_HUB_CACHE` / `HF_DATASETS_CACHE`) to avoid small `/root` partitions on GPU nodes.
+- `invarlock evaluate` now honors `guards.order` when provided by `--preset` (instead of always forcing `["invariants", "spectral", "rmt", "variance", "invariants"]`), so evaluate matches the calibration preset’s intended guard set.
 
 ### Dependencies
 - Bump katex from 0.16.25 to 0.16.27.
@@ -76,7 +118,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - CI/Release baseline pairing is fail-closed: `invarlock run --baseline ...` now requires valid `evaluation_windows` evidence and enforces dataset/tokenizer/masking parity.
-- CI/Release certificate generation now requires `paired_windows` evidence and rejects non-perfect window pairing.
+- CI/Release report generation now requires `paired_windows` evidence and rejects non-perfect window pairing.
 
 ### Documentation
 - Updated artifacts, CLI, and environment variable references for snapshot fallback and baseline pairing requirements.
@@ -92,7 +134,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Window pairing enforcement now tracks overlap vs duplicate fractions and detects count mismatches;
-  CI/Release certificates require perfect pairing, non-overlapping windows, and coverage floors.
+  CI/Release reports require perfect pairing, non-overlapping windows, and coverage floors.
 - Determinism preset chooses `CUBLAS_WORKSPACE_CONFIG` based on GPU memory and disables
   `TOKENIZERS_PARALLELISM` under strict settings.
 - Guard overhead metric fields standardized to `bare_ppl`/`guarded_ppl`; primary metric `display_ci`
@@ -114,7 +156,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Calibration CLI (`invarlock calibrate`) and runtime modules for policy and guard tuning.
 - Determinism utilities and CLI flows to exercise repeatable runs and presets.
-- Bench policy regression harness and additional regression tests for guards and certificates.
+- Bench policy regression harness and additional regression tests for guards and reports.
 - Benchmark policy regression golden `bench-golden-2025-12-13` (`2627b8872cd6bfc37bda31fbc11b78ed814751cbf2a9ad1396e173f1f4e5383a`) tracked to guard guard-effect CI against silent gate/output shifts.
 
 ### Changed
@@ -122,7 +164,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI commands (`run`, `verify`, `doctor`, `explain-gates`) extended with calibration and reporting surfaces.
 
 ### Fixed
-- Additional edge cases in certificate reporting, policy utilities, and guard analysis covered and hardened via new tests.
+- Additional edge cases in report reporting, policy utilities, and guard analysis covered and hardened via new tests.
 
 ### Documentation
 - Expanded assurance docs for calibration, guard contracts, determinism, and BCA/bootstrap methods.
@@ -188,8 +230,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 First public release on GitHub and PyPI.
 
 ### Added
-- Core compare & certify pipeline and guard chain for edit‑agnostic robustness certificates.
-- Evaluation Certificate schema v1 and CLI entry points (including `invarlock certify`).
+- Core compare & evaluate pipeline and guard chain for edit‑agnostic robustness reports.
+- Evaluation report schema v1 and CLI entry points (including `invarlock evaluate`).
 - Torch‑optional core install with optional extras (e.g., `invarlock[hf]`, `invarlock[adapters]`).
 - Initial documentation set: quickstart, user guides, and CLI reference.
 

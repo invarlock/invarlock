@@ -4,16 +4,18 @@ InvarLock CLI Run Command
 
 Run a guarded pipeline from a YAML config. Intended for local smokes,
 plugin demos, and development. Advanced: for pairwise certification,
-prefer Compare & Certify via `invarlock certify --baseline ... --subject ...`.
+prefer Compare & Evaluate via `invarlock evaluate --baseline ... --subject ...`.
 """
 
 import copy
 import hashlib
 import inspect
 import json
+import logging
 import math
 import os
 import random
+import re
 import shutil
 import sys as _sys
 import types as _types
@@ -125,10 +127,7 @@ RELEASE_CALIBRATION_MAX = 24
 GUARD_OVERHEAD_THRESHOLD = 0.01
 KV_LABEL_WIDTH = 10
 
-_NOISY_WARNING_PATTERNS = (
-    r".*`torch_dtype` is deprecated.*",
-    r".*loss_type=None.*unrecognized.*",
-)
+_NOISY_WARNING_PATTERNS = (r".*loss_type=None.*unrecognized.*",)
 
 
 def _resolve_warning_suppression(profile: str | None) -> tuple[bool, bool]:
@@ -139,7 +138,7 @@ def _resolve_warning_suppression(profile: str | None) -> tuple[bool, bool]:
         "on",
     }
     profile_norm = (profile or "").strip().lower()
-    enabled = bool(suppress_all) or profile_norm in {"ci", "ci_cpu", "release", "dev"}
+    enabled = bool(suppress_all) or profile_norm in {"ci", "ci_cpu", "release"}
     return enabled, suppress_all
 
 
@@ -156,14 +155,176 @@ def _apply_warning_filters(profile: str | None) -> bool:
 
 
 @contextmanager
-def _suppress_noisy_warnings(profile: str | None) -> Iterator[None]:
-    enabled, _suppress_all = _resolve_warning_suppression(profile)
+def _suppress_noisy_warnings(
+    profile: str | None,
+    *,
+    event_path: Path | None = None,
+    context: dict[str, Any] | None = None,
+) -> Iterator[None]:
+    enabled, suppress_all = _resolve_warning_suppression(profile)
     if not enabled:
         yield
         return
-    with warnings.catch_warnings():
-        _apply_warning_filters(profile)
-        yield
+
+    prev_tf_verbosity = os.environ.get("TRANSFORMERS_VERBOSITY")
+    os.environ["TRANSFORMERS_VERBOSITY"] = "error"
+    transformers_logger = logging.getLogger("transformers")
+    prev_tf_level = transformers_logger.level
+    transformers_logger.setLevel(logging.ERROR)
+
+    patterns = [re.compile(p) for p in _NOISY_WARNING_PATTERNS]
+    suppressed: list[str] = []
+
+    class _NoisyLogFilter(logging.Filter):
+        def filter(self, record: logging.LogRecord) -> bool:  # noqa: A003
+            try:
+                message = record.getMessage()
+            except Exception:
+                return True
+            if any(p.search(message) for p in patterns):
+                suppressed.append(message)
+                return False
+            return True
+
+    def _iter_handlers() -> list[logging.Handler]:
+        handlers: list[logging.Handler] = []
+        seen: set[int] = set()
+        for logger in (
+            logging.getLogger(),
+            logging.getLogger("transformers"),
+            logging.getLogger("huggingface_hub"),
+            logging.getLogger("datasets"),
+        ):
+            for handler in getattr(logger, "handlers", []) or []:
+                if id(handler) in seen:
+                    continue
+                seen.add(id(handler))
+                handlers.append(handler)
+        return handlers
+
+    log_filter = _NoisyLogFilter()
+    handlers = _iter_handlers()
+
+    def _append_suppressed_warnings() -> None:
+        if not suppressed or event_path is None:
+            return
+        try:
+            path = Path(event_path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            payload = {
+                "timestamp": datetime.now().isoformat(),
+                "component": "warnings",
+                "operation": "suppressed",
+                "level": "WARNING",
+                "data": {
+                    "count": len(suppressed),
+                    "messages": suppressed[:50],
+                    "profile": profile or "",
+                    **(context or {}),
+                },
+            }
+            with path.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(payload) + "\n")
+        except Exception:
+            # Best-effort: suppressed warnings are non-fatal and logging must not
+            # impact model loading.
+            return
+
+    for handler in handlers:
+        handler.addFilter(log_filter)
+
+    try:
+        with warnings.catch_warnings():
+            from contextlib import redirect_stderr, redirect_stdout
+
+            class _FilteredStream:
+                def __init__(self, raw: Any) -> None:
+                    self._raw = raw
+
+                def __getattr__(self, name: str) -> object:
+                    return getattr(self._raw, name)
+
+                def write(self, s: object) -> int:
+                    try:
+                        if isinstance(s, bytes):
+                            text = s.decode("utf-8", errors="replace")
+                        else:
+                            text = str(s)
+                    except Exception:
+                        return int(self._raw.write(s))
+
+                    # Preserve progress bars (carriage returns) by passing through
+                    # all non-matching chunks immediately.
+                    pieces = text.splitlines(keepends=True)
+                    for piece in pieces:
+                        if any(p.search(piece) for p in patterns):
+                            suppressed.append(piece.rstrip("\n"))
+                            continue
+                        self._raw.write(piece)
+                    return len(text)
+
+                def flush(self) -> None:
+                    try:
+                        self._raw.flush()
+                    except Exception:
+                        pass
+
+            stdout_proxy = _FilteredStream(_sys.stdout)
+            stderr_proxy = _FilteredStream(_sys.stderr)
+
+            with redirect_stdout(stdout_proxy), redirect_stderr(stderr_proxy):
+                if suppress_all:
+                    warnings.simplefilter("ignore")
+                    yield
+                else:
+                    original_showwarning = warnings.showwarning
+
+                    def _showwarning(
+                        message: Warning | str,
+                        category: type[Warning],
+                        filename: str,
+                        lineno: int,
+                        file: object | None = None,
+                        line: str | None = None,
+                    ) -> None:
+                        try:
+                            rendered = warnings.formatwarning(
+                                message, category, filename, lineno, line
+                            )
+                        except Exception:
+                            rendered = str(message)
+                        if any(p.search(rendered) for p in patterns):
+                            suppressed.append(str(message))
+                            return
+                        original_showwarning(
+                            message,
+                            category,
+                            filename,
+                            lineno,
+                            file=file,
+                            line=line,
+                        )
+
+                    warnings.showwarning = _showwarning  # type: ignore[assignment]
+                    try:
+                        yield
+                    finally:
+                        warnings.showwarning = original_showwarning  # type: ignore[assignment]
+    finally:
+        for handler in handlers:
+            try:
+                handler.removeFilter(log_filter)
+            except Exception:
+                pass
+        try:
+            transformers_logger.setLevel(prev_tf_level)
+        except Exception:
+            pass
+        if prev_tf_verbosity is None:
+            os.environ.pop("TRANSFORMERS_VERBOSITY", None)
+        else:
+            os.environ["TRANSFORMERS_VERBOSITY"] = prev_tf_verbosity
+        _append_suppressed_warnings()
 
 
 def _format_kv_line(label: str, value: str, *, width: int = KV_LABEL_WIDTH) -> str:
@@ -361,7 +522,7 @@ def _resolve_pm_drift_band(
     """Resolve preview→final drift band from config/env with safe defaults.
 
     The drift band governs the Preview Final Drift Acceptable gate. By default,
-    certificates enforce 0.95–1.05 unless an explicit band is provided.
+    evaluation reports enforce 0.95–1.05 unless an explicit band is provided.
     """
 
     base_min = 0.95
@@ -1185,13 +1346,24 @@ def _extract_model_load_kwargs(cfg: InvarLockConfig) -> dict[str, Any]:
         for key, value in model.items()
         if key not in {"id", "adapter", "device"} and value is not None
     }
-    # Backwards-compatible aliasing: config `dtype` → HF `torch_dtype`.
-    if "dtype" in extra and "torch_dtype" not in extra:
-        extra["torch_dtype"] = extra.pop("dtype")
+    removed_keys: list[str] = []
+    for key in ("torch_dtype", "load_in_8bit", "load_in_4bit"):
+        if key in extra:
+            removed_keys.append(key)
+    if removed_keys:
+        raise InvarlockError(
+            code="E007",
+            message=(
+                "CONFIG-KEY-REMOVED: "
+                + ", ".join(removed_keys)
+                + ". Use model.dtype and/or model.quantization_config."
+            ),
+            details={"removed_keys": removed_keys},
+        )
 
-    # Normalize torch_dtype when present (keep as string for JSON-ability).
-    if "torch_dtype" in extra and isinstance(extra.get("torch_dtype"), str):
-        dtype_str = str(extra.get("torch_dtype") or "").strip().lower()
+    # Normalize dtype when present (keep as string for JSON-ability).
+    if "dtype" in extra and isinstance(extra.get("dtype"), str):
+        dtype_str = str(extra.get("dtype") or "").strip().lower()
         aliases = {
             "fp16": "float16",
             "half": "float16",
@@ -1199,9 +1371,9 @@ def _extract_model_load_kwargs(cfg: InvarLockConfig) -> dict[str, Any]:
             "fp32": "float32",
         }
         if dtype_str in aliases:
-            extra["torch_dtype"] = aliases[dtype_str]
+            extra["dtype"] = aliases[dtype_str]
         elif dtype_str:
-            extra["torch_dtype"] = dtype_str
+            extra["dtype"] = dtype_str
 
     return extra
 
@@ -1212,6 +1384,8 @@ def _load_model_with_cfg(
     device: str,
     *,
     profile: str | None = None,
+    event_path: Path | None = None,
+    warning_context: dict[str, Any] | None = None,
 ) -> Any:
     """Load a model with config-provided kwargs, filtering for strict adapters."""
     try:
@@ -1225,7 +1399,11 @@ def _load_model_with_cfg(
         raise ValueError("Missing model.id in config")
 
     extra = _extract_model_load_kwargs(cfg)
-    with _suppress_noisy_warnings(profile):
+    with _suppress_noisy_warnings(
+        profile,
+        event_path=event_path,
+        context=warning_context,
+    ):
         try:
             sig = inspect.signature(adapter.load_model)
             accepts_var_kw = any(
@@ -1307,18 +1485,23 @@ def _run_bare_control(
             if snapshot_provenance is not None:
                 snapshot_provenance["reload_path_used"] = True
 
-        bare_report = bare_runner.execute(
-            model=bare_target_model,
-            adapter=adapter,
-            edit=edit_op,
-            guards=[],
-            config=bare_config,
-            calibration_data=calibration_data,
-            auto_config=auto_config,
-            edit_config=runtime_edit_config,
-            preview_n=preview_count,
-            final_n=final_count,
-        )
+        with _suppress_noisy_warnings(
+            profile_normalized,
+            event_path=getattr(run_config, "event_path", None),
+            context={"phase": "guard_overhead_bare"},
+        ):
+            bare_report = bare_runner.execute(
+                model=bare_target_model,
+                adapter=adapter,
+                edit=edit_op,
+                guards=[],
+                config=bare_config,
+                calibration_data=calibration_data,
+                auto_config=auto_config,
+                edit_config=runtime_edit_config,
+                preview_n=preview_count,
+                final_n=final_count,
+            )
     finally:
         if private_model_loaded:
             _free_model_memory(bare_target_model)
@@ -1417,8 +1600,21 @@ def _execute_guarded_run(
             emoji="🔧",
             profile=profile_normalized,
         )
+        warning_context: dict[str, Any] = {"phase": "load_model"}
+        try:
+            if hasattr(run_config, "context") and isinstance(run_config.context, dict):
+                rid = run_config.context.get("run_id")
+                if isinstance(rid, str) and rid:
+                    warning_context["run_id"] = rid
+        except Exception:
+            pass
         model = _load_model_with_cfg(
-            adapter, cfg, resolved_device, profile=profile_normalized
+            adapter,
+            cfg,
+            resolved_device,
+            profile=profile_normalized,
+            event_path=getattr(run_config, "event_path", None),
+            warning_context=warning_context,
         )
         if snapshot_provenance is not None:
             snapshot_provenance["reload_path_used"] = True
@@ -1430,18 +1626,23 @@ def _execute_guarded_run(
     )
     runtime_edit_config.setdefault("emit", True)
 
-    core_report = runner.execute(
-        model=model,
-        adapter=adapter,
-        edit=edit_op,
-        guards=guards,
-        config=run_config,
-        calibration_data=calibration_data,
-        auto_config=auto_config,
-        edit_config=runtime_edit_config,
-        preview_n=preview_count,
-        final_n=final_count,
-    )
+    with _suppress_noisy_warnings(
+        profile_normalized,
+        event_path=getattr(run_config, "event_path", None),
+        context={"phase": "core_runner_execute"},
+    ):
+        core_report = runner.execute(
+            model=model,
+            adapter=adapter,
+            edit=edit_op,
+            guards=guards,
+            config=run_config,
+            calibration_data=calibration_data,
+            auto_config=auto_config,
+            edit_config=runtime_edit_config,
+            preview_n=preview_count,
+            final_n=final_count,
+        )
     return core_report, model
 
 
@@ -2226,7 +2427,9 @@ def run_command(
         None, "--probes", help="Number of micro-probes (0=deterministic, >0=adaptive)"
     ),
     until_pass: bool = typer.Option(
-        False, "--until-pass", help="Retry until certificate passes (max 3 attempts)"
+        False,
+        "--until-pass",
+        help="Retry until evaluation report passes gates (max 3 attempts)",
     ),
     max_attempts: int = typer.Option(
         3, "--max-attempts", help="Maximum retry attempts for --until-pass mode"
@@ -2237,7 +2440,7 @@ def run_command(
     baseline: str | None = typer.Option(
         None,
         "--baseline",
-        help="Path to baseline report.json for certificate validation",
+        help="Path to baseline report.json for evaluation report validation",
     ),
     no_cleanup: bool = typer.Option(
         False, "--no-cleanup", help="Skip cleanup of temporary artifacts"
@@ -2262,7 +2465,7 @@ def run_command(
     The command assembles non-overlapping preview/final windows, executes the
     GuardChain (invariants → spectral → RMT → variance), checks pairing/overlap
     invariants, enforces guard-overhead ≤1 %, and emits a run report plus JSONL
-    events suitable for certificate generation.
+    events suitable for evaluation report generation.
     """
 
     try:
@@ -3655,7 +3858,12 @@ def run_command(
                 emoji="🔧",
             ):
                 model = _load_model_with_cfg(
-                    adapter, cfg, resolved_device, profile=profile_normalized
+                    adapter,
+                    cfg,
+                    resolved_device,
+                    profile=profile_normalized,
+                    event_path=run_dir / "events.jsonl",
+                    warning_context={"phase": "load_model", "run_id": run_id},
                 )
 
             # No edit-specific bootstrap logic
@@ -4024,7 +4232,7 @@ def run_command(
             # Convert CoreRunner report to evaluation report
             report = create_empty_report()
 
-            # Persist minimal run context for certificate/report provenance.
+            # Persist minimal run context for evaluation report provenance.
             try:
                 report["context"] = {
                     "profile": profile_normalized,
@@ -5121,11 +5329,11 @@ def run_command(
                             f"(>{threshold_fraction * 100:.1f}% increase)"
                         )
 
-            # Drift gate status is no longer surfaced in console; rely on certificate gates
+            # Drift gate status is no longer surfaced in console; rely on evaluation report gates
 
-            # Certificate validation for --until-pass mode
+            # Evaluation report validation for --until-pass mode
             if retry_controller and baseline:
-                from invarlock.reporting.certificate import make_certificate
+                from invarlock.reporting.report_builder import make_report
 
                 try:
                     baseline_report = baseline_report_data
@@ -5140,18 +5348,18 @@ def run_command(
                     _event(
                         console,
                         "EXEC",
-                        "Generating evaluation certificate...",
+                        "Generating evaluation report...",
                         emoji="📜",
                         profile=profile_normalized,
                     )
-                    certificate = make_certificate(report, baseline_report)
+                    evaluation_report = make_report(report, baseline_report)
 
-                    validation = certificate.get("validation", {})
-                    certificate_passed = all(validation.values())
+                    validation = evaluation_report.get("validation", {})
+                    report_passed = all(validation.values())
 
                     failed_gates = [k for k, v in validation.items() if not v]
                     result_summary = {
-                        "passed": certificate_passed,
+                        "passed": report_passed,
                         "failures": failed_gates,
                         "validation": validation,
                     }
@@ -5159,11 +5367,11 @@ def run_command(
                         attempt, result_summary, edit_config
                     )
 
-                    if certificate_passed:
+                    if report_passed:
                         _event(
                             console,
                             "PASS",
-                            "Certificate PASSED all gates!",
+                            "Evaluation report PASSED all gates!",
                             emoji="✅",
                             profile=profile_normalized,
                         )
@@ -5172,7 +5380,7 @@ def run_command(
                         _event(
                             console,
                             "FAIL",
-                            f"Certificate FAILED gates: {', '.join(failed_gates)}",
+                            f"Evaluation report FAILED gates: {', '.join(failed_gates)}",
                             emoji="⚠️",
                             profile=profile_normalized,
                         )
@@ -5229,7 +5437,7 @@ def run_command(
                         except Exception:
                             pass
 
-                        if retry_controller.should_retry(certificate_passed):
+                        if retry_controller.should_retry(report_passed):
                             attempt += 1
                             continue
                         else:
@@ -5242,11 +5450,11 @@ def run_command(
                             )
                             break
 
-                except Exception as cert_error:
+                except Exception as report_error:
                     _event(
                         console,
                         "WARN",
-                        f"Certificate validation failed: {cert_error}",
+                        f"Evaluation report validation failed: {report_error}",
                         emoji="⚠️",
                         profile=profile_normalized,
                     )
@@ -5255,7 +5463,7 @@ def run_command(
                             attempt,
                             {
                                 "passed": False,
-                                "failures": ["certificate_error"],
+                                "failures": ["report_error"],
                                 "validation": {},
                             },
                             edit_config,

@@ -19,7 +19,7 @@ InvarLock runs offline by default. For commands that need downloads (models/data
 enable network explicitly per run:
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 invarlock run -c ...   # or invarlock certify ...
+INVARLOCK_ALLOW_NETWORK=1 invarlock run -c ...   # or invarlock evaluate ...
 ```
 
 ### 1.2 Quick setup (recommended)
@@ -79,7 +79,7 @@ invarlock/
 │   ├── core/            # Runner, registry, contracts, auto-tuning, events, types
 │   ├── guards/          # Safety mechanisms (invariants, spectral, rmt, variance, policies)
 │   ├── eval/            # Evaluation metrics and helpers
-│   ├── reporting/       # Certificate + reporting surface
+│   ├── reporting/       # Evaluation report + reporting surface
 │   ├── cli/             # Typer-based CLI app and commands
 │   ├── adapters/        # External model adapters (HF, etc.)
 │   ├── edits/           # Edit abstractions and demos
@@ -196,9 +196,10 @@ Key points:
   - Evaluation/reporting entry points:
     `src/invarlock/eval/metrics.py`,
     `src/invarlock/reporting/report.py`,
+    `src/invarlock/reporting/report_builder.py`,
     `src/invarlock/reporting/report_types.py`,
+    `src/invarlock/reporting/report_schema.py`,
     `src/invarlock/reporting/validate.py`,
-    `src/invarlock/reporting/certificate.py`
   - CLI commands:
     `src/invarlock/cli/commands/run.py`,
     `src/invarlock/cli/commands/verify.py`
@@ -386,7 +387,7 @@ At a high level, maintainers:
 2. Update `CHANGELOG.md` with release notes.
 3. Run the full verification and coverage gates (for example, `make verify` and `make coverage-enforce`).
 4. Build distribution artifacts (for example, `python -m build` to produce wheel and sdist under `dist/`).
-5. Run a pre‑release smoke test from the built artifacts, including a minimal `invarlock run`/`invarlock certify` flow.
+5. Run a pre‑release smoke test from the built artifacts, including a minimal `invarlock run`/`invarlock evaluate` flow.
 6. Tag the release and push tags to GitHub.
 7. Let CI publish to PyPI/TestPyPI.
 

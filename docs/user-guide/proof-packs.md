@@ -4,13 +4,13 @@
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Hardware-agnostic validation runs that bundle certificates into portable artifacts. |
+| **Purpose** | Hardware-agnostic validation runs that bundle reports into portable artifacts. |
 | **Audience** | CI operators producing validation evidence across GPU topologies. |
 | **Requires** | GPU capable of fitting selected models; HF cache or network for model download. |
-| **Outputs** | Proof pack directory with certificates, reports, checksums, and optional GPG signature. |
+| **Outputs** | Proof pack directory with reports, reports, checksums, and optional GPG signature. |
 | **Source of truth** | `scripts/proof_packs/run_suite.sh`, `scripts/proof_packs/run_pack.sh`. |
 
-Proof packs are hardware-agnostic validation runs that bundle InvarLock certificates,
+Proof packs are hardware-agnostic validation runs that bundle InvarLock reports,
 summary reports, and verification metadata into a portable artifact. They replace the
 B200-specific validation harness with a suite that can run on any NVIDIA GPU topology
 that can fit the selected models.
@@ -71,21 +71,21 @@ A suite run writes artifacts under `OUTPUT_DIR` (default: `./proof_pack_runs/<su
 
 - `reports/final_verdict.txt` + `reports/final_verdict.json`
 - `analysis/determinism_repeats.json` (when `--repeats` is used)
-- `*/certificates/**/evaluation.cert.json`
+- `*/reports/**/evaluation.report.json`
 
 `run_pack.sh` copies curated artifacts into a pack directory (default
 `OUTPUT_DIR/proof_pack`) and organizes them as:
 
 - `results/final_verdict.txt` + `results/final_verdict.json`
 - `results/**/determinism_repeats.json` (if present)
-- `certs/<model>/<edit>/<run>/evaluation.cert.json`
+- `certs/<model>/<edit>/<run>/evaluation.report.json`
 - `certs/**/evaluation.html` + `certs/**/verify.json`
 - `README.md`, `manifest.json`, `checksums.sha256`
 - `manifest.json.asc` if GPG signing is available
 
 ## Edit Provenance Labels
 
-Certificates record the edit algorithm used:
+reports record the edit algorithm used:
 
 | Label | When to Use |
 | --- | --- |
@@ -103,6 +103,17 @@ a drift summary in `results/determinism_repeats.json`.
 
 ## Signing & Verification
 
-`run_pack.sh` signs `manifest.json` when `gpg` is available. To skip signing,
-set `PACK_GPG_SIGN=0`. Use `verify_pack.sh` to validate checksums, signatures,
-and certificate integrity.
+`manifest.json` includes `checksums_sha256_digest` (sha256 of `checksums.sha256`) so a
+signed manifest cryptographically binds the checksums file (and thus all hashed artifacts).
+Signed packs also record `signing_key_fingerprint` for audit trails.
+
+Use `verify_pack.sh`:
+
+- Default: `scripts/proof_packs/verify_pack.sh --pack <dir>`
+  - Verifies `checksums_sha256_digest`, validates `checksums.sha256`, and runs `invarlock verify`.
+  - Warns (but does not fail) if the pack is unsigned.
+- Strict (recommended for distributable evidence): `scripts/proof_packs/verify_pack.sh --pack <dir> --strict`
+  - Fails if `manifest.json.asc` is missing, `gpg` verification fails, or extra files exist outside `checksums.sha256`.
+  - Alternative: set `PACK_STRICT_MODE=1` (e.g., `PACK_STRICT_MODE=1 scripts/proof_packs/verify_pack.sh --pack <dir>`).
+
+To skip signing during pack creation, set `PACK_GPG_SIGN=0`. To require signing, set `PACK_STRICT_MODE=1`.

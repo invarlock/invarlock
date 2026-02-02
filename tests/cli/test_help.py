@@ -13,10 +13,10 @@ def test_invarlock_help_layout_and_exit_codes():
     out = result.stdout
 
     # Core copy
-    assert "certify model changes" in out.lower()
+    assert "evaluate model changes" in out.lower()
     # Updated help mentions built-in quant_rtn demo via --edit-config
     assert "built-in quant_rtn" in out.lower()
-    assert "invarlock certify --baseline" in out and "--subject" in out
+    assert "invarlock evaluate --baseline" in out and "--subject" in out
 
     # Exit codes surfaced (normalize whitespace to avoid wrapping issues)
     normalized = " ".join(out.split())
@@ -24,8 +24,15 @@ def test_invarlock_help_layout_and_exit_codes():
     assert "2=schema invalid" in normalized and "3=hard abort" in normalized
 
     # Command names presence (order may vary with Typer versions)
-    for name in ("certify", "report", "run", "plugins", "doctor", "version"):
+    for name in ("evaluate", "report", "run", "plugins", "doctor", "version"):
         assert name in out
+
+
+def test_invarlock_version_option():
+    runner = CliRunner()
+    result = runner.invoke(app, ["--version"])
+    assert result.exit_code == 0
+    assert "InvarLock" in result.stdout
 
 
 def test_report_group_help_lists_subcommands():

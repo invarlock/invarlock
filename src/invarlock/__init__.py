@@ -1,5 +1,5 @@
 """
-InvarLock: Edit‑agnostic robustness certificates for weight edits
+InvarLock: Edit‑agnostic evaluation reports for weight edits
 =============================================================
 
 Core runtime package — torch-independent utilities, configuration, and interfaces.
@@ -9,10 +9,10 @@ For torch-dependent functionality, see subpackages under `invarlock.*`:
 - `invarlock.adapters`: Model adapters (HF causal/MLM/seq2seq + auto)
 - `invarlock.guards`: Safety mechanisms (invariants, spectral, RMT, variance)
 - `invarlock.edits`: Built-in quantization and edit interfaces
-- `invarlock.eval`: Metrics, guard-overhead checks, and certification
+- `invarlock.eval`: Metrics, guard-overhead checks, and evaluation reporting
 """
 
-__version__ = "0.3.7"
+__version__ = "0.3.8"
 
 # Core exports - torch-independent
 from .config import CFG, Defaults, get_default_config

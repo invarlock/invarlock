@@ -28,7 +28,7 @@ EDIT_CFG="${EDIT_CFG:-configs/overlays/edits/quant_rtn/8bit_attn.yaml}"
 RUN_ROOT="${ROOT}/runs/telemetry_cpu/quant8"
 CERT_ROOT="${OUT_ROOT}/quant8"
 
-invarlock certify \
+invarlock evaluate \
   --baseline "${MODEL_ID}" \
   --subject "${MODEL_ID}" \
   --adapter auto \
@@ -37,8 +37,8 @@ invarlock certify \
   --preset "${PRESET}" \
   --edit-config "${EDIT_CFG}" \
   --out "${RUN_ROOT}" \
-  --cert-out "${CERT_ROOT}" >/dev/null
+  --report-out "${CERT_ROOT}" >/dev/null
 
-invarlock verify "${CERT_ROOT}/evaluation.cert.json" >/dev/null
+invarlock verify "${CERT_ROOT}/evaluation.report.json" >/dev/null
 
 echo "Telemetry certs written to ${CERT_ROOT}"

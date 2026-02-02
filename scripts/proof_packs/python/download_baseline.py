@@ -107,7 +107,6 @@ def download_snapshot(
         local_dir=str(model_dir),
         local_dir_use_symlinks=local_dir_use_symlinks,
         cache_dir=os.environ.get("HF_HUB_CACHE"),
-        resume_download=True,
         revision=revision,
     )
 
@@ -178,7 +177,7 @@ def main(argv: list[str] | None = None) -> int:
 
         use_fa2 = flash_available and model_supports_flash_attention(model_id)
         model_kwargs: dict[str, Any] = {
-            "torch_dtype": torch.bfloat16,
+            "dtype": torch.bfloat16,
             "trust_remote_code": True,
             "device_map": "auto",
             "low_cpu_mem_usage": True,

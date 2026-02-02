@@ -10,14 +10,15 @@ Provides the `invarlock report` group with:
 import json
 import math
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 import typer
 from rich.console import Console
 
 from invarlock.cli.output import print_event, resolve_output_style
-from invarlock.reporting import certificate as certificate_lib
 from invarlock.reporting import report as report_lib
+from invarlock.reporting import report_builder as report_builder
 
 console = Console()
 
@@ -27,10 +28,22 @@ GATE_LABEL_WIDTH = 32
 ARTIFACT_LABEL_WIDTH = 18
 
 
-def _print_section_header(console: Console, title: str) -> None:
+def _format_section_title(title: str, *, suffix: str | None = None) -> str:
+    if not suffix:
+        return title
+    combined = f"{title} {suffix}"
+    if len(combined) > SECTION_WIDTH:
+        return combined
+    pad = max(1, SECTION_WIDTH - len(title) - len(suffix))
+    return f"{title}{' ' * pad}{suffix}"
+
+
+def _print_section_header(
+    console: Console, title: str, *, suffix: str | None = None
+) -> None:
     bar = "═" * SECTION_WIDTH
     console.print(bar)
-    console.print(title)
+    console.print(_format_section_title(title, suffix=suffix))
     console.print(bar)
 
 
@@ -52,24 +65,24 @@ def _fmt_metric_value(value: Any) -> str:
     return f"{val:.3f}"
 
 
-def _fmt_ci_range(ci: Any) -> str:
+def _fmt_ci_95(ci: Any) -> str | None:
     if isinstance(ci, (list, tuple)) and len(ci) == 2:
         try:
             lo = float(ci[0])
             hi = float(ci[1])
         except (TypeError, ValueError):
-            return "N/A"
+            return None
         if math.isfinite(lo) and math.isfinite(hi):
-            return f"{lo:.3f}–{hi:.3f}"
-    return "N/A"
+            return f"[{lo:.3f}, {hi:.3f}]"
+    return None
 
 
 def _artifact_entries(
     saved_files: dict[str, str], output_dir: str
 ) -> list[tuple[str, str]]:
     order = [
-        ("cert", "Certificate (JSON)"),
-        ("cert_md", "Certificate (MD)"),
+        ("report", "Evaluation Report (JSON)"),
+        ("report_md", "Evaluation Report (MD)"),
         ("json", "JSON"),
         ("markdown", "Markdown"),
         ("html", "HTML"),
@@ -89,7 +102,7 @@ def _artifact_entries(
 
 # Group with callback so `invarlock report` still generates reports
 report_app = typer.Typer(
-    help="Operations on reports and certificates (verify, explain, html, validate).",
+    help="Operations on run reports and evaluation reports (verify, explain, html, validate).",
     invoke_without_command=True,
 )
 
@@ -103,6 +116,9 @@ def _generate_reports(
     output: str | None = None,
     style: str = "audit",
     no_color: bool = False,
+    summary_baseline_seconds: float | None = None,
+    summary_subject_seconds: float | None = None,
+    summary_report_start: float | None = None,
 ) -> None:
     # This callback runs only when invoked without subcommand (default Click behavior)
     try:
@@ -127,6 +143,9 @@ def _generate_reports(
         output = _coerce_option(output)
         style = _coerce_option(style, "audit")
         no_color = bool(_coerce_option(no_color, False))
+        summary_baseline_seconds = _coerce_option(summary_baseline_seconds)
+        summary_subject_seconds = _coerce_option(summary_subject_seconds)
+        summary_report_start = _coerce_option(summary_report_start)
 
         output_style = resolve_output_style(
             style=str(style),
@@ -163,23 +182,34 @@ def _generate_reports(
             output_dir = output
 
         # Determine formats
+        allowed_formats = {"json", "md", "markdown", "html", "report", "all"}
+        if format not in allowed_formats:
+            _event("FAIL", f"Unknown --format '{format}'", emoji="❌")
+            raise typer.Exit(2)
+
+        if format == "md":
+            format = "markdown"
         if format == "all":
             formats = ["json", "markdown", "html"]
         else:
             formats = [format]
 
-        # Validate certificate requirements
-        if "cert" in formats:
+        # Validate evaluation report requirements
+        if "report" in formats:
             if baseline_report is None:
-                _event("FAIL", "Certificate format requires --baseline", emoji="❌")
+                _event(
+                    "FAIL",
+                    "Evaluation report format requires --baseline",
+                    emoji="❌",
+                )
                 _event(
                     "INFO",
-                    "Use: invarlock report --run <run_dir> --format cert --baseline <baseline_run_dir>",
+                    "Use: invarlock report --run <run_dir> --format report --baseline <baseline_run_dir>",
                 )
                 raise typer.Exit(1)
             _event(
                 "EXEC",
-                "Generating evaluation certificate with baseline comparison",
+                "Generating evaluation report with baseline comparison",
                 emoji="📜",
             )
 
@@ -197,31 +227,54 @@ def _generate_reports(
         # Show results
         _event("PASS", "Reports generated successfully.", emoji="✅")
 
-        if "cert" in formats and baseline_report:
+        if "report" in formats and baseline_report:
             try:
-                certificate = certificate_lib.make_certificate(
+                evaluation_report = report_builder.make_report(
                     primary_report, baseline_report
                 )
-                certificate_lib.validate_certificate(certificate)
+                report_builder.validate_report(evaluation_report)
                 from invarlock.reporting.render import (
                     compute_console_validation_block as _console_block,
                 )
 
-                block = _console_block(certificate)
+                block = _console_block(evaluation_report)
                 overall_pass = bool(block.get("overall_pass"))
                 status_text = _format_status(overall_pass)
 
                 console.print("")
-                _print_section_header(console, "CERTIFICATE SUMMARY")
+                summary_suffix: str | None = None
+                if summary_report_start is not None:
+                    try:
+                        base = (
+                            float(summary_baseline_seconds)
+                            if summary_baseline_seconds is not None
+                            else 0.0
+                        )
+                        subject = (
+                            float(summary_subject_seconds)
+                            if summary_subject_seconds is not None
+                            else 0.0
+                        )
+                        report_elapsed = max(
+                            0.0, float(perf_counter() - float(summary_report_start))
+                        )
+                        summary_suffix = f"[{(base + subject + report_elapsed):.2f}s]"
+                    except Exception:
+                        summary_suffix = None
+                _print_section_header(
+                    console,
+                    "EVALUATION REPORT SUMMARY",
+                    suffix=summary_suffix,
+                )
                 console.print(_format_kv_line("Status", status_text))
 
-                schema_version = certificate.get("schema_version")
+                schema_version = evaluation_report.get("schema_version")
                 if schema_version:
                     console.print(
                         _format_kv_line("Schema Version", str(schema_version))
                     )
 
-                run_id = certificate.get("run_id") or (
+                run_id = evaluation_report.get("run_id") or (
                     (primary_report.get("meta", {}) or {}).get("run_id")
                 )
                 if run_id:
@@ -234,7 +287,15 @@ def _generate_reports(
                 if edit_name:
                     console.print(_format_kv_line("Edit", str(edit_name)))
 
-                pm = (primary_report.get("metrics", {}) or {}).get("primary_metric", {})
+                pm = (
+                    (evaluation_report.get("primary_metric") or {})
+                    if isinstance(evaluation_report, dict)
+                    else {}
+                )
+                if not pm:
+                    pm = (primary_report.get("metrics", {}) or {}).get(
+                        "primary_metric", {}
+                    )
                 console.print("  PRIMARY METRIC")
                 pm_entries: list[tuple[str, str]] = []
                 if isinstance(pm, dict) and pm:
@@ -250,8 +311,9 @@ def _generate_reports(
                     if ratio is not None:
                         pm_entries.append(("Ratio", _fmt_metric_value(ratio)))
                     dci = pm.get("display_ci")
-                    if dci is not None:
-                        pm_entries.append(("CI", _fmt_ci_range(dci)))
+                    ci_95 = _fmt_ci_95(dci)
+                    if ci_95 is not None:
+                        pm_entries.append(("CI (95%)", ci_95))
                 if not pm_entries:
                     pm_entries.append(("Status", "Unavailable"))
                 for idx, (label, value) in enumerate(pm_entries):
@@ -284,8 +346,8 @@ def _generate_reports(
                 # CI gating should be handled by dedicated verify commands.
 
             except Exception as e:
-                _event("WARN", f"Certificate validation error: {e}", emoji="⚠️")
-                # Exit non-zero on certificate generation error
+                _event("WARN", f"Evaluation report validation error: {e}", emoji="⚠️")
+                # Exit non-zero on evaluation report generation error
                 raise typer.Exit(1) from e
         else:
             console.print(_format_kv_line("Output", str(output_dir)))
@@ -318,7 +380,7 @@ def report_callback(
         None, "--run", help="Path to run directory or RunReport JSON"
     ),
     format: str = typer.Option(
-        "json", "--format", help="Output format (json|md|html|cert|all)"
+        "json", "--format", help="Output format (json|md|html|report|all)"
     ),
     compare: str | None = typer.Option(
         None, "--compare", help="Path to second run for comparison"
@@ -326,7 +388,7 @@ def report_callback(
     baseline: str | None = typer.Option(
         None,
         "--baseline",
-        help="Path to baseline run for certificate generation (required for cert format)",
+        help="Path to baseline run for evaluation report generation (required for report format)",
     ),
     output: str | None = typer.Option(None, "--output", "-o", help="Output directory"),
     style: str = typer.Option("audit", "--style", help="Output style (audit|friendly)"),
@@ -372,6 +434,9 @@ def report_command(
     output: str | None = None,
     style: str = "audit",
     no_color: bool = False,
+    summary_baseline_seconds: float | None = None,
+    summary_subject_seconds: float | None = None,
+    summary_report_start: float | None = None,
 ):
     return _generate_reports(
         run=run,
@@ -381,6 +446,9 @@ def report_command(
         output=output,
         style=style,
         no_color=no_color,
+        summary_baseline_seconds=summary_baseline_seconds,
+        summary_subject_seconds=summary_subject_seconds,
+        summary_report_start=summary_report_start,
     )
 
 
@@ -407,16 +475,16 @@ def _load_run_report(path: str) -> dict:
 
 # Subcommands wired from existing modules
 @report_app.command(
-    name="verify", help="Recompute and verify metrics for a report/cert."
+    name="verify", help="Recompute and verify metrics for evaluation reports."
 )
 def report_verify_command(
-    certificates: list[str] = typer.Argument(
-        ..., help="One or more certificate JSON files to verify."
+    reports: list[str] = typer.Argument(
+        ..., help="One or more evaluation report JSON files to verify."
     ),
     baseline: str | None = typer.Option(
         None,
         "--baseline",
-        help="Optional baseline certificate/report JSON to enforce provider parity.",
+        help="Optional baseline evaluation report JSON to enforce provider parity.",
     ),
     tolerance: float = typer.Option(
         1e-9, "--tolerance", help="Tolerance for analysis-basis comparisons."
@@ -431,10 +499,10 @@ def report_verify_command(
 
     from .verify import verify_command as _verify_command
 
-    cert_paths = [_Path(c) for c in certificates]
+    report_paths = [_Path(p) for p in reports]
     baseline_path = _Path(baseline) if isinstance(baseline, str) else None
     return _verify_command(
-        certificates=cert_paths,
+        reports=report_paths,
         baseline=baseline_path,
         tolerance=tolerance,
         profile=profile,
@@ -442,7 +510,7 @@ def report_verify_command(
 
 
 @report_app.command(
-    name="explain", help="Explain certificate gates for report vs baseline."
+    name="explain", help="Explain evaluation report gates for report vs baseline."
 )
 def report_explain(
     report: str = typer.Option(..., "--report", help="Path to primary report.json"),
@@ -450,15 +518,17 @@ def report_explain(
         ..., "--baseline", help="Path to baseline report.json"
     ),
 ):  # pragma: no cover - thin wrapper
-    """Explain certificate gates for a report vs baseline."""
+    """Explain evaluation report gates for a report vs baseline."""
     from .explain_gates import explain_gates_command as _explain
 
     return _explain(report=report, baseline=baseline)
 
 
-@report_app.command(name="html", help="Render a certificate JSON to HTML.")
+@report_app.command(name="html", help="Render an evaluation report JSON to HTML.")
 def report_html(
-    input: str = typer.Option(..., "--input", "-i", help="Path to certificate JSON"),
+    input: str = typer.Option(
+        ..., "--input", "-i", help="Path to evaluation report JSON"
+    ),
     output: str = typer.Option(..., "--output", "-o", help="Path to output HTML file"),
     embed_css: bool = typer.Option(
         True, "--embed-css/--no-embed-css", help="Inline a minimal static stylesheet"
@@ -475,10 +545,10 @@ def report_html(
 @report_app.command("validate")
 def report_validate(
     report: str = typer.Argument(
-        ..., help="Path to certificate JSON to validate against schema v1"
+        ..., help="Path to evaluation report JSON to validate against schema v1"
     ),
 ):
-    """Validate a certificate JSON against the current schema (v1)."""
+    """Validate an evaluation report JSON against the current schema (v1)."""
     output_style = resolve_output_style(
         style="audit",
         profile="ci",
@@ -498,15 +568,15 @@ def report_validate(
         raise typer.Exit(1) from exc
 
     try:
-        from invarlock.reporting.certificate import validate_certificate
+        from invarlock.reporting.report_builder import validate_report
 
-        ok = validate_certificate(payload)
+        ok = validate_report(payload)
         if not ok:
-            _event("FAIL", "Certificate schema validation failed", emoji="❌")
+            _event("FAIL", "Evaluation report schema validation failed", emoji="❌")
             raise typer.Exit(2)
-        _event("PASS", "Certificate schema is valid", emoji="✅")
+        _event("PASS", "Evaluation report schema is valid", emoji="✅")
     except ValueError as exc:
-        _event("FAIL", f"Certificate validation error: {exc}", emoji="❌")
+        _event("FAIL", f"Evaluation report validation error: {exc}", emoji="❌")
         raise typer.Exit(2) from exc
     except typer.Exit:
         raise

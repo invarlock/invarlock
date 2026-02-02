@@ -20,10 +20,6 @@ import typer
 import yaml
 from rich.console import Console
 
-from invarlock.calibration.spectral_null import summarize_null_sweep_reports
-from invarlock.calibration.variance_ve import summarize_ve_sweep_reports
-from invarlock.guards.tier_config import get_tier_guard_config
-
 console = Console()
 
 calibrate_app = typer.Typer(
@@ -114,6 +110,26 @@ def _write_tiers_recommendation(
     )
 
 
+def get_tier_guard_config(tier: str, guard_key: str) -> dict[str, Any]:
+    """Lazy wrapper for tier config lookup.
+
+    This is intentionally a module-level symbol so tests can patch it without
+    importing torch/transformers at import time.
+    """
+    try:
+        from invarlock.guards.tier_config import get_tier_guard_config as _get_cfg
+    except ModuleNotFoundError as exc:
+        missing = getattr(exc, "name", "") or ""
+        if missing in {"torch", "transformers"}:
+            console.print(
+                "[red]Missing optional dependencies for calibration.[/red] "
+                "Install `invarlock[hf]` (or at least torch/transformers) to run sweeps."
+            )
+            raise typer.Exit(1) from exc
+        raise
+    return _get_cfg(tier, guard_key)
+
+
 @calibrate_app.command(
     name="null-sweep",
     help="Run a null (no-op edit) sweep and calibrate spectral κ/alpha empirically.",
@@ -159,6 +175,21 @@ def null_sweep(
 ) -> None:
     # Keep import light: only pull run machinery when invoked.
     from .run import run_command
+
+    # Optional deps: calibration sweeps require torch/guards, but docs/tests may
+    # import this module without heavy deps. Import lazily so CLI example
+    # validation can parse `invarlock calibrate ...` without installing torch.
+    try:
+        from invarlock.calibration.spectral_null import summarize_null_sweep_reports
+    except ModuleNotFoundError as exc:
+        missing = getattr(exc, "name", "") or ""
+        if missing in {"torch", "transformers"}:
+            console.print(
+                "[red]Missing optional dependencies for calibration.[/red] "
+                "Install `invarlock[hf]` (or at least torch/transformers) to run sweeps."
+            )
+            raise typer.Exit(1) from exc
+        raise
 
     base = _load_yaml(config)
     specs = _materialize_sweep_specs(
@@ -377,6 +408,19 @@ def ve_sweep(
 ) -> None:
     # Keep import light: only pull run machinery when invoked.
     from .run import run_command
+
+    # Optional deps: see null_sweep() note.
+    try:
+        from invarlock.calibration.variance_ve import summarize_ve_sweep_reports
+    except ModuleNotFoundError as exc:
+        missing = getattr(exc, "name", "") or ""
+        if missing in {"torch", "transformers"}:
+            console.print(
+                "[red]Missing optional dependencies for calibration.[/red] "
+                "Install `invarlock[hf]` (or at least torch/transformers) to run sweeps."
+            )
+            raise typer.Exit(1) from exc
+        raise
 
     base = _load_yaml(config)
     windows = [int(w) for w in (window or [])] or [6, 8, 12, 16]

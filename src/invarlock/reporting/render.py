@@ -9,8 +9,7 @@ from typing import Any
 
 import yaml
 
-# Import certificate module for helper access without creating hard cycles
-from . import certificate as C
+from .report_schema import validate_report
 
 # Console Validation Block helpers (allow-list driven)
 _CONSOLE_LABELS_DEFAULT = [
@@ -37,8 +36,10 @@ def _load_console_labels() -> list[str]:
     return list(_CONSOLE_LABELS_DEFAULT)
 
 
-def compute_console_validation_block(certificate: dict[str, Any]) -> dict[str, Any]:
-    """Produce a normalized console validation block from a certificate.
+def compute_console_validation_block(
+    evaluation_report: dict[str, Any],
+) -> dict[str, Any]:
+    """Produce a normalized console validation block from an evaluation report.
 
     Returns a dict with keys:
     - labels: the canonical label list
@@ -47,8 +48,8 @@ def compute_console_validation_block(certificate: dict[str, Any]) -> dict[str, A
       counted only when evaluated.
     """
     labels = _load_console_labels()
-    validation = certificate.get("validation", {}) or {}
-    guard_ctx = certificate.get("guard_overhead", {}) or {}
+    validation = evaluation_report.get("validation", {}) or {}
+    guard_ctx = evaluation_report.get("guard_overhead", {}) or {}
     guard_evaluated = (
         bool(guard_ctx.get("evaluated")) if isinstance(guard_ctx, dict) else False
     )
@@ -121,18 +122,18 @@ def _render_executive_dashboard(cert: dict[str, Any]) -> str:
 
 
 def _append_safety_dashboard_section(
-    lines: list[str], certificate: dict[str, Any]
+    lines: list[str], evaluation_report: dict[str, Any]
 ) -> None:
-    """Append a concise, first-screen dashboard for the certificate."""
-    block = compute_console_validation_block(certificate)
+    """Append a concise, first-screen dashboard for the evaluation report."""
+    block = compute_console_validation_block(evaluation_report)
     overall_pass = bool(block.get("overall_pass"))
     overall_status = (
         f"{'✅' if overall_pass else '❌'} {'PASS' if overall_pass else 'FAIL'}"
     )
 
-    validation = certificate.get("validation", {}) or {}
-    pm = certificate.get("primary_metric", {}) or {}
-    auto = certificate.get("auto", {}) or {}
+    validation = evaluation_report.get("validation", {}) or {}
+    pm = evaluation_report.get("primary_metric", {}) or {}
+    auto = evaluation_report.get("auto", {}) or {}
     tier = str(auto.get("tier") or "balanced").lower()
 
     # Primary metric summary
@@ -172,7 +173,7 @@ def _append_safety_dashboard_section(
     pm_status = (
         f"{'✅' if pm_ok else '❌'} {measured}"
         if isinstance(pm_ok, bool)
-        else f"🛈 {measured}"
+        else f"ℹ️ {measured}"
     )
 
     # Drift summary (final/preview ratio) when preview/final are numeric
@@ -205,7 +206,7 @@ def _append_safety_dashboard_section(
     drift_status = (
         f"{'✅' if drift_ok else '❌'} {drift_val}"
         if isinstance(drift_ok, bool)
-        else f"🛈 {drift_val}"
+        else f"ℹ️ {drift_val}"
     )
 
     def _gate_cell(key: str, ok_default: bool | None = None) -> str:
@@ -217,10 +218,10 @@ def _append_safety_dashboard_section(
         else:
             ok = bool(validation.get(key))
         if ok is None:
-            return "🛈 N/A"
+            return "ℹ️ N/A"
         return "✅ PASS" if ok else "❌ FAIL"
 
-    overhead_ctx = certificate.get("guard_overhead", {}) or {}
+    overhead_ctx = evaluation_report.get("guard_overhead", {}) or {}
     overhead_evaluated = (
         bool(overhead_ctx.get("evaluated")) if isinstance(overhead_ctx, dict) else False
     )
@@ -247,11 +248,11 @@ def _append_safety_dashboard_section(
             "Overhead",
             f"{'✅' if bool(validation.get('guard_overhead_acceptable', True)) else '❌'} {overhead_measured}"
             if isinstance(validation, dict)
-            else f"🛈 {overhead_measured}",
+            else f"ℹ️ {overhead_measured}",
             threshold_str,
         )
 
-    lines.append("## Safety Dashboard")
+    lines.append("## Evaluation Dashboard")
     lines.append("")
     lines.append("| Check | Status | Quick Summary |")
     lines.append("|-------|--------|---------------|")
@@ -271,10 +272,10 @@ def _append_safety_dashboard_section(
 
 
 def _append_primary_metric_section(
-    lines: list[str], certificate: dict[str, Any]
+    lines: list[str], evaluation_report: dict[str, Any]
 ) -> None:
     """Append the Primary Metric section early for quick triage."""
-    pm = certificate.get("primary_metric")
+    pm = evaluation_report.get("primary_metric")
     if not isinstance(pm, dict) or not pm:
         return
 
@@ -342,7 +343,7 @@ def _append_primary_metric_section(
 
     # Secondary metrics (informational)
     try:
-        secs = certificate.get("secondary_metrics")
+        secs = evaluation_report.get("secondary_metrics")
         if isinstance(secs, list) and secs:
             lines.append("## Secondary Metrics (informational)")
             lines.append("")
@@ -375,10 +376,10 @@ def _append_primary_metric_section(
 
 
 def _append_policy_configuration_section(
-    lines: list[str], certificate: dict[str, Any]
+    lines: list[str], evaluation_report: dict[str, Any]
 ) -> None:
-    resolved_policy = certificate.get("resolved_policy")
-    policy_provenance = certificate.get("policy_provenance", {}) or {}
+    resolved_policy = evaluation_report.get("resolved_policy")
+    policy_provenance = evaluation_report.get("policy_provenance", {}) or {}
     has_prov = isinstance(policy_provenance, dict) and bool(policy_provenance)
     has_resolved = isinstance(resolved_policy, dict) and bool(resolved_policy)
     if not (has_prov or has_resolved):
@@ -391,12 +392,12 @@ def _append_policy_configuration_section(
     if has_prov:
         tier = policy_provenance.get("tier")
     if not tier:
-        tier = (certificate.get("auto", {}) or {}).get("tier")
+        tier = (evaluation_report.get("auto", {}) or {}).get("tier")
     digest_value = None
     if has_prov:
         digest_value = policy_provenance.get("policy_digest")
     if not digest_value:
-        digest_value = (certificate.get("policy_digest", {}) or {}).get(
+        digest_value = (evaluation_report.get("policy_digest", {}) or {}).get(
             "thresholds_hash"
         )
 
@@ -436,10 +437,10 @@ def _append_policy_configuration_section(
 
 
 def _append_dataset_and_provenance_section(
-    lines: list[str], certificate: dict[str, Any]
+    lines: list[str], evaluation_report: dict[str, Any]
 ) -> None:
-    dataset = certificate.get("dataset", {}) or {}
-    provenance_info = certificate.get("provenance", {}) or {}
+    dataset = evaluation_report.get("dataset", {}) or {}
+    provenance_info = evaluation_report.get("provenance", {}) or {}
 
     has_dataset = isinstance(dataset, dict) and bool(dataset)
     has_provenance = isinstance(provenance_info, dict) and bool(provenance_info)
@@ -545,14 +546,14 @@ def _append_dataset_and_provenance_section(
                 )
 
         try:
-            conf = certificate.get("confidence", {}) or {}
+            conf = evaluation_report.get("confidence", {}) or {}
             if isinstance(conf, dict) and conf.get("label"):
                 lines.append(f"- **Confidence:** {conf.get('label')}")
         except Exception:
             pass
 
         try:
-            pd = certificate.get("policy_digest", {}) or {}
+            pd = evaluation_report.get("policy_digest", {}) or {}
             if isinstance(pd, dict) and pd:
                 pv = pd.get("policy_version")
                 th = pd.get("thresholds_hash")
@@ -671,13 +672,13 @@ def _append_accuracy_subgroups(lines: list[str], subgroups: dict[str, Any]) -> N
     lines.append("")
 
 
-def _compute_certificate_hash(certificate: dict[str, Any]) -> str:
-    """Compute integrity hash for the certificate.
+def _compute_report_hash(evaluation_report: dict[str, Any]) -> str:
+    """Compute integrity hash for the evaluation_report.
 
     Hash ignores the `artifacts` section for stability across saves.
     """
     # Create a copy without the artifacts section for stable hashing
-    cert_copy = dict(certificate or {})
+    cert_copy = dict(evaluation_report or {})
     cert_copy.pop("artifacts", None)
 
     # Sort keys for deterministic hashing
@@ -687,8 +688,8 @@ def _compute_certificate_hash(certificate: dict[str, Any]) -> str:
     return _hash.sha256(cert_str.encode()).hexdigest()[:16]
 
 
-def build_console_summary_pack(certificate: dict[str, Any]) -> dict[str, Any]:
-    """Build a small, reusable console summary pack from a certificate.
+def build_console_summary_pack(evaluation_report: dict[str, Any]) -> dict[str, Any]:
+    """Build a small, reusable console summary pack from a evaluation_report.
 
     Returns a dict with:
     - overall_pass: bool
@@ -696,7 +697,7 @@ def build_console_summary_pack(certificate: dict[str, Any]) -> dict[str, Any]:
     - gate_lines: list of "<Label>: <Status>" strings for each evaluated gate
     - labels: the canonical label list used
     """
-    block = compute_console_validation_block(certificate)
+    block = compute_console_validation_block(evaluation_report)
     overall_pass = bool(block.get("overall_pass"))
     emoji = "✅" if overall_pass else "❌"
     overall_line = f"Overall Status: {emoji} {'PASS' if overall_pass else 'FAIL'}"
@@ -717,43 +718,38 @@ def build_console_summary_pack(certificate: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def render_certificate_markdown(certificate: dict[str, Any]) -> str:
+def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
     """
-    Render a certificate as a formatted Markdown report with pretty tables.
+    Render an evaluation report as a formatted Markdown report with pretty tables.
 
-    This implementation is moved from certificate.py to keep that module lean.
-    To avoid circular import issues, we alias helpers from the certificate
-    module inside the function body.
+    This implementation is moved from report_builder.py to keep that module lean.
     """
-    # Alias frequently used helpers locally to avoid editing the large body
-    validate_certificate = C.validate_certificate
-
-    if not validate_certificate(certificate):
-        raise ValueError("Invalid certificate structure")
+    if not validate_report(evaluation_report):
+        raise ValueError("Invalid evaluation report structure")
 
     lines: list[str] = []
     appendix_lines: list[str] = []
-    edit_name = str(certificate.get("edit_name") or "").lower()
+    edit_name = str(evaluation_report.get("edit_name") or "").lower()
 
     # Header
-    lines.append("# InvarLock Evaluation Certificate")
+    lines.append("# InvarLock Evaluation Report")
     lines.append("")
     lines.append(
         "> *Basis: “point” gates check the point estimate; “upper” gates check the CI "
         "upper bound; “point & upper” requires both to pass.*"
     )
     lines.append("")
-    lines.append(f"**Schema Version:** {certificate['schema_version']}")
-    lines.append(f"**Run ID:** `{certificate['run_id']}`")
-    lines.append(f"**Generated:** {certificate['artifacts']['generated_at']}")
-    lines.append(f"**Edit Type:** {certificate.get('edit_name', 'Unknown')}")
+    lines.append(f"**Schema Version:** {evaluation_report['schema_version']}")
+    lines.append(f"**Run ID:** `{evaluation_report['run_id']}`")
+    lines.append(f"**Generated:** {evaluation_report['artifacts']['generated_at']}")
+    lines.append(f"**Edit Type:** {evaluation_report.get('edit_name', 'Unknown')}")
     lines.append("")
     lines.append(
-        "> Full evidence: see [`evaluation.cert.json`](evaluation.cert.json) for complete provenance, digests, and raw measurements."
+        "> Full evidence: see [`evaluation.report.json`](evaluation.report.json) for complete provenance, digests, and raw measurements."
     )
     lines.append("")
 
-    plugins = certificate.get("plugins", {})
+    plugins = evaluation_report.get("plugins", {})
     if isinstance(plugins, dict) and plugins:
         lines.append("## Plugin Provenance")
         lines.append("")
@@ -780,7 +776,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
     # Executive Summary with validation status (canonical, from console block)
     lines.append("## Executive Summary")
     lines.append("")
-    _block = compute_console_validation_block(certificate)
+    _block = compute_console_validation_block(evaluation_report)
     overall_pass = bool(_block.get("overall_pass"))
     status_emoji = "✅" if overall_pass else "❌"
     lines.append(
@@ -789,13 +785,13 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
     # Window Plan one-liner for quick audit
     try:
         plan_ctx = (
-            certificate.get("window_plan")
-            or certificate.get("dataset", {}).get("windows", {})
-            or certificate.get("ppl", {}).get("window_plan")
+            evaluation_report.get("window_plan")
+            or evaluation_report.get("dataset", {}).get("windows", {})
+            or evaluation_report.get("ppl", {}).get("window_plan")
         )
-        seq_len = certificate.get("dataset", {}).get("seq_len") or certificate.get(
-            "dataset", {}
-        ).get("sequence_length")
+        seq_len = evaluation_report.get("dataset", {}).get(
+            "seq_len"
+        ) or evaluation_report.get("dataset", {}).get("sequence_length")
         if isinstance(plan_ctx, dict):
             profile = plan_ctx.get("profile")
             preview_n = (
@@ -815,23 +811,23 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
         pass
     lines.append("")
 
-    dashboard = _render_executive_dashboard(certificate)
+    dashboard = _render_executive_dashboard(evaluation_report)
     if dashboard:
         lines.extend(dashboard.splitlines())
         lines.append("")
 
     lines.append("## Contents")
     lines.append("")
-    lines.append("- [Safety Dashboard](#safety-dashboard)")
+    lines.append("- [Evaluation Dashboard](#evaluation-dashboard)")
     lines.append("- [Quality Gates](#quality-gates)")
-    lines.append("- [Safety Check Details](#safety-check-details)")
+    lines.append("- [Guard Check Details](#guard-check-details)")
     lines.append("- [Primary Metric](#primary-metric)")
     lines.append("- [Guard Observability](#guard-observability)")
     lines.append("- [Model Information](#model-information)")
     lines.append("- [Dataset and Provenance](#dataset-and-provenance)")
     lines.append("- [Policy Configuration](#policy-configuration)")
     lines.append("- [Appendix](#appendix)")
-    lines.append("- [Certificate Integrity](#certificate-integrity)")
+    lines.append("- [Evaluation Report Integrity](#evaluation-report-integrity)")
     lines.append("")
 
     # Validation table with canonical gates (mirrors console allow-list)
@@ -840,9 +836,9 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
     lines.append("| Gate | Status | Measured | Threshold | Basis | Description |")
     lines.append("|------|--------|----------|-----------|-------|-------------|")
 
-    pm_block = certificate.get("primary_metric", {}) or {}
+    pm_block = evaluation_report.get("primary_metric", {}) or {}
     has_pm = isinstance(pm_block, dict) and bool(pm_block)
-    auto_info = certificate.get("auto", {})
+    auto_info = evaluation_report.get("auto", {})
     tier = (auto_info.get("tier") or "balanced").lower()
 
     # Helper to emit Primary Metric Acceptable row
@@ -851,7 +847,9 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
         value = pm_block.get("ratio_vs_baseline")
         gating_basis = pm_block.get("gating_basis") or "point"
         ok = bool(
-            certificate.get("validation", {}).get("primary_metric_acceptable", True)
+            evaluation_report.get("validation", {}).get(
+                "primary_metric_acceptable", True
+            )
         )
         status = "✅ PASS" if ok else "❌ FAIL"
         if pm_kind in {"accuracy", "vqa_accuracy"}:
@@ -885,7 +883,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
     # Helper to emit Preview Final Drift Acceptable row
     def _emit_drift_gate_row() -> None:
         ok = bool(
-            certificate.get("validation", {}).get(
+            evaluation_report.get("validation", {}).get(
                 "preview_final_drift_acceptable", True
             )
         )
@@ -942,12 +940,14 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
 
     # Helper to emit Guard Overhead Acceptable row (only when evaluated)
     def _emit_overhead_gate_row() -> None:
-        guard_overhead = certificate.get("guard_overhead", {}) or {}
+        guard_overhead = evaluation_report.get("guard_overhead", {}) or {}
         evaluated = bool(guard_overhead.get("evaluated"))
         if not evaluated:
             return
         ok = bool(
-            certificate.get("validation", {}).get("guard_overhead_acceptable", True)
+            evaluation_report.get("validation", {}).get(
+                "guard_overhead_acceptable", True
+            )
         )
         status = "✅ PASS" if ok else "❌ FAIL"
         overhead_pct = guard_overhead.get("overhead_percent")
@@ -975,7 +975,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
         )
 
     def _emit_pm_tail_gate_row() -> None:
-        pm_tail = certificate.get("primary_metric_tail", {}) or {}
+        pm_tail = evaluation_report.get("primary_metric_tail", {}) or {}
         if not isinstance(pm_tail, dict) or not pm_tail:
             return
 
@@ -985,7 +985,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
         warned = bool(pm_tail.get("warned", False))
 
         if not evaluated:
-            status = "🛈 INFO"
+            status = "ℹ️ INFO"
         elif passed:
             status = "✅ PASS"
         elif mode == "fail":
@@ -1042,17 +1042,17 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
         _emit_overhead_gate_row()
 
     # Annotate hysteresis usage if applied
-    if certificate.get("validation", {}).get("hysteresis_applied"):
+    if evaluation_report.get("validation", {}).get("hysteresis_applied"):
         lines.append("- Note: hysteresis applied to gate boundary")
 
     lines.append("")
-    lines.append("## Safety Check Details")
+    lines.append("## Guard Check Details")
     lines.append("")
-    lines.append("| Safety Check | Status | Measured | Threshold | Description |")
+    lines.append("| Guard Check | Status | Measured | Threshold | Description |")
     lines.append("|--------------|--------|----------|-----------|-------------|")
 
-    inv_summary = certificate["invariants"]
-    validation = certificate.get("validation", {})
+    inv_summary = evaluation_report["invariants"]
+    validation = evaluation_report.get("validation", {})
     inv_status = "✅ PASS" if validation.get("invariants_pass", False) else "❌ FAIL"
     inv_counts = inv_summary.get("summary", {}) or {}
     inv_measure = inv_summary.get("status", "pass").upper()
@@ -1084,23 +1084,23 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
         lines.append(f"- Non-fatal: {non_fatal_message}")
 
     spec_status = "✅ PASS" if validation.get("spectral_stable", False) else "❌ FAIL"
-    caps_applied = certificate["spectral"]["caps_applied"]
+    caps_applied = evaluation_report["spectral"]["caps_applied"]
     lines.append(
         f"| Spectral Stability | {spec_status} | {caps_applied} violations | < 5 | Weight matrix spectral norms |"
     )
 
     # Catastrophic spike safety stop row is now driven by primary metric flags
-    if isinstance(certificate.get("primary_metric"), dict):
+    if isinstance(evaluation_report.get("primary_metric"), dict):
         pm_ok = bool(validation.get("primary_metric_acceptable", True))
-        pm_ratio = certificate.get("primary_metric", {}).get("ratio_vs_baseline")
+        pm_ratio = evaluation_report.get("primary_metric", {}).get("ratio_vs_baseline")
         if isinstance(pm_ratio, int | float):
             lines.append(
-                f"| Catastrophic Spike Gate (safety stop) | {'✅ PASS' if pm_ok else '❌ FAIL'} | {pm_ratio:.3f}x | ≤ 2.0x | Hard stop @ 2.0× |"
+                f"| Catastrophic Spike Gate (hard stop) | {'✅ PASS' if pm_ok else '❌ FAIL'} | {pm_ratio:.3f}x | ≤ 2.0x | Hard stop @ 2.0× |"
             )
 
     # Include RMT Health row for compatibility and clarity
     rmt_status = "✅ PASS" if validation.get("rmt_stable", False) else "❌ FAIL"
-    rmt_state = certificate.get("rmt", {}).get("status", "unknown").title()
+    rmt_state = evaluation_report.get("rmt", {}).get("status", "unknown").title()
     lines.append(
         f"| RMT Health | {rmt_status} | {rmt_state} | ε-rule | Random Matrix Theory guard status |"
     )
@@ -1108,8 +1108,8 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
     # Pairing + Bootstrap snapshot (quick audit surface)
     try:
         stats = (
-            certificate.get("dataset", {}).get("windows", {}).get("stats", {})
-            or certificate.get("ppl", {}).get("stats", {})
+            evaluation_report.get("dataset", {}).get("windows", {}).get("stats", {})
+            or evaluation_report.get("ppl", {}).get("stats", {})
             or {}
         )
         paired_windows = stats.get("paired_windows")
@@ -1138,7 +1138,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
                 parts.append(f"{float(overlap_frac) * 100.0:.1f}% overlap")
             elif overlap_frac is not None:
                 parts.append(f"overlap={overlap_frac}")
-            lines.append(f"✅ Pairing: {', '.join(parts) if parts else 'N/A'}")
+            lines.append(f"- ✅ Pairing: {', '.join(parts) if parts else 'N/A'}")
         if isinstance(bootstrap, dict):
             reps = bootstrap.get("replicates")
             bseed = bootstrap.get("seed")
@@ -1154,17 +1154,19 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
                         bits.append(f"seed={int(bseed)}")
                     except Exception:
                         bits.append(f"seed={bseed}")
-                lines.append(f"✅ Bootstrap: {', '.join(bits) if bits else 'N/A'}")
+                lines.append(f"- ✅ Bootstrap: {', '.join(bits) if bits else 'N/A'}")
         # Optional: show log-space paired Δ CI next to ratio CI for clarity
-        delta_ci = certificate.get("primary_metric", {}).get("ci") or certificate.get(
-            "ppl", {}
-        ).get("logloss_delta_ci")
+        delta_ci = evaluation_report.get("primary_metric", {}).get(
+            "ci"
+        ) or evaluation_report.get("ppl", {}).get("logloss_delta_ci")
         if (
             isinstance(delta_ci, tuple | list)
             and len(delta_ci) == 2
             and all(isinstance(x, int | float) for x in delta_ci)
         ):
-            lines.append(f"🛈 Log Δ (paired) CI: [{delta_ci[0]:.6f}, {delta_ci[1]:.6f}]")
+            lines.append(
+                f"- ℹ️ Log Δ (paired) CI: [{delta_ci[0]:.6f}, {delta_ci[1]:.6f}]"
+            )
     except Exception:
         pass
 
@@ -1185,13 +1187,13 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
 
     lines.append("")
 
-    _append_primary_metric_section(lines, certificate)
+    _append_primary_metric_section(lines, evaluation_report)
 
     # Guard observability snapshots
     lines.append("## Guard Observability")
     lines.append("")
 
-    spectral_info = certificate.get("spectral", {}) or {}
+    spectral_info = evaluation_report.get("spectral", {}) or {}
     if spectral_info:
         lines.append("### Spectral Guard Summary")
         lines.append("")
@@ -1260,7 +1262,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
             if max_module:
                 max_val += f" – {max_module}"
             if kappa_f is None:
-                max_status = "🛈 No κ"
+                max_status = "ℹ️ No κ"
             elif max_abs_z <= kappa_f:
                 max_status = f"✅ Within κ={kappa_f:.3f}"
             else:
@@ -1280,7 +1282,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
             if isinstance(mt_m, int | float) and math.isfinite(float(mt_m)):
                 parts.append(f"m={int(mt_m)}")
             lines.append(
-                f"| Multiple Testing | {', '.join(parts) if parts else '—'} | 🛈 INFO |"
+                f"| Multiple Testing | {', '.join(parts) if parts else '—'} | ℹ️ INFO |"
             )
 
         lines.append("")
@@ -1360,7 +1362,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
             lines.append("</details>")
             lines.append("")
 
-    rmt_info = certificate.get("rmt", {}) or {}
+    rmt_info = evaluation_report.get("rmt", {}) or {}
     if rmt_info:
         lines.append("### RMT Guard")
         lines.append("")
@@ -1411,7 +1413,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
         else:
             lines.append("")
 
-    guard_overhead_info = certificate.get("guard_overhead", {}) or {}
+    guard_overhead_info = evaluation_report.get("guard_overhead", {}) or {}
     if guard_overhead_info:
         lines.append("### Guard Overhead")
         lines.append("")
@@ -1439,7 +1441,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
         overhead_source = guard_overhead_info.get("source")
         if overhead_source:
             lines.append(f"- Source: {overhead_source}")
-        plan_ctx = certificate.get("provenance", {}).get("window_plan", {})
+        plan_ctx = evaluation_report.get("provenance", {}).get("window_plan", {})
         if isinstance(plan_ctx, dict) and plan_ctx:
             plan_preview = (
                 plan_ctx.get("preview_n")
@@ -1458,8 +1460,8 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
         lines.append("")
 
     compression_diag = (
-        certificate.get("structure", {}).get("compression_diagnostics", {})
-        if isinstance(certificate.get("structure"), dict)
+        evaluation_report.get("structure", {}).get("compression_diagnostics", {})
+        if isinstance(evaluation_report.get("structure"), dict)
         else {}
     )
     inference_flags = compression_diag.get("inferred") or {}
@@ -1485,7 +1487,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
     # Model and Configuration
     lines.append("## Model Information")
     lines.append("")
-    meta = certificate["meta"]
+    meta = evaluation_report["meta"]
     lines.append(f"- **Model ID:** {meta.get('model_id')}")
     lines.append(f"- **Adapter:** {meta.get('adapter')}")
     lines.append(f"- **Device:** {meta.get('device')}")
@@ -1556,7 +1558,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
     # Edit Configuration (removed duplicate Edit Information section)
 
     # Auto-tuning Configuration
-    auto = certificate["auto"]
+    auto = evaluation_report["auto"]
     if auto["tier"] != "none":
         lines.append("## Auto-Tuning Configuration")
         lines.append("")
@@ -1574,18 +1576,18 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
             pass
         lines.append("")
 
-    _append_dataset_and_provenance_section(lines, certificate)
+    _append_dataset_and_provenance_section(lines, evaluation_report)
 
     # Structural Changes heading is printed with content later; avoid empty header here
 
     # System Overhead section (latency/throughput)
-    sys_over = certificate.get("system_overhead", {}) or {}
+    sys_over = evaluation_report.get("system_overhead", {}) or {}
     if isinstance(sys_over, dict) and sys_over:
         _append_system_overhead_section(lines, sys_over)
 
     # Accuracy Subgroups (informational)
     try:
-        cls = certificate.get("classification", {})
+        cls = evaluation_report.get("classification", {})
         sub = cls.get("subgroups") if isinstance(cls, dict) else None
         if isinstance(sub, dict) and sub:
             _append_accuracy_subgroups(lines, sub)
@@ -1593,7 +1595,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
         pass
     # Structural Changes
     try:
-        structure = certificate.get("structure", {}) or {}
+        structure = evaluation_report.get("structure", {}) or {}
         params_changed = int(structure.get("params_changed", 0) or 0)
         layers_modified = int(structure.get("layers_modified", 0) or 0)
         bitwidth_changes = 0
@@ -1605,7 +1607,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
         has_changes = any(
             v > 0 for v in (params_changed, layers_modified, bitwidth_changes)
         )
-        edit_name = str(certificate.get("edit_name", "unknown"))
+        edit_name = str(evaluation_report.get("edit_name", "unknown"))
         if has_changes:
             lines.append("## Structural Changes")
             lines.append("")
@@ -1735,7 +1737,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
             lines.append("")
 
     # Variance Guard (Spectral/RMT summaries are already provided above)
-    variance = certificate["variance"]
+    variance = evaluation_report["variance"]
     appendix_lines.append("### Variance Guard")
     appendix_lines.append("")
 
@@ -1766,7 +1768,7 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
             )
             # Add concise rationale aligned with Balanced predictive gate contract
             try:
-                ve_policy = certificate.get("policies", {}).get("variance", {})
+                ve_policy = evaluation_report.get("policies", {}).get("variance", {})
                 min_effect = ve_policy.get("min_effect_lognll")
                 if isinstance(min_effect, int | float):
                     appendix_lines.append(
@@ -1799,7 +1801,11 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
     lines.append("")
 
     # MoE Observability (non-gating)
-    moe = certificate.get("moe", {}) if isinstance(certificate.get("moe"), dict) else {}
+    moe = (
+        evaluation_report.get("moe", {})
+        if isinstance(evaluation_report.get("moe"), dict)
+        else {}
+    )
     if moe:
         lines.append("## MoE Observability")
         lines.append("")
@@ -1828,16 +1834,16 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
                 lines.append(f"- **{label}:** {float(moe[key]):+.4f}")
         lines.append("")
 
-    _append_policy_configuration_section(lines, certificate)
+    _append_policy_configuration_section(lines, evaluation_report)
 
     appendix_lines.append("### Artifacts")
     appendix_lines.append("")
-    artifacts = certificate["artifacts"]
+    artifacts = evaluation_report["artifacts"]
     if artifacts.get("events_path"):
         appendix_lines.append(f"- **Events Log:** `{artifacts['events_path']}`")
     if artifacts.get("report_path"):
         appendix_lines.append(f"- **Full Report:** `{artifacts['report_path']}`")
-    appendix_lines.append(f"- **Certificate Generated:** {artifacts['generated_at']}")
+    appendix_lines.append(f"- **Report Generated:** {artifacts['generated_at']}")
     appendix_lines.append("")
 
     if appendix_lines:
@@ -1845,19 +1851,19 @@ def render_certificate_markdown(certificate: dict[str, Any]) -> str:
         lines.append("")
         lines.extend(appendix_lines)
 
-    # Certificate Hash for Integrity
-    cert_hash = _compute_certificate_hash(certificate)
-    lines.append("## Certificate Integrity")
+    # Report Hash for Integrity
+    cert_hash = _compute_report_hash(evaluation_report)
+    lines.append("## Evaluation Report Integrity")
     lines.append("")
-    lines.append(f"**Certificate Hash:** `{cert_hash}`")
+    lines.append(f"**Report Hash:** `{cert_hash}`")
     lines.append("")
     lines.append("---")
     lines.append("")
     lines.append(
-        "*This InvarLock evaluation certificate provides a comprehensive assessment of model compression safety.*"
+        "*This InvarLock Evaluation Report summarizes baseline‑paired evaluation results for a subject model relative to the provided baseline snapshot under the configured profile/preset.*"
     )
     lines.append(
-        "*All metrics are compared against the uncompressed baseline model for safety validation.*"
+        "*It reports regression-risk indicators for the measured signals; it is not a broad AI safety, alignment, or content-safety guarantee.*"
     )
 
     return "\n".join(lines)

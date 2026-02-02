@@ -1,4 +1,4 @@
-from invarlock.reporting.certificate import _compute_validation_flags
+from invarlock.reporting.report_builder import _compute_validation_flags
 
 
 def test_tiny_relax_env_relaxes_gates(monkeypatch):

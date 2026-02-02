@@ -363,7 +363,7 @@ def test_until_pass_materialize_sets_flags_and_retries_once(
         )
         stack.enter_context(patch("invarlock.core.retry.RetryController", RC))
         stack.enter_context(
-            patch("invarlock.reporting.certificate.make_certificate", make_cert)
+            patch("invarlock.reporting.report_builder.make_report", make_cert)
         )
         for target in (
             "invarlock.reporting.validate.validate_guard_overhead",

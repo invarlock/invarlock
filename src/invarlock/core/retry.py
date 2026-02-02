@@ -2,11 +2,11 @@
 InvarLock Retry Controller
 =====================
 
-Manages retry logic for automated certification workflows with:
+Manages retry logic for automated evaluation workflows with:
 - Attempt budgets (max 3 attempts default)
 - Time budgets (optional timeout)
 - Parameter adjustment strategies per edit type
-- Certificate-driven retry decisions
+- Gate-driven retry decisions
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ __all__ = ["RetryController", "adjust_edit_params"]
 
 class RetryController:
     """
-    Controls retry logic for certificate-driven automation.
+    Controls retry logic for evaluation-report-driven automation.
 
     Features:
     - Attempt budget enforcement (default 3 max)
@@ -45,18 +45,18 @@ class RetryController:
         self.start_time = time.time()
         self.attempt_history: list[dict[str, Any]] = []
 
-    def should_retry(self, certificate_passed: bool) -> bool:
+    def should_retry(self, report_passed: bool) -> bool:
         """
         Determine if retry should be attempted.
 
         Args:
-            certificate_passed: Whether certificate validation passed
+            report_passed: Whether evaluation report gates passed
 
         Returns:
             True if retry should be attempted, False otherwise
         """
-        # If certificate passed, no retry needed
-        if certificate_passed:
+        # If report passed, no retry needed
+        if report_passed:
             return False
 
         # Check attempt budget (attempt count equals history length)
@@ -81,21 +81,21 @@ class RetryController:
     def record_attempt(
         self,
         attempt_num: int,
-        certificate_result: dict[str, Any],
+        report_result: dict[str, Any],
         edit_params: dict[str, Any],
     ) -> None:
         """Record details of an attempt for tracking."""
-        certificate_result = certificate_result or {}
+        report_result = report_result or {}
         edit_params = edit_params or {}
 
         self.attempt_history.append(
             {
                 "attempt": attempt_num,
                 "timestamp": time.time(),
-                "certificate_passed": certificate_result.get("passed", False),
+                "report_passed": report_result.get("passed", False),
                 "edit_params": edit_params.copy(),
-                "failures": certificate_result.get("failures", []),
-                "validation": certificate_result.get("validation", {}),
+                "failures": report_result.get("failures", []),
+                "validation": report_result.get("validation", {}),
             }
         )
 
@@ -114,7 +114,7 @@ def adjust_edit_params(
     edit_name: str,
     edit_params: dict[str, Any],
     attempt: int,
-    certificate_result: dict[str, Any] | None = None,
+    report_result: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
     Adjust edit parameters for retry attempt based on edit type and failure mode.
@@ -126,7 +126,7 @@ def adjust_edit_params(
         edit_name: Name of the edit operation
         edit_params: Current edit parameters
         attempt: Attempt number (1-indexed)
-        certificate_result: Optional certificate result for failure analysis
+        report_result: Optional evaluation report result for failure analysis
 
     Returns:
         Adjusted parameters for next attempt

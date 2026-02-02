@@ -2,7 +2,7 @@
 
 Provides a tiny, versioned schema describing the adapter family and the
 underlying library versions. This does not perform any edits; it only reads
-environment and import metadata to annotate reports/certificates.
+environment and import metadata to annotate evaluation artifacts.
 """
 
 from __future__ import annotations
@@ -46,12 +46,12 @@ def extract_adapter_provenance(adapter_name: str) -> AdapterProvenance:
         msg = (
             None
             if supported
-            else f"Use Compare & Certify (BYOE); {library} version unsupported (tested: {tested})"
+            else f"Use Compare & Evaluate (BYOE); {library} version unsupported (tested: {tested})"
         )
     except Exception:  # Package not installed or version unknown
         ver = None
         supported = False
-        msg = f"{library} not available; prefer Compare & Certify (BYOE) or install extras."
+        msg = f"{library} not available; prefer Compare & Evaluate (BYOE) or install extras."
 
     return AdapterProvenance(
         family=family,

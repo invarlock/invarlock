@@ -1,10 +1,10 @@
-# InvarLock Documentation (0.3.7)
+# InvarLock Documentation
 
 The OSS core is edit‑agnostic (BYOE). A small built‑in quantization demo
 (`quant_rtn`, 8‑bit) exists for CI/quickstart. See
-[Compare & Certify (BYOE)](user-guide/compare-and-certify.md).
+[Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md).
 
-Welcome to the documentation hub for InvarLock (Edit‑agnostic robustness certificates for weight edits).
+Welcome to the documentation hub for InvarLock (Edit‑agnostic robustness reports for weight edits).
 The material below is organized so new users can ramp quickly while practitioners
 find detailed reference, design rationales, and assurance notes.
 
@@ -14,7 +14,7 @@ find detailed reference, design rationales, and assurance notes.
 
 1. **[Getting Started](user-guide/getting-started.md)** – environment setup and the first certification loop.
 2. **[Quickstart](user-guide/quickstart.md)** – CLI highlights for common workflows.
-3. **[Compare & Certify (BYOE)](user-guide/compare-and-certify.md)** – baseline ↔ subject with guardchain.
+3. **[Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md)** – baseline ↔ subject with guardchain.
 4. **[Primary Metric Smoke](user-guide/primary-metric-smoke.md)** – tiny examples for ppl/accuracy kinds.
 
 ### Quick Examples
@@ -23,18 +23,18 @@ find detailed reference, design rationales, and assurance notes.
 # Core-only install (no torch/transformers): CLI + config tools
 pip install invarlock
 
-# HF/torch stack for adapter-based flows (certify/run)
+# HF/torch stack for adapter-based flows (evaluate/run)
 pip install "invarlock[hf]"
 
-# Compare & Certify (BYOE checkpoints)
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
+# Compare & evaluate (BYOE checkpoints)
+INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
   --baseline <BASELINE_MODEL> \
   --subject  <SUBJECT_MODEL> \
   --adapter  auto
 ```
 
 Tip: enable Hub downloads per command when fetching models/datasets:
-`INVARLOCK_ALLOW_NETWORK=1 invarlock certify ...`
+`INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate ...`
 
 ---
 
@@ -44,11 +44,11 @@ Tip: enable Hub downloads per command when fetching models/datasets:
 
 - [Getting Started](user-guide/getting-started.md)
 - [Quickstart](user-guide/quickstart.md)
-- [Compare & Certify (BYOE)](user-guide/compare-and-certify.md)
+- [Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md)
 - [Primary Metric Smoke](user-guide/primary-metric-smoke.md)
 - [Configuration Gallery](user-guide/config-gallery.md)
 - [Example Reports](user-guide/example-reports.md)
-- [Reading a Certificate](user-guide/reading-certificate.md)
+- [Reading a report](user-guide/reading-report.md)
 - [Troubleshooting](user-guide/troubleshooting.md) — Error codes and common fixes
 - [Plugins](user-guide/plugins.md) — Extending adapters and guards
 - [Bring Your Own Data](user-guide/bring-your-own-data.md) — Custom datasets
@@ -63,7 +63,7 @@ Tip: enable Hub downloads per command when fetching models/datasets:
 - [Configuration Schema](reference/config-schema.md)
 - [Guards](reference/guards.md)
 - [Model Adapters](reference/model-adapters.md)
-- [Certificates](reference/certificates.md) — Schema, telemetry, and HTML export
+- [reports](reference/reports.md) — Schema, telemetry, and HTML export
 - [Tier Policy Catalog (runtime tiers.yaml)](reference/tier-policy-catalog.md)
 - [Datasets](reference/datasets.md)
 - [Artifact Layout](reference/artifacts.md)
@@ -122,8 +122,8 @@ to change proposals or releases when you update calibration.
 1. **Configure** – describe model, dataset, edit, and guard policies in YAML.
 2. **Execute** – run `invarlock run` under a CI or release profile with pairing
    enforced.
-3. **Validate** – generate certificates via `invarlock report` and run `invarlock verify` for policy compliance.
-4. **Iterate** – compare runs, adjust edit plans, and reissue certificates until gates pass.
+3. **Validate** – generate reports via `invarlock report` and run `invarlock verify` for policy compliance.
+4. **Iterate** – compare runs, adjust edit plans, and reissue reports until gates pass.
 
 The guard suite (invariants, spectral, variance, and RMT) ensures edits stay
 inside safety envelopes even when aggressive compression is attempted.
@@ -157,7 +157,7 @@ Notes
 | Python    | 3.12+                                                                 |
 | Devices   | CUDA, MPS (Apple Silicon), CPU                                        |
 | Models    | GPT‑2 Small/Medium adapters                                           |
-| Edits     | RTN quantization (demo built-in); others via Compare & Certify (BYOE) |
+| Edits     | RTN quantization (demo built-in); others via Compare & evaluate (BYOE) |
 | Datasets  | WikiText‑2 (paired 200/200 windows), synthetic samples                |
 
 ---
@@ -169,7 +169,7 @@ Notes
 ```bash
 pip install "invarlock[adapters,guards,eval]"
 invarlock doctor
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
+INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
   --baseline gpt2 \
   --subject /path/to/edited \
   --adapter auto \
@@ -188,13 +188,13 @@ python scripts/verify_ci_matrix.sh
 ### Production Certification
 
 ```bash
-INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
+INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
   --baseline /path/to/baseline \
   --subject  /path/to/edited \
   --adapter auto \
   --profile release \
   --preset configs/presets/causal_lm/wikitext2_512.yaml
-invarlock verify reports/cert/evaluation.cert.json
+invarlock verify reports/eval/evaluation.report.json
 ```
 
 ---
@@ -214,7 +214,7 @@ dataset:
   final_n: 200
   seed: 42
 edit:
-  # No edit by default (Compare & Certify/BYOE recommended), or use built-in quant demo:
+  # No edit by default (Compare & evaluate/BYOE recommended), or use built-in quant demo:
   # edit:
   #   name: quant_rtn
   #   plan:

@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+import typer
 
 from invarlock.cli.commands.report import report_command
 
@@ -68,7 +69,7 @@ def test_report_command_with_comparison(mock_load):
 
 
 @patch("invarlock.cli.commands.report._load_run_report")
-def test_report_command_certificate_no_baseline(mock_load):
+def test_report_command_evaluation_report_no_baseline(mock_load):
     mock_report = {
         "meta": {"model_id": "gpt2"},
         "edit": {"name": "quant_rtn"},
@@ -76,17 +77,21 @@ def test_report_command_certificate_no_baseline(mock_load):
     }
     mock_load.return_value = mock_report
     with patch("invarlock.cli.commands.report.console"):
-        with pytest.raises((SystemExit, Exception)):
+        with pytest.raises(typer.Exit):
             report_command(
-                run="run.json", format="cert", compare=None, baseline=None, output=None
+                run="run.json",
+                format="report",
+                compare=None,
+                baseline=None,
+                output=None,
             )
 
 
 @patch("invarlock.reporting.report.save_report")
 @patch("invarlock.cli.commands.report._load_run_report")
-@patch("invarlock.reporting.certificate.make_certificate")
-@patch("invarlock.reporting.certificate.validate_certificate")
-def test_report_command_certificate_with_baseline(
+@patch("invarlock.reporting.report_builder.make_report")
+@patch("invarlock.reporting.report_builder.validate_report")
+def test_report_command_evaluation_report_with_baseline(
     mock_validate, mock_cert, mock_load, mock_save
 ):
     run = {
@@ -104,14 +109,14 @@ def test_report_command_certificate_with_baseline(
         return baseline if "baseline" in path else run
 
     mock_load.side_effect = side
-    mock_save.return_value = {"cert": "certificate.json"}
+    mock_save.return_value = {"report": "evaluation.report.json"}
     mock_cert.return_value = {"validation": {"safety_check": True}}
     mock_validate.return_value = True
 
     with patch("invarlock.cli.commands.report.console"):
         report_command(
             run="run.json",
-            format="cert",
+            format="report",
             compare=None,
             baseline="baseline.json",
             output=None,

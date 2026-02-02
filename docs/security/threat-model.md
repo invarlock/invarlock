@@ -54,7 +54,7 @@ security or alignment.
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │                    VALIDATION LAYER                             │   │
 │  │  ┌─────────────────────────────────────────────────────────────┐│   │
-│  │  │ invarlock doctor → invarlock certify → invarlock verify    ││   │
+│  │  │ invarlock doctor → invarlock evaluate → invarlock verify    ││   │
 │  │  │ ────────────────────────────────────────────────────────── ││   │
 │  │  │ • Environment    • Guard checks      • Schema validation   ││   │
 │  │  │   diagnostics    • Pairing math      • Ratio math check    ││   │
@@ -66,7 +66,7 @@ security or alignment.
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │                    EVIDENCE LAYER                               │   │
 │  │  ┌────────────────────────────────────────────────────────────┐ │   │
-│  │  │ evaluation.cert.json                                       │ │   │
+│  │  │ evaluation.report.json                                     │ │   │
 │  │  │ ────────────────────────────────                           │ │   │
 │  │  │ • seeds, device, policy_digest                             │ │   │
 │  │  │ • tokenizer_hash, provider_digest                          │ │   │
@@ -84,7 +84,7 @@ security or alignment.
 
 - Baseline and subject model weights for supported task families.
 - Evaluation datasets, pairing schedules, and seed bundles.
-- Certification artifacts: reports, certificates, logs, and policy digests.
+- Certification artifacts: reports, reports, logs, and policy digests.
 
 **Adversaries / failure modes**
 
@@ -100,9 +100,9 @@ security or alignment.
 - Network guard (`invarlock.security`) denies outbound sockets by default; network
   use must be opted into per command.
 - Supply-chain checks in CI (SBOM generation, `pip-audit`, secret scanning).
-- Strict configuration and certificate validation (`invarlock doctor`,
+- Strict configuration and report validation (`invarlock doctor`,
   `invarlock verify`) to detect misconfiguration and schema drift.
-- Certificate fields for seeds, windowing, dataset/tokenizer hashes, and guard
+- report fields for seeds, windowing, dataset/tokenizer hashes, and guard
   telemetry so reviewers can audit the safety case.
 
 ## Attack Scenarios
@@ -139,18 +139,18 @@ task-specific degradation not captured by primary metric.
 Tighten tier (conservative) for high-stakes releases.
 
 **Detection:** `validation.primary_metric_acceptable = false` or guard warnings
-in certificate. Manual review of `report.guards[]` evidence.
+in report. Manual review of `report.guards[]` evidence.
 
 ### 4. Configuration Drift Attack
 
 **Threat:** Attacker modifies config to weaken guards (larger ε, disabled
 checks) hoping reviewers don't notice.
 
-**Mitigation:** Certificates capture `resolved_policy.*` and `policy_digest`
+**Mitigation:** reports capture `resolved_policy.*` and `policy_digest`
 for audit. `invarlock verify` enforces schema compliance.
 
 **Detection:** Policy changes appear in `policy_digest.changed = true`.
-Compare certificates side-by-side for unexpected policy drift.
+Compare reports side-by-side for unexpected policy drift.
 
 ### 5. Window Schedule Manipulation
 

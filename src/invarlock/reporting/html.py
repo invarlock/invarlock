@@ -1,5 +1,5 @@
 """
-Minimal HTML exporter for certificates.
+Minimal HTML exporter for reports.
 
 This implementation wraps the Markdown rendering in a simple HTML template so
 that the numbers and core content remain identical across formats.
@@ -10,7 +10,7 @@ from __future__ import annotations
 from html import escape
 from typing import Any
 
-from .render import render_certificate_markdown
+from .render import render_report_markdown
 
 markdown_module: Any | None = None
 try:
@@ -37,13 +37,13 @@ def _apply_status_badges(html_body: str) -> str:
     return updated
 
 
-def render_certificate_html(certificate: dict[str, Any]) -> str:
-    """Render a certificate as a simple HTML document.
+def render_report_html(evaluation_report: dict[str, Any]) -> str:
+    """Render an evaluation report as a simple HTML document.
 
     Uses the Markdown renderer and converts to HTML when available, falling back
     to a <pre> block when the markdown dependency is missing.
     """
-    md = render_certificate_markdown(certificate)
+    md = render_report_markdown(evaluation_report)
     if markdown_module is None:
         body = f'<pre class="invarlock-md">{escape(md)}</pre>'
     else:
@@ -52,7 +52,7 @@ def render_certificate_html(certificate: dict[str, Any]) -> str:
         body = f'<div class="invarlock-md">{html_body}</div>'
     return (
         '<!DOCTYPE html><html><head><meta charset="utf-8">'
-        "<title>InvarLock Evaluation Certificate</title>"
+        "<title>InvarLock Evaluation Report</title>"
         "<style>"
         ":root{--pass:#2da44e;--fail:#cf222e;--warn:#bf8700;--ink:#1f2328;"
         "--muted:#57606a;--panel:#f6f8fa;--border:#d0d7de}"
@@ -79,4 +79,4 @@ def render_certificate_html(certificate: dict[str, Any]) -> str:
     )
 
 
-__all__ = ["render_certificate_html"]
+__all__ = ["render_report_html"]

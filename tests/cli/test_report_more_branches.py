@@ -8,8 +8,8 @@ import typer
 from typer.models import OptionInfo
 
 import invarlock.cli.commands.report as report_mod
-import invarlock.reporting.certificate as cert_mod
 import invarlock.reporting.report as report_lib
+import invarlock.reporting.report_builder as cert_mod
 
 
 def _make_primary_report():
@@ -56,7 +56,7 @@ def test_generate_reports_coerces_optioninfo_and_all_formats(monkeypatch):
     assert saved["formats"] == ["json", "markdown", "html"]
 
 
-def test_generate_reports_certificate_validation_block(monkeypatch):
+def test_generate_reports_evaluation_report_validation_block(monkeypatch):
     primary = _make_primary_report()
     baseline = _make_primary_report()
 
@@ -68,18 +68,25 @@ def test_generate_reports_certificate_validation_block(monkeypatch):
     monkeypatch.setattr(
         report_lib,
         "save_report",
-        lambda *_, **__: {"cert": "evaluation.cert.json"},
+        lambda *_, **__: {"report": "evaluation.report.json"},
         raising=False,
     )
     monkeypatch.setattr(
         cert_mod,
-        "make_certificate",
-        lambda *_, **__: {"validation": {"overall": True}},
+        "make_report",
+        lambda *_, **__: {
+            "validation": {"overall": True},
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 45.657,
+                "final": 47.082,
+                "ratio_vs_baseline": 1.0,
+                "display_ci": [0.9981, 1.0019],
+            },
+        },
         raising=False,
     )
-    monkeypatch.setattr(
-        cert_mod, "validate_certificate", lambda cert: True, raising=False
-    )
+    monkeypatch.setattr(cert_mod, "validate_report", lambda cert: True, raising=False)
 
     block = {
         "overall_pass": True,
@@ -93,34 +100,92 @@ def test_generate_reports_certificate_validation_block(monkeypatch):
         "invarlock.reporting.render.compute_console_validation_block",
         fake_console_block,
     )
-    monkeypatch.setattr(
-        report_mod, "console", type("C", (), {"print": lambda *_: None})()
-    )
+    captured: list[str] = []
+
+    class _CaptureConsole:
+        def print(self, *args: object, **kwargs: object) -> None:
+            captured.append(" ".join(str(a) for a in args))
+
+    monkeypatch.setattr(report_mod, "console", _CaptureConsole())
 
     report_mod.report_command(
         run="run.json",
-        format="cert",
+        format="report",
         compare=None,
         baseline="baseline.json",
         output="out",
     )
+    out = "\n".join(captured)
+    assert "PRIMARY METRIC" in out
+    assert "CI (95%)" in out
+    assert "[0.998, 1.002]" in out
 
 
-def test_generate_reports_certificate_validation_error(monkeypatch):
+def test_generate_reports_summary_includes_total_time_suffix(monkeypatch):
+    primary = _make_primary_report()
+    baseline = _make_primary_report()
+
+    def fake_load(path):
+        return baseline if "baseline" in path else primary
+
+    monkeypatch.setattr(report_mod, "_load_run_report", fake_load, raising=False)
+    monkeypatch.setattr(
+        report_lib,
+        "save_report",
+        lambda *_, **__: {"report": "evaluation.report.json"},
+        raising=False,
+    )
+    monkeypatch.setattr(
+        cert_mod,
+        "make_report",
+        lambda *_, **__: {"validation": {"overall": True}, "primary_metric": {}},
+        raising=False,
+    )
+    monkeypatch.setattr(cert_mod, "validate_report", lambda cert: True, raising=False)
+    monkeypatch.setattr(
+        "invarlock.reporting.render.compute_console_validation_block",
+        lambda cert: {"overall_pass": True, "rows": []},
+    )
+    monkeypatch.setattr(report_mod, "perf_counter", lambda: 126.0)
+
+    captured: list[str] = []
+
+    class _CaptureConsole:
+        def print(self, *args: object, **kwargs: object) -> None:
+            captured.append(" ".join(str(a) for a in args))
+
+    monkeypatch.setattr(report_mod, "console", _CaptureConsole())
+
+    report_mod.report_command(
+        run="run.json",
+        format="report",
+        compare=None,
+        baseline="baseline.json",
+        output="out",
+        summary_baseline_seconds=1.0,
+        summary_subject_seconds=2.0,
+        summary_report_start=120.0,
+    )
+    out = "\n".join(captured)
+    assert "EVALUATION REPORT SUMMARY" in out
+    assert "[9.00s]" in out
+
+
+def test_generate_reports_evaluation_report_validation_error(monkeypatch):
     monkeypatch.setattr(
         report_mod, "_load_run_report", lambda path: _make_primary_report()
     )
     monkeypatch.setattr(
         report_lib,
         "save_report",
-        lambda *_, **__: {"cert": "evaluation.cert.json"},
+        lambda *_, **__: {"report": "evaluation.report.json"},
         raising=False,
     )
 
     def _boom(*_args, **_kwargs):
-        raise RuntimeError("bad cert")
+        raise RuntimeError("bad report")
 
-    monkeypatch.setattr(cert_mod, "make_certificate", _boom, raising=False)
+    monkeypatch.setattr(cert_mod, "make_report", _boom, raising=False)
     monkeypatch.setattr(
         report_mod, "console", type("C", (), {"print": lambda *_: None})()
     )
@@ -128,7 +193,7 @@ def test_generate_reports_certificate_validation_error(monkeypatch):
     with pytest.raises(typer.Exit) as exc:
         report_mod.report_command(
             run="run.json",
-            format="cert",
+            format="report",
             compare=None,
             baseline="baseline.json",
             output=None,
@@ -137,40 +202,40 @@ def test_generate_reports_certificate_validation_error(monkeypatch):
 
 
 def test_report_validate_success(monkeypatch, tmp_path):
-    cert = tmp_path / "cert.json"
-    cert.write_text(json.dumps({"ok": True}), encoding="utf-8")
+    report = tmp_path / "report.json"
+    report.write_text(json.dumps({"ok": True}), encoding="utf-8")
     monkeypatch.setattr(
         report_mod, "console", type("C", (), {"print": lambda *_: None})()
     )
     monkeypatch.setattr(
         cert_mod,
-        "validate_certificate",
+        "validate_report",
         lambda payload: True,
         raising=False,
     )
-    report_mod.report_validate(report=str(cert))
+    report_mod.report_validate(report=str(report))
 
 
 def test_report_validate_schema_failure(monkeypatch, tmp_path):
-    cert = tmp_path / "cert.json"
-    cert.write_text("{}", encoding="utf-8")
+    report = tmp_path / "report.json"
+    report.write_text("{}", encoding="utf-8")
     monkeypatch.setattr(
         report_mod, "console", type("C", (), {"print": lambda *_: None})()
     )
     monkeypatch.setattr(
         cert_mod,
-        "validate_certificate",
+        "validate_report",
         lambda payload: False,
         raising=False,
     )
     with pytest.raises(typer.Exit) as exc:
-        report_mod.report_validate(report=str(cert))
+        report_mod.report_validate(report=str(report))
     assert exc.value.exit_code == 2
 
 
 def test_report_validate_value_error(monkeypatch, tmp_path):
-    cert = tmp_path / "cert.json"
-    cert.write_text("{}", encoding="utf-8")
+    report = tmp_path / "report.json"
+    report.write_text("{}", encoding="utf-8")
     monkeypatch.setattr(
         report_mod, "console", type("C", (), {"print": lambda *_: None})()
     )
@@ -178,15 +243,15 @@ def test_report_validate_value_error(monkeypatch, tmp_path):
     def _raise_val(payload):
         raise ValueError("bad schema")
 
-    monkeypatch.setattr(cert_mod, "validate_certificate", _raise_val, raising=False)
+    monkeypatch.setattr(cert_mod, "validate_report", _raise_val, raising=False)
     with pytest.raises(typer.Exit) as exc:
-        report_mod.report_validate(report=str(cert))
+        report_mod.report_validate(report=str(report))
     assert exc.value.exit_code == 2
 
 
 def test_report_validate_generic_error(monkeypatch, tmp_path):
-    cert = tmp_path / "cert.json"
-    cert.write_text("{}", encoding="utf-8")
+    report = tmp_path / "report.json"
+    report.write_text("{}", encoding="utf-8")
     monkeypatch.setattr(
         report_mod, "console", type("C", (), {"print": lambda *_: None})()
     )
@@ -194,15 +259,15 @@ def test_report_validate_generic_error(monkeypatch, tmp_path):
     def _raise(payload):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(cert_mod, "validate_certificate", _raise, raising=False)
+    monkeypatch.setattr(cert_mod, "validate_report", _raise, raising=False)
     with pytest.raises(typer.Exit) as exc:
-        report_mod.report_validate(report=str(cert))
+        report_mod.report_validate(report=str(report))
     assert exc.value.exit_code == 1
 
 
 def test_report_validate_read_failure(monkeypatch, tmp_path):
-    cert = tmp_path / "cert.json"
-    cert.write_text("{}", encoding="utf-8")
+    report = tmp_path / "report.json"
+    report.write_text("{}", encoding="utf-8")
     monkeypatch.setattr(
         report_mod, "console", type("C", (), {"print": lambda *_: None})()
     )
@@ -213,5 +278,5 @@ def test_report_validate_read_failure(monkeypatch, tmp_path):
         raising=False,
     )
     with pytest.raises(typer.Exit) as exc:
-        report_mod.report_validate(report=str(cert))
+        report_mod.report_validate(report=str(report))
     assert exc.value.exit_code == 1

@@ -8,7 +8,7 @@ from invarlock.reporting.primary_metric_utils import attach_primary_metric
 
 
 def test_attach_primary_metric_from_report_with_ppl_analysis():
-    certificate: dict[str, object] = {}
+    evaluation_report: dict[str, object] = {}
     report = {
         "metrics": {
             "primary_metric": {"kind": "ppl_mlm", "final": 4.0},
@@ -23,14 +23,14 @@ def test_attach_primary_metric_from_report_with_ppl_analysis():
     ppl_analysis = {"unstable": True}
 
     attach_primary_metric(
-        certificate,
+        evaluation_report,
         report,
         baseline_raw=None,
         baseline_ref=baseline_ref,
         ppl_analysis=ppl_analysis,
     )
 
-    pm = certificate["primary_metric"]
+    pm = evaluation_report["primary_metric"]
     assert pm["analysis_basis"] == "mean_logloss"
     assert pm["analysis_point_preview"] == pytest.approx(1.5)
     assert pm["analysis_point_final"] == pytest.approx(2.0)
@@ -44,7 +44,7 @@ def test_attach_primary_metric_from_report_with_ppl_analysis():
 
 
 def test_attach_primary_metric_classification_fallback(monkeypatch):
-    certificate: dict[str, object] = {}
+    evaluation_report: dict[str, object] = {}
     report = {
         "metrics": {
             "classification": {"final": {"correct_total": 80, "total": 100}},
@@ -64,14 +64,14 @@ def test_attach_primary_metric_classification_fallback(monkeypatch):
     )
 
     attach_primary_metric(
-        certificate,
+        evaluation_report,
         report,
         baseline_raw=baseline_raw,
         baseline_ref=None,
         ppl_analysis=None,
     )
 
-    pm = certificate["primary_metric"]
+    pm = evaluation_report["primary_metric"]
     assert pm["kind"] == "vqa_accuracy"
     assert pm["final"] == pytest.approx(0.8)
     assert pm["display_ci"] == [pm["final"], pm["final"]]
@@ -79,7 +79,7 @@ def test_attach_primary_metric_classification_fallback(monkeypatch):
 
 
 def test_attach_primary_metric_uses_report_windows(monkeypatch):
-    certificate: dict[str, object] = {}
+    evaluation_report: dict[str, object] = {}
     report = {"metrics": {"loss_type": "mlm"}}
 
     import invarlock.eval.primary_metric as pm_mod
@@ -92,14 +92,14 @@ def test_attach_primary_metric_uses_report_windows(monkeypatch):
     )
 
     attach_primary_metric(
-        certificate,
+        evaluation_report,
         report,
         baseline_raw={},
         baseline_ref=None,
         ppl_analysis=None,
     )
 
-    assert certificate["primary_metric"] == {
+    assert evaluation_report["primary_metric"] == {
         "kind": "ppl_mlm",
         "final": 1.23,
         "display_ci": [1.23, 1.23],
@@ -107,7 +107,7 @@ def test_attach_primary_metric_uses_report_windows(monkeypatch):
 
 
 def test_attach_primary_metric_display_ci_fallback(monkeypatch):
-    certificate = {"primary_metric": {"ratio_vs_baseline": 1.2}}
+    evaluation_report = {"primary_metric": {"ratio_vs_baseline": 1.2}}
     report = {}
     import invarlock.eval.primary_metric as pm_mod
 
@@ -119,18 +119,18 @@ def test_attach_primary_metric_display_ci_fallback(monkeypatch):
     )
 
     attach_primary_metric(
-        certificate,
+        evaluation_report,
         report,
         baseline_raw=None,
         baseline_ref=None,
         ppl_analysis=None,
     )
 
-    assert certificate["primary_metric"]["display_ci"] == [1.2, 1.2]
+    assert evaluation_report["primary_metric"]["display_ci"] == [1.2, 1.2]
 
 
 def test_attach_primary_metric_marks_nonfinite_as_degraded():
-    certificate: dict[str, object] = {}
+    evaluation_report: dict[str, object] = {}
     report = {
         "metrics": {
             "primary_metric": {
@@ -143,20 +143,20 @@ def test_attach_primary_metric_marks_nonfinite_as_degraded():
     }
 
     attach_primary_metric(
-        certificate,
+        evaluation_report,
         report,
         baseline_raw=None,
         baseline_ref=None,
         ppl_analysis=None,
     )
 
-    pm = certificate["primary_metric"]
+    pm = evaluation_report["primary_metric"]
     assert pm["degraded"] is True
     assert pm["degraded_reason"] == "non_finite_pm"
 
 
 def test_attach_primary_metric_skips_ratio_nan_without_baseline():
-    certificate: dict[str, object] = {}
+    evaluation_report: dict[str, object] = {}
     report = {
         "metrics": {
             "primary_metric": {
@@ -169,20 +169,20 @@ def test_attach_primary_metric_skips_ratio_nan_without_baseline():
     }
 
     attach_primary_metric(
-        certificate,
+        evaluation_report,
         report,
         baseline_raw=None,
         baseline_ref=None,
         ppl_analysis=None,
     )
 
-    pm = certificate["primary_metric"]
+    pm = evaluation_report["primary_metric"]
     assert pm["degraded"] is False
     assert "degraded_reason" not in pm
 
 
 def test_attach_primary_metric_retries_window_computation(monkeypatch):
-    certificate: dict[str, object] = {}
+    evaluation_report: dict[str, object] = {}
     report = {"metrics": {"loss_type": "s2s"}}
 
     import invarlock.eval.primary_metric as pm_mod
@@ -205,14 +205,14 @@ def test_attach_primary_metric_retries_window_computation(monkeypatch):
     )
 
     attach_primary_metric(
-        certificate,
+        evaluation_report,
         report,
         baseline_raw={},
         baseline_ref=None,
         ppl_analysis=None,
     )
 
-    pm = certificate["primary_metric"]
+    pm = evaluation_report["primary_metric"]
     assert pm["kind"] == "ppl_seq2seq"
     assert pm["final"] == pytest.approx(2.5)
     assert pm["display_ci"] == [2.5, 2.5]
@@ -220,7 +220,7 @@ def test_attach_primary_metric_retries_window_computation(monkeypatch):
 
 
 def test_attach_primary_metric_classification_numeric_baseline_ref(monkeypatch):
-    certificate: dict[str, object] = {}
+    evaluation_report: dict[str, object] = {}
     report = {
         "metrics": {
             "classification": {
@@ -247,14 +247,14 @@ def test_attach_primary_metric_classification_numeric_baseline_ref(monkeypatch):
     )
 
     attach_primary_metric(
-        certificate,
+        evaluation_report,
         report,
         baseline_raw=None,
         baseline_ref=baseline_ref,
         ppl_analysis=None,
     )
 
-    pm = certificate["primary_metric"]
+    pm = evaluation_report["primary_metric"]
     assert pm["kind"] == "accuracy"
     assert pm["final"] == pytest.approx(0.65)
     assert pm["ratio_vs_baseline"] == pytest.approx(10.0)
@@ -262,7 +262,7 @@ def test_attach_primary_metric_classification_numeric_baseline_ref(monkeypatch):
 
 
 def test_attach_primary_metric_display_ci_default_when_no_numeric(monkeypatch):
-    certificate = {"primary_metric": {"kind": "mystery"}}
+    evaluation_report = {"primary_metric": {"kind": "mystery"}}
     report: dict[str, object] = {}
 
     import invarlock.eval.primary_metric as pm_mod
@@ -275,18 +275,18 @@ def test_attach_primary_metric_display_ci_default_when_no_numeric(monkeypatch):
     )
 
     attach_primary_metric(
-        certificate,
+        evaluation_report,
         report,
         baseline_raw=None,
         baseline_ref=None,
         ppl_analysis=None,
     )
 
-    assert certificate["primary_metric"]["display_ci"] == [1.0, 1.0]
+    assert evaluation_report["primary_metric"]["display_ci"] == [1.0, 1.0]
 
 
 def test_attach_primary_metric_handles_bad_ppl_analysis(monkeypatch):
-    certificate: dict[str, object] = {}
+    evaluation_report: dict[str, object] = {}
     report = {
         "metrics": {
             "primary_metric": {"kind": "ppl_causal", "final": 2.0},
@@ -308,19 +308,19 @@ def test_attach_primary_metric_handles_bad_ppl_analysis(monkeypatch):
             raise RuntimeError("bad")
 
     attach_primary_metric(
-        certificate,
+        evaluation_report,
         report,
         baseline_raw=None,
         baseline_ref=baseline_ref,
         ppl_analysis=Boom(),
     )
 
-    pm = certificate["primary_metric"]
+    pm = evaluation_report["primary_metric"]
     assert pm["ratio_vs_baseline"] == pytest.approx(2.0)
 
 
 def test_attach_primary_metric_classification_handles_non_numeric_final(monkeypatch):
-    certificate: dict[str, object] = {}
+    evaluation_report: dict[str, object] = {}
     report = {
         "metrics": {
             "classification": {
@@ -341,21 +341,21 @@ def test_attach_primary_metric_classification_handles_non_numeric_final(monkeypa
     )
 
     attach_primary_metric(
-        certificate,
+        evaluation_report,
         report,
         baseline_raw=None,
         baseline_ref=None,
         ppl_analysis=None,
     )
 
-    pm = certificate["primary_metric"]
+    pm = evaluation_report["primary_metric"]
     assert pm["kind"] == "accuracy"
     assert "final" not in pm
     assert pm["display_ci"] == [1.0, 1.0]
 
 
 def test_attach_primary_metric_classification_without_baseline(monkeypatch):
-    certificate: dict[str, object] = {}
+    evaluation_report: dict[str, object] = {}
     report = {
         "metrics": {
             "classification": {"final": {"correct_total": 55, "total": 100}},
@@ -373,14 +373,14 @@ def test_attach_primary_metric_classification_without_baseline(monkeypatch):
     )
 
     attach_primary_metric(
-        certificate,
+        evaluation_report,
         report,
         baseline_raw={},
         baseline_ref={},
         ppl_analysis=None,
     )
 
-    pm = certificate["primary_metric"]
+    pm = evaluation_report["primary_metric"]
     assert pm["kind"] == "accuracy"
     assert pm["final"] == pytest.approx(0.55)
     assert "ratio_vs_baseline" not in pm

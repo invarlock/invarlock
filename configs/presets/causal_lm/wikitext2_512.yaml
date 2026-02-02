@@ -1,7 +1,7 @@
 # Preset: Causal LM (decoder-only) on WikiText-2.
 #
 # - Runnable (repo checkout): `invarlock run -c ... [--profile ci|release|ci_cpu]`
-# - Also usable as `invarlock certify --preset ...`
+# - Also usable as `invarlock evaluate --preset ...`
 
 model:
   id: "sshleifer/tiny-gpt2"
@@ -15,7 +15,7 @@ dataset:
   stride: 512
   preview_n: 64
   final_n: 64
-  seed: 42
+  seed: 43
 
 eval:
   metric:

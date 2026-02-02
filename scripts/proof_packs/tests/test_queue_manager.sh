@@ -492,7 +492,7 @@ test_generate_model_tasks_use_batch_branches() {
 
     local seq=0
     add_task() { seq=$((seq + 1)); echo "t${seq}"; }
-    generate_eval_certify_tasks() { :; }
+    generate_eval_evaluate_tasks() { :; }
     generate_edit_tasks() { :; }
 
     estimate_model_memory() {
@@ -531,7 +531,7 @@ test_generate_model_tasks_sanitizes_invalid_calibration_runs() {
         count=$(wc -l < "${calls}" | tr -d ' ')
         echo "t${count}"
     }
-    generate_eval_certify_tasks() { :; }
+    generate_eval_evaluate_tasks() { :; }
     generate_edit_tasks() { :; }
     estimate_model_memory() { echo "14"; }
 
@@ -585,8 +585,8 @@ test_generate_model_tasks_disables_batch_for_large_memory_and_uses_manifest_fall
     [[ "${all_calls}" != *"CREATE_EDITS_BATCH"* ]] || t_fail "expected large memory to disable batch edits"
     assert_match "CREATE_EDIT\\|" "${all_calls}" "per-edit create tasks emitted"
 
-    # preset_ready=1 should be normalized to true so certify tasks are emitted even with DRIFT_CALIBRATION_RUNS=0.
-    assert_match "CERTIFY_EDIT\\|" "${all_calls}" "certify tasks emitted when preset_ready=1"
+    # preset_ready=1 should be normalized to true so evaluate tasks are emitted even with DRIFT_CALIBRATION_RUNS=0.
+    assert_match "evaluate_EDIT\\|" "${all_calls}" "evaluate tasks emitted when preset_ready=1"
 
     # scenarios.json + jq fallback defaults should be used.
     assert_match "quant_rtn:clean:ffn" "${all_calls}" "fallback clean edit spec used"
@@ -611,22 +611,22 @@ test_generate_edit_tasks_sanitizes_cert_runs() {
     estimate_model_memory() { echo "14"; }
 
     local cert_count
-    cert_count="$(awk '/^CERTIFY_EDIT$/ {c++} END {print c+0}' "${calls}")"
-    assert_eq "0" "${cert_count}" "precondition: no certify tasks yet"
+    cert_count="$(awk '/^evaluate_EDIT$/ {c++} END {print c+0}' "${calls}")"
+    assert_eq "0" "${cert_count}" "precondition: no evaluate tasks yet"
 
     : > "${calls}"
-    generate_certify_tasks "m" "n" "edit" "preset" "spec" "clean" "bad" >/dev/null
-    cert_count="$(awk '/^CERTIFY_EDIT$/ {c++} END {print c+0}' "${calls}")"
+    generate_evaluate_tasks "m" "n" "edit" "preset" "spec" "clean" "bad" >/dev/null
+    cert_count="$(awk '/^evaluate_EDIT$/ {c++} END {print c+0}' "${calls}")"
     assert_eq "1" "${cert_count}" "invalid cert_runs defaults to 1"
 
     : > "${calls}"
-    generate_certify_tasks "m" "n" "edit" "preset" "spec" "clean" "-2" >/dev/null
-    cert_count="$(awk '/^CERTIFY_EDIT$/ {c++} END {print c+0}' "${calls}")"
+    generate_evaluate_tasks "m" "n" "edit" "preset" "spec" "clean" "-2" >/dev/null
+    cert_count="$(awk '/^evaluate_EDIT$/ {c++} END {print c+0}' "${calls}")"
     assert_eq "0" "${cert_count}" "negative cert_runs clamps to 0"
 
     : > "${calls}"
     generate_edit_tasks "m" "n" "setup" "preset" "spec" "clean" "bad" >/dev/null
-    cert_count="$(awk '/^CERTIFY_EDIT$/ {c++} END {print c+0}' "${calls}")"
+    cert_count="$(awk '/^evaluate_EDIT$/ {c++} END {print c+0}' "${calls}")"
     local create_count
     create_count="$(awk '/^CREATE_EDIT$/ {c++} END {print c+0}' "${calls}")"
     assert_eq "1" "${create_count}" "create_edit task still created"
@@ -634,7 +634,7 @@ test_generate_edit_tasks_sanitizes_cert_runs() {
 
     : > "${calls}"
     generate_edit_tasks "m" "n" "setup" "preset" "spec" "clean" "-1" >/dev/null
-    cert_count="$(awk '/^CERTIFY_EDIT$/ {c++} END {print c+0}' "${calls}")"
+    cert_count="$(awk '/^evaluate_EDIT$/ {c++} END {print c+0}' "${calls}")"
     create_count="$(awk '/^CREATE_EDIT$/ {c++} END {print c+0}' "${calls}")"
     assert_eq "1" "${create_count}" "create_edit task created with negative cert_runs"
     assert_eq "0" "${cert_count}" "negative cert_runs clamps to 0"
@@ -833,7 +833,7 @@ test_check_dependencies_met_returns_nonzero_when_task_file_missing() {
     assert_rc "1" "${RUN_RC}" "missing task file treated as unmet dependencies"
 }
 
-test_generate_certify_tasks_and_generate_edit_tasks_create_expected_tasks() {
+test_generate_evaluate_tasks_and_generate_edit_tasks_create_expected_tasks() {
     mock_reset
     # shellcheck source=../queue_manager.sh
     source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
@@ -845,19 +845,19 @@ test_generate_certify_tasks_and_generate_edit_tasks_create_expected_tasks() {
     init_queue "${out_dir}" >/dev/null
 
     local out
-    out="$(generate_certify_tasks "org/model" "m" "edit1" "preset1" "quant_rtn:8:128:ffn" "clean" "1")"
-    assert_match 'Created: ' "${out}" "creates certify tasks"
+    out="$(generate_evaluate_tasks "org/model" "m" "edit1" "preset1" "quant_rtn:8:128:ffn" "clean" "1")"
+    assert_match 'Created: ' "${out}" "creates evaluate tasks"
 
     local pending_count
     pending_count="$(ls "${QUEUE_DIR}/pending"/*.task 2>/dev/null | wc -l | tr -d ' ')"
-    assert_eq "1" "${pending_count}" "creates 1 certify task"
+    assert_eq "1" "${pending_count}" "creates 1 evaluate task"
 
     local task_file task_type version
     for task_file in "${QUEUE_DIR}/pending"/*.task; do
         task_type="$(jq -r '.task_type' "${task_file}")"
-        assert_eq "CERTIFY_EDIT" "${task_type}" "certify task type"
+        assert_eq "evaluate_EDIT" "${task_type}" "evaluate task type"
         version="$(jq -r '.params.version // ""' "${task_file}")"
-        assert_eq "clean" "${version}" "certify task carries version hint"
+        assert_eq "clean" "${version}" "evaluate task carries version hint"
     done
 
     run generate_edit_tasks "org/model" "m" "setup1" "preset1" "quant_rtn:8:128:ffn" "clean" "1"
@@ -1056,7 +1056,7 @@ test_generate_model_tasks_branch_coverage() {
         echo "t${count}"
     }
     estimate_model_memory() { echo "14"; }
-    generate_eval_certify_tasks() { :; }
+    generate_eval_evaluate_tasks() { :; }
     generate_edit_tasks() { :; }
 
     PACK_USE_BATCH_EDITS="true"
@@ -1103,7 +1103,7 @@ test_generate_model_tasks_defaults_error_types_when_manifest_missing_errors() {
         echo "t${count}"
     }
     estimate_model_memory() { echo "14"; }
-    generate_eval_certify_tasks() { :; }
+    generate_eval_evaluate_tasks() { :; }
     generate_edit_tasks() { :; }
     jq() { :; }
 
@@ -1162,7 +1162,7 @@ test_generate_model_tasks_additional_batch_branches() {
         echo "t${count}"
     }
     estimate_model_memory() { echo "14"; }
-    generate_eval_certify_tasks() { :; }
+    generate_eval_evaluate_tasks() { :; }
     generate_edit_tasks() { :; }
 
     PACK_USE_BATCH_EDITS="true"
@@ -1173,8 +1173,8 @@ test_generate_model_tasks_additional_batch_branches() {
     generate_model_tasks "1" "org/model" "model" >/dev/null
     assert_match "CALIBRATION_RUN" "$(cat "${calls}")" "calibration task created"
     local error_count
-    error_count="$(awk '/^CERTIFY_ERROR$/ {c++} END {print c+0}' "${calls}")"
-    assert_eq "9" "${error_count}" "certify error tasks created"
+    error_count="$(awk '/^evaluate_ERROR$/ {c++} END {print c+0}' "${calls}")"
+    assert_eq "9" "${error_count}" "evaluate error tasks created"
 
     : > "${calls}"
     CLEAN_EDIT_RUNS=""

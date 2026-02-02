@@ -1,7 +1,7 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
 
-.PHONY: help install dev-install test lint format clean docsclean deepclean docs docs-ci verify coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry
+.PHONY: help install dev-install test test-assurance lint format clean docsclean deepclean docs docs-ci verify coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry
 
 help:  ## Show this help message
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
@@ -27,7 +27,7 @@ coverage:  ## Run tests with coverage and generate XML
 		tests/cli/test_calibrate_harness_artifacts.py tests/cli/test_determinism_preset.py tests/cli/test_json_helpers.py \
 		tests/cli/test_config.py tests/cli/test_config_more.py tests/cli/test_config_runtime_loader.py tests/cli/test_config_schema_and_loader.py \
 		tests/eval/test_metrics*.py tests/eval/test_report*.py tests/eval/test_validate_module.py tests/eval/test_baseline_artifacts.py tests/eval/test_bench.py tests/eval/test_primary_metric*.py \
-		tests/eval/test_determinism.py tests/eval/test_mask_parity_fail.py tests/eval/test_certificate*.py \
+		tests/eval/test_determinism.py tests/eval/test_mask_parity_fail.py \
 		--cov=src/invarlock/eval --cov=src/invarlock/guards --cov=src/invarlock/calibration \
 		--cov=src/invarlock/cli --cov=src/invarlock/core --cov=src/invarlock/reporting \
 		--cov-branch \
@@ -59,11 +59,11 @@ test-ci:
 	PYTHONPATH=src pytest -q tests/ci
 
 test-assurance:  ## Run assurance-related tests only
-	pytest \
-		tests/unit/test_assurance_contracts.py \
-		tests/unit/test_metrics_masked_lm.py \
-		tests/unit/test_structured_edit.py::test_structured_prune_mask_determinism \
-		tests/unit/test_cli.py::test_run_command_successful_execution
+	PYTHONPATH=src pytest -q \
+		tests/api/test_assurance_facade.py \
+		tests/eval/test_assurance_contracts.py \
+		tests/docs/test_assurance_xref_linter.py \
+		tests/reporting/test_policy_utils.py::test_compute_policy_digest_matches_assurance_spec
 
 lint:  ## Run linting
 	$(MAKE) ensure-ruff
@@ -110,7 +110,7 @@ deepclean: ## Remove all generated artifacts, caches, and run outputs (destructi
 		pip-wheel-metadata/ \
 		__pycache__/ */__pycache__/ \
 		.pytest_cache/ .mypy_cache/ .ruff_cache/ .pre-commit-cache/ .npm-cache/ .npm-prefix/ \
-		.hypothesis/ .certify_tmp/ tmp/ tmp_*/ \
+		.hypothesis/ .evaluate_tmp/ tmp/ tmp_*/ \
 		.tox/ .nox/ \
 		.coverage coverage.xml htmlcov/ \
 		test_config.yaml tmp_cfg.yaml \
@@ -138,18 +138,18 @@ docs-ci:  ## Build documentation and run link checker
 
 ## (Consolidated) Single docs-serve target defined above
 
-##@ Certification
-cert-loop:  ## Run automated certification loop (baseline + quant8)
-	@echo "Running automated certification workflow..."
-	@rm -rf runs/cert_loop reports/cert/cert_loop
-	@INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock certify \
-		--baseline sshleifer/tiny-gpt2 --subject sshleifer/tiny-gpt2 --adapter auto \
+##@ Evaluation
+eval-loop:  ## Run automated evaluation loop (baseline + quant8)
+	@echo "Running automated evaluation workflow..."
+	@rm -rf runs/eval_loop reports/eval/eval_loop
+	@INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
+		--source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto \
 		--profile ci --tier balanced \
 		--preset configs/presets/causal_lm/wikitext2_512.yaml \
 		--edit-config configs/overlays/edits/quant_rtn/8bit_attn.yaml \
-		--out runs/cert_loop \
-		--cert-out reports/cert/cert_loop
-	@echo "Certification complete. Artifacts: runs/cert_loop/, reports/cert/cert_loop/"
+		--out runs/eval_loop \
+		--report-out reports/eval/eval_loop
+	@echo "Evaluation complete. Artifacts: runs/eval_loop/, reports/eval/eval_loop/"
 
 ##@ Utilities
 ci-matrix:  ## Verify CI matrix
@@ -171,13 +171,13 @@ ensure-ruff:
 
 .PHONY: docs-check docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell
 docs-check: ## Run consolidated docs validation (build, links, refs, examples, consistency)
-	python scripts/docs_check.py --all
+	PYTHONPATH=src python scripts/docs_check.py --all
 
 docs-check-build: ## Build docs strictly and run link checks
-	python scripts/docs_check.py --build --links
+	PYTHONPATH=src python scripts/docs_check.py --build --links
 
 docs-check-links: ## Run docs link checks only
-	python scripts/docs_check.py --links
+	PYTHONPATH=src python scripts/docs_check.py --links
 
 docs-lint: ## Lint docs (markdown + spell)
 	python scripts/docs_lint.py --all

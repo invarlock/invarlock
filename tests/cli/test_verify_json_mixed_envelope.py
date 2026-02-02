@@ -57,7 +57,7 @@ def test_verify_json_mixed_failure_envelope(tmp_path: Path, capsys) -> None:
     with pytest.raises(typer.Exit) as ei:
         verify_command([p1, p2], baseline=None, profile="dev", json_out=True)
     out = json.loads(capsys.readouterr().out)
-    assert out["certificate"]["count"] == 2
+    assert out["evaluation_report"]["count"] == 2
     assert out["summary"]["ok"] is False
     # When any cert is malformed, the envelope labels all as "malformed"
     assert out["summary"]["reason"] == "malformed"

@@ -2,7 +2,7 @@
 
 > **Plain language:** VE only proposes scales when the predictive paired
 > ΔlogNLL shows a real improvement—Balanced needs a one-sided win, Conservative
-> needs a two-sided push—and the certificate explains why VE stayed on or off.
+> needs a two-sided push—and the report explains why VE stayed on or off.
 
 ## Claim
 
@@ -68,9 +68,9 @@ or z = z₀.₉₇₅ for two-sided (Conservative), then set min_effect ≈ z ×
   must match the edited sublayer (e.g., **post‑`mlp.c_proj`, pre‑residual**);
   targets list those modules.
 
-## Runtime Contract (certificate)
+## Runtime Contract (report)
 
-- Certificate records `variance.predictive_gate` with `{evaluated,passed,reason,delta_ci,mean_delta}` and `variance.ab_test.provenance` stating window IDs and seed for A/B.
+- report records `variance.predictive_gate` with `{evaluated,passed,reason,delta_ci,mean_delta}` and `variance.ab_test.provenance` stating window IDs and seed for A/B.
 - Tier knobs for sidedness and min-effect are recorded under `resolved_policy.variance.{predictive_one_sided,min_effect_lognll}`.
 - Lints reject enablement if CI contains 0 or if provenance is missing.
 

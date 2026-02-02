@@ -63,7 +63,7 @@ pack_copy_optional() {
 
 pack_collect_certs() {
     local run_dir="$1"
-    find "${run_dir}" -type f -name "evaluation.cert.json" -path "*/certificates/*" ! -path "*/cert/*" | sort
+    find "${run_dir}" -type f -name "evaluation.report.json" -path "*/reports/*" ! -path "*/cert/*" | sort
 }
 
 pack_cert_rel_path() {
@@ -71,8 +71,8 @@ pack_cert_rel_path() {
     local cert_path="$2"
     local rel="${cert_path#"${run_dir}/"}"
     local model="${rel%%/*}"
-    local remainder="${rel#*/certificates/}"
-    remainder="${remainder%/evaluation.cert.json}"
+    local remainder="${rel#*/reports/}"
+    remainder="${remainder%/evaluation.report.json}"
     if [[ -z "${model}" || "${remainder}" == "${rel}" ]]; then
         return 1
     fi
@@ -84,11 +84,11 @@ pack_generate_html() {
     local cert
     while IFS= read -r cert; do
         [[ -n "${cert}" ]] || continue
-        local html="${cert%.cert.json}.html"
+        local html="${cert%.report.json}.html"
         if ! invarlock report html --input "${cert}" --output "${html}" --force >/dev/null; then
             echo "WARNING: Failed to render HTML report for ${cert}" >&2
         fi
-    done < <(find "${pack_dir}/certs" -type f -name "evaluation.cert.json" | sort)
+    done < <(find "${pack_dir}/certs" -type f -name "evaluation.report.json" | sort)
 }
 
 pack_verify_certs() {
@@ -102,7 +102,7 @@ pack_verify_certs() {
         [[ -n "${cert}" ]] || continue
         local cert_dir
         cert_dir="$(dirname "${cert}")"
-        if [[ "${cert}" == */errors/*/evaluation.cert.json ]]; then
+        if [[ "${cert}" == */errors/*/evaluation.report.json ]]; then
             # Error injection certs are expected to fail verify (unsafe edits by design).
             invarlock verify --json --profile "${profile}" "${cert}" > "${cert_dir}/verify.json" || true
             count_error=$((count_error + 1))
@@ -115,11 +115,11 @@ pack_verify_certs() {
             echo "ERROR: Unexpected verify failure: ${cert}" >&2
             count_failed=$((count_failed + 1))
         fi
-    done < <(find "${pack_dir}/certs" -type f -name "evaluation.cert.json" | sort)
+    done < <(find "${pack_dir}/certs" -type f -name "evaluation.report.json" | sort)
 
     local total=$((count_clean + count_error + count_failed))
     if [[ ${total} -eq 0 ]]; then
-        echo "ERROR: No certificates found to verify." >&2
+        echo "ERROR: No reports found to verify." >&2
         return 1
     fi
 
@@ -164,17 +164,78 @@ pack_write_manifest() {
 
 pack_sign_manifest() {
     local pack_dir="$1"
+    local strict="${PACK_STRICT_MODE:-0}"
     if [[ "${PACK_GPG_SIGN:-1}" == "0" ]]; then
         return 0
     fi
-    if command -v gpg >/dev/null 2>&1; then
-        if ! gpg --armor --detach-sign --output "${pack_dir}/manifest.json.asc" "${pack_dir}/manifest.json"; then
-            rm -f "${pack_dir}/manifest.json.asc"
-            echo "WARNING: gpg signing failed; skipping manifest signature." >&2
+
+    if [[ ! -f "${pack_dir}/manifest.json" ]]; then
+        echo "ERROR: manifest.json missing; cannot sign." >&2
+        return 1
+    fi
+
+    if ! command -v gpg >/dev/null 2>&1; then
+        if [[ "${strict}" == "1" ]]; then
+            echo "ERROR: gpg not found (strict mode requires signing)." >&2
+            return 1
+        fi
+        echo "WARNING: gpg not found; skipping manifest signature." >&2
+        return 0
+    fi
+
+    local tmp_sig="${pack_dir}/manifest.json.asc.tmp"
+    rm -f "${tmp_sig}"
+    if ! gpg --armor --detach-sign --output "${tmp_sig}" "${pack_dir}/manifest.json"; then
+        rm -f "${tmp_sig}"
+        if [[ "${strict}" == "1" ]]; then
+            echo "ERROR: gpg signing failed (strict mode)." >&2
+            return 1
+        fi
+        echo "WARNING: gpg signing failed; skipping manifest signature." >&2
+        return 0
+    fi
+
+    # Attempt to extract signer fingerprint for audit trails.
+    local verify_out=""
+    if verify_out="$(gpg --verify --status-fd 1 "${tmp_sig}" "${pack_dir}/manifest.json" 2>&1)"; then
+        local signer_fpr
+        signer_fpr="$(printf '%s\n' "${verify_out}" | awk '/VALIDSIG / {print $3; exit}')"
+        if [[ -n "${signer_fpr}" ]]; then
+            python3 - "${pack_dir}/manifest.json" "${signer_fpr}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+fpr = sys.argv[2]
+payload = json.loads(path.read_text())
+payload["signing_key_fingerprint"] = fpr
+path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+PY
         fi
     else
-        echo "WARNING: gpg not found; skipping manifest signature." >&2
+        if [[ "${strict}" == "1" ]]; then
+            rm -f "${tmp_sig}"
+            echo "ERROR: gpg signature verification failed during signing (strict mode)." >&2
+            printf '%s\n' "${verify_out}" >&2
+            return 1
+        fi
+        echo "WARNING: gpg signature verification failed during signing; omitting signer fingerprint." >&2
     fi
+
+    rm -f "${pack_dir}/manifest.json.asc"
+    if ! gpg --armor --detach-sign --output "${pack_dir}/manifest.json.asc" "${pack_dir}/manifest.json"; then
+        rm -f "${pack_dir}/manifest.json.asc" "${tmp_sig}"
+        if [[ "${strict}" == "1" ]]; then
+            echo "ERROR: gpg signing failed (strict mode)." >&2
+            return 1
+        fi
+        echo "WARNING: gpg signing failed; skipping manifest signature." >&2
+        return 0
+    fi
+
+    rm -f "${tmp_sig}"
+    return 0
 }
 
 pack_write_checksums() {
@@ -185,8 +246,19 @@ pack_write_checksums() {
         cd "${pack_dir}"
         while IFS= read -r file; do
             [[ -n "${file}" ]] || continue
+            case "${file}" in
+                ./checksums.sha256|./manifest.json|./manifest.json.asc)
+                    continue
+                    ;;
+                ./metadata/manifest.json|./metadata/manifest.json.asc|./metadata/checksums.sha256)
+                    continue
+                    ;;
+                ./.DS_Store|*/.DS_Store|./__MACOSX/*)
+                    continue
+                    ;;
+            esac
             ${sha_cmd} "${file}"
-        done < <(find . -type f ! -name "checksums.sha256" -print | sort) > "checksums.sha256"
+        done < <(find . -type f -print | sort) > "checksums.sha256"
     )
 }
 
@@ -196,7 +268,7 @@ pack_write_readme() {
     cat > "${pack_dir}/README.md" <<'EOF'
 # InvarLock Proof Pack
 
-This proof pack bundles certificates, summary reports, and metadata for offline
+This proof pack bundles reports, summary reports, and metadata for offline
 verification. No model weights are included.
 
 ## Verify
@@ -208,11 +280,11 @@ verification. No model weights are included.
    sha256sum -c checksums.sha256
    # macOS: shasum -a 256 -c checksums.sha256
 
-3) Verify certificate integrity:
-   invarlock verify --json certs/**/evaluation.cert.json
+3) Verify report integrity:
+   invarlock verify --json certs/**/evaluation.report.json
 
 Or use:
-  scripts/proof_packs/verify_pack.sh --pack <pack-dir>
+  scripts/proof_packs/verify_pack.sh --pack <pack-dir> [--strict]
 EOF
 }
 
@@ -280,7 +352,7 @@ pack_build_pack() {
         rel="$(pack_cert_rel_path "${run_dir}" "${cert}")" || continue
         local dest_dir="${pack_dir}/certs/${rel}"
         mkdir -p "${dest_dir}"
-        cp "${cert}" "${dest_dir}/evaluation.cert.json"
+        cp "${cert}" "${dest_dir}/evaluation.report.json"
     done < <(pack_collect_certs "${run_dir}")
 
     local verify_rc=0
@@ -295,20 +367,26 @@ pack_build_pack() {
     fi
 
     pack_write_readme "${pack_dir}"
+    pack_write_checksums "${pack_dir}"
     pack_write_manifest "${pack_dir}" "${run_dir}" "${PACK_SUITE:-}" "${PACK_NET:-0}" "${PACK_DETERMINISM:-}" "${PACK_REPEATS:-0}"
-    pack_sign_manifest "${pack_dir}"
+    local sign_rc=0
+    if pack_sign_manifest "${pack_dir}"; then
+        sign_rc=0
+    else
+        sign_rc=$?
+    fi
     if [[ "${layout}" == "v2" ]]; then
         mkdir -p "${pack_dir}/metadata"
         cp "${pack_dir}/manifest.json" "${pack_dir}/metadata/manifest.json"
         if [[ -f "${pack_dir}/manifest.json.asc" ]]; then
             cp "${pack_dir}/manifest.json.asc" "${pack_dir}/metadata/manifest.json.asc"
         fi
-    fi
-    pack_write_checksums "${pack_dir}"
-    if [[ "${layout}" == "v2" ]]; then
         cp "${pack_dir}/checksums.sha256" "${pack_dir}/metadata/checksums.sha256"
     fi
 
+    if [[ "${verify_rc}" -eq 0 && "${sign_rc}" -ne 0 ]]; then
+        return "${sign_rc}"
+    fi
     return "${verify_rc}"
 }
 

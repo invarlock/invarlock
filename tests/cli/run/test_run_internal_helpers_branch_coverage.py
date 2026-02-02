@@ -222,13 +222,13 @@ def test_extract_model_load_kwargs_filters_core_fields() -> None:
                     "id": "m",
                     "adapter": "a",
                     "device": "cpu",
-                    "torch_dtype": "float16",
+                    "dtype": "float16",
                     "foo": None,
                 }
             }
 
     out = run_mod._extract_model_load_kwargs(_Cfg())
-    assert out == {"torch_dtype": "float16"}
+    assert out == {"dtype": "float16"}
 
 
 def test_load_model_with_cfg_passes_filtered_kwargs() -> None:
@@ -258,19 +258,19 @@ def test_load_model_with_cfg_passes_filtered_kwargs() -> None:
 def test_extract_model_load_kwargs_covers_unknown_dtype_normalization() -> None:
     class _Cfg:
         def model_dump(self):
-            return {"model": {"id": "m", "adapter": "a", "torch_dtype": "Float8"}}
+            return {"model": {"id": "m", "adapter": "a", "dtype": "Float8"}}
 
     out = run_mod._extract_model_load_kwargs(_Cfg())
-    assert out == {"torch_dtype": "float8"}
+    assert out == {"dtype": "float8"}
 
 
 def test_extract_model_load_kwargs_keeps_blank_dtype_string() -> None:
     class _Cfg:
         def model_dump(self):
-            return {"model": {"id": "m", "adapter": "a", "torch_dtype": " "}}
+            return {"model": {"id": "m", "adapter": "a", "dtype": " "}}
 
     out = run_mod._extract_model_load_kwargs(_Cfg())
-    assert out == {"torch_dtype": " "}
+    assert out == {"dtype": " "}
 
 
 def test_load_model_with_cfg_passes_allowed_kwargs_for_strict_signature() -> None:

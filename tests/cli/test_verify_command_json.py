@@ -82,7 +82,7 @@ def test_verify_json_success_single(tmp_path: Path, capsys) -> None:
     out = capsys.readouterr().out.strip()
     payload = json.loads(out)
     assert payload["summary"]["ok"] is True
-    assert payload["certificate"]["count"] == 1
+    assert payload["evaluation_report"]["count"] == 1
     assert payload["results"][0]["ok"] is True
 
 
@@ -100,7 +100,7 @@ def test_verify_json_mixed_policy_fail(tmp_path: Path, capsys) -> None:
     payload = json.loads(out)
     assert payload["summary"]["ok"] is False
     assert payload["summary"]["reason"] == "policy_fail"
-    assert payload["certificate"]["count"] == 2
+    assert payload["evaluation_report"]["count"] == 2
 
 
 def test_verify_json_malformed(tmp_path: Path, capsys) -> None:
