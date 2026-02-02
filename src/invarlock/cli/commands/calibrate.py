@@ -20,10 +20,6 @@ import typer
 import yaml
 from rich.console import Console
 
-from invarlock.calibration.spectral_null import summarize_null_sweep_reports
-from invarlock.calibration.variance_ve import summarize_ve_sweep_reports
-from invarlock.guards.tier_config import get_tier_guard_config
-
 console = Console()
 
 calibrate_app = typer.Typer(
@@ -159,6 +155,11 @@ def null_sweep(
 ) -> None:
     # Keep import light: only pull run machinery when invoked.
     from .run import run_command
+
+    # Optional deps: calibration sweeps require torch/guards, but docs/tests may
+    # import this module without heavy deps. Import lazily so CLI example
+    # validation can parse `invarlock calibrate ...` without installing torch.
+    from invarlock.calibration.spectral_null import summarize_null_sweep_reports
 
     base = _load_yaml(config)
     specs = _materialize_sweep_specs(
@@ -377,6 +378,10 @@ def ve_sweep(
 ) -> None:
     # Keep import light: only pull run machinery when invoked.
     from .run import run_command
+
+    # Optional deps: see null_sweep() note.
+    from invarlock.calibration.variance_ve import summarize_ve_sweep_reports
+    from invarlock.guards.tier_config import get_tier_guard_config
 
     base = _load_yaml(config)
     windows = [int(w) for w in (window or [])] or [6, 8, 12, 16]
