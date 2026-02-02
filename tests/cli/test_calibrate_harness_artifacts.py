@@ -71,6 +71,7 @@ def test_null_sweep_emits_json_csv_md_and_tier_patch(tmp_path: Path) -> None:
                         "family_z_summary": {
                             "ffn": {"max": 3.0},
                             "attn": {"max": 2.0},
+                            "other": {"max": None},
                         },
                         "multiple_testing": {"method": "bh", "alpha": 0.05, "m": 4},
                         "multiple_testing_selection": {
@@ -79,7 +80,7 @@ def test_null_sweep_emits_json_csv_md_and_tier_patch(tmp_path: Path) -> None:
                             "family_violation_counts": {"ffn": 1, "attn": 0},
                         },
                     },
-                    "violations": [{"family": "ffn"}],
+                    "violations": [{"family": None}, {"family": "ffn"}, "not-a-dict"],
                 }
             ],
             "meta": {"tier": tier, "seed": 0, "config": config},
@@ -314,3 +315,67 @@ def test_ve_sweep_covers_guard_search_and_ci_width_exceptions(tmp_path: Path) ->
             device=None,
             safety_margin=0.0,
         )
+
+
+def test_ve_sweep_covers_non_dict_variance_config_and_guard_loop_continue(
+    tmp_path: Path,
+) -> None:
+    base = tmp_path / "base.yaml"
+    base.write_text(
+        yaml.safe_dump(
+            {
+                "dataset": {"seed": 0},
+                "edit": {"name": "noop", "plan": {"seed": 0}},
+                "guards": {"variance": "oops"},
+                "output": {"dir": str(tmp_path / "runs")},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    out = tmp_path / "out"
+
+    def _fake_run_command(*, out: str, tier: str, config: str, **_kwargs) -> str:  # noqa: ARG001
+        report_path = Path(out) / "report.json"
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "guards": [
+                {"name": "other", "metrics": {}},
+                {
+                    "name": "variance",
+                    "metrics": {
+                        "predictive_gate": {
+                            "evaluated": True,
+                            "mean_delta": -0.1,
+                            "delta_ci": [-0.2, -0.1],
+                        }
+                    },
+                },
+            ],
+            "meta": {"tier": tier, "config": config},
+        }
+        report_path.write_text(json.dumps(payload), encoding="utf-8")
+        return str(report_path)
+
+    with (
+        patch("invarlock.cli.commands.run.run_command", _fake_run_command),
+        patch(
+            "invarlock.cli.commands.calibrate.get_tier_guard_config",
+            lambda *_a, **_k: {"predictive_one_sided": True},
+        ),
+    ):
+        calibrate_mod.ve_sweep(
+            config=base,
+            out=out,
+            tiers=["balanced"],
+            seed=[42],
+            n_seeds=1,
+            seed_start=42,
+            window=[6],
+            target_enable_rate=0.05,
+            profile="ci",
+            device=None,
+            safety_margin=0.0,
+        )
+
+    assert (out / "ve_sweep_report.json").exists()
