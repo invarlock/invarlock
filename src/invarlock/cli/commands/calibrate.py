@@ -110,6 +110,26 @@ def _write_tiers_recommendation(
     )
 
 
+def get_tier_guard_config(tier: str, guard_key: str) -> dict[str, Any]:
+    """Lazy wrapper for tier config lookup.
+
+    This is intentionally a module-level symbol so tests can patch it without
+    importing torch/transformers at import time.
+    """
+    try:
+        from invarlock.guards.tier_config import get_tier_guard_config as _get_cfg
+    except ModuleNotFoundError as exc:
+        missing = getattr(exc, "name", "") or ""
+        if missing in {"torch", "transformers"}:
+            console.print(
+                "[red]Missing optional dependencies for calibration.[/red] "
+                "Install `invarlock[hf]` (or at least torch/transformers) to run sweeps."
+            )
+            raise typer.Exit(1) from exc
+        raise
+    return _get_cfg(tier, guard_key)
+
+
 @calibrate_app.command(
     name="null-sweep",
     help="Run a null (no-op edit) sweep and calibrate spectral κ/alpha empirically.",
@@ -392,7 +412,6 @@ def ve_sweep(
     # Optional deps: see null_sweep() note.
     try:
         from invarlock.calibration.variance_ve import summarize_ve_sweep_reports
-        from invarlock.guards.tier_config import get_tier_guard_config
     except ModuleNotFoundError as exc:
         missing = getattr(exc, "name", "") or ""
         if missing in {"torch", "transformers"}:
