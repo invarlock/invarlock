@@ -4,7 +4,7 @@
       media="(prefers-color-scheme: dark)"
       srcset="docs/assets/invarlock-logo-dark.svg"
     />
-    <img src="docs/assets/invarlock-logo.svg" alt="InvarLock" width="420" />
+    <img src="docs/assets/invarlock-logo.svg" alt="InvarLock" />
   </picture>
 </p>
 
