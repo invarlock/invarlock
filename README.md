@@ -41,15 +41,21 @@ For guidance on where to ask questions, how to report bugs, and what to expect i
 ## How it works
 
 ```text
-┌───────────────────────┐     ┌────────────────────────────────────────────────┐
-│ Baseline (checkpoint)  │────►│ invarlock evaluate                             │
-└───────────────────────┘     │  ├─► Paired windows (deterministic)             │
-┌───────────────────────┐     │  ├─► GuardChain: invariants → spectral → RMT    │
-│ Subject  (checkpoint)  │────►│  │        → variance                           │
-└───────────────────────┘     │  └─► Emit: evaluation.report.json               │
-                              └────────────────────────────────────────────────┘
-                                         │
-                                     PASS (ship) / FAIL (rollback)
+┌───────────────────────┐     ┌────────────────────────────────────────────┐
+│ Baseline (checkpoint) │────►│                                            │
+└───────────────────────┘     │  invarlock evaluate                        │
+                              │  ├─► Paired windows (deterministic)        │
+┌───────────────────────┐     │  ├─► GuardChain pipeline                   │
+│ Subject  (checkpoint) │────►│  │   └─► invariants → spectral → RMT → VE  │
+└───────────────────────┘     │  └─► Emit: evaluation.report.json          │    
+                              │                                            │
+                              └────────────────────────────────────────────┘                                                                                               
+                                                     │                                                                                                                          
+                                     ┌───────────────┴───────────────┐                                                                                                          
+                                     ▼                               ▼                                                                                                          
+                                 ✅ PASS                          ❌ FAIL                                                                                                        
+                                 (ship)                          (rollback)    
+                                     
 ```
 
 ## Quick start
