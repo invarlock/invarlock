@@ -6,23 +6,36 @@
   />
 </p>
 
-# InvarLock — Edit‑agnostic robustness reports for weight edits
+<h1 align="center">InvarLock</h1>
 
-[![CI](https://img.shields.io/github/actions/workflow/status/invarlock/invarlock/ci.yml?branch=main&logo=github&label=CI)](https://github.com/invarlock/invarlock/actions/workflows/ci.yml)
-[![PyPI](https://badge.fury.io/py/invarlock.svg)](https://pypi.org/project/invarlock/)
-[![Docs](https://img.shields.io/badge/docs-quickstart-blue.svg)](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/quickstart.md)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/release/python-3120/)
+<p align="center"><em>Edit‑agnostic robustness reports for weight edits</em></p>
+
+<p align="center">
+  <a href="https://github.com/invarlock/invarlock/actions/workflows/ci.yml">
+    <img alt="CI" src="https://img.shields.io/github/actions/workflow/status/invarlock/invarlock/ci.yml?branch=main&logo=github&label=CI" />
+  </a>
+  <a href="https://pypi.org/project/invarlock/">
+    <img alt="PyPI" src="https://badge.fury.io/py/invarlock.svg" />
+  </a>
+  <a href="https://github.com/invarlock/invarlock/blob/main/docs/user-guide/quickstart.md">
+    <img alt="Docs" src="https://img.shields.io/badge/docs-quickstart-blue.svg" />
+  </a>
+  <a href="LICENSE">
+    <img alt="License: Apache-2.0" src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" />
+  </a>
+  <a href="https://www.python.org/downloads/release/python-3120/">
+    <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12+-blue.svg" />
+  </a>
+</p>
+
+<p align="center">
+  <strong>Catch silent quality regressions from quantization, pruning, and weight edits before they ship.</strong>
+</p>
 
 Quantizing, pruning, or otherwise editing a model’s weights can silently degrade quality.
 InvarLock compares an edited **subject** checkpoint against a fixed **baseline** with paired
 evaluation windows, enforces a guard pipeline (invariants → spectral → RMT → variance), and
 produces a machine‑readable Evaluation Report you can gate in CI.
-
-> Status: pre‑1.0. Until 1.0, minor releases may be breaking. See `CHANGELOG.md`.
-
-For guidance on where to ask questions, how to report bugs, and what to expect in terms of response times, see
-[SUPPORT.md](https://github.com/invarlock/invarlock/blob/main/SUPPORT.md).
 
 ## Why InvarLock?
 
@@ -162,6 +175,13 @@ If you use InvarLock in scientific work, please cite it (canonical metadata is i
 | CUDA                   | ✅ Recommended   | For larger models                         |
 | CPU                    | ✅ Fallback      | Slower but functional                     |
 <!-- markdownlint-enable MD060 -->
+
+## Project status
+
+InvarLock is pre‑1.0. Until 1.0, minor releases may include breaking changes. See [`CHANGELOG.md`](CHANGELOG.md).
+
+For guidance on where to ask questions, how to report bugs, and what to expect in terms of response times, see
+[`SUPPORT.md`](SUPPORT.md).
 
 ## Contributing
 
