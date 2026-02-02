@@ -66,14 +66,14 @@ jobs:
             tests/cli/test_doctor_json_cls_measured_no_d012.py \
             tests/cli/test_doctor_json_tiny_relax_note.py \
             tests/integration/scripts/test_tiny_matrix_checklist.py \
-            tests/reporting/test_certificate_schema_v1_accuracy_tags.py \
-            tests/reporting/test_cert_markdown_estimated_suffix.py \
-            tests/reporting/test_cert_markdown_no_estimated_for_measured.py
+            tests/reporting/test_report_schema_v1_accuracy_tags.py \
+            tests/reporting/test_report_markdown_estimated_suffix.py \
+            tests/reporting/test_report_markdown_no_estimated_for_measured.py
 
       - name: Allow-list contracts (fast unit set)
         run: |
           pytest -q \
-            tests/reporting/test_certificate_acceptance.py \
+            tests/reporting/test_report_acceptance.py \
             tests/cli/test_console_validation_block.py \
             tests/cli/test_verify_json_shape.py::test_verify_json_envelope_is_stable \
             tests/cli/test_verify_json_single_line.py::test_verify_json_single_line \
