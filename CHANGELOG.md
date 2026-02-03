@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - CI: update workflow test paths after the report/certificate rename.
 - Tests: apply ruff-format to warning suppression coverage test.
+- CLI: `invarlock report explain` drift gate now prints the resolved drift band (no hard-coded threshold).
 
 ### Dependencies
 
