@@ -12,12 +12,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
+
+### Dependencies
+
+### Documentation
+
+## [0.3.9] - 2026-02-03
+
+### Fixed
 - CI: update workflow test paths after the report/certificate rename.
 - Tests: apply ruff-format to warning suppression coverage test.
 - CLI: `invarlock report explain` drift gate now prints the resolved drift band (no hard-coded threshold).
 - CLI: align `invarlock report` “ARTIFACTS” block so artifact paths start in the same column.
-
-### Dependencies
 
 ### Documentation
 - README: refresh above-the-fold header layout, including a banner-sized logo lockup and centered badges.
