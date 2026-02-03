@@ -3,6 +3,7 @@ name: Documentation CI
 on:
   # Cost optimization: main branch docs build is already in ci.yml
   # This workflow only runs for PRs (detailed validation) and weekly link checks
+  workflow_dispatch:
   pull_request:
     branches: [ main, develop ]
     paths:
