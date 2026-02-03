@@ -80,6 +80,9 @@ TIER_RATIO_LIMITS: dict[str, float] = {
     "none": 1.10,
 }
 
+# Canonical preview→final drift band used when not explicitly configured.
+PM_DRIFT_BAND_DEFAULT: tuple[float, float] = (0.95, 1.05)
+
 
 def _is_ppl_kind(name: Any) -> bool:
     """Return True if a primary_metric kind denotes a ppl-like metric.
@@ -3263,8 +3266,7 @@ def _resolve_pm_drift_band_from_report(
 ) -> dict[str, float]:
     """Resolve preview→final drift band from report context/meta/env."""
 
-    base_min = 0.95
-    base_max = 1.05
+    base_min, base_max = PM_DRIFT_BAND_DEFAULT
 
     def _safe_float(val: Any) -> float | None:
         try:
@@ -3436,8 +3438,7 @@ def _compute_validation_flags(
     # Canonical Gates
     # 1. Drift gate: by default 0.95 ≤ final/preview ≤ 1.05 (configurable)
     drift_ratio = ppl.get("preview_final_ratio", 1.0)
-    drift_min = 0.95
-    drift_max = 1.05
+    drift_min, drift_max = PM_DRIFT_BAND_DEFAULT
     if isinstance(pm_drift_band, dict):
         try:
             cand_min = pm_drift_band.get("min")

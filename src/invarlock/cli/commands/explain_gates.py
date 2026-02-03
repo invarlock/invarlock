@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 import typer
 from rich.console import Console
 
 from invarlock.core.auto_tuning import get_tier_policies
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_builder import (
+    PM_DRIFT_BAND_DEFAULT,
+    make_report,
+)
 
 console = Console()
 
@@ -47,12 +51,8 @@ def explain_gates_command(
     tier = str(
         (evaluation_report.get("auto", {}) or {}).get("tier", "balanced")
     ).lower()
-    tier_thresholds = {
-        "conservative": 1.05,
-        "balanced": 1.10,
-        "aggressive": 1.20,
-        "none": 1.10,
-    }
+    tier_policies = get_tier_policies()
+    tier_defaults = tier_policies.get(tier, tier_policies.get("balanced", {}))
     resolved_policy = (
         evaluation_report.get("resolved_policy", {})
         if isinstance(evaluation_report.get("resolved_policy"), dict)
@@ -64,8 +64,6 @@ def explain_gates_command(
         else {}
     )
     if not metrics_policy:
-        tier_policies = get_tier_policies()
-        tier_defaults = tier_policies.get(tier, tier_policies.get("balanced", {}))
         metrics_policy = (
             tier_defaults.get("metrics", {}) if isinstance(tier_defaults, dict) else {}
         )
@@ -79,13 +77,31 @@ def explain_gates_command(
     hysteresis_ratio = float(pm_policy.get("hysteresis_ratio", 0.0))
     min_tokens = int(pm_policy.get("min_tokens", 0))
     try:
-        limit_base = float(
-            pm_policy.get("ratio_limit_base", tier_thresholds.get(tier, 1.10))
-            or tier_thresholds.get(tier, 1.10)
-        )
+        limit_base = float(pm_policy.get("ratio_limit_base"))
     except Exception:
-        limit_base = tier_thresholds.get(tier, 1.10)
-    limit_with_hyst = limit_base + max(0.0, hysteresis_ratio)
+        limit_base = None
+    if limit_base is None or not isinstance(limit_base, int | float):
+        limit_base = None
+    elif not float("-inf") < float(limit_base) < float("inf"):
+        limit_base = None
+    if limit_base is None:
+        try:
+            fallback = (
+                tier_defaults.get("metrics", {})
+                if isinstance(tier_defaults, dict)
+                else {}
+            )
+            fallback_pm = (
+                fallback.get("pm_ratio", {}) if isinstance(fallback, dict) else {}
+            )
+            limit_base = float(fallback_pm.get("ratio_limit_base"))
+        except Exception:
+            limit_base = None
+    limit_with_hyst = (
+        float(limit_base) + max(0.0, hysteresis_ratio)
+        if isinstance(limit_base, int | float)
+        else None
+    )
     tokens_ok = True
     telem = (
         evaluation_report.get("telemetry", {})
@@ -118,16 +134,21 @@ def explain_gates_command(
             )
         else:
             console.print(f"  observed: {ratio:.3f}x")
-    console.print(
-        f"  threshold: ≤ {limit_base:.2f}x{(f' (+hysteresis {hysteresis_ratio:.3f})' if hysteresis_ratio else '')}"
-    )
+    if isinstance(limit_base, int | float):
+        hyst_suffix = (
+            f" (+hysteresis {hysteresis_ratio:.3f})" if hysteresis_ratio else ""
+        )
+        console.print(f"  threshold: ≤ {float(limit_base):.2f}x{hyst_suffix}")
+    else:
+        console.print("  threshold: unavailable")
     console.print(
         f"  tokens: {'ok' if tokens_ok else 'below floor'} (token floors: min_tokens={min_tokens or 0}, total={int(telem.get('preview_total_tokens', 0)) + int(telem.get('final_total_tokens', 0)) if telem else 0})"
     )
     if hysteresis_applied:
-        console.print(
-            f"  note: hysteresis applied → effective threshold = {limit_with_hyst:.3f}x"
-        )
+        if isinstance(limit_with_hyst, int | float):
+            console.print(
+                f"  note: hysteresis applied → effective threshold = {float(limit_with_hyst):.3f}x"
+            )
 
     # Tail gate explanation (warn/fail; based on per-window Δlog-loss vs baseline)
     pm_tail = (
@@ -199,11 +220,18 @@ def explain_gates_command(
     except Exception:
         pass
 
-    # Drift gate explanation
+    # Drift gate explanation (ppl-like kinds only)
     drift = None
-    drift_ci = None
-    if isinstance(evaluation_report.get("primary_metric"), dict):
-        pm = evaluation_report.get("primary_metric", {})
+    drift_status = (
+        "PASS" if bool(validation.get("preview_final_drift_acceptable")) else "FAIL"
+    )
+    pm = (
+        evaluation_report.get("primary_metric", {})
+        if isinstance(evaluation_report.get("primary_metric"), dict)
+        else {}
+    )
+    kind = str(pm.get("kind", "") or "").lower()
+    if kind.startswith("ppl"):
         preview = pm.get("preview")
         final = pm.get("final")
         if isinstance(preview, int | float) and isinstance(final, int | float):
@@ -212,19 +240,26 @@ def explain_gates_command(
                     drift = float(final) / float(preview)
             except Exception:
                 drift = None
-    drift_status = (
-        "PASS" if bool(validation.get("preview_final_drift_acceptable")) else "FAIL"
-    )
-    console.print("\n[bold]Gate: Drift (final/preview)[/bold]")
-    if isinstance(drift, int | float):
-        if isinstance(drift_ci, tuple | list) and len(drift_ci) == 2:
-            console.print(
-                f"  observed: {drift:.3f} (CI {drift_ci[0]:.3f}-{drift_ci[1]:.3f})"
-            )
-        else:
+
+        console.print("\n[bold]Gate: Drift (final/preview)[/bold]")
+        if isinstance(drift, int | float):
             console.print(f"  observed: {drift:.3f}")
-    console.print("  threshold: 0.95-1.05")
-    console.print(f"  status: {drift_status}")
+        drift_band = (
+            pm.get("drift_band") if isinstance(pm.get("drift_band"), dict) else {}
+        )
+        drift_min = drift_band.get("min")
+        drift_max = drift_band.get("max")
+        if not (
+            isinstance(drift_min, int | float)
+            and isinstance(drift_max, int | float)
+            and math.isfinite(float(drift_min))
+            and math.isfinite(float(drift_max))
+            and float(drift_min) > 0.0
+            and float(drift_min) < float(drift_max)
+        ):
+            drift_min, drift_max = PM_DRIFT_BAND_DEFAULT
+        console.print(f"  threshold: {float(drift_min):.3f}-{float(drift_max):.3f}")
+        console.print(f"  status: {drift_status}")
 
     # Guard Overhead explanation (if present)
     overhead = (
