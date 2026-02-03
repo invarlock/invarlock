@@ -1,12 +1,12 @@
 <p align="center">
-  <img
-    src="docs/assets/invarlock-logo.svg"
-    alt="InvarLock"
-    width="420"
-  />
+  <picture>
+    <source
+      media="(prefers-color-scheme: dark)"
+      srcset="docs/assets/invarlock-logo-dark.svg"
+    />
+    <img src="docs/assets/invarlock-logo.svg" alt="InvarLock" />
+  </picture>
 </p>
-
-<h1 align="center">InvarLock</h1>
 
 <p align="center"><em>Edit‑agnostic robustness reports for weight edits</em></p>
 

@@ -110,9 +110,9 @@ def test_plugins_adapters_json_with_optioninfo(monkeypatch, capsys):
     monkeypatch.setattr(
         plugins_mod,
         "_check_plugin_extras",
-        lambda name, kind: "⚠️ missing invarlock[gpu]"
-        if name == "hf_bnb"
-        else "✓ invarlock[adapters]",
+        lambda name, kind: (
+            "⚠️ missing invarlock[gpu]" if name == "hf_bnb" else "✓ invarlock[adapters]"
+        ),
         raising=False,
     )
     monkeypatch.setattr(
@@ -642,9 +642,9 @@ def test_plugins_guards_verbose_json_and_explain(monkeypatch, capsys):
     _patch_registry(monkeypatch, {}, guards=guards)
     monkeypatch.setattr(
         "invarlock.cli.commands.plugins._check_plugin_extras",
-        lambda name, kind: "⚠️ missing invarlock[guard]"
-        if name == "remote_guard"
-        else "",
+        lambda name, kind: (
+            "⚠️ missing invarlock[guard]" if name == "remote_guard" else ""
+        ),
         raising=False,
     )
     buf = _set_console(monkeypatch)

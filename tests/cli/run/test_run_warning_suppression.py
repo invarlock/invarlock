@@ -15,7 +15,9 @@ class _CaptureHandler(logging.Handler):
         return
 
 
-def test_warning_suppression_filters_and_event_logging(tmp_path: Path, monkeypatch) -> None:
+def test_warning_suppression_filters_and_event_logging(
+    tmp_path: Path, monkeypatch
+) -> None:
     # Cover suppress-all branch in _apply_warning_filters().
     with warnings.catch_warnings():
         monkeypatch.setenv("INVARLOCK_SUPPRESS_WARNINGS", "1")

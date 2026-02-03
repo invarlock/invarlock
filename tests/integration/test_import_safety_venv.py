@@ -42,6 +42,19 @@ def test_import_and_cli_help_without_torch(tmp_path: Path):
         combined = f"{install.stdout}{install.stderr}"
         if "requires a different Python" in combined or "not in '>=3.12'" in combined:
             pytest.skip("Requires Python 3.12+ to install invarlock in a venv.")
+        if any(
+            marker in combined
+            for marker in (
+                "Failed to establish a new connection",
+                "NewConnectionError",
+                "Temporary failure in name resolution",
+                "Name or service not known",
+                "nodename nor servname provided",
+            )
+        ):
+            pytest.skip(
+                "Network unavailable to install runtime dependencies into an isolated venv."
+            )
         assert install.returncode == 0, combined
 
     # Ensure torch/transformers are not present in the venv.

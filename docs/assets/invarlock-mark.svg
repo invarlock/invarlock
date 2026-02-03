@@ -1,0 +1,54 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="512"
+  height="512"
+  viewBox="0 0 512 512"
+  role="img"
+  aria-label="InvarLock"
+>
+  <defs>
+    <linearGradient id="brand" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#8b5cf6" />
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" fill="#0a0a0b" />
+
+  <g transform="translate(256 256) scale(1.55) translate(-256 -256)">
+    <path
+      d="M174 150 H126 V362 H174"
+      fill="none"
+      stroke="#f8fafc"
+      stroke-width="21.94"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      opacity="0.82"
+    />
+    <path
+      d="M338 150 H386 V362 H338"
+      fill="none"
+      stroke="#f8fafc"
+      stroke-width="21.94"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      opacity="0.82"
+    />
+    <path
+      d="M156 292 C 198 212, 230 212, 256 252 S 314 332, 356 242"
+      fill="none"
+      stroke="url(#brand)"
+      stroke-width="21.94"
+      stroke-linecap="round"
+      opacity="0.78"
+    />
+    <path
+      d="M156 292 C 198 212, 230 212, 256 252 S 314 332, 356 242"
+      fill="none"
+      stroke="#f8fafc"
+      stroke-width="10.32"
+      stroke-linecap="round"
+      opacity="0.9"
+    />
+  </g>
+</svg>

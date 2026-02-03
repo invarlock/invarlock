@@ -29,11 +29,11 @@ def test_version_command_no_version():
     with patch("invarlock.cli.app.console") as mock_console:
         with patch(
             "builtins.__import__",
-            side_effect=lambda name, *args, **kwargs: ImportError(
-                "No module named 'invarlock'"
-            )
-            if name == "invarlock"
-            else __import__(name, *args, **kwargs),
+            side_effect=lambda name, *args, **kwargs: (
+                ImportError("No module named 'invarlock'")
+                if name == "invarlock"
+                else __import__(name, *args, **kwargs)
+            ),
         ):
             version()
             mock_console.print.assert_called()

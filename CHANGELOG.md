@@ -17,6 +17,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+## [0.3.9] - 2026-02-03
+
+### Fixed
+- CI: update workflow test paths after the report/certificate rename.
+- Tests: apply ruff-format to warning suppression coverage test.
+- CLI: `invarlock report explain` drift gate now prints the resolved drift band (no hard-coded threshold).
+- CLI: align `invarlock report` “ARTIFACTS” block so artifact paths start in the same column.
+- Observability: CPU health check no longer fails when platform CPU count is unavailable.
+- Proof packs: config generator can emit configs to stdout without relying on `/dev/stdout`.
+- Tests: stabilize the end-to-end pipeline memory management integration test with a PyTorch warm-up.
+- Tests: build-wheel packaging test uses `build --no-isolation` to avoid network in offline environments.
+- Tests: import-safety venv integration test skips cleanly when network is unavailable.
+
+### Documentation
+- README: refresh above-the-fold header layout, including a banner-sized logo lockup and centered badges.
+- Branding: make the README logo lockup more logomark-dominant and add a dark-mode logo variant.
+- Branding: logomark-only avatar asset (`docs/assets/invarlock-mark.svg`) for GitHub profile usage.
+
 ## [0.3.8] - 2026-02-02
 
 ### Added

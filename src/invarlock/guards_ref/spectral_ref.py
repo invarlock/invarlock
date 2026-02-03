@@ -20,7 +20,7 @@ def bh_select(pvals: list[float], alpha: float) -> list[bool]:
 
     # Sort by p-value ascending while remembering original indices
     order = sorted(
-        range(n), key=lambda i: (float("inf") if not _finite01(pvals[i]) else pvals[i])
+        range(n), key=lambda i: float("inf") if not _finite01(pvals[i]) else pvals[i]
     )
     rejs_sorted = [False] * n
     max_k = 0
