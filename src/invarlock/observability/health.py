@@ -3,6 +3,7 @@ Health checking and status monitoring.
 """
 
 import logging
+import os
 import time
 import traceback
 from collections.abc import Callable
@@ -177,8 +178,12 @@ class HealthChecker:
 
         def check_cpu():
             """Check CPU usage."""
+            cpu_details: dict[str, Any] = {"percent": None, "core_count": None}
+            warnings: list[str] = []
+
             try:
                 cpu_percent = psutil.cpu_percent(interval=1)
+                cpu_details["percent"] = cpu_percent
 
                 if cpu_percent > 95:
                     status = HealthStatus.CRITICAL
@@ -189,28 +194,41 @@ class HealthChecker:
                 else:
                     status = HealthStatus.HEALTHY
                     message = f"CPU usage normal: {cpu_percent:.1f}%"
-
-                return ComponentHealth(
-                    name="cpu",
-                    status=status,
-                    message=message,
-                    details={
-                        "percent": cpu_percent,
-                        "core_count": psutil.cpu_count(),
-                        "load_avg": psutil.getloadavg()
-                        if hasattr(psutil, "getloadavg")
-                        else None,
-                    },
-                    timestamp=time.time(),
-                )
             except Exception as e:
-                return ComponentHealth(
-                    name="cpu",
-                    status=HealthStatus.CRITICAL,
-                    message=f"Failed to check CPU: {e}",
-                    details={"error": str(e)},
-                    timestamp=time.time(),
-                )
+                status = HealthStatus.CRITICAL
+                message = f"Failed to measure CPU usage: {e}"
+                cpu_details["error"] = str(e)
+
+            try:
+                core_count = psutil.cpu_count()
+                if core_count is None:
+                    core_count = os.cpu_count()
+                cpu_details["core_count"] = core_count
+            except Exception as e:
+                cpu_details["core_count"] = os.cpu_count()
+                warnings.append(f"cpu_count_unavailable: {e}")
+
+            try:
+                load_avg: Any | None = None
+                if hasattr(psutil, "getloadavg"):
+                    load_avg = psutil.getloadavg()
+                elif hasattr(os, "getloadavg"):
+                    load_avg = os.getloadavg()  # type: ignore[attr-defined]
+                cpu_details["load_avg"] = load_avg
+            except Exception as e:
+                cpu_details["load_avg"] = None
+                warnings.append(f"load_avg_unavailable: {e}")
+
+            if warnings:
+                cpu_details["warnings"] = warnings
+
+            return ComponentHealth(
+                name="cpu",
+                status=status,
+                message=message,
+                details=cpu_details,
+                timestamp=time.time(),
+            )
 
         def check_disk():
             """Check disk space."""

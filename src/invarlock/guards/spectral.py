@@ -61,7 +61,7 @@ def _bh_reject_families(
 
     order = sorted(
         range(n),
-        key=lambda idx: (float("inf") if not _finite01(pvals[idx]) else pvals[idx]),
+        key=lambda idx: float("inf") if not _finite01(pvals[idx]) else pvals[idx],
     )
     max_k = 0
     for rank, idx in enumerate(order, start=1):

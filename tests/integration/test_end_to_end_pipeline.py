@@ -534,6 +534,13 @@ class TestEndToEndPipeline:
 
         import psutil
 
+        # Warm up PyTorch to avoid counting one-time threadpool/allocator costs
+        # against this test's memory-growth budget.
+        warm_tensor = torch.empty((1024, 1024))
+        warm_tensor.normal_()
+        del warm_tensor
+        gc.collect()
+
         initial_memory = psutil.Process().memory_info().rss
 
         # Create multiple models to test memory management

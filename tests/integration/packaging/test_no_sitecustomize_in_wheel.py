@@ -10,7 +10,15 @@ import pytest
 def test_sitecustomize_not_in_wheel(tmp_path):
     # Build wheel locally
     subprocess.run(
-        [sys.executable, "-m", "build", "--wheel", "--outdir", str(tmp_path)],
+        [
+            sys.executable,
+            "-m",
+            "build",
+            "--wheel",
+            "--no-isolation",
+            "--outdir",
+            str(tmp_path),
+        ],
         check=True,
     )
     wheel = next(tmp_path.glob("*.whl"))

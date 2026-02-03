@@ -59,7 +59,8 @@ generate_invarlock_config() {
         guards_order_yaml=$'    - invariants\n    - spectral\n    - rmt\n    - variance\n    - invariants\n'
     fi
 
-    cat > "${output_yaml}" << YAML_EOF
+    _emit_config_yaml() {
+        cat << YAML_EOF
 # Auto-generated InvarLock config for proof packs
 # Platform: proof pack runner
 
@@ -121,6 +122,13 @@ memory:
   preallocate: true
   cache_enabled: true
 YAML_EOF
+    }
+
+    if [[ -z "${output_yaml}" || "${output_yaml}" == "-" || "${output_yaml}" == "/dev/stdout" ]]; then
+        _emit_config_yaml
+    else
+        _emit_config_yaml > "${output_yaml}"
+    fi
 }
 export -f generate_invarlock_config
 

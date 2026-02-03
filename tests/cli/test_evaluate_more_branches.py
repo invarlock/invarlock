@@ -185,9 +185,9 @@ def test_evaluate_edit_config_invalid_yaml_exits(monkeypatch, tmp_path):
     monkeypatch.setattr(
         mod,
         "_latest_run_report",
-        lambda run_root: baseline_report
-        if Path(run_root).name == "source"
-        else baseline_report,
+        lambda run_root: (
+            baseline_report if Path(run_root).name == "source" else baseline_report
+        ),
     )
 
     with pytest.raises(click.exceptions.Exit):
