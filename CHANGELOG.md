@@ -12,10 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
+- CI: update workflow test paths after the report/certificate rename.
+- Tests: apply ruff-format to warning suppression coverage test.
 
 ### Dependencies
 
 ### Documentation
+- README: refresh above-the-fold header layout, including a banner-sized logo lockup and centered badges.
+- Branding: make the README logo lockup more logomark-dominant and add a dark-mode logo variant.
+- Branding: logomark-only avatar asset (`docs/assets/invarlock-mark.svg`) for GitHub profile usage.
 
 ## [0.3.8] - 2026-02-02
 
