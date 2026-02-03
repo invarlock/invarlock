@@ -337,9 +337,13 @@ def _generate_reports(
 
                 console.print("  ARTIFACTS")
                 entries = _artifact_entries(saved_files, str(output_dir))
+                artifact_label_width = max(
+                    ARTIFACT_LABEL_WIDTH,
+                    max((len(label) for label, _ in entries), default=0),
+                )
                 for idx, (label, value) in enumerate(entries):
                     branch = "└─" if idx == len(entries) - 1 else "├─"
-                    console.print(f"  {branch} {label:<{ARTIFACT_LABEL_WIDTH}} {value}")
+                    console.print(f"  {branch} {label:<{artifact_label_width}} {value}")
                 console.print("═" * SECTION_WIDTH)
 
                 # In CLI report flow, do not hard-exit on validation failure; just display status.
