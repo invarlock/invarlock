@@ -55,6 +55,7 @@ coverage_owner_hint() {
     local rel="$1"
     case "${rel}" in
         scripts/proof_packs/lib/config_generator.sh) echo "scripts/proof_packs/tests/test_config_generator.sh" ;;
+        scripts/proof_packs/lib/dataset_provider_config.sh) echo "scripts/proof_packs/tests/test_dataset_provider_config.sh" ;;
         scripts/proof_packs/lib/task_serialization.sh) echo "scripts/proof_packs/tests/test_task_serialization.sh" ;;
         scripts/proof_packs/lib/queue_manager.sh) echo "scripts/proof_packs/tests/test_queue_manager.sh" ;;
         scripts/proof_packs/lib/scheduler.sh) echo "scripts/proof_packs/tests/test_scheduler.sh" ;;

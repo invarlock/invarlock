@@ -12,6 +12,8 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=runtime.sh
 source "${SCRIPT_DIR}/runtime.sh"
+# shellcheck source=dataset_provider_config.sh
+source "${SCRIPT_DIR}/dataset_provider_config.sh"
 [[ -z "${QUEUE_MANAGER_LOADED:-}" ]] && source "${SCRIPT_DIR}/queue_manager.sh" && export QUEUE_MANAGER_LOADED=1
 
 # ============ FALLBACK FUNCTIONS ============
@@ -357,6 +359,9 @@ YAML
             guards_order_yaml+=$'    - '"${g}"$'\n'
         done
 
+        local dataset_provider_yaml
+        dataset_provider_yaml="$(pack_render_dataset_provider_yaml "${INVARLOCK_DATASET:-wikitext2}")"
+
         local baseline_yaml="${abs_baseline_root}/baseline_noop.yaml"
         cat > "${baseline_yaml}" << YAML
 model:
@@ -369,7 +374,7 @@ model:
   low_cpu_mem_usage: true
 
 dataset:
-  provider: "${INVARLOCK_DATASET:-wikitext2}"
+${dataset_provider_yaml}
   split: validation
   seq_len: ${seq_len}
   stride: ${stride}
@@ -926,6 +931,9 @@ YAML
         guards_order_yaml+=$'    - '"${g}"$'\n'
     done
 
+    local dataset_provider_yaml
+    dataset_provider_yaml="$(pack_render_dataset_provider_yaml "${INVARLOCK_DATASET:-wikitext2}")"
+
     cat > "${config_yaml}" << YAML_EOF
 model:
   id: "${baseline_path}"
@@ -937,7 +945,7 @@ model:
   low_cpu_mem_usage: true
 
 dataset:
-  provider: "${INVARLOCK_DATASET:-wikitext2}"
+${dataset_provider_yaml}
   preview_n: ${preview_n}
   final_n: ${final_n}
   seq_len: ${seq_len}
@@ -1378,9 +1386,11 @@ YAML
         # Create minimal preset with seq_len/stride
         mkdir -p "${preset_dir}"
         preset_file="${preset_dir}/calibrated_preset_${model_name}.yaml"
+        local dataset_provider_yaml
+        dataset_provider_yaml="$(pack_render_dataset_provider_yaml "${INVARLOCK_DATASET:-wikitext2}")"
         cat > "${preset_file}" << PRESET_YAML
 dataset:
-  provider: wikitext2
+${dataset_provider_yaml}
   split: validation
   seq_len: ${seq_len}
   stride: ${stride}
@@ -1665,9 +1675,11 @@ YAML
         # Create minimal preset with seq_len/stride
         mkdir -p "${preset_dir}"
         preset_file="${preset_dir}/calibrated_preset_${model_name}.yaml"
+        local dataset_provider_yaml
+        dataset_provider_yaml="$(pack_render_dataset_provider_yaml "${INVARLOCK_DATASET:-wikitext2}")"
         cat > "${preset_file}" << PRESET_YAML
 dataset:
-  provider: wikitext2
+${dataset_provider_yaml}
   split: validation
   seq_len: ${seq_len}
   stride: ${stride}

@@ -21,7 +21,7 @@ import sys as _sys
 import types as _types
 import warnings
 from array import array
-from collections.abc import Callable, Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -111,6 +111,24 @@ def _event(
         emoji=emoji,
         console_style=console_style,
     )
+
+
+def _canonical_dataset_id(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    if hasattr(value, "_data"):
+        try:
+            value = value._data
+        except Exception:
+            pass
+    if isinstance(value, Mapping):
+        try:
+            return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
+        except Exception:
+            return str(value)
+    return str(value)
 
 
 LIGHT_IMPORT = os.getenv("INVARLOCK_LIGHT_IMPORT", "").strip().lower() in {
@@ -2032,7 +2050,8 @@ def _validate_and_harvest_baseline_schedule(
     cfg_dataset = getattr(cfg.dataset, "provider", None)
     if cfg_dataset is None:
         cfg_dataset = getattr(cfg.dataset, "dataset", None)
-    baseline_dataset = _extract_meta("dataset")
+    cfg_dataset = _canonical_dataset_id(cfg_dataset)
+    baseline_dataset = _canonical_dataset_id(_extract_meta("dataset"))
     if (
         baseline_dataset is not None
         and cfg_dataset is not None
@@ -4352,9 +4371,12 @@ def run_command(
                 "cert_lints": [dict(lint) for lint in model_profile.cert_lints],
             }
 
+            dataset_provider = getattr(cfg.dataset, "provider", None)
+            if dataset_provider is None:
+                dataset_provider = getattr(cfg.dataset, "dataset", None)
             report["data"].update(
                 {
-                    "dataset": cfg.dataset.provider,
+                    "dataset": _canonical_dataset_id(dataset_provider),
                     # Resolved split (explicit or inferred)
                     "split": resolved_split,
                     "seq_len": cfg.dataset.seq_len,

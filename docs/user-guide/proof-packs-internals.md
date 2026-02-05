@@ -79,9 +79,9 @@ task graph, scheduling, and artifact generation. It complements
 └──────┬───────┴───────┬──────┴────────────────────────────┘
        │               │
        ▼               ▼
-┌──────────────────────────────────────────────────────────┐
+┌───────────────────────────────────────────────────────────┐
 │                    ORCHESTRATION LAYER                    │
-├──────────────────────────────────────────────────────────┤
+├───────────────────────────────────────────────────────────┤
 │  lib/validation_suite.sh (main_dynamic)                   │
 │  ├─ Phase 0: setup + preflight                            │
 │  ├─ Phase 1: queue init      ───────────┐                 │
@@ -91,27 +91,27 @@ task graph, scheduling, and artifact generation. It complements
                                │          │
        ┌───────────────────────┘          └─────────────┐
        ▼                                                 ▼
-┌──────────────────────────┐                   ┌──────────────────┐
+┌───────────────────────────┐                   ┌──────────────────┐
 │       TASK EXECUTION      │                   │  CORE SERVICES   │
-├──────────────────────────┤                   ├──────────────────┤
+├───────────────────────────┤                   ├──────────────────┤
 │  lib/gpu_worker.sh        │◄──────────────────┤  queue_manager   │
 │  ├─ Task claim            │                   │  scheduler       │
 │  ├─ OOM pre-check         │                   │  task_serial.    │
 │  ├─ execute_task()        │                   │  fault_tol.      │
 │  └─ GPU cleanup           │                   └──────────────────┘
-└──────┬───────────────────┘
+└──────┬────────────────────┘
        │
        ▼
-┌──────────────────────────┐
+┌───────────────────────────┐
 │       TASK FUNCTIONS      │
-├──────────────────────────┤
+├───────────────────────────┤
 │  ├─ SETUP_BASELINE        │
 │  ├─ CALIBRATION_RUN       │
 │  ├─ GENERATE_PRESET       │
 │  ├─ CREATE_EDITS(_BATCH)  │
 │  ├─ CREATE_ERROR          │
-│  └─ evaluate_*             │
-└──────────────────────────┘
+│  └─ evaluate_*            │
+└───────────────────────────┘
 ```
 
 ## Troubleshooting decision tree
@@ -584,6 +584,19 @@ Common knobs for the setup script:
 | Variable | Default | Description |
 | --- | --- | --- |
 | `INVARLOCK_DATASET` | `wikitext2` | Dataset provider |
+| `INVARLOCK_DATASET_PROVIDER_YAML` | unset | Raw YAML mapping for `dataset.provider` (advanced; overrides provider kind + args) |
+| `INVARLOCK_DATASET_PROVIDER_JSON` | unset | Raw JSON object for `dataset.provider` (advanced; overrides provider kind + args) |
+| `INVARLOCK_HF_DATASET_NAME` | `allenai/c4` | HF dataset name when `INVARLOCK_DATASET=hf_text` (legacy `c4` auto-migrated) |
+| `INVARLOCK_HF_CONFIG_NAME` | `en` (for `allenai/c4`) | HF dataset config when `INVARLOCK_DATASET=hf_text` |
+| `INVARLOCK_HF_TEXT_FIELD` | `text` | Text field when `INVARLOCK_DATASET=hf_text` |
+| `INVARLOCK_HF_MAX_SAMPLES` | `2000` | Max rows consumed when `INVARLOCK_DATASET=hf_text` |
+| `INVARLOCK_HF_TRUST_REMOTE_CODE` | unset | Pass `trust_remote_code` to HF `load_dataset` (not needed for `allenai/c4` Parquet) |
+| `INVARLOCK_HF_CACHE_DIR` | unset | `datasets` cache_dir override when `INVARLOCK_DATASET=hf_text` |
+| `INVARLOCK_LOCAL_JSONL_FILE` | unset | JSONL file path when `INVARLOCK_DATASET=local_jsonl` |
+| `INVARLOCK_LOCAL_JSONL_PATH` | unset | JSONL file/dir path when `INVARLOCK_DATASET=local_jsonl` |
+| `INVARLOCK_LOCAL_JSONL_DATA_FILES` | unset | JSONL glob/list when `INVARLOCK_DATASET=local_jsonl` |
+| `INVARLOCK_LOCAL_JSONL_TEXT_FIELD` | `text` | Text field when `INVARLOCK_DATASET=local_jsonl` |
+| `INVARLOCK_LOCAL_JSONL_MAX_SAMPLES` | `2000` | Max rows consumed when `INVARLOCK_DATASET=local_jsonl` |
 | `INVARLOCK_TIER` | `balanced` | Guard tier preset |
 | `INVARLOCK_PREVIEW_WINDOWS` | `32` | Preview windows |
 | `INVARLOCK_FINAL_WINDOWS` | `32` | Final windows |
