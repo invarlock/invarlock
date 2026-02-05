@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 import pytest
@@ -93,6 +94,8 @@ def _ppl_evaluation_report(
             "rmt_stable": True,
         },
     }
+    if isinstance(ratio, int | float) and math.isfinite(float(ratio)) and ratio > 0:
+        cert["primary_metric"]["ci"] = [math.log(float(ratio)), math.log(float(ratio))]
 
     if include_provider_digest:
         cert.setdefault("provenance", {})["provider_digest"] = {

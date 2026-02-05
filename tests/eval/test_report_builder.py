@@ -905,16 +905,15 @@ class TestExtractVarianceAnalysis:
 class TestNormalizationAndDataset:
     """Coverage for normalization helpers and dataset hashing."""
 
-    def test_normalize_baseline_invalid_ppl_defaults(self):
+    def test_normalize_baseline_invalid_ppl_raises(self):
         baseline = {
             "run_id": "r1",
             "model_id": "m",
-            "ppl_final": 0.5,
+            "ppl_final": 0.0,
             "ppl_preview": 0.4,
         }
-        normalized = _normalize_baseline(baseline)
-        assert normalized["ppl_final"] == 50.797
-        assert normalized["run_id"] == "r1"
+        with pytest.raises(ValueError, match="Invalid baseline"):
+            _normalize_baseline(baseline)
 
     def test_normalize_baseline_schema_v1(self):
         baseline = {

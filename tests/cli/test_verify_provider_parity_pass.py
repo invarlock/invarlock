@@ -29,7 +29,7 @@ def test_verify_ci_provider_parity_pass(tmp_path: Path, capsys) -> None:
     rmt_hash = verify_mod._measurement_contract_digest(rmt_contract)
     cert = {
         "schema_version": "v1",
-        "run_id": "r",
+        "run_id": "run-ci-provider",
         "artifacts": {"generated_at": "t"},
         "plugins": {},
         "meta": {},
@@ -59,6 +59,7 @@ def test_verify_ci_provider_parity_pass(tmp_path: Path, capsys) -> None:
             "preview": 10.0,
             "final": 10.0,
             "ratio_vs_baseline": 1.0,
+            "ci": [0.0, 0.0],
             "display_ci": [1.0, 1.0],
         },
         "spectral": {

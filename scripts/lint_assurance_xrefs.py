@@ -341,8 +341,11 @@ def _sample_reports() -> list[dict[str, Any]]:
         "flags": {"guard_recovered": False, "rollback_reason": None},
     }
     ppl_baseline = {
-        "meta": {"model_id": "m", "adapter": "hf", "seed": 1},
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
+        "run_id": "baseline-ppl",
+        "model_id": "m",
+        "ppl_final": 10.0,
+        "ppl_preview": 10.0,
+        "primary_metric": {"kind": "ppl_causal", "final": 10.0},
         "evaluation_windows": {
             "final": {
                 "window_ids": [1, 2],
@@ -386,7 +389,13 @@ def _sample_reports() -> list[dict[str, Any]]:
         "artifacts": {"events_path": "", "logs_path": "", "checkpoint_path": None},
         "flags": {"guard_recovered": False, "rollback_reason": None},
     }
-    acc_baseline = {"metrics": {"primary_metric": {"kind": "accuracy", "final": 0.79}}}
+    acc_baseline = {
+        "run_id": "baseline-acc",
+        "model_id": "m",
+        "ppl_final": 10.0,
+        "ppl_preview": 10.0,
+        "primary_metric": {"kind": "accuracy", "final": 0.79},
+    }
 
     return [
         make_report(ppl_report, ppl_baseline),

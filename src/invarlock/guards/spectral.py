@@ -662,7 +662,29 @@ class SpectralGuard(Guard):
 
                     family_stats = self.baseline_family_stats.get(family, {})
                     cap_config = self.family_caps.get(family, {})
-                    kappa_cap = float(cap_config.get("kappa", self.sigma_quantile))
+                    kappa_raw = (
+                        cap_config.get("kappa")
+                        if isinstance(cap_config, dict)
+                        else None
+                    )
+                    if not (
+                        isinstance(kappa_raw, int | float)
+                        and math.isfinite(float(kappa_raw))
+                    ):
+                        other_cfg = self.family_caps.get("other", {})
+                        kappa_raw = (
+                            other_cfg.get("kappa")
+                            if isinstance(other_cfg, dict)
+                            else None
+                        )
+                    if not (
+                        isinstance(kappa_raw, int | float)
+                        and math.isfinite(float(kappa_raw))
+                    ):
+                        kappa_raw = (
+                            _default_family_caps().get("other", {}).get("kappa", 3.0)
+                        )
+                    kappa_cap = float(kappa_raw)
 
                     z_score = compute_z_score_for_value(
                         sigma_max,

@@ -414,7 +414,7 @@ Guard that tracks variance change and applies equalization when beneficial.
 | Aspect | Details |
 | --- | --- |
 | **Context** | A/B test compares bare vs VE-enabled evaluation |
-| **Enabling condition** | CI excludes 0 AND mean Δ ≥ min_effect_lognll |
+| **Enabling condition** | CI excludes 0 AND mean Δ ≤ -min_effect_lognll |
 | **Related terms** | Four-Guard Pipeline, Guard Overhead, Predictive Gate |
 | **report fields** | `variance.{enabled,gain,predictive_gate.delta_ci,predictive_gate.passed}` |
 | **See also** | [VE Gate Power](07-ve-gate-power.md) |

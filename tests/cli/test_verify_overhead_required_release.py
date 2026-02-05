@@ -53,6 +53,7 @@ def _release_ready_cert(*, include_guard_overhead: bool) -> dict:
             "preview": 10.0,
             "final": 10.0,
             "ratio_vs_baseline": 1.0,
+            "ci": [0.0, 0.0],
             "display_ci": [1.0, 1.0],
         },
         "spectral": {

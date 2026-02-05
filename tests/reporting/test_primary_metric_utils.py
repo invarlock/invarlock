@@ -384,3 +384,31 @@ def test_attach_primary_metric_classification_without_baseline(monkeypatch):
     assert pm["kind"] == "accuracy"
     assert pm["final"] == pytest.approx(0.55)
     assert "ratio_vs_baseline" not in pm
+
+
+def test_attach_primary_metric_invalid_reason_when_only_invalid_flag_present():
+    evaluation_report: dict[str, object] = {}
+    report = {
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 2.0,
+                "final": 2.0,
+                "ratio_vs_baseline": 1.0,
+                "invalid": True,
+            }
+        }
+    }
+    baseline_ref = {"primary_metric": {"final": 2.0}}
+
+    attach_primary_metric(
+        evaluation_report,
+        report,
+        baseline_raw=None,
+        baseline_ref=baseline_ref,
+        ppl_analysis=None,
+    )
+
+    pm = evaluation_report["primary_metric"]
+    assert pm["degraded"] is True
+    assert pm["degraded_reason"] == "primary_metric_invalid"
