@@ -5,7 +5,7 @@
 PACK_SUITE="${PACK_SUITE:-subset}"
 
 pack_list_suites() {
-    printf '%s\n' subset full
+    printf '%s\n' subset full workshop3
 }
 
 pack_apply_suite() {
@@ -31,6 +31,17 @@ pack_apply_suite() {
             MODEL_4="01-ai/Yi-34B"
             MODEL_5="mistralai/Mixtral-8x7B-v0.1"
             MODEL_6="Qwen/Qwen1.5-72B"
+            MODEL_7=""
+            MODEL_8=""
+            ;;
+        workshop3)
+            # Workshop-friendly 3-model suite (architecture diversity).
+            MODEL_1="mistralai/Mistral-7B-v0.1"
+            MODEL_2="allenai/OLMo-2-1124-13B"
+            MODEL_3="Qwen/Qwen2.5-32B"
+            MODEL_4=""
+            MODEL_5=""
+            MODEL_6=""
             MODEL_7=""
             MODEL_8=""
             ;;
