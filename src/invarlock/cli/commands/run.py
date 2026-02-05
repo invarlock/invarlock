@@ -2641,8 +2641,19 @@ def run_command(
         profile_label = profile_normalized or None
         if torch is not None and profile_label in {"ci", "release"}:
             try:  # pragma: no cover - behavior depends on torch availability
+                determinism_mode = (
+                    os.environ.get("PACK_DETERMINISM")
+                    or os.environ.get("INVARLOCK_DETERMINISM")
+                    or "throughput"
+                )
+                warn_only = False
+                if determinism_mode and determinism_mode.lower() != "strict":
+                    warn_only = True
+                warn_only_env = os.environ.get("INVARLOCK_DETERMINISM_WARN_ONLY", "")
+                if warn_only_env.strip().lower() in {"1", "true", "yes", "y", "on"}:
+                    warn_only = True
                 if hasattr(torch, "use_deterministic_algorithms"):
-                    torch.use_deterministic_algorithms(True, warn_only=False)
+                    torch.use_deterministic_algorithms(True, warn_only=warn_only)
                 if hasattr(torch.backends, "cudnn"):
                     torch.backends.cudnn.benchmark = False
                     try:
