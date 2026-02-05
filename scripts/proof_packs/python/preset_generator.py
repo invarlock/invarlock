@@ -104,9 +104,9 @@ def _resolve_dataset_provider_spec(
         # Migrate legacy "c4" to "allenai/c4" (script-based c4 deprecated in datasets 4.x)
         if str(dataset_name) == "c4":
             dataset_name = "allenai/c4"
-        config_name = os.environ.get(
-            "INVARLOCK_HF_CONFIG_NAME"
-        ) or os.environ.get("INVARLOCK_HF_DATASET_CONFIG_NAME")
+        config_name = os.environ.get("INVARLOCK_HF_CONFIG_NAME") or os.environ.get(
+            "INVARLOCK_HF_DATASET_CONFIG_NAME"
+        )
         if not config_name and str(dataset_name) == "allenai/c4":
             config_name = "en"
         text_field = os.environ.get("INVARLOCK_HF_TEXT_FIELD") or "text"
