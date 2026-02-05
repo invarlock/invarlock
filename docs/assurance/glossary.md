@@ -37,7 +37,7 @@
 | --- | --- | --- |
 | Window Pairing | Aligning baseline and subject eval windows | `dataset.windows.stats.paired_windows` |
 | Provider Digest | Hash of dataset identity (ids/tokenizer/masking) | `provenance.provider_digest` |
-| Tokenizer Hash | Stable hash of tokenizer settings | `dataset.tokenizer.hash` |
+| Tokenizer Hash | Stable hash of tokenizer settings | `meta.tokenizer_hash` |
 
 ### Policy Terms
 
@@ -400,7 +400,7 @@ Stable hash of tokenizer settings and vocabulary for reproducibility.
 | --- | --- |
 | **Context** | Ensures baseline and subject use identical tokenization |
 | **Related terms** | Provider Digest, Window Pairing |
-| **report fields** | `dataset.tokenizer.hash`, `meta.tokenizer_hash` |
+| **report fields** | `data.tokenizer_hash`, `meta.tokenizer_hash` |
 | **See also** | [Determinism Contracts](08-determinism-contracts.md) |
 
 ---

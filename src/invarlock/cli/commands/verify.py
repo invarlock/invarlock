@@ -233,6 +233,10 @@ def _validate_primary_metric(report: dict[str, Any]) -> list[str]:
             errors.append(
                 "report missing primary_metric.ratio_vs_baseline for non-ppl metric."
             )
+        elif not _is_finite_number(ratio_vs_baseline):
+            errors.append(
+                "report is missing a finite primary_metric.ratio_vs_baseline value."
+            )
 
     return errors
 

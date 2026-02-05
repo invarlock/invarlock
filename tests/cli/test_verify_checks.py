@@ -64,6 +64,14 @@ def test_validate_primary_metric_non_ppl_requires_ratio():
     assert any("missing primary_metric.ratio_vs_baseline" in e for e in errs)
 
 
+def test_validate_primary_metric_non_ppl_rejects_non_finite_ratio() -> None:
+    cert = _cert_base(
+        {"kind": "accuracy", "final": 0.9, "ratio_vs_baseline": float("nan")}
+    )
+    errs = v._validate_primary_metric(cert)
+    assert any("finite primary_metric.ratio_vs_baseline" in e for e in errs)
+
+
 def test_pairing_and_counts_checks():
     cert = _cert_base({"kind": "ppl_causal", "final": 100.0, "ratio_vs_baseline": 1.0})
     assert v._validate_pairing(cert) == []
