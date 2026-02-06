@@ -1778,5 +1778,31 @@ PRESET_YAML
         fi
     fi
 
+    # VE/variance is a remediation guard and is muted under compare-mode evaluation
+    # because the subject run uses a no-op edit. Emit an explicit probe artifact on
+    # shared windows for the VE demo scenario.
+    if [[ "${error_type}" == "ve_mlp_scale_skew" && "${PACK_ENABLE_VE_CROSS_PROBE:-1}" != "0" ]]; then
+        local ve_probe_script="${SCRIPT_DIR}/../python/ve_cross_model_probe.py"
+        local ve_probe_out="${cert_dir}/ve_probe.json"
+        if [[ -f "${ve_probe_script}" && -n "${baseline_report_file}" && -f "${baseline_report_file}" ]]; then
+            local ve_probe_rc=0
+            _cmd_python "${ve_probe_script}" \
+                --baseline-model "${abs_baseline_path}" \
+                --subject-model "${abs_error_path}" \
+                --baseline-report "${baseline_report_file}" \
+                --out "${ve_probe_out}" \
+                --tier "${tier}" \
+                --profile "${profile_flag}" \
+                --calibration-windows "${PACK_VE_PROBE_WINDOWS:-12}" \
+                --min-coverage "${PACK_VE_PROBE_MIN_COVERAGE:-10}" \
+                >> "${log_file}" 2>&1 || ve_probe_rc=$?
+            if [[ ${ve_probe_rc} -ne 0 ]]; then
+                echo "  WARNING: VE cross-model probe failed (exit=${ve_probe_rc})" >> "${log_file}"
+            fi
+        else
+            echo "  WARNING: Skipping VE cross-model probe (missing script or baseline report)" >> "${log_file}"
+        fi
+    fi
+
     return ${exit_code}
 }
