@@ -622,7 +622,8 @@ execute_task() {
                 ;;
             CREATE_ERROR)
                 local error_type=$(echo "${params}" | jq -r '.error_type // ""')
-                task_create_error "${model_name}" "${gpu_id}" "${error_type}" "${output_dir}" "${task_log}" || exit_code=$?
+                local error_env=$(echo "${params}" | jq -c '.error_env // {}' 2>/dev/null || echo '{}')
+                task_create_error "${model_name}" "${gpu_id}" "${error_type}" "${error_env}" "${output_dir}" "${task_log}" || exit_code=$?
                 ;;
             evaluate_ERROR)
                 local error_type=$(echo "${params}" | jq -r '.error_type // ""')
@@ -1446,13 +1447,14 @@ PRESET_YAML
 # ============ TASK: CREATE_ERROR ============
 
 # Create error-injected model
-# Usage: task_create_error <model_name> <gpu_id> <error_type> <output_dir> <log_file>
+# Usage: task_create_error <model_name> <gpu_id> <error_type> <error_env_json> <output_dir> <log_file>
 task_create_error() {
     local model_name="$1"
     local gpu_id="$2"
     local error_type="$3"
-    local output_dir="$4"
-    local log_file="$5"
+    local error_env_json="${4:-{}}"
+    local output_dir="$5"
+    local log_file="$6"
 
     local model_output_dir="${output_dir}/${model_name}"
     local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null || true)
@@ -1470,8 +1472,38 @@ task_create_error() {
 
     echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Creating error model: ${error_type}" >> "${log_file}"
 
+    local -a injector_env=()
+    if [[ -n "${error_env_json}" && "${error_env_json}" != "null" ]]; then
+        mapfile -t injector_env < <(
+            printf '%s\n' "${error_env_json}" | jq -r '
+                if type=="object" then
+                    to_entries[]
+                    | select((.key | type) == "string")
+                    | select(.key | startswith("INVARLOCK_"))
+                    | select(.key | test("^[A-Z][A-Z0-9_]*$"))
+                    | select((.value | type) as $t | ($t == "string" or $t == "number" or $t == "boolean"))
+                    | "\(.key)=\(.value | tostring)"
+                else
+                    empty
+                end
+            ' 2>/dev/null
+        )
+    fi
+    if [[ ${#injector_env[@]} -gt 0 ]]; then
+        echo "  Injector env overrides: ${injector_env[*]}" >> "${log_file}"
+    fi
+
     if type create_error_model &>/dev/null; then
-        create_error_model "${baseline_path}" "${error_path}" "${error_type}" "${gpu_id}" >> "${log_file}" 2>&1
+        if [[ ${#injector_env[@]} -gt 0 ]]; then
+            (
+                for entry in "${injector_env[@]}"; do
+                    export "${entry}"
+                done
+                create_error_model "${baseline_path}" "${error_path}" "${error_type}" "${gpu_id}"
+            ) >> "${log_file}" 2>&1
+        else
+            create_error_model "${baseline_path}" "${error_path}" "${error_type}" "${gpu_id}" >> "${log_file}" 2>&1
+        fi
     else
         echo "ERROR: create_error_model not available" >> "${log_file}"
         return 1
@@ -1718,6 +1750,31 @@ PRESET_YAML
         found_cert=$(find "${cert_dir}" -name "evaluation.report.json" -type f 2>/dev/null | head -1)
         if [[ -n "${found_cert}" && -f "${found_cert}" && "${found_cert}" != "${cert_file}" ]]; then
             cp "${found_cert}" "${cert_file}" 2>/dev/null || true
+        fi
+    fi
+
+    # Compare-mode evaluate cannot directly expose delta-style RMT signals because
+    # guards are prepared/finalized on the same loaded model. For the RMT probe
+    # scenario, emit an explicit cross-model artifact on shared windows.
+    if [[ "${error_type}" == "rmt_norm_noise" && "${PACK_ENABLE_RMT_CROSS_PROBE:-1}" != "0" ]]; then
+        local probe_script="${SCRIPT_DIR}/../python/rmt_cross_model_probe.py"
+        local probe_out="${cert_dir}/rmt_probe.json"
+        if [[ -f "${probe_script}" && -n "${baseline_report_file}" && -f "${baseline_report_file}" ]]; then
+            local probe_rc=0
+            _cmd_python "${probe_script}" \
+                --baseline-model "${abs_baseline_path}" \
+                --subject-model "${abs_error_path}" \
+                --baseline-report "${baseline_report_file}" \
+                --out "${probe_out}" \
+                --tier "${tier}" \
+                --profile "${profile_flag}" \
+                --activation-windows "${PACK_RMT_PROBE_WINDOWS:-64}" \
+                >> "${log_file}" 2>&1 || probe_rc=$?
+            if [[ ${probe_rc} -ne 0 ]]; then
+                echo "  WARNING: RMT cross-model probe failed (exit=${probe_rc})" >> "${log_file}"
+            fi
+        else
+            echo "  WARNING: Skipping RMT cross-model probe (missing script or baseline report)" >> "${log_file}"
         fi
     fi
 

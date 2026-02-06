@@ -471,119 +471,309 @@ def main(argv: list[str]) -> int:
             )
 
     elif error_type == "rmt_norm_noise":
-        # RMT-targeted error injection: add small noise to normalization layers
-        # to cause RMT epsilon violations while keeping invariants/spectral stable.
+        # RMT-targeted error injection.
         #
-        # Environment variables:
-        #   INVARLOCK_RMT_NORM_NOISE_SCALE: noise scale (default: 0.05)
-        #   INVARLOCK_RMT_NORM_TARGET_LAYERS: comma-separated layer indices (default: last 4)
-        #   INVARLOCK_RMT_NORM_MAX_MODULES: max modules to perturb (default: 32)
-        #   INVARLOCK_RMT_NORM_SEED: random seed (default: 42)
-        #   INVARLOCK_RMT_NORM_INCLUDE_GLOBAL: include global norms not in layers (default: 0)
-        #   INVARLOCK_RMT_NORM_MULT_CLAMP: clamp multiplier to [1-c, 1+c] (default: 0.5)
+        # Two deterministic probe modes are supported:
+        #   1) norm_noise (legacy): perturb normalization weights.
+        #   2) anisotropy (default): make selected projection rows co-linear while
+        #      preserving row norms, which targets activation edge-risk used by RMT.
+        #
+        # Mode selection:
+        #   INVARLOCK_RMT_PROBE_MODE=norm_noise|anisotropy
+        #   If unset and INVARLOCK_RMT_NORM_NOISE_SCALE is present, legacy mode is used.
+        probe_mode = os.environ.get("INVARLOCK_RMT_PROBE_MODE", "").strip().lower()
+        if not probe_mode:
+            probe_mode = (
+                "norm_noise"
+                if "INVARLOCK_RMT_NORM_NOISE_SCALE" in os.environ
+                else "anisotropy"
+            )
 
-        noise_scale = float(os.environ.get("INVARLOCK_RMT_NORM_NOISE_SCALE", "0.05"))
-        target_layers_spec = os.environ.get("INVARLOCK_RMT_NORM_TARGET_LAYERS", "")
-        max_modules = int(os.environ.get("INVARLOCK_RMT_NORM_MAX_MODULES", "32"))
-        seed = int(os.environ.get("INVARLOCK_RMT_NORM_SEED", "42"))
-        include_global = os.environ.get("INVARLOCK_RMT_NORM_INCLUDE_GLOBAL", "0") == "1"
-        mult_clamp = float(os.environ.get("INVARLOCK_RMT_NORM_MULT_CLAMP", "0.5"))
+        if probe_mode == "norm_noise":
+            noise_scale = float(
+                os.environ.get("INVARLOCK_RMT_NORM_NOISE_SCALE", "0.05")
+            )
+            target_layers_spec = os.environ.get("INVARLOCK_RMT_NORM_TARGET_LAYERS", "")
+            max_modules = int(os.environ.get("INVARLOCK_RMT_NORM_MAX_MODULES", "32"))
+            seed = int(os.environ.get("INVARLOCK_RMT_NORM_SEED", "42"))
+            include_global = (
+                os.environ.get("INVARLOCK_RMT_NORM_INCLUDE_GLOBAL", "0") == "1"
+            )
+            mult_clamp = float(os.environ.get("INVARLOCK_RMT_NORM_MULT_CLAMP", "0.5"))
 
-        # Set deterministic seeds
-        random.seed(seed)
-        torch.manual_seed(seed)
+            random.seed(seed)
+            torch.manual_seed(seed)
 
-        # Find normalization modules by layer
-        layer_pattern = re.compile(r"(?:layers|blocks|h)\.(\d+)\.")
-        norm_modules_by_layer: dict[int, list[tuple[str, torch.nn.Module]]] = {}
-        global_norm_modules: list[tuple[str, torch.nn.Module]] = []
+            layer_pattern = re.compile(r"(?:layers|blocks|h)\.(\d+)\.")
+            norm_modules_by_layer: dict[int, list[tuple[str, torch.nn.Module]]] = {}
+            global_norm_modules: list[tuple[str, torch.nn.Module]] = []
 
-        for name, module in model.named_modules():
-            if not _is_norm_module(module):
-                continue
-            weight = _get_norm_weight(module)
-            if weight is None:
-                continue
-            match = layer_pattern.search(name)
-            if match:
-                layer_idx = int(match.group(1))
-                norm_modules_by_layer.setdefault(layer_idx, []).append((name, module))
-            else:
-                global_norm_modules.append((name, module))
-
-        # Determine max layer count and target layers
-        all_layer_indices = sorted(norm_modules_by_layer.keys())
-        max_layer = max(all_layer_indices) + 1 if all_layer_indices else 0
-        if target_layers_spec:
-            target_layers = _parse_layer_indices(target_layers_spec, max_layer)
-        else:
-            target_layers = _default_last_layers(all_layer_indices, 4)
-
-        # Collect target norm modules
-        target_modules: list[tuple[str, torch.nn.Module]] = []
-        for layer_idx in target_layers:
-            if layer_idx in norm_modules_by_layer:
-                target_modules.extend(norm_modules_by_layer[layer_idx])
-        # Include global norms if requested (e.g., final RMSNorm outside blocks).
-        if include_global:
-            target_modules.extend(global_norm_modules)
-
-        # Shuffle deterministically so we don't always hit the first blocks.
-        random.shuffle(target_modules)
-
-        # Limit to max_modules
-        if len(target_modules) > max_modules:
-            target_modules = target_modules[:max_modules]
-
-        # Apply noise to norm weights
-        modified_count = 0
-        modified_names: list[str] = []
-        for name, module in target_modules:
-            weight = _get_norm_weight(module)
-            if weight is None:
-                continue
-            if not weight.is_floating_point():
-                continue
-            with torch.no_grad():
-                base = weight.detach().clone()
-                noise = torch.randn(
-                    base.shape, device=base.device, dtype=torch.float32
-                ) * float(noise_scale)
-                multiplier = (1.0 + noise).clamp(1.0 - mult_clamp, 1.0 + mult_clamp)
-                weight.mul_(multiplier.to(dtype=base.dtype))
-
-                if not torch.isfinite(weight).all():
-                    weight.copy_(base)
+            for name, module in model.named_modules():
+                if not _is_norm_module(module):
                     continue
-            modified_count += 1
-            modified_names.append(name)
-            if modified_count <= 5:
-                print(f"Perturbed norm: {name} (scale={noise_scale})")
+                weight = _get_norm_weight(module)
+                if weight is None:
+                    continue
+                match = layer_pattern.search(name)
+                if match:
+                    layer_idx = int(match.group(1))
+                    norm_modules_by_layer.setdefault(layer_idx, []).append(
+                        (name, module)
+                    )
+                else:
+                    global_norm_modules.append((name, module))
 
-        if modified_count > 5:
-            print(f"  ... and {modified_count - 5} more norm modules")
+            all_layer_indices = sorted(norm_modules_by_layer.keys())
+            max_layer = max(all_layer_indices) + 1 if all_layer_indices else 0
+            if target_layers_spec:
+                target_layers = _parse_layer_indices(target_layers_spec, max_layer)
+            else:
+                target_layers = _default_last_layers(all_layer_indices, 4)
 
-        if modified_count > 0:
-            error_info.update(
-                {
-                    "injected": True,
-                    "noise_scale": noise_scale,
-                    "seed": seed,
-                    "target_layers": target_layers,
-                    "max_modules": max_modules,
-                    "include_global": include_global,
-                    "mult_clamp": mult_clamp,
-                    "modified_count": modified_count,
-                    "modified_modules": modified_names[:20],  # Cap for readability
-                    "total_layers": max_layer,
-                }
-            )
-            print(
-                f"Applied RMT norm noise to {modified_count} modules "
-                f"(scale={noise_scale}, seed={seed})"
-            )
+            target_modules: list[tuple[str, torch.nn.Module]] = []
+            for layer_idx in target_layers:
+                if layer_idx in norm_modules_by_layer:
+                    target_modules.extend(norm_modules_by_layer[layer_idx])
+            if include_global:
+                target_modules.extend(global_norm_modules)
+
+            random.shuffle(target_modules)
+            if len(target_modules) > max_modules:
+                target_modules = target_modules[:max_modules]
+
+            modified_count = 0
+            modified_names: list[str] = []
+            for name, module in target_modules:
+                weight = _get_norm_weight(module)
+                if weight is None or not weight.is_floating_point():
+                    continue
+                with torch.no_grad():
+                    base = weight.detach().clone()
+                    noise = torch.randn(
+                        base.shape, device=base.device, dtype=torch.float32
+                    ) * float(noise_scale)
+                    multiplier = (1.0 + noise).clamp(1.0 - mult_clamp, 1.0 + mult_clamp)
+                    weight.mul_(multiplier.to(dtype=base.dtype))
+                    if not torch.isfinite(weight).all():
+                        weight.copy_(base)
+                        continue
+                modified_count += 1
+                modified_names.append(name)
+                if modified_count <= 5:
+                    print(f"Perturbed norm: {name} (scale={noise_scale})")
+
+            if modified_count > 5:
+                print(f"  ... and {modified_count - 5} more norm modules")
+
+            if modified_count > 0:
+                error_info.update(
+                    {
+                        "injected": True,
+                        "mode": "norm_noise",
+                        "noise_scale": noise_scale,
+                        "seed": seed,
+                        "target_layers": target_layers,
+                        "max_modules": max_modules,
+                        "include_global": include_global,
+                        "mult_clamp": mult_clamp,
+                        "modified_count": modified_count,
+                        "modified_modules": modified_names[:20],
+                        "total_layers": max_layer,
+                    }
+                )
+                print(
+                    f"Applied RMT norm noise to {modified_count} modules "
+                    f"(scale={noise_scale}, seed={seed})"
+                )
+            else:
+                print("WARNING: rmt_norm_noise not injected (no norm modules found)")
         else:
-            print("WARNING: rmt_norm_noise not injected (no norm modules found)")
+            # Default probe: inject structured anisotropy into selected projections.
+            blend = float(os.environ.get("INVARLOCK_RMT_ANISO_BLEND", "0.75"))
+            blend = min(max(blend, 0.05), 0.99)
+            row_frac = float(os.environ.get("INVARLOCK_RMT_ANISO_ROW_FRAC", "0.35"))
+            row_frac = min(max(row_frac, 0.01), 0.95)
+            max_rows = int(os.environ.get("INVARLOCK_RMT_ANISO_MAX_ROWS", "256"))
+            max_params = int(os.environ.get("INVARLOCK_RMT_ANISO_MAX_PARAMS", "24"))
+            target_family = (
+                os.environ.get("INVARLOCK_RMT_ANISO_TARGET_FAMILY", "attn")
+                .strip()
+                .lower()
+            )
+            target_layers_spec = os.environ.get("INVARLOCK_RMT_ANISO_TARGET_LAYERS", "")
+            include_qkv = os.environ.get("INVARLOCK_RMT_ANISO_INCLUDE_QKV", "1") == "1"
+            preserve_row_norms = (
+                os.environ.get("INVARLOCK_RMT_ANISO_PRESERVE_ROW_NORMS", "1") == "1"
+            )
+            jitter = float(os.environ.get("INVARLOCK_RMT_ANISO_JITTER", "0.01"))
+            seed = int(os.environ.get("INVARLOCK_RMT_ANISO_SEED", "42"))
+
+            random.seed(seed)
+            torch.manual_seed(seed)
+
+            layer_pattern = re.compile(r"(?:layers|blocks|h)\.(\d+)\.")
+            attn_patterns = (
+                "q_proj",
+                "k_proj",
+                "v_proj",
+                "o_proj",
+                "c_attn",
+                "c_proj",
+                "out_proj",
+                "query_key_value",
+                "self_attn",
+                "attention",
+            )
+            ffn_patterns = (
+                "mlp",
+                "ffn",
+                "feed_forward",
+                "gate_proj",
+                "up_proj",
+                "down_proj",
+                "fc1",
+                "fc2",
+                "c_fc",
+                "experts",
+            )
+            embed_patterns = ("embed", "wte", "wpe")
+
+            def is_target_family(name: str) -> bool:
+                lname = name.lower()
+                if target_family == "attn":
+                    return any(p in lname for p in attn_patterns)
+                if target_family == "ffn":
+                    return any(p in lname for p in ffn_patterns)
+                if target_family == "embed":
+                    return any(p in lname for p in embed_patterns)
+                if target_family == "all":
+                    return any(
+                        p in lname
+                        for p in attn_patterns + ffn_patterns + embed_patterns
+                    )
+                return any(p in lname for p in attn_patterns + ffn_patterns)
+
+            def is_qkv_param(name: str) -> bool:
+                lname = name.lower()
+                return any(
+                    p in lname
+                    for p in (
+                        "q_proj",
+                        "k_proj",
+                        "v_proj",
+                        "c_attn",
+                        "query_key_value",
+                    )
+                )
+
+            params_by_layer: dict[int, list[tuple[str, torch.Tensor]]] = {}
+            global_params: list[tuple[str, torch.Tensor]] = []
+            for name, param in model.named_parameters():
+                if param.dim() < 2 or "weight" not in name.lower():
+                    continue
+                if not param.is_floating_point():
+                    continue
+                if not is_target_family(name):
+                    continue
+                if (
+                    target_family in ("attn", "both")
+                    and (not include_qkv)
+                    and is_qkv_param(name)
+                ):
+                    continue
+                match = layer_pattern.search(name)
+                if match:
+                    layer_idx = int(match.group(1))
+                    params_by_layer.setdefault(layer_idx, []).append((name, param))
+                else:
+                    global_params.append((name, param))
+
+            all_layer_indices = sorted(params_by_layer.keys())
+            max_layer = max(all_layer_indices) + 1 if all_layer_indices else 0
+            if target_layers_spec:
+                target_layers = _parse_layer_indices(target_layers_spec, max_layer)
+            else:
+                target_layers = _default_last_layers(all_layer_indices, 8)
+
+            target_params: list[tuple[str, torch.Tensor]] = []
+            for layer_idx in target_layers:
+                if layer_idx in params_by_layer:
+                    target_params.extend(params_by_layer[layer_idx])
+            target_params.extend(global_params)
+
+            random.shuffle(target_params)
+            if len(target_params) > max_params:
+                target_params = target_params[:max_params]
+
+            modified_count = 0
+            modified_names: list[str] = []
+            for name, param in target_params:
+                with torch.no_grad():
+                    w = param.data
+                    rows = int(round(float(w.shape[0]) * row_frac))
+                    rows = max(2, min(rows, int(w.shape[0]), max_rows))
+                    if rows < 2:
+                        continue
+                    base = w[:rows, :].detach().clone()
+                    anchor = base[:1, :].expand_as(base)
+                    mixed = (1.0 - blend) * base + blend * anchor
+                    if preserve_row_norms:
+                        base_norm = torch.linalg.vector_norm(
+                            base.float(), ord=2, dim=1, keepdim=True
+                        ).clamp_min(1e-12)
+                        mixed_norm = torch.linalg.vector_norm(
+                            mixed.float(), ord=2, dim=1, keepdim=True
+                        ).clamp_min(1e-12)
+                        mixed = mixed * (base_norm / mixed_norm).to(mixed.dtype)
+                    if jitter > 0.0:
+                        scale = max(float(base.float().std().item()), 1e-6)
+                        mixed = mixed + (
+                            torch.randn_like(mixed, dtype=torch.float32).to(mixed.dtype)
+                            * float(jitter * scale)
+                        )
+                    if not torch.isfinite(mixed).all():
+                        continue
+                    w[:rows, :] = mixed.to(dtype=w.dtype)
+
+                modified_count += 1
+                modified_names.append(name)
+                if modified_count <= 5:
+                    print(
+                        f"Anisotropy perturbation: {name} (rows={rows}, blend={blend})"
+                    )
+
+            if modified_count > 5:
+                print(f"  ... and {modified_count - 5} more parameters")
+
+            if modified_count > 0:
+                error_info.update(
+                    {
+                        "injected": True,
+                        "mode": "anisotropy",
+                        "blend": blend,
+                        "row_frac": row_frac,
+                        "max_rows": max_rows,
+                        "max_params": max_params,
+                        "target_family": target_family,
+                        "target_layers": target_layers,
+                        "include_qkv": include_qkv,
+                        "preserve_row_norms": preserve_row_norms,
+                        "jitter": jitter,
+                        "seed": seed,
+                        "modified_count": modified_count,
+                        "modified_params": modified_names[:20],
+                        "total_layers": max_layer,
+                    }
+                )
+                print(
+                    f"Applied RMT anisotropy probe to {modified_count} params "
+                    f"(blend={blend}, family={target_family}, seed={seed})"
+                )
+            else:
+                print(
+                    "WARNING: rmt_norm_noise not injected "
+                    "(no matching parameters for anisotropy mode)"
+                )
 
     elif error_type == "spectral_moderate_scale":
         # Spectral-targeted error injection: apply moderate scaling to attention/MLP weights

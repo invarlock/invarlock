@@ -6,7 +6,9 @@
     "notes": [
       "Scenario IDs must match the directory names under <model>/reports/ in proof pack runs.",
       "Strictness drives verdict gating: must_* scenarios are gating; informational scenarios never fail the pack.",
-      "intent + primary_guard provide scenario utility metadata for maintainers and third-party evidence consumers."
+      "intent + primary_guard provide scenario utility metadata for maintainers and third-party evidence consumers.",
+      "Error scenarios may include generation.env to pin deterministic, scenario-specific injector settings.",
+      "Optional sidecar probe artifacts (for example rmt_probe.json) can provide detector evidence when compare-mode guards are delta-internal."
     ]
   },
   "scenarios": [
@@ -85,7 +87,7 @@
       "strictness": "informational",
       "intent": "subtle_detectable",
       "primary_guard": "primary_metric",
-      "generation": {"kind": "edit", "edit_spec": "quant_rtn:4:32:all", "version": "stress"},
+      "generation": {"kind": "edit", "edit_spec": "quant_rtn:3:32:all", "version": "stress"},
       "requirements": {
         "detectors_any_of": [
           {"kind": "validation_flag", "flag": "primary_metric_acceptable", "expected": false},
@@ -117,6 +119,7 @@
       "primary_guard": "invariants",
       "generation": {"kind": "error", "error_type": "nan_injection"},
       "requirements": {
+        "primary_guard_required": true,
         "detectors_any_of": [
           {"kind": "invariants_status", "allowed": ["fail", "error"]}
         ]
@@ -173,6 +176,7 @@
       "primary_guard": "primary_metric",
       "generation": {"kind": "error", "error_type": "extreme_quant"},
       "requirements": {
+        "primary_guard_required": true,
         "detectors_any_of": [
           {"kind": "validation_flag", "flag": "primary_metric_acceptable", "expected": false},
           {"kind": "primary_metric", "field": "degraded", "expected": true},
@@ -247,11 +251,28 @@
       "category": "error_injection",
       "failure_class": "rmt.norm_perturbation",
       "strictness": "informational",
-      "intent": "subtle_detectable",
+      "intent": "fault_detection",
       "primary_guard": "rmt",
-      "generation": {"kind": "error", "error_type": "rmt_norm_noise"},
+      "generation": {
+        "kind": "error",
+        "error_type": "rmt_norm_noise",
+        "env": {
+          "INVARLOCK_RMT_PROBE_MODE": "anisotropy",
+          "INVARLOCK_RMT_ANISO_BLEND": "0.99",
+          "INVARLOCK_RMT_ANISO_ROW_FRAC": "0.95",
+          "INVARLOCK_RMT_ANISO_MAX_ROWS": "4096",
+          "INVARLOCK_RMT_ANISO_MAX_PARAMS": "32",
+          "INVARLOCK_RMT_ANISO_TARGET_FAMILY": "attn",
+          "INVARLOCK_RMT_ANISO_PRESERVE_ROW_NORMS": "0",
+          "INVARLOCK_RMT_ANISO_JITTER": "0.0",
+          "INVARLOCK_RMT_ANISO_INCLUDE_QKV": "1",
+          "INVARLOCK_RMT_ANISO_SEED": "42"
+        }
+      },
       "requirements": {
+        "primary_guard_required": true,
         "detectors_any_of": [
+          {"kind": "rmt_probe", "field": "stable", "expected": false},
           {"kind": "validation_flag", "flag": "rmt_stable", "expected": false}
         ]
       }
@@ -263,9 +284,21 @@
       "strictness": "informational",
       "intent": "subtle_detectable",
       "primary_guard": "spectral",
-      "generation": {"kind": "error", "error_type": "spectral_moderate_scale"},
+      "generation": {
+        "kind": "error",
+        "error_type": "spectral_moderate_scale",
+        "env": {
+          "INVARLOCK_SPECTRAL_SCALE_FACTOR": "2.0",
+          "INVARLOCK_SPECTRAL_TARGET_FAMILY": "attn",
+          "INVARLOCK_SPECTRAL_MAX_PARAMS": "4",
+          "INVARLOCK_SPECTRAL_INCLUDE_QKV": "0",
+          "INVARLOCK_SPECTRAL_SEED": "42"
+        }
+      },
       "requirements": {
+        "primary_guard_required": true,
         "detectors_any_of": [
+          {"kind": "spectral_caps_applied", "min": 1},
           {"kind": "validation_flag", "flag": "spectral_stable", "expected": false}
         ]
       }

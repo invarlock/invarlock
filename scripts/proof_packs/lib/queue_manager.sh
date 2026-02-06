@@ -1193,33 +1193,60 @@ generate_model_tasks() {
 
     # 5. Error injection tests
     if [[ "${RUN_ERROR_INJECTION:-true}" == "true" ]]; then
-        local error_types=()
-	        if command -v jq >/dev/null 2>&1 && [[ -f "${scenarios_file}" ]]; then
-	            mapfile -t error_types < <(
-	                jq -r '.scenarios[]
-	                    | select(.generation.kind=="error")
-	                    | .generation.error_type' "${scenarios_file}"
-	            )
-	        fi
-	        if [[ ${#error_types[@]} -eq 0 ]]; then
-	            :
-	            error_types=(
-	                "nan_injection"
-	                "inf_injection"
-	                "shape_mismatch"
-	                "missing_tensors"
-                "extreme_quant"
-                "scale_explosion"
-                "rank_collapse"
-                "norm_collapse"
-                "weight_tying_break"
+        local jq_bin=""
+        jq_bin="$(type -P jq 2>/dev/null || true)"
+        local error_pairs=()
+        if [[ -n "${jq_bin}" && -f "${scenarios_file}" ]]; then
+            mapfile -t error_pairs < <(
+                "${jq_bin}" -r '.scenarios[]
+                    | select(.generation.kind=="error")
+                    | [
+                        (.generation.error_type // ""),
+                        ((.generation.env // {}) | tojson)
+                      ]
+                    | @tsv' "${scenarios_file}"
             )
         fi
-        for error_type in "${error_types[@]}"; do
+        if [[ ${#error_pairs[@]} -eq 0 ]]; then
+            :
+            error_pairs=(
+                $'nan_injection\t{}'
+                $'inf_injection\t{}'
+                $'shape_mismatch\t{}'
+                $'missing_tensors\t{}'
+                $'extreme_quant\t{}'
+                $'scale_explosion\t{}'
+                $'rank_collapse\t{}'
+                $'norm_collapse\t{}'
+                $'weight_tying_break\t{}'
+            )
+        fi
+        for error_pair in "${error_pairs[@]}"; do
+            local error_type="${error_pair%%$'\t'*}"
+            local error_env_json="{}"
+            if [[ "${error_pair}" == *$'\t'* ]]; then
+                error_env_json="${error_pair#*$'\t'}"
+            fi
+            if [[ -z "${error_type}" ]]; then
+                continue
+            fi
+
+            local params_json
+            if [[ -n "${jq_bin}" ]]; then
+                params_json="$(
+                    "${jq_bin}" -cn \
+                        --arg error_type "${error_type}" \
+                        --argjson error_env "${error_env_json}" \
+                        '{error_type: $error_type, error_env: $error_env}'
+                )"
+            else
+                params_json='{"error_type": "'"${error_type}"'"}'
+            fi
+
             # CREATE_ERROR
             local error_create_id=$(add_task "CREATE_ERROR" "${model_id}" "${model_name}" \
                 "$(estimate_model_memory "${model_id}" "CREATE_ERROR")" \
-                "${setup_id}" '{"error_type": "'"${error_type}"'"}' 60)
+                "${setup_id}" "${params_json}" 60)
             echo "Created: ${error_create_id}"
 
             # evaluate_ERROR (only if preset exists)
@@ -1230,7 +1257,7 @@ generate_model_tasks() {
                 fi
                 local error_cert_id=$(add_task "evaluate_ERROR" "${model_id}" "${model_name}" \
                     "$(estimate_model_memory "${model_id}" "evaluate_ERROR")" \
-                    "${cert_deps}" '{"error_type": "'"${error_type}"'"}' 55)
+                    "${cert_deps}" "${params_json}" 55)
                 echo "Created: ${error_cert_id}"
             else
                 echo "Skipping evaluate_ERROR (${error_type}) because no calibrated preset is available"

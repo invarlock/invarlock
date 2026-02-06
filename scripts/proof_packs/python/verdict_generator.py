@@ -51,6 +51,33 @@ def _as_bool(value: Any, *, default: bool) -> bool:
     return bool(value)
 
 
+def _as_int(value: Any, *, default: int = 0) -> int:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        try:
+            return int(value)
+        except Exception:
+            return default
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except Exception:
+            return default
+    return default
+
+
+def _spectral_caps_applied(cert: dict[str, Any]) -> int:
+    spectral = cert.get("spectral")
+    if not isinstance(spectral, dict):
+        return 0
+    return max(0, _as_int(spectral.get("caps_applied"), default=0))
+
+
 @dataclass(frozen=True)
 class ValidationSnapshot:
     invariants_ok: bool
@@ -175,6 +202,30 @@ def _detector_matches(cert: dict[str, Any], detector: dict[str, Any]) -> bool:
         if not isinstance(status, str):
             return False
         return status.strip().lower() in allowed_norm
+
+    if kind == "rmt_probe":
+        field = detector.get("field")
+        expected = detector.get("expected")
+        if not isinstance(field, str) or expected is None:
+            return False
+        probe = cert.get("rmt_probe")
+        if not isinstance(probe, dict):
+            return False
+        if field not in probe:
+            return False
+        return _as_bool(probe.get(field), default=False) == bool(expected)
+
+    if kind == "spectral_caps_applied":
+        min_caps = detector.get("min")
+        if min_caps is None:
+            return False
+        try:
+            min_val = int(min_caps)
+        except Exception:
+            return False
+        if min_val < 0:
+            min_val = 0
+        return _spectral_caps_applied(cert) >= min_val
 
     return False
 
@@ -303,6 +354,28 @@ def _record_signaled(record: dict[str, Any]) -> bool:
     return _core_signal_count(record) > 0
 
 
+def _record_primary_guard_hit(record: dict[str, Any]) -> bool:
+    primary_guard = str(record.get("primary_guard") or "").strip().lower()
+    if not primary_guard:
+        return False
+    flags = record.get("guard_flags")
+    if not isinstance(flags, dict):
+        flags = {}
+    if bool(flags.get(primary_guard)):
+        return True
+
+    if primary_guard == "rmt":
+        probe = record.get("rmt_probe")
+        if isinstance(probe, dict):
+            stable = probe.get("stable")
+            if stable is not None and _as_bool(stable, default=True) is False:
+                return True
+    if primary_guard == "spectral":
+        if int(record.get("spectral_caps_applied") or 0) > 0:
+            return True
+    return False
+
+
 def _build_guard_signal_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
     signals: dict[str, dict[str, int]] = {}
     for guard in CORE_GUARDS:
@@ -374,6 +447,11 @@ def _build_scenario_signal_summary(
         strictness = str(spec.get("strictness") or "").strip().lower()
         intent = str(spec.get("intent") or "")
         primary_guard = str(spec.get("primary_guard") or "")
+        requirements = spec.get("requirements")
+        primary_guard_required = bool(
+            isinstance(requirements, dict)
+            and requirements.get("primary_guard_required") is True
+        )
 
         scenario_records = [
             r
@@ -382,13 +460,9 @@ def _build_scenario_signal_summary(
         ]
         detector_hits = sum(1 for r in scenario_records if bool(r.get("detectors_hit")))
         signaled = sum(1 for r in scenario_records if _record_signaled(r))
-        primary_guard_hits = 0
-        if primary_guard:
-            primary_guard_hits = sum(
-                1
-                for r in scenario_records
-                if bool((r.get("guard_flags") or {}).get(primary_guard))
-            )
+        primary_guard_hits = sum(
+            1 for r in scenario_records if bool(r.get("primary_guard_hit"))
+        )
 
         rows.append(
             {
@@ -397,6 +471,7 @@ def _build_scenario_signal_summary(
                 "strictness": strictness,
                 "intent": intent,
                 "primary_guard": primary_guard,
+                "primary_guard_required": primary_guard_required,
                 "reports": len(scenario_records),
                 "passed": sum(1 for r in scenario_records if bool(r.get("passed"))),
                 "failed": sum(1 for r in scenario_records if not bool(r.get("passed"))),
@@ -435,6 +510,7 @@ def generate_verdict(*, output_dir: Path) -> dict[str, Any]:
     }
     catastrophic_required: set[str] = set()
     informational_stress: set[str] = set()
+    primary_guard_required_scenarios: set[str] = set()
 
     for scenario_id, spec in scenario_index.items():
         category = str(spec.get("category") or "").strip().lower()
@@ -449,6 +525,8 @@ def generate_verdict(*, output_dir: Path) -> dict[str, Any]:
         reqs = spec.get("requirements")
         if isinstance(reqs, dict) and reqs.get("catastrophic_required") is True:
             catastrophic_required.add(scenario_id)
+        if isinstance(reqs, dict) and reqs.get("primary_guard_required") is True:
+            primary_guard_required_scenarios.add(scenario_id)
 
     # Pick the newest run for each (model, category, scenario_id).
     latest: dict[tuple[str, str, str], tuple[int, Path]] = {}
@@ -478,6 +556,15 @@ def generate_verdict(*, output_dir: Path) -> dict[str, Any]:
         if not isinstance(cert, dict):
             continue
 
+        probe_path = cert_path.parent / "rmt_probe.json"
+        if probe_path.is_file():
+            try:
+                probe_payload = json.loads(probe_path.read_text(encoding="utf-8"))
+                if isinstance(probe_payload, dict):
+                    cert["rmt_probe"] = probe_payload
+            except Exception:
+                pass
+
         outcome = _evaluate_report(cert)
         spec = scenario_index.get(scenario_id, {})
 
@@ -488,6 +575,9 @@ def generate_verdict(*, output_dir: Path) -> dict[str, Any]:
         detectors_hit = False
         if detectors:
             detectors_hit = any(_detector_matches(cert, d) for d in detectors)
+        primary_guard_required = bool(
+            isinstance(reqs, dict) and reqs.get("primary_guard_required") is True
+        )
 
         record: dict[str, Any] = {
             "model": model_name,
@@ -505,10 +595,17 @@ def generate_verdict(*, output_dir: Path) -> dict[str, Any]:
             "reasons": list(outcome.reasons),
             "detectors_hit": detectors_hit,
             "detectors": detectors or [],
+            "primary_guard_required": primary_guard_required,
             "invariants_status": outcome.invariants_status,
             "guard_flags": outcome.guard_flags,
+            "spectral_caps_applied": _spectral_caps_applied(cert),
             "path": str(cert_path),
         }
+        if isinstance(cert.get("rmt_probe"), dict):
+            record["rmt_probe"] = cert["rmt_probe"]
+            if _as_bool(record["rmt_probe"].get("stable"), default=True) is False:
+                record["guard_flags"]["rmt"] = True
+        record["primary_guard_hit"] = _record_primary_guard_hit(record)
         record["any_core_guard_flag"] = _core_signal_count(record) > 0
         records.append(record)
 
@@ -542,7 +639,9 @@ def generate_verdict(*, output_dir: Path) -> dict[str, Any]:
             for scenario_id in sorted(expected_ids):
                 if (model_name, category, scenario_id) in by_key:
                     continue
-                if scenario_id in gating_by_category.get(category, set()):
+                if scenario_id in gating_by_category.get(category, set()) or (
+                    scenario_id in primary_guard_required_scenarios
+                ):
                     missing_model[category].append(scenario_id)
                 else:
                     missing_model.setdefault(f"{category}_informational", []).append(
@@ -668,6 +767,64 @@ def generate_verdict(*, output_dir: Path) -> dict[str, Any]:
                 }
             )
 
+    for scenario_id in sorted(primary_guard_required_scenarios):
+        spec = scenario_index.get(scenario_id, {})
+        category = str(spec.get("category") or "").strip().lower()
+        primary_guard = str(spec.get("primary_guard") or "").strip().lower()
+        if category not in SUMMARY_CATEGORIES or not primary_guard:
+            continue
+
+        present = [
+            by_key[(m, category, scenario_id)]
+            for m in model_names
+            if (m, category, scenario_id) in by_key
+        ]
+        if not present:
+            continue
+        if any(bool(r.get("primary_guard_hit")) for r in present):
+            continue
+
+        failed_requirements.append(
+            {
+                "requirement": "scenario_primary_guard_signal",
+                "message": "Scenario marked primary_guard_required did not trigger its declared primary guard.",
+                "scenario": scenario_id,
+                "category": category,
+                "primary_guard": primary_guard,
+                "failures": [
+                    {
+                        "model": r["model"],
+                        "detectors_hit": r["detectors_hit"],
+                        "reasons": r["reasons"],
+                        "path": r["path"],
+                    }
+                    for r in present
+                ],
+            }
+        )
+
+    required_guard_records = [
+        r for r in records if r.get("name") in primary_guard_required_scenarios
+    ]
+    for guard in CORE_GUARDS:
+        guard_records = [
+            r
+            for r in required_guard_records
+            if str(r.get("primary_guard") or "") == guard
+        ]
+        if not guard_records:
+            continue
+        if any(bool(r.get("primary_guard_hit")) for r in guard_records):
+            continue
+        failed_requirements.append(
+            {
+                "requirement": "guard_primary_demonstrated",
+                "message": "No primary_guard_required scenario produced a direct hit for guard.",
+                "guard": guard,
+                "scenarios": sorted({str(r.get("name") or "") for r in guard_records}),
+            }
+        )
+
     clean = [r for r in records if r["category"] == "clean"]
     stress = [r for r in records if r["category"] == "stress"]
     errors = [r for r in records if r["category"] == "error_injection"]
@@ -692,6 +849,13 @@ def generate_verdict(*, output_dir: Path) -> dict[str, Any]:
                     },
                 }
             )
+
+    primary_guard_required_records = [
+        r for r in records if r["name"] in primary_guard_required_scenarios
+    ]
+    primary_guard_required_hits = sum(
+        1 for r in primary_guard_required_records if bool(r.get("primary_guard_hit"))
+    )
 
     catastrophic_records = [r for r in stress if r["name"] in catastrophic_required]
     guard_signal_summary = _build_guard_signal_summary(records)
@@ -718,6 +882,7 @@ def generate_verdict(*, output_dir: Path) -> dict[str, Any]:
             "stress_required_fail": True,
             "error_injection_detected": True,
             "informational_stress_min_signal_fraction": info_min_signal_fraction,
+            "primary_guard_signal_required": True,
         },
         "counts": {
             "models_total": len(model_names),
@@ -738,6 +903,16 @@ def generate_verdict(*, output_dir: Path) -> dict[str, Any]:
             "informational_stress_total": info_total,
             "informational_stress_fail": info_fail,
             "informational_stress_signaled": info_signaled,
+            "primary_guard_required_scenarios": len(primary_guard_required_scenarios),
+            "primary_guard_required_records": len(primary_guard_required_records),
+            "primary_guard_required_hits": primary_guard_required_hits,
+            "primary_guard_required_scenarios_hit": len(
+                {
+                    str(r.get("name") or "")
+                    for r in primary_guard_required_records
+                    if bool(r.get("primary_guard_hit"))
+                }
+            ),
         },
         "core_guard_order": list(CORE_GUARDS),
         "category_summary": category_summary,
@@ -778,6 +953,10 @@ def _render_text(payload: dict[str, Any]) -> str:
         (
             "  Informational stress signaled: "
             f"{counts.get('informational_stress_signaled')}/{counts.get('informational_stress_total')}"
+        ),
+        (
+            "  Primary-guard-required hits: "
+            f"{counts.get('primary_guard_required_hits')}/{counts.get('primary_guard_required_records')}"
         ),
         "",
     ]
