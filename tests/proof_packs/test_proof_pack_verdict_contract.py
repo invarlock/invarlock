@@ -119,7 +119,7 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
             },
         )
 
-    # Error injections (11) => must be detected (not PASS).
+    # Error injections (9) => must be detected (not PASS).
     for error_type in (
         "nan_injection",
         "inf_injection",
@@ -130,10 +130,7 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
         "rank_collapse",
         "norm_collapse",
         "weight_tying_break",
-        "rmt_norm_noise",
-        "spectral_moderate_scale",
     ):
-        invariants_status = "fail"
         _write_cert(
             model_dir / "reports" / "errors" / error_type / "evaluation.report.json",
             validation={
@@ -144,8 +141,50 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
                 "preview_final_drift_acceptable": False,
                 "guard_overhead_acceptable": True,
             },
-            invariants_status=invariants_status,
+            invariants_status="fail",
         )
+
+    rmt_cert = (
+        model_dir
+        / "reports"
+        / "errors"
+        / "rmt_norm_noise"
+        / "evaluation.report.json"
+    )
+    _write_cert(
+        rmt_cert,
+        validation={
+            "invariants_pass": True,
+            "primary_metric_acceptable": True,
+            "spectral_stable": True,
+            "rmt_stable": True,
+            "preview_final_drift_acceptable": True,
+            "guard_overhead_acceptable": True,
+        },
+        invariants_status="pass",
+    )
+    _write_rmt_probe(rmt_cert.parent / "rmt_probe.json", stable=False)
+
+    spectral_cert = (
+        model_dir
+        / "reports"
+        / "errors"
+        / "spectral_moderate_scale"
+        / "evaluation.report.json"
+    )
+    _write_cert(
+        spectral_cert,
+        validation={
+            "invariants_pass": True,
+            "primary_metric_acceptable": True,
+            "spectral_stable": True,
+            "rmt_stable": True,
+            "preview_final_drift_acceptable": True,
+            "guard_overhead_acceptable": True,
+        },
+        invariants_status="pass",
+        spectral_caps_applied=2,
+    )
 
     ve_cert = (
         model_dir
@@ -182,17 +221,17 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
     guard_summary = verdict["guard_signal_summary"]
     assert guard_summary["records_total"] == 20
     signals = guard_summary["signals"]
-    assert signals["primary_metric"]["flagged"] == 13
+    assert signals["primary_metric"]["flagged"] == 11
     assert signals["primary_metric"]["unique"] == 2
-    assert signals["spectral"]["flagged"] == 13
+    assert signals["spectral"]["flagged"] == 11
     assert signals["spectral"]["unique"] == 2
-    assert signals["rmt"]["flagged"] == 11
-    assert signals["rmt"]["unique"] == 0
-    assert signals["invariants"]["flagged"] == 11
+    assert signals["rmt"]["flagged"] == 10
+    assert signals["rmt"]["unique"] == 1
+    assert signals["invariants"]["flagged"] == 9
     assert signals["invariants"]["unique"] == 0
 
     interventions = verdict["guard_intervention_summary"]["signals"]
-    assert interventions["spectral_caps"]["flagged"] == 0
+    assert interventions["spectral_caps"]["flagged"] == 1
     assert interventions["ve_signal"]["flagged"] == 1
 
     category = verdict["category_summary"]
@@ -201,7 +240,7 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
     assert category["stress"]["reports"] == 4
     assert category["stress"]["any_flag"] == 4
     assert category["error_injection"]["reports"] == 12
-    assert category["error_injection"]["any_flag"] == 11
+    assert category["error_injection"]["any_flag"] == 10
 
 
 def test_verdict_contract_reports_guard_signal_uniqueness(tmp_path: Path) -> None:

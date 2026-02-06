@@ -930,6 +930,55 @@ def generate_verdict(*, output_dir: Path, manifest_path: Path | None = None) -> 
             }
         )
 
+    for scenario_id in sorted(primary_guard_required_scenarios):
+        spec = scenario_index.get(scenario_id, {})
+        category = str(spec.get("category") or "").strip().lower()
+        primary_guard = str(spec.get("primary_guard") or "").strip().lower()
+        if category not in SUMMARY_CATEGORIES or not primary_guard:
+            continue
+
+        reqs = spec.get("requirements") if isinstance(spec, dict) else None
+        has_detectors = bool(
+            isinstance(reqs, dict)
+            and (
+                isinstance(reqs.get("detectors_any_of"), list)
+                or isinstance(reqs.get("detectors_all_of"), list)
+            )
+        )
+        if not has_detectors:
+            continue
+
+        present = [
+            by_key[(m, category, scenario_id)]
+            for m in model_names
+            if (m, category, scenario_id) in by_key
+        ]
+        if not present:
+            continue
+
+        missed = [r for r in present if not bool(r.get("detectors_hit"))]
+        if not missed:
+            continue
+
+        failed_requirements.append(
+            {
+                "requirement": "scenario_expected_detectors",
+                "message": "Primary-guard-required scenario missing expected detector signal constraints.",
+                "scenario": scenario_id,
+                "category": category,
+                "primary_guard": primary_guard,
+                "failures": [
+                    {
+                        "model": r["model"],
+                        "detectors_hit": r["detectors_hit"],
+                        "reasons": r["reasons"],
+                        "path": r["path"],
+                    }
+                    for r in missed
+                ],
+            }
+        )
+
     required_guard_records = [
         r for r in records if r.get("name") in primary_guard_required_scenarios
     ]

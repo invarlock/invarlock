@@ -260,19 +260,25 @@
         "error_type": "rmt_norm_noise",
         "env": {
           "INVARLOCK_RMT_PROBE_MODE": "anisotropy",
-          "INVARLOCK_RMT_ANISO_BLEND": "0.99",
-          "INVARLOCK_RMT_ANISO_ROW_FRAC": "0.95",
-          "INVARLOCK_RMT_ANISO_MAX_ROWS": "4096",
-          "INVARLOCK_RMT_ANISO_MAX_PARAMS": "32",
+          "INVARLOCK_RMT_ANISO_BLEND": "0.95",
+          "INVARLOCK_RMT_ANISO_ROW_FRAC": "0.50",
+          "INVARLOCK_RMT_ANISO_MAX_ROWS": "64",
+          "INVARLOCK_RMT_ANISO_MAX_PARAMS": "64",
           "INVARLOCK_RMT_ANISO_TARGET_FAMILY": "attn",
-          "INVARLOCK_RMT_ANISO_PRESERVE_ROW_NORMS": "0",
-          "INVARLOCK_RMT_ANISO_JITTER": "0.0",
-          "INVARLOCK_RMT_ANISO_INCLUDE_QKV": "1",
+          "INVARLOCK_RMT_ANISO_TARGET_LAYERS": "all",
+          "INVARLOCK_RMT_ANISO_PRESERVE_ROW_NORMS": "1",
+          "INVARLOCK_RMT_ANISO_JITTER": "0.01",
+          "INVARLOCK_RMT_ANISO_INCLUDE_QKV": "0",
           "INVARLOCK_RMT_ANISO_SEED": "42"
         }
       },
       "requirements": {
         "primary_guard_required": true,
+        "detectors_all_of": [
+          {"kind": "validation_flag", "flag": "primary_metric_acceptable", "expected": true},
+          {"kind": "validation_flag", "flag": "invariants_pass", "expected": true},
+          {"kind": "validation_flag", "flag": "spectral_stable", "expected": true}
+        ],
         "detectors_any_of": [
           {"kind": "rmt_probe", "field": "stable", "expected": false},
           {"kind": "validation_flag", "flag": "rmt_stable", "expected": false}
@@ -299,6 +305,12 @@
       },
       "requirements": {
         "primary_guard_required": true,
+        "detectors_all_of": [
+          {"kind": "validation_flag", "flag": "primary_metric_acceptable", "expected": true},
+          {"kind": "validation_flag", "flag": "invariants_pass", "expected": true},
+          {"kind": "validation_flag", "flag": "rmt_stable", "expected": true},
+          {"kind": "validation_flag", "flag": "spectral_stable", "expected": true}
+        ],
         "detectors_any_of": [
           {"kind": "spectral_caps_applied", "min": 1},
           {"kind": "validation_flag", "flag": "spectral_stable", "expected": false}
@@ -323,6 +335,12 @@
       },
       "requirements": {
         "primary_guard_required": true,
+        "detectors_all_of": [
+          {"kind": "validation_flag", "flag": "primary_metric_acceptable", "expected": true},
+          {"kind": "validation_flag", "flag": "invariants_pass", "expected": true},
+          {"kind": "validation_flag", "flag": "spectral_stable", "expected": true},
+          {"kind": "validation_flag", "flag": "rmt_stable", "expected": true}
+        ],
         "detectors_any_of": [
           {"kind": "ve_probe", "field": "signal", "expected": true}
         ]
