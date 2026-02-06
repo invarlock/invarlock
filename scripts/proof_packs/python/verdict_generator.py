@@ -71,6 +71,23 @@ def _as_int(value: Any, *, default: int = 0) -> int:
     return default
 
 
+def _as_float(value: Any, *, default: float | None = None) -> float | None:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return float(int(value))
+    if isinstance(value, int | float):
+        v = float(value)
+        return v if v == v and abs(v) != float("inf") else default
+    if isinstance(value, str):
+        try:
+            v = float(value.strip())
+        except Exception:
+            return default
+        return v if v == v and abs(v) != float("inf") else default
+    return default
+
+
 def _spectral_caps_applied(cert: dict[str, Any]) -> int:
     spectral = cert.get("spectral")
     if not isinstance(spectral, dict):
@@ -227,6 +244,29 @@ def _detector_matches(cert: dict[str, Any], detector: dict[str, Any]) -> bool:
             min_val = 0
         return _spectral_caps_applied(cert) >= min_val
 
+    if kind == "ve_probe":
+        field = detector.get("field")
+        expected = detector.get("expected")
+        min_value = detector.get("min")
+        if not isinstance(field, str) or not field.strip():
+            return False
+        probe = cert.get("ve_probe")
+        if not isinstance(probe, dict):
+            return False
+        if field not in probe:
+            return False
+        if expected is not None:
+            return _as_bool(probe.get(field), default=False) == bool(expected)
+        if min_value is not None:
+            min_val = _as_float(min_value, default=None)
+            if min_val is None:
+                return False
+            actual = _as_float(probe.get(field), default=None)
+            if actual is None:
+                return False
+            return actual >= min_val
+        return False
+
     return False
 
 
@@ -373,6 +413,19 @@ def _record_primary_guard_hit(record: dict[str, Any]) -> bool:
     if primary_guard == "spectral":
         if int(record.get("spectral_caps_applied") or 0) > 0:
             return True
+    if primary_guard == "variance":
+        probe = record.get("ve_probe")
+        if isinstance(probe, dict):
+            signal = probe.get("signal")
+            if signal is not None and _as_bool(signal, default=False) is True:
+                return True
+            would_enable = probe.get("would_enable")
+            if would_enable is not None and _as_bool(would_enable, default=False) is True:
+                return True
+            scales = _as_int(probe.get("proposed_scales"), default=0)
+            gain = _as_float(probe.get("ab_gain"), default=None)
+            if scales > 0 and gain is not None and gain > 0.0:
+                return True
     return False
 
 
@@ -565,6 +618,15 @@ def generate_verdict(*, output_dir: Path) -> dict[str, Any]:
             except Exception:
                 pass
 
+        ve_probe_path = cert_path.parent / "ve_probe.json"
+        if ve_probe_path.is_file():
+            try:
+                probe_payload = json.loads(ve_probe_path.read_text(encoding="utf-8"))
+                if isinstance(probe_payload, dict):
+                    cert["ve_probe"] = probe_payload
+            except Exception:
+                pass
+
         outcome = _evaluate_report(cert)
         spec = scenario_index.get(scenario_id, {})
 
@@ -605,6 +667,8 @@ def generate_verdict(*, output_dir: Path) -> dict[str, Any]:
             record["rmt_probe"] = cert["rmt_probe"]
             if _as_bool(record["rmt_probe"].get("stable"), default=True) is False:
                 record["guard_flags"]["rmt"] = True
+        if isinstance(cert.get("ve_probe"), dict):
+            record["ve_probe"] = cert["ve_probe"]
         record["primary_guard_hit"] = _record_primary_guard_hit(record)
         record["any_core_guard_flag"] = _core_signal_count(record) > 0
         records.append(record)
