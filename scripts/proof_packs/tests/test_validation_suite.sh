@@ -700,6 +700,7 @@ test_pack_validation_check_dependencies_flash_attn_branches_and_package_installs
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
+    PACK_NET="1"
     source ./scripts/proof_packs/lib/validation_suite.sh
     pack_setup_output_dirs
 

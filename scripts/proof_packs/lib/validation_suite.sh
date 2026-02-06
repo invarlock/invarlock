@@ -1203,6 +1203,16 @@ check_dependencies() {
     # Check transformers
     python3 -c "import transformers; print(f'Transformers {transformers.__version__}')" 2>/dev/null || missing+=("transformers")
 
+    # Check huggingface_hub (required by --net 1 preflight/downloads)
+    if [[ "${PACK_NET}" == "1" ]]; then
+        if ! python3 -c "import huggingface_hub" 2>/dev/null; then
+            log "Installing huggingface_hub..."
+            if ! python3 -m pip install huggingface_hub; then
+                missing+=("huggingface_hub")
+            fi
+        fi
+    fi
+
     # Check accelerate (required by transformers for device_map="auto")
     if ! python3 -c "import accelerate" 2>/dev/null; then
         if [[ "${PACK_NET}" == "1" ]]; then
@@ -1238,39 +1248,59 @@ check_dependencies() {
                 log "         Or set SKIP_FLASH_ATTN=true to suppress this warning"
                 log "         Continuing with eager attention (may be slower)"
             else
-                log "Flash Attention 2: Not found, attempting install..."
-                # Use timeout to prevent hanging on slow builds
-                if timeout 600 python3 -m pip install flash-attn --no-build-isolation 2>&1 | tee -a "${LOG_FILE}"; then
-                    # Verify it actually imported
-                    if python3 -c "import flash_attn" 2>/dev/null; then
-                        export FLASH_ATTENTION_AVAILABLE="true"
-                        log "Flash Attention 2: Installed successfully"
+                if [[ "${PACK_NET}" != "1" ]]; then
+                    export FLASH_ATTENTION_AVAILABLE="false"
+                    log "Flash Attention 2: Not found (offline), using eager attention"
+                else
+                    log "Flash Attention 2: Not found, attempting install..."
+                    # Use timeout to prevent hanging on slow builds
+                    if timeout 600 python3 -m pip install flash-attn --no-build-isolation 2>&1 | tee -a "${LOG_FILE}"; then
+                        # Verify it actually imported
+                        if python3 -c "import flash_attn" 2>/dev/null; then
+                            export FLASH_ATTENTION_AVAILABLE="true"
+                            log "Flash Attention 2: Installed successfully"
+                        else
+                            export FLASH_ATTENTION_AVAILABLE="false"
+                            log "WARNING: flash-attn installed but import failed, using eager attention"
+                        fi
                     else
                         export FLASH_ATTENTION_AVAILABLE="false"
-                        log "WARNING: flash-attn installed but import failed, using eager attention"
+                        log "WARNING: flash-attn install failed (build error), using eager attention"
+                        log "         This is OK - script will work without flash attention, just slower."
                     fi
-                else
-                    export FLASH_ATTENTION_AVAILABLE="false"
-                    log "WARNING: flash-attn install failed (build error), using eager attention"
-                    log "         This is OK - script will work without flash attention, just slower."
                 fi
             fi
         fi
     fi
 
     # Check PyYAML
-    python3 -c "import yaml" 2>/dev/null || python3 -m pip install pyyaml
+    if ! python3 -c "import yaml" 2>/dev/null; then
+        if [[ "${PACK_NET}" == "1" ]]; then
+            log "Installing pyyaml..."
+            python3 -m pip install pyyaml || missing+=("pyyaml")
+        else
+            missing+=("pyyaml")
+        fi
+    fi
 
     # Check protobuf (required by many HuggingFace models)
     if ! python3 -c "import google.protobuf" 2>/dev/null; then
-        log "Installing protobuf..."
-        python3 -m pip install protobuf
+        if [[ "${PACK_NET}" == "1" ]]; then
+            log "Installing protobuf..."
+            python3 -m pip install protobuf || missing+=("protobuf")
+        else
+            missing+=("protobuf")
+        fi
     fi
 
     # Check sentencepiece (required by many tokenizers)
     if ! python3 -c "import sentencepiece" 2>/dev/null; then
-        log "Installing sentencepiece..."
-        python3 -m pip install sentencepiece
+        if [[ "${PACK_NET}" == "1" ]]; then
+            log "Installing sentencepiece..."
+            python3 -m pip install sentencepiece || missing+=("sentencepiece")
+        else
+            missing+=("sentencepiece")
+        fi
     fi
 
     # Check InvarLock (Python module and CLI)
