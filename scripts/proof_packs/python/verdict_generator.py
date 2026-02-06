@@ -13,6 +13,10 @@ CORE_GUARDS: tuple[str, ...] = (
     "rmt",
     "primary_metric",
 )
+INTERVENTION_SIGNALS: tuple[str, ...] = (
+    "spectral_caps",
+    "ve_signal",
+)
 SUMMARY_CATEGORIES: tuple[str, ...] = ("clean", "stress", "error_injection")
 
 
@@ -442,6 +446,48 @@ def _build_guard_signal_summary(records: list[dict[str, Any]]) -> dict[str, Any]
             if _core_signal_count(record) == 1:
                 unique += 1
         signals[guard] = {"flagged": flagged, "unique": unique}
+    return {
+        "records_total": len(records),
+        "signals": signals,
+    }
+
+
+def _intervention_flags(record: dict[str, Any]) -> dict[str, bool]:
+    spectral_caps = int(record.get("spectral_caps_applied") or 0) > 0
+
+    ve_signal = False
+    probe = record.get("ve_probe")
+    if isinstance(probe, dict):
+        if _as_bool(probe.get("signal"), default=False):
+            ve_signal = True
+        if _as_bool(probe.get("would_enable"), default=False):
+            ve_signal = True
+        scales = _as_int(probe.get("proposed_scales"), default=0)
+        gain = _as_float(probe.get("ab_gain"), default=None)
+        if scales > 0:
+            ve_signal = True
+        if gain is not None and gain > 0.0:
+            ve_signal = True
+
+    return {
+        "spectral_caps": spectral_caps,
+        "ve_signal": ve_signal,
+    }
+
+
+def _build_guard_intervention_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
+    signals: dict[str, dict[str, int]] = {}
+    for signal in INTERVENTION_SIGNALS:
+        flagged = 0
+        unique = 0
+        for record in records:
+            flags = _intervention_flags(record)
+            if not flags.get(signal, False):
+                continue
+            flagged += 1
+            if sum(1 for k in INTERVENTION_SIGNALS if flags.get(k, False)) == 1:
+                unique += 1
+        signals[signal] = {"flagged": flagged, "unique": unique}
     return {
         "records_total": len(records),
         "signals": signals,
@@ -940,6 +986,7 @@ def generate_verdict(*, output_dir: Path, manifest_path: Path | None = None) -> 
 
     catastrophic_records = [r for r in stress if r["name"] in catastrophic_required]
     guard_signal_summary = _build_guard_signal_summary(records)
+    guard_intervention_summary = _build_guard_intervention_summary(records)
     category_summary = _build_category_summary(
         records,
         expected_by_category=expected_by_category,
@@ -998,6 +1045,7 @@ def generate_verdict(*, output_dir: Path, manifest_path: Path | None = None) -> 
         "core_guard_order": list(CORE_GUARDS),
         "category_summary": category_summary,
         "guard_signal_summary": guard_signal_summary,
+        "guard_intervention_summary": guard_intervention_summary,
         "scenario_signal_summary": scenario_signal_summary,
         "records": records,
         "missing": missing,
@@ -1014,6 +1062,7 @@ def _render_text(payload: dict[str, Any]) -> str:
 
     category_summary = payload.get("category_summary") or {}
     guard_signal_summary = payload.get("guard_signal_summary") or {}
+    guard_intervention_summary = payload.get("guard_intervention_summary") or {}
 
     lines = [
         "INVARLOCK PROOF PACK (ASSURANCE) — FINAL VERDICT",
@@ -1065,6 +1114,17 @@ def _render_text(payload: dict[str, Any]) -> str:
                 if not isinstance(row, dict):
                     continue
                 lines.append(f"  {guard}: {row.get('flagged')}/{row.get('unique')}")
+            lines.append("")
+
+    if isinstance(guard_intervention_summary, dict):
+        signals = guard_intervention_summary.get("signals")
+        if isinstance(signals, dict) and signals:
+            lines.append("GUARD INTERVENTIONS (flagged / unique):")
+            for signal in INTERVENTION_SIGNALS:
+                row = signals.get(signal)
+                if not isinstance(row, dict):
+                    continue
+                lines.append(f"  {signal}: {row.get('flagged')}/{row.get('unique')}")
             lines.append("")
 
     missing_by_model = missing.get("by_model")
@@ -1126,6 +1186,10 @@ def main() -> int:
     _write_json(
         reports_dir / "guard_signal_summary.json",
         payload.get("guard_signal_summary") or {},
+    )
+    _write_json(
+        reports_dir / "guard_intervention_summary.json",
+        payload.get("guard_intervention_summary") or {},
     )
     _write_json(
         reports_dir / "category_summary.json",

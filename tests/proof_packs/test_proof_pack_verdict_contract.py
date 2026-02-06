@@ -191,6 +191,10 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
     assert signals["invariants"]["flagged"] == 11
     assert signals["invariants"]["unique"] == 0
 
+    interventions = verdict["guard_intervention_summary"]["signals"]
+    assert interventions["spectral_caps"]["flagged"] == 0
+    assert interventions["ve_signal"]["flagged"] == 1
+
     category = verdict["category_summary"]
     assert category["clean"]["reports"] == 4
     assert category["clean"]["any_flag"] == 0
