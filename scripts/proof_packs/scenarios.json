@@ -260,14 +260,14 @@
         "error_type": "rmt_norm_noise",
         "env": {
           "INVARLOCK_RMT_PROBE_MODE": "anisotropy",
-          "INVARLOCK_RMT_ANISO_BLEND": "0.95",
-          "INVARLOCK_RMT_ANISO_ROW_FRAC": "0.50",
-          "INVARLOCK_RMT_ANISO_MAX_ROWS": "64",
-          "INVARLOCK_RMT_ANISO_MAX_PARAMS": "16",
+          "INVARLOCK_RMT_ANISO_BLEND": "0.985",
+          "INVARLOCK_RMT_ANISO_ROW_FRAC": "0.80",
+          "INVARLOCK_RMT_ANISO_MAX_ROWS": "1024",
+          "INVARLOCK_RMT_ANISO_MAX_PARAMS": "4",
           "INVARLOCK_RMT_ANISO_TARGET_FAMILY": "attn",
-          "INVARLOCK_RMT_ANISO_TARGET_LAYERS": "0",
-          "INVARLOCK_RMT_ANISO_PRESERVE_ROW_NORMS": "1",
-          "INVARLOCK_RMT_ANISO_JITTER": "0.01",
+          "INVARLOCK_RMT_ANISO_TARGET_LAYERS": "all",
+          "INVARLOCK_RMT_ANISO_PRESERVE_ROW_NORMS": "0",
+          "INVARLOCK_RMT_ANISO_JITTER": "0.02",
           "INVARLOCK_RMT_ANISO_INCLUDE_QKV": "1",
           "INVARLOCK_RMT_ANISO_SEED": "42"
         }
