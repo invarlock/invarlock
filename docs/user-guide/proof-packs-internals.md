@@ -190,6 +190,12 @@ Stress edits are split into required-fail (catastrophic) and informational scena
 Required-fail scenarios are gating in the final verdict; informational scenarios are tracked
 as detection-quality signals and are validated by a minimum signal-fraction criterion.
 
+Important nuance: some guards remediate without flipping a boolean validation gate. For
+example, Spectral can remain `validation.spectral_stable=true` while applying caps
+(`spectral.caps_applied > 0`). Informational stress scenarios treat both hard gate flips
+and remediation events (caps applied) as a “signal” so the suite measures guard activity
+without manufacturing clean false positives.
+
 | Edit Type | Parameters | Scope |
 | --- | --- | --- |
 | Quantization RTN | `quant_rtn:4:32:all` (4-bit, group size 32) | All layers |
@@ -205,6 +211,11 @@ Enabled when `RUN_ERROR_INJECTION=true` (default):
   `shape_mismatch`, `missing_tensors`, `extreme_quant`, `scale_explosion`,
   `rank_collapse`, `norm_collapse`, `weight_tying_break`
 - Informational detection: `rmt_norm_noise`, `spectral_moderate_scale`
+
+`rmt_norm_noise` additionally emits an `rmt_probe.json` sidecar next to the error cert.
+This runs an explicit cross-model RMT probe on shared calibration windows (stored in the
+baseline report) so the proof pack can demonstrate RMT’s delta policy even when compare-mode
+evaluation keeps `validation.rmt_stable=true`.
 
 Source of truth: `scripts/proof_packs/scenarios.json` strictness + `intent` +
 `primary_guard` metadata.
@@ -454,6 +465,10 @@ OUTPUT_DIR/
       <edit_name>/run_<n>/
       errors/<type>/
 ```
+
+Some scenarios emit additional sidecar artifacts alongside `evaluation.report.json`
+(for example `reports/errors/rmt_norm_noise/rmt_probe.json`). When present, `run_pack.sh`
+copies these sidecars into the packaged proof pack under `certs/**/`.
 
 ## Run modes
 

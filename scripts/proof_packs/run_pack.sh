@@ -401,6 +401,8 @@ pack_build_pack() {
         local dest_dir="${pack_dir}/certs/${rel}"
         mkdir -p "${dest_dir}"
         cp "${cert}" "${dest_dir}/evaluation.report.json"
+        # Optional sidecar artifacts (used by some detectors; safe to omit when absent).
+        pack_copy_optional "$(dirname "${cert}")/rmt_probe.json" "${dest_dir}/rmt_probe.json"
     done < <(pack_collect_certs "${run_dir}")
 
     local verify_rc=0

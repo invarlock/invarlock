@@ -90,6 +90,7 @@ A suite run writes artifacts under `OUTPUT_DIR` (default: `./proof_pack_runs/<su
 - `results/**/category_summary.json`, `results/**/guard_signal_summary.json`, `results/**/scenario_signal_summary.json`
 - `results/**/determinism_repeats.json` (if present)
 - `certs/<model>/<edit>/<run>/evaluation.report.json`
+- `certs/**/rmt_probe.json` (optional sidecar; emitted by some scenarios, e.g. `rmt_norm_noise`)
 - `certs/**/evaluation.html` + `certs/**/verify.json`
 - `README.md`, `manifest.json`, `checksums.sha256`
 - `manifest.json.asc` if GPG signing is available
