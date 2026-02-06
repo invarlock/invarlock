@@ -290,6 +290,10 @@ PACK_TUNED_EDIT_PARAMS_FILE="${PACK_TUNED_EDIT_PARAMS_FILE:-}"
 # Optional calibration preset reuse (skip calibration runs, copy presets in)
 PACK_CALIBRATION_PRESET_DIR="${PACK_CALIBRATION_PRESET_DIR:-}"
 PACK_CALIBRATION_PRESET_FILE="${PACK_CALIBRATION_PRESET_FILE:-}"
+# Delete edited/error models after certification to keep disk usage bounded.
+# Override with PACK_CLEANUP_MODELS=0 to retain model variants for debugging.
+PACK_CLEANUP_MODELS="${PACK_CLEANUP_MODELS:-1}"
+export PACK_CLEANUP_MODELS
 
 # InvarLock Configuration - BASE DEFAULTS (will be overridden per-model)
 # WikiText-2 validation has ~1174 usable samples
@@ -980,7 +984,47 @@ estimate_planned_model_storage_gb() {
     local edits_total=$(( ${#EDIT_TYPES_CLEAN[@]} + ${#EDIT_TYPES_STRESS[@]} ))
     local errors_total=0
     if [[ "${RUN_ERROR_INJECTION}" == "true" ]]; then
-        errors_total=9  # nan_injection, inf_injection, shape_mismatch, missing_tensors, extreme_quant, scale_explosion, rank_collapse, norm_collapse, weight_tying_break
+        # Derive count from scenarios.json when available to keep disk estimates aligned with the suite.
+        local pack_root
+        pack_root="$(cd "${_PACK_VALIDATION_LIB_DIR}/.." && pwd)"
+        local scenarios_file="${pack_root}/scenarios.json"
+        if command -v jq >/dev/null 2>&1 && [[ -f "${scenarios_file}" ]]; then
+            errors_total="$(jq -r '[.scenarios[] | select(.generation.kind=="error")] | length' "${scenarios_file}" 2>/dev/null || true)"
+        fi
+        if [[ -z "${errors_total}" || ! "${errors_total}" =~ ^[0-9]+$ ]]; then
+            errors_total=9  # fallback for legacy scenario sets
+        fi
+    fi
+
+    # When cleanup is enabled, edited/error models are removed after evaluation; estimate peak usage instead of total copies.
+    if [[ "${PACK_CLEANUP_MODELS:-1}" != "0" ]]; then
+        # In cleanup mode, default is per-edit unless explicitly forced to batch edits.
+        local use_batch_edits="${PACK_USE_BATCH_EDITS:-}"
+        local edits_peak=0
+        local clean_runs="${CLEAN_EDIT_RUNS:-0}"
+        local stress_runs="${STRESS_EDIT_RUNS:-0}"
+        if ! [[ "${clean_runs}" =~ ^-?[0-9]+$ ]]; then
+            clean_runs=0
+        fi
+        if ! [[ "${stress_runs}" =~ ^-?[0-9]+$ ]]; then
+            stress_runs=0
+        fi
+        if [[ ${clean_runs} -gt 0 || ${stress_runs} -gt 0 ]] && [[ ${edits_total} -gt 0 ]]; then
+            case "${use_batch_edits}" in
+                1|true|yes|on)
+                    edits_peak="${edits_total}"
+                    ;;
+                *)
+                    edits_peak=1
+                    ;;
+            esac
+        fi
+        local errors_peak=0
+        if [[ ${errors_total} -gt 0 ]]; then
+            errors_peak=1
+        fi
+        edits_total="${edits_peak}"
+        errors_total="${errors_peak}"
     fi
 
     local baseline_mode="${PACK_BASELINE_STORAGE_MODE:-snapshot_symlink}"

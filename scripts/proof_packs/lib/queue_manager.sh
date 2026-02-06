@@ -992,6 +992,13 @@ generate_model_tasks() {
         fi
     fi
 
+    # Default to per-edit tasks when model cleanup is enabled to avoid
+    # creating all variants up-front (which can exhaust disk on single-node runs).
+    local cleanup_models="${PACK_CLEANUP_MODELS:-1}"
+    if [[ "${cleanup_models}" != "0" && -z "${PACK_USE_BATCH_EDITS:-}" ]]; then
+        use_batch="false"
+    fi
+
     # Track task IDs for dependencies
     local task_ids=()
 
@@ -1038,6 +1045,22 @@ generate_model_tasks() {
     local use_preset="false"
     if [[ ${calibration_runs} -gt 0 || "${preset_ready}" == "true" ]]; then
         use_preset="true"
+    fi
+
+    local clean_runs="${CLEAN_EDIT_RUNS:-0}"
+    if ! [[ "${clean_runs}" =~ ^-?[0-9]+$ ]]; then
+        clean_runs=0
+    fi
+    if [[ ${clean_runs} -lt 0 ]]; then
+        clean_runs=0
+    fi
+
+    local stress_runs="${STRESS_EDIT_RUNS:-0}"
+    if ! [[ "${stress_runs}" =~ ^-?[0-9]+$ ]]; then
+        stress_runs=0
+    fi
+    if [[ ${stress_runs} -lt 0 ]]; then
+        stress_runs=0
     fi
 
     # 4. Edit creation + evaluate
@@ -1088,62 +1111,95 @@ generate_model_tasks() {
     # Ensure use_batch is defined (defensive for set -u)
     use_batch=${use_batch:-true}
     # Skip edits entirely if both clean and stress runs are disabled
-    if [[ ${CLEAN_EDIT_RUNS:-0} -le 0 && ${STRESS_EDIT_RUNS:-0} -le 0 ]]; then
+    if [[ ${clean_runs} -le 0 && ${stress_runs} -le 0 ]]; then
         echo "Skipping edit creation (CLEAN_EDIT_RUNS=0, STRESS_EDIT_RUNS=0)"
+
+    elif [[ "${use_preset}" != "true" ]]; then
+        echo "Skipping edit creation (no calibrated preset available)"
 
     elif [[ "${use_batch}" == "true" ]]; then
         # CREATE_EDITS_BATCH - Create edits with a single model load (Batch optimization)
         :
 
+        local -a requested_specs=()
+        local edit_spec
+        if [[ ${clean_runs} -gt 0 ]]; then
+            for edit_spec in "${clean_edits[@]}"; do
+                requested_specs+=("{\"spec\": \"${edit_spec}\", \"version\": \"clean\"}")
+            done
+        fi
+        if [[ ${stress_runs} -gt 0 ]]; then
+            for edit_spec in "${stress_edits[@]}"; do
+                requested_specs+=("{\"spec\": \"${edit_spec}\", \"version\": \"stress\"}")
+            done
+        fi
+        local requested_json
+        requested_json="[$(IFS=','; echo "${requested_specs[*]}")]"
+
         local edit_deps="${setup_id}"
         local edits_id=$(add_task "CREATE_EDITS_BATCH" "${model_id}" "${model_name}" \
             "$(estimate_model_memory "${model_id}" "CREATE_EDITS_BATCH")" \
-            "${edit_deps}" '{"edit_specs": '"${all_edit_specs}"', "use_batch": true}' 70)
+            "${edit_deps}" '{"edit_specs": '"${requested_json}"', "use_batch": true}' 70)
         task_ids+=("${edits_id}")
         echo "Created: ${edits_id}"
 
-        if [[ "${use_preset}" == "true" ]]; then
+        if [[ ${clean_runs} -gt 0 ]]; then
             for edit_spec in "${clean_edits[@]}"; do
-                local clean_runs=${CLEAN_EDIT_RUNS}
-                if ! [[ "${clean_runs}" =~ ^-?[0-9]+$ ]]; then
-                    clean_runs=1
+                local -a eval_ids=()
+                local run
+                for run in $(seq 1 "${clean_runs}"); do
+                    local cert_deps="${edits_id}"
+                    if [[ -n "${preset_id}" ]]; then
+                        cert_deps="${edits_id},${preset_id}"
+                    fi
+                    local cert_id=$(add_task "evaluate_EDIT" "${model_id}" "${model_name}" \
+                        "$(estimate_model_memory "${model_id}" "evaluate_EDIT")" \
+                        "${cert_deps}" '{"edit_spec": "'"${edit_spec}"'", "version": "clean", "run": '"${run}"'}' 74)
+                    eval_ids+=("${cert_id}")
+                    task_ids+=("${cert_id}")
+                    echo "Created: ${cert_id}"
+                done
+                if [[ "${cleanup_models}" != "0" && ${#eval_ids[@]} -gt 0 ]]; then
+                    local deps_csv
+                    deps_csv="$(IFS=','; echo "${eval_ids[*]}")"
+                    local cleanup_id
+                    cleanup_id=$(add_task "CLEANUP_EDIT" "${model_id}" "${model_name}" \
+                        1 "${deps_csv}" '{"edit_spec": "'"${edit_spec}"'", "version": "clean"}' 80)
+                    echo "Created: ${cleanup_id}"
                 fi
-                if [[ ${clean_runs} -lt 0 ]]; then
-                    clean_runs=0
-                fi
-                generate_evaluate_tasks \
-                    "${model_id}" \
-                    "${model_name}" \
-                    "${edits_id}" \
-                    "${preset_id}" \
-                    "${edit_spec}" \
-                    "clean" \
-                    "${clean_runs}"
             done
+        fi
 
+        if [[ ${stress_runs} -gt 0 ]]; then
             for edit_spec in "${stress_edits[@]}"; do
-                local stress_runs=${STRESS_EDIT_RUNS}
-                if ! [[ "${stress_runs}" =~ ^-?[0-9]+$ ]]; then
-                    stress_runs=1
+                local -a eval_ids=()
+                local run
+                for run in $(seq 1 "${stress_runs}"); do
+                    local cert_deps="${edits_id}"
+                    if [[ -n "${preset_id}" ]]; then
+                        cert_deps="${edits_id},${preset_id}"
+                    fi
+                    local cert_id=$(add_task "evaluate_EDIT" "${model_id}" "${model_name}" \
+                        "$(estimate_model_memory "${model_id}" "evaluate_EDIT")" \
+                        "${cert_deps}" '{"edit_spec": "'"${edit_spec}"'", "version": "stress", "run": '"${run}"'}' 74)
+                    eval_ids+=("${cert_id}")
+                    task_ids+=("${cert_id}")
+                    echo "Created: ${cert_id}"
+                done
+                if [[ "${cleanup_models}" != "0" && ${#eval_ids[@]} -gt 0 ]]; then
+                    local deps_csv
+                    deps_csv="$(IFS=','; echo "${eval_ids[*]}")"
+                    local cleanup_id
+                    cleanup_id=$(add_task "CLEANUP_EDIT" "${model_id}" "${model_name}" \
+                        1 "${deps_csv}" '{"edit_spec": "'"${edit_spec}"'", "version": "stress"}' 80)
+                    echo "Created: ${cleanup_id}"
                 fi
-                if [[ ${stress_runs} -lt 0 ]]; then
-                    stress_runs=0
-                fi
-                generate_evaluate_tasks \
-                    "${model_id}" \
-                    "${model_name}" \
-                    "${edits_id}" \
-                    "${preset_id}" \
-                    "${edit_spec}" \
-                    "stress" \
-                    "${stress_runs}"
             done
-        else
-            echo "Skipping edit evaluate tasks (no calibrated preset available)"
         fi
 
     else
         # CREATE_EDIT - Create single edits (one task per edit) and enqueue eval/evaluate
+        if [[ ${clean_runs} -gt 0 ]]; then
         for edit_spec in "${clean_edits[@]}"; do
             local edit_deps="${setup_id}"
             local edit_id=$(add_task "CREATE_EDIT" "${model_id}" "${model_name}" \
@@ -1153,21 +1209,33 @@ generate_model_tasks() {
             echo "Created: ${edit_id}"
 
             # evaluate_EDIT runs for clean edits (3 by default)
-            if [[ ${CLEAN_EDIT_RUNS:-0} -gt 0 && "${use_preset}" == "true" ]]; then
-                for run in $(seq 1 "${CLEAN_EDIT_RUNS}"); do
+            local -a eval_ids=()
+            if [[ "${use_preset}" == "true" ]]; then
+                for run in $(seq 1 "${clean_runs}"); do
                     local cert_deps="${edit_id}"
                     if [[ -n "${preset_id}" ]]; then
                         cert_deps="${edit_id},${preset_id}"
                     fi
                     local cert_id=$(add_task "evaluate_EDIT" "${model_id}" "${model_name}" \
                         "$(estimate_model_memory "${model_id}" "evaluate_EDIT")" \
-                        "${cert_deps}" '{"edit_spec": "'"${edit_spec}"'", "version": "clean", "run": '"${run}"'}' 65)
+                        "${cert_deps}" '{"edit_spec": "'"${edit_spec}"'", "version": "clean", "run": '"${run}"'}' 74)
+                    eval_ids+=("${cert_id}")
                     task_ids+=("${cert_id}")
                     echo "Created: ${cert_id}"
                 done
             fi
+            if [[ "${cleanup_models}" != "0" && ${#eval_ids[@]} -gt 0 ]]; then
+                local deps_csv
+                deps_csv="$(IFS=','; echo "${eval_ids[*]}")"
+                local cleanup_id
+                cleanup_id=$(add_task "CLEANUP_EDIT" "${model_id}" "${model_name}" \
+                    1 "${deps_csv}" '{"edit_spec": "'"${edit_spec}"'", "version": "clean"}' 80)
+                echo "Created: ${cleanup_id}"
+            fi
         done
+        fi
 
+        if [[ ${stress_runs} -gt 0 ]]; then
         for edit_spec in "${stress_edits[@]}"; do
             local edit_id=$(add_task "CREATE_EDIT" "${model_id}" "${model_name}" \
                 "$(estimate_model_memory "${model_id}" "CREATE_EDIT")" \
@@ -1175,24 +1243,35 @@ generate_model_tasks() {
             task_ids+=("${edit_id}")
             echo "Created: ${edit_id}"
 
-            if [[ ${STRESS_EDIT_RUNS:-0} -gt 0 && "${use_preset}" == "true" ]]; then
-                for run in $(seq 1 "${STRESS_EDIT_RUNS}"); do
+            local -a eval_ids=()
+            if [[ "${use_preset}" == "true" ]]; then
+                for run in $(seq 1 "${stress_runs}"); do
                     local cert_deps="${edit_id}"
                     if [[ -n "${preset_id}" ]]; then
                         cert_deps="${edit_id},${preset_id}"
                     fi
                     local cert_id=$(add_task "evaluate_EDIT" "${model_id}" "${model_name}" \
                         "$(estimate_model_memory "${model_id}" "evaluate_EDIT")" \
-                        "${cert_deps}" '{"edit_spec": "'"${edit_spec}"'", "version": "stress", "run": '"${run}"'}' 65)
+                        "${cert_deps}" '{"edit_spec": "'"${edit_spec}"'", "version": "stress", "run": '"${run}"'}' 74)
+                    eval_ids+=("${cert_id}")
                     task_ids+=("${cert_id}")
                     echo "Created: ${cert_id}"
                 done
             fi
+            if [[ "${cleanup_models}" != "0" && ${#eval_ids[@]} -gt 0 ]]; then
+                local deps_csv
+                deps_csv="$(IFS=','; echo "${eval_ids[*]}")"
+                local cleanup_id
+                cleanup_id=$(add_task "CLEANUP_EDIT" "${model_id}" "${model_name}" \
+                    1 "${deps_csv}" '{"edit_spec": "'"${edit_spec}"'", "version": "stress"}' 80)
+                echo "Created: ${cleanup_id}"
+            fi
         done
+        fi
     fi
 
     # 5. Error injection tests
-    if [[ "${RUN_ERROR_INJECTION:-true}" == "true" ]]; then
+    if [[ "${RUN_ERROR_INJECTION:-true}" == "true" && "${use_preset}" == "true" ]]; then
         local jq_bin=""
         jq_bin="$(type -P jq 2>/dev/null || true)"
         local error_pairs=()
@@ -1249,22 +1328,23 @@ generate_model_tasks() {
                 "${setup_id}" "${params_json}" 60)
             echo "Created: ${error_create_id}"
 
-            # evaluate_ERROR (only if preset exists)
-            if [[ "${use_preset}" == "true" ]]; then
-                local cert_deps="${error_create_id}"
-                if [[ -n "${preset_id}" ]]; then
-                    cert_deps="${error_create_id},${preset_id}"
-                fi
-                local error_cert_id=$(add_task "evaluate_ERROR" "${model_id}" "${model_name}" \
-                    "$(estimate_model_memory "${model_id}" "evaluate_ERROR")" \
-                    "${cert_deps}" "${params_json}" 55)
-                echo "Created: ${error_cert_id}"
-            else
-                echo "Skipping evaluate_ERROR (${error_type}) because no calibrated preset is available"
+            local cert_deps="${error_create_id}"
+            if [[ -n "${preset_id}" ]]; then
+                cert_deps="${error_create_id},${preset_id}"
+            fi
+            local error_cert_id=$(add_task "evaluate_ERROR" "${model_id}" "${model_name}" \
+                "$(estimate_model_memory "${model_id}" "evaluate_ERROR")" \
+                "${cert_deps}" "${params_json}" 64)
+            echo "Created: ${error_cert_id}"
+            if [[ "${cleanup_models}" != "0" ]]; then
+                local cleanup_id
+                cleanup_id=$(add_task "CLEANUP_ERROR" "${model_id}" "${model_name}" \
+                    1 "${error_cert_id}" "${params_json}" 80)
+                echo "Created: ${cleanup_id}"
             fi
         done
     else
-        echo "Skipping error injection (RUN_ERROR_INJECTION=false)"
+        echo "Skipping error injection (RUN_ERROR_INJECTION=false or no preset)"
     fi
 
     echo "Generated tasks for model ${model_name}"
@@ -1297,7 +1377,7 @@ generate_evaluate_tasks() {
             fi
             local cert_id=$(add_task "evaluate_EDIT" "${model_id}" "${model_name}" \
                 "$(estimate_model_memory "${model_id}" "evaluate_EDIT")" \
-                "${cert_deps}" '{"edit_spec": "'"${edit_spec}"'", "version": "'"${version}"'", "run": '"${run}"'}' 65)
+                "${cert_deps}" '{"edit_spec": "'"${edit_spec}"'", "version": "'"${version}"'", "run": '"${run}"'}' 74)
             echo "Created: ${cert_id}"
         done
     fi
@@ -1338,7 +1418,7 @@ generate_edit_tasks() {
             fi
             local cert_id=$(add_task "evaluate_EDIT" "${model_id}" "${model_name}" \
                 "$(estimate_model_memory "${model_id}" "evaluate_EDIT")" \
-                "${cert_deps}" '{"edit_spec": "'"${edit_spec}"'", "version": "'"${version}"'", "run": '"${run}"'}' 65)
+                "${cert_deps}" '{"edit_spec": "'"${edit_spec}"'", "version": "'"${version}"'", "run": '"${run}"'}' 74)
             echo "Created: ${cert_id}"
         done
     fi
