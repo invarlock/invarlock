@@ -386,6 +386,9 @@ pack_build_pack() {
     pack_copy_file "${run_dir}/reports/final_verdict.txt" "${verdicts_dir}/final_verdict.txt"
     pack_copy_file "${run_dir}/reports/final_verdict.json" "${verdicts_dir}/final_verdict.json"
     pack_copy_optional "${run_dir}/analysis/determinism_repeats.json" "${analysis_dir}/determinism_repeats.json"
+    pack_copy_optional "${run_dir}/reports/category_summary.json" "${analysis_dir}/category_summary.json"
+    pack_copy_optional "${run_dir}/reports/guard_signal_summary.json" "${analysis_dir}/guard_signal_summary.json"
+    pack_copy_optional "${run_dir}/reports/scenario_signal_summary.json" "${analysis_dir}/scenario_signal_summary.json"
 
     pack_copy_optional "${run_dir}/state/model_revisions.json" "${revisions_dest}"
     pack_copy_optional "${run_dir}/state/scenarios.json" "${scenarios_dest}"

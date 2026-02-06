@@ -188,7 +188,7 @@ parameters at runtime.
 
 Stress edits are split into required-fail (catastrophic) and informational scenarios.
 Required-fail scenarios are gating in the final verdict; informational scenarios are tracked
-as detection-quality signals and are validated by a minimum fail-fraction criterion.
+as detection-quality signals and are validated by a minimum signal-fraction criterion.
 
 | Edit Type | Parameters | Scope |
 | --- | --- | --- |
@@ -206,7 +206,8 @@ Enabled when `RUN_ERROR_INJECTION=true` (default):
   `rank_collapse`, `norm_collapse`, `weight_tying_break`
 - Informational detection: `rmt_norm_noise`, `spectral_moderate_scale`
 
-Source of truth: `scripts/proof_packs/scenarios.json` strictness metadata.
+Source of truth: `scripts/proof_packs/scenarios.json` strictness + `intent` +
+`primary_guard` metadata.
 
 ## Scheduling
 
@@ -421,6 +422,9 @@ OUTPUT_DIR/
   reports/
     final_verdict.txt
     final_verdict.json
+    category_summary.json
+    guard_signal_summary.json
+    scenario_signal_summary.json
   presets/
   state/
     model_revisions.json              # pinned HF revisions (when --net 1)
@@ -507,7 +511,8 @@ Large runs can be storage-heavy (baseline + edits + error models):
 
 `run_pack.sh` builds a portable pack:
 
-- Copies `reports/final_verdict.{txt,json}` and key `analysis/*` artifacts.
+- Copies `reports/final_verdict.{txt,json}` plus verdict sidecars (`category_summary`,
+  `guard_signal_summary`, `scenario_signal_summary`) and key `analysis/*` artifacts.
 - Collects all reports into `proof_pack/certs/...`.
 - Generates `manifest.json`, `checksums.sha256`, and optional
   `manifest.json.asc`.

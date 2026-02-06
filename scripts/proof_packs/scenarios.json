@@ -5,7 +5,8 @@
     "purpose": "Single source of truth for proof-pack scenarios and their assurance expectations.",
     "notes": [
       "Scenario IDs must match the directory names under <model>/reports/ in proof pack runs.",
-      "Strictness drives verdict gating: must_* scenarios are gating; informational scenarios never fail the pack."
+      "Strictness drives verdict gating: must_* scenarios are gating; informational scenarios never fail the pack.",
+      "intent + primary_guard provide scenario utility metadata for maintainers and third-party evidence consumers."
     ]
   },
   "scenarios": [
@@ -14,6 +15,8 @@
       "category": "clean",
       "failure_class": "common_edit.quant_rtn",
       "strictness": "must_pass",
+      "intent": "clean_control",
+      "primary_guard": "primary_metric",
       "generation": {"kind": "edit", "edit_spec": "quant_rtn:clean:ffn", "version": "clean"}
     },
     {
@@ -21,6 +24,8 @@
       "category": "clean",
       "failure_class": "common_edit.fp8_quant",
       "strictness": "must_pass",
+      "intent": "clean_control",
+      "primary_guard": "primary_metric",
       "generation": {"kind": "edit", "edit_spec": "fp8_quant:clean:ffn", "version": "clean"}
     },
     {
@@ -28,6 +33,8 @@
       "category": "clean",
       "failure_class": "common_edit.magnitude_prune",
       "strictness": "must_pass",
+      "intent": "clean_control",
+      "primary_guard": "primary_metric",
       "generation": {"kind": "edit", "edit_spec": "magnitude_prune:clean:ffn", "version": "clean"}
     },
     {
@@ -35,6 +42,8 @@
       "category": "clean",
       "failure_class": "common_edit.lowrank_svd",
       "strictness": "must_pass",
+      "intent": "clean_control",
+      "primary_guard": "primary_metric",
       "generation": {"kind": "edit", "edit_spec": "lowrank_svd:clean:ffn", "version": "clean"}
     },
     {
@@ -42,6 +51,8 @@
       "category": "stress",
       "failure_class": "catastrophic_edit.magnitude_prune",
       "strictness": "must_fail",
+      "intent": "catastrophic_failure",
+      "primary_guard": "primary_metric",
       "generation": {"kind": "edit", "edit_spec": "magnitude_prune:0.5:all", "version": "stress"},
       "requirements": {
         "catastrophic_required": true,
@@ -56,6 +67,8 @@
       "category": "stress",
       "failure_class": "catastrophic_edit.lowrank_svd",
       "strictness": "must_fail",
+      "intent": "catastrophic_failure",
+      "primary_guard": "primary_metric",
       "generation": {"kind": "edit", "edit_spec": "lowrank_svd:32:all", "version": "stress"},
       "requirements": {
         "catastrophic_required": true,
@@ -70,6 +83,8 @@
       "category": "stress",
       "failure_class": "stress_edit.quant_rtn",
       "strictness": "informational",
+      "intent": "subtle_detectable",
+      "primary_guard": "primary_metric",
       "generation": {"kind": "edit", "edit_spec": "quant_rtn:4:32:all", "version": "stress"},
       "requirements": {
         "detectors_any_of": [
@@ -83,6 +98,8 @@
       "category": "stress",
       "failure_class": "stress_edit.fp8_quant",
       "strictness": "informational",
+      "intent": "subtle_detectable",
+      "primary_guard": "spectral",
       "generation": {"kind": "edit", "edit_spec": "fp8_quant:e5m2:all", "version": "stress"},
       "requirements": {
         "detectors_any_of": [
@@ -96,6 +113,8 @@
       "category": "error_injection",
       "failure_class": "structural.non_finite",
       "strictness": "must_detect",
+      "intent": "fault_detection",
+      "primary_guard": "invariants",
       "generation": {"kind": "error", "error_type": "nan_injection"},
       "requirements": {
         "detectors_any_of": [
@@ -108,6 +127,8 @@
       "category": "error_injection",
       "failure_class": "structural.non_finite",
       "strictness": "must_detect",
+      "intent": "fault_detection",
+      "primary_guard": "invariants",
       "generation": {"kind": "error", "error_type": "inf_injection"},
       "requirements": {
         "detectors_any_of": [
@@ -120,6 +141,8 @@
       "category": "error_injection",
       "failure_class": "structural.shape_mismatch",
       "strictness": "must_detect",
+      "intent": "fault_detection",
+      "primary_guard": "invariants",
       "generation": {"kind": "error", "error_type": "shape_mismatch"},
       "requirements": {
         "detectors_any_of": [
@@ -132,6 +155,8 @@
       "category": "error_injection",
       "failure_class": "structural.missing_tensors",
       "strictness": "must_detect",
+      "intent": "fault_detection",
+      "primary_guard": "invariants",
       "generation": {"kind": "error", "error_type": "missing_tensors"},
       "requirements": {
         "detectors_any_of": [
@@ -144,6 +169,8 @@
       "category": "error_injection",
       "failure_class": "structural.extreme_quantization",
       "strictness": "must_detect",
+      "intent": "fault_detection",
+      "primary_guard": "primary_metric",
       "generation": {"kind": "error", "error_type": "extreme_quant"},
       "requirements": {
         "detectors_any_of": [
@@ -158,6 +185,8 @@
       "category": "error_injection",
       "failure_class": "structural.scale_explosion",
       "strictness": "must_detect",
+      "intent": "fault_detection",
+      "primary_guard": "spectral",
       "generation": {"kind": "error", "error_type": "scale_explosion"},
       "requirements": {
         "detectors_any_of": [
@@ -172,6 +201,8 @@
       "category": "error_injection",
       "failure_class": "spectral.rank_collapse",
       "strictness": "must_detect",
+      "intent": "fault_detection",
+      "primary_guard": "spectral",
       "generation": {"kind": "error", "error_type": "rank_collapse"},
       "requirements": {
         "detectors_any_of": [
@@ -186,6 +217,8 @@
       "category": "error_injection",
       "failure_class": "spectral.norm_collapse",
       "strictness": "must_detect",
+      "intent": "fault_detection",
+      "primary_guard": "spectral",
       "generation": {"kind": "error", "error_type": "norm_collapse"},
       "requirements": {
         "detectors_any_of": [
@@ -200,6 +233,8 @@
       "category": "error_injection",
       "failure_class": "structural.weight_tying",
       "strictness": "must_detect",
+      "intent": "fault_detection",
+      "primary_guard": "invariants",
       "generation": {"kind": "error", "error_type": "weight_tying_break"},
       "requirements": {
         "detectors_any_of": [
@@ -212,6 +247,8 @@
       "category": "error_injection",
       "failure_class": "rmt.norm_perturbation",
       "strictness": "informational",
+      "intent": "subtle_detectable",
+      "primary_guard": "rmt",
       "generation": {"kind": "error", "error_type": "rmt_norm_noise"},
       "requirements": {
         "detectors_any_of": [
@@ -224,6 +261,8 @@
       "category": "error_injection",
       "failure_class": "spectral.moderate_scale",
       "strictness": "informational",
+      "intent": "subtle_detectable",
+      "primary_guard": "spectral",
       "generation": {"kind": "error", "error_type": "spectral_moderate_scale"},
       "requirements": {
         "detectors_any_of": [
