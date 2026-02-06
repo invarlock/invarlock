@@ -450,7 +450,31 @@ class VarianceGuard(Guard):
         """
         from .policies import get_variance_policy
 
-        self._policy = policy or get_variance_policy("balanced")
+        # Treat caller-provided policy as overrides on top of the default policy.
+        # Proof-pack probes may pass partial policies (e.g., just "calibration"),
+        # and the guard should remain robust.
+        base_policy: dict[str, Any] = dict(get_variance_policy("balanced"))
+        base_calibration = base_policy.get("calibration")
+        if isinstance(base_calibration, dict):
+            base_calibration = dict(base_calibration)
+            base_policy["calibration"] = base_calibration
+
+        if policy:
+            merged: dict[str, Any] = dict(base_policy)
+            for key, value in dict(policy).items():
+                if (
+                    key == "calibration"
+                    and isinstance(value, dict)
+                    and isinstance(base_calibration, dict)
+                ):
+                    merged_calibration = dict(base_calibration)
+                    merged_calibration.update(value)
+                    merged["calibration"] = merged_calibration
+                else:
+                    merged[key] = value
+            self._policy = merged
+        else:
+            self._policy = base_policy
         self._policy.setdefault("mode", "ci")
         self._policy.setdefault("min_rel_gain", 0.001)
         self._policy.setdefault("alpha", 0.05)
@@ -2054,7 +2078,11 @@ class VarianceGuard(Guard):
 
         self._log_event(
             "prepare",
-            message=f"Preparing variance guard with scope={self._policy['scope']}, min_gain={self._policy['min_gain']}",
+            message=(
+                "Preparing variance guard with "
+                f"scope={self._policy.get('scope', 'unknown')}, "
+                f"min_gain={self._policy.get('min_gain', 'unknown')}"
+            ),
         )
 
         try:
