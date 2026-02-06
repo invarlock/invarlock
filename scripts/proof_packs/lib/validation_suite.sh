@@ -1203,6 +1203,16 @@ check_dependencies() {
     # Check transformers
     python3 -c "import transformers; print(f'Transformers {transformers.__version__}')" 2>/dev/null || missing+=("transformers")
 
+    # Check accelerate (required by transformers for device_map="auto")
+    if ! python3 -c "import accelerate" 2>/dev/null; then
+        if [[ "${PACK_NET}" == "1" ]]; then
+            log "Installing accelerate..."
+            python3 -m pip install accelerate
+        else
+            missing+=("accelerate")
+        fi
+    fi
+
     # Check for flash-attn
     if python3 -c "import flash_attn; print('Flash Attention OK')" 2>/dev/null; then
         export FLASH_ATTENTION_AVAILABLE="true"
