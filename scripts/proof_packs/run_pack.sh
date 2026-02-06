@@ -162,6 +162,46 @@ pack_write_manifest() {
         --repeats "${repeats}"
 }
 
+pack_require_passing_run_verdict() {
+    local run_dir="$1"
+    local verdict_file="${run_dir}/reports/final_verdict.json"
+    local verdict_status="MISSING"
+
+    if type pack_read_final_verdict >/dev/null 2>&1; then
+        verdict_status="$(pack_read_final_verdict "${verdict_file}")"
+    else
+        verdict_status="$(python3 - "${verdict_file}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+if not path.is_file():
+    print("MISSING")
+    raise SystemExit(0)
+try:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+except Exception:
+    print("INVALID")
+    raise SystemExit(0)
+value = payload.get("verdict")
+if isinstance(value, str):
+    print(value.strip().upper())
+else:
+    print("MISSING")
+PY
+)"
+    fi
+
+    if [[ "${verdict_status}" == "FAIL" ]]; then
+        echo "ERROR: Run final verdict is FAIL; refusing to build a distributable pack." >&2
+        return 1
+    fi
+    if [[ "${verdict_status}" != "PASS" ]]; then
+        echo "WARNING: Run final verdict status is ${verdict_status}; proceeding with pack build." >&2
+    fi
+}
+
 pack_sign_manifest() {
     local pack_dir="$1"
     local strict="${PACK_STRICT_MODE:-0}"
@@ -271,6 +311,9 @@ pack_write_readme() {
 This proof pack bundles reports, summary reports, and metadata for offline
 verification. No model weights are included.
 
+By default this is evidence-grade packaging. For proof-grade attestation,
+require a signed manifest and strict verification.
+
 ## Verify
 
 1) Verify the manifest signature (if present):
@@ -300,6 +343,8 @@ pack_build_pack() {
         echo "ERROR: run_dir not found: ${run_dir}" >&2
         return 1
     fi
+
+    pack_require_passing_run_verdict "${run_dir}" || return 1
 
     if [[ -d "${pack_dir}" && -n "$(ls -A "${pack_dir}" 2>/dev/null)" ]]; then
         echo "ERROR: pack_dir already exists and is not empty: ${pack_dir}" >&2

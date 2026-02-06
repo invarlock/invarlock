@@ -321,9 +321,19 @@ def generate_verdict(*, output_dir: Path) -> dict[str, Any]:
         (r["model"], r["category"], r["name"]): r for r in records
     }
     model_names = sorted(models)
+    info_min_fail_fraction = 0.5
 
     failed_requirements: list[dict[str, Any]] = []
     missing: dict[str, Any] = {"by_model": {}}
+
+    if not model_names:
+        failed_requirements.append(
+            {
+                "requirement": "evidence_present",
+                "message": "No model reports were found; verdict requires evidence.",
+                "details": {"report_glob": "*/reports/**/evaluation.report.json"},
+            }
+        )
 
     for model_name in model_names:
         missing_model: dict[str, list[str]] = {
@@ -461,8 +471,6 @@ def generate_verdict(*, output_dir: Path) -> dict[str, Any]:
                 }
             )
 
-    verdict = "PASS" if not failed_requirements else "FAIL"
-
     clean = [r for r in records if r["category"] == "clean"]
     stress = [r for r in records if r["category"] == "stress"]
     errors = [r for r in records if r["category"] == "error_injection"]
@@ -470,8 +478,24 @@ def generate_verdict(*, output_dir: Path) -> dict[str, Any]:
     info_stress = [r for r in stress if r["name"] in informational_stress]
     info_fail = sum(1 for r in info_stress if not r["passed"])
     info_total = len(info_stress)
+    if info_total > 0:
+        info_fail_fraction = info_fail / info_total
+        if info_fail_fraction < info_min_fail_fraction:
+            failed_requirements.append(
+                {
+                    "requirement": "informational_stress_min_fail_fraction",
+                    "message": "Informational stress fail fraction below required minimum.",
+                    "details": {
+                        "required_min": info_min_fail_fraction,
+                        "observed": info_fail_fraction,
+                        "fail_count": info_fail,
+                        "total_count": info_total,
+                    },
+                }
+            )
 
     catastrophic_records = [r for r in stress if r["name"] in catastrophic_required]
+    verdict = "PASS" if not failed_requirements else "FAIL"
 
     return {
         "verdict": verdict,
@@ -484,7 +508,7 @@ def generate_verdict(*, output_dir: Path) -> dict[str, Any]:
             "clean_all_pass": True,
             "stress_required_fail": True,
             "error_injection_detected": True,
-            "informational_stress_min_fail_fraction": 0.5,
+            "informational_stress_min_fail_fraction": info_min_fail_fraction,
         },
         "counts": {
             "models_total": len(model_names),

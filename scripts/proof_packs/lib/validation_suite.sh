@@ -100,6 +100,32 @@ pack_is_bash4() {
     [[ "${BASH_VERSINFO[0]}" -ge 4 ]]
 }
 
+pack_read_final_verdict() {
+    local verdict_path="$1"
+    python3 - "${verdict_path}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+if not path.is_file():
+    print("MISSING")
+    raise SystemExit(0)
+
+try:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+except Exception:
+    print("INVALID")
+    raise SystemExit(0)
+
+value = payload.get("verdict")
+if isinstance(value, str):
+    print(value.strip().upper())
+else:
+    print("MISSING")
+PY
+}
+
 # ============ VERSION ============
 SCRIPT_VERSION="proof-packs-v1"
 
@@ -1411,6 +1437,7 @@ export -f get_model_invarlock_config
 # ============ MAIN - DYNAMIC GPU SCHEDULING (v2.0) ============
 main_dynamic() {
     local start_time=$(date +%s)
+    local suite_status=0
     local gpu_mem="${PACK_GPU_MEM_GB:-${GPU_MEMORY_GB:-}}"
     local gpu_count_label="${NUM_GPUS:-auto}"
     [[ -z "${gpu_mem}" ]] && gpu_mem="auto"
@@ -1853,12 +1880,14 @@ EOF
 
     if [[ ${failed} -gt 0 ]]; then
         log "WARNING: ${failed} GPU worker(s) failed"
+        suite_status=1
     fi
 
     # Check for failed tasks
     local failed_tasks=$(count_tasks "failed")
     if [[ ${failed_tasks} -gt 0 ]]; then
         log "WARNING: ${failed_tasks} task(s) failed"
+        suite_status=1
         log "Failed tasks:"
         for task_file in "${QUEUE_DIR}/failed"/*.task; do
             [[ -f "${task_file}" ]] || continue
@@ -1887,6 +1916,15 @@ EOF
     compile_results
     run_analysis
     generate_verdict
+    local verdict_file="${OUTPUT_DIR}/reports/final_verdict.json"
+    local verdict_status
+    verdict_status="$(pack_read_final_verdict "${verdict_file}")"
+    if [[ "${verdict_status}" == "FAIL" ]]; then
+        log "ERROR: Final verdict is ${verdict_status}; suite marked failed."
+        suite_status=1
+    elif [[ "${verdict_status}" != "PASS" ]]; then
+        log "WARNING: Final verdict status is ${verdict_status}; unable to enforce PASS gate."
+    fi
 
     local end_time=$(date +%s)
     local duration=$((end_time - start_time))
@@ -1896,6 +1934,7 @@ EOF
     log "Tasks completed: $(count_tasks "completed")/${total_tasks}"
     log "Report: ${OUTPUT_DIR}/reports/final_verdict.txt"
     log "Presets: ${OUTPUT_DIR}/presets/"
+    return "${suite_status}"
 }
 
 # ============ MAIN ============
