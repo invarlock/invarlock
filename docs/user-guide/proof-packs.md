@@ -79,6 +79,7 @@ A suite run writes artifacts under `OUTPUT_DIR` (default: `./proof_pack_runs/<su
 - `reports/final_verdict.txt` + `reports/final_verdict.json`
 - `reports/category_summary.json`
 - `reports/guard_signal_summary.json`
+- `reports/guard_intervention_summary.json` (non-failing remediation signals, e.g. spectral caps + VE probe)
 - `reports/scenario_signal_summary.json`
 - `analysis/determinism_repeats.json` (when `--repeats` is used)
 - `*/reports/**/evaluation.report.json`
@@ -87,7 +88,7 @@ A suite run writes artifacts under `OUTPUT_DIR` (default: `./proof_pack_runs/<su
 `OUTPUT_DIR/proof_pack`) and organizes them as:
 
 - `results/final_verdict.txt` + `results/final_verdict.json`
-- `results/**/category_summary.json`, `results/**/guard_signal_summary.json`, `results/**/scenario_signal_summary.json`
+- `results/**/category_summary.json`, `results/**/guard_signal_summary.json`, `results/**/guard_intervention_summary.json`, `results/**/scenario_signal_summary.json`
 - `results/**/determinism_repeats.json` (if present)
 - `certs/<model>/<edit>/<run>/evaluation.report.json`
 - `certs/**/rmt_probe.json` (optional sidecar; emitted by some scenarios, e.g. `rmt_norm_noise`)

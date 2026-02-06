@@ -441,6 +441,7 @@ OUTPUT_DIR/
     final_verdict.json
     category_summary.json
     guard_signal_summary.json
+    guard_intervention_summary.json
     scenario_signal_summary.json
   presets/
   state/
