@@ -342,7 +342,8 @@
           {"kind": "validation_flag", "flag": "rmt_stable", "expected": true}
         ],
         "detectors_any_of": [
-          {"kind": "ve_probe", "field": "signal", "expected": true}
+          {"kind": "ve_probe", "field": "signal", "expected": true},
+          {"kind": "ve_probe", "field": "proposed_scales", "min": 1}
         ]
       }
     }

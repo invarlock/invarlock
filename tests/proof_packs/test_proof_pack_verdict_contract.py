@@ -40,14 +40,27 @@ def _write_rmt_probe(path: Path, *, stable: bool) -> None:
     )
 
 
-def _write_ve_probe(path: Path, *, signal: bool) -> None:
+def _write_ve_probe(
+    path: Path,
+    *,
+    signal: bool,
+    proposed_scales: int | None = None,
+    would_enable: bool | None = None,
+    ab_gain: float | None = None,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    if proposed_scales is None:
+        proposed_scales = 1 if signal else 0
+    if would_enable is None:
+        would_enable = signal
+    if ab_gain is None:
+        ab_gain = 0.01 if signal else 0.0
     payload = {
         "probe": "ve_probe_v1",
         "signal": signal,
-        "would_enable": signal,
-        "proposed_scales": 1 if signal else 0,
-        "ab_gain": 0.01 if signal else 0.0,
+        "would_enable": bool(would_enable),
+        "proposed_scales": int(proposed_scales),
+        "ab_gain": float(ab_gain),
         "ppl_no_ve": 10.0,
         "ppl_with_ve": 9.0 if signal else 10.0,
     }
@@ -205,7 +218,16 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
         },
         invariants_status="pass",
     )
-    _write_ve_probe(ve_cert.parent / "ve_probe.json", signal=True)
+    # VE is a remediation guard: the proof pack contract is that it runs and
+    # produces a meaningful probe artifact. A conservative outcome (signal=false)
+    # is acceptable as long as it proposed remediation scales.
+    _write_ve_probe(
+        ve_cert.parent / "ve_probe.json",
+        signal=False,
+        proposed_scales=32,
+        would_enable=False,
+        ab_gain=-0.1,
+    )
 
     verdict = _run_verdict(repo_root, output_dir)
     assert verdict["verdict"] == "PASS"

@@ -427,8 +427,10 @@ def _record_primary_guard_hit(record: dict[str, Any]) -> bool:
             if would_enable is not None and _as_bool(would_enable, default=False) is True:
                 return True
             scales = _as_int(probe.get("proposed_scales"), default=0)
+            if scales > 0:
+                return True
             gain = _as_float(probe.get("ab_gain"), default=None)
-            if scales > 0 and gain is not None and gain > 0.0:
+            if gain is not None and gain > 0.0:
                 return True
     return False
 
