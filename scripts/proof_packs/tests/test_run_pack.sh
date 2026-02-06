@@ -11,6 +11,7 @@ test_run_pack_build_pack_collects_artifacts() {
 
     echo "verdict" > "${run_dir}/reports/final_verdict.txt"
     echo "{}" > "${run_dir}/reports/final_verdict.json"
+    echo "{}" > "${run_dir}/reports/guard_intervention_summary.json"
     echo '{"model_list": ["org/model"], "models": {"org/model": {"revision": "abc"}}}' > "${run_dir}/state/model_revisions.json"
     echo '{"schema":"proof_pack_scenarios_v1","schema_version":1,"scenarios":[]}' > "${run_dir}/state/scenarios.json"
     echo "{}" > "${run_dir}/modelA/reports/edit/run_1/evaluation.report.json"
@@ -78,6 +79,7 @@ EOF
     assert_file_exists "${pack_dir}/checksums.sha256" "checksums written"
     assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/evaluation.html" "html rendered"
     assert_file_exists "${pack_dir}/README.md" "readme written"
+    assert_file_exists "${pack_dir}/results/guard_intervention_summary.json" "intervention summary copied"
 }
 
 test_run_pack_build_pack_rejects_failed_final_verdict() {
@@ -106,6 +108,7 @@ test_run_pack_build_pack_layout_v2_nests_results_and_metadata() {
 
     echo "verdict" > "${run_dir}/reports/final_verdict.txt"
     echo "{}" > "${run_dir}/reports/final_verdict.json"
+    echo "{}" > "${run_dir}/reports/guard_intervention_summary.json"
     echo '{"model_list": ["org/model"], "models": {"org/model": {"revision": "abc"}}}' > "${run_dir}/state/model_revisions.json"
     echo '{"schema":"proof_pack_scenarios_v1","schema_version":1,"scenarios":[]}' > "${run_dir}/state/scenarios.json"
     echo "{}" > "${run_dir}/modelA/reports/edit/run_1/evaluation.report.json"
@@ -164,6 +167,7 @@ EOF
     assert_file_exists "${pack_dir}/metadata/manifest.json" "manifest copied to metadata"
     assert_file_exists "${pack_dir}/metadata/manifest.json.asc" "manifest signature copied to metadata"
     assert_file_exists "${pack_dir}/metadata/checksums.sha256" "checksums copied to metadata"
+    assert_file_exists "${pack_dir}/results/analysis/guard_intervention_summary.json" "intervention summary nested"
     [[ ! -f "${pack_dir}/results/final_verdict.txt" ]] || t_fail "legacy verdict path should not exist under v2 layout"
 }
 

@@ -388,6 +388,7 @@ pack_build_pack() {
     pack_copy_optional "${run_dir}/analysis/determinism_repeats.json" "${analysis_dir}/determinism_repeats.json"
     pack_copy_optional "${run_dir}/reports/category_summary.json" "${analysis_dir}/category_summary.json"
     pack_copy_optional "${run_dir}/reports/guard_signal_summary.json" "${analysis_dir}/guard_signal_summary.json"
+    pack_copy_optional "${run_dir}/reports/guard_intervention_summary.json" "${analysis_dir}/guard_intervention_summary.json"
     pack_copy_optional "${run_dir}/reports/scenario_signal_summary.json" "${analysis_dir}/scenario_signal_summary.json"
 
     pack_copy_optional "${run_dir}/state/model_revisions.json" "${revisions_dest}"
