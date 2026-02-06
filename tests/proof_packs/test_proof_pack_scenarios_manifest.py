@@ -20,7 +20,7 @@ def test_scenarios_include_intent_and_primary_guard_metadata() -> None:
         "subtle_detectable",
         "fault_detection",
     }
-    allowed_guards = {"invariants", "primary_metric", "spectral", "rmt"}
+    allowed_guards = {"invariants", "primary_metric", "spectral", "rmt", "variance"}
 
     assert scenarios, "scenario manifest must not be empty"
 
@@ -51,6 +51,7 @@ def test_scenarios_target_expected_guards_for_injection_probes() -> None:
         "weight_tying_break": "invariants",
         "rmt_norm_noise": "rmt",
         "spectral_moderate_scale": "spectral",
+        "ve_mlp_scale_skew": "variance",
     }
 
     for scenario_id, expected_guard in expected_primary_guard.items():
@@ -67,6 +68,7 @@ def test_scenarios_require_direct_primary_guard_hits_for_demo_probes() -> None:
         "extreme_quant",
         "rmt_norm_noise",
         "spectral_moderate_scale",
+        "ve_mlp_scale_skew",
     }
     for scenario_id in required:
         scenario = by_id.get(scenario_id)
@@ -79,7 +81,7 @@ def test_scenarios_require_direct_primary_guard_hits_for_demo_probes() -> None:
             f"{scenario_id}: primary_guard_required must be true"
         )
 
-    for scenario_id in ("rmt_norm_noise", "spectral_moderate_scale"):
+    for scenario_id in ("rmt_norm_noise", "spectral_moderate_scale", "ve_mlp_scale_skew"):
         scenario = by_id[scenario_id]
         generation = scenario.get("generation")
         assert isinstance(generation, dict), f"{scenario_id}: generation must be dict"

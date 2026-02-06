@@ -15,6 +15,7 @@ test_run_pack_build_pack_collects_artifacts() {
     echo '{"schema":"proof_pack_scenarios_v1","schema_version":1,"scenarios":[]}' > "${run_dir}/state/scenarios.json"
     echo "{}" > "${run_dir}/modelA/reports/edit/run_1/evaluation.report.json"
     echo '{"probe":"rmt_cross_model_v1","stable":false}' > "${run_dir}/modelA/reports/edit/run_1/rmt_probe.json"
+    echo '{"probe":"ve_probe_v1","signal":true}' > "${run_dir}/modelA/reports/edit/run_1/ve_probe.json"
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
@@ -68,6 +69,7 @@ EOF
     assert_file_exists "${pack_dir}/state/scenarios.json" "scenarios manifest copied"
     assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/evaluation.report.json" "cert copied"
     assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/rmt_probe.json" "probe sidecar copied"
+    assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/ve_probe.json" "ve probe sidecar copied"
     assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/verify.json" "verify output captured"
     assert_file_exists "${pack_dir}/results/verification_summary.json" "verification summary written"
     run python3 -c 'import json,sys; json.load(open(sys.argv[1], encoding="utf-8"))' "${pack_dir}/results/verification_summary.json"
