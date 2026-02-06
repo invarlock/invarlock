@@ -5,40 +5,11 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-SAMPLE_CERTS = {
-    "svd95_balanced_release_cert.json": {
-        "variance": {
-            "enabled": True,
-            "predictive_gate": {
-                "evaluated": True,
-                "passed": True,
-                "delta_ci": [-0.002, -0.001],
-            },
-        }
-    },
-    "svd95_conservative_release_cert.json": {
-        "variance": {
-            "enabled": False,
-            "predictive_gate": {
-                "evaluated": True,
-                "passed": False,
-                "reason": "ci_contains_zero",
-                "delta_ci": [-0.0005, 0.0003],
-            },
-        }
-    },
-}
-
 
 def _load_cert(cert_path: Path) -> dict:
-    if cert_path.is_file():
-        return json.loads(cert_path.read_text(encoding="utf-8"))
-
-    sample = SAMPLE_CERTS.get(cert_path.name)
-    if sample is not None:
-        return sample
-
-    raise AssertionError(f"Evaluation Report missing: {cert_path}")
+    if not cert_path.is_file():
+        pytest.skip(f"Evaluation Report fixture missing: {cert_path}")
+    return json.loads(cert_path.read_text(encoding="utf-8"))
 
 
 def test_variance_enabled_for_balanced_proof_pack():

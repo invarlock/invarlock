@@ -76,6 +76,21 @@ EOF
     assert_file_exists "${pack_dir}/README.md" "readme written"
 }
 
+test_run_pack_build_pack_rejects_failed_final_verdict() {
+    mock_reset
+
+    source ./scripts/proof_packs/run_pack.sh
+
+    local run_dir="${TEST_TMPDIR}/run"
+    mkdir -p "${run_dir}/reports"
+    echo "FAIL" > "${run_dir}/reports/final_verdict.txt"
+    echo '{"verdict":"FAIL"}' > "${run_dir}/reports/final_verdict.json"
+
+    run pack_build_pack "${run_dir}" "${TEST_TMPDIR}/pack"
+    assert_rc "1" "${RUN_RC}" "pack build fails when run verdict is FAIL"
+    assert_match "refusing to build a distributable pack" "${RUN_ERR}" "rejects failed run verdict"
+}
+
 test_run_pack_build_pack_layout_v2_nests_results_and_metadata() {
     mock_reset
 

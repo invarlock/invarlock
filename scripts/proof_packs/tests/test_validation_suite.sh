@@ -1168,7 +1168,8 @@ EOF
 
     signal_shutdown() { echo "shutdown:$1" >> "${TEST_TMPDIR}/shutdown.calls"; }
 
-    main_dynamic
+    run main_dynamic
+    assert_rc "1" "${RUN_RC}" "main_dynamic fails closed when worker/task failures occur"
     assert_file_exists "${TEST_TMPDIR}/shutdown.calls" "signal_shutdown called on empty queue"
 }
 
@@ -1425,7 +1426,7 @@ EOF
     kill() { return 0; }
 
     run main
-    assert_rc "0" "${RUN_RC}" "main completes offline"
+    assert_rc "1" "${RUN_RC}" "main fails closed when failed tasks are present"
     assert_file_exists "${TEST_TMPDIR}/boost.calls" "progress path applies work-stealing boost"
     assert_file_exists "${TEST_TMPDIR}/task_id.calls" "failed task reporting reads task ids"
     assert_file_exists "${TEST_TMPDIR}/python3.calls" "analysis steps invoke python3"
