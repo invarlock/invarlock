@@ -40,6 +40,22 @@ def _write_rmt_probe(path: Path, *, stable: bool) -> None:
     )
 
 
+def _write_ve_probe(path: Path, *, signal: bool) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "probe": "ve_probe_v1",
+        "signal": signal,
+        "would_enable": signal,
+        "proposed_scales": 1 if signal else 0,
+        "ab_gain": 0.01 if signal else 0.0,
+        "ppl_no_ve": 10.0,
+        "ppl_with_ve": 9.0 if signal else 10.0,
+    }
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+
 def _run_verdict(repo_root: Path, output_dir: Path) -> dict[str, Any]:
     script = repo_root / "scripts/proof_packs/python/verdict_generator.py"
     subprocess.run(
@@ -131,19 +147,40 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
             invariants_status=invariants_status,
         )
 
+    ve_cert = (
+        model_dir
+        / "reports"
+        / "errors"
+        / "ve_mlp_scale_skew"
+        / "evaluation.report.json"
+    )
+    _write_cert(
+        ve_cert,
+        validation={
+            "invariants_pass": True,
+            "primary_metric_acceptable": True,
+            "spectral_stable": True,
+            "rmt_stable": True,
+            "preview_final_drift_acceptable": True,
+            "guard_overhead_acceptable": True,
+        },
+        invariants_status="pass",
+    )
+    _write_ve_probe(ve_cert.parent / "ve_probe.json", signal=True)
+
     verdict = _run_verdict(repo_root, output_dir)
     assert verdict["verdict"] == "PASS"
     counts = verdict["counts"]
     assert counts["models_total"] == 1
     assert counts["clean_total"] == 4
     assert counts["stress_total"] == 4
-    assert counts["error_injection_total"] == 11
+    assert counts["error_injection_total"] == 12
     assert counts["informational_stress_signaled"] == 2
-    assert counts["primary_guard_required_scenarios"] == 4
-    assert counts["primary_guard_required_hits"] == 4
+    assert counts["primary_guard_required_scenarios"] == 5
+    assert counts["primary_guard_required_hits"] == 5
 
     guard_summary = verdict["guard_signal_summary"]
-    assert guard_summary["records_total"] == 19
+    assert guard_summary["records_total"] == 20
     signals = guard_summary["signals"]
     assert signals["primary_metric"]["flagged"] == 13
     assert signals["primary_metric"]["unique"] == 2
@@ -159,7 +196,7 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
     assert category["clean"]["any_flag"] == 0
     assert category["stress"]["reports"] == 4
     assert category["stress"]["any_flag"] == 4
-    assert category["error_injection"]["reports"] == 11
+    assert category["error_injection"]["reports"] == 12
     assert category["error_injection"]["any_flag"] == 11
 
 
@@ -304,6 +341,7 @@ def test_verdict_contract_enforces_informational_stress_signal_fraction(
         "weight_tying_break",
         "rmt_norm_noise",
         "spectral_moderate_scale",
+        "ve_mlp_scale_skew",
     ):
         _write_cert(
             model_dir / "reports" / "errors" / error_type / "evaluation.report.json",
@@ -317,6 +355,11 @@ def test_verdict_contract_enforces_informational_stress_signal_fraction(
             },
             invariants_status="fail",
         )
+        if error_type == "ve_mlp_scale_skew":
+            _write_ve_probe(
+                model_dir / "reports" / "errors" / error_type / "ve_probe.json",
+                signal=True,
+            )
 
     verdict = _run_verdict(repo_root, output_dir)
     assert verdict["verdict"] == "FAIL"
@@ -427,5 +470,42 @@ def test_verdict_contract_accepts_spectral_caps_applied_as_primary_guard_signal(
     assert not any(
         req.get("requirement") == "scenario_primary_guard_signal"
         and req.get("scenario") == "spectral_moderate_scale"
+        for req in verdict.get("failed_requirements", [])
+    )
+
+
+def test_verdict_contract_accepts_ve_probe_sidecar_as_primary_guard_signal(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    output_dir = tmp_path / "run"
+    cert_path = (
+        output_dir
+        / "mistral-7b"
+        / "reports"
+        / "errors"
+        / "ve_mlp_scale_skew"
+        / "evaluation.report.json"
+    )
+
+    _write_cert(
+        cert_path,
+        validation={
+            "invariants_pass": True,
+            "primary_metric_acceptable": True,
+            "spectral_stable": True,
+            "rmt_stable": True,
+            "preview_final_drift_acceptable": True,
+            "guard_overhead_acceptable": True,
+        },
+        invariants_status="pass",
+    )
+    _write_ve_probe(cert_path.parent / "ve_probe.json", signal=True)
+
+    verdict = _run_verdict(repo_root, output_dir)
+    assert verdict["verdict"] == "FAIL"
+    assert not any(
+        req.get("requirement") == "scenario_primary_guard_signal"
+        and req.get("scenario") == "ve_mlp_scale_skew"
         for req in verdict.get("failed_requirements", [])
     )

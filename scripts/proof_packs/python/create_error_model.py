@@ -924,6 +924,115 @@ def main(argv: list[str]) -> int:
         else:
             print("WARNING: spectral_moderate_scale not injected (no matching params)")
 
+    elif error_type == "ve_mlp_scale_skew":
+        # VE-targeted error injection.
+        #
+        # Intentionally scale one (or a few) FFN output projection weights
+        # (e.g., down_proj/c_proj/fc2) by a bounded factor so DD-VE should propose
+        # an approximately inverse correction (within clamp).
+        scale_factor = float(os.environ.get("INVARLOCK_VE_SCALE_FACTOR", "0.90"))
+        target_layers_spec = os.environ.get("INVARLOCK_VE_TARGET_LAYERS", "").strip()
+        max_params = int(os.environ.get("INVARLOCK_VE_MAX_PARAMS", "1"))
+        seed = int(os.environ.get("INVARLOCK_VE_SEED", "42"))
+        target_family = os.environ.get("INVARLOCK_VE_TARGET_FAMILY", "mlp").strip().lower()
+        include_experts = os.environ.get("INVARLOCK_VE_INCLUDE_EXPERTS", "1") == "1"
+
+        if not scale_factor > 0.0:
+            raise SystemExit("ve_mlp_scale_skew: INVARLOCK_VE_SCALE_FACTOR must be > 0")
+        if max_params < 0:
+            max_params = 0
+
+        random.seed(seed)
+        torch.manual_seed(seed)
+
+        layer_pattern = re.compile(r"(?:layers|blocks|h)\.(\d+)\.")
+        mlp_out_patterns = ("down_proj.weight", "c_proj.weight", "fc2.weight")
+        # Some MoE experts use w2 as the FFN output projection.
+        expert_out_patterns = ("w2.weight",)
+
+        def is_target_param(name: str) -> bool:
+            lname = name.lower()
+            if target_family not in ("mlp", "both", "attn"):
+                return False
+            if target_family in ("mlp", "both"):
+                if any(pat in lname for pat in mlp_out_patterns):
+                    return True
+                if include_experts and any(pat in lname for pat in expert_out_patterns):
+                    if any(tok in lname for tok in ("experts", "moe", "block_sparse_moe")):
+                        return True
+            return False
+
+        params_by_layer: dict[int, list[tuple[str, torch.Tensor]]] = {}
+        for name, param in model.named_parameters():
+            lname = name.lower()
+            if param.dim() < 2 or "weight" not in lname:
+                continue
+            if not param.is_floating_point():
+                continue
+            if not is_target_param(name):
+                continue
+            match = layer_pattern.search(name)
+            if match:
+                layer_idx = int(match.group(1))
+                params_by_layer.setdefault(layer_idx, []).append((name, param))
+            else:
+                # Still allow global/expert weights even if no layer index is found.
+                params_by_layer.setdefault(-1, []).append((name, param))
+
+        all_layer_indices = sorted(i for i in params_by_layer.keys() if i >= 0)
+        max_layer = max(all_layer_indices) + 1 if all_layer_indices else 0
+        if target_layers_spec:
+            target_layers = _parse_layer_indices(target_layers_spec, max_layer)
+        else:
+            target_layers = _default_last_layers(all_layer_indices, 4)
+
+        target_params: list[tuple[str, torch.Tensor]] = []
+        for layer_idx in target_layers:
+            target_params.extend(params_by_layer.get(layer_idx, []))
+        if not target_params and params_by_layer.get(-1):
+            # Fallback to any matching weights.
+            target_params = list(params_by_layer[-1])
+            target_layers = [-1]
+
+        random.shuffle(target_params)
+        if max_params > 0 and len(target_params) > max_params:
+            target_params = target_params[:max_params]
+
+        modified_count = 0
+        modified_names: list[str] = []
+        for name, param in target_params:
+            with torch.no_grad():
+                param.mul_(scale_factor)
+            modified_count += 1
+            modified_names.append(name)
+            if modified_count <= 5:
+                print(f"Scaled param: {name} (factor={scale_factor})")
+
+        if modified_count > 5:
+            print(f"  ... and {modified_count - 5} more parameters")
+
+        if modified_count > 0:
+            error_info.update(
+                {
+                    "injected": True,
+                    "scale_factor": scale_factor,
+                    "seed": seed,
+                    "target_family": target_family,
+                    "target_layers": target_layers,
+                    "max_params": max_params,
+                    "include_experts": include_experts,
+                    "modified_count": modified_count,
+                    "modified_params": modified_names[:20],
+                    "total_layers": max_layer,
+                }
+            )
+            print(
+                f"Applied VE MLP scale skew to {modified_count} params "
+                f"(factor={scale_factor}, seed={seed})"
+            )
+        else:
+            print("WARNING: ve_mlp_scale_skew not injected (no matching params)")
+
     else:
         print(f"WARNING: Unknown error_type={error_type!r}; no injection applied")
 

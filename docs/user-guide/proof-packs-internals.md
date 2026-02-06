@@ -210,12 +210,18 @@ Enabled when `RUN_ERROR_INJECTION=true` (default):
 - Required detection (`must_detect`): `nan_injection`, `inf_injection`,
   `shape_mismatch`, `missing_tensors`, `extreme_quant`, `scale_explosion`,
   `rank_collapse`, `norm_collapse`, `weight_tying_break`
-- Informational detection: `rmt_norm_noise`, `spectral_moderate_scale`
+- Informational detection: `rmt_norm_noise`, `spectral_moderate_scale`, `ve_mlp_scale_skew`
 
 `rmt_norm_noise` additionally emits an `rmt_probe.json` sidecar next to the error cert.
 This runs an explicit cross-model RMT probe on shared calibration windows (stored in the
 baseline report) so the proof pack can demonstrate RMT’s delta policy even when compare-mode
 evaluation keeps `validation.rmt_stable=true`.
+
+`ve_mlp_scale_skew` additionally emits a `ve_probe.json` sidecar next to the error cert.
+Variance (DD-VE) is a remediation guard and compare-mode evaluation runs the subject model
+with a no-op edit, which can mute VE’s in-report evidence. The VE probe runs VE calibration
+directly on shared windows and records whether VE proposes scales and produces a meaningful
+primary-metric improvement.
 
 Source of truth: `scripts/proof_packs/scenarios.json` strictness + `intent` +
 `primary_guard` metadata.
@@ -467,8 +473,9 @@ OUTPUT_DIR/
 ```
 
 Some scenarios emit additional sidecar artifacts alongside `evaluation.report.json`
-(for example `reports/errors/rmt_norm_noise/rmt_probe.json`). When present, `run_pack.sh`
-copies these sidecars into the packaged proof pack under `certs/**/`.
+(for example `reports/errors/rmt_norm_noise/rmt_probe.json` or
+`reports/errors/ve_mlp_scale_skew/ve_probe.json`). When present, `run_pack.sh` copies
+these sidecars into the packaged proof pack under `certs/**/`.
 
 ## Run modes
 

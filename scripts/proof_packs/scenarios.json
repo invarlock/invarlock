@@ -304,6 +304,29 @@
           {"kind": "validation_flag", "flag": "spectral_stable", "expected": false}
         ]
       }
+    },
+    {
+      "id": "ve_mlp_scale_skew",
+      "category": "error_injection",
+      "failure_class": "variance.ve_scale_skew",
+      "strictness": "informational",
+      "intent": "subtle_detectable",
+      "primary_guard": "variance",
+      "generation": {
+        "kind": "error",
+        "error_type": "ve_mlp_scale_skew",
+        "env": {
+          "INVARLOCK_VE_SCALE_FACTOR": "0.90",
+          "INVARLOCK_VE_MAX_PARAMS": "1",
+          "INVARLOCK_VE_SEED": "42"
+        }
+      },
+      "requirements": {
+        "primary_guard_required": true,
+        "detectors_any_of": [
+          {"kind": "ve_probe", "field": "signal", "expected": true}
+        ]
+      }
     }
   ]
 }
