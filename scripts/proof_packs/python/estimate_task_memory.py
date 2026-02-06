@@ -99,6 +99,8 @@ def main() -> int:
         required = 5.0
     elif task_type == "SETUP_BASELINE":
         required = float(weights_gb) + load_overhead
+    elif task_type in ("CLEANUP_EDIT", "CLEANUP_ERROR"):
+        required = 1.0
     elif task_type == "CREATE_EDITS_BATCH":
         required = (float(weights_gb) * 2.0) + batch_overhead
     elif task_type in ("CREATE_EDIT", "CREATE_ERROR"):

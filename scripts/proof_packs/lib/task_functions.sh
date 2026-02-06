@@ -620,6 +620,11 @@ execute_task() {
                 local run=$(echo "${params}" | jq -r '.run // 1')
                 task_evaluate_edit "${model_name}" "${gpu_id}" "${edit_spec}" "${version}" "${run}" "${output_dir}" "${task_log}" || exit_code=$?
                 ;;
+            CLEANUP_EDIT)
+                local edit_spec=$(echo "${params}" | jq -r '.edit_spec // ""')
+                local version=$(echo "${params}" | jq -r '.version // "clean"')
+                task_cleanup_edit "${model_name}" "${edit_spec}" "${version}" "${output_dir}" "${task_log}" || exit_code=$?
+                ;;
             CREATE_ERROR)
                 local error_type=$(echo "${params}" | jq -r '.error_type // ""')
                 local error_env=$(echo "${params}" | jq -c '.error_env // {}' 2>/dev/null || echo '{}')
@@ -628,6 +633,10 @@ execute_task() {
             evaluate_ERROR)
                 local error_type=$(echo "${params}" | jq -r '.error_type // ""')
                 task_evaluate_error "${model_name}" "${gpu_id}" "${error_type}" "${output_dir}" "${task_log}" || exit_code=$?
+                ;;
+            CLEANUP_ERROR)
+                local error_type=$(echo "${params}" | jq -r '.error_type // ""')
+                task_cleanup_error "${model_name}" "${error_type}" "${output_dir}" "${task_log}" || exit_code=$?
                 ;;
             GENERATE_PRESET)
                 task_generate_preset "${model_name}" "${output_dir}" "${task_log}" || exit_code=$?
@@ -1444,6 +1453,66 @@ PRESET_YAML
     return ${exit_code}
 }
 
+# ============ TASK: CLEANUP_EDIT ============
+task_cleanup_edit() {
+    local model_name="$1"
+    local edit_spec="$2"
+    local version="$3"
+    local output_dir="$4"
+    local log_file="$5"
+
+    if [[ "${PACK_CLEANUP_MODELS:-1}" == "0" ]]; then
+        echo "  Cleanup disabled (PACK_CLEANUP_MODELS=0); skipping edit cleanup" >> "${log_file}"
+        return 0
+    fi
+
+    local model_output_dir="${output_dir}/${model_name}"
+    local resolved
+    resolved=$(resolve_edit_params "${model_output_dir}" "${edit_spec}" "${version}")
+    local status
+    status=$(echo "${resolved}" | jq -r '.status')
+    if [[ "${status}" == "skipped" ]]; then
+        echo "  Clean edit skipped by tuned preset: ${edit_spec}" >> "${log_file}"
+        return 0
+    fi
+    if [[ "${status}" != "selected" ]]; then
+        echo "ERROR: Unable to resolve edit spec (${edit_spec}): ${status}" >> "${log_file}"
+        return 1
+    fi
+    local edit_dir_name
+    edit_dir_name=$(echo "${resolved}" | jq -r '.edit_dir_name')
+    if [[ -z "${edit_dir_name}" || "${edit_dir_name}" == "null" ]]; then
+        echo "ERROR: Empty edit_dir_name for ${edit_spec}" >> "${log_file}"
+        return 1
+    fi
+
+    local models_root="${model_output_dir}/models"
+    local edit_path="${models_root}/${edit_dir_name}"
+    local baseline_path="${models_root}/baseline"
+
+    if [[ "${edit_path}" == "${baseline_path}" ]]; then
+        echo "ERROR: Refusing to delete baseline path: ${edit_path}" >> "${log_file}"
+        return 1
+    fi
+    if [[ "${edit_path}" != "${models_root}/"* ]]; then
+        echo "ERROR: Refusing to delete path outside models root: ${edit_path}" >> "${log_file}"
+        return 1
+    fi
+    if [[ ! -e "${edit_path}" ]]; then
+        echo "  Edit path already absent: ${edit_path}" >> "${log_file}"
+        return 0
+    fi
+
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Cleaning up edit model: ${edit_dir_name}" >> "${log_file}"
+    rm -rf "${edit_path}" >> "${log_file}" 2>&1 || {
+        echo "ERROR: Failed to remove edit path: ${edit_path}" >> "${log_file}"
+        return 1
+    }
+
+    echo "  Removed: ${edit_path}" >> "${log_file}"
+    return 0
+}
+
 # ============ TASK: CREATE_ERROR ============
 
 # Create error-injected model
@@ -1805,4 +1874,49 @@ PRESET_YAML
     fi
 
     return ${exit_code}
+}
+
+# ============ TASK: CLEANUP_ERROR ============
+task_cleanup_error() {
+    local model_name="$1"
+    local error_type="$2"
+    local output_dir="$3"
+    local log_file="$4"
+
+    if [[ "${PACK_CLEANUP_MODELS:-1}" == "0" ]]; then
+        echo "  Cleanup disabled (PACK_CLEANUP_MODELS=0); skipping error cleanup" >> "${log_file}"
+        return 0
+    fi
+
+    if [[ -z "${error_type}" ]]; then
+        echo "ERROR: CLEANUP_ERROR missing error_type" >> "${log_file}"
+        return 1
+    fi
+
+    local model_output_dir="${output_dir}/${model_name}"
+    local models_root="${model_output_dir}/models"
+    local error_path="${models_root}/error_${error_type}"
+    local baseline_path="${models_root}/baseline"
+
+    if [[ "${error_path}" == "${baseline_path}" ]]; then
+        echo "ERROR: Refusing to delete baseline path: ${error_path}" >> "${log_file}"
+        return 1
+    fi
+    if [[ "${error_path}" != "${models_root}/"* ]]; then
+        echo "ERROR: Refusing to delete path outside models root: ${error_path}" >> "${log_file}"
+        return 1
+    fi
+    if [[ ! -e "${error_path}" ]]; then
+        echo "  Error path already absent: ${error_path}" >> "${log_file}"
+        return 0
+    fi
+
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Cleaning up error model: ${error_type}" >> "${log_file}"
+    rm -rf "${error_path}" >> "${log_file}" 2>&1 || {
+        echo "ERROR: Failed to remove error path: ${error_path}" >> "${log_file}"
+        return 1
+    }
+
+    echo "  Removed: ${error_path}" >> "${log_file}"
+    return 0
 }
