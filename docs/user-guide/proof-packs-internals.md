@@ -186,7 +186,9 @@ parameters at runtime.
 
 ### Stress edits
 
-Stress edits should trigger InvarLock guard failures:
+Stress edits are split into required-fail (catastrophic) and informational scenarios.
+Required-fail scenarios are gating in the final verdict; informational scenarios are tracked
+as detection-quality signals and are validated by a minimum fail-fraction criterion.
 
 | Edit Type | Parameters | Scope |
 | --- | --- | --- |
@@ -199,11 +201,12 @@ Stress edits should trigger InvarLock guard failures:
 
 Enabled when `RUN_ERROR_INJECTION=true` (default):
 
-- `nan_injection`
-- `inf_injection`
-- `extreme_quant`
-- `scale_explosion`
-- `weight_tying_break`
+- Required detection (`must_detect`): `nan_injection`, `inf_injection`,
+  `shape_mismatch`, `missing_tensors`, `extreme_quant`, `scale_explosion`,
+  `rank_collapse`, `norm_collapse`, `weight_tying_break`
+- Informational detection: `rmt_norm_noise`, `spectral_moderate_scale`
+
+Source of truth: `scripts/proof_packs/scenarios.json` strictness metadata.
 
 ## Scheduling
 

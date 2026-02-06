@@ -4,16 +4,19 @@
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Hardware-agnostic validation runs that bundle reports into portable artifacts. |
+| **Purpose** | Hardware-agnostic validation runs that bundle reports into portable evidence artifacts. |
 | **Audience** | CI operators producing validation evidence across GPU topologies. |
 | **Requires** | GPU capable of fitting selected models; HF cache or network for model download. |
 | **Outputs** | Proof pack directory with reports, reports, checksums, and optional GPG signature. |
 | **Source of truth** | `scripts/proof_packs/run_suite.sh`, `scripts/proof_packs/run_pack.sh`. |
 
 Proof packs are hardware-agnostic validation runs that bundle InvarLock reports,
-summary reports, and verification metadata into a portable artifact. They replace the
+summary reports, and verification metadata into a portable evidence artifact. They replace the
 B200-specific validation harness with a suite that can run on any NVIDIA GPU topology
 that can fit the selected models.
+
+By default, a proof pack is evidence-grade (integrity + cert verification). Treat it
+as proof-grade only when the manifest is signed and the pack is verified in strict mode.
 
 ## Entrypoint Guide
 
@@ -101,7 +104,7 @@ Use `--determinism strict` to disable TF32 and cuDNN benchmarks and align with
 strict InvarLock presets. `--repeats N` reruns a single edit N times and records
 a drift summary in `results/determinism_repeats.json`.
 
-## Signing & Verification
+## Signing & Verification (Evidence vs Proof-Grade)
 
 `manifest.json` includes `checksums_sha256_digest` (sha256 of `checksums.sha256`) so a
 signed manifest cryptographically binds the checksums file (and thus all hashed artifacts).
@@ -111,9 +114,11 @@ Use `verify_pack.sh`:
 
 - Default: `scripts/proof_packs/verify_pack.sh --pack <dir>`
   - Verifies `checksums_sha256_digest`, validates `checksums.sha256`, and runs `invarlock verify`.
-  - Warns (but does not fail) if the pack is unsigned.
+  - Warns (but does not fail) if the pack is unsigned; this is evidence-grade verification.
 - Strict (recommended for distributable evidence): `scripts/proof_packs/verify_pack.sh --pack <dir> --strict`
   - Fails if `manifest.json.asc` is missing, `gpg` verification fails, or extra files exist outside `checksums.sha256`.
   - Alternative: set `PACK_STRICT_MODE=1` (e.g., `PACK_STRICT_MODE=1 scripts/proof_packs/verify_pack.sh --pack <dir>`).
+
+For proof-grade attestation, require all three: signed manifest, strict verification, and PASS final verdict.
 
 To skip signing during pack creation, set `PACK_GPG_SIGN=0`. To require signing, set `PACK_STRICT_MODE=1`.
