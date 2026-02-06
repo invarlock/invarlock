@@ -56,3 +56,41 @@ def test_scenarios_target_expected_guards_for_injection_probes() -> None:
     for scenario_id, expected_guard in expected_primary_guard.items():
         assert scenario_id in by_id, f"{scenario_id} missing from scenarios manifest"
         assert by_id[scenario_id].get("primary_guard") == expected_guard
+
+
+def test_scenarios_require_direct_primary_guard_hits_for_demo_probes() -> None:
+    scenarios = _load_scenarios()
+    by_id = {str(item.get("id")): item for item in scenarios}
+
+    required = {
+        "nan_injection",
+        "extreme_quant",
+        "rmt_norm_noise",
+        "spectral_moderate_scale",
+    }
+    for scenario_id in required:
+        scenario = by_id.get(scenario_id)
+        assert scenario is not None, f"{scenario_id} missing from scenarios manifest"
+        requirements = scenario.get("requirements")
+        assert isinstance(requirements, dict), (
+            f"{scenario_id}: requirements must be a mapping"
+        )
+        assert requirements.get("primary_guard_required") is True, (
+            f"{scenario_id}: primary_guard_required must be true"
+        )
+
+    for scenario_id in ("rmt_norm_noise", "spectral_moderate_scale"):
+        scenario = by_id[scenario_id]
+        generation = scenario.get("generation")
+        assert isinstance(generation, dict), f"{scenario_id}: generation must be dict"
+        env = generation.get("env")
+        assert isinstance(env, dict) and env, (
+            f"{scenario_id}: generation.env must be a non-empty mapping"
+        )
+        for key, value in env.items():
+            assert isinstance(key, str) and key.startswith("INVARLOCK_"), (
+                f"{scenario_id}: invalid env key {key!r}"
+            )
+            assert isinstance(value, str), (
+                f"{scenario_id}: env value must be string for {key}"
+            )

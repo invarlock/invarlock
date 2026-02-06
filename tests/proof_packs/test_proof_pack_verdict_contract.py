@@ -12,6 +12,7 @@ def _write_cert(
     validation: dict[str, Any],
     degraded: bool = False,
     invariants_status: str = "pass",
+    spectral_caps_applied: int | None = None,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload: dict[str, Any] = {
@@ -19,6 +20,20 @@ def _write_cert(
         "primary_metric": {"degraded": degraded, "invalid": degraded},
         "guard_overhead": {"evaluated": True},
         "invariants": {"status": invariants_status},
+    }
+    if spectral_caps_applied is not None:
+        payload["spectral"] = {"caps_applied": int(spectral_caps_applied)}
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+
+def _write_rmt_probe(path: Path, *, stable: bool) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "probe": "rmt_cross_model_v1",
+        "stable": stable,
+        "epsilon_violations": [] if stable else [{"family": "ffn"}],
     }
     path.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -88,7 +103,7 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
             },
         )
 
-    # Error injections (9) => must be detected (not PASS).
+    # Error injections (11) => must be detected (not PASS).
     for error_type in (
         "nan_injection",
         "inf_injection",
@@ -99,6 +114,8 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
         "rank_collapse",
         "norm_collapse",
         "weight_tying_break",
+        "rmt_norm_noise",
+        "spectral_moderate_scale",
     ):
         invariants_status = "fail"
         _write_cert(
@@ -120,19 +137,21 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
     assert counts["models_total"] == 1
     assert counts["clean_total"] == 4
     assert counts["stress_total"] == 4
-    assert counts["error_injection_total"] == 9
+    assert counts["error_injection_total"] == 11
     assert counts["informational_stress_signaled"] == 2
+    assert counts["primary_guard_required_scenarios"] == 4
+    assert counts["primary_guard_required_hits"] == 4
 
     guard_summary = verdict["guard_signal_summary"]
-    assert guard_summary["records_total"] == 17
+    assert guard_summary["records_total"] == 19
     signals = guard_summary["signals"]
-    assert signals["primary_metric"]["flagged"] == 11
+    assert signals["primary_metric"]["flagged"] == 13
     assert signals["primary_metric"]["unique"] == 2
-    assert signals["spectral"]["flagged"] == 11
+    assert signals["spectral"]["flagged"] == 13
     assert signals["spectral"]["unique"] == 2
-    assert signals["rmt"]["flagged"] == 9
+    assert signals["rmt"]["flagged"] == 11
     assert signals["rmt"]["unique"] == 0
-    assert signals["invariants"]["flagged"] == 9
+    assert signals["invariants"]["flagged"] == 11
     assert signals["invariants"]["unique"] == 0
 
     category = verdict["category_summary"]
@@ -140,8 +159,8 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
     assert category["clean"]["any_flag"] == 0
     assert category["stress"]["reports"] == 4
     assert category["stress"]["any_flag"] == 4
-    assert category["error_injection"]["reports"] == 9
-    assert category["error_injection"]["any_flag"] == 9
+    assert category["error_injection"]["reports"] == 11
+    assert category["error_injection"]["any_flag"] == 11
 
 
 def test_verdict_contract_reports_guard_signal_uniqueness(tmp_path: Path) -> None:
@@ -283,6 +302,8 @@ def test_verdict_contract_enforces_informational_stress_signal_fraction(
         "rank_collapse",
         "norm_collapse",
         "weight_tying_break",
+        "rmt_norm_noise",
+        "spectral_moderate_scale",
     ):
         _write_cert(
             model_dir / "reports" / "errors" / error_type / "evaluation.report.json",
@@ -303,5 +324,108 @@ def test_verdict_contract_enforces_informational_stress_signal_fraction(
     assert verdict["counts"]["informational_stress_signaled"] == 0
     assert any(
         req.get("requirement") == "informational_stress_min_signal_fraction"
+        for req in verdict.get("failed_requirements", [])
+    )
+
+
+def test_verdict_contract_requires_primary_guard_signal_for_marked_scenarios(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    output_dir = tmp_path / "run"
+    model_dir = output_dir / "mistral-7b"
+
+    _write_cert(
+        model_dir / "reports" / "errors" / "rmt_norm_noise" / "evaluation.report.json",
+        validation={
+            "invariants_pass": True,
+            "primary_metric_acceptable": True,
+            "spectral_stable": True,
+            "rmt_stable": True,
+            "preview_final_drift_acceptable": True,
+            "guard_overhead_acceptable": True,
+        },
+        invariants_status="pass",
+    )
+
+    verdict = _run_verdict(repo_root, output_dir)
+    assert verdict["verdict"] == "FAIL"
+    assert any(
+        req.get("requirement") == "scenario_primary_guard_signal"
+        and req.get("scenario") == "rmt_norm_noise"
+        for req in verdict.get("failed_requirements", [])
+    )
+
+
+def test_verdict_contract_accepts_rmt_probe_sidecar_as_primary_guard_signal(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    output_dir = tmp_path / "run"
+    cert_path = (
+        output_dir
+        / "mistral-7b"
+        / "reports"
+        / "errors"
+        / "rmt_norm_noise"
+        / "evaluation.report.json"
+    )
+
+    _write_cert(
+        cert_path,
+        validation={
+            "invariants_pass": True,
+            "primary_metric_acceptable": True,
+            "spectral_stable": True,
+            "rmt_stable": True,
+            "preview_final_drift_acceptable": True,
+            "guard_overhead_acceptable": True,
+        },
+        invariants_status="pass",
+    )
+    _write_rmt_probe(cert_path.parent / "rmt_probe.json", stable=False)
+
+    verdict = _run_verdict(repo_root, output_dir)
+    assert verdict["verdict"] == "FAIL"
+    assert not any(
+        req.get("requirement") == "scenario_primary_guard_signal"
+        and req.get("scenario") == "rmt_norm_noise"
+        for req in verdict.get("failed_requirements", [])
+    )
+
+
+def test_verdict_contract_accepts_spectral_caps_applied_as_primary_guard_signal(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    output_dir = tmp_path / "run"
+    cert_path = (
+        output_dir
+        / "mistral-7b"
+        / "reports"
+        / "errors"
+        / "spectral_moderate_scale"
+        / "evaluation.report.json"
+    )
+
+    _write_cert(
+        cert_path,
+        validation={
+            "invariants_pass": True,
+            "primary_metric_acceptable": True,
+            "spectral_stable": True,
+            "rmt_stable": True,
+            "preview_final_drift_acceptable": True,
+            "guard_overhead_acceptable": True,
+        },
+        invariants_status="pass",
+        spectral_caps_applied=2,
+    )
+
+    verdict = _run_verdict(repo_root, output_dir)
+    assert verdict["verdict"] == "FAIL"
+    assert not any(
+        req.get("requirement") == "scenario_primary_guard_signal"
+        and req.get("scenario") == "spectral_moderate_scale"
         for req in verdict.get("failed_requirements", [])
     )

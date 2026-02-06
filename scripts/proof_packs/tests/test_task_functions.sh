@@ -498,23 +498,31 @@ test_task_create_error_branches_cover_skip_missing_function_and_verify_paths() {
     : > "${log_file}"
 
     # Baseline missing error.
-    if task_create_error "${model_name}" 0 cuda_assert "${TEST_TMPDIR}/nope" "${log_file}"; then
+    if task_create_error "${model_name}" 0 cuda_assert '{}' "${TEST_TMPDIR}/nope" "${log_file}"; then
         t_fail "expected create_error to fail without baseline"
     fi
 
     # Missing create_error_model implementation.
-    if task_create_error "${model_name}" 0 cuda_assert "${out}" "${log_file}"; then
+    if task_create_error "${model_name}" 0 cuda_assert '{}' "${out}" "${log_file}"; then
         t_fail "expected create_error to fail when create_error_model is missing"
     fi
 
-    create_error_model() { mkdir -p "$2"; echo "{}" > "$2/config.json"; }
-    task_create_error "${model_name}" 0 cuda_assert "${out}" "${log_file}"
-    task_create_error "${model_name}" 0 cuda_assert "${out}" "${log_file}"
+    local captured_mode="${TEST_TMPDIR}/captured_mode.txt"
+    create_error_model() {
+        echo "${INVARLOCK_RMT_PROBE_MODE:-}" > "${captured_mode}"
+        mkdir -p "$2"
+        echo "{}" > "$2/config.json"
+    }
+    task_create_error "${model_name}" 0 cuda_assert '{"INVARLOCK_RMT_PROBE_MODE":"anisotropy"}' "${out}" "${log_file}"
+    assert_eq "anisotropy" "$(cat "${captured_mode}")" "injector env propagated to create_error_model"
+
+    task_create_error "${model_name}" 0 cuda_assert '{}' "${out}" "${log_file}"
+    task_create_error "${model_name}" 0 cuda_assert '{}' "${out}" "${log_file}"
 
     # Verify failure branch.
     rm -rf "${model_output_dir}/models/error_cuda_assert"
     create_error_model() { mkdir -p "$2"; }
-    if task_create_error "${model_name}" 0 cuda_assert "${out}" "${log_file}"; then
+    if task_create_error "${model_name}" 0 cuda_assert '{}' "${out}" "${log_file}"; then
         t_fail "expected create_error verification failure"
     fi
 }
@@ -666,6 +674,65 @@ test_task_evaluate_error_repairs_missing_tensors_config_when_available() {
     : > "${log_file}"
 
     task_evaluate_error "${model_name}" 0 missing_tensors "${out}" "${log_file}"
+}
+
+test_task_evaluate_error_emits_rmt_cross_model_probe_for_rmt_norm_noise() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    fixture_write "invarlock.create_cert" ""
+
+    local out="${TEST_TMPDIR}/out"
+    local model_name="m"
+    local model_output_dir="${out}/${model_name}"
+    local baseline_dir="${model_output_dir}/models/baseline"
+    local error_dir="${model_output_dir}/models/error_rmt_norm_noise"
+    local log_file="${TEST_TMPDIR}/log.txt"
+    mkdir -p "${baseline_dir}" "${error_dir}" "$(dirname "${log_file}")" "${out}/presets"
+    echo "{}" > "${baseline_dir}/config.json"
+    echo "{}" > "${error_dir}/config.json"
+    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
+    : > "${log_file}"
+
+    cat > "${out}/presets/calibrated_preset_${model_name}.yaml" <<'YAML'
+dataset:
+  provider: wikitext2
+  split: validation
+YAML
+
+    local probe_baseline_report_file="${TEST_TMPDIR}/baseline_report.json"
+    echo '{"evaluation_windows":{"preview":{"input_ids":[[1,2,3]],"attention_masks":[[1,1,1]]},"final":{"input_ids":[[4,5,6]],"attention_masks":[[1,1,1]]}}}' > "${probe_baseline_report_file}"
+    _ensure_evaluate_baseline_report() {
+        echo "${probe_baseline_report_file}"
+    }
+
+    local py_calls="${TEST_TMPDIR}/python.calls"
+    _cmd_python() {
+        echo "$*" >> "${py_calls}"
+        if [[ "${1:-}" == *"rmt_cross_model_probe.py" ]]; then
+            local out_path=""
+            local prev=""
+            for arg in "$@"; do
+                if [[ "${prev}" == "--out" ]]; then
+                    out_path="${arg}"
+                    break
+                fi
+                prev="${arg}"
+            done
+            if [[ -n "${out_path}" ]]; then
+                mkdir -p "$(dirname "${out_path}")"
+                echo '{"probe":"rmt_cross_model_v1","stable":false}' > "${out_path}"
+            fi
+        fi
+        return 0
+    }
+
+    task_evaluate_error "${model_name}" 0 rmt_norm_noise "${out}" "${log_file}"
+
+    local probe_path="${model_output_dir}/reports/errors/rmt_norm_noise/rmt_probe.json"
+    assert_file_exists "${probe_path}" "rmt probe artifact emitted"
+    assert_match "rmt_cross_model_probe\\.py" "$(cat "${py_calls}")" "rmt probe script invoked"
 }
 
 test_task_create_model_variant_dispatch_and_fallback_errors() {

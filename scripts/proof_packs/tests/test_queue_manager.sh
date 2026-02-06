@@ -1138,12 +1138,77 @@ EOF
     generate_model_tasks "1" "org/model" "model" >/dev/null
 
     assert_match "CREATE_ERROR" "$(cat "${calls}")" "default error tasks created"
-    assert_match "\"error_type\": \"nan_injection\"" "$(cat "${calls}")" "includes nan injection"
-    assert_match "\"error_type\": \"inf_injection\"" "$(cat "${calls}")" "includes inf injection"
+    assert_match "\"error_type\"[[:space:]]*:[[:space:]]*\"nan_injection\"" "$(cat "${calls}")" "includes nan injection"
+    assert_match "\"error_type\"[[:space:]]*:[[:space:]]*\"inf_injection\"" "$(cat "${calls}")" "includes inf injection"
 
     local created
     created="$(grep -c '^CREATE_ERROR' "${calls}" || true)"
     assert_eq "9" "${created}" "fallback creates 9 default error injections"
+}
+
+test_generate_model_tasks_propagates_error_env_from_manifest() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
+
+    local calls="${TEST_TMPDIR}/calls_error_env"
+    : > "${calls}"
+    add_task() {
+        local task_type="$1"
+        local params="${6:-}"
+        printf '%s\t%s\n' "${task_type}" "${params}" >> "${calls}"
+        local count
+        count=$(wc -l < "${calls}" | tr -d ' ')
+        echo "t${count}"
+    }
+    estimate_model_memory() { echo "14"; }
+    generate_eval_evaluate_tasks() { :; }
+    generate_edit_tasks() { :; }
+
+    local pack_root="${TEST_TMPDIR}/pack_error_env"
+    mkdir -p "${pack_root}/lib"
+    SCRIPT_DIR="${pack_root}/lib"
+
+    cat > "${pack_root}/scenarios.json" <<'EOF'
+{
+  "schema": "proof_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {
+      "id": "quant_4bit_clean",
+      "generation": {"kind": "edit", "edit_spec": "quant_rtn:clean:ffn", "version": "clean"}
+    },
+    {
+      "id": "quant_4bit_stress",
+      "generation": {"kind": "edit", "edit_spec": "quant_rtn:3:32:all", "version": "stress"}
+    },
+    {
+      "id": "rmt_norm_noise",
+      "generation": {
+        "kind": "error",
+        "error_type": "rmt_norm_noise",
+        "env": {
+          "INVARLOCK_RMT_PROBE_MODE": "anisotropy",
+          "INVARLOCK_RMT_ANISO_BLEND": "0.75"
+        }
+      }
+    }
+  ]
+}
+EOF
+
+    PACK_USE_BATCH_EDITS="true"
+    CLEAN_EDIT_RUNS="1"
+    STRESS_EDIT_RUNS="1"
+    DRIFT_CALIBRATION_RUNS=1
+    RUN_ERROR_INJECTION="true"
+    generate_model_tasks "1" "org/model" "model" >/dev/null
+
+    local create_params
+    create_params="$(awk -F '\t' '$1=="CREATE_ERROR"{print $2; exit}' "${calls}")"
+    assert_match '"error_type":"rmt_norm_noise"' "${create_params}" "error_type retained"
+    assert_eq "anisotropy" "$(printf '%s' "${create_params}" | jq -r '.error_env.INVARLOCK_RMT_PROBE_MODE')" "env mode propagated"
+    assert_eq "0.75" "$(printf '%s' "${create_params}" | jq -r '.error_env.INVARLOCK_RMT_ANISO_BLEND')" "env blend propagated"
 }
 
 
@@ -1174,7 +1239,7 @@ test_generate_model_tasks_additional_batch_branches() {
     assert_match "CALIBRATION_RUN" "$(cat "${calls}")" "calibration task created"
     local error_count
     error_count="$(awk '/^evaluate_ERROR$/ {c++} END {print c+0}' "${calls}")"
-    assert_eq "9" "${error_count}" "evaluate error tasks created"
+    assert_eq "11" "${error_count}" "evaluate error tasks created"
 
     : > "${calls}"
     CLEAN_EDIT_RUNS=""
