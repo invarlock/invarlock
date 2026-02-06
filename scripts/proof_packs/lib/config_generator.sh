@@ -192,7 +192,7 @@ run_single_calibration() {
     report_file=$(find "${run_dir}" -name "report*.json" -type f 2>/dev/null | head -1)
     if [[ -n "${report_file}" ]]; then
         cp "${report_file}" "${run_dir}/baseline_report.json" 2>/dev/null || true
-        python3 "${_PACK_CONFIG_GENERATOR_PY_DIR}/report_from_report.py" \
+        python3 "${_PACK_CONFIG_GENERATOR_PY_DIR}/evaluation_report_from_report.py" \
             --report "${report_file}" \
             --out "${run_dir}/evaluation.report.json" >> "${log_file}" 2>&1 || true
     fi
