@@ -121,6 +121,90 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
     assert counts["clean_total"] == 4
     assert counts["stress_total"] == 4
     assert counts["error_injection_total"] == 9
+    assert counts["informational_stress_signaled"] == 2
+
+    guard_summary = verdict["guard_signal_summary"]
+    assert guard_summary["records_total"] == 17
+    signals = guard_summary["signals"]
+    assert signals["primary_metric"]["flagged"] == 11
+    assert signals["primary_metric"]["unique"] == 2
+    assert signals["spectral"]["flagged"] == 11
+    assert signals["spectral"]["unique"] == 2
+    assert signals["rmt"]["flagged"] == 9
+    assert signals["rmt"]["unique"] == 0
+    assert signals["invariants"]["flagged"] == 9
+    assert signals["invariants"]["unique"] == 0
+
+    category = verdict["category_summary"]
+    assert category["clean"]["reports"] == 4
+    assert category["clean"]["any_flag"] == 0
+    assert category["stress"]["reports"] == 4
+    assert category["stress"]["any_flag"] == 4
+    assert category["error_injection"]["reports"] == 9
+    assert category["error_injection"]["any_flag"] == 9
+
+
+def test_verdict_contract_reports_guard_signal_uniqueness(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    output_dir = tmp_path / "run"
+    model_dir = output_dir / "mistral-7b"
+
+    _write_cert(
+        model_dir / "reports" / "quant_4bit_clean" / "run_1" / "evaluation.report.json",
+        validation={
+            "invariants_pass": True,
+            "primary_metric_acceptable": True,
+            "spectral_stable": True,
+            "rmt_stable": True,
+            "preview_final_drift_acceptable": True,
+            "guard_overhead_acceptable": True,
+        },
+    )
+    _write_cert(
+        model_dir
+        / "reports"
+        / "prune_50pct_stress"
+        / "run_1"
+        / "evaluation.report.json",
+        validation={
+            "invariants_pass": True,
+            "primary_metric_acceptable": False,
+            "spectral_stable": True,
+            "rmt_stable": True,
+            "preview_final_drift_acceptable": True,
+            "guard_overhead_acceptable": True,
+        },
+    )
+    _write_cert(
+        model_dir / "reports" / "fp8_e5m2_stress" / "run_1" / "evaluation.report.json",
+        validation={
+            "invariants_pass": True,
+            "primary_metric_acceptable": True,
+            "spectral_stable": False,
+            "rmt_stable": True,
+            "preview_final_drift_acceptable": True,
+            "guard_overhead_acceptable": True,
+        },
+    )
+    _write_cert(
+        model_dir / "reports" / "errors" / "nan_injection" / "evaluation.report.json",
+        validation={
+            "invariants_pass": False,
+            "primary_metric_acceptable": True,
+            "spectral_stable": True,
+            "rmt_stable": True,
+            "preview_final_drift_acceptable": True,
+            "guard_overhead_acceptable": True,
+        },
+        invariants_status="fail",
+    )
+
+    verdict = _run_verdict(repo_root, output_dir)
+    summary = verdict["guard_signal_summary"]["signals"]
+    assert summary["invariants"] == {"flagged": 1, "unique": 1}
+    assert summary["primary_metric"] == {"flagged": 1, "unique": 1}
+    assert summary["spectral"] == {"flagged": 1, "unique": 1}
+    assert summary["rmt"] == {"flagged": 0, "unique": 0}
 
 
 def test_verdict_contract_fails_closed_when_no_reports(tmp_path: Path) -> None:
@@ -137,7 +221,7 @@ def test_verdict_contract_fails_closed_when_no_reports(tmp_path: Path) -> None:
     )
 
 
-def test_verdict_contract_enforces_informational_stress_fraction(
+def test_verdict_contract_enforces_informational_stress_signal_fraction(
     tmp_path: Path,
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
@@ -175,7 +259,7 @@ def test_verdict_contract_enforces_informational_stress_fraction(
             },
         )
 
-    # Informational stress edits intentionally PASS here to drive fail fraction to 0.0.
+    # Informational stress edits intentionally PASS here to drive signal fraction to 0.0.
     for edit in ("quant_4bit_stress", "fp8_e5m2_stress"):
         _write_cert(
             model_dir / "reports" / edit / "run_1" / "evaluation.report.json",
@@ -216,8 +300,8 @@ def test_verdict_contract_enforces_informational_stress_fraction(
     verdict = _run_verdict(repo_root, output_dir)
     assert verdict["verdict"] == "FAIL"
     assert verdict["counts"]["informational_stress_total"] == 2
-    assert verdict["counts"]["informational_stress_fail"] == 0
+    assert verdict["counts"]["informational_stress_signaled"] == 0
     assert any(
-        req.get("requirement") == "informational_stress_min_fail_fraction"
+        req.get("requirement") == "informational_stress_min_signal_fraction"
         for req in verdict.get("failed_requirements", [])
     )

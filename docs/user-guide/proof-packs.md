@@ -18,6 +18,10 @@ that can fit the selected models.
 By default, a proof pack is evidence-grade (integrity + cert verification). Treat it
 as proof-grade only when the manifest is signed and the pack is verified in strict mode.
 
+Operationally, proof packs are a maintainer smoke test that also emits reusable
+evidence data. The same run should let maintainers catch regressions, let third parties
+verify reported outcomes, and provide structured outputs for downstream analysis.
+
 ## Entrypoint Guide
 
 | Script | Purpose | Output | Use When |
@@ -73,6 +77,9 @@ Proof packs require pinned model revisions for reproducibility:
 A suite run writes artifacts under `OUTPUT_DIR` (default: `./proof_pack_runs/<suite>_<timestamp>`):
 
 - `reports/final_verdict.txt` + `reports/final_verdict.json`
+- `reports/category_summary.json`
+- `reports/guard_signal_summary.json`
+- `reports/scenario_signal_summary.json`
 - `analysis/determinism_repeats.json` (when `--repeats` is used)
 - `*/reports/**/evaluation.report.json`
 
@@ -80,6 +87,7 @@ A suite run writes artifacts under `OUTPUT_DIR` (default: `./proof_pack_runs/<su
 `OUTPUT_DIR/proof_pack`) and organizes them as:
 
 - `results/final_verdict.txt` + `results/final_verdict.json`
+- `results/**/category_summary.json`, `results/**/guard_signal_summary.json`, `results/**/scenario_signal_summary.json`
 - `results/**/determinism_repeats.json` (if present)
 - `certs/<model>/<edit>/<run>/evaluation.report.json`
 - `certs/**/evaluation.html` + `certs/**/verify.json`
