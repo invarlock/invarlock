@@ -215,6 +215,41 @@ EOF
     assert_match "VERDICT" "$(cat "${OUTPUT_DIR}/reports/final_verdict.txt")" "verdict content emitted"
 }
 
+test_pack_validation_pack_run_suite_runs_dependency_check_before_preflight_when_net_enabled() {
+    mock_reset
+
+    local calls_file="${TEST_TMPDIR}/calls.txt"
+
+    (
+        OUTPUT_DIR="${TEST_TMPDIR}/out"
+        PACK_NET="1"
+        PACK_SUITE="subset"
+        source ./scripts/proof_packs/lib/validation_suite.sh
+
+        # Stub out heavy setup (we only care about call ordering inside pack_run_suite).
+        pack_apply_network_mode() { :; }
+        pack_source_libs() { :; }
+        pack_setup_output_dirs() { :; }
+        pack_prepare_scenarios_manifest() { :; }
+        pack_setup_hf_cache_dirs() { :; }
+        pack_model_list_array() { PACK_MODEL_LIST=("mistralai/Mistral-7B-v0.1"); }
+        pack_prepare_tuned_edit_params() { :; }
+        pack_validate_tuned_edit_params() { :; }
+        pack_prepare_calibration_presets() { :; }
+        pack_validate_guard_calibration() { :; }
+
+        calls=""
+        check_dependencies() { calls="${calls}check,"; }
+        pack_preflight_models() { calls="${calls}preflight,"; }
+        main_dynamic() { calls="${calls}main,"; }
+
+        pack_run_suite
+        printf '%s' "${calls}" > "${calls_file}"
+    )
+
+    assert_eq "check,preflight,main," "$(cat "${calls_file}")" "dependency check precedes net preflight"
+}
+
 _make_validation_suite_sandbox() {
     local sandbox
     sandbox="$(mktemp -d "${TEST_TMPDIR}/pack_validation_suite.XXXXXX")"
@@ -1977,6 +2012,7 @@ test_pack_validation_pack_run_suite_branches() {
 
     cleanup() { return 0; }
     pack_apply_network_mode() { :; }
+    check_dependencies() { :; }
     pack_prepare_tuned_edit_params() { :; }
     pack_validate_tuned_edit_params() { :; }
     pack_prepare_calibration_presets() { :; }

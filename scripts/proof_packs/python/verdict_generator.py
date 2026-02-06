@@ -537,8 +537,9 @@ def _build_scenario_signal_summary(
     return rows
 
 
-def generate_verdict(*, output_dir: Path) -> dict[str, Any]:
-    manifest_path = _manifest_root() / "scenarios.json"
+def generate_verdict(*, output_dir: Path, manifest_path: Path | None = None) -> dict[str, Any]:
+    if manifest_path is None:
+        manifest_path = _manifest_root() / "scenarios.json"
     manifest = _load_scenarios_manifest(manifest_path)
 
     scenarios = manifest.get("scenarios", [])
@@ -631,12 +632,27 @@ def generate_verdict(*, output_dir: Path) -> dict[str, Any]:
         spec = scenario_index.get(scenario_id, {})
 
         reqs = spec.get("requirements") if isinstance(spec, dict) else None
-        detectors = None
+        detectors_any = None
         if isinstance(reqs, dict) and isinstance(reqs.get("detectors_any_of"), list):
-            detectors = [d for d in reqs.get("detectors_any_of") if isinstance(d, dict)]
+            detectors_any = [
+                d for d in reqs.get("detectors_any_of") if isinstance(d, dict)
+            ]
+
+        detectors_all = None
+        if isinstance(reqs, dict) and isinstance(reqs.get("detectors_all_of"), list):
+            detectors_all = [
+                d for d in reqs.get("detectors_all_of") if isinstance(d, dict)
+            ]
+
         detectors_hit = False
-        if detectors:
-            detectors_hit = any(_detector_matches(cert, d) for d in detectors)
+        if detectors_any or detectors_all:
+            detectors_hit = True
+            if detectors_any:
+                detectors_hit = any(_detector_matches(cert, d) for d in detectors_any)
+            if detectors_all:
+                detectors_hit = detectors_hit and all(
+                    _detector_matches(cert, d) for d in detectors_all
+                )
         primary_guard_required = bool(
             isinstance(reqs, dict) and reqs.get("primary_guard_required") is True
         )
@@ -656,7 +672,8 @@ def generate_verdict(*, output_dir: Path) -> dict[str, Any]:
             "passed": outcome.passed,
             "reasons": list(outcome.reasons),
             "detectors_hit": detectors_hit,
-            "detectors": detectors or [],
+            "detectors": detectors_any or [],
+            "detectors_all_of": detectors_all or [],
             "primary_guard_required": primary_guard_required,
             "invariants_status": outcome.invariants_status,
             "guard_flags": outcome.guard_flags,
@@ -1088,13 +1105,18 @@ def _write_json(path: Path, payload: Any) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument(
+        "--manifest",
+        type=Path,
+        help="Optional scenarios manifest JSON (defaults to scripts/proof_packs/scenarios.json).",
+    )
     args = parser.parse_args()
 
     output_dir: Path = args.output_dir
     reports_dir = output_dir / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
 
-    payload = generate_verdict(output_dir=output_dir)
+    payload = generate_verdict(output_dir=output_dir, manifest_path=args.manifest)
     _write_json(reports_dir / "final_verdict.json", payload)
     (reports_dir / "final_verdict.txt").write_text(
         _render_text(payload),

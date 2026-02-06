@@ -509,3 +509,93 @@ def test_verdict_contract_accepts_ve_probe_sidecar_as_primary_guard_signal(
         and req.get("scenario") == "ve_mlp_scale_skew"
         for req in verdict.get("failed_requirements", [])
     )
+
+
+def test_verdict_contract_supports_detectors_all_of(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    output_dir = tmp_path / "run"
+    manifest_path = tmp_path / "scenarios.json"
+
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema": "proof_pack_scenarios_v1",
+                "schema_version": 1,
+                "scenarios": [
+                    {
+                        "id": "demo_error",
+                        "category": "error_injection",
+                        "failure_class": "demo",
+                        "strictness": "must_detect",
+                        "intent": "fault_detection",
+                        "primary_guard": "rmt",
+                        "generation": {"kind": "error", "error_type": "demo_error"},
+                        "requirements": {
+                            "primary_guard_required": True,
+                            # OR matches (probe stable=false), but AND also requires PM acceptable.
+                            "detectors_any_of": [
+                                {
+                                    "kind": "rmt_probe",
+                                    "field": "stable",
+                                    "expected": False,
+                                }
+                            ],
+                            "detectors_all_of": [
+                                {
+                                    "kind": "validation_flag",
+                                    "flag": "primary_metric_acceptable",
+                                    "expected": True,
+                                }
+                            ],
+                        },
+                    }
+                ],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    model_dir = output_dir / "mistral-7b"
+    cert_path = (
+        model_dir / "reports" / "errors" / "demo_error" / "evaluation.report.json"
+    )
+    _write_cert(
+        cert_path,
+        validation={
+            "invariants_pass": True,
+            # Make the AND clause fail (but keep the OR clause true via probe).
+            "primary_metric_acceptable": False,
+            "spectral_stable": True,
+            "rmt_stable": True,
+            "preview_final_drift_acceptable": True,
+            "guard_overhead_acceptable": True,
+        },
+        invariants_status="pass",
+    )
+    _write_rmt_probe(cert_path.parent / "rmt_probe.json", stable=False)
+
+    script = repo_root / "scripts/proof_packs/python/verdict_generator.py"
+    subprocess.run(
+        [
+            "python3",
+            str(script),
+            "--output-dir",
+            str(output_dir),
+            "--manifest",
+            str(manifest_path),
+        ],
+        check=True,
+        cwd=repo_root,
+    )
+    verdict_path = output_dir / "reports" / "final_verdict.json"
+    verdict = json.loads(verdict_path.read_text(encoding="utf-8"))
+
+    assert verdict["verdict"] == "FAIL"
+    assert any(
+        req.get("requirement") == "error_injection_detected"
+        and req.get("scenario") == "demo_error"
+        for req in verdict.get("failed_requirements", [])
+    )

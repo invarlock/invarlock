@@ -1503,7 +1503,11 @@ main_dynamic() {
     echo "========================================================================"
     echo ""
 
-    check_dependencies
+    if [[ "${PACK_DEPENDENCIES_CHECKED:-0}" != "1" ]]; then
+        check_dependencies
+        PACK_DEPENDENCIES_CHECKED=1
+        export PACK_DEPENDENCIES_CHECKED
+    fi
     configure_gpu_pool
     pack_model_list_array
 
@@ -2040,6 +2044,14 @@ pack_run_suite() {
     pack_validate_tuned_edit_params || return 1
     pack_prepare_calibration_presets || return 1
     pack_validate_guard_calibration || return 1
+
+    # Net-enabled preflight uses optional python deps (huggingface_hub) and should
+    # not run before we validate/install dependencies.
+    if [[ "${PACK_NET}" == "1" && "${PACK_DEPENDENCIES_CHECKED:-0}" != "1" ]]; then
+        check_dependencies
+        PACK_DEPENDENCIES_CHECKED=1
+        export PACK_DEPENDENCIES_CHECKED
+    fi
 
     if [[ "${PACK_NET}" == "1" ]]; then
         pack_preflight_models "${OUTPUT_DIR}" "${PACK_MODEL_LIST[@]}" || return 1
