@@ -609,10 +609,10 @@
         "kind": "error",
         "error_type": "spectral_moderate_scale",
         "env": {
-          "INVARLOCK_SPECTRAL_SCALE_FACTOR": "1.6",
+          "INVARLOCK_SPECTRAL_SCALE_FACTOR": "1.3",
           "INVARLOCK_SPECTRAL_TARGET_FAMILY": "attn",
           "INVARLOCK_SPECTRAL_TARGET_PARAMS": "o_proj",
-          "INVARLOCK_SPECTRAL_MAX_PARAMS": "2",
+          "INVARLOCK_SPECTRAL_MAX_PARAMS": "4",
           "INVARLOCK_SPECTRAL_INCLUDE_QKV": "0",
           "INVARLOCK_SPECTRAL_SEED": "42"
         }
