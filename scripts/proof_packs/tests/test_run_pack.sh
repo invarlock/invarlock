@@ -905,6 +905,9 @@ test_run_pack_entrypoint_errors_on_invalid_args() {
     run pack_run_pack --determinism
     assert_rc "2" "${RUN_RC}" "missing determinism value"
 
+    run pack_run_pack --scenario-ids
+    assert_rc "2" "${RUN_RC}" "missing scenario-ids value"
+
     run pack_run_pack --repeats nope
     assert_rc "2" "${RUN_RC}" "invalid repeats value"
 
@@ -924,12 +927,13 @@ test_run_pack_entrypoint_parses_suite_determinism_and_repeats() {
     pack_entrypoint() { printf '%s\n' "$@" > "${TEST_TMPDIR}/run.args"; }
     pack_build_pack() { :; }
 
-    pack_run_pack --suite full --net 1 --layout v2 --determinism strict --repeats 2 --out "${TEST_TMPDIR}/out"
+    pack_run_pack --suite full --net 1 --layout v2 --determinism strict --repeats 2 --scenario-ids "x,y" --out "${TEST_TMPDIR}/out"
 
     assert_match "--suite[[:space:]]+full" "$(cat "${TEST_TMPDIR}/run.args")" "suite forwarded"
     assert_eq "v2" "${PACK_PACK_LAYOUT}" "layout forwarded"
     assert_match "--determinism[[:space:]]+strict" "$(cat "${TEST_TMPDIR}/run.args")" "determinism forwarded"
     assert_match "--repeats[[:space:]]+2" "$(cat "${TEST_TMPDIR}/run.args")" "repeats forwarded"
+    assert_match "--scenario-ids[[:space:]]+x,y" "$(cat "${TEST_TMPDIR}/run.args")" "scenario ids forwarded"
 }
 
 
@@ -971,6 +975,9 @@ test_run_pack_entrypoint_builds_run_args_for_modes() {
 
     pack_run_pack --run-only --out "${TEST_TMPDIR}/out2"
     assert_match "--run-only" "$(cat "${TEST_TMPDIR}/run.args")" "run-only forwarded"
+
+    pack_run_pack --errors-only --out "${TEST_TMPDIR}/out_err"
+    assert_match "--errors-only" "$(cat "${TEST_TMPDIR}/run.args")" "errors-only forwarded"
 
     pack_run_pack --resume --pack-dir "${TEST_TMPDIR}/pack3" --out "${TEST_TMPDIR}/out3"
     assert_match "--resume" "$(cat "${TEST_TMPDIR}/run.args")" "resume forwarded"

@@ -2170,6 +2170,39 @@ test_pack_validation_pack_run_suite_calibrate_only_skips_tuned_edit_params_valid
     trap - EXIT INT TERM HUP QUIT
 }
 
+test_pack_validation_pack_run_suite_errors_only_skips_tuned_edit_params_validation() {
+    mock_reset
+
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    cleanup() { return 0; }
+    pack_require_bash4() { return 0; }
+    pack_apply_network_mode() { :; }
+    pack_source_libs() { return 0; }
+    pack_prepare_scenarios_manifest() { return 0; }
+    pack_setup_hf_cache_dirs() { return 0; }
+
+    # Ensure the model list would fail tuned preset validation if it ran.
+    pack_model_list_array() { PACK_MODEL_LIST=("Qwen/Qwen2.5-14B"); }
+
+    PACK_SUITE_MODE="errors-only"
+    PACK_SUITE="full"
+    PACK_NET="0"
+    OUTPUT_DIR="${TEST_TMPDIR}/out_errors_only"
+    export PACK_SUITE_MODE PACK_SUITE PACK_NET OUTPUT_DIR
+
+    pack_load_model_revisions() { return 0; }
+    main_dynamic() {
+        printf '%s\n' "${CLEAN_EDIT_RUNS:-}|${STRESS_EDIT_RUNS:-}|${RUN_ERROR_INJECTION:-}" > "${TEST_TMPDIR}/errors_only.env"
+    }
+
+    run pack_run_suite
+    assert_rc "0" "${RUN_RC}" "errors-only skips tuned edit preset validation"
+    assert_file_exists "${TEST_TMPDIR}/errors_only.env" "main_dynamic invoked"
+    assert_eq "0|0|true" "$(cat "${TEST_TMPDIR}/errors_only.env")" "errors-only disables edits but keeps error injection enabled"
+    trap - EXIT INT TERM HUP QUIT
+}
+
 
 test_pack_apply_network_mode_sets_env_flags() {
     mock_reset
@@ -2715,4 +2748,35 @@ EOF
     local ids
     ids="$(jq -r '.scenarios[].id' "${OUTPUT_DIR}/state/scenarios.json" | sort | paste -sd ',' -)"
     assert_eq "b,c" "${ids}" "filters by suite, but keeps untagged scenarios"
+}
+
+test_pack_prepare_scenarios_manifest_filters_by_scenario_ids() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    local PACK_SUITE="showcase"
+
+    local manifest="${TEST_TMPDIR}/scenarios.json"
+    cat > "${manifest}" <<'EOF'
+{
+  "_meta": {},
+  "schema": "proof_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {"id": "a", "category": "clean", "strictness": "must_pass", "generation": {"kind": "edit", "edit_spec": "x", "version": "clean"}, "suites": ["subset"]},
+    {"id": "b", "category": "clean", "strictness": "must_pass", "generation": {"kind": "edit", "edit_spec": "y", "version": "clean"}, "suites": ["showcase"]},
+    {"id": "c", "category": "clean", "strictness": "must_pass", "generation": {"kind": "edit", "edit_spec": "z", "version": "clean"}}
+  ]
+}
+EOF
+    local PACK_SCENARIOS_MANIFEST_FILE="${manifest}"
+    local PACK_SCENARIO_IDS="b"
+
+    pack_prepare_scenarios_manifest
+
+    local ids
+    ids="$(jq -r '.scenarios[].id' "${OUTPUT_DIR}/state/scenarios.json" | sort | paste -sd ',' -)"
+    assert_eq "b" "${ids}" "filters by scenario id after suite filtering"
 }

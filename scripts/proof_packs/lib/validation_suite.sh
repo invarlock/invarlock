@@ -661,20 +661,30 @@ pack_prepare_scenarios_manifest() {
         mkdir -p "${OUTPUT_DIR}/state"
         local dest="${OUTPUT_DIR}/state/scenarios.json"
         local suite="${PACK_SUITE:-subset}"
+        local scenario_ids_csv="${PACK_SCENARIO_IDS:-}"
 
         if command -v jq >/dev/null 2>&1; then
             # Scenarios can optionally declare `suites: ["subset", "full", ...]`.
             # When present, the manifest is filtered to just the active PACK_SUITE.
-            jq --arg suite "${suite}" \
-                '. as $root
+            jq --arg suite "${suite}" --arg scenario_ids_csv "${scenario_ids_csv}" \
+                'def suites_ok($suite):
+                    ((.suites? | type) != "array")
+                    or ((.suites | length) == 0)
+                    or ((.suites | index($suite)) != null);
+                 def trim: gsub("^\\s+|\\s+$"; "");
+                 def ids($csv): ($csv | split(",") | map(trim) | map(select(length>0)));
+                 ._meta = (._meta | if type=="object" then . else {} end)
                  | ._meta.applied_suite = $suite
+                 | (ids($scenario_ids_csv)) as $ids
+                 | if ($ids | length) > 0 then ._meta.scenario_ids_filter = $ids else . end
                  | .scenarios = [
                      .scenarios[]
-                     | select(
-                         (.suites? | type) != "array"
-                         or ((.suites | length) == 0)
-                         or ((.suites | index($suite)) != null)
-                     )
+                     | select(suites_ok($suite))
+                     | if ($ids | length) > 0 then
+                         select(.id as $id | ($ids | index($id)) != null)
+                       else
+                         .
+                       end
                    ]' \
                 "${src}" > "${dest}"
         else
@@ -2117,14 +2127,26 @@ pack_run_suite() {
         error_exit "No models configured for PACK_SUITE=${PACK_SUITE}."
     fi
 
-    # Calibration-only runs do not execute clean/stress/error scenarios.
-    # Avoid requiring tuned edit presets during this phase.
-    if [[ "${PACK_SUITE_MODE:-full}" == "calibrate-only" ]]; then
-        CLEAN_EDIT_RUNS=0
-        STRESS_EDIT_RUNS=0
-        RUN_ERROR_INJECTION="false"
-        export CLEAN_EDIT_RUNS STRESS_EDIT_RUNS RUN_ERROR_INJECTION
-    fi
+    # Suite modes can change what parts of the task graph are generated.
+    # This keeps feedback loops fast when iterating on a specific subsystem.
+    case "${PACK_SUITE_MODE:-full}" in
+        calibrate-only)
+            # Calibration-only runs do not execute clean/stress/error scenarios.
+            # Avoid requiring tuned edit presets during this phase.
+            CLEAN_EDIT_RUNS=0
+            STRESS_EDIT_RUNS=0
+            RUN_ERROR_INJECTION="false"
+            export CLEAN_EDIT_RUNS STRESS_EDIT_RUNS RUN_ERROR_INJECTION
+            ;;
+        errors-only)
+            # Error-only runs are for rapidly iterating on error injection + guard probes.
+            # Keep calibration (or preset reuse) enabled so detectors have a baseline.
+            CLEAN_EDIT_RUNS=0
+            STRESS_EDIT_RUNS=0
+            RUN_ERROR_INJECTION="true"
+            export CLEAN_EDIT_RUNS STRESS_EDIT_RUNS RUN_ERROR_INJECTION
+            ;;
+    esac
 
     pack_prepare_tuned_edit_params || return 1
     pack_validate_tuned_edit_params || return 1

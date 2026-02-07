@@ -24,8 +24,23 @@ test_run_suite_entrypoint_parses_calibrate_only_and_run_only_flags() {
     pack_entrypoint --calibrate-only --out "${TEST_TMPDIR}/out1"
     assert_eq "calibrate-only:false" "$(cat "${TEST_TMPDIR}/entrypoint.flags")" "calibrate-only sets mode without resume"
 
+    pack_entrypoint --errors-only --out "${TEST_TMPDIR}/out_err"
+    assert_eq "errors-only:false" "$(cat "${TEST_TMPDIR}/entrypoint.flags")" "errors-only sets mode without resume"
+
     pack_entrypoint --run-only --out "${TEST_TMPDIR}/out2"
     assert_eq "run-only:true" "$(cat "${TEST_TMPDIR}/entrypoint.flags")" "run-only sets mode and implies resume"
+}
+
+test_run_suite_entrypoint_parses_scenario_ids_flag() {
+    mock_reset
+
+    source ./scripts/proof_packs/run_suite.sh
+
+    pack_apply_suite() { return 0; }
+    pack_run_suite() { echo "${PACK_SCENARIO_IDS:-}" > "${TEST_TMPDIR}/entrypoint.scenario_ids"; }
+
+    pack_entrypoint --scenario-ids "a,b,c" --out "${TEST_TMPDIR}/out"
+    assert_eq "a,b,c" "$(cat "${TEST_TMPDIR}/entrypoint.scenario_ids")" "scenario ids propagated"
 }
 
 test_run_suite_entrypoint_sets_default_output_dir() {
@@ -73,6 +88,9 @@ test_run_suite_entrypoint_errors_on_missing_values() {
 
     run pack_entrypoint --out
     assert_rc "2" "${RUN_RC}" "missing out value"
+
+    run pack_entrypoint --scenario-ids
+    assert_rc "2" "${RUN_RC}" "missing scenario-ids value"
 
     run pack_entrypoint --determinism
     assert_rc "2" "${RUN_RC}" "missing determinism value"

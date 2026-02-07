@@ -18,7 +18,9 @@ Options:
   --layout NAME        Pack layout (v1|v2) (default: v1)
   --determinism MODE   Determinism mode (strict|throughput)
   --repeats N          Determinism repeat count metadata (default: 0)
+  --scenario-ids IDS   Comma-separated scenario IDs to include (filters scenarios.json before queue generation)
   --calibrate-only     Only run calibration tasks (implies PACK_SUITE_MODE=calibrate-only)
+  --errors-only        Only run error injection scenarios (still performs calibration unless presets are provided)
   --run-only           Run edits/certs only (implies resume)
   --resume             Resume an existing run directory
   --help               Show this help message
@@ -454,6 +456,7 @@ pack_run_pack() {
     local resume_flag="${RESUME_FLAG:-false}"
     local pack_dir="${PACK_DIR:-}"
     local layout="${PACK_PACK_LAYOUT:-v1}"
+    local scenario_ids="${PACK_SCENARIO_IDS:-}"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -509,6 +512,14 @@ pack_run_pack() {
                 fi
                 shift 2
                 ;;
+            --scenario-ids)
+                scenario_ids="${2:-}"
+                if [[ -z "${scenario_ids}" ]]; then
+                    echo "ERROR: --scenario-ids requires a value" >&2
+                    return 2
+                fi
+                shift 2
+                ;;
             --repeats)
                 repeats="${2:-}"
                 if [[ -z "${repeats}" || ! "${repeats}" =~ ^[0-9]+$ ]]; then
@@ -523,6 +534,11 @@ pack_run_pack() {
                 ;;
             --calibrate-only)
                 suite_mode="calibrate-only"
+                resume_flag="false"
+                shift
+                ;;
+            --errors-only)
+                suite_mode="errors-only"
                 resume_flag="false"
                 shift
                 ;;
@@ -563,10 +579,15 @@ pack_run_pack() {
     run_args=("--suite" "${suite}" "--out" "${out}" "--determinism" "${determinism}" "--repeats" "${repeats}" "--net" "${net}")
     if [[ "${suite_mode}" == "calibrate-only" ]]; then
         run_args+=("--calibrate-only")
+    elif [[ "${suite_mode}" == "errors-only" ]]; then
+        run_args+=("--errors-only")
     elif [[ "${suite_mode}" == "run-only" ]]; then
         run_args+=("--run-only")
     elif [[ "${resume_flag}" == "true" ]]; then
         run_args+=("--resume")
+    fi
+    if [[ -n "${scenario_ids}" ]]; then
+        run_args+=("--scenario-ids" "${scenario_ids}")
     fi
 
     pack_entrypoint "${run_args[@]}"

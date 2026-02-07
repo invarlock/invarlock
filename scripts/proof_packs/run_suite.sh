@@ -22,7 +22,9 @@ Options:
   --out DIR            Output directory (default: ./proof_pack_runs/<suite>_<timestamp>)
   --determinism MODE   Determinism mode (strict|throughput)
   --repeats N          Determinism repeat count metadata (default: 0)
+  --scenario-ids IDS   Comma-separated scenario IDs to include (filters scenarios.json before queue generation)
   --calibrate-only     Only run calibration tasks (implies PACK_SUITE_MODE=calibrate-only)
+  --errors-only        Only run error injection scenarios (still performs calibration unless presets are provided)
   --run-only           Run edits/certs only (implies resume)
   --resume             Resume an existing run directory
   --help               Show this help message
@@ -61,6 +63,7 @@ pack_entrypoint() {
     local repeats="${PACK_REPEATS:-0}"
     local suite_mode="${PACK_SUITE_MODE:-full}"
     local resume_flag="${RESUME_FLAG:-false}"
+    local scenario_ids="${PACK_SCENARIO_IDS:-}"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -92,6 +95,14 @@ pack_entrypoint() {
                 fi
                 shift 2
                 ;;
+            --scenario-ids)
+                scenario_ids="${2:-}"
+                if [[ -z "${scenario_ids}" ]]; then
+                    echo "ERROR: --scenario-ids requires a value" >&2
+                    return 2
+                fi
+                shift 2
+                ;;
             --determinism)
                 determinism="${2:-}"
                 if [[ -z "${determinism}" ]]; then
@@ -114,6 +125,11 @@ pack_entrypoint() {
                 ;;
             --calibrate-only)
                 suite_mode="calibrate-only"
+                resume_flag="false"
+                shift
+                ;;
+            --errors-only)
+                suite_mode="errors-only"
                 resume_flag="false"
                 shift
                 ;;
@@ -157,8 +173,9 @@ pack_entrypoint() {
     PACK_SUITE_MODE="${suite_mode}"
     RESUME_FLAG="${resume_flag}"
     OUTPUT_DIR="${out}"
+    PACK_SCENARIO_IDS="${scenario_ids}"
 
-    export PACK_SUITE PACK_NET PACK_DETERMINISM PACK_REPEATS PACK_SUITE_MODE RESUME_FLAG OUTPUT_DIR
+    export PACK_SUITE PACK_NET PACK_DETERMINISM PACK_REPEATS PACK_SUITE_MODE RESUME_FLAG OUTPUT_DIR PACK_SCENARIO_IDS
 
     pack_apply_entrypoint_determinism
     pack_apply_suite "${PACK_SUITE}" || return 2
