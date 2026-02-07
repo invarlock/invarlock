@@ -29,6 +29,8 @@ test_gpu_worker_sets_waiting_deps_when_only_pending_tasks() {
     local out="${TEST_TMPDIR}/out"
     mkdir -p "${out}/workers" "${out}/logs/tasks"
 
+    WORKER_DEP_RESOLVE_INTERVAL=0
+
     export QUEUE_DIR="${out}/queue"
     mkdir -p "${QUEUE_DIR}"/{pending,ready,running,completed,failed}
 
@@ -38,6 +40,7 @@ test_gpu_worker_sets_waiting_deps_when_only_pending_tasks() {
 
     get_gpu_available_memory() { echo "100"; }
     find_and_claim_task() { echo ""; return 1; }
+    resolve_dependencies() { touch "${out}/workers/dep_resolve.called"; return 0; }
 
     gpu_worker "0" "${out}" &
     local pid=$!
@@ -55,6 +58,7 @@ test_gpu_worker_sets_waiting_deps_when_only_pending_tasks() {
     wait "${pid}" || true
 
     assert_eq "true" "${saw_waiting}" "waiting_deps status observed"
+    assert_file_exists "${out}/workers/dep_resolve.called" "dependency promotion triggered in worker loop"
 }
 
 test_gpu_worker_exits_on_poison_context_log() {
