@@ -194,6 +194,56 @@ def _normalize_guard_result(
     return passed, action, metrics, norm_violations
 
 
+def _top_k_items(values: dict[str, Any], *, k: int) -> list[dict[str, Any]]:
+    if not isinstance(values, dict) or not values:
+        return []
+    rows: list[tuple[str, float]] = []
+    for key, raw in values.items():
+        v = _safe_float(raw)
+        if v is None:
+            continue
+        rows.append((str(key), v))
+    rows.sort(key=lambda kv: kv[1], reverse=True)
+    out: list[dict[str, Any]] = []
+    for name, val in rows[: max(int(k), 0)]:
+        out.append({"module": name, "value": float(val)})
+    return out
+
+
+def _top_k_deltas(
+    base: dict[str, Any], cur: dict[str, Any], *, k: int, eps: float = 1e-12
+) -> list[dict[str, Any]]:
+    if not isinstance(base, dict):
+        base = {}
+    if not isinstance(cur, dict):
+        cur = {}
+
+    rows: list[tuple[float, str, float, float]] = []
+    keys = set(base) | set(cur)
+    for key in keys:
+        b = _safe_float(base.get(key))
+        c = _safe_float(cur.get(key))
+        if b is None or c is None:
+            continue
+        delta = c - b
+        frac = delta / max(abs(b), eps)
+        rows.append((frac, str(key), b, c))
+
+    rows.sort(key=lambda t: t[0], reverse=True)
+    out: list[dict[str, Any]] = []
+    for frac, name, b, c in rows[: max(int(k), 0)]:
+        out.append(
+            {
+                "module": name,
+                "base": float(b),
+                "cur": float(c),
+                "delta": float(c - b),
+                "delta_frac": float(frac),
+            }
+        )
+    return out
+
+
 def run_probe(args: argparse.Namespace) -> dict[str, Any]:
     baseline_model_path = Path(args.baseline_model).resolve()
     subject_model_path = Path(args.subject_model).resolve()
@@ -231,6 +281,10 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
     passed, action, metrics, violations = _normalize_guard_result(result)
     stable = bool(metrics.get("stable", passed))
 
+    # These are populated even when metrics omit module-level details.
+    edge_by_module_base = getattr(guard, "baseline_edge_risk_by_module", {}) or {}
+    edge_by_module = getattr(guard, "edge_risk_by_module", {}) or {}
+
     payload: dict[str, Any] = {
         "probe": "rmt_cross_model_v1",
         "timestamp_utc": datetime.now(UTC).isoformat(),
@@ -249,6 +303,12 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
         "edge_risk_by_family": metrics.get("edge_risk_by_family") or {},
         "epsilon_by_family": metrics.get("epsilon_by_family") or {},
         "epsilon_violations": metrics.get("epsilon_violations") or [],
+        "edge_risk_by_module_count": len(edge_by_module),
+        "edge_risk_by_module_base_top": _top_k_items(edge_by_module_base, k=25),
+        "edge_risk_by_module_top": _top_k_items(edge_by_module, k=25),
+        "edge_risk_by_module_delta_top": _top_k_deltas(
+            edge_by_module_base, edge_by_module, k=25
+        ),
         "violations": violations,
         "metrics": metrics,
     }

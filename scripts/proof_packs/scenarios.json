@@ -546,15 +546,16 @@
         "error_type": "rmt_norm_noise",
         "env": {
           "INVARLOCK_RMT_PROBE_MODE": "anisotropy",
-          "INVARLOCK_RMT_ANISO_BLEND": "0.90",
-          "INVARLOCK_RMT_ANISO_ROW_FRAC": "0.20",
-          "INVARLOCK_RMT_ANISO_MAX_ROWS": "512",
-          "INVARLOCK_RMT_ANISO_MAX_PARAMS": "12",
-          "INVARLOCK_RMT_ANISO_TARGET_FAMILY": "attn",
+          "INVARLOCK_RMT_ANISO_BLEND": "0.98",
+          "INVARLOCK_RMT_ANISO_ROW_FRAC": "0.30",
+          "INVARLOCK_RMT_ANISO_MAX_ROWS": "2048",
+          "INVARLOCK_RMT_ANISO_MAX_PARAMS": "4",
+          "INVARLOCK_RMT_ANISO_TARGET_FAMILY": "ffn",
+          "INVARLOCK_RMT_ANISO_TARGET_PARAMS": "up_proj",
           "INVARLOCK_RMT_ANISO_TARGET_LAYERS": "0-3",
           "INVARLOCK_RMT_ANISO_PRESERVE_ROW_NORMS": "1",
-          "INVARLOCK_RMT_ANISO_JITTER": "0.01",
-          "INVARLOCK_RMT_ANISO_INCLUDE_QKV": "1",
+          "INVARLOCK_RMT_ANISO_JITTER": "0.0",
+          "INVARLOCK_RMT_ANISO_INCLUDE_QKV": "0",
           "INVARLOCK_RMT_ANISO_SEED": "42"
         }
       },
@@ -610,7 +611,9 @@
         "env": {
           "INVARLOCK_SPECTRAL_SCALE_FACTOR": "2.0",
           "INVARLOCK_SPECTRAL_TARGET_FAMILY": "attn",
-          "INVARLOCK_SPECTRAL_MAX_PARAMS": "4",
+          "INVARLOCK_SPECTRAL_TARGET_LAYERS": "0-3",
+          "INVARLOCK_SPECTRAL_TARGET_PARAMS": "o_proj",
+          "INVARLOCK_SPECTRAL_MAX_PARAMS": "1",
           "INVARLOCK_SPECTRAL_INCLUDE_QKV": "0",
           "INVARLOCK_SPECTRAL_SEED": "42"
         }
@@ -642,12 +645,7 @@
         "detectors_any_of": [
           {
             "kind": "spectral_caps_applied",
-            "min": 1
-          },
-          {
-            "kind": "validation_flag",
-            "flag": "spectral_stable",
-            "expected": false
+            "min": 3
           }
         ]
       }
@@ -729,14 +727,16 @@
         "error_type": "rmt_norm_noise_strong",
         "env": {
           "INVARLOCK_RMT_PROBE_MODE": "anisotropy",
-          "INVARLOCK_RMT_ANISO_BLEND": "0.95",
-          "INVARLOCK_RMT_ANISO_ROW_FRAC": "0.20",
-          "INVARLOCK_RMT_ANISO_MAX_ROWS": "512",
-          "INVARLOCK_RMT_ANISO_MAX_PARAMS": "12",
-          "INVARLOCK_RMT_ANISO_TARGET_FAMILY": "attn",
-          "INVARLOCK_RMT_ANISO_PRESERVE_ROW_NORMS": "1",
-          "INVARLOCK_RMT_ANISO_JITTER": "0.02",
-          "INVARLOCK_RMT_ANISO_INCLUDE_QKV": "1",
+          "INVARLOCK_RMT_ANISO_BLEND": "1.0",
+          "INVARLOCK_RMT_ANISO_ROW_FRAC": "0.50",
+          "INVARLOCK_RMT_ANISO_MAX_ROWS": "8192",
+          "INVARLOCK_RMT_ANISO_MAX_PARAMS": "8",
+          "INVARLOCK_RMT_ANISO_TARGET_FAMILY": "ffn",
+          "INVARLOCK_RMT_ANISO_TARGET_PARAMS": "up_proj",
+          "INVARLOCK_RMT_ANISO_TARGET_LAYERS": "0-7",
+          "INVARLOCK_RMT_ANISO_PRESERVE_ROW_NORMS": "0",
+          "INVARLOCK_RMT_ANISO_JITTER": "0.0",
+          "INVARLOCK_RMT_ANISO_INCLUDE_QKV": "0",
           "INVARLOCK_RMT_ANISO_SEED": "7"
         }
       },
@@ -771,9 +771,11 @@
         "kind": "error",
         "error_type": "spectral_moderate_scale_mlp",
         "env": {
-          "INVARLOCK_SPECTRAL_SCALE_FACTOR": "2.0",
+          "INVARLOCK_SPECTRAL_SCALE_FACTOR": "1.4",
           "INVARLOCK_SPECTRAL_TARGET_FAMILY": "mlp",
-          "INVARLOCK_SPECTRAL_MAX_PARAMS": "6",
+          "INVARLOCK_SPECTRAL_TARGET_LAYERS": "0-3",
+          "INVARLOCK_SPECTRAL_TARGET_PARAMS": "up_proj",
+          "INVARLOCK_SPECTRAL_MAX_PARAMS": "2",
           "INVARLOCK_SPECTRAL_SEED": "7"
         }
       },

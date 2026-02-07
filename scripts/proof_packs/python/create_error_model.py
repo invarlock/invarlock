@@ -590,7 +590,8 @@ def main(argv: list[str]) -> int:
         else:
             # Default probe: inject structured anisotropy into selected projections.
             blend = float(os.environ.get("INVARLOCK_RMT_ANISO_BLEND", "0.75"))
-            blend = min(max(blend, 0.05), 0.99)
+            # Allow full row tying for strong probes (blend==1.0).
+            blend = min(max(blend, 0.05), 1.0)
             row_frac = float(os.environ.get("INVARLOCK_RMT_ANISO_ROW_FRAC", "0.35"))
             row_frac = min(max(row_frac, 0.01), 0.95)
             max_rows = int(os.environ.get("INVARLOCK_RMT_ANISO_MAX_ROWS", "256"))
@@ -600,6 +601,14 @@ def main(argv: list[str]) -> int:
                 .strip()
                 .lower()
             )
+            target_param_substrings_spec = os.environ.get(
+                "INVARLOCK_RMT_ANISO_TARGET_PARAMS", ""
+            ).strip()
+            target_param_substrings = [
+                part.strip().lower()
+                for part in target_param_substrings_spec.split(",")
+                if part.strip()
+            ]
             target_layers_spec = os.environ.get("INVARLOCK_RMT_ANISO_TARGET_LAYERS", "")
             include_qkv = os.environ.get("INVARLOCK_RMT_ANISO_INCLUDE_QKV", "1") == "1"
             preserve_row_norms = (
@@ -666,6 +675,12 @@ def main(argv: list[str]) -> int:
                     )
                 )
 
+            def matches_param_filter(name: str) -> bool:
+                if not target_param_substrings:
+                    return True
+                lname = name.lower()
+                return any(sub in lname for sub in target_param_substrings)
+
             params_by_layer: dict[int, list[tuple[str, torch.Tensor]]] = {}
             global_params: list[tuple[str, torch.Tensor]] = []
             for name, param in model.named_parameters():
@@ -674,6 +689,8 @@ def main(argv: list[str]) -> int:
                 if not param.is_floating_point():
                     continue
                 if not is_target_family(name):
+                    continue
+                if not matches_param_filter(name):
                     continue
                 if (
                     target_family in ("attn", "both")
@@ -755,6 +772,7 @@ def main(argv: list[str]) -> int:
                         "max_rows": max_rows,
                         "max_params": max_params,
                         "target_family": target_family,
+                        "target_param_substrings": target_param_substrings,
                         "target_layers": target_layers,
                         "include_qkv": include_qkv,
                         "preserve_row_norms": preserve_row_norms,
@@ -790,6 +808,14 @@ def main(argv: list[str]) -> int:
         scale_factor = float(os.environ.get("INVARLOCK_SPECTRAL_SCALE_FACTOR", "3.0"))
         target_family = os.environ.get("INVARLOCK_SPECTRAL_TARGET_FAMILY", "attn")
         target_layers_spec = os.environ.get("INVARLOCK_SPECTRAL_TARGET_LAYERS", "")
+        target_param_substrings_spec = os.environ.get(
+            "INVARLOCK_SPECTRAL_TARGET_PARAMS", ""
+        ).strip()
+        target_param_substrings = [
+            part.strip().lower()
+            for part in target_param_substrings_spec.split(",")
+            if part.strip()
+        ]
         max_params = int(os.environ.get("INVARLOCK_SPECTRAL_MAX_PARAMS", "8"))
         seed = int(os.environ.get("INVARLOCK_SPECTRAL_SEED", "42"))
         include_qkv = os.environ.get("INVARLOCK_SPECTRAL_INCLUDE_QKV", "0") == "1"
@@ -849,6 +875,12 @@ def main(argv: list[str]) -> int:
                 )
             )
 
+        def matches_param_filter(name: str) -> bool:
+            if not target_param_substrings:
+                return True
+            lname = name.lower()
+            return any(sub in lname for sub in target_param_substrings)
+
         params_by_layer: dict[int, list[tuple[str, torch.Tensor]]] = {}
         for name, param in model.named_parameters():
             if param.dim() < 2 or "weight" not in name.lower():
@@ -856,6 +888,8 @@ def main(argv: list[str]) -> int:
             if not param.is_floating_point():
                 continue
             if not is_target_family(name):
+                continue
+            if not matches_param_filter(name):
                 continue
             if (
                 (target_family in ("attn", "both"))
@@ -884,6 +918,9 @@ def main(argv: list[str]) -> int:
             if layer_idx in params_by_layer:
                 target_params.extend(params_by_layer[layer_idx])
 
+        # Deterministically shuffle for better coverage across architectures.
+        random.shuffle(target_params)
+
         # Limit to max_params
         if len(target_params) > max_params:
             target_params = target_params[:max_params]
@@ -910,6 +947,7 @@ def main(argv: list[str]) -> int:
                     "seed": seed,
                     "target_family": target_family,
                     "target_layers": target_layers,
+                    "target_param_substrings": target_param_substrings,
                     "max_params": max_params,
                     "include_qkv": include_qkv,
                     "modified_count": modified_count,
@@ -934,7 +972,9 @@ def main(argv: list[str]) -> int:
         target_layers_spec = os.environ.get("INVARLOCK_VE_TARGET_LAYERS", "").strip()
         max_params = int(os.environ.get("INVARLOCK_VE_MAX_PARAMS", "1"))
         seed = int(os.environ.get("INVARLOCK_VE_SEED", "42"))
-        target_family = os.environ.get("INVARLOCK_VE_TARGET_FAMILY", "mlp").strip().lower()
+        target_family = (
+            os.environ.get("INVARLOCK_VE_TARGET_FAMILY", "mlp").strip().lower()
+        )
         include_experts = os.environ.get("INVARLOCK_VE_INCLUDE_EXPERTS", "1") == "1"
 
         if not scale_factor > 0.0:
@@ -958,7 +998,9 @@ def main(argv: list[str]) -> int:
                 if any(pat in lname for pat in mlp_out_patterns):
                     return True
                 if include_experts and any(pat in lname for pat in expert_out_patterns):
-                    if any(tok in lname for tok in ("experts", "moe", "block_sparse_moe")):
+                    if any(
+                        tok in lname for tok in ("experts", "moe", "block_sparse_moe")
+                    ):
                         return True
             return False
 
