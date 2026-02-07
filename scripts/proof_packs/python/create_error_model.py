@@ -6,6 +6,7 @@ import os
 import random
 import re
 import sys
+import zlib
 from pathlib import Path
 
 import torch
@@ -55,6 +56,57 @@ def _default_last_layers(all_layer_indices: list[int], n: int) -> list[int]:
     if not all_layer_indices:
         return []
     return all_layer_indices[-n:] if len(all_layer_indices) >= n else all_layer_indices
+
+
+def _stable_crc32(text: str) -> int:
+    """Stable hash for deterministic per-parameter RNG across runs/processes."""
+    return zlib.crc32(text.encode("utf-8")) & 0xFFFFFFFF
+
+
+def _select_row_indices(
+    w: torch.Tensor,
+    *,
+    rows: int,
+    selection: str,
+    seed: int,
+    name: str,
+) -> torch.Tensor:
+    """Select row indices deterministically (per-param) for row-wise probes."""
+    rows = max(0, min(int(rows), int(w.shape[0])))
+    if rows <= 0:
+        return torch.empty((0,), dtype=torch.long, device=w.device)
+
+    mode = (selection or "first").strip().lower()
+    if mode in {"first", "head"}:
+        return torch.arange(rows, device=w.device)
+    if mode in {"last", "tail"}:
+        start = max(0, int(w.shape[0]) - rows)
+        return torch.arange(start, start + rows, device=w.device)
+
+    # Per-parameter deterministic RNG.
+    seed_u32 = (int(seed) + _stable_crc32(name)) & 0xFFFFFFFF
+    g = torch.Generator(device="cpu")
+    g.manual_seed(seed_u32)
+
+    if mode in {"random_block", "rand_block", "block"}:
+        max_start = max(0, int(w.shape[0]) - rows)
+        start = (
+            0
+            if max_start == 0
+            else int(torch.randint(0, max_start + 1, (1,), generator=g).item())
+        )
+        return torch.arange(start, start + rows, device=w.device)
+
+    if mode in {"random", "rand"}:
+        idx = torch.randperm(int(w.shape[0]), generator=g)[:rows]
+        return idx.to(device=w.device)
+
+    if mode in {"top_norm", "top", "largest_norm"}:
+        norms = torch.linalg.vector_norm(w.float(), ord=2, dim=1)
+        return torch.topk(norms, k=rows, largest=True).indices
+
+    # Default to first rows for unknown modes.
+    return torch.arange(rows, device=w.device)
 
 
 def main(argv: list[str]) -> int:
@@ -597,7 +649,7 @@ def main(argv: list[str]) -> int:
             scale_factor = float(
                 os.environ.get("INVARLOCK_RMT_ROW_SCALE_FACTOR", "1.6")
             )
-            scale_factor = min(max(scale_factor, 1.01), 10.0)
+            scale_factor = min(max(scale_factor, 0.1), 10.0)
             row_frac = float(os.environ.get("INVARLOCK_RMT_ROW_SCALE_ROW_FRAC", "0.10"))
             row_frac = min(max(row_frac, 0.01), 0.95)
             max_rows = int(os.environ.get("INVARLOCK_RMT_ROW_SCALE_MAX_ROWS", "2048"))
@@ -620,6 +672,9 @@ def main(argv: list[str]) -> int:
             )
             include_qkv = (
                 os.environ.get("INVARLOCK_RMT_ROW_SCALE_INCLUDE_QKV", "0") == "1"
+            )
+            row_selection = os.environ.get(
+                "INVARLOCK_RMT_ROW_SCALE_ROW_SELECTION", "first"
             )
             seed = int(os.environ.get("INVARLOCK_RMT_ROW_SCALE_SEED", "42"))
 
@@ -737,17 +792,22 @@ def main(argv: list[str]) -> int:
                     rows = max(1, min(rows, int(w.shape[0]), max_rows))
                     if rows < 1:
                         continue
-                    base = w[:rows, :].detach().clone()
-                    w[:rows, :].mul_(float(scale_factor))
-                    if not torch.isfinite(w[:rows, :]).all():
-                        w[:rows, :].copy_(base)
+                    idx = _select_row_indices(
+                        w, rows=rows, selection=row_selection, seed=seed, name=name
+                    )
+                    if idx.numel() == 0:
+                        continue
+                    base = w[idx, :].detach().clone()
+                    w[idx, :].mul_(float(scale_factor))
+                    if not torch.isfinite(w[idx, :]).all():
+                        w[idx, :].copy_(base)
                         continue
 
                 modified_count += 1
                 modified_names.append(name)
                 if modified_count <= 5:
                     print(
-                        f"Row-scale perturbation: {name} (rows={rows}, factor={scale_factor})"
+                        f"Row-scale perturbation: {name} (rows={rows}, factor={scale_factor}, sel={row_selection})"
                     )
 
             if modified_count > 5:
@@ -766,6 +826,7 @@ def main(argv: list[str]) -> int:
                         "target_param_substrings": target_param_substrings,
                         "target_layers": target_layers,
                         "include_qkv": include_qkv,
+                        "row_selection": row_selection,
                         "seed": seed,
                         "modified_count": modified_count,
                         "modified_params": modified_names[:20],
@@ -809,6 +870,7 @@ def main(argv: list[str]) -> int:
                 os.environ.get("INVARLOCK_RMT_ANISO_PRESERVE_ROW_NORMS", "1") == "1"
             )
             jitter = float(os.environ.get("INVARLOCK_RMT_ANISO_JITTER", "0.01"))
+            row_selection = os.environ.get("INVARLOCK_RMT_ANISO_ROW_SELECTION", "first")
             seed = int(os.environ.get("INVARLOCK_RMT_ANISO_SEED", "42"))
 
             random.seed(seed)
@@ -925,7 +987,12 @@ def main(argv: list[str]) -> int:
                     rows = max(2, min(rows, int(w.shape[0]), max_rows))
                     if rows < 2:
                         continue
-                    base = w[:rows, :].detach().clone()
+                    idx = _select_row_indices(
+                        w, rows=rows, selection=row_selection, seed=seed, name=name
+                    )
+                    if idx.numel() < 2:
+                        continue
+                    base = w[idx, :].detach().clone()
                     anchor = base[:1, :].expand_as(base)
                     mixed = (1.0 - blend) * base + blend * anchor
                     if preserve_row_norms:
@@ -944,13 +1011,13 @@ def main(argv: list[str]) -> int:
                         )
                     if not torch.isfinite(mixed).all():
                         continue
-                    w[:rows, :] = mixed.to(dtype=w.dtype)
+                    w[idx, :] = mixed.to(dtype=w.dtype)
 
                 modified_count += 1
                 modified_names.append(name)
                 if modified_count <= 5:
                     print(
-                        f"Anisotropy perturbation: {name} (rows={rows}, blend={blend})"
+                        f"Anisotropy perturbation: {name} (rows={rows}, blend={blend}, sel={row_selection})"
                     )
 
             if modified_count > 5:
@@ -971,6 +1038,7 @@ def main(argv: list[str]) -> int:
                         "include_qkv": include_qkv,
                         "preserve_row_norms": preserve_row_norms,
                         "jitter": jitter,
+                        "row_selection": row_selection,
                         "seed": seed,
                         "modified_count": modified_count,
                         "modified_params": modified_names[:20],
