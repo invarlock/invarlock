@@ -1193,9 +1193,27 @@ check_dependencies() {
     log_section "PHASE 0: DEPENDENCY CHECK"
 
     local missing=()
+    local pip_available="true"
 
     # Check Python
     command -v python3 >/dev/null 2>&1 || missing+=("python3")
+
+    if [[ "${PACK_NET}" == "1" ]]; then
+        if ! python3 -m pip --version >/dev/null 2>&1; then
+            pip_available="false"
+            # Try to bootstrap pip when available (common on Debian/Ubuntu images).
+            if python3 -m ensurepip --upgrade >/dev/null 2>&1; then
+                if python3 -m pip --version >/dev/null 2>&1; then
+                    pip_available="true"
+                fi
+            fi
+        fi
+        if [[ "${pip_available}" != "true" ]]; then
+            missing+=("pip")
+            log "ERROR: python3 -m pip is not available."
+            log "       Install python3-pip (or use a virtualenv) before running proof packs with --net 1."
+        fi
+    fi
 
     # Check PyTorch with CUDA
     python3 -c "import torch; assert torch.cuda.is_available(), 'No CUDA'" 2>/dev/null || missing+=("torch+cuda")
@@ -1207,7 +1225,9 @@ check_dependencies() {
     if [[ "${PACK_NET}" == "1" ]]; then
         if ! python3 -c "import huggingface_hub" 2>/dev/null; then
             log "Installing huggingface_hub..."
-            if ! python3 -m pip install huggingface_hub; then
+            if [[ "${pip_available}" != "true" ]]; then
+                missing+=("huggingface_hub")
+            elif ! python3 -m pip install huggingface_hub; then
                 missing+=("huggingface_hub")
             fi
         fi
@@ -1217,7 +1237,11 @@ check_dependencies() {
     if ! python3 -c "import accelerate" 2>/dev/null; then
         if [[ "${PACK_NET}" == "1" ]]; then
             log "Installing accelerate..."
-            python3 -m pip install accelerate
+            if [[ "${pip_available}" == "true" ]]; then
+                python3 -m pip install accelerate || missing+=("accelerate")
+            else
+                missing+=("accelerate")
+            fi
         else
             missing+=("accelerate")
         fi
@@ -1254,7 +1278,7 @@ check_dependencies() {
                 else
                     log "Flash Attention 2: Not found, attempting install..."
                     # Use timeout to prevent hanging on slow builds
-                    if timeout 600 python3 -m pip install flash-attn --no-build-isolation 2>&1 | tee -a "${LOG_FILE}"; then
+                    if [[ "${pip_available}" == "true" ]] && timeout 600 python3 -m pip install flash-attn --no-build-isolation 2>&1 | tee -a "${LOG_FILE}"; then
                         # Verify it actually imported
                         if python3 -c "import flash_attn" 2>/dev/null; then
                             export FLASH_ATTENTION_AVAILABLE="true"
@@ -1277,7 +1301,11 @@ check_dependencies() {
     if ! python3 -c "import yaml" 2>/dev/null; then
         if [[ "${PACK_NET}" == "1" ]]; then
             log "Installing pyyaml..."
-            python3 -m pip install pyyaml || missing+=("pyyaml")
+            if [[ "${pip_available}" == "true" ]]; then
+                python3 -m pip install pyyaml || missing+=("pyyaml")
+            else
+                missing+=("pyyaml")
+            fi
         else
             missing+=("pyyaml")
         fi
@@ -1287,7 +1315,11 @@ check_dependencies() {
     if ! python3 -c "import google.protobuf" 2>/dev/null; then
         if [[ "${PACK_NET}" == "1" ]]; then
             log "Installing protobuf..."
-            python3 -m pip install protobuf || missing+=("protobuf")
+            if [[ "${pip_available}" == "true" ]]; then
+                python3 -m pip install protobuf || missing+=("protobuf")
+            else
+                missing+=("protobuf")
+            fi
         else
             missing+=("protobuf")
         fi
@@ -1297,7 +1329,11 @@ check_dependencies() {
     if ! python3 -c "import sentencepiece" 2>/dev/null; then
         if [[ "${PACK_NET}" == "1" ]]; then
             log "Installing sentencepiece..."
-            python3 -m pip install sentencepiece || missing+=("sentencepiece")
+            if [[ "${pip_available}" == "true" ]]; then
+                python3 -m pip install sentencepiece || missing+=("sentencepiece")
+            else
+                missing+=("sentencepiece")
+            fi
         else
             missing+=("sentencepiece")
         fi
