@@ -548,7 +548,7 @@
           "INVARLOCK_RMT_PROBE_MODE": "anisotropy",
           "INVARLOCK_RMT_ANISO_BLEND": "0.98",
           "INVARLOCK_RMT_ANISO_ROW_FRAC": "0.30",
-          "INVARLOCK_RMT_ANISO_MAX_ROWS": "2048",
+          "INVARLOCK_RMT_ANISO_MAX_ROWS": "4096",
           "INVARLOCK_RMT_ANISO_MAX_PARAMS": "4",
           "INVARLOCK_RMT_ANISO_TARGET_FAMILY": "ffn",
           "INVARLOCK_RMT_ANISO_TARGET_PARAMS": "up_proj",
@@ -609,12 +609,11 @@
         "kind": "error",
         "error_type": "spectral_moderate_scale",
         "env": {
-          "INVARLOCK_SPECTRAL_SCALE_FACTOR": "2.0",
-          "INVARLOCK_SPECTRAL_TARGET_FAMILY": "attn",
+          "INVARLOCK_SPECTRAL_PAIR_INVERSE": "1",
+          "INVARLOCK_SPECTRAL_SCALE_FACTOR": "1.6",
+          "INVARLOCK_SPECTRAL_TARGET_FAMILY": "mlp",
           "INVARLOCK_SPECTRAL_TARGET_LAYERS": "0-3",
-          "INVARLOCK_SPECTRAL_TARGET_PARAMS": "o_proj",
-          "INVARLOCK_SPECTRAL_MAX_PARAMS": "1",
-          "INVARLOCK_SPECTRAL_INCLUDE_QKV": "0",
+          "INVARLOCK_SPECTRAL_MAX_PARAMS": "2",
           "INVARLOCK_SPECTRAL_SEED": "42"
         }
       },
