@@ -545,18 +545,15 @@
         "kind": "error",
         "error_type": "rmt_norm_noise",
         "env": {
-          "INVARLOCK_RMT_PROBE_MODE": "anisotropy",
-          "INVARLOCK_RMT_ANISO_BLEND": "1.0",
-          "INVARLOCK_RMT_ANISO_ROW_FRAC": "0.10",
-          "INVARLOCK_RMT_ANISO_MAX_ROWS": "2048",
-          "INVARLOCK_RMT_ANISO_MAX_PARAMS": "2",
-          "INVARLOCK_RMT_ANISO_TARGET_FAMILY": "ffn",
-          "INVARLOCK_RMT_ANISO_TARGET_PARAMS": "up_proj,gate_proj",
-          "INVARLOCK_RMT_ANISO_TARGET_LAYERS": "1",
-          "INVARLOCK_RMT_ANISO_PRESERVE_ROW_NORMS": "1",
-          "INVARLOCK_RMT_ANISO_JITTER": "0.0",
-          "INVARLOCK_RMT_ANISO_INCLUDE_QKV": "0",
-          "INVARLOCK_RMT_ANISO_SEED": "42"
+          "INVARLOCK_RMT_PROBE_MODE": "row_scale",
+          "INVARLOCK_RMT_ROW_SCALE_FACTOR": "1.5",
+          "INVARLOCK_RMT_ROW_SCALE_ROW_FRAC": "0.05",
+          "INVARLOCK_RMT_ROW_SCALE_MAX_ROWS": "1024",
+          "INVARLOCK_RMT_ROW_SCALE_MAX_PARAMS": "4",
+          "INVARLOCK_RMT_ROW_SCALE_TARGET_FAMILY": "ffn",
+          "INVARLOCK_RMT_ROW_SCALE_TARGET_PARAMS": "up_proj,gate_proj",
+          "INVARLOCK_RMT_ROW_SCALE_INCLUDE_QKV": "0",
+          "INVARLOCK_RMT_ROW_SCALE_SEED": "42"
         }
       },
       "requirements": {
@@ -609,10 +606,11 @@
         "kind": "error",
         "error_type": "spectral_moderate_scale",
         "env": {
-          "INVARLOCK_SPECTRAL_SCALE_FACTOR": "1.4",
+          "INVARLOCK_SPECTRAL_SCALE_FACTOR": "1.5",
           "INVARLOCK_SPECTRAL_TARGET_FAMILY": "attn",
+          "INVARLOCK_SPECTRAL_TARGET_LAYERS": "all",
           "INVARLOCK_SPECTRAL_TARGET_PARAMS": "o_proj",
-          "INVARLOCK_SPECTRAL_MAX_PARAMS": "4",
+          "INVARLOCK_SPECTRAL_MAX_PARAMS": "8",
           "INVARLOCK_SPECTRAL_INCLUDE_QKV": "0",
           "INVARLOCK_SPECTRAL_SEED": "42"
         }
@@ -725,18 +723,15 @@
         "kind": "error",
         "error_type": "rmt_norm_noise_strong",
         "env": {
-          "INVARLOCK_RMT_PROBE_MODE": "anisotropy",
-          "INVARLOCK_RMT_ANISO_BLEND": "1.0",
-          "INVARLOCK_RMT_ANISO_ROW_FRAC": "0.50",
-          "INVARLOCK_RMT_ANISO_MAX_ROWS": "8192",
-          "INVARLOCK_RMT_ANISO_MAX_PARAMS": "8",
-          "INVARLOCK_RMT_ANISO_TARGET_FAMILY": "ffn",
-          "INVARLOCK_RMT_ANISO_TARGET_PARAMS": "up_proj",
-          "INVARLOCK_RMT_ANISO_TARGET_LAYERS": "0-7",
-          "INVARLOCK_RMT_ANISO_PRESERVE_ROW_NORMS": "0",
-          "INVARLOCK_RMT_ANISO_JITTER": "0.0",
-          "INVARLOCK_RMT_ANISO_INCLUDE_QKV": "0",
-          "INVARLOCK_RMT_ANISO_SEED": "7"
+          "INVARLOCK_RMT_PROBE_MODE": "row_scale",
+          "INVARLOCK_RMT_ROW_SCALE_FACTOR": "1.8",
+          "INVARLOCK_RMT_ROW_SCALE_ROW_FRAC": "0.10",
+          "INVARLOCK_RMT_ROW_SCALE_MAX_ROWS": "2048",
+          "INVARLOCK_RMT_ROW_SCALE_MAX_PARAMS": "8",
+          "INVARLOCK_RMT_ROW_SCALE_TARGET_FAMILY": "ffn",
+          "INVARLOCK_RMT_ROW_SCALE_TARGET_PARAMS": "up_proj,gate_proj,down_proj",
+          "INVARLOCK_RMT_ROW_SCALE_INCLUDE_QKV": "0",
+          "INVARLOCK_RMT_ROW_SCALE_SEED": "7"
         }
       },
       "requirements": {

@@ -587,6 +587,200 @@ def main(argv: list[str]) -> int:
                 )
             else:
                 print("WARNING: rmt_norm_noise not injected (no norm modules found)")
+        elif probe_mode == "row_scale":
+            # Variant probe: amplify a subset of output rows in selected projections.
+            #
+            # This intentionally introduces heteroskedastic activation structure (not a
+            # pure global rescale, which cancels under RMT standardisation), and tends
+            # to be more reliable across architectures than "row tying" for producing
+            # epsilon-band violations.
+            scale_factor = float(
+                os.environ.get("INVARLOCK_RMT_ROW_SCALE_FACTOR", "1.6")
+            )
+            scale_factor = min(max(scale_factor, 1.01), 10.0)
+            row_frac = float(os.environ.get("INVARLOCK_RMT_ROW_SCALE_ROW_FRAC", "0.10"))
+            row_frac = min(max(row_frac, 0.01), 0.95)
+            max_rows = int(os.environ.get("INVARLOCK_RMT_ROW_SCALE_MAX_ROWS", "2048"))
+            max_params = int(os.environ.get("INVARLOCK_RMT_ROW_SCALE_MAX_PARAMS", "8"))
+            target_family = (
+                os.environ.get("INVARLOCK_RMT_ROW_SCALE_TARGET_FAMILY", "ffn")
+                .strip()
+                .lower()
+            )
+            target_param_substrings_spec = os.environ.get(
+                "INVARLOCK_RMT_ROW_SCALE_TARGET_PARAMS", ""
+            ).strip()
+            target_param_substrings = [
+                part.strip().lower()
+                for part in target_param_substrings_spec.split(",")
+                if part.strip()
+            ]
+            target_layers_spec = os.environ.get(
+                "INVARLOCK_RMT_ROW_SCALE_TARGET_LAYERS", ""
+            )
+            include_qkv = (
+                os.environ.get("INVARLOCK_RMT_ROW_SCALE_INCLUDE_QKV", "0") == "1"
+            )
+            seed = int(os.environ.get("INVARLOCK_RMT_ROW_SCALE_SEED", "42"))
+
+            random.seed(seed)
+            torch.manual_seed(seed)
+
+            layer_pattern = re.compile(r"(?:layers|blocks|h)\.(\d+)\.")
+            attn_patterns = (
+                "q_proj",
+                "k_proj",
+                "v_proj",
+                "o_proj",
+                "c_attn",
+                "c_proj",
+                "out_proj",
+                "query_key_value",
+                "self_attn",
+                "attention",
+            )
+            ffn_patterns = (
+                "mlp",
+                "ffn",
+                "feed_forward",
+                "gate_proj",
+                "up_proj",
+                "down_proj",
+                "fc1",
+                "fc2",
+                "c_fc",
+                "experts",
+            )
+            embed_patterns = ("embed", "wte", "wpe")
+
+            def is_target_family(name: str) -> bool:
+                lname = name.lower()
+                if target_family == "attn":
+                    return any(p in lname for p in attn_patterns)
+                if target_family == "ffn":
+                    return any(p in lname for p in ffn_patterns)
+                if target_family == "embed":
+                    return any(p in lname for p in embed_patterns)
+                if target_family == "all":
+                    return any(
+                        p in lname
+                        for p in attn_patterns + ffn_patterns + embed_patterns
+                    )
+                return any(p in lname for p in attn_patterns + ffn_patterns)
+
+            def is_qkv_param(name: str) -> bool:
+                lname = name.lower()
+                return any(
+                    p in lname
+                    for p in (
+                        "q_proj",
+                        "k_proj",
+                        "v_proj",
+                        "c_attn",
+                        "query_key_value",
+                    )
+                )
+
+            def matches_param_filter(name: str) -> bool:
+                if not target_param_substrings:
+                    return True
+                lname = name.lower()
+                return any(sub in lname for sub in target_param_substrings)
+
+            params_by_layer: dict[int, list[tuple[str, torch.Tensor]]] = {}
+            global_params: list[tuple[str, torch.Tensor]] = []
+            for name, param in model.named_parameters():
+                if param.dim() < 2 or "weight" not in name.lower():
+                    continue
+                if not param.is_floating_point():
+                    continue
+                if not is_target_family(name):
+                    continue
+                if not matches_param_filter(name):
+                    continue
+                if (
+                    target_family in ("attn", "both")
+                    and (not include_qkv)
+                    and is_qkv_param(name)
+                ):
+                    continue
+                match = layer_pattern.search(name)
+                if match:
+                    layer_idx = int(match.group(1))
+                    params_by_layer.setdefault(layer_idx, []).append((name, param))
+                else:
+                    global_params.append((name, param))
+
+            all_layer_indices = sorted(params_by_layer.keys())
+            max_layer = max(all_layer_indices) + 1 if all_layer_indices else 0
+            if target_layers_spec:
+                target_layers = _parse_layer_indices(target_layers_spec, max_layer)
+            else:
+                target_layers = _default_last_layers(all_layer_indices, 8)
+
+            target_params: list[tuple[str, torch.Tensor]] = []
+            for layer_idx in target_layers:
+                if layer_idx in params_by_layer:
+                    target_params.extend(params_by_layer[layer_idx])
+            target_params.extend(global_params)
+
+            random.shuffle(target_params)
+            if len(target_params) > max_params:
+                target_params = target_params[:max_params]
+
+            modified_count = 0
+            modified_names: list[str] = []
+            for name, param in target_params:
+                with torch.no_grad():
+                    w = param.data
+                    rows = int(round(float(w.shape[0]) * row_frac))
+                    rows = max(1, min(rows, int(w.shape[0]), max_rows))
+                    if rows < 1:
+                        continue
+                    base = w[:rows, :].detach().clone()
+                    w[:rows, :].mul_(float(scale_factor))
+                    if not torch.isfinite(w[:rows, :]).all():
+                        w[:rows, :].copy_(base)
+                        continue
+
+                modified_count += 1
+                modified_names.append(name)
+                if modified_count <= 5:
+                    print(
+                        f"Row-scale perturbation: {name} (rows={rows}, factor={scale_factor})"
+                    )
+
+            if modified_count > 5:
+                print(f"  ... and {modified_count - 5} more parameters")
+
+            if modified_count > 0:
+                error_info.update(
+                    {
+                        "injected": True,
+                        "mode": "row_scale",
+                        "scale_factor": scale_factor,
+                        "row_frac": row_frac,
+                        "max_rows": max_rows,
+                        "max_params": max_params,
+                        "target_family": target_family,
+                        "target_param_substrings": target_param_substrings,
+                        "target_layers": target_layers,
+                        "include_qkv": include_qkv,
+                        "seed": seed,
+                        "modified_count": modified_count,
+                        "modified_params": modified_names[:20],
+                        "total_layers": max_layer,
+                    }
+                )
+                print(
+                    f"Applied RMT row-scale probe to {modified_count} params "
+                    f"(factor={scale_factor}, family={target_family}, seed={seed})"
+                )
+            else:
+                print(
+                    "WARNING: rmt_norm_noise not injected "
+                    "(no matching parameters for row_scale mode)"
+                )
         else:
             # Default probe: inject structured anisotropy into selected projections.
             blend = float(os.environ.get("INVARLOCK_RMT_ANISO_BLEND", "0.75"))
@@ -732,16 +926,7 @@ def main(argv: list[str]) -> int:
                     if rows < 2:
                         continue
                     base = w[:rows, :].detach().clone()
-                    # Pick a deterministic "anchor" row that is likely to be active.
-                    # Using the first row is brittle across architectures and can
-                    # materially reduce RMT probe sensitivity on some models.
-                    anchor_idx = 0
-                    try:
-                        norms = torch.linalg.vector_norm(base.float(), ord=2, dim=1)
-                        anchor_idx = int(torch.argmax(norms).item())
-                    except Exception:
-                        anchor_idx = 0
-                    anchor = base[anchor_idx : anchor_idx + 1, :].expand_as(base)
+                    anchor = base[:1, :].expand_as(base)
                     mixed = (1.0 - blend) * base + blend * anchor
                     if preserve_row_norms:
                         base_norm = torch.linalg.vector_norm(
