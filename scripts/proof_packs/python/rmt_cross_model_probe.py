@@ -244,6 +244,86 @@ def _top_k_deltas(
     return out
 
 
+def _classify_family(module_name: str) -> str:
+    """Mirror RMTGuard family assignment ({attn, ffn, embed, other})."""
+    lower = module_name.lower()
+    if any(tok in lower for tok in ("attn", "attention", "self_attn")):
+        return "attn"
+    if any(
+        tok in lower
+        for tok in (
+            "router",
+            "routing",
+            "gate",
+            "gating",
+            "dispatch",
+            "switch",
+            "experts",
+            "expert",
+            "moe",
+            "mixture_of_experts",
+            "mlp",
+            "ffn",
+            "c_fc",
+            "feed_forward",
+        )
+    ):
+        return "ffn"
+    if "embed" in lower or "wte" in lower or "wpe" in lower:
+        return "embed"
+    return "other"
+
+
+def _delta_max_family_summary(
+    base: dict[str, Any], cur: dict[str, Any], *, eps: float = 1e-12
+) -> tuple[dict[str, float], dict[str, float], dict[str, dict[str, Any]]]:
+    """Summarize per-family edge-risk using the module with max positive delta_frac.
+
+    RMTGuard aggregates edge-risk per family using a max over modules, which can be
+    dominated by a single baseline outlier. For cross-model probes we want a stable,
+    architecture-robust signal that reflects "something in this family moved" even
+    when the absolute family max does not.
+
+    Returns:
+      (edge_base_by_family, edge_cur_by_family, peak_by_family)
+    """
+    if not isinstance(base, dict):
+        base = {}
+    if not isinstance(cur, dict):
+        cur = {}
+
+    peak_by_family: dict[str, dict[str, Any]] = {}
+    keys = set(base) | set(cur)
+    for key in keys:
+        b = _safe_float(base.get(key))
+        c = _safe_float(cur.get(key))
+        if b is None or c is None or b <= 0.0:
+            continue
+        delta_frac = (c - b) / max(abs(b), eps)
+        family = _classify_family(str(key))
+        prev = peak_by_family.get(family)
+        if prev is None or float(delta_frac) > float(prev.get("delta_frac", -1e9)):
+            peak_by_family[family] = {
+                "module": str(key),
+                "base": float(b),
+                "cur": float(c),
+                "delta_frac": float(delta_frac),
+            }
+
+    edge_base_by_family: dict[str, float] = {}
+    edge_cur_by_family: dict[str, float] = {}
+    for family in ("attn", "ffn", "embed", "other"):
+        peak = peak_by_family.get(family)
+        if peak is None:
+            edge_base_by_family[family] = 0.0
+            edge_cur_by_family[family] = 0.0
+        else:
+            edge_base_by_family[family] = float(peak.get("base", 0.0) or 0.0)
+            edge_cur_by_family[family] = float(peak.get("cur", 0.0) or 0.0)
+
+    return edge_base_by_family, edge_cur_by_family, peak_by_family
+
+
 def run_probe(args: argparse.Namespace) -> dict[str, Any]:
     baseline_model_path = Path(args.baseline_model).resolve()
     subject_model_path = Path(args.subject_model).resolve()
@@ -279,14 +359,61 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
         _model_cleanup(subject_model)
 
     passed, action, metrics, violations = _normalize_guard_result(result)
-    stable = bool(metrics.get("stable", passed))
+    stable_guard = bool(metrics.get("stable", passed))
 
     # These are populated even when metrics omit module-level details.
     edge_by_module_base = getattr(guard, "baseline_edge_risk_by_module", {}) or {}
     edge_by_module = getattr(guard, "edge_risk_by_module", {}) or {}
 
+    edge_family_base, edge_family_cur, peak_by_family = _delta_max_family_summary(
+        edge_by_module_base, edge_by_module
+    )
+
+    epsilon_default = _safe_float(metrics.get("epsilon_default"))
+    if epsilon_default is None:
+        epsilon_default = _safe_float((policy or {}).get("epsilon_default"))
+    if epsilon_default is None:
+        epsilon_default = 0.01
+
+    epsilon_by_family_raw = metrics.get("epsilon_by_family") or {}
+    epsilon_by_family: dict[str, float] = {}
+    if isinstance(epsilon_by_family_raw, dict):
+        for family, value in epsilon_by_family_raw.items():
+            vv = _safe_float(value)
+            if vv is None:
+                continue
+            epsilon_by_family[str(family)] = vv
+
+    epsilon_violations: list[dict[str, Any]] = []
+    for family, base_val in edge_family_base.items():
+        base_val = float(base_val)
+        cur_val = float(edge_family_cur.get(family, 0.0) or 0.0)
+        if base_val <= 0.0:
+            continue
+        eps_val = float(epsilon_by_family.get(family, epsilon_default))
+        allowed = (1.0 + eps_val) * base_val
+        if cur_val > allowed:
+            peak = peak_by_family.get(family) or {}
+            delta = (cur_val / base_val) - 1.0
+            epsilon_violations.append(
+                {
+                    "family": family,
+                    "module": peak.get("module"),
+                    "edge_base": base_val,
+                    "edge_cur": cur_val,
+                    "delta": float(delta),
+                    "allowed": float(allowed),
+                    "epsilon": float(eps_val),
+                }
+            )
+
+    stable = not epsilon_violations
+    if not stable:
+        action = "abort"
+
     payload: dict[str, Any] = {
-        "probe": "rmt_cross_model_v1",
+        "probe": "rmt_cross_model_v2",
+        "family_aggregation": "delta_max",
         "timestamp_utc": datetime.now(UTC).isoformat(),
         "baseline_model": str(baseline_model_path),
         "subject_model": str(subject_model_path),
@@ -299,10 +426,12 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
         "passed": passed,
         "action": action,
         "stable": stable,
-        "edge_risk_by_family_base": metrics.get("edge_risk_by_family_base") or {},
-        "edge_risk_by_family": metrics.get("edge_risk_by_family") or {},
-        "epsilon_by_family": metrics.get("epsilon_by_family") or {},
-        "epsilon_violations": metrics.get("epsilon_violations") or [],
+        "stable_guard": stable_guard,
+        "edge_risk_by_family_base": edge_family_base,
+        "edge_risk_by_family": edge_family_cur,
+        "epsilon_by_family": epsilon_by_family,
+        "epsilon_default": float(epsilon_default),
+        "epsilon_violations": epsilon_violations,
         "edge_risk_by_module_count": len(edge_by_module),
         "edge_risk_by_module_base_top": _top_k_items(edge_by_module_base, k=25),
         "edge_risk_by_module_top": _top_k_items(edge_by_module, k=25),
