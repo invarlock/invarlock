@@ -147,8 +147,8 @@ Model suites are defined in `scripts/proof_packs/suites.sh` and applied by
 | Suite | Models | Notes |
 | --- | --- | --- |
 | `subset` | `mistralai/Mistral-7B-v0.1` | Single-GPU friendly |
-| `showcase` | `mistralai/Mistral-7B-v0.1`, `Qwen/Qwen2.5-14B`, `allenai/OLMo-2-1124-13B` | Multi-GPU recommended; guard-focused scenarios |
-| `workshop3` | `mistralai/Mistral-7B-v0.1`, `allenai/OLMo-2-1124-13B`, `Qwen/Qwen2.5-32B` | Workshop-friendly 3-model suite (architecture diversity) |
+| `showcase` | `mistralai/Mistral-7B-v0.1`, `Qwen/Qwen2.5-14B`, `Qwen/Qwen2.5-32B` | Multi-GPU recommended; guard-focused scenarios |
+| `workshop3` | `mistralai/Mistral-7B-v0.1`, `mistralai/Mixtral-8x7B-v0.1`, `01-ai/Yi-34B` | Workshop-friendly 3-model suite (architecture diversity) |
 | `full` | `mistralai/Mistral-7B-v0.1`, `Qwen/Qwen2.5-14B`, `Qwen/Qwen2.5-32B`, `01-ai/Yi-34B`, `mistralai/Mixtral-8x7B-v0.1`, `Qwen/Qwen1.5-72B` | Multi-GPU recommended |
 
 Default full-suite model sizes (weights-only, approximate):

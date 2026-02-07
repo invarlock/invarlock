@@ -51,7 +51,7 @@ test_suites_apply_showcase_sets_models() {
     assert_eq "showcase" "${PACK_SUITE}" "suite set"
     assert_eq "mistralai/Mistral-7B-v0.1" "${MODEL_1}" "model 1 set"
     assert_eq "Qwen/Qwen2.5-14B" "${MODEL_2}" "model 2 set"
-    assert_eq "allenai/OLMo-2-1124-13B" "${MODEL_3}" "model 3 set"
+    assert_eq "Qwen/Qwen2.5-32B" "${MODEL_3}" "model 3 set"
     assert_eq "" "${MODEL_4}" "model 4 cleared"
 }
 
@@ -64,8 +64,8 @@ test_suites_apply_workshop3_sets_models() {
 
     assert_eq "workshop3" "${PACK_SUITE}" "suite set"
     assert_eq "mistralai/Mistral-7B-v0.1" "${MODEL_1}" "model 1 set"
-    assert_eq "allenai/OLMo-2-1124-13B" "${MODEL_2}" "model 2 set"
-    assert_eq "Qwen/Qwen2.5-32B" "${MODEL_3}" "model 3 set"
+    assert_eq "mistralai/Mixtral-8x7B-v0.1" "${MODEL_2}" "model 2 set"
+    assert_eq "01-ai/Yi-34B" "${MODEL_3}" "model 3 set"
     assert_eq "" "${MODEL_4}" "model 4 cleared"
 }
 
