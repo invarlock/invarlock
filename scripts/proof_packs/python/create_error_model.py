@@ -470,7 +470,7 @@ def main(argv: list[str]) -> int:
                 "WARNING: Could not locate tied weights; weight_tying_break not injected"
             )
 
-    elif error_type == "rmt_norm_noise":
+    elif error_type.startswith("rmt_norm_noise"):
         # RMT-targeted error injection.
         #
         # Two deterministic probe modes are supported:
@@ -775,7 +775,7 @@ def main(argv: list[str]) -> int:
                     "(no matching parameters for anisotropy mode)"
                 )
 
-    elif error_type == "spectral_moderate_scale":
+    elif error_type.startswith("spectral_moderate_scale"):
         # Spectral-targeted error injection: apply moderate scaling to attention/MLP weights
         # to cause spectral instability (z-score violations) while keeping invariants/RMT stable.
         #
@@ -924,7 +924,7 @@ def main(argv: list[str]) -> int:
         else:
             print("WARNING: spectral_moderate_scale not injected (no matching params)")
 
-    elif error_type == "ve_mlp_scale_skew":
+    elif error_type.startswith("ve_mlp_scale_skew"):
         # VE-targeted error injection.
         #
         # Intentionally scale one (or a few) FFN output projection weights

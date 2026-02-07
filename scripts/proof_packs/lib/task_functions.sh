@@ -1856,7 +1856,7 @@ PRESET_YAML
     # Compare-mode evaluate cannot directly expose delta-style RMT signals because
     # guards are prepared/finalized on the same loaded model. For the RMT probe
     # scenario, emit an explicit cross-model artifact on shared windows.
-    if [[ "${error_type}" == "rmt_norm_noise" && "${PACK_ENABLE_RMT_CROSS_PROBE:-1}" != "0" ]]; then
+    if [[ "${error_type}" == rmt_norm_noise* && "${PACK_ENABLE_RMT_CROSS_PROBE:-1}" != "0" ]]; then
         local probe_script="${SCRIPT_DIR}/../python/rmt_cross_model_probe.py"
         local probe_out="${cert_dir}/rmt_probe.json"
         if [[ -f "${probe_script}" && -n "${baseline_report_file}" && -f "${baseline_report_file}" ]]; then
@@ -1881,7 +1881,7 @@ PRESET_YAML
     # VE/variance is a remediation guard and is muted under compare-mode evaluation
     # because the subject run uses a no-op edit. Emit an explicit probe artifact on
     # shared windows for the VE demo scenario.
-    if [[ "${error_type}" == "ve_mlp_scale_skew" && "${PACK_ENABLE_VE_CROSS_PROBE:-1}" != "0" ]]; then
+    if [[ "${error_type}" == ve_mlp_scale_skew* && "${PACK_ENABLE_VE_CROSS_PROBE:-1}" != "0" ]]; then
         local ve_probe_script="${SCRIPT_DIR}/../python/ve_cross_model_probe.py"
         local ve_probe_out="${cert_dir}/ve_probe.json"
         if [[ -f "${ve_probe_script}" && -n "${baseline_report_file}" && -f "${baseline_report_file}" ]]; then
