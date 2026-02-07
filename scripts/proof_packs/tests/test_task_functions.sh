@@ -524,6 +524,69 @@ test_task_evaluate_tasks_treat_nonzero_cli_rc_as_success_when_report_written() {
     assert_file_exists "${model_output_dir}/reports/errors/cuda_assert/evaluation.report.json" "error report written"
 }
 
+test_task_evaluate_tasks_generate_evaluation_report_when_only_report_json_written() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+    stub_resolve_edit_params
+
+    fixture_write "invarlock.create_report_for_evaluate" ""
+    fixture_write "invarlock.rc" "1"
+
+    local out="${TEST_TMPDIR}/out"
+    local model_name="m"
+    local model_output_dir="${out}/${model_name}"
+    local baseline_dir="${model_output_dir}/models/baseline"
+    local log_file="${TEST_TMPDIR}/log.txt"
+    mkdir -p "$(dirname "${log_file}")"
+    : > "${log_file}"
+
+    _estimate_model_size() { echo "7"; }
+    _ensure_evaluate_baseline_report() { echo "${TEST_TMPDIR}/baseline_report.json"; }
+    echo "{}" > "${TEST_TMPDIR}/baseline_report.json"
+
+    _cmd_python() {
+        local script="$1"
+        shift || true
+        if [[ "${script}" == *"evaluation_report_from_report.py" ]]; then
+            local out_path=""
+            while [[ $# -gt 0 ]]; do
+                if [[ "${1}" == "--out" ]]; then
+                    out_path="${2:-}"
+                    break
+                fi
+                shift
+            done
+            if [[ -n "${out_path}" ]]; then
+                mkdir -p "$(dirname "${out_path}")"
+                echo "{}" > "${out_path}"
+            fi
+            return 0
+        fi
+        return 0
+    }
+
+    # evaluate_EDIT: no evaluation.report.json produced by CLI, but report.json exists -> conversion creates cert.
+    local edit_dir="${model_output_dir}/models/quant_4bit_clean"
+    mkdir -p "${baseline_dir}" "${edit_dir}"
+    echo "{}" > "${baseline_dir}/config.json"
+    echo "{}" > "${edit_dir}/config.json"
+    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
+
+    run task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean 1 "${out}" "${log_file}"
+    assert_rc "0" "${RUN_RC}" "report.json conversion makes evaluate_EDIT succeed"
+    assert_file_exists "${model_output_dir}/reports/quant_4bit_clean/run_1/evaluation.report.json" "converted edit report exists"
+
+    # evaluate_ERROR: same behavior.
+    local error_dir="${model_output_dir}/models/error_cuda_assert"
+    mkdir -p "${error_dir}"
+    echo "{}" > "${error_dir}/config.json"
+
+    run task_evaluate_error "${model_name}" 0 cuda_assert "${out}" "${log_file}"
+    assert_rc "0" "${RUN_RC}" "report.json conversion makes evaluate_ERROR succeed"
+    assert_file_exists "${model_output_dir}/reports/errors/cuda_assert/evaluation.report.json" "converted error report exists"
+}
+
 test_task_create_error_branches_cover_skip_missing_function_and_verify_paths() {
     mock_reset
     # shellcheck source=../task_functions.sh

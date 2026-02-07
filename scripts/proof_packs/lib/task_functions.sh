@@ -1444,9 +1444,22 @@ PRESET_YAML
     # Find and copy report (only the canonical cert)
     if [[ ! -f "${cert_file}" ]]; then
         local found_cert
-        found_cert=$(find "${cert_dir}" -name "evaluation.report.json" -type f 2>/dev/null | head -1)
+        found_cert=$(find "${cert_dir}" -name "evaluation.report.json" -type f 2>/dev/null | sort | tail -1)
         if [[ -n "${found_cert}" && -f "${found_cert}" && "${found_cert}" != "${cert_file}" ]]; then
             cp "${found_cert}" "${cert_file}" 2>/dev/null || true
+        fi
+    fi
+
+    # Some failure modes (e.g., overhead gate, abort-on-unsafe) still write a
+    # structured `report.json` but skip the derived `evaluation.report.json`.
+    # Convert when possible so the proof-pack verdict can still be computed.
+    if [[ ! -f "${cert_file}" ]]; then
+        local report_file=""
+        report_file=$(find "${cert_dir}" -name "report*.json" -type f 2>/dev/null | sort | tail -1)
+        if [[ -n "${report_file}" && -f "${report_file}" ]]; then
+            _cmd_python "${SCRIPT_DIR}/../python/evaluation_report_from_report.py" \
+                --report "${report_file}" \
+                --out "${cert_file}" >> "${log_file}" 2>&1 || true
         fi
     fi
 
@@ -1824,9 +1837,19 @@ PRESET_YAML
     # Find and copy report (only the canonical cert)
     if [[ ! -f "${cert_file}" ]]; then
         local found_cert
-        found_cert=$(find "${cert_dir}" -name "evaluation.report.json" -type f 2>/dev/null | head -1)
+        found_cert=$(find "${cert_dir}" -name "evaluation.report.json" -type f 2>/dev/null | sort | tail -1)
         if [[ -n "${found_cert}" && -f "${found_cert}" && "${found_cert}" != "${cert_file}" ]]; then
             cp "${found_cert}" "${cert_file}" 2>/dev/null || true
+        fi
+    fi
+
+    if [[ ! -f "${cert_file}" ]]; then
+        local report_file=""
+        report_file=$(find "${cert_dir}" -name "report*.json" -type f 2>/dev/null | sort | tail -1)
+        if [[ -n "${report_file}" && -f "${report_file}" ]]; then
+            _cmd_python "${SCRIPT_DIR}/../python/evaluation_report_from_report.py" \
+                --report "${report_file}" \
+                --out "${cert_file}" >> "${log_file}" 2>&1 || true
         fi
     fi
 
