@@ -797,11 +797,14 @@ def main(argv: list[str]) -> int:
                     )
                     if idx.numel() == 0:
                         continue
+                    # NOTE: w[idx, :] uses advanced indexing for most selection
+                    # modes (e.g. random/top_norm). In-place ops on the result do
+                    # not write back to w. Use explicit assignment.
                     base = w[idx, :].detach().clone()
-                    w[idx, :].mul_(float(scale_factor))
-                    if not torch.isfinite(w[idx, :]).all():
-                        w[idx, :].copy_(base)
+                    scaled = (base.float() * float(scale_factor)).to(dtype=w.dtype)
+                    if not torch.isfinite(scaled).all():
                         continue
+                    w[idx, :] = scaled
 
                 modified_count += 1
                 modified_names.append(name)
