@@ -546,13 +546,15 @@
         "error_type": "rmt_norm_noise",
         "env": {
           "INVARLOCK_RMT_PROBE_MODE": "row_scale",
-          "INVARLOCK_RMT_ROW_SCALE_FACTOR": "1.5",
+          "INVARLOCK_RMT_ROW_SCALE_FACTOR": "10.0",
           "INVARLOCK_RMT_ROW_SCALE_ROW_FRAC": "0.05",
-          "INVARLOCK_RMT_ROW_SCALE_MAX_ROWS": "1024",
-          "INVARLOCK_RMT_ROW_SCALE_MAX_PARAMS": "4",
+          "INVARLOCK_RMT_ROW_SCALE_MAX_ROWS": "256",
+          "INVARLOCK_RMT_ROW_SCALE_MAX_PARAMS": "8",
           "INVARLOCK_RMT_ROW_SCALE_TARGET_FAMILY": "ffn",
-          "INVARLOCK_RMT_ROW_SCALE_TARGET_PARAMS": "up_proj,gate_proj",
+          "INVARLOCK_RMT_ROW_SCALE_TARGET_PARAMS": "up_proj,gate_proj,down_proj",
           "INVARLOCK_RMT_ROW_SCALE_INCLUDE_QKV": "0",
+          "INVARLOCK_RMT_ROW_SCALE_TARGET_LAYERS": "0-3,28-31",
+          "INVARLOCK_RMT_ROW_SCALE_ROW_SELECTION": "random",
           "INVARLOCK_RMT_ROW_SCALE_SEED": "42"
         }
       },
@@ -724,13 +726,15 @@
         "error_type": "rmt_norm_noise_strong",
         "env": {
           "INVARLOCK_RMT_PROBE_MODE": "row_scale",
-          "INVARLOCK_RMT_ROW_SCALE_FACTOR": "1.8",
+          "INVARLOCK_RMT_ROW_SCALE_FACTOR": "10.0",
           "INVARLOCK_RMT_ROW_SCALE_ROW_FRAC": "0.10",
-          "INVARLOCK_RMT_ROW_SCALE_MAX_ROWS": "2048",
-          "INVARLOCK_RMT_ROW_SCALE_MAX_PARAMS": "8",
+          "INVARLOCK_RMT_ROW_SCALE_MAX_ROWS": "512",
+          "INVARLOCK_RMT_ROW_SCALE_MAX_PARAMS": "16",
           "INVARLOCK_RMT_ROW_SCALE_TARGET_FAMILY": "ffn",
           "INVARLOCK_RMT_ROW_SCALE_TARGET_PARAMS": "up_proj,gate_proj,down_proj",
           "INVARLOCK_RMT_ROW_SCALE_INCLUDE_QKV": "0",
+          "INVARLOCK_RMT_ROW_SCALE_TARGET_LAYERS": "0-7,24-31",
+          "INVARLOCK_RMT_ROW_SCALE_ROW_SELECTION": "random",
           "INVARLOCK_RMT_ROW_SCALE_SEED": "7"
         }
       },
