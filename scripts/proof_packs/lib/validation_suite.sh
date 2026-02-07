@@ -353,6 +353,33 @@ pack_setup_hf_cache_dirs() {
     return 0
 }
 
+pack_preflight_datasets() {
+    # Proof pack runs are often launched with PACK_NET=0 (offline) after a prior net-enabled
+    # preflight/population step. If HF caches are per-run (default: OUTPUT_DIR/.hf), a new
+    # OUTPUT_DIR can look "cold" and cause calibration to fail later. Preflight once here to
+    # fail fast with a clear message and, when PACK_NET=1, warm the cache.
+    log_section "PHASE 0: DATASET PREFLIGHT"
+
+    local repo_root
+    repo_root="$(cd "${_PACK_VALIDATION_LIB_DIR}/../../.." && pwd)"
+
+    if python3 "${repo_root}/scripts/proof_packs/python/dataset_preflight.py" | tee -a "${LOG_FILE}"; then
+        log "Dataset preflight: OK"
+        return 0
+    fi
+
+    echo "" | tee -a "${LOG_FILE}"
+    echo "ERROR: Dataset preflight failed (INVARLOCK_DATASET=${INVARLOCK_DATASET:-wikitext2})." | tee -a "${LOG_FILE}" >&2
+    if [[ "${PACK_NET}" != "1" ]]; then
+        echo "       Offline mode is enabled (PACK_NET=0)." | tee -a "${LOG_FILE}" >&2
+        echo "       Fix options:" | tee -a "${LOG_FILE}" >&2
+        echo "         1) Re-run with --net 1 once to populate the dataset cache, then run offline." | tee -a "${LOG_FILE}" >&2
+        echo "         2) Use --resume to reuse an existing OUTPUT_DIR (its .hf cache already contains the dataset)." | tee -a "${LOG_FILE}" >&2
+        echo "         3) Export HF_HOME/HF_DATASETS_CACHE to a shared cache directory before running." | tee -a "${LOG_FILE}" >&2
+    fi
+    error_exit "Dataset preflight failed."
+}
+
 pack_run_determinism_repeats() {
     local repeats="${PACK_REPEATS:-0}"
     if [[ -z "${OUTPUT_DIR:-}" ]]; then
@@ -2121,6 +2148,7 @@ pack_run_suite() {
     pack_setup_output_dirs || return 1
     pack_prepare_scenarios_manifest || return 1
     pack_setup_hf_cache_dirs || return 1
+    pack_preflight_datasets || return 1
 
     pack_model_list_array
     if [[ ${#PACK_MODEL_LIST[@]} -eq 0 ]]; then

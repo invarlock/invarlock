@@ -232,6 +232,7 @@ test_pack_validation_pack_run_suite_runs_dependency_check_before_preflight_when_
         pack_setup_output_dirs() { :; }
         pack_prepare_scenarios_manifest() { :; }
         pack_setup_hf_cache_dirs() { :; }
+        pack_preflight_datasets() { :; }
         pack_model_list_array() { PACK_MODEL_LIST=("mistralai/Mistral-7B-v0.1"); }
         pack_prepare_tuned_edit_params() { :; }
         pack_validate_tuned_edit_params() { :; }
@@ -2013,6 +2014,7 @@ test_pack_validation_pack_run_suite_branches() {
 
     cleanup() { return 0; }
     pack_apply_network_mode() { :; }
+    pack_preflight_datasets() { :; }
     check_dependencies() { :; }
     pack_prepare_tuned_edit_params() { :; }
     pack_validate_tuned_edit_params() { :; }
@@ -2152,6 +2154,7 @@ test_pack_validation_pack_run_suite_calibrate_only_skips_tuned_edit_params_valid
     pack_source_libs() { return 0; }
     pack_prepare_scenarios_manifest() { return 0; }
     pack_setup_hf_cache_dirs() { return 0; }
+    pack_preflight_datasets() { :; }
 
     # Ensure the model list would fail tuned preset validation if it ran.
     pack_model_list_array() { PACK_MODEL_LIST=("Qwen/Qwen2.5-14B"); }
@@ -2181,6 +2184,7 @@ test_pack_validation_pack_run_suite_errors_only_skips_tuned_edit_params_validati
     pack_source_libs() { return 0; }
     pack_prepare_scenarios_manifest() { return 0; }
     pack_setup_hf_cache_dirs() { return 0; }
+    pack_preflight_datasets() { :; }
 
     # Ensure the model list would fail tuned preset validation if it ran.
     pack_model_list_array() { PACK_MODEL_LIST=("Qwen/Qwen2.5-14B"); }
