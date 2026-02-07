@@ -644,7 +644,7 @@
         "detectors_any_of": [
           {
             "kind": "spectral_caps_applied",
-            "min": 3
+            "min": 1
           }
         ]
       }
