@@ -11,7 +11,7 @@ pack_usage() {
 Usage: scripts/proof_packs/run_pack.sh [options]
 
 Options:
-  --suite NAME         Suite name (subset|full)
+  --suite NAME         Suite name (subset|showcase|workshop3|full)
   --net 1|0            Enable network access for preflight/downloads (default: 0)
   --out DIR            Output directory for the run (default: ./proof_pack_runs/<suite>_<timestamp>)
   --pack-dir DIR       Output directory for the proof pack (default: <out>/proof_pack)

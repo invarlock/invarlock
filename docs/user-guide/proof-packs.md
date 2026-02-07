@@ -61,7 +61,14 @@ models via `MODEL_1`–`MODEL_8`.
 | Suite | Models | Notes |
 | --- | --- | --- |
 | `subset` | `mistralai/Mistral-7B-v0.1` | Single-GPU friendly |
+| `showcase` | 7B–14B ungated models | Multi-GPU recommended; adds guard-focused scenarios |
+| `workshop3` | 7B–32B ungated models | Workshop-friendly 3-model suite (architecture diversity) |
 | `full` | 7B–72B ungated models | Multi-GPU recommended |
+
+Scenario selection is driven by `scripts/proof_packs/scenarios.json`. Scenarios can
+optionally declare `suites: ["subset", "showcase", "full", ...]`; during execution the
+suite writes the effective (filtered) manifest to `OUTPUT_DIR/state/scenarios.json`,
+and both task generation and final verdict compilation use that state manifest.
 
 ## Network & Model Revisions
 

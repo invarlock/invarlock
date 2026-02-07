@@ -656,10 +656,30 @@ pack_setup_output_dirs() {
 pack_prepare_scenarios_manifest() {
     local repo_root
     repo_root="$(cd "${_PACK_VALIDATION_LIB_DIR}/../../.." && pwd)"
-    local src="${repo_root}/scripts/proof_packs/scenarios.json"
+    local src="${PACK_SCENARIOS_MANIFEST_FILE:-${repo_root}/scripts/proof_packs/scenarios.json}"
     if [[ -f "${src}" ]]; then
         mkdir -p "${OUTPUT_DIR}/state"
-        cp "${src}" "${OUTPUT_DIR}/state/scenarios.json"
+        local dest="${OUTPUT_DIR}/state/scenarios.json"
+        local suite="${PACK_SUITE:-subset}"
+
+        if command -v jq >/dev/null 2>&1; then
+            # Scenarios can optionally declare `suites: ["subset", "full", ...]`.
+            # When present, the manifest is filtered to just the active PACK_SUITE.
+            jq --arg suite "${suite}" \
+                '. as $root
+                 | ._meta.applied_suite = $suite
+                 | .scenarios = [
+                     .scenarios[]
+                     | select(
+                         (.suites? | type) != "array"
+                         or ((.suites | length) == 0)
+                         or ((.suites | index($suite)) != null)
+                     )
+                   ]' \
+                "${src}" > "${dest}"
+        else
+            cp "${src}" "${dest}"
+        fi
     fi
 }
 

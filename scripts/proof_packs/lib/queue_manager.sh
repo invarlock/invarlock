@@ -1068,7 +1068,20 @@ generate_model_tasks() {
     # and verdict contract in sync.
     local pack_root
     pack_root="$(cd "${SCRIPT_DIR}/.." && pwd)"
-    local scenarios_file="${pack_root}/scenarios.json"
+    local scenarios_file=""
+    local suite_manifest=""
+    # Prefer the run's state manifest (may be filtered by suite tags) when available.
+    if [[ -n "${QUEUE_DIR:-}" ]]; then
+        local run_root
+        run_root="$(cd "${QUEUE_DIR}/.." && pwd)"
+        suite_manifest="${run_root}/state/scenarios.json"
+        if [[ -f "${suite_manifest}" ]]; then
+            scenarios_file="${suite_manifest}"
+        fi
+    fi
+    if [[ -z "${scenarios_file}" ]]; then
+        scenarios_file="${pack_root}/scenarios.json"
+    fi
 
     local clean_edits=()
     local stress_edits=()

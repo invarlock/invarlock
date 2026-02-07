@@ -2670,7 +2670,7 @@ test_pack_validation_estimate_planned_model_storage_falls_back_when_mapfile_disa
     assert_eq "20" "${total}" "planned storage sums weights and edits without mapfile"
 }
 
-test_pack_prepare_scenarios_manifest_copies_repo_manifest_into_state() {
+test_pack_prepare_scenarios_manifest_writes_state_manifest() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
@@ -2678,5 +2678,41 @@ test_pack_prepare_scenarios_manifest_copies_repo_manifest_into_state() {
 
     pack_prepare_scenarios_manifest
 
-    assert_file_exists "${OUTPUT_DIR}/state/scenarios.json" "scenarios manifest copied into run state"
+    assert_file_exists "${OUTPUT_DIR}/state/scenarios.json" "scenarios manifest written into run state"
+    assert_eq "proof_pack_scenarios_v1" "$(jq -r '.schema' "${OUTPUT_DIR}/state/scenarios.json")" "schema set"
+    assert_eq "1" "$(jq -r '.schema_version' "${OUTPUT_DIR}/state/scenarios.json")" "schema version set"
+    assert_eq "subset" "$(jq -r '._meta.applied_suite' "${OUTPUT_DIR}/state/scenarios.json")" "suite recorded"
+    local count
+    count="$(jq '.scenarios | length' "${OUTPUT_DIR}/state/scenarios.json")"
+    assert_ne "0" "${count}" "scenarios list is non-empty"
+}
+
+test_pack_prepare_scenarios_manifest_filters_by_suite_tags() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    local PACK_SUITE="showcase"
+
+    local manifest="${TEST_TMPDIR}/scenarios.json"
+    cat > "${manifest}" <<'EOF'
+{
+  "_meta": {},
+  "schema": "proof_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {"id": "a", "category": "clean", "strictness": "must_pass", "generation": {"kind": "edit", "edit_spec": "x", "version": "clean"}, "suites": ["subset"]},
+    {"id": "b", "category": "clean", "strictness": "must_pass", "generation": {"kind": "edit", "edit_spec": "y", "version": "clean"}, "suites": ["showcase"]},
+    {"id": "c", "category": "clean", "strictness": "must_pass", "generation": {"kind": "edit", "edit_spec": "z", "version": "clean"}}
+  ]
+}
+EOF
+    local PACK_SCENARIOS_MANIFEST_FILE="${manifest}"
+
+    pack_prepare_scenarios_manifest
+
+    local ids
+    ids="$(jq -r '.scenarios[].id' "${OUTPUT_DIR}/state/scenarios.json" | sort | paste -sd ',' -)"
+    assert_eq "b,c" "${ids}" "filters by suite, but keeps untagged scenarios"
 }

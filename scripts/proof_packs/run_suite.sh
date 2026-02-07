@@ -17,7 +17,7 @@ WARNING: This runs the suite WITHOUT creating a proof pack.
          For distributable validation artifacts, use scripts/proof_packs/run_pack.sh instead.
 
 Options:
-  --suite NAME         Suite name (subset|full)
+  --suite NAME         Suite name (subset|showcase|workshop3|full)
   --net 1|0            Enable network access for preflight/downloads (default: 0)
   --out DIR            Output directory (default: ./proof_pack_runs/<suite>_<timestamp>)
   --determinism MODE   Determinism mode (strict|throughput)

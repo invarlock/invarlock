@@ -11,7 +11,7 @@ task graph, scheduling, and artifact generation. It complements
 | Purpose | Hardware-agnostic Phase 0 validation harness for edit detection |
 | Version | `proof-packs-v1` |
 | Hardware | NVIDIA GPUs where models fit VRAM; multi-GPU recommended for `full` |
-| Models | `subset` (1 model) or `full` (6 models), ungated public |
+| Models | `subset` (1 model), `showcase`/`workshop3` (3 models), or `full` (6 models); all ungated public |
 | Edits | 4 types × 2 versions per model; clean variants use tuned presets |
 | Scheduling | Dynamic work-stealing, `small_first` priority strategy |
 | Multi-GPU | Profile-based; `required_gpus` grows only when memory requires it |
@@ -49,8 +49,8 @@ task graph, scheduling, and artifact generation. It complements
   portable proof pack (manifest + checksums + certs).
 - `scripts/proof_packs/verify_pack.sh` validates a proof pack: checksums,
   optional GPG signature, and `invarlock verify`.
-- `scripts/proof_packs/suites.sh` defines the `subset` and `full` model sets and
-  allows `MODEL_1`–`MODEL_8` overrides.
+- `scripts/proof_packs/suites.sh` defines the model suites and allows
+  `MODEL_1`–`MODEL_8` overrides.
 - `scripts/proof_packs/lib/validation_suite.sh` orchestrates the run: preflight,
   queue creation, worker launch, and monitoring.
 
@@ -147,6 +147,8 @@ Model suites are defined in `scripts/proof_packs/suites.sh` and applied by
 | Suite | Models | Notes |
 | --- | --- | --- |
 | `subset` | `mistralai/Mistral-7B-v0.1` | Single-GPU friendly |
+| `showcase` | `mistralai/Mistral-7B-v0.1`, `Qwen/Qwen2.5-14B`, `allenai/OLMo-2-1124-13B` | Multi-GPU recommended; guard-focused scenarios |
+| `workshop3` | `mistralai/Mistral-7B-v0.1`, `allenai/OLMo-2-1124-13B`, `Qwen/Qwen2.5-32B` | Workshop-friendly 3-model suite (architecture diversity) |
 | `full` | `mistralai/Mistral-7B-v0.1`, `Qwen/Qwen2.5-14B`, `Qwen/Qwen2.5-32B`, `01-ai/Yi-34B`, `mistralai/Mixtral-8x7B-v0.1`, `Qwen/Qwen1.5-72B` | Multi-GPU recommended |
 
 Default full-suite model sizes (weights-only, approximate):

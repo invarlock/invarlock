@@ -1239,7 +1239,12 @@ test_generate_model_tasks_additional_batch_branches() {
     assert_match "CALIBRATION_RUN" "$(cat "${calls}")" "calibration task created"
     local error_count
     error_count="$(awk '/^evaluate_ERROR$/ {c++} END {print c+0}' "${calls}")"
-    assert_eq "12" "${error_count}" "evaluate error tasks created"
+    local expected_error_count
+    expected_error_count="$(
+        jq '.scenarios | map(select(.generation.kind=="error")) | length' \
+            "${TEST_ROOT}/scripts/proof_packs/scenarios.json"
+    )"
+    assert_eq "${expected_error_count}" "${error_count}" "evaluate error tasks created"
 
     : > "${calls}"
     CLEAN_EDIT_RUNS=""
