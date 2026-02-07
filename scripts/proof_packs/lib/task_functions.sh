@@ -1450,6 +1450,14 @@ PRESET_YAML
         fi
     fi
 
+    # InvarLock may exit non-zero (e.g., abort-on-unsafe in CI/release profiles)
+    # while still writing the canonical report. The proof-pack harness only needs
+    # the report artifact; treat this as success to avoid wasteful retries.
+    if [[ ${exit_code} -ne 0 && -f "${cert_file}" ]]; then
+        echo "  WARNING: invarlock evaluate exited ${exit_code} but wrote evaluation.report.json; treating as success" >> "${log_file}"
+        exit_code=0
+    fi
+
     return ${exit_code}
 }
 
@@ -1871,6 +1879,13 @@ PRESET_YAML
         else
             echo "  WARNING: Skipping VE cross-model probe (missing script or baseline report)" >> "${log_file}"
         fi
+    fi
+
+    # Same as evaluate_EDIT: keep the task successful when the report exists even
+    # if the CLI exited non-zero (common for injected failures).
+    if [[ ${exit_code} -ne 0 && -f "${cert_file}" ]]; then
+        echo "  WARNING: invarlock evaluate exited ${exit_code} but wrote evaluation.report.json; treating as success" >> "${log_file}"
+        exit_code=0
     fi
 
     return ${exit_code}

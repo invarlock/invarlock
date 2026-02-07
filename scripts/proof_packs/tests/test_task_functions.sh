@@ -482,6 +482,48 @@ test_task_evaluate_error_missing_baseline_missing_error_model_skip_and_preset_mi
     task_evaluate_error "${model_name}" 0 cuda_assert "${out}" "${log_file}"
 }
 
+test_task_evaluate_tasks_treat_nonzero_cli_rc_as_success_when_report_written() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+    stub_resolve_edit_params
+
+    fixture_write "invarlock.create_cert" ""
+    fixture_write "invarlock.rc" "3"
+
+    local out="${TEST_TMPDIR}/out"
+    local model_name="m"
+    local model_output_dir="${out}/${model_name}"
+    local baseline_dir="${model_output_dir}/models/baseline"
+    local log_file="${TEST_TMPDIR}/log.txt"
+    mkdir -p "$(dirname "${log_file}")"
+    : > "${log_file}"
+
+    _estimate_model_size() { echo "7"; }
+    _ensure_evaluate_baseline_report() { echo "${TEST_TMPDIR}/baseline_report.json"; }
+    echo "{}" > "${TEST_TMPDIR}/baseline_report.json"
+
+    # evaluate_EDIT: rc!=0 but report exists -> treat as success
+    local edit_dir="${model_output_dir}/models/quant_4bit_clean"
+    mkdir -p "${baseline_dir}" "${edit_dir}"
+    echo "{}" > "${baseline_dir}/config.json"
+    echo "{}" > "${edit_dir}/config.json"
+    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
+
+    run task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean 1 "${out}" "${log_file}"
+    assert_rc "0" "${RUN_RC}" "non-zero invarlock rc is ignored when report exists (edit)"
+    assert_file_exists "${model_output_dir}/reports/quant_4bit_clean/run_1/evaluation.report.json" "edit report written"
+
+    # evaluate_ERROR: rc!=0 but report exists -> treat as success
+    local error_dir="${model_output_dir}/models/error_cuda_assert"
+    mkdir -p "${error_dir}"
+    echo "{}" > "${error_dir}/config.json"
+
+    run task_evaluate_error "${model_name}" 0 cuda_assert "${out}" "${log_file}"
+    assert_rc "0" "${RUN_RC}" "non-zero invarlock rc is ignored when report exists (error)"
+    assert_file_exists "${model_output_dir}/reports/errors/cuda_assert/evaluation.report.json" "error report written"
+}
+
 test_task_create_error_branches_cover_skip_missing_function_and_verify_paths() {
     mock_reset
     # shellcheck source=../task_functions.sh
