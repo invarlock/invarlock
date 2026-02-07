@@ -732,7 +732,16 @@ def main(argv: list[str]) -> int:
                     if rows < 2:
                         continue
                     base = w[:rows, :].detach().clone()
-                    anchor = base[:1, :].expand_as(base)
+                    # Pick a deterministic "anchor" row that is likely to be active.
+                    # Using the first row is brittle across architectures and can
+                    # materially reduce RMT probe sensitivity on some models.
+                    anchor_idx = 0
+                    try:
+                        norms = torch.linalg.vector_norm(base.float(), ord=2, dim=1)
+                        anchor_idx = int(torch.argmax(norms).item())
+                    except Exception:
+                        anchor_idx = 0
+                    anchor = base[anchor_idx : anchor_idx + 1, :].expand_as(base)
                     mixed = (1.0 - blend) * base + blend * anchor
                     if preserve_row_norms:
                         base_norm = torch.linalg.vector_norm(
