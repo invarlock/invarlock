@@ -20,6 +20,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+_ALLOWED_VERIFY_PROFILES = {"dev", "ci", "release"}
+
 
 def _sha256_hex(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
@@ -31,6 +33,67 @@ def _utc_now_iso() -> str:
 
 def _read_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _normalize_verify_payload(
+    verify_payload: dict[str, Any], verify_profile: str | None
+) -> dict[str, Any]:
+    """
+    Normalize `invarlock verify --json` outputs into the artifact schema shape:
+      {profile: dev|ci|release, ok: bool, errors: list[str], verify_json: object}
+
+    InvarLock emits a verify-v1 envelope (format_version=verify-v1) that does not
+    include the profile string, so callers should pass `--verify-profile` when
+    embedding it.
+    """
+
+    def pick_profile(*candidates: object) -> str:
+        for c in candidates:
+            if isinstance(c, str) and c in _ALLOWED_VERIFY_PROFILES:
+                return c
+        return "ci"
+
+    if verify_payload.get("format_version") == "verify-v1":
+        summary = verify_payload.get("summary")
+        summary = summary if isinstance(summary, dict) else {}
+        ok = bool(summary.get("ok", False))
+        profile = pick_profile(verify_profile)
+
+        errors: list[str] = []
+        results = verify_payload.get("results")
+        if isinstance(results, list):
+            for r in results:
+                if not isinstance(r, dict):
+                    continue
+                if bool(r.get("ok", True)):
+                    continue
+                rid = r.get("id") or r.get("kind") or "check"
+                reason = r.get("reason") or "failed"
+                errors.append(f"{rid}:{reason}")
+
+        if not ok and not errors:
+            errors.append(str(summary.get("reason", "failed")))
+
+        return {
+            "profile": profile,
+            "ok": ok,
+            "errors": errors,
+            "verify_json": verify_payload,
+        }
+
+    # Legacy (pre verify-v1): {"profile": "...", "ok": bool, "errors": [...]}
+    profile = pick_profile(verify_payload.get("profile"), verify_profile)
+    ok = bool(verify_payload.get("ok", False))
+    raw_errors = verify_payload.get("errors", [])
+    if not isinstance(raw_errors, list):
+        raw_errors = [raw_errors]
+    errors = [str(e) for e in raw_errors]
+    return {
+        "profile": profile,
+        "ok": ok,
+        "errors": errors,
+        "verify_json": verify_payload,
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -59,6 +122,15 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="Optional path to `invarlock verify --json` output to embed under guard_evidence.invarlock.verify.verify_json.",
     )
+    p.add_argument(
+        "--verify-profile",
+        type=str,
+        choices=sorted(_ALLOWED_VERIFY_PROFILES),
+        help=(
+            "Profile used when producing --verify-json (dev|ci|release). "
+            "Required when --verify-json is a verify-v1 envelope (no profile field)."
+        ),
+    )
     p.add_argument("--invarlock-version", type=str, default="unknown")
     p.add_argument("--git-commit", type=str, default="unknown")
     args = p.parse_args(argv)
@@ -75,7 +147,12 @@ def main(argv: list[str] | None = None) -> int:
 
     verify_payload = None
     if args.verify_json is not None:
-        verify_payload = _read_json(args.verify_json)
+        raw_verify_payload = _read_json(args.verify_json)
+        if not isinstance(raw_verify_payload, dict):
+            raise TypeError("--verify-json must contain a JSON object at top-level")
+        verify_payload = _normalize_verify_payload(
+            raw_verify_payload, args.verify_profile
+        )
 
     artifact: dict[str, Any] = {
         "schema_version": "verifier_carrying_artifact.v1",
@@ -103,12 +180,7 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     if verify_payload is not None:
-        artifact["guard_evidence"]["invarlock"]["verify"] = {
-            "profile": str(verify_payload.get("profile", "ci")),
-            "ok": bool(verify_payload.get("ok", False)),
-            "errors": verify_payload.get("errors", []),
-            "verify_json": verify_payload,
-        }
+        artifact["guard_evidence"]["invarlock"]["verify"] = verify_payload
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(

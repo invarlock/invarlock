@@ -217,6 +217,7 @@ python scripts/verifai2_2026/pilot_assemble_artifact.py \
   --evaluation-report /tmp/pilot_reports/evaluation.report.json \
   --verifier-trace /tmp/verifier_trace.json \
   --verify-json /tmp/pilot_reports/verify.json \
+  --verify-profile dev \
   --embed-evaluation-report \
   --out /tmp/pilot_artifact.json
 
