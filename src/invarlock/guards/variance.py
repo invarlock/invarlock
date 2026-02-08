@@ -221,10 +221,15 @@ def equalise_residual_variance(
 
         return fn
 
-    def _moe_expert_w2_modules(block: Any) -> list[nn.Module]:
+    def _moe_expert_out_modules(block: Any) -> list[nn.Module]:
         """Return MoE expert output projection modules for known transformer MoE blocks.
 
-        Some HF implementations store experts in `nn.ModuleList` while others use
+        Models vary in how they name the expert output projection:
+        - Mixtral-style: `w2`
+        - Llama/Qwen-style: `down_proj`
+        - GPT-style: `c_proj` / `fc2`
+
+        Some implementations store experts in `nn.ModuleList` while others use
         `nn.ModuleDict` (which iterates over keys by default). Use `_modules`
         when available so we always iterate over actual expert modules.
         """
@@ -241,9 +246,11 @@ def equalise_residual_variance(
             except TypeError:
                 return []
         for expert in iterable:
-            w2 = getattr(expert, "w2", None)
-            if w2 is not None and hasattr(w2, "weight"):
-                out.append(w2)
+            for attr in ("w2", "down_proj", "c_proj", "fc2"):
+                proj = getattr(expert, attr, None)
+                if proj is not None and hasattr(proj, "weight"):
+                    out.append(proj)
+                    break
         return out
 
     # Register hooks on projection layers
@@ -277,8 +284,8 @@ def equalise_residual_variance(
                 hooks[name] = mlp_proj.register_forward_hook(_branch_hook(name))
             else:
                 # Mixtral-style MoE: no single down_proj/c_proj module. Hook on the
-                # MoE block output and scale expert w2 projections together.
-                if _moe_expert_w2_modules(mlp_container):
+                # MoE block output and scale expert output projections together.
+                if _moe_expert_out_modules(mlp_container):
                     name = f"block{i}.mlp"
                     hooks[name] = mlp_container.register_forward_hook(
                         _branch_hook(name)
@@ -415,14 +422,14 @@ def equalise_residual_variance(
                 applied_scales[name] = alpha
                 continue
 
-            moe_w2 = _moe_expert_w2_modules(mlp_container)
-            if moe_w2:
+            moe_out = _moe_expert_out_modules(mlp_container)
+            if moe_out:
                 if apply:
                     with torch.no_grad():
-                        for w2 in moe_w2:
-                            w2.weight.mul_(alpha)
-                            if scale_bias and getattr(w2, "bias", None) is not None:
-                                w2.bias.mul_(alpha)
+                        for proj in moe_out:
+                            proj.weight.mul_(alpha)
+                            if scale_bias and getattr(proj, "bias", None) is not None:
+                                proj.bias.mul_(alpha)
                 applied_scales[name] = alpha
 
     return applied_scales
@@ -1120,16 +1127,21 @@ class VarianceGuard(Guard):
                     except TypeError:
                         iterable = []
                 for expert in iterable:
-                    w2 = getattr(expert, "w2", None)
-                    weight = getattr(w2, "weight", None) if w2 is not None else None
-                    if weight is None:
-                        continue
-                    try:
-                        dim = weight.dim()
-                    except Exception:
-                        dim = getattr(weight, "ndim", None)
-                    if dim == 2:
-                        return True
+                    for attr in ("w2", "down_proj", "c_proj", "fc2"):
+                        proj = getattr(expert, attr, None)
+                        weight = (
+                            getattr(proj, "weight", None) if proj is not None else None
+                        )
+                        if weight is None:
+                            continue
+                        try:
+                            dim = weight.dim()
+                        except Exception:
+                            dim = getattr(weight, "ndim", None)
+                        # Some MoE implementations pack experts into a single
+                        # tensor (dim=3). We can still scale that weight safely.
+                        if dim in (2, 3):
+                            return True
 
             if isinstance(module, module_types):
                 return True
