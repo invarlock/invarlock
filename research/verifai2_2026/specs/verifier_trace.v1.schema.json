@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/schemas/verifier_trace.v1.schema.json",
+  "title": "Verifier Trace (v1)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "verifier", "trace_contract", "results"],
+  "properties": {
+    "schema_version": { "const": "verifier_trace.v1" },
+    "verifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "kind", "harness"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "kind": {
+          "type": "string",
+          "enum": ["code_execution", "proof_checker", "smt_solver", "static_analyzer"]
+        },
+        "harness": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "version": { "type": "string" },
+            "git_commit": { "type": "string" },
+            "container_image": { "type": "string" },
+            "config_digest_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        },
+        "sandbox": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "network_enabled": { "type": "boolean" },
+            "timeout_s": { "type": "number", "minimum": 0 },
+            "cpu_limit": { "type": "integer", "minimum": 1 },
+            "mem_limit_mb": { "type": "integer", "minimum": 1 },
+            "wall_limit_s": { "type": "number", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "trace_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prompt_set", "model", "decoding"],
+      "properties": {
+        "prompt_set": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "dataset", "items", "digest_sha256"],
+          "properties": {
+            "mode": { "type": "string", "enum": ["embedded", "hash_only"] },
+            "dataset": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string", "minLength": 1 },
+                "config": { "type": "string" },
+                "split": { "type": "string" },
+                "revision": { "type": "string" },
+                "manifest_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            },
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "sha256"],
+                "properties": {
+                  "id": { "type": "string", "minLength": 1 },
+                  "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+                  "text": { "type": "string" }
+                },
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": { "text": { "type": "string" } },
+                      "required": ["text"]
+                    },
+                    "then": {
+                      "properties": {},
+                      "description": "If prompt text is embedded, sha256 should be computed over UTF-8 bytes of text."
+                    }
+                  }
+                ]
+              }
+            },
+            "digest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "selection_script_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        },
+        "model": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "revision"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "revision": { "type": "string", "minLength": 1 },
+            "files": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["path", "sha256"],
+                "properties": {
+                  "path": { "type": "string", "minLength": 1 },
+                  "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+                }
+              }
+            }
+          }
+        },
+        "tokenizer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "revision"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "revision": { "type": "string", "minLength": 1 }
+          }
+        },
+        "decoding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["method", "max_new_tokens", "temperature", "top_p", "seed"],
+          "properties": {
+            "method": { "type": "string", "enum": ["greedy", "sample", "beam"] },
+            "temperature": { "type": "number", "minimum": 0 },
+            "top_p": { "type": "number", "minimum": 0, "maximum": 1 },
+            "top_k": { "type": "integer", "minimum": 0 },
+            "max_new_tokens": { "type": "integer", "minimum": 1 },
+            "stop": { "type": "array", "items": { "type": "string" } },
+            "seed": { "type": "integer" }
+          }
+        },
+        "environment": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "os": { "type": "string" },
+            "python": { "type": "string" },
+            "container_image": { "type": "string" },
+            "cuda": { "type": "string" },
+            "gpu": { "type": "string" }
+          }
+        },
+        "run": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "run_id": { "type": "string" },
+            "started_at": { "type": "string" },
+            "finished_at": { "type": "string" }
+          }
+        }
+      }
+    },
+    "results": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "cases"],
+      "properties": {
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["n_total", "n_pass", "pass_at_1"],
+          "properties": {
+            "n_total": { "type": "integer", "minimum": 0 },
+            "n_pass": { "type": "integer", "minimum": 0 },
+            "pass_at_1": { "type": "number", "minimum": 0, "maximum": 1 },
+            "metric_name": { "type": "string" }
+          }
+        },
+        "cases": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "verdict"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "verdict": {
+                "type": "string",
+                "enum": ["pass", "fail", "error", "timeout", "skipped"]
+              },
+              "error_type": { "type": "string" },
+              "wall_time_s": { "type": "number", "minimum": 0 },
+              "stderr_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "counterexample": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "failing_test_ids": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  },
+                  "message_excerpt": { "type": "string" },
+                  "message_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "sha256"],
+        "properties": {
+          "kind": { "type": "string" },
+          "path": { "type": "string" },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "mime": { "type": "string" }
+        }
+      }
+    },
+    "extensions": { "type": "object" }
+  }
+}
+

@@ -1,0 +1,69 @@
+{
+  "schema_version": "verifier_trace.v1",
+  "verifier": {
+    "name": "mbpp",
+    "kind": "code_execution",
+    "harness": {
+      "name": "mbpp-harness",
+      "version": "0.0.0-demo",
+      "git_commit": "deadbeef",
+      "config_digest_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "sandbox": {
+      "network_enabled": false,
+      "timeout_s": 10,
+      "cpu_limit": 2,
+      "mem_limit_mb": 2048,
+      "wall_limit_s": 10
+    }
+  },
+  "trace_contract": {
+    "prompt_set": {
+      "mode": "hash_only",
+      "dataset": {
+        "name": "MBPP",
+        "split": "test",
+        "revision": "demo",
+        "manifest_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "items": [
+        {
+          "id": "MBPP/0",
+          "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+        }
+      ],
+      "digest_sha256": "f7554e2c8cbc727dcef967479d6031250be2c97040b1a4fc9731d8217db21128"
+    },
+    "model": {
+      "id": "demo/code-model",
+      "revision": "demo-rev"
+    },
+    "tokenizer": {
+      "id": "demo/code-model",
+      "revision": "demo-rev"
+    },
+    "decoding": {
+      "method": "greedy",
+      "temperature": 0.0,
+      "top_p": 1.0,
+      "top_k": 0,
+      "max_new_tokens": 256,
+      "seed": 42
+    }
+  },
+  "results": {
+    "summary": {
+      "n_total": 1,
+      "n_pass": 0,
+      "pass_at_1": 0.0,
+      "metric_name": "pass@1"
+    },
+    "cases": [
+      {
+        "id": "MBPP/0",
+        "verdict": "error",
+        "error_type": "RuntimeError"
+      }
+    ]
+  }
+}

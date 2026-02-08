@@ -1,0 +1,99 @@
+{
+  "schema_version": "verifier_carrying_artifact.v1",
+  "guard_evidence": {
+    "invarlock": {
+      "evaluation_report": {
+        "sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+        "embedded": {
+          "schema_version": "v1",
+          "run_id": "demo_run",
+          "meta": { "model_id": "demo/code-model" },
+          "dataset": { "provider": "local_jsonl", "seq_len": 128, "windows": { "preview": 1, "final": 1, "stats": {} } },
+          "artifacts": {},
+          "plugins": {},
+          "primary_metric": { "kind": "ppl_causal", "preview": 10.0, "final": 10.1, "ratio_vs_baseline": 1.01, "display_ci": [1.0, 1.02] }
+        }
+      },
+      "verify": {
+        "profile": "ci",
+        "ok": true,
+        "errors": []
+      }
+    }
+  },
+  "verifier_traces": [
+    {
+      "schema_version": "verifier_trace.v1",
+      "verifier": {
+        "name": "humaneval",
+        "kind": "code_execution",
+        "harness": { "name": "human-eval-harness" }
+      },
+      "trace_contract": {
+        "prompt_set": {
+          "mode": "hash_only",
+          "dataset": { "name": "HumanEval", "split": "test", "revision": "demo" },
+          "items": [
+            { "id": "HumanEval/0", "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" }
+          ],
+          "digest_sha256": "3b89134b124cdbee8fda9c7f52f633ecea650cc35d9fa7518a6833d7cdfc122f"
+        },
+        "model": { "id": "demo/code-model", "revision": "demo-rev" },
+        "tokenizer": { "id": "demo/code-model", "revision": "demo-rev" },
+        "decoding": {
+          "method": "greedy",
+          "temperature": 0.0,
+          "top_p": 1.0,
+          "top_k": 0,
+          "max_new_tokens": 256,
+          "seed": 42
+        }
+      },
+      "results": {
+        "summary": { "n_total": 1, "n_pass": 1, "pass_at_1": 1.0, "metric_name": "pass@1" },
+        "cases": [{ "id": "HumanEval/0", "verdict": "pass" }]
+      }
+    },
+    {
+      "schema_version": "verifier_trace.v1",
+      "verifier": {
+        "name": "mbpp",
+        "kind": "code_execution",
+        "harness": { "name": "mbpp-harness" }
+      },
+      "trace_contract": {
+        "prompt_set": {
+          "mode": "hash_only",
+          "dataset": { "name": "MBPP", "split": "test", "revision": "demo" },
+          "items": [
+            { "id": "MBPP/0", "sha256": "3333333333333333333333333333333333333333333333333333333333333333" }
+          ],
+          "digest_sha256": "56464bff4d9289fc366ff13a0939f134b5213dcbebde6d72f2ea0823e30bb359"
+        },
+        "model": { "id": "demo/code-model", "revision": "demo-rev" },
+        "tokenizer": { "id": "demo/code-model", "revision": "demo-rev" },
+        "decoding": {
+          "method": "greedy",
+          "temperature": 0.0,
+          "top_p": 1.0,
+          "top_k": 0,
+          "max_new_tokens": 256,
+          "seed": 42
+        }
+      },
+      "results": {
+        "summary": { "n_total": 1, "n_pass": 0, "pass_at_1": 0.0, "metric_name": "pass@1" },
+        "cases": [{ "id": "MBPP/0", "verdict": "fail" }]
+      }
+    }
+  ],
+  "provenance": {
+    "created_at": "2026-02-08T00:00:00Z",
+    "tooling": {
+      "invarlock_version": "0.3.9",
+      "schema_verify_version": "0.1.0",
+      "git_commit": "deadbeef"
+    },
+    "notes": "Example artifact for schema validation."
+  }
+}
