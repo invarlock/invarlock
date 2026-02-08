@@ -247,6 +247,8 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
     assert signals["rmt"]["unique"] == 1
     assert signals["invariants"]["flagged"] == 9
     assert signals["invariants"]["unique"] == 0
+    assert signals["variance"]["flagged"] == 1
+    assert signals["variance"]["unique"] == 1
 
     interventions = verdict["guard_intervention_summary"]["signals"]
     assert interventions["spectral_caps"]["flagged"] == 1
@@ -258,7 +260,7 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
     assert category["stress"]["reports"] == 4
     assert category["stress"]["any_flag"] == 4
     assert category["error_injection"]["reports"] == 12
-    assert category["error_injection"]["any_flag"] == 10
+    assert category["error_injection"]["any_flag"] == 11
 
 
 def test_verdict_contract_reports_guard_signal_uniqueness(tmp_path: Path) -> None:
