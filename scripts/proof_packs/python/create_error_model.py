@@ -945,7 +945,11 @@ def main(argv: list[str]) -> int:
             params_by_layer: dict[int, list[tuple[str, torch.Tensor]]] = {}
             global_params: list[tuple[str, torch.Tensor]] = []
             for name, param in model.named_parameters():
-                if param.dim() < 2 or "weight" not in name.lower():
+                # Some architectures (e.g., Mixtral) materialize fused expert
+                # weights as a 3D Parameter (e.g. `...experts.down_proj`) without
+                # a `.weight` suffix. Treat any floating-point tensor with
+                # dim >= 2 as weight-like here.
+                if param.dim() < 2:
                     continue
                 if not param.is_floating_point():
                     continue
@@ -1143,7 +1147,7 @@ def main(argv: list[str]) -> int:
             params_by_layer: dict[int, list[tuple[str, torch.Tensor]]] = {}
             global_params: list[tuple[str, torch.Tensor]] = []
             for name, param in model.named_parameters():
-                if param.dim() < 2 or "weight" not in name.lower():
+                if param.dim() < 2:
                     continue
                 if not param.is_floating_point():
                     continue
@@ -1364,7 +1368,7 @@ def main(argv: list[str]) -> int:
             down_by_layer: dict[int, list[tuple[str, torch.Tensor]]] = {}
             for name, param in model.named_parameters():
                 lname = name.lower()
-                if param.dim() < 2 or "weight" not in lname:
+                if param.dim() < 2:
                     continue
                 if not param.is_floating_point():
                     continue
@@ -1440,7 +1444,7 @@ def main(argv: list[str]) -> int:
         else:
             params_by_layer: dict[int, list[tuple[str, torch.Tensor]]] = {}
             for name, param in model.named_parameters():
-                if param.dim() < 2 or "weight" not in name.lower():
+                if param.dim() < 2:
                     continue
                 if not param.is_floating_point():
                     continue
@@ -1545,13 +1549,19 @@ def main(argv: list[str]) -> int:
         torch.manual_seed(seed)
 
         layer_pattern = re.compile(r"(?:layers|blocks|h)\.(\d+)\.")
-        mlp_out_patterns = ("down_proj.weight", "c_proj.weight", "fc2.weight")
+        # Include suffix-less fused MoE expert weights (e.g. `...experts.down_proj`)
+        # in addition to standard `*.weight` parameter names.
+        mlp_out_patterns = ("down_proj", "c_proj", "fc2")
         # Some MoE experts use w2 as the FFN output projection.
-        expert_out_patterns = ("w2.weight",)
+        expert_out_patterns = ("w2",)
 
         def is_target_param(name: str) -> bool:
             lname = name.lower()
             if target_family not in ("mlp", "both", "attn"):
+                return False
+            if (not include_experts) and any(
+                tok in lname for tok in ("experts", "moe", "block_sparse_moe")
+            ):
                 return False
             if target_family in ("mlp", "both"):
                 if any(pat in lname for pat in mlp_out_patterns):
@@ -1566,7 +1576,7 @@ def main(argv: list[str]) -> int:
         params_by_layer: dict[int, list[tuple[str, torch.Tensor]]] = {}
         for name, param in model.named_parameters():
             lname = name.lower()
-            if param.dim() < 2 or "weight" not in lname:
+            if param.dim() < 2:
                 continue
             if not param.is_floating_point():
                 continue
