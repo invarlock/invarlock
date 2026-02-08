@@ -107,6 +107,14 @@ no hand-wavy “we will log X later”.
 - Verifier: a placeholder verifier trace record (until HumanEval harness is
   wired) to validate schema and assembly.
 
+Notes for small/offline pilots:
+
+- Prefer `--profile dev --tier none` for the pilot. `--profile ci` applies
+  default dataset window counts (200/200) and will fail fast on small canaries.
+- If you copy a Hugging Face cache snapshot for offline use, make sure the
+  copied model directory contains *real files*, not symlinks into the HF cache.
+  (Use `cp -aL` when copying snapshot contents.)
+
 ### Pilot outputs (pass criteria)
 
 - An InvarLock `evaluation.report.json` and a passing `invarlock verify`.
@@ -152,5 +160,27 @@ python scripts/verifai2_2026/make_text_canary.py \
   --n 512 \
   --out /tmp/code_canary.jsonl \
   --manifest-out /tmp/code_canary.manifest.json
-```
 
+# Minimal offline pilot (end-to-end artifact): local_jsonl + local HF directory
+HF_HOME=/tmp/hf_home HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
+PYTHONPATH=src python -m invarlock evaluate \
+  --baseline /path/to/local_hf_model_dir \
+  --subject /path/to/local_hf_model_dir \
+  --adapter hf_causal \
+  --profile dev --tier none \
+  --preset /tmp/pilot_local_jsonl.yaml \
+  --edit-config configs/overlays/edits/quant_rtn/tiny_demo.yaml \
+  --out /tmp/pilot_runs --report-out /tmp/pilot_reports
+
+PYTHONPATH=src python -m invarlock verify --profile dev --json \
+  /tmp/pilot_reports/evaluation.report.json > /tmp/pilot_reports/verify.json
+
+python scripts/verifai2_2026/pilot_assemble_artifact.py \
+  --evaluation-report /tmp/pilot_reports/evaluation.report.json \
+  --verifier-trace /tmp/pilot_dummy_trace.json \
+  --verify-json /tmp/pilot_reports/verify.json \
+  --embed-evaluation-report \
+  --out /tmp/pilot_artifact.json
+
+python scripts/verifai2_2026/schema_verify.py --check-files /tmp/pilot_artifact.json
+```
