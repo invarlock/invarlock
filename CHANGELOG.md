@@ -17,6 +17,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+## [0.3.10] - 2026-02-08
+
+### Added
+- Proof packs: new guard showcase suite and expanded scenario coverage (scenario filtering/errors-only mode, suite-scoped scenarios, and model override support).
+- Proof packs: new demo/probing artifacts (verdict tables generator, VE `ve_probe` sidecar, and additional RMT/spectral/variance showcase injections).
+- CI: add Python 3.12 smoke and scheduled weekly verification.
+
+### Changed
+- CI: make release/CI verification more reproducible (deterministic `verify-full`) and improve local `act` ergonomics.
+- Docs CI: allow on-demand runs via `workflow_dispatch`.
+- Proof packs: strengthen “evidence signal” outputs and tighten fail-closed behavior for verdict/task failures.
+
+### Fixed
+- Guards/variance and VE: improve Mixture-of-Experts compatibility (fused expert weight layouts, broader VE layer discovery, and Mixtral `block_sparse_moe` support) and harden variance defaults/probes.
+- Proof packs: improve reliability and determinism of demos (retuned injections/detectors, more robust packaging of probe sidecars, and safer behavior when reports exist but evaluation exits nonzero).
+- Assurance: close verification/baseline evidence gaps and tighten audit coverage.
+- CLI/eval/tests: stabilize CI help-smoke output, accept extra `load_dataset` kwargs, and allow warn-only determinism.
+
+### Dependencies
+- Proof packs: harden dependency preflight and net-enabled install behavior (require `huggingface_hub` where needed; ensure `accelerate` is available).
+
+### Documentation
+- Docs: fix markdown link fragments.
+- Proof packs: clarify evidence vs proof-grade posture and document new artifacts (intervention summary + VE probe sidecar).
+
 ## [0.3.9] - 2026-02-03
 
 ### Fixed
