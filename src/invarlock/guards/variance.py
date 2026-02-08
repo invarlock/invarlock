@@ -235,12 +235,19 @@ def equalise_residual_variance(
                 name = f"block{i}.attn"
                 hooks[name] = attn_proj.register_forward_hook(_branch_hook(name))
 
+        mlp_container = None
         if hasattr(blk, "mlp"):
+            mlp_container = blk.mlp  # type: ignore[attr-defined]
+        elif hasattr(blk, "block_sparse_moe"):
+            # Mixtral decoder layers use block_sparse_moe instead of a plain mlp module.
+            mlp_container = blk.block_sparse_moe  # type: ignore[attr-defined]
+
+        if mlp_container is not None:
             # Check for c_proj (GPT-2) or down_proj (RoPE decoder) or fc2 (generic)
             mlp_proj = (
-                getattr(blk.mlp, "c_proj", None)
-                or getattr(blk.mlp, "down_proj", None)
-                or getattr(blk.mlp, "fc2", None)
+                getattr(mlp_container, "c_proj", None)
+                or getattr(mlp_container, "down_proj", None)
+                or getattr(mlp_container, "fc2", None)
             )
             if mlp_proj is not None:
                 name = f"block{i}.mlp"
@@ -248,9 +255,11 @@ def equalise_residual_variance(
             else:
                 # Mixtral-style MoE: no single down_proj/c_proj module. Hook on the
                 # MoE block output and scale expert w2 projections together.
-                if _moe_expert_w2_modules(blk.mlp):
+                if _moe_expert_w2_modules(mlp_container):
                     name = f"block{i}.mlp"
-                    hooks[name] = blk.mlp.register_forward_hook(_branch_hook(name))
+                    hooks[name] = mlp_container.register_forward_hook(
+                        _branch_hook(name)
+                    )
 
     # Collect variance statistics
     try:
@@ -333,11 +342,17 @@ def equalise_residual_variance(
                         applied_scales[name] = alpha
 
         # Handle MLP projection
+        mlp_container = None
         if hasattr(blk, "mlp"):
+            mlp_container = blk.mlp  # type: ignore[attr-defined]
+        elif hasattr(blk, "block_sparse_moe"):
+            mlp_container = blk.block_sparse_moe  # type: ignore[attr-defined]
+
+        if mlp_container is not None:
             mlp_proj = (
-                getattr(blk.mlp, "c_proj", None)
-                or getattr(blk.mlp, "down_proj", None)
-                or getattr(blk.mlp, "fc2", None)
+                getattr(mlp_container, "c_proj", None)
+                or getattr(mlp_container, "down_proj", None)
+                or getattr(mlp_container, "fc2", None)
             )
             name = f"block{i}.mlp"
             values = sample_values.get(name, [])
@@ -377,7 +392,7 @@ def equalise_residual_variance(
                 applied_scales[name] = alpha
                 continue
 
-            moe_w2 = _moe_expert_w2_modules(getattr(blk, "mlp", None))
+            moe_w2 = _moe_expert_w2_modules(mlp_container)
             if moe_w2:
                 if apply:
                     with torch.no_grad():
@@ -1121,23 +1136,33 @@ class VarianceGuard(Guard):
                     targets[name] = attn_proj
                     _record_match(name, attn_proj)
 
-            # Handle MLP projection based on scope
-            if scope in ["ffn", "both"] and hasattr(blk, "mlp"):
+            # Handle MLP projection based on scope.
+            # Some architectures (e.g., Mixtral) expose the FFN under block_sparse_moe
+            # instead of a plain .mlp module.
+            if scope in ["ffn", "both"]:
+                mlp_container = None
+                if hasattr(blk, "mlp"):
+                    mlp_container = blk.mlp  # type: ignore[attr-defined]
+                elif hasattr(blk, "block_sparse_moe"):
+                    mlp_container = blk.block_sparse_moe  # type: ignore[attr-defined]
+                if mlp_container is None:
+                    continue
+
                 mlp_proj = (
-                    getattr(blk.mlp, "c_proj", None)
-                    or getattr(blk.mlp, "down_proj", None)
-                    or getattr(blk.mlp, "fc2", None)
+                    getattr(mlp_container, "c_proj", None)
+                    or getattr(mlp_container, "down_proj", None)
+                    or getattr(mlp_container, "fc2", None)
                 )
                 name = f"transformer.h.{i}.mlp.c_proj"
                 if mlp_proj is None:
-                    if _is_supported_module(blk.mlp):
+                    if _is_supported_module(mlp_container):
                         # Composite MoE block (experts with w2). Use the mlp block
                         # itself as the target container.
                         if not self._matches_tap(name):
-                            _record_rejection(name, "tap_mismatch", blk.mlp)
+                            _record_rejection(name, "tap_mismatch", mlp_container)
                         else:
-                            targets[name] = blk.mlp
-                            _record_match(name, blk.mlp)
+                            targets[name] = mlp_container
+                            _record_match(name, mlp_container)
                     else:
                         _record_rejection(name, "missing_module", None)
                 elif not self._matches_tap(name):
