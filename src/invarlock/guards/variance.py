@@ -124,6 +124,13 @@ def _iter_transformer_layers(model: nn.Module):
     elif hasattr(model, "model") and hasattr(model.model, "layers"):
         # RoPE decoder style
         yield from model.model.layers
+    elif (
+        hasattr(model, "model")
+        and hasattr(model.model, "model")
+        and hasattr(model.model.model, "layers")
+    ):
+        # Some wrappers nest decoder layers under model.model.layers.
+        yield from model.model.model.layers
     elif hasattr(model, "encoder") and hasattr(model.encoder, "layer"):
         # BERT style
         yield from model.encoder.layer
@@ -134,9 +141,16 @@ def _iter_transformer_layers(model: nn.Module):
         # Generic transformer with top-level layers attribute
         yield from model.layers
     else:
-        # Fallback: look for modules with attention
+        # Fallback: look for modules that resemble decoder layers.
+        #
+        # Some architectures (e.g., Mixtral) use `self_attn` + `block_sparse_moe`
+        # instead of `attn` + `mlp`, and some wrappers may hide the canonical
+        # layers list from the attribute heuristics above.
         for module in model.modules():
-            if hasattr(module, "attn") and hasattr(module, "mlp"):
+            if (hasattr(module, "attn") and hasattr(module, "mlp")) or (
+                hasattr(module, "self_attn")
+                and (hasattr(module, "mlp") or hasattr(module, "block_sparse_moe"))
+            ):
                 yield module
 
 

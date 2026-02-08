@@ -1,7 +1,11 @@
 import torch
 import torch.nn as nn
 
-from invarlock.guards.variance import VarianceGuard, equalise_residual_variance
+from invarlock.guards.variance import (
+    VarianceGuard,
+    _iter_transformer_layers,
+    equalise_residual_variance,
+)
 
 
 def test_variance_guard_tap_alias_matches_model_layers_down_proj():
@@ -164,3 +168,50 @@ def test_equalise_residual_variance_supports_block_sparse_moe_blocks():
         allow_empty=False,
     )
     assert "block0.mlp" in out
+
+
+def test_iter_transformer_layers_fallback_handles_block_sparse_moe_layers():
+    class ToyBlock(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.self_attn = nn.Identity()
+            self.block_sparse_moe = nn.Identity()
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return x
+
+    class WeirdWrapper(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.backbone = nn.ModuleList([ToyBlock(), ToyBlock()])
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            for blk in self.backbone:
+                x = blk(x)
+            return x
+
+    model = WeirdWrapper()
+    layers = list(_iter_transformer_layers(model))
+    assert len(layers) == 2
+    assert all(hasattr(layer, "block_sparse_moe") for layer in layers)
+
+
+def test_iter_transformer_layers_handles_nested_model_model_layers():
+    class ToyInner(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.layers = nn.ModuleList([nn.Linear(1, 1), nn.Linear(1, 1)])
+
+    class ToyOuter(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.model = ToyInner()
+
+    class ToyWrapper(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.model = ToyOuter()
+
+    model = ToyWrapper()
+    layers = list(_iter_transformer_layers(model))
+    assert len(layers) == 2

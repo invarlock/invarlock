@@ -192,11 +192,19 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
     guard = VarianceGuard(policy)
     adapter = HF_Causal_Adapter()
 
+    prep_result: dict[str, Any] = {}
+    target_resolution: Any = None
+    target_module_names: Any = None
+
     subject_model = _load_model(
         subject_model_path, dtype=dtype, trust_remote_code=bool(args.trust_remote_code)
     )
     try:
-        guard.prepare(subject_model, adapter=adapter, calib=batches, policy=policy)
+        prep_result = guard.prepare(
+            subject_model, adapter=adapter, calib=batches, policy=policy
+        )
+        target_resolution = guard._stats.get("target_resolution")  # noqa: SLF001
+        target_module_names = guard._stats.get("target_module_names")  # noqa: SLF001
         proposed_scales_pre = guard._stats.get("proposed_scales_pre_edit", {})  # noqa: SLF001
         proposed_scales = len(guard._scales)  # noqa: SLF001
         ppl_no_ve = guard._ppl_no_ve  # noqa: SLF001
@@ -250,6 +258,9 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
         "profile": str(args.profile),
         "tier": str(args.tier),
         "calibration_windows_loaded": len(batches),
+        "prepare": prep_result,
+        "target_resolution": target_resolution,
+        "target_module_names": target_module_names,
         "policy": policy,
         "signal": signal,
         "signal_reasons": reasons,
