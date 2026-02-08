@@ -572,7 +572,7 @@ execute_task() {
     # Set PM acceptance range to avoid gate failures during validation
     # These bounds are calibrated for typical validation runs; adjust if needed
     export INVARLOCK_PM_ACCEPTANCE_MIN="${INVARLOCK_PM_ACCEPTANCE_MIN:-0.90}"
-    export INVARLOCK_PM_ACCEPTANCE_MAX="${INVARLOCK_PM_ACCEPTANCE_MAX:-1.20}"
+    export INVARLOCK_PM_ACCEPTANCE_MAX="${INVARLOCK_PM_ACCEPTANCE_MAX:-1.10}"
 
     local task_pid_file=""
     if [[ -n "${QUEUE_DIR:-}" && -d "${QUEUE_DIR}/running" ]]; then

@@ -574,7 +574,7 @@ pack_configure_hf_access() {
 # PM acceptance range used during validation
 # These bounds help avoid unnecessary gate failures during validation runs
 export INVARLOCK_PM_ACCEPTANCE_MIN="${INVARLOCK_PM_ACCEPTANCE_MIN:-0.90}"
-export INVARLOCK_PM_ACCEPTANCE_MAX="${INVARLOCK_PM_ACCEPTANCE_MAX:-1.20}"
+export INVARLOCK_PM_ACCEPTANCE_MAX="${INVARLOCK_PM_ACCEPTANCE_MAX:-1.10}"
 
 # Flash attention flag - will be set dynamically based on availability
 export FLASH_ATTENTION_AVAILABLE="false"
