@@ -21,7 +21,9 @@ def test_read_text_is_lossy(tmp_path: Path) -> None:
     assert isinstance(s, str)
 
 
-def test_build_canary_filters_and_truncates_deterministically(tmp_path: Path) -> None:
+def test_build_canary_filters_and_truncates_deterministically(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     root = tmp_path / "root"
     root.mkdir()
     (root / "subdir").mkdir()
@@ -36,27 +38,33 @@ def test_build_canary_filters_and_truncates_deterministically(tmp_path: Path) ->
     os.symlink(str(root / "does_not_exist.txt"), str(root / "broken_link.txt"))
     unreadable = root / "unreadable.txt"
     unreadable.write_text("U" * 50, encoding="utf-8")
-    os.chmod(unreadable, 0)
 
-    try:
-        selected1, manifest1 = make_text_canary.build_canary(
-            input_dir=root,
-            patterns=["**/*"],
-            n=2,
-            seed=123,
-            min_chars=10,
-            max_chars=10,
-        )
-        selected2, manifest2 = make_text_canary.build_canary(
-            input_dir=root,
-            patterns=["**/*"],
-            n=2,
-            seed=123,
-            min_chars=10,
-            max_chars=10,
-        )
-    finally:
-        os.chmod(unreadable, 0o600)
+    # Root on Linux can ignore chmod bits; force the read failure deterministically.
+    orig_read_bytes = Path.read_bytes
+
+    def _patched_read_bytes(self: Path) -> bytes:
+        if self == unreadable:
+            raise PermissionError("synthetic unreadable")
+        return orig_read_bytes(self)
+
+    monkeypatch.setattr(Path, "read_bytes", _patched_read_bytes, raising=True)
+
+    selected1, manifest1 = make_text_canary.build_canary(
+        input_dir=root,
+        patterns=["**/*"],
+        n=2,
+        seed=123,
+        min_chars=10,
+        max_chars=10,
+    )
+    selected2, manifest2 = make_text_canary.build_canary(
+        input_dir=root,
+        patterns=["**/*"],
+        n=2,
+        seed=123,
+        min_chars=10,
+        max_chars=10,
+    )
     assert [it["id"] for it in selected1] == [it["id"] for it in selected2]
     assert manifest1["input"]["candidates"] == manifest2["input"]["candidates"]
 
