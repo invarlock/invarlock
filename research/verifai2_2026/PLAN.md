@@ -15,11 +15,16 @@ after this plan is executed.
 2. **Verifier-carrying artifact schema** (S1)
    - JSON Schema: `research/verifai2_2026/specs/verifier_carrying_artifact.v1.schema.json`
    - `schema-verify` checker: `scripts/verifai2_2026/schema_verify.py`
+   - Prompt-set builder: `scripts/verifai2_2026/make_prompt_set.py`
+   - Trace exporter: `scripts/verifai2_2026/verifier_trace_from_cases.py`
 
 3. **Pilot scaffolding** (F4 + S1)
    - Canary builder + manifest: `scripts/verifai2_2026/make_text_canary.py`
    - Artifact assembler (InvarLock report + verifier trace -> unified artifact):
      `scripts/verifai2_2026/pilot_assemble_artifact.py`
+   - Minimal code-exec verifier (pilot harness): `scripts/verifai2_2026/run_code_tests_verifier.py`
+   - Harness-output normalizer (ingest -> cases.jsonl): `scripts/verifai2_2026/cases_from_harness.py`
+   - Deterministic pipeline wrapper (prompt_set + cases + trace): `scripts/verifai2_2026/run_verifier_trace_pipeline.py`
    - Example inputs:
      - `research/verifai2_2026/examples/verifier_trace_humaneval.example.json`
      - `research/verifai2_2026/examples/verifier_trace_mbpp.example.json`
@@ -104,8 +109,9 @@ no hand-wavy “we will log X later”.
 - Model: a small code-capable HF checkpoint that loads with `hf_causal`.
 - Edit: built-in INT8 `quant_rtn` (1–2 variants) + one pruning mask variant.
 - Canary: a tiny `local_jsonl` file produced by `make_text_canary.py`.
-- Verifier: a placeholder verifier trace record (until HumanEval harness is
-  wired) to validate schema and assembly.
+- Verifier: for the pilot, generate a real trace record with
+  `run_verifier_trace_pipeline.py` using a tiny local task set (or HumanEval/MBPP
+  tasks if available in your environment).
 
 Notes for small/offline pilots:
 
@@ -149,9 +155,36 @@ unambiguous. Instead, release:
 ## Validation Commands (for Steps 1–4)
 
 ```bash
+# Isolated tests + 100% line/branch coverage for the paper-tool scripts only.
+# This does not touch the repo-wide `make coverage-enforce` machinery.
+scripts/verifai2_2026/tests/run.sh
+
 # Validate schemas + examples
 python scripts/verifai2_2026/schema_verify.py --help
 python scripts/verifai2_2026/schema_verify.py research/verifai2_2026/examples/artifact.example.json
+
+# Build a verifier trace from a local task+completion set (pilot-friendly).
+# The wrapper pins decoding parameters and produces:
+#   prompt_set.json, cases.jsonl, verifier_trace.v1.json
+python scripts/verifai2_2026/run_verifier_trace_pipeline.py \
+  --backend code_tests \
+  --tasks /tmp/tasks.jsonl \
+  --completions /tmp/completions.jsonl \
+  --prompt-set-out /tmp/prompt_set.json \
+  --cases-out /tmp/cases.jsonl \
+  --trace-out /tmp/verifier_trace.json \
+  --verifier-name humaneval \
+  --verifier-kind code_execution \
+  --harness-name local_code_tests \
+  --harness-version 0.1 \
+  --model-id demo/code-model --model-revision demo-rev \
+  --tokenizer-id demo/code-model --tokenizer-revision demo-rev \
+  --decoding-method greedy --temperature 0 --top-p 1 --top-k 0 --max-new-tokens 256 --seed 42
+
+# Ingest harness outputs to normalized cases (then export a trace).
+python scripts/verifai2_2026/cases_from_harness.py \
+  --in /tmp/harness_output.jsonl \
+  --out /tmp/cases.jsonl
 
 # Build a tiny local canary from a directory of code/text files
 python scripts/verifai2_2026/make_text_canary.py \
@@ -177,7 +210,7 @@ PYTHONPATH=src python -m invarlock verify --profile dev --json \
 
 python scripts/verifai2_2026/pilot_assemble_artifact.py \
   --evaluation-report /tmp/pilot_reports/evaluation.report.json \
-  --verifier-trace /tmp/pilot_dummy_trace.json \
+  --verifier-trace /tmp/verifier_trace.json \
   --verify-json /tmp/pilot_reports/verify.json \
   --embed-evaluation-report \
   --out /tmp/pilot_artifact.json

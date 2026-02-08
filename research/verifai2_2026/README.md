@@ -19,4 +19,12 @@ Start here:
   - `scripts/verifai2_2026/make_text_canary.py`
   - `scripts/verifai2_2026/pilot_assemble_artifact.py`
   - `scripts/verifai2_2026/schema_verify.py`
+  - `scripts/verifai2_2026/make_prompt_set.py`
+  - `scripts/verifai2_2026/verifier_trace_from_cases.py`
+  - `scripts/verifai2_2026/cases_from_harness.py`
+  - `scripts/verifai2_2026/run_code_tests_verifier.py`
+  - `scripts/verifai2_2026/run_verifier_trace_pipeline.py`
 
+Tooling test gate (isolated; does not affect repo-wide coverage):
+
+- `scripts/verifai2_2026/tests/run.sh`
