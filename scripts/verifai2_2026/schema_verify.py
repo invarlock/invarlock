@@ -25,6 +25,10 @@ import jsonschema
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
 
+_VERIFIER_TRACE_SCHEMA_URI = (
+    "https://invarlock.dev/schemas/verifier_trace.v1.schema.json"
+)
+
 
 def _sha256_hex(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
@@ -303,13 +307,12 @@ def validate_artifact(path: Path, *, schema_root: Path, check_files: bool) -> li
     artifact = _read_json(path)
     wrapper_schema, trace_schema = _load_schemas(schema_root)
 
-    trace_id = trace_schema.get("$id")
-    registry = Registry()
-    if isinstance(trace_id, str) and trace_id:
-        registry = registry.with_resource(
-            trace_id,
-            Resource.from_contents(trace_schema, default_specification=DRAFT202012),
-        )
+    # Wrapper schema refs the trace schema by URL; register it explicitly so we
+    # never depend on network retrieval.
+    registry = Registry().with_resource(
+        _VERIFIER_TRACE_SCHEMA_URI,
+        Resource.from_contents(trace_schema, default_specification=DRAFT202012),
+    )
 
     validator = jsonschema.Draft202012Validator(wrapper_schema, registry=registry)
 
