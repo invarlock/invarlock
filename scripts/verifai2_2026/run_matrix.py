@@ -149,6 +149,10 @@ def main(argv: list[str] | None = None) -> int:
                 pa_argv.append("--embed-evaluation-report")
             if isinstance(artifact.get("verify_json"), str):
                 pa_argv.extend(["--verify-json", str(artifact.get("verify_json"))])
+            if isinstance(artifact.get("verify_profile"), str):
+                pa_argv.extend(
+                    ["--verify-profile", str(artifact.get("verify_profile"))]
+                )
             if isinstance(artifact.get("invarlock_version"), str):
                 pa_argv.extend(
                     ["--invarlock-version", str(artifact.get("invarlock_version"))]

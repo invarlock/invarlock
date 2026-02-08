@@ -172,7 +172,16 @@ def test_main_execute_success_with_artifact_and_validate(tmp_path: Path) -> None
     eval_report = tmp_path / "evaluation.report.json"
     _write_json(eval_report, {"hello": "world"})
     verify_json = tmp_path / "verify.json"
-    _write_json(verify_json, {"profile": "ci", "ok": True, "errors": []})
+    # verify-v1 envelope (current invarlock verify output); profile must be supplied
+    # by the embedding tool (run_matrix -> pilot_assemble_artifact).
+    _write_json(
+        verify_json,
+        {
+            "format_version": "verify-v1",
+            "summary": {"ok": True, "reason": "ok"},
+            "results": [{"id": "check", "ok": True, "reason": "ok"}],
+        },
+    )
 
     prompt_set_out = tmp_path / "prompt_set.json"
     cases_out = tmp_path / "cases.jsonl"
@@ -232,6 +241,7 @@ def test_main_execute_success_with_artifact_and_validate(tmp_path: Path) -> None
                     "evaluation_report": str(eval_report),
                     "out": str(artifact_out),
                     "verify_json": str(verify_json),
+                    "verify_profile": "dev",
                     "embed_evaluation_report": True,
                     "invarlock_version": "0.0",
                     "git_commit": "deadbeef",
@@ -249,6 +259,8 @@ def test_main_execute_success_with_artifact_and_validate(tmp_path: Path) -> None
     assert rc == 0
     assert trace_out.exists()
     assert artifact_out.exists()
+    art = json.loads(artifact_out.read_text(encoding="utf-8"))
+    assert art["guard_evidence"]["invarlock"]["verify"]["profile"] == "dev"
 
 
 def test_main_execute_trace_failure_returns_rc(
