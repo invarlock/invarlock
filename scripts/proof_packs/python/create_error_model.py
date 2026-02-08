@@ -5,9 +5,11 @@ import json
 import os
 import random
 import re
+import shutil
 import sys
 import zlib
 from pathlib import Path
+from typing import Any
 
 import torch
 from error_injection_config import fix_layer_drop_config
@@ -109,6 +111,181 @@ def _select_row_indices(
     return torch.arange(rows, device=w.device)
 
 
+def _read_json(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+
+def _safe_copy(src: Path, dest: Path) -> None:
+    try:
+        if src.is_file() and not dest.exists():
+            shutil.copy2(src, dest)
+    except OSError:
+        return
+
+
+def _safe_symlink(src: Path, dest: Path) -> None:
+    if dest.exists() or dest.is_symlink():
+        return
+    try:
+        os.symlink(src, dest)
+    except OSError:
+        # Fall back to a copy for filesystems that disallow symlinks.
+        _safe_copy(src, dest)
+
+
+def _shape_mismatch_overlay_safetensors(
+    *,
+    baseline_path: Path,
+    output_path: Path,
+    tokenizer: Any,
+    delta: int,
+) -> dict[str, Any] | None:
+    """Create a vocab-size mismatch error model without re-saving full weights.
+
+    For very large sharded checkpoints, `save_pretrained()` can be killed (OOM)
+    while writing shards. Instead, we:
+    - symlink the baseline shards into the output dir
+    - write a small safetensors override shard containing resized embedding + lm_head
+    - write a new `model.safetensors.index.json` pointing those tensors to the override
+    """
+    index_path = baseline_path / "model.safetensors.index.json"
+    if not index_path.is_file():
+        return None
+
+    try:
+        from safetensors import safe_open
+        from safetensors.torch import save_file
+    except Exception:
+        return None
+
+    baseline_index = _read_json(index_path)
+    weight_map = baseline_index.get("weight_map")
+    if not isinstance(weight_map, dict) or not weight_map:
+        return None
+
+    def _pick_key(candidates: tuple[str, ...]) -> str | None:
+        for suffix in candidates:
+            for key in weight_map:
+                if not isinstance(key, str):
+                    continue
+                if key.endswith(suffix):
+                    return key
+        return None
+
+    embed_key = _pick_key(
+        ("embed_tokens.weight", "wte.weight", "word_embeddings.weight")
+    )
+    if embed_key is None:
+        return None
+
+    head_key = _pick_key(("lm_head.weight",))
+
+    embed_file = weight_map.get(embed_key)
+    head_file = weight_map.get(head_key) if head_key else None
+    if not isinstance(embed_file, str) or not embed_file:
+        return None
+    if head_key and (not isinstance(head_file, str) or not head_file):
+        head_key = None
+        head_file = None
+
+    # Load only the tensors we need.
+    def _load_tensor(filename: str, key: str) -> torch.Tensor:
+        with safe_open(
+            str(baseline_path / filename), framework="pt", device="cpu"
+        ) as f:
+            return f.get_tensor(key)
+
+    embed_weight = _load_tensor(embed_file, embed_key)
+    old_vocab = int(embed_weight.shape[0])
+    hidden = int(embed_weight.shape[1]) if embed_weight.ndim == 2 else None
+    if hidden is None or embed_weight.ndim != 2:
+        return None
+
+    new_vocab = old_vocab + int(delta)
+    if new_vocab <= old_vocab:
+        return None
+
+    # Preserve the old embeddings exactly; pad new rows with zeros. This keeps
+    # the scenario stable (dataset won't hit the new token IDs).
+    new_embed = torch.zeros(
+        (new_vocab, hidden), dtype=embed_weight.dtype, device=embed_weight.device
+    )
+    new_embed[:old_vocab, :] = embed_weight
+    del embed_weight
+
+    overrides: dict[str, torch.Tensor] = {embed_key: new_embed}
+    if head_key and head_file:
+        head_weight = _load_tensor(head_file, head_key)
+        if head_weight.ndim == 2 and int(head_weight.shape[0]) == old_vocab:
+            new_head = torch.zeros(
+                (new_vocab, int(head_weight.shape[1])),
+                dtype=head_weight.dtype,
+                device=head_weight.device,
+            )
+            new_head[:old_vocab, :] = head_weight
+            overrides[head_key] = new_head
+        del head_weight
+
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    # Save tokenizer assets for downstream evaluation.
+    try:
+        tokenizer.save_pretrained(output_path)
+    except Exception:
+        pass
+
+    # Copy minimal config artifacts and bump vocab_size.
+    cfg_path = baseline_path / "config.json"
+    cfg: dict[str, Any] = _read_json(cfg_path) if cfg_path.is_file() else {}
+    cfg["vocab_size"] = int(new_vocab)
+    _write_json(output_path / "config.json", cfg)
+
+    for extra in ("generation_config.json", "chat_template.jinja"):
+        _safe_copy(baseline_path / extra, output_path / extra)
+
+    # Symlink all baseline shards referenced by the index into the output dir.
+    for filename in sorted({v for v in weight_map.values() if isinstance(v, str)}):
+        _safe_symlink(baseline_path / filename, output_path / filename)
+
+    override_name = "shape_mismatch_overrides.safetensors"
+    override_path = output_path / override_name
+    save_file(overrides, str(override_path))
+
+    updated_weight_map = {
+        str(k): str(v) for k, v in weight_map.items() if isinstance(k, str)
+    }
+    updated_weight_map[embed_key] = override_name
+    if head_key:
+        updated_weight_map[head_key] = override_name
+
+    _write_json(
+        output_path / "model.safetensors.index.json",
+        {
+            "metadata": baseline_index.get("metadata")
+            if isinstance(baseline_index.get("metadata"), dict)
+            else {},
+            "weight_map": updated_weight_map,
+        },
+    )
+
+    return {
+        "error_type": "shape_mismatch",
+        "injected": True,
+        "mode": "overlay_safetensors",
+        "old_vocab_size": int(old_vocab),
+        "new_vocab_size": int(new_vocab),
+        "delta": int(delta),
+        "overrides_file": override_name,
+        "overrides_keys": sorted(overrides),
+    }
+
+
 def main(argv: list[str]) -> int:
     if len(argv) != 4:
         print(
@@ -123,6 +300,29 @@ def main(argv: list[str]) -> int:
 
     print(f"Loading baseline from {baseline_path}...")
     tokenizer = AutoTokenizer.from_pretrained(baseline_path, trust_remote_code=True)
+
+    if error_type == "shape_mismatch":
+        # Large sharded models can be OOM-killed during save_pretrained() shard writes.
+        # Prefer an index-based overlay that only rewrites the embedding + lm_head tensors.
+        delta = 8
+        try:
+            error_info = _shape_mismatch_overlay_safetensors(
+                baseline_path=baseline_path,
+                output_path=output_path,
+                tokenizer=tokenizer,
+                delta=delta,
+            )
+        except Exception as exc:
+            error_info = None
+            print(f"WARNING: shape_mismatch overlay failed ({exc}); falling back")
+
+        if error_info is not None:
+            output_path.mkdir(parents=True, exist_ok=True)
+            (output_path / "error_metadata.json").write_text(
+                json.dumps(error_info, indent=2, sort_keys=True) + "\n"
+            )
+            print(f"Saved error model to {output_path}")
+            return 0
 
     try:
         model = AutoModelForCausalLM.from_pretrained(

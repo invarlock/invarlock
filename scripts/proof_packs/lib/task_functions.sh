@@ -1555,9 +1555,16 @@ task_create_error() {
         return 1
     fi
 
-    if [[ -d "${error_path}" && -f "${error_path}/config.json" ]]; then
+    # Only treat error models as cached when the injector completed fully.
+    # error_metadata.json is written by create_error_model.py at the end; partial
+    # directories (e.g. OOM-killed saves) may still contain config.json.
+    if [[ -d "${error_path}" && -f "${error_path}/config.json" && -f "${error_path}/error_metadata.json" ]]; then
         echo "  Error model ${error_type} already exists, skipping" >> "${log_file}"
         return 0
+    fi
+    if [[ -d "${error_path}" && -f "${error_path}/config.json" && ! -f "${error_path}/error_metadata.json" ]]; then
+        echo "  WARNING: Found incomplete error model (missing error_metadata.json); recreating: ${error_path}" >> "${log_file}"
+        rm -rf "${error_path}" 2>/dev/null || true
     fi
 
     echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Creating error model: ${error_type}" >> "${log_file}"
@@ -1583,6 +1590,7 @@ task_create_error() {
         echo "  Injector env overrides: ${injector_env[*]}" >> "${log_file}"
     fi
 
+    local create_rc=0
     if type create_error_model &>/dev/null; then
         if [[ ${#injector_env[@]} -gt 0 ]]; then
             (
@@ -1590,16 +1598,20 @@ task_create_error() {
                     export "${entry}"
                 done
                 create_error_model "${baseline_path}" "${error_path}" "${error_type}" "${gpu_id}"
-            ) >> "${log_file}" 2>&1
+            ) >> "${log_file}" 2>&1 || create_rc=$?
         else
-            create_error_model "${baseline_path}" "${error_path}" "${error_type}" "${gpu_id}" >> "${log_file}" 2>&1
+            create_error_model "${baseline_path}" "${error_path}" "${error_type}" "${gpu_id}" >> "${log_file}" 2>&1 || create_rc=$?
         fi
     else
         echo "ERROR: create_error_model not available" >> "${log_file}"
         return 1
     fi
+    if [[ ${create_rc} -ne 0 ]]; then
+        echo "  ERROR: create_error_model failed (exit=${create_rc})" >> "${log_file}"
+        return 1
+    fi
 
-    if [[ -d "${error_path}" && -f "${error_path}/config.json" ]]; then
+    if [[ -d "${error_path}" && -f "${error_path}/config.json" && -f "${error_path}/error_metadata.json" ]]; then
         echo "  Created: ${error_path}" >> "${log_file}"
         return 0
     else

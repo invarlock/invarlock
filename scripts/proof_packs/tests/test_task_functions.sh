@@ -617,6 +617,9 @@ test_task_create_error_branches_cover_skip_missing_function_and_verify_paths() {
         echo "${INVARLOCK_RMT_PROBE_MODE:-}" > "${captured_mode}"
         mkdir -p "$2"
         echo "{}" > "$2/config.json"
+        # task_create_error treats error models as cached only when the injector
+        # completed (signaled by error_metadata.json).
+        echo "{}" > "$2/error_metadata.json"
     }
     task_create_error "${model_name}" 0 cuda_assert '{"INVARLOCK_RMT_PROBE_MODE":"anisotropy"}' "${out}" "${log_file}"
     assert_eq "anisotropy" "$(cat "${captured_mode}")" "injector env propagated to create_error_model"

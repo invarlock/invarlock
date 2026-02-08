@@ -12,6 +12,7 @@ from typing import Any
 import torch
 from transformers import AutoModelForCausalLM
 
+from invarlock.adapters.hf_causal import HF_Causal_Adapter
 from invarlock.guards.variance import VarianceGuard
 
 
@@ -91,8 +92,16 @@ def _safe_float(value: Any) -> float | None:
 def _extract_variance_policy(
     baseline_report: dict[str, Any], *, calibration_windows: int, min_coverage: int
 ) -> dict[str, Any]:
-    meta = baseline_report.get("meta")
     policy: dict[str, Any] = {}
+
+    # Prefer resolved policy when it is available (matches evaluation-time guard wiring).
+    resolved = baseline_report.get("resolved_policy")
+    if isinstance(resolved, dict):
+        variance = resolved.get("variance")
+        if isinstance(variance, dict):
+            policy.update(variance)
+
+    meta = baseline_report.get("meta")
     if isinstance(meta, dict):
         tier_policies = meta.get("tier_policies")
         if isinstance(tier_policies, dict):
@@ -181,12 +190,13 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
     )
 
     guard = VarianceGuard(policy)
+    adapter = HF_Causal_Adapter()
 
     subject_model = _load_model(
         subject_model_path, dtype=dtype, trust_remote_code=bool(args.trust_remote_code)
     )
     try:
-        guard.prepare(subject_model, calib=batches, policy=policy)
+        guard.prepare(subject_model, adapter=adapter, calib=batches, policy=policy)
         proposed_scales_pre = guard._stats.get("proposed_scales_pre_edit", {})  # noqa: SLF001
         proposed_scales = len(guard._scales)  # noqa: SLF001
         ppl_no_ve = guard._ppl_no_ve  # noqa: SLF001

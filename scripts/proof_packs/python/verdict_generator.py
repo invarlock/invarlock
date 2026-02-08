@@ -11,7 +11,7 @@ CORE_GUARDS: tuple[str, ...] = (
     "invariants",
     "spectral",
     "rmt",
-    "primary_metric",
+    "variance",
 )
 INTERVENTION_SIGNALS: tuple[str, ...] = (
     "spectral_caps",
@@ -178,6 +178,10 @@ def _guard_flags(snapshot: ValidationSnapshot) -> dict[str, bool]:
         "primary_metric": (not snapshot.pm_ok) or snapshot.pm_degraded,
         "spectral": not snapshot.spectral_ok,
         "rmt": not snapshot.rmt_ok,
+        # Variance equalization is a remediation guard; compare-mode evaluation
+        # mutes enable/disable behavior, so proof-pack scenarios attach a probe
+        # artifact (ve_probe.json). Records may overwrite this based on probe signal.
+        "variance": False,
         "drift": not snapshot.drift_ok,
         "overhead": snapshot.overhead_evaluated and (not snapshot.overhead_ok),
     }
@@ -739,6 +743,17 @@ def generate_verdict(
                 record["guard_flags"]["rmt"] = True
         if isinstance(cert.get("ve_probe"), dict):
             record["ve_probe"] = cert["ve_probe"]
+            probe = record["ve_probe"]
+            if _as_bool(probe.get("signal"), default=False):
+                record["guard_flags"]["variance"] = True
+            if _as_bool(probe.get("would_enable"), default=False):
+                record["guard_flags"]["variance"] = True
+            scales = _as_int(probe.get("proposed_scales"), default=0)
+            if scales > 0:
+                record["guard_flags"]["variance"] = True
+            gain = _as_float(probe.get("ab_gain"), default=None)
+            if gain is not None and gain > 0.0:
+                record["guard_flags"]["variance"] = True
         record["primary_guard_hit"] = _record_primary_guard_hit(record)
         record["any_core_guard_flag"] = _core_signal_count(record) > 0
         records.append(record)
