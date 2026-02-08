@@ -12,6 +12,7 @@ CORE_GUARDS: tuple[str, ...] = (
     "spectral",
     "rmt",
     "variance",
+    "primary_metric",
 )
 INTERVENTION_SIGNALS: tuple[str, ...] = (
     "spectral_caps",
