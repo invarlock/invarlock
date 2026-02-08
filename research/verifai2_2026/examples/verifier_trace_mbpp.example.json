@@ -32,7 +32,7 @@
           "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
         }
       ],
-      "digest_sha256": "f7554e2c8cbc727dcef967479d6031250be2c97040b1a4fc9731d8217db21128"
+      "digest_sha256": "56464bff4d9289fc366ff13a0939f134b5213dcbebde6d72f2ea0823e30bb359"
     },
     "model": {
       "id": "demo/code-model",
@@ -55,7 +55,7 @@
     "summary": {
       "n_total": 1,
       "n_pass": 0,
-      "pass_at_1": 0.0,
+      "pass_rate": 0.0,
       "metric_name": "pass@1"
     },
     "cases": [

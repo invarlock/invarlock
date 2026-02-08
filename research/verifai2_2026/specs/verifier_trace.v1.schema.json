@@ -30,7 +30,17 @@
               "type": "string",
               "pattern": "^[a-f0-9]{64}$"
             }
-          }
+          },
+          "allOf": [
+            {
+              "anyOf": [
+                { "required": ["version"] },
+                { "required": ["git_commit"] },
+                { "required": ["container_image"] }
+              ],
+              "description": "At least one harness identity field must be present."
+            }
+          ]
         },
         "sandbox": {
           "type": "object",
@@ -43,12 +53,37 @@
             "wall_limit_s": { "type": "number", "minimum": 0 }
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "kind": { "const": "code_execution" } },
+            "required": ["kind"]
+          },
+          "then": {
+            "required": ["sandbox"],
+            "properties": {
+              "sandbox": {
+                "required": [
+                  "network_enabled",
+                  "timeout_s",
+                  "cpu_limit",
+                  "mem_limit_mb",
+                  "wall_limit_s"
+                ],
+                "properties": {
+                  "network_enabled": { "const": false }
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     "trace_contract": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["prompt_set", "model", "decoding"],
+      "required": ["prompt_set", "model", "tokenizer", "decoding"],
       "properties": {
         "prompt_set": {
           "type": "object",
@@ -59,7 +94,7 @@
             "dataset": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["name"],
+              "required": ["name", "split", "revision"],
               "properties": {
                 "name": { "type": "string", "minLength": 1 },
                 "config": { "type": "string" },
@@ -102,7 +137,22 @@
               "type": "string",
               "pattern": "^[a-f0-9]{64}$"
             }
-          }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": { "mode": { "const": "embedded" } },
+                "required": ["mode"]
+              },
+              "then": {
+                "properties": {
+                  "items": {
+                    "items": { "required": ["text"] }
+                  }
+                }
+              }
+            }
+          ]
         },
         "model": {
           "type": "object",
@@ -178,12 +228,12 @@
         "summary": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["n_total", "n_pass", "pass_at_1"],
+          "required": ["n_total", "n_pass", "pass_rate", "metric_name"],
           "properties": {
             "n_total": { "type": "integer", "minimum": 0 },
             "n_pass": { "type": "integer", "minimum": 0 },
-            "pass_at_1": { "type": "number", "minimum": 0, "maximum": 1 },
-            "metric_name": { "type": "string" }
+            "pass_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+            "metric_name": { "type": "string", "minLength": 1 }
           }
         },
         "cases": {
@@ -200,6 +250,7 @@
                 "enum": ["pass", "fail", "error", "timeout", "skipped"]
               },
               "error_type": { "type": "string" },
+              "output_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
               "wall_time_s": { "type": "number", "minimum": 0 },
               "stderr_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
               "counterexample": {
@@ -239,4 +290,3 @@
     "extensions": { "type": "object" }
   }
 }
-

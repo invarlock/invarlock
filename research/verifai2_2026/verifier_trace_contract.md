@@ -34,10 +34,20 @@ Unless explicitly noted otherwise:
 - Hash algorithm is SHA-256 (hex lowercase).
 - JSON objects are canonicalized for hashing by:
   - sorting keys
-  - removing insignificant whitespace
+  - removing insignificant whitespace (no spaces after separators)
   - encoding as UTF-8 bytes
 
-Prompt-set digest is computed over a canonical JSON object:
+Normative reference implementation for canonical JSON bytes:
+
+```py
+json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+```
+
+### Prompt-Set Digest
+
+Prompt-set digest is computed over a canonical JSON object (note: **do not**
+include embedded prompt text in this digest; it must be stable across
+`mode=hash_only` vs `mode=embedded`):
 
 ```json
 {
@@ -48,13 +58,21 @@ Prompt-set digest is computed over a canonical JSON object:
 
 The `items` array order is significant and must be the order used by the harness.
 
+### Item Hash Meaning
+
+`items[*].sha256` is the SHA-256 of the **exact prompt string fed to the model**
+(UTF-8 bytes), after any harness templating/normalization. When `mode=embedded`,
+`items[*].text` must be present and `sha256(text)` must match `items[*].sha256`.
+
 ## Required Fields (v1)
 
 ### 1) Verifier identity
 
 - `verifier.name`: e.g. `"humaneval"`, `"mbpp"`, `"lean4"`, `"z3"`
 - `verifier.kind`: `"code_execution" | "proof_checker" | "smt_solver" | "static_analyzer"`
-- `verifier.harness`: name + version/commit/container digest when applicable
+- `verifier.harness`: name + (**at least one of**) version, git commit, container
+  image digest. `config_digest_sha256` should be recorded when a structured
+  harness config exists.
 
 ### 2) Prompt set
 
@@ -66,8 +84,15 @@ Two supported modes:
 
 Required:
 
-- dataset identifiers: name/config/split/revision (or `"local"` with manifest hash)
+- dataset identifiers: name/split/revision (plus config when relevant). For local
+  prompt sets, record `dataset.name="local"` and set `dataset.revision` to a
+  content-addressed identifier (e.g., the canary JSONL sha256); also record
+  `dataset.manifest_sha256` when available.
 - per-item id + sha256 of prompt text (or sha256 of a canonical prompt record)
+
+**Contract invariant:** `results.cases[*].id` must exactly match the prompt-set
+`items[*].id` list (same ids, same order). This makes traces stable and
+machine-checkable.
 
 ### 3) Model + tokenizer identity
 
@@ -104,7 +129,8 @@ Recommended:
 Required:
 
 - per-item verdicts (pass/fail/error) with stable ids
-- aggregate summary (pass@1, total, etc.)
+- aggregate summary (pass-rate + total, with an explicit metric name like
+  `"pass@1"` or `"pass@10"`)
 
 Optional:
 
@@ -117,4 +143,3 @@ Optional:
   and that configuration metadata is present.
 - It cannot validate that the harness executed correctly without rerunning it.
 - The point is auditability and reproducibility, not formal correctness.
-

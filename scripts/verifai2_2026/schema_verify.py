@@ -22,6 +22,8 @@ from pathlib import Path
 from typing import Any
 
 import jsonschema
+from referencing import Registry, Resource
+from referencing.jsonschema import DRAFT202012
 
 
 def _sha256_hex(data: bytes) -> str:
@@ -34,14 +36,29 @@ def _read_json(path: Path) -> Any:
 
 def _canonical_json_bytes(obj: Any) -> bytes:
     # Canonicalization for hashing: sorted keys, no whitespace, UTF-8.
-    return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode(
-        "utf-8"
-    )
+    return json.dumps(
+        obj, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    ).encode("utf-8")
 
 
 def _compute_prompt_set_digest(prompt_set: dict[str, Any]) -> str:
-    dataset = prompt_set.get("dataset", {})
-    items = prompt_set.get("items", [])
+    dataset_raw = prompt_set.get("dataset", {})
+    items_raw = prompt_set.get("items", [])
+
+    # Contract: digest is independent of embedded prompt text.
+    dataset = {}
+    if isinstance(dataset_raw, dict):
+        for k in ("name", "config", "split", "revision"):
+            if k in dataset_raw:
+                dataset[k] = dataset_raw[k]
+
+    items: list[dict[str, Any]] = []
+    if isinstance(items_raw, list):
+        for it in items_raw:
+            if not isinstance(it, dict):
+                continue
+            items.append({"id": it.get("id"), "sha256": it.get("sha256")})
+
     payload = {"dataset": dataset, "items": items}
     return _sha256_hex(_canonical_json_bytes(payload))
 
@@ -57,12 +74,28 @@ def _validate_prompt_set(trace: dict[str, Any]) -> list[str]:
     items = prompt_set.get("items")
     if mode == "embedded":
         if isinstance(items, list):
-            missing = [it.get("id") for it in items if isinstance(it, dict) and "text" not in it]
+            missing = [
+                it.get("id")
+                for it in items
+                if isinstance(it, dict) and "text" not in it
+            ]
             if missing:
                 errors.append(
                     "prompt_set.mode=embedded but some items are missing text: "
                     + ", ".join(str(x) for x in missing[:5])
                 )
+            for it in items:
+                if not isinstance(it, dict):
+                    continue
+                text = it.get("text")
+                sha = it.get("sha256")
+                if isinstance(text, str) and isinstance(sha, str):
+                    actual = _sha256_hex(text.encode("utf-8"))
+                    if sha != actual:
+                        errors.append(
+                            f"prompt_set item sha256 mismatch for id={it.get('id')}: "
+                            f"recorded={sha} expected={actual}"
+                        )
 
     digest = prompt_set.get("digest_sha256")
     if isinstance(digest, str):
@@ -85,25 +118,64 @@ def _validate_results_consistency(trace: dict[str, Any]) -> list[str]:
     try:
         n_total = int(summary.get("n_total"))
         n_pass = int(summary.get("n_pass"))
-        pass_at_1 = float(summary.get("pass_at_1"))
+        pass_rate = float(summary.get("pass_rate"))
     except Exception:
         return errors
 
     observed_total = len(cases)
     if n_total != observed_total:
-        errors.append(f"results.summary.n_total={n_total} but cases has {observed_total}")
+        errors.append(
+            f"results.summary.n_total={n_total} but cases has {observed_total}"
+        )
 
     observed_pass = sum(
         1 for c in cases if isinstance(c, dict) and str(c.get("verdict")) == "pass"
     )
     if n_pass != observed_pass:
-        errors.append(f"results.summary.n_pass={n_pass} but cases has {observed_pass} pass")
+        errors.append(
+            f"results.summary.n_pass={n_pass} but cases has {observed_pass} pass"
+        )
 
     expected = (observed_pass / observed_total) if observed_total else 0.0
-    if abs(pass_at_1 - expected) > 1e-9:
+    if abs(pass_rate - expected) > 1e-9:
         errors.append(
-            f"results.summary.pass_at_1={pass_at_1} but expected {expected} from cases"
+            f"results.summary.pass_rate={pass_rate} but expected {expected} from cases"
         )
+    return errors
+
+
+def _validate_case_ids_match_prompt_set(trace: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    tc = trace.get("trace_contract") or {}
+    prompt_set = tc.get("prompt_set") if isinstance(tc, dict) else None
+    if not isinstance(prompt_set, dict):
+        return errors
+
+    items = prompt_set.get("items")
+    if not isinstance(items, list):
+        return errors
+    expected_ids = []
+    for it in items:
+        if isinstance(it, dict) and isinstance(it.get("id"), str):
+            expected_ids.append(it["id"])
+
+    results = trace.get("results") or {}
+    cases = results.get("cases") if isinstance(results, dict) else None
+    if not isinstance(cases, list):
+        return errors
+    observed_ids = []
+    for c in cases:
+        if isinstance(c, dict) and isinstance(c.get("id"), str):
+            observed_ids.append(c["id"])
+
+    if expected_ids and observed_ids and expected_ids != observed_ids:
+        errors.append(
+            "results.cases ids do not exactly match trace_contract.prompt_set.items ids"
+        )
+
+    if len(set(observed_ids)) != len(observed_ids):
+        errors.append("results.cases contains duplicate ids")
+
     return errors
 
 
@@ -141,13 +213,15 @@ def validate_artifact(path: Path, *, schema_root: Path, check_files: bool) -> li
     artifact = _read_json(path)
     wrapper_schema, trace_schema = _load_schemas(schema_root)
 
-    store = {}
     trace_id = trace_schema.get("$id")
+    registry = Registry()
     if isinstance(trace_id, str) and trace_id:
-        store[trace_id] = trace_schema
+        registry = registry.with_resource(
+            trace_id,
+            Resource.from_contents(trace_schema, default_specification=DRAFT202012),
+        )
 
-    resolver = jsonschema.RefResolver.from_schema(wrapper_schema, store=store)
-    validator = jsonschema.Draft202012Validator(wrapper_schema, resolver=resolver)
+    validator = jsonschema.Draft202012Validator(wrapper_schema, registry=registry)
 
     errors: list[str] = []
     for err in sorted(validator.iter_errors(artifact), key=str):
@@ -166,13 +240,17 @@ def validate_artifact(path: Path, *, schema_root: Path, check_files: bool) -> li
                     errors.append(f"trace[{i}]: {e}")
                 for e in _validate_results_consistency(t):
                     errors.append(f"trace[{i}]: {e}")
+                for e in _validate_case_ids_match_prompt_set(t):
+                    errors.append(f"trace[{i}]: {e}")
 
     return errors
 
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser()
-    p.add_argument("artifact", type=Path, help="Path to verifier-carrying artifact JSON.")
+    p.add_argument(
+        "artifact", type=Path, help="Path to verifier-carrying artifact JSON."
+    )
     p.add_argument(
         "--schema-root",
         type=Path,
@@ -200,4 +278,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

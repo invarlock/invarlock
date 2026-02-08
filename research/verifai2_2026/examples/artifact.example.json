@@ -27,7 +27,14 @@
       "verifier": {
         "name": "humaneval",
         "kind": "code_execution",
-        "harness": { "name": "human-eval-harness" }
+        "harness": { "name": "human-eval-harness", "version": "0.0.0-demo" },
+        "sandbox": {
+          "network_enabled": false,
+          "timeout_s": 10,
+          "cpu_limit": 2,
+          "mem_limit_mb": 2048,
+          "wall_limit_s": 10
+        }
       },
       "trace_contract": {
         "prompt_set": {
@@ -50,7 +57,7 @@
         }
       },
       "results": {
-        "summary": { "n_total": 1, "n_pass": 1, "pass_at_1": 1.0, "metric_name": "pass@1" },
+        "summary": { "n_total": 1, "n_pass": 1, "pass_rate": 1.0, "metric_name": "pass@1" },
         "cases": [{ "id": "HumanEval/0", "verdict": "pass" }]
       }
     },
@@ -59,7 +66,14 @@
       "verifier": {
         "name": "mbpp",
         "kind": "code_execution",
-        "harness": { "name": "mbpp-harness" }
+        "harness": { "name": "mbpp-harness", "version": "0.0.0-demo" },
+        "sandbox": {
+          "network_enabled": false,
+          "timeout_s": 10,
+          "cpu_limit": 2,
+          "mem_limit_mb": 2048,
+          "wall_limit_s": 10
+        }
       },
       "trace_contract": {
         "prompt_set": {
@@ -82,7 +96,7 @@
         }
       },
       "results": {
-        "summary": { "n_total": 1, "n_pass": 0, "pass_at_1": 0.0, "metric_name": "pass@1" },
+        "summary": { "n_total": 1, "n_pass": 0, "pass_rate": 0.0, "metric_name": "pass@1" },
         "cases": [{ "id": "MBPP/0", "verdict": "fail" }]
       }
     }

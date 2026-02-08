@@ -36,7 +36,7 @@
           "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
         }
       ],
-      "digest_sha256": "b67e112bff50a980046cc80c63c665074b67532b3230363bc727a7a63df8e081",
+      "digest_sha256": "e56823b0247faf8438351bede9d2f74b3a31aa11f12cd03c485fcee369f2f135",
       "selection_script_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
     },
     "model": {
@@ -70,7 +70,7 @@
     "summary": {
       "n_total": 2,
       "n_pass": 1,
-      "pass_at_1": 0.5,
+      "pass_rate": 0.5,
       "metric_name": "pass@1"
     },
     "cases": [

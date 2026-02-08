@@ -16,7 +16,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +26,7 @@ def _sha256_hex(data: bytes) -> str:
 
 
 def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def _read_json(path: Path) -> Any:
@@ -65,7 +65,9 @@ def main(argv: list[str] | None = None) -> int:
 
     eval_bytes = args.evaluation_report.read_bytes()
     eval_sha = _sha256_hex(eval_bytes)
-    eval_obj = _read_json(args.evaluation_report) if args.embed_evaluation_report else None
+    eval_obj = (
+        _read_json(args.evaluation_report) if args.embed_evaluation_report else None
+    )
 
     traces: list[dict[str, Any]] = []
     for tpath in args.verifier_trace:
@@ -96,7 +98,9 @@ def main(argv: list[str] | None = None) -> int:
         },
     }
     if eval_obj is not None:
-        artifact["guard_evidence"]["invarlock"]["evaluation_report"]["embedded"] = eval_obj
+        artifact["guard_evidence"]["invarlock"]["evaluation_report"]["embedded"] = (
+            eval_obj
+        )
 
     if verify_payload is not None:
         artifact["guard_evidence"]["invarlock"]["verify"] = {
@@ -107,7 +111,9 @@ def main(argv: list[str] | None = None) -> int:
         }
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(artifact, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+    args.out.write_text(
+        json.dumps(artifact, indent=2, ensure_ascii=True) + "\n", encoding="utf-8"
+    )
 
     print(f"Wrote artifact: {args.out}")
     return 0
@@ -115,4 +121,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
