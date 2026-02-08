@@ -17,6 +17,7 @@ import fnmatch
 import hashlib
 import itertools
 import math
+import re
 import time
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
@@ -151,6 +152,7 @@ def equalise_residual_variance(
     device: str | None = None,
     allow_empty: bool = False,
     clamp_range: tuple | None = (0.9, 1.1),
+    apply: bool = True,
 ) -> dict[str, float]:
     """
     Apply data-driven variance equalization to transformer branches.
@@ -172,6 +174,10 @@ def equalise_residual_variance(
         device: Device to use (auto-detected if None)
         allow_empty: Whether to allow empty dataloader (returns empty dict)
         clamp_range: Optional (min, max) to clamp scaling factors (e.g., (0.9, 1.1))
+        apply: Whether to apply scaling in-place to the model. When False, returns
+            the scales that would have been applied (subject to tol/clamp), without
+            mutating weights. This is useful for probes and guard planning on very
+            large models where copying/restoring full state dicts is impractical.
 
     Returns:
         Dict mapping layer names to applied scaling factors
@@ -201,6 +207,22 @@ def equalise_residual_variance(
 
         return fn
 
+    def _moe_expert_w2_modules(block: Any) -> list[nn.Module]:
+        """Return MoE expert output projection modules for known transformer MoE blocks."""
+        experts = getattr(block, "experts", None)
+        if experts is None:
+            return []
+        out: list[nn.Module] = []
+        try:
+            iterable = list(experts)
+        except TypeError:
+            return []
+        for expert in iterable:
+            w2 = getattr(expert, "w2", None)
+            if w2 is not None and hasattr(w2, "weight"):
+                out.append(w2)
+        return out
+
     # Register hooks on projection layers
     for i, blk in enumerate(_iter_transformer_layers(model)):
         # Handle GPT-2 style architecture
@@ -223,6 +245,12 @@ def equalise_residual_variance(
             if mlp_proj is not None:
                 name = f"block{i}.mlp"
                 hooks[name] = mlp_proj.register_forward_hook(_branch_hook(name))
+            else:
+                # Mixtral-style MoE: no single down_proj/c_proj module. Hook on the
+                # MoE block output and scale expert w2 projections together.
+                if _moe_expert_w2_modules(blk.mlp):
+                    name = f"block{i}.mlp"
+                    hooks[name] = blk.mlp.register_forward_hook(_branch_hook(name))
 
     # Collect variance statistics
     try:
@@ -260,7 +288,7 @@ def equalise_residual_variance(
     for h in hooks.values():
         h.remove()
 
-    # Apply scaling factors
+    # Apply (or report) scaling factors
     applied_scales: dict[str, float] = {}
 
     for i, blk in enumerate(_iter_transformer_layers(model)):
@@ -311,39 +339,53 @@ def equalise_residual_variance(
                 or getattr(blk.mlp, "down_proj", None)
                 or getattr(blk.mlp, "fc2", None)
             )
+            name = f"block{i}.mlp"
+            values = sample_values.get(name, [])
+            if not values:
+                continue
+
+            tensor_vals = torch.tensor(values, dtype=torch.float64)
+
+            if tensor_vals.numel() >= 10:
+                lower = torch.quantile(tensor_vals, 0.02)
+                upper = torch.quantile(tensor_vals, 0.98)
+                tensor_vals = torch.clamp(tensor_vals, lower.item(), upper.item())
+
+            group_count = 8 if tensor_vals.numel() >= 8 else tensor_vals.numel()
+            if group_count > 1:
+                chunks = torch.chunk(tensor_vals, group_count)
+                group_means = torch.stack([chunk.mean() for chunk in chunks])
+                var_F = torch.median(group_means).item()
+            else:
+                var_F = tensor_vals.mean().item()
+
+            alpha = (1.0 / max(var_F, 1e-9)) ** 0.5
+
+            # Apply clamping if specified
+            if clamp_range is not None:
+                alpha = max(clamp_range[0], min(alpha, clamp_range[1]))
+
+            if abs(alpha - 1.0) < tol:
+                continue
+
             if mlp_proj is not None:
-                name = f"block{i}.mlp"
-                values = sample_values.get(name, [])
-                if values:
-                    tensor_vals = torch.tensor(values, dtype=torch.float64)
+                if apply:
+                    with torch.no_grad():
+                        mlp_proj.weight.mul_(alpha)
+                        if scale_bias and mlp_proj.bias is not None:
+                            mlp_proj.bias.mul_(alpha)
+                applied_scales[name] = alpha
+                continue
 
-                    if tensor_vals.numel() >= 10:
-                        lower = torch.quantile(tensor_vals, 0.02)
-                        upper = torch.quantile(tensor_vals, 0.98)
-                        tensor_vals = torch.clamp(
-                            tensor_vals, lower.item(), upper.item()
-                        )
-
-                    group_count = 8 if tensor_vals.numel() >= 8 else tensor_vals.numel()
-                    if group_count > 1:
-                        chunks = torch.chunk(tensor_vals, group_count)
-                        group_means = torch.stack([chunk.mean() for chunk in chunks])
-                        var_F = torch.median(group_means).item()
-                    else:
-                        var_F = tensor_vals.mean().item()
-
-                    alpha = (1.0 / max(var_F, 1e-9)) ** 0.5
-
-                    # Apply clamping if specified
-                    if clamp_range is not None:
-                        alpha = max(clamp_range[0], min(alpha, clamp_range[1]))
-
-                    if abs(alpha - 1.0) >= tol:
-                        with torch.no_grad():
-                            mlp_proj.weight.mul_(alpha)
-                            if scale_bias and mlp_proj.bias is not None:
-                                mlp_proj.bias.mul_(alpha)
-                        applied_scales[name] = alpha
+            moe_w2 = _moe_expert_w2_modules(getattr(blk, "mlp", None))
+            if moe_w2:
+                if apply:
+                    with torch.no_grad():
+                        for w2 in moe_w2:
+                            w2.weight.mul_(alpha)
+                            if scale_bias and getattr(w2, "bias", None) is not None:
+                                w2.bias.mul_(alpha)
+                applied_scales[name] = alpha
 
     return applied_scales
 
@@ -720,9 +762,35 @@ class VarianceGuard(Guard):
     def _matches_tap(self, name: str) -> bool:
         """Return True if a module name matches configured tap patterns."""
         normalized = self._normalize_module_name(name)
+
+        candidates = {normalized, name}
+        # Tap patterns may come from tier configs that use "model.layers.*" naming,
+        # while the variance guard internally normalizes to "transformer.h.*".
+        # Generate a small alias set so probes can reuse resolved policies across
+        # architectures (e.g., Qwen/Llama-style down_proj vs GPT-style c_proj).
+        match = re.match(r"^transformer\.h\.(\d+)\.(attn|mlp)\.c_proj$", normalized)
+        if match:
+            layer_idx = match.group(1)
+            branch = match.group(2)
+            prefixes = (
+                f"transformer.h.{layer_idx}",
+                f"model.layers.{layer_idx}",
+                f"model.model.layers.{layer_idx}",
+                f"decoder.layers.{layer_idx}",
+                f"layers.{layer_idx}",
+            )
+            if branch == "mlp":
+                suffixes = ("mlp.c_proj", "mlp.down_proj", "mlp.fc2")
+            else:
+                suffixes = ("attn.c_proj", "attn.out_proj", "attn.o_proj")
+            for prefix in prefixes:
+                for suffix in suffixes:
+                    candidates.add(f"{prefix}.{suffix}")
+
         for pattern in self._tap_patterns:
-            if fnmatch.fnmatch(normalized, pattern) or fnmatch.fnmatch(name, pattern):
-                return True
+            for candidate in candidates:
+                if fnmatch.fnmatch(candidate, pattern):
+                    return True
         return False
 
     def _normalize_pairing_ids(
@@ -1001,6 +1069,27 @@ class VarianceGuard(Guard):
 
         def _is_supported_module(module: Any) -> bool:
             """Heuristic check that a module looks like a projection."""
+            # Mixtral-style MoE blocks expose experts with w2 output projections
+            # rather than a single down_proj/c_proj module. Treat the MoE block
+            # itself as supported so VE can still resolve targets.
+            experts = getattr(module, "experts", None)
+            if experts is not None:
+                try:
+                    iterable = list(experts)
+                except TypeError:
+                    iterable = []
+                for expert in iterable:
+                    w2 = getattr(expert, "w2", None)
+                    weight = getattr(w2, "weight", None) if w2 is not None else None
+                    if weight is None:
+                        continue
+                    try:
+                        dim = weight.dim()
+                    except Exception:
+                        dim = getattr(weight, "ndim", None)
+                    if dim == 2:
+                        return True
+
             if isinstance(module, module_types):
                 return True
             class_name = module.__class__.__name__ if module is not None else ""
@@ -1041,7 +1130,16 @@ class VarianceGuard(Guard):
                 )
                 name = f"transformer.h.{i}.mlp.c_proj"
                 if mlp_proj is None:
-                    _record_rejection(name, "missing_module", None)
+                    if _is_supported_module(blk.mlp):
+                        # Composite MoE block (experts with w2). Use the mlp block
+                        # itself as the target container.
+                        if not self._matches_tap(name):
+                            _record_rejection(name, "tap_mismatch", blk.mlp)
+                        else:
+                            targets[name] = blk.mlp
+                            _record_match(name, blk.mlp)
+                    else:
+                        _record_rejection(name, "missing_module", None)
                 elif not self._matches_tap(name):
                     _record_rejection(name, "tap_mismatch", mlp_proj)
                 elif not _is_supported_module(mlp_proj):
@@ -1223,9 +1321,6 @@ class VarianceGuard(Guard):
         # Use existing equalise_residual_variance but don't apply yet
         # We'll capture the proposed scales and apply them later in enable()
 
-        # Temporarily capture the current model state
-        original_state = copy.deepcopy(model.state_dict())
-
         try:
             tensor_ready_batches = self._tensorize_calibration_batches(dataloader)
 
@@ -1241,11 +1336,11 @@ class VarianceGuard(Guard):
                 seed=self._policy["seed"],
                 clamp_range=self._policy["clamp"],
                 allow_empty=True,
+                apply=False,
             )
 
             if not proposed_scales and self._policy.get("deadband", 0.0) > 0.0:
                 relaxed_tol = max(self._policy["deadband"] * 0.5, 1e-4)
-                model.load_state_dict(original_state)
                 tensor_ready_batches = self._tensorize_calibration_batches(dataloader)
                 proposed_scales = equalise_residual_variance(
                     model=model,
@@ -1256,6 +1351,7 @@ class VarianceGuard(Guard):
                     seed=self._policy["seed"] + 7,
                     clamp_range=self._policy["clamp"],
                     allow_empty=True,
+                    apply=False,
                 )
 
             raw_scales = dict(proposed_scales)
@@ -1298,9 +1394,6 @@ class VarianceGuard(Guard):
                     "scales": focus_raw_scales,
                 }
             )
-
-            # Restore original state since we only wanted the proposed scales
-            model.load_state_dict(original_state)
 
             filtered_scales: dict[str, float] = {}
             raw_delta_map: dict[str, float] = {}
@@ -1400,8 +1493,6 @@ class VarianceGuard(Guard):
             return filtered_scales
 
         except Exception as e:
-            # Restore state on any error
-            model.load_state_dict(original_state)
             raise e
 
     def _evaluate_calibration_pass(
