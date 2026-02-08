@@ -372,6 +372,67 @@ def test_equalise_residual_variance_apply_true_scales_moe_expert_outputs():
     assert not torch.equal(expert.down_proj.bias, original_b)
 
 
+def test_equalise_residual_variance_supports_fused_moe_expert_weight_tensors():
+    class FusedExperts(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            # Pack expert output projections into a single fused tensor:
+            # [n_experts, out, in].
+            self.down_proj = nn.Parameter(torch.ones(2, 4, 4))
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            # Always route to expert 0 for determinism.
+            w = self.down_proj[0]
+            return torch.matmul(x, w.t())
+
+    class ToyMoE(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.experts = FusedExperts()
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return self.experts(x) * 2.0
+
+    class ToyBlock(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.mlp = ToyMoE()
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return self.mlp(x)
+
+    class ToyModel(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.model = nn.Module()
+            self.model.layers = nn.ModuleList([ToyBlock()])
+
+        def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
+            x = input_ids.float()
+            if x.dim() == 2:
+                x = x.unsqueeze(-1).repeat(1, 1, 4)
+            for blk in self.model.layers:
+                x = blk(x)
+            return x
+
+    model = ToyModel()
+    original = model.model.layers[0].mlp.experts.down_proj.detach().clone()
+
+    dataloader = [{"input_ids": torch.ones(2, 3, dtype=torch.long)}]
+    out = equalise_residual_variance(
+        model,
+        dataloader,
+        windows=1,
+        tol=0.0,
+        clamp_range=None,
+        apply=True,
+        allow_empty=False,
+    )
+
+    assert "block0.mlp" in out
+    assert not torch.equal(model.model.layers[0].mlp.experts.down_proj, original)
+
+
 def test_equalise_residual_variance_handles_non_iterable_moe_experts():
     class BadMoE(nn.Module):
         def __init__(self) -> None:
@@ -542,6 +603,42 @@ def test_variance_guard_resolves_moe_targets_with_down_proj_experts():
         def __init__(self) -> None:
             super().__init__()
             self.experts = nn.ModuleList([ToyExpert(), ToyExpert()])
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return x
+
+    class ToyBlock(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.mlp = ToyMoE()
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return x
+
+    class ToyModel(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.model = nn.Module()
+            self.model.layers = nn.ModuleList([ToyBlock()])
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return x
+
+    guard = VarianceGuard(policy={"scope": "ffn"})
+    targets = guard._resolve_target_modules(ToyModel())  # noqa: SLF001
+    assert "transformer.h.0.mlp.c_proj" in targets
+
+
+def test_variance_guard_resolves_fused_moe_targets_with_expert_weight_tensor():
+    class FusedExperts(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.down_proj = nn.Parameter(torch.ones(2, 4, 4))
+
+    class ToyMoE(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.experts = FusedExperts()
 
         def forward(self, x: torch.Tensor) -> torch.Tensor:
             return x

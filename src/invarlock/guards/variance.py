@@ -221,7 +221,7 @@ def equalise_residual_variance(
 
         return fn
 
-    def _moe_expert_out_modules(block: Any) -> list[nn.Module]:
+    def _moe_expert_out_modules(block: Any) -> list[Any]:
         """Return MoE expert output projection modules for known transformer MoE blocks.
 
         Models vary in how they name the expert output projection:
@@ -232,11 +232,15 @@ def equalise_residual_variance(
         Some implementations store experts in `nn.ModuleList` while others use
         `nn.ModuleDict` (which iterates over keys by default). Use `_modules`
         when available so we always iterate over actual expert modules.
+
+        Some optimized MoE implementations pack all expert projections into a
+        single fused tensor (e.g., `block.experts.down_proj` as a 3D Parameter)
+        rather than a per-expert `nn.Module`. Handle both representations.
         """
         experts = getattr(block, "experts", None)
         if experts is None:
             return []
-        out: list[nn.Module] = []
+        out: list[Any] = []
         iterable: Iterable[Any]
         if isinstance(experts, nn.Module) and hasattr(experts, "_modules"):
             iterable = experts._modules.values()  # type: ignore[attr-defined]
@@ -244,13 +248,33 @@ def equalise_residual_variance(
             try:
                 iterable = list(experts)
             except TypeError:
-                return []
+                iterable = []
         for expert in iterable:
             for attr in ("w2", "down_proj", "c_proj", "fc2"):
                 proj = getattr(expert, attr, None)
                 if proj is not None and hasattr(proj, "weight"):
                     out.append(proj)
                     break
+        if out:
+            return out
+
+        # Fallback for fused expert weights stored directly on the experts container.
+        for attr in ("w2", "down_proj", "c_proj", "fc2"):
+            proj = getattr(experts, attr, None)
+            if proj is None:
+                continue
+            weight = getattr(proj, "weight", None)
+            candidate = weight if isinstance(weight, torch.Tensor) else None
+            if candidate is None and isinstance(proj, torch.Tensor):
+                candidate = proj
+            if candidate is None:
+                continue
+            try:
+                dim = candidate.dim()
+            except Exception:
+                dim = getattr(candidate, "ndim", None)
+            if dim in (2, 3):
+                return [proj]
         return out
 
     # Register hooks on projection layers
@@ -427,9 +451,14 @@ def equalise_residual_variance(
                 if apply:
                     with torch.no_grad():
                         for proj in moe_out:
-                            proj.weight.mul_(alpha)
-                            if scale_bias and getattr(proj, "bias", None) is not None:
-                                proj.bias.mul_(alpha)
+                            weight = getattr(proj, "weight", None)
+                            if isinstance(weight, torch.Tensor):
+                                weight.mul_(alpha)
+                                bias = getattr(proj, "bias", None)
+                                if scale_bias and isinstance(bias, torch.Tensor):
+                                    bias.mul_(alpha)
+                            elif isinstance(proj, torch.Tensor):
+                                proj.mul_(alpha)
                 applied_scales[name] = alpha
 
     return applied_scales
@@ -1119,6 +1148,26 @@ class VarianceGuard(Guard):
             # itself as supported so VE can still resolve targets.
             experts = getattr(module, "experts", None)
             if experts is not None:
+                # Some optimized MoE implementations pack expert projections into
+                # a single fused tensor on the experts container (e.g.
+                # `experts.down_proj` as a 3D Parameter). Detect that first.
+                for attr in ("w2", "down_proj", "c_proj", "fc2"):
+                    proj = getattr(experts, attr, None)
+                    if proj is None:
+                        continue
+                    weight = getattr(proj, "weight", None)
+                    candidate = weight if isinstance(weight, torch.Tensor) else None
+                    if candidate is None and isinstance(proj, torch.Tensor):
+                        candidate = proj
+                    if candidate is None:
+                        continue
+                    try:
+                        dim = candidate.dim()
+                    except Exception:
+                        dim = getattr(candidate, "ndim", None)
+                    if dim in (2, 3):
+                        return True
+
                 if isinstance(experts, nn.Module) and hasattr(experts, "_modules"):
                     iterable = experts._modules.values()  # type: ignore[attr-defined]
                 else:
