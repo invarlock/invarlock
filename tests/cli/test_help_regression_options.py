@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from click.termui import strip_ansi
 from typer.testing import CliRunner
 
 
@@ -17,7 +18,7 @@ def test_run_help_exposes_typed_options(monkeypatch):
     runner = CliRunner()
     res = runner.invoke(app, ["run", "--help"])
     assert res.exit_code == 0, res.output
-    out = res.stdout
+    out = strip_ansi(res.stdout)
     # Regression guard: no raw ARGS/KWARGS placeholder
     assert "ARGS KWARGS" not in out
     # Must expose config and common options
@@ -31,7 +32,7 @@ def test_evaluate_help_exposes_baseline_and_subject(monkeypatch):
     runner = CliRunner()
     res = runner.invoke(app, ["evaluate", "--help"])
     assert res.exit_code == 0, res.output
-    out = res.stdout
+    out = strip_ansi(res.stdout)
     assert "--baseline" in out or "--source" in out
     assert "--subject" in out or "--edited" in out
     assert "--preset" in out
@@ -42,7 +43,7 @@ def test_doctor_help_is_typed(monkeypatch):
     runner = CliRunner()
     res = runner.invoke(app, ["doctor", "--help"])
     assert res.exit_code == 0, res.output
-    out = res.stdout
+    out = strip_ansi(res.stdout)
     assert "ARGS KWARGS" not in out
     # Provide a config option
     assert "--config" in out
@@ -57,6 +58,6 @@ def test_groups_help_list_subcommands(monkeypatch):
     ):
         res = runner.invoke(app, [cmd, "--help"])
         assert res.exit_code == 0, f"help failed for {cmd}: {res.output}"
-        out = res.stdout
+        out = strip_ansi(res.stdout)
         for token in expected:
             assert token in out
