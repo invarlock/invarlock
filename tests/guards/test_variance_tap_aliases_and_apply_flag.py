@@ -117,6 +117,97 @@ def test_equalise_residual_variance_supports_moe_mlp_blocks():
     assert "block0.mlp" in out
 
 
+def test_equalise_residual_variance_supports_moe_module_dict_experts():
+    class ToyExpert(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.w2 = nn.Linear(4, 4, bias=False)
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return self.w2(x)
+
+    class ToyMoE(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            # Some MoE implementations store experts in ModuleDict (iterates over keys),
+            # so equalise_residual_variance must iterate experts via values/_modules.
+            self.experts = nn.ModuleDict({"0": ToyExpert(), "1": ToyExpert()})
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return self.experts["0"](x) * 2.0
+
+    class ToyBlock(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.block_sparse_moe = ToyMoE()
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return self.block_sparse_moe(x)
+
+    class ToyModel(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.model = nn.Module()
+            self.model.layers = nn.ModuleList([ToyBlock()])
+
+        def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
+            x = input_ids.float()
+            if x.dim() == 2:
+                x = x.unsqueeze(-1).repeat(1, 1, 4)
+            for blk in self.model.layers:
+                x = blk(x)
+            return x
+
+    model = ToyModel()
+    dataloader = [{"input_ids": torch.ones(2, 3, dtype=torch.long)}]
+    out = equalise_residual_variance(
+        model,
+        dataloader,
+        windows=1,
+        tol=0.0,
+        clamp_range=None,
+        apply=False,
+        allow_empty=False,
+    )
+    assert "block0.mlp" in out
+
+
+def test_variance_guard_resolves_moe_targets_with_module_dict_experts():
+    class ToyExpert(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.w2 = nn.Linear(4, 4, bias=False)
+
+    class ToyMoE(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.experts = nn.ModuleDict({"0": ToyExpert(), "1": ToyExpert()})
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return x
+
+    class ToyBlock(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.block_sparse_moe = ToyMoE()
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return x
+
+    class ToyModel(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.model = nn.Module()
+            self.model.layers = nn.ModuleList([ToyBlock()])
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return x
+
+    guard = VarianceGuard(policy={"scope": "ffn"})
+    targets = guard._resolve_target_modules(ToyModel())  # noqa: SLF001
+    assert "transformer.h.0.mlp.c_proj" in targets
+
+
 def test_equalise_residual_variance_supports_block_sparse_moe_blocks():
     class ToyExpert(nn.Module):
         def __init__(self) -> None:

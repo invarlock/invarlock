@@ -222,15 +222,24 @@ def equalise_residual_variance(
         return fn
 
     def _moe_expert_w2_modules(block: Any) -> list[nn.Module]:
-        """Return MoE expert output projection modules for known transformer MoE blocks."""
+        """Return MoE expert output projection modules for known transformer MoE blocks.
+
+        Some HF implementations store experts in `nn.ModuleList` while others use
+        `nn.ModuleDict` (which iterates over keys by default). Use `_modules`
+        when available so we always iterate over actual expert modules.
+        """
         experts = getattr(block, "experts", None)
         if experts is None:
             return []
         out: list[nn.Module] = []
-        try:
-            iterable = list(experts)
-        except TypeError:
-            return []
+        iterable: Iterable[Any]
+        if isinstance(experts, nn.Module) and hasattr(experts, "_modules"):
+            iterable = experts._modules.values()  # type: ignore[attr-defined]
+        else:
+            try:
+                iterable = list(experts)
+            except TypeError:
+                return []
         for expert in iterable:
             w2 = getattr(expert, "w2", None)
             if w2 is not None and hasattr(w2, "weight"):
@@ -1103,10 +1112,13 @@ class VarianceGuard(Guard):
             # itself as supported so VE can still resolve targets.
             experts = getattr(module, "experts", None)
             if experts is not None:
-                try:
-                    iterable = list(experts)
-                except TypeError:
-                    iterable = []
+                if isinstance(experts, nn.Module) and hasattr(experts, "_modules"):
+                    iterable = experts._modules.values()  # type: ignore[attr-defined]
+                else:
+                    try:
+                        iterable = list(experts)
+                    except TypeError:
+                        iterable = []
                 for expert in iterable:
                     w2 = getattr(expert, "w2", None)
                     weight = getattr(w2, "weight", None) if w2 is not None else None
