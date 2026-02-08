@@ -215,6 +215,42 @@ EOF
     assert_match "VERDICT" "$(cat "${OUTPUT_DIR}/reports/final_verdict.txt")" "verdict content emitted"
 }
 
+test_pack_validation_pack_run_suite_runs_dependency_check_before_preflight_when_net_enabled() {
+    mock_reset
+
+    local calls_file="${TEST_TMPDIR}/calls.txt"
+
+    (
+        OUTPUT_DIR="${TEST_TMPDIR}/out"
+        PACK_NET="1"
+        PACK_SUITE="subset"
+        source ./scripts/proof_packs/lib/validation_suite.sh
+
+        # Stub out heavy setup (we only care about call ordering inside pack_run_suite).
+        pack_apply_network_mode() { :; }
+        pack_source_libs() { :; }
+        pack_setup_output_dirs() { :; }
+        pack_prepare_scenarios_manifest() { :; }
+        pack_setup_hf_cache_dirs() { :; }
+        pack_preflight_datasets() { :; }
+        pack_model_list_array() { PACK_MODEL_LIST=("mistralai/Mistral-7B-v0.1"); }
+        pack_prepare_tuned_edit_params() { :; }
+        pack_validate_tuned_edit_params() { :; }
+        pack_prepare_calibration_presets() { :; }
+        pack_validate_guard_calibration() { :; }
+
+        calls=""
+        check_dependencies() { calls="${calls}check,"; }
+        pack_preflight_models() { calls="${calls}preflight,"; }
+        main_dynamic() { calls="${calls}main,"; }
+
+        pack_run_suite
+        printf '%s' "${calls}" > "${calls_file}"
+    )
+
+    assert_eq "check,preflight,main," "$(cat "${calls_file}")" "dependency check precedes net preflight"
+}
+
 _make_validation_suite_sandbox() {
     local sandbox
     sandbox="$(mktemp -d "${TEST_TMPDIR}/pack_validation_suite.XXXXXX")"
@@ -665,6 +701,7 @@ test_pack_validation_check_dependencies_flash_attn_branches_and_package_installs
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
+    PACK_NET="1"
     source ./scripts/proof_packs/lib/validation_suite.sh
     pack_setup_output_dirs
 
@@ -1168,7 +1205,8 @@ EOF
 
     signal_shutdown() { echo "shutdown:$1" >> "${TEST_TMPDIR}/shutdown.calls"; }
 
-    main_dynamic
+    run main_dynamic
+    assert_rc "1" "${RUN_RC}" "main_dynamic fails closed when worker/task failures occur"
     assert_file_exists "${TEST_TMPDIR}/shutdown.calls" "signal_shutdown called on empty queue"
 }
 
@@ -1425,7 +1463,7 @@ EOF
     kill() { return 0; }
 
     run main
-    assert_rc "0" "${RUN_RC}" "main completes offline"
+    assert_rc "1" "${RUN_RC}" "main fails closed when failed tasks are present"
     assert_file_exists "${TEST_TMPDIR}/boost.calls" "progress path applies work-stealing boost"
     assert_file_exists "${TEST_TMPDIR}/task_id.calls" "failed task reporting reads task ids"
     assert_file_exists "${TEST_TMPDIR}/python3.calls" "analysis steps invoke python3"
@@ -1976,6 +2014,8 @@ test_pack_validation_pack_run_suite_branches() {
 
     cleanup() { return 0; }
     pack_apply_network_mode() { :; }
+    pack_preflight_datasets() { :; }
+    check_dependencies() { :; }
     pack_prepare_tuned_edit_params() { :; }
     pack_validate_tuned_edit_params() { :; }
     pack_prepare_calibration_presets() { :; }
@@ -2114,6 +2154,7 @@ test_pack_validation_pack_run_suite_calibrate_only_skips_tuned_edit_params_valid
     pack_source_libs() { return 0; }
     pack_prepare_scenarios_manifest() { return 0; }
     pack_setup_hf_cache_dirs() { return 0; }
+    pack_preflight_datasets() { :; }
 
     # Ensure the model list would fail tuned preset validation if it ran.
     pack_model_list_array() { PACK_MODEL_LIST=("Qwen/Qwen2.5-14B"); }
@@ -2129,6 +2170,40 @@ test_pack_validation_pack_run_suite_calibrate_only_skips_tuned_edit_params_valid
 
     run pack_run_suite
     assert_rc "0" "${RUN_RC}" "calibrate-only skips tuned edit preset validation"
+    trap - EXIT INT TERM HUP QUIT
+}
+
+test_pack_validation_pack_run_suite_errors_only_skips_tuned_edit_params_validation() {
+    mock_reset
+
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    cleanup() { return 0; }
+    pack_require_bash4() { return 0; }
+    pack_apply_network_mode() { :; }
+    pack_source_libs() { return 0; }
+    pack_prepare_scenarios_manifest() { return 0; }
+    pack_setup_hf_cache_dirs() { return 0; }
+    pack_preflight_datasets() { :; }
+
+    # Ensure the model list would fail tuned preset validation if it ran.
+    pack_model_list_array() { PACK_MODEL_LIST=("Qwen/Qwen2.5-14B"); }
+
+    PACK_SUITE_MODE="errors-only"
+    PACK_SUITE="full"
+    PACK_NET="0"
+    OUTPUT_DIR="${TEST_TMPDIR}/out_errors_only"
+    export PACK_SUITE_MODE PACK_SUITE PACK_NET OUTPUT_DIR
+
+    pack_load_model_revisions() { return 0; }
+    main_dynamic() {
+        printf '%s\n' "${CLEAN_EDIT_RUNS:-}|${STRESS_EDIT_RUNS:-}|${RUN_ERROR_INJECTION:-}" > "${TEST_TMPDIR}/errors_only.env"
+    }
+
+    run pack_run_suite
+    assert_rc "0" "${RUN_RC}" "errors-only skips tuned edit preset validation"
+    assert_file_exists "${TEST_TMPDIR}/errors_only.env" "main_dynamic invoked"
+    assert_eq "0|0|true" "$(cat "${TEST_TMPDIR}/errors_only.env")" "errors-only disables edits but keeps error injection enabled"
     trap - EXIT INT TERM HUP QUIT
 }
 
@@ -2632,7 +2707,7 @@ test_pack_validation_estimate_planned_model_storage_falls_back_when_mapfile_disa
     assert_eq "20" "${total}" "planned storage sums weights and edits without mapfile"
 }
 
-test_pack_prepare_scenarios_manifest_copies_repo_manifest_into_state() {
+test_pack_prepare_scenarios_manifest_writes_state_manifest() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
@@ -2640,5 +2715,72 @@ test_pack_prepare_scenarios_manifest_copies_repo_manifest_into_state() {
 
     pack_prepare_scenarios_manifest
 
-    assert_file_exists "${OUTPUT_DIR}/state/scenarios.json" "scenarios manifest copied into run state"
+    assert_file_exists "${OUTPUT_DIR}/state/scenarios.json" "scenarios manifest written into run state"
+    assert_eq "proof_pack_scenarios_v1" "$(jq -r '.schema' "${OUTPUT_DIR}/state/scenarios.json")" "schema set"
+    assert_eq "1" "$(jq -r '.schema_version' "${OUTPUT_DIR}/state/scenarios.json")" "schema version set"
+    assert_eq "subset" "$(jq -r '._meta.applied_suite' "${OUTPUT_DIR}/state/scenarios.json")" "suite recorded"
+    local count
+    count="$(jq '.scenarios | length' "${OUTPUT_DIR}/state/scenarios.json")"
+    assert_ne "0" "${count}" "scenarios list is non-empty"
+}
+
+test_pack_prepare_scenarios_manifest_filters_by_suite_tags() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    local PACK_SUITE="showcase"
+
+    local manifest="${TEST_TMPDIR}/scenarios.json"
+    cat > "${manifest}" <<'EOF'
+{
+  "_meta": {},
+  "schema": "proof_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {"id": "a", "category": "clean", "strictness": "must_pass", "generation": {"kind": "edit", "edit_spec": "x", "version": "clean"}, "suites": ["subset"]},
+    {"id": "b", "category": "clean", "strictness": "must_pass", "generation": {"kind": "edit", "edit_spec": "y", "version": "clean"}, "suites": ["showcase"]},
+    {"id": "c", "category": "clean", "strictness": "must_pass", "generation": {"kind": "edit", "edit_spec": "z", "version": "clean"}}
+  ]
+}
+EOF
+    local PACK_SCENARIOS_MANIFEST_FILE="${manifest}"
+
+    pack_prepare_scenarios_manifest
+
+    local ids
+    ids="$(jq -r '.scenarios[].id' "${OUTPUT_DIR}/state/scenarios.json" | sort | paste -sd ',' -)"
+    assert_eq "b,c" "${ids}" "filters by suite, but keeps untagged scenarios"
+}
+
+test_pack_prepare_scenarios_manifest_filters_by_scenario_ids() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    local PACK_SUITE="showcase"
+
+    local manifest="${TEST_TMPDIR}/scenarios.json"
+    cat > "${manifest}" <<'EOF'
+{
+  "_meta": {},
+  "schema": "proof_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {"id": "a", "category": "clean", "strictness": "must_pass", "generation": {"kind": "edit", "edit_spec": "x", "version": "clean"}, "suites": ["subset"]},
+    {"id": "b", "category": "clean", "strictness": "must_pass", "generation": {"kind": "edit", "edit_spec": "y", "version": "clean"}, "suites": ["showcase"]},
+    {"id": "c", "category": "clean", "strictness": "must_pass", "generation": {"kind": "edit", "edit_spec": "z", "version": "clean"}}
+  ]
+}
+EOF
+    local PACK_SCENARIOS_MANIFEST_FILE="${manifest}"
+    local PACK_SCENARIO_IDS="b"
+
+    pack_prepare_scenarios_manifest
+
+    local ids
+    ids="$(jq -r '.scenarios[].id' "${OUTPUT_DIR}/state/scenarios.json" | sort | paste -sd ',' -)"
+    assert_eq "b" "${ids}" "filters by scenario id after suite filtering"
 }

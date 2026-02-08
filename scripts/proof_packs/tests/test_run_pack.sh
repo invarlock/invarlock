@@ -11,9 +11,12 @@ test_run_pack_build_pack_collects_artifacts() {
 
     echo "verdict" > "${run_dir}/reports/final_verdict.txt"
     echo "{}" > "${run_dir}/reports/final_verdict.json"
+    echo "{}" > "${run_dir}/reports/guard_intervention_summary.json"
     echo '{"model_list": ["org/model"], "models": {"org/model": {"revision": "abc"}}}' > "${run_dir}/state/model_revisions.json"
     echo '{"schema":"proof_pack_scenarios_v1","schema_version":1,"scenarios":[]}' > "${run_dir}/state/scenarios.json"
     echo "{}" > "${run_dir}/modelA/reports/edit/run_1/evaluation.report.json"
+    echo '{"probe":"rmt_cross_model_v1","stable":false}' > "${run_dir}/modelA/reports/edit/run_1/rmt_probe.json"
+    echo '{"probe":"ve_probe_v1","signal":true}' > "${run_dir}/modelA/reports/edit/run_1/ve_probe.json"
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
@@ -66,6 +69,8 @@ EOF
     assert_file_exists "${pack_dir}/state/model_revisions.json" "revisions copied"
     assert_file_exists "${pack_dir}/state/scenarios.json" "scenarios manifest copied"
     assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/evaluation.report.json" "cert copied"
+    assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/rmt_probe.json" "probe sidecar copied"
+    assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/ve_probe.json" "ve probe sidecar copied"
     assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/verify.json" "verify output captured"
     assert_file_exists "${pack_dir}/results/verification_summary.json" "verification summary written"
     run python3 -c 'import json,sys; json.load(open(sys.argv[1], encoding="utf-8"))' "${pack_dir}/results/verification_summary.json"
@@ -74,6 +79,22 @@ EOF
     assert_file_exists "${pack_dir}/checksums.sha256" "checksums written"
     assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/evaluation.html" "html rendered"
     assert_file_exists "${pack_dir}/README.md" "readme written"
+    assert_file_exists "${pack_dir}/results/guard_intervention_summary.json" "intervention summary copied"
+}
+
+test_run_pack_build_pack_rejects_failed_final_verdict() {
+    mock_reset
+
+    source ./scripts/proof_packs/run_pack.sh
+
+    local run_dir="${TEST_TMPDIR}/run"
+    mkdir -p "${run_dir}/reports"
+    echo "FAIL" > "${run_dir}/reports/final_verdict.txt"
+    echo '{"verdict":"FAIL"}' > "${run_dir}/reports/final_verdict.json"
+
+    run pack_build_pack "${run_dir}" "${TEST_TMPDIR}/pack"
+    assert_rc "1" "${RUN_RC}" "pack build fails when run verdict is FAIL"
+    assert_match "refusing to build a distributable pack" "${RUN_ERR}" "rejects failed run verdict"
 }
 
 test_run_pack_build_pack_layout_v2_nests_results_and_metadata() {
@@ -87,6 +108,7 @@ test_run_pack_build_pack_layout_v2_nests_results_and_metadata() {
 
     echo "verdict" > "${run_dir}/reports/final_verdict.txt"
     echo "{}" > "${run_dir}/reports/final_verdict.json"
+    echo "{}" > "${run_dir}/reports/guard_intervention_summary.json"
     echo '{"model_list": ["org/model"], "models": {"org/model": {"revision": "abc"}}}' > "${run_dir}/state/model_revisions.json"
     echo '{"schema":"proof_pack_scenarios_v1","schema_version":1,"scenarios":[]}' > "${run_dir}/state/scenarios.json"
     echo "{}" > "${run_dir}/modelA/reports/edit/run_1/evaluation.report.json"
@@ -145,6 +167,7 @@ EOF
     assert_file_exists "${pack_dir}/metadata/manifest.json" "manifest copied to metadata"
     assert_file_exists "${pack_dir}/metadata/manifest.json.asc" "manifest signature copied to metadata"
     assert_file_exists "${pack_dir}/metadata/checksums.sha256" "checksums copied to metadata"
+    assert_file_exists "${pack_dir}/results/analysis/guard_intervention_summary.json" "intervention summary nested"
     [[ ! -f "${pack_dir}/results/final_verdict.txt" ]] || t_fail "legacy verdict path should not exist under v2 layout"
 }
 
@@ -870,6 +893,9 @@ test_run_pack_entrypoint_errors_on_invalid_args() {
     run pack_run_pack --net
     assert_rc "2" "${RUN_RC}" "missing net value"
 
+    run pack_run_pack --models
+    assert_rc "2" "${RUN_RC}" "missing models value"
+
     run pack_run_pack --out
     assert_rc "2" "${RUN_RC}" "missing out value"
 
@@ -881,6 +907,9 @@ test_run_pack_entrypoint_errors_on_invalid_args() {
 
     run pack_run_pack --determinism
     assert_rc "2" "${RUN_RC}" "missing determinism value"
+
+    run pack_run_pack --scenario-ids
+    assert_rc "2" "${RUN_RC}" "missing scenario-ids value"
 
     run pack_run_pack --repeats nope
     assert_rc "2" "${RUN_RC}" "invalid repeats value"
@@ -901,12 +930,14 @@ test_run_pack_entrypoint_parses_suite_determinism_and_repeats() {
     pack_entrypoint() { printf '%s\n' "$@" > "${TEST_TMPDIR}/run.args"; }
     pack_build_pack() { :; }
 
-    pack_run_pack --suite full --net 1 --layout v2 --determinism strict --repeats 2 --out "${TEST_TMPDIR}/out"
+    pack_run_pack --suite full --models "org/modelA" --net 1 --layout v2 --determinism strict --repeats 2 --scenario-ids "x,y" --out "${TEST_TMPDIR}/out"
 
     assert_match "--suite[[:space:]]+full" "$(cat "${TEST_TMPDIR}/run.args")" "suite forwarded"
+    assert_match "--models[[:space:]]+org/modelA" "$(cat "${TEST_TMPDIR}/run.args")" "models forwarded"
     assert_eq "v2" "${PACK_PACK_LAYOUT}" "layout forwarded"
     assert_match "--determinism[[:space:]]+strict" "$(cat "${TEST_TMPDIR}/run.args")" "determinism forwarded"
     assert_match "--repeats[[:space:]]+2" "$(cat "${TEST_TMPDIR}/run.args")" "repeats forwarded"
+    assert_match "--scenario-ids[[:space:]]+x,y" "$(cat "${TEST_TMPDIR}/run.args")" "scenario ids forwarded"
 }
 
 
@@ -948,6 +979,9 @@ test_run_pack_entrypoint_builds_run_args_for_modes() {
 
     pack_run_pack --run-only --out "${TEST_TMPDIR}/out2"
     assert_match "--run-only" "$(cat "${TEST_TMPDIR}/run.args")" "run-only forwarded"
+
+    pack_run_pack --errors-only --out "${TEST_TMPDIR}/out_err"
+    assert_match "--errors-only" "$(cat "${TEST_TMPDIR}/run.args")" "errors-only forwarded"
 
     pack_run_pack --resume --pack-dir "${TEST_TMPDIR}/pack3" --out "${TEST_TMPDIR}/out3"
     assert_match "--resume" "$(cat "${TEST_TMPDIR}/run.args")" "resume forwarded"

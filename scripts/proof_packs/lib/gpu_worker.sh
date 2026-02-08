@@ -36,6 +36,12 @@ WORKER_HEARTBEAT_INTERVAL="${WORKER_HEARTBEAT_INTERVAL:-30}"
 # Idle sleep time when no tasks available
 WORKER_IDLE_SLEEP="${WORKER_IDLE_SLEEP:-5}"
 
+# Dependency resolution interval (seconds) for pending-only queues.
+# The main harness promotes dependencies in the monitor loop, but if the monitor
+# is interrupted (e.g., SSH session drop) workers should still be able to make
+# forward progress.
+WORKER_DEP_RESOLVE_INTERVAL="${WORKER_DEP_RESOLVE_INTERVAL:-30}"
+
 # Maximum consecutive failures before worker shutdown
 WORKER_MAX_FAILURES="${WORKER_MAX_FAILURES:-10}"
 
@@ -178,6 +184,10 @@ gpu_worker() {
     if ! [[ "${idle_sleep}" =~ ^[0-9]+$ ]]; then
         idle_sleep=5
     fi
+    local dep_resolve_interval="${WORKER_DEP_RESOLVE_INTERVAL:-30}"
+    if ! [[ "${dep_resolve_interval}" =~ ^-?[0-9]+$ ]]; then
+        dep_resolve_interval=30
+    fi
     local max_failures="${WORKER_MAX_FAILURES:-10}"
     if ! [[ "${max_failures}" =~ ^[0-9]+$ ]]; then
         max_failures=10
@@ -187,6 +197,8 @@ gpu_worker() {
     local tasks_completed=0
     local last_heartbeat
     last_heartbeat=$(_now_epoch)
+    local last_dep_resolve
+    last_dep_resolve=$(_now_epoch)
 
     # Set GPU for this worker
     export CUDA_VISIBLE_DEVICES="${gpu_id}"
@@ -242,6 +254,14 @@ gpu_worker() {
             local running=$(count_tasks "running")
 
             if [[ ${ready} -eq 0 && ${pending} -gt 0 ]]; then
+                # Fail-safe dependency promotion: if the monitor loop is not running,
+                # periodically promote pending->ready so workers don't deadlock.
+                local now_resolve
+                now_resolve=$(_now_epoch)
+                if [[ ${dep_resolve_interval} -le 0 || $((now_resolve - last_dep_resolve)) -ge ${dep_resolve_interval} ]]; then
+                    resolve_dependencies 2>/dev/null || true
+                    last_dep_resolve=${now_resolve}
+                fi
                 # All ready tasks taken, wait for deps to resolve
                 update_worker_status "${gpu_id}" "${output_dir}" "waiting_deps"
             else

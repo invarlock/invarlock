@@ -82,7 +82,20 @@ def _stub_runtime(monkeypatch, tmp_path: Path):
             metrics={"window_overlap_fraction": 0.0, "window_match_fraction": 1.0},
             guards={},
             context={"dataset_meta": {}},
-            evaluation_windows={},
+            # Provide finite paired losses so PM computation and baseline normalization
+            # remain valid under fail-closed baseline checks.
+            evaluation_windows={
+                "preview": {
+                    "window_ids": [0, 1],
+                    "logloss": [2.20, 2.10],
+                    "token_counts": [16, 16],
+                },
+                "final": {
+                    "window_ids": [2, 3],
+                    "logloss": [2.05, 2.15],
+                    "token_counts": [16, 16],
+                },
+            },
             status="success",
         )
 

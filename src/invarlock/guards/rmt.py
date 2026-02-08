@@ -4,9 +4,6 @@ InvarLock – Safety: Random Matrix Theory (RMT) Health Check
 
 Detect-only mode for v0: identifies singular value outliers that
 deviate from the Marchenko-Pastur bulk distribution.
-
-Based on insights from Słowik et al., 2025 linking MP outliers
-to training instability.
 """
 
 from __future__ import annotations

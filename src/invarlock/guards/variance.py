@@ -17,6 +17,7 @@ import fnmatch
 import hashlib
 import itertools
 import math
+import re
 import time
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
@@ -123,6 +124,13 @@ def _iter_transformer_layers(model: nn.Module):
     elif hasattr(model, "model") and hasattr(model.model, "layers"):
         # RoPE decoder style
         yield from model.model.layers
+    elif (
+        hasattr(model, "model")
+        and hasattr(model.model, "model")
+        and hasattr(model.model.model, "layers")
+    ):
+        # Some wrappers nest decoder layers under model.model.layers.
+        yield from model.model.model.layers
     elif hasattr(model, "encoder") and hasattr(model.encoder, "layer"):
         # BERT style
         yield from model.encoder.layer
@@ -133,9 +141,16 @@ def _iter_transformer_layers(model: nn.Module):
         # Generic transformer with top-level layers attribute
         yield from model.layers
     else:
-        # Fallback: look for modules with attention
+        # Fallback: look for modules that resemble decoder layers.
+        #
+        # Some architectures (e.g., Mixtral) use `self_attn` + `block_sparse_moe`
+        # instead of `attn` + `mlp`, and some wrappers may hide the canonical
+        # layers list from the attribute heuristics above.
         for module in model.modules():
-            if hasattr(module, "attn") and hasattr(module, "mlp"):
+            if (hasattr(module, "attn") and hasattr(module, "mlp")) or (
+                hasattr(module, "self_attn")
+                and (hasattr(module, "mlp") or hasattr(module, "block_sparse_moe"))
+            ):
                 yield module
 
 
@@ -151,6 +166,7 @@ def equalise_residual_variance(
     device: str | None = None,
     allow_empty: bool = False,
     clamp_range: tuple | None = (0.9, 1.1),
+    apply: bool = True,
 ) -> dict[str, float]:
     """
     Apply data-driven variance equalization to transformer branches.
@@ -172,6 +188,10 @@ def equalise_residual_variance(
         device: Device to use (auto-detected if None)
         allow_empty: Whether to allow empty dataloader (returns empty dict)
         clamp_range: Optional (min, max) to clamp scaling factors (e.g., (0.9, 1.1))
+        apply: Whether to apply scaling in-place to the model. When False, returns
+            the scales that would have been applied (subject to tol/clamp), without
+            mutating weights. This is useful for probes and guard planning on very
+            large models where copying/restoring full state dicts is impractical.
 
     Returns:
         Dict mapping layer names to applied scaling factors
@@ -201,6 +221,62 @@ def equalise_residual_variance(
 
         return fn
 
+    def _moe_expert_out_modules(block: Any) -> list[Any]:
+        """Return MoE expert output projection modules for known transformer MoE blocks.
+
+        Models vary in how they name the expert output projection:
+        - Mixtral-style: `w2`
+        - Llama/Qwen-style: `down_proj`
+        - GPT-style: `c_proj` / `fc2`
+
+        Some implementations store experts in `nn.ModuleList` while others use
+        `nn.ModuleDict` (which iterates over keys by default). Use `_modules`
+        when available so we always iterate over actual expert modules.
+
+        Some optimized MoE implementations pack all expert projections into a
+        single fused tensor (e.g., `block.experts.down_proj` as a 3D Parameter)
+        rather than a per-expert `nn.Module`. Handle both representations.
+        """
+        experts = getattr(block, "experts", None)
+        if experts is None:
+            return []
+        out: list[Any] = []
+        iterable: Iterable[Any]
+        if isinstance(experts, nn.Module) and hasattr(experts, "_modules"):
+            iterable = experts._modules.values()  # type: ignore[attr-defined]
+        else:
+            try:
+                iterable = list(experts)
+            except TypeError:
+                iterable = []
+        for expert in iterable:
+            for attr in ("w2", "down_proj", "c_proj", "fc2"):
+                proj = getattr(expert, attr, None)
+                if proj is not None and hasattr(proj, "weight"):
+                    out.append(proj)
+                    break
+        if out:
+            return out
+
+        # Fallback for fused expert weights stored directly on the experts container.
+        for attr in ("w2", "down_proj", "c_proj", "fc2"):
+            proj = getattr(experts, attr, None)
+            if proj is None:
+                continue
+            weight = getattr(proj, "weight", None)
+            candidate = weight if isinstance(weight, torch.Tensor) else None
+            if candidate is None and isinstance(proj, torch.Tensor):
+                candidate = proj
+            if candidate is None:
+                continue
+            try:
+                dim = candidate.dim()
+            except Exception:
+                dim = getattr(candidate, "ndim", None)
+            if dim in (2, 3):
+                return [proj]
+        return out
+
     # Register hooks on projection layers
     for i, blk in enumerate(_iter_transformer_layers(model)):
         # Handle GPT-2 style architecture
@@ -213,16 +289,31 @@ def equalise_residual_variance(
                 name = f"block{i}.attn"
                 hooks[name] = attn_proj.register_forward_hook(_branch_hook(name))
 
+        mlp_container = None
         if hasattr(blk, "mlp"):
+            mlp_container = blk.mlp  # type: ignore[attr-defined]
+        elif hasattr(blk, "block_sparse_moe"):
+            # Mixtral decoder layers use block_sparse_moe instead of a plain mlp module.
+            mlp_container = blk.block_sparse_moe  # type: ignore[attr-defined]
+
+        if mlp_container is not None:
             # Check for c_proj (GPT-2) or down_proj (RoPE decoder) or fc2 (generic)
             mlp_proj = (
-                getattr(blk.mlp, "c_proj", None)
-                or getattr(blk.mlp, "down_proj", None)
-                or getattr(blk.mlp, "fc2", None)
+                getattr(mlp_container, "c_proj", None)
+                or getattr(mlp_container, "down_proj", None)
+                or getattr(mlp_container, "fc2", None)
             )
             if mlp_proj is not None:
                 name = f"block{i}.mlp"
                 hooks[name] = mlp_proj.register_forward_hook(_branch_hook(name))
+            else:
+                # Mixtral-style MoE: no single down_proj/c_proj module. Hook on the
+                # MoE block output and scale expert output projections together.
+                if _moe_expert_out_modules(mlp_container):
+                    name = f"block{i}.mlp"
+                    hooks[name] = mlp_container.register_forward_hook(
+                        _branch_hook(name)
+                    )
 
     # Collect variance statistics
     try:
@@ -260,7 +351,7 @@ def equalise_residual_variance(
     for h in hooks.values():
         h.remove()
 
-    # Apply scaling factors
+    # Apply (or report) scaling factors
     applied_scales: dict[str, float] = {}
 
     for i, blk in enumerate(_iter_transformer_layers(model)):
@@ -305,45 +396,70 @@ def equalise_residual_variance(
                         applied_scales[name] = alpha
 
         # Handle MLP projection
+        mlp_container = None
         if hasattr(blk, "mlp"):
+            mlp_container = blk.mlp  # type: ignore[attr-defined]
+        elif hasattr(blk, "block_sparse_moe"):
+            mlp_container = blk.block_sparse_moe  # type: ignore[attr-defined]
+
+        if mlp_container is not None:
             mlp_proj = (
-                getattr(blk.mlp, "c_proj", None)
-                or getattr(blk.mlp, "down_proj", None)
-                or getattr(blk.mlp, "fc2", None)
+                getattr(mlp_container, "c_proj", None)
+                or getattr(mlp_container, "down_proj", None)
+                or getattr(mlp_container, "fc2", None)
             )
+            name = f"block{i}.mlp"
+            values = sample_values.get(name, [])
+            if not values:
+                continue
+
+            tensor_vals = torch.tensor(values, dtype=torch.float64)
+
+            if tensor_vals.numel() >= 10:
+                lower = torch.quantile(tensor_vals, 0.02)
+                upper = torch.quantile(tensor_vals, 0.98)
+                tensor_vals = torch.clamp(tensor_vals, lower.item(), upper.item())
+
+            group_count = 8 if tensor_vals.numel() >= 8 else tensor_vals.numel()
+            if group_count > 1:
+                chunks = torch.chunk(tensor_vals, group_count)
+                group_means = torch.stack([chunk.mean() for chunk in chunks])
+                var_F = torch.median(group_means).item()
+            else:
+                var_F = tensor_vals.mean().item()
+
+            alpha = (1.0 / max(var_F, 1e-9)) ** 0.5
+
+            # Apply clamping if specified
+            if clamp_range is not None:
+                alpha = max(clamp_range[0], min(alpha, clamp_range[1]))
+
+            if abs(alpha - 1.0) < tol:
+                continue
+
             if mlp_proj is not None:
-                name = f"block{i}.mlp"
-                values = sample_values.get(name, [])
-                if values:
-                    tensor_vals = torch.tensor(values, dtype=torch.float64)
+                if apply:
+                    with torch.no_grad():
+                        mlp_proj.weight.mul_(alpha)
+                        if scale_bias and mlp_proj.bias is not None:
+                            mlp_proj.bias.mul_(alpha)
+                applied_scales[name] = alpha
+                continue
 
-                    if tensor_vals.numel() >= 10:
-                        lower = torch.quantile(tensor_vals, 0.02)
-                        upper = torch.quantile(tensor_vals, 0.98)
-                        tensor_vals = torch.clamp(
-                            tensor_vals, lower.item(), upper.item()
-                        )
-
-                    group_count = 8 if tensor_vals.numel() >= 8 else tensor_vals.numel()
-                    if group_count > 1:
-                        chunks = torch.chunk(tensor_vals, group_count)
-                        group_means = torch.stack([chunk.mean() for chunk in chunks])
-                        var_F = torch.median(group_means).item()
-                    else:
-                        var_F = tensor_vals.mean().item()
-
-                    alpha = (1.0 / max(var_F, 1e-9)) ** 0.5
-
-                    # Apply clamping if specified
-                    if clamp_range is not None:
-                        alpha = max(clamp_range[0], min(alpha, clamp_range[1]))
-
-                    if abs(alpha - 1.0) >= tol:
-                        with torch.no_grad():
-                            mlp_proj.weight.mul_(alpha)
-                            if scale_bias and mlp_proj.bias is not None:
-                                mlp_proj.bias.mul_(alpha)
-                        applied_scales[name] = alpha
+            moe_out = _moe_expert_out_modules(mlp_container)
+            if moe_out:
+                if apply:
+                    with torch.no_grad():
+                        for proj in moe_out:
+                            weight = getattr(proj, "weight", None)
+                            if isinstance(weight, torch.Tensor):
+                                weight.mul_(alpha)
+                                bias = getattr(proj, "bias", None)
+                                if scale_bias and isinstance(bias, torch.Tensor):
+                                    bias.mul_(alpha)
+                            elif isinstance(proj, torch.Tensor):
+                                proj.mul_(alpha)
+                applied_scales[name] = alpha
 
     return applied_scales
 
@@ -450,7 +566,39 @@ class VarianceGuard(Guard):
         """
         from .policies import get_variance_policy
 
-        self._policy = policy or get_variance_policy("balanced")
+        # Treat caller-provided policy as overrides on top of the default policy.
+        # Proof-pack probes may pass partial policies (e.g., just "calibration"),
+        # and the guard should remain robust.
+        base_policy: dict[str, Any] = dict(get_variance_policy("balanced"))
+        base_calibration = base_policy.get("calibration")
+        if isinstance(base_calibration, dict):
+            base_calibration = dict(base_calibration)
+            base_policy["calibration"] = base_calibration
+
+        if policy:
+            merged: dict[str, Any] = dict(base_policy)
+            for key, value in dict(policy).items():
+                if (
+                    key == "calibration"
+                    and isinstance(value, dict)
+                    and isinstance(base_calibration, dict)
+                ):
+                    merged_calibration = dict(base_calibration)
+                    merged_calibration.update(value)
+                    merged["calibration"] = merged_calibration
+                else:
+                    merged[key] = value
+            self._policy = merged
+        else:
+            self._policy = base_policy
+
+        # If the caller is explicitly overriding policy values but does not set a
+        # tie-breaker deadband, use the guard's default (0.005) rather than the
+        # tier policy's calibrated value. This avoids surprising "enable" decisions
+        # when callers only tweak min_gain, and matches the guard-level contract
+        # exercised in unit tests.
+        if policy and "tie_breaker_deadband" not in policy:
+            self._policy["tie_breaker_deadband"] = 0.005
         self._policy.setdefault("mode", "ci")
         self._policy.setdefault("min_rel_gain", 0.001)
         self._policy.setdefault("alpha", 0.05)
@@ -642,9 +790,12 @@ class VarianceGuard(Guard):
             if isinstance(deltas, dict):
                 params_changed = deltas.get("params_changed")
         if params_changed is None:
-            params_changed = (
-                0 if edit_info and edit_info.get("name") in {"noop"} else None
-            )
+            # Some probe/report harnesses may provide non-dict edit metadata.
+            # Treat those as "unknown" rather than crashing.
+            if isinstance(edit_info, dict) and edit_info.get("name") in {"noop"}:
+                params_changed = 0
+            else:
+                params_changed = None
         self._params_changed = params_changed
         if params_changed == 0:
             self._monitor_only = True
@@ -685,9 +836,35 @@ class VarianceGuard(Guard):
     def _matches_tap(self, name: str) -> bool:
         """Return True if a module name matches configured tap patterns."""
         normalized = self._normalize_module_name(name)
+
+        candidates = {normalized, name}
+        # Tap patterns may come from tier configs that use "model.layers.*" naming,
+        # while the variance guard internally normalizes to "transformer.h.*".
+        # Generate a small alias set so probes can reuse resolved policies across
+        # architectures (e.g., Qwen/Llama-style down_proj vs GPT-style c_proj).
+        match = re.match(r"^transformer\.h\.(\d+)\.(attn|mlp)\.c_proj$", normalized)
+        if match:
+            layer_idx = match.group(1)
+            branch = match.group(2)
+            prefixes = (
+                f"transformer.h.{layer_idx}",
+                f"model.layers.{layer_idx}",
+                f"model.model.layers.{layer_idx}",
+                f"decoder.layers.{layer_idx}",
+                f"layers.{layer_idx}",
+            )
+            if branch == "mlp":
+                suffixes = ("mlp.c_proj", "mlp.down_proj", "mlp.fc2")
+            else:
+                suffixes = ("attn.c_proj", "attn.out_proj", "attn.o_proj")
+            for prefix in prefixes:
+                for suffix in suffixes:
+                    candidates.add(f"{prefix}.{suffix}")
+
         for pattern in self._tap_patterns:
-            if fnmatch.fnmatch(normalized, pattern) or fnmatch.fnmatch(name, pattern):
-                return True
+            for candidate in candidates:
+                if fnmatch.fnmatch(candidate, pattern):
+                    return True
         return False
 
     def _normalize_pairing_ids(
@@ -966,6 +1143,55 @@ class VarianceGuard(Guard):
 
         def _is_supported_module(module: Any) -> bool:
             """Heuristic check that a module looks like a projection."""
+            # Mixtral-style MoE blocks expose experts with w2 output projections
+            # rather than a single down_proj/c_proj module. Treat the MoE block
+            # itself as supported so VE can still resolve targets.
+            experts = getattr(module, "experts", None)
+            if experts is not None:
+                # Some optimized MoE implementations pack expert projections into
+                # a single fused tensor on the experts container (e.g.
+                # `experts.down_proj` as a 3D Parameter). Detect that first.
+                for attr in ("w2", "down_proj", "c_proj", "fc2"):
+                    proj = getattr(experts, attr, None)
+                    if proj is None:
+                        continue
+                    weight = getattr(proj, "weight", None)
+                    candidate = weight if isinstance(weight, torch.Tensor) else None
+                    if candidate is None and isinstance(proj, torch.Tensor):
+                        candidate = proj
+                    if candidate is None:
+                        continue
+                    try:
+                        dim = candidate.dim()
+                    except Exception:
+                        dim = getattr(candidate, "ndim", None)
+                    if dim in (2, 3):
+                        return True
+
+                if isinstance(experts, nn.Module) and hasattr(experts, "_modules"):
+                    iterable = experts._modules.values()  # type: ignore[attr-defined]
+                else:
+                    try:
+                        iterable = list(experts)
+                    except TypeError:
+                        iterable = []
+                for expert in iterable:
+                    for attr in ("w2", "down_proj", "c_proj", "fc2"):
+                        proj = getattr(expert, attr, None)
+                        weight = (
+                            getattr(proj, "weight", None) if proj is not None else None
+                        )
+                        if weight is None:
+                            continue
+                        try:
+                            dim = weight.dim()
+                        except Exception:
+                            dim = getattr(weight, "ndim", None)
+                        # Some MoE implementations pack experts into a single
+                        # tensor (dim=3). We can still scale that weight safely.
+                        if dim in (2, 3):
+                            return True
+
             if isinstance(module, module_types):
                 return True
             class_name = module.__class__.__name__ if module is not None else ""
@@ -997,16 +1223,35 @@ class VarianceGuard(Guard):
                     targets[name] = attn_proj
                     _record_match(name, attn_proj)
 
-            # Handle MLP projection based on scope
-            if scope in ["ffn", "both"] and hasattr(blk, "mlp"):
+            # Handle MLP projection based on scope.
+            # Some architectures (e.g., Mixtral) expose the FFN under block_sparse_moe
+            # instead of a plain .mlp module.
+            if scope in ["ffn", "both"]:
+                mlp_container = None
+                if hasattr(blk, "mlp"):
+                    mlp_container = blk.mlp  # type: ignore[attr-defined]
+                elif hasattr(blk, "block_sparse_moe"):
+                    mlp_container = blk.block_sparse_moe  # type: ignore[attr-defined]
+                if mlp_container is None:
+                    continue
+
                 mlp_proj = (
-                    getattr(blk.mlp, "c_proj", None)
-                    or getattr(blk.mlp, "down_proj", None)
-                    or getattr(blk.mlp, "fc2", None)
+                    getattr(mlp_container, "c_proj", None)
+                    or getattr(mlp_container, "down_proj", None)
+                    or getattr(mlp_container, "fc2", None)
                 )
                 name = f"transformer.h.{i}.mlp.c_proj"
                 if mlp_proj is None:
-                    _record_rejection(name, "missing_module", None)
+                    if _is_supported_module(mlp_container):
+                        # Composite MoE block (experts with w2). Use the mlp block
+                        # itself as the target container.
+                        if not self._matches_tap(name):
+                            _record_rejection(name, "tap_mismatch", mlp_container)
+                        else:
+                            targets[name] = mlp_container
+                            _record_match(name, mlp_container)
+                    else:
+                        _record_rejection(name, "missing_module", None)
                 elif not self._matches_tap(name):
                     _record_rejection(name, "tap_mismatch", mlp_proj)
                 elif not _is_supported_module(mlp_proj):
@@ -1188,9 +1433,6 @@ class VarianceGuard(Guard):
         # Use existing equalise_residual_variance but don't apply yet
         # We'll capture the proposed scales and apply them later in enable()
 
-        # Temporarily capture the current model state
-        original_state = copy.deepcopy(model.state_dict())
-
         try:
             tensor_ready_batches = self._tensorize_calibration_batches(dataloader)
 
@@ -1206,11 +1448,11 @@ class VarianceGuard(Guard):
                 seed=self._policy["seed"],
                 clamp_range=self._policy["clamp"],
                 allow_empty=True,
+                apply=False,
             )
 
             if not proposed_scales and self._policy.get("deadband", 0.0) > 0.0:
                 relaxed_tol = max(self._policy["deadband"] * 0.5, 1e-4)
-                model.load_state_dict(original_state)
                 tensor_ready_batches = self._tensorize_calibration_batches(dataloader)
                 proposed_scales = equalise_residual_variance(
                     model=model,
@@ -1221,6 +1463,7 @@ class VarianceGuard(Guard):
                     seed=self._policy["seed"] + 7,
                     clamp_range=self._policy["clamp"],
                     allow_empty=True,
+                    apply=False,
                 )
 
             raw_scales = dict(proposed_scales)
@@ -1263,9 +1506,6 @@ class VarianceGuard(Guard):
                     "scales": focus_raw_scales,
                 }
             )
-
-            # Restore original state since we only wanted the proposed scales
-            model.load_state_dict(original_state)
 
             filtered_scales: dict[str, float] = {}
             raw_delta_map: dict[str, float] = {}
@@ -1365,8 +1605,6 @@ class VarianceGuard(Guard):
             return filtered_scales
 
         except Exception as e:
-            # Restore state on any error
-            model.load_state_dict(original_state)
             raise e
 
     def _evaluate_calibration_pass(
@@ -2054,7 +2292,11 @@ class VarianceGuard(Guard):
 
         self._log_event(
             "prepare",
-            message=f"Preparing variance guard with scope={self._policy['scope']}, min_gain={self._policy['min_gain']}",
+            message=(
+                "Preparing variance guard with "
+                f"scope={self._policy.get('scope', 'unknown')}, "
+                f"min_gain={self._policy.get('min_gain', 'unknown')}"
+            ),
         )
 
         try:
@@ -2210,6 +2452,12 @@ class VarianceGuard(Guard):
                             "ratio_ci": (1.0, 1.0),
                         }
                     )
+                    # Make this branch observable in metrics, even though we
+                    # do not apply any scales.
+                    self._stats["ab_point_estimates"] = {
+                        "ppl_no_ve": ppl_no_ve_mean,
+                        "ppl_with_ve": ppl_no_ve_mean,
+                    }
 
                 if (
                     coverage >= min_coverage

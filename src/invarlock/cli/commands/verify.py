@@ -26,7 +26,9 @@ from invarlock.core.exceptions import (
 from invarlock.core.exceptions import (
     ValidationError as _ValidationError,
 )
+from invarlock.reporting import report_builder as _report_builder
 from invarlock.reporting.report_builder import validate_report
+from invarlock.reporting.report_schema import REPORT_JSON_SCHEMA, REPORT_SCHEMA_VERSION
 
 from .._json import emit as _emit_json
 from .._json import encode_error as _encode_error
@@ -56,6 +58,105 @@ def _load_evaluation_report(path: Path) -> dict[str, Any]:
     """Load an evaluation report JSON from disk."""
     with path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
+
+
+def _validate_report_schema_strict(report: dict[str, Any]) -> bool:
+    """Fail-closed schema validation for verify-time checks."""
+    if not isinstance(report, dict):
+        return False
+    if report.get("schema_version") != REPORT_SCHEMA_VERSION:
+        return False
+
+    schema_lib = getattr(_report_builder, "jsonschema", None)
+    if schema_lib is None:
+        return False
+
+    try:
+        schema_lib.validate(instance=report, schema=REPORT_JSON_SCHEMA)
+    except Exception:
+        return False
+    return True
+
+
+def _validate_logspace_ci_identity(
+    report: dict[str, Any], *, profile: str | None
+) -> list[str]:
+    """Validate paired ppl CI identity: display_ci ~= exp(ci)."""
+    errors: list[str] = []
+    pm = report.get("primary_metric", {}) or {}
+    if not isinstance(pm, dict):
+        return errors
+
+    kind = str(pm.get("kind", "")).lower()
+    if not kind.startswith("ppl"):
+        return errors
+
+    stats = report.get("dataset", {}).get("windows", {}).get("stats", {}) or {}
+    if not isinstance(stats, dict):
+        return errors
+
+    pairing_reason = stats.get("window_pairing_reason")
+    paired_windows = _coerce_int(stats.get("paired_windows"))
+    match_fraction = _coerce_float(stats.get("window_match_fraction"))
+    overlap_fraction = _coerce_float(stats.get("window_overlap_fraction"))
+    paired = bool(
+        pairing_reason is None
+        and paired_windows is not None
+        and paired_windows > 0
+        and isinstance(match_fraction, float)
+        and match_fraction >= 0.999999
+        and isinstance(overlap_fraction, float)
+        and overlap_fraction <= 1e-9
+    )
+    if not paired:
+        return errors
+
+    baseline_ref = report.get("baseline_ref", {}) or {}
+    baseline_pm = (
+        baseline_ref.get("primary_metric") if isinstance(baseline_ref, dict) else None
+    )
+    baseline_final = baseline_pm.get("final") if isinstance(baseline_pm, dict) else None
+    if not (
+        isinstance(baseline_final, int | float) and math.isfinite(float(baseline_final))
+    ):
+        return errors
+
+    def _finite_bounds(bounds: Any) -> bool:
+        return (
+            isinstance(bounds, tuple | list)
+            and len(bounds) == 2
+            and all(
+                isinstance(v, int | float) and math.isfinite(float(v)) for v in bounds
+            )
+        )
+
+    prof = (profile or "").strip().lower() if isinstance(profile, str | None) else "dev"
+    ci = pm.get("ci")
+    display_ci = pm.get("display_ci")
+
+    if prof in {"ci", "release"}:
+        if not _finite_bounds(ci):
+            errors.append(
+                "primary_metric.ci missing for ppl-like metric under paired baseline in CI/Release."
+            )
+        if not _finite_bounds(display_ci):
+            errors.append(
+                "primary_metric.display_ci missing for ppl-like metric under paired baseline in CI/Release."
+            )
+
+    if not (_finite_bounds(ci) and _finite_bounds(display_ci)):
+        return errors
+
+    expected = (math.exp(float(ci[0])), math.exp(float(ci[1])))
+    observed = (float(display_ci[0]), float(display_ci[1]))
+    for obs, exp_val in zip(observed, expected, strict=False):
+        tolerance = 5e-4 * max(1.0, abs(exp_val))
+        if abs(obs - exp_val) > tolerance:
+            errors.append(
+                "primary_metric.display_ci mismatch: bounds do not match exp(ci)."
+            )
+            break
+    return errors
 
 
 def _validate_primary_metric(report: dict[str, Any]) -> list[str]:
@@ -131,6 +232,10 @@ def _validate_primary_metric(report: dict[str, Any]) -> list[str]:
         if ratio_vs_baseline is None or not isinstance(ratio_vs_baseline, int | float):
             errors.append(
                 "report missing primary_metric.ratio_vs_baseline for non-ppl metric."
+            )
+        elif not _is_finite_number(ratio_vs_baseline):
+            errors.append(
+                "report is missing a finite primary_metric.ratio_vs_baseline value."
             )
 
     return errors
@@ -451,15 +556,6 @@ def _validate_evaluation_report_payload(
     """Run all verification checks for a single evaluation report."""
     errors: list[str] = []
     report = _load_evaluation_report(path)
-
-    # Always surface schema validation failures for this payload
-    if not validate_report(report):
-        errors.append("report schema validation failed.")
-        return errors
-
-    errors.extend(_validate_primary_metric(report))
-    errors.extend(_validate_pairing(report))
-    errors.extend(_validate_counts(report))
     try:
         prof = (
             (profile or "").strip().lower()
@@ -468,6 +564,21 @@ def _validate_evaluation_report_payload(
         )
     except Exception:
         prof = "dev"
+
+    # CI/Release fail closed on schema; dev keeps historical lenient behavior.
+    if prof in {"ci", "release"} and not _validate_report_schema_strict(report):
+        errors.append("report schema validation failed.")
+        return errors
+
+    # Structural checks and validation flag typing.
+    if not validate_report(report):
+        errors.append("report schema validation failed.")
+        return errors
+
+    errors.extend(_validate_primary_metric(report))
+    errors.extend(_validate_pairing(report))
+    errors.extend(_validate_counts(report))
+    errors.extend(_validate_logspace_ci_identity(report, profile=profile))
     # Drift band is a CI/Release enforcement check; dev profile should not
     # fail verification due to preview→final drift.
     if prof in {"ci", "release"}:

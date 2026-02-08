@@ -1,6 +1,7 @@
 import os
 from unittest.mock import patch
 
+from click.termui import strip_ansi
 from typer.testing import CliRunner
 
 os.environ["INVARLOCK_LIGHT_IMPORT"] = "1"
@@ -43,7 +44,7 @@ def test_cli_help_lists_core_commands():
     runner = CliRunner()
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    output = result.stdout
+    output = strip_ansi(result.stdout)
     assert "evaluate model changes" in output.lower()
     # Verify the new grouped layout mentions key groups
     for command in ("evaluate", "report", "run", "plugins", "doctor", "version"):
@@ -54,6 +55,6 @@ def test_run_help_mentions_profile_and_retry_options():
     runner = CliRunner()
     result = runner.invoke(app, ["run", "--help"])
     assert result.exit_code == 0
-    output = result.stdout
+    output = strip_ansi(result.stdout)
     for option in ("--profile", "--until-pass", "--baseline"):
         assert option in output

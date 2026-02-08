@@ -67,6 +67,29 @@ def test_spectral_guard_detects_multiple_violation_types():
     assert guard.latest_z_scores["layer.mlp.c_fc"] > 0
 
 
+def test_detect_spectral_violations_unknown_family_uses_other_cap():
+    guard = SpectralGuard(scope="all", correction_enabled=False)
+    guard.deadband = 0.0
+    guard.ignore_preview_inflation = False
+    guard.prepared = True
+    guard.baseline_sigmas = {"router.layer": 1.0}
+    guard.baseline_family_stats = {"router": {"mean": 0.0, "std": 1.0}}
+    guard.module_family_map = {"router.layer": "router"}
+    # Deliberately omit a router family cap; unknown families should reuse `other`.
+    guard.family_caps = {"other": {"kappa": 2.8}}
+    guard.target_sigma = 1.0
+
+    module = DummyModule(torch.eye(2))
+    model = DummyModel({"router.layer": module})
+    violations = guard._detect_spectral_violations(
+        model,
+        metrics={"router.layer": 1.0},
+        phase="finalize",
+    )
+
+    assert not any(v.get("type") == "family_z_cap" for v in violations)
+
+
 def test_spectral_guard_validate_auto_prepare(monkeypatch):
     guard = SpectralGuard(scope="ffn", correction_enabled=True)
     guard.min_condition_number = 0.0

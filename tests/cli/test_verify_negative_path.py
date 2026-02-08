@@ -38,6 +38,8 @@ def _mk_basic_reports() -> tuple[dict, dict]:
     baseline = {
         "run_id": "baseline-1",
         "model_id": "m",
+        "ppl_final": 50.0,
+        "ppl_preview": 50.0,
         "metrics": {
             "primary_metric": {"kind": "ppl_causal", "final": 50.0, "preview": 50.0},
             "bootstrap": {"replicates": 200, "alpha": 0.05},

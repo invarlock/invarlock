@@ -23,7 +23,12 @@ generate_verdict() {
     local root
     root="$(_pack_result_compiler_root)"
 
-    python3 "${root}/python/verdict_generator.py" --output-dir "${OUTPUT_DIR}"
+    local -a manifest_args=()
+    if [[ -f "${OUTPUT_DIR}/state/scenarios.json" ]]; then
+        manifest_args+=(--manifest "${OUTPUT_DIR}/state/scenarios.json")
+    fi
+
+    python3 "${root}/python/verdict_generator.py" --output-dir "${OUTPUT_DIR}" "${manifest_args[@]}"
     log "Wrote: ${OUTPUT_DIR}/reports/final_verdict.txt"
     log "Wrote: ${OUTPUT_DIR}/reports/final_verdict.json"
 }

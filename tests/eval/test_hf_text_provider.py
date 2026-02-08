@@ -19,7 +19,9 @@ def test_hf_text_provider_windows_monkeypatched(monkeypatch):
         def cache_files(self):
             return []
 
-    def fake_load_dataset(path, name=None, split=None, cache_dir=None):  # noqa: ARG001
+    def fake_load_dataset(  # noqa: ARG001
+        path, name=None, split=None, cache_dir=None, **kwargs
+    ):
         return DummyDS()
 
     monkeypatch.setattr(data_mod, "load_dataset", fake_load_dataset, raising=False)

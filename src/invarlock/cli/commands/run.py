@@ -21,7 +21,7 @@ import sys as _sys
 import types as _types
 import warnings
 from array import array
-from collections.abc import Callable, Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -111,6 +111,24 @@ def _event(
         emoji=emoji,
         console_style=console_style,
     )
+
+
+def _canonical_dataset_id(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    if hasattr(value, "_data"):
+        try:
+            value = value._data
+        except Exception:
+            pass
+    if isinstance(value, Mapping):
+        try:
+            return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
+        except Exception:
+            return str(value)
+    return str(value)
 
 
 LIGHT_IMPORT = os.getenv("INVARLOCK_LIGHT_IMPORT", "").strip().lower() in {
@@ -2032,7 +2050,8 @@ def _validate_and_harvest_baseline_schedule(
     cfg_dataset = getattr(cfg.dataset, "provider", None)
     if cfg_dataset is None:
         cfg_dataset = getattr(cfg.dataset, "dataset", None)
-    baseline_dataset = _extract_meta("dataset")
+    cfg_dataset = _canonical_dataset_id(cfg_dataset)
+    baseline_dataset = _canonical_dataset_id(_extract_meta("dataset"))
     if (
         baseline_dataset is not None
         and cfg_dataset is not None
@@ -2622,8 +2641,19 @@ def run_command(
         profile_label = profile_normalized or None
         if torch is not None and profile_label in {"ci", "release"}:
             try:  # pragma: no cover - behavior depends on torch availability
+                determinism_mode = (
+                    os.environ.get("PACK_DETERMINISM")
+                    or os.environ.get("INVARLOCK_DETERMINISM")
+                    or "throughput"
+                )
+                warn_only = False
+                if determinism_mode and determinism_mode.lower() != "strict":
+                    warn_only = True
+                warn_only_env = os.environ.get("INVARLOCK_DETERMINISM_WARN_ONLY", "")
+                if warn_only_env.strip().lower() in {"1", "true", "yes", "y", "on"}:
+                    warn_only = True
                 if hasattr(torch, "use_deterministic_algorithms"):
-                    torch.use_deterministic_algorithms(True, warn_only=False)
+                    torch.use_deterministic_algorithms(True, warn_only=warn_only)
                 if hasattr(torch.backends, "cudnn"):
                     torch.backends.cudnn.benchmark = False
                     try:
@@ -4352,9 +4382,12 @@ def run_command(
                 "cert_lints": [dict(lint) for lint in model_profile.cert_lints],
             }
 
+            dataset_provider = getattr(cfg.dataset, "provider", None)
+            if dataset_provider is None:
+                dataset_provider = getattr(cfg.dataset, "dataset", None)
             report["data"].update(
                 {
-                    "dataset": cfg.dataset.provider,
+                    "dataset": _canonical_dataset_id(dataset_provider),
                     # Resolved split (explicit or inferred)
                     "split": resolved_split,
                     "seq_len": cfg.dataset.seq_len,

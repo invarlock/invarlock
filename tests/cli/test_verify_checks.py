@@ -8,9 +8,15 @@ from invarlock.cli.commands import verify as v
 
 def _cert_base(pm: dict[str, Any]) -> dict[str, Any]:
     return {
+        "schema_version": "v1",
+        "run_id": "run-verify-checks",
+        "artifacts": {"generated_at": "2024-01-01T00:00:00Z"},
+        "plugins": {},
         "meta": {"model_id": "m", "adapter": "hf", "seed": 1, "device": "cpu"},
         "primary_metric": pm,
         "dataset": {
+            "provider": "unit",
+            "seq_len": 8,
             "windows": {
                 "preview": 2,
                 "final": 2,
@@ -20,7 +26,7 @@ def _cert_base(pm: dict[str, Any]) -> dict[str, Any]:
                     "coverage": {"preview": {"used": 2}, "final": {"used": 2}},
                     "paired_windows": 2,
                 },
-            }
+            },
         },
         "baseline_ref": {
             "primary_metric": {"kind": pm.get("kind", ""), "final": 100.0}
@@ -56,6 +62,14 @@ def test_validate_primary_metric_non_ppl_requires_ratio():
     cert = _cert_base({"kind": "accuracy", "final": 0.9})
     errs = v._validate_primary_metric(cert)
     assert any("missing primary_metric.ratio_vs_baseline" in e for e in errs)
+
+
+def test_validate_primary_metric_non_ppl_rejects_non_finite_ratio() -> None:
+    cert = _cert_base(
+        {"kind": "accuracy", "final": 0.9, "ratio_vs_baseline": float("nan")}
+    )
+    errs = v._validate_primary_metric(cert)
+    assert any("finite primary_metric.ratio_vs_baseline" in e for e in errs)
 
 
 def test_pairing_and_counts_checks():
@@ -226,3 +240,96 @@ def test_validate_evaluation_report_payload_success_and_fail(
     p_bad.write_text(json.dumps(cert_bad))
     errs = v._validate_evaluation_report_payload(p_bad)
     assert errs and any("missing" in e.lower() or "mismatch" in e.lower() for e in errs)
+
+
+def _measurement_contracts() -> tuple[dict[str, Any], dict[str, Any]]:
+    spectral_contract = {
+        "estimator": {"type": "power_iter", "iters": 4, "init": "ones"}
+    }
+    rmt_contract = {
+        "estimator": {"type": "power_iter", "iters": 3, "init": "ones"},
+        "activation_sampling": {
+            "windows": {"count": 8, "indices_policy": "evenly_spaced"}
+        },
+    }
+    return spectral_contract, rmt_contract
+
+
+def _attach_ci_contract_blocks(cert: dict[str, Any]) -> dict[str, Any]:
+    spectral_contract, rmt_contract = _measurement_contracts()
+    cert["spectral"] = {
+        "evaluated": True,
+        "measurement_contract": spectral_contract,
+        "measurement_contract_hash": v._measurement_contract_digest(spectral_contract),
+        "measurement_contract_match": True,
+    }
+    cert["rmt"] = {
+        "evaluated": True,
+        "measurement_contract": rmt_contract,
+        "measurement_contract_hash": v._measurement_contract_digest(rmt_contract),
+        "measurement_contract_match": True,
+    }
+    cert["resolved_policy"] = {
+        "spectral": {"measurement_contract": spectral_contract},
+        "rmt": {"measurement_contract": rmt_contract},
+    }
+    return cert
+
+
+def test_validate_evaluation_report_payload_rejects_sparse_schema_invalid_report(
+    tmp_path: Path,
+) -> None:
+    sparse = {
+        "schema_version": "v1",
+        "run_id": "run-sparse",
+        "primary_metric": {
+            "kind": "ppl_causal",
+            "final": 1.0,
+        },
+    }
+    p = tmp_path / "sparse.json"
+    p.write_text(json.dumps(sparse), encoding="utf-8")
+    errs = v._validate_evaluation_report_payload(p, profile="ci")
+    assert any("schema validation failed" in e.lower() for e in errs)
+
+
+def test_validate_evaluation_report_payload_rejects_display_ci_exp_ci_mismatch_ci_profile(
+    tmp_path: Path,
+) -> None:
+    cert = _cert_base(
+        {
+            "kind": "ppl_causal",
+            "preview": 10.0,
+            "final": 10.0,
+            "ratio_vs_baseline": 0.1,
+            "ci": [0.0, 0.0],
+            "display_ci": [9.99, 9.99],
+        }
+    )
+    cert["baseline_ref"]["primary_metric"]["final"] = 10.0
+    cert["primary_metric"]["ratio_vs_baseline"] = 1.0
+    cert = _attach_ci_contract_blocks(cert)
+    p = tmp_path / "display_ci_mismatch.json"
+    p.write_text(json.dumps(cert), encoding="utf-8")
+    errs = v._validate_evaluation_report_payload(p, profile="ci")
+    assert any("display_ci" in e.lower() and "exp(ci)" in e.lower() for e in errs)
+
+
+def test_validate_evaluation_report_payload_requires_ci_and_display_ci_for_paired_ppl_ci_profile(
+    tmp_path: Path,
+) -> None:
+    cert = _cert_base(
+        {
+            "kind": "ppl_causal",
+            "preview": 10.0,
+            "final": 10.0,
+            "ratio_vs_baseline": 1.0,
+            "display_ci": [1.0, 1.0],
+        }
+    )
+    cert["baseline_ref"]["primary_metric"]["final"] = 10.0
+    cert = _attach_ci_contract_blocks(cert)
+    p = tmp_path / "missing_ci.json"
+    p.write_text(json.dumps(cert), encoding="utf-8")
+    errs = v._validate_evaluation_report_payload(p, profile="ci")
+    assert any("primary_metric.ci" in e for e in errs)

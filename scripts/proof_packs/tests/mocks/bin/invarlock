@@ -60,7 +60,19 @@ case "${subcmd}" in
             mkdir -p "${target}"
             printf '{"ok":true}\n' > "${target}/evaluation.report.json"
         fi
+        if [[ -n "${target:-}" && -n "${TEST_TMPDIR:-}" && -f "${fixtures}/invarlock.create_report_for_evaluate" ]]; then
+            nested_dir="${target}/edited/000000"
+            mkdir -p "${nested_dir}"
+            printf '{"ok":true}\n' > "${nested_dir}/report.json"
+        fi
         ;;
 esac
+
+if [[ -n "${TEST_TMPDIR:-}" && -f "${fixtures}/invarlock.rc" ]]; then
+    rc="$(cat "${fixtures}/invarlock.rc" 2>/dev/null || echo "0")"
+    if [[ "${rc}" =~ ^-?[0-9]+$ ]]; then
+        exit "${rc}"
+    fi
+fi
 
 exit 0

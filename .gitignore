@@ -145,3 +145,6 @@ contracts/
 
 # Local-only CI workflows (for benchmarking, not required for core CI)
 # .github/workflows/guard-effect-benchmark.yml  # Temporarily tracked for optimization
+
+# Worktree scratch dirs
+.worktrees/

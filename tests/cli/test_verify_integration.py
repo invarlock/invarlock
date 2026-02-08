@@ -1,4 +1,5 @@
 import json
+import math
 from pathlib import Path
 
 import pytest
@@ -20,12 +21,18 @@ def _cert_with_provenance() -> dict:
     spectral_hash = v._measurement_contract_digest(spectral_contract)
     rmt_hash = v._measurement_contract_digest(rmt_contract)
     base = {
+        "schema_version": "v1",
+        "run_id": "run-verify-integration",
+        "artifacts": {"generated_at": "2024-01-01T00:00:00Z"},
+        "plugins": {},
         "meta": {"model_id": "m", "adapter": "hf", "seed": 1, "device": "cpu"},
         "primary_metric": {
             "kind": "ppl_causal",
             "preview": 100.0,
             "final": 101.0,
             "ratio_vs_baseline": 1.01,
+            "ci": [math.log(1.01), math.log(1.01)],
+            "display_ci": [1.01, 1.01],
         },
         "spectral": {
             "evaluated": True,
@@ -44,6 +51,8 @@ def _cert_with_provenance() -> dict:
             "rmt": {"measurement_contract": rmt_contract},
         },
         "dataset": {
+            "provider": "unit",
+            "seq_len": 8,
             "windows": {
                 "preview": 1,
                 "final": 1,
@@ -53,7 +62,7 @@ def _cert_with_provenance() -> dict:
                     "coverage": {"preview": {"used": 1}, "final": {"used": 1}},
                     "paired_windows": 1,
                 },
-            }
+            },
         },
         "baseline_ref": {"primary_metric": {"kind": "ppl_causal", "final": 100.0}},
         "provenance": {

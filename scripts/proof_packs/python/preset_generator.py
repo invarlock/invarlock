@@ -54,6 +54,119 @@ def _load_json(path: Path) -> Any:
         return None
 
 
+def _resolve_dataset_provider_spec(
+    kind: str,
+) -> str | dict[str, Any]:
+    """Resolve dataset.provider to either a string or a mapping.
+
+    Proof packs historically used a string provider name (e.g. "wikitext2").
+    For providers that require extra parameters (hf_text/local_jsonl), we emit a
+    mapping under dataset.provider so `invarlock run/evaluate` can pass those
+    kwargs to the provider constructor.
+    """
+    kind_norm = str(kind or "").strip()
+    if not kind_norm:
+        kind_norm = "wikitext2"
+
+    raw_yaml = os.environ.get("INVARLOCK_DATASET_PROVIDER_YAML")
+    if raw_yaml:
+        if not _YAML_AVAILABLE:
+            raise SystemExit(
+                "INVARLOCK_DATASET_PROVIDER_YAML is set but PyYAML is unavailable"
+            )
+        parsed = yaml.safe_load(raw_yaml)  # type: ignore[attr-defined]
+        if not isinstance(parsed, dict):
+            raise SystemExit("INVARLOCK_DATASET_PROVIDER_YAML must parse to a mapping")
+        provider = dict(parsed)
+        provider.setdefault("kind", kind_norm)
+        return provider
+
+    raw_json = os.environ.get("INVARLOCK_DATASET_PROVIDER_JSON")
+    if raw_json:
+        try:
+            parsed = json.loads(raw_json)
+        except json.JSONDecodeError as exc:
+            raise SystemExit(
+                f"INVARLOCK_DATASET_PROVIDER_JSON is not valid JSON ({exc})"
+            ) from exc
+        if not isinstance(parsed, dict):
+            raise SystemExit("INVARLOCK_DATASET_PROVIDER_JSON must be a JSON object")
+        provider = dict(parsed)
+        provider.setdefault("kind", kind_norm)
+        return provider
+
+    if kind_norm == "hf_text":
+        dataset_name = os.environ.get("INVARLOCK_HF_DATASET_NAME") or os.environ.get(
+            "INVARLOCK_HF_DATASET"
+        )
+        if not dataset_name:
+            dataset_name = "allenai/c4"
+        # Migrate legacy "c4" to "allenai/c4" (script-based c4 deprecated in datasets 4.x)
+        if str(dataset_name) == "c4":
+            dataset_name = "allenai/c4"
+        config_name = os.environ.get("INVARLOCK_HF_CONFIG_NAME") or os.environ.get(
+            "INVARLOCK_HF_DATASET_CONFIG_NAME"
+        )
+        if not config_name and str(dataset_name) == "allenai/c4":
+            config_name = "en"
+        text_field = os.environ.get("INVARLOCK_HF_TEXT_FIELD") or "text"
+        try:
+            max_samples = int(os.environ.get("INVARLOCK_HF_MAX_SAMPLES") or "2000")
+        except Exception:
+            max_samples = 2000
+        cache_dir = os.environ.get("INVARLOCK_HF_CACHE_DIR") or os.environ.get(
+            "HF_DATASETS_CACHE"
+        )
+        # trust_remote_code only if explicitly set (not needed for allenai/c4 Parquet)
+        trust_raw = os.environ.get("INVARLOCK_HF_TRUST_REMOTE_CODE")
+        trust_remote_code: bool | None = None
+        if trust_raw is not None:
+            norm = trust_raw.strip().lower()
+            if norm in {"1", "true", "yes", "y", "on"}:
+                trust_remote_code = True
+            elif norm in {"0", "false", "no", "n", "off"}:
+                trust_remote_code = False
+        provider: dict[str, Any] = {
+            "kind": "hf_text",
+            "dataset_name": str(dataset_name),
+            "text_field": str(text_field),
+            "max_samples": int(max_samples),
+        }
+        if config_name:
+            provider["config_name"] = str(config_name)
+        if trust_remote_code is not None:
+            provider["trust_remote_code"] = bool(trust_remote_code)
+        if cache_dir:
+            provider["cache_dir"] = str(cache_dir)
+        return provider
+
+    if kind_norm == "local_jsonl":
+        file = os.environ.get("INVARLOCK_LOCAL_JSONL_FILE")
+        path = os.environ.get("INVARLOCK_LOCAL_JSONL_PATH")
+        data_files = os.environ.get("INVARLOCK_LOCAL_JSONL_DATA_FILES")
+        text_field = os.environ.get("INVARLOCK_LOCAL_JSONL_TEXT_FIELD") or "text"
+        try:
+            max_samples = int(
+                os.environ.get("INVARLOCK_LOCAL_JSONL_MAX_SAMPLES") or "2000"
+            )
+        except Exception:
+            max_samples = 2000
+        provider = {
+            "kind": "local_jsonl",
+            "text_field": str(text_field),
+            "max_samples": int(max_samples),
+        }
+        if file:
+            provider["file"] = str(file)
+        elif path:
+            provider["path"] = str(path)
+        elif data_files:
+            provider["data_files"] = str(data_files)
+        return provider
+
+    return kind_norm
+
+
 def _load_guard_order_and_assurance(
     cal_dir: Path,
 ) -> tuple[list[str], dict[str, Any] | None]:
@@ -652,7 +765,7 @@ def generate_preset(
     model_name: str,
     model_path: str,
     tier: str,
-    dataset_provider: str,
+    dataset_provider: str | dict[str, Any],
     seq_len: int,
     stride: int,
     preview_n: int,
@@ -823,13 +936,15 @@ def main(argv: list[str] | None = None) -> int:
     if not edit_types:
         edit_types = ["quant_rtn", "fp8_quant", "magnitude_prune", "lowrank_svd"]
 
+    dataset_provider = _resolve_dataset_provider_spec(str(args.dataset_provider))
+
     preset_file, stats_path, derived_files = generate_preset(
         cal_dir=Path(args.cal_dir),
         preset_file=Path(args.preset_file),
         model_name=str(args.model_name),
         model_path=str(args.model_path),
         tier=str(args.tier).strip().lower(),
-        dataset_provider=str(args.dataset_provider),
+        dataset_provider=dataset_provider,
         seq_len=int(args.seq_len),
         stride=int(args.stride),
         preview_n=int(args.preview_n),

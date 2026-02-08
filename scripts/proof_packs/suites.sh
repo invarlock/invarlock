@@ -5,7 +5,7 @@
 PACK_SUITE="${PACK_SUITE:-subset}"
 
 pack_list_suites() {
-    printf '%s\n' subset full
+    printf '%s\n' subset showcase workshop3 full
 }
 
 pack_apply_suite() {
@@ -23,6 +23,18 @@ pack_apply_suite() {
             MODEL_7=""
             MODEL_8=""
             ;;
+        showcase)
+            # Fast multi-model suite for guard demonstrations (fits on 2-4 GPUs).
+            # Keep models ungated and covered by tuned clean-edit presets.
+            MODEL_1="mistralai/Mistral-7B-v0.1"
+            MODEL_2="Qwen/Qwen2.5-14B"
+            MODEL_3="Qwen/Qwen2.5-32B"
+            MODEL_4=""
+            MODEL_5=""
+            MODEL_6=""
+            MODEL_7=""
+            MODEL_8=""
+            ;;
         full)
             # Multi-GPU: ungated medium/large models.
             MODEL_1="mistralai/Mistral-7B-v0.1"
@@ -31,6 +43,17 @@ pack_apply_suite() {
             MODEL_4="01-ai/Yi-34B"
             MODEL_5="mistralai/Mixtral-8x7B-v0.1"
             MODEL_6="Qwen/Qwen1.5-72B"
+            MODEL_7=""
+            MODEL_8=""
+            ;;
+        workshop3)
+            # Workshop-friendly 3-model suite (architecture diversity).
+            MODEL_1="mistralai/Mistral-7B-v0.1"
+            MODEL_2="mistralai/Mixtral-8x7B-v0.1"
+            MODEL_3="01-ai/Yi-34B"
+            MODEL_4=""
+            MODEL_5=""
+            MODEL_6=""
             MODEL_7=""
             MODEL_8=""
             ;;

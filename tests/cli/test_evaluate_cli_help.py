@@ -1,5 +1,6 @@
 import os
 
+from click.termui import strip_ansi
 from typer.testing import CliRunner
 
 os.environ["INVARLOCK_LIGHT_IMPORT"] = "1"
@@ -11,6 +12,7 @@ runner = CliRunner()
 def test_cli_evaluate_help():
     result = runner.invoke(app, ["evaluate", "--help"])
     assert result.exit_code == 0
-    assert "--baseline" in result.stdout and "--subject" in result.stdout
-    assert "--baseline-report" in result.stdout
-    assert "--edit-label" in result.stdout
+    stdout = strip_ansi(result.stdout)
+    assert "--baseline" in stdout and "--subject" in stdout
+    assert "--baseline-report" in stdout
+    assert "--edit-label" in stdout

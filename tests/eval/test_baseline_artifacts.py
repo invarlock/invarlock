@@ -61,14 +61,12 @@ def _build_baseline_report(ppl_final: float) -> dict:
     return report
 
 
-def test_normalize_baseline_falls_back_for_invalid_ppl():
-    """Invalid baseline PPL values should fall back to the computed constant."""
+def test_normalize_baseline_raises_for_invalid_ppl():
+    """Invalid baseline PPL values should fail closed."""
     baseline = _build_baseline_report(ppl_final=0.0)
 
-    normalized = _normalize_baseline(baseline)
-
-    assert normalized["ppl_final"] == pytest.approx(50.797)
-    assert normalized["ppl_preview"] == pytest.approx(50.797)
+    with pytest.raises(ValueError, match="Invalid baseline"):
+        _normalize_baseline(baseline)
 
 
 def test_normalize_baseline_preserves_valid_values():

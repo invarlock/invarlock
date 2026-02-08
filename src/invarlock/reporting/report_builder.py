@@ -2357,9 +2357,127 @@ def make_report(
 def _normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
     """Normalize baseline input to a consistent dictionary format."""
     if isinstance(baseline, dict):
+
+        def _coerce_valid_ppl(value: Any, *, label: str) -> float:
+            if not (isinstance(value, int | float) and math.isfinite(float(value))):
+                raise ValueError(
+                    f"Invalid baseline {label}: expected finite numeric value."
+                )
+            out = float(value)
+            if out <= 0.0:
+                raise ValueError(
+                    f"Invalid baseline {label}: expected value > 0.0, observed {out}."
+                )
+            return out
+
+        def _normalize_kind(value: Any) -> str:
+            try:
+                return str(value or "").strip().lower()
+            except Exception:
+                return ""
+
+        def _is_ppl_kind(value: Any) -> bool:
+            kind = _normalize_kind(value)
+            # Treat unknown kinds as ppl-like for backward compatibility.
+            return not kind or kind.startswith("ppl")
+
+        def _derive_ppl_from_logloss_block(block: Any) -> float | None:
+            if not isinstance(block, dict):
+                return None
+            ll = block.get("logloss")
+            if not isinstance(ll, list) or not ll:
+                return None
+            vals = [float(x) for x in ll if isinstance(x, int | float)]
+            if not vals:
+                return None
+            token_counts = block.get("token_counts")
+            mean_ll: float
+            if (
+                isinstance(token_counts, list)
+                and token_counts
+                and len(token_counts) == len(vals)
+            ):
+                try:
+                    num = 0.0
+                    den = 0.0
+                    for lval, tval in zip(vals, token_counts, strict=False):
+                        if not isinstance(tval, int | float):
+                            continue
+                        tf = float(tval)
+                        if tf <= 0.0:
+                            continue
+                        num += float(lval) * tf
+                        den += tf
+                    if den > 0.0:
+                        mean_ll = num / den
+                    else:
+                        mean_ll = float(sum(vals) / len(vals))
+                except Exception:
+                    mean_ll = float(sum(vals) / len(vals))
+            else:
+                mean_ll = float(sum(vals) / len(vals))
+            if not math.isfinite(mean_ll):
+                return None
+            ppl = math.exp(mean_ll)
+            return float(ppl) if math.isfinite(ppl) else None
+
         # Check if it's a baseline schema (v1 only)
         if baseline.get("schema_version") in {"baseline-v1"}:
-            ppl_final = baseline.get("metrics", {}).get("ppl_final", float("nan"))
+            metrics_blk = baseline.get("metrics", {}) or {}
+            pm = (
+                metrics_blk.get("primary_metric", {})
+                if isinstance(metrics_blk, dict)
+                else {}
+            )
+            pm_kind = _normalize_kind(pm.get("kind")) if isinstance(pm, dict) else ""
+            pm_is_ppl = _is_ppl_kind(pm_kind)
+            ppl_final_raw = (
+                metrics_blk.get("ppl_final") if isinstance(metrics_blk, dict) else None
+            )
+            if (
+                not (
+                    isinstance(ppl_final_raw, int | float)
+                    and math.isfinite(float(ppl_final_raw))
+                )
+                and pm_is_ppl
+            ):
+                if isinstance(pm, dict):
+                    pf = pm.get("final")
+                    if isinstance(pf, int | float):
+                        ppl_final_raw = float(pf)
+            if not (
+                isinstance(ppl_final_raw, int | float)
+                and math.isfinite(float(ppl_final_raw))
+            ):
+                eval_windows = baseline.get("evaluation_windows")
+                if isinstance(eval_windows, dict):
+                    ppl_final_raw = _derive_ppl_from_logloss_block(
+                        eval_windows.get("final")
+                    )
+            if (
+                not (
+                    isinstance(ppl_final_raw, int | float)
+                    and math.isfinite(float(ppl_final_raw))
+                )
+                and pm_kind
+                and not pm_kind.startswith("ppl")
+            ):
+                out: dict[str, Any] = {
+                    "run_id": baseline.get("meta", {}).get("commit_sha", "unknown")[
+                        :16
+                    ],
+                    "model_id": baseline.get("meta", {}).get("model_id", "unknown"),
+                    "spectral": baseline.get("spectral_base", {}),
+                    "rmt": baseline.get("rmt_base", {}),
+                    "invariants": baseline.get("invariants", {}),
+                }
+                if isinstance(pm, dict) and pm:
+                    out["primary_metric"] = copy.deepcopy(pm)
+                return out
+            ppl_final = _coerce_valid_ppl(
+                ppl_final_raw,
+                label="metrics.ppl_final",
+            )
             return {
                 "run_id": baseline.get("meta", {}).get("commit_sha", "unknown")[:16],
                 "model_id": baseline.get("meta", {}).get("model_id", "unknown"),
@@ -2372,55 +2490,60 @@ def _normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
         elif "meta" in baseline and "metrics" in baseline and "edit" in baseline:
             # Accept both ppl_* metrics and PM-first reports
             metrics_blk = baseline.get("metrics", {}) or {}
+            pm = (
+                metrics_blk.get("primary_metric", {})
+                if isinstance(metrics_blk, dict)
+                else {}
+            )
+            pm_kind = _normalize_kind(pm.get("kind")) if isinstance(pm, dict) else ""
+            pm_is_ppl = _is_ppl_kind(pm_kind)
             ppl_final = metrics_blk.get("ppl_final")
             ppl_preview = metrics_blk.get("ppl_preview")
-            if ppl_final is None:
-                # Fallback: derive from primary_metric if it is ppl-like
+            if (
+                not (
+                    isinstance(ppl_final, int | float)
+                    and math.isfinite(float(ppl_final))
+                )
+                and pm_is_ppl
+            ):
+                # Fallback: derive from primary_metric when present.
                 try:
-                    pm = metrics_blk.get("primary_metric", {}) or {}
-                    kind = str(pm.get("kind") or "").lower()
-                    if kind.startswith("ppl"):
-                        pf = pm.get("final")
-                        pp = pm.get("preview", pf)
-                        if isinstance(pf, int | float):
-                            ppl_final = float(pf)
-                        if isinstance(pp, int | float):
-                            ppl_preview = float(pp)
+                    pf = pm.get("final")
+                    pp = pm.get("preview", pf)
+                    if isinstance(pf, int | float):
+                        ppl_final = float(pf)
+                    if isinstance(pp, int | float):
+                        ppl_preview = float(pp)
                 except Exception:  # pragma: no cover
                     # Leave as None; downstream validation will handle
                     pass
-            if ppl_preview is None:
-                ppl_preview = ppl_final
-
-            # Detect invalid baseline by checking if it's actually a no-op baseline
-            edit_plan = baseline["edit"].get("plan", {})
-            plan_digest = baseline["edit"].get("plan_digest", "")
-
-            # Valid baseline indicators: target_sparsity=0.0, plan_digest contains "baseline_noop" or "noop"
-            is_valid_baseline = (
-                edit_plan.get("target_sparsity") == 0.0
-                or "baseline_noop" in plan_digest
-                or "noop" in plan_digest
-                or baseline["edit"]["name"] == "baseline"
-            )
-
-            # Only flag as invalid if PPL is clearly wrong OR it's definitely not a baseline
-            if (isinstance(ppl_final, int | float) and ppl_final <= 1.0) or (
-                not is_valid_baseline
-                and baseline["edit"]["deltas"]["params_changed"] > 0
-            ):
-                print(
-                    f"⚠️  Warning: Invalid baseline detected (PPL={ppl_final}, edit={baseline['edit']['name']}, params_changed={baseline['edit']['deltas']['params_changed']})"
-                )
-                print("   Using computed baseline PPL for GPT-2 on validation split")
-                # Use computed baseline for GPT-2 on validation split
-                ppl_final = 50.797  # Computed GPT-2 validation PPL
-                ppl_preview = ppl_final
-
             eval_windows = baseline.get("evaluation_windows", {})
             final_windows = (
                 eval_windows.get("final", {}) if isinstance(eval_windows, dict) else {}
             )
+            preview_windows = (
+                eval_windows.get("preview", {})
+                if isinstance(eval_windows, dict)
+                else {}
+            )
+            if ppl_final is None:
+                ppl_final = _derive_ppl_from_logloss_block(final_windows)
+            if ppl_preview is None:
+                ppl_preview = _derive_ppl_from_logloss_block(preview_windows)
+            if ppl_preview is None:
+                ppl_preview = ppl_final
+
+            non_ppl_without_ppl_metrics = (
+                not (
+                    isinstance(ppl_final, int | float)
+                    and math.isfinite(float(ppl_final))
+                )
+                and pm_kind
+                and not pm_kind.startswith("ppl")
+            )
+
+            # Fail closed for invalid baseline ppl metrics; this prevents silent
+            # hardcoded baseline substitution that can mask broken evidence inputs.
             baseline_eval_windows = {
                 "final": {
                     "window_ids": list(final_windows.get("window_ids", [])),
@@ -2452,11 +2575,9 @@ def _normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
             except Exception:  # pragma: no cover
                 baseline_tokenizer_hash = None
 
-            return {
+            baseline_out: dict[str, Any] = {
                 "run_id": _generate_run_id(baseline),
                 "model_id": baseline["meta"]["model_id"],
-                "ppl_final": ppl_final,
-                "ppl_preview": ppl_preview,
                 "spectral": baseline["metrics"].get("spectral", {}),
                 "rmt": baseline["metrics"].get("rmt", {}),
                 "invariants": baseline["metrics"].get("invariants", {}),
@@ -2467,16 +2588,134 @@ def _normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
                 "window_match_fraction": window_match,
                 "tokenizer_hash": baseline_tokenizer_hash,
             }
+            if isinstance(pm, dict) and pm:
+                baseline_out["primary_metric"] = copy.deepcopy(pm)
+
+            if non_ppl_without_ppl_metrics:
+                return baseline_out
+
+            ppl_final = _coerce_valid_ppl(ppl_final, label="metrics.ppl_final")
+            ppl_preview = _coerce_valid_ppl(
+                ppl_preview if ppl_preview is not None else ppl_final,
+                label="metrics.ppl_preview",
+            )
+            baseline_out["ppl_final"] = ppl_final
+            baseline_out["ppl_preview"] = ppl_preview
+            return baseline_out
         else:
-            # Assume it's already normalized
-            ppl_final = baseline.get("ppl_final", float("nan"))
-            if ppl_final <= 1.0:
-                print(
-                    f"⚠️  Warning: Invalid baseline PPL ({ppl_final}), using computed baseline"
+            # Assume it's already normalized, but recover ppl fields from PM-first
+            # baseline payloads when needed.
+            baseline_out = baseline.copy()
+            metrics_blk = baseline_out.get("metrics", {})
+            pm_kind = ""
+            if isinstance(metrics_blk, dict):
+                pm_metrics = metrics_blk.get("primary_metric")
+                if isinstance(pm_metrics, dict):
+                    pm_kind = _normalize_kind(pm_metrics.get("kind"))
+            if not pm_kind:
+                pm_top = baseline_out.get("primary_metric", {})
+                if isinstance(pm_top, dict):
+                    pm_kind = _normalize_kind(pm_top.get("kind"))
+            pm_is_non_ppl = bool(pm_kind) and not pm_kind.startswith("ppl")
+
+            ppl_final = baseline_out.get("ppl_final")
+            ppl_preview = baseline_out.get("ppl_preview")
+
+            if not (
+                isinstance(ppl_final, int | float) and math.isfinite(float(ppl_final))
+            ):
+                if isinstance(metrics_blk, dict):
+                    pf_direct = metrics_blk.get("ppl_final")
+                    pp_direct = metrics_blk.get("ppl_preview", pf_direct)
+                    if isinstance(pf_direct, int | float) and math.isfinite(
+                        float(pf_direct)
+                    ):
+                        ppl_final = float(pf_direct)
+                    if isinstance(pp_direct, int | float) and math.isfinite(
+                        float(pp_direct)
+                    ):
+                        ppl_preview = float(pp_direct)
+                    if (
+                        not (
+                            isinstance(ppl_final, int | float)
+                            and math.isfinite(float(ppl_final))
+                        )
+                        and not pm_is_non_ppl
+                    ):
+                        pm = metrics_blk.get("primary_metric", {})
+                        if isinstance(pm, dict):
+                            pf = pm.get("final")
+                            pp = pm.get("preview", pf)
+                            if isinstance(pf, int | float):
+                                ppl_final = float(pf)
+                            if isinstance(pp, int | float):
+                                ppl_preview = float(pp)
+                if (
+                    not (
+                        isinstance(ppl_final, int | float)
+                        and math.isfinite(float(ppl_final))
+                    )
+                    and not pm_is_non_ppl
+                ):
+                    pm_top = baseline_out.get("primary_metric", {})
+                    if isinstance(pm_top, dict):
+                        pf = pm_top.get("final")
+                        pp = pm_top.get("preview", pf)
+                        if isinstance(pf, int | float):
+                            ppl_final = float(pf)
+                        if isinstance(pp, int | float):
+                            ppl_preview = float(pp)
+                if not (
+                    isinstance(ppl_final, int | float)
+                    and math.isfinite(float(ppl_final))
+                ):
+                    eval_windows = baseline_out.get("evaluation_windows")
+                    if isinstance(eval_windows, dict):
+                        ppl_final = _derive_ppl_from_logloss_block(
+                            eval_windows.get("final")
+                        )
+                        if ppl_preview is None:
+                            ppl_preview = _derive_ppl_from_logloss_block(
+                                eval_windows.get("preview")
+                            )
+
+            if (
+                not (
+                    isinstance(ppl_final, int | float)
+                    and math.isfinite(float(ppl_final))
                 )
-                baseline = baseline.copy()  # Don't mutate original
-                baseline["ppl_final"] = 50.797
-            return baseline
+                and pm_is_non_ppl
+            ):
+                if "ppl_final" in baseline_out:
+                    try:
+                        pf = float(baseline_out.get("ppl_final"))
+                    except Exception:
+                        baseline_out.pop("ppl_final", None)
+                    else:
+                        if not math.isfinite(pf) or pf <= 0.0:
+                            baseline_out.pop("ppl_final", None)
+                if "ppl_preview" in baseline_out:
+                    try:
+                        pp = float(baseline_out.get("ppl_preview"))
+                    except Exception:
+                        baseline_out.pop("ppl_preview", None)
+                    else:
+                        if not math.isfinite(pp) or pp <= 0.0:
+                            baseline_out.pop("ppl_preview", None)
+                return baseline_out
+
+            ppl_final = _coerce_valid_ppl(ppl_final, label="ppl_final")
+            if ppl_preview is None:
+                ppl_preview = ppl_final
+            else:
+                ppl_preview = _coerce_valid_ppl(ppl_preview, label="ppl_preview")
+
+            baseline_out["ppl_final"] = ppl_final
+            if "ppl_preview" in baseline_out or not math.isclose(
+                float(ppl_preview), float(ppl_final), rel_tol=0.0, abs_tol=0.0
+            ):
+                baseline_out["ppl_preview"] = ppl_preview
+            return baseline_out
     else:
         raise ValueError(
             "Baseline must be a RunReport dict or normalized baseline dict"

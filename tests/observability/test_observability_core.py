@@ -430,7 +430,8 @@ class TestResourceMonitor:
 
         registry = MetricsRegistry()
         # Set very low thresholds to trigger warnings
-        config = MonitoringConfig(cpu_threshold=0.0, memory_threshold=0.0)
+        # Use negative thresholds to avoid flakiness when cpu_percent==0.0.
+        config = MonitoringConfig(cpu_threshold=-1.0, memory_threshold=-1.0)
         monitor = ResourceMonitor(registry, config)
 
         warnings = monitor.check_thresholds()

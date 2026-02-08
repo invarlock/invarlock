@@ -4,6 +4,9 @@
 _PACK_CONFIG_GENERATOR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _PACK_CONFIG_GENERATOR_PY_DIR="${_PACK_CONFIG_GENERATOR_DIR}/../python"
 
+# shellcheck source=dataset_provider_config.sh
+source "${_PACK_CONFIG_GENERATOR_DIR}/dataset_provider_config.sh"
+
 # ============ INVARLOCK CONFIG FOR PROOF PACKS ============
 generate_invarlock_config() {
     local model_path="$1"
@@ -20,6 +23,8 @@ generate_invarlock_config() {
     # Use auto adapter for generic causal LM support (Mistral, Mixtral, Qwen, MPT, Falcon, etc.)
     local adapter="hf_auto"
     local dataset_provider="${INVARLOCK_DATASET}"
+    local dataset_provider_yaml
+    dataset_provider_yaml="$(pack_render_dataset_provider_yaml "${dataset_provider}")"
 
     local attn_impl_yaml=""
     if [[ "${FLASH_ATTENTION_AVAILABLE}" == "true" ]]; then
@@ -76,7 +81,7 @@ model:
   ${attn_impl_yaml}
 
 dataset:
-  provider: "${dataset_provider}"
+${dataset_provider_yaml}
   preview_n: ${preview_n}
   final_n: ${final_n}
   seq_len: ${seq_len}
@@ -187,7 +192,7 @@ run_single_calibration() {
     report_file=$(find "${run_dir}" -name "report*.json" -type f 2>/dev/null | head -1)
     if [[ -n "${report_file}" ]]; then
         cp "${report_file}" "${run_dir}/baseline_report.json" 2>/dev/null || true
-        python3 "${_PACK_CONFIG_GENERATOR_PY_DIR}/report_from_report.py" \
+        python3 "${_PACK_CONFIG_GENERATOR_PY_DIR}/evaluation_report_from_report.py" \
             --report "${report_file}" \
             --out "${run_dir}/evaluation.report.json" >> "${log_file}" 2>&1 || true
     fi

@@ -2,13 +2,288 @@ from __future__ import annotations
 
 import gc
 import json
+import os
+import random
 import re
+import shutil
 import sys
+import zlib
 from pathlib import Path
+from typing import Any
 
 import torch
 from error_injection_config import fix_layer_drop_config
 from transformers import AutoModelForCausalLM, AutoTokenizer
+
+
+def _is_norm_module(module: torch.nn.Module) -> bool:
+    """Check if module is a normalization layer (LayerNorm, RMSNorm, etc.)."""
+    class_name = module.__class__.__name__.lower()
+    # Match LayerNorm, RMSNorm, LlamaRMSNorm, MistralRMSNorm, Qwen2RMSNorm, etc.
+    return "norm" in class_name and any(
+        kw in class_name for kw in ("layer", "rms", "group", "batch")
+    )
+
+
+def _get_norm_weight(module: torch.nn.Module) -> torch.Tensor | None:
+    """Get the weight parameter from a norm module."""
+    # Standard LayerNorm uses .weight
+    if hasattr(module, "weight") and module.weight is not None:
+        return module.weight
+    # Some RMSNorm implementations use .scale
+    if hasattr(module, "scale") and module.scale is not None:
+        return module.scale
+    return None
+
+
+def _parse_layer_indices(spec: str, max_layers: int) -> list[int]:
+    """Parse layer specification like '8,9,10,11' or 'all' or empty for all."""
+    if not spec or spec.lower() in ("all", "*", ""):
+        return list(range(max_layers))
+    indices = []
+    for part in spec.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "-" in part:
+            # Range like "8-12"
+            start, end = part.split("-", 1)
+            indices.extend(range(int(start), int(end) + 1))
+        else:
+            indices.append(int(part))
+    return [i for i in indices if 0 <= i < max_layers]
+
+
+def _default_last_layers(all_layer_indices: list[int], n: int) -> list[int]:
+    if not all_layer_indices:
+        return []
+    return all_layer_indices[-n:] if len(all_layer_indices) >= n else all_layer_indices
+
+
+def _stable_crc32(text: str) -> int:
+    """Stable hash for deterministic per-parameter RNG across runs/processes."""
+    return zlib.crc32(text.encode("utf-8")) & 0xFFFFFFFF
+
+
+def _select_row_indices(
+    w: torch.Tensor,
+    *,
+    rows: int,
+    selection: str,
+    seed: int,
+    name: str,
+) -> torch.Tensor:
+    """Select row indices deterministically (per-param) for row-wise probes."""
+    rows = max(0, min(int(rows), int(w.shape[0])))
+    if rows <= 0:
+        return torch.empty((0,), dtype=torch.long, device=w.device)
+
+    mode = (selection or "first").strip().lower()
+    if mode in {"first", "head"}:
+        return torch.arange(rows, device=w.device)
+    if mode in {"last", "tail"}:
+        start = max(0, int(w.shape[0]) - rows)
+        return torch.arange(start, start + rows, device=w.device)
+
+    # Per-parameter deterministic RNG.
+    seed_u32 = (int(seed) + _stable_crc32(name)) & 0xFFFFFFFF
+    g = torch.Generator(device="cpu")
+    g.manual_seed(seed_u32)
+
+    if mode in {"random_block", "rand_block", "block"}:
+        max_start = max(0, int(w.shape[0]) - rows)
+        start = (
+            0
+            if max_start == 0
+            else int(torch.randint(0, max_start + 1, (1,), generator=g).item())
+        )
+        return torch.arange(start, start + rows, device=w.device)
+
+    if mode in {"random", "rand"}:
+        idx = torch.randperm(int(w.shape[0]), generator=g)[:rows]
+        return idx.to(device=w.device)
+
+    if mode in {"top_norm", "top", "largest_norm"}:
+        norms = torch.linalg.vector_norm(w.float(), ord=2, dim=1)
+        return torch.topk(norms, k=rows, largest=True).indices
+
+    # Default to first rows for unknown modes.
+    return torch.arange(rows, device=w.device)
+
+
+def _read_json(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+
+def _safe_copy(src: Path, dest: Path) -> None:
+    try:
+        if src.is_file() and not dest.exists():
+            shutil.copy2(src, dest)
+    except OSError:
+        return
+
+
+def _safe_symlink(src: Path, dest: Path) -> None:
+    if dest.exists() or dest.is_symlink():
+        return
+    try:
+        os.symlink(src, dest)
+    except OSError:
+        # Fall back to a copy for filesystems that disallow symlinks.
+        _safe_copy(src, dest)
+
+
+def _shape_mismatch_overlay_safetensors(
+    *,
+    baseline_path: Path,
+    output_path: Path,
+    tokenizer: Any,
+    delta: int,
+) -> dict[str, Any] | None:
+    """Create a vocab-size mismatch error model without re-saving full weights.
+
+    For very large sharded checkpoints, `save_pretrained()` can be killed (OOM)
+    while writing shards. Instead, we:
+    - symlink the baseline shards into the output dir
+    - write a small safetensors override shard containing resized embedding + lm_head
+    - write a new `model.safetensors.index.json` pointing those tensors to the override
+    """
+    index_path = baseline_path / "model.safetensors.index.json"
+    if not index_path.is_file():
+        return None
+
+    try:
+        from safetensors import safe_open
+        from safetensors.torch import save_file
+    except Exception:
+        return None
+
+    baseline_index = _read_json(index_path)
+    weight_map = baseline_index.get("weight_map")
+    if not isinstance(weight_map, dict) or not weight_map:
+        return None
+
+    def _pick_key(candidates: tuple[str, ...]) -> str | None:
+        for suffix in candidates:
+            for key in weight_map:
+                if not isinstance(key, str):
+                    continue
+                if key.endswith(suffix):
+                    return key
+        return None
+
+    embed_key = _pick_key(
+        ("embed_tokens.weight", "wte.weight", "word_embeddings.weight")
+    )
+    if embed_key is None:
+        return None
+
+    head_key = _pick_key(("lm_head.weight",))
+
+    embed_file = weight_map.get(embed_key)
+    head_file = weight_map.get(head_key) if head_key else None
+    if not isinstance(embed_file, str) or not embed_file:
+        return None
+    if head_key and (not isinstance(head_file, str) or not head_file):
+        head_key = None
+        head_file = None
+
+    # Load only the tensors we need.
+    def _load_tensor(filename: str, key: str) -> torch.Tensor:
+        with safe_open(
+            str(baseline_path / filename), framework="pt", device="cpu"
+        ) as f:
+            return f.get_tensor(key)
+
+    embed_weight = _load_tensor(embed_file, embed_key)
+    old_vocab = int(embed_weight.shape[0])
+    hidden = int(embed_weight.shape[1]) if embed_weight.ndim == 2 else None
+    if hidden is None or embed_weight.ndim != 2:
+        return None
+
+    new_vocab = old_vocab + int(delta)
+    if new_vocab <= old_vocab:
+        return None
+
+    # Preserve the old embeddings exactly; pad new rows with zeros. This keeps
+    # the scenario stable (dataset won't hit the new token IDs).
+    new_embed = torch.zeros(
+        (new_vocab, hidden), dtype=embed_weight.dtype, device=embed_weight.device
+    )
+    new_embed[:old_vocab, :] = embed_weight
+    del embed_weight
+
+    overrides: dict[str, torch.Tensor] = {embed_key: new_embed}
+    if head_key and head_file:
+        head_weight = _load_tensor(head_file, head_key)
+        if head_weight.ndim == 2 and int(head_weight.shape[0]) == old_vocab:
+            new_head = torch.zeros(
+                (new_vocab, int(head_weight.shape[1])),
+                dtype=head_weight.dtype,
+                device=head_weight.device,
+            )
+            new_head[:old_vocab, :] = head_weight
+            overrides[head_key] = new_head
+        del head_weight
+
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    # Save tokenizer assets for downstream evaluation.
+    try:
+        tokenizer.save_pretrained(output_path)
+    except Exception:
+        pass
+
+    # Copy minimal config artifacts and bump vocab_size.
+    cfg_path = baseline_path / "config.json"
+    cfg: dict[str, Any] = _read_json(cfg_path) if cfg_path.is_file() else {}
+    cfg["vocab_size"] = int(new_vocab)
+    _write_json(output_path / "config.json", cfg)
+
+    for extra in ("generation_config.json", "chat_template.jinja"):
+        _safe_copy(baseline_path / extra, output_path / extra)
+
+    # Symlink all baseline shards referenced by the index into the output dir.
+    for filename in sorted({v for v in weight_map.values() if isinstance(v, str)}):
+        _safe_symlink(baseline_path / filename, output_path / filename)
+
+    override_name = "shape_mismatch_overrides.safetensors"
+    override_path = output_path / override_name
+    save_file(overrides, str(override_path))
+
+    updated_weight_map = {
+        str(k): str(v) for k, v in weight_map.items() if isinstance(k, str)
+    }
+    updated_weight_map[embed_key] = override_name
+    if head_key:
+        updated_weight_map[head_key] = override_name
+
+    _write_json(
+        output_path / "model.safetensors.index.json",
+        {
+            "metadata": baseline_index.get("metadata")
+            if isinstance(baseline_index.get("metadata"), dict)
+            else {},
+            "weight_map": updated_weight_map,
+        },
+    )
+
+    return {
+        "error_type": "shape_mismatch",
+        "injected": True,
+        "mode": "overlay_safetensors",
+        "old_vocab_size": int(old_vocab),
+        "new_vocab_size": int(new_vocab),
+        "delta": int(delta),
+        "overrides_file": override_name,
+        "overrides_keys": sorted(overrides),
+    }
 
 
 def main(argv: list[str]) -> int:
@@ -25,6 +300,29 @@ def main(argv: list[str]) -> int:
 
     print(f"Loading baseline from {baseline_path}...")
     tokenizer = AutoTokenizer.from_pretrained(baseline_path, trust_remote_code=True)
+
+    if error_type == "shape_mismatch":
+        # Large sharded models can be OOM-killed during save_pretrained() shard writes.
+        # Prefer an index-based overlay that only rewrites the embedding + lm_head tensors.
+        delta = 8
+        try:
+            error_info = _shape_mismatch_overlay_safetensors(
+                baseline_path=baseline_path,
+                output_path=output_path,
+                tokenizer=tokenizer,
+                delta=delta,
+            )
+        except Exception as exc:
+            error_info = None
+            print(f"WARNING: shape_mismatch overlay failed ({exc}); falling back")
+
+        if error_info is not None:
+            output_path.mkdir(parents=True, exist_ok=True)
+            (output_path / "error_metadata.json").write_text(
+                json.dumps(error_info, indent=2, sort_keys=True) + "\n"
+            )
+            print(f"Saved error model to {output_path}")
+            return 0
 
     try:
         model = AutoModelForCausalLM.from_pretrained(
@@ -423,6 +721,928 @@ def main(argv: list[str]) -> int:
             print(
                 "WARNING: Could not locate tied weights; weight_tying_break not injected"
             )
+
+    elif error_type.startswith("rmt_norm_noise"):
+        # RMT-targeted error injection.
+        #
+        # Two deterministic probe modes are supported:
+        #   1) norm_noise (legacy): perturb normalization weights.
+        #   2) anisotropy (default): make selected projection rows co-linear while
+        #      preserving row norms, which targets activation edge-risk used by RMT.
+        #
+        # Mode selection:
+        #   INVARLOCK_RMT_PROBE_MODE=norm_noise|anisotropy
+        #   If unset and INVARLOCK_RMT_NORM_NOISE_SCALE is present, legacy mode is used.
+        probe_mode = os.environ.get("INVARLOCK_RMT_PROBE_MODE", "").strip().lower()
+        if not probe_mode:
+            probe_mode = (
+                "norm_noise"
+                if "INVARLOCK_RMT_NORM_NOISE_SCALE" in os.environ
+                else "anisotropy"
+            )
+
+        if probe_mode == "norm_noise":
+            noise_scale = float(
+                os.environ.get("INVARLOCK_RMT_NORM_NOISE_SCALE", "0.05")
+            )
+            target_layers_spec = os.environ.get("INVARLOCK_RMT_NORM_TARGET_LAYERS", "")
+            max_modules = int(os.environ.get("INVARLOCK_RMT_NORM_MAX_MODULES", "32"))
+            seed = int(os.environ.get("INVARLOCK_RMT_NORM_SEED", "42"))
+            include_global = (
+                os.environ.get("INVARLOCK_RMT_NORM_INCLUDE_GLOBAL", "0") == "1"
+            )
+            mult_clamp = float(os.environ.get("INVARLOCK_RMT_NORM_MULT_CLAMP", "0.5"))
+
+            random.seed(seed)
+            torch.manual_seed(seed)
+
+            layer_pattern = re.compile(r"(?:layers|blocks|h)\.(\d+)\.")
+            norm_modules_by_layer: dict[int, list[tuple[str, torch.nn.Module]]] = {}
+            global_norm_modules: list[tuple[str, torch.nn.Module]] = []
+
+            for name, module in model.named_modules():
+                if not _is_norm_module(module):
+                    continue
+                weight = _get_norm_weight(module)
+                if weight is None:
+                    continue
+                match = layer_pattern.search(name)
+                if match:
+                    layer_idx = int(match.group(1))
+                    norm_modules_by_layer.setdefault(layer_idx, []).append(
+                        (name, module)
+                    )
+                else:
+                    global_norm_modules.append((name, module))
+
+            all_layer_indices = sorted(norm_modules_by_layer.keys())
+            max_layer = max(all_layer_indices) + 1 if all_layer_indices else 0
+            if target_layers_spec:
+                target_layers = _parse_layer_indices(target_layers_spec, max_layer)
+            else:
+                target_layers = _default_last_layers(all_layer_indices, 4)
+
+            target_modules: list[tuple[str, torch.nn.Module]] = []
+            for layer_idx in target_layers:
+                if layer_idx in norm_modules_by_layer:
+                    target_modules.extend(norm_modules_by_layer[layer_idx])
+            if include_global:
+                target_modules.extend(global_norm_modules)
+
+            random.shuffle(target_modules)
+            if len(target_modules) > max_modules:
+                target_modules = target_modules[:max_modules]
+
+            modified_count = 0
+            modified_names: list[str] = []
+            for name, module in target_modules:
+                weight = _get_norm_weight(module)
+                if weight is None or not weight.is_floating_point():
+                    continue
+                with torch.no_grad():
+                    base = weight.detach().clone()
+                    noise = torch.randn(
+                        base.shape, device=base.device, dtype=torch.float32
+                    ) * float(noise_scale)
+                    multiplier = (1.0 + noise).clamp(1.0 - mult_clamp, 1.0 + mult_clamp)
+                    weight.mul_(multiplier.to(dtype=base.dtype))
+                    if not torch.isfinite(weight).all():
+                        weight.copy_(base)
+                        continue
+                modified_count += 1
+                modified_names.append(name)
+                if modified_count <= 5:
+                    print(f"Perturbed norm: {name} (scale={noise_scale})")
+
+            if modified_count > 5:
+                print(f"  ... and {modified_count - 5} more norm modules")
+
+            if modified_count > 0:
+                error_info.update(
+                    {
+                        "injected": True,
+                        "mode": "norm_noise",
+                        "noise_scale": noise_scale,
+                        "seed": seed,
+                        "target_layers": target_layers,
+                        "max_modules": max_modules,
+                        "include_global": include_global,
+                        "mult_clamp": mult_clamp,
+                        "modified_count": modified_count,
+                        "modified_modules": modified_names[:20],
+                        "total_layers": max_layer,
+                    }
+                )
+                print(
+                    f"Applied RMT norm noise to {modified_count} modules "
+                    f"(scale={noise_scale}, seed={seed})"
+                )
+            else:
+                print("WARNING: rmt_norm_noise not injected (no norm modules found)")
+        elif probe_mode == "row_scale":
+            # Variant probe: amplify a subset of output rows in selected projections.
+            #
+            # This intentionally introduces heteroskedastic activation structure (not a
+            # pure global rescale, which cancels under RMT standardisation), and tends
+            # to be more reliable across architectures than "row tying" for producing
+            # epsilon-band violations.
+            scale_factor = float(
+                os.environ.get("INVARLOCK_RMT_ROW_SCALE_FACTOR", "1.6")
+            )
+            scale_factor = min(max(scale_factor, 0.1), 10.0)
+            row_frac = float(os.environ.get("INVARLOCK_RMT_ROW_SCALE_ROW_FRAC", "0.10"))
+            row_frac = min(max(row_frac, 0.01), 0.95)
+            max_rows = int(os.environ.get("INVARLOCK_RMT_ROW_SCALE_MAX_ROWS", "2048"))
+            max_params = int(os.environ.get("INVARLOCK_RMT_ROW_SCALE_MAX_PARAMS", "8"))
+            target_family = (
+                os.environ.get("INVARLOCK_RMT_ROW_SCALE_TARGET_FAMILY", "ffn")
+                .strip()
+                .lower()
+            )
+            target_param_substrings_spec = os.environ.get(
+                "INVARLOCK_RMT_ROW_SCALE_TARGET_PARAMS", ""
+            ).strip()
+            target_param_substrings = [
+                part.strip().lower()
+                for part in target_param_substrings_spec.split(",")
+                if part.strip()
+            ]
+            target_layers_spec = os.environ.get(
+                "INVARLOCK_RMT_ROW_SCALE_TARGET_LAYERS", ""
+            )
+            include_qkv = (
+                os.environ.get("INVARLOCK_RMT_ROW_SCALE_INCLUDE_QKV", "0") == "1"
+            )
+            row_selection = os.environ.get(
+                "INVARLOCK_RMT_ROW_SCALE_ROW_SELECTION", "first"
+            )
+            seed = int(os.environ.get("INVARLOCK_RMT_ROW_SCALE_SEED", "42"))
+
+            random.seed(seed)
+            torch.manual_seed(seed)
+
+            layer_pattern = re.compile(r"(?:layers|blocks|h)\.(\d+)\.")
+            attn_patterns = (
+                "q_proj",
+                "k_proj",
+                "v_proj",
+                "o_proj",
+                "c_attn",
+                "c_proj",
+                "out_proj",
+                "query_key_value",
+                "self_attn",
+                "attention",
+            )
+            ffn_patterns = (
+                "mlp",
+                "ffn",
+                "feed_forward",
+                "gate_proj",
+                "up_proj",
+                "down_proj",
+                "fc1",
+                "fc2",
+                "c_fc",
+                "experts",
+            )
+            embed_patterns = ("embed", "wte", "wpe")
+
+            def is_target_family(name: str) -> bool:
+                lname = name.lower()
+                if target_family == "attn":
+                    return any(p in lname for p in attn_patterns)
+                if target_family == "ffn":
+                    return any(p in lname for p in ffn_patterns)
+                if target_family == "embed":
+                    return any(p in lname for p in embed_patterns)
+                if target_family == "all":
+                    return any(
+                        p in lname
+                        for p in attn_patterns + ffn_patterns + embed_patterns
+                    )
+                return any(p in lname for p in attn_patterns + ffn_patterns)
+
+            def is_qkv_param(name: str) -> bool:
+                lname = name.lower()
+                return any(
+                    p in lname
+                    for p in (
+                        "q_proj",
+                        "k_proj",
+                        "v_proj",
+                        "c_attn",
+                        "query_key_value",
+                    )
+                )
+
+            def matches_param_filter(name: str) -> bool:
+                if not target_param_substrings:
+                    return True
+                lname = name.lower()
+                return any(sub in lname for sub in target_param_substrings)
+
+            params_by_layer: dict[int, list[tuple[str, torch.Tensor]]] = {}
+            global_params: list[tuple[str, torch.Tensor]] = []
+            for name, param in model.named_parameters():
+                # Some architectures (e.g., Mixtral) materialize fused expert
+                # weights as a 3D Parameter (e.g. `...experts.down_proj`) without
+                # a `.weight` suffix. Treat any floating-point tensor with
+                # dim >= 2 as weight-like here.
+                if param.dim() < 2:
+                    continue
+                if not param.is_floating_point():
+                    continue
+                if not is_target_family(name):
+                    continue
+                if not matches_param_filter(name):
+                    continue
+                if (
+                    target_family in ("attn", "both")
+                    and (not include_qkv)
+                    and is_qkv_param(name)
+                ):
+                    continue
+                match = layer_pattern.search(name)
+                if match:
+                    layer_idx = int(match.group(1))
+                    params_by_layer.setdefault(layer_idx, []).append((name, param))
+                else:
+                    global_params.append((name, param))
+
+            all_layer_indices = sorted(params_by_layer.keys())
+            max_layer = max(all_layer_indices) + 1 if all_layer_indices else 0
+            if target_layers_spec:
+                target_layers = _parse_layer_indices(target_layers_spec, max_layer)
+            else:
+                target_layers = _default_last_layers(all_layer_indices, 8)
+
+            target_params: list[tuple[str, torch.Tensor]] = []
+            for layer_idx in target_layers:
+                if layer_idx in params_by_layer:
+                    target_params.extend(params_by_layer[layer_idx])
+            target_params.extend(global_params)
+
+            random.shuffle(target_params)
+            if len(target_params) > max_params:
+                target_params = target_params[:max_params]
+
+            modified_count = 0
+            modified_names: list[str] = []
+            for name, param in target_params:
+                with torch.no_grad():
+                    w = param.data
+                    rows = int(round(float(w.shape[0]) * row_frac))
+                    rows = max(1, min(rows, int(w.shape[0]), max_rows))
+                    if rows < 1:
+                        continue
+                    idx = _select_row_indices(
+                        w, rows=rows, selection=row_selection, seed=seed, name=name
+                    )
+                    if idx.numel() == 0:
+                        continue
+                    # NOTE: w[idx, :] uses advanced indexing for most selection
+                    # modes (e.g. random/top_norm). In-place ops on the result do
+                    # not write back to w. Use explicit assignment.
+                    base = w[idx, :].detach().clone()
+                    scaled = (base.float() * float(scale_factor)).to(dtype=w.dtype)
+                    if not torch.isfinite(scaled).all():
+                        continue
+                    w[idx, :] = scaled
+
+                modified_count += 1
+                modified_names.append(name)
+                if modified_count <= 5:
+                    print(
+                        f"Row-scale perturbation: {name} (rows={rows}, factor={scale_factor}, sel={row_selection})"
+                    )
+
+            if modified_count > 5:
+                print(f"  ... and {modified_count - 5} more parameters")
+
+            if modified_count > 0:
+                error_info.update(
+                    {
+                        "injected": True,
+                        "mode": "row_scale",
+                        "scale_factor": scale_factor,
+                        "row_frac": row_frac,
+                        "max_rows": max_rows,
+                        "max_params": max_params,
+                        "target_family": target_family,
+                        "target_param_substrings": target_param_substrings,
+                        "target_layers": target_layers,
+                        "include_qkv": include_qkv,
+                        "row_selection": row_selection,
+                        "seed": seed,
+                        "modified_count": modified_count,
+                        "modified_params": modified_names[:20],
+                        "total_layers": max_layer,
+                    }
+                )
+                print(
+                    f"Applied RMT row-scale probe to {modified_count} params "
+                    f"(factor={scale_factor}, family={target_family}, seed={seed})"
+                )
+            else:
+                print(
+                    "WARNING: rmt_norm_noise not injected "
+                    "(no matching parameters for row_scale mode)"
+                )
+        else:
+            # Default probe: inject structured anisotropy into selected projections.
+            blend = float(os.environ.get("INVARLOCK_RMT_ANISO_BLEND", "0.75"))
+            # Allow full row tying for strong probes (blend==1.0).
+            blend = min(max(blend, 0.05), 1.0)
+            row_frac = float(os.environ.get("INVARLOCK_RMT_ANISO_ROW_FRAC", "0.35"))
+            row_frac = min(max(row_frac, 0.01), 0.95)
+            max_rows = int(os.environ.get("INVARLOCK_RMT_ANISO_MAX_ROWS", "256"))
+            max_params = int(os.environ.get("INVARLOCK_RMT_ANISO_MAX_PARAMS", "24"))
+            target_family = (
+                os.environ.get("INVARLOCK_RMT_ANISO_TARGET_FAMILY", "attn")
+                .strip()
+                .lower()
+            )
+            target_param_substrings_spec = os.environ.get(
+                "INVARLOCK_RMT_ANISO_TARGET_PARAMS", ""
+            ).strip()
+            target_param_substrings = [
+                part.strip().lower()
+                for part in target_param_substrings_spec.split(",")
+                if part.strip()
+            ]
+            target_layers_spec = os.environ.get("INVARLOCK_RMT_ANISO_TARGET_LAYERS", "")
+            include_qkv = os.environ.get("INVARLOCK_RMT_ANISO_INCLUDE_QKV", "1") == "1"
+            preserve_row_norms = (
+                os.environ.get("INVARLOCK_RMT_ANISO_PRESERVE_ROW_NORMS", "1") == "1"
+            )
+            jitter = float(os.environ.get("INVARLOCK_RMT_ANISO_JITTER", "0.01"))
+            row_selection = os.environ.get("INVARLOCK_RMT_ANISO_ROW_SELECTION", "first")
+            seed = int(os.environ.get("INVARLOCK_RMT_ANISO_SEED", "42"))
+
+            random.seed(seed)
+            torch.manual_seed(seed)
+
+            layer_pattern = re.compile(r"(?:layers|blocks|h)\.(\d+)\.")
+            attn_patterns = (
+                "q_proj",
+                "k_proj",
+                "v_proj",
+                "o_proj",
+                "c_attn",
+                "c_proj",
+                "out_proj",
+                "query_key_value",
+                "self_attn",
+                "attention",
+            )
+            ffn_patterns = (
+                "mlp",
+                "ffn",
+                "feed_forward",
+                "gate_proj",
+                "up_proj",
+                "down_proj",
+                "fc1",
+                "fc2",
+                "c_fc",
+                "experts",
+            )
+            embed_patterns = ("embed", "wte", "wpe")
+
+            def is_target_family(name: str) -> bool:
+                lname = name.lower()
+                if target_family == "attn":
+                    return any(p in lname for p in attn_patterns)
+                if target_family == "ffn":
+                    return any(p in lname for p in ffn_patterns)
+                if target_family == "embed":
+                    return any(p in lname for p in embed_patterns)
+                if target_family == "all":
+                    return any(
+                        p in lname
+                        for p in attn_patterns + ffn_patterns + embed_patterns
+                    )
+                return any(p in lname for p in attn_patterns + ffn_patterns)
+
+            def is_qkv_param(name: str) -> bool:
+                lname = name.lower()
+                return any(
+                    p in lname
+                    for p in (
+                        "q_proj",
+                        "k_proj",
+                        "v_proj",
+                        "c_attn",
+                        "query_key_value",
+                    )
+                )
+
+            def matches_param_filter(name: str) -> bool:
+                if not target_param_substrings:
+                    return True
+                lname = name.lower()
+                return any(sub in lname for sub in target_param_substrings)
+
+            params_by_layer: dict[int, list[tuple[str, torch.Tensor]]] = {}
+            global_params: list[tuple[str, torch.Tensor]] = []
+            for name, param in model.named_parameters():
+                if param.dim() < 2:
+                    continue
+                if not param.is_floating_point():
+                    continue
+                if not is_target_family(name):
+                    continue
+                if not matches_param_filter(name):
+                    continue
+                if (
+                    target_family in ("attn", "both")
+                    and (not include_qkv)
+                    and is_qkv_param(name)
+                ):
+                    continue
+                match = layer_pattern.search(name)
+                if match:
+                    layer_idx = int(match.group(1))
+                    params_by_layer.setdefault(layer_idx, []).append((name, param))
+                else:
+                    global_params.append((name, param))
+
+            all_layer_indices = sorted(params_by_layer.keys())
+            max_layer = max(all_layer_indices) + 1 if all_layer_indices else 0
+            if target_layers_spec:
+                target_layers = _parse_layer_indices(target_layers_spec, max_layer)
+            else:
+                target_layers = _default_last_layers(all_layer_indices, 8)
+
+            target_params: list[tuple[str, torch.Tensor]] = []
+            for layer_idx in target_layers:
+                if layer_idx in params_by_layer:
+                    target_params.extend(params_by_layer[layer_idx])
+            target_params.extend(global_params)
+
+            random.shuffle(target_params)
+            if len(target_params) > max_params:
+                target_params = target_params[:max_params]
+
+            modified_count = 0
+            modified_names: list[str] = []
+            for name, param in target_params:
+                with torch.no_grad():
+                    w = param.data
+                    rows = int(round(float(w.shape[0]) * row_frac))
+                    rows = max(2, min(rows, int(w.shape[0]), max_rows))
+                    if rows < 2:
+                        continue
+                    idx = _select_row_indices(
+                        w, rows=rows, selection=row_selection, seed=seed, name=name
+                    )
+                    if idx.numel() < 2:
+                        continue
+                    base = w[idx, :].detach().clone()
+                    anchor = base[:1, :].expand_as(base)
+                    mixed = (1.0 - blend) * base + blend * anchor
+                    if preserve_row_norms:
+                        base_norm = torch.linalg.vector_norm(
+                            base.float(), ord=2, dim=1, keepdim=True
+                        ).clamp_min(1e-12)
+                        mixed_norm = torch.linalg.vector_norm(
+                            mixed.float(), ord=2, dim=1, keepdim=True
+                        ).clamp_min(1e-12)
+                        mixed = mixed * (base_norm / mixed_norm).to(mixed.dtype)
+                    if jitter > 0.0:
+                        scale = max(float(base.float().std().item()), 1e-6)
+                        mixed = mixed + (
+                            torch.randn_like(mixed, dtype=torch.float32).to(mixed.dtype)
+                            * float(jitter * scale)
+                        )
+                    if not torch.isfinite(mixed).all():
+                        continue
+                    w[idx, :] = mixed.to(dtype=w.dtype)
+
+                modified_count += 1
+                modified_names.append(name)
+                if modified_count <= 5:
+                    print(
+                        f"Anisotropy perturbation: {name} (rows={rows}, blend={blend}, sel={row_selection})"
+                    )
+
+            if modified_count > 5:
+                print(f"  ... and {modified_count - 5} more parameters")
+
+            if modified_count > 0:
+                error_info.update(
+                    {
+                        "injected": True,
+                        "mode": "anisotropy",
+                        "blend": blend,
+                        "row_frac": row_frac,
+                        "max_rows": max_rows,
+                        "max_params": max_params,
+                        "target_family": target_family,
+                        "target_param_substrings": target_param_substrings,
+                        "target_layers": target_layers,
+                        "include_qkv": include_qkv,
+                        "preserve_row_norms": preserve_row_norms,
+                        "jitter": jitter,
+                        "row_selection": row_selection,
+                        "seed": seed,
+                        "modified_count": modified_count,
+                        "modified_params": modified_names[:20],
+                        "total_layers": max_layer,
+                    }
+                )
+                print(
+                    f"Applied RMT anisotropy probe to {modified_count} params "
+                    f"(blend={blend}, family={target_family}, seed={seed})"
+                )
+            else:
+                print(
+                    "WARNING: rmt_norm_noise not injected "
+                    "(no matching parameters for anisotropy mode)"
+                )
+
+    elif error_type.startswith("spectral_moderate_scale"):
+        # Spectral-targeted error injection: apply moderate scaling to attention/MLP weights
+        # to cause spectral instability (z-score violations) while keeping invariants/RMT stable.
+        #
+        # Environment variables:
+        #   INVARLOCK_SPECTRAL_SCALE_FACTOR: scale factor (default: 3.0)
+        #   INVARLOCK_SPECTRAL_TARGET_FAMILY: target family (attn, mlp, or both; default: attn)
+        #   INVARLOCK_SPECTRAL_TARGET_LAYERS: comma-separated layer indices (default: last 4)
+        #   INVARLOCK_SPECTRAL_MAX_PARAMS: max params to scale (default: 8)
+        #   INVARLOCK_SPECTRAL_SEED: random seed (default: 42)
+        #   INVARLOCK_SPECTRAL_INCLUDE_QKV: include Q/K/V projection weights (default: 0)
+
+        scale_factor = float(os.environ.get("INVARLOCK_SPECTRAL_SCALE_FACTOR", "3.0"))
+        target_family = os.environ.get("INVARLOCK_SPECTRAL_TARGET_FAMILY", "attn")
+        target_layers_spec = os.environ.get("INVARLOCK_SPECTRAL_TARGET_LAYERS", "")
+        target_param_substrings_spec = os.environ.get(
+            "INVARLOCK_SPECTRAL_TARGET_PARAMS", ""
+        ).strip()
+        target_param_substrings = [
+            part.strip().lower()
+            for part in target_param_substrings_spec.split(",")
+            if part.strip()
+        ]
+        pair_inverse = os.environ.get("INVARLOCK_SPECTRAL_PAIR_INVERSE", "0") == "1"
+        max_params = int(os.environ.get("INVARLOCK_SPECTRAL_MAX_PARAMS", "8"))
+        seed = int(os.environ.get("INVARLOCK_SPECTRAL_SEED", "42"))
+        include_qkv = os.environ.get("INVARLOCK_SPECTRAL_INCLUDE_QKV", "0") == "1"
+
+        # Set deterministic seeds
+        random.seed(seed)
+        torch.manual_seed(seed)
+
+        # Find weight parameters by layer and family
+        layer_pattern = re.compile(r"(?:layers|blocks|h)\.(\d+)\.")
+
+        # Family detection patterns
+        attn_patterns = (
+            "q_proj",
+            "k_proj",
+            "v_proj",
+            "o_proj",
+            "c_attn",
+            "c_proj",
+            "out_proj",
+            "query_key_value",
+            "self_attn",
+            "attention",
+        )
+        mlp_patterns = (
+            "mlp",
+            "ffn",
+            "feed_forward",
+            "gate_proj",
+            "up_proj",
+            "down_proj",
+            "fc1",
+            "fc2",
+            "c_fc",
+            "experts",
+        )
+
+        def is_target_family(name: str) -> bool:
+            lname = name.lower()
+            if target_family == "attn":
+                return any(p in lname for p in attn_patterns)
+            elif target_family == "mlp":
+                return any(p in lname for p in mlp_patterns)
+            else:  # "both"
+                return any(p in lname for p in attn_patterns + mlp_patterns)
+
+        def is_qkv_param(name: str) -> bool:
+            lname = name.lower()
+            return any(
+                p in lname
+                for p in (
+                    "q_proj",
+                    "k_proj",
+                    "v_proj",
+                    "c_attn",
+                    "query_key_value",
+                )
+            )
+
+        def matches_param_filter(name: str) -> bool:
+            if not target_param_substrings:
+                return True
+            lname = name.lower()
+            return any(sub in lname for sub in target_param_substrings)
+
+        if pair_inverse and target_family.strip().lower() in {"mlp", "both"}:
+            # Paired scaling (e.g., scale up_proj by k and down_proj by 1/k) is a
+            # useful way to trigger spectral violations without fully wrecking PM.
+            #
+            # This is intentionally narrow (MLP-only) to keep the injection stable.
+            up_patterns = ("up_proj.weight", "w1.weight", "fc1.weight", "c_fc.weight")
+            down_patterns = (
+                "down_proj.weight",
+                "w2.weight",
+                "fc2.weight",
+                "c_proj.weight",
+            )
+
+            up_by_layer: dict[int, list[tuple[str, torch.Tensor]]] = {}
+            down_by_layer: dict[int, list[tuple[str, torch.Tensor]]] = {}
+            for name, param in model.named_parameters():
+                lname = name.lower()
+                if param.dim() < 2:
+                    continue
+                if not param.is_floating_point():
+                    continue
+                match = layer_pattern.search(name)
+                if not match:
+                    continue
+                layer_idx = int(match.group(1))
+                if any(pat in lname for pat in up_patterns):
+                    up_by_layer.setdefault(layer_idx, []).append((name, param))
+                if any(pat in lname for pat in down_patterns):
+                    down_by_layer.setdefault(layer_idx, []).append((name, param))
+
+            all_layer_indices = sorted(set(up_by_layer) & set(down_by_layer))
+            max_layer = max(all_layer_indices) + 1 if all_layer_indices else 0
+            if target_layers_spec:
+                target_layers = _parse_layer_indices(target_layers_spec, max_layer)
+            else:
+                target_layers = _default_last_layers(all_layer_indices, 4)
+
+            modified_count = 0
+            modified_names: list[str] = []
+            pairs_applied = 0
+
+            for layer_idx in target_layers:
+                ups = up_by_layer.get(layer_idx) or []
+                downs = down_by_layer.get(layer_idx) or []
+                if not ups or not downs:
+                    continue
+
+                # Deterministic but model-agnostic selection: take first match.
+                up_name, up_param = sorted(ups, key=lambda t: t[0])[0]
+                down_name, down_param = sorted(downs, key=lambda t: t[0])[0]
+
+                with torch.no_grad():
+                    up_param.mul_(scale_factor)
+                    down_param.mul_(1.0 / max(scale_factor, 1e-12))
+                modified_names.extend([up_name, down_name])
+                modified_count += 2
+                pairs_applied += 1
+                if pairs_applied <= 3:
+                    print(
+                        f"Paired scale: {up_name}×{scale_factor:g}, "
+                        f"{down_name}×{(1.0 / scale_factor):g}"
+                    )
+                if pairs_applied >= max(0, max_params):
+                    break
+
+            if modified_count > 0:
+                error_info.update(
+                    {
+                        "injected": True,
+                        "pair_inverse": True,
+                        "scale_factor": scale_factor,
+                        "seed": seed,
+                        "target_family": target_family,
+                        "target_layers": target_layers,
+                        "max_params": max_params,
+                        "modified_count": modified_count,
+                        "modified_params": modified_names[:20],
+                        "total_layers": max_layer,
+                    }
+                )
+                print(
+                    f"Applied paired spectral scaling to {pairs_applied} layers "
+                    f"(scale_factor={scale_factor}, seed={seed})"
+                )
+            else:
+                print(
+                    "WARNING: spectral_moderate_scale not injected "
+                    "(no matching MLP up/down projection pairs)"
+                )
+
+        else:
+            params_by_layer: dict[int, list[tuple[str, torch.Tensor]]] = {}
+            for name, param in model.named_parameters():
+                if param.dim() < 2:
+                    continue
+                if not param.is_floating_point():
+                    continue
+                if not is_target_family(name):
+                    continue
+                if not matches_param_filter(name):
+                    continue
+                if (
+                    (target_family in ("attn", "both"))
+                    and (not include_qkv)
+                    and is_qkv_param(name)
+                ):
+                    continue
+                match = layer_pattern.search(name)
+                if match:
+                    layer_idx = int(match.group(1))
+                    params_by_layer.setdefault(layer_idx, []).append((name, param))
+
+            # Determine target layers (default: last 4 layers)
+            all_layer_indices = sorted(params_by_layer.keys())
+            max_layer = max(all_layer_indices) + 1 if all_layer_indices else 0
+
+            if target_layers_spec:
+                target_layers = _parse_layer_indices(target_layers_spec, max_layer)
+            else:
+                # Default to last 4 layers
+                target_layers = _default_last_layers(all_layer_indices, 4)
+
+            # Collect target parameters
+            target_params: list[tuple[str, torch.Tensor]] = []
+            for layer_idx in target_layers:
+                if layer_idx in params_by_layer:
+                    target_params.extend(params_by_layer[layer_idx])
+
+            # Deterministically shuffle for better coverage across architectures.
+            random.shuffle(target_params)
+
+            # Limit to max_params
+            if len(target_params) > max_params:
+                target_params = target_params[:max_params]
+
+            # Apply scaling
+            modified_count = 0
+            modified_names: list[str] = []
+            for name, param in target_params:
+                with torch.no_grad():
+                    param.mul_(scale_factor)
+                modified_count += 1
+                modified_names.append(name)
+                if modified_count <= 5:
+                    print(f"Scaled param: {name} (factor={scale_factor})")
+
+            if modified_count > 5:
+                print(f"  ... and {modified_count - 5} more parameters")
+
+            if modified_count > 0:
+                error_info.update(
+                    {
+                        "injected": True,
+                        "scale_factor": scale_factor,
+                        "seed": seed,
+                        "target_family": target_family,
+                        "target_layers": target_layers,
+                        "target_param_substrings": target_param_substrings,
+                        "max_params": max_params,
+                        "include_qkv": include_qkv,
+                        "modified_count": modified_count,
+                        "modified_params": modified_names[:20],
+                        "total_layers": max_layer,
+                    }
+                )
+                print(
+                    f"Applied spectral moderate scale to {modified_count} params "
+                    f"(factor={scale_factor}, family={target_family}, seed={seed})"
+                )
+            else:
+                print(
+                    "WARNING: spectral_moderate_scale not injected (no matching params)"
+                )
+
+    elif error_type.startswith("ve_mlp_scale_skew"):
+        # VE-targeted error injection.
+        #
+        # Intentionally scale one (or a few) FFN output projection weights
+        # (e.g., down_proj/c_proj/fc2) by a bounded factor so DD-VE should propose
+        # an approximately inverse correction (within clamp).
+        scale_factor = float(os.environ.get("INVARLOCK_VE_SCALE_FACTOR", "0.90"))
+        target_layers_spec = os.environ.get("INVARLOCK_VE_TARGET_LAYERS", "").strip()
+        max_params = int(os.environ.get("INVARLOCK_VE_MAX_PARAMS", "1"))
+        seed = int(os.environ.get("INVARLOCK_VE_SEED", "42"))
+        target_family = (
+            os.environ.get("INVARLOCK_VE_TARGET_FAMILY", "mlp").strip().lower()
+        )
+        include_experts = os.environ.get("INVARLOCK_VE_INCLUDE_EXPERTS", "1") == "1"
+
+        if not scale_factor > 0.0:
+            raise SystemExit("ve_mlp_scale_skew: INVARLOCK_VE_SCALE_FACTOR must be > 0")
+        if max_params < 0:
+            max_params = 0
+
+        random.seed(seed)
+        torch.manual_seed(seed)
+
+        layer_pattern = re.compile(r"(?:layers|blocks|h)\.(\d+)\.")
+        # Include suffix-less fused MoE expert weights (e.g. `...experts.down_proj`)
+        # in addition to standard `*.weight` parameter names.
+        mlp_out_patterns = ("down_proj", "c_proj", "fc2")
+        # Some MoE experts use w2 as the FFN output projection.
+        expert_out_patterns = ("w2",)
+
+        def is_target_param(name: str) -> bool:
+            lname = name.lower()
+            if target_family not in ("mlp", "both", "attn"):
+                return False
+            if (not include_experts) and any(
+                tok in lname for tok in ("experts", "moe", "block_sparse_moe")
+            ):
+                return False
+            if target_family in ("mlp", "both"):
+                if any(pat in lname for pat in mlp_out_patterns):
+                    return True
+                if include_experts and any(pat in lname for pat in expert_out_patterns):
+                    if any(
+                        tok in lname for tok in ("experts", "moe", "block_sparse_moe")
+                    ):
+                        return True
+            return False
+
+        params_by_layer: dict[int, list[tuple[str, torch.Tensor]]] = {}
+        for name, param in model.named_parameters():
+            lname = name.lower()
+            if param.dim() < 2:
+                continue
+            if not param.is_floating_point():
+                continue
+            if not is_target_param(name):
+                continue
+            match = layer_pattern.search(name)
+            if match:
+                layer_idx = int(match.group(1))
+                params_by_layer.setdefault(layer_idx, []).append((name, param))
+            else:
+                # Still allow global/expert weights even if no layer index is found.
+                params_by_layer.setdefault(-1, []).append((name, param))
+
+        all_layer_indices = sorted(i for i in params_by_layer.keys() if i >= 0)
+        max_layer = max(all_layer_indices) + 1 if all_layer_indices else 0
+        if target_layers_spec:
+            target_layers = _parse_layer_indices(target_layers_spec, max_layer)
+        else:
+            target_layers = _default_last_layers(all_layer_indices, 4)
+
+        target_params: list[tuple[str, torch.Tensor]] = []
+        for layer_idx in target_layers:
+            target_params.extend(params_by_layer.get(layer_idx, []))
+        if not target_params and params_by_layer.get(-1):
+            # Fallback to any matching weights.
+            target_params = list(params_by_layer[-1])
+            target_layers = [-1]
+
+        random.shuffle(target_params)
+        if max_params > 0 and len(target_params) > max_params:
+            target_params = target_params[:max_params]
+
+        modified_count = 0
+        modified_names: list[str] = []
+        for name, param in target_params:
+            with torch.no_grad():
+                param.mul_(scale_factor)
+            modified_count += 1
+            modified_names.append(name)
+            if modified_count <= 5:
+                print(f"Scaled param: {name} (factor={scale_factor})")
+
+        if modified_count > 5:
+            print(f"  ... and {modified_count - 5} more parameters")
+
+        if modified_count > 0:
+            error_info.update(
+                {
+                    "injected": True,
+                    "scale_factor": scale_factor,
+                    "seed": seed,
+                    "target_family": target_family,
+                    "target_layers": target_layers,
+                    "max_params": max_params,
+                    "include_experts": include_experts,
+                    "modified_count": modified_count,
+                    "modified_params": modified_names[:20],
+                    "total_layers": max_layer,
+                }
+            )
+            print(
+                f"Applied VE MLP scale skew to {modified_count} params "
+                f"(factor={scale_factor}, seed={seed})"
+            )
+        else:
+            print("WARNING: ve_mlp_scale_skew not injected (no matching params)")
 
     else:
         print(f"WARNING: Unknown error_type={error_type!r}; no injection applied")

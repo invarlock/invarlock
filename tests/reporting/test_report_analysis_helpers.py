@@ -552,22 +552,20 @@ def test_normalize_baseline_infers_primary_metric():
     assert normalized["evaluation_windows"]["final"]["logloss"] == [0.2]
 
 
-def test_normalize_baseline_warns_on_invalid(capsys):
+def test_normalize_baseline_raises_on_invalid():
     baseline = {
         "meta": {"model_id": "demo"},
         "edit": {"name": "quantize", "plan": {}, "deltas": {"params_changed": 5}},
         "metrics": {
-            "ppl_final": 0.5,
-            "ppl_preview": 0.5,
+            "ppl_final": 0.0,
+            "ppl_preview": 0.0,
             "spectral": {},
             "rmt": {},
             "invariants": {},
         },
     }
-    normalized = cert._normalize_baseline(baseline)
-    assert normalized["ppl_final"] == pytest.approx(50.797)
-    out = capsys.readouterr().out
-    assert "Invalid baseline detected" in out
+    with pytest.raises(ValueError, match="Invalid baseline"):
+        cert._normalize_baseline(baseline)
 
 
 def test_compute_validation_flags_guard_overhead_ratio_failure(monkeypatch):
@@ -938,15 +936,15 @@ def test_normalize_baseline_handles_v1_schema_structure():
     assert normalized["spectral"] == {"caps": 1}
 
 
-def test_normalize_baseline_falls_back_for_invalid_ppl():
+def test_normalize_baseline_raises_for_invalid_ppl():
     baseline = {
         "meta": {"model_id": "demo"},
         "edit": {"name": "baseline", "plan": {}, "deltas": {"params_changed": 0}},
-        "metrics": {"ppl_final": 0.9, "spectral": {}, "rmt": {}, "invariants": {}},
+        "metrics": {"ppl_final": 0.0, "spectral": {}, "rmt": {}, "invariants": {}},
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
-    normalized = cert._normalize_baseline(baseline)
-    assert normalized["ppl_final"] == pytest.approx(50.797)
+    with pytest.raises(ValueError, match="Invalid baseline"):
+        cert._normalize_baseline(baseline)
 
 
 def test_normalize_baseline_extracts_runreport_payload():

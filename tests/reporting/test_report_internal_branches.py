@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import math
-
 import pytest
 
 from invarlock.reporting import report_builder as cert
@@ -27,7 +25,7 @@ def test_normalize_baseline_v1_schema():
     assert normalized["ppl_final"] == 42.0
 
 
-def test_normalize_baseline_run_report_invalid_ppl(capfd):
+def test_normalize_baseline_run_report_invalid_ppl():
     baseline = {
         "meta": {"model_id": "demo", "tokenizer_hash": "hash"},
         "data": {},
@@ -37,7 +35,7 @@ def test_normalize_baseline_run_report_invalid_ppl(capfd):
             "deltas": {"params_changed": 5},
         },
         "metrics": {
-            "ppl_final": 0.5,
+            "ppl_final": 0.0,
             "spectral": {},
             "rmt": {},
             "invariants": {},
@@ -50,17 +48,13 @@ def test_normalize_baseline_run_report_invalid_ppl(capfd):
             "final": {"window_ids": [1], "logloss": [0.1]},
         },
     }
-    normalized = cert._normalize_baseline(baseline)
-    out = capfd.readouterr().out
-    assert "Invalid baseline detected" in out
-    assert math.isclose(normalized["ppl_final"], 50.797)
+    with pytest.raises(ValueError, match="Invalid baseline"):
+        cert._normalize_baseline(baseline)
 
 
-def test_normalize_baseline_dict_soft_fallback(capfd):
-    normalized = cert._normalize_baseline({"ppl_final": 0.5})
-    out = capfd.readouterr().out
-    assert "Invalid baseline PPL" in out
-    assert math.isclose(normalized["ppl_final"], 50.797)
+def test_normalize_baseline_dict_soft_fallback():
+    with pytest.raises(ValueError, match="Invalid baseline"):
+        cert._normalize_baseline({"ppl_final": 0.0})
 
 
 def test_normalize_baseline_invalid_type():

@@ -100,6 +100,32 @@ pack_is_bash4() {
     [[ "${BASH_VERSINFO[0]}" -ge 4 ]]
 }
 
+pack_read_final_verdict() {
+    local verdict_path="$1"
+    python3 - "${verdict_path}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+if not path.is_file():
+    print("MISSING")
+    raise SystemExit(0)
+
+try:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+except Exception:
+    print("INVALID")
+    raise SystemExit(0)
+
+value = payload.get("verdict")
+if isinstance(value, str):
+    print(value.strip().upper())
+else:
+    print("MISSING")
+PY
+}
+
 # ============ VERSION ============
 SCRIPT_VERSION="proof-packs-v1"
 
@@ -264,6 +290,10 @@ PACK_TUNED_EDIT_PARAMS_FILE="${PACK_TUNED_EDIT_PARAMS_FILE:-}"
 # Optional calibration preset reuse (skip calibration runs, copy presets in)
 PACK_CALIBRATION_PRESET_DIR="${PACK_CALIBRATION_PRESET_DIR:-}"
 PACK_CALIBRATION_PRESET_FILE="${PACK_CALIBRATION_PRESET_FILE:-}"
+# Delete edited/error models after certification to keep disk usage bounded.
+# Override with PACK_CLEANUP_MODELS=0 to retain model variants for debugging.
+PACK_CLEANUP_MODELS="${PACK_CLEANUP_MODELS:-1}"
+export PACK_CLEANUP_MODELS
 
 # InvarLock Configuration - BASE DEFAULTS (will be overridden per-model)
 # WikiText-2 validation has ~1174 usable samples
@@ -321,6 +351,33 @@ pack_setup_hf_cache_dirs() {
         return 1
     fi
     return 0
+}
+
+pack_preflight_datasets() {
+    # Proof pack runs are often launched with PACK_NET=0 (offline) after a prior net-enabled
+    # preflight/population step. If HF caches are per-run (default: OUTPUT_DIR/.hf), a new
+    # OUTPUT_DIR can look "cold" and cause calibration to fail later. Preflight once here to
+    # fail fast with a clear message and, when PACK_NET=1, warm the cache.
+    log_section "PHASE 0: DATASET PREFLIGHT"
+
+    local repo_root
+    repo_root="$(cd "${_PACK_VALIDATION_LIB_DIR}/../../.." && pwd)"
+
+    if python3 "${repo_root}/scripts/proof_packs/python/dataset_preflight.py" | tee -a "${LOG_FILE}"; then
+        log "Dataset preflight: OK"
+        return 0
+    fi
+
+    echo "" | tee -a "${LOG_FILE}"
+    echo "ERROR: Dataset preflight failed (INVARLOCK_DATASET=${INVARLOCK_DATASET:-wikitext2})." | tee -a "${LOG_FILE}" >&2
+    if [[ "${PACK_NET}" != "1" ]]; then
+        echo "       Offline mode is enabled (PACK_NET=0)." | tee -a "${LOG_FILE}" >&2
+        echo "       Fix options:" | tee -a "${LOG_FILE}" >&2
+        echo "         1) Re-run with --net 1 once to populate the dataset cache, then run offline." | tee -a "${LOG_FILE}" >&2
+        echo "         2) Use --resume to reuse an existing OUTPUT_DIR (its .hf cache already contains the dataset)." | tee -a "${LOG_FILE}" >&2
+        echo "         3) Export HF_HOME/HF_DATASETS_CACHE to a shared cache directory before running." | tee -a "${LOG_FILE}" >&2
+    fi
+    error_exit "Dataset preflight failed."
 }
 
 pack_run_determinism_repeats() {
@@ -517,7 +574,7 @@ pack_configure_hf_access() {
 # PM acceptance range used during validation
 # These bounds help avoid unnecessary gate failures during validation runs
 export INVARLOCK_PM_ACCEPTANCE_MIN="${INVARLOCK_PM_ACCEPTANCE_MIN:-0.90}"
-export INVARLOCK_PM_ACCEPTANCE_MAX="${INVARLOCK_PM_ACCEPTANCE_MAX:-1.20}"
+export INVARLOCK_PM_ACCEPTANCE_MAX="${INVARLOCK_PM_ACCEPTANCE_MAX:-1.10}"
 
 # Flash attention flag - will be set dynamically based on availability
 export FLASH_ATTENTION_AVAILABLE="false"
@@ -626,10 +683,40 @@ pack_setup_output_dirs() {
 pack_prepare_scenarios_manifest() {
     local repo_root
     repo_root="$(cd "${_PACK_VALIDATION_LIB_DIR}/../../.." && pwd)"
-    local src="${repo_root}/scripts/proof_packs/scenarios.json"
+    local src="${PACK_SCENARIOS_MANIFEST_FILE:-${repo_root}/scripts/proof_packs/scenarios.json}"
     if [[ -f "${src}" ]]; then
         mkdir -p "${OUTPUT_DIR}/state"
-        cp "${src}" "${OUTPUT_DIR}/state/scenarios.json"
+        local dest="${OUTPUT_DIR}/state/scenarios.json"
+        local suite="${PACK_SUITE:-subset}"
+        local scenario_ids_csv="${PACK_SCENARIO_IDS:-}"
+
+        if command -v jq >/dev/null 2>&1; then
+            # Scenarios can optionally declare `suites: ["subset", "full", ...]`.
+            # When present, the manifest is filtered to just the active PACK_SUITE.
+            jq --arg suite "${suite}" --arg scenario_ids_csv "${scenario_ids_csv}" \
+                'def suites_ok($suite):
+                    ((.suites? | type) != "array")
+                    or ((.suites | length) == 0)
+                    or ((.suites | index($suite)) != null);
+                 def trim: gsub("^\\s+|\\s+$"; "");
+                 def ids($csv): ($csv | split(",") | map(trim) | map(select(length>0)));
+                 ._meta = (._meta | if type=="object" then . else {} end)
+                 | ._meta.applied_suite = $suite
+                 | (ids($scenario_ids_csv)) as $ids
+                 | if ($ids | length) > 0 then ._meta.scenario_ids_filter = $ids else . end
+                 | .scenarios = [
+                     .scenarios[]
+                     | select(suites_ok($suite))
+                     | if ($ids | length) > 0 then
+                         select(.id as $id | ($ids | index($id)) != null)
+                       else
+                         .
+                       end
+                   ]' \
+                "${src}" > "${dest}"
+        else
+            cp "${src}" "${dest}"
+        fi
     fi
 }
 
@@ -954,7 +1041,47 @@ estimate_planned_model_storage_gb() {
     local edits_total=$(( ${#EDIT_TYPES_CLEAN[@]} + ${#EDIT_TYPES_STRESS[@]} ))
     local errors_total=0
     if [[ "${RUN_ERROR_INJECTION}" == "true" ]]; then
-        errors_total=9  # nan_injection, inf_injection, shape_mismatch, missing_tensors, extreme_quant, scale_explosion, rank_collapse, norm_collapse, weight_tying_break
+        # Derive count from scenarios.json when available to keep disk estimates aligned with the suite.
+        local pack_root
+        pack_root="$(cd "${_PACK_VALIDATION_LIB_DIR}/.." && pwd)"
+        local scenarios_file="${pack_root}/scenarios.json"
+        if command -v jq >/dev/null 2>&1 && [[ -f "${scenarios_file}" ]]; then
+            errors_total="$(jq -r '[.scenarios[] | select(.generation.kind=="error")] | length' "${scenarios_file}" 2>/dev/null || true)"
+        fi
+        if [[ -z "${errors_total}" || ! "${errors_total}" =~ ^[0-9]+$ ]]; then
+            errors_total=9  # fallback for legacy scenario sets
+        fi
+    fi
+
+    # When cleanup is enabled, edited/error models are removed after evaluation; estimate peak usage instead of total copies.
+    if [[ "${PACK_CLEANUP_MODELS:-1}" != "0" ]]; then
+        # In cleanup mode, default is per-edit unless explicitly forced to batch edits.
+        local use_batch_edits="${PACK_USE_BATCH_EDITS:-}"
+        local edits_peak=0
+        local clean_runs="${CLEAN_EDIT_RUNS:-0}"
+        local stress_runs="${STRESS_EDIT_RUNS:-0}"
+        if ! [[ "${clean_runs}" =~ ^-?[0-9]+$ ]]; then
+            clean_runs=0
+        fi
+        if ! [[ "${stress_runs}" =~ ^-?[0-9]+$ ]]; then
+            stress_runs=0
+        fi
+        if [[ ${clean_runs} -gt 0 || ${stress_runs} -gt 0 ]] && [[ ${edits_total} -gt 0 ]]; then
+            case "${use_batch_edits}" in
+                1|true|yes|on)
+                    edits_peak="${edits_total}"
+                    ;;
+                *)
+                    edits_peak=1
+                    ;;
+            esac
+        fi
+        local errors_peak=0
+        if [[ ${errors_total} -gt 0 ]]; then
+            errors_peak=1
+        fi
+        edits_total="${edits_peak}"
+        errors_total="${errors_peak}"
     fi
 
     local baseline_mode="${PACK_BASELINE_STORAGE_MODE:-snapshot_symlink}"
@@ -1123,15 +1250,59 @@ check_dependencies() {
     log_section "PHASE 0: DEPENDENCY CHECK"
 
     local missing=()
+    local pip_available="true"
 
     # Check Python
     command -v python3 >/dev/null 2>&1 || missing+=("python3")
+
+    if [[ "${PACK_NET}" == "1" ]]; then
+        if ! python3 -m pip --version >/dev/null 2>&1; then
+            pip_available="false"
+            # Try to bootstrap pip when available (common on Debian/Ubuntu images).
+            if python3 -m ensurepip --upgrade >/dev/null 2>&1; then
+                if python3 -m pip --version >/dev/null 2>&1; then
+                    pip_available="true"
+                fi
+            fi
+        fi
+        if [[ "${pip_available}" != "true" ]]; then
+            missing+=("pip")
+            log "ERROR: python3 -m pip is not available."
+            log "       Install python3-pip (or use a virtualenv) before running proof packs with --net 1."
+        fi
+    fi
 
     # Check PyTorch with CUDA
     python3 -c "import torch; assert torch.cuda.is_available(), 'No CUDA'" 2>/dev/null || missing+=("torch+cuda")
 
     # Check transformers
     python3 -c "import transformers; print(f'Transformers {transformers.__version__}')" 2>/dev/null || missing+=("transformers")
+
+    # Check huggingface_hub (required by --net 1 preflight/downloads)
+    if [[ "${PACK_NET}" == "1" ]]; then
+        if ! python3 -c "import huggingface_hub" 2>/dev/null; then
+            log "Installing huggingface_hub..."
+            if [[ "${pip_available}" != "true" ]]; then
+                missing+=("huggingface_hub")
+            elif ! python3 -m pip install huggingface_hub; then
+                missing+=("huggingface_hub")
+            fi
+        fi
+    fi
+
+    # Check accelerate (required by transformers for device_map="auto")
+    if ! python3 -c "import accelerate" 2>/dev/null; then
+        if [[ "${PACK_NET}" == "1" ]]; then
+            log "Installing accelerate..."
+            if [[ "${pip_available}" == "true" ]]; then
+                python3 -m pip install accelerate || missing+=("accelerate")
+            else
+                missing+=("accelerate")
+            fi
+        else
+            missing+=("accelerate")
+        fi
+    fi
 
     # Check for flash-attn
     if python3 -c "import flash_attn; print('Flash Attention OK')" 2>/dev/null; then
@@ -1158,39 +1329,71 @@ check_dependencies() {
                 log "         Or set SKIP_FLASH_ATTN=true to suppress this warning"
                 log "         Continuing with eager attention (may be slower)"
             else
-                log "Flash Attention 2: Not found, attempting install..."
-                # Use timeout to prevent hanging on slow builds
-                if timeout 600 python3 -m pip install flash-attn --no-build-isolation 2>&1 | tee -a "${LOG_FILE}"; then
-                    # Verify it actually imported
-                    if python3 -c "import flash_attn" 2>/dev/null; then
-                        export FLASH_ATTENTION_AVAILABLE="true"
-                        log "Flash Attention 2: Installed successfully"
+                if [[ "${PACK_NET}" != "1" ]]; then
+                    export FLASH_ATTENTION_AVAILABLE="false"
+                    log "Flash Attention 2: Not found (offline), using eager attention"
+                else
+                    log "Flash Attention 2: Not found, attempting install..."
+                    # Use timeout to prevent hanging on slow builds
+                    if [[ "${pip_available}" == "true" ]] && timeout 600 python3 -m pip install flash-attn --no-build-isolation 2>&1 | tee -a "${LOG_FILE}"; then
+                        # Verify it actually imported
+                        if python3 -c "import flash_attn" 2>/dev/null; then
+                            export FLASH_ATTENTION_AVAILABLE="true"
+                            log "Flash Attention 2: Installed successfully"
+                        else
+                            export FLASH_ATTENTION_AVAILABLE="false"
+                            log "WARNING: flash-attn installed but import failed, using eager attention"
+                        fi
                     else
                         export FLASH_ATTENTION_AVAILABLE="false"
-                        log "WARNING: flash-attn installed but import failed, using eager attention"
+                        log "WARNING: flash-attn install failed (build error), using eager attention"
+                        log "         This is OK - script will work without flash attention, just slower."
                     fi
-                else
-                    export FLASH_ATTENTION_AVAILABLE="false"
-                    log "WARNING: flash-attn install failed (build error), using eager attention"
-                    log "         This is OK - script will work without flash attention, just slower."
                 fi
             fi
         fi
     fi
 
     # Check PyYAML
-    python3 -c "import yaml" 2>/dev/null || python3 -m pip install pyyaml
+    if ! python3 -c "import yaml" 2>/dev/null; then
+        if [[ "${PACK_NET}" == "1" ]]; then
+            log "Installing pyyaml..."
+            if [[ "${pip_available}" == "true" ]]; then
+                python3 -m pip install pyyaml || missing+=("pyyaml")
+            else
+                missing+=("pyyaml")
+            fi
+        else
+            missing+=("pyyaml")
+        fi
+    fi
 
     # Check protobuf (required by many HuggingFace models)
     if ! python3 -c "import google.protobuf" 2>/dev/null; then
-        log "Installing protobuf..."
-        python3 -m pip install protobuf
+        if [[ "${PACK_NET}" == "1" ]]; then
+            log "Installing protobuf..."
+            if [[ "${pip_available}" == "true" ]]; then
+                python3 -m pip install protobuf || missing+=("protobuf")
+            else
+                missing+=("protobuf")
+            fi
+        else
+            missing+=("protobuf")
+        fi
     fi
 
     # Check sentencepiece (required by many tokenizers)
     if ! python3 -c "import sentencepiece" 2>/dev/null; then
-        log "Installing sentencepiece..."
-        python3 -m pip install sentencepiece
+        if [[ "${PACK_NET}" == "1" ]]; then
+            log "Installing sentencepiece..."
+            if [[ "${pip_available}" == "true" ]]; then
+                python3 -m pip install sentencepiece || missing+=("sentencepiece")
+            else
+                missing+=("sentencepiece")
+            fi
+        else
+            missing+=("sentencepiece")
+        fi
     fi
 
     # Check InvarLock (Python module and CLI)
@@ -1411,6 +1614,7 @@ export -f get_model_invarlock_config
 # ============ MAIN - DYNAMIC GPU SCHEDULING (v2.0) ============
 main_dynamic() {
     local start_time=$(date +%s)
+    local suite_status=0
     local gpu_mem="${PACK_GPU_MEM_GB:-${GPU_MEMORY_GB:-}}"
     local gpu_count_label="${NUM_GPUS:-auto}"
     [[ -z "${gpu_mem}" ]] && gpu_mem="auto"
@@ -1422,7 +1626,11 @@ main_dynamic() {
     echo "========================================================================"
     echo ""
 
-    check_dependencies
+    if [[ "${PACK_DEPENDENCIES_CHECKED:-0}" != "1" ]]; then
+        check_dependencies
+        PACK_DEPENDENCIES_CHECKED=1
+        export PACK_DEPENDENCIES_CHECKED
+    fi
     configure_gpu_pool
     pack_model_list_array
 
@@ -1853,12 +2061,14 @@ EOF
 
     if [[ ${failed} -gt 0 ]]; then
         log "WARNING: ${failed} GPU worker(s) failed"
+        suite_status=1
     fi
 
     # Check for failed tasks
     local failed_tasks=$(count_tasks "failed")
     if [[ ${failed_tasks} -gt 0 ]]; then
         log "WARNING: ${failed_tasks} task(s) failed"
+        suite_status=1
         log "Failed tasks:"
         for task_file in "${QUEUE_DIR}/failed"/*.task; do
             [[ -f "${task_file}" ]] || continue
@@ -1887,6 +2097,15 @@ EOF
     compile_results
     run_analysis
     generate_verdict
+    local verdict_file="${OUTPUT_DIR}/reports/final_verdict.json"
+    local verdict_status
+    verdict_status="$(pack_read_final_verdict "${verdict_file}")"
+    if [[ "${verdict_status}" == "FAIL" ]]; then
+        log "ERROR: Final verdict is ${verdict_status}; suite marked failed."
+        suite_status=1
+    elif [[ "${verdict_status}" != "PASS" ]]; then
+        log "WARNING: Final verdict status is ${verdict_status}; unable to enforce PASS gate."
+    fi
 
     local end_time=$(date +%s)
     local duration=$((end_time - start_time))
@@ -1896,6 +2115,7 @@ EOF
     log "Tasks completed: $(count_tasks "completed")/${total_tasks}"
     log "Report: ${OUTPUT_DIR}/reports/final_verdict.txt"
     log "Presets: ${OUTPUT_DIR}/presets/"
+    return "${suite_status}"
 }
 
 # ============ MAIN ============
@@ -1928,25 +2148,46 @@ pack_run_suite() {
     pack_setup_output_dirs || return 1
     pack_prepare_scenarios_manifest || return 1
     pack_setup_hf_cache_dirs || return 1
+    pack_preflight_datasets || return 1
 
     pack_model_list_array
     if [[ ${#PACK_MODEL_LIST[@]} -eq 0 ]]; then
         error_exit "No models configured for PACK_SUITE=${PACK_SUITE}."
     fi
 
-    # Calibration-only runs do not execute clean/stress/error scenarios.
-    # Avoid requiring tuned edit presets during this phase.
-    if [[ "${PACK_SUITE_MODE:-full}" == "calibrate-only" ]]; then
-        CLEAN_EDIT_RUNS=0
-        STRESS_EDIT_RUNS=0
-        RUN_ERROR_INJECTION="false"
-        export CLEAN_EDIT_RUNS STRESS_EDIT_RUNS RUN_ERROR_INJECTION
-    fi
+    # Suite modes can change what parts of the task graph are generated.
+    # This keeps feedback loops fast when iterating on a specific subsystem.
+    case "${PACK_SUITE_MODE:-full}" in
+        calibrate-only)
+            # Calibration-only runs do not execute clean/stress/error scenarios.
+            # Avoid requiring tuned edit presets during this phase.
+            CLEAN_EDIT_RUNS=0
+            STRESS_EDIT_RUNS=0
+            RUN_ERROR_INJECTION="false"
+            export CLEAN_EDIT_RUNS STRESS_EDIT_RUNS RUN_ERROR_INJECTION
+            ;;
+        errors-only)
+            # Error-only runs are for rapidly iterating on error injection + guard probes.
+            # Keep calibration (or preset reuse) enabled so detectors have a baseline.
+            CLEAN_EDIT_RUNS=0
+            STRESS_EDIT_RUNS=0
+            RUN_ERROR_INJECTION="true"
+            export CLEAN_EDIT_RUNS STRESS_EDIT_RUNS RUN_ERROR_INJECTION
+            ;;
+    esac
 
     pack_prepare_tuned_edit_params || return 1
     pack_validate_tuned_edit_params || return 1
     pack_prepare_calibration_presets || return 1
     pack_validate_guard_calibration || return 1
+
+    # Net-enabled preflight uses optional python deps (huggingface_hub) and should
+    # not run before we validate/install dependencies.
+    if [[ "${PACK_NET}" == "1" && "${PACK_DEPENDENCIES_CHECKED:-0}" != "1" ]]; then
+        check_dependencies
+        PACK_DEPENDENCIES_CHECKED=1
+        export PACK_DEPENDENCIES_CHECKED
+    fi
 
     if [[ "${PACK_NET}" == "1" ]]; then
         pack_preflight_models "${OUTPUT_DIR}" "${PACK_MODEL_LIST[@]}" || return 1

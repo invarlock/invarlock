@@ -10,6 +10,9 @@ from invarlock.cli.commands import verify as V
 def _base_cert() -> dict:
     return {
         "schema_version": "v1",
+        "run_id": "run-verify-branches",
+        "artifacts": {"generated_at": "2024-01-01T00:00:00Z"},
+        "plugins": {},
         "baseline_ref": {"primary_metric": {"final": 10.0}},
         "primary_metric": {
             "kind": "ppl_causal",
@@ -19,6 +22,8 @@ def _base_cert() -> dict:
             "display_ci": [10.0, 10.0],
         },
         "dataset": {
+            "provider": "unit",
+            "seq_len": 8,
             "windows": {
                 "preview": 1,
                 "final": 1,
@@ -28,7 +33,7 @@ def _base_cert() -> dict:
                     "window_overlap_fraction": 0.0,
                     "coverage": {"preview": {"used": 1}, "final": {"used": 1}},
                 },
-            }
+            },
         },
         "meta": {},
     }

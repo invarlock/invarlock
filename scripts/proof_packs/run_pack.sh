@@ -11,14 +11,17 @@ pack_usage() {
 Usage: scripts/proof_packs/run_pack.sh [options]
 
 Options:
-  --suite NAME         Suite name (subset|full)
+  --suite NAME         Suite name (subset|showcase|workshop3|full)
+  --models CSV         Comma-separated model IDs to run (overrides suite defaults)
   --net 1|0            Enable network access for preflight/downloads (default: 0)
   --out DIR            Output directory for the run (default: ./proof_pack_runs/<suite>_<timestamp>)
   --pack-dir DIR       Output directory for the proof pack (default: <out>/proof_pack)
   --layout NAME        Pack layout (v1|v2) (default: v1)
   --determinism MODE   Determinism mode (strict|throughput)
   --repeats N          Determinism repeat count metadata (default: 0)
+  --scenario-ids IDS   Comma-separated scenario IDs to include (filters scenarios.json before queue generation)
   --calibrate-only     Only run calibration tasks (implies PACK_SUITE_MODE=calibrate-only)
+  --errors-only        Only run error injection scenarios (still performs calibration unless presets are provided)
   --run-only           Run edits/certs only (implies resume)
   --resume             Resume an existing run directory
   --help               Show this help message
@@ -162,6 +165,46 @@ pack_write_manifest() {
         --repeats "${repeats}"
 }
 
+pack_require_passing_run_verdict() {
+    local run_dir="$1"
+    local verdict_file="${run_dir}/reports/final_verdict.json"
+    local verdict_status="MISSING"
+
+    if type pack_read_final_verdict >/dev/null 2>&1; then
+        verdict_status="$(pack_read_final_verdict "${verdict_file}")"
+    else
+        verdict_status="$(python3 - "${verdict_file}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+if not path.is_file():
+    print("MISSING")
+    raise SystemExit(0)
+try:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+except Exception:
+    print("INVALID")
+    raise SystemExit(0)
+value = payload.get("verdict")
+if isinstance(value, str):
+    print(value.strip().upper())
+else:
+    print("MISSING")
+PY
+)"
+    fi
+
+    if [[ "${verdict_status}" == "FAIL" ]]; then
+        echo "ERROR: Run final verdict is FAIL; refusing to build a distributable pack." >&2
+        return 1
+    fi
+    if [[ "${verdict_status}" != "PASS" ]]; then
+        echo "WARNING: Run final verdict status is ${verdict_status}; proceeding with pack build." >&2
+    fi
+}
+
 pack_sign_manifest() {
     local pack_dir="$1"
     local strict="${PACK_STRICT_MODE:-0}"
@@ -271,6 +314,9 @@ pack_write_readme() {
 This proof pack bundles reports, summary reports, and metadata for offline
 verification. No model weights are included.
 
+By default this is evidence-grade packaging. For proof-grade attestation,
+require a signed manifest and strict verification.
+
 ## Verify
 
 1) Verify the manifest signature (if present):
@@ -300,6 +346,8 @@ pack_build_pack() {
         echo "ERROR: run_dir not found: ${run_dir}" >&2
         return 1
     fi
+
+    pack_require_passing_run_verdict "${run_dir}" || return 1
 
     if [[ -d "${pack_dir}" && -n "$(ls -A "${pack_dir}" 2>/dev/null)" ]]; then
         echo "ERROR: pack_dir already exists and is not empty: ${pack_dir}" >&2
@@ -341,6 +389,10 @@ pack_build_pack() {
     pack_copy_file "${run_dir}/reports/final_verdict.txt" "${verdicts_dir}/final_verdict.txt"
     pack_copy_file "${run_dir}/reports/final_verdict.json" "${verdicts_dir}/final_verdict.json"
     pack_copy_optional "${run_dir}/analysis/determinism_repeats.json" "${analysis_dir}/determinism_repeats.json"
+    pack_copy_optional "${run_dir}/reports/category_summary.json" "${analysis_dir}/category_summary.json"
+    pack_copy_optional "${run_dir}/reports/guard_signal_summary.json" "${analysis_dir}/guard_signal_summary.json"
+    pack_copy_optional "${run_dir}/reports/guard_intervention_summary.json" "${analysis_dir}/guard_intervention_summary.json"
+    pack_copy_optional "${run_dir}/reports/scenario_signal_summary.json" "${analysis_dir}/scenario_signal_summary.json"
 
     pack_copy_optional "${run_dir}/state/model_revisions.json" "${revisions_dest}"
     pack_copy_optional "${run_dir}/state/scenarios.json" "${scenarios_dest}"
@@ -353,6 +405,9 @@ pack_build_pack() {
         local dest_dir="${pack_dir}/certs/${rel}"
         mkdir -p "${dest_dir}"
         cp "${cert}" "${dest_dir}/evaluation.report.json"
+        # Optional sidecar artifacts (used by some detectors; safe to omit when absent).
+        pack_copy_optional "$(dirname "${cert}")/rmt_probe.json" "${dest_dir}/rmt_probe.json"
+        pack_copy_optional "$(dirname "${cert}")/ve_probe.json" "${dest_dir}/ve_probe.json"
     done < <(pack_collect_certs "${run_dir}")
 
     local verify_rc=0
@@ -395,6 +450,7 @@ pack_run_pack() {
 
     local suite="${PACK_SUITE:-subset}"
     local net="${PACK_NET:-0}"
+    local models_csv="${PACK_MODELS_CSV:-${PACK_MODELS:-}}"
     local out="${PACK_OUTPUT_DIR:-${OUTPUT_DIR:-}}"
     local determinism="${PACK_DETERMINISM:-throughput}"
     local repeats="${PACK_REPEATS:-0}"
@@ -402,6 +458,7 @@ pack_run_pack() {
     local resume_flag="${RESUME_FLAG:-false}"
     local pack_dir="${PACK_DIR:-}"
     local layout="${PACK_PACK_LAYOUT:-v1}"
+    local scenario_ids="${PACK_SCENARIO_IDS:-}"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -421,6 +478,14 @@ pack_run_pack() {
                 net="${2:-}"
                 if [[ -z "${net}" ]]; then
                     echo "ERROR: --net requires 1 or 0" >&2
+                    return 2
+                fi
+                shift 2
+                ;;
+            --models)
+                models_csv="${2:-}"
+                if [[ -z "${models_csv}" ]]; then
+                    echo "ERROR: --models requires a value" >&2
                     return 2
                 fi
                 shift 2
@@ -457,6 +522,14 @@ pack_run_pack() {
                 fi
                 shift 2
                 ;;
+            --scenario-ids)
+                scenario_ids="${2:-}"
+                if [[ -z "${scenario_ids}" ]]; then
+                    echo "ERROR: --scenario-ids requires a value" >&2
+                    return 2
+                fi
+                shift 2
+                ;;
             --repeats)
                 repeats="${2:-}"
                 if [[ -z "${repeats}" || ! "${repeats}" =~ ^[0-9]+$ ]]; then
@@ -471,6 +544,11 @@ pack_run_pack() {
                 ;;
             --calibrate-only)
                 suite_mode="calibrate-only"
+                resume_flag="false"
+                shift
+                ;;
+            --errors-only)
+                suite_mode="errors-only"
                 resume_flag="false"
                 shift
                 ;;
@@ -509,12 +587,20 @@ pack_run_pack() {
 
     local -a run_args
     run_args=("--suite" "${suite}" "--out" "${out}" "--determinism" "${determinism}" "--repeats" "${repeats}" "--net" "${net}")
+    if [[ -n "${models_csv}" ]]; then
+        run_args+=("--models" "${models_csv}")
+    fi
     if [[ "${suite_mode}" == "calibrate-only" ]]; then
         run_args+=("--calibrate-only")
+    elif [[ "${suite_mode}" == "errors-only" ]]; then
+        run_args+=("--errors-only")
     elif [[ "${suite_mode}" == "run-only" ]]; then
         run_args+=("--run-only")
     elif [[ "${resume_flag}" == "true" ]]; then
         run_args+=("--resume")
+    fi
+    if [[ -n "${scenario_ids}" ]]; then
+        run_args+=("--scenario-ids" "${scenario_ids}")
     fi
 
     pack_entrypoint "${run_args[@]}"

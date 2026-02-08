@@ -1,5 +1,6 @@
 import os
 
+from click.termui import strip_ansi
 from typer.testing import CliRunner
 
 os.environ["INVARLOCK_LIGHT_IMPORT"] = "1"
@@ -10,7 +11,7 @@ def test_invarlock_help_layout_and_exit_codes():
     runner = CliRunner()
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    out = result.stdout
+    out = strip_ansi(result.stdout)
 
     # Core copy
     assert "evaluate model changes" in out.lower()
@@ -32,14 +33,14 @@ def test_invarlock_version_option():
     runner = CliRunner()
     result = runner.invoke(app, ["--version"])
     assert result.exit_code == 0
-    assert "InvarLock" in result.stdout
+    assert "InvarLock" in strip_ansi(result.stdout)
 
 
 def test_report_group_help_lists_subcommands():
     runner = CliRunner()
     result = runner.invoke(app, ["report", "--help"])
     assert result.exit_code == 0
-    out = result.stdout
+    out = strip_ansi(result.stdout)
     for sub in ("verify", "explain", "html", "validate"):
         assert sub in out
 
@@ -48,7 +49,7 @@ def test_plugins_group_help_lists_subcommands():
     runner = CliRunner()
     result = runner.invoke(app, ["plugins", "--help"])
     assert result.exit_code == 0
-    out = result.stdout
+    out = strip_ansi(result.stdout)
     for sub in ("list", "guards", "edits", "install", "uninstall"):
         assert sub in out
 

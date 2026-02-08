@@ -94,7 +94,7 @@ def test_local_jsonl_pairs_provider_windows_and_labels(tmp_path: Path):
 def test_hf_text_provider_windows_and_tokenize(monkeypatch):
     monkeypatch.setattr(data_mod, "HAS_DATASETS", True, raising=False)
 
-    def fake_load_dataset(path, name=None, split=None, cache_dir=None):
+    def fake_load_dataset(path, name=None, split=None, cache_dir=None, **kwargs):
         return [{"text": "example one"}, {"text": "example two"}]
 
     monkeypatch.setattr(data_mod, "load_dataset", fake_load_dataset, raising=False)
@@ -111,7 +111,7 @@ def test_hf_text_provider_windows_and_tokenize(monkeypatch):
 def test_hf_seq2seq_provider_windows_and_capacity(monkeypatch):
     monkeypatch.setattr(data_mod, "HAS_DATASETS", True, raising=False)
 
-    def fake_load_dataset(path, name=None, split=None, cache_dir=None):
+    def fake_load_dataset(path, name=None, split=None, cache_dir=None, **kwargs):
         return [
             {"source": "src one", "target": "tgt one"},
             {"source": "src two", "target": "tgt two"},

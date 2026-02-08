@@ -11,7 +11,7 @@ task graph, scheduling, and artifact generation. It complements
 | Purpose | Hardware-agnostic Phase 0 validation harness for edit detection |
 | Version | `proof-packs-v1` |
 | Hardware | NVIDIA GPUs where models fit VRAM; multi-GPU recommended for `full` |
-| Models | `subset` (1 model) or `full` (6 models), ungated public |
+| Models | `subset` (1 model), `showcase`/`workshop3` (3 models), or `full` (6 models); all ungated public |
 | Edits | 4 types × 2 versions per model; clean variants use tuned presets |
 | Scheduling | Dynamic work-stealing, `small_first` priority strategy |
 | Multi-GPU | Profile-based; `required_gpus` grows only when memory requires it |
@@ -49,8 +49,8 @@ task graph, scheduling, and artifact generation. It complements
   portable proof pack (manifest + checksums + certs).
 - `scripts/proof_packs/verify_pack.sh` validates a proof pack: checksums,
   optional GPG signature, and `invarlock verify`.
-- `scripts/proof_packs/suites.sh` defines the `subset` and `full` model sets and
-  allows `MODEL_1`–`MODEL_8` overrides.
+- `scripts/proof_packs/suites.sh` defines the model suites and allows
+  `MODEL_1`–`MODEL_8` overrides.
 - `scripts/proof_packs/lib/validation_suite.sh` orchestrates the run: preflight,
   queue creation, worker launch, and monitoring.
 
@@ -79,9 +79,9 @@ task graph, scheduling, and artifact generation. It complements
 └──────┬───────┴───────┬──────┴────────────────────────────┘
        │               │
        ▼               ▼
-┌──────────────────────────────────────────────────────────┐
+┌───────────────────────────────────────────────────────────┐
 │                    ORCHESTRATION LAYER                    │
-├──────────────────────────────────────────────────────────┤
+├───────────────────────────────────────────────────────────┤
 │  lib/validation_suite.sh (main_dynamic)                   │
 │  ├─ Phase 0: setup + preflight                            │
 │  ├─ Phase 1: queue init      ───────────┐                 │
@@ -91,27 +91,27 @@ task graph, scheduling, and artifact generation. It complements
                                │          │
        ┌───────────────────────┘          └─────────────┐
        ▼                                                 ▼
-┌──────────────────────────┐                   ┌──────────────────┐
+┌───────────────────────────┐                   ┌──────────────────┐
 │       TASK EXECUTION      │                   │  CORE SERVICES   │
-├──────────────────────────┤                   ├──────────────────┤
+├───────────────────────────┤                   ├──────────────────┤
 │  lib/gpu_worker.sh        │◄──────────────────┤  queue_manager   │
 │  ├─ Task claim            │                   │  scheduler       │
 │  ├─ OOM pre-check         │                   │  task_serial.    │
 │  ├─ execute_task()        │                   │  fault_tol.      │
 │  └─ GPU cleanup           │                   └──────────────────┘
-└──────┬───────────────────┘
+└──────┬────────────────────┘
        │
        ▼
-┌──────────────────────────┐
+┌───────────────────────────┐
 │       TASK FUNCTIONS      │
-├──────────────────────────┤
+├───────────────────────────┤
 │  ├─ SETUP_BASELINE        │
 │  ├─ CALIBRATION_RUN       │
 │  ├─ GENERATE_PRESET       │
 │  ├─ CREATE_EDITS(_BATCH)  │
 │  ├─ CREATE_ERROR          │
-│  └─ evaluate_*             │
-└──────────────────────────┘
+│  └─ evaluate_*            │
+└───────────────────────────┘
 ```
 
 ## Troubleshooting decision tree
@@ -147,6 +147,8 @@ Model suites are defined in `scripts/proof_packs/suites.sh` and applied by
 | Suite | Models | Notes |
 | --- | --- | --- |
 | `subset` | `mistralai/Mistral-7B-v0.1` | Single-GPU friendly |
+| `showcase` | `mistralai/Mistral-7B-v0.1`, `Qwen/Qwen2.5-14B`, `Qwen/Qwen2.5-32B` | Multi-GPU recommended; guard-focused scenarios |
+| `workshop3` | `mistralai/Mistral-7B-v0.1`, `mistralai/Mixtral-8x7B-v0.1`, `01-ai/Yi-34B` | Workshop-friendly 3-model suite (architecture diversity) |
 | `full` | `mistralai/Mistral-7B-v0.1`, `Qwen/Qwen2.5-14B`, `Qwen/Qwen2.5-32B`, `01-ai/Yi-34B`, `mistralai/Mixtral-8x7B-v0.1`, `Qwen/Qwen1.5-72B` | Multi-GPU recommended |
 
 Default full-suite model sizes (weights-only, approximate):
@@ -186,7 +188,15 @@ parameters at runtime.
 
 ### Stress edits
 
-Stress edits should trigger InvarLock guard failures:
+Stress edits are split into required-fail (catastrophic) and informational scenarios.
+Required-fail scenarios are gating in the final verdict; informational scenarios are tracked
+as detection-quality signals and are validated by a minimum signal-fraction criterion.
+
+Important nuance: some guards remediate without flipping a boolean validation gate. For
+example, Spectral can remain `validation.spectral_stable=true` while applying caps
+(`spectral.caps_applied > 0`). Informational stress scenarios treat both hard gate flips
+and remediation events (caps applied) as a “signal” so the suite measures guard activity
+without manufacturing clean false positives.
 
 | Edit Type | Parameters | Scope |
 | --- | --- | --- |
@@ -199,11 +209,24 @@ Stress edits should trigger InvarLock guard failures:
 
 Enabled when `RUN_ERROR_INJECTION=true` (default):
 
-- `nan_injection`
-- `inf_injection`
-- `extreme_quant`
-- `scale_explosion`
-- `weight_tying_break`
+- Required detection (`must_detect`): `nan_injection`, `inf_injection`,
+  `shape_mismatch`, `missing_tensors`, `extreme_quant`, `scale_explosion`,
+  `rank_collapse`, `norm_collapse`, `weight_tying_break`
+- Informational detection: `rmt_norm_noise`, `spectral_moderate_scale`, `ve_mlp_scale_skew`
+
+`rmt_norm_noise` additionally emits an `rmt_probe.json` sidecar next to the error cert.
+This runs an explicit cross-model RMT probe on shared calibration windows (stored in the
+baseline report) so the proof pack can demonstrate RMT’s delta policy even when compare-mode
+evaluation keeps `validation.rmt_stable=true`.
+
+`ve_mlp_scale_skew` additionally emits a `ve_probe.json` sidecar next to the error cert.
+Variance (DD-VE) is a remediation guard and compare-mode evaluation runs the subject model
+with a no-op edit, which can mute VE’s in-report evidence. The VE probe runs VE calibration
+directly on shared windows and records whether VE proposes scales and produces a meaningful
+primary-metric improvement.
+
+Source of truth: `scripts/proof_packs/scenarios.json` strictness + `intent` +
+`primary_guard` metadata.
 
 ## Scheduling
 
@@ -418,6 +441,10 @@ OUTPUT_DIR/
   reports/
     final_verdict.txt
     final_verdict.json
+    category_summary.json
+    guard_signal_summary.json
+    guard_intervention_summary.json
+    scenario_signal_summary.json
   presets/
   state/
     model_revisions.json              # pinned HF revisions (when --net 1)
@@ -447,6 +474,11 @@ OUTPUT_DIR/
       <edit_name>/run_<n>/
       errors/<type>/
 ```
+
+Some scenarios emit additional sidecar artifacts alongside `evaluation.report.json`
+(for example `reports/errors/rmt_norm_noise/rmt_probe.json` or
+`reports/errors/ve_mlp_scale_skew/ve_probe.json`). When present, `run_pack.sh` copies
+these sidecars into the packaged proof pack under `certs/**/`.
 
 ## Run modes
 
@@ -504,7 +536,8 @@ Large runs can be storage-heavy (baseline + edits + error models):
 
 `run_pack.sh` builds a portable pack:
 
-- Copies `reports/final_verdict.{txt,json}` and key `analysis/*` artifacts.
+- Copies `reports/final_verdict.{txt,json}` plus verdict sidecars (`category_summary`,
+  `guard_signal_summary`, `scenario_signal_summary`) and key `analysis/*` artifacts.
 - Collects all reports into `proof_pack/certs/...`.
 - Generates `manifest.json`, `checksums.sha256`, and optional
   `manifest.json.asc`.
@@ -584,6 +617,19 @@ Common knobs for the setup script:
 | Variable | Default | Description |
 | --- | --- | --- |
 | `INVARLOCK_DATASET` | `wikitext2` | Dataset provider |
+| `INVARLOCK_DATASET_PROVIDER_YAML` | unset | Raw YAML mapping for `dataset.provider` (advanced; overrides provider kind + args) |
+| `INVARLOCK_DATASET_PROVIDER_JSON` | unset | Raw JSON object for `dataset.provider` (advanced; overrides provider kind + args) |
+| `INVARLOCK_HF_DATASET_NAME` | `allenai/c4` | HF dataset name when `INVARLOCK_DATASET=hf_text` (legacy `c4` auto-migrated) |
+| `INVARLOCK_HF_CONFIG_NAME` | `en` (for `allenai/c4`) | HF dataset config when `INVARLOCK_DATASET=hf_text` |
+| `INVARLOCK_HF_TEXT_FIELD` | `text` | Text field when `INVARLOCK_DATASET=hf_text` |
+| `INVARLOCK_HF_MAX_SAMPLES` | `2000` | Max rows consumed when `INVARLOCK_DATASET=hf_text` |
+| `INVARLOCK_HF_TRUST_REMOTE_CODE` | unset | Pass `trust_remote_code` to HF `load_dataset` (not needed for `allenai/c4` Parquet) |
+| `INVARLOCK_HF_CACHE_DIR` | unset | `datasets` cache_dir override when `INVARLOCK_DATASET=hf_text` |
+| `INVARLOCK_LOCAL_JSONL_FILE` | unset | JSONL file path when `INVARLOCK_DATASET=local_jsonl` |
+| `INVARLOCK_LOCAL_JSONL_PATH` | unset | JSONL file/dir path when `INVARLOCK_DATASET=local_jsonl` |
+| `INVARLOCK_LOCAL_JSONL_DATA_FILES` | unset | JSONL glob/list when `INVARLOCK_DATASET=local_jsonl` |
+| `INVARLOCK_LOCAL_JSONL_TEXT_FIELD` | `text` | Text field when `INVARLOCK_DATASET=local_jsonl` |
+| `INVARLOCK_LOCAL_JSONL_MAX_SAMPLES` | `2000` | Max rows consumed when `INVARLOCK_DATASET=local_jsonl` |
 | `INVARLOCK_TIER` | `balanced` | Guard tier preset |
 | `INVARLOCK_PREVIEW_WINDOWS` | `32` | Preview windows |
 | `INVARLOCK_FINAL_WINDOWS` | `32` | Final windows |

@@ -12,6 +12,8 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=runtime.sh
 source "${SCRIPT_DIR}/runtime.sh"
+# shellcheck source=dataset_provider_config.sh
+source "${SCRIPT_DIR}/dataset_provider_config.sh"
 [[ -z "${QUEUE_MANAGER_LOADED:-}" ]] && source "${SCRIPT_DIR}/queue_manager.sh" && export QUEUE_MANAGER_LOADED=1
 
 # ============ FALLBACK FUNCTIONS ============
@@ -357,6 +359,9 @@ YAML
             guards_order_yaml+=$'    - '"${g}"$'\n'
         done
 
+        local dataset_provider_yaml
+        dataset_provider_yaml="$(pack_render_dataset_provider_yaml "${INVARLOCK_DATASET:-wikitext2}")"
+
         local baseline_yaml="${abs_baseline_root}/baseline_noop.yaml"
         cat > "${baseline_yaml}" << YAML
 model:
@@ -369,7 +374,7 @@ model:
   low_cpu_mem_usage: true
 
 dataset:
-  provider: "${INVARLOCK_DATASET:-wikitext2}"
+${dataset_provider_yaml}
   split: validation
   seq_len: ${seq_len}
   stride: ${stride}
@@ -567,7 +572,7 @@ execute_task() {
     # Set PM acceptance range to avoid gate failures during validation
     # These bounds are calibrated for typical validation runs; adjust if needed
     export INVARLOCK_PM_ACCEPTANCE_MIN="${INVARLOCK_PM_ACCEPTANCE_MIN:-0.90}"
-    export INVARLOCK_PM_ACCEPTANCE_MAX="${INVARLOCK_PM_ACCEPTANCE_MAX:-1.20}"
+    export INVARLOCK_PM_ACCEPTANCE_MAX="${INVARLOCK_PM_ACCEPTANCE_MAX:-1.10}"
 
     local task_pid_file=""
     if [[ -n "${QUEUE_DIR:-}" && -d "${QUEUE_DIR}/running" ]]; then
@@ -615,13 +620,23 @@ execute_task() {
                 local run=$(echo "${params}" | jq -r '.run // 1')
                 task_evaluate_edit "${model_name}" "${gpu_id}" "${edit_spec}" "${version}" "${run}" "${output_dir}" "${task_log}" || exit_code=$?
                 ;;
+            CLEANUP_EDIT)
+                local edit_spec=$(echo "${params}" | jq -r '.edit_spec // ""')
+                local version=$(echo "${params}" | jq -r '.version // "clean"')
+                task_cleanup_edit "${model_name}" "${edit_spec}" "${version}" "${output_dir}" "${task_log}" || exit_code=$?
+                ;;
             CREATE_ERROR)
                 local error_type=$(echo "${params}" | jq -r '.error_type // ""')
-                task_create_error "${model_name}" "${gpu_id}" "${error_type}" "${output_dir}" "${task_log}" || exit_code=$?
+                local error_env=$(echo "${params}" | jq -c '.error_env // {}' 2>/dev/null || echo '{}')
+                task_create_error "${model_name}" "${gpu_id}" "${error_type}" "${error_env}" "${output_dir}" "${task_log}" || exit_code=$?
                 ;;
             evaluate_ERROR)
                 local error_type=$(echo "${params}" | jq -r '.error_type // ""')
                 task_evaluate_error "${model_name}" "${gpu_id}" "${error_type}" "${output_dir}" "${task_log}" || exit_code=$?
+                ;;
+            CLEANUP_ERROR)
+                local error_type=$(echo "${params}" | jq -r '.error_type // ""')
+                task_cleanup_error "${model_name}" "${error_type}" "${output_dir}" "${task_log}" || exit_code=$?
                 ;;
             GENERATE_PRESET)
                 task_generate_preset "${model_name}" "${output_dir}" "${task_log}" || exit_code=$?
@@ -926,6 +941,9 @@ YAML
         guards_order_yaml+=$'    - '"${g}"$'\n'
     done
 
+    local dataset_provider_yaml
+    dataset_provider_yaml="$(pack_render_dataset_provider_yaml "${INVARLOCK_DATASET:-wikitext2}")"
+
     cat > "${config_yaml}" << YAML_EOF
 model:
   id: "${baseline_path}"
@@ -937,7 +955,7 @@ model:
   low_cpu_mem_usage: true
 
 dataset:
-  provider: "${INVARLOCK_DATASET:-wikitext2}"
+${dataset_provider_yaml}
   preview_n: ${preview_n}
   final_n: ${final_n}
   seq_len: ${seq_len}
@@ -978,7 +996,7 @@ YAML_EOF
     local report_file=$(find "${run_dir}" -name "report*.json" -type f 2>/dev/null | head -1)
     if [[ -n "${report_file}" ]]; then
         cp "${report_file}" "${run_dir}/baseline_report.json" 2>/dev/null || true
-        _cmd_python "${SCRIPT_DIR}/../python/report_from_report.py" \
+        _cmd_python "${SCRIPT_DIR}/../python/evaluation_report_from_report.py" \
             --report "${report_file}" \
             --out "${run_dir}/evaluation.report.json" >> "${log_file}" 2>&1 || true
     fi
@@ -1378,9 +1396,11 @@ YAML
         # Create minimal preset with seq_len/stride
         mkdir -p "${preset_dir}"
         preset_file="${preset_dir}/calibrated_preset_${model_name}.yaml"
+        local dataset_provider_yaml
+        dataset_provider_yaml="$(pack_render_dataset_provider_yaml "${INVARLOCK_DATASET:-wikitext2}")"
         cat > "${preset_file}" << PRESET_YAML
 dataset:
-  provider: wikitext2
+${dataset_provider_yaml}
   split: validation
   seq_len: ${seq_len}
   stride: ${stride}
@@ -1424,25 +1444,107 @@ PRESET_YAML
     # Find and copy report (only the canonical cert)
     if [[ ! -f "${cert_file}" ]]; then
         local found_cert
-        found_cert=$(find "${cert_dir}" -name "evaluation.report.json" -type f 2>/dev/null | head -1)
+        found_cert=$(find "${cert_dir}" -name "evaluation.report.json" -type f 2>/dev/null | sort | tail -1)
         if [[ -n "${found_cert}" && -f "${found_cert}" && "${found_cert}" != "${cert_file}" ]]; then
             cp "${found_cert}" "${cert_file}" 2>/dev/null || true
         fi
     fi
 
+    # Some failure modes (e.g., overhead gate, abort-on-unsafe) still write a
+    # structured `report.json` but skip the derived `evaluation.report.json`.
+    # Convert when possible so the proof-pack verdict can still be computed.
+    if [[ ! -f "${cert_file}" ]]; then
+        local report_file=""
+        report_file=$(find "${cert_dir}" -name "report*.json" -type f 2>/dev/null | sort | tail -1)
+        if [[ -n "${report_file}" && -f "${report_file}" ]]; then
+            _cmd_python "${SCRIPT_DIR}/../python/evaluation_report_from_report.py" \
+                --report "${report_file}" \
+                --out "${cert_file}" >> "${log_file}" 2>&1 || true
+        fi
+    fi
+
+    # InvarLock may exit non-zero (e.g., abort-on-unsafe in CI/release profiles)
+    # while still writing the canonical report. The proof-pack harness only needs
+    # the report artifact; treat this as success to avoid wasteful retries.
+    if [[ ${exit_code} -ne 0 && -f "${cert_file}" ]]; then
+        echo "  WARNING: invarlock evaluate exited ${exit_code} but wrote evaluation.report.json; treating as success" >> "${log_file}"
+        exit_code=0
+    fi
+
     return ${exit_code}
+}
+
+# ============ TASK: CLEANUP_EDIT ============
+task_cleanup_edit() {
+    local model_name="$1"
+    local edit_spec="$2"
+    local version="$3"
+    local output_dir="$4"
+    local log_file="$5"
+
+    if [[ "${PACK_CLEANUP_MODELS:-1}" == "0" ]]; then
+        echo "  Cleanup disabled (PACK_CLEANUP_MODELS=0); skipping edit cleanup" >> "${log_file}"
+        return 0
+    fi
+
+    local model_output_dir="${output_dir}/${model_name}"
+    local resolved
+    resolved=$(resolve_edit_params "${model_output_dir}" "${edit_spec}" "${version}")
+    local status
+    status=$(echo "${resolved}" | jq -r '.status')
+    if [[ "${status}" == "skipped" ]]; then
+        echo "  Clean edit skipped by tuned preset: ${edit_spec}" >> "${log_file}"
+        return 0
+    fi
+    if [[ "${status}" != "selected" ]]; then
+        echo "ERROR: Unable to resolve edit spec (${edit_spec}): ${status}" >> "${log_file}"
+        return 1
+    fi
+    local edit_dir_name
+    edit_dir_name=$(echo "${resolved}" | jq -r '.edit_dir_name')
+    if [[ -z "${edit_dir_name}" || "${edit_dir_name}" == "null" ]]; then
+        echo "ERROR: Empty edit_dir_name for ${edit_spec}" >> "${log_file}"
+        return 1
+    fi
+
+    local models_root="${model_output_dir}/models"
+    local edit_path="${models_root}/${edit_dir_name}"
+    local baseline_path="${models_root}/baseline"
+
+    if [[ "${edit_path}" == "${baseline_path}" ]]; then
+        echo "ERROR: Refusing to delete baseline path: ${edit_path}" >> "${log_file}"
+        return 1
+    fi
+    if [[ "${edit_path}" != "${models_root}/"* ]]; then
+        echo "ERROR: Refusing to delete path outside models root: ${edit_path}" >> "${log_file}"
+        return 1
+    fi
+    if [[ ! -e "${edit_path}" ]]; then
+        echo "  Edit path already absent: ${edit_path}" >> "${log_file}"
+        return 0
+    fi
+
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Cleaning up edit model: ${edit_dir_name}" >> "${log_file}"
+    rm -rf "${edit_path}" >> "${log_file}" 2>&1 || {
+        echo "ERROR: Failed to remove edit path: ${edit_path}" >> "${log_file}"
+        return 1
+    }
+
+    echo "  Removed: ${edit_path}" >> "${log_file}"
+    return 0
 }
 
 # ============ TASK: CREATE_ERROR ============
 
 # Create error-injected model
-# Usage: task_create_error <model_name> <gpu_id> <error_type> <output_dir> <log_file>
+# Usage: task_create_error <model_name> <gpu_id> <error_type> <error_env_json> <output_dir> <log_file>
 task_create_error() {
     local model_name="$1"
     local gpu_id="$2"
     local error_type="$3"
-    local output_dir="$4"
-    local log_file="$5"
+    local error_env_json="${4:-{}}"
+    local output_dir="$5"
+    local log_file="$6"
 
     local model_output_dir="${output_dir}/${model_name}"
     local baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null || true)
@@ -1453,21 +1555,63 @@ task_create_error() {
         return 1
     fi
 
-    if [[ -d "${error_path}" && -f "${error_path}/config.json" ]]; then
+    # Only treat error models as cached when the injector completed fully.
+    # error_metadata.json is written by create_error_model.py at the end; partial
+    # directories (e.g. OOM-killed saves) may still contain config.json.
+    if [[ -d "${error_path}" && -f "${error_path}/config.json" && -f "${error_path}/error_metadata.json" ]]; then
         echo "  Error model ${error_type} already exists, skipping" >> "${log_file}"
         return 0
+    fi
+    if [[ -d "${error_path}" && -f "${error_path}/config.json" && ! -f "${error_path}/error_metadata.json" ]]; then
+        echo "  WARNING: Found incomplete error model (missing error_metadata.json); recreating: ${error_path}" >> "${log_file}"
+        rm -rf "${error_path}" 2>/dev/null || true
     fi
 
     echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Creating error model: ${error_type}" >> "${log_file}"
 
+    local -a injector_env=()
+    if [[ -n "${error_env_json}" && "${error_env_json}" != "null" ]]; then
+        mapfile -t injector_env < <(
+            printf '%s\n' "${error_env_json}" | jq -r '
+                if type=="object" then
+                    to_entries[]
+                    | select((.key | type) == "string")
+                    | select(.key | startswith("INVARLOCK_"))
+                    | select(.key | test("^[A-Z][A-Z0-9_]*$"))
+                    | select((.value | type) as $t | ($t == "string" or $t == "number" or $t == "boolean"))
+                    | "\(.key)=\(.value | tostring)"
+                else
+                    empty
+                end
+            ' 2>/dev/null
+        )
+    fi
+    if [[ ${#injector_env[@]} -gt 0 ]]; then
+        echo "  Injector env overrides: ${injector_env[*]}" >> "${log_file}"
+    fi
+
+    local create_rc=0
     if type create_error_model &>/dev/null; then
-        create_error_model "${baseline_path}" "${error_path}" "${error_type}" "${gpu_id}" >> "${log_file}" 2>&1
+        if [[ ${#injector_env[@]} -gt 0 ]]; then
+            (
+                for entry in "${injector_env[@]}"; do
+                    export "${entry}"
+                done
+                create_error_model "${baseline_path}" "${error_path}" "${error_type}" "${gpu_id}"
+            ) >> "${log_file}" 2>&1 || create_rc=$?
+        else
+            create_error_model "${baseline_path}" "${error_path}" "${error_type}" "${gpu_id}" >> "${log_file}" 2>&1 || create_rc=$?
+        fi
     else
         echo "ERROR: create_error_model not available" >> "${log_file}"
         return 1
     fi
+    if [[ ${create_rc} -ne 0 ]]; then
+        echo "  ERROR: create_error_model failed (exit=${create_rc})" >> "${log_file}"
+        return 1
+    fi
 
-    if [[ -d "${error_path}" && -f "${error_path}/config.json" ]]; then
+    if [[ -d "${error_path}" && -f "${error_path}/config.json" && -f "${error_path}/error_metadata.json" ]]; then
         echo "  Created: ${error_path}" >> "${log_file}"
         return 0
     else
@@ -1665,9 +1809,11 @@ YAML
         # Create minimal preset with seq_len/stride
         mkdir -p "${preset_dir}"
         preset_file="${preset_dir}/calibrated_preset_${model_name}.yaml"
+        local dataset_provider_yaml
+        dataset_provider_yaml="$(pack_render_dataset_provider_yaml "${INVARLOCK_DATASET:-wikitext2}")"
         cat > "${preset_file}" << PRESET_YAML
 dataset:
-  provider: wikitext2
+${dataset_provider_yaml}
   split: validation
   seq_len: ${seq_len}
   stride: ${stride}
@@ -1703,11 +1849,124 @@ PRESET_YAML
     # Find and copy report (only the canonical cert)
     if [[ ! -f "${cert_file}" ]]; then
         local found_cert
-        found_cert=$(find "${cert_dir}" -name "evaluation.report.json" -type f 2>/dev/null | head -1)
+        found_cert=$(find "${cert_dir}" -name "evaluation.report.json" -type f 2>/dev/null | sort | tail -1)
         if [[ -n "${found_cert}" && -f "${found_cert}" && "${found_cert}" != "${cert_file}" ]]; then
             cp "${found_cert}" "${cert_file}" 2>/dev/null || true
         fi
     fi
 
+    if [[ ! -f "${cert_file}" ]]; then
+        local report_file=""
+        report_file=$(find "${cert_dir}" -name "report*.json" -type f 2>/dev/null | sort | tail -1)
+        if [[ -n "${report_file}" && -f "${report_file}" ]]; then
+            _cmd_python "${SCRIPT_DIR}/../python/evaluation_report_from_report.py" \
+                --report "${report_file}" \
+                --out "${cert_file}" >> "${log_file}" 2>&1 || true
+        fi
+    fi
+
+    # Compare-mode evaluate cannot directly expose delta-style RMT signals because
+    # guards are prepared/finalized on the same loaded model. For the RMT probe
+    # scenario, emit an explicit cross-model artifact on shared windows.
+    if [[ "${error_type}" == rmt_norm_noise* && "${PACK_ENABLE_RMT_CROSS_PROBE:-1}" != "0" ]]; then
+        local probe_script="${SCRIPT_DIR}/../python/rmt_cross_model_probe.py"
+        local probe_out="${cert_dir}/rmt_probe.json"
+        if [[ -f "${probe_script}" && -n "${baseline_report_file}" && -f "${baseline_report_file}" ]]; then
+            local probe_rc=0
+            _cmd_python "${probe_script}" \
+                --baseline-model "${abs_baseline_path}" \
+                --subject-model "${abs_error_path}" \
+                --baseline-report "${baseline_report_file}" \
+                --out "${probe_out}" \
+                --tier "${tier}" \
+                --profile "${profile_flag}" \
+                --activation-windows "${PACK_RMT_PROBE_WINDOWS:-64}" \
+                >> "${log_file}" 2>&1 || probe_rc=$?
+            if [[ ${probe_rc} -ne 0 ]]; then
+                echo "  WARNING: RMT cross-model probe failed (exit=${probe_rc})" >> "${log_file}"
+            fi
+        else
+            echo "  WARNING: Skipping RMT cross-model probe (missing script or baseline report)" >> "${log_file}"
+        fi
+    fi
+
+    # VE/variance is a remediation guard and is muted under compare-mode evaluation
+    # because the subject run uses a no-op edit. Emit an explicit probe artifact on
+    # shared windows for the VE demo scenario.
+    if [[ "${error_type}" == ve_mlp_scale_skew* && "${PACK_ENABLE_VE_CROSS_PROBE:-1}" != "0" ]]; then
+        local ve_probe_script="${SCRIPT_DIR}/../python/ve_cross_model_probe.py"
+        local ve_probe_out="${cert_dir}/ve_probe.json"
+        if [[ -f "${ve_probe_script}" && -n "${baseline_report_file}" && -f "${baseline_report_file}" ]]; then
+            local ve_probe_rc=0
+            _cmd_python "${ve_probe_script}" \
+                --baseline-model "${abs_baseline_path}" \
+                --subject-model "${abs_error_path}" \
+                --baseline-report "${baseline_report_file}" \
+                --out "${ve_probe_out}" \
+                --tier "${tier}" \
+                --profile "${profile_flag}" \
+                --calibration-windows "${PACK_VE_PROBE_WINDOWS:-12}" \
+                --min-coverage "${PACK_VE_PROBE_MIN_COVERAGE:-10}" \
+                >> "${log_file}" 2>&1 || ve_probe_rc=$?
+            if [[ ${ve_probe_rc} -ne 0 ]]; then
+                echo "  WARNING: VE cross-model probe failed (exit=${ve_probe_rc})" >> "${log_file}"
+            fi
+        else
+            echo "  WARNING: Skipping VE cross-model probe (missing script or baseline report)" >> "${log_file}"
+        fi
+    fi
+
+    # Same as evaluate_EDIT: keep the task successful when the report exists even
+    # if the CLI exited non-zero (common for injected failures).
+    if [[ ${exit_code} -ne 0 && -f "${cert_file}" ]]; then
+        echo "  WARNING: invarlock evaluate exited ${exit_code} but wrote evaluation.report.json; treating as success" >> "${log_file}"
+        exit_code=0
+    fi
+
     return ${exit_code}
+}
+
+# ============ TASK: CLEANUP_ERROR ============
+task_cleanup_error() {
+    local model_name="$1"
+    local error_type="$2"
+    local output_dir="$3"
+    local log_file="$4"
+
+    if [[ "${PACK_CLEANUP_MODELS:-1}" == "0" ]]; then
+        echo "  Cleanup disabled (PACK_CLEANUP_MODELS=0); skipping error cleanup" >> "${log_file}"
+        return 0
+    fi
+
+    if [[ -z "${error_type}" ]]; then
+        echo "ERROR: CLEANUP_ERROR missing error_type" >> "${log_file}"
+        return 1
+    fi
+
+    local model_output_dir="${output_dir}/${model_name}"
+    local models_root="${model_output_dir}/models"
+    local error_path="${models_root}/error_${error_type}"
+    local baseline_path="${models_root}/baseline"
+
+    if [[ "${error_path}" == "${baseline_path}" ]]; then
+        echo "ERROR: Refusing to delete baseline path: ${error_path}" >> "${log_file}"
+        return 1
+    fi
+    if [[ "${error_path}" != "${models_root}/"* ]]; then
+        echo "ERROR: Refusing to delete path outside models root: ${error_path}" >> "${log_file}"
+        return 1
+    fi
+    if [[ ! -e "${error_path}" ]]; then
+        echo "  Error path already absent: ${error_path}" >> "${log_file}"
+        return 0
+    fi
+
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Cleaning up error model: ${error_type}" >> "${log_file}"
+    rm -rf "${error_path}" >> "${log_file}" 2>&1 || {
+        echo "ERROR: Failed to remove error path: ${error_path}" >> "${log_file}"
+        return 1
+    }
+
+    echo "  Removed: ${error_path}" >> "${log_file}"
+    return 0
 }

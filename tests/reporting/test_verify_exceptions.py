@@ -29,12 +29,13 @@ def test_verify_json_recompute_mismatch_metrics_error_in_ci(tmp_path: Path) -> N
     # Construct a evaluation_report with ppl kind and mismatched ratio vs baseline
     cert = {
         "schema_version": "v1",
-        "run_id": "r1",
+        "run_id": "run-1",
         "primary_metric": {
             "kind": "ppl_causal",
             "final": 12.0,
             "preview": 10.0,
             "ratio_vs_baseline": 1.2345,
+            "ci": [0.0, 0.0],
             "display_ci": [1.0, 1.0],
         },
         "provenance": {"provider_digest": {"ids_sha256": "deadbeef"}},
