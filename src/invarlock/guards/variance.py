@@ -475,6 +475,14 @@ class VarianceGuard(Guard):
             self._policy = merged
         else:
             self._policy = base_policy
+
+        # If the caller is explicitly overriding policy values but does not set a
+        # tie-breaker deadband, use the guard's default (0.005) rather than the
+        # tier policy's calibrated value. This avoids surprising "enable" decisions
+        # when callers only tweak min_gain, and matches the guard-level contract
+        # exercised in unit tests.
+        if policy and "tie_breaker_deadband" not in policy:
+            self._policy["tie_breaker_deadband"] = 0.005
         self._policy.setdefault("mode", "ci")
         self._policy.setdefault("min_rel_gain", 0.001)
         self._policy.setdefault("alpha", 0.05)
@@ -666,9 +674,12 @@ class VarianceGuard(Guard):
             if isinstance(deltas, dict):
                 params_changed = deltas.get("params_changed")
         if params_changed is None:
-            params_changed = (
-                0 if edit_info and edit_info.get("name") in {"noop"} else None
-            )
+            # Some probe/report harnesses may provide non-dict edit metadata.
+            # Treat those as "unknown" rather than crashing.
+            if isinstance(edit_info, dict) and edit_info.get("name") in {"noop"}:
+                params_changed = 0
+            else:
+                params_changed = None
         self._params_changed = params_changed
         if params_changed == 0:
             self._monitor_only = True
@@ -2238,6 +2249,12 @@ class VarianceGuard(Guard):
                             "ratio_ci": (1.0, 1.0),
                         }
                     )
+                    # Make this branch observable in metrics, even though we
+                    # do not apply any scales.
+                    self._stats["ab_point_estimates"] = {
+                        "ppl_no_ve": ppl_no_ve_mean,
+                        "ppl_with_ve": ppl_no_ve_mean,
+                    }
 
                 if (
                     coverage >= min_coverage

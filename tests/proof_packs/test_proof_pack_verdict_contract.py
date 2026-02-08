@@ -158,11 +158,7 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
         )
 
     rmt_cert = (
-        model_dir
-        / "reports"
-        / "errors"
-        / "rmt_norm_noise"
-        / "evaluation.report.json"
+        model_dir / "reports" / "errors" / "rmt_norm_noise" / "evaluation.report.json"
     )
     _write_cert(
         rmt_cert,

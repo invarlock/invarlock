@@ -424,7 +424,10 @@ def _record_primary_guard_hit(record: dict[str, Any]) -> bool:
             if signal is not None and _as_bool(signal, default=False) is True:
                 return True
             would_enable = probe.get("would_enable")
-            if would_enable is not None and _as_bool(would_enable, default=False) is True:
+            if (
+                would_enable is not None
+                and _as_bool(would_enable, default=False) is True
+            ):
                 return True
             scales = _as_int(probe.get("proposed_scales"), default=0)
             if scales > 0:
@@ -585,7 +588,9 @@ def _build_scenario_signal_summary(
     return rows
 
 
-def generate_verdict(*, output_dir: Path, manifest_path: Path | None = None) -> dict[str, Any]:
+def generate_verdict(
+    *, output_dir: Path, manifest_path: Path | None = None
+) -> dict[str, Any]:
     if manifest_path is None:
         manifest_path = _manifest_root() / "scenarios.json"
     manifest = _load_scenarios_manifest(manifest_path)

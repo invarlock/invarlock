@@ -81,7 +81,11 @@ def test_scenarios_require_direct_primary_guard_hits_for_demo_probes() -> None:
             f"{scenario_id}: primary_guard_required must be true"
         )
 
-    for scenario_id in ("rmt_norm_noise", "spectral_moderate_scale", "ve_mlp_scale_skew"):
+    for scenario_id in (
+        "rmt_norm_noise",
+        "spectral_moderate_scale",
+        "ve_mlp_scale_skew",
+    ):
         scenario = by_id[scenario_id]
         generation = scenario.get("generation")
         assert isinstance(generation, dict), f"{scenario_id}: generation must be dict"

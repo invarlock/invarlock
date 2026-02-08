@@ -10,4 +10,3 @@ def test_variance_guard_merges_defaults_for_partial_policy():
     calibration = g._policy.get("calibration")
     assert isinstance(calibration, dict)
     assert calibration.get("windows") == 7
-

@@ -17,7 +17,9 @@ def main() -> int:
     try:
         from datasets import load_dataset
     except Exception as exc:
-        print("[DATASET_PREFLIGHT] ERROR: datasets library is required for provider=wikitext2.")
+        print(
+            "[DATASET_PREFLIGHT] ERROR: datasets library is required for provider=wikitext2."
+        )
         print(f"[DATASET_PREFLIGHT] import_error={type(exc).__name__}: {exc}")
         return 1
 
@@ -49,4 +51,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
