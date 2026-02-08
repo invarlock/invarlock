@@ -12,6 +12,7 @@ Usage: scripts/proof_packs/run_pack.sh [options]
 
 Options:
   --suite NAME         Suite name (subset|showcase|workshop3|full)
+  --models CSV         Comma-separated model IDs to run (overrides suite defaults)
   --net 1|0            Enable network access for preflight/downloads (default: 0)
   --out DIR            Output directory for the run (default: ./proof_pack_runs/<suite>_<timestamp>)
   --pack-dir DIR       Output directory for the proof pack (default: <out>/proof_pack)
@@ -449,6 +450,7 @@ pack_run_pack() {
 
     local suite="${PACK_SUITE:-subset}"
     local net="${PACK_NET:-0}"
+    local models_csv="${PACK_MODELS_CSV:-${PACK_MODELS:-}}"
     local out="${PACK_OUTPUT_DIR:-${OUTPUT_DIR:-}}"
     local determinism="${PACK_DETERMINISM:-throughput}"
     local repeats="${PACK_REPEATS:-0}"
@@ -476,6 +478,14 @@ pack_run_pack() {
                 net="${2:-}"
                 if [[ -z "${net}" ]]; then
                     echo "ERROR: --net requires 1 or 0" >&2
+                    return 2
+                fi
+                shift 2
+                ;;
+            --models)
+                models_csv="${2:-}"
+                if [[ -z "${models_csv}" ]]; then
+                    echo "ERROR: --models requires a value" >&2
                     return 2
                 fi
                 shift 2
@@ -577,6 +587,9 @@ pack_run_pack() {
 
     local -a run_args
     run_args=("--suite" "${suite}" "--out" "${out}" "--determinism" "${determinism}" "--repeats" "${repeats}" "--net" "${net}")
+    if [[ -n "${models_csv}" ]]; then
+        run_args+=("--models" "${models_csv}")
+    fi
     if [[ "${suite_mode}" == "calibrate-only" ]]; then
         run_args+=("--calibrate-only")
     elif [[ "${suite_mode}" == "errors-only" ]]; then

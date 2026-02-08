@@ -43,6 +43,25 @@ test_run_suite_entrypoint_parses_scenario_ids_flag() {
     assert_eq "a,b,c" "$(cat "${TEST_TMPDIR}/entrypoint.scenario_ids")" "scenario ids propagated"
 }
 
+test_run_suite_entrypoint_parses_models_flag() {
+    mock_reset
+
+    source ./scripts/proof_packs/run_suite.sh
+
+    pack_apply_suite() {
+        MODEL_1="orig/model1"
+        MODEL_2="orig/model2"
+        export MODEL_1 MODEL_2
+        return 0
+    }
+    pack_run_suite() {
+        pack_model_list | paste -sd "," - > "${TEST_TMPDIR}/entrypoint.models"
+    }
+
+    pack_entrypoint --models "org/modelA,org/modelB" --out "${TEST_TMPDIR}/out"
+    assert_eq "org/modelA,org/modelB" "$(cat "${TEST_TMPDIR}/entrypoint.models")" "models override suite defaults"
+}
+
 test_run_suite_entrypoint_sets_default_output_dir() {
     mock_reset
 
@@ -88,6 +107,9 @@ test_run_suite_entrypoint_errors_on_missing_values() {
 
     run pack_entrypoint --out
     assert_rc "2" "${RUN_RC}" "missing out value"
+
+    run pack_entrypoint --models
+    assert_rc "2" "${RUN_RC}" "missing models value"
 
     run pack_entrypoint --scenario-ids
     assert_rc "2" "${RUN_RC}" "missing scenario-ids value"

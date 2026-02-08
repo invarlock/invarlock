@@ -18,6 +18,7 @@ WARNING: This runs the suite WITHOUT creating a proof pack.
 
 Options:
   --suite NAME         Suite name (subset|showcase|workshop3|full)
+  --models CSV         Comma-separated model IDs to run (overrides suite defaults)
   --net 1|0            Enable network access for preflight/downloads (default: 0)
   --out DIR            Output directory (default: ./proof_pack_runs/<suite>_<timestamp>)
   --determinism MODE   Determinism mode (strict|throughput)
@@ -57,6 +58,7 @@ pack_entrypoint() {
     set -euo pipefail
 
     local suite="${PACK_SUITE:-subset}"
+    local models_csv="${PACK_MODELS_CSV:-${PACK_MODELS:-}}"
     local net="${PACK_NET:-0}"
     local out="${PACK_OUTPUT_DIR:-${OUTPUT_DIR:-}}"
     local determinism="${PACK_DETERMINISM:-throughput}"
@@ -75,6 +77,14 @@ pack_entrypoint() {
                 suite="${2:-}"
                 if [[ -z "${suite}" ]]; then
                     echo "ERROR: --suite requires a value" >&2
+                    return 2
+                fi
+                shift 2
+                ;;
+            --models)
+                models_csv="${2:-}"
+                if [[ -z "${models_csv}" ]]; then
+                    echo "ERROR: --models requires a value" >&2
                     return 2
                 fi
                 shift 2
@@ -175,10 +185,48 @@ pack_entrypoint() {
     OUTPUT_DIR="${out}"
     PACK_SCENARIO_IDS="${scenario_ids}"
 
-    export PACK_SUITE PACK_NET PACK_DETERMINISM PACK_REPEATS PACK_SUITE_MODE RESUME_FLAG OUTPUT_DIR PACK_SCENARIO_IDS
+    PACK_MODELS_CSV="${models_csv}"
+
+    export PACK_SUITE PACK_NET PACK_DETERMINISM PACK_REPEATS PACK_SUITE_MODE RESUME_FLAG OUTPUT_DIR PACK_SCENARIO_IDS PACK_MODELS_CSV
 
     pack_apply_entrypoint_determinism
     pack_apply_suite "${PACK_SUITE}" || return 2
+
+    if [[ -n "${PACK_MODELS_CSV}" ]]; then
+        local -a models=()
+        local raw
+        IFS=',' read -r -a models <<< "${PACK_MODELS_CSV}"
+        local -a cleaned=()
+        for raw in "${models[@]}"; do
+            raw="${raw#"${raw%%[![:space:]]*}"}"
+            raw="${raw%"${raw##*[![:space:]]}"}"
+            [[ -n "${raw}" ]] || continue
+            cleaned+=("${raw}")
+        done
+
+        if [[ ${#cleaned[@]} -eq 0 ]]; then
+            echo "ERROR: --models provided no valid model ids" >&2
+            return 2
+        fi
+        if [[ ${#cleaned[@]} -gt 8 ]]; then
+            echo "ERROR: --models supports up to 8 models (got ${#cleaned[@]})" >&2
+            return 2
+        fi
+
+        # Override suite defaults. Leave unused MODEL_N blank to disable them.
+        local i
+        for i in {1..8}; do
+            local var="MODEL_${i}"
+            local idx=$((i - 1))
+            if [[ ${idx} -lt ${#cleaned[@]} ]]; then
+                printf -v "${var}" '%s' "${cleaned[${idx}]}"
+            else
+                printf -v "${var}" '%s' ""
+            fi
+            export "${var}"
+        done
+    fi
+
     pack_run_suite
 }
 

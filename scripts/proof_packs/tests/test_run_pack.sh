@@ -893,6 +893,9 @@ test_run_pack_entrypoint_errors_on_invalid_args() {
     run pack_run_pack --net
     assert_rc "2" "${RUN_RC}" "missing net value"
 
+    run pack_run_pack --models
+    assert_rc "2" "${RUN_RC}" "missing models value"
+
     run pack_run_pack --out
     assert_rc "2" "${RUN_RC}" "missing out value"
 
@@ -927,9 +930,10 @@ test_run_pack_entrypoint_parses_suite_determinism_and_repeats() {
     pack_entrypoint() { printf '%s\n' "$@" > "${TEST_TMPDIR}/run.args"; }
     pack_build_pack() { :; }
 
-    pack_run_pack --suite full --net 1 --layout v2 --determinism strict --repeats 2 --scenario-ids "x,y" --out "${TEST_TMPDIR}/out"
+    pack_run_pack --suite full --models "org/modelA" --net 1 --layout v2 --determinism strict --repeats 2 --scenario-ids "x,y" --out "${TEST_TMPDIR}/out"
 
     assert_match "--suite[[:space:]]+full" "$(cat "${TEST_TMPDIR}/run.args")" "suite forwarded"
+    assert_match "--models[[:space:]]+org/modelA" "$(cat "${TEST_TMPDIR}/run.args")" "models forwarded"
     assert_eq "v2" "${PACK_PACK_LAYOUT}" "layout forwarded"
     assert_match "--determinism[[:space:]]+strict" "$(cat "${TEST_TMPDIR}/run.args")" "determinism forwarded"
     assert_match "--repeats[[:space:]]+2" "$(cat "${TEST_TMPDIR}/run.args")" "repeats forwarded"
