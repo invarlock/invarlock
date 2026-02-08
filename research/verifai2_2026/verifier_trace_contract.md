@@ -64,6 +64,22 @@ The `items` array order is significant and must be the order used by the harness
 (UTF-8 bytes), after any harness templating/normalization. When `mode=embedded`,
 `items[*].text` must be present and `sha256(text)` must match `items[*].sha256`.
 
+### Pass@k (Multi-Attempt) Semantics
+
+Some verifiers compute pass@k by running multiple generations per prompt.
+To support this without changing the prompt-set contract:
+
+- `results.cases[*]` corresponds to **one prompt** (one task id).
+- If multiple attempts are run, record them under `results.cases[*].attempts[]`.
+- The case-level `verdict` is an **aggregate**:
+  - `pass` iff any attempt verdict is `pass`
+  - otherwise non-pass (fail/error/timeout) with implementation-defined
+    precedence; the trace should include per-attempt verdicts so precedence
+    does not hide information.
+- `results.summary.metric_name` should name the aggregate metric (e.g. `pass@1`,
+  `pass@10`). When available, also record `results.summary.k` and
+  `trace_contract.decoding.num_samples`.
+
 ## Required Fields (v1)
 
 ### 1) Verifier identity

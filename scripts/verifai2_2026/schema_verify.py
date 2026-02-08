@@ -179,6 +179,96 @@ def _validate_case_ids_match_prompt_set(trace: dict[str, Any]) -> list[str]:
     return errors
 
 
+def _validate_attempts_consistency(trace: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    results = trace.get("results") or {}
+    summary = results.get("summary") if isinstance(results, dict) else None
+    cases = results.get("cases") if isinstance(results, dict) else None
+    if not (isinstance(summary, dict) and isinstance(cases, list)):
+        return errors
+
+    n_samples_per_case = summary.get("n_samples_per_case")
+    if n_samples_per_case is not None:
+        try:
+            n_samples_per_case = int(n_samples_per_case)
+        except Exception:
+            n_samples_per_case = None
+
+    tc = trace.get("trace_contract") or {}
+    decoding = tc.get("decoding") if isinstance(tc, dict) else None
+    num_samples = None
+    if isinstance(decoding, dict) and decoding.get("num_samples") is not None:
+        try:
+            num_samples = int(decoding.get("num_samples"))
+        except Exception:
+            num_samples = None
+
+    k = summary.get("k")
+    if k is not None:
+        try:
+            k = int(k)
+        except Exception:
+            k = None
+
+    if k is not None and num_samples is not None and num_samples < k:
+        errors.append(
+            f"results.summary.k={k} but trace_contract.decoding.num_samples={num_samples}"
+        )
+
+    if (
+        n_samples_per_case is not None
+        and num_samples is not None
+        and n_samples_per_case != num_samples
+    ):
+        errors.append(
+            "results.summary.n_samples_per_case does not match trace_contract.decoding.num_samples"
+        )
+
+    for c in cases:
+        if not isinstance(c, dict):
+            continue
+        attempts = c.get("attempts")
+        if attempts is None:
+            continue
+        if not isinstance(attempts, list) or not attempts:
+            errors.append(
+                f"case id={c.get('id')}: attempts must be a non-empty array when present"
+            )
+            continue
+
+        if n_samples_per_case is not None and len(attempts) != n_samples_per_case:
+            errors.append(
+                f"case id={c.get('id')}: attempts has {len(attempts)} entries but n_samples_per_case={n_samples_per_case}"
+            )
+
+        attempt_ids: list[int] = []
+        any_pass = False
+        for a in attempts:
+            if not isinstance(a, dict):
+                continue
+            try:
+                attempt_ids.append(int(a.get("attempt_id")))
+            except Exception:
+                pass
+            if str(a.get("verdict")) == "pass":
+                any_pass = True
+
+        if len(set(attempt_ids)) != len(attempt_ids):
+            errors.append(
+                f"case id={c.get('id')}: attempts contains duplicate attempt_id values"
+            )
+
+        case_verdict = str(c.get("verdict"))
+        if case_verdict == "pass" and not any_pass:
+            errors.append(f"case id={c.get('id')}: verdict=pass but no attempt passed")
+        if case_verdict != "pass" and any_pass:
+            errors.append(
+                f"case id={c.get('id')}: verdict={case_verdict} but at least one attempt passed"
+            )
+
+    return errors
+
+
 def _check_file_sha256(path: Path, expected: str) -> str | None:
     if not path.exists():
         return f"referenced file does not exist: {path}"
@@ -241,6 +331,8 @@ def validate_artifact(path: Path, *, schema_root: Path, check_files: bool) -> li
                 for e in _validate_results_consistency(t):
                     errors.append(f"trace[{i}]: {e}")
                 for e in _validate_case_ids_match_prompt_set(t):
+                    errors.append(f"trace[{i}]: {e}")
+                for e in _validate_attempts_consistency(t):
                     errors.append(f"trace[{i}]: {e}")
 
     return errors
