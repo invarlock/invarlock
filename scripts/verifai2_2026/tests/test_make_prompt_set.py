@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from scripts.verifai2_2026 import make_prompt_set
+from scripts.verifai2_2026 import verifier_trace_from_cases
 
 
 def _sha256_hex(data: bytes) -> str:
@@ -111,10 +112,9 @@ def test_main_hash_only_limit_and_revision_default(tmp_path: Path) -> None:
     assert [it["id"] for it in obj["items"]] == ["a"]
     assert "text" not in obj["items"][0]
 
-    # Digest is stable and computed over dataset+id+sha only.
-    expected_digest = make_prompt_set._compute_prompt_set_digest(
-        obj["dataset"], obj["items"]
-    )
+    # Digest is computed per verifier_trace_contract.md: it must ignore embedded
+    # prompt text and non-identifier dataset metadata like manifest_sha256.
+    expected_digest = verifier_trace_from_cases._compute_prompt_set_digest(obj)
     assert obj["digest_sha256"] == expected_digest
 
 

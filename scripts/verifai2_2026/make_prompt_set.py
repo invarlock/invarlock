@@ -70,8 +70,15 @@ def _format_prompt(template: str, record: dict[str, Any], *, text_field: str) ->
 def _compute_prompt_set_digest(
     dataset: dict[str, Any], items: list[dict[str, Any]]
 ) -> str:
+    # Contract: digest hashes only dataset identifiers (name/config/split/revision)
+    # plus the ordered (id, sha256) item list. It must be stable across other
+    # dataset metadata such as manifest_sha256 or selection_script hashes.
+    dataset_id: dict[str, Any] = {}
+    for k in ("name", "config", "split", "revision"):
+        if k in dataset:
+            dataset_id[k] = dataset[k]
     payload = {
-        "dataset": dataset,
+        "dataset": dataset_id,
         "items": [{"id": it["id"], "sha256": it["sha256"]} for it in items],
     }
     return _sha256_hex(_canonical_json_bytes(payload))
