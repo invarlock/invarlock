@@ -186,6 +186,11 @@ python scripts/verifai2_2026/cases_from_harness.py \
   --in /tmp/harness_output.jsonl \
   --out /tmp/cases.jsonl
 
+# Scale runs from a JSON plan (dry-run vs execute). This is intended to be used
+# in the GPU environment after datasets/models are staged.
+python scripts/verifai2_2026/run_matrix.py --plan /tmp/verifai2_matrix_plan.json
+python scripts/verifai2_2026/run_matrix.py --execute --plan /tmp/verifai2_matrix_plan.json
+
 # Build a tiny local canary from a directory of code/text files
 python scripts/verifai2_2026/make_text_canary.py \
   --input-dir /path/to/corpus \
