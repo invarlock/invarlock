@@ -893,7 +893,8 @@ def _check_plugin_extras(plugin_name: str, plugin_type: str) -> str:
         },
         # Optional adapter plugins
         "hf_gptq": {"packages": ["auto_gptq"], "extra": "invarlock[gptq]"},
-        "hf_awq": {"packages": ["autoawq"], "extra": "invarlock[awq]"},
+        # `autoawq` installs the `awq` import name (not `autoawq`) in practice.
+        "hf_awq": {"packages": ["awq"], "extra": "invarlock[awq]"},
         "hf_bnb": {"packages": ["bitsandbytes"], "extra": "invarlock[gpu]"},
     }
 

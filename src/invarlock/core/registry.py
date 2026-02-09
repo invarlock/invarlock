@@ -170,7 +170,8 @@ class CoreRegistry:
             "invarlock.plugins.hf_awq_adapter",
             "HF_AWQ_Adapter",
             status="Available (plugin)",
-            required_deps=["autoawq"],
+            # `autoawq` installs the `awq` import name (not `autoawq`) in practice.
+            required_deps=["awq"],
         )
         _fallback(
             self._adapters,
