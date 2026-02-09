@@ -78,15 +78,15 @@ Model cards and leaderboards rarely encode verifier determinism contracts \citep
 Dataset metadata schemas such as Croissant improve dataset provenance but do not pin verifier-run
 provenance \citep{akhtar2024croissant}.
 Supply-chain frameworks like SLSA provide content-addressing primitives that inspire our design but
-target software artifacts, not model-evaluation evidence \citep{slsa2024spec}.
+target software artifacts, not model-evaluation evidence \citep{slsa2023spec}.
 
 \paragraph{Why not existing artifact and tracing standards?}
 Experiment trackers (e.g., MLflow, W\&B) log metrics and artifacts but do not enforce a closed
 schema with per-case verifier verdicts, prompt-set digesting rules, or code-execution sandbox
 contracts.
-SARIF standardizes static-analysis results but not generative-model evaluation.
-OpenTelemetry traces capture service-level spans, not the determinism contract needed to compare
-two verifier runs.
+SARIF \citep{sarif2020} standardizes static-analysis results but not generative-model evaluation.
+OpenTelemetry \citep{opentelemetryspec} traces capture service-level spans, not the determinism
+contract needed to compare two verifier runs.
 The gap we fill is specific: a strict, machine-validated object that binds auxiliary guard evidence
 to first-class verifier traces under a shared determinism contract, with per-case verdicts and
 prompt-set integrity built in.
@@ -154,7 +154,8 @@ recorded explicitly.
 
 \section{Schema Verification (Validator)}
 The \schemaverify utility validates:
-(i) structural conformance against Draft 2020-12 JSON Schema for both the wrapper artifact and each
+(i) structural conformance against Draft 2020-12 JSON Schema \citep{jsonschema2020_12} for both the
+wrapper artifact and each
 verifier trace, and
 (ii) cross-block consistency for contract-defined invariants, including prompt-set digest
 recomputation, case-id alignment between prompt sets and results, and (optionally) on-disk SHA-256
