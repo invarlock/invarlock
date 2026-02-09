@@ -69,7 +69,7 @@ REPORT_JSON_SCHEMA: dict[str, Any] = {
                     "properties": {
                         "preview": {"type": "integer", "minimum": 0},
                         "final": {"type": "integer", "minimum": 0},
-                        "seed": {"type": "integer"},
+                        "seed": {"type": ["integer", "null"]},
                         "stats": {"type": "object"},
                     },
                 },

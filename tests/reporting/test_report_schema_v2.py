@@ -106,6 +106,14 @@ def test_system_overhead_has_pattern_properties():
         assert any(isinstance(x, dict) and x.get("type") == "object" for x in one_of)
 
 
+def test_dataset_windows_seed_allows_null():
+    win_props = REPORT_JSON_SCHEMA["properties"]["dataset"]["properties"]["windows"][
+        "properties"
+    ]
+    seed_spec = win_props["seed"]
+    assert seed_spec.get("type") == ["integer", "null"]
+
+
 def test_primary_metric_analysis_basis_present_and_consistent():
     report = _mock_report_with_primary_metric()
     baseline = _mock_baseline()
