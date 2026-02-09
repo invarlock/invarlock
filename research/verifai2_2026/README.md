@@ -11,6 +11,7 @@ for two intended VerifAI-2 workshop submissions:
 Start here:
 
 - Plan: `research/verifai2_2026/PLAN.md`
+- S1 paper draft: `research/verifai2_2026/papers/s1.md`
 - Verifier trace contract (spec): `research/verifai2_2026/verifier_trace_contract.md`
 - Schemas:
   - `research/verifai2_2026/specs/verifier_trace.v1.schema.json`
