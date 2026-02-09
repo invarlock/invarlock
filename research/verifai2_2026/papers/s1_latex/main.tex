@@ -1,0 +1,167 @@
+\documentclass{article} % For LaTeX2e
+\usepackage{iclr2026_conference,times}
+
+% Optional math commands from https://github.com/goodfeli/dlbook_notation.
+\input{math_commands.tex}
+
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{xspace}
+
+\newcommand{\invarlock}{\textsc{InvarLock}\xspace}
+\newcommand{\schemaverify}{\texttt{schema-verify}\xspace}
+
+\title{A Machine-Readable Schema for Weight-Edit Evaluation Reports\\with First-Class Verifier Traces}
+
+% Authors must not appear in the submitted version.
+\author{Anonymous Authors}
+
+%\iclrfinalcopy % Uncomment for camera-ready version, but NOT for submission.
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Evaluations of weight edits such as quantization and pruning increasingly mix
+statistical guard frameworks (e.g., \invarlock), general evaluation harnesses,
+and task-specific external verifiers (e.g., HumanEval/MBPP execution).
+Today these tools emit incompatible artifacts, making it difficult to align guard
+evidence with verifier outcomes, reproduce end-to-end verification loops, or
+build automated promotion gates with auditable inputs.
+We propose a lightweight JSON Schema for \emph{verifier-carrying evaluation artifacts}
+that links three evidence elements in a single machine-checkable object:
+\texttt{guard\_evidence} (tool-native guard measurements, thresholds, and verdicts,
+including \invarlock evaluation reports and optional \texttt{invarlock verify} outputs),
+\texttt{verifier\_traces} (external verifier results together with a trace contract
+covering prompt hashes, harness/sandbox identity, resource limits, and decoding
+parameters), and \texttt{provenance} (model/tokenizer identity, edit configuration, and
+tool versioning), under a versioned wrapper (\texttt{schema\_version}).
+A companion \schemaverify utility validates structural conformance and cross-block
+consistency, enabling downstream automation to treat the artifact as a reliable unit
+of evidence in verification-aware pipelines.
+We implement serializers for \invarlock artifacts and code-execution verifiers and
+demonstrate cross-tool queries on a paired dataset spanning multiple models and edit
+families, including cases where guard evidence and verifier outcomes disagree.
+We release the schema, serializers, validator, and a queryable demo corpus as open-source
+building blocks for composing soft evidence with hard verification in model-edit workflows.
+\end{abstract}
+
+\section{Introduction}
+When a language model is quantized, pruned, or otherwise weight-edited, evaluation evidence is
+produced at three layers that rarely interoperate:
+(i) \textbf{guard frameworks} (e.g., \invarlock) emit diagnostic measurements and gate flags,
+(ii) \textbf{evaluation harnesses} define prompt sets and generation parameters,
+and (iii) \textbf{external verifiers} provide the decisive outcome signal (did outputs satisfy the
+verifier?).
+This structure aligns with verifier-first evaluation: the external verifier outcome is the
+headline metric, while guard evidence is auxiliary and diagnostic.
+In practice, however, the layers emit incompatible artifacts with missing provenance, and basic
+comparability questions become hard to answer automatically:
+are two reported pass@1 values computed over the same prompt set, under the same harness revision,
+with the same decoding parameters, and under the same execution sandbox constraints?
+
+Existing formats do not close this gap.
+Model cards and leaderboards rarely encode verifier determinism contracts \citep{mitchell2019model_cards}.
+Dataset metadata standards improve dataset provenance but do not pin verifier-run provenance
+\citep{akhtar2024croissant}.
+Supply-chain frameworks provide content-addressing primitives that inspire our design but target
+software artifacts rather than model-evaluation evidence \citep{slsa2024spec}.
+
+We address this with a \textbf{verifier-carrying artifact}: a strict JSON Schema that co-locates
+hash-linked guard evidence with first-class verifier traces under shared provenance.
+The verifier trace's \emph{contract} pins comparability-critical conditions (prompt-set digests,
+harness identity, model/tokenizer revisions, decoding parameters, and sandbox limits).
+\schemaverify checks JSON Schema conformance and contract-driven cross-block consistency, without
+claiming formal guarantees about model correctness or verifier soundness.
+
+\textbf{Contributions.}
+(1) A verifier-trace schema and contract for auditable external verification runs.
+(2) A wrapper schema that packages auxiliary guard evidence and first-class verifier traces in one
+queryable object.
+(3) A validator that enforces structure and cross-block consistency.
+
+\section{Schema Overview}
+The verifier-carrying artifact is a single JSON object
+(\texttt{schema\_version="verifier\_carrying\_artifact.v1"}) intended to be the unit of exchange for
+weight-edit evaluation evidence.
+It is intentionally strict (\texttt{additionalProperties=false}) on core objects so typos and
+logging drift fail validation instead of silently passing.
+The wrapper has three evidence blocks under shared provenance:
+\texttt{provenance}, \texttt{guard\_evidence}, and \texttt{verifier\_traces[]} (minItems=1).
+In v1, \texttt{guard\_evidence} includes \texttt{guard\_evidence.invarlock.evaluation\_report} as a
+content-addressed file reference (SHA-256) and optional \texttt{invarlock verify} output.
+The verifier trace is tool-agnostic: future versions can add peer guard-evidence blocks without
+changing the trace contract.
+
+\section{Verifier Trace Contract}
+The verifier trace contract is a minimal, machine-checkable record binding an external verifier
+outcome (e.g., HumanEval pass@1 \citep{chen2021humaneval} or MBPP pass@1 \citep{austin2021mbpp}) to
+the concrete conditions under which it was produced.
+It records: verifier identity (name/kind + harness identity), prompt-set integrity (dataset
+identifiers plus ordered prompt ids and hashes with a dataset-level digest computed over canonical
+JSON bytes), model/tokenizer id+revision, and decoding parameters (including seed).
+For code-execution verifiers, the schema requires an explicit sandbox block (network disabled,
+timeouts, and resource limits), making execution constraints auditable rather than implicit.
+
+The contract is a trust boundary: it makes comparability and auditability machine-checkable.
+It does not ``prove'' determinism across platforms; rather, it defines the minimum information
+needed to diagnose divergences and support replay.
+
+\section{Validator}
+\schemaverify performs structural validation against Draft 2020-12 JSON Schema for both the wrapper
+artifact and each verifier trace.
+It also checks contract-defined cross-block invariants, including prompt-set digest recomputation,
+alignment between prompt-set ids and per-case result ids, and (optionally) on-disk SHA-256
+verification when local paths are available.
+These checks establish evidence integrity and joinability, not behavioral correctness.
+
+\section{Demonstration Corpus}
+We include a queryable demonstration summary
+(\texttt{research/verifai2\_2026/examples/s1\_demo.summary.jsonl}) illustrating joins and audit
+queries over verifier outcomes and guard evidence.
+The demo contains 11 verifier-carrying artifacts, each paired with two verifier traces (HumanEval
+and MBPP), yielding 22 joined rows spanning three base model families (Phi-2, DeepSeek-Coder-1.3B,
+and Qwen2.5-Coder-3B) and multiple edit families (INT8 RTN recipes and magnitude pruning masks).
+
+Table~\ref{tab:demo} shows representative rows.
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{llllrrrr}
+\toprule
+Model family & Edit & Verifier & $\Delta$pass@1 & PM & Spec & RMT & Spec status \\
+\midrule
+DeepSeek-Coder-1.3B & INT8 RTN (mild) & HumanEval & +0.012 & \checkmark & \checkmark & \checkmark & capped \\
+DeepSeek-Coder-1.3B & INT8 RTN (mild) & MBPP     & $-$0.006 & \checkmark & \checkmark & \checkmark & capped \\
+Qwen2.5-Coder-3B    & INT8 RTN (mild) & HumanEval & $-$0.006 & \checkmark & \checkmark & \checkmark & capped \\
+Phi-2 (BYOE)        & pruning 40\%    & HumanEval & +0.220 & $\times$ & \checkmark & \checkmark & stable \\
+\bottomrule
+\end{tabular}
+\caption{Representative demo rows (joined view). ``Spec status=capped'' means caps were applied
+(\texttt{caps\_applied>0}); it is not itself a failure. Gate outcomes are recorded separately.}
+\label{tab:demo}
+\end{table}
+
+\paragraph{Example queries.}
+The joined view enables simple queries that are hard to answer from per-tool logs.
+For example: ``primary-metric gate fails, yet HumanEval improves materially'' can be expressed as a
+filter over joined records, surfacing guard--verifier disagreement cases that motivate
+trust-calibrated escalation policies (consult the verifier before rejecting an edit based solely on
+guard gates).
+
+\section{Limitations}
+This work standardizes evidence, not guarantees.
+The validator checks structural well-formedness and contract-driven consistency; it cannot certify
+verifier soundness or harness correctness without rerunning the pipeline.
+The demonstration corpus is illustrative; larger-scale analyses of guard--verifier alignment are
+out of scope here.
+
+\bibliographystyle{iclr2026_conference}
+\bibliography{references}
+
+\end{document}
