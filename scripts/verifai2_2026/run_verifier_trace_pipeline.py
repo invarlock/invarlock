@@ -188,6 +188,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--timeout-s", type=float, default=10.0)
     p.add_argument("--cpu-limit-s", type=int, default=10)
     p.add_argument("--mem-limit-mb", type=int, default=2048)
+    p.add_argument(
+        "--jobs",
+        type=int,
+        default=1,
+        help="Parallelism for backend=code_tests (verifier subprocesses).",
+    )
     p.add_argument("--python", type=str, default=sys.executable)
 
     args = p.parse_args(argv)
@@ -275,6 +281,8 @@ def main(argv: list[str] | None = None) -> int:
                 str(int(args.cpu_limit_s)),
                 "--mem-limit-mb",
                 str(int(args.mem_limit_mb)),
+                "--jobs",
+                str(int(args.jobs)),
             ]
         )
         if rc != 0:

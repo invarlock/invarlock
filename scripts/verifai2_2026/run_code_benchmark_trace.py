@@ -63,6 +63,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--sandbox-cpu-limit", type=int, default=2)
     p.add_argument("--sandbox-mem-limit-mb", type=int, default=2048)
     p.add_argument("--sandbox-wall-limit-s", type=float, default=10.0)
+    p.add_argument(
+        "--verifier-jobs",
+        type=int,
+        default=1,
+        help="Parallelism for executing code verifier subprocesses.",
+    )
 
     p.add_argument("--metric-name", type=str, default="pass@1")
     p.add_argument("--k", type=int, default=0)
@@ -149,6 +155,8 @@ def main(argv: list[str] | None = None) -> int:
                 str(cases),
                 "--trace-out",
                 str(trace),
+                "--jobs",
+                str(int(args.verifier_jobs)),
                 "--verifier-name",
                 str(args.verifier_name),
                 "--verifier-kind",
