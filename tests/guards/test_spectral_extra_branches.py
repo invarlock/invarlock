@@ -216,6 +216,7 @@ def test_classify_module_family_moe_and_module_type_branches() -> None:
     assert spectral.classify_module_family("experts.block", linear) == "expert_ffn"
     assert spectral.classify_module_family("layer.attn.c_proj", linear) == "attn"
     assert spectral.classify_module_family("layer.mlp.c_fc", linear) == "ffn"
+    assert spectral.classify_module_family("layer.mlp.gate_proj", linear) == "ffn"
 
     # module type based embedding classification
     assert (

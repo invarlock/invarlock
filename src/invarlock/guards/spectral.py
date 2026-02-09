@@ -1831,6 +1831,11 @@ def classify_module_family(name: str, module: Any) -> str:
     """Classify module into a spectral family for policy purposes."""
     lname = name.lower()
 
+    # Dense gated FFNs (e.g., SwiGLU) commonly use `gate_proj`. These are not MoE
+    # routers, and misclassifying them can make spectral caps trip universally.
+    if "gate_proj" in lname:
+        return "ffn"
+
     # MoE router/gating
     if any(
         tok in lname
