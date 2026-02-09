@@ -71,6 +71,16 @@ Dataset metadata standards improve dataset provenance but do not pin verifier-ru
 Supply-chain frameworks provide content-addressing primitives that inspire our design but target
 software artifacts rather than model-evaluation evidence \citep{slsa2024spec}.
 
+\paragraph{Why not existing standards?}
+Experiment trackers (e.g., MLflow/W\&B) log metrics and artifacts but typically do not enforce a
+closed schema with per-case verifier verdicts, prompt-set digesting rules, and code-execution
+sandbox contracts.
+SARIF targets static-analysis outputs, and OpenTelemetry targets service-level spans; neither
+standardizes the determinism-oriented contract needed to compare two verifier runs of generative
+models.
+We fill a narrower gap: a strict, machine-validated object that binds auxiliary guard evidence to
+first-class verifier traces under a shared contract.
+
 We address this with a \textbf{verifier-carrying artifact}: a strict JSON Schema that co-locates
 hash-linked guard evidence with first-class verifier traces under shared provenance.
 The verifier trace's \emph{contract} pins comparability-critical conditions (prompt-set digests,
@@ -86,14 +96,15 @@ queryable object.
 
 \section{Schema Overview}
 The verifier-carrying artifact is a single JSON object
-(\texttt{schema\_version="verifier\_carrying\_artifact.v1"}) intended to be the unit of exchange for
-weight-edit evaluation evidence.
+(\texttt{schema\_version} const \path{verifier_carrying_artifact.v1}) intended to be the unit of
+exchange for weight-edit evaluation evidence.
 It is intentionally strict (\texttt{additionalProperties=false}) on core objects so typos and
 logging drift fail validation instead of silently passing.
 The wrapper has three evidence blocks under shared provenance:
 \texttt{provenance}, \texttt{guard\_evidence}, and \texttt{verifier\_traces[]} (minItems=1).
 In v1, \texttt{guard\_evidence} includes \texttt{guard\_evidence.invarlock.evaluation\_report} as a
-content-addressed file reference (SHA-256) and optional \texttt{invarlock verify} output.
+content-addressed file reference (SHA-256) and optional \texttt{invarlock verify} output (including
+optional embedded \texttt{verify\_json}).
 The verifier trace is tool-agnostic: future versions can add peer guard-evidence blocks without
 changing the trace contract.
 
@@ -101,11 +112,16 @@ changing the trace contract.
 The verifier trace contract is a minimal, machine-checkable record binding an external verifier
 outcome (e.g., HumanEval pass@1 \citep{chen2021humaneval} or MBPP pass@1 \citep{austin2021mbpp}) to
 the concrete conditions under which it was produced.
+If contract fields match between two traces, the runs are \emph{intended} to be comparable; when
+outcomes differ despite matching contracts, the artifact makes the mismatch diagnosable rather than
+silent.
 It records: verifier identity (name/kind + harness identity), prompt-set integrity (dataset
 identifiers plus ordered prompt ids and hashes with a dataset-level digest computed over canonical
 JSON bytes), model/tokenizer id+revision, and decoding parameters (including seed).
 For code-execution verifiers, the schema requires an explicit sandbox block (network disabled,
-timeouts, and resource limits), making execution constraints auditable rather than implicit.
+timeouts and resource limits), making execution constraints auditable rather than implicit. In v1
+these include \texttt{timeout\_s}, \texttt{wall\_limit\_s}, \texttt{cpu\_limit}, and
+\texttt{mem\_limit\_mb}, with \texttt{network\_enabled=false} schema-enforced.
 
 The contract is a trust boundary: it makes comparability and auditability machine-checkable.
 It does not ``prove'' determinism across platforms; rather, it defines the minimum information
@@ -121,29 +137,32 @@ These checks establish evidence integrity and joinability, not behavioral correc
 
 \section{Demonstration Corpus}
 We include a queryable demonstration summary
-(\texttt{research/verifai2\_2026/examples/s1\_demo.summary.jsonl}) illustrating joins and audit
-queries over verifier outcomes and guard evidence.
+(\texttt{s1\_demo.summary.jsonl}\footnote{\path{research/verifai2_2026/examples/s1_demo.summary.jsonl}})
+illustrating joins and audit queries over verifier outcomes and guard evidence.
 The demo contains 11 verifier-carrying artifacts, each paired with two verifier traces (HumanEval
 and MBPP), yielding 22 joined rows spanning three base model families (Phi-2, DeepSeek-Coder-1.3B,
 and Qwen2.5-Coder-3B) and multiple edit families (INT8 RTN recipes and magnitude pruning masks).
+Two Phi-2 pruning variants are represented as BYOE subject checkpoints; this matters because the
+trace contract pins the exact model id+revision used for generation.
 
 Table~\ref{tab:demo} shows representative rows.
 
 \begin{table}[t]
 \centering
-\small
+\scriptsize
 \begin{tabular}{llllrrrr}
 \toprule
-Model family & Edit & Verifier & $\Delta$pass@1 & PM & Spec & RMT & Spec status \\
+Model & Edit & Verifier & $\Delta$pass@1 & PM & Spec & RMT & Status \\
 \midrule
-DeepSeek-Coder-1.3B & INT8 RTN (mild) & HumanEval & +0.012 & \checkmark & \checkmark & \checkmark & capped \\
-DeepSeek-Coder-1.3B & INT8 RTN (mild) & MBPP     & $-$0.006 & \checkmark & \checkmark & \checkmark & capped \\
-Qwen2.5-Coder-3B    & INT8 RTN (mild) & HumanEval & $-$0.006 & \checkmark & \checkmark & \checkmark & capped \\
-Phi-2 (BYOE)        & pruning 40\%    & HumanEval & +0.220 & $\times$ & \checkmark & \checkmark & stable \\
+DS-Coder-1.3B & INT8 RTN & HumanEval & +0.012 & \checkmark & \checkmark & \checkmark & capped \\
+DS-Coder-1.3B & INT8 RTN & MBPP     & $-$0.006 & \checkmark & \checkmark & \checkmark & capped \\
+Qwen-Coder-3B & INT8 RTN & HumanEval & $-$0.006 & \checkmark & \checkmark & \checkmark & capped \\
+Phi-2 (BYOE)  & prune 40\% & HumanEval & +0.220 & $\times$ & \checkmark & \checkmark & stable \\
 \bottomrule
 \end{tabular}
-\caption{Representative demo rows (joined view). ``Spec status=capped'' means caps were applied
-(\texttt{caps\_applied>0}); it is not itself a failure. Gate outcomes are recorded separately.}
+\caption{Representative demo rows (joined view). ``capped'' means spectral family caps were applied
+(\texttt{caps\_applied>0}); it is not itself a failure. Gate outcomes are recorded separately.
+Abbreviations: DS-Coder = DeepSeek-Coder.}
 \label{tab:demo}
 \end{table}
 
