@@ -8,6 +8,7 @@
 \usepackage{graphicx}
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
+\usepackage{longtable}
 \usepackage{hyperref}
 \usepackage{url}
 \usepackage{xspace}
@@ -175,13 +176,16 @@ Table~\ref{tab:demo} shows representative rows.
 \toprule
 Model & Edit & Verifier & $\Delta$pass@1 & PM & Spec & RMT & Status \\
 \midrule
-DS-Coder-1.3B & INT8 RTN & HumanEval & +0.012 & \checkmark & \checkmark & \checkmark & capped \\
-DS-Coder-1.3B & INT8 RTN & MBPP     & $-$0.006 & \checkmark & \checkmark & \checkmark & capped \\
-Qwen-Coder-3B & INT8 RTN & HumanEval & $-$0.006 & \checkmark & \checkmark & \checkmark & capped \\
+DS-Coder-1.3B & INT8 RTN c=0.00 & HumanEval & +0.012 & \checkmark & \checkmark & \checkmark & capped \\
+DS-Coder-1.3B & INT8 RTN c=0.00 & MBPP     & $-$0.006 & \checkmark & \checkmark & \checkmark & capped \\
+Qwen-Coder-3B & INT8 RTN c=0.00 & HumanEval & $-$0.006 & \checkmark & \checkmark & \checkmark & capped \\
+Qwen-Coder-3B & INT8 RTN c=0.00 & MBPP     & $-$0.002 & \checkmark & \checkmark & \checkmark & capped \\
+Phi-2         & INT8 RTN c=0.00 & HumanEval & +0.098 & \checkmark & \checkmark & $\times$ & stable \\
 Phi-2 (BYOE)  & prune 40\% & HumanEval & +0.220 & $\times$ & \checkmark & \checkmark & stable \\
 \bottomrule
 \end{tabular}
-\caption{Representative demo rows (joined view). ``capped'' means spectral family caps were applied
+\caption{Representative demo rows (joined view), subset (6 of 22 rows). Full table in
+Appendix~\ref{app:fulltable}. ``capped'' means spectral family caps were applied
 (\texttt{caps\_applied>0}); it is not itself a failure. Gate outcomes are recorded separately.}
 \label{tab:demo}
 \end{table}
@@ -248,5 +252,21 @@ of guard--verifier alignment are out of scope here.
 
 \bibliographystyle{iclr2026_conference}
 \bibliography{references}
+
+\appendix
+\section{Full Demonstration Table}\label{app:fulltable}
+\small
+\input{tables/s1_demo_full_table.tex}
+
+\section{Named File Inventory}\label{app:file-inventory}
+To make file references concrete, we include a compact inventory of named files (by path) and
+content digests (SHA-256 prefixes). Full digests are computed over raw file bytes.
+
+\begin{table}[t]
+\centering
+\scriptsize
+\input{tables/file_inventory.tex}
+\caption{Inventory of named files referenced by this paper (SHA-256 prefixes shown for compactness).}
+\end{table}
 
 \end{document}

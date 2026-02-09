@@ -1,0 +1,36 @@
+% Auto-generated from research/verifai2_2026/examples/s1_demo.summary.jsonl
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.0}
+\begin{longtable}{lllrcccc}
+\toprule
+Model & Edit & V & $\Delta$ & PM & Spec & RMT & Status\\
+\midrule
+\endfirsthead
+\toprule
+Model & Edit & V & $\Delta$ & PM & Spec & RMT & Status\\
+\midrule
+\endhead
+DS-Coder-1.3B & INT8 RTN c=0.00 & HE & +0.012 & \checkmark & \checkmark & \checkmark & capped\\
+DS-Coder-1.3B & INT8 RTN c=0.00 & MBPP & -0.006 & \checkmark & \checkmark & \checkmark & capped\\
+DS-Coder-1.3B & INT8 RTN c=0.1 & HE & +0.293 & $\times$ & \checkmark & $\times$ & capped\\
+DS-Coder-1.3B & INT8 RTN c=0.1 & MBPP & -0.126 & $\times$ & \checkmark & $\times$ & capped\\
+DS-Coder-1.3B & INT8 RTN c=0.25 & HE & -0.238 & $\times$ & \checkmark & $\times$ & capped\\
+DS-Coder-1.3B & INT8 RTN c=0.25 & MBPP & -0.126 & $\times$ & \checkmark & $\times$ & capped\\
+Phi-2 & INT8 RTN c=0.00 & HE & +0.098 & \checkmark & \checkmark & $\times$ & stable\\
+Phi-2 & INT8 RTN c=0.00 & MBPP & -0.004 & \checkmark & \checkmark & $\times$ & stable\\
+Phi-2 & INT8 RTN c=0.25 & HE & -0.305 & $\times$ & \checkmark & $\times$ & stable\\
+Phi-2 & INT8 RTN c=0.25 & MBPP & -0.032 & $\times$ & \checkmark & $\times$ & stable\\
+Phi-2 & INT8 RTN c=0.5 & HE & -0.305 & $\times$ & \checkmark & $\times$ & capped\\
+Phi-2 & INT8 RTN c=0.5 & MBPP & -0.032 & $\times$ & \checkmark & $\times$ & capped\\
+Phi-2 (prune20) & Prune 20\% & HE & +0.037 & \checkmark & \checkmark & $\times$ & stable\\
+Phi-2 (prune20) & Prune 20\% & MBPP & +0.000 & \checkmark & \checkmark & $\times$ & stable\\
+Phi-2 (prune40) & Prune 40\% & HE & +0.220 & $\times$ & \checkmark & \checkmark & stable\\
+Phi-2 (prune40) & Prune 40\% & MBPP & -0.002 & $\times$ & \checkmark & \checkmark & stable\\
+Qwen-Coder-3B & INT8 RTN c=0.00 & HE & -0.006 & \checkmark & \checkmark & \checkmark & capped\\
+Qwen-Coder-3B & INT8 RTN c=0.00 & MBPP & -0.002 & \checkmark & \checkmark & \checkmark & capped\\
+Qwen-Coder-3B & INT8 RTN c=0.1 & HE & -0.238 & $\times$ & \checkmark & $\times$ & capped\\
+Qwen-Coder-3B & INT8 RTN c=0.1 & MBPP & -0.404 & $\times$ & \checkmark & $\times$ & capped\\
+Qwen-Coder-3B & INT8 RTN c=0.25 & HE & -0.238 & $\times$ & $\times$ & $\times$ & capped\\
+Qwen-Coder-3B & INT8 RTN c=0.25 & MBPP & -0.404 & $\times$ & $\times$ & $\times$ & capped\\
+\bottomrule
+\end{longtable}
