@@ -117,6 +117,21 @@ logging drift fail validation instead of silently passing.
 It has three required evidence blocks under a single provenance envelope:
 \texttt{provenance}, \texttt{guard\_evidence}, and \texttt{verifier\_traces[]} (minItems=1).
 
+A condensed artifact skeleton (ellipses indicate omitted substructures) is:
+\begin{lstlisting}
+{
+  "schema_version": "verifier_carrying_artifact.v1",
+  "provenance": { ... },
+  "guard_evidence": { "invarlock": { "evaluation_report": { "sha256": "..." } } },
+  "verifier_traces": [
+    { "schema_version": "verifier_trace.v1",
+      "verifier": { "kind": "code_execution", ... },
+      "trace_contract": { "prompt_set": { "digest_sha256": "..." }, ... },
+      "results": { "summary": { "pass_rate": 0.0 }, "cases": [ ... ] } }
+  ]
+}
+\end{lstlisting}
+
 In v1, \texttt{guard\_evidence} includes \texttt{guard\_evidence.invarlock.evaluation\_report} as a
 hash-linked file reference (with optional \texttt{embedded} for inline inclusion), plus optional
 \texttt{guard\_evidence.invarlock.verify} output (\texttt{ok}, \texttt{profile}, \texttt{errors}, and
