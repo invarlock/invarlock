@@ -689,18 +689,22 @@ class RTNQuantEdit(ModelEdit):
 
         lower = clamp_ratio / 2
         upper = 1 - lower
-        eps = torch.finfo(weight.dtype).eps
+
+        # `torch.quantile` is not implemented for fp16/bf16 on some backends.
+        # Compute thresholds in float32, then cast back to preserve the original
+        # dtype of the weights.
+        weight_f32 = weight.float()
 
         # Compute per-output-channel quantiles to preserve channel statistics
         quantiles = torch.quantile(
-            weight,
-            torch.tensor([lower, upper], device=weight.device, dtype=weight.dtype),
+            weight_f32,
+            torch.tensor([lower, upper], device=weight.device, dtype=torch.float32),
             dim=1,
             keepdim=True,
-        )
+        ).to(weight.dtype)
 
-        q_low = quantiles[0].clamp_min(-torch.inf)
-        q_high = quantiles[1].clamp_min(eps)
+        q_low = quantiles[0]
+        q_high = quantiles[1]
         return torch.clamp(weight, q_low, q_high)
 
     def _quantize_per_channel(

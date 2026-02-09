@@ -23,6 +23,32 @@ def test_percentile_clamp_reduces_outliers() -> None:
     assert not torch.equal(clamped, weight)
 
 
+def test_percentile_clamp_supports_fp16_inputs() -> None:
+    # Regression test: torch.quantile() is not implemented for fp16/bf16 on some
+    # backends, so clipping must compute thresholds in float32.
+    edit = RTNQuantEdit(clamp_ratio=0.1)
+    weight = torch.linspace(-1, 1, steps=100, dtype=torch.float16).view(10, 10)
+
+    clamped = edit._apply_outlier_clipping(weight.clone(), edit.clamp_ratio)
+
+    assert clamped.dtype == weight.dtype
+    assert clamped.shape == weight.shape
+    assert torch.isfinite(clamped).all()
+
+    lower = edit.clamp_ratio / 2
+    upper = 1 - lower
+    q = torch.quantile(
+        weight.float(),
+        torch.tensor([lower, upper], dtype=torch.float32),
+        dim=1,
+        keepdim=True,
+    )
+    q_low, q_high = q[0], q[1]
+    # Allow for fp16 rounding when comparing against float32 quantiles.
+    assert (clamped.float() >= q_low - 1e-3).all()
+    assert (clamped.float() <= q_high + 1e-3).all()
+
+
 def test_quant_rtn_rejects_non_int8_bitwidth() -> None:
     """quant_rtn is a minimal INT8 demo edit; 4-bit is not supported."""
     with pytest.raises(ValueError):
