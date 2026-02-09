@@ -66,8 +66,8 @@ produced at three layers that rarely interoperate:
 (ii) \textbf{evaluation harnesses} define prompt sets and generation parameters, and
 (iii) \textbf{external verifiers} (e.g., HumanEval/MBPP code-execution sandboxes) provide the
 decisive outcome signal: did the edited model's outputs satisfy the verifier?
-This three-layer structure aligns with verifier-first evaluation: verifier-grounded outcomes are
-the headline metric, while guard evidence is auxiliary and diagnostic.
+This three-layer structure aligns with VerifAI's emphasis on verifier-grounded outcomes:
+verifier pass/fail is the headline metric, while guard evidence is auxiliary and diagnostic.
 In practice, the layers emit incompatible artifacts with missing provenance; even basic
 comparability questions become hard to answer automatically: are two pass@1 numbers computed over
 the same prompt set, under the same harness revision and sandbox constraints, with the same
@@ -98,6 +98,10 @@ identity, model/tokenizer revisions, decoding parameters, and execution sandbox 
 \schemaverify checks structural conformance and contract-driven cross-block consistency, without
 claiming formal guarantees about model correctness or verifier soundness.
 
+The resulting artifact supports verifier-centered workflows such as automated promotion gates and
+escalation policies (escalate from cheap guard screens to expensive verifier runs when evidence
+indicates risk).
+
 \textbf{Contributions.}
 (1) A verifier-trace schema and contract for auditable external verification runs.
 (2) A wrapper schema that packages auxiliary guard evidence and first-class verifier traces in one
@@ -119,11 +123,13 @@ hash-linked file reference (with optional \texttt{embedded} for inline inclusion
 optional embedded \texttt{verify\_json} from \texttt{invarlock verify --json}).
 The wrapper intentionally treats the \invarlock evaluation report as its own artifact (referenced
 by digest), while the verifier trace is the primary verifier-first outcome record.
+Future versions can add peer \texttt{guard\_evidence} blocks for other guard frameworks without
+changing the verifier-trace contract.
 
 \section{Verifier Trace Contract}
 The trace contract is the minimal, machine-checkable record binding an external verifier outcome
-(e.g., HumanEval pass@1 \citep{chen2021humaneval}) to the concrete conditions under which it was
-produced.
+(e.g., HumanEval/MBPP pass@1 \citep{chen2021humaneval,austin2021mbpp}) to the concrete
+conditions under which it was produced.
 If the contract fields match between two traces, the runs are \emph{intended to be comparable}; when
 outcomes differ despite matching contracts, the artifact makes the mismatch diagnosable rather than
 silent.
@@ -174,7 +180,7 @@ Table~\ref{tab:demo} shows representative rows.
 \scriptsize
 \begin{tabular}{llllrrrr}
 \toprule
-Model & Edit & Verifier & $\Delta$pass@1 & PM & Spec & RMT & Status \\
+Model & Edit & Verifier & $\Delta$pass@1 & PM & Spec & RMT & Spec.\ status \\
 \midrule
 DS-Coder-1.3B & INT8 RTN c=0.00 & HumanEval & +0.012 & \checkmark & \checkmark & \checkmark & capped \\
 DS-Coder-1.3B & INT8 RTN c=0.00 & MBPP     & $-$0.006 & \checkmark & \checkmark & \checkmark & capped \\
@@ -185,7 +191,8 @@ Phi-2 (BYOE)  & prune 40\% & HumanEval & +0.220 & $\times$ & \checkmark & \check
 \bottomrule
 \end{tabular}
 \caption{Representative demo rows (joined view), subset (6 of 22 rows). Full table in
-Appendix~\ref{app:fulltable}. ``capped'' means spectral family caps were applied
+Appendix~\ref{app:fulltable}. PM=primary-metric gate, Spec=spectral gate; c is clamp ratio.
+``capped'' means spectral family caps were applied
 (\texttt{caps\_applied>0}); it is not itself a failure. Gate outcomes are recorded separately.}
 \label{tab:demo}
 \end{table}
@@ -208,6 +215,9 @@ jq -r '
      delta_pass_rate, verifier_n_total}
 ' s1_demo.summary.jsonl
 \end{lstlisting}
+\noindent\emph{On our demo, this surfaces mild MBPP regressions even when all gates pass
+(e.g., $\Delta=-0.006$ on $N=500$). The contract field \texttt{verifier\_n\_total} makes the
+significance question well-posed (a binomial 95\% CI is on the order of $\pm 0.03$).}
 
 \textbf{Q2: Primary-metric gate fails, yet HumanEval improves materially.}
 \begin{lstlisting}
@@ -221,6 +231,8 @@ jq -r '
      primary_metric_ratio_vs_baseline}
 ' s1_demo.summary.jsonl
 \end{lstlisting}
+\noindent\emph{This surfaces unnecessary rejections: edits the guard would block, yet the external
+verifier improves (e.g., Phi-2 prune 40\% with $\Delta=+0.220$ on HumanEval).}
 
 \textbf{Q3: Release-safe join via prompt digest (sorted before grouping).}
 \begin{lstlisting}
@@ -231,6 +243,8 @@ jq -s '
   | .[] | map({invarlock_edit_name, delta_pass_rate, gate_spectral_stable})
 ' s1_demo.summary.jsonl
 \end{lstlisting}
+\noindent\emph{This demonstrates release-safe joinability: edits can be compared and grouped by
+\texttt{prompt\_digest} without redistributing prompt text (via \texttt{hash\_only} prompt sets).}
 
 \textbf{Q4: Caps applied but gate passes (capped $\neq$ failed).}
 \begin{lstlisting}
@@ -240,6 +254,8 @@ jq -r '
      spectral_stability_score, gate_spectral_stable}
 ' s1_demo.summary.jsonl
 \end{lstlisting}
+\noindent\emph{This returns cases where \texttt{spectral\_status="capped"} but the gate still passes
+(\texttt{gate\_spectral\_stable=true}), motivating distinct fields for status vs.\ verdict.}
 
 \section{Limitations}
 This work standardizes \emph{evidence}, not guarantees.
@@ -249,6 +265,10 @@ The trace contract records conditions needed for comparability but does not elim
 dependence or hidden nondeterminism; the goal is auditability.
 The demonstration corpus is small and meant to illustrate joins and queries; larger-scale analyses
 of guard--verifier alignment are out of scope here.
+The v1 \texttt{guard\_evidence} block is \invarlock-specific, while the \texttt{verifier\_trace} schema
+is tool-agnostic; other guard frameworks can be supported via peer blocks.
+Although the trace schema supports multiple verifier kinds (proof checking, SMT, static analysis),
+our demo instantiates code-execution verifiers only.
 
 \bibliographystyle{iclr2026_conference}
 \bibliography{references}
