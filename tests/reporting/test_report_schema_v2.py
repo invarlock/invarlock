@@ -97,7 +97,13 @@ def test_system_overhead_has_pattern_properties():
     assert any("latency_ms_" in p for p in pats)
     assert any("throughput_" in p for p in pats)
     for spec in pats.values():
-        assert spec.get("type") == "number"
+        # Support both historical numeric entries and structured overhead entries.
+        if spec.get("type") == "number":
+            continue
+        one_of = spec.get("oneOf")
+        assert isinstance(one_of, list)
+        assert any(isinstance(x, dict) and x.get("type") == "number" for x in one_of)
+        assert any(isinstance(x, dict) and x.get("type") == "object" for x in one_of)
 
 
 def test_primary_metric_analysis_basis_present_and_consistent():

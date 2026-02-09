@@ -113,8 +113,38 @@ REPORT_JSON_SCHEMA: dict[str, Any] = {
             "type": "object",
             # Numeric keys must match these patterns when present; allow flexibility otherwise
             "patternProperties": {
-                "^latency_ms_(p50|p95)$": {"type": "number"},
-                "^throughput_.*$": {"type": "number"},
+                # Historical reports used plain numbers; newer reports emit
+                # structured overhead entries (baseline/edited/delta/ratio).
+                "^latency_ms_(p50|p95)$": {
+                    "oneOf": [
+                        {"type": "number"},
+                        {
+                            "type": "object",
+                            "properties": {
+                                "baseline": {"type": "number"},
+                                "edited": {"type": "number"},
+                                "delta": {"type": "number"},
+                                "ratio": {"type": "number"},
+                            },
+                            "additionalProperties": True,
+                        },
+                    ]
+                },
+                "^throughput_.*$": {
+                    "oneOf": [
+                        {"type": "number"},
+                        {
+                            "type": "object",
+                            "properties": {
+                                "baseline": {"type": "number"},
+                                "edited": {"type": "number"},
+                                "delta": {"type": "number"},
+                                "ratio": {"type": "number"},
+                            },
+                            "additionalProperties": True,
+                        },
+                    ]
+                },
             },
             "additionalProperties": True,
         },
