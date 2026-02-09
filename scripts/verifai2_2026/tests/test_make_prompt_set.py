@@ -6,8 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.verifai2_2026 import make_prompt_set
-from scripts.verifai2_2026 import verifier_trace_from_cases
+from scripts.verifai2_2026 import make_prompt_set, verifier_trace_from_cases
 
 
 def _sha256_hex(data: bytes) -> str:
