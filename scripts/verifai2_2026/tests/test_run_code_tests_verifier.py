@@ -175,7 +175,7 @@ def test_main_rejects_missing_fields(tmp_path: Path) -> None:
     _write_jsonl(completions, [{"id": "a", "completion": None}])
     out_cases = tmp_path / "cases.jsonl"
 
-    with pytest.raises(ValueError, match=r"Task/completion fields missing"):
+    with pytest.raises(ValueError, match=r"Completion missing text field"):
         run_code_tests_verifier.main(
             [
                 "--tasks",
@@ -186,6 +186,107 @@ def test_main_rejects_missing_fields(tmp_path: Path) -> None:
                 str(out_cases),
             ]
         )
+
+
+def test_main_rejects_task_missing_prompt_or_tests(tmp_path: Path) -> None:
+    tasks = tmp_path / "tasks.jsonl"
+    _write_jsonl(tasks, [{"id": "a", "prompt": None, "tests": "assert True"}])
+    completions = tmp_path / "completions.jsonl"
+    _write_jsonl(completions, [{"id": "a", "completion": ""}])
+    out_cases = tmp_path / "cases.jsonl"
+
+    with pytest.raises(ValueError, match=r"Task fields missing"):
+        run_code_tests_verifier.main(
+            [
+                "--tasks",
+                str(tasks),
+                "--completions",
+                str(completions),
+                "--out-cases",
+                str(out_cases),
+            ]
+        )
+
+
+def test_main_jobs_must_be_ge_1(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    tasks = tmp_path / "tasks.jsonl"
+    _write_jsonl(tasks, [{"id": "a", "prompt": "", "tests": "assert True"}])
+    completions = tmp_path / "completions.jsonl"
+    _write_jsonl(completions, [{"id": "a", "completion": ""}])
+    out_cases = tmp_path / "cases.jsonl"
+
+    rc = run_code_tests_verifier.main(
+        [
+            "--tasks",
+            str(tasks),
+            "--completions",
+            str(completions),
+            "--out-cases",
+            str(out_cases),
+            "--jobs",
+            "0",
+        ]
+    )
+    assert rc == 2
+    assert "--jobs must be >= 1" in capsys.readouterr().err
+
+
+def test_main_jobs_gt_1_uses_thread_pool(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class _Proc:
+        def __init__(self, *, ok: bool) -> None:
+            self.returncode = 0 if ok else 1
+            self.stderr = "" if ok else "ValueError: boom\n"
+
+    calls: list[str] = []
+
+    def _fake_run(argv, **kwargs):  # noqa: ANN001
+        # Called from multiple threads; list append is atomic enough here.
+        calls.append("x")
+        # Alternate pass/fail by call count to exercise both branches.
+        return _Proc(ok=(len(calls) % 2 == 1))
+
+    monkeypatch.setattr(run_code_tests_verifier.subprocess, "run", _fake_run)
+
+    tasks = tmp_path / "tasks.jsonl"
+    _write_jsonl(
+        tasks,
+        [
+            {"id": "a", "prompt": "", "tests": "assert True"},
+            {"id": "b", "prompt": "", "tests": "assert True"},
+        ],
+    )
+    completions = tmp_path / "completions.jsonl"
+    _write_jsonl(
+        completions,
+        [
+            {"id": "a", "completion": ""},
+            {"id": "b", "completion": ""},
+        ],
+    )
+    out_cases = tmp_path / "cases.jsonl"
+
+    rc = run_code_tests_verifier.main(
+        [
+            "--tasks",
+            str(tasks),
+            "--completions",
+            str(completions),
+            "--out-cases",
+            str(out_cases),
+            "--jobs",
+            "2",
+        ]
+    )
+    assert rc == 0
+    assert len(calls) == 2
+    rows = [
+        json.loads(line) for line in out_cases.read_text(encoding="utf-8").splitlines()
+    ]
+    assert {r["verdict"] for r in rows} == {"pass", "fail"}
 
 
 def test_timeout_includes_message_excerpt_when_available(
