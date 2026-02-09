@@ -157,7 +157,7 @@ These checks establish evidence integrity and joinability, not correctness.
 
 \section{Demonstration Corpus and Example Queries}
 We include a queryable demonstration summary,
-\texttt{s1\_demo.summary.jsonl}\footnote{\path{research/verifai2_2026/examples/s1_demo.summary.jsonl}},
+\texttt{s1\_demo.summary.jsonl} (see Appendix~\ref{app:file-inventory}),
 that illustrates how verifier-carrying artifacts enable joins and audit queries across tools.
 
 \paragraph{Demo scope.}
@@ -253,20 +253,21 @@ of guard--verifier alignment are out of scope here.
 \bibliographystyle{iclr2026_conference}
 \bibliography{references}
 
+\clearpage
 \appendix
 \section{Full Demonstration Table}\label{app:fulltable}
 \small
 \input{tables/s1_demo_full_table.tex}
 
+\clearpage
 \section{Named File Inventory}\label{app:file-inventory}
 To make file references concrete, we include a compact inventory of named files (by path) and
 content digests (SHA-256 prefixes). Full digests are computed over raw file bytes.
 
-\begin{table}[t]
-\centering
+\paragraph{Inventory (SHA-256 prefixes).}
+\begin{center}
 \scriptsize
 \input{tables/file_inventory.tex}
-\caption{Inventory of named files referenced by this paper (SHA-256 prefixes shown for compactness).}
-\end{table}
+\end{center}
 
 \end{document}
