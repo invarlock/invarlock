@@ -140,6 +140,7 @@ test_config.yaml
 
 # Optional local assets (not required for code/tests)
 plans/
+research/
 data/
 contracts/
 
@@ -148,3 +149,7 @@ contracts/
 
 # Worktree scratch dirs
 .worktrees/
+
+# Research pipeline dirs
+research/verifai2_2026/
+scripts/verifai2_2026/

@@ -17,6 +17,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+## [0.3.11] - 2026-02-12
+
+### Added
+- Verifier-carrying artifact workflow pieces: verifier jobs, deterministic code verifier traces, and parallelized code-tests verification.
+- New utility scripts and tests for prompt-set generation, text canaries, artifact assembly, schema verification, and artifact summarization.
+
+### Changed
+- Matrix/pipeline flow now propagates and normalizes verifier profile context for reproducible artifact embedding and prompt-set digesting.
+- Plugin detection flow updated to detect AWQ support through the lightweight `awq` module path.
+- Spectral guard handling updated to treat `gate_proj` as an FFN projection in gating paths.
+
+### Fixed
+- CLI plugin listing avoids importing AWQ at discovery time.
+- Reporting schema accepts nullable dataset window seeds and structured `system_overhead` payloads.
+- Quantization RTN outlier clipping path is hardened for fp16-safe behavior.
+
+### Dependencies
+
+### Documentation
+- Expanded docs and paper sources with citations, appendix content, and artifact schema snippets.
+
 ## [0.3.10] - 2026-02-08
 
 ### Added
