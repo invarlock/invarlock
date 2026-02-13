@@ -31,8 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reporting schema accepts nullable dataset window seeds and structured `system_overhead` payloads.
 - Quantization RTN outlier clipping path is hardened for fp16-safe behavior.
 
-### Dependencies
-
 ### Documentation
 - Release notes and metadata updated for `v0.3.11`.
 
