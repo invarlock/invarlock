@@ -206,4 +206,4 @@ jobs:
         run: bash scripts/generate_sbom.sh
 
       - name: Run pip-audit
-        run: pip-audit --ignore-vuln GHSA-4xh5-x5gv-qwph || true
+        run: pip-audit --ignore-vuln GHSA-4xh5-x5gv-qwph

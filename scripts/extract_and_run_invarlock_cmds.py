@@ -58,6 +58,7 @@ CMD_PATTERN = re.compile(
 )
 ANGLE_PLACEHOLDER_PATTERN = re.compile(r"<[^>]+>")
 RUN_ID_PLACEHOLDER_PATTERN = re.compile(r"\bruns/\d{8}_\d{6}\b")
+ENV_ASSIGNMENT_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=.*$")
 
 
 def _is_code_fence(line: str) -> bool:
@@ -249,6 +250,30 @@ def _force_local_python(cmd_str: str) -> str:
     return cmd_str
 
 
+def _split_env_and_argv(cmd_str: str) -> tuple[dict[str, str], list[str]]:
+    """Parse inline env assignments and command argv without invoking a shell."""
+    try:
+        tokens = shlex.split(cmd_str, posix=True)
+    except ValueError as exc:
+        raise ValueError(f"invalid command syntax: {exc}") from exc
+    if not tokens:
+        raise ValueError("empty command")
+
+    inline_env: dict[str, str] = {}
+    idx = 0
+    for tok in tokens:
+        if not ENV_ASSIGNMENT_PATTERN.match(tok):
+            break
+        key, value = tok.split("=", 1)
+        inline_env[key] = value
+        idx += 1
+
+    argv = tokens[idx:]
+    if not argv:
+        raise ValueError("command is missing executable")
+    return inline_env, argv
+
+
 def run_commands(commands: list[Command], results_path: Path) -> None:
     # Optional limit via env to keep CI/dev fast
     try:
@@ -264,14 +289,28 @@ def run_commands(commands: list[Command], results_path: Path) -> None:
         commands = commands[start:end]
     with results_path.open("w", encoding="utf-8") as out:
         for c in commands:
-            # Build execution string; honor inline env assignments
+            # Build execution string and parse inline env assignments safely.
             cmd_str = _force_local_python(c.cmd.strip())
             env = _env_for(cmd_str)
-            # Execute via shell to support inline env assignments
+            try:
+                inline_env, argv = _split_env_and_argv(cmd_str)
+                env.update(inline_env)
+            except ValueError as exc:
+                record = {
+                    "id": c.id,
+                    "file": c.file,
+                    "line": c.line,
+                    "command": cmd_str,
+                    "exit_code": None,
+                    "error": str(exc),
+                }
+                out.write(json.dumps(record) + "\n")
+                out.flush()
+                continue
+
             try:
                 proc = subprocess.run(
-                    cmd_str,
-                    shell=True,
+                    argv,
                     cwd=str(ROOT),
                     env=env,
                     capture_output=True,
