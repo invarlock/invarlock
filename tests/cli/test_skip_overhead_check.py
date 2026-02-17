@@ -1,20 +1,26 @@
 from invarlock.cli.commands import run
 
 
-def test_should_measure_overhead_respects_env(monkeypatch):
-    monkeypatch.setenv("INVARLOCK_SKIP_OVERHEAD_CHECK", "1")
-    measure, skip = run._should_measure_overhead("ci")
+def test_should_measure_overhead_respects_config():
+    measure, skip, source = run._should_measure_overhead(
+        "ci", {"context": {"run": {"skip_overhead_check": True}}}
+    )
     assert skip is True
     assert measure is False
+    assert source == "config:context.run.skip_overhead_check"
 
-    monkeypatch.delenv("INVARLOCK_SKIP_OVERHEAD_CHECK", raising=False)
-    measure_default, skip_default = run._should_measure_overhead("release")
+    measure_default, skip_default, source_default = run._should_measure_overhead(
+        "release", {}
+    )
     assert skip_default is False
     assert measure_default is True
+    assert source_default is None
 
 
-def test_should_measure_overhead_non_ci_profile(monkeypatch):
-    monkeypatch.delenv("INVARLOCK_SKIP_OVERHEAD_CHECK", raising=False)
-    measure, skip = run._should_measure_overhead("dev")
+def test_should_measure_overhead_non_ci_profile() -> None:
+    measure, skip, source = run._should_measure_overhead(
+        "dev", {"context": {"run": {"skip_overhead_check": True}}}
+    )
     assert skip is False
     assert measure is False
+    assert source is None

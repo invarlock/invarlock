@@ -89,8 +89,8 @@ def test_evaluation_report_propagates_determinism_and_overhead_skip_fields() -> 
     report["guard_overhead"] = {
         "mode": "skipped",
         "skipped": True,
-        "skip_reason": "INVARLOCK_SKIP_OVERHEAD_CHECK",
-        "source": "env:INVARLOCK_SKIP_OVERHEAD_CHECK",
+        "skip_reason": "context.run.skip_overhead_check",
+        "source": "config:context.run.skip_overhead_check",
         "overhead_threshold": 0.01,
     }
 
@@ -104,4 +104,4 @@ def test_evaluation_report_propagates_determinism_and_overhead_skip_fields() -> 
     assert isinstance(overhead, dict)
     assert overhead.get("mode") == "skipped"
     assert overhead.get("skipped") is True
-    assert overhead.get("skip_reason") == "INVARLOCK_SKIP_OVERHEAD_CHECK"
+    assert overhead.get("skip_reason") == "context.run.skip_overhead_check"

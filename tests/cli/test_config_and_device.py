@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+import invarlock.cli.config as config_mod
 from invarlock.cli.config import (
     DatasetConfig,
     EvalBootstrapConfig,
@@ -66,12 +67,12 @@ dataset: !include inc.yaml
     cfg = load_config(main)
     assert isinstance(cfg, InvarLockConfig)
     assert cfg.edit.name == "quant_rtn"
-    # apply_profile(ci) falls back to env defaults when runtime profiles missing
+    # apply_profile(ci) requires a packaged/runtime profile file.
+    monkeypatch.setattr(config_mod, "_load_runtime_yaml", lambda *_a, **_k: None)
     monkeypatch.delenv("INVARLOCK_CONFIG_ROOT", raising=False)
-    monkeypatch.setenv("INVARLOCK_CI_PREVIEW", "10")
-    monkeypatch.setenv("INVARLOCK_CI_FINAL", "20")
-    cfg2 = apply_profile(cfg, "ci")
-    assert cfg2.dataset.preview_n == 10 and cfg2.dataset.final_n == 20
+    with pytest.raises(ValueError, match="Unknown profile"):
+        apply_profile(cfg, "ci")
+    cfg2 = cfg
     # resolve_edit_kind and override
     assert resolve_edit_kind("quant") == "quant_rtn"
     with pytest.raises(ValueError):

@@ -327,8 +327,10 @@ INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE=1 invarlock run -c <config.yaml>
 
 **Fix (local debugging only):**
 
-```bash
-INVARLOCK_GUARD_PREPARE_STRICT=0 invarlock run -c <config.yaml>
+```yaml
+context:
+  run:
+    strict_guard_prepare: false
 ```
 
 ### Non-Finite Metrics on CPU

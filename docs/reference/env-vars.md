@@ -30,17 +30,14 @@ INVARLOCK_EVAL_DEVICE=cpu invarlock run -c <config>.yaml --out runs/cpu_smoke
 
 **Precedence (conflict cases)**
 
-1. Env overrides for strictness/materialization (`INVARLOCK_EVAL_STRICT`,
-   `INVARLOCK_GUARD_PREPARE_STRICT`, `INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE`).
-2. CLI/config values for overlapping settings (device/tier/probes).
+1. CLI/config values for assurance-critical policy (strictness, drift/acceptance bands, overhead skip, tiny relax).
+2. Env overrides only for explicitly env-scoped toggles (for example, downloads and calibration materialization).
 3. Packaged defaults when no explicit setting exists.
 
 ### Key override matrix
 
 | Setting | Env var | Config/CLI | Winner rule | How to confirm |
 | --- | --- | --- | --- | --- |
-| Strict eval errors | `INVARLOCK_EVAL_STRICT` | `context.eval.strict` / `context.eval.strict_errors` | Env wins. | Config shows in `report.context.eval`; env is not recorded. |
-| Guard prepare strict | `INVARLOCK_GUARD_PREPARE_STRICT` | `context.run.strict_guard_prepare` | Env wins. | Config shows in `report.context.run`; env is not recorded. |
 | Calibration materialize | `INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE` | `context.eval.materialize_calibration` / `context.eval.allow_iterable_calibration` | Env wins. | Config shows in `report.context`; env is not recorded. |
 | Network downloads | `INVARLOCK_ALLOW_NETWORK` | — | Env-only toggle. | Not recorded; rely on env. |
 | Offline datasets | `HF_DATASETS_OFFLINE` | — | Env-only toggle. | Not recorded; rely on env. |
@@ -49,8 +46,8 @@ INVARLOCK_EVAL_DEVICE=cpu invarlock run -c <config>.yaml --out runs/cpu_smoke
 
 | Scenario | Result | Fix |
 | --- | --- | --- |
-| `context.eval.strict_errors: false` + `INVARLOCK_EVAL_STRICT=1` | Strict evaluation stays on. | Unset the env var. |
-| `context.run.strict_guard_prepare: false` + `INVARLOCK_GUARD_PREPARE_STRICT=1` | Guard prepare stays strict. | Unset the env var. |
+| `context.run.skip_overhead_check: true` in `--profile release` | Overhead check is skipped and recorded in `guard_overhead.source`. | Set `context.run.skip_overhead_check: false` for full overhead enforcement. |
+| `context.run.tiny_relax: true` | Tiny-relax gating is enabled from config and recorded in `auto.tiny_relax`. | Remove or set to `false` for full policy strictness. |
 
 ## Reference
 
@@ -74,18 +71,10 @@ HF adapters also honor `TRUST_REMOTE_CODE_BOOL` and `ALLOW_REMOTE_CODE` for comp
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `INVARLOCK_BOOTSTRAP_BCA` | unset | Prefer BCa bootstrap CIs when sample size allows. |
-| `INVARLOCK_EVAL_STRICT` | unset | Soft-fail evaluation errors when set to `0`. |
-| `INVARLOCK_TINY_RELAX` | unset | Relax gates for tiny dev demos (doctor heuristics). |
+| `INVARLOCK_TINY_RELAX` | unset | Doctor-only hint for tiny local demos (does not drive assurance gates). |
 | `INVARLOCK_EVAL_DEVICE` | unset | Force evaluation device (`cpu`, `cuda`, `mps`). |
 | `INVARLOCK_STORE_EVAL_WINDOWS` | `1` | Store token windows in reports (set `0` to disable). |
 | `INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE` | unset | Allow materializing iterables lacking `__len__`. |
-
-### Profiles (CI fallback)
-
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `INVARLOCK_CI_PREVIEW` | `200` | Override preview window count when `ci` profile YAML is absent. |
-| `INVARLOCK_CI_FINAL` | `200` | Override final window count when `ci` profile YAML is absent. |
 
 ### Dataset preparation
 
@@ -122,11 +111,13 @@ HF adapters also honor `TRUST_REMOTE_CODE_BOOL` and `ALLOW_REMOTE_CODE` for comp
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `INVARLOCK_ASSERT_GUARDS` | unset | Enable guard runtime assertions. |
-| `INVARLOCK_GUARD_PREPARE_STRICT` | unset | Allow guard prepare failures to continue when set to `0`. |
 | `INVARLOCK_EVIDENCE_DEBUG` | unset | Emit `guards_evidence.json` for audit. |
-| `INVARLOCK_SKIP_OVERHEAD_CHECK` | unset | Skip overhead checks in CI/Release profiles. |
-| `INVARLOCK_PM_ACCEPTANCE_MAX` | `1.10` | Upper PM acceptance ratio. |
-| `INVARLOCK_PM_ACCEPTANCE_MIN` | `0.95` | Lower PM acceptance ratio (symmetric band). |
+
+Primary-metric gate bounds are profile/config settings (`primary_metric.acceptance_range`
+and `primary_metric.drift_band`), not environment overrides.
+Strictness/tiny-relax/overhead-skip are also config/profile policy:
+`context.eval.strict` / `context.eval.strict_errors`, `context.run.strict_guard_prepare`,
+`context.run.tiny_relax`, `context.run.skip_overhead_check`.
 
 ### Config loading
 

@@ -636,9 +636,10 @@ Common knobs for the setup script:
 | `INVARLOCK_SEQ_LEN` | `512` | Sequence length |
 | `INVARLOCK_STRIDE` | `256` | Stride |
 | `INVARLOCK_EVAL_BATCH` | `32` | InvarLock batch size |
-| `INVARLOCK_PM_ACCEPTANCE_MIN` | `0.90` | Primary metric lower bound |
-| `INVARLOCK_PM_ACCEPTANCE_MAX` | `1.20` | Primary metric upper bound |
 | `PACK_GUARDS_ORDER` | `invariants,spectral,rmt,variance,invariants` | Guards included in calibration and presets |
+
+Primary metric acceptance/drift gates should be configured via profile/config
+(`primary_metric.acceptance_range`, `primary_metric.drift_band`), not env vars.
 
 ### Tuned edit presets
 

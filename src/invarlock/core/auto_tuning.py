@@ -418,8 +418,6 @@ def _load_profile_overrides(
         return {}
     prof = str(profile).strip().lower()
     candidate = _load_runtime_yaml(config_root, "profiles", f"{prof}.yaml")
-    if candidate is None and prof == "ci":
-        candidate = _load_runtime_yaml(config_root, "profiles", "ci_cpu.yaml") or {}
     if not isinstance(candidate, dict):
         return {}
     return candidate

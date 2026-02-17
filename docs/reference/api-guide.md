@@ -249,7 +249,7 @@ Core exceptions live in `invarlock.core.exceptions`:
 - **Calibration data not indexable**: pass a list/sequence or set
   `INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE=1` to allow materialization.
 - **Guard prepare failures in CI/Release**: adjust guard policies or set
-  `INVARLOCK_GUARD_PREPARE_STRICT=0` for local debugging only.
+  `context.run.strict_guard_prepare: false` for local debugging only.
 
 ## Observability
 

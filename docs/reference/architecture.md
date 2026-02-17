@@ -360,7 +360,7 @@ my_custom_adapter = "my_adapter:MyAdapter"
 - **Import errors in torch-free context**: ensure `invarlock.core` imports stay
   torch-independent; use adapters for torch operations.
 - **Guard preparation failures**: check tier policy compatibility; use
-  `INVARLOCK_GUARD_PREPARE_STRICT=0` for debugging.
+  `context.run.strict_guard_prepare: false` for debugging.
 - **report generation errors**: verify baseline and subject reports exist
   and have compatible window structures.
 

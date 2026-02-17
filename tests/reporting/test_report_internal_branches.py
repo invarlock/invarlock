@@ -99,8 +99,7 @@ def test_extract_structural_deltas_infers_scope_and_details():
     assert diagnostics["rank_summary"]["modules_modified"] == 1
 
 
-def test_compute_validation_flags_hysteresis_and_ci(monkeypatch):
-    monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
+def test_compute_validation_flags_hysteresis_and_ci() -> None:
     flags = cert._compute_validation_flags(
         ppl={
             "preview_final_ratio": 1.0,
@@ -121,8 +120,7 @@ def test_compute_validation_flags_hysteresis_and_ci(monkeypatch):
     assert flags.get("hysteresis_applied")
 
 
-def test_compute_validation_flags_tiny_relax_env(monkeypatch):
-    monkeypatch.setenv("INVARLOCK_TINY_RELAX", "1")
+def test_compute_validation_flags_tiny_relax_mode() -> None:
     flags = cert._compute_validation_flags(
         ppl={"preview_final_ratio": 1.2, "ratio_vs_baseline": 1.5},
         spectral={"caps_applied": 10},
@@ -131,6 +129,7 @@ def test_compute_validation_flags_tiny_relax_env(monkeypatch):
         tier="balanced",
         guard_overhead={"passed": False, "evaluated": False},
         primary_metric={"kind": "ppl_causal", "ratio_vs_baseline": float("nan")},
+        tiny_relax=True,
     )
     assert flags["preview_final_drift_acceptable"] is True
     assert flags["guard_overhead_acceptable"] is True

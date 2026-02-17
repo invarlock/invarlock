@@ -306,12 +306,20 @@ def test_run_command_does_not_include_determinism_when_preset_empty(
     assert "determinism" not in meta
 
 
-def test_run_command_emits_overhead_skip_marker_in_release_when_env_set(
+def test_run_command_emits_overhead_skip_marker_in_release_when_configured(
     tmp_path: Path,
-    monkeypatch,
 ) -> None:
-    monkeypatch.setenv("INVARLOCK_SKIP_OVERHEAD_CHECK", "1")
     cfg = _cfg(tmp_path)
+    cfg.write_text(
+        cfg.read_text(encoding="utf-8")
+        + """
+
+context:
+  run:
+    skip_overhead_check: true
+""",
+        encoding="utf-8",
+    )
     captured: dict[str, object] = {}
 
     class DummyRegistry:
@@ -438,5 +446,5 @@ def test_run_command_emits_overhead_skip_marker_in_release_when_env_set(
     assert isinstance(overhead, dict)
     assert overhead.get("skipped") is True
     assert overhead.get("mode") == "skipped"
-    assert overhead.get("source") == "env:INVARLOCK_SKIP_OVERHEAD_CHECK"
-    assert overhead.get("skip_reason") == "INVARLOCK_SKIP_OVERHEAD_CHECK"
+    assert overhead.get("source") == "config:context.run.skip_overhead_check"
+    assert overhead.get("skip_reason") == "context.run.skip_overhead_check"

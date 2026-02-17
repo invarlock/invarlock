@@ -101,10 +101,9 @@ def test_make_evaluation_report_minimal_paths() -> None:
     assert isinstance(cert.get("confidence"), dict)
 
 
-def test_make_evaluation_report_tiny_relax_flag(monkeypatch) -> None:
+def test_make_evaluation_report_tiny_relax_flag() -> None:
     report = _mk_minimal_report()
     baseline = _mk_minimal_baseline()
-    # Enable tiny-relax to exercise relaxed gating and provenance flags
-    monkeypatch.setenv("INVARLOCK_TINY_RELAX", "1")
+    report["context"] = {"run": {"tiny_relax": True}}
     cert = make_report(report, baseline)
     assert cert.get("auto", {}).get("tiny_relax") is True

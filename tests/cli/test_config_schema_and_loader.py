@@ -149,6 +149,7 @@ def test_apply_profile_ci_and_release():
     )
     ci = apply_profile(cfg, "ci")
     assert ci.dataset.preview_n >= 200 and ci.eval.bootstrap.replicates >= 1200
+    assert ci.primary_metric.overhead_threshold == pytest.approx(0.01)
     rel = apply_profile(cfg, "release")
     assert rel.dataset.preview_n >= 240 and rel.eval.bootstrap.replicates >= 3200
 

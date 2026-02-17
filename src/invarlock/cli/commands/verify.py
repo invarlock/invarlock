@@ -597,7 +597,7 @@ def _validate_evaluation_report_payload(
         if not isinstance(go, dict) or not go:
             errors.append(
                 "Release verification requires guard_overhead (missing). "
-                "Set INVARLOCK_SKIP_OVERHEAD_CHECK=1 to explicitly skip during evaluation."
+                "Set context.run.skip_overhead_check=true in the run config to explicitly skip during evaluation."
             )
         else:
             skipped = bool(go.get("skipped", False)) or (
@@ -608,7 +608,7 @@ def _validate_evaluation_report_payload(
                 if evaluated is not True:
                     errors.append(
                         "Release verification requires evaluated guard_overhead (not evaluated). "
-                        "Set INVARLOCK_SKIP_OVERHEAD_CHECK=1 to explicitly skip during evaluation."
+                        "Set context.run.skip_overhead_check=true in the run config to explicitly skip during evaluation."
                     )
                 ratio = go.get("overhead_ratio")
                 if ratio is None:

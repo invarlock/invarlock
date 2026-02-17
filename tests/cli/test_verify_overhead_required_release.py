@@ -91,7 +91,8 @@ def _release_ready_cert(*, include_guard_overhead: bool) -> dict:
         cert["guard_overhead"] = {
             "skipped": True,
             "mode": "skipped",
-            "source": "env:INVARLOCK_SKIP_OVERHEAD_CHECK",
+            "source": "config:context.run.skip_overhead_check",
+            "skip_reason": "context.run.skip_overhead_check",
             "overhead_threshold": 0.01,
         }
 

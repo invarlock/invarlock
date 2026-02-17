@@ -9,14 +9,14 @@ from invarlock.cli.errors import InvarlockError
 from invarlock.core.exceptions import ConfigError, DataError, ValidationError
 
 
-def test_should_measure_overhead_respects_env_and_profile(monkeypatch) -> None:
-    monkeypatch.delenv("INVARLOCK_SKIP_OVERHEAD_CHECK", raising=False)
-    assert run_mod._should_measure_overhead("ci") == (True, False)
-    assert run_mod._should_measure_overhead("release") == (True, False)
-    assert run_mod._should_measure_overhead("dev") == (False, False)
+def test_should_measure_overhead_respects_config_and_profile() -> None:
+    assert run_mod._should_measure_overhead("ci", {}) == (True, False, None)
+    assert run_mod._should_measure_overhead("release", {}) == (True, False, None)
+    assert run_mod._should_measure_overhead("dev", {}) == (False, False, None)
 
-    monkeypatch.setenv("INVARLOCK_SKIP_OVERHEAD_CHECK", "1")
-    assert run_mod._should_measure_overhead("ci") == (False, True)
+    assert run_mod._should_measure_overhead(
+        "ci", {"context": {"run": {"skip_overhead_check": True}}}
+    ) == (False, True, "config:context.run.skip_overhead_check")
 
 
 def test_persist_ref_masks_writes_artifact_when_present(tmp_path: Path) -> None:

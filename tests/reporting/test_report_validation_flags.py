@@ -4,9 +4,6 @@ from invarlock.reporting import report_builder as C
 
 
 def test_compute_validation_flags_tiny_relax_and_tokens_floor(monkeypatch):
-    # Enable tiny relax to exercise relaxed branches
-    monkeypatch.setenv("INVARLOCK_TINY_RELAX", "1")
-
     pm_policy = {
         "min_tokens": 100000,
         "min_token_fraction": 0.5,
@@ -45,6 +42,7 @@ def test_compute_validation_flags_tiny_relax_and_tokens_floor(monkeypatch):
         primary_metric=primary_metric,
         moe=None,
         dataset_capacity=dataset_capacity,
+        tiny_relax=True,
     )
 
     assert isinstance(flags, dict)
@@ -53,21 +51,18 @@ def test_compute_validation_flags_tiny_relax_and_tokens_floor(monkeypatch):
     assert flags.get("primary_metric_acceptable") is True
 
 
-def test_tiny_relax_relaxes_tokens_floor_for_ppl(monkeypatch):
+def test_tiny_relax_relaxes_tokens_floor_for_ppl():
     # Balanced default with pm_ratio policy and tiny token counts should still pass under tiny_relax
-    monkeypatch.setenv("INVARLOCK_TINY_RELAX", "1")
-    try:
-        flags = C._compute_validation_flags(
-            ppl={"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.0},
-            spectral={"caps_applied": 0},
-            rmt={"stable": True},
-            invariants={"status": "pass"},
-            tier="balanced",
-            _ppl_metrics={"preview_total_tokens": 1000, "final_total_tokens": 1000},
-            primary_metric={"kind": "ppl_causal", "ratio_vs_baseline": 1.0},
-        )
-    finally:
-        monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
+    flags = C._compute_validation_flags(
+        ppl={"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.0},
+        spectral={"caps_applied": 0},
+        rmt={"stable": True},
+        invariants={"status": "pass"},
+        tier="balanced",
+        _ppl_metrics={"preview_total_tokens": 1000, "final_total_tokens": 1000},
+        primary_metric={"kind": "ppl_causal", "ratio_vs_baseline": 1.0},
+        tiny_relax=True,
+    )
 
     assert isinstance(flags, dict)
     assert flags.get("primary_metric_acceptable") is True

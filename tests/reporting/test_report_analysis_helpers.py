@@ -454,7 +454,6 @@ def test_compute_validation_flags_tiny_relax_allows_unevaluated_overhead(monkeyp
     monkeypatch.setattr(
         cert, "get_tier_policies", lambda *_a, **_k: dict(fake_policies)
     )
-    monkeypatch.setenv("INVARLOCK_TINY_RELAX", "1")
 
     guard_overhead = {"passed": False, "evaluated": False, "errors": ["missing"]}
     flags = cert._compute_validation_flags(
@@ -467,6 +466,7 @@ def test_compute_validation_flags_tiny_relax_allows_unevaluated_overhead(monkeyp
         primary_metric={"kind": "ppl_causal", "ratio_vs_baseline": 1.0},
         _ppl_metrics={"preview_total_tokens": 0, "final_total_tokens": 0},
         dataset_capacity={"tokens_available": 0},
+        tiny_relax=True,
     )
 
     assert flags["guard_overhead_acceptable"] is True
@@ -632,7 +632,6 @@ def test_compute_validation_flags_guard_overhead_ratio_passes_with_tiny_relax(
     monkeypatch.setattr(
         cert, "get_tier_policies", lambda *_a, **_k: dict(fake_policies)
     )
-    monkeypatch.setenv("INVARLOCK_TINY_RELAX", "1")
 
     guard_overhead = {"overhead_ratio": 1.05, "overhead_threshold": 0.01}
     flags = cert._compute_validation_flags(
@@ -645,6 +644,7 @@ def test_compute_validation_flags_guard_overhead_ratio_passes_with_tiny_relax(
         primary_metric={"kind": "ppl_causal", "ratio_vs_baseline": 1.2},
         _ppl_metrics={"preview_total_tokens": 0, "final_total_tokens": 0},
         dataset_capacity={"tokens_available": 0},
+        tiny_relax=True,
     )
 
     assert flags["guard_overhead_acceptable"] is True

@@ -45,7 +45,7 @@ def test_coerce_mapping_covers_multiple_sources_and_failures() -> None:
     assert run_mod._coerce_mapping(_C) == {}
 
 
-def test_resolve_pm_acceptance_range_parses_cfg_and_env(monkeypatch) -> None:
+def test_resolve_pm_acceptance_range_parses_cfg_and_ignores_env(monkeypatch) -> None:
     monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MIN", raising=False)
     monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MAX", raising=False)
 
@@ -59,17 +59,7 @@ def test_resolve_pm_acceptance_range_parses_cfg_and_env(monkeypatch) -> None:
     monkeypatch.setenv("INVARLOCK_PM_ACCEPTANCE_MIN", "-1")
     monkeypatch.setenv("INVARLOCK_PM_ACCEPTANCE_MAX", "0")
     out2 = run_mod._resolve_pm_acceptance_range(cfg)
-    assert out2 == {"min": 0.95, "max": 1.1}
-
-    monkeypatch.setenv("INVARLOCK_PM_ACCEPTANCE_MIN", "1.2")
-    monkeypatch.setenv("INVARLOCK_PM_ACCEPTANCE_MAX", "1.1")
-    out3 = run_mod._resolve_pm_acceptance_range(cfg)
-    assert out3 == {"min": 1.2, "max": 1.2}
-
-    monkeypatch.setenv("INVARLOCK_PM_ACCEPTANCE_MIN", "")
-    monkeypatch.setenv("INVARLOCK_PM_ACCEPTANCE_MAX", "bad")
-    out4 = run_mod._resolve_pm_acceptance_range(cfg)
-    assert out4["max"] == 1.2
+    assert out2 == {"min": 0.95, "max": 1.2}
 
 
 def test_resolve_pm_acceptance_range_ignores_invalid_cfg_max(monkeypatch) -> None:
@@ -95,6 +85,21 @@ def test_resolve_pm_acceptance_range_covers_outer_exception(monkeypatch) -> None
         )
         == {}
     )
+
+
+def test_resolve_guard_overhead_threshold_from_config() -> None:
+    assert run_mod._resolve_guard_overhead_threshold(None) == pytest.approx(
+        run_mod.GUARD_OVERHEAD_THRESHOLD
+    )
+    assert run_mod._resolve_guard_overhead_threshold(
+        {"primary_metric": {"overhead_threshold": 0.025}}
+    ) == pytest.approx(0.025)
+    assert run_mod._resolve_guard_overhead_threshold(
+        {"primary_metric": {"overhead_threshold": "bad"}}
+    ) == pytest.approx(run_mod.GUARD_OVERHEAD_THRESHOLD)
+    assert run_mod._resolve_guard_overhead_threshold(
+        {"primary_metric": {"overhead_threshold": -1}}
+    ) == pytest.approx(run_mod.GUARD_OVERHEAD_THRESHOLD)
 
 
 def test_choose_dataset_split_covers_fallback_and_exception_branch() -> None:

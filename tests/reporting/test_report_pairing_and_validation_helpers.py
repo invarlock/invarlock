@@ -367,9 +367,7 @@ def test_prepare_guard_overhead_section_keeps_skip_reason() -> None:
     assert out.get("skip_reason") == "because"
 
 
-def test_compute_validation_flags_acceptance_bounds_and_accuracy_tiny_relax(
-    monkeypatch,
-) -> None:
+def test_compute_validation_flags_acceptance_bounds_and_accuracy_tiny_relax() -> None:
     # Acceptance bounds (min/max) parsing and PM ratio fallback.
     flags = cert_mod._compute_validation_flags(
         ppl={"preview_final_ratio": 1.0, "ratio_vs_baseline": float("nan")},
@@ -383,7 +381,6 @@ def test_compute_validation_flags_acceptance_bounds_and_accuracy_tiny_relax(
     assert flags.get("primary_metric_acceptable") in {True, False}
 
     # Tiny-relax accuracy branch: accept missing delta and small n.
-    monkeypatch.setenv("INVARLOCK_TINY_RELAX", "1")
     flags2 = cert_mod._compute_validation_flags(
         ppl={"preview_final_ratio": 1.0, "ratio_vs_baseline": 0.0},
         spectral={},
@@ -392,6 +389,7 @@ def test_compute_validation_flags_acceptance_bounds_and_accuracy_tiny_relax(
         tier="balanced",
         primary_metric={"kind": "accuracy", "ratio_vs_baseline": None, "n_final": 1},
         dataset_capacity={"examples_available": 1},
+        tiny_relax=True,
     )
     assert flags2.get("primary_metric_acceptable") is True
 

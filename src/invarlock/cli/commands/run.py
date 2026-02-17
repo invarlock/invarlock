@@ -462,7 +462,7 @@ def _to_serialisable_dict(section: object) -> dict[str, Any]:
 def _resolve_pm_acceptance_range(
     cfg: InvarLockConfig | dict[str, Any] | None,
 ) -> dict[str, float]:
-    """Resolve primary-metric acceptance bounds from config/env with safe defaults."""
+    """Resolve primary-metric acceptance bounds from config with safe defaults."""
 
     base_min = 0.95
     base_max = 1.10
@@ -491,28 +491,12 @@ def _resolve_pm_acceptance_range(
         cfg_min = None
         cfg_max = None
 
-    def _parse_env(name: str) -> float | None:
-        try:
-            raw = os.environ.get(name, "")
-            if raw is None or str(raw).strip() == "":
-                return None
-            return float(raw)
-        except Exception:
-            return None
-
-    env_min = _parse_env("INVARLOCK_PM_ACCEPTANCE_MIN")
-    env_max = _parse_env("INVARLOCK_PM_ACCEPTANCE_MAX")
-
-    has_explicit = any(v is not None for v in (cfg_min, cfg_max, env_min, env_max))
+    has_explicit = any(v is not None for v in (cfg_min, cfg_max))
     if not has_explicit:
         return {}
 
-    min_val = (
-        env_min if env_min is not None else cfg_min if cfg_min is not None else base_min
-    )
-    max_val = (
-        env_max if env_max is not None else cfg_max if cfg_max is not None else base_max
-    )
+    min_val = cfg_min if cfg_min is not None else base_min
+    max_val = cfg_max if cfg_max is not None else base_max
 
     try:
         if min_val is not None and min_val <= 0:
@@ -537,7 +521,7 @@ def _resolve_pm_acceptance_range(
 def _resolve_pm_drift_band(
     cfg: InvarLockConfig | dict[str, Any] | None,
 ) -> dict[str, float]:
-    """Resolve preview→final drift band from config/env with safe defaults.
+    """Resolve preview→final drift band from config with safe defaults.
 
     The drift band governs the Preview Final Drift Acceptable gate. By default,
     evaluation reports enforce 0.95–1.05 unless an explicit band is provided.
@@ -575,28 +559,12 @@ def _resolve_pm_drift_band(
         cfg_min = None
         cfg_max = None
 
-    def _parse_env(name: str) -> float | None:
-        try:
-            raw = os.environ.get(name, "")
-            if raw is None or str(raw).strip() == "":
-                return None
-            return float(raw)
-        except Exception:
-            return None
-
-    env_min = _parse_env("INVARLOCK_PM_DRIFT_MIN")
-    env_max = _parse_env("INVARLOCK_PM_DRIFT_MAX")
-
-    has_explicit = any(v is not None for v in (cfg_min, cfg_max, env_min, env_max))
+    has_explicit = any(v is not None for v in (cfg_min, cfg_max))
     if not has_explicit:
         return {}
 
-    min_val = (
-        env_min if env_min is not None else cfg_min if cfg_min is not None else base_min
-    )
-    max_val = (
-        env_max if env_max is not None else cfg_max if cfg_max is not None else base_max
-    )
+    min_val = cfg_min if cfg_min is not None else base_min
+    max_val = cfg_max if cfg_max is not None else base_max
 
     try:
         if min_val is not None and min_val <= 0:
@@ -615,6 +583,65 @@ def _resolve_pm_drift_band(
         min_val, max_val = base_min, base_max
 
     return {"min": float(min_val), "max": float(max_val)}
+
+
+def _resolve_guard_overhead_threshold(
+    cfg: InvarLockConfig | dict[str, Any] | None,
+) -> float:
+    """Resolve guard-overhead threshold from config with safe default fallback."""
+    threshold = GUARD_OVERHEAD_THRESHOLD
+    try:
+        cfg_map = _coerce_mapping(cfg) if cfg is not None else {}
+        pm_section = cfg_map.get("primary_metric") if isinstance(cfg_map, dict) else {}
+        pm_map = _coerce_mapping(pm_section)
+        candidate = (
+            pm_map.get("overhead_threshold") if isinstance(pm_map, dict) else None
+        )
+        if candidate is not None:
+            parsed = float(candidate)
+            if math.isfinite(parsed) and parsed >= 0.0:
+                threshold = parsed
+    except Exception:
+        return GUARD_OVERHEAD_THRESHOLD
+    return float(threshold)
+
+
+def _coerce_bool_like(value: Any) -> bool | None:
+    """Best-effort bool coercion used for config policy toggles."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int) and value in {0, 1}:
+        return bool(value)
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"1", "true", "yes", "on"}:
+            return True
+        if lowered in {"0", "false", "no", "off"}:
+            return False
+    return None
+
+
+def _resolve_skip_overhead_policy(
+    cfg: InvarLockConfig | dict[str, Any] | None,
+) -> tuple[bool, str | None]:
+    """Resolve overhead-skip policy from run/eval config context."""
+
+    cfg_map = _coerce_mapping(cfg) if cfg is not None else {}
+    if not isinstance(cfg_map, dict):
+        return False, None
+    ctx = _coerce_mapping(cfg_map.get("context"))
+    run_ctx = _coerce_mapping(ctx.get("run")) if isinstance(ctx, dict) else {}
+    eval_ctx = _coerce_mapping(ctx.get("eval")) if isinstance(ctx, dict) else {}
+
+    run_val = _coerce_bool_like(run_ctx.get("skip_overhead_check"))
+    if run_val is not None:
+        return bool(run_val), "config:context.run.skip_overhead_check"
+
+    eval_val = _coerce_bool_like(eval_ctx.get("skip_overhead_check"))
+    if eval_val is not None:
+        return bool(eval_val), "config:context.eval.skip_overhead_check"
+
+    return False, None
 
 
 def _free_model_memory(model: object | None) -> None:
@@ -638,17 +665,18 @@ class _SnapshotRestoreFailed(RuntimeError):
     """Internal signal for snapshot restore failures during retries."""
 
 
-def _should_measure_overhead(profile_normalized: str) -> tuple[bool, bool]:
-    """Return (measure_guard_overhead, skip_overhead) derived from env/profile."""
+def _should_measure_overhead(
+    profile_normalized: str,
+    cfg: InvarLockConfig | dict[str, Any] | None,
+) -> tuple[bool, bool, str | None]:
+    """Return overhead check policy resolved from profile + config context."""
 
-    skip_overhead_env = (
-        os.environ.get("INVARLOCK_SKIP_OVERHEAD_CHECK", "").strip().lower()
-    )
-    skip_overhead = skip_overhead_env in {"1", "true", "yes"}
-    measure_guard_overhead = (
-        profile_normalized in {"ci", "release"} and not skip_overhead
-    )
-    return measure_guard_overhead, skip_overhead
+    skip_overhead_cfg, skip_source = _resolve_skip_overhead_policy(cfg)
+    enforce_profile = profile_normalized in {"ci", "release"}
+    skip_overhead = bool(skip_overhead_cfg and enforce_profile)
+    measure_guard_overhead = bool(enforce_profile and not skip_overhead)
+    source = skip_source if skip_overhead else None
+    return measure_guard_overhead, skip_overhead, source
 
 
 def _choose_dataset_split(
@@ -1455,6 +1483,7 @@ def _run_bare_control(
     restore_fn: Any | None,
     console: Console,
     resolved_loss_type: str,
+    overhead_threshold: float = GUARD_OVERHEAD_THRESHOLD,
     profile_normalized: str | None = None,
     snapshot_provenance: dict[str, bool] | None = None,
     skip_model_load: bool = False,
@@ -1549,7 +1578,7 @@ def _run_bare_control(
             )
 
     payload: dict[str, Any] = {
-        "overhead_threshold": GUARD_OVERHEAD_THRESHOLD,
+        "overhead_threshold": float(overhead_threshold),
         "messages": [],
         "warnings": [],
         "errors": [],
@@ -2483,7 +2512,8 @@ def run_command(
 
     The command assembles non-overlapping preview/final windows, executes the
     GuardChain (invariants → spectral → RMT → variance), checks pairing/overlap
-    invariants, enforces guard-overhead ≤1 %, and emits a run report plus JSONL
+    invariants, enforces the configured guard-overhead budget (default ≤1 %),
+    and emits a run report plus JSONL
     events suitable for evaluation report generation.
     """
 
@@ -2933,6 +2963,7 @@ def run_command(
         }
         pm_acceptance_range = _resolve_pm_acceptance_range(cfg)
         pm_drift_band = _resolve_pm_drift_band(cfg)
+        guard_overhead_threshold = _resolve_guard_overhead_threshold(cfg)
 
         _event(
             console,
@@ -3007,6 +3038,10 @@ def run_command(
         if pm_drift_band:
             run_context.setdefault("primary_metric", {})["drift_band"] = pm_drift_band
             run_context["pm_drift_band"] = pm_drift_band
+        run_context.setdefault("primary_metric", {})["overhead_threshold"] = (
+            guard_overhead_threshold
+        )
+        run_context["guard_overhead_threshold"] = guard_overhead_threshold
         run_context["model_profile"] = {
             "family": model_profile.family,
             "default_loss": model_profile.default_loss,
@@ -4099,14 +4134,17 @@ def run_command(
 
         # RETRY LOOP - All report processing inside loop
         attempt = 1
-        measure_guard_overhead, skip_overhead = _should_measure_overhead(
-            profile_normalized
-        )
+        (
+            measure_guard_overhead,
+            skip_overhead,
+            skip_overhead_source,
+        ) = _should_measure_overhead(profile_normalized, cfg)
         if skip_overhead and profile_normalized in {"ci", "release"}:
+            source_note = f" ({skip_overhead_source})" if skip_overhead_source else ""
             _event(
                 console,
                 "WARN",
-                "Overhead check skipped via INVARLOCK_SKIP_OVERHEAD_CHECK",
+                f"Overhead check skipped via config policy{source_note}",
                 emoji="⚠️",
                 profile=profile_normalized,
             )
@@ -4154,17 +4192,22 @@ def run_command(
             guard_overhead_payload: dict[str, Any] | None = None
             try:
                 if skip_overhead and profile_normalized in {"ci", "release"}:
+                    skip_reason = (
+                        "context.run.skip_overhead_check"
+                        if skip_overhead_source
+                        == "config:context.run.skip_overhead_check"
+                        else "context.eval.skip_overhead_check"
+                    )
                     guard_overhead_payload = {
-                        "overhead_threshold": GUARD_OVERHEAD_THRESHOLD,
+                        "overhead_threshold": guard_overhead_threshold,
                         "evaluated": False,
                         "passed": True,
                         "skipped": True,
-                        "skip_reason": "INVARLOCK_SKIP_OVERHEAD_CHECK",
+                        "skip_reason": skip_reason,
                         "mode": "skipped",
-                        "source": "env:INVARLOCK_SKIP_OVERHEAD_CHECK",
-                        "messages": [
-                            "Overhead check skipped via INVARLOCK_SKIP_OVERHEAD_CHECK"
-                        ],
+                        "source": skip_overhead_source
+                        or "config:context.run.skip_overhead_check",
+                        "messages": ["Overhead check skipped via config policy"],
                         "warnings": [],
                         "errors": [],
                         "checks": {},
@@ -4188,6 +4231,7 @@ def run_command(
                         restore_fn=restore_fn,
                         console=console,
                         resolved_loss_type=resolved_loss_type,
+                        overhead_threshold=guard_overhead_threshold,
                         profile_normalized=profile_normalized,
                         snapshot_provenance=snapshot_provenance,
                         skip_model_load=skip_model_load,
@@ -4264,10 +4308,22 @@ def run_command(
 
             # Persist minimal run context for evaluation report provenance.
             try:
+                run_policy_context = (
+                    dict(run_context.get("run"))
+                    if isinstance(run_context.get("run"), dict)
+                    else {}
+                )
+                eval_policy_context = (
+                    dict(run_context.get("eval"))
+                    if isinstance(run_context.get("eval"), dict)
+                    else {}
+                )
                 report["context"] = {
                     "profile": profile_normalized,
                     "auto": dict(auto_config),
                     "assurance": dict(run_context.get("assurance") or {}),
+                    "run": run_policy_context,
+                    "eval": eval_policy_context,
                 }
             except Exception:
                 pass
@@ -4374,6 +4430,7 @@ def run_command(
                 report["meta"]["pm_acceptance_range"] = pm_acceptance_range
             if pm_drift_band:
                 report["meta"]["pm_drift_band"] = pm_drift_band
+            report["meta"]["guard_overhead_threshold"] = guard_overhead_threshold
             report["meta"]["model_profile"] = {
                 "family": model_profile.family,
                 "default_loss": model_profile.default_loss,
@@ -4610,7 +4667,7 @@ def run_command(
                         bare_struct,
                         guarded_struct,
                         overhead_threshold=guard_overhead_payload.get(
-                            "overhead_threshold", GUARD_OVERHEAD_THRESHOLD
+                            "overhead_threshold", guard_overhead_threshold
                         ),
                     )
                     try:
@@ -5329,7 +5386,9 @@ def run_command(
             guard_overhead_info = report.get("guard_overhead")
             if guard_overhead_info:
                 threshold_fraction = _print_guard_overhead_summary(
-                    console, guard_overhead_info
+                    console,
+                    guard_overhead_info,
+                    default_threshold=guard_overhead_threshold,
                 )
                 if not guard_overhead_info.get("passed", True):
                     _event(
@@ -5794,13 +5853,22 @@ def _normalize_overhead_result(
 
 
 def _print_guard_overhead_summary(
-    console: Console, guard_overhead_info: dict[str, Any]
+    console: Console,
+    guard_overhead_info: dict[str, Any],
+    *,
+    default_threshold: float = GUARD_OVERHEAD_THRESHOLD,
 ) -> float:
     """Print a concise guard-overhead console summary. Returns threshold fraction used."""
     evaluated = bool(guard_overhead_info.get("evaluated", True))
+    try:
+        fallback_threshold = float(default_threshold)
+        if fallback_threshold < 0.0 or not math.isfinite(fallback_threshold):
+            fallback_threshold = GUARD_OVERHEAD_THRESHOLD
+    except Exception:
+        fallback_threshold = GUARD_OVERHEAD_THRESHOLD
     if not evaluated:
         _event(console, "METRIC", "Guard Overhead: not evaluated", emoji="🛡️")
-        return GUARD_OVERHEAD_THRESHOLD
+        return fallback_threshold
     overhead_status = "PASS" if guard_overhead_info.get("passed", True) else "FAIL"
     overhead_percent = guard_overhead_info.get("overhead_percent")
     if isinstance(overhead_percent, (int | float)) and math.isfinite(
@@ -5814,11 +5882,13 @@ def _print_guard_overhead_summary(
         else:
             # Avoid any 'nanx' or ambiguous output
             overhead_display = "not evaluated"
-    threshold_percent = guard_overhead_info.get("overhead_threshold", 0.01)
+    threshold_percent = guard_overhead_info.get(
+        "overhead_threshold", fallback_threshold
+    )
     try:
         threshold_fraction = float(threshold_percent)
     except (TypeError, ValueError):
-        threshold_fraction = GUARD_OVERHEAD_THRESHOLD
+        threshold_fraction = fallback_threshold
     threshold_display = f"≤ +{threshold_fraction * 100:.1f}%"
     _event(
         console,

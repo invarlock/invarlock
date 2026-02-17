@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+import invarlock.cli.config as config_mod
 from invarlock.cli.config import (
     AutoConfig,
     InvarLockConfig,
@@ -82,20 +83,17 @@ def test_resolve_edit_kind_unknown_raises():
         resolve_edit_kind("not-a-kind")
 
 
-def test_apply_profile_ci_env_overrides(monkeypatch):
-    # Defaults overwritten by env when profile==ci
-    monkeypatch.setenv("INVARLOCK_CI_PREVIEW", "42")
-    monkeypatch.setenv("INVARLOCK_CI_FINAL", "84")
+def test_apply_profile_ci_raises_when_runtime_profile_missing(monkeypatch):
+    monkeypatch.setattr(config_mod, "_load_runtime_yaml", lambda *_a, **_k: None)
     cfg = InvarLockConfig(dataset={"provider": "wikitext2"})
-    out = apply_profile(cfg, "ci")
-    d = out.data.get("dataset", {})
-    assert d.get("preview_n") == 42 and d.get("final_n") == 84
+    with pytest.raises(ValueError, match="Unknown profile"):
+        apply_profile(cfg, "ci")
 
 
-def test_apply_profile_ci_invalid_env_uses_defaults(monkeypatch):
+def test_apply_profile_ci_missing_runtime_profile_ignores_env(monkeypatch):
+    monkeypatch.setattr(config_mod, "_load_runtime_yaml", lambda *_a, **_k: None)
     monkeypatch.setenv("INVARLOCK_CI_PREVIEW", "not-an-int")
     monkeypatch.setenv("INVARLOCK_CI_FINAL", "also-bad")
     cfg = InvarLockConfig(dataset={"provider": "wikitext2"})
-    out = apply_profile(cfg, "ci")
-    d = out.data.get("dataset", {})
-    assert d.get("preview_n") == 200 and d.get("final_n") == 200
+    with pytest.raises(ValueError, match="Unknown profile"):
+        apply_profile(cfg, "ci")

@@ -2650,7 +2650,7 @@ class CoreRunner:
             *,
             run_key: str,
             eval_keys: tuple[str, ...],
-            env_key: str,
+            env_key: str | None,
             default: bool,
         ) -> bool:
             val = _coerce_bool(run_ctx.get(run_key))
@@ -2659,22 +2659,23 @@ class CoreRunner:
                     val = _coerce_bool(eval_ctx.get(key))
                     if val is not None:
                         break
-            env_val = _env_flag(env_key)
-            if env_val is not None:
-                val = env_val
+            if env_key:
+                env_val = _env_flag(env_key)
+                if env_val is not None:
+                    val = env_val
             return default if val is None else bool(val)
 
         return {
             "strict_eval": _resolve_flag(
                 run_key="strict_eval",
                 eval_keys=("strict_errors", "strict"),
-                env_key="INVARLOCK_EVAL_STRICT",
+                env_key=None,
                 default=True,
             ),
             "strict_guard_prepare": _resolve_flag(
                 run_key="strict_guard_prepare",
                 eval_keys=(),
-                env_key="INVARLOCK_GUARD_PREPARE_STRICT",
+                env_key=None,
                 default=True,
             ),
             "allow_calibration_materialize": _resolve_flag(

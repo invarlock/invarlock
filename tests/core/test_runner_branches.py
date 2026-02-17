@@ -1661,11 +1661,10 @@ def test_resolve_policy_flags_precedence(monkeypatch, tmp_path):
     cfg.context.setdefault("eval", {})["strict"] = "false"
     cfg.context.setdefault("run", {})["strict_guard_prepare"] = "0"
     cfg.context.setdefault("run", {})["allow_calibration_materialize"] = "1"
-    monkeypatch.setenv("INVARLOCK_EVAL_STRICT", "1")
 
     flags = runner._resolve_policy_flags(cfg)
 
-    assert flags["strict_eval"] is True  # env overrides eval/run
+    assert flags["strict_eval"] is False
     assert flags["strict_guard_prepare"] is False
     assert flags["allow_calibration_materialize"] is True
 

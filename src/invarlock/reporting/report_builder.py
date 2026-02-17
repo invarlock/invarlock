@@ -1778,6 +1778,7 @@ def make_report(
 
     pm_acceptance_range = _resolve_pm_acceptance_range_from_report(report)
     pm_drift_band = _resolve_pm_drift_band_from_report(report)
+    tiny_relax = _resolve_tiny_relax_from_report(report)
 
     # Primary metric tail evidence and gate evaluation (ΔlogNLL vs baseline, per-window).
     pm_tail_result: dict[str, Any] = {}
@@ -1916,6 +1917,12 @@ def make_report(
     except Exception:  # pragma: no cover - defensive against patched functions
         validation_kwargs["pm_tail"] = pm_tail_result
 
+    try:
+        if "tiny_relax" in inspect.signature(_compute_validation_flags).parameters:
+            validation_kwargs["tiny_relax"] = tiny_relax
+    except Exception:  # pragma: no cover - defensive against patched functions
+        validation_kwargs["tiny_relax"] = tiny_relax
+
     validation_flags = _compute_validation_flags(**validation_kwargs)
 
     # Enforce validation key allow-list to prevent surface drift
@@ -1952,21 +1959,8 @@ def make_report(
         "primary_metric_tail": pm_tail_result,
     }
 
-    # Record tiny-relax provenance explicitly when active (dev-only demos)
-    try:
-        import os as _os
-
-        _tiny_relax_env = str(
-            _os.environ.get("INVARLOCK_TINY_RELAX", "")
-        ).strip().lower() in {
-            "1",
-            "true",
-            "yes",
-            "on",
-        }
-    except Exception:  # pragma: no cover
-        _tiny_relax_env = False
-    if _tiny_relax_env:
+    # Record tiny-relax provenance explicitly when active.
+    if tiny_relax:
         try:
             evaluation_report.setdefault("auto", {})["tiny_relax"] = True
             prov = evaluation_report.setdefault("provenance", {})
@@ -3406,7 +3400,7 @@ def _build_provenance_block(
 def _resolve_pm_acceptance_range_from_report(
     report: dict[str, Any] | None,
 ) -> dict[str, float]:
-    """Resolve primary-metric acceptance bounds from report context/meta/env."""
+    """Resolve primary-metric acceptance bounds from report context/meta."""
 
     base_min = 0.95
     base_max = 1.10
@@ -3457,28 +3451,12 @@ def _resolve_pm_acceptance_range_from_report(
                     else _safe_float(meta_range.get("max"))
                 )
 
-    def _parse_env(name: str) -> float | None:
-        try:
-            raw = os.environ.get(name, "")
-            if raw is None or str(raw).strip() == "":
-                return None
-            return float(raw)
-        except Exception:
-            return None
-
-    env_min = _parse_env("INVARLOCK_PM_ACCEPTANCE_MIN")
-    env_max = _parse_env("INVARLOCK_PM_ACCEPTANCE_MAX")
-
-    has_explicit = any(v is not None for v in (cfg_min, cfg_max, env_min, env_max))
+    has_explicit = any(v is not None for v in (cfg_min, cfg_max))
     if not has_explicit:
         return {}
 
-    min_val = (
-        env_min if env_min is not None else cfg_min if cfg_min is not None else base_min
-    )
-    max_val = (
-        env_max if env_max is not None else cfg_max if cfg_max is not None else base_max
-    )
+    min_val = cfg_min if cfg_min is not None else base_min
+    max_val = cfg_max if cfg_max is not None else base_max
 
     try:
         if min_val is not None and min_val <= 0:
@@ -3503,7 +3481,7 @@ def _resolve_pm_acceptance_range_from_report(
 def _resolve_pm_drift_band_from_report(
     report: dict[str, Any] | None,
 ) -> dict[str, float]:
-    """Resolve preview→final drift band from report context/meta/env."""
+    """Resolve preview→final drift band from report context/meta."""
 
     base_min, base_max = PM_DRIFT_BAND_DEFAULT
 
@@ -3556,28 +3534,12 @@ def _resolve_pm_drift_band_from_report(
                     else _safe_float(meta_band.get("max"))
                 )
 
-    def _parse_env(name: str) -> float | None:
-        try:
-            raw = os.environ.get(name, "")
-            if raw is None or str(raw).strip() == "":
-                return None
-            return float(raw)
-        except Exception:
-            return None
-
-    env_min = _parse_env("INVARLOCK_PM_DRIFT_MIN")
-    env_max = _parse_env("INVARLOCK_PM_DRIFT_MAX")
-
-    has_explicit = any(v is not None for v in (cfg_min, cfg_max, env_min, env_max))
+    has_explicit = any(v is not None for v in (cfg_min, cfg_max))
     if not has_explicit:
         return {}
 
-    min_val = (
-        env_min if env_min is not None else cfg_min if cfg_min is not None else base_min
-    )
-    max_val = (
-        env_max if env_max is not None else cfg_max if cfg_max is not None else base_max
-    )
+    min_val = cfg_min if cfg_min is not None else base_min
+    max_val = cfg_max if cfg_max is not None else base_max
 
     try:
         if min_val is not None and min_val <= 0:
@@ -3598,6 +3560,56 @@ def _resolve_pm_drift_band_from_report(
     return {"min": float(min_val), "max": float(max_val)}
 
 
+def _resolve_tiny_relax_from_report(report: dict[str, Any] | None) -> bool:
+    """Resolve tiny-relax mode from report context/meta policy fields."""
+
+    def _coerce_bool_like(value: Any) -> bool | None:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, int) and value in {0, 1}:
+            return bool(value)
+        if isinstance(value, str):
+            lowered = value.strip().lower()
+            if lowered in {"1", "true", "yes", "on"}:
+                return True
+            if lowered in {"0", "false", "no", "off"}:
+                return False
+        return None
+
+    if not isinstance(report, dict):
+        return False
+
+    ctx = report.get("context")
+    if isinstance(ctx, dict):
+        run_ctx = ctx.get("run")
+        if isinstance(run_ctx, dict):
+            run_val = _coerce_bool_like(run_ctx.get("tiny_relax"))
+            if run_val is not None:
+                return bool(run_val)
+        eval_ctx = ctx.get("eval")
+        if isinstance(eval_ctx, dict):
+            eval_val = _coerce_bool_like(eval_ctx.get("tiny_relax"))
+            if eval_val is not None:
+                return bool(eval_val)
+
+    # Backward-compatible fallback for historical reports.
+    auto_block = report.get("auto")
+    if isinstance(auto_block, dict):
+        auto_val = _coerce_bool_like(auto_block.get("tiny_relax"))
+        if auto_val is not None:
+            return bool(auto_val)
+
+    meta = report.get("meta")
+    if isinstance(meta, dict):
+        meta_auto = meta.get("auto")
+        if isinstance(meta_auto, dict):
+            meta_auto_val = _coerce_bool_like(meta_auto.get("tiny_relax"))
+            if meta_auto_val is not None:
+                return bool(meta_auto_val)
+
+    return False
+
+
 def _compute_validation_flags(
     ppl: dict[str, Any],
     spectral: dict[str, Any],
@@ -3613,19 +3625,12 @@ def _compute_validation_flags(
     pm_acceptance_range: dict[str, float] | None = None,
     pm_drift_band: dict[str, float] | None = None,
     pm_tail: dict[str, Any] | None = None,
+    tiny_relax: bool = False,
 ) -> dict[str, bool]:
     """Compute validation flags for the evaluation report including canonical gates."""
     tier = (tier or "balanced").lower()
-    # Dev-only tiny relax: widen gates and lower floors when explicitly requested
-    import os as _os
-
-    _tiny_relax = str(_os.environ.get("INVARLOCK_TINY_RELAX", "")).strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
-    if _tiny_relax:
+    # Tiny-relax is policy/config-driven and applies only when explicitly set.
+    if tiny_relax:
         tier = "aggressive"
 
     tier_thresholds = {
@@ -3695,7 +3700,7 @@ def _compute_validation_flags(
         except Exception:  # pragma: no cover
             pass
     preview_final_drift_acceptable = drift_min <= drift_ratio <= drift_max
-    if _tiny_relax:
+    if tiny_relax:
         # Treat drift identity as informational in tiny dev demos
         preview_final_drift_acceptable = True
 
@@ -3783,7 +3788,7 @@ def _compute_validation_flags(
             except Exception:  # pragma: no cover
                 tokens_ok = True
     # Under tiny_relax, treat token floors as informational only
-    tokens_ok_eff = tokens_ok or _tiny_relax
+    tokens_ok_eff = tokens_ok or tiny_relax
     # Apply hysteresis to ratio limit if needed
     ratio_limit_with_hyst = ratio_limit + max(0.0, hysteresis_ratio)
     lower_bound_ok = True
@@ -3801,7 +3806,7 @@ def _compute_validation_flags(
         and ratio_vs_baseline <= ratio_limit_with_hyst
         and tokens_ok_eff
     )
-    if _tiny_relax:
+    if tiny_relax:
         # In tiny demos, allow undefined ratio and relax floors
         if not isinstance(ratio_vs_baseline, int | float) or not math.isfinite(
             ratio_vs_baseline
@@ -3837,7 +3842,7 @@ def _compute_validation_flags(
     if isinstance(guard_overhead, dict) and guard_overhead:
         if "passed" in guard_overhead:
             guard_overhead_pass = bool(guard_overhead.get("passed"))
-            if _tiny_relax and (
+            if tiny_relax and (
                 not bool(guard_overhead.get("evaluated", True))
                 or guard_overhead.get("errors")
             ):
@@ -3851,7 +3856,7 @@ def _compute_validation_flags(
             except (TypeError, ValueError):
                 ratio_val = float("nan")
                 threshold_val = 0.01
-            if _tiny_relax and threshold_val < 0.10:
+            if tiny_relax and threshold_val < 0.10:
                 threshold_val = 0.10
             if not math.isfinite(ratio_val):
                 # In dev/Compare-&-Evaluate flows we often lack a bare run; treat missing metric as pass
@@ -3908,7 +3913,7 @@ def _compute_validation_flags(
                     and math.isfinite(delta)
                     and (delta >= (delta_min_pp - max(0.0, hysteresis_pp)))
                 )
-                if _tiny_relax and not (
+                if tiny_relax and not (
                     isinstance(delta, int | float) and math.isfinite(delta)
                 ):
                     meets_delta = True
@@ -3931,7 +3936,7 @@ def _compute_validation_flags(
                     except Exception:  # pragma: no cover
                         pass
                     meets_n = int(n_fin) >= eff_min_examples
-                    if _tiny_relax:
+                    if tiny_relax:
                         # In tiny demos accept smaller sample sizes
                         meets_n = True
                 flags["primary_metric_acceptable"] = bool(meets_delta and meets_n)

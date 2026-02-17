@@ -3,20 +3,16 @@ from invarlock.cli.config import InvarLockConfig
 from invarlock.reporting import report_builder as cert
 
 
-def test_pm_acceptance_range_env_override(monkeypatch):
+def test_pm_acceptance_range_ignores_env_override(monkeypatch):
     monkeypatch.setenv("INVARLOCK_PM_ACCEPTANCE_MIN", "0.9")
     monkeypatch.setenv("INVARLOCK_PM_ACCEPTANCE_MAX", "1.2")
-
     cfg = InvarLockConfig(
         {"primary_metric": {"acceptance_range": {"min": 0.95, "max": 1.05}}}
     )
     resolved = run._resolve_pm_acceptance_range(cfg)
 
-    assert resolved["min"] == 0.9
-    assert resolved["max"] == 1.2
-
-    monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MIN", raising=False)
-    monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MAX", raising=False)
+    assert resolved["min"] == 0.95
+    assert resolved["max"] == 1.05
 
 
 def test_evaluation_report_acceptance_range_applied():

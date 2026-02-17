@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from invarlock.reporting.report_builder import (
     _compute_quality_overhead_from_guard,
     _compute_validation_flags,
@@ -25,21 +23,18 @@ def test_accuracy_min_examples_fraction_precedence() -> None:
     assert flags["primary_metric_acceptable"] is False
 
 
-def test_tiny_relax_env_widens_acceptance(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_tiny_relax_mode_widens_acceptance() -> None:
     # In tiny relax, undefined ratio becomes acceptable and tokens floors relax
-    monkeypatch.setenv("INVARLOCK_TINY_RELAX", "1")
-    try:
-        flags = _compute_validation_flags(
-            ppl={"preview_final_ratio": 1.0, "ratio_vs_baseline": float("nan")},
-            spectral={},
-            rmt={},
-            invariants={},
-            tier="conservative",
-            _ppl_metrics={"preview_total_tokens": 0, "final_total_tokens": 0},
-        )
-        assert flags["primary_metric_acceptable"] is True
-    finally:
-        monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
+    flags = _compute_validation_flags(
+        ppl={"preview_final_ratio": 1.0, "ratio_vs_baseline": float("nan")},
+        spectral={},
+        rmt={},
+        invariants={},
+        tier="conservative",
+        _ppl_metrics={"preview_total_tokens": 0, "final_total_tokens": 0},
+        tiny_relax=True,
+    )
+    assert flags["primary_metric_acceptable"] is True
 
 
 def test_quality_overhead_from_guard_accuracy_delta_pp() -> None:

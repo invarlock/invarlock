@@ -1,0 +1,16 @@
+# CI profile overrides for standard evaluation workflows.
+#
+# Keeps default CI window sizing and bootstrap depth explicit in packaged
+# runtime data so policy behavior does not depend on implicit fallback logic.
+
+dataset:
+  preview_n: 200
+  final_n: 200
+
+eval:
+  bootstrap:
+    replicates: 1200
+    alpha: 0.05
+
+primary_metric:
+  overhead_threshold: 0.01

@@ -184,8 +184,9 @@ packaged presets include it by default; remove a guard from the list to skip it.
 
 ## Troubleshooting
 
-- **Guard prepare failed**: set `INVARLOCK_GUARD_PREPARE_STRICT=0` for local
-  debugging, or adjust tier policies for the guard that failed.
+- **Guard prepare failed**: set `context.run.strict_guard_prepare: false` in
+  your run config for local debugging, or adjust tier policies for the guard
+  that failed.
 - **Spectral instability**: lower `sigma_quantile`, narrow `scope`, or increase
   deadband to reduce noise.
 - **RMT ε-band violations**: tighten calibration (more windows) or adjust

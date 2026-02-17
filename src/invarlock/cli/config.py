@@ -353,22 +353,7 @@ def apply_profile(cfg: InvarLockConfig, profile: str) -> InvarLockConfig:
     overrides: dict[str, Any] | None = _load_runtime_yaml("profiles", f"{profile}.yaml")
 
     if overrides is None:
-        # Provide sensible CI defaults when 'ci' profile file is absent
-        if profile.lower() == "ci":
-            try:
-                prev = int(os.getenv("INVARLOCK_CI_PREVIEW", "200"))
-            except Exception:
-                prev = 200
-            try:
-                fin = int(os.getenv("INVARLOCK_CI_FINAL", "200"))
-            except Exception:
-                fin = 200
-            overrides = {
-                "dataset": {"preview_n": prev, "final_n": fin},
-                "eval": {"bootstrap": {"replicates": 1200, "alpha": 0.05}},
-            }
-        else:
-            raise ValueError(f"Unknown profile: {profile}")
+        raise ValueError(f"Unknown profile: {profile}")
     return InvarLockConfig(_deep_merge(cfg.model_dump(), overrides))
 
 

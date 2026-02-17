@@ -6,11 +6,11 @@ from invarlock.reporting import report_builder as cert
 from tests.reporting.test_report_full_context import _rich_run_report
 
 
-def test_make_evaluation_report_marks_tiny_relax(monkeypatch):
+def test_make_evaluation_report_marks_tiny_relax() -> None:
     report, baseline = _rich_run_report()
     report = deepcopy(report)
     baseline = deepcopy(baseline)
-    monkeypatch.setenv("INVARLOCK_TINY_RELAX", "1")
+    report["context"] = {"run": {"tiny_relax": True}}
     evaluation_report = cert.make_report(report, baseline)
     assert evaluation_report["auto"]["tiny_relax"] is True
     stats = evaluation_report["dataset"]["windows"]["stats"]

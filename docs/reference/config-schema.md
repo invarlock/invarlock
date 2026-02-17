@@ -154,6 +154,14 @@ guards:
 
 ```yaml
 context:
+  run:
+    strict_guard_prepare: true
+    strict_eval: true
+    skip_overhead_check: false   # release/ci explicit skip marker
+    tiny_relax: false            # dev/demo-only relaxed gating
+  eval:
+    strict_errors: true
+    tiny_relax: false
   snapshot:
     mode: auto
     ram_fraction: 0.4
