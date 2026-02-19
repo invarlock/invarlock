@@ -1,4 +1,5 @@
 import os
+import subprocess
 import sys
 from types import SimpleNamespace
 
@@ -71,7 +72,7 @@ def test_plugins_install_unknown_without_explicit_dry_run(monkeypatch):
 def test_plugins_install_apply_invokes_pip(monkeypatch):
     called: dict[str, list[str]] = {}
 
-    def fake_run(cmd, capture_output, text):
+    def fake_run(cmd, capture_output, text, check, timeout):  # noqa: ANN001
         called["cmd"] = cmd
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 
@@ -86,8 +87,23 @@ def test_plugins_install_apply_invokes_pip(monkeypatch):
 
 
 def test_plugins_install_apply_normalizes_pip_failure_exit_code(monkeypatch):
-    def fake_run(cmd, capture_output, text):
+    def fake_run(cmd, capture_output, text, check, timeout):  # noqa: ANN001
         return SimpleNamespace(returncode=42, stdout="", stderr="boom")
+
+    monkeypatch.setattr("invarlock.cli.commands.plugins.subprocess.run", fake_run)
+    monkeypatch.delenv("INVARLOCK_PLUGINS_DRY_RUN", raising=False)
+
+    with pytest.raises(typer.Exit) as exc:
+        plugins_mod.plugins_install_command(
+            ["gptq"], upgrade=False, dry_run=False, apply=True
+        )
+
+    assert exc.value.exit_code == 1
+
+
+def test_plugins_install_apply_handles_timeout(monkeypatch):
+    def fake_run(cmd, capture_output, text, check, timeout):  # noqa: ANN001
+        raise subprocess.TimeoutExpired(cmd=cmd, timeout=timeout)
 
     monkeypatch.setattr("invarlock.cli.commands.plugins.subprocess.run", fake_run)
     monkeypatch.delenv("INVARLOCK_PLUGINS_DRY_RUN", raising=False)

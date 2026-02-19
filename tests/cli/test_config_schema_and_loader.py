@@ -163,6 +163,42 @@ def test_load_config_include_missing_file(tmp_path: Path):
         load_config(cfg_path)
 
 
+def test_load_config_include_cycle_detected(tmp_path: Path) -> None:
+    main = tmp_path / "main.yaml"
+    a_path = tmp_path / "a.yaml"
+    b_path = tmp_path / "b.yaml"
+
+    main.write_text(f"defaults: !include {a_path.name}\n", encoding="utf-8")
+    a_path.write_text(f"defaults: !include {b_path.name}\n", encoding="utf-8")
+    b_path.write_text(f"defaults: !include {a_path.name}\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"Config !include cycle detected"):
+        load_config(main)
+
+
+def test_load_config_include_depth_guard(tmp_path: Path) -> None:
+    main = tmp_path / "main.yaml"
+    depth = 18
+    chain_files = [tmp_path / f"inc_{idx}.yaml" for idx in range(depth)]
+
+    main.write_text(f"defaults: !include {chain_files[0].name}\n", encoding="utf-8")
+    for idx, chain_file in enumerate(chain_files):
+        if idx < depth - 1:
+            chain_file.write_text(
+                f"defaults: !include {chain_files[idx + 1].name}\n",
+                encoding="utf-8",
+            )
+        else:
+            chain_file.write_text(
+                "model: {id: gpt2, adapter: hf_causal}\n"
+                "edit: {name: quant_rtn, plan: {}}\n",
+                encoding="utf-8",
+            )
+
+    with pytest.raises(ValueError, match=r"Config !include depth exceeds"):
+        load_config(main)
+
+
 def test_load_config_none_and_nondict(tmp_path: Path):
     # None
     cfg_null = tmp_path / "null.yaml"

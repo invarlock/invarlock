@@ -26,6 +26,19 @@ plugins_app = typer.Typer(
     help="Manage optional backends; list adapters/guards/edits.",
 )
 
+PLUGIN_PIP_TIMEOUT_SECONDS = 300
+
+
+def _resolve_plugin_pip_timeout() -> int:
+    raw = os.environ.get("INVARLOCK_PLUGIN_PIP_TIMEOUT_SEC", "").strip()
+    if not raw:
+        return PLUGIN_PIP_TIMEOUT_SECONDS
+    try:
+        parsed = int(raw)
+    except ValueError:
+        return PLUGIN_PIP_TIMEOUT_SECONDS
+    return parsed if parsed > 0 else PLUGIN_PIP_TIMEOUT_SECONDS
+
 
 def _sort_rows(rows):
     """Stable sort by name, kind, then module and entry_point."""
@@ -1094,14 +1107,34 @@ def plugins_uninstall_command(
 
     try:
         cmd = [sys.executable, "-m", "pip", "uninstall", "-y", *all_pkgs]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            _print_normalized("uninstall", all_pkgs, "apply", "skipped")
-            raise typer.Exit(1)
-        _print_normalized("uninstall", all_pkgs, "apply", "ok")
-    except Exception as e:
-        console.print(f"[red]❌ Uninstall failed: {e}[/red]")
-        raise typer.Exit(1) from e
+        timeout_seconds = _resolve_plugin_pip_timeout()
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired as exc:
+        _print_normalized("uninstall", all_pkgs, "apply", "timeout")
+        console.print(
+            f"[red]❌ Uninstall timed out after {timeout_seconds}s[/red]"
+        )
+        raise typer.Exit(1) from exc
+    except OSError as exc:
+        _print_normalized("uninstall", all_pkgs, "apply", "failed")
+        console.print(f"[red]❌ Unable to invoke pip uninstall: {exc}[/red]")
+        raise typer.Exit(1) from exc
+    if result.returncode != 0:
+        _print_normalized("uninstall", all_pkgs, "apply", "skipped")
+        error_text = (result.stderr or result.stdout or "").strip()
+        if error_text:
+            console.print(
+                f"[red]❌ pip uninstall failed ({result.returncode}): "
+                f"{_escape(error_text.splitlines()[-1])}[/red]"
+            )
+        raise typer.Exit(1)
+    _print_normalized("uninstall", all_pkgs, "apply", "ok")
 
 
 def plugins_install_command(
@@ -1169,14 +1202,32 @@ def plugins_install_command(
         cmd = [sys.executable, "-m", "pip", "install", *all_targets]
         if upgrade:
             cmd.insert(4, "--upgrade")
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            _print_normalized("install", all_targets, "apply", "skipped")
-            raise typer.Exit(1)
-        _print_normalized("install", all_targets, "apply", "ok")
-    except Exception as e:
-        console.print(f"[red]❌ Install failed: {e}[/red]")
-        raise typer.Exit(1) from e
+        timeout_seconds = _resolve_plugin_pip_timeout()
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired as exc:
+        _print_normalized("install", all_targets, "apply", "timeout")
+        console.print(f"[red]❌ Install timed out after {timeout_seconds}s[/red]")
+        raise typer.Exit(1) from exc
+    except OSError as exc:
+        _print_normalized("install", all_targets, "apply", "failed")
+        console.print(f"[red]❌ Unable to invoke pip install: {exc}[/red]")
+        raise typer.Exit(1) from exc
+    if result.returncode != 0:
+        _print_normalized("install", all_targets, "apply", "skipped")
+        error_text = (result.stderr or result.stdout or "").strip()
+        if error_text:
+            console.print(
+                f"[red]❌ pip install failed ({result.returncode}): "
+                f"{_escape(error_text.splitlines()[-1])}[/red]"
+            )
+        raise typer.Exit(1)
+    _print_normalized("install", all_targets, "apply", "ok")
 
 
 # Wire subcommands under group

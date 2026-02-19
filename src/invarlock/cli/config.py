@@ -198,15 +198,39 @@ class AutoConfig:
             raise ValueError("target_pm_ratio must be >= 1.0")
 
 
-def _create_loader(base_dir: Path):
+CONFIG_INCLUDE_MAX_DEPTH = 16
+
+
+def _create_loader(
+    base_dir: Path,
+    *,
+    include_stack: tuple[Path, ...] = (),
+    max_include_depth: int = CONFIG_INCLUDE_MAX_DEPTH,
+):
     class Loader(yaml.SafeLoader):
         pass
 
     Loader._base_dir = Path(base_dir).resolve()
+    Loader._include_stack = tuple(Path(p).resolve() for p in include_stack)
+    Loader._max_include_depth = int(max_include_depth)
 
     def _construct_include(loader: yaml.SafeLoader, node: yaml.Node):
         rel = loader.construct_scalar(node)
         path = (loader._base_dir / rel).resolve()
+        include_stack = tuple(getattr(loader, "_include_stack", ()))
+        max_include_depth = int(
+            getattr(loader, "_max_include_depth", CONFIG_INCLUDE_MAX_DEPTH)
+        )
+
+        if path in include_stack:
+            chain = " -> ".join(str(p) for p in (*include_stack, path))
+            raise ValueError(f"Config !include cycle detected: {chain}")
+        if len(include_stack) >= max_include_depth:
+            chain = " -> ".join(str(p) for p in (*include_stack, path))
+            raise ValueError(
+                f"Config !include depth exceeds {max_include_depth}: {chain}"
+            )
+
         allow_outside = os.environ.get("INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE", "")
         allow_outside = allow_outside.strip().lower() in {"1", "true", "yes", "on"}
         if not allow_outside:
@@ -218,7 +242,11 @@ def _create_loader(base_dir: Path):
                     "Set INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE=1 to override."
                 ) from exc
         with path.open(encoding="utf-8") as fh:
-            inc_loader = _create_loader(path.parent)
+            inc_loader = _create_loader(
+                path.parent,
+                include_stack=(*include_stack, path),
+                max_include_depth=max_include_depth,
+            )
             return yaml.load(fh, Loader=inc_loader)
 
     Loader.add_constructor("!include", _construct_include)

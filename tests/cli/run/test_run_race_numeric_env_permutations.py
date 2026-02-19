@@ -311,7 +311,8 @@ def test_invalid_file_encoding_baseline(tmp_path: Path):
 
 
 def test_env_var_poisoning_for_tmpdir_and_debug(tmp_path: Path, monkeypatch):
-    # TMPDIR empty -> snapshot chooser falls back to /tmp; INVARLOCK_DEBUG_TRACE odd chars -> no crash
+    # TMPDIR empty -> snapshot chooser falls back to platform tempdir; odd debug
+    # trace content must not crash.
     cfg = _base_cfg(tmp_path)
 
     class Adapter:
