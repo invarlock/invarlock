@@ -264,3 +264,25 @@ def test_analysis_and_overhead_wrappers_delegate(monkeypatch):
         "evaluated": False,
         "passed": True,
     }
+
+
+def test_run_command_injects_explicit_deps(monkeypatch):
+    sentinel = object()
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        run_mod, "_resolve_pm_acceptance_range", sentinel, raising=False
+    )
+
+    def _fake_run_command_impl(**kwargs):
+        captured.update(kwargs)
+        return "ok"
+
+    monkeypatch.setattr(run_mod, "_run_command_impl", _fake_run_command_impl)
+    out = run_mod.run_command(config="configs/example.yml")
+
+    assert out == "ok"
+    deps = captured.get("deps")
+    assert isinstance(deps, dict)
+    assert deps["_resolve_pm_acceptance_range"] is sentinel
+    assert deps["console"] is run_mod.console
