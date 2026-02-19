@@ -83,3 +83,18 @@ def test_plugins_install_apply_invokes_pip(monkeypatch):
     assert called["cmd"][0] == sys.executable
     assert called["cmd"][1:4] == ["-m", "pip", "install"]
     assert "--upgrade" in called["cmd"]
+
+
+def test_plugins_install_apply_normalizes_pip_failure_exit_code(monkeypatch):
+    def fake_run(cmd, capture_output, text):
+        return SimpleNamespace(returncode=42, stdout="", stderr="boom")
+
+    monkeypatch.setattr("invarlock.cli.commands.plugins.subprocess.run", fake_run)
+    monkeypatch.delenv("INVARLOCK_PLUGINS_DRY_RUN", raising=False)
+
+    with pytest.raises(typer.Exit) as exc:
+        plugins_mod.plugins_install_command(
+            ["gptq"], upgrade=False, dry_run=False, apply=True
+        )
+
+    assert exc.value.exit_code == 1

@@ -2,6 +2,7 @@ import sys
 from unittest.mock import Mock, patch
 
 import pytest
+import typer
 
 from invarlock.cli.commands.doctor import doctor_command
 
@@ -39,9 +40,13 @@ def test_doctor_command_healthy():
                 with patch("torch.cuda.is_available", return_value=True):
                     with patch("torch.cuda.get_device_properties") as mock_props:
                         mock_props.return_value.total_memory = 24 * 1024**3
-                        with pytest.raises(SystemExit) as exc_info:
+                        with pytest.raises((SystemExit, typer.Exit)) as exc_info:
                             doctor_command()
-                        assert exc_info.value.code == 0
+                        assert (
+                            getattr(exc_info.value, "exit_code", None)
+                            if hasattr(exc_info.value, "exit_code")
+                            else getattr(exc_info.value, "code", None)
+                        ) == 0
 
 
 def test_doctor_command_missing_core():
@@ -49,9 +54,13 @@ def test_doctor_command_missing_core():
         "invarlock.core.registry.get_registry", side_effect=ImportError("No core")
     ):
         with patch("invarlock.cli.commands.doctor.console"):
-            with pytest.raises(SystemExit) as exc_info:
+            with pytest.raises((SystemExit, typer.Exit)) as exc_info:
                 doctor_command()
-            assert exc_info.value.code == 1
+            assert (
+                getattr(exc_info.value, "exit_code", None)
+                if hasattr(exc_info.value, "exit_code")
+                else getattr(exc_info.value, "code", None)
+            ) == 1
 
 
 def test_doctor_command_no_torch():
@@ -67,9 +76,13 @@ def test_doctor_command_no_torch():
 
         try:
             with patch("builtins.__import__", side_effect=mock_import):
-                with pytest.raises(SystemExit) as exc_info:
+                with pytest.raises((SystemExit, typer.Exit)) as exc_info:
                     doctor_command()
-                assert exc_info.value.code == 1
+                assert (
+                    getattr(exc_info.value, "exit_code", None)
+                    if hasattr(exc_info.value, "exit_code")
+                    else getattr(exc_info.value, "code", None)
+                ) == 1
         finally:
             if torch_was_loaded:
                 sys.modules["torch"] = torch_module
@@ -94,7 +107,7 @@ def test_doctor_command_optional_deps():
                 with patch("builtins.__import__", side_effect=mock_import):
                     try:
                         doctor_command()
-                    except SystemExit:
+                    except (SystemExit, typer.Exit):
                         pass
                     # Should reference datasets in console output
                     calls = mock_console.print.call_args_list

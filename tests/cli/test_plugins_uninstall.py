@@ -71,6 +71,21 @@ def test_plugins_uninstall_apply_invokes_pip(monkeypatch):
     assert "-y" in called["cmd"]
 
 
+def test_plugins_uninstall_apply_normalizes_pip_failure_exit_code(monkeypatch):
+    def fake_run(cmd, capture_output, text):
+        return SimpleNamespace(returncode=42, stdout="", stderr="boom")
+
+    monkeypatch.setattr("invarlock.cli.commands.plugins.subprocess.run", fake_run)
+    monkeypatch.delenv("INVARLOCK_PLUGINS_DRY_RUN", raising=False)
+
+    with pytest.raises(typer.Exit) as exc:
+        plugins_mod.plugins_uninstall_command(
+            ["gptq"], yes=True, dry_run=False, apply=True
+        )
+
+    assert exc.value.exit_code == 1
+
+
 def test_plugins_uninstall_prompt_cancel(monkeypatch):
     outputs: list[str] = []
 

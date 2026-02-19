@@ -763,9 +763,9 @@ def test_doctor_non_json_device_and_optional_paths(monkeypatch):
         sys.modules, "transformers", types.SimpleNamespace(__version__="1.0")
     )
 
-    with pytest.raises(SystemExit) as exc:
+    with pytest.raises((SystemExit, typer.Exit)) as exc:
         doctor_mod.doctor_command(profile="ci")
-    assert exc.value.code == 0
+    assert getattr(exc.value, "exit_code", getattr(exc.value, "code", None)) == 0
     assert any("Optional Dependencies" in line for line in dummy_console.lines)
     assert any("Plugin Registry" in line for line in dummy_console.lines)
 
@@ -873,9 +873,9 @@ def test_doctor_determinism_warning_prints(monkeypatch, tmp_path):
     cfg_path = tmp_path / "cfg.yml"
     cfg_path.write_text("dummy", encoding="utf-8")
 
-    with pytest.raises(SystemExit) as exc:
+    with pytest.raises((SystemExit, typer.Exit)) as exc:
         doctor_mod.doctor_command(config=str(cfg_path))
-    assert exc.value.code == 0
+    assert getattr(exc.value, "exit_code", getattr(exc.value, "code", None)) == 0
     assert any(
         doctor_mod.DETERMINISM_SHARDS_WARNING in line for line in dummy_console.lines
     )

@@ -178,7 +178,7 @@ def test_doctor_torch_import_failure_console(monkeypatch):
     dummy_console = CaptureConsole()
     monkeypatch.setattr(builtins, "__import__", fake_import)
     monkeypatch.setattr(doctor_mod, "console", dummy_console, raising=False)
-    with pytest.raises(SystemExit) as exc:
+    with pytest.raises((SystemExit, typer.Exit)) as exc:
         doctor_mod.doctor_command(json_out=False)
-    assert exc.value.code == 1
+    assert getattr(exc.value, "exit_code", getattr(exc.value, "code", None)) == 1
     assert any("PyTorch not available" in line for line in dummy_console.lines)

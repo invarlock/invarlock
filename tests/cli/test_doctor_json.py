@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import json
 
+import pytest
+import typer
 from typer.testing import CliRunner
 
 from invarlock.cli.app import app
+from invarlock.cli.commands.doctor import doctor_command
 
 
 def test_doctor_json_mode_outputs_findings_and_exitcode(monkeypatch):
@@ -19,3 +22,10 @@ def test_doctor_json_mode_outputs_findings_and_exitcode(monkeypatch):
     # Should include at least one note when INVARLOCK_TINY_RELAX is set
     # (ok if filtered out on some builds; ensure structure viable)
     assert "summary" in payload and "resolution" in payload
+
+
+def test_doctor_command_raises_typer_exit_for_human_mode(monkeypatch):
+    monkeypatch.setenv("INVARLOCK_TINY_RELAX", "1")
+    with pytest.raises(typer.Exit) as exc:
+        doctor_command(json_out=False)
+    assert exc.value.exit_code in (0, 1)

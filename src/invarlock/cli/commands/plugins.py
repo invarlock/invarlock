@@ -1097,7 +1097,7 @@ def plugins_uninstall_command(
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             _print_normalized("uninstall", all_pkgs, "apply", "skipped")
-            raise typer.Exit(result.returncode)
+            raise typer.Exit(1)
         _print_normalized("uninstall", all_pkgs, "apply", "ok")
     except Exception as e:
         console.print(f"[red]❌ Uninstall failed: {e}[/red]")
@@ -1172,7 +1172,7 @@ def plugins_install_command(
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             _print_normalized("install", all_targets, "apply", "skipped")
-            raise typer.Exit(result.returncode)
+            raise typer.Exit(1)
         _print_normalized("install", all_targets, "apply", "ok")
     except Exception as e:
         console.print(f"[red]❌ Install failed: {e}[/red]")

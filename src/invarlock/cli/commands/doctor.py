@@ -1367,4 +1367,4 @@ def doctor_command(
             console.print(
                 "Run: pip install invarlock[all] to install missing dependencies"
             )
-        sys.exit(exit_code)
+        raise typer.Exit(exit_code)
