@@ -11,7 +11,16 @@ from email.mime.text import MIMEText
 from enum import Enum
 from typing import Any
 
-import requests
+try:
+    import requests  # type: ignore[import]
+except Exception:  # pragma: no cover - exercised when requests is absent
+
+    class _MissingRequests:
+        @staticmethod
+        def post(*args: Any, **kwargs: Any) -> Any:
+            raise ModuleNotFoundError("requests")
+
+    requests = _MissingRequests()  # type: ignore[assignment]
 
 
 class AlertSeverity(Enum):
