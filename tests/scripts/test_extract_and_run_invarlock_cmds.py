@@ -50,7 +50,9 @@ def test_run_commands_uses_argv_and_merges_inline_env(
     monkeypatch.setattr(module.subprocess, "run", _fake_run)
 
     results_path = tmp_path / "results.jsonl"
-    commands = [module.Command(id=1, file="README.md", line=1, cmd="FOO=bar invarlock --help")]
+    commands = [
+        module.Command(id=1, file="README.md", line=1, cmd="FOO=bar invarlock --help")
+    ]
     module.run_commands(commands, results_path)
 
     assert isinstance(called["cmd"], list)
@@ -59,7 +61,10 @@ def test_run_commands_uses_argv_and_merges_inline_env(
     assert "shell" not in kwargs
     assert kwargs["env"]["FOO"] == "bar"
 
-    records = [json.loads(line) for line in results_path.read_text(encoding="utf-8").splitlines()]
+    records = [
+        json.loads(line)
+        for line in results_path.read_text(encoding="utf-8").splitlines()
+    ]
     assert len(records) == 1
     assert records[0]["exit_code"] == 0
 
@@ -83,7 +88,10 @@ def test_run_commands_records_parse_errors(tmp_path: Path, monkeypatch) -> None:
     ]
     module.run_commands(commands, results_path)
 
-    records = [json.loads(line) for line in results_path.read_text(encoding="utf-8").splitlines()]
+    records = [
+        json.loads(line)
+        for line in results_path.read_text(encoding="utf-8").splitlines()
+    ]
     assert len(records) == 1
     assert records[0]["exit_code"] is None
     assert "invalid command syntax" in records[0]["error"]
