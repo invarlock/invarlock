@@ -3629,6 +3629,15 @@ def _compute_validation_flags(
 ) -> dict[str, bool]:
     """Compute validation flags for the evaluation report including canonical gates."""
     tier = (tier or "balanced").lower()
+    if not tiny_relax:
+        tiny_relax = str(
+            os.environ.get("INVARLOCK_TINY_RELAX", "")
+        ).strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
     # Tiny-relax is policy/config-driven and applies only when explicitly set.
     if tiny_relax:
         tier = "aggressive"

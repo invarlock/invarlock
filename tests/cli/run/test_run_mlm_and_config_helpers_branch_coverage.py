@@ -71,6 +71,26 @@ def test_resolve_pm_acceptance_range_ignores_invalid_cfg_max(monkeypatch) -> Non
     assert out == {"min": 1.0, "max": 1.1}
 
 
+def test_resolve_pm_acceptance_range_clamps_invalid_bounds(monkeypatch) -> None:
+    monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MIN", raising=False)
+    monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MAX", raising=False)
+
+    out_min = run_mod._resolve_pm_acceptance_range(
+        {"primary_metric": {"acceptance_range": {"min": -0.1, "max": 1.2}}}
+    )
+    assert out_min == {"min": 0.95, "max": 1.2}
+
+    out_max = run_mod._resolve_pm_acceptance_range(
+        {"primary_metric": {"acceptance_range": {"min": 1.0, "max": 0.0}}}
+    )
+    assert out_max == {"min": 1.0, "max": 1.1}
+
+    out_order = run_mod._resolve_pm_acceptance_range(
+        {"primary_metric": {"acceptance_range": {"min": 1.2, "max": 1.1}}}
+    )
+    assert out_order == {"min": 1.2, "max": 1.2}
+
+
 def test_resolve_pm_acceptance_range_covers_outer_exception(monkeypatch) -> None:
     monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MIN", raising=False)
     monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MAX", raising=False)

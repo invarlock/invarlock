@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import importlib
+import types
+
 from rich.console import Console
 
 from invarlock.cli.commands import run as run_mod
@@ -30,8 +33,52 @@ def test_format_debug_metric_diffs_skips_log_terms_on_domain_error() -> None:
     assert "Δlog(final)" not in out
 
 
+def test_format_debug_metric_diffs_handles_bad_numeric_inputs() -> None:
+    pm = {"final": "bad", "preview": "bad", "ratio_vs_baseline": "bad"}
+    metrics = {"primary_metric": {"final": "bad", "preview": "bad"}}
+    baseline = {"metrics": {"primary_metric": {"final": "bad"}}}
+
+    out = run_mod._format_debug_metric_diffs(pm, metrics, baseline)
+    assert out == ""
+
+
+def test_format_debug_metric_diffs_skips_preview_log_terms_on_domain_error() -> None:
+    pm = {"final": 11.0, "preview": -1.0}
+    metrics = {"primary_metric": {"final": 10.0, "preview": 9.0}}
+
+    out = run_mod._format_debug_metric_diffs(pm, metrics, baseline_report_data=None)
+    assert "preview: v1-v1 = -10.000000000" in out
+    assert "Δlog(preview)" not in out
+
+
+def test_format_debug_metric_diffs_skips_baseline_ratio_for_non_positive_baseline() -> (
+    None
+):
+    pm = {"final": 12.0, "preview": 11.0, "ratio_vs_baseline": 2.0}
+    metrics = {"primary_metric": {"final": 10.0, "preview": 9.0}}
+    baseline = {"metrics": {"primary_metric": {"final": 0.0}}}
+
+    out = run_mod._format_debug_metric_diffs(pm, metrics, baseline)
+    assert "final: v1-v1 = +2.000000000" in out
+    assert "ratio_vs_baseline: v1-v1" not in out
+
+
+def test_merge_primary_metric_health_returns_empty_for_non_mapping() -> None:
+    assert run_mod._merge_primary_metric_health(None, {"invalid": True}) == {}
+
+
 def test_normalize_overhead_result_marks_missing_ratio_as_not_evaluated() -> None:
     out = run_mod._normalize_overhead_result(None)
+    assert out["evaluated"] is False
+    assert out["passed"] is True
+
+
+def test_normalize_overhead_result_handles_float_coercion_failure() -> None:
+    class BadInt(int):
+        def __float__(self) -> float:
+            raise TypeError("boom")
+
+    out = run_mod._normalize_overhead_result({"overhead_ratio": BadInt(1)})
     assert out["evaluated"] is False
     assert out["passed"] is True
 
@@ -94,6 +141,26 @@ def test_print_guard_overhead_summary_handles_missing_ratio_and_percent() -> Non
     assert "not evaluated" in console.export_text()
 
 
+def test_print_guard_overhead_summary_uses_fallback_for_bad_default_threshold() -> None:
+    console = Console(record=True)
+    threshold = run_mod._print_guard_overhead_summary(
+        console,
+        {"evaluated": False},
+        default_threshold="bad",  # type: ignore[arg-type]
+    )
+    assert threshold == run_mod.GUARD_OVERHEAD_THRESHOLD
+
+
+def test_print_guard_overhead_summary_uses_fallback_for_non_finite_threshold() -> None:
+    console = Console(record=True)
+    threshold = run_mod._print_guard_overhead_summary(
+        console,
+        {"evaluated": False},
+        default_threshold=float("nan"),
+    )
+    assert threshold == run_mod.GUARD_OVERHEAD_THRESHOLD
+
+
 def test_print_retry_summary_prints_when_attempts_present() -> None:
     console = Console(record=True)
 
@@ -105,3 +172,42 @@ def test_print_retry_summary_prints_when_attempts_present() -> None:
 
     run_mod._print_retry_summary(console, Retry())
     assert "Retry Summary" in console.export_text()
+
+
+def test_print_retry_summary_no_attempts_silent() -> None:
+    console = Console(record=True)
+    run_mod._print_retry_summary(console, None)
+    assert console.export_text() == ""
+
+
+def test_print_retry_summary_swallows_summary_errors() -> None:
+    console = Console(record=True)
+
+    class Retry:
+        attempt_history = [object()]
+
+        def get_attempt_summary(self):  # noqa: ANN001
+            raise RuntimeError("boom")
+
+    run_mod._print_retry_summary(console, Retry())
+    assert console.export_text() == ""
+
+
+def test_shutil_shim_install_failure_is_non_fatal(monkeypatch, caplog) -> None:
+    real_module_type = types.ModuleType
+
+    def _raising_module_type(name, *args, **kwargs):
+        if isinstance(name, str) and name.endswith(".shutil"):
+            raise TypeError("shim-fail")
+        return real_module_type(name, *args, **kwargs)
+
+    with monkeypatch.context() as patch_ctx:
+        patch_ctx.setattr(types, "ModuleType", _raising_module_type)
+        with caplog.at_level("DEBUG", logger=run_mod.__name__):
+            importlib.reload(run_mod)
+
+    assert any(
+        "Failed to install shutil shim" in record.getMessage()
+        for record in caplog.records
+    )
+    importlib.reload(run_mod)

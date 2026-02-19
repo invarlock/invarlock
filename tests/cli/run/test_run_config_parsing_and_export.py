@@ -221,7 +221,7 @@ def _run_with_common_patches(
         patch("invarlock.core.registry.get_registry", lambda: Registry()),
         patch(
             "invarlock.cli.commands.run._should_measure_overhead",
-            lambda *_a: (False, False),
+            lambda *_a: (False, False, None),
         ),
         patch("invarlock.cli.commands.run._execute_guarded_run", exec_stub),
         patch("invarlock.cli.commands.run._postprocess_and_summarize", post_stub),
@@ -594,7 +594,7 @@ def test_run_command_baseline_token_counts_provider_parity_export_and_classifica
             ),
             patch(
                 "invarlock.cli.commands.run._should_measure_overhead",
-                lambda *_a: (False, False),
+                lambda *_a: (False, False, None),
             ),
             patch("invarlock.cli.commands.run._execute_guarded_run", exec_stub),
             patch("invarlock.cli.commands.run._postprocess_and_summarize", post_stub),
@@ -711,7 +711,7 @@ def test_run_command_classification_pseudo_counts_and_export_env_dir(
             ),
             patch(
                 "invarlock.cli.commands.run._should_measure_overhead",
-                lambda *_a: (False, False),
+                lambda *_a: (False, False, None),
             ),
             patch(
                 "invarlock.cli.commands.run._resolve_provider_and_split",
@@ -865,7 +865,7 @@ def test_run_command_until_pass_auto_tune_head_budget_paths(tmp_path: Path) -> N
                 patch("invarlock.core.registry.get_registry", lambda: Registry()),
                 patch(
                     "invarlock.cli.commands.run._should_measure_overhead",
-                    lambda *_a: (False, False),
+                    lambda *_a: (False, False, None),
                 ),
                 patch("invarlock.cli.commands.run._execute_guarded_run", exec_stub),
                 patch(

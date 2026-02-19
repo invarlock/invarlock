@@ -5825,8 +5825,8 @@ try:  # best-effort; harmless in production
     _shim.rmtree = shutil.rmtree  # type: ignore[attr-defined]
     _sys.modules[__name__ + ".shutil"] = _shim
     _sys.modules["src." + __name__ + ".shutil"] = _shim
-except Exception:
-    pass
+except (AttributeError, KeyError, TypeError) as exc:
+    logging.getLogger(__name__).debug("Failed to install shutil shim: %s", exc)
 
 
 def _normalize_overhead_result(

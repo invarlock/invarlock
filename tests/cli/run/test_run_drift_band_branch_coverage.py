@@ -59,3 +59,23 @@ def test_resolve_pm_drift_band_accepts_partial_cfg_dict(monkeypatch) -> None:
         {"primary_metric": {"drift_band": {"min": 0.9}}}
     )
     assert out2 == {"min": 0.9, "max": 1.05}
+
+
+def test_resolve_pm_drift_band_clamps_invalid_bounds(monkeypatch) -> None:
+    monkeypatch.delenv("INVARLOCK_PM_DRIFT_MIN", raising=False)
+    monkeypatch.delenv("INVARLOCK_PM_DRIFT_MAX", raising=False)
+
+    out_min = run_mod._resolve_pm_drift_band(
+        {"primary_metric": {"drift_band": {"min": -0.1, "max": 1.2}}}
+    )
+    assert out_min == {"min": 0.95, "max": 1.2}
+
+    out_max = run_mod._resolve_pm_drift_band(
+        {"primary_metric": {"drift_band": {"min": 0.9, "max": 0.0}}}
+    )
+    assert out_max == {"min": 0.9, "max": 1.05}
+
+    out_order = run_mod._resolve_pm_drift_band(
+        {"primary_metric": {"drift_band": {"min": 1.2, "max": 1.1}}}
+    )
+    assert out_order == {"min": 0.95, "max": 1.05}

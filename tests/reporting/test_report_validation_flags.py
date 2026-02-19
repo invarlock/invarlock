@@ -51,6 +51,21 @@ def test_compute_validation_flags_tiny_relax_and_tokens_floor(monkeypatch):
     assert flags.get("primary_metric_acceptable") is True
 
 
+def test_compute_validation_flags_tiny_relax_uses_env_fallback(monkeypatch) -> None:
+    monkeypatch.setenv("INVARLOCK_TINY_RELAX", "yes")
+
+    flags = C._compute_validation_flags(
+        ppl={"preview_final_ratio": 2.0, "ratio_vs_baseline": 1.0},
+        spectral={"caps_applied": 0},
+        rmt={"stable": True},
+        invariants={"status": "pass"},
+        tier="balanced",
+        primary_metric={"kind": "ppl_causal", "ratio_vs_baseline": 1.0},
+    )
+
+    assert flags.get("preview_final_drift_acceptable") is True
+
+
 def test_tiny_relax_relaxes_tokens_floor_for_ppl():
     # Balanced default with pm_ratio policy and tiny token counts should still pass under tiny_relax
     flags = C._compute_validation_flags(
@@ -66,6 +81,150 @@ def test_tiny_relax_relaxes_tokens_floor_for_ppl():
 
     assert isinstance(flags, dict)
     assert flags.get("primary_metric_acceptable") is True
+
+
+def test_compute_validation_flags_handles_policy_cast_failures(monkeypatch) -> None:
+    monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
+    fake_policies = {
+        "balanced": {"metrics": {"pm_ratio": {"ratio_limit_base": "bad"}}},
+    }
+    monkeypatch.setattr(C, "get_tier_policies", lambda *_a, **_k: dict(fake_policies))
+
+    flags = C._compute_validation_flags(
+        ppl={"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.0},
+        spectral={"caps_applied": 0},
+        rmt={"stable": True},
+        invariants={"status": "pass"},
+        tier="balanced",
+        primary_metric={"kind": "ppl_causal", "ratio_vs_baseline": 1.0},
+        pm_acceptance_range={"min": "bad", "max": "bad"},
+        pm_drift_band={"min": 2.0, "max": 1.0},
+    )
+
+    assert isinstance(flags, dict)
+    assert flags.get("preview_final_drift_acceptable") is True
+    assert flags.get("primary_metric_acceptable") is True
+
+
+def test_compute_validation_flags_applies_min_tokens_tolerance(monkeypatch) -> None:
+    monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
+    pm_policy = {
+        "ratio_limit_base": 1.10,
+        "min_tokens": 100,
+        "min_tokens_tolerance": 0.10,
+        "min_token_fraction": 0.0,
+    }
+    fake_policies = {
+        "balanced": {"metrics": {"pm_ratio": pm_policy}},
+    }
+    monkeypatch.setattr(C, "get_tier_policies", lambda *_a, **_k: dict(fake_policies))
+
+    flags = C._compute_validation_flags(
+        ppl={"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.0},
+        spectral={"caps_applied": 0},
+        rmt={"stable": True},
+        invariants={"status": "pass"},
+        tier="balanced",
+        _ppl_metrics={
+            "preview_total_tokens": 47,
+            "final_total_tokens": 48,
+            "bootstrap": {
+                "coverage": {
+                    "preview": {"used": 50, "required": 50},
+                    "final": {"used": 50, "required": 50},
+                }
+            },
+        },
+        primary_metric={"kind": "ppl_causal", "ratio_vs_baseline": 1.0},
+    )
+
+    assert isinstance(flags, dict)
+    assert flags.get("primary_metric_acceptable") is True
+
+
+def test_compute_validation_flags_handles_bad_min_tokens_tolerance(monkeypatch) -> None:
+    monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
+    pm_policy = {
+        "ratio_limit_base": 1.10,
+        "min_tokens": 100,
+        "min_tokens_tolerance": "bad",
+        "min_token_fraction": 0.0,
+    }
+    fake_policies = {
+        "balanced": {"metrics": {"pm_ratio": pm_policy}},
+    }
+    monkeypatch.setattr(C, "get_tier_policies", lambda *_a, **_k: dict(fake_policies))
+
+    flags = C._compute_validation_flags(
+        ppl={"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.0},
+        spectral={"caps_applied": 0},
+        rmt={"stable": True},
+        invariants={"status": "pass"},
+        tier="balanced",
+        _ppl_metrics={
+            "preview_total_tokens": 47,
+            "final_total_tokens": 48,
+            "bootstrap": {
+                "coverage": {
+                    "preview": {"used": 50, "required": 50},
+                    "final": {"used": 50, "required": 50},
+                }
+            },
+        },
+        primary_metric={"kind": "ppl_causal", "ratio_vs_baseline": 1.0},
+    )
+
+    assert isinstance(flags, dict)
+    assert flags.get("primary_metric_acceptable") is False
+
+
+def test_compute_validation_flags_clamps_negative_min_tokens_tolerance(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
+    pm_policy = {
+        "ratio_limit_base": 1.10,
+        "min_tokens": 100,
+        "min_tokens_tolerance": -0.5,
+        "min_token_fraction": 0.0,
+    }
+    fake_policies = {
+        "balanced": {"metrics": {"pm_ratio": pm_policy}},
+    }
+    monkeypatch.setattr(C, "get_tier_policies", lambda *_a, **_k: dict(fake_policies))
+
+    flags = C._compute_validation_flags(
+        ppl={"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.0},
+        spectral={"caps_applied": 0},
+        rmt={"stable": True},
+        invariants={"status": "pass"},
+        tier="balanced",
+        _ppl_metrics={
+            "preview_total_tokens": 47,
+            "final_total_tokens": 48,
+            "bootstrap": {
+                "coverage": {
+                    "preview": {"used": 50, "required": 50},
+                    "final": {"used": 50, "required": 50},
+                }
+            },
+        },
+        primary_metric={"kind": "ppl_causal", "ratio_vs_baseline": 1.0},
+    )
+
+    assert isinstance(flags, dict)
+    assert flags.get("primary_metric_acceptable") is False
+
+
+def test_resolve_tiny_relax_from_report_auto_and_meta_fallbacks() -> None:
+    assert C._resolve_tiny_relax_from_report({"auto": {"tiny_relax": "on"}}) is True
+    assert (
+        C._resolve_tiny_relax_from_report({"meta": {"auto": {"tiny_relax": 1}}}) is True
+    )
+    assert (
+        C._resolve_tiny_relax_from_report({"meta": {"auto": {"tiny_relax": "maybe"}}})
+        is False
+    )
 
 
 def test_prepare_guard_overhead_section_fallback_paths():
