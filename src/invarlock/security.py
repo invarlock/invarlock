@@ -16,6 +16,7 @@ import shutil
 import socket
 import stat
 import tempfile
+import threading
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
@@ -89,6 +90,9 @@ class NetworkGuard:
 
 
 _GUARD = NetworkGuard()
+_NETWORK_POLICY_LOCK = threading.RLock()
+_NETWORK_ALLOW_SCOPE_COUNT = 0
+_NETWORK_BLOCKED = _GUARD.installed
 
 
 def enforce_network_policy(allow: bool) -> None:
@@ -98,15 +102,20 @@ def enforce_network_policy(allow: bool) -> None:
     Args:
         allow: When True the guard is removed, otherwise network access is blocked.
     """
-    if allow:
-        _GUARD.restore()
-    else:
-        _GUARD.install()
+    global _NETWORK_BLOCKED
+    with _NETWORK_POLICY_LOCK:
+        _NETWORK_BLOCKED = not bool(allow)
+        if _NETWORK_BLOCKED:
+            if _NETWORK_ALLOW_SCOPE_COUNT == 0:
+                _GUARD.install()
+        else:
+            _GUARD.restore()
 
 
 def network_policy_allows() -> bool:
     """Return True if outbound connections are currently permitted."""
-    return not _GUARD.installed
+    with _NETWORK_POLICY_LOCK:
+        return not _GUARD.installed
 
 
 def enforce_default_security() -> None:
@@ -127,14 +136,17 @@ def temporarily_allow_network() -> Iterator[None]:
 
     Restores the previous policy when exiting the context.
     """
-    was_installed = _GUARD.installed
-    if was_installed:
+    global _NETWORK_ALLOW_SCOPE_COUNT
+    with _NETWORK_POLICY_LOCK:
+        _NETWORK_ALLOW_SCOPE_COUNT += 1
         _GUARD.restore()
     try:
         yield
     finally:
-        if was_installed:
-            _GUARD.install()
+        with _NETWORK_POLICY_LOCK:
+            _NETWORK_ALLOW_SCOPE_COUNT = max(0, _NETWORK_ALLOW_SCOPE_COUNT - 1)
+            if _NETWORK_ALLOW_SCOPE_COUNT == 0 and _NETWORK_BLOCKED:
+                _GUARD.install()
 
 
 @contextlib.contextmanager

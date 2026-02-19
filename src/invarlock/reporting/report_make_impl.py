@@ -825,7 +825,10 @@ def make_report_impl(
         "tier": auto.get("tier", "balanced"),
         "overrides": overrides_list,
         "policy_digest": resolved_digest,
+        "validation_allowlist_source": _VALIDATION_ALLOWLIST_SOURCE,
     }
+    if profile in {"ci", "release"} and _VALIDATION_ALLOWLIST_SOURCE != "contracts":
+        policy_provenance["validation_allowlist_fallback"] = True
     auto["policy_digest"] = resolved_digest
 
     for guard_name in ("spectral", "rmt", "variance"):

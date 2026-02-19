@@ -454,36 +454,54 @@ _VALIDATION_ALLOWLIST_DEFAULT = {
 }
 
 
-def _load_validation_allowlist() -> set[str]:
-    """Load validation key allow-list from contracts/validation_keys.json when available.
-
-    Falls back to a safe built-in default when the contracts directory is not present
-    (e.g., installed wheel) or when parsing fails.
-    """
+def _load_validation_allowlist_with_source() -> tuple[set[str], str]:
+    """Load validation key allow-list and report the source explicitly."""
     try:
         root = Path(__file__).resolve().parents[3]
         path = root / "contracts" / "validation_keys.json"
         if path.exists():
             data = json.loads(path.read_text(encoding="utf-8"))
             if isinstance(data, list):
-                return {str(k) for k in data}
-    except (OSError, TypeError, ValueError, json.JSONDecodeError):  # pragma: no cover
-        pass
-    return set(_VALIDATION_ALLOWLIST_DEFAULT)
+                return {str(k) for k in data}, "contracts"
+            return (
+                set(_VALIDATION_ALLOWLIST_DEFAULT),
+                "fallback:invalid-contract-validation-keys",
+            )
+    except Exception:  # pragma: no cover
+        return set(_VALIDATION_ALLOWLIST_DEFAULT), "fallback:load-error"
+    return set(_VALIDATION_ALLOWLIST_DEFAULT), "fallback:missing-contract"
+
+
+def _load_validation_allowlist() -> set[str]:
+    """Load validation key allow-list from contracts with fail-closed fallback."""
+    keys, _ = _load_validation_allowlist_with_source()
+    return keys
+
+
+def _apply_validation_allowlist_schema(validation_keys: set[str]) -> None:
+    """Apply allow-list constraints to report schema (fail closed on shape drift)."""
+    schema_properties = REPORT_JSON_SCHEMA.get("properties")
+    if not isinstance(schema_properties, dict):
+        raise RuntimeError(
+            "REPORT_JSON_SCHEMA.properties must be a mapping to enforce validation "
+            "allow-list constraints."
+        )
+    validation_spec = schema_properties.get("validation")
+    if not isinstance(validation_spec, dict):
+        raise RuntimeError(
+            "REPORT_JSON_SCHEMA.properties.validation must be a mapping to enforce "
+            "validation allow-list constraints."
+        )
+    validation_spec["properties"] = {k: {"type": "boolean"} for k in validation_keys}
+    validation_spec["additionalProperties"] = False
 
 
 # Tighten JSON Schema: populate validation.properties from allow-list and
 # disallow unknown validation keys at schema level.
-try:
-    _vkeys = _load_validation_allowlist()
-    if isinstance(REPORT_JSON_SCHEMA.get("properties"), dict):
-        vspec = REPORT_JSON_SCHEMA["properties"].get("validation")
-        if isinstance(vspec, dict):
-            vspec["properties"] = {k: {"type": "boolean"} for k in _vkeys}
-            vspec["additionalProperties"] = False
-except (TypeError, ValueError, KeyError, AttributeError):  # pragma: no cover
-    # Keep permissive defaults if something goes wrong during import
-    pass
+_VALIDATION_ALLOWLIST_KEYS, _VALIDATION_ALLOWLIST_SOURCE = (
+    _load_validation_allowlist_with_source()
+)
+_apply_validation_allowlist_schema(_VALIDATION_ALLOWLIST_KEYS)
 
 
 ## Note: helpers like _get_section/_get_mapping/_iter_guard_entries,

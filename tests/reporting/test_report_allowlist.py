@@ -35,6 +35,22 @@ def test_load_validation_allowlist_prefers_contract_file(tmp_path, monkeypatch):
             pass
 
 
+def test_load_validation_allowlist_with_source_reports_fallback() -> None:
+    keys, source = cert._load_validation_allowlist_with_source()
+    assert isinstance(keys, set)
+    assert source == "contracts" or source.startswith("fallback:")
+
+
+def test_apply_validation_allowlist_schema_fails_closed() -> None:
+    original = cert.REPORT_JSON_SCHEMA.get("properties")
+    try:
+        cert.REPORT_JSON_SCHEMA["properties"] = None
+        with pytest.raises(RuntimeError, match="properties must be a mapping"):
+            cert._apply_validation_allowlist_schema({"primary_metric_acceptable"})
+    finally:
+        cert.REPORT_JSON_SCHEMA["properties"] = original
+
+
 def test_compute_edit_digest_branches():
     quant_digest = cert._compute_edit_digest(
         {"edit": {"name": "quant_rtn", "plan": {}}}
