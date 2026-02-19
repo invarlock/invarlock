@@ -1,10 +1,15 @@
-# Calibration CLI
+# Tier Policy Tuning CLI (Calibration)
+
+> Scope note: this page covers **Tier Policy Tuning** via `invarlock calibrate ...`.
+> It outputs `tiers_patch_*.yaml` recommendations for `runtime/tiers.yaml`.
+> For proof-pack run-scoped preset derivation (`CALIBRATION_RUN -> GENERATE_PRESET`),
+> see [Proof Pack Internals](../user-guide/proof-packs-internals.md).
 
 ## Overview
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Run calibration sweeps to empirically derive guard thresholds and tier policy recommendations. |
+| **Purpose** | Run policy-tuning sweeps to empirically derive guard thresholds and tier policy recommendations. |
 | **Audience** | Operators recalibrating tier policies for new model families or updated guard contracts. |
 | **Primary commands** | `invarlock calibrate null-sweep`, `invarlock calibrate ve-sweep`. |
 | **Requires** | `invarlock[hf]` for HF workflows; base config YAML for each sweep type. |
@@ -31,7 +36,7 @@ invarlock calibrate ve-sweep \
 
 ## Concepts
 
-- **Calibration sweeps**: Run multiple seeds/tiers to build empirical distributions
+- **Policy-tuning sweeps**: Run multiple seeds/tiers to build empirical distributions
   for threshold recommendations.
 - **Null sweep**: Uses a no-op edit to measure baseline spectral behavior and
   derive false-positive-controlled κ caps and α levels.
@@ -40,7 +45,7 @@ invarlock calibrate ve-sweep \
 - **Artifacts**: Each sweep emits JSON (machine), CSV (spreadsheet), Markdown
   (human), and a `tiers_patch_*.yaml` recommendation file.
 
-### Sweep → Tier policy flow
+### Policy-Tuning Sweep → Tier Policy Flow
 
 ```text
   ┌──────────────────┐
@@ -49,7 +54,7 @@ invarlock calibrate ve-sweep \
            │
            ▼
   ┌──────────────────┐
-  │  calibrate CLI   │
+  │ policy tuning CLI│
   │ (null/ve sweep)  │
   └────────┬─────────┘
            │
@@ -68,7 +73,7 @@ invarlock calibrate ve-sweep \
 
 ## Reference
 
-### Command Index
+### Policy-Tuning Commands
 
 | Command | Purpose | Key outputs |
 | --- | --- | --- |

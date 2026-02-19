@@ -4,6 +4,11 @@ This guide explains how the proof pack suite is wired internally: entrypoints,
 task graph, scheduling, and artifact generation. It complements
 [Proof Packs](proof-packs.md), which focuses on how to run a suite.
 
+> Scope note: in this guide, `CALIBRATION_RUN -> GENERATE_PRESET` is called
+> **Preset Derivation**. It produces run-scoped
+> `calibrated_preset_<model>.yaml/json` files and does not directly modify
+> global `runtime/tiers.yaml`.
+
 ## Overview
 
 | Aspect | Details |
@@ -13,6 +18,7 @@ task graph, scheduling, and artifact generation. It complements
 | Hardware | NVIDIA GPUs where models fit VRAM; multi-GPU recommended for `full` |
 | Models | `subset` (1 model), `showcase`/`workshop3` (3 models), or `full` (6 models); all ungated public |
 | Edits | 4 types × 2 versions per model; clean variants use tuned presets |
+| Preset Derivation | `CALIBRATION_RUN` + `GENERATE_PRESET` create run-scoped calibrated presets |
 | Scheduling | Dynamic work-stealing, `small_first` priority strategy |
 | Multi-GPU | Profile-based; `required_gpus` grows only when memory requires it |
 | Output | Proof pack with `manifest.json`, `checksums.sha256`, and cert bundles (`--layout v2` nests results + metadata) |
@@ -66,7 +72,7 @@ task graph, scheduling, and artifact generation. It complements
 - `lib/result_compiler.sh`: analysis and verdict compilation.
 - `lib/fault_tolerance.sh`: error classification and retry/backoff logic.
 - `scripts/proof_packs/python/manifest_writer.py`: proof pack `manifest.json` writer.
-- `scripts/proof_packs/python/preset_generator.py`: calibrated preset + edit-type variants.
+- `scripts/proof_packs/python/preset_generator.py`: preset derivation + edit-type variants.
 
 ### Module dependency graph
 
@@ -125,9 +131,9 @@ Proof pack issues?
 │
 ├─ Spectral guard failing “clean” quantization edits?
 │  ├─ Check: caps_exceeded in report spectral.summary
-│  │  └─ Use edit-type presets (generated from calibration) or increase max_caps
+│  │  └─ Use edit-type presets (generated from preset derivation) or increase max_caps
 │  └─ Check: high z-scores in attention layers
-│     └─ Expected for quantization; calibrate or adjust thresholds
+│     └─ Expected for quantization; tune thresholds if needed
 │
 ├─ OOM errors?
 │  ├─ Lower GPU_MEMORY_PER_DEVICE / GPU_MEMORY_GB
@@ -402,7 +408,7 @@ Defaults: `DRIFT_CALIBRATION_RUNS=5`, `CLEAN_EDIT_RUNS=3`,
 Batch path (default for small/medium):
 
 - Setup baseline: 1 task
-- Calibration runs + preset: 6 tasks
+- Preset-derivation runs + preset generation: 6 tasks
 - Batch edits: 1 task
 - evaluate edits: 20 tasks
 - Error injection: 10 tasks
@@ -412,7 +418,7 @@ Total: ~38 tasks/model (varies with overrides).
 Per-edit path (large/MoE or `PACK_USE_BATCH_EDITS=false`):
 
 - Setup baseline: 1 task
-- Calibration runs + preset: 6 tasks
+- Preset-derivation runs + preset generation: 6 tasks
 - Create edits: 8 tasks
 - evaluate edits: 20 tasks
 - Error injection: 10 tasks
@@ -483,11 +489,12 @@ these sidecars into the packaged proof pack under `certs/**/`.
 ## Run modes
 
 - `--calibrate-only` / `PACK_SUITE_MODE=calibrate-only`
+  - Preset derivation only mode.
   - Only promotes `SETUP_BASELINE`, `CALIBRATION_RUN`, and `GENERATE_PRESET`
     tasks.
   - The monitor exits after all `GENERATE_PRESET` tasks complete.
 - `--run-only`
-  - Continue a prior run after calibration. This is effectively `--resume` with
+  - Continue a prior run after preset derivation. This is effectively `--resume` with
     `PACK_SUITE_MODE=full`.
 - `--resume`
   - Reuses an existing queue and continues from where the run stopped.
@@ -636,7 +643,7 @@ Common knobs for the setup script:
 | `INVARLOCK_SEQ_LEN` | `512` | Sequence length |
 | `INVARLOCK_STRIDE` | `256` | Stride |
 | `INVARLOCK_EVAL_BATCH` | `32` | InvarLock batch size |
-| `PACK_GUARDS_ORDER` | `invariants,spectral,rmt,variance,invariants` | Guards included in calibration and presets |
+| `PACK_GUARDS_ORDER` | `invariants,spectral,rmt,variance,invariants` | Guards included in preset derivation and generated presets |
 
 Primary metric acceptance/drift gates should be configured via profile/config
 (`primary_metric.acceptance_range`, `primary_metric.drift_band`), not env vars.
@@ -647,18 +654,18 @@ Primary metric acceptance/drift gates should be configured via profile/config
 | --- | --- | --- |
 | `PACK_TUNED_EDIT_PARAMS_FILE` | unset | JSON file with tuned clean edit params (required when `CLEAN_EDIT_RUNS>0`). |
 
-### Calibration preset reuse
+### Preset derivation reuse
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `PACK_CALIBRATION_PRESET_DIR` | unset | Directory containing `calibrated_preset_<model>.yaml/json` to reuse; skips calibration runs. |
+| `PACK_CALIBRATION_PRESET_DIR` | unset | Directory containing `calibrated_preset_<model>.yaml/json` to reuse; skips preset-derivation runs. |
 | `PACK_CALIBRATION_PRESET_FILE` | unset | Single preset file applied to all models (advanced). |
 
 ### Experiment controls
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `DRIFT_CALIBRATION_RUNS` | `5` | Calibration run count |
+| `DRIFT_CALIBRATION_RUNS` | `5` | Preset-derivation run count |
 | `CLEAN_EDIT_RUNS` | `3` | Clean edit evaluate runs |
 | `STRESS_EDIT_RUNS` | `2` | Stress edit evaluate runs |
 | `RUN_ERROR_INJECTION` | `true` | Enable error injection |

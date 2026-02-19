@@ -53,13 +53,13 @@ Tip: enable Hub downloads per command when fetching models/datasets:
 - [Plugins](user-guide/plugins.md) — Extending adapters and guards
 - [Bring Your Own Data](user-guide/bring-your-own-data.md) — Custom datasets
 - [Proof Packs](user-guide/proof-packs.md) — Validation suite bundles
-- [Proof Packs Internals](user-guide/proof-packs-internals.md) — Suite architecture
+- [Proof Packs Internals](user-guide/proof-packs-internals.md) — Suite architecture and preset derivation flow
 
 ### Reference
 
 - [Reference Index](reference/index.md)
 - [CLI Reference](reference/cli.md)
-- [Calibration CLI](reference/calibration.md) — `invarlock calibrate` for tier policy sweeps
+- [Tier Policy Tuning CLI (Calibration)](reference/calibration.md) — `invarlock calibrate` for tier policy sweeps
 - [Configuration Schema](reference/config-schema.md)
 - [Guards](reference/guards.md)
 - [Model Adapters](reference/model-adapters.md)
