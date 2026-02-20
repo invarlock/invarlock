@@ -33,6 +33,18 @@ def run_command_impl(
 ) -> str | None:
     """Run implementation moved out of run.py to keep command surface stable."""
 
+    COERCE_EXCEPTIONS = (AttributeError, TypeError, ValueError, Exception)
+    NUMERIC_EXCEPTIONS = (TypeError, ValueError, OverflowError)
+    NON_FATAL_RUNTIME_EXCEPTIONS = (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        RuntimeError,
+        OSError,
+        Exception,
+    )
+
     def _dep(name: str) -> Any:
         try:
             return deps[name]
@@ -123,7 +135,7 @@ def run_command_impl(
 
     try:
         from typer.models import OptionInfo as _TyperOptionInfo  # noqa: F401
-    except Exception:  # pragma: no cover - typer internals may change
+    except (ImportError, ModuleNotFoundError, AttributeError):  # pragma: no cover
         _TyperOptionInfo = ()  # type: ignore[assignment]
 
     config = _coerce_option(config)
@@ -165,6 +177,7 @@ def run_command_impl(
 
     # Use shared CLI coercers from invarlock.cli.utils
     report_path_out: str | None = None
+    snapshot_tmpdir: str | None = None
 
     def _fail_run(message: str) -> None:
         _event(console, "FAIL", message, emoji="❌", profile=profile_normalized)
@@ -256,7 +269,7 @@ def run_command_impl(
         if loss_cfg is not None and getattr(loss_cfg, "type", None) == "auto":
             try:
                 loss_cfg.type = resolved_loss_type  # type: ignore[assignment]
-            except Exception:
+            except COERCE_EXCEPTIONS:
                 pass
 
         # Set deterministic seeds for Python/NumPy/Torch and record provenance
@@ -264,11 +277,11 @@ def run_command_impl(
         if hasattr(cfg, "dataset"):
             try:
                 raw_seed_value = getattr(cfg.dataset, "seed", 42)
-            except Exception:
+            except COERCE_EXCEPTIONS:
                 raw_seed_value = 42
         try:
             seed_value = int(raw_seed_value)
-        except (TypeError, ValueError, OverflowError):
+        except NUMERIC_EXCEPTIONS:
             seed_value = 42
         set_seed(seed_value)
         # Enforce deterministic algorithms in CI/Release profiles when torch is available
@@ -292,20 +305,26 @@ def run_command_impl(
                     torch.backends.cudnn.benchmark = False
                     try:
                         torch.backends.cudnn.deterministic = True  # type: ignore[attr-defined]
-                    except Exception:
+                    except (AttributeError, TypeError, RuntimeError):
                         pass
-            except Exception:
+            except NON_FATAL_RUNTIME_EXCEPTIONS:
                 # If we cannot enforce determinism here, we will rely on core checks
                 pass
         try:
             numpy_seed = int(np.random.get_state()[1][0])
-        except Exception:
+        except (
+            AttributeError,
+            IndexError,
+            TypeError,
+            ValueError,
+            OverflowError,
+        ):
             numpy_seed = seed_value
         torch_seed = None
         if torch is not None:
             try:
                 torch_seed = int(torch.initial_seed())
-            except Exception:
+            except (AttributeError, TypeError, ValueError, OverflowError, RuntimeError):
                 torch_seed = seed_value
         seed_bundle = {
             "python": int(seed_value),
@@ -344,7 +363,14 @@ def run_command_impl(
                     for key in ("python", "numpy", "torch"):
                         if key in preset_seeds:
                             seed_bundle[key] = preset_seeds.get(key)
-        except Exception:
+        except (
+            ImportError,
+            ModuleNotFoundError,
+            AttributeError,
+            TypeError,
+            ValueError,
+            RuntimeError,
+        ):
             determinism_meta = None
 
         # Create run directory with timestamp
@@ -389,7 +415,7 @@ def run_command_impl(
                 try:
                     with baseline_path.open(encoding="utf-8") as f:
                         baseline_report_data = json.load(f)
-                except Exception as exc:  # noqa: BLE001
+                except (OSError, TypeError, ValueError) as exc:
                     msg = f"PAIRING-EVIDENCE-MISSING: baseline report JSON parse failed ({exc})"
                     if strict_baseline:
                         raise InvarlockError(code="E001", message=msg) from exc
@@ -428,7 +454,7 @@ def run_command_impl(
                                     continue
                                 for key, value in src.items():
                                     dst[key] = value
-                        except Exception:
+                        except NON_FATAL_RUNTIME_EXCEPTIONS:
                             pass
                         # Harvest tokenizer hash provenance from baseline when present.
                         try:
@@ -454,7 +480,7 @@ def run_command_impl(
                                     tok = data.get("tokenizer_hash")
                                 if isinstance(tok, str) and tok:
                                     tokenizer_hash = tok
-                        except Exception:
+                        except NON_FATAL_RUNTIME_EXCEPTIONS:
                             pass
                         _event(
                             console,
@@ -489,7 +515,7 @@ def run_command_impl(
         # Default split prior to provider resolution; updated if provider exposes splits
         try:
             resolved_split = getattr(cfg.dataset, "split", None) or "validation"
-        except Exception:
+        except (AttributeError, TypeError):
             resolved_split = "validation"
         used_fallback_split: bool = False
 
@@ -511,7 +537,7 @@ def run_command_impl(
             raise typer.Exit(1)
         try:
             edit_op = registry.get_edit(edit_name.strip())
-        except Exception:
+        except (AttributeError, KeyError):
             _event(
                 console,
                 "WARN",
@@ -530,12 +556,18 @@ def run_command_impl(
             prov = extract_adapter_provenance(cfg.model.adapter)
             # Attach a small, stable provenance dict under adapter plugin metadata
             adapter_meta["provenance"] = prov.to_dict()
-        except Exception:
+        except (
+            ImportError,
+            ModuleNotFoundError,
+            AttributeError,
+            TypeError,
+            ValueError,
+        ):
             # Best-effort only; absence should not break runs
             pass
         try:
             edit_meta = registry.get_plugin_metadata(edit_name.strip(), "edits")
-        except Exception:
+        except KeyError:
             edit_meta = {
                 "name": edit_name.strip(),
                 "module": "edits.unknown",
@@ -633,7 +665,7 @@ def run_command_impl(
                                 final.get("token_counts") or []
                             )
                         run_context["baseline_eval_windows"] = base_eval
-        except Exception:
+        except NON_FATAL_RUNTIME_EXCEPTIONS:
             pass
         run_context.setdefault("primary_metric", {})["acceptance_range"] = (
             pm_acceptance_range
@@ -660,7 +692,7 @@ def run_command_impl(
             run_context.setdefault("eval", {}).setdefault("loss", {})[
                 "resolved_type"
             ] = resolved_loss_type
-        except Exception:
+        except (AttributeError, TypeError):
             pass
         run_config = RunConfig(
             device=resolved_device,
@@ -698,7 +730,14 @@ def run_command_impl(
             if use_mlm and tokenizer is None:
                 try:
                     tokenizer, tokenizer_hash = resolve_tokenizer(model_profile)
-                except Exception as exc:
+                except (
+                    ImportError,
+                    ModuleNotFoundError,
+                    AttributeError,
+                    RuntimeError,
+                    TypeError,
+                    ValueError,
+                ) as exc:
                     _event(console, "FAIL", str(exc), emoji="❌", profile=profile)
                     raise typer.Exit(1) from exc
             preview_window_ids = pairing_schedule["preview"].get("window_ids")
@@ -737,7 +776,7 @@ def run_command_impl(
                     if isinstance(mtc, list) and idx < len(mtc):
                         try:
                             entry["mlm_masked"] = int(mtc[idx])
-                        except Exception:
+                        except NUMERIC_EXCEPTIONS:
                             pass
                 calibration_data.append(entry)
             final_window_ids = pairing_schedule["final"].get("window_ids")
@@ -776,7 +815,7 @@ def run_command_impl(
                     if isinstance(mtc, list) and idx < len(mtc):
                         try:
                             entry["mlm_masked"] = int(mtc[idx])
-                        except Exception:
+                        except NUMERIC_EXCEPTIONS:
                             pass
                 calibration_data.append(entry)
             preview_count = len(pairing_schedule["preview"]["input_ids"])
@@ -945,7 +984,7 @@ def run_command_impl(
             ):
                 try:
                     val = getattr(cfg.dataset, key)
-                except Exception:
+                except (AttributeError, TypeError):
                     val = None
                 if val is not None and val != "":
                     provider_kwargs[key] = val
@@ -969,15 +1008,15 @@ def run_command_impl(
                         for k, v in provider_val._data.items():  # type: ignore[attr-defined]
                             if k != "kind" and v is not None and v != "":
                                 provider_kwargs[k] = v
-                    except Exception:
+                    except (AttributeError, TypeError):
                         # Fallback: if items() exists
                         try:
                             for k, v in provider_val.items():  # type: ignore[attr-defined]
                                 if k != "kind" and v is not None and v != "":
                                     provider_kwargs[k] = v
-                        except Exception:
+                        except (AttributeError, TypeError):
                             pass
-                except Exception:
+                except (AttributeError, TypeError):
                     _ = None
             data_provider, resolved_split, used_fallback_split = (
                 _resolve_provider_and_split(
@@ -994,7 +1033,14 @@ def run_command_impl(
             # Load tokenizer for dataset processing
             try:
                 tokenizer, tokenizer_hash = resolve_tokenizer(model_profile)
-            except Exception as exc:
+            except (
+                ImportError,
+                ModuleNotFoundError,
+                AttributeError,
+                RuntimeError,
+                TypeError,
+                ValueError,
+            ) as exc:
                 _event(console, "FAIL", str(exc), emoji="❌", profile=profile)
                 raise typer.Exit(1) from exc
 
@@ -1093,7 +1139,7 @@ def run_command_impl(
                     provider_labels_fin = getattr(
                         data_provider, "last_final_labels", None
                     )
-                except Exception:
+                except (AttributeError, TypeError):
                     provider_labels_prev = None
                     provider_labels_fin = None
 
@@ -1392,7 +1438,7 @@ def run_command_impl(
         try:
             run_context["dataset"]["preview_n"] = preview_count
             run_context["dataset"]["final_n"] = final_count
-        except Exception:
+        except (KeyError, TypeError):
             pass
         run_context["dataset_meta"] = dataset_meta
         if window_plan:
@@ -1437,19 +1483,19 @@ def run_command_impl(
         # Build auto configuration with safe fallbacks when section/keys are absent
         try:
             auto_enabled = bool(cfg.auto.enabled)
-        except Exception:
+        except NON_FATAL_RUNTIME_EXCEPTIONS:
             auto_enabled = False
         try:
             auto_tier = cfg.auto.tier
-        except Exception:
+        except NON_FATAL_RUNTIME_EXCEPTIONS:
             auto_tier = "balanced"
         try:
             auto_probes = int(cfg.auto.probes)
-        except Exception:
+        except NON_FATAL_RUNTIME_EXCEPTIONS:
             auto_probes = 0
         try:
             auto_target_ratio = float(cfg.auto.target_pm_ratio)
-        except Exception:
+        except NON_FATAL_RUNTIME_EXCEPTIONS:
             auto_target_ratio = 2.0
 
         auto_config = {
@@ -1543,14 +1589,14 @@ def run_command_impl(
                     for _, p in getattr(m, "named_parameters", lambda: [])():
                         try:
                             total += int(p.element_size() * p.nelement())
-                        except Exception:
+                        except (AttributeError, TypeError, ValueError):
                             pass
                     for _, b in getattr(m, "named_buffers", lambda: [])():
                         try:
                             total += int(b.element_size() * b.nelement())
-                        except Exception:
+                        except (AttributeError, TypeError, ValueError):
                             pass
-                except Exception:
+                except (AttributeError, TypeError):
                     return 0
                 return total
 
@@ -1564,7 +1610,7 @@ def run_command_impl(
                     )
                     if not isinstance(cfg_snapshot, dict):
                         cfg_snapshot = {}
-            except Exception:
+            except NON_FATAL_RUNTIME_EXCEPTIONS:
                 cfg_snapshot = {}
 
             def _choose_snapshot_mode() -> str:
@@ -1611,7 +1657,13 @@ def run_command_impl(
                 try:
                     ram = psutil.virtual_memory()
                     avail_mb = float(getattr(ram, "available", 0)) / (1024.0 * 1024.0)
-                except Exception:
+                except (
+                    AttributeError,
+                    RuntimeError,
+                    OSError,
+                    TypeError,
+                    ValueError,
+                ):
                     avail_mb = 0.0
                 # fraction: config override > env > default 0.4
                 frac = 0.4
@@ -1625,7 +1677,7 @@ def run_command_impl(
                         frac = float(
                             os.environ.get("INVARLOCK_SNAPSHOT_AUTO_RAM_FRACTION", frac)
                         )
-                except Exception:
+                except (TypeError, ValueError):
                     pass
                 # threshold mb: if no RAM info, use config threshold_mb or env fallback; else derive from avail*frac
                 if avail_mb > 0:
@@ -1641,7 +1693,7 @@ def run_command_impl(
                             threshold_mb = float(
                                 os.environ.get("INVARLOCK_SNAPSHOT_THRESHOLD_MB", "768")
                             )
-                    except Exception:
+                    except (TypeError, ValueError):
                         threshold_mb = 768.0
                 # Disk availability for chunked
                 try:
@@ -1656,7 +1708,7 @@ def run_command_impl(
                         )
                     du = shutil.disk_usage(tmpdir)
                     free_mb = float(du.free) / (1024.0 * 1024.0)
-                except Exception:
+                except (OSError, TypeError, ValueError):
                     free_mb = 0.0
                 # Disk margin ratio: config > default 1.2
                 margin = 1.2
@@ -1666,7 +1718,7 @@ def run_command_impl(
                         and cfg_snapshot.get("disk_free_margin_ratio") is not None
                     ):
                         margin = float(cfg_snapshot.get("disk_free_margin_ratio"))
-                except Exception:
+                except (TypeError, ValueError):
                     pass
                 # Choose chunked if model snapshot is a large fraction of available RAM and disk has room
                 if (
@@ -1712,7 +1764,7 @@ def run_command_impl(
                 )
                 try:
                     base_blob = adapter.snapshot(model)  # type: ignore[attr-defined]
-                except Exception:
+                except NON_FATAL_RUNTIME_EXCEPTIONS:
                     if not supports_chunked:
                         raise
                     snapshot_tmpdir = adapter.snapshot_chunked(model)  # type: ignore[attr-defined]
@@ -1732,7 +1784,7 @@ def run_command_impl(
                 _free_model_memory(model)
                 model = None
                 restore_fn = None
-        except Exception:
+        except NON_FATAL_RUNTIME_EXCEPTIONS:
             # On any failure, fall back to reload-per-attempt path
             _free_model_memory(model)
             model = None
@@ -1931,7 +1983,7 @@ def run_command_impl(
                     "run": run_policy_context,
                     "eval": eval_policy_context,
                 }
-            except Exception:
+            except (TypeError, ValueError, KeyError):
                 pass
 
             # Code provenance: commit hash and InvarLock version
@@ -1952,14 +2004,14 @@ def run_command_impl(
                             .decode("utf-8", "ignore")
                             .strip()
                         )
-                except Exception:
+                except (OSError, subprocess.SubprocessError):
                     commit_value = ""
             invarlock_version = None
             try:
                 from invarlock import __version__ as _invarlock_version
 
                 invarlock_version = _invarlock_version
-            except Exception:
+            except ImportError:
                 invarlock_version = None
 
             # Collect determinism/env flags
@@ -1976,7 +2028,7 @@ def run_command_impl(
                             env_flags["torch_deterministic_algorithms"] = bool(
                                 det_enabled()
                             )
-                    except Exception:
+                    except (AttributeError, RuntimeError, TypeError):
                         pass
                     try:
                         tf32_matmul = getattr(
@@ -1988,7 +2040,7 @@ def run_command_impl(
                             env_flags["cuda_matmul_allow_tf32"] = bool(
                                 tf32_matmul.allow_tf32
                             )
-                    except Exception:
+                    except (AttributeError, RuntimeError, TypeError):
                         pass
                     try:
                         cudnn_mod = getattr(torch.backends, "cudnn", None)
@@ -2002,20 +2054,20 @@ def run_command_impl(
                             env_flags["cudnn_benchmark"] = bool(
                                 getattr(cudnn_mod, "benchmark", None)
                             )
-                    except Exception:
+                    except (AttributeError, RuntimeError, TypeError):
                         pass
                     try:
                         env_flags["mps_available"] = bool(
                             getattr(torch.backends, "mps", None)
                             and torch.backends.mps.is_available()
                         )
-                    except Exception:
+                    except (AttributeError, RuntimeError, TypeError):
                         pass
                 # Common environment variables for determinism
                 env_flags["CUBLAS_WORKSPACE_CONFIG"] = _os.environ.get(
                     "CUBLAS_WORKSPACE_CONFIG"
                 )
-            except Exception:
+            except (AttributeError, RuntimeError, TypeError, ValueError, OSError):
                 env_flags = {}
 
             meta_payload = {
@@ -2083,7 +2135,7 @@ def run_command_impl(
                 prov["reload_path_used"] = bool(
                     snapshot_provenance.get("reload_path_used")
                 )
-            except Exception:
+            except (TypeError, KeyError):
                 pass
 
             # Transfer edit information
@@ -2155,7 +2207,7 @@ def run_command_impl(
                             if key in core_timings:
                                 try:
                                     timings[key] = float(core_timings[key])
-                                except Exception:
+                                except NUMERIC_EXCEPTIONS:
                                     timings[key] = core_timings[key]
                 metrics_payload = {
                     "latency_ms_per_tok": core_report.metrics.get(
@@ -2267,7 +2319,7 @@ def run_command_impl(
                             if isinstance(pm_guarded, dict) and pm_guarded
                             else None
                         )
-                    except Exception:
+                    except (AttributeError, TypeError, ValueError):
                         guard_overhead_payload["guarded_report"] = None
                     bare_struct = guard_overhead_payload.get("bare_report") or {}
                     guarded_struct = guard_overhead_payload.get("guarded_report") or {}
@@ -2281,19 +2333,19 @@ def run_command_impl(
                     )
                     try:
                         messages = list(getattr(result, "messages", []))
-                    except Exception:  # pragma: no cover - defensive
+                    except TypeError:  # pragma: no cover - defensive
                         messages = []
                     try:
                         warnings = list(getattr(result, "warnings", []))
-                    except Exception:  # pragma: no cover - defensive
+                    except TypeError:  # pragma: no cover - defensive
                         warnings = []
                     try:
                         errors = list(getattr(result, "errors", []))
-                    except Exception:  # pragma: no cover - defensive
+                    except TypeError:  # pragma: no cover - defensive
                         errors = []
                     try:
                         checks = dict(getattr(result, "checks", {}))
-                    except Exception:  # pragma: no cover - defensive
+                    except (TypeError, ValueError):  # pragma: no cover - defensive
                         checks = {}
                     metrics_obj = getattr(result, "metrics", {})
                     if not isinstance(metrics_obj, dict):
@@ -2394,7 +2446,7 @@ def run_command_impl(
                     def _tokens(rec: dict[str, Any]) -> int:
                         try:
                             return int(len(rec.get("input_ids", []) or []))
-                        except Exception:
+                        except NUMERIC_EXCEPTIONS:
                             return 0
 
                     preview_window_count = len(preview_records)
@@ -2447,7 +2499,7 @@ def run_command_impl(
                             ),
                         },
                     }
-                except Exception:
+                except NON_FATAL_RUNTIME_EXCEPTIONS:
                     # Best-effort: provenance digest will be skipped if windows cannot be built
                     pass
 
@@ -2458,7 +2510,7 @@ def run_command_impl(
                 try:
                     prov["dataset_split"] = str(resolved_split)
                     prov["split_fallback"] = bool(used_fallback_split)
-                except Exception:
+                except (TypeError, ValueError):
                     pass
                 provider_digest = _compute_provider_digest(report)
                 if provider_digest:
@@ -2491,11 +2543,11 @@ def run_command_impl(
                         ) from None
                     except RuntimeError as _e:
                         _fail_run(str(_e))
-                    except Exception:
+                    except NON_FATAL_RUNTIME_EXCEPTIONS:
                         pass
             except (typer.Exit, SystemExit, click.exceptions.Exit):
                 raise
-            except Exception:
+            except NON_FATAL_RUNTIME_EXCEPTIONS:
                 pass
 
             # Transfer guard results
@@ -2543,7 +2595,7 @@ def run_command_impl(
                 save_model_cfg = bool(
                     getattr(getattr(cfg, "output", {}), "save_model", False)
                 )
-            except Exception:
+            except (AttributeError, TypeError):
                 save_model_cfg = False
             if export_env or save_model_cfg:
                 try:
@@ -2564,7 +2616,7 @@ def run_command_impl(
                         if model_dir_cfg:
                             p = Path(str(model_dir_cfg))
                             export_dir = p if p.is_absolute() else (run_dir / p)
-                    except Exception:
+                    except NON_FATAL_RUNTIME_EXCEPTIONS:
                         export_dir = None
                     # (2) env override
                     if export_dir is None:
@@ -2581,7 +2633,7 @@ def run_command_impl(
                                     getattr(cfg, "output", {}), "model_subdir", "model"
                                 )
                             )
-                        except Exception:
+                        except NON_FATAL_RUNTIME_EXCEPTIONS:
                             export_subdir = "model"
                         export_dir = run_dir / export_subdir
 
@@ -2599,7 +2651,7 @@ def run_command_impl(
                             emoji="⚠️",
                             profile=profile_normalized,
                         )
-                except Exception:
+                except NON_FATAL_RUNTIME_EXCEPTIONS:
                     _event(
                         console,
                         "WARN",
@@ -2634,7 +2686,7 @@ def run_command_impl(
                     .get("loss", {})
                     .get("resolved_type")
                 )
-            except Exception:
+            except (AttributeError, TypeError, KeyError):
                 loss_type_ctx = None
             if str(loss_type_ctx).lower() == "classification":
                 try:
@@ -2647,7 +2699,7 @@ def run_command_impl(
                             core_report.evaluation_windows, dict
                         ):
                             ew = core_report.evaluation_windows  # type: ignore[assignment]
-                    except Exception:
+                    except (AttributeError, TypeError):
                         ew = {}
                     if not ew:
                         # Fallback to the soon-to-be persisted report windows (may lack input_ids)
@@ -2682,13 +2734,13 @@ def run_command_impl(
                         try:
                             prev_n_cfg = getattr(cfg.dataset, "preview_n", None)
                             fin_n_cfg = getattr(cfg.dataset, "final_n", None)
-                        except Exception:
+                        except (AttributeError, TypeError):
                             prev_n_cfg = None
                             fin_n_cfg = None
                         try:
                             prev_n = int(preview_count_report or prev_n_cfg or 0)
                             fin_n = int(final_count_report or fin_n_cfg or 0)
-                        except Exception:
+                        except NUMERIC_EXCEPTIONS:
                             prev_n = 0
                             fin_n = 0
                         c_prev, n_prev = (prev_n, prev_n) if prev_n > 0 else (0, 0)
@@ -2709,7 +2761,7 @@ def run_command_impl(
                                 notes.append(
                                     "accuracy: pseudo counts from preview_n/final_n"
                                 )
-                        except Exception:
+                        except (TypeError, KeyError, AttributeError):
                             pass
                     else:
                         classification_metrics["counts_source"] = "measured"
@@ -2719,7 +2771,14 @@ def run_command_impl(
                     # Convenience: top-level accuracy (final)
                     if n_fin > 0:
                         report["metrics"]["accuracy"] = float(c_fin / n_fin)
-                except Exception:
+                except (
+                    ImportError,
+                    ModuleNotFoundError,
+                    AttributeError,
+                    TypeError,
+                    ValueError,
+                    RuntimeError,
+                ):
                     pass
 
             match_fraction = metrics_section.get("window_match_fraction")
@@ -2773,7 +2832,7 @@ def run_command_impl(
                         paired_windows_val, bool
                     ):
                         paired_windows_int = int(paired_windows_val)
-                except Exception:
+                except NUMERIC_EXCEPTIONS:
                     paired_windows_int = None
                 if paired_windows_int is None or paired_windows_int <= 0:
                     err = InvarlockError(
@@ -2858,7 +2917,7 @@ def run_command_impl(
                                 report["metrics"]["primary_metric"]["ci_level"] = float(
                                     metric_opts["ci_level"]
                                 )  # type: ignore[index]
-                        except Exception:
+                        except (TypeError, ValueError, KeyError):
                             pass
                 # Shadow parity check against ppl_* fields (best-effort)
                 try:
@@ -2884,9 +2943,16 @@ def run_command_impl(
                             console.print(
                                 "[dim]DEBUG_METRIC_DIFFS: " + diffs_line + "[/dim]"
                             )
-                except Exception:
+                except NON_FATAL_RUNTIME_EXCEPTIONS:
                     pass
-            except Exception:
+            except (
+                ImportError,
+                ModuleNotFoundError,
+                AttributeError,
+                TypeError,
+                ValueError,
+                RuntimeError,
+            ):
                 # Non-fatal: metric-v1 snapshot should not break runs
                 pass
 
@@ -2903,9 +2969,9 @@ def run_command_impl(
                 try:
                     if isinstance(window_plan, dict) and "coverage_ok" in window_plan:
                         stats["coverage"] = bool(window_plan.get("coverage_ok"))
-                except Exception:
+                except (AttributeError, KeyError, TypeError):
                     pass
-            except Exception:
+            except (AttributeError, KeyError, TypeError):
                 pass
 
             telemetry_path: Path | None = None
@@ -2928,7 +2994,7 @@ def run_command_impl(
             try:
                 if isinstance(saved_files, dict) and saved_files.get("json"):
                     report_path_out = str(saved_files["json"])
-            except Exception:
+            except (TypeError, KeyError):
                 pass
 
             if telemetry and telemetry_path is not None:
@@ -2960,7 +3026,7 @@ def run_command_impl(
             pm_obj = None
             try:
                 pm_obj = report.get("metrics", {}).get("primary_metric")
-            except Exception:
+            except (AttributeError, TypeError, KeyError):
                 pm_obj = None
             if isinstance(pm_obj, dict) and pm_obj:
                 try:
@@ -2988,7 +3054,7 @@ def run_command_impl(
                             emoji="🔗",
                             profile=profile_normalized,
                         )
-                except Exception:
+                except (TypeError, ValueError):
                     pass
             # Legacy ppl_* console block removed in favor of primary_metric summary
 
@@ -3018,7 +3084,7 @@ def run_command_impl(
                             .get("loss", {})
                             .get("resolved_type")
                         )
-                    except Exception:
+                    except (AttributeError, KeyError, TypeError):
                         loss_type_ctx = None
                     if (
                         measure_guard_overhead
@@ -3135,7 +3201,7 @@ def run_command_impl(
                                     emoji="🔧",
                                     profile=profile_normalized,
                                 )
-                        except Exception:
+                        except (AttributeError, KeyError, TypeError, ValueError):
                             pass
 
                         if retry_controller.should_retry(report_passed):
@@ -3303,7 +3369,7 @@ def run_command_impl(
                     import shutil as _sh
 
                     _sh.rmtree(snapshot_tmpdir, ignore_errors=True)
-                except Exception:
+                except OSError:
                     pass
                 finally:
                     _event(
@@ -3321,6 +3387,6 @@ def run_command_impl(
                     emoji="🧹",
                     profile=profile_normalized,
                 )
-        except Exception:
+        except (AttributeError, NameError, TypeError, OSError):
             # Best-effort cleanup printing; never raise from finally
             pass
