@@ -1117,9 +1117,7 @@ def plugins_uninstall_command(
         )
     except subprocess.TimeoutExpired as exc:
         _print_normalized("uninstall", all_pkgs, "apply", "timeout")
-        console.print(
-            f"[red]❌ Uninstall timed out after {timeout_seconds}s[/red]"
-        )
+        console.print(f"[red]❌ Uninstall timed out after {timeout_seconds}s[/red]")
         raise typer.Exit(1) from exc
     except OSError as exc:
         _print_normalized("uninstall", all_pkgs, "apply", "failed")

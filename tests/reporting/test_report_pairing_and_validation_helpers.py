@@ -400,14 +400,18 @@ def test_evaluation_report_module_schema_tightening_branches(monkeypatch) -> Non
         monkeypatch.setattr(
             cert_schema_mod, "REPORT_JSON_SCHEMA", {"properties": "nope"}
         )
-        importlib.reload(cert_mod)
+        with pytest.raises(RuntimeError, match="properties must be a mapping"):
+            importlib.reload(cert_mod)
 
         monkeypatch.setattr(
             cert_schema_mod,
             "REPORT_JSON_SCHEMA",
             {"properties": {"validation": "nope"}},
         )
-        importlib.reload(cert_mod)
+        with pytest.raises(
+            RuntimeError, match="properties.validation must be a mapping"
+        ):
+            importlib.reload(cert_mod)
     finally:
         monkeypatch.setattr(cert_schema_mod, "REPORT_JSON_SCHEMA", original_schema)
         importlib.reload(cert_mod)
