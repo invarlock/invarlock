@@ -1411,6 +1411,86 @@ except ImportError:
     HAS_CORE_COMPONENTS = False
 
 
+def _build_run_command_deps() -> dict[str, Any]:
+    """Build explicit dependencies for run_command_impl.
+
+    Passing an explicit map avoids dynamic module globals mutation while keeping
+    monkeypatch behavior stable (resolved at call time).
+    """
+
+    return {
+        "InvarlockError": InvarlockError,
+        "Path": Path,
+        "RELEASE_MIN_WINDOWS_PER_ARM": RELEASE_MIN_WINDOWS_PER_ARM,
+        "SimpleNamespace": SimpleNamespace,
+        "_SnapshotRestoreFailed": _SnapshotRestoreFailed,
+        "_apply_mlm_masks": _apply_mlm_masks,
+        "_apply_warning_filters": _apply_warning_filters,
+        "_canonical_dataset_id": _canonical_dataset_id,
+        "_coerce_float": _coerce_float,
+        "_coerce_int": _coerce_int,
+        "_coerce_option": _coerce_option,
+        "_compute_provider_digest": _compute_provider_digest,
+        "_enforce_provider_parity": _enforce_provider_parity,
+        "_event": _event,
+        "_execute_guarded_run": _execute_guarded_run,
+        "_extract_pairing_schedule": _extract_pairing_schedule,
+        "_extract_pm_snapshot_for_overhead": _extract_pm_snapshot_for_overhead,
+        "_format_debug_metric_diffs": _format_debug_metric_diffs,
+        "_format_guard_chain": _format_guard_chain,
+        "_format_kv_line": _format_kv_line,
+        "_free_model_memory": _free_model_memory,
+        "_hash_sequences": _hash_sequences,
+        "_init_retry_controller": _init_retry_controller,
+        "_load_model_with_cfg": _load_model_with_cfg,
+        "_maybe_plan_release_windows": _maybe_plan_release_windows,
+        "_merge_primary_metric_health": _merge_primary_metric_health,
+        "_normalize_overhead_result": _normalize_overhead_result,
+        "_persist_ref_masks": _persist_ref_masks,
+        "_postprocess_and_summarize": _postprocess_and_summarize,
+        "_prepare_config_for_run": _prepare_config_for_run,
+        "_print_guard_overhead_summary": _print_guard_overhead_summary,
+        "_print_pipeline_start": _print_pipeline_start,
+        "_print_retry_summary": _print_retry_summary,
+        "_resolve_device_and_output": _resolve_device_and_output,
+        "_resolve_exit_code": _resolve_exit_code,
+        "_resolve_guard_overhead_threshold": _resolve_guard_overhead_threshold,
+        "_resolve_metric_and_provider": _resolve_metric_and_provider,
+        "_resolve_pm_acceptance_range": _resolve_pm_acceptance_range,
+        "_resolve_pm_drift_band": _resolve_pm_drift_band,
+        "_resolve_provider_and_split": _resolve_provider_and_split,
+        "_run_bare_control": _run_bare_control,
+        "_safe_int": _safe_int,
+        "_should_measure_overhead": _should_measure_overhead,
+        "_style_from_console": _style_from_console,
+        "_tensor_or_list_to_ints": _tensor_or_list_to_ints,
+        "_to_serialisable_dict": _to_serialisable_dict,
+        "_tokenizer_digest": _tokenizer_digest,
+        "_validate_and_harvest_baseline_schedule": _validate_and_harvest_baseline_schedule,
+        "click": click,
+        "console": console,
+        "copy": copy,
+        "datetime": datetime,
+        "detect_model_profile": detect_model_profile,
+        "hashlib": hashlib,
+        "json": json,
+        "math": math,
+        "np": np,
+        "os": os,
+        "perf_counter": perf_counter,
+        "print_timing_summary": print_timing_summary,
+        "psutil": psutil,
+        "resolve_output_style": resolve_output_style,
+        "resolve_tokenizer": resolve_tokenizer,
+        "set_seed": set_seed,
+        "shutil": shutil,
+        "timed_step": timed_step,
+        "torch": torch,
+        "typer": typer,
+        "validate_guard_overhead": validate_guard_overhead,
+    }
+
+
 def run_command(
     config: str = typer.Option(
         ..., "--config", "-c", help="Path to YAML configuration file"
@@ -1509,6 +1589,7 @@ def run_command(
         timing=timing,
         telemetry=telemetry,
         no_color=no_color,
+        deps=_build_run_command_deps(),
     )
 
 

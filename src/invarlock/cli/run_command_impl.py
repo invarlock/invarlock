@@ -1,9 +1,10 @@
 # mypy: ignore-errors
-# ruff: noqa: F821
 """Implementation body for cli.commands.run.run_command."""
 
 from __future__ import annotations
 
+import tempfile
+from collections.abc import Mapping
 from typing import Any
 
 
@@ -28,13 +29,87 @@ def run_command_impl(
     timing: Any = False,
     telemetry: Any = False,
     no_color: Any = False,
+    deps: Mapping[str, Any],
 ) -> str | None:
     """Run implementation moved out of run.py to keep command surface stable."""
-    from invarlock.cli.commands import run as run_mod
 
-    # Pull latest helper references from run.py each call so test monkeypatches
-    # continue to affect command behavior exactly as before.
-    globals().update(run_mod.__dict__)
+    def _dep(name: str) -> Any:
+        try:
+            return deps[name]
+        except KeyError as exc:
+            raise RuntimeError(f"run_command_impl missing dependency: {name}") from exc
+
+    InvarlockError = _dep("InvarlockError")
+    Path = _dep("Path")
+    RELEASE_MIN_WINDOWS_PER_ARM = _dep("RELEASE_MIN_WINDOWS_PER_ARM")
+    SimpleNamespace = _dep("SimpleNamespace")
+    _SnapshotRestoreFailed = _dep("_SnapshotRestoreFailed")
+    _apply_mlm_masks = _dep("_apply_mlm_masks")
+    _apply_warning_filters = _dep("_apply_warning_filters")
+    _canonical_dataset_id = _dep("_canonical_dataset_id")
+    _coerce_float = _dep("_coerce_float")
+    _coerce_int = _dep("_coerce_int")
+    _coerce_option = _dep("_coerce_option")
+    _compute_provider_digest = _dep("_compute_provider_digest")
+    _enforce_provider_parity = _dep("_enforce_provider_parity")
+    _event = _dep("_event")
+    _execute_guarded_run = _dep("_execute_guarded_run")
+    _extract_pairing_schedule = _dep("_extract_pairing_schedule")
+    _extract_pm_snapshot_for_overhead = _dep("_extract_pm_snapshot_for_overhead")
+    _format_debug_metric_diffs = _dep("_format_debug_metric_diffs")
+    _format_guard_chain = _dep("_format_guard_chain")
+    _format_kv_line = _dep("_format_kv_line")
+    _free_model_memory = _dep("_free_model_memory")
+    _hash_sequences = _dep("_hash_sequences")
+    _init_retry_controller = _dep("_init_retry_controller")
+    _load_model_with_cfg = _dep("_load_model_with_cfg")
+    _maybe_plan_release_windows = _dep("_maybe_plan_release_windows")
+    _merge_primary_metric_health = _dep("_merge_primary_metric_health")
+    _normalize_overhead_result = _dep("_normalize_overhead_result")
+    _persist_ref_masks = _dep("_persist_ref_masks")
+    _postprocess_and_summarize = _dep("_postprocess_and_summarize")
+    _prepare_config_for_run = _dep("_prepare_config_for_run")
+    _print_guard_overhead_summary = _dep("_print_guard_overhead_summary")
+    _print_pipeline_start = _dep("_print_pipeline_start")
+    _print_retry_summary = _dep("_print_retry_summary")
+    _resolve_device_and_output = _dep("_resolve_device_and_output")
+    _resolve_exit_code = _dep("_resolve_exit_code")
+    _resolve_guard_overhead_threshold = _dep("_resolve_guard_overhead_threshold")
+    _resolve_metric_and_provider = _dep("_resolve_metric_and_provider")
+    _resolve_pm_acceptance_range = _dep("_resolve_pm_acceptance_range")
+    _resolve_pm_drift_band = _dep("_resolve_pm_drift_band")
+    _resolve_provider_and_split = _dep("_resolve_provider_and_split")
+    _run_bare_control = _dep("_run_bare_control")
+    _safe_int = _dep("_safe_int")
+    _should_measure_overhead = _dep("_should_measure_overhead")
+    _style_from_console = _dep("_style_from_console")
+    _tensor_or_list_to_ints = _dep("_tensor_or_list_to_ints")
+    _to_serialisable_dict = _dep("_to_serialisable_dict")
+    _tokenizer_digest = _dep("_tokenizer_digest")
+    _validate_and_harvest_baseline_schedule = _dep(
+        "_validate_and_harvest_baseline_schedule"
+    )
+    click = _dep("click")
+    console = _dep("console")
+    copy = _dep("copy")
+    datetime = _dep("datetime")
+    detect_model_profile = _dep("detect_model_profile")
+    hashlib = _dep("hashlib")
+    json = _dep("json")
+    math = _dep("math")
+    np = _dep("np")
+    os = _dep("os")
+    perf_counter = _dep("perf_counter")
+    psutil = _dep("psutil")
+    print_timing_summary = _dep("print_timing_summary")
+    resolve_output_style = _dep("resolve_output_style")
+    resolve_tokenizer = _dep("resolve_tokenizer")
+    set_seed = _dep("set_seed")
+    shutil = _dep("shutil")
+    timed_step = _dep("timed_step")
+    torch = _dep("torch")
+    typer = _dep("typer")
+    validate_guard_overhead = _dep("validate_guard_overhead")
 
     """
     Run InvarLock pipeline with the given configuration.
