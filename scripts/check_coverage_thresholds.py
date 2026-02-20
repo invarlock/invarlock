@@ -64,10 +64,22 @@ THRESHOLDS = {
     "src/invarlock/cli/commands/run.py": 0.90,
     "src/invarlock/cli/commands/verify.py": 0.90,
     "src/invarlock/cli/commands/calibrate.py": 0.90,
+    # PR-4 split modules
+    "src/invarlock/cli/run_analysis.py": 0.90,
+    "src/invarlock/cli/run_artifacts.py": 0.90,
+    "src/invarlock/cli/run_config.py": 0.90,
+    "src/invarlock/cli/run_overhead.py": 0.90,
+    "src/invarlock/cli/run_pairing.py": 0.90,
+    "src/invarlock/cli/run_policy.py": 0.90,
     # CLI determinism preset (CI/Release provenance)
     "src/invarlock/cli/determinism.py": 0.90,
     # Core events logger
     "src/invarlock/core/events.py": 0.90,
+    # PR-5 split modules
+    "src/invarlock/reporting/report_overhead.py": 0.90,
+    "src/invarlock/reporting/report_policy.py": 0.90,
+    "src/invarlock/reporting/report_provenance.py": 0.90,
+    "src/invarlock/reporting/report_validation.py": 0.90,
 }
 
 # Default floors (applied only to core classification; non-core modules are not
