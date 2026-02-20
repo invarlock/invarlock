@@ -205,15 +205,14 @@ def _canonical_dataset_id(value: Any) -> str | None:
         return None
     if isinstance(value, str):
         return value
-    if hasattr(value, "_data"):
-        try:
-            value = value._data
-        except Exception:
-            pass
+    try:
+        value = getattr(value, "_data", value)
+    except AttributeError:
+        pass
     if isinstance(value, Mapping):
         try:
             return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
-        except Exception:
+        except (TypeError, ValueError):
             return str(value)
     return str(value)
 
@@ -330,7 +329,7 @@ def _suppress_noisy_warnings(
             }
             with path.open("a", encoding="utf-8") as fh:
                 fh.write(json.dumps(payload) + "\n")
-        except Exception:
+        except (OSError, TypeError, ValueError):
             # Best-effort: suppressed warnings are non-fatal and logging must not
             # impact model loading.
             return
@@ -355,7 +354,7 @@ def _suppress_noisy_warnings(
                             text = s.decode("utf-8", errors="replace")
                         else:
                             text = str(s)
-                    except Exception:
+                    except (TypeError, ValueError, UnicodeDecodeError):
                         return int(self._raw.write(s))
 
                     # Preserve progress bars (carriage returns) by passing through
@@ -371,7 +370,7 @@ def _suppress_noisy_warnings(
                 def flush(self) -> None:
                     try:
                         self._raw.flush()
-                    except Exception:
+                    except (AttributeError, OSError, ValueError):
                         pass
 
             stdout_proxy = _FilteredStream(_sys.stdout)
@@ -396,7 +395,7 @@ def _suppress_noisy_warnings(
                             rendered = warnings.formatwarning(
                                 message, category, filename, lineno, line
                             )
-                        except Exception:
+                        except (TypeError, ValueError):
                             rendered = str(message)
                         if any(p.search(rendered) for p in patterns):
                             suppressed.append(str(message))
@@ -419,11 +418,11 @@ def _suppress_noisy_warnings(
         for handler in handlers:
             try:
                 handler.removeFilter(log_filter)
-            except Exception:
+            except ValueError:
                 pass
         try:
             transformers_logger.setLevel(prev_tf_level)
-        except Exception:
+        except (TypeError, ValueError):
             pass
         if prev_tf_verbosity is None:
             os.environ.pop("TRANSFORMERS_VERBOSITY", None)
@@ -574,7 +573,7 @@ def _free_model_memory(model: object | None) -> None:
         if torch is not None and torch.cuda.is_available():
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
-    except Exception:
+    except (ImportError, RuntimeError, TypeError, ValueError, AttributeError):
         # Cleanup should never raise; fallback is to proceed without cache purge
         pass
 
@@ -759,7 +758,7 @@ def _apply_mlm_masks(
         )
     try:
         mask_token_id = int(mask_token_id)
-    except Exception:
+    except (TypeError, ValueError, OverflowError):
         mask_token_id = _safe_int(mask_token_id, 0)
 
     # Build special token id set to avoid masking them
