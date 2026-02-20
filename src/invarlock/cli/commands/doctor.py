@@ -220,6 +220,17 @@ def doctor_command(
     Checks PyTorch, device availability, memory, and optional extras.
     """
 
+    NON_FATAL_EXCEPTIONS = (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+    )
+
     # Normalize Typer OptionInfo placeholders when invoked directly in tests
     def _is_optioninfo_like(obj: object) -> bool:
         try:
@@ -229,7 +240,7 @@ def doctor_command(
                 return True
             # Heuristic: has typical Typer OptionInfo attributes
             return hasattr(obj, "param_decls") and hasattr(obj, "default")
-        except Exception:
+        except NON_FATAL_EXCEPTIONS:
             return False
 
     def _coerce_opt(val: object, *, bool_default: bool | None = None):
@@ -378,7 +389,7 @@ def doctor_command(
                     f"torch CUDA build: {'yes' if torch_cuda_build else 'no'} · "
                     f"cuda.is_available(): {'true' if cuda_available else 'false'}[/dim]"
                 )
-        except Exception:
+        except NON_FATAL_EXCEPTIONS:
             pass
 
         # Memory check
@@ -392,7 +403,7 @@ def doctor_command(
                         console.print(
                             "[yellow]⚠️  Warning: Less than 4GB GPU memory available[/yellow]"
                         )
-        except Exception:
+        except NON_FATAL_EXCEPTIONS:
             pass
 
     except ImportError:
@@ -418,7 +429,7 @@ def doctor_command(
         import torch as _torch
 
         has_cuda = bool(getattr(_torch, "cuda", None) and _torch.cuda.is_available())
-    except Exception:
+    except NON_FATAL_EXCEPTIONS:
         has_cuda = False
 
     for dep, description in optional_deps:
@@ -459,7 +470,7 @@ def doctor_command(
                         console.print(
                             "  [green]✅ bitsandbytes — 8/4-bit loading (GPU)[/green]"
                         )
-                except Exception:
+                except NON_FATAL_EXCEPTIONS:
                     if not json_out:
                         console.print(
                             "  [yellow]⚠️  bitsandbytes — Present but CPU-only build detected[/yellow]"
@@ -505,7 +516,7 @@ def doctor_command(
                 try:
                     cfg = apply_profile(cfg, profile)
                     console.print(f"  ▶ Profile applied: {profile}")
-                except Exception as _e:
+                except NON_FATAL_EXCEPTIONS as _e:
                     console.print(f"  [yellow]⚠️ Profile apply failed: {_e}[/yellow]")
 
             # Provider kind sanity (D001)
@@ -532,7 +543,7 @@ def doctor_command(
                         get = getattr(obj, "get", None)
                         if callable(get):  # type: ignore[call-arg]
                             return get(key)  # type: ignore[return-value]
-                    except Exception:
+                    except NON_FATAL_EXCEPTIONS:
                         return None
                     return None
 
@@ -581,7 +592,7 @@ def doctor_command(
                         from pathlib import Path as _P
 
                         exists = bool(p) and _P(str(p)).exists()
-                    except Exception:
+                    except NON_FATAL_EXCEPTIONS:
                         exists = False
                     if not exists:
                         _add(
@@ -622,7 +633,7 @@ def doctor_command(
                             "hf_text: set dataset.field.text or map 'text' to your column",
                             field="dataset.provider.text_field",
                         )
-            except Exception:
+            except NON_FATAL_EXCEPTIONS:
                 pass
 
             # Resolve adapter & provider
@@ -644,7 +655,7 @@ def doctor_command(
             )
             try:
                 cfg_metric_kind = str(metric_kind_resolved)
-            except Exception:
+            except NON_FATAL_EXCEPTIONS:
                 cfg_metric_kind = cfg_metric_kind
             if not json_out:
                 console.print(
@@ -668,14 +679,14 @@ def doctor_command(
                     requested_device = getattr(
                         getattr(cfg, "runner", object()), "device", None
                     )
-                except Exception:
+                except NON_FATAL_EXCEPTIONS:
                     requested_device = None
                 if requested_device is None:
                     try:
                         requested_device = getattr(
                             getattr(cfg, "model", object()), "device", None
                         )
-                    except Exception:
+                    except NON_FATAL_EXCEPTIONS:
                         requested_device = None
                 req = str(requested_device or "").lower()
                 if req.startswith("cuda") and not (
@@ -688,7 +699,7 @@ def doctor_command(
                         field="runner.device",
                     )
                     had_error = True
-            except Exception:
+            except NON_FATAL_EXCEPTIONS:
                 pass
 
             # Determinism guard rails: warn when provider.workers>0 without deterministic_shards
@@ -707,7 +718,7 @@ def doctor_command(
                     try:
                         workers = provider_cfg.get("workers", None)  # type: ignore[attr-defined]
                         det = provider_cfg.get("deterministic_shards", None)  # type: ignore[attr-defined]
-                    except Exception:
+                    except NON_FATAL_EXCEPTIONS:
                         workers = workers
                         det = det
                 # Legacy style might place workers directly under dataset
@@ -723,7 +734,7 @@ def doctor_command(
                         console.print(
                             f"  [yellow]⚠️  {DETERMINISM_SHARDS_WARNING} (deterministic shards)[/yellow]"
                         )
-            except Exception:
+            except NON_FATAL_EXCEPTIONS:
                 # Best-effort linting only
                 pass
 
@@ -733,12 +744,12 @@ def doctor_command(
                 if hasattr(cfg, "eval") and hasattr(cfg.eval, "bootstrap"):
                     try:
                         reps_val = getattr(cfg.eval.bootstrap, "replicates", None)
-                    except Exception:
+                    except NON_FATAL_EXCEPTIONS:
                         reps_val = None
                 if reps_val is not None:
                     try:
                         reps_val = int(reps_val)
-                    except Exception:
+                    except NON_FATAL_EXCEPTIONS:
                         reps_val = None
                 if isinstance(reps_val, int) and reps_val < 200:
                     _add(
@@ -747,7 +758,7 @@ def doctor_command(
                         "bootstrap replicates (<200) may produce unstable CIs; increase reps or expect wider intervals.",
                         field="eval.bootstrap.replicates",
                     )
-            except Exception:
+            except NON_FATAL_EXCEPTIONS:
                 pass
 
             # Capacity estimation if available
@@ -834,7 +845,7 @@ def doctor_command(
                                     },
                                 },
                             }
-                        except Exception:
+                        except NON_FATAL_EXCEPTIONS:
                             pass
                         tokens_avail = cap.get("tokens_available")
                         examples_avail = cap.get("examples_available")
@@ -878,9 +889,9 @@ def doctor_command(
                                 f"Insufficient capacity: tokens_available={tokens_avail}, examples_available={examples_avail} below effective floors",
                             )
                             had_error = True
-                    except Exception:
+                    except NON_FATAL_EXCEPTIONS:
                         pass
-                except Exception as _e:
+                except NON_FATAL_EXCEPTIONS as _e:
                     console.print(
                         f"  [yellow]⚠️ Capacity estimation failed: {_e}[/yellow]"
                     )
@@ -915,13 +926,13 @@ def doctor_command(
                                     console.print(
                                         f"  [yellow]⚠️  {DATASET_SPLIT_FALLBACK_WARNING}[/yellow]"
                                     )
-                        except Exception:
+                        except NON_FATAL_EXCEPTIONS:
                             pass
                     else:
                         console.print("  [yellow]⚠️ Baseline not found[/yellow]")
-                except Exception as _e:
+                except NON_FATAL_EXCEPTIONS as _e:
                     console.print(f"  [yellow]⚠️ Baseline check failed: {_e}[/yellow]")
-        except Exception as e:
+        except NON_FATAL_EXCEPTIONS as e:
             console.print(f"  [yellow]⚠️ Preflight failed: {e}[/yellow]")
 
     # Baseline quick check for split fallback visibility (even without --config)
@@ -944,7 +955,7 @@ def doctor_command(
                         console.print(
                             f"  [yellow]⚠️  {DATASET_SPLIT_FALLBACK_WARNING}[/yellow]"
                         )
-    except Exception:
+    except NON_FATAL_EXCEPTIONS:
         pass
 
     had_error = had_error or _cross_check_reports(
@@ -966,7 +977,7 @@ def doctor_command(
             "yes",
             "on",
         }
-    except Exception:
+    except NON_FATAL_EXCEPTIONS:
         tiny_env = False
     tiny_cert = False
     try:
@@ -977,7 +988,7 @@ def doctor_command(
         def _readsafe(p):
             try:
                 return _json_d13.loads(_Path_d13(p).read_text()) if p else None
-            except Exception:
+            except NON_FATAL_EXCEPTIONS:
                 return None
 
         sb = _readsafe(subject_report) if subject_report else None
@@ -986,7 +997,7 @@ def doctor_command(
             ((sb or {}).get("auto", {}) or {}).get("tiny_relax")
             or ((bb or {}).get("auto", {}) or {}).get("tiny_relax")
         )
-    except Exception:
+    except NON_FATAL_EXCEPTIONS:
         tiny_cert = False
     if tiny_env or tiny_cert:
         _add(
@@ -1024,7 +1035,7 @@ def doctor_command(
                 import torch as _t
 
                 has_cuda = bool(getattr(_t, "cuda", None) and _t.cuda.is_available())
-            except Exception:
+            except NON_FATAL_EXCEPTIONS:
                 has_cuda = False
             is_linux = _platform.system().lower() == "linux"
 
@@ -1060,7 +1071,7 @@ def doctor_command(
                         import transformers as _tf  # type: ignore
 
                         version = getattr(_tf, "__version__", None)
-                    except Exception:
+                    except NON_FATAL_EXCEPTIONS:
                         version = None
                 elif n == "hf_gptq":
                     backend = "auto-gptq"
@@ -1129,7 +1140,7 @@ def doctor_command(
         # falling back to a lightweight rows helper that only probes availability.
         try:
             all_rows = _gather_adapter_rows()
-        except Exception as _adapter_exc:
+        except NON_FATAL_EXCEPTIONS as _adapter_exc:
             # Known benign case: optional Optimum/ONNXRuntime missing on host
             if "optimum" in str(_adapter_exc).lower():
                 try:
@@ -1138,7 +1149,7 @@ def doctor_command(
                     )
 
                     all_rows = _rows_fallback()
-                except Exception:
+                except NON_FATAL_EXCEPTIONS:
                     raise  # re-raise if fallback also fails
             else:
                 raise
@@ -1200,7 +1211,7 @@ def doctor_command(
                 enable = ""
                 try:
                     extras = _check_plugin_extras(n, kind)
-                except Exception:
+                except NON_FATAL_EXCEPTIONS:
                     extras = ""
                 if (
                     isinstance(extras, str)
@@ -1297,7 +1308,7 @@ def doctor_command(
                         provider_params.get(pname, "-"),
                     )
                 console.print(dtable)
-        except Exception:
+        except NON_FATAL_EXCEPTIONS:
             pass
 
         if not json_out:
@@ -1307,7 +1318,7 @@ def doctor_command(
             console.print(
                 "[dim]Hints: use --json · filter with --only ready|core|plugin|auto|unsupported[/dim]"
             )
-    except Exception as e:
+    except NON_FATAL_EXCEPTIONS as e:
         # Gracefully handle missing optional Optimum stack
         if "optimum" in str(e).lower():
             if not json_out:
@@ -1331,7 +1342,7 @@ def doctor_command(
             findings.sort(
                 key=lambda f: (_order.get(f.get("severity"), 9), f.get("code", "Z999"))
             )
-        except Exception:
+        except NON_FATAL_EXCEPTIONS:
             pass
         result_obj = {
             "format_version": DOCTOR_FORMAT_VERSION,

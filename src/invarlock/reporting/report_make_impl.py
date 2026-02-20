@@ -19,6 +19,18 @@ def make_report_impl(
     # Keep runtime lookup dynamic so report_builder monkeypatches in tests continue to apply.
     globals().update(builder_mod.__dict__)
 
+    NON_FATAL_EXCEPTIONS = (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+    )
+    NUMERIC_EXCEPTIONS = (TypeError, ValueError, OverflowError)
+
     report = _normalize_and_validate_report(report)
 
     # Normalize baseline input
@@ -33,7 +45,7 @@ def make_report_impl(
             and "edit" in baseline_raw
         ):
             baseline_report = _normalize_and_validate_report(baseline_raw)
-    except Exception:  # pragma: no cover - baseline compare is best-effort
+    except NON_FATAL_EXCEPTIONS:  # pragma: no cover - baseline compare is best-effort
         baseline_report = None
 
     # Extract core metadata with full seed bundle
@@ -50,7 +62,7 @@ def make_report_impl(
         )
         if isinstance(env_flags, dict) and env_flags:
             meta["env_flags"] = env_flags
-    except Exception:  # pragma: no cover
+    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         pass
 
     # Determinism preset (CI/Release provenance) when present.
@@ -62,7 +74,7 @@ def make_report_impl(
         )
         if isinstance(det, dict) and det:
             meta["determinism"] = det
-    except Exception:  # pragma: no cover
+    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         pass
 
     # Execution profile provenance when available via run context.
@@ -75,7 +87,7 @@ def make_report_impl(
         )
         if ctx_profile:
             meta["profile"] = ctx_profile
-    except Exception:  # pragma: no cover
+    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         pass
 
     tokenizer_hash_meta = report["meta"].get("tokenizer_hash")
@@ -112,7 +124,7 @@ def make_report_impl(
             windows = dataset_info.get("windows")
             if isinstance(windows, dict):
                 windows.setdefault("stats", {})
-    except Exception:  # pragma: no cover
+    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         pass
 
     # Baseline reference (PM-only). Derive a primary_metric snapshot from baseline windows.
@@ -126,12 +138,12 @@ def make_report_impl(
         )
         if isinstance(bm, dict) and bm:
             baseline_pm = bm
-    except Exception:  # pragma: no cover
+    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         baseline_pm = None
     if not isinstance(baseline_pm, dict) or not baseline_pm:
         try:
             baseline_pm = compute_primary_metric_from_report(baseline_normalized)
-        except Exception:  # pragma: no cover
+        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
             baseline_pm = {"kind": "ppl_causal", "final": float("nan")}
     baseline_ref = {
         "run_id": baseline_normalized.get("run_id", "unknown"),
@@ -190,7 +202,7 @@ def make_report_impl(
                 lo, hi = float(dlci[0]), float(dlci[1])
                 ratio_ci = (math.exp(lo), math.exp(hi))
                 ratio_ci_source = "run_metrics"
-        except Exception:  # pragma: no cover
+        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
             pass
     paired_windows = 0
     # UX hint: mark CI as unstable for very low replicate counts or insufficient tokens
@@ -199,7 +211,7 @@ def make_report_impl(
         rep_raw = metrics_bootstrap.get("replicates", metrics_bootstrap.get("n"))
         if rep_raw is not None and int(rep_raw) < 200:
             unstable_ci_flag = True
-    except Exception:  # pragma: no cover
+    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         unstable_ci_flag = False
     # Also consider token-count floor from tier policy when available
     try:
@@ -226,7 +238,7 @@ def make_report_impl(
             )
             if isinstance(auto_cfg, dict) and auto_cfg.get("tier"):
                 tier = str(auto_cfg.get("tier")).lower()
-        except Exception:  # pragma: no cover
+        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
             pass
         tier_policies = get_tier_policies()
         tier_defaults = tier_policies.get(tier, tier_policies.get("balanced", {}))
@@ -245,7 +257,7 @@ def make_report_impl(
             and total_tokens < min_tokens
         ):
             unstable_ci_flag = True
-    except Exception:  # pragma: no cover
+    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         pass
     raw_logloss_delta = report["metrics"].get("logloss_delta")
     logloss_delta = (
@@ -307,14 +319,14 @@ def make_report_impl(
                         continue
                     try:
                         wv = float(w)
-                    except Exception:
+                    except NUMERIC_EXCEPTIONS:
                         continue
                     if not math.isfinite(wv):
                         continue
                     weights.append(float(max(wv, 0.0)))
                 if weights:
                     paired_weights = weights
-        except Exception:  # pragma: no cover
+        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
             paired_weights = None
         method = str(metrics_bootstrap.get("method", "percentile")).lower()
         replicates = int(
@@ -336,7 +348,7 @@ def make_report_impl(
                 ).strip().lower() in {"1", "true", "yes", "on"}
                 if use_bca_flag and paired_windows >= 200:
                     ci_method = "bca"
-        except Exception:  # pragma: no cover
+        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
             pass
         if replicates > 0:
             try:
@@ -404,7 +416,7 @@ def make_report_impl(
                                 continue
                             try:
                                 wv = float(w)
-                            except Exception:  # pragma: no cover
+                            except NON_FATAL_EXCEPTIONS:  # pragma: no cover
                                 continue
                             if not math.isfinite(wv) or wv <= 0:
                                 continue
@@ -415,9 +427,9 @@ def make_report_impl(
                             sum_dw += wv * (float(r_val) - base_map[key])
                         if sum_w > 0.0:
                             baseline_delta_mean = float(sum_dw / sum_w)
-                except Exception:  # pragma: no cover
+                except NON_FATAL_EXCEPTIONS:  # pragma: no cover
                     baseline_delta_mean = float("nan")
-            except Exception:  # pragma: no cover
+            except NON_FATAL_EXCEPTIONS:  # pragma: no cover
                 ratio_ci_source = "run_metrics"
 
     def _finite_bounds(bounds: tuple[float, float]) -> bool:
@@ -481,7 +493,7 @@ def make_report_impl(
                     isinstance(ratio_ci, tuple | list) and len(ratio_ci) == 2
                 ) and isinstance(edited_final, int | float):
                     ratio_ci = (float(edited_final), float(edited_final))
-        except Exception:  # pragma: no cover
+        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
             pass
 
     _enforce_ratio_ci_alignment(ratio_ci_source, ratio_ci, logloss_delta_ci)
@@ -496,7 +508,7 @@ def make_report_impl(
             if isinstance(report.get("metrics"), dict)
             else None
         )
-    except Exception:  # pragma: no cover
+    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         paired_windows_signal = None
     paired_windows_signal_int = _coerce_int(paired_windows_signal)
     if paired_windows_signal_int is not None and paired_windows_signal_int >= 0:
@@ -509,12 +521,12 @@ def make_report_impl(
             if isinstance(report.get("metrics"), dict)
             else None
         )
-    except Exception:  # pragma: no cover
+    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         pm_blk = None
     if not isinstance(pm_blk, dict) or not pm_blk:
         try:
             pm_blk = compute_primary_metric_from_report(report)
-        except Exception:  # pragma: no cover
+        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
             pm_blk = {}
     pm_prev = pm_blk.get("preview") if isinstance(pm_blk, dict) else float("nan")
     pm_fin = pm_blk.get("final") if isinstance(pm_blk, dict) else float("nan")
@@ -528,7 +540,7 @@ def make_report_impl(
                 and base_final > 0
             ):
                 pm_ratio = float(pm_fin) / float(base_final)
-        except Exception:  # pragma: no cover
+        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
             pm_ratio = float("nan")
     pm_preview_final_ratio = (
         float(pm_fin) / float(pm_prev)
@@ -698,7 +710,7 @@ def make_report_impl(
                     stats_obj["coverage_ok"] = (act_prev >= req_prev) and (
                         act_fin >= req_fin
                     )
-    except Exception:  # pragma: no cover
+    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         pass
 
     _enforce_pairing_and_coverage(
@@ -763,7 +775,7 @@ def make_report_impl(
         ctx = report.get("context") if isinstance(report, dict) else None
         if isinstance(ctx, dict) and ctx.get("profile"):
             profile = str(ctx.get("profile"))
-    except Exception:
+    except NON_FATAL_EXCEPTIONS:
         profile = None
     try:
         window_plan = (
@@ -777,7 +789,7 @@ def make_report_impl(
             and window_plan.get("profile")
         ):
             profile = str(window_plan.get("profile"))
-    except Exception:
+    except NON_FATAL_EXCEPTIONS:
         profile = None
     try:
         meta_cfg = (
@@ -791,7 +803,7 @@ def make_report_impl(
             cfg2 = report.get("config")
             if isinstance(cfg2.get("guards"), dict):
                 explicit_overrides = cfg2.get("guards")
-    except Exception:
+    except NON_FATAL_EXCEPTIONS:
         explicit_overrides = None
 
     resolved_policy = _build_resolved_policies(
@@ -905,13 +917,13 @@ def make_report_impl(
             for wid in window_ids:
                 try:
                     h.update(int(wid).to_bytes(8, "little", signed=True))
-                except Exception:  # pragma: no cover
+                except NON_FATAL_EXCEPTIONS:  # pragma: no cover
                     h.update(str(wid).encode("utf-8", "ignore"))
             schedule_digest = h.hexdigest()
             guard_overhead_section["schedule_digest"] = schedule_digest
         else:
             schedule_digest = None
-    except Exception:  # pragma: no cover
+    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         schedule_digest = None
 
     policy_provenance["resolved_at"] = artifacts_payload["generated_at"]
@@ -941,7 +953,7 @@ def make_report_impl(
         if isinstance(baseline_raw, dict):
             try:
                 base_moe = baseline_raw.get("moe")
-            except Exception:  # pragma: no cover
+            except NON_FATAL_EXCEPTIONS:  # pragma: no cover
                 base_moe = None
         # Then normalized baseline variants
         if (not isinstance(base_moe, dict) or not base_moe) and isinstance(
@@ -959,7 +971,7 @@ def make_report_impl(
                     )
                     if isinstance(mx, dict):
                         base_moe = mx.get("moe")
-            except Exception:  # pragma: no cover
+            except NON_FATAL_EXCEPTIONS:  # pragma: no cover
                 pass
         if isinstance(run_moe, dict) and run_moe:
             # Copy selected fields
@@ -982,7 +994,7 @@ def make_report_impl(
                         sum(util_vals) / max(1, len(util_vals))
                     )
                     moe_section["utilization_count"] = int(len(util_vals))
-                except Exception:  # pragma: no cover
+                except NON_FATAL_EXCEPTIONS:  # pragma: no cover
                     pass
             # Deltas vs baseline (if available)
             if isinstance(base_moe, dict) and base_moe:
@@ -999,9 +1011,9 @@ def make_report_impl(
                         mu = float(sum(util_vals) / len(util_vals))
                         mb = float(sum(bu_vals) / len(bu_vals))
                         moe_section["delta_utilization_mean"] = mu - mb
-                    except Exception:  # pragma: no cover
+                    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
                         pass
-    except Exception:  # pragma: no cover
+    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         moe_section = {}
 
     # Build dataset capacity context for gating floors
@@ -1025,9 +1037,9 @@ def make_report_impl(
                 capacity_examples = int(
                     dataset_info.get("windows", {}).get("preview", 0)
                 ) + int(dataset_info.get("windows", {}).get("final", 0))
-            except Exception:  # pragma: no cover
+            except NON_FATAL_EXCEPTIONS:  # pragma: no cover
                 capacity_examples = None
-    except Exception:  # pragma: no cover
+    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         capacity_tokens = None
         capacity_examples = None
 
@@ -1047,7 +1059,7 @@ def make_report_impl(
             )
             if isinstance(pm_block, dict):
                 pm_kind = pm_block.get("kind")
-        except Exception:  # pragma: no cover
+        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
             pm_kind = None
 
         pm_tail_policy: dict[str, Any] = {}
@@ -1061,7 +1073,7 @@ def make_report_impl(
                 metrics_pol.get("pm_tail"), dict
             ):
                 pm_tail_policy = dict(metrics_pol.get("pm_tail") or {})
-        except Exception:  # pragma: no cover
+        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
             pm_tail_policy = {}
 
         deltas: list[float] = []
@@ -1120,7 +1132,7 @@ def make_report_impl(
                         if isinstance(run_tc, list) and idx < len(run_tc):
                             try:
                                 wv = float(run_tc[idx])
-                            except Exception:
+                            except NUMERIC_EXCEPTIONS:
                                 wv = 0.0
                             weights.append(float(max(wv, 0.0)))
 
@@ -1130,7 +1142,7 @@ def make_report_impl(
             policy=pm_tail_policy,
         )
         pm_tail_result["source"] = "paired_baseline.final"
-    except Exception:  # pragma: no cover
+    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         pm_tail_result = {"mode": "warn", "evaluated": False, "passed": True}
 
     validation_kwargs = {
@@ -1157,25 +1169,33 @@ def make_report_impl(
             in inspect.signature(_compute_validation_flags).parameters
         ):
             validation_kwargs["pm_acceptance_range"] = pm_acceptance_range
-    except Exception:  # pragma: no cover - defensive against patched functions
+    except (
+        NON_FATAL_EXCEPTIONS
+    ):  # pragma: no cover - defensive against patched functions
         validation_kwargs["pm_acceptance_range"] = pm_acceptance_range
 
     try:
         if "pm_drift_band" in inspect.signature(_compute_validation_flags).parameters:
             validation_kwargs["pm_drift_band"] = pm_drift_band
-    except Exception:  # pragma: no cover - defensive against patched functions
+    except (
+        NON_FATAL_EXCEPTIONS
+    ):  # pragma: no cover - defensive against patched functions
         validation_kwargs["pm_drift_band"] = pm_drift_band
 
     try:
         if "pm_tail" in inspect.signature(_compute_validation_flags).parameters:
             validation_kwargs["pm_tail"] = pm_tail_result
-    except Exception:  # pragma: no cover - defensive against patched functions
+    except (
+        NON_FATAL_EXCEPTIONS
+    ):  # pragma: no cover - defensive against patched functions
         validation_kwargs["pm_tail"] = pm_tail_result
 
     try:
         if "tiny_relax" in inspect.signature(_compute_validation_flags).parameters:
             validation_kwargs["tiny_relax"] = tiny_relax
-    except Exception:  # pragma: no cover - defensive against patched functions
+    except (
+        NON_FATAL_EXCEPTIONS
+    ):  # pragma: no cover - defensive against patched functions
         validation_kwargs["tiny_relax"] = tiny_relax
 
     validation_flags = _compute_validation_flags(**validation_kwargs)
@@ -1222,7 +1242,7 @@ def make_report_impl(
             flags = prov.setdefault("flags", [])
             if "tiny_relax" not in flags:
                 flags.append("tiny_relax")
-        except Exception:  # pragma: no cover
+        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
             pass
 
     # Compute PM-aware quality overhead when both snapshots are present
@@ -1236,7 +1256,7 @@ def make_report_impl(
             )
             if isinstance(pm_try, dict):
                 pm_kind_hint = pm_try.get("kind")
-        except Exception:  # pragma: no cover
+        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
             pm_kind_hint = None
         qo = _compute_quality_overhead_from_guard(raw_guard_ctx, pm_kind_hint)
         if (
@@ -1245,18 +1265,18 @@ def make_report_impl(
             and math.isfinite(float(qo.get("value", float("nan"))))
         ):
             evaluation_report["quality_overhead"] = qo
-    except Exception:  # pragma: no cover
+    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         pass
 
     try:
         _propagate_pairing_stats(evaluation_report, ppl_analysis)
-    except Exception:  # pragma: no cover
+    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         pass
 
     # Attach policy/version digest object (thresholds/floors + key knobs)
     try:
         cur_tier = str(auto.get("tier", "balanced")).lower()
-    except Exception:  # pragma: no cover
+    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         cur_tier = "balanced"
     thresholds_payload = _compute_thresholds_payload(cur_tier, resolved_policy)
     thresholds_hash = _compute_thresholds_hash(thresholds_payload)
@@ -1277,7 +1297,7 @@ def make_report_impl(
                 base_auto = base_meta.get("auto")
                 if isinstance(base_auto, dict) and base_auto.get("tier"):
                     base_tier = str(base_auto.get("tier")).lower()
-    except Exception:  # pragma: no cover
+    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         base_tier = None
     baseline_payload = _compute_thresholds_payload(
         base_tier or cur_tier, resolved_policy
@@ -1304,7 +1324,7 @@ def make_report_impl(
             (metrics_policy.get("accuracy") or {}).get("hysteresis_delta_pp", 0.0)
             or 0.0
         )
-    except Exception:  # pragma: no cover
+    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         pass
     min_effective = float(
         (resolved_policy.get("variance") or {}).get("min_effect_lognll", 0.0) or 0.0
@@ -1342,7 +1362,7 @@ def make_report_impl(
                         sanitized.append(payload)
                 if sanitized:
                     evaluation_report["secondary_metrics"] = sanitized
-    except Exception:  # pragma: no cover
+    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         pass
 
     # Optional: classification subgroup analysis (informational)
@@ -1386,11 +1406,11 @@ def make_report_impl(
                             "n_preview": nprev,
                             "n_final": nfin,
                         }
-                    except Exception:  # pragma: no cover
+                    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
                         continue
                 if out:
                     evaluation_report["classification"] = {"subgroups": out}
-    except Exception:  # pragma: no cover
+    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         pass
 
     # Compute System Overhead (latency/throughput) vs baseline when available
@@ -1442,12 +1462,12 @@ def make_report_impl(
                     entry["ratio"] = (
                         float(edited_val / base_val) if base_val != 0 else float("nan")
                     )
-                except Exception:  # pragma: no cover
+                except NON_FATAL_EXCEPTIONS:  # pragma: no cover
                     entry["ratio"] = float("nan")
             system_overhead[metric_key] = entry
         if system_overhead:
             evaluation_report["system_overhead"] = system_overhead
-    except Exception:  # pragma: no cover
+    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         pass
 
     # Attach/normalize primary metric block (moved to helper)
@@ -1459,7 +1479,7 @@ def make_report_impl(
             pm_block = evaluation_report.get("primary_metric")
             if isinstance(pm_block, dict):
                 pm_block.setdefault("drift_band", dict(pm_drift_band))
-    except Exception:  # pragma: no cover
+    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         pass
     _enforce_display_ci_alignment(
         ratio_ci_source,
@@ -1495,7 +1515,7 @@ def make_report_impl(
                     # As last resort, emit a degenerate [1.0, 1.0] to satisfy schema invariants
                     pm["display_ci"] = [1.0, 1.0]
                     pm.setdefault("estimated", True)
-    except Exception:  # pragma: no cover
+    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         pass
 
     # Emit optional one-line telemetry summary (opt-in via INVARLOCK_TELEMETRY=1).
@@ -1523,7 +1543,7 @@ def make_report_impl(
             tokens_total = (
                 evaluation_report.get("dataset", {}).get("hash", {}).get("total_tokens")
             )
-        except Exception:  # pragma: no cover
+        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
             tokens_total = None
         # CI interval
         ci_lo = None
@@ -1538,14 +1558,14 @@ def make_report_impl(
         try:
             if isinstance(ci_lo, int | float) and isinstance(ci_hi, int | float):
                 ci_w = float(ci_hi) - float(ci_lo)
-        except Exception:  # pragma: no cover
+        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
             ci_w = None
         # Gate outcome
         val = evaluation_report.get("validation", {})
         gate_ok = None
         try:
             gate_ok = bool(val.get("primary_metric_acceptable"))
-        except Exception:  # pragma: no cover
+        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
             gate_ok = None
         # Build line
         parts = [
@@ -1564,7 +1584,7 @@ def make_report_impl(
                 sf = (report.get("provenance", {}) or {}).get("split_fallback")
             if split:
                 parts.append(f"split={split}{'*' if sf else ''}")
-        except Exception:  # pragma: no cover
+        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
             pass
         if isinstance(ci_lo, int | float) and isinstance(ci_hi, int | float):
             parts.append(f"ci={ci_lo:.3f}-{ci_hi:.3f}")
@@ -1583,13 +1603,13 @@ def make_report_impl(
             "on",
         }:
             print(summary_line)
-    except Exception:  # pragma: no cover
+    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         pass
 
     # Attach confidence label (non-gating)
     try:
         evaluation_report["confidence"] = _compute_confidence_label(evaluation_report)
-    except Exception:  # pragma: no cover
+    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         pass
 
     return evaluation_report
