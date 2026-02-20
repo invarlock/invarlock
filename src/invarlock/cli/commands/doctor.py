@@ -6,12 +6,15 @@ Handles the 'invarlock doctor' command for health checks.
 """
 
 import importlib.util
+import json
+import logging
 import os as _os
 import platform as _platform
 import shutil as _shutil
 import sys
 import warnings
 from collections.abc import Callable
+from pathlib import Path
 
 import typer
 from rich.console import Console
@@ -23,6 +26,7 @@ from ..constants import DOCTOR_FORMAT_VERSION
 DETERMINISM_SHARDS_WARNING = "Provider workers > 0 without deterministic_shards=True; enable deterministic_shards or set workers=0 for determinism."
 
 console = Console()
+LOGGER = logging.getLogger(__name__)
 
 
 def _cross_check_reports(
@@ -37,146 +41,139 @@ def _cross_check_reports(
     add_fn: Callable[..., None],
 ) -> bool:
     """Perform baseline vs subject cross-checks and report findings."""
-    had_error = False
-    try:
-        import json as _json_cc
-        from pathlib import Path as _Path_cc
 
-        if baseline_report and subject_report:
-            bpath = _Path_cc(baseline_report)
-            spath = _Path_cc(subject_report)
-            if bpath.exists() and spath.exists():
-                bdata = _json_cc.loads(bpath.read_text())
-                sdata = _json_cc.loads(spath.read_text())
-                bprov = bdata.get("provenance", {}) if isinstance(bdata, dict) else {}
-                sprov = sdata.get("provenance", {}) if isinstance(sdata, dict) else {}
-                # D009: tokenizer digest mismatch
-                try:
-                    bdig = bprov.get("provider_digest", {}) or {}
-                    sdig = sprov.get("provider_digest", {}) or {}
-                    btok = bdig.get("tokenizer_sha256")
-                    stok = sdig.get("tokenizer_sha256")
-                    if (
-                        isinstance(btok, str)
-                        and isinstance(stok, str)
-                        and btok
-                        and stok
-                        and btok != stok
-                    ):
-                        add_fn(
-                            "D009",
-                            "warning",
-                            "tokenizer digests differ between baseline and subject; run will abort in ci/release (E002).",
-                            field="provenance.provider_digest.tokenizer_sha256",
-                        )
-                except Exception:
-                    pass
-                # D010: MLM mask digest missing (only for ppl_mlm)
-                try:
-                    bdig = bprov.get("provider_digest", {}) or {}
-                    sdig = sprov.get("provider_digest", {}) or {}
-                    btok = bdig.get("tokenizer_sha256")
-                    stok = sdig.get("tokenizer_sha256")
-                    bmask = bdig.get("masking_sha256")
-                    smask = sdig.get("masking_sha256")
-                    # Determine if PM is MLM from either report or config context
-                    try:
-                        pm_b = (
-                            (bdata.get("metrics", {}) or {}).get("primary_metric", {})
-                            or {}
-                        ).get("kind")
-                        pm_s = (
-                            (sdata.get("metrics", {}) or {}).get("primary_metric", {})
-                            or {}
-                        ).get("kind")
-                    except Exception:
-                        pm_b = pm_s = None
-                    is_mlm = False
-                    for _k in (pm_b, pm_s, cfg_metric_kind):
-                        try:
-                            if isinstance(_k, str) and _k.lower() == "ppl_mlm":
-                                is_mlm = True
-                                break
-                        except Exception:
-                            pass
-                    if (
-                        is_mlm
-                        and isinstance(btok, str)
-                        and isinstance(stok, str)
-                        and btok
-                        and stok
-                        and btok == stok
-                        and (not bmask or not smask)
-                    ):
-                        add_fn(
-                            "D010",
-                            "warning",
-                            "ppl_mlm with matching tokenizer but missing masking digests; ci/release may abort on mask parity.",
-                            baseline_has_mask=bool(bmask),
-                            subject_has_mask=bool(smask),
-                        )
-                except Exception:
-                    pass
-                # D011: split mismatch
-                try:
-                    bsplit = bprov.get("dataset_split")
-                    ssplit = sprov.get("dataset_split")
-                    if (
-                        isinstance(bsplit, str)
-                        and isinstance(ssplit, str)
-                        and bsplit
-                        and ssplit
-                        and bsplit != ssplit
-                    ):
-                        sev = "error" if bool(strict) else "warning"
-                        add_fn(
-                            "D011",
-                            sev,
-                            f"dataset split mismatch (baseline={bsplit}, subject={ssplit})",
-                            field="provenance.dataset_split",
-                            baseline=bsplit,
-                            subject=ssplit,
-                        )
-                        if sev == "error":
-                            had_error = True
-                except Exception:
-                    pass
-                # D012: Accuracy PM flagged as estimated/pseudo (warn in dev; error in ci/release)
-                try:
-                    spm = (sdata.get("metrics", {}) or {}).get(
-                        "primary_metric", {}
-                    ) or {}
-                    kind = str(spm.get("kind", "")).lower()
-                    if kind in {"accuracy", "vqa_accuracy"}:
-                        estimated = bool(spm.get("estimated"))
-                        counts_source = str(spm.get("counts_source", "")).lower()
-                        if estimated or counts_source == "pseudo_config":
-                            prof = None
-                            try:
-                                prof = str(
-                                    (sdata.get("meta", {}) or {}).get("profile", "")
-                                ).lower()
-                            except Exception:
-                                prof = None
-                            prof_flag = None
-                            try:
-                                prof_flag = str(profile).lower() if profile else None
-                            except Exception:
-                                prof_flag = None
-                            eff_prof = prof_flag or prof or "dev"
-                            sev = "warning" if eff_prof == "dev" else "error"
-                            add_fn(
-                                "D012",
-                                sev,
-                                "accuracy primary metric uses pseudo/estimated counts; use labeled preset for measured accuracy.",
-                                field="metrics.primary_metric",
-                            )
-                            if sev == "error":
-                                had_error = True
-                except Exception:
-                    pass
-    except Exception:
-        pass
+    def _as_dict(value: object) -> dict:
+        return value if isinstance(value, dict) else {}
+
+    def _as_lower(value: object) -> str:
+        return value.strip().lower() if isinstance(value, str) else ""
+
+    def _load_report(path: Path) -> dict | None:
+        try:
+            raw = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            LOGGER.debug(
+                "doctor cross-check failed to read report %s", path, exc_info=exc
+            )
+            return None
+        try:
+            payload = json.loads(raw)
+        except (json.JSONDecodeError, TypeError, ValueError) as exc:
+            LOGGER.debug(
+                "doctor cross-check failed to parse report %s", path, exc_info=exc
+            )
+            return None
+        return _as_dict(payload)
+
+    def _primary_metric_kind(report_data: dict) -> str:
+        metrics = _as_dict(report_data.get("metrics"))
+        primary_metric = _as_dict(metrics.get("primary_metric"))
+        return _as_lower(primary_metric.get("kind"))
+
+    had_error = False
+    if not (baseline_report and subject_report):
+        return had_error
+
+    bpath = Path(baseline_report)
+    spath = Path(subject_report)
+    if not (bpath.exists() and spath.exists()):
+        return had_error
+
+    bdata = _load_report(bpath)
+    sdata = _load_report(spath)
+    if bdata is None or sdata is None:
+        return had_error
+
+    bprov = _as_dict(bdata.get("provenance"))
+    sprov = _as_dict(sdata.get("provenance"))
+    bdig = _as_dict(bprov.get("provider_digest"))
+    sdig = _as_dict(sprov.get("provider_digest"))
+
+    # D009: tokenizer digest mismatch
+    btok = bdig.get("tokenizer_sha256")
+    stok = sdig.get("tokenizer_sha256")
+    if (
+        isinstance(btok, str)
+        and isinstance(stok, str)
+        and btok
+        and stok
+        and btok != stok
+    ):
+        add_fn(
+            "D009",
+            "warning",
+            "tokenizer digests differ between baseline and subject; run will abort in ci/release (E002).",
+            field="provenance.provider_digest.tokenizer_sha256",
+        )
+
+    # D010: MLM mask digest missing (only for ppl_mlm)
+    bmask = bdig.get("masking_sha256")
+    smask = sdig.get("masking_sha256")
+    is_mlm = "ppl_mlm" in {
+        _primary_metric_kind(bdata),
+        _primary_metric_kind(sdata),
+        _as_lower(cfg_metric_kind),
+    }
+    if (
+        is_mlm
+        and isinstance(btok, str)
+        and isinstance(stok, str)
+        and btok
+        and stok
+        and btok == stok
+        and (not bmask or not smask)
+    ):
+        add_fn(
+            "D010",
+            "warning",
+            "ppl_mlm with matching tokenizer but missing masking digests; ci/release may abort on mask parity.",
+            baseline_has_mask=bool(bmask),
+            subject_has_mask=bool(smask),
+        )
+
+    # D011: split mismatch
+    bsplit = bprov.get("dataset_split")
+    ssplit = sprov.get("dataset_split")
+    if (
+        isinstance(bsplit, str)
+        and isinstance(ssplit, str)
+        and bsplit
+        and ssplit
+        and bsplit != ssplit
+    ):
+        sev = "error" if bool(strict) else "warning"
+        add_fn(
+            "D011",
+            sev,
+            f"dataset split mismatch (baseline={bsplit}, subject={ssplit})",
+            field="provenance.dataset_split",
+            baseline=bsplit,
+            subject=ssplit,
+        )
+        if sev == "error":
+            had_error = True
+
+    # D012: Accuracy PM flagged as estimated/pseudo (warn in dev; error in ci/release)
+    s_metrics = _as_dict(sdata.get("metrics"))
+    spm = _as_dict(s_metrics.get("primary_metric"))
+    pm_kind = _as_lower(spm.get("kind"))
+    if pm_kind in {"accuracy", "vqa_accuracy"}:
+        estimated = bool(spm.get("estimated"))
+        counts_source = _as_lower(spm.get("counts_source"))
+        if estimated or counts_source == "pseudo_config":
+            report_profile = _as_lower(_as_dict(sdata.get("meta")).get("profile"))
+            profile_flag = _as_lower(profile)
+            effective_profile = profile_flag or report_profile or "dev"
+            sev = "warning" if effective_profile == "dev" else "error"
+            add_fn(
+                "D012",
+                sev,
+                "accuracy primary metric uses pseudo/estimated counts; use labeled preset for measured accuracy.",
+                field="metrics.primary_metric",
+            )
+            if sev == "error":
+                had_error = True
+
     return had_error
 
 
@@ -268,23 +265,18 @@ def doctor_command(
             typer.echo(f"{prefix} {message} [INVARLOCK:{code}]")
 
     # Early: surface tiny relax as a note when active (env-based)
-    try:
-        import os as __os
-
-        if str(__os.environ.get("INVARLOCK_TINY_RELAX", "")).strip().lower() in {
-            "1",
-            "true",
-            "yes",
-            "on",
-        }:
-            _add(
-                "D013",
-                "note",
-                "tiny relax (dev) active; gates widened and drift/overhead may be informational.",
-                field="auto.tiny_relax",
-            )
-    except Exception:
-        pass
+    if str(_os.environ.get("INVARLOCK_TINY_RELAX", "")).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
+        _add(
+            "D013",
+            "note",
+            "tiny relax (dev) active; gates widened and drift/overhead may be informational.",
+            field="auto.tiny_relax",
+        )
 
     # Redirect rich Console output in JSON mode so no extra text is emitted
     if json_out:
@@ -300,7 +292,7 @@ def doctor_command(
     # Environment facts (OS · Python · invarlock)
     try:
         from invarlock import __version__ as _invarlock_version  # type: ignore
-    except Exception:
+    except ImportError:
         _invarlock_version = "unknown"
     if not json_out:
         os_line = (

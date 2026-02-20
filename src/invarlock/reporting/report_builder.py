@@ -27,7 +27,7 @@ from typing import Any
 # Optional JSON Schema validation support
 try:  # pragma: no cover - exercised in integration
     import jsonschema
-except Exception:  # pragma: no cover
+except ImportError:  # pragma: no cover
     jsonschema = None  # type: ignore
 
 from invarlock.core.auto_tuning import get_tier_policies
@@ -159,7 +159,10 @@ def _compute_edit_digest(report: dict) -> dict:
     hash the name+config. Otherwise, treat as cert_only with a stable hash.
     """
     try:
-        edits = report.get("edit") or report.get("provenance", {}).get("edits") or {}
+        edits = report.get("edit")
+        if not isinstance(edits, dict):
+            provenance = report.get("provenance")
+            edits = provenance.get("edits") if isinstance(provenance, dict) else {}
     except Exception:  # pragma: no cover
         edits = {}
     family = "cert_only"
@@ -207,7 +210,7 @@ def _compute_confidence_label(evaluation_report: dict[str, Any]) -> dict[str, An
                     basis = kind
                 else:
                     basis = basis if basis else (kind or "primary_metric")
-    except Exception:  # pragma: no cover
+    except (TypeError, ValueError):  # pragma: no cover
         pass
 
     width = hi - lo if (math.isfinite(lo) and math.isfinite(hi)) else float("nan")
@@ -225,7 +228,7 @@ def _compute_confidence_label(evaluation_report: dict[str, Any]) -> dict[str, An
                 ap = conf_pol.get("accuracy_delta_pp_width_max")
                 if isinstance(ap, int | float):
                     thr_pp = float(ap)
-    except Exception:  # pragma: no cover
+    except (TypeError, ValueError):  # pragma: no cover
         pass
     is_acc = basis in {"accuracy", "vqa_accuracy"}
     thr = thr_pp if is_acc else thr_ratio
@@ -233,7 +236,7 @@ def _compute_confidence_label(evaluation_report: dict[str, Any]) -> dict[str, An
     # Unstable hint from primary metric (if provided)
     try:
         unstable = bool((evaluation_report.get("primary_metric") or {}).get("unstable"))
-    except Exception:  # pragma: no cover
+    except (AttributeError, TypeError, ValueError):  # pragma: no cover
         unstable = False
 
     label = "Low"
@@ -464,7 +467,7 @@ def _load_validation_allowlist() -> set[str]:
             data = json.loads(path.read_text(encoding="utf-8"))
             if isinstance(data, list):
                 return {str(k) for k in data}
-    except Exception:  # pragma: no cover
+    except (OSError, TypeError, ValueError, json.JSONDecodeError):  # pragma: no cover
         pass
     return set(_VALIDATION_ALLOWLIST_DEFAULT)
 
@@ -478,7 +481,7 @@ try:
         if isinstance(vspec, dict):
             vspec["properties"] = {k: {"type": "boolean"} for k in _vkeys}
             vspec["additionalProperties"] = False
-except Exception:  # pragma: no cover
+except (TypeError, ValueError, KeyError, AttributeError):  # pragma: no cover
     # Keep permissive defaults if something goes wrong during import
     pass
 
@@ -499,7 +502,9 @@ def _normalize_and_validate_report(report: RunReport | dict[str, Any]) -> RunRep
 
         if isinstance(report, dict):
             report = _norm(report)
-    except Exception:  # pragma: no cover
+    except ImportError:  # pragma: no cover
+        pass
+    except (TypeError, ValueError, AttributeError):  # pragma: no cover
         pass
     if not validate_run_report(report):
         raise ValueError("Invalid RunReport structure")
