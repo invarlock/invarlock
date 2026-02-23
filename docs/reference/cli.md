@@ -480,18 +480,16 @@ $ invarlock plugins list
 │ noop      │ Core   │ Edit │ —       │ —       │ ✅ Ready        │
 │ quant_rtn │ Core   │ Edit │ —       │ —       │ ✅ Ready        │
 └───────────┴────────┴──────┴─────────┴─────────┴─────────────────┘
-       Adapters — ready: 7 · auto: 2 · missing-extras: 0 · unsupported: 0
+       Adapters — ready: 4 · auto: 1 · missing-extras: 0 · unsupported: 0
 ┏━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃ Adapter        ┃ Origin ┃ Mode         ┃ Backend      ┃ Version  ┃ Status / Action                     ┃
 ┡━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ hf_mlm        │ Core   │ Adapter      │ transformers │ ==<ver>  │ ✅ Ready                            │
-│ hf_causal        │ Core   │ Adapter      │ transformers │ ==<ver>  │ ✅ Ready                            │
-│ hf_causal       │ Core   │ Adapter      │ transformers │ ==<ver>  │ ✅ Ready                            │
-│ hf_causal_onnx        │ Core   │ Adapter      │ transformers │ ==<ver>  │ ✅ Ready                            │
-│ hf_seq2seq          │ Core   │ Adapter      │ transformers │ ==<ver>  │ ✅ Ready                            │
+│ hf_mlm         │ Core   │ Adapter      │ transformers │ ==<ver>  │ ✅ Ready                            │
+│ hf_causal      │ Core   │ Adapter      │ transformers │ ==<ver>  │ ✅ Ready                            │
+│ hf_causal_onnx │ Core   │ Adapter      │ transformers │ ==<ver>  │ ✅ Ready                            │
+│ hf_seq2seq     │ Core   │ Adapter      │ transformers │ ==<ver>  │ ✅ Ready                            │
 ├────────────────┼────────┼──────────────┼──────────────┼──────────┼─────────────────────────────────────┤
-│ hf_auto │ Core   │ Auto‑matcher │ transformers │ ==<ver>  │ 🧩 Auto (selects best hf_* adapter) │
-│ hf_auto    │ Core   │ Auto‑matcher │ transformers │ ==<ver>  │ 🧩 Auto (selects best hf_* adapter) │
+│ hf_auto        │ Core   │ Auto-matcher │ transformers │ ==<ver>  │ 🧩 Auto (selects best hf_* adapter) │
 └────────────────┴────────┴──────────────┴──────────────┴──────────┴─────────────────────────────────────┘
 Hints: add --only ready|core|optional|auto|unsupported · use --json for scripting · use adapters (plural)
                           Dataset Providers

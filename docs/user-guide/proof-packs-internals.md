@@ -77,47 +77,32 @@ task graph, scheduling, and artifact generation. It complements
 ### Module dependency graph
 
 ```text
-┌──────────────────────────────────────────────────────────┐
-│                       ENTRYPOINTS                        │
-├──────────────┬──────────────┬────────────────────────────┤
-│ run_pack.sh  │ run_suite.sh │ verify_pack.sh             │
-│ (pack+run)   │ (run only)   │ (checksums+certs verify)   │
-└──────┬───────┴───────┬──────┴────────────────────────────┘
-       │               │
-       ▼               ▼
-┌───────────────────────────────────────────────────────────┐
-│                    ORCHESTRATION LAYER                    │
-├───────────────────────────────────────────────────────────┤
-│  lib/validation_suite.sh (main_dynamic)                   │
-│  ├─ Phase 0: setup + preflight                            │
-│  ├─ Phase 1: queue init      ───────────┐                 │
-│  ├─ Phase 2: worker launch   │          │                 │
-│  └─ Phase 3: monitor + retry │          │                 │
-└──────────────────────────────┼──────────┼─────────────────┘
-                               │          │
-       ┌───────────────────────┘          └─────────────┐
-       ▼                                                 ▼
-┌───────────────────────────┐                   ┌──────────────────┐
-│       TASK EXECUTION      │                   │  CORE SERVICES   │
-├───────────────────────────┤                   ├──────────────────┤
-│  lib/gpu_worker.sh        │◄──────────────────┤  queue_manager   │
-│  ├─ Task claim            │                   │  scheduler       │
-│  ├─ OOM pre-check         │                   │  task_serial.    │
-│  ├─ execute_task()        │                   │  fault_tol.      │
-│  └─ GPU cleanup           │                   └──────────────────┘
-└──────┬────────────────────┘
-       │
-       ▼
-┌───────────────────────────┐
-│       TASK FUNCTIONS      │
-├───────────────────────────┤
-│  ├─ SETUP_BASELINE        │
-│  ├─ CALIBRATION_RUN       │
-│  ├─ GENERATE_PRESET       │
-│  ├─ CREATE_EDITS(_BATCH)  │
-│  ├─ CREATE_ERROR          │
-│  └─ evaluate_*            │
-└───────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────┐
+│                        MODULE DEPENDENCY GRAPH                        │
+├───────────────────────────────────────────────────────────────────────┤
+│ ENTRYPOINTS                                                           │
+│   run_pack.sh | run_suite.sh | verify_pack.sh                         │
+│   (pack+run) | (run only)  | (checksums+certs verify)                 │
+│                                   │                                   │
+│                                   ▼                                   │
+│ ORCHESTRATION LAYER                                                   │
+│   lib/validation_suite.sh (main_dynamic)                              │
+│   Phase 0: setup + preflight                                          │
+│   Phase 1: queue init -> Phase 2: worker launch -> Phase 3: monitor   │
+│                                   │                                   │
+│                   ┌───────────────┴───────────────┐                   │
+│                   ▼                               ▼                   │
+│ TASK EXECUTION                                  CORE SERVICES         │
+│   lib/gpu_worker.sh                               queue_manager       │
+│   task claim -> precheck -> execute -> cleanup    scheduler           │
+│                                                  task_serialization   │
+│                                                  fault_tolerance      │
+│                   │                                                   │
+│                   ▼                                                   │
+│ TASK FUNCTIONS                                                        │
+│   SETUP_BASELINE, CALIBRATION_RUN, GENERATE_PRESET                    │
+│   CREATE_EDITS(_BATCH), CREATE_ERROR, evaluate_*                      │
+└───────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Troubleshooting decision tree

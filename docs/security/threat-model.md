@@ -21,59 +21,35 @@ security or alignment.
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                      SECURITY BOUNDARY LAYERS                           │
+│                     SECURITY BOUNDARY LAYERS                            │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                    NETWORK LAYER                                │   │
-│  │  ┌───────────────────────────────────────────────────────────┐ │   │
-│  │  │ INVARLOCK_ALLOW_NETWORK=0 (default)                       │ │   │
-│  │  │ ─────────────────────────────────────                     │ │   │
-│  │  │ • Socket blocking via invarlock.security                  │ │   │
-│  │  │ • Outbound connections denied by default                  │ │   │
-│  │  │ • Downloads require explicit opt-in                       │ │   │
-│  │  └───────────────────────────────────────────────────────────┘ │   │
-│  └─────────────────────────────────────────────────────────────────┘   │
-│                              │                                          │
-│                              ▼                                          │
-│  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                    ARTIFACT LAYER                               │   │
-│  │  ┌─────────────────┐  ┌──────────────────┐  ┌────────────────┐ │   │
-│  │  │ MODEL LOADING   │  │ DATASET LOADING  │  │ CONFIG LOADING │ │   │
-│  │  │ ─────────────── │  │ ────────────────  │  │ ──────────────  │ │   │
-│  │  │ • Adapter       │  │ • Provider       │  │ • YAML parsing │ │   │
-│  │  │   validation    │  │   validation     │  │ • Schema       │ │   │
-│  │  │ • Torch device  │  │ • Tokenizer hash │  │   validation   │ │   │
-│  │  │   placement     │  │ • Window pairing │  │ • include      │ │   │
-│  │  │ • No pickle     │  │   verification   │  │   restriction  │ │   │
-│  │  │   execution     │  │                  │  │   to config dir│ │   │
-│  │  └─────────────────┘  └──────────────────┘  └────────────────┘ │   │
-│  └─────────────────────────────────────────────────────────────────┘   │
-│                              │                                          │
-│                              ▼                                          │
-│  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                    VALIDATION LAYER                             │   │
-│  │  ┌─────────────────────────────────────────────────────────────┐│   │
-│  │  │ invarlock doctor → invarlock evaluate → invarlock verify    ││   │
-│  │  │ ────────────────────────────────────────────────────────── ││   │
-│  │  │ • Environment    • Guard checks      • Schema validation   ││   │
-│  │  │   diagnostics    • Pairing math      • Ratio math check    ││   │
-│  │  │ • Config check   • CI/Release gates  • Contract match      ││   │
-│  │  └─────────────────────────────────────────────────────────────┘│   │
-│  └─────────────────────────────────────────────────────────────────┘   │
-│                              │                                          │
-│                              ▼                                          │
-│  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                    EVIDENCE LAYER                               │   │
-│  │  ┌────────────────────────────────────────────────────────────┐ │   │
-│  │  │ evaluation.report.json                                     │ │   │
-│  │  │ ────────────────────────────────                           │ │   │
-│  │  │ • seeds, device, policy_digest                             │ │   │
-│  │  │ • tokenizer_hash, provider_digest                          │ │   │
-│  │  │ • measurement_contract_hash (guards)                       │ │   │
-│  │  │ • Events log for forensic review                           │ │   │
-│  │  └────────────────────────────────────────────────────────────┘ │   │
-│  └─────────────────────────────────────────────────────────────────┘   │
+│  ┌───────────────────────────────────────────────────────────────────┐  │
+│  │ NETWORK LAYER                                                     │  │
+│  │ INVARLOCK_ALLOW_NETWORK=0 by default; outbound blocked unless     │  │
+│  │ explicitly enabled.                                               │  │
+│  └───────────────────────────────────────────────────────────────────┘  │
+│                               │                                         │
+│                               ▼                                         │
+│  ┌───────────────────────────────────────────────────────────────────┐  │
+│  │ ARTIFACT LAYER                                                    │  │
+│  │ model loading | dataset loading | config loading                  │  │
+│  │ adapter checks | pairing checks | schema checks                   │  │
+│  └───────────────────────────────────────────────────────────────────┘  │
+│                               │                                         │
+│                               ▼                                         │
+│  ┌───────────────────────────────────────────────────────────────────┐  │
+│  │ VALIDATION LAYER                                                  │  │
+│  │ invarlock doctor -> invarlock evaluate -> invarlock verify        │  │
+│  │ env/config checks | pairing math | schema + contracts             │  │
+│  └───────────────────────────────────────────────────────────────────┘  │
+│                               │                                         │
+│                               ▼                                         │
+│  ┌───────────────────────────────────────────────────────────────────┐  │
+│  │ EVIDENCE LAYER                                                    │  │
+│  │ evaluation.report.json with seeds, hashes, policy digest, and     │  │
+│  │ guard measurement contracts for audit.                            │  │
+│  └───────────────────────────────────────────────────────────────────┘  │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
