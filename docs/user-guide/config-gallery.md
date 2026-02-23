@@ -23,7 +23,7 @@ core install (`pip install invarlock`) remains torch‑free.
 
 | Preset | Use Case | Model Type | Dataset |
 | --- | --- | --- | --- |
-| `configs/presets/causal_lm/wikitext2_512.yaml` | Standard certification | Decoder-only causal | WikiText-2 |
+| `configs/presets/causal_lm/wikitext2_512.yaml` | Standard evaluation | Decoder-only causal | WikiText-2 |
 
 **When to use:** Primary preset for causal language models. 512-token sequences
 provide good coverage while keeping runtime reasonable.
@@ -37,7 +37,7 @@ invarlock evaluate --baseline gpt2 --subject /path/to/edited \
 
 | Preset | Use Case | Model Type | Dataset |
 | --- | --- | --- | --- |
-| `configs/presets/masked_lm/wikitext2_128.yaml` | Standard MLM certification | BERT/RoBERTa | WikiText-2 |
+| `configs/presets/masked_lm/wikitext2_128.yaml` | Standard MLM evaluation | BERT/RoBERTa | WikiText-2 |
 | `configs/presets/masked_lm/synthetic_128.yaml` | Offline testing | BERT/RoBERTa | Synthetic |
 
 **When to use:** MLM presets for BERT-family models. Use synthetic preset when
@@ -84,7 +84,7 @@ Profiles control window counts and bootstrap depth:
 
 | Profile | Windows | Bootstrap | Use Case |
 | --- | --- | --- | --- |
-| `ci` | 200/200 | 1200 | Standard CI certification |
+| `ci` | 200/200 | 1200 | Standard CI evaluation |
 | `release` | 400/400 | 3200 | Production releases |
 | `ci_cpu` | 120/120 | 1200 | CPU-only environments |
 

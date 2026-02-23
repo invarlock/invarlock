@@ -4,8 +4,8 @@
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Get started with InvarLock certification in minutes. |
-| **Audience** | New users running their first certification. |
+| **Purpose** | Get started with InvarLock evaluation in minutes. |
+| **Audience** | New users running their first evaluation. |
 | **Requires** | `invarlock[hf]` for HF adapter workflows. |
 | **Network** | `INVARLOCK_ALLOW_NETWORK=1` for model/dataset downloads. |
 | **Next step** | [Compare & evaluate](compare-and-evaluate.md) for production workflows. |

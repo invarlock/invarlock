@@ -22,7 +22,7 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 
 ## By Task
 
-### Running Certifications
+### Running Evaluations
 
 1. [CLI Reference](cli.md) — `evaluate`, `verify`, `run` commands
 2. [Configuration Schema](config-schema.md) — YAML presets and profiles

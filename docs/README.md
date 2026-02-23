@@ -12,7 +12,7 @@ find detailed reference, design rationales, and assurance notes.
 
 ## Start Here
 
-1. **[Getting Started](user-guide/getting-started.md)** – environment setup and the first certification loop.
+1. **[Getting Started](user-guide/getting-started.md)** – environment setup and the first evaluation loop.
 2. **[Quickstart](user-guide/quickstart.md)** – CLI highlights for common workflows.
 3. **[Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md)** – baseline ↔ subject with guardchain.
 4. **[Primary Metric Smoke](user-guide/primary-metric-smoke.md)** – tiny examples for ppl/accuracy kinds.
@@ -185,7 +185,7 @@ invarlock plugins adapters
 python scripts/verify_ci_matrix.sh
 ```
 
-### Production Certification
+### Production Evaluation
 
 ```bash
 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \

@@ -87,7 +87,7 @@ paired ΔlogNLL, then exponentiated to ratio CI.
 
 #### report
 
-Structured evidence artifact summarizing a certification run and its validation status.
+Structured evidence artifact summarizing an evaluation run and its validation status.
 
 | Aspect | Details |
 | --- | --- |
@@ -112,7 +112,7 @@ Workflow that compares a subject model to a baseline, optionally with an externa
 | **report fields** | `provenance.baseline.*`, `provenance.edited.*` |
 | **See also** | [Compare & evaluate Guide](../user-guide/compare-and-evaluate.md) |
 
-**Example:** BYOE workflow certifies an externally quantized checkpoint against its
+**Example:** BYOE workflow evaluates an externally quantized checkpoint against its
 unmodified baseline.
 
 ---
@@ -381,7 +381,7 @@ Guard threshold preset selecting the safety profile for a run.
 
 #### Timing Summary
 
-Consolidated timing breakdown for a certification run.
+Consolidated timing breakdown for an evaluation run.
 
 | Aspect | Details |
 | --- | --- |

@@ -4,7 +4,7 @@
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Edit-agnostic safety certification framework for ML model weight modifications. |
+| **Purpose** | Edit-agnostic safety evaluation framework for ML model weight modifications. |
 | **Audience** | Developers extending InvarLock, operators debugging pipelines, security reviewers. |
 | **Core components** | CLI layer, Core runtime, Guard chain, Reporting/report subsystem. |
 | **Design goals** | Torch-independent core, edit-agnostic guards, deterministic evaluation, full provenance. |
@@ -146,7 +146,7 @@ report generation, validation, and rendering.
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                        CERTIFICATION PIPELINE                               │
+│                        EVALUATION PIPELINE                                  │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │   PHASE 1: BASELINE RUN                                                     │
@@ -167,7 +167,7 @@ report generation, validation, and rendering.
 │   ───────────────────────────────                                           │
 │   ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐             │
 │   │  Pair    │───▶│ Compute  │───▶│  Apply   │───▶│  Render  │             │
-│   │  Windows │    │  Ratios  │    │  Gates   │    │  Cert    │             │
+│   │  Windows │    │  Ratios  │    │  Gates   │    │ report   │             │
 │   └──────────┘    └──────────┘    └──────────┘    └──────────┘             │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘

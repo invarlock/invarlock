@@ -27,7 +27,7 @@ calibration data that accompany the InvarLock assurance notes.
 | **Spectral** | 2‑D layer weights (FFN, attention proj, embeddings) | Compute $z = \frac{\hat{s} - \mu_f}{\sigma_f}$ where $\hat{s}$ is an **iterative estimate** of $\sigma_{\max}$ under a fixed measurement contract; require `abs(z) ≤ κ_f` calibrated for ≤5% WARN FPR. Optional degeneracy proxies (stable-rank drift, norm collapse) may add WARN/ABORT depending on policy. | WARN when cap applied; abort if cap would exceed `max_caps` (and for configured fatal degeneracy thresholds). | `invarlock.guards.spectral` |
 | **RMT** | Token‑weighted activations (sampled) | Compute a per‑module **edge risk score** $r = \hat{\sigma}_{\max}(A') / \sigma_{\mathrm{MP}}(m,n)$ on whitened activations $A'$ under a fixed measurement contract; accept when baseline‑relative growth stays within the calibrated ε-band per family. | report fails on ε‑band violations; catastrophic spikes in the primary metric are gated separately (`spike_threshold` = 2.0× for ppl‑like metrics). | `invarlock.guards.rmt` |
 | **Variance (VE)** | Paired ΔlogNLL with calibration windows | Enable VE only if the predictive CI upper bound ≤ −`min_effect_lognll` **and** mean Δ ≤ −`min_effect_lognll` (Balanced uses one‑sided CI; Conservative uses two‑sided CI). A CI entirely above +`min_effect_lognll` is treated as regression and VE stays off. | VE disabled, guard records reason; edit continues | `invarlock.guards.variance` |
-| **Bootstrap sanity** | Evaluation windows, token counts | Matching window IDs, zero overlap; BCa replicates ≥ requested | Abort certification and surface reason | `invarlock.reporting.report_builder` |
+| **Bootstrap sanity** | Evaluation windows, token counts | Matching window IDs, zero overlap; BCa replicates ≥ requested | Abort evaluation and surface reason | `invarlock.reporting.report_builder` |
 
 Each guard logs its policy digest, metrics, and **measurement contract**; reports
 mirror those fields under `resolved_policy.*` and `spectral`/`rmt`/`variance` blocks.
@@ -43,7 +43,7 @@ mirror those fields under `resolved_policy.*` and `spectral`/`rmt`/`variance` bl
 ### Catastrophic limits and aborts
 
 - Spike stop: a large primary‑metric spike (for ppl‑like metrics, ≥ 2.0× ratio) triggers a hard abort/rollback independent of guard WARNs.
-- Pairing/coverage: preview/final counts must match, pairing must be 1.0, overlap 0.0 in CI/Release; violations abort certification.
+- Pairing/coverage: preview/final counts must match, pairing must be 1.0, overlap 0.0 in CI/Release; violations abort evaluation.
 
 ### Invariants coverage checklist
 
@@ -228,7 +228,7 @@ Detailed derivations are in the calibration appendix (`09-tier-v1-calibration.md
 
 ## 7. Known Limitations
 
-- Guarantees apply to evaluation slices only; task-level accuracy is not certified.
+- Guarantees apply to evaluation slices only; task-level accuracy is not guaranteed.
 - Dataset shift or tokenizer changes invalidate pairing schedules.
 - No adversarial robustness or gradient masking guarantees.
 - CUDA kernels outside deterministic mode may exceed drift tolerances.

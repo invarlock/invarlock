@@ -35,7 +35,7 @@ Copy-paste checklist for production or CI deployments:
 - [ ] Write paths validated (no user-controlled output dirs)
 - [ ] Secrets excluded from configs and logs
 
-## Certification
+## Evaluation & Verification
 - [ ] `invarlock evaluate` completed with `--profile release`
 - [ ] `invarlock verify` passes on generated report
 - [ ] report + baseline report archived together

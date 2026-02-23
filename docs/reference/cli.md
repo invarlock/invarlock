@@ -4,7 +4,7 @@
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Command-line interface for certification, verification, and reporting. |
+| **Purpose** | Command-line interface for evaluation, verification, and reporting. |
 | **Audience** | Operators running InvarLock from terminal/CI. |
 | **Primary commands** | `evaluate`, `verify`, `report`, `run`, `plugins`, `doctor`. |
 | **Requires** | `invarlock[hf]` for HF workflows; optional extras for quantized adapters. |

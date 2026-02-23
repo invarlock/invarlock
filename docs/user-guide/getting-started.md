@@ -4,13 +4,13 @@
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Install InvarLock and run your first certification. |
+| **Purpose** | Install InvarLock and run your first evaluation. |
 | **Audience** | New users setting up their environment. |
 | **Python** | 3.12+ recommended (CI uses 3.13). |
 | **Install** | `pip install "invarlock[hf]"` for HF adapter workflows. |
 | **Next step** | [Quickstart](quickstart.md) for hands-on commands. |
 
-This guide covers installation, environment setup, and your first certification run.
+This guide covers installation, environment setup, and your first evaluation run.
 
 ## Learning Paths
 

@@ -14,7 +14,7 @@ security or alignment.
   as potentially untrusted artifacts.
 - Default runtime posture disables outbound network connections unless
   `INVARLOCK_ALLOW_NETWORK=1` is explicitly set.
-- Certification runs use the pairing, windowing, and bootstrap profiles
+- Evaluation runs use the pairing, windowing, and bootstrap profiles
   described in the assurance docs and configs.
 
 ## Security Flow Overview
@@ -84,7 +84,7 @@ security or alignment.
 
 - Baseline and subject model weights for supported task families.
 - Evaluation datasets, pairing schedules, and seed bundles.
-- Certification artifacts: reports, reports, logs, and policy digests.
+- Evaluation artifacts: reports, logs, and policy digests.
 
 **Adversaries / failure modes**
 
@@ -118,7 +118,7 @@ delegates to external processes:
 compares subject to baseline but does not validate baseline correctness.
 
 **Detection:** None — baseline is trusted by design. Use external model
-provenance checks (e.g., model cards, hash verification) before certification.
+provenance checks (e.g., model cards, hash verification) before evaluation.
 
 ### 2. Malformed Pickle in Subject Checkpoint
 

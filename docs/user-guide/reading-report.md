@@ -5,7 +5,7 @@
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Understand and interpret InvarLock v1 reports. |
-| **Audience** | Reviewers validating certification evidence. |
+| **Audience** | Reviewers validating evaluation evidence. |
 | **Key sections** | Evaluation Dashboard, Quality Gates, Primary Metric, Provenance, Measurement contracts. |
 | **Validation** | Use `invarlock verify <cert.json>` to check schema and pairing. |
 | **Source of truth** | [reports](../reference/reports.md) for full schema. |

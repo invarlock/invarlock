@@ -5,7 +5,7 @@
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Show how to generate and interpret InvarLock reports. |
-| **Audience** | Users learning the certification workflow. |
+| **Audience** | Users learning the evaluation workflow. |
 | **Outputs** | `evaluation.report.json`, `evaluation_report.md`, `report.json`. |
 | **Requires** | `invarlock[hf]` for HF adapter workflows. |
 

@@ -9,7 +9,7 @@ title: Compare & evaluate (BYOE)
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | evaluate two checkpoints (baseline vs subject) with deterministic pairing. |
-| **Audience** | Users with existing edit pipelines who want certification without coupling. |
+| **Audience** | Users with existing edit pipelines who want paired evaluation without coupling. |
 | **Workflow** | Baseline run → Subject run → report with paired windows. |
 | **Network** | Offline by default; `INVARLOCK_ALLOW_NETWORK=1` for model downloads. |
 | **Output** | `evaluation.report.json` + `evaluation_report.md`. |

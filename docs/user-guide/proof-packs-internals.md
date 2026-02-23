@@ -389,7 +389,7 @@ SETUP_BASELINE
 Notes:
 
 - Error injection tasks (`CREATE_ERROR` → `evaluate_ERROR`) branch off
-  `SETUP_BASELINE` and require the preset for certification.
+  `SETUP_BASELINE` and require the preset for evaluation.
 
 Per-edit path (large/MoE or `PACK_USE_BATCH_EDITS=false`):
 

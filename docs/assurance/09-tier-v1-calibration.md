@@ -25,7 +25,7 @@
 ### Window Minima Rationale (counts/power)
 
 - The CI profile targets 200×200 non‑overlapping, paired windows with BCa replicates ≈ 1.2k. The Release profile targets 400×400 with ≈ 3.2k replicates. These counts follow a half‑width sizing rule on the paired Δlog‑loss CI (power ≈ 50% at the boundary for the chosen `min_effect_lognll`), verified on pilot runs.
-- Release evidence must meet the requested counts; runs that under‑cover preview/final windows or bootstrap replicates fail certification in CI/Release profiles (see Coverage & Pairing Plan).
+- Release evidence must meet the requested counts; runs that under‑cover preview/final windows or bootstrap replicates fail evaluation in CI/Release profiles (see Coverage & Pairing Plan).
 
 **Spectral calibration provenance.** Aggregated null-run stats are derived from
 calibration runs. Local tooling can parse report JSON files (glob pattern
