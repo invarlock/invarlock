@@ -17,6 +17,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+## [0.3.12] - 2026-02-27
+
+### Added
+- Coverage thresholds now enforce split-module branch floors for critical CLI/reporting paths.
+
+### Changed
+- Refactored CLI run/report builder flows into smaller modules and injected explicit run-command dependencies.
+- Tightened exception-hygiene handling across `run`, `report`, and `doctor` command paths.
+- Repository housekeeping now excludes research pipeline artifacts from tracked source files.
+
+### Fixed
+- Hardened config include resolution and plugin subprocess path handling in CLI flows.
+- Normalized doctor/plugin command exit semantics for stable profile-specific failure behavior.
+- Strengthened reporting fail-closed schema behavior with network refcounting and schema patch hardening.
+- Hardened overhead/tiny-relax guard handling and config/profile gate-control enforcement.
+- Made observability alerting import-safe when `requests` is unavailable.
+- Hardened docs command runner security checks and enforced pip-audit execution.
+
+### Dependencies
+- Bumped `katex` from `0.16.27` to `0.16.28`.
+- Bumped `markdownlint-cli2` from `0.20.0` to `0.21.0`.
+
+### Documentation
+- Replaced remaining certification wording with evaluation terminology in docs.
+- Clarified calibration policy/preset guidance and aligned ASCII diagram connector formatting.
+
 ## [0.3.11] - 2026-02-12
 
 ### Added
