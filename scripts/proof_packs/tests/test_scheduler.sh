@@ -1291,4 +1291,3 @@ test_scheduler_find_and_claim_logs_reserve_failure_when_debug() {
     assert_rc "1" "${RUN_RC}" "reserve failure returns non-zero"
     assert_match "reserve_gpus failed" "${RUN_ERR}" "debug message emitted"
 }
-

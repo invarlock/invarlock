@@ -65,32 +65,32 @@ from invarlock.core.api import Guard
 
 class NaNCheckGuard(Guard):
     """Guard that fails if any model weight contains NaN."""
-    
+
     name = "nan_check"
-    
+
     def __init__(self, strict: bool = True):
         """
         Args:
             strict: If True, abort on NaN. If False, warn only.
         """
         self.strict = strict
-    
+
     def prepare(self, model, adapter, calib, policy):
         """Called before the edit is applied."""
         return {"ready": True, "checked_params": 0}
-    
+
     def validate(self, model, adapter, context):
         """Called after the edit is applied."""
         import torch
-        
+
         nan_params = []
         total_params = 0
-        
+
         for name, param in model.named_parameters():
             total_params += 1
             if torch.isnan(param).any():
                 nan_params.append(name)
-        
+
         if nan_params:
             action = "abort" if self.strict else "warn"
             return {
@@ -102,7 +102,7 @@ class NaNCheckGuard(Guard):
                     "nan_params": nan_params[:5],  # First 5 for brevity
                 },
             }
-        
+
         return {
             "passed": True,
             "action": "continue",
@@ -164,13 +164,13 @@ from invarlock.core.api import Guard
 class ThresholdGuard(Guard):
     """
     Monitors maximum weight magnitude after edits.
-    
+
     Fails if any weight exceeds the configured threshold, which can
     indicate numerical instability from aggressive quantization.
     """
-    
+
     name = "threshold"
-    
+
     def __init__(
         self,
         max_magnitude: float = 100.0,
@@ -187,37 +187,37 @@ class ThresholdGuard(Guard):
         self.warn_magnitude = warn_magnitude
         self.scope = scope
         self._baseline_magnitudes: dict[str, float] = {}
-    
+
     def prepare(self, model, adapter, calib, policy) -> dict[str, Any]:
         """Capture baseline weight magnitudes."""
         import torch
-        
+
         self._baseline_magnitudes = {}
         for name, param in model.named_parameters():
             if self._in_scope(name):
                 self._baseline_magnitudes[name] = param.abs().max().item()
-        
+
         return {
             "ready": True,
             "baseline_params": len(self._baseline_magnitudes),
             "scope": self.scope,
         }
-    
+
     def validate(self, model, adapter, context) -> dict[str, Any]:
         """Check weight magnitudes after edit."""
         import torch
-        
+
         violations = []
         warnings = []
         max_seen = 0.0
-        
+
         for name, param in model.named_parameters():
             if not self._in_scope(name):
                 continue
-                
+
             magnitude = param.abs().max().item()
             max_seen = max(max_seen, magnitude)
-            
+
             if magnitude > self.max_magnitude:
                 violations.append({
                     "param": name,
@@ -229,7 +229,7 @@ class ThresholdGuard(Guard):
                     "param": name,
                     "magnitude": magnitude,
                 })
-        
+
         if violations:
             return {
                 "passed": False,
@@ -242,7 +242,7 @@ class ThresholdGuard(Guard):
                     "violation_count": len(violations),
                 },
             }
-        
+
         if warnings:
             return {
                 "passed": True,
@@ -254,14 +254,14 @@ class ThresholdGuard(Guard):
                     "warning_count": len(warnings),
                 },
             }
-        
+
         return {
             "passed": True,
             "action": "continue",
             "message": "All weight magnitudes within bounds",
             "metrics": {"max_magnitude": max_seen},
         }
-    
+
     def _in_scope(self, name: str) -> bool:
         """Check if parameter is in configured scope."""
         if self.scope == "all":
@@ -314,7 +314,7 @@ def test_prepare_captures_baselines(model, adapter):
     """Test that prepare() captures baseline magnitudes."""
     guard = ThresholdGuard()
     result = guard.prepare(model, adapter, None, None)
-    
+
     assert result["ready"] is True
     assert result["baseline_params"] > 0
 
@@ -323,9 +323,9 @@ def test_validate_passes_normal_weights(model, adapter):
     """Test validation passes for normal weight magnitudes."""
     guard = ThresholdGuard(max_magnitude=100.0)
     guard.prepare(model, adapter, None, None)
-    
+
     result = guard.validate(model, adapter, {})
-    
+
     assert result["passed"] is True
     assert result["action"] == "continue"
 
@@ -334,9 +334,9 @@ def test_validate_fails_large_weights(model, adapter):
     """Test validation fails when weights exceed threshold."""
     guard = ThresholdGuard(max_magnitude=0.01)  # Very low threshold
     guard.prepare(model, adapter, None, None)
-    
+
     result = guard.validate(model, adapter, {})
-    
+
     assert result["passed"] is False
     assert result["action"] == "abort"
     assert "violations" in result["metrics"]
@@ -347,9 +347,9 @@ def test_validate_warns_near_threshold(model, adapter):
     # Set warn threshold just below actual magnitudes
     guard = ThresholdGuard(max_magnitude=100.0, warn_magnitude=0.01)
     guard.prepare(model, adapter, None, None)
-    
+
     result = guard.validate(model, adapter, {})
-    
+
     assert result["passed"] is True
     assert result["action"] == "warn"
 
@@ -358,7 +358,7 @@ def test_scope_filtering(model, adapter):
     """Test that scope correctly filters parameters."""
     guard = ThresholdGuard(scope="attn")
     guard.prepare(model, adapter, None, None)
-    
+
     # Only attn layer should be captured
     assert len(guard._baseline_magnitudes) == 2  # weight + bias
     assert all("attn" in k for k in guard._baseline_magnitudes)
@@ -388,13 +388,13 @@ from invarlock.core.api import ModelAdapter
 class CustomFormatAdapter(ModelAdapter):
     """
     Adapter for loading models in a custom format.
-    
+
     This adapter demonstrates the required interface. Replace the
     implementation with your actual loading logic.
     """
-    
+
     name = "custom_format"
-    
+
     def load_model(
         self,
         model_id: str,
@@ -403,17 +403,17 @@ class CustomFormatAdapter(ModelAdapter):
     ) -> Any:
         """
         Load a model from the custom format.
-        
+
         Args:
             model_id: Path to model directory or identifier.
             device: Target device ("auto", "cpu", "cuda", "mps").
             **kwargs: Additional loading arguments.
-        
+
         Returns:
             Loaded model instance.
         """
         import torch
-        
+
         # Resolve device
         if device == "auto":
             if torch.cuda.is_available():
@@ -422,27 +422,27 @@ class CustomFormatAdapter(ModelAdapter):
                 device = "mps"
             else:
                 device = "cpu"
-        
+
         # Load your model here
         model_path = Path(model_id)
         if not model_path.exists():
             raise FileNotFoundError(f"Model not found: {model_id}")
-        
+
         # Example: load a state dict
         state_dict = torch.load(model_path / "model.pt", map_location=device)
-        
+
         # Create and load model architecture
         # model = YourModelClass()
         # model.load_state_dict(state_dict)
         # model.to(device)
         # return model
-        
+
         raise NotImplementedError("Replace with actual loading logic")
-    
+
     def describe(self, model) -> dict[str, Any]:
         """
         Describe model structure for guards and reporting.
-        
+
         Returns:
             Dictionary with model metadata.
         """
@@ -453,21 +453,21 @@ class CustomFormatAdapter(ModelAdapter):
             "n_head": getattr(model, "n_head", None),
             # Add other relevant metadata
         }
-    
+
     def snapshot(self, model) -> bytes:
         """Create an in-memory snapshot for retry loops."""
         import io
         import torch
-        
+
         buffer = io.BytesIO()
         torch.save(model.state_dict(), buffer)
         return buffer.getvalue()
-    
+
     def restore(self, model, snapshot: bytes) -> None:
         """Restore model state from snapshot."""
         import io
         import torch
-        
+
         buffer = io.BytesIO(snapshot)
         state_dict = torch.load(buffer, map_location="cpu")
         model.load_state_dict(state_dict)
