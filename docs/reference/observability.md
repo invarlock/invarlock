@@ -66,26 +66,26 @@ config = MonitoringConfig(
     metrics_interval=10.0,
     health_check_interval=30.0,
     resource_check_interval=5.0,
-    
+
     # Data retention
     metrics_retention_hours=24,
     max_events=10000,
-    
+
     # Alerting
     enable_alerting=True,
     alert_channels=[],
-    
+
     # Export settings
     prometheus_enabled=False,
     prometheus_port=9090,
     json_export_enabled=True,
     json_export_path="./monitoring",
-    
+
     # Resource thresholds (percent)
     cpu_threshold=80.0,
     memory_threshold=85.0,
     gpu_memory_threshold=90.0,
-    
+
     # Performance monitoring
     latency_percentiles=[50, 90, 95, 99],
     slow_request_threshold=30.0,

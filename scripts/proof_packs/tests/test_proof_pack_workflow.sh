@@ -43,4 +43,3 @@ test_pack_build_pack_and_verify_pack_end_to_end_v2_layout() {
     assert_rc "0" "${RUN_RC}" "verify_pack succeeds"
     assert_file_exists "${verify_json}" "verify json written"
 }
-

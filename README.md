@@ -60,15 +60,15 @@ produces a machine‑readable Evaluation Report you can gate in CI.
                               │  ├─► Paired windows (deterministic)        │
 ┌───────────────────────┐     │  ├─► GuardChain pipeline                   │
 │ Subject  (checkpoint) │────►│  │   └─► invariants → spectral → RMT → VE  │
-└───────────────────────┘     │  └─► Emit: evaluation.report.json          │    
+└───────────────────────┘     │  └─► Emit: evaluation.report.json          │
                               │                                            │
-                              └────────────────────────────────────────────┘                                                                                               
-                                                     │                                                                                                                          
-                                     ┌───────────────┴───────────────┐                                                                                                          
-                                     ▼                               ▼                                                                                                          
-                                 ✅ PASS                          ❌ FAIL                                                                                                        
-                                 (ship)                          (rollback)    
-                                     
+                              └────────────────────────────────────────────┘
+                                                     │
+                                     ┌───────────────┴───────────────┐
+                                     ▼                               ▼
+                                 ✅ PASS                          ❌ FAIL
+                                 (ship)                          (rollback)
+
 ```
 
 ## Quick start
