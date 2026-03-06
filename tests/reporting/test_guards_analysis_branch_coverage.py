@@ -224,7 +224,7 @@ def test_extract_spectral_analysis_bad_sigma_quantile_and_deadband_omits_summary
 
 
 def test_extract_rmt_analysis_edge_risk_paths_and_contract_hashes() -> None:
-    contract = {"estimator": {"type": "power_iter"}}
+    contract = {"kind": "activation_edge_risk", "estimator": {"type": "power_iter"}}
     baseline = {
         "rmt": {
             "measurement_contract": contract,
@@ -256,6 +256,7 @@ def test_extract_rmt_analysis_edge_risk_paths_and_contract_hashes() -> None:
     assert out["measurement_contract_match"] is True
     assert out["epsilon_violations"]
     assert out["families"]["attn"]["ratio"] == 2.0
+    assert out["mode"] == "activation_edge_risk"
 
 
 def test_extract_variance_analysis_provenance_window_ids_and_ratio_ci_fail() -> None:

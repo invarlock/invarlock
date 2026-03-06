@@ -19,6 +19,7 @@ def test_compute_actual_window_hashes_uses_report_hashes():
     assert result["preview"] == "blake2s:abc"
     assert result["final"] == "blake2s:def"
     assert result["total_tokens"] == 220
+    assert result["source"] == "explicit_preview_final_hashes"
 
 
 def test_compute_actual_window_hashes_report_hashes_non_int_token_counts():
@@ -38,6 +39,7 @@ def test_compute_actual_window_hashes_report_hashes_non_int_token_counts():
     assert result["total_tokens"] == 0
     assert result["preview_tokens"] == "100"
     assert result["final_tokens"] is None
+    assert result["source"] == "explicit_preview_final_hashes"
 
 
 def test_compute_actual_window_hashes_config_fallback(monkeypatch):
@@ -56,6 +58,7 @@ def test_compute_actual_window_hashes_config_fallback(monkeypatch):
     assert result["preview"] == f"sha256:{digest[:32]}"
     assert result["final"].startswith("sha256:")
     assert result["total_tokens"] == (2 * 16) + (3 * 16)
+    assert result["source"] == "config_fallback"
 
 
 def test_compute_actual_window_hashes_from_sequences():
@@ -69,6 +72,7 @@ def test_compute_actual_window_hashes_from_sequences():
     assert result["preview"].startswith("sha256:")
     assert result["final_tokens"] == 3
     assert result["total_tokens"] == 8
+    assert result["source"] == "explicit_token_ids"
 
 
 def test_extract_dataset_info_prefers_actual_hash(monkeypatch):
@@ -147,3 +151,4 @@ def test_extract_dataset_info_uses_config_fallback(monkeypatch):
     info = hashing_mod._extract_dataset_info(report)
     assert info["hash"]["dataset"] == "tok-hash"
     assert info["hash"]["total_tokens"] == (2 * 4) + (3 * 4)
+    assert info["hash"]["source"] == "config_fallback"

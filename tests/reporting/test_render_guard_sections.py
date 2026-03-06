@@ -60,6 +60,12 @@ def test_render_report_markdown_includes_guard_sections():
         "top_z_scores": {"attn": [{"module": "attn.0", "z": 3.1}]},
     }
     cert["rmt"] = {
+        "mode": "activation_edge_risk",
+        "measurement_contract": {
+            "kind": "activation_edge_risk",
+            "estimator": {"type": "power_iter"},
+            "activation_sampling": {"windows": {"count": 8}},
+        },
         "families": {
             "mlp": {"epsilon": 0.2, "bare": 10, "guarded": 6},
         }
@@ -72,6 +78,7 @@ def test_render_report_markdown_includes_guard_sections():
     assert "Caps Applied" in report
     assert "Top |z| per family" in report
     assert "RMT Guard" in report
+    assert "Mode: `activation_edge_risk`" in report
     assert "| Family | ε_f" in report
 
 
@@ -118,3 +125,37 @@ def test_render_report_markdown_rmt_handles_non_numeric_counts():
     assert "| mlp | 0.200 | - | - | - |" in rendered
     assert "- Status: \u274c FAIL" in rendered
     assert "- Families: 1" in rendered
+
+
+def test_render_report_markdown_rmt_edge_risk_rows_and_dataset_hash_source():
+    cert = deepcopy(_base_evaluation_report())
+    cert["spectral"] = {"caps_applied": 0, "max_caps": 0, "summary": {}}
+    cert["dataset"]["hash"] = {
+        "preview_tokens": 10,
+        "final_tokens": 12,
+        "total_tokens": 22,
+        "source": "config_fallback",
+    }
+    cert["rmt"] = {
+        "mode": "activation_edge_risk",
+        "measurement_contract": {
+            "kind": "activation_edge_risk",
+            "estimator": {"type": "power_iter"},
+            "activation_sampling": {"windows": {"count": 8}},
+        },
+        "families": {
+            "ffn": {
+                "epsilon": 0.01,
+                "edge_base": 1.2,
+                "edge_cur": 1.23,
+                "delta": 0.025,
+            }
+        },
+        "stable": True,
+    }
+
+    rendered = render_mod.render_report_markdown(cert)
+
+    assert "**Hash Source:** config-derived fallback" in rendered
+    assert "| Family | ε_f | Edge Base | Edge Cur | Δ |" in rendered
+    assert "| ffn | 0.010 | 1.200 | 1.230 | +0.025 |" in rendered
