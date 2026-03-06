@@ -62,6 +62,7 @@ test-assurance:  ## Run assurance-related tests only
 	PYTHONPATH=src pytest -q \
 		tests/api/test_assurance_facade.py \
 		tests/eval/test_assurance_contracts.py \
+		tests/docs/test_claim_surface_consistency.py \
 		tests/docs/test_assurance_xref_linter.py \
 		tests/reporting/test_policy_utils.py::test_compute_policy_digest_matches_assurance_spec
 
