@@ -13,7 +13,8 @@ readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.12"
 keywords = [
   "machine-learning", "deep-learning", "transformers", "pytorch", "llm",
-  "quantization", "safety", "evaluation", "certification"
+  "quantization", "evaluation", "verification", "model-editing",
+  "release-assurance", "reproducibility"
 ]
 classifiers = [
   "Development Status :: 4 - Beta",

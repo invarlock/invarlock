@@ -34,6 +34,10 @@ $$
 The contract fixes the estimator budget and the activation sampling policy; those
 knobs are recorded in the report.
 
+This note documents the runtime report contract for the activation edge-risk
+mode surfaced in reports; it does not describe every legacy utility that still
+lives in `src/invarlock/guards/rmt.py`.
+
 ## Derivation (sketch)
 
 - Edge risk fluctuates under null due to finite‑sample deviations from the
@@ -74,8 +78,10 @@ larger ε to avoid spurious failures.
 
 ## Runtime Contract (report)
 
-- report reports `rmt.{edge_risk_by_family_base,edge_risk_by_family,epsilon_default,epsilon_by_family,epsilon_violations,stable,status}`.
+- report reports `rmt.{mode,edge_risk_by_family_base,edge_risk_by_family,epsilon_default,epsilon_by_family,epsilon_violations,stable,status}`.
 - Per-family details for rendering live under `rmt.families.*.{edge_base,edge_cur,epsilon,allowed,ratio,delta}`.
+- `rmt.measurement_contract.kind = "activation_edge_risk"` records which RMT
+  measurement path produced the evidence.
 - report lint verifies the inequality and marks violations; `validation.rmt_stable` reflects the ε‑band gate.
 
 ## Observability

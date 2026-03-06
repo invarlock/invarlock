@@ -7,7 +7,7 @@
 | **Purpose** | Understand and interpret InvarLock v1 reports. |
 | **Audience** | Reviewers validating evaluation evidence. |
 | **Key sections** | Evaluation Dashboard, Quality Gates, Primary Metric, Provenance, Measurement contracts. |
-| **Validation** | Use `invarlock verify <cert.json>` to check schema and pairing. |
+| **Validation** | Use `invarlock verify <evaluation.report.json>` to check schema and pairing. |
 | **Source of truth** | [reports](../reference/reports.md) for full schema. |
 
 This guide highlights the key sections of a v1 report and how to
@@ -32,12 +32,16 @@ interpret them.
   - Provider/environment/policy digests: `provider_digest`
     (ids/tokenizer/masking), `env_flags`, and `policy_digest` with thresholds
     snapshot.
+  - `dataset.hash.source` tells you whether dataset hashes were derived from
+    explicit preview/final hashes, explicit token IDs, or a config fallback.
 - Policy Configuration
   - Human-readable tier/digest plus collapsible resolved policy YAML; full details remain in `evaluation.report.json`.
 - Measurement contract
   - `resolved_policy.spectral.measurement_contract` /
     `resolved_policy.rmt.measurement_contract` pin the estimator + sampling
     procedure used by guards.
+  - `rmt.mode` makes the active RMT measurement path reviewer-visible; current
+    public reports emit `activation_edge_risk`.
   - `spectral.measurement_contract_hash` / `rmt.measurement_contract_hash` are
     compact digests for audit and baseline pairing.
   - In CI/Release, `invarlock verify` enforces baseline/subject pairing (`*_measurement_contract_match = true`).

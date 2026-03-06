@@ -71,7 +71,7 @@ except Exception as e:
 PY
 fi
 
-echo "# Tiny Models Certification Matrix ($STAMP)" > "$TMP_DIR/checklist.md"
+echo "# Tiny Models Evaluation Matrix ($STAMP)" > "$TMP_DIR/checklist.md"
 echo "Env: INVARLOCK_DEDUP_TEXTS=1, INVARLOCK_CAPACITY_FAST=1, HF_HUB_ENABLE_HF_TRANSFER=${HF_HUB_ENABLE_HF_TRANSFER:-0}${NET:+, INVARLOCK_ALLOW_NETWORK=1, HF_DATASETS_OFFLINE=${HF_DATASETS_OFFLINE:-0}}" >> "$TMP_DIR/checklist.md"
 echo >> "$TMP_DIR/checklist.md"
 
@@ -84,8 +84,8 @@ for PRESET in \
   configs/presets/causal_lm/wikitext2_512.yaml \
   omit
 do
-  tag="gpt2_cert_${PRESET##*/}"
-  [ "$PRESET" = "omit" ] && tag="gpt2_cert_auto"
+  tag="gpt2_eval_${PRESET##*/}"
+  [ "$PRESET" = "omit" ] && tag="gpt2_eval_auto"
   cmd=(invarlock evaluate --baseline "$GPT2_ID" --subject "$GPT2_ID" --adapter hf_causal --profile "$PROFILE" --tier balanced)
   [ "$PRESET" != "omit" ] && cmd+=(--preset "$PRESET")
   append "$tag" "${cmd[*]}"
@@ -96,7 +96,7 @@ echo >> "$TMP_DIR/checklist.md"
 echo "### GPT-2 Quant (demo edit)" >> "$TMP_DIR/checklist.md"
 QCFG="configs/overlays/edits/quant_rtn/tiny_demo.yaml"
 cmd=(invarlock evaluate --baseline "$GPT2_ID" --subject "$GPT2_ID" --adapter hf_causal --profile "$PROFILE" --tier balanced --preset configs/presets/causal_lm/wikitext2_512.yaml --edit-config "$QCFG")
-append "gpt2_editcert_quant8" "${cmd[*]}"
+append "gpt2_eval_quant8" "${cmd[*]}"
 [ "$RUN" = "1" ] && eval "${cmd[*]}" || true
 
 echo >> "$TMP_DIR/checklist.md"
@@ -105,7 +105,7 @@ echo >> "$TMP_DIR/checklist.md"
 BERT_ID=${BERT_ID:-"prajjwal1/bert-tiny"}
 echo "## BERT (masked LM)" >> "$TMP_DIR/checklist.md"
 cmd=(invarlock evaluate --baseline "$BERT_ID" --subject "$BERT_ID" --adapter hf_mlm --profile "$PROFILE" --tier balanced --preset configs/presets/masked_lm/wikitext2_128.yaml)
-append "bert_mlm_cert" "${cmd[*]}"
+append "bert_mlm_eval" "${cmd[*]}"
 [ "$RUN" = "1" ] && eval "${cmd[*]}" || true
 
 echo >> "$TMP_DIR/checklist.md"
@@ -114,7 +114,7 @@ echo >> "$TMP_DIR/checklist.md"
 CLS_ID=${CLS_ID:-"distilbert-base-uncased-finetuned-sst-2-english"}
 echo "## DistilBERT (classification)" >> "$TMP_DIR/checklist.md"
 cmd=(invarlock evaluate --baseline "$CLS_ID" --subject "$CLS_ID" --adapter hf_mlm --profile "$PROFILE" --tier balanced --preset configs/presets/masked_lm/wikitext2_128.yaml)
-append "distilbert_cls_cert" "${cmd[*]}"
+append "distilbert_cls_eval" "${cmd[*]}"
 [ "$RUN" = "1" ] && eval "${cmd[*]}" || true
 
 # Optional: measured accuracy (requires network) when INCLUDE_MEASURED_CLS=1

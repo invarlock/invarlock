@@ -15,7 +15,7 @@ def test_tiny_gpt2_matrix_dry_run(tmp_path: Path):
     checklist = Path(env["TMP_DIR"]) / "checklist.md"
     assert checklist.exists()
     text = checklist.read_text()
-    assert "Certification Matrix" in text
+    assert "Evaluation Matrix" in text
     # Basic sanity: contains at least one invarlock evaluate command
     assert "invarlock evaluate" in text
 

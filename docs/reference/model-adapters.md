@@ -37,6 +37,11 @@ model = adapter.load_model("gpt2", device="auto")
 print(adapter.describe(model)["model_type"])
 ```
 
+> Adapter availability is broader than the published assurance basis. GPT-2 and
+> BERT currently back the published calibrated basis; repo-shipped pilot configs
+> for Mistral 7B and Qwen2 7B are for experimentation until supporting
+> artifacts are attached.
+
 ## Concepts
 
 - **Adapters hide model-specific logic**: they handle loading, structure description,

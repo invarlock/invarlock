@@ -3,7 +3,7 @@ InvarLock CLI Run Command
 =====================
 
 Run a guarded pipeline from a YAML config. Intended for local smokes,
-plugin demos, and development. Advanced: for pairwise certification,
+plugin demos, and development. Advanced: for pairwise evaluation,
 prefer Compare & Evaluate via `invarlock evaluate --baseline ... --subject ...`.
 """
 
