@@ -1049,6 +1049,13 @@ def make_report_impl(
     pm_acceptance_range = _resolve_pm_acceptance_range_from_report(report)
     pm_drift_band = _resolve_pm_drift_band_from_report(report)
     tiny_relax = _resolve_tiny_relax_from_report(report)
+    if not tiny_relax:
+        tiny_relax = str(os.environ.get("INVARLOCK_TINY_RELAX", "")).strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
     # Primary metric tail evidence and gate evaluation (ΔlogNLL vs baseline, per-window).
     pm_tail_result: dict[str, Any] = {}

@@ -642,6 +642,9 @@ def run_command_impl(
             "plugins": plugin_provenance,
             "run_id": run_id,
         }
+        tiny_relax_env = str(os.environ.get("INVARLOCK_TINY_RELAX", "")).strip().lower()
+        if tiny_relax_env in {"1", "true", "yes", "on"}:
+            run_context.setdefault("run", {})["tiny_relax"] = True
         # Provide baseline per-window logloss to the CoreRunner for paired tail
         # evidence and (optionally) fail/rollback enforcement.
         try:

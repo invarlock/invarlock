@@ -175,6 +175,136 @@ def test_run_command_returns_report_path_and_emits_determinism_meta(
     assert det.get("level") in {"strict", "tolerance", "off"}
 
 
+def test_run_command_persists_tiny_relax_context(
+    tmp_path: Path, monkeypatch
+) -> None:
+    cfg = _cfg(tmp_path)
+    captured: dict[str, object] = {}
+    monkeypatch.setenv("INVARLOCK_TINY_RELAX", "1")
+
+    class DummyRegistry:
+        def get_adapter(self, name):  # noqa: ARG002 - stub
+            return SimpleNamespace(
+                name=name,
+                load_model=lambda model_id, device: object(),
+                snapshot=lambda model: b"x",
+                restore=lambda model, blob: None,
+            )
+
+        def get_edit(self, name):  # noqa: ARG002 - stub
+            return SimpleNamespace(name=name)
+
+        def get_guard(self, name):  # noqa: ARG002 - stub
+            raise KeyError(name)
+
+        def get_plugin_metadata(self, name, t):  # noqa: ARG002 - stub
+            return {"name": name, "module": f"{t}.{name}", "version": "test"}
+
+    def _runner_exec(**_kwargs):
+        return SimpleNamespace(
+            edit={"plan_digest": "abcd", "deltas": {"params_changed": 0}},
+            metrics={"latency_ms_per_tok": 0.0, "memory_mb_peak": 0.0},
+            guards={},
+            context={"dataset_meta": {}},
+            evaluation_windows={
+                "preview": {"logloss": [2.0], "token_counts": [8]},
+                "final": {"logloss": [2.0], "token_counts": [8]},
+            },
+            status="success",
+        )
+
+    def _fake_emit(*, report, out_dir, filename_prefix, console):  # noqa: ARG001
+        captured["report"] = report
+        return {"json": str(out_dir / f"{filename_prefix}.json")}
+
+    fake_pm = lambda *a, **k: {  # noqa: E731
+        "kind": "ppl_causal",
+        "preview": 10.0,
+        "final": 10.0,
+        "ratio_vs_baseline": 1.0,
+        "display_ci": [1.0, 1.0],
+    }
+
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch("invarlock.core.registry.get_registry", lambda: DummyRegistry())
+        )
+        stack.enter_context(
+            patch(
+                "invarlock.core.runner.CoreRunner",
+                lambda: SimpleNamespace(execute=_runner_exec),
+            )
+        )
+        stack.enter_context(
+            patch(
+                "invarlock.eval.data.get_provider",
+                lambda *a, **k: SimpleNamespace(
+                    windows=lambda **kw: (
+                        SimpleNamespace(
+                            input_ids=[[1, 2, 3, 4]], attention_masks=[[1, 1, 1, 1]]
+                        ),
+                        SimpleNamespace(
+                            input_ids=[[5, 6, 7, 8]], attention_masks=[[1, 1, 1, 1]]
+                        ),
+                    )
+                ),
+            )
+        )
+        stack.enter_context(
+            patch("invarlock.cli.device.resolve_device", lambda d: "cpu")
+        )
+        stack.enter_context(
+            patch(
+                "invarlock.cli.device.validate_device_for_config", lambda d: (True, "")
+            )
+        )
+        stack.enter_context(
+            patch(
+                "invarlock.cli.commands.run.detect_model_profile",
+                lambda *a, **k: SimpleNamespace(
+                    default_loss="ce",
+                    invariants=[],
+                    cert_lints=[],
+                    module_selectors={},
+                    family="test",
+                ),
+            )
+        )
+        stack.enter_context(
+            patch(
+                "invarlock.cli.commands.run.resolve_tokenizer",
+                lambda *a, **k: (
+                    SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=10),
+                    "tokhash123",
+                ),
+            )
+        )
+        stack.enter_context(
+            patch(
+                "invarlock.eval.primary_metric.compute_primary_metric_from_report",
+                fake_pm,
+            )
+        )
+        stack.enter_context(
+            patch("invarlock.cli.commands.run._emit_run_artifacts", _fake_emit)
+        )
+
+        run_command(
+            config=str(cfg),
+            device="cpu",
+            profile="ci",
+            out=str(tmp_path / "runs"),
+        )
+
+    report_obj = captured.get("report")
+    assert isinstance(report_obj, dict)
+    context = report_obj.get("context")
+    assert isinstance(context, dict)
+    run_context = context.get("run")
+    assert isinstance(run_context, dict)
+    assert run_context.get("tiny_relax") is True
+
+
 def test_run_command_does_not_include_determinism_when_preset_empty(
     tmp_path: Path,
 ) -> None:
