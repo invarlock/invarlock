@@ -4,18 +4,27 @@ from __future__ import annotations
 
 import copy
 import math
+from collections.abc import Callable
 from typing import Any
+
+ValidateGuardOverheadFn = Callable[..., Any]
+ComputePrimaryMetricFn = Callable[..., dict[str, Any]]
+GetMetricFn = Callable[[str], Any]
 
 
 def prepare_guard_overhead_section(
     raw: Any,
     *,
-    validate_guard_overhead_fn: Any | None = None,
+    validate_guard_overhead_fn: ValidateGuardOverheadFn | None = None,
 ) -> tuple[dict[str, Any], bool]:
     """Normalize guard overhead payload and determine whether it passes the gate."""
 
     if validate_guard_overhead_fn is None:
-        from .validate import validate_guard_overhead as validate_guard_overhead_fn
+        from .validate import validate_guard_overhead
+
+        validate_guard_overhead_impl: ValidateGuardOverheadFn = validate_guard_overhead
+    else:
+        validate_guard_overhead_impl = validate_guard_overhead_fn
 
     if not isinstance(raw, dict) or not raw:
         return {}, True
@@ -61,7 +70,7 @@ def prepare_guard_overhead_section(
     bare_report = payload.pop("bare_report", None)
     guarded_report = payload.pop("guarded_report", None)
     if isinstance(bare_report, dict) and isinstance(guarded_report, dict):
-        result = validate_guard_overhead_fn(
+        result = validate_guard_overhead_impl(
             bare_report, guarded_report, overhead_threshold=threshold
         )
         metrics = result.metrics or {}
@@ -112,9 +121,8 @@ def prepare_guard_overhead_section(
         if isinstance(payload.get("errors"), list)
         else []
     )
-    sanitized["checks"] = (
-        dict(payload.get("checks")) if isinstance(payload.get("checks"), dict) else {}
-    )
+    checks = payload.get("checks")
+    sanitized["checks"] = dict(checks) if isinstance(checks, dict) else {}
 
     if ratio is not None:
         sanitized["overhead_ratio"] = ratio
@@ -137,16 +145,24 @@ def compute_quality_overhead_from_guard(
     raw_guard: Any,
     pm_kind_hint: str | None = None,
     *,
-    compute_primary_metric_from_report_fn: Any | None = None,
-    get_metric_fn: Any | None = None,
+    compute_primary_metric_from_report_fn: ComputePrimaryMetricFn | None = None,
+    get_metric_fn: GetMetricFn | None = None,
 ) -> dict[str, Any] | None:
     """Compute PM-aware quality overhead from guard context when possible."""
 
     if compute_primary_metric_from_report_fn is None or get_metric_fn is None:
         from invarlock.eval.primary_metric import (
-            compute_primary_metric_from_report as compute_primary_metric_from_report_fn,
+            compute_primary_metric_from_report,
+            get_metric,
         )
-        from invarlock.eval.primary_metric import get_metric as get_metric_fn
+
+        compute_primary_metric_from_report_impl: ComputePrimaryMetricFn = (
+            compute_primary_metric_from_report
+        )
+        get_metric_impl: GetMetricFn = get_metric
+    else:
+        compute_primary_metric_from_report_impl = compute_primary_metric_from_report_fn
+        get_metric_impl = get_metric_fn
 
     try:
         if not isinstance(raw_guard, dict):
@@ -162,8 +178,8 @@ def compute_quality_overhead_from_guard(
         )
         if not kind:
             kind = "ppl_causal"
-        pm_b = compute_primary_metric_from_report_fn(bare, kind=kind)
-        pm_g = compute_primary_metric_from_report_fn(guarded, kind=kind)
+        pm_b = compute_primary_metric_from_report_impl(bare, kind=kind)
+        pm_g = compute_primary_metric_from_report_impl(guarded, kind=kind)
         g_point = pm_g.get("final")
         b_point = pm_b.get("final")
         if not (
@@ -175,7 +191,7 @@ def compute_quality_overhead_from_guard(
             return None
         # Resolve direction from registry when possible
         try:
-            direction = get_metric_fn(kind).direction
+            direction = get_metric_impl(kind).direction
         except Exception:  # pragma: no cover
             direction = str(pm_g.get("direction", "")).lower()
         if direction == "lower":

@@ -2,7 +2,8 @@
 
 > **Plain language:** The reported perplexity ratio is just the exponential of
 > the token-weighted mean Δlog-loss, and the confidence interval comes from
-> exponentiating the same paired bootstrap—we prove both facts here.
+> exponentiating the same paired bootstrap; this note derives both facts in the
+> report's operating context.
 
 ## Claim
 
@@ -89,7 +90,7 @@ BCa applied to the paired vector $\{\Delta \ell_i\}$ (resampled with weights
 proportional to $t_i$) yields CI $[L, U]$; exponentiate to obtain
 $[\exp(L), \exp(U)]$.
 
-### Unbiasedness in log space (lemma)
+### Estimation note in log space
 
 Let the token‑weighted mean be $\overline{\Delta \ell}_{\text{w}} = \sum_i t_i\,\Delta \ell_i / \sum_i t_i$. By linearity of expectation,
 
@@ -99,7 +100,9 @@ $$
 = \log\Bigg(\prod_i \Big(\tfrac{p_i^{(B)}}{p_i^{(A)}}\Big)^{\,t_i/\sum_j t_j}\Bigg),
 $$
 
-so the estimator is unbiased for the log of the (token‑weighted) ratio. Under mild assumptions (ergodicity across windows), the point estimator converges to the population log‑ratio.
+so, under the stated window-level assumptions, the estimator targets the log of
+the token‑weighted ratio. Under mild assumptions (ergodicity across windows),
+the point estimator converges to the population log‑ratio.
 
 ### Jensen inequality note
 

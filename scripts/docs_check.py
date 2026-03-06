@@ -85,6 +85,7 @@ def check_consistency() -> None:
     checks = [
         "scripts/check_version_consistency.py",
         "scripts/check_cli_completeness.py",
+        "scripts/check_claim_surface_consistency.py",
         "scripts/check_config_schema_sync.py",
         "scripts/check_guard_completeness.py",
         "scripts/lint_assurance_xrefs.py",

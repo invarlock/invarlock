@@ -1236,11 +1236,11 @@ task_evaluate_edit() {
     abs_edit_path="$(cd "$(dirname "${edit_path}")" && pwd)/$(basename "${edit_path}")"
 
     if [[ -f "${cert_file}" ]]; then
-        echo "  Certification for ${edit_dir_name} run ${run_num} already exists, skipping" >> "${log_file}"
+        echo "  Evaluation report for ${edit_dir_name} run ${run_num} already exists, skipping" >> "${log_file}"
         return 0
     fi
 
-    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] evaluateing: ${edit_dir_name} run ${run_num}" >> "${log_file}"
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] evaluating: ${edit_dir_name} run ${run_num}" >> "${log_file}"
 
     mkdir -p "${cert_dir}"
 
@@ -1655,7 +1655,7 @@ task_evaluate_error() {
     abs_error_path="$(cd "$(dirname "${error_path}")" && pwd)/$(basename "${error_path}")"
 
     if [[ -f "${cert_file}" ]]; then
-        echo "  Certification for error ${error_type} already exists, skipping" >> "${log_file}"
+        echo "  Evaluation report for error ${error_type} already exists, skipping" >> "${log_file}"
         return 0
     fi
 
@@ -1667,7 +1667,7 @@ task_evaluate_error() {
         fi
     fi
 
-    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] evaluateing error model: ${error_type}" >> "${log_file}"
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] evaluating error model: ${error_type}" >> "${log_file}"
 
     mkdir -p "${cert_dir}"
 

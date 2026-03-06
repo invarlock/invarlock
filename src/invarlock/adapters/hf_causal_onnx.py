@@ -3,7 +3,7 @@ HuggingFace Optimum ONNX Runtime Adapter
 =======================================
 
 Minimal adapter to load CPU-friendly ONNX Runtime models via Optimum for
-causal language modeling. This enables certification of pre-quantized int8
+causal language modeling. This enables evaluation of pre-quantized int8
 models published for ONNX/Optimum, when used with `edit: noop`.
 
 Notes

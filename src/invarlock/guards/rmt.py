@@ -2210,6 +2210,7 @@ class RMTGuard(Guard):
                 "baseline_metrics": {
                     "edge_risk_by_family": dict(self.baseline_edge_risk_by_family),
                     "measurement_contract": {
+                        "kind": "activation_edge_risk",
                         "estimator": self.estimator,
                         "activation_sampling": self.activation_sampling,
                     },
@@ -2449,6 +2450,7 @@ class RMTGuard(Guard):
             "epsilon_by_family": dict(self.epsilon_by_family),
             "epsilon_violations": list(self.epsilon_violations),
             "measurement_contract": {
+                "kind": "activation_edge_risk",
                 "estimator": self.estimator,
                 "activation_sampling": self.activation_sampling,
             },

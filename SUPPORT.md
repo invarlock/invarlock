@@ -59,7 +59,7 @@ Issues that do not follow the templates, or that are clearly out of scope (e.g.,
 The issue tracker is not the right place for:
 
 - General PyTorch or transformers debugging help,
-- Model training or fine‑tuning advice unrelated to InvarLock’s certification flow,
+- Model training or fine‑tuning advice unrelated to InvarLock’s evaluation workflows,
 - Broad ML consultations or architecture reviews,
 - Vendor‑specific support for hardware or cloud environments.
 

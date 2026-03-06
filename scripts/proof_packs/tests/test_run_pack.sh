@@ -79,6 +79,7 @@ EOF
     assert_file_exists "${pack_dir}/checksums.sha256" "checksums written"
     assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/evaluation.html" "html rendered"
     assert_file_exists "${pack_dir}/README.md" "readme written"
+    assert_match "signed manifest, strict verification, and a PASS final verdict" "$(cat "${pack_dir}/README.md")" "README documents proof-grade triad"
     assert_file_exists "${pack_dir}/results/guard_intervention_summary.json" "intervention summary copied"
 }
 

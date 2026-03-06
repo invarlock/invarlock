@@ -15,8 +15,8 @@ summary reports, and verification metadata into a portable evidence artifact. Th
 B200-specific validation harness with a suite that can run on any NVIDIA GPU topology
 that can fit the selected models.
 
-By default, a proof pack is evidence-grade (integrity + cert verification). Treat it
-as proof-grade only when the manifest is signed and the pack is verified in strict mode.
+By default, a proof pack is evidence-grade (integrity + report verification). Treat it
+as proof-grade only when the manifest is signed, the pack is verified in strict verification mode, and the final verdict is PASS.
 
 Operationally, proof packs are a maintainer smoke test that also emits reusable
 evidence data. The same run should let maintainers catch regressions, let third parties

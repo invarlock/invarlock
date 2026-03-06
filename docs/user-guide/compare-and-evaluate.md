@@ -46,7 +46,7 @@ Outputs:
 
 ## Reuse a baseline report (skip baseline evaluation)
 
-When evaluateing many subjects against the same baseline, you can reuse a single
+When evaluating many subjects against the same baseline, you can reuse a single
 baseline `report.json` and skip Phase 1/3 (baseline evaluation) by passing
 `--baseline-report`.
 

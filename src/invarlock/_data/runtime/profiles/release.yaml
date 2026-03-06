@@ -1,4 +1,4 @@
-# Release profile overrides for certification workflows.
+# Release profile overrides for release-assurance workflows.
 #
 # Applies denser evaluation coverage, longer bootstrap runs, and embeds
 # policy snapshot metadata so artifacts can be audited after publication.

@@ -992,6 +992,15 @@ def _extract_rmt_analysis(
         result["policy"] = policy_out
     if measurement_contract is not None:
         result["measurement_contract"] = measurement_contract
+    mode = None
+    if isinstance(measurement_contract, dict):
+        raw_mode = measurement_contract.get("kind")
+        if isinstance(raw_mode, str) and raw_mode.strip():
+            mode = raw_mode.strip()
+    if mode is None and result["evaluated"]:
+        mode = "activation_edge_risk"
+    if mode is not None:
+        result["mode"] = mode
     if mc_hash:
         result["measurement_contract_hash"] = mc_hash
     if baseline_hash:

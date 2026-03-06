@@ -45,6 +45,13 @@ invarlock calibrate ve-sweep \
 - **Artifacts**: Each sweep emits JSON (machine), CSV (spreadsheet), Markdown
   (human), and a `tiers_patch_*.yaml` recommendation file.
 
+## Published Basis vs Shipped Configs
+
+Published assurance basis currently covers GPT-2 and BERT profiles. The repo
+also ships pilot calibration configs for additional families such as Mistral 7B
+and Qwen2 7B under `configs/calibration/`, but those configs are not part of
+the published assurance basis until supporting artifacts are attached.
+
 ### Policy-Tuning Sweep → Tier Policy Flow
 
 ```text

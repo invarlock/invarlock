@@ -217,7 +217,7 @@ Exhaustive command map with brief descriptions and notable options.
     `--baseline`, `--no-cleanup`, `--timing`, `--telemetry`.
 
 - `invarlock report` (group)
-  - Purpose: Operations on reports/evalificates (verify, explain, html, validate).
+  - Purpose: Operations on reports/evaluation artifacts (verify, explain, html, validate).
   - Default (no subcommand): generate report(s) from a run.
   - Options (default callback): `--run`, `--format (json|md|html|cert|all)`,
     `--compare`, `--baseline`, `--output/-o`.

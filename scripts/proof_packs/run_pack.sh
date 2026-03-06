@@ -315,7 +315,7 @@ This proof pack bundles reports, summary reports, and metadata for offline
 verification. No model weights are included.
 
 By default this is evidence-grade packaging. For proof-grade attestation,
-require a signed manifest and strict verification.
+require a signed manifest, strict verification, and a PASS final verdict.
 
 ## Verify
 

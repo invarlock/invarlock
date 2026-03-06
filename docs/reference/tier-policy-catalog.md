@@ -88,7 +88,7 @@ same structure:
 - **What it controls** (runtime behavior)
 - **Where documented** (assurance notes / method write-ups)
 - **Keys** (key-by-key meaning)
-- **Observability** (where it appears in reports/evalificates)
+- **Observability** (where it appears in reports/evaluation artifacts)
 
 #### Primary-metric gates (`metrics.*`)
 

@@ -125,8 +125,8 @@ to change proposals or releases when you update calibration.
 3. **Validate** – generate reports via `invarlock report` and run `invarlock verify` for policy compliance.
 4. **Iterate** – compare runs, adjust edit plans, and reissue reports until gates pass.
 
-The guard suite (invariants, spectral, variance, and RMT) ensures edits stay
-inside safety envelopes even when aggressive compression is attempted.
+The guard suite (invariants, spectral, variance, and RMT) keeps edits inside
+configured acceptance envelopes even when aggressive compression is attempted.
 
 ---
 
@@ -152,13 +152,15 @@ Notes
 
 ## Support Matrix
 
-| Component | Support                                                               |
-| --------- | --------------------------------------------------------------------- |
-| Python    | 3.12+                                                                 |
-| Devices   | CUDA, MPS (Apple Silicon), CPU                                        |
-| Models    | GPT‑2 Small/Medium adapters                                           |
-| Edits     | RTN quantization (demo built-in); others via Compare & evaluate (BYOE) |
-| Datasets  | WikiText‑2 (paired 200/200 windows), synthetic samples                |
+| Surface | Preset shipped | Adapter available | Pilot calibration config present | Published assurance basis |
+| ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
+| GPT-2 causal LM | Yes | Yes | Yes | Yes |
+| BERT / RoBERTa MLM | Yes | Yes | Yes | Yes |
+| Mistral 7B causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
+| Qwen2 7B causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
+| Seq2Seq / local pairs | Yes | Yes | No | No |
+
+Published assurance basis currently covers GPT-2 and BERT profiles. Repo-shipped presets and pilot calibration configs for additional families, including Mistral 7B and Qwen2 7B, do not become part of the published assurance basis until supporting artifacts are attached.
 
 ---
 

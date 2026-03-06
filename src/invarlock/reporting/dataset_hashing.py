@@ -30,6 +30,7 @@ def compute_window_hashes(
     return {
         "preview": f"sha256:{preview_hash}",
         "final": f"sha256:{final_hash}",
+        "source": "explicit_token_ids",
         "total_tokens": sum(
             len(ids) for ids in preview_window.input_ids + final_window.input_ids
         ),
@@ -65,6 +66,7 @@ def _compute_actual_window_hashes(report: dict[str, Any]) -> dict[str, Any]:
                 "total_tokens": total_tokens,
                 "preview_tokens": preview_tokens_ct,
                 "final_tokens": final_tokens_ct,
+                "source": "explicit_preview_final_hashes",
             }
 
         windows = report.get("evaluation_windows", {})
@@ -107,6 +109,7 @@ def _compute_actual_window_hashes(report: dict[str, Any]) -> dict[str, Any]:
                 "preview_tokens": preview_tokens,
                 "final_tokens": final_tokens,
                 "total_tokens": preview_tokens + final_tokens,
+                "source": "config_fallback",
             }
         # Compute hashes directly from token ID sequences for robustness
         import hashlib as _hashlib
@@ -131,6 +134,7 @@ def _compute_actual_window_hashes(report: dict[str, Any]) -> dict[str, Any]:
             "final_tokens": final_tokens,
             "dataset": None,
             "total_tokens": preview_tokens + final_tokens,
+            "source": "explicit_token_ids",
         }
     except Exception:
         # Signal caller to use config-based fallback
@@ -194,6 +198,7 @@ def _extract_dataset_info(report: dict[str, Any]) -> dict[str, Any]:
             "preview_tokens": preview_tokens,
             "final_tokens": final_tokens,
             "total_tokens": preview_tokens + final_tokens,
+            "source": "config_fallback",
         }
 
     tokenizer_info = {

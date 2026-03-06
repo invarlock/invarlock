@@ -63,6 +63,26 @@ REPORT_JSON_SCHEMA: dict[str, Any] = {
             "properties": {
                 "provider": {"type": "string"},
                 "seq_len": {"type": "integer", "minimum": 1},
+                "hash": {
+                    "type": "object",
+                    "properties": {
+                        "preview": {"type": "string"},
+                        "final": {"type": "string"},
+                        "dataset": {"type": ["string", "null"]},
+                        "preview_tokens": {"type": ["integer", "string", "null"]},
+                        "final_tokens": {"type": ["integer", "string", "null"]},
+                        "total_tokens": {"type": "integer", "minimum": 0},
+                        "source": {
+                            "enum": [
+                                "explicit_preview_final_hashes",
+                                "explicit_token_ids",
+                                "config_fallback",
+                            ]
+                        },
+                    },
+                    "additionalProperties": True,
+                },
+                "tokenizer": {"type": "object"},
                 "windows": {
                     "type": "object",
                     "required": ["preview", "final", "stats"],
@@ -153,6 +173,14 @@ REPORT_JSON_SCHEMA: dict[str, Any] = {
             # properties populated at import-time from allow-list; default permissive
             "properties": {},
             "additionalProperties": {"type": "boolean"},
+        },
+        "rmt": {
+            "type": "object",
+            "properties": {
+                "mode": {"type": "string"},
+                "measurement_contract_hash": {"type": "string"},
+            },
+            "additionalProperties": True,
         },
         "artifacts": {"type": "object"},
         "provenance": {"type": "object"},

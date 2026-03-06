@@ -233,8 +233,11 @@ Detailed derivations are in the calibration appendix (`09-tier-v1-calibration.md
 - No adversarial robustness or gradient masking guarantees.
 - CUDA kernels outside deterministic mode may exceed drift tolerances.
 - Reference mask-based flows are conservative; stronger compression requires plugins.
-- Calibration data currently covers GPT-2 and BERT profiles.
-  Contributions for additional model families are welcome—attach pilot certs
+- Published assurance basis currently covers GPT-2 and BERT profiles.
+- The repo also ships pilot calibration configs for additional families such as
+  Mistral 7B and Qwen2 7B; those configs are not part of the published
+  assurance basis until supporting artifacts are attached.
+- Contributions for additional model families are welcome; attach pilot reports
   and summary CSVs (typically written under `reports/calibration/` when running
   the calibration scripts) to change proposals or release artifacts.
 

@@ -290,7 +290,7 @@ PACK_TUNED_EDIT_PARAMS_FILE="${PACK_TUNED_EDIT_PARAMS_FILE:-}"
 # Optional calibration preset reuse (skip calibration runs, copy presets in)
 PACK_CALIBRATION_PRESET_DIR="${PACK_CALIBRATION_PRESET_DIR:-}"
 PACK_CALIBRATION_PRESET_FILE="${PACK_CALIBRATION_PRESET_FILE:-}"
-# Delete edited/error models after certification to keep disk usage bounded.
+# Delete edited/error models after evaluation to keep disk usage bounded.
 # Override with PACK_CLEANUP_MODELS=0 to retain model variants for debugging.
 PACK_CLEANUP_MODELS="${PACK_CLEANUP_MODELS:-1}"
 export PACK_CLEANUP_MODELS

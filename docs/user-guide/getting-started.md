@@ -77,7 +77,7 @@ For offline use, pre‑download assets and enforce offline reads with
 Use the prebuilt workflow to capture a baseline and execute the edit stack:
 
 ```bash
-make cert-loop
+make eval-loop
 ```
 
 For more hands-on examples, see the [Example Reports](example-reports.md).

@@ -12,7 +12,7 @@
 
 This guide helps you get started with InvarLock (Edit‑agnostic robustness reports for weight edits)
 quickly. Every run flows through the **GuardChain**
-(invariants → spectral → RMT → variance) and produces a machine-readable safety
+(invariants → spectral → RMT → variance) and produces a machine-readable evaluation
 report with drift, guard-overhead, and policy digests.
 If any terms are unfamiliar, see the [Glossary](../assurance/glossary.md).
 
