@@ -107,3 +107,61 @@ def test_make_evaluation_report_tiny_relax_flag() -> None:
     report["context"] = {"run": {"tiny_relax": True}}
     cert = make_report(report, baseline)
     assert cert.get("auto", {}).get("tiny_relax") is True
+
+
+def test_make_evaluation_report_sets_measurement_contract_match_from_run_baseline() -> None:
+    spectral_contract = {
+        "estimator": {"type": "power_iter", "iters": 4, "init": "ones"}
+    }
+    rmt_contract = {
+        "kind": "activation_edge_risk",
+        "estimator": {"type": "power_iter", "iters": 3, "init": "ones"},
+        "activation_sampling": {
+            "windows": {"count": 8, "indices_policy": "evenly_spaced"}
+        },
+    }
+    report = _mk_minimal_report()
+    report["guards"] = [
+        {
+            "name": "spectral",
+            "metrics": {
+                "measurement_contract": spectral_contract,
+                "max_spectral_norm_final": 1.0,
+                "mean_spectral_norm_final": 1.0,
+                "caps_applied": 0,
+            },
+        },
+        {
+            "name": "rmt",
+            "metrics": {
+                "measurement_contract": rmt_contract,
+                "edge_risk_by_family_base": {"attn": 1.0},
+                "edge_risk_by_family": {"attn": 1.0},
+                "epsilon_by_family": {"attn": 0.01},
+                "stable": True,
+            },
+        },
+    ]
+    baseline = _mk_minimal_baseline()
+    baseline["guards"] = [
+        {
+            "name": "spectral",
+            "metrics": {
+                "measurement_contract": spectral_contract,
+                "max_spectral_norm_final": 1.0,
+                "mean_spectral_norm_final": 1.0,
+            },
+        },
+        {
+            "name": "rmt",
+            "metrics": {
+                "measurement_contract": rmt_contract,
+                "edge_risk_by_family": {"attn": 1.0},
+            },
+        },
+    ]
+
+    cert = make_report(report, baseline)
+
+    assert cert["spectral"]["measurement_contract_match"] is True
+    assert cert["rmt"]["measurement_contract_match"] is True

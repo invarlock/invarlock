@@ -827,6 +827,22 @@ def make_report(
 def _normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
     """Normalize baseline input to a consistent dictionary format."""
     if isinstance(baseline, dict):
+        def _guard_metrics_block(guard_name: str) -> dict[str, Any]:
+            for guard in baseline.get("guards", []) or []:
+                if str(guard.get("name", "")).lower() != guard_name:
+                    continue
+                metrics = guard.get("metrics")
+                if isinstance(metrics, dict) and metrics:
+                    return dict(metrics)
+                return {}
+            return {}
+
+        def _merged_guard_metrics(guard_name: str, metrics_value: Any) -> dict[str, Any]:
+            merged = dict(metrics_value) if isinstance(metrics_value, dict) else {}
+            guard_metrics = _guard_metrics_block(guard_name)
+            if guard_metrics:
+                merged.update(guard_metrics)
+            return merged
 
         def _coerce_valid_ppl(value: Any, *, label: str) -> float:
             if not (isinstance(value, int | float) and math.isfinite(float(value))):
@@ -1048,8 +1064,10 @@ def _normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
             baseline_out: dict[str, Any] = {
                 "run_id": _generate_run_id(baseline),
                 "model_id": baseline["meta"]["model_id"],
-                "spectral": baseline["metrics"].get("spectral", {}),
-                "rmt": baseline["metrics"].get("rmt", {}),
+                "spectral": _merged_guard_metrics(
+                    "spectral", baseline["metrics"].get("spectral", {})
+                ),
+                "rmt": _merged_guard_metrics("rmt", baseline["metrics"].get("rmt", {})),
                 "invariants": baseline["metrics"].get("invariants", {}),
                 "moe": baseline["metrics"].get("moe", {}),
                 "evaluation_windows": baseline_eval_windows,

@@ -259,6 +259,40 @@ def test_extract_rmt_analysis_edge_risk_paths_and_contract_hashes() -> None:
     assert out["mode"] == "activation_edge_risk"
 
 
+def test_extract_spectral_analysis_uses_run_report_baseline_contract() -> None:
+    contract = {"estimator": {"type": "power_iter", "iters": 4, "init": "ones"}}
+    baseline = {
+        "guards": [
+            {
+                "name": "spectral",
+                "metrics": {
+                    "measurement_contract": contract,
+                    "max_spectral_norm_final": 1.0,
+                    "mean_spectral_norm_final": 1.0,
+                },
+            }
+        ]
+    }
+    report = {
+        "guards": [
+            {
+                "name": "spectral",
+                "metrics": {
+                    "measurement_contract": contract,
+                    "max_spectral_norm_final": 1.0,
+                    "mean_spectral_norm_final": 1.0,
+                    "caps_applied": 0,
+                },
+            }
+        ]
+    }
+
+    out = GA._extract_spectral_analysis(report, baseline)
+
+    assert out["evaluated"] is True
+    assert out["measurement_contract_match"] is True
+
+
 def test_extract_variance_analysis_provenance_window_ids_and_ratio_ci_fail() -> None:
     report = {
         "guards": [
