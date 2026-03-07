@@ -1,6 +1,7 @@
 # ruff: noqa: I001,E402,F811
 from __future__ import annotations
 
+import builtins
 import json
 from pathlib import Path
 from unittest.mock import patch
@@ -49,6 +50,122 @@ def test_calibrate_helpers_cover_defaults_and_errors(tmp_path: Path) -> None:
     csv_path = tmp_path / "empty.csv"
     calibrate_mod._dump_csv(csv_path, [])
     assert csv_path.read_text(encoding="utf-8") == ""
+
+
+def test_mark_calibration_context_repairs_non_mapping_state() -> None:
+    cfg = {"context": "bad"}
+    calibrate_mod._mark_calibration_context(cfg)
+    assert cfg["context"]["run"]["skip_overhead_check"] is True
+
+    cfg2 = {"context": {"run": "bad"}}
+    calibrate_mod._mark_calibration_context(cfg2)
+    assert cfg2["context"]["run"]["skip_overhead_check"] is True
+
+
+def test_get_tier_guard_config_missing_optional_deps_and_reraise(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_import = builtins.__import__
+
+    def _missing_torch(
+        name: str,
+        globals=None,
+        locals=None,
+        fromlist=(),
+        level: int = 0,
+    ):
+        if name == "invarlock.guards.tier_config":
+            exc = ModuleNotFoundError("missing torch")
+            exc.name = "torch"
+            raise exc
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", _missing_torch)
+    with pytest.raises(typer.Exit):
+        calibrate_mod.get_tier_guard_config("balanced", "variance_guard")
+
+    def _missing_other(
+        name: str,
+        globals=None,
+        locals=None,
+        fromlist=(),
+        level: int = 0,
+    ):
+        if name == "invarlock.guards.tier_config":
+            exc = ModuleNotFoundError("missing other")
+            exc.name = "not_torch"
+            raise exc
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", _missing_other)
+    with pytest.raises(ModuleNotFoundError):
+        calibrate_mod.get_tier_guard_config("balanced", "variance_guard")
+
+
+def test_calibrate_commands_exit_on_missing_optional_deps(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = _write_base_config(tmp_path)
+    out = tmp_path / "out"
+    real_import = builtins.__import__
+
+    def _missing_spectral(
+        name: str,
+        globals=None,
+        locals=None,
+        fromlist=(),
+        level: int = 0,
+    ):
+        if name == "invarlock.calibration.spectral_null":
+            exc = ModuleNotFoundError("missing torch")
+            exc.name = "torch"
+            raise exc
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", _missing_spectral)
+    with pytest.raises(typer.Exit):
+        calibrate_mod.null_sweep(
+            config=cfg,
+            out=out,
+            tiers=["balanced"],
+            seed=[42],
+            n_seeds=1,
+            seed_start=42,
+            profile="ci",
+            device=None,
+            safety_margin=0.05,
+            target_any_warning_rate=0.01,
+        )
+
+    def _missing_variance(
+        name: str,
+        globals=None,
+        locals=None,
+        fromlist=(),
+        level: int = 0,
+    ):
+        if name == "invarlock.calibration.variance_ve":
+            exc = ModuleNotFoundError("missing transformers")
+            exc.name = "transformers"
+            raise exc
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", _missing_variance)
+    with pytest.raises(typer.Exit):
+        calibrate_mod.ve_sweep(
+            config=cfg,
+            out=out,
+            tiers=["balanced"],
+            seed=[42],
+            n_seeds=1,
+            seed_start=42,
+            window=[6],
+            target_enable_rate=0.05,
+            profile="ci",
+            device=None,
+            safety_margin=0.0,
+        )
 
 
 def test_null_sweep_emits_json_csv_md_and_tier_patch(tmp_path: Path) -> None:
