@@ -9,7 +9,7 @@ Usage: scripts/proof_packs/verify_pack.sh --pack DIR [options]
 
 Options:
   --pack DIR          Proof pack directory to verify
-  --json-out FILE     Write verify JSON output to FILE
+  --json-out FILE     Write verify JSON output to FILE (must be outside the pack)
   --skip-verify       Skip invarlock verify step
   --strict            Fail closed on missing/invalid signatures and pack mismatches
   --help              Show this help message
@@ -57,6 +57,25 @@ if isinstance(value, str):
     print(value)
 else:
     print(str(value))
+PY
+}
+
+pack_path_within_dir() {
+    local dir_path="$1"
+    local candidate_path="$2"
+    python3 - "${dir_path}" "${candidate_path}" <<'PY'
+from pathlib import Path
+import sys
+
+dir_path = Path(sys.argv[1]).resolve()
+candidate_path = Path(sys.argv[2]).resolve()
+
+try:
+    candidate_path.relative_to(dir_path)
+except ValueError:
+    raise SystemExit(1)
+
+raise SystemExit(0)
 PY
 }
 
@@ -299,6 +318,10 @@ pack_verify_pack() {
     fi
     if [[ ! -f "${pack_dir}/checksums.sha256" ]]; then
         echo "ERROR: checksums.sha256 missing in pack." >&2
+        return 1
+    fi
+    if [[ -n "${json_out}" ]] && pack_path_within_dir "${pack_dir}" "${json_out}"; then
+        echo "ERROR: --json-out must point outside the pack directory." >&2
         return 1
     fi
 

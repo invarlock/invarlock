@@ -55,6 +55,32 @@ test_verify_pack_errors_on_missing_args() {
 }
 
 
+test_verify_pack_rejects_json_output_inside_pack() {
+    mock_reset
+
+    source ./scripts/proof_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}/certs"
+    echo "{}" > "${pack_dir}/certs/evaluation.report.json"
+
+    local sha_cmd
+    sha_cmd="$(pack_sha256_cmd)"
+    (
+        cd "${pack_dir}"
+        ${sha_cmd} certs/evaluation.report.json > checksums.sha256
+    )
+
+    local checksums_digest
+    checksums_digest="$(cd "${pack_dir}" && python3 -c 'import hashlib;print(hashlib.sha256(open("checksums.sha256","rb").read()).hexdigest())' < /dev/null)"
+    printf '%s\n' "{\"format\":\"proof-pack-v1\",\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
+
+    run pack_verify_pack --pack "${pack_dir}" --json-out "${pack_dir}/verify.json"
+    assert_rc "1" "${RUN_RC}" "json output inside pack is rejected"
+    assert_match "--json-out must point outside the pack directory" "${RUN_ERR}" "error explains path constraint"
+}
+
+
 test_verify_pack_help_and_main_entrypoint() {
     mock_reset
 
