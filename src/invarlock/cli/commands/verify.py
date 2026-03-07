@@ -28,6 +28,7 @@ from invarlock.core.exceptions import (
 )
 from invarlock.reporting import report_builder as _report_builder
 from invarlock.reporting.report_builder import validate_report
+from invarlock.reporting.report_policy import resolve_tiny_relax_from_report
 from invarlock.reporting.report_schema import REPORT_JSON_SCHEMA, REPORT_SCHEMA_VERSION
 
 from .._json import emit as _emit_json
@@ -327,6 +328,8 @@ def _validate_drift_band(report: dict[str, Any]) -> list[str]:
     Defaults to 0.95–1.05 unless the report provides `primary_metric.drift_band`.
     """
     errors: list[str] = []
+    if resolve_tiny_relax_from_report(report):
+        return errors
     pm = report.get("primary_metric", {}) or {}
     if not isinstance(pm, dict) or not pm:
         errors.append("report missing primary_metric block.")

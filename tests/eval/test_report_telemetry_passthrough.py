@@ -56,6 +56,8 @@ def test_evaluation_report_telemetry_fields_and_device_default():
     # throughput key may be omitted
     assert tel.get("preview_total_tokens") == 12.0
     assert tel.get("final_total_tokens") == 34.0
-    # masked token totals may be omitted
+    assert tel.get("masked_tokens_total") == 0.0
+    assert tel.get("masked_tokens_preview") == 0.0
+    assert tel.get("masked_tokens_final") == 0.0
     # edge_device and device are surfaced in meta or omitted; do not assert under telemetry
     assert cert.get("meta", {}).get("device") == "cpu"

@@ -251,6 +251,17 @@ def test_validate_drift_band_parses_override_shapes() -> None:
     assert verify_mod._validate_drift_band(cert_invalid)
 
 
+def test_validate_drift_band_skips_tiny_relax_reports() -> None:
+    verify_mod = _import_verify_module()
+
+    cert_tiny_relax = {
+        "auto": {"tiny_relax": True},
+        "primary_metric": {"preview": 10.0, "final": 20.0},
+    }
+
+    assert verify_mod._validate_drift_band(cert_tiny_relax) == []
+
+
 def test_coercion_helpers_and_measurement_contract_digest() -> None:
     verify_mod = _import_verify_module()
 

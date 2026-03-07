@@ -208,6 +208,9 @@ def normalize_run_report(report: Mapping[str, Any] | RunReport) -> RunReport:
         "total_tokens",
         "preview_total_tokens",
         "final_total_tokens",
+        "masked_tokens_total",
+        "masked_tokens_preview",
+        "masked_tokens_final",
     ):
         if k in m_in:
             metrics_out[k] = m_in.get(k)
