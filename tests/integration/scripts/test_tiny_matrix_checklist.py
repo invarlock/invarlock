@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -16,24 +17,19 @@ def test_tiny_gpt2_matrix_dry_run(tmp_path: Path):
     assert checklist.exists()
     text = checklist.read_text()
     assert "Evaluation Matrix" in text
-    # Basic sanity: contains at least one invarlock evaluate command
-    assert "invarlock evaluate" in text
+    # Basic sanity: contains at least one evaluate command
+    assert "evaluate" in text and "--adapter hf_causal" in text
 
 
 def _read_profile_from_checklist(path: str) -> str:
     txt = Path(path).read_text()
     for line in txt.splitlines():
-        if "invarlock evaluate" in line and "--profile" in line:
+        if "evaluate" in line and "--profile" in line:
             parts = line.strip().split()
             for i, p in enumerate(parts):
                 if p == "--profile" and i + 1 < len(parts):
                     return parts[i + 1]
     return ""
-
-
-def _has_measured_cls(path: str) -> bool:
-    txt = Path(path).read_text()
-    return "distilbert_cls_measured" in txt
 
 
 def test_checklist_uses_dev_profile_when_tiny_relax(monkeypatch, tmp_path):
@@ -93,12 +89,10 @@ def test_explicit_profile_overrides_relax(monkeypatch, tmp_path):
     assert _read_profile_from_checklist(str(checklists[-1])) == "ci"
 
 
-def test_measured_cls_included_only_when_requested(monkeypatch, tmp_path):
-    # Default: not included
+def test_checklist_no_longer_advertises_distilbert_classification(tmp_path: Path):
     env = os.environ.copy()
     env["RUN"] = "0"
-    env["NET"] = "1"
-    env.pop("INCLUDE_MEASURED_CLS", None)
+    env["TMP_DIR"] = str(tmp_path / "tmp")
     subprocess.run(
         ["bash", "scripts/run_tiny_all_matrix.sh"],
         env=env,
@@ -106,13 +100,44 @@ def test_measured_cls_included_only_when_requested(monkeypatch, tmp_path):
         capture_output=True,
         text=True,
     )
-    checklists = sorted(Path("tmp").glob("tiny_all_*/checklist.md"))
-    assert checklists, "No checklist generated"
-    chk = str(checklists[-1])
-    assert _has_measured_cls(chk) is False
+    checklist = Path(env["TMP_DIR"]) / "checklist.md"
+    text = checklist.read_text(encoding="utf-8")
+    assert "DistilBERT" not in text
+    assert "classification" not in text.lower()
 
-    # With toggle: included
-    env["INCLUDE_MEASURED_CLS"] = "1"
+
+def test_run_mode_falls_back_to_python_module_when_console_script_missing(
+    tmp_path: Path,
+) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    log_path = tmp_path / "python_calls.log"
+    fake_python = bin_dir / "python"
+    fake_python.write_text(
+        "\n".join(
+            [
+                "#!/usr/bin/env bash",
+                f"echo \"$@\" >> {log_path}",
+                "exit 0",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    fake_python.chmod(0o755)
+
+    env = os.environ.copy()
+    env["RUN"] = "1"
+    env["NET"] = "0"
+    env["INVARLOCK_TINY_RELAX"] = "1"
+    env["TMP_DIR"] = str(tmp_path / "tmp")
+    path_parts = os.environ.get("PATH", "").split(os.pathsep)
+    installed_cli = shutil.which("invarlock")
+    if installed_cli:
+        cli_dir = str(Path(installed_cli).resolve().parent)
+        path_parts = [part for part in path_parts if Path(part).resolve() != Path(cli_dir)]
+    env["PATH"] = os.pathsep.join([str(bin_dir), *path_parts])
+
     subprocess.run(
         ["bash", "scripts/run_tiny_all_matrix.sh"],
         env=env,
@@ -120,10 +145,9 @@ def test_measured_cls_included_only_when_requested(monkeypatch, tmp_path):
         capture_output=True,
         text=True,
     )
-    checklists2 = sorted(Path("tmp").glob("tiny_all_*/checklist.md"))
-    assert checklists2, "No checklist generated"
-    chk2 = str(checklists2[-1])
-    assert _has_measured_cls(chk2) is True
+
+    calls = log_path.read_text(encoding="utf-8")
+    assert "-m invarlock.cli evaluate" in calls
 
 
 pytestmark = pytest.mark.integration
