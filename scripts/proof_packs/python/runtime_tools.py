@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import datetime
 
+UTC = getattr(datetime, "UTC", datetime.timezone.utc)  # noqa: UP017
+
 
 def iso_to_epoch(iso: str) -> int:
     iso = iso.strip()
@@ -10,7 +12,7 @@ def iso_to_epoch(iso: str) -> int:
         return 0
     try:
         dt = datetime.datetime.strptime(iso, "%Y-%m-%dT%H:%M:%SZ").replace(
-            tzinfo=datetime.UTC
+            tzinfo=UTC
         )
     except Exception:
         return 0
@@ -18,7 +20,7 @@ def iso_to_epoch(iso: str) -> int:
 
 
 def now_iso_plus_seconds(seconds: int) -> str:
-    dt = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=seconds)
+    dt = datetime.datetime.now(UTC) + datetime.timedelta(seconds=seconds)
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
