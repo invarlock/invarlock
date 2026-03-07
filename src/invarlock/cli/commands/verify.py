@@ -30,6 +30,7 @@ from invarlock.reporting import report_builder as _report_builder
 from invarlock.reporting.report_builder import validate_report
 from invarlock.reporting.report_policy import resolve_tiny_relax_from_report
 from invarlock.reporting.report_schema import REPORT_JSON_SCHEMA, REPORT_SCHEMA_VERSION
+from invarlock.reporting.report_validation import compute_validation_flags
 
 from .._json import emit as _emit_json
 from .._json import encode_error as _encode_error
@@ -240,6 +241,108 @@ def _validate_primary_metric(report: dict[str, Any]) -> list[str]:
             )
 
     return errors
+
+
+def _recompute_validation_flags(report: dict[str, Any]) -> dict[str, bool]:
+    """Recompute report gates from serialized evidence for verify-time parity."""
+
+    pm = report.get("primary_metric") or {}
+    if not isinstance(pm, dict):
+        pm = {}
+
+    ppl: dict[str, Any] = {}
+    ratio_vs_baseline = _coerce_float(pm.get("ratio_vs_baseline"))
+    if ratio_vs_baseline is not None:
+        ppl["ratio_vs_baseline"] = ratio_vs_baseline
+
+    preview = _coerce_float(pm.get("preview"))
+    final = _coerce_float(pm.get("final"))
+    if preview is not None and final is not None and preview > 0.0:
+        ppl["preview_final_ratio"] = final / preview
+
+    ppl_metrics: dict[str, Any] = {}
+    telemetry = report.get("telemetry")
+    if isinstance(telemetry, dict):
+        for key in ("preview_total_tokens", "final_total_tokens"):
+            value = _coerce_int(telemetry.get(key))
+            if value is not None:
+                ppl_metrics[key] = value
+
+    auto = report.get("auto")
+    if not isinstance(auto, dict):
+        auto = {}
+    tier = str(auto.get("tier") or "balanced").strip().lower() or "balanced"
+    target_ratio = _coerce_float(auto.get("target_pm_ratio"))
+    tiny_relax = resolve_tiny_relax_from_report(report)
+
+    metrics_policy = None
+    resolved_policy = report.get("resolved_policy")
+    if isinstance(resolved_policy, dict):
+        candidate = resolved_policy.get("metrics")
+        if isinstance(candidate, dict) and candidate:
+            metrics_policy = candidate
+
+    get_tier_policies_fn = None
+    if isinstance(metrics_policy, dict):
+
+        def _report_tier_policies() -> dict[str, Any]:
+            return {tier: {"metrics": metrics_policy}}
+
+        get_tier_policies_fn = _report_tier_policies
+
+    return compute_validation_flags(
+        ppl=ppl,
+        spectral=report.get("spectral") if isinstance(report.get("spectral"), dict) else {},
+        rmt=report.get("rmt") if isinstance(report.get("rmt"), dict) else {},
+        invariants=report.get("invariants")
+        if isinstance(report.get("invariants"), dict)
+        else {},
+        tier=tier,
+        _ppl_metrics=ppl_metrics,
+        target_ratio=target_ratio,
+        guard_overhead=report.get("guard_overhead")
+        if isinstance(report.get("guard_overhead"), dict)
+        else None,
+        primary_metric=pm,
+        moe=report.get("moe") if isinstance(report.get("moe"), dict) else None,
+        pm_tail=report.get("primary_metric_tail")
+        if isinstance(report.get("primary_metric_tail"), dict)
+        else None,
+        tiny_relax=tiny_relax,
+        get_tier_policies_fn=get_tier_policies_fn,
+    )
+
+
+def _validate_primary_metric_policy(
+    report: dict[str, Any], *, profile: str | None = None
+) -> list[str]:
+    """Enforce the serialized PM policy gate in CI/release verification."""
+
+    prof = str(profile or "dev").strip().lower()
+    if prof not in {"ci", "release"}:
+        return []
+
+    flags = _recompute_validation_flags(report)
+    if bool(flags.get("primary_metric_acceptable", True)):
+        return []
+
+    telemetry = report.get("telemetry")
+    total_tokens = None
+    if isinstance(telemetry, dict):
+        preview_tokens = _coerce_int(telemetry.get("preview_total_tokens"))
+        final_tokens = _coerce_int(telemetry.get("final_total_tokens"))
+        if preview_tokens is not None and final_tokens is not None:
+            total_tokens = preview_tokens + final_tokens
+
+    auto = report.get("auto")
+    tier = "balanced"
+    if isinstance(auto, dict):
+        tier = str(auto.get("tier") or "balanced").strip().lower() or "balanced"
+
+    detail = f"tier={tier}"
+    if total_tokens is not None:
+        detail += f", total_tokens={total_tokens}"
+    return [f"Primary metric policy gate failed ({detail})."]
 
 
 def _validate_pairing(report: dict[str, Any]) -> list[str]:
@@ -586,6 +689,7 @@ def _validate_evaluation_report_payload(
     # fail verification due to preview→final drift.
     if prof in {"ci", "release"}:
         errors.extend(_validate_drift_band(report))
+        errors.extend(_validate_primary_metric_policy(report, profile=prof))
     errors.extend(_apply_profile_lints(report))
     errors.extend(_validate_tokenizer_hash(report))
     if prof in {"ci", "release"}:
