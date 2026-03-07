@@ -159,7 +159,7 @@ def plugins_command(
             return
 
         from invarlock.core.registry import get_registry
-        from invarlock.eval.data import get_provider, list_providers
+        from invarlock.eval.data import list_providers
 
         registry = get_registry()
 
@@ -776,25 +776,22 @@ def plugins_command(
             providers = sorted(list_providers())
 
             if json_out:
+                try:
+                    import invarlock.eval.data as _data_mod  # type: ignore
+
+                    _providers_map = getattr(_data_mod, "_PROVIDERS", {}) or {}
+                except Exception:
+                    _providers_map = {}
                 items = []
                 for provider_name in providers:
-                    try:
-                        provider = get_provider(provider_name)
-                        items.append(
-                            {
-                                "name": provider_name,
-                                "module": provider.__class__.__module__,
-                                "status": "available",
-                            }
-                        )
-                    except Exception as e:  # pragma: no cover - defensive
-                        items.append(
-                            {
-                                "name": provider_name,
-                                "module": "unknown",
-                                "status": f"error: {e}",
-                            }
-                        )
+                    provider_cls = _providers_map.get(provider_name)
+                    items.append(
+                        {
+                            "name": provider_name,
+                            "module": getattr(provider_cls, "__module__", "unknown"),
+                            "status": "available",
+                        }
+                    )
                 _emit_plugins_json("datasets", items)
             else:
                 show_plugins("Dataset Providers", providers, "datasets")

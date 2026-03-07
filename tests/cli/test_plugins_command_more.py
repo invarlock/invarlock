@@ -222,6 +222,40 @@ def test_plugins_datasets_json(monkeypatch, capsys):
     assert payload["kind"] == "datasets"
 
 
+def test_plugins_datasets_json_does_not_instantiate_parameterized_providers(
+    monkeypatch, capsys
+):
+    _patch_registry(monkeypatch, {})
+
+    class _NeedsArgsProvider:
+        __module__ = "invarlock.eval.providers.seq2seq"
+
+        def __init__(self, dataset_name: str):
+            self.dataset_name = dataset_name
+
+    monkeypatch.setattr(
+        plugins_mod, "list_providers", lambda: ["hf_seq2seq"], raising=False
+    )
+    monkeypatch.setattr(data_mod, "list_providers", lambda: ["hf_seq2seq"], raising=False)
+    monkeypatch.setattr(
+        data_mod,
+        "_PROVIDERS",
+        {"hf_seq2seq": _NeedsArgsProvider},
+        raising=False,
+    )
+
+    plugins_command(category="datasets", json_out=True)
+    payload = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert payload["kind"] == "datasets"
+    assert payload["items"] == [
+        {
+            "name": "hf_seq2seq",
+            "module": "invarlock.eval.providers.seq2seq",
+            "status": "available",
+        }
+    ]
+
+
 def test_plugins_adapters_handle_torch_and_extra_errors(monkeypatch, capsys):
     adapters = {
         "hf_bnb": {"module": "invarlock.plugins.bitsandbytes", "entry_point": "bnb"},
