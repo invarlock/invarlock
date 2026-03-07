@@ -175,9 +175,7 @@ def test_run_command_returns_report_path_and_emits_determinism_meta(
     assert det.get("level") in {"strict", "tolerance", "off"}
 
 
-def test_run_command_persists_tiny_relax_context(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_run_command_persists_tiny_relax_context(tmp_path: Path, monkeypatch) -> None:
     cfg = _cfg(tmp_path)
     captured: dict[str, object] = {}
     monkeypatch.setenv("INVARLOCK_TINY_RELAX", "1")

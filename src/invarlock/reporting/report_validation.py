@@ -89,9 +89,7 @@ def compute_validation_flags(
         ratio_max_bound = acceptance_max
 
     ratio_limit = (
-        ratio_max_bound
-        if ratio_max_bound is not None
-        else float(ratio_limit_base)
+        ratio_max_bound if ratio_max_bound is not None else float(ratio_limit_base)
     )
     if isinstance(target_ratio, int | float) and target_ratio > 0:
         ratio_limit = min(ratio_limit, float(target_ratio))

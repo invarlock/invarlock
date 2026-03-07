@@ -57,9 +57,7 @@ def explain_gates_command(
     tier = str(auto.get("tier", "balanced")).lower()
     effective_tier = "aggressive" if tiny_relax else tier
     tier_policies = get_tier_policies()
-    tier_defaults = tier_policies.get(
-        effective_tier, tier_policies.get("balanced", {})
-    )
+    tier_defaults = tier_policies.get(effective_tier, tier_policies.get("balanced", {}))
     resolved_policy = (
         evaluation_report.get("resolved_policy", {})
         if isinstance(evaluation_report.get("resolved_policy"), dict)
@@ -151,7 +149,9 @@ def explain_gates_command(
     else:
         console.print("  threshold: unavailable")
     if tiny_relax:
-        console.print("  note: tiny relax enabled; aggressive-tier gates and token floors are informational")
+        console.print(
+            "  note: tiny relax enabled; aggressive-tier gates and token floors are informational"
+        )
     token_state = "ok" if tokens_ok else "below floor"
     console.print(
         f"  tokens: {token_state} (token floors: min_tokens={min_tokens or 0}, total={int(telem.get('preview_total_tokens', 0)) + int(telem.get('final_total_tokens', 0)) if telem else 0})"

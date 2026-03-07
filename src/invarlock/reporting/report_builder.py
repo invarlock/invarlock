@@ -827,6 +827,7 @@ def make_report(
 def _normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
     """Normalize baseline input to a consistent dictionary format."""
     if isinstance(baseline, dict):
+
         def _guard_metrics_block(guard_name: str) -> dict[str, Any]:
             for guard in baseline.get("guards", []) or []:
                 if str(guard.get("name", "")).lower() != guard_name:
@@ -837,7 +838,9 @@ def _normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
                 return {}
             return {}
 
-        def _merged_guard_metrics(guard_name: str, metrics_value: Any) -> dict[str, Any]:
+        def _merged_guard_metrics(
+            guard_name: str, metrics_value: Any
+        ) -> dict[str, Any]:
             merged = dict(metrics_value) if isinstance(metrics_value, dict) else {}
             guard_metrics = _guard_metrics_block(guard_name)
             if guard_metrics:

@@ -68,7 +68,7 @@ def test_render_report_markdown_includes_guard_sections():
         },
         "families": {
             "mlp": {"epsilon": 0.2, "bare": 10, "guarded": 6},
-        }
+        },
     }
 
     report = render_mod.render_report_markdown(cert)

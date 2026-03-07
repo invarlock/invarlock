@@ -292,7 +292,9 @@ def _recompute_validation_flags(report: dict[str, Any]) -> dict[str, bool]:
 
     return compute_validation_flags(
         ppl=ppl,
-        spectral=report.get("spectral") if isinstance(report.get("spectral"), dict) else {},
+        spectral=report.get("spectral")
+        if isinstance(report.get("spectral"), dict)
+        else {},
         rmt=report.get("rmt") if isinstance(report.get("rmt"), dict) else {},
         invariants=report.get("invariants")
         if isinstance(report.get("invariants"), dict)

@@ -1397,16 +1397,16 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
             contract_parts: list[str] = []
             estimator = measurement_contract.get("estimator")
             if isinstance(estimator, dict) and estimator:
-                contract_parts.append(f"estimator={json.dumps(estimator, sort_keys=True)}")
+                contract_parts.append(
+                    f"estimator={json.dumps(estimator, sort_keys=True)}"
+                )
             activation_sampling = measurement_contract.get("activation_sampling")
             if isinstance(activation_sampling, dict) and activation_sampling:
                 contract_parts.append(
                     f"activation_sampling={json.dumps(activation_sampling, sort_keys=True)}"
                 )
             if contract_parts:
-                lines.append(
-                    f"- Measurement Contract: {'; '.join(contract_parts)}"
-                )
+                lines.append(f"- Measurement Contract: {'; '.join(contract_parts)}")
         delta_total = rmt_info.get("delta_total")
         if isinstance(delta_total, int):
             lines.append(f"- Δ total: {delta_total:+d}")
@@ -1414,8 +1414,7 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
         lines.append(f"- Families: {len(families)}")
         if families:
             edge_risk_mode = any(
-                isinstance(data, dict)
-                and ("edge_base" in data or "edge_cur" in data)
+                isinstance(data, dict) and ("edge_base" in data or "edge_cur" in data)
                 for data in families.values()
             )
             lines.append("")
@@ -1445,9 +1444,7 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
                         else "-"
                     )
                     edge_cur_str = (
-                        f"{edge_cur:.3f}"
-                        if isinstance(edge_cur, int | float)
-                        else "-"
+                        f"{edge_cur:.3f}" if isinstance(edge_cur, int | float) else "-"
                     )
                     delta_str = (
                         f"{delta_val:+.3f}"
@@ -1473,9 +1470,7 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
                     delta_count = int(guarded_count) - int(bare_count)  # type: ignore[arg-type]
                 except Exception:
                     delta_count = None
-                delta_str = (
-                    f"{delta_count:+d}" if isinstance(delta_count, int) else "-"
-                )
+                delta_str = f"{delta_count:+d}" if isinstance(delta_count, int) else "-"
                 lines.append(
                     f"| {family} | {epsilon_str} | {bare_str} | {guarded_str} | {delta_str} |"
                 )

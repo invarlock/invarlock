@@ -11,9 +11,7 @@ def iso_to_epoch(iso: str) -> int:
     if not iso or iso == "null":
         return 0
     try:
-        dt = datetime.datetime.strptime(iso, "%Y-%m-%dT%H:%M:%SZ").replace(
-            tzinfo=UTC
-        )
+        dt = datetime.datetime.strptime(iso, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
     except Exception:
         return 0
     return int(dt.timestamp())

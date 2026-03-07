@@ -236,7 +236,9 @@ def test_plugins_datasets_json_does_not_instantiate_parameterized_providers(
     monkeypatch.setattr(
         plugins_mod, "list_providers", lambda: ["hf_seq2seq"], raising=False
     )
-    monkeypatch.setattr(data_mod, "list_providers", lambda: ["hf_seq2seq"], raising=False)
+    monkeypatch.setattr(
+        data_mod, "list_providers", lambda: ["hf_seq2seq"], raising=False
+    )
     monkeypatch.setattr(
         data_mod,
         "_PROVIDERS",

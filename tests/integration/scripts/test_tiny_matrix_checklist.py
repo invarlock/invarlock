@@ -117,7 +117,7 @@ def test_run_mode_falls_back_to_python_module_when_console_script_missing(
         "\n".join(
             [
                 "#!/usr/bin/env bash",
-                f"echo \"$@\" >> {log_path}",
+                f'echo "$@" >> {log_path}',
                 "exit 0",
             ]
         )
@@ -135,7 +135,9 @@ def test_run_mode_falls_back_to_python_module_when_console_script_missing(
     installed_cli = shutil.which("invarlock")
     if installed_cli:
         cli_dir = str(Path(installed_cli).resolve().parent)
-        path_parts = [part for part in path_parts if Path(part).resolve() != Path(cli_dir)]
+        path_parts = [
+            part for part in path_parts if Path(part).resolve() != Path(cli_dir)
+        ]
     env["PATH"] = os.pathsep.join([str(bin_dir), *path_parts])
 
     subprocess.run(

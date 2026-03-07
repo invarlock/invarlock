@@ -109,7 +109,9 @@ def test_make_evaluation_report_tiny_relax_flag() -> None:
     assert cert.get("auto", {}).get("tiny_relax") is True
 
 
-def test_make_evaluation_report_sets_measurement_contract_match_from_run_baseline() -> None:
+def test_make_evaluation_report_sets_measurement_contract_match_from_run_baseline() -> (
+    None
+):
     spectral_contract = {
         "estimator": {"type": "power_iter", "iters": 4, "init": "ones"}
     }

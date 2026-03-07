@@ -215,7 +215,9 @@ def _build_sample_evaluation_report() -> dict:
 
 
 def _make_ci_ready(cert: dict) -> dict:
-    spectral_contract = {"estimator": {"type": "power_iter", "iters": 4, "init": "ones"}}
+    spectral_contract = {
+        "estimator": {"type": "power_iter", "iters": 4, "init": "ones"}
+    }
     rmt_contract = {
         "estimator": {"type": "power_iter", "iters": 3, "init": "ones"},
         "activation_sampling": {
