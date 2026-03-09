@@ -654,6 +654,7 @@ def test_plugins_guards_compact_table(monkeypatch):
     plugins_command(category="guards", verbose=False, json_out=False)
     text = buf.getvalue()
     assert "Guard Plugins" in text and "Needs extra" in text
+    assert "Hints:" not in text
 
 
 def test_plugins_guards_empty_message(monkeypatch):

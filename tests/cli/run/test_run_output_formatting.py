@@ -98,10 +98,10 @@ def test_suppress_noisy_warnings_release_filters_stderr_output(
 
 def test_evaluate_helpers_cover_banner_and_ratio() -> None:
     lines = evaluate_mod._render_banner_lines("Title", "Context")
-    assert len(lines) == 4
-    assert "Title" in lines[1]
-    assert "Context" in lines[2]
-    assert len(lines[0]) == len(lines[1]) == len(lines[2]) == len(lines[3])
+    assert len(lines) == 3
+    assert lines[0] == "Title"
+    assert lines[1] == "Context"
+    assert set(lines[2]) == {"-"}
     assert evaluate_mod._format_ratio(1.23456) == "1.235"
     assert (
         evaluate_mod._resolve_verbosity(False, False) == evaluate_mod.VERBOSITY_DEFAULT

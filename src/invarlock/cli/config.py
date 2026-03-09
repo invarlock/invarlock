@@ -181,12 +181,6 @@ class VarianceGuardConfig:
 
 
 @dataclass
-class EditConfig:
-    name: str
-    plan: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
 class AutoConfig:
     probes: int = 0
     target_pm_ratio: float = 1.0
@@ -424,12 +418,3 @@ def apply_edit_override(cfg: InvarLockConfig, kind: str) -> InvarLockConfig:
 # Backward-compat helper name expected by tests
 def _deep_merge_dicts(a: dict, b: dict) -> dict:  # pragma: no cover - trivial alias
     return _deep_merge(a, b)
-
-
-def create_example_config() -> InvarLockConfig:  # pragma: no cover - test helper
-    return InvarLockConfig(
-        model={"id": "gpt2", "adapter": "hf_causal", "device": "auto"},
-        edit={"name": "quant_rtn", "plan": {}},
-        dataset={"provider": "wikitext2", "seq_len": 512, "stride": 512},
-        output={"dir": "runs"},
-    )

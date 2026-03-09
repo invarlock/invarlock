@@ -21,7 +21,6 @@ def test_cli_plugins_guards_smoke():
 def test_cli_doctor_smoke():
     result = runner.invoke(app, ["doctor"])
     assert result.exit_code in (0, 1)
-    assert "health" in result.stdout.lower() or result.stdout
 
 
 def test_cli_plugins_unknown_category_exits_error():

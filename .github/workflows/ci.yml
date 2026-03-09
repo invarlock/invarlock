@@ -178,7 +178,7 @@ jobs:
         run: |
           python -m pip install -U pip wheel
           pip install -e .[hf]
-          pip install pytest "ruff==0.14.6" mkdocs mkdocs-material mkdocs-mermaid2-plugin build
+          pip install pytest ruff mkdocs mkdocs-material mkdocs-mermaid2-plugin build
 
       - name: Full verify
         run: |

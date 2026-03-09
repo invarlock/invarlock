@@ -297,7 +297,7 @@ def doctor_command(
         console = Console(file=StringIO())
 
     if not json_out:
-        console.print("🏥 InvarLock Health Check")
+        console.print("InvarLock Health Check")
         console.print("=" * 50)
 
     # Environment facts (OS · Python · invarlock)
@@ -345,7 +345,7 @@ def doctor_command(
 
         device_info = get_device_info()
         if not json_out:
-            console.print("\n🖥️  Device Information")
+            console.print("\nDevice Information")
 
         for device_name, info in device_info.items():
             if device_name == "auto_selected":
@@ -397,7 +397,7 @@ def doctor_command(
             if torch.cuda.is_available():
                 free_memory = torch.cuda.get_device_properties(0).total_memory / 1e9
                 if not json_out:
-                    console.print(f"\n💾 GPU Memory: {free_memory:.1f} GB total")
+                    console.print(f"\nGPU Memory: {free_memory:.1f} GB total")
                 if free_memory < 4.0:
                     if not json_out:
                         console.print(
@@ -414,7 +414,7 @@ def doctor_command(
 
     # Check optional dependencies
     if not json_out:
-        console.print("\n📦 Optional Dependencies")
+        console.print("\nOptional Dependencies")
 
     optional_deps = [
         ("datasets", "Dataset loading (WikiText-2, etc.)"),
@@ -1014,7 +1014,7 @@ def doctor_command(
         from .plugins import _check_plugin_extras
 
         if not json_out:
-            console.print("\n🔌 Plugin Registry")
+            console.print("\nPlugin Registry")
         registry = get_registry()
         if not json_out:
             console.print(f"  Adapters: {len(registry.list_adapters())}")
@@ -1174,14 +1174,12 @@ def doctor_command(
             for r in rows:
                 backend_disp, ver_disp = _fmt_backend_ver(r["backend"], r["version"])
                 if r["mode"] == "auto-matcher":
-                    status_disp = "🧩 Auto (selects best hf_* adapter)"
+                    status_disp = "Ready"
                 elif r["status"] == "ready":
-                    status_disp = "✅ Ready"
+                    status_disp = "Ready"
                 elif r["status"] == "needs_extra":
                     status_disp = (
-                        f"⛔ Needs extra → {r['enable']}"
-                        if r["enable"]
-                        else "⛔ Needs extra"
+                        f"Needs extra: {r['enable']}" if r["enable"] else "Needs extra"
                     )
                 else:
                     status_disp = r["status"]
@@ -1254,12 +1252,12 @@ def doctor_command(
                     b, v = _fmt_backend_ver(r["backend"], r["version"])
 
                     status_disp = (
-                        "✅ Ready"
+                        "Ready"
                         if r["status"] == "ready"
                         else (
-                            f"⛔ Needs extra → {r['enable']}"
+                            f"Needs extra: {r['enable']}"
                             if r["enable"]
-                            else "⛔ Needs extra"
+                            else "Needs extra"
                         )
                     )
                     table.add_row(
@@ -1310,14 +1308,6 @@ def doctor_command(
                 console.print(dtable)
         except NON_FATAL_EXCEPTIONS:
             pass
-
-        if not json_out:
-            console.print(
-                "[dim]Legend: ✅ Ready = usable now · 🧩 Auto‑matcher = picks an adapter for you[/dim]"
-            )
-            console.print(
-                "[dim]Hints: use --json · filter with --only ready|core|plugin|auto|unsupported[/dim]"
-            )
     except NON_FATAL_EXCEPTIONS as e:
         # Gracefully handle missing optional Optimum stack
         if "optimum" in str(e).lower():

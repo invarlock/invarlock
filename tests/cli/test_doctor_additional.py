@@ -768,6 +768,8 @@ def test_doctor_non_json_device_and_optional_paths(monkeypatch):
     assert getattr(exc.value, "exit_code", getattr(exc.value, "code", None)) == 0
     assert any("Optional Dependencies" in line for line in dummy_console.lines)
     assert any("Plugin Registry" in line for line in dummy_console.lines)
+    assert all("Legend:" not in line for line in dummy_console.lines)
+    assert all("Hints:" not in line for line in dummy_console.lines)
 
 
 def test_doctor_determinism_warning_prints(monkeypatch, tmp_path):

@@ -85,10 +85,9 @@ def test_artifact_wrappers_delegate(monkeypatch, tmp_path):
     monkeypatch.setattr(
         run_mod,
         "_persist_ref_masks_impl",
-        lambda core_report, run_dir: run_dir
-        / "artifacts"
-        / "edit_masks"
-        / "masks.json",
+        lambda core_report, run_dir: (
+            run_dir / "artifacts" / "edit_masks" / "masks.json"
+        ),
     )
     assert run_mod._persist_ref_masks({}, tmp_path).name == "masks.json"
 

@@ -339,16 +339,16 @@ def plugins_command(
                     "Auto‑matcher" if r.get("mode") == "auto-matcher" else "Adapter"
                 )
                 if r["support"] == "auto":
-                    status_disp = "🧩 Auto (selects best hf_* adapter)"
+                    status_disp = "Ready"
                 elif r["status"] == "ready":
-                    status_disp = "✅ Ready"
+                    status_disp = "Ready"
                 elif r["status"] == "needs_extra":
-                    status_disp = f"⛔ Needs extra → {r['enable'] or ''}".rstrip()
+                    status_disp = f"Needs extra: {r['enable'] or ''}".rstrip(": ")
                 elif r["status"] == "unsupported":
                     if r["backend"] == "bitsandbytes":
-                        status_disp = "🚫 Unsupported (requires CUDA)"
+                        status_disp = "Unsupported (requires CUDA)"
                     else:
-                        status_disp = "🚫 Unsupported on this platform"
+                        status_disp = "Unsupported on this platform"
                 else:
                     status_disp = r["status"]
                 next_support = rows[idx + 1]["support"] if idx + 1 < len(rows) else None
@@ -364,9 +364,6 @@ def plugins_command(
                 )
             # Hints
             console.print(table)
-            console.print(
-                "[dim]Hints: add --only ready|core|optional|auto|unsupported · use --json for scripting · use adapters (plural)[/dim]"
-            )
 
         def _print_adapters_verbose(rows: list[dict]) -> None:
             table = Table(title="Adapters (verbose)")
@@ -442,15 +439,15 @@ def plugins_command(
             console.print(f"  Support     : {r['support'].capitalize()}")
             console.print(f"  Backend     : {backend_disp}")
             if r["support"] == "auto":
-                console.print("  Status      : 🧩 Ready (matcher)")
+                console.print("  Status      : Ready (auto matcher)")
             elif r["status"] == "ready":
-                console.print("  Status      : ✅ Ready")
+                console.print("  Status      : Ready")
             elif r["status"] == "needs_extra":
-                console.print("  Status      : ⛔ Needs extra")
+                console.print("  Status      : Needs extra")
                 if r["enable"]:
                     console.print(f"  Enable      : {_escape(r['enable'])}")
             elif r["status"] == "partial":
-                console.print("  Status      : ⚠️ Partial (GPU-only features disabled)")
+                console.print("  Status      : Partial (GPU-only features disabled)")
             if r["name"] == "hf_gptq":
                 console.print(
                     "  Matches     : AutoGPTQ-quantized HF repos (from_quantized)"
@@ -547,9 +544,9 @@ def plugins_command(
                 origin_disp = r.get("origin", r.get("support", "")).capitalize()
                 mode_disp = "Guard" if r.get("mode") == "guard" else "Edit"
                 if r["status"] == "ready":
-                    status_disp = "✅ Ready"
+                    status_disp = "Ready"
                 elif r["status"] == "needs_extra":
-                    status_disp = f"⛔ Needs extra → {r['enable'] or ''}".rstrip()
+                    status_disp = f"Needs extra: {r['enable'] or ''}".rstrip(": ")
                 else:
                     status_disp = r["status"]
                 next_support = rows[idx + 1]["support"] if idx + 1 < len(rows) else None
@@ -698,9 +695,9 @@ def plugins_command(
             backend_label = r.get("backend") or "—"
             console.print(f"  Backend     : {backend_label}")
             if r["status"] == "ready":
-                console.print("  Status      : ✅ Ready")
+                console.print("  Status      : Ready")
             elif r["status"] == "needs_extra":
-                console.print("  Status      : ⛔ Needs extra")
+                console.print("  Status      : Needs extra")
                 if r["enable"]:
                     console.print(f"  Enable      : {_escape(r['enable'])}")
             console.print(f"  Module      : {r['module']}")
