@@ -440,7 +440,7 @@ def test_execute_single_run_skips_tokenizer_hash_and_duration_branches(
 
     import invarlock.core.registry as core_registry
     import invarlock.core.runner as core_runner
-    import invarlock.guards.rmt as rmt_mod
+    import invarlock.guards.rmt_legacy as rmt_mod
 
     class _Adapter:
         def restore(self, _model, _blob):  # noqa: ANN001
@@ -989,10 +989,11 @@ class TestExecuteSingleRun:
         )
         monkeypatch.setattr("invarlock.core.runner.CoreRunner.execute", _fake_execute)
         monkeypatch.setattr(
-            "invarlock.guards.rmt.capture_baseline_mp_stats", lambda *_a, **_k: {}
+            "invarlock.guards.rmt_legacy.capture_baseline_mp_stats",
+            lambda *_a, **_k: {},
         )
         monkeypatch.setattr(
-            "invarlock.guards.rmt.rmt_detect",
+            "invarlock.guards.rmt_legacy.rmt_detect",
             lambda *_a, **_k: {"n_layers_flagged": 0},
         )
 
@@ -1126,10 +1127,10 @@ class TestExecuteSingleRun:
         )
         monkeypatch.setattr("invarlock.core.runner.CoreRunner.execute", _fake_execute)
         monkeypatch.setattr(
-            "invarlock.guards.rmt.capture_baseline_mp_stats", _fake_capture
+            "invarlock.guards.rmt_legacy.capture_baseline_mp_stats", _fake_capture
         )
         monkeypatch.setattr(
-            "invarlock.guards.rmt.rmt_detect",
+            "invarlock.guards.rmt_legacy.rmt_detect",
             lambda *_a, **_k: {"n_layers_flagged": 0},
         )
 

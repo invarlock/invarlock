@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from invarlock.guards.rmt import (
+from invarlock.guards.rmt_legacy import (
     _iter_transformer_layers,
     capture_baseline_mp_stats,
     layer_svd_stats,

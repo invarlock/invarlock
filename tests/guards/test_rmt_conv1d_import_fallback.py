@@ -4,7 +4,8 @@ import builtins
 
 import torch.nn as nn
 
-from invarlock.guards import rmt as R
+import invarlock.guards.rmt as runtime_rmt
+import invarlock.guards.rmt_legacy as legacy_rmt
 
 
 class _TinyModel(nn.Module):
@@ -26,9 +27,9 @@ def test_rmt_conv1d_importerror_fallback_branches(monkeypatch) -> None:
     monkeypatch.setattr(builtins, "__import__", _fake_import)
 
     model = _TinyModel()
-    stats = R.capture_baseline_mp_stats(model)
+    stats = legacy_rmt.capture_baseline_mp_stats(model)
     assert stats  # should still collect linear layers without Conv1D
 
-    guard = R.RMTGuard()
+    guard = runtime_rmt.RMTGuard()
     modules = guard._get_linear_modules(model)
     assert modules and modules[0][0].endswith(".attn.c_attn")

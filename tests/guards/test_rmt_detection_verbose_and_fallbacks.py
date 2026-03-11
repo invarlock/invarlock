@@ -3,7 +3,8 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from invarlock.guards import rmt as R
+import invarlock.guards.rmt as runtime_rmt
+import invarlock.guards.rmt_legacy as legacy_rmt
 
 
 class _TinyBlock(nn.Module):
@@ -43,10 +44,10 @@ def test_rmt_detect_prints_improving_when_outliers_drop(monkeypatch, capsys) -> 
     def fake_apply(*_a, **_k):  # noqa: ANN001
         state["corrected"] = True
 
-    monkeypatch.setattr(R, "layer_svd_stats", fake_layer_svd_stats)
-    monkeypatch.setattr(R, "_apply_rmt_correction", fake_apply)
+    monkeypatch.setattr(legacy_rmt, "layer_svd_stats", fake_layer_svd_stats)
+    monkeypatch.setattr(legacy_rmt, "_apply_rmt_correction", fake_apply)
 
-    R.rmt_detect(
+    legacy_rmt.rmt_detect(
         model,
         threshold=1.5,
         detect_only=False,
@@ -71,8 +72,8 @@ def test_rmt_detect_with_names_verbose_prints_more_layers_flagged(
             "worst_details": {"name": "attn.c_proj", "s_max": 2.0},
         }
 
-    monkeypatch.setattr(R, "layer_svd_stats", fake_layer_svd_stats)
-    R.rmt_detect_with_names(model, threshold=1.5, verbose=True)
+    monkeypatch.setattr(legacy_rmt, "layer_svd_stats", fake_layer_svd_stats)
+    legacy_rmt.rmt_detect_with_names(model, threshold=1.5, verbose=True)
     out = capsys.readouterr().out
     assert "... and 2 more layers flagged" in out
 
@@ -87,7 +88,9 @@ def test_apply_rmt_correction_fallback_scaling_on_svd_failure(
         raise torch.linalg.LinAlgError("svd fail")
 
     monkeypatch.setattr(torch.linalg, "svdvals", boom)
-    R._apply_rmt_correction(layer, factor=0.9, layer_name="layer", verbose=True)
+    legacy_rmt._apply_rmt_correction(
+        layer, factor=0.9, layer_name="layer", verbose=True
+    )
     out = capsys.readouterr().out
     assert "fallback scaling" in out
 
@@ -98,7 +101,7 @@ def test_apply_rmt_correction_fallback_scaling_on_svd_failure(
 def test_rmt_guard_finalize_hydrates_edge_risk_from_calibration_batches(
     monkeypatch,
 ) -> None:
-    guard = R.RMTGuard()
+    guard = runtime_rmt.RMTGuard()
     guard.prepared = True
     guard._calibration_batches = [object()]
 
@@ -123,7 +126,7 @@ def test_iter_transformer_layers_skips_non_iterable_decoder_layers() -> None:
             self.model = nn.Module()
             self.model.layers = object()
 
-    assert list(R._iter_transformer_layers(Model())) == []
+    assert list(legacy_rmt._iter_transformer_layers(Model())) == []
 
 
 def test_iter_transformer_layers_skips_non_iterable_bert_layers() -> None:
@@ -133,7 +136,7 @@ def test_iter_transformer_layers_skips_non_iterable_bert_layers() -> None:
             self.encoder = nn.Module()
             self.encoder.layer = object()
 
-    assert list(R._iter_transformer_layers(Model())) == []
+    assert list(legacy_rmt._iter_transformer_layers(Model())) == []
 
 
 def test_rmt_detect_with_names_skips_non_iterable_gpt2_layers() -> None:
@@ -143,7 +146,7 @@ def test_rmt_detect_with_names_skips_non_iterable_gpt2_layers() -> None:
             self.transformer = nn.Module()
             self.transformer.h = object()
 
-    out = R.rmt_detect_with_names(Model(), threshold=1.5, verbose=False)
+    out = legacy_rmt.rmt_detect_with_names(Model(), threshold=1.5, verbose=False)
     assert out["n_layers_flagged"] == 0
 
 
@@ -154,7 +157,7 @@ def test_rmt_detect_with_names_skips_non_iterable_decoder_layers() -> None:
             self.model = nn.Module()
             self.model.layers = object()
 
-    out = R.rmt_detect_with_names(Model(), threshold=1.5, verbose=False)
+    out = legacy_rmt.rmt_detect_with_names(Model(), threshold=1.5, verbose=False)
     assert out["n_layers_flagged"] == 0
 
 
@@ -165,7 +168,7 @@ def test_rmt_detect_with_names_skips_non_iterable_bert_layers() -> None:
             self.encoder = nn.Module()
             self.encoder.layer = object()
 
-    out = R.rmt_detect_with_names(Model(), threshold=1.5, verbose=False)
+    out = legacy_rmt.rmt_detect_with_names(Model(), threshold=1.5, verbose=False)
     assert out["n_layers_flagged"] == 0
 
 
@@ -187,7 +190,7 @@ def test_rmt_detect_skips_modules_without_2d_weights_when_suffix_matches() -> No
             self.transformer = nn.Module()
             self.transformer.h = nn.ModuleList([_WeirdBlock()])
 
-    out = R.rmt_detect(_Model(), detect_only=True)
+    out = legacy_rmt.rmt_detect(_Model(), detect_only=True)
     assert out["n_layers_flagged"] == 0
 
 
@@ -202,8 +205,8 @@ def test_rmt_detect_partial_baseline_deadband_branch_sets_outlier(monkeypatch) -
             "worst_details": {"name": "attn.c_proj", "s_max": 10.0},
         }
 
-    monkeypatch.setattr(R, "layer_svd_stats", fake_layer_svd_stats)
-    out = R.rmt_detect(
+    monkeypatch.setattr(legacy_rmt, "layer_svd_stats", fake_layer_svd_stats)
+    out = legacy_rmt.rmt_detect(
         model,
         threshold=1.5,
         detect_only=True,
@@ -224,8 +227,8 @@ def test_rmt_detect_omits_details_when_worst_details_missing(monkeypatch) -> Non
             "worst_ratio": 2.0,
         }
 
-    monkeypatch.setattr(R, "layer_svd_stats", fake_layer_svd_stats)
-    out = R.rmt_detect(model, threshold=1.5, detect_only=True)
+    monkeypatch.setattr(legacy_rmt, "layer_svd_stats", fake_layer_svd_stats)
+    out = legacy_rmt.rmt_detect(model, threshold=1.5, detect_only=True)
     assert out["per_layer"] and "details" not in out["per_layer"][0]
 
 
@@ -242,10 +245,10 @@ def test_rmt_detect_prints_stalled_when_outliers_do_not_improve(
             "worst_details": {"name": "attn.c_proj", "s_max": 2.0},
         }
 
-    monkeypatch.setattr(R, "layer_svd_stats", fake_layer_svd_stats)
-    monkeypatch.setattr(R, "_apply_rmt_correction", lambda *_a, **_k: None)
+    monkeypatch.setattr(legacy_rmt, "layer_svd_stats", fake_layer_svd_stats)
+    monkeypatch.setattr(legacy_rmt, "_apply_rmt_correction", lambda *_a, **_k: None)
 
-    R.rmt_detect(
+    legacy_rmt.rmt_detect(
         model,
         threshold=1.5,
         detect_only=False,
@@ -277,10 +280,10 @@ def test_rmt_detect_improving_path_with_verbose_false_emits_no_message(
     def fake_apply(*_a, **_k):  # noqa: ANN001
         state["corrected"] = True
 
-    monkeypatch.setattr(R, "layer_svd_stats", fake_layer_svd_stats)
-    monkeypatch.setattr(R, "_apply_rmt_correction", fake_apply)
+    monkeypatch.setattr(legacy_rmt, "layer_svd_stats", fake_layer_svd_stats)
+    monkeypatch.setattr(legacy_rmt, "_apply_rmt_correction", fake_apply)
 
-    R.rmt_detect(
+    legacy_rmt.rmt_detect(
         model,
         threshold=1.5,
         detect_only=False,
@@ -305,8 +308,8 @@ def test_rmt_detect_logs_more_layers_when_over_three_outliers(
             "worst_details": {"name": "attn.c_proj", "s_max": 2.0},
         }
 
-    monkeypatch.setattr(R, "layer_svd_stats", fake_layer_svd_stats)
-    R.rmt_detect(model, threshold=1.5, detect_only=True, verbose=True)
+    monkeypatch.setattr(legacy_rmt, "layer_svd_stats", fake_layer_svd_stats)
+    legacy_rmt.rmt_detect(model, threshold=1.5, detect_only=True, verbose=True)
     out = capsys.readouterr().out
     assert "more layers flagged" in out
 
@@ -318,12 +321,14 @@ def test_rmt_detect_target_layers_handles_missing_named_modules(monkeypatch) -> 
 
     model = Model(n_layers=1)
     monkeypatch.setattr(
-        R,
+        legacy_rmt,
         "layer_svd_stats",
         lambda *_a, **_k: {"sigma_min": 1.0, "sigma_max": 1.0, "worst_ratio": 1.0},
     )
 
-    out = R.rmt_detect(model, target_layers=["transformer_layer_0"], detect_only=True)
+    out = legacy_rmt.rmt_detect(
+        model, target_layers=["transformer_layer_0"], detect_only=True
+    )
     assert out["n_layers_flagged"] == 0
 
 
@@ -342,5 +347,7 @@ def test_apply_rmt_correction_scales_tied_parameters() -> None:
             return tied if name == "tied.weight" else None
 
     before = tied.detach().clone()
-    R._apply_rmt_correction(layer, factor=0.9, layer_name="layer", adapter=Adapter())
+    legacy_rmt._apply_rmt_correction(
+        layer, factor=0.9, layer_name="layer", adapter=Adapter()
+    )
     assert torch.allclose(tied.detach(), before) is False

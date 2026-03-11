@@ -2,11 +2,8 @@ import pytest
 import torch
 import torch.nn as nn
 
-from invarlock.guards.rmt import (
-    RMTGuard,
-    _apply_rmt_correction,
-    rmt_detect_with_names,
-)
+from invarlock.guards.rmt import RMTGuard
+from invarlock.guards.rmt_legacy import _apply_rmt_correction, rmt_detect_with_names
 
 
 class DummyAdapter:

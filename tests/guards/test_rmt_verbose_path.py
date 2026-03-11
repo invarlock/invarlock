@@ -1,6 +1,6 @@
 import torch
 
-from invarlock.guards import rmt as R
+import invarlock.guards.rmt_legacy as R
 
 
 class TinyOutlier(torch.nn.Module):
