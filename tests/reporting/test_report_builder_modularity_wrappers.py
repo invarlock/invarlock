@@ -16,7 +16,10 @@ def test_report_builder_wrapper_delegation(monkeypatch):
     monkeypatch.setattr(
         rb,
         "_compute_quality_overhead_from_guard_impl",
-        lambda raw_guard, pm_kind_hint, compute_primary_metric_from_report_fn, get_metric_fn: {
+        lambda raw_guard,
+        pm_kind_hint,
+        compute_primary_metric_from_report_fn,
+        get_metric_fn: {
             "basis": "ratio",
             "value": 1.01,
         },

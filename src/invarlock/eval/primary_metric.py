@@ -564,6 +564,8 @@ def compute_primary_metric_from_report(
     final_win: dict[str, Any] = {}
 
     counts_source_tag: str | None = None
+    n_prev: int | None = None
+    n_fin: int | None = None
     if kind in {"accuracy", "vqa_accuracy"}:
         # Prefer classification aggregates if provided (may not have evaluation_windows)
         metrics = (
@@ -731,9 +733,9 @@ def compute_primary_metric_from_report(
         payload["degraded_reason"] = degraded_reason
     # Carry counts for accuracy to aid gating
     if kind in {"accuracy", "vqa_accuracy"}:
-        if "n_prev" in locals() and n_prev is not None:
+        if n_prev is not None:
             payload["n_preview"] = int(n_prev)
-        if "n_fin" in locals() and n_fin is not None:
+        if n_fin is not None:
             payload["n_final"] = int(n_fin)
         # Carry counts_source/estimated tag when available
         if isinstance(counts_source_tag, str) and counts_source_tag:

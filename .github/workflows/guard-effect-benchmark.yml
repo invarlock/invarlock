@@ -22,10 +22,16 @@ on:
 env:
   PYTHONPATH: ${{ github.workspace }}/src
 
+permissions:
+  contents: read
+
 jobs:
   guard-effect-benchmark:
     runs-on: ubuntu-latest
     timeout-minutes: 30  # Reduced from 60
+    permissions:
+      contents: read
+      issues: write
 
     strategy:
       matrix:
@@ -34,15 +40,15 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
       with:
         python-version: ${{ matrix.python-version }}
 
     - name: Cache pip dependencies
-      uses: actions/cache@v4
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
       # `act` can clobber PATH after setup-python on some hosts; cache is optional.
       if: ${{ !env.ACT }}
       with:
@@ -90,7 +96,7 @@ jobs:
           --verbose
 
     - name: Upload benchmark results
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
       if: always()  # Upload even if benchmark fails
       with:
         name: guard-effect-results-py${{ matrix.python-version }}
@@ -101,7 +107,7 @@ jobs:
 
     - name: Comment PR with results
       if: github.event_name == 'pull_request' && always()
-      uses: actions/github-script@v8
+      uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
       with:
         script: |
           const fs = require('fs');
@@ -151,13 +157,15 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.profile == 'release'
     timeout-minutes: 60  # Reduced from 120
+    permissions:
+      contents: read
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
     - name: Set up Python 3.13
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
       with:
         python-version: "3.13"
 
@@ -184,7 +192,7 @@ jobs:
           --verbose
 
     - name: Upload release benchmark results
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
       if: always()
       with:
         name: guard-effect-results-release

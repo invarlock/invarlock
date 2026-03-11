@@ -21,7 +21,7 @@ import time
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 import numpy as np
 import psutil
@@ -33,6 +33,10 @@ from invarlock.core.exceptions import MetricsError, ValidationError
 
 # ── Enhanced logging setup ─────────────────────────────────────────────────
 logger = logging.getLogger(__name__)
+
+
+def _call_model(model: nn.Module, /, *args: Any, **kwargs: Any) -> Any:
+    return cast(Any, model)(*args, **kwargs)
 
 
 try:  # Optional dependency: tqdm (progress bars)
@@ -762,7 +766,7 @@ def _perform_pre_eval_checks(
             k: v.to(device) if isinstance(v, torch.Tensor) else v
             for k, v in dry_batch.items()
         }
-        _ = model(**model_input)
+        _ = _call_model(model, **model_input)
         logger.debug("Pre-evaluation dry run successful")
     except Exception as e:
         logger.warning(f"Pre-evaluation dry run failed: {e}")
@@ -809,7 +813,7 @@ def _collect_activations(
                     input_ids = input_ids[:, : config.max_tokens]
 
                 # Forward pass with hidden states
-                output = model(input_ids, output_hidden_states=True)
+                output = _call_model(model, input_ids, output_hidden_states=True)
 
                 # Collect hidden states (exclude first and last)
                 if hasattr(output, "hidden_states") and len(output.hidden_states) > 2:
@@ -1281,7 +1285,8 @@ def _forward_loss_causal(
 
     # 1) Prefer dict-style outputs
     try:
-        outputs = model(
+        outputs = _call_model(
+            model,
             input_ids=input_ids,
             attention_mask=attention_mask,
             labels=labels,
@@ -1293,8 +1298,8 @@ def _forward_loss_causal(
         logits = getattr(outputs, "logits", None)
     except (TypeError, AttributeError):
         # Some stub models/tests may not accept return_dict
-        outputs = model(
-            input_ids=input_ids, attention_mask=attention_mask, labels=labels
+        outputs = _call_model(
+            model, input_ids=input_ids, attention_mask=attention_mask, labels=labels
         )
         if isinstance(outputs, tuple | list):
             # If labels were provided, many HF models put loss first, logits second
@@ -1823,12 +1828,8 @@ def compute_ppl(
             continue
 
         # Convert to tensors
-        input_ids_tensor = (
-            torch.tensor(input_ids, dtype=torch.long).unsqueeze(0).to(device)
-        )
-        attention_mask_tensor = (
-            torch.tensor(attention_mask, dtype=torch.long).unsqueeze(0).to(device)
-        )
+        input_ids_tensor = torch.LongTensor(input_ids).unsqueeze(0).to(device)
+        attention_mask_tensor = torch.LongTensor(attention_mask).unsqueeze(0).to(device)
 
         if model_vocab_size is not None:
             input_ids_tensor, attention_mask_tensor, _ = _sanitize_token_ids_for_model(
@@ -1845,7 +1846,8 @@ def compute_ppl(
 
         # Forward pass
         try:
-            outputs = model(
+            outputs = _call_model(
+                model,
                 input_ids=input_ids_tensor,
                 attention_mask=attention_mask_tensor,
                 return_dict=True,
@@ -1853,8 +1855,8 @@ def compute_ppl(
             logits = outputs.logits if hasattr(outputs, "logits") else outputs[0]
         except Exception:
             # Fallback for non-standard models
-            outputs = model(
-                input_ids=input_ids_tensor, attention_mask=attention_mask_tensor
+            outputs = _call_model(
+                model, input_ids=input_ids_tensor, attention_mask=attention_mask_tensor
             )
             if isinstance(outputs, tuple | list):
                 logits = outputs[0]
@@ -1958,11 +1960,9 @@ def measure_latency(
         window.input_ids, window.attention_masks, strict=False
     ):
         if len(input_ids) > 10:  # Ensure reasonable length
-            sample_input_ids = (
-                torch.tensor(input_ids, dtype=torch.long).unsqueeze(0).to(device)
-            )
+            sample_input_ids = torch.LongTensor(input_ids).unsqueeze(0).to(device)
             sample_attention_mask = (
-                torch.tensor(attention_mask, dtype=torch.long).unsqueeze(0).to(device)
+                torch.LongTensor(attention_mask).unsqueeze(0).to(device)
             )
             break
 
@@ -1973,8 +1973,10 @@ def measure_latency(
     with torch.no_grad():
         for _ in range(warmup_steps):
             try:
-                _ = model(
-                    input_ids=sample_input_ids, attention_mask=sample_attention_mask
+                _ = _call_model(
+                    model,
+                    input_ids=sample_input_ids,
+                    attention_mask=sample_attention_mask,
                 )
             except Exception:
                 # If there are issues with the model, return 0
@@ -1989,7 +1991,11 @@ def measure_latency(
 
     with torch.no_grad():
         for _ in range(measurement_steps):
-            _ = model(input_ids=sample_input_ids, attention_mask=sample_attention_mask)
+            _ = _call_model(
+                model,
+                input_ids=sample_input_ids,
+                attention_mask=sample_attention_mask,
+            )
 
     if device.type == "cuda":
         torch.cuda.synchronize()

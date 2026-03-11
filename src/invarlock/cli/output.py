@@ -91,6 +91,7 @@ def make_console(
 ) -> Console:
     if no_color is None:
         no_color = env_no_color()
+    color_system: str | None = None
     if no_color:
         color_system = None
     else:

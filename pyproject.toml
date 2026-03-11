@@ -152,6 +152,35 @@ dev = [
   "twine>=4.0.0",
 ]
 
+ci = [
+  "pytest>=7.0",
+  "ruff>=0.1.0",
+  "mkdocs>=1.5",
+  "mkdocs-material>=9.5",
+  "mkdocs-mermaid2-plugin>=1.1",
+]
+
+docs-ci = [
+  "linkchecker>=10.5",
+  "mypy>=1.0",
+  "hypothesis>=6.98",
+]
+
+precommit-ci = [
+  "pre-commit>=3.0",
+]
+
+release-ci = [
+  "build>=0.10.0",
+  "twine>=4.0.0",
+  "cyclonedx-bom>=4.1",
+]
+
+security-ci = [
+  "pip-audit>=2.8",
+  "cyclonedx-bom>=4.1",
+]
+
 # Entry points for production-ready plugins
 [project.entry-points."invarlock.edits"]
 quant_rtn = "invarlock.edits:RTNQuantEdit"

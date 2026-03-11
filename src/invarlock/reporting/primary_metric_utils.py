@@ -31,7 +31,7 @@ def attach_primary_metric(
         if isinstance(pm, dict) and pm:
             pm_copy = copy.deepcopy(pm)
             pm_copy.setdefault("invalid", bool(pm_copy.get("invalid", False)))
-            degraded_reason = pm_copy.get("degraded_reason")
+            degraded_reason: str | None = pm_copy.get("degraded_reason")
             preview_val = pm_copy.get("preview")
             final_val = pm_copy.get("final")
             ratio_val = pm_copy.get("ratio_vs_baseline")
@@ -124,7 +124,7 @@ def attach_primary_metric(
                                 else (math.nan, math.nan)
                             )
                         if (
-                            isinstance(dlci_source, tuple | list)
+                            isinstance(dlci_source, (tuple, list))
                             and len(dlci_source) == 2
                         ):
                             lo_raw, hi_raw = dlci_source[0], dlci_source[1]

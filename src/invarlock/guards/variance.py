@@ -2860,11 +2860,9 @@ class VarianceGuard(Guard):
                             if str(original_device).startswith("mps"):
                                 module.weight.data = module.weight.data * scale_factor
                             else:
-                                scale_tensor = torch.tensor(
-                                    scale_factor,
-                                    device=original_device,
-                                    dtype=original_dtype,
-                                )
+                                scale_tensor = module.weight.new_tensor(
+                                    scale_factor
+                                ).to(dtype=original_dtype, device=original_device)
                                 module.weight.mul_(scale_tensor)
 
                         applied_count += 1
@@ -3055,11 +3053,9 @@ class VarianceGuard(Guard):
                             if str(original_device).startswith("mps"):
                                 module.weight.data = module.weight.data * revert_factor
                             else:
-                                revert_tensor = torch.tensor(
-                                    revert_factor,
-                                    device=original_device,
-                                    dtype=original_dtype,
-                                )
+                                revert_tensor = module.weight.new_tensor(
+                                    revert_factor
+                                ).to(dtype=original_dtype, device=original_device)
                                 module.weight.mul_(revert_tensor)
 
                         reverted_count += 1

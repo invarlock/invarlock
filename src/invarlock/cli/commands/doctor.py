@@ -653,10 +653,11 @@ def doctor_command(
                     cfg, model_profile, resolved_loss_type=None
                 )
             )
+            cfg_metric_kind = str(metric_kind_resolved)
             try:
                 cfg_metric_kind = str(metric_kind_resolved)
             except NON_FATAL_EXCEPTIONS:
-                cfg_metric_kind = cfg_metric_kind
+                pass
             if not json_out:
                 console.print(
                     f"  Metric: {metric_kind_resolved} · Provider: {provider_kind}"
@@ -719,8 +720,7 @@ def doctor_command(
                         workers = provider_cfg.get("workers", None)  # type: ignore[attr-defined]
                         det = provider_cfg.get("deterministic_shards", None)  # type: ignore[attr-defined]
                     except NON_FATAL_EXCEPTIONS:
-                        workers = workers
-                        det = det
+                        pass
                 # Legacy style might place workers directly under dataset
                 if workers is None and hasattr(cfg.dataset, "workers"):
                     workers = cfg.dataset.workers
@@ -851,12 +851,12 @@ def doctor_command(
                         examples_avail = cap.get("examples_available")
                         eff_tokens = int(min_tokens)
                         eff_examples = int(min_examples)
-                        if isinstance(tokens_avail, int | float) and token_frac > 0:
+                        if isinstance(tokens_avail, (int, float)) and token_frac > 0:
                             eff_tokens = max(
                                 eff_tokens,
                                 int(_math.ceil(float(tokens_avail) * token_frac)),
                             )
-                        if isinstance(examples_avail, int | float) and ex_frac > 0:
+                        if isinstance(examples_avail, (int, float)) and ex_frac > 0:
                             eff_examples = max(
                                 eff_examples,
                                 int(_math.ceil(float(examples_avail) * ex_frac)),

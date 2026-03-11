@@ -16,18 +16,23 @@ on:
         options: [ testpypi, pypi ]
         default: testpypi
 
+permissions:
+  contents: read
+
 jobs:
   build_check:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: '3.13'
       - name: Install build tooling
         run: |
           python -m pip install --upgrade pip
-          pip install build twine
+          pip install -e .[release-ci,security-ci]
       - name: Build wheel/sdist
         run: python -m build
       - name: Twine check
@@ -40,46 +45,89 @@ jobs:
           . .venv/bin/activate
           pip install dist/*.whl
           python -c "import invarlock; import sys; print('invarlock version', getattr(invarlock, '__version__', 'n/a')); sys.exit(0)"
+      - name: Generate release SBOM
+        run: bash scripts/generate_sbom.sh artifacts/supply-chain/sbom.json
       - name: Upload dist artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
         with:
           name: dist
           path: dist/*
+          if-no-files-found: error
+          retention-days: 3
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: release-sbom
+          path: artifacts/supply-chain/sbom.json
           if-no-files-found: error
           retention-days: 3
 
   publish:
     needs: build_check
     runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'push' && 'pypi' || inputs.target }}
     permissions:
       contents: read
       id-token: write
+      attestations: write
     if: >-
-      ${{ github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v') && inputs.publish == true }}
+      ${{
+        startsWith(github.ref, 'refs/tags/v') &&
+        (
+          github.event_name == 'push' ||
+          (github.event_name == 'workflow_dispatch' && inputs.publish == true)
+        )
+      }}
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: '3.13'
       - name: Download dist artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           name: dist
           path: dist
-      - name: Publish to TestPyPI/PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Resolve publish target
+        id: vars
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "publish_target=pypi" >> "$GITHUB_OUTPUT"
+            echo "publish_repository_url=" >> "$GITHUB_OUTPUT"
+          elif [ "${{ inputs.target }}" = "testpypi" ]; then
+            echo "publish_target=testpypi" >> "$GITHUB_OUTPUT"
+            echo "publish_repository_url=https://test.pypi.org/legacy/" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish_target=pypi" >> "$GITHUB_OUTPUT"
+            echo "publish_repository_url=" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Attest release artifacts
+        id: attest_release
+        uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661
         with:
-          user: __token__
-          password: ${{ inputs.target == 'pypi' && secrets.PYPI_API_TOKEN || secrets.TESTPYPI_API_TOKEN }}
-          repository-url: ${{ inputs.target == 'pypi' && 'https://upload.pypi.org/legacy/' || 'https://test.pypi.org/legacy/' }}
+          subject-path: dist/*
+      - name: Upload provenance bundle
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: release-provenance
+          path: ${{ steps.attest_release.outputs.bundle-path }}
+          if-no-files-found: error
+          retention-days: 3
+      - name: Publish to TestPyPI/PyPI
+        uses: pypa/gh-action-pypi-publish@106e0b0b7c337fa67ed433972f777c6357f78598
+        with:
+          packages-dir: dist
+          repository-url: ${{ steps.vars.outputs.publish_repository_url }}
 
   testpypi_smoke:
     needs: publish
     if: >-
       ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true && inputs.target == 'testpypi' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: '3.13'
       - name: Install from TestPyPI and smoke test
@@ -91,3 +139,66 @@ jobs:
           python -m pip install --upgrade pip
           pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple invarlock
           invarlock --help || python -c "import invarlock; import sys; print('invarlock version', getattr(invarlock,'__version__','n/a')); sys.exit(0)"
+
+  bundle_release:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    if: >-
+      ${{
+        needs.publish.result == 'success' &&
+        startsWith(github.ref, 'refs/tags/v') &&
+        (
+          github.event_name == 'push' ||
+          (github.event_name == 'workflow_dispatch' && inputs.publish == true && inputs.target == 'pypi')
+        )
+      }}
+    steps:
+      - name: Download dist artifacts
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: dist
+          path: dist
+      - name: Download SBOM artifact
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: release-sbom
+          path: artifacts/supply-chain
+      - name: Download provenance artifact
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: release-provenance
+          path: provenance
+      - name: Sign release artifacts
+        uses: sigstore/gh-action-sigstore-python@a5caf349bc536fbef3668a10ed7f5cd309a4b53d
+        with:
+          inputs: dist/*
+          upload-signing-artifacts: true
+      - name: Create or update GitHub release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          mkdir -p release-assets
+          cp dist/* release-assets/
+          cp artifacts/supply-chain/sbom.json "release-assets/invarlock-${version}-sbom.cdx.json"
+          cp provenance/* release-assets/
+
+          mapfile -t signing_assets < <(
+            find dist -maxdepth 1 -type f \
+              \( -name '*.sigstore' -o -name '*.crt' -o -name '*.sig' -o -name '*.pem' \)
+          )
+          if [ ${#signing_assets[@]} -eq 0 ]; then
+            echo "No Sigstore signing artifacts found in dist/" >&2
+            exit 1
+          fi
+          cp "${signing_assets[@]}" release-assets/
+
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" --title "$tag" --generate-notes
+          fi
+          gh release upload "$tag" release-assets/* --clobber
