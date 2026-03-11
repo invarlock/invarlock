@@ -456,7 +456,7 @@ Standardized deviation used in spectral guard scoring.
 
 ## See Also
 
-- [Safety Case Overview](00-safety-case.md) — Enumerated claims and evidence
+- [Assurance Case Overview](00-assurance-case.md) — Enumerated claims and evidence
 - [Guard Contracts](04-guard-contracts.md) — Guard behavior specifications
 - [CLI Reference](../reference/cli.md) — Command-line usage
 - [Guards Reference](../reference/guards.md) — Guard configuration

@@ -1,10 +1,10 @@
 # Assurance Case Overview (v1.0)
 
-> **TL;DR:** InvarLock evaluates whether **weight edits** (quantization, pruning, etc.) regress a model beyond defined bounds. It does **not** evaluate content safety, alignment, or deployment security. The safety case covers: (1) paired primary metrics with bootstrap CIs, (2) four guards (invariants, spectral, RMT, variance), (3) deterministic evaluation with full provenance. Each claim has tests and report evidence.
+> **TL;DR:** InvarLock evaluates whether **weight edits** (quantization, pruning, etc.) regress a model beyond defined bounds. It does **not** evaluate content safety, alignment, or deployment security. The assurance case covers: (1) paired primary metrics with bootstrap CIs, (2) four guards (invariants, spectral, RMT, variance), (3) deterministic evaluation with full provenance. Each claim has tests and report evidence.
 
-> **Plain language:** This overview lists every safety claim, the evidence we ship with the repo, and the runtime contracts that enforce each claim in production.
+> **Plain language:** This overview lists every assurance claim, the evidence we ship with the repo, and the runtime contracts that enforce each claim in production.
 
-This note enumerates the explicit **safety claims** the toolkit makes, the
+This note enumerates the explicit **assurance claims** the toolkit makes, the
 **evidence** shipped in-tree, and the **runtime contracts** that enforce each
 claim. Each claim must have:
 
@@ -58,7 +58,7 @@ documented tiers and environments, not a universal guarantee about model safety.
 
 | Claim | Evidence | Runtime enforcement | Observability (report v1.0) | Assumptions & scope |
 |------|----------|---------------------|----------------------------------|---------------------|
-| Paired ratios are computed in **log space**, **token‑weighted**, then re‑exponentiated. | `docs/assurance/01-eval-math-proof.md` | The report pairs windows and enforces `ratio_ci == exp(logloss_delta_ci)` within tolerance; see tests `tests/eval/test_report_builder.py::TestMakeEvaluationReport::test_pm_preview_final_ratio_identity` and `tests/core/test_bootstrap.py::test_compute_paired_delta_and_ratio_ci_consistency`. | `primary_metric.{ratio_vs_baseline,display_ci}`, `dataset.windows.stats.{paired_windows,window_match_fraction,window_overlap_fraction}`. | Windows are **paired**, **non‑overlapping**; token counts are known. BCa bootstrap used on paired ΔlogNLL; if all windows equal length, weighting reduces to simple mean. |
+| Paired ratios are computed in **log space**, **token‑weighted**, then re‑exponentiated. | `docs/assurance/01-eval-math-derivation.md` | The report pairs windows and enforces `ratio_ci == exp(logloss_delta_ci)` within tolerance; see tests `tests/eval/test_report_builder.py::TestMakeEvaluationReport::test_pm_preview_final_ratio_identity` and `tests/core/test_bootstrap.py::test_compute_paired_delta_and_ratio_ci_consistency`. | `primary_metric.{ratio_vs_baseline,display_ci}`, `dataset.windows.stats.{paired_windows,window_match_fraction,window_overlap_fraction}`. | Windows are **paired**, **non‑overlapping**; token counts are known. BCa bootstrap used on paired ΔlogNLL; if all windows equal length, weighting reduces to simple mean. |
 | Tier-specific **primary metric** gates keep edits within acceptance bands (Balanced ≤ 1.10×, Conservative ≤ 1.05× for ppl‑like). | `docs/assurance/04-guard-contracts.md` | `make_report` applies tier thresholds; see `tests/eval/test_assurance_contracts.py::test_ppl_ratio_gate_enforced`. | `validation.primary_metric_acceptable`, `primary_metric.{ratio_vs_baseline,display_ci}`, `auto.tier`. | Baseline/reference pairing intact; CLI tier selection propagated. |
 | Spectral family caps achieve the documented **false positive rate** (FPR). | `docs/assurance/05-spectral-fpr-derivation.md` | Property test `tests/eval/test_assurance_contracts.py::test_spectral_fpr_matches_tail_probabilities`. | `spectral.family_caps[*].kappa`, `spectral.families[*].kappa`, `spectral.multiple_testing` | z‑scores approx Gaussian under null; per‑run FPR set via Bonferroni/BH. |
 | RMT ε‑rule enforces the declared **acceptance band** on activation edge‑risk growth. | `docs/assurance/06-rmt-epsilon-rule.md` | `tests/eval/test_assurance_contracts.py::test_rmt_epsilon_rule_acceptance_band`. | `rmt.{edge_risk_by_family_base,edge_risk_by_family,epsilon_default,epsilon_by_family,epsilon_violations,stable,status}`, `rmt.families.*.{edge_base,edge_cur,delta}` | ε calibrated on **null** runs and stored in `tiers.yaml`. |
@@ -71,11 +71,11 @@ documented tiers and environments, not a universal guarantee about model safety.
 
 **Summary**
 
-- Every safety‑critical guard links to a short assurance note and an automated test.
+- Every assurance-critical guard links to a short assurance note and an automated test.
 - The report verifier enforces **log‑space math** and **pairing** at runtime.
-- Observability fields make the safety case auditable in certs.
+- Observability fields make the assurance case auditable in reports and proof packs.
 
-> Tier scope: Balanced and Conservative are the supported safety tiers. The Aggressive tier is research‑oriented and not covered by this safety case. The `none` tier is provided only for dev/demo flows (loosest gates) and is **explicitly outside** the safety case.
+> Tier scope: Balanced and Conservative are the supported published assurance tiers. The Aggressive tier is research‑oriented and not covered by this assurance case. The `none` tier is provided only for dev/demo flows (loosest gates) and is **explicitly outside** the assurance case.
 
 > 🔍 **Verify on your machine**
 >

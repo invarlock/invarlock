@@ -373,4 +373,4 @@ my_custom_adapter = "my_adapter:MyAdapter"
 - [Guards Reference](guards.md) — Guard configuration and evidence
 - [Configuration Schema](config-schema.md) — YAML config structure
 - [reports](reports.md) — report schema and verification
-- [Safety Case Overview](../assurance/00-safety-case.md) — Assurance claims and evidence
+- [Assurance Case Overview](../assurance/00-assurance-case.md) — Assurance claims and evidence

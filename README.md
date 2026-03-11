@@ -139,7 +139,7 @@ Optional extras: `invarlock[gpu]`, `invarlock[awq,gptq]`. Full setup: <https://g
 - Compare & evaluate (BYOE): <https://github.com/invarlock/invarlock/blob/main/docs/user-guide/compare-and-evaluate.md>
 - Reading a report: <https://github.com/invarlock/invarlock/blob/main/docs/user-guide/reading-report.md>
 - CLI reference: <https://github.com/invarlock/invarlock/blob/main/docs/reference/cli.md>
-- Assurance case: <https://github.com/invarlock/invarlock/blob/main/docs/assurance/00-safety-case.md>
+- Assurance case: <https://github.com/invarlock/invarlock/blob/main/docs/assurance/00-assurance-case.md>
 - Threat model: <https://github.com/invarlock/invarlock/blob/main/docs/security/threat-model.md>
 
 ## Community

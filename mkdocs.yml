@@ -35,10 +35,10 @@ nav:
       - Artifact Layout: reference/artifacts.md
       - Observability: reference/observability.md
   - Assurance:
-      - Safety Case: assurance/00-safety-case.md
+      - Assurance Case: assurance/00-assurance-case.md
       - Glossary: assurance/glossary.md
       # Merged into Evaluation Math
-      - Evaluation Math: assurance/01-eval-math-proof.md
+      - Evaluation Math Derivation: assurance/01-eval-math-derivation.md
       - Coverage & Pairing Plan: assurance/02-coverage-and-pairing.md
       - BCa Bootstrap (Paired Δlog): assurance/03-bca-bootstrap.md
       - Guard Contracts & Primer: assurance/04-guard-contracts.md

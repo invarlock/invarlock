@@ -299,7 +299,7 @@ def compute_paired_delta_log_ci(
 
     This implementation uses token-weighted resampling when window weights are
     provided. When all weights are equal, the weighted bootstrap reduces to the
-    simple mean. See docs/assurance/01-eval-math-proof.md for the derivation.
+    simple mean. See docs/assurance/01-eval-math-derivation.md for the derivation.
 
     Args:
         final_logloss: Iterable of per-window log-loss values after the edit/guard.

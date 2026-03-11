@@ -57,5 +57,5 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 ## Related Documentation
 
 - [User Guide](../user-guide/getting-started.md) — Task-oriented workflows
-- [Assurance](../assurance/00-safety-case.md) — Safety claims and proofs
+- [Assurance](../assurance/00-assurance-case.md) — Assurance claims and derivations
 - [Security](../security/pip-audit-allowlist.md) — Security policies

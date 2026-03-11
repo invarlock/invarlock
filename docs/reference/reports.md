@@ -142,7 +142,7 @@ The markdown report is structured to highlight evaluation outcomes first:
 
 The example below shows a realistic, PM‑only report envelope. It follows
 the current validator in `invarlock.reporting.report_schema` and the
-fields produced by `invarlock.assurance.make_report`.
+fields produced by `invarlock.reporting.report_builder.make_report`.
 
 ```json
 {
@@ -446,5 +446,5 @@ html = render_report_html(report)
 
 - [CLI Reference](cli.md)
 - [Artifact Layout](artifacts.md)
-- [Safety Case](../assurance/00-safety-case.md) — What the report guarantees
+- [Assurance Case](../assurance/00-assurance-case.md) — What the report guarantees
 - [Reading a report](../user-guide/reading-report.md) — User-oriented guide

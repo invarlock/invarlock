@@ -136,5 +136,5 @@ Choose your path based on your workflow:
 | See example outputs | [Example Reports](example-reports.md) |
 | Understand what's in a report | [Reading a report](reading-report.md) |
 | Use InvarLock programmatically | [API Guide](../reference/api-guide.md) |
-| Understand the safety guarantees | [Safety Case](../assurance/00-safety-case.md) |
+| Understand the assurance scope | [Assurance Case](../assurance/00-assurance-case.md) |
 | Set up secure production deployment | [Security Best Practices](../security/best-practices.md) |

@@ -60,5 +60,5 @@ Tip: Use `invarlock verify` to recheck schema, pairing, and ratio math.
 ## Related Documentation
 
 - [reports](../reference/reports.md) — Full v1 schema reference, telemetry, and HTML export
-- [Safety Case](../assurance/00-safety-case.md) — What the report does and does not guarantee
+- [Assurance Case](../assurance/00-assurance-case.md) — What the report does and does not guarantee
 - [CLI Reference](../reference/cli.md) — `invarlock verify` command details

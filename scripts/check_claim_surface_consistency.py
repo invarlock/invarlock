@@ -36,7 +36,11 @@ def main() -> int:
 
     required_by_file = {
         "docs/user-guide/quickstart.md": ["machine-readable evaluation"],
-        "docs/user-guide/getting-started.md": ["make eval-loop"],
+        "docs/user-guide/getting-started.md": [
+            "make eval-loop",
+            "Understand the assurance scope",
+            "Assurance Case",
+        ],
         "docs/user-guide/example-reports.md": [
             "Machine-readable evaluation report",
         ],
@@ -46,10 +50,24 @@ def main() -> int:
             "Evaluation Matrix",
         ],
         "docs/README.md": [
+            "Assurance Case",
+            "Evaluation Math Derivation",
             "Published assurance basis currently covers GPT-2 and BERT profiles.",
             "Mistral 7B",
             "Qwen2 7B",
             "pilot calibration configs",
+        ],
+        "mkdocs.yml": [
+            "Assurance Case: assurance/00-assurance-case.md",
+            "Evaluation Math Derivation: assurance/01-eval-math-derivation.md",
+        ],
+        "README.md": ["docs/assurance/00-assurance-case.md"],
+        "docs/user-guide/reading-report.md": ["Assurance Case"],
+        "docs/reference/index.md": ["Assurance claims and derivations"],
+        "docs/assurance/00-assurance-case.md": [
+            "assurance case",
+            "assurance claims",
+            "published assurance tiers",
         ],
         "docs/assurance/04-guard-contracts.md": [
             "Published assurance basis currently covers GPT-2 and BERT profiles.",
@@ -94,7 +112,11 @@ def main() -> int:
 
     banned_by_file = {
         "docs/user-guide/quickstart.md": ["machine-readable safety report"],
-        "docs/user-guide/getting-started.md": ["make cert-loop"],
+        "docs/user-guide/getting-started.md": [
+            "make cert-loop",
+            "safety guarantees",
+            "[Safety Case]",
+        ],
         "docs/user-guide/example-reports.md": ["Signed compliance payload"],
         "SUPPORT.md": ["certification flow"],
         "scripts/run_tiny_all_matrix.sh": [
@@ -106,6 +128,18 @@ def main() -> int:
         ],
         "tests/integration/scripts/test_tiny_matrix_checklist.py": [
             "Certification Matrix",
+        ],
+        "mkdocs.yml": ["Safety Case:"],
+        "docs/README.md": ["Safety Case", "safety claim"],
+        "docs/reference/index.md": ["Safety claims and proofs"],
+        "docs/reference/architecture.md": ["Safety Case Overview"],
+        "docs/reference/reports.md": ["Safety Case"],
+        "docs/user-guide/reading-report.md": ["[Safety Case]"],
+        "docs/user-guide/primary-metric-smoke.md": ["Evaluation Math Proof"],
+        "docs/assurance/00-assurance-case.md": [
+            "safety case",
+            "safety claims",
+            "safety tiers",
         ],
         "Makefile": ["cert-loop:"],
         "scripts/proof_packs/lib/task_functions.sh": ["Certification for "],

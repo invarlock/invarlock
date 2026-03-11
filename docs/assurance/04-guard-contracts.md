@@ -12,7 +12,7 @@
 - [4. Reproducibility Kit](#4-reproducibility-kit) — how to reproduce a report
 - [5. Device Tolerance Guidance](#5-device-tolerance-guidance) — expected drift across backends
 - [6. Threshold Rationale (Defaults)](#6-threshold-rationale-defaults) — why the defaults are what they are
-- [7. Known Limitations](#7-known-limitations) — what the safety case does not cover
+- [7. Known Limitations](#7-known-limitations) — what the assurance case does not cover
 - [8. Coverage Reference](#8-coverage-reference) — tests that underpin this handbook
 
 This handbook captures the practical guarantees that underpin InvarLock's guard
@@ -254,7 +254,7 @@ Run them collectively with `make test` or `pytest -q -m "assurance"` where appli
 
 ## References
 
-- Evaluation math and paired ratios: `01-eval-math-proof.md`
+- Evaluation math and paired ratios: `01-eval-math-derivation.md`
 - Paired BCa bootstrap details: `03-bca-bootstrap.md`
 - Spectral FPR and multiple-testing control: `05-spectral-fpr-derivation.md`
 - RMT ε‑rule and outlier bands: `06-rmt-epsilon-rule.md`

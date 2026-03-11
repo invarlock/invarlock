@@ -78,8 +78,8 @@ Tip: enable Hub downloads per command when fetching models/datasets:
 
 ### Assurance
 
-- [Safety Case](assurance/00-safety-case.md)
-- [Evaluation Math](assurance/01-eval-math-proof.md)
+- [Assurance Case](assurance/00-assurance-case.md)
+- [Evaluation Math Derivation](assurance/01-eval-math-derivation.md)
 - [Coverage & Pairing Plan](assurance/02-coverage-and-pairing.md)
 - [BCa Bootstrap (Paired Δlog)](assurance/03-bca-bootstrap.md)
 - [Guard Contracts & Primer](assurance/04-guard-contracts.md)
@@ -93,7 +93,7 @@ Tip: enable Hub downloads per command when fetching models/datasets:
 - [Device Drift Bands](assurance/12-device-drift-bands.md)
 - [GPU/MPS-First Guards (Decision Memo)](assurance/13-gpu-mps-first-guards.md)
 
-Note: Every safety claim is backed by automated tests and cross-referenced in
+Note: Every assurance claim is backed by automated tests and cross-referenced in
 the docs. See Guard Contracts → Coverage Reference
 (assurance/04-guard-contracts.md) for the test index.
 
