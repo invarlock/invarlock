@@ -247,3 +247,23 @@ def test_readme_exposes_scorecard_badge():
         in readme
     )
     assert "https://scorecard.dev/viewer/?uri=github.com/invarlock/invarlock" in readme
+
+
+def test_codeql_workflow_uses_repo_config():
+    workflow = _load_workflow(Path(".github/workflows/codeql.yml"))
+    init_step = _find_step_by_uses_prefix(
+        workflow["jobs"]["analyze"]["steps"], "github/codeql-action/init@"
+    )
+    assert init_step["with"]["config-file"] == ".github/codeql/codeql-config.yml"
+
+
+def test_codeql_config_scopes_analysis_to_shipped_python():
+    config_path = Path(".github/codeql/codeql-config.yml")
+    assert config_path.exists(), "CodeQL config file missing"
+
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    assert config["paths"] == ["src/invarlock"]
+
+    excluded_ids = set(config["query-filters"][0]["exclude"]["id"])
+    assert "py/empty-except" in excluded_ids
+    assert "py/unused-local-variable" in excluded_ids

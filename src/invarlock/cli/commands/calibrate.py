@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
@@ -292,7 +293,7 @@ def null_sweep(
                 continue
             max_z = vals.get("max")
             try:
-                if max_z is not None and max_z == max_z:
+                if max_z is not None and not math.isnan(float(max_z)):
                     row[f"max_z_{fam}"] = float(max_z)
             except Exception:
                 continue

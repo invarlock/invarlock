@@ -829,24 +829,20 @@ def doctor_command(
                         ex_frac = float(
                             acc_policy.get("min_examples_fraction", 0.0) or 0.0
                         )
-                        # Publish policy meta for JSON output
-                        try:
-                            global POLICY_META
-                            POLICY_META = {
-                                "tier": use_tier,
-                                "floors": {
-                                    "pm_ratio": {
-                                        "min_tokens": min_tokens,
-                                        "min_token_fraction": token_frac,
-                                    },
-                                    "accuracy": {
-                                        "min_examples": min_examples,
-                                        "min_examples_fraction": ex_frac,
-                                    },
+                        global POLICY_META
+                        POLICY_META = {
+                            "tier": use_tier,
+                            "floors": {
+                                "pm_ratio": {
+                                    "min_tokens": min_tokens,
+                                    "min_token_fraction": token_frac,
                                 },
-                            }
-                        except NON_FATAL_EXCEPTIONS:
-                            pass
+                                "accuracy": {
+                                    "min_examples": min_examples,
+                                    "min_examples_fraction": ex_frac,
+                                },
+                            },
+                        }
                         tokens_avail = cap.get("tokens_available")
                         examples_avail = cap.get("examples_available")
                         eff_tokens = int(min_tokens)

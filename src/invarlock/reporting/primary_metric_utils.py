@@ -45,6 +45,8 @@ def attach_primary_metric(
                 return isinstance(value, (int, float)) and math.isfinite(float(value))
 
             baseline_has_reference = _is_finite(baseline_final)
+            needs_pm_fallback = False
+            needs_ratio_fallback = False
             needs_pm_fallback = not (_is_finite(preview_val) and _is_finite(final_val))
             needs_ratio_fallback = baseline_has_reference and not _is_finite(ratio_val)
 

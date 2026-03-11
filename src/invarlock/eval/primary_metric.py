@@ -706,6 +706,7 @@ def compute_primary_metric_from_report(
         except Exception:
             ratio_vs_baseline = float("nan")
 
+    invalid = True
     invalid = not (_is_finite(preview_point) and _is_finite(final_point))
     degraded_reason = None
     if invalid:

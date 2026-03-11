@@ -725,8 +725,6 @@ def run_command_impl(
             )
             effective_preview = harvested["effective_preview"]
             effective_final = harvested["effective_final"]
-            preview_count = harvested["preview_count"]
-            final_count = harvested["final_count"]
             dataset_meta = harvested["dataset_meta"]
             window_plan = harvested["window_plan"]
             calibration_data = harvested["calibration_data"]
@@ -1084,8 +1082,6 @@ def run_command_impl(
                     actual_per_arm = int(window_plan["actual_preview"])
                     effective_preview = actual_per_arm
                     effective_final = actual_per_arm
-                    preview_count = effective_preview
-                    final_count = effective_final
                     dataset_stride = getattr(
                         cfg.dataset, "stride", getattr(cfg.dataset, "seq_len", 0)
                     )
@@ -1309,8 +1305,6 @@ def run_command_impl(
 
                 effective_preview = proposed_per_arm
                 effective_final = proposed_per_arm
-                preview_count = effective_preview
-                final_count = effective_final
                 if window_plan is not None:
                     window_plan.setdefault("dedupe_adjustments", []).append(
                         {
@@ -2629,16 +2623,15 @@ def run_command_impl(
                             export_dir = p if p.is_absolute() else (run_dir / p)
                     # (3) config subdir
                     if export_dir is None:
-                        export_subdir = "model"
                         try:
-                            export_subdir = str(
+                            resolved_export_subdir = str(
                                 getattr(
                                     getattr(cfg, "output", {}), "model_subdir", "model"
                                 )
                             )
                         except NON_FATAL_RUNTIME_EXCEPTIONS:
-                            export_subdir = "model"
-                        export_dir = run_dir / export_subdir
+                            resolved_export_subdir = "model"
+                        export_dir = run_dir / resolved_export_subdir
 
                     # Ensure directory exists
                     ok = False
@@ -3249,11 +3242,7 @@ def run_command_impl(
                 # No retry mode - single run
                 break
 
-            # Show retry summary if applicable
-            _print_retry_summary(console, retry_controller)
-
-            # (moved) Cleanup printing occurs after loop to guarantee execution
-            pass
+        _print_retry_summary(console, retry_controller)
 
         if output_style.timing:
             total_duration = (

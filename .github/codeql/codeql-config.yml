@@ -1,0 +1,21 @@
+name: InvarLock CodeQL configuration
+
+paths:
+  - src/invarlock
+
+query-filters:
+  - exclude:
+      id:
+        - py/cyclic-import
+        - py/empty-except
+        - py/import-and-import-from
+        - py/import-own-module
+        - py/ineffectual-statement
+        - py/not-named-self
+        - py/polluting-import
+        - py/repeated-import
+        - py/unexpected-raise-in-special-method
+        - py/unnecessary-lambda
+        - py/unused-global-variable
+        - py/unused-import
+        - py/unused-local-variable

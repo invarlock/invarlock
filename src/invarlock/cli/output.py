@@ -74,12 +74,11 @@ def resolve_output_style(
     no_color: bool = False,
 ) -> OutputStyle:
     name = resolve_style_name(style, profile)
-    color_enabled = not (bool(no_color) or env_no_color())
     return OutputStyle(
         name=name,
         progress=bool(progress),
         timing=bool(timing),
-        color=color_enabled,
+        color=not (bool(no_color) or env_no_color()),
     )
 
 

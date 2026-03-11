@@ -25,9 +25,7 @@ def rmt_decide(
         epsilon_val = float(epsilon_by_family.get(family, 0.0) or 0.0)
         allowed = (1.0 + epsilon_val) * baseline
         allowed_by_family[family] = allowed
-        delta_by_family[family] = (
-            (current / baseline) - 1.0 if baseline > 0 else float("inf")
-        )
+        delta_by_family[family] = (current / baseline) - 1.0
 
     ok = all(
         float(current_by_family.get(family, 0.0) or 0.0) <= allowed_by_family[family]

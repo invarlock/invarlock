@@ -630,10 +630,6 @@ def rmt_detect(
         prev_outlier_count = current_outliers
         correction_iterations += 1
 
-        # Exit if no outliers remain
-        if current_outliers == 0:
-            break
-
     # Aggregate results
     n_outliers = len(flagged_layers)
     max_ratio = max((item["worst_ratio"] for item in per_layer), default=0.0)
@@ -1324,7 +1320,7 @@ class RMTGuard(Guard):
             )
             allowed = (1.0 + epsilon_val) * base
             if cur > allowed:
-                delta = (cur / base) - 1.0 if base > 0 else float("inf")
+                delta = (cur / base) - 1.0
                 violations.append(
                     {
                         "family": family,

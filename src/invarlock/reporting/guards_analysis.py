@@ -931,7 +931,7 @@ def _extract_rmt_analysis(
             )
             allowed = (1.0 + eps) * base
             if cur > allowed:
-                delta = (cur / base) - 1.0 if base > 0 else float("inf")
+                delta = (cur / base) - 1.0
                 epsilon_violations.append(
                     {
                         "family": family,

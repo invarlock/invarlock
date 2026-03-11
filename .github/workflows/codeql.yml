@@ -35,8 +35,7 @@ jobs:
           languages: python
           # Use extended security queries for more thorough analysis
           queries: +security-extended,security-and-quality
-          # Config file for custom patterns (optional, create if needed)
-          # config-file: .github/codeql/codeql-config.yml
+          config-file: .github/codeql/codeql-config.yml
 
       # Autobuild attempts to build any compiled languages (not needed for Python)
       # but helps CodeQL understand the codebase structure

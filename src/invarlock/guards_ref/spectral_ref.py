@@ -74,15 +74,8 @@ def spectral_decide(
 
     # Map to two-sided p-values via complementary error function (normal)
     # p = 2 * (1 - Phi(|z|)) = erfc(|z| / sqrt(2))
-    try:
-        import math as _m
-
-        def _p(z: float) -> float:
-            return float(_m.erfc(abs(z) / math.sqrt(2.0)))
-    except Exception:
-
-        def _p(z: float) -> float:  # pragma: no cover
-            return 1.0
+    def _p(z: float) -> float:
+        return float(math.erfc(abs(z) / math.sqrt(2.0)))
 
     pvals = [_p(z_by_name[n]) for n in names]
     method_obj = (mtest or {}).get("method", "bh")
