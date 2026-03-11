@@ -378,7 +378,6 @@ retry_task() {
             jq --arg status "${target_status}" '
                 .retries = ((.retries // 0) + 1)
                 | .status = $status
-                | .gpu_id = -1
                 | .assigned_gpus = null
                 | .started_at = null
                 | .completed_at = null
@@ -415,15 +414,12 @@ reclaim_orphaned_tasks() {
     for task_file in "${running_dir}"/*.task; do
         [[ -f "${task_file}" ]] || continue
 
-        local task_gpu
-        task_gpu=$(get_task_field "${task_file}" "gpu_id")
-        if [[ "${task_gpu}" == "${gpu_id}" ]]; then
+        local assigned_gpus
+        assigned_gpus=$(get_task_assigned_gpus "${task_file}")
+        assigned_gpus="${assigned_gpus// /}"
+        if [[ -n "${assigned_gpus}" && "${assigned_gpus}" != "null" && "${assigned_gpus%%,*}" == "${gpu_id}" ]]; then
             local task_id
             task_id=$(get_task_id "${task_file}")
-
-            local assigned_gpus
-            assigned_gpus=$(get_task_field "${task_file}" "assigned_gpus")
-            [[ -z "${assigned_gpus}" || "${assigned_gpus}" == "null" ]] && assigned_gpus="${gpu_id}"
 
             local pid_file="${running_dir}/${task_id}.pid"
             local pid=""
@@ -496,7 +492,6 @@ reclaim_orphaned_tasks() {
         [[ -f "${task_path}" ]] || continue
 
         update_task_status "${task_path}" "pending" || continue
-        assign_task_gpu "${task_path}" "-1" || continue
         update_task_field "${task_path}" "assigned_gpus" "null" "true" 2>/dev/null || true
         rm -f "${running_dir}/${task_id}.pid" 2>/dev/null || true
         mv "${task_path}" "${QUEUE_DIR}/pending/" 2>/dev/null || continue
@@ -1387,47 +1382,6 @@ generate_evaluate_tasks() {
             local cert_deps="${edit_dep_id}"
             if [[ -n "${preset_id}" ]]; then
                 cert_deps="${edit_dep_id},${preset_id}"
-            fi
-            local cert_id=$(add_task "evaluate_EDIT" "${model_id}" "${model_name}" \
-                "$(estimate_model_memory "${model_id}" "evaluate_EDIT")" \
-                "${cert_deps}" '{"edit_spec": "'"${edit_spec}"'", "version": "'"${version}"'", "run": '"${run}"'}' 74)
-            echo "Created: ${cert_id}"
-        done
-    fi
-}
-
-# Legacy: Generate tasks for an edit type (deprecated).
-# Kept for backwards compatibility with external scripts
-# Usage: generate_edit_tasks <model_id> <model_name> <setup_id> <preset_id> <edit_spec> <version> <cert_runs>
-generate_edit_tasks() {
-    local model_id="$1"
-    local model_name="$2"
-    local setup_id="$3"
-    local preset_id="$4"
-    local edit_spec="$5"
-    local version="$6"
-    local cert_runs="$7"
-    if ! [[ "${cert_runs}" =~ ^-?[0-9]+$ ]]; then
-        cert_runs=1
-    fi
-    if [[ ${cert_runs} -lt 0 ]]; then
-        cert_runs=0
-    fi
-
-    echo "WARNING: generate_edit_tasks is deprecated; use CREATE_EDIT + evaluate_EDIT" >&2
-
-    # CREATE_EDIT (single edit)
-    local edit_id=$(add_task "CREATE_EDIT" "${model_id}" "${model_name}" \
-        "$(estimate_model_memory "${model_id}" "CREATE_EDIT")" \
-        "${setup_id}" '{"edit_spec": "'"${edit_spec}"'", "version": "'"${version}"'"}' 70)
-    echo "Created: ${edit_id}"
-
-    # evaluate_EDIT × cert_runs
-    if [[ ${cert_runs} -gt 0 ]]; then
-        for run in $(seq 1 "${cert_runs}"); do
-            local cert_deps="${edit_id}"
-            if [[ -n "${preset_id}" ]]; then
-                cert_deps="${edit_id},${preset_id}"
             fi
             local cert_id=$(add_task "evaluate_EDIT" "${model_id}" "${model_name}" \
                 "$(estimate_model_memory "${model_id}" "evaluate_EDIT")" \

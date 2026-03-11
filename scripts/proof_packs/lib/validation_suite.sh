@@ -596,13 +596,11 @@ pack_source_libs() {
     SCRIPT_DIR="$(_pack_script_dir)"
     export SCRIPT_DIR  # Export for subshell workers
 
-    # Determine lib directory - support lib/ and flat layouts.
+    # Determine lib directory - support the repo lib dir and packaged v2 lib dir.
     if [[ -f "${SCRIPT_DIR}/task_serialization.sh" ]]; then
         LIB_DIR="${SCRIPT_DIR}"
     elif [[ -d "${SCRIPT_DIR}/lib" && -f "${SCRIPT_DIR}/lib/task_serialization.sh" ]]; then
         LIB_DIR="${SCRIPT_DIR}/lib"
-    elif [[ -d "${SCRIPT_DIR}/../lib" && -f "${SCRIPT_DIR}/../lib/task_serialization.sh" ]]; then
-        LIB_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)/lib"
     else
         LIB_DIR="${SCRIPT_DIR}"
     fi
@@ -1793,7 +1791,6 @@ main_dynamic() {
                 jq '(.params // {}) as $p
                     | .status="pending"
                     | .retries=0
-                    | .gpu_id=-1
                     | .assigned_gpus=null
                     | .started_at=null
                     | .completed_at=null

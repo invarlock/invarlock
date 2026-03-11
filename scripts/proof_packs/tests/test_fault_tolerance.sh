@@ -67,7 +67,7 @@ test_should_retry_task_branches() {
     source "${TEST_ROOT}/scripts/proof_packs/lib/fault_tolerance.sh"
 
     local task="${TEST_TMPDIR}/t.task"
-    jq -n '{task_id:"t", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"failed", retries:2, max_retries:4, created_at:"x", started_at:null, completed_at:null, error_msg:"x", gpu_id:-1, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
+    jq -n '{task_id:"t", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"failed", retries:2, max_retries:4, created_at:"x", started_at:null, completed_at:null, error_msg:"x", assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
         > "${task}"
 
     run should_retry_task "${task}" "permanent"
@@ -94,7 +94,7 @@ test_should_retry_task_sanitizes_missing_retry_fields() {
     MAX_RETRIES=3
 
     local task="${TEST_TMPDIR}/t.task"
-    jq -n '{task_id:"t", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"failed", created_at:"x", started_at:null, completed_at:null, error_msg:"x", gpu_id:-1, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
+    jq -n '{task_id:"t", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"failed", created_at:"x", started_at:null, completed_at:null, error_msg:"x", assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
         > "${task}"
 
     run should_retry_task "${task}" "transient"
@@ -109,7 +109,7 @@ test_should_retry_task_sanitizes_invalid_max_retries_env() {
     MAX_RETRIES="nope"
 
     local task="${TEST_TMPDIR}/t.task"
-    jq -n '{task_id:"t", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"failed", retries:2, created_at:"x", started_at:null, completed_at:null, error_msg:"x", gpu_id:-1, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
+    jq -n '{task_id:"t", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"failed", retries:2, created_at:"x", started_at:null, completed_at:null, error_msg:"x", assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
         > "${task}"
 
     run should_retry_task "${task}" "transient"
@@ -132,7 +132,7 @@ test_maybe_retry_task_sets_retry_after_and_moves_task() {
     mkdir -p "${QUEUE_DIR}"/{pending,ready,running,completed,failed}
 
     local task_id="t1"
-    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"failed", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:"x", gpu_id:0, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
+    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"failed", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:"x", assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
         > "${QUEUE_DIR}/failed/${task_id}.task"
     printf "ConnectionError\n" > "${out}/logs/tasks/${task_id}.log"
 
@@ -160,7 +160,7 @@ test_maybe_retry_task_sanitizes_non_numeric_retries_and_returns_error_when_updat
     mkdir -p "${QUEUE_DIR}"/{pending,ready,running,completed,failed}
 
     local task_id="t1"
-    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"failed", retries:null, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:"x", gpu_id:0, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
+    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"failed", retries:null, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:"x", assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
         > "${QUEUE_DIR}/failed/${task_id}.task"
     printf "ConnectionError\n" > "${out}/logs/tasks/${task_id}.log"
 
@@ -179,7 +179,7 @@ test_is_retry_ready_gates_on_retry_after() {
 
     _now_epoch() { echo "0"; }
     local task="${TEST_TMPDIR}/t.task"
-    jq -n '{task_id:"t", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"ready", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, gpu_id:-1, assigned_gpus:null, dependencies:[], params:{retry_after:"2025-01-01T00:00:10Z"}, priority:50}' \
+    jq -n '{task_id:"t", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"ready", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{retry_after:"2025-01-01T00:00:10Z"}, priority:50}' \
         > "${task}"
 
     ! is_retry_ready "${task}"
@@ -215,7 +215,7 @@ test_maybe_retry_task_missing_task_and_non_retryable_paths() {
 
     # Not retryable path (permanent error).
     local task_id="t1"
-    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"failed", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:"x", gpu_id:0, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
+    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"failed", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:"x", assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
         > "${QUEUE_DIR}/failed/${task_id}.task"
     printf "No space left on device\n" > "${out}/logs/tasks/${task_id}.log"
     if maybe_retry_task "${task_id}" >/dev/null; then
@@ -229,7 +229,7 @@ test_is_retry_ready_defaults_ready_when_retry_after_missing() {
     source "${TEST_ROOT}/scripts/proof_packs/lib/fault_tolerance.sh"
 
     local task="${TEST_TMPDIR}/t.task"
-    jq -n '{task_id:"t", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"ready", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, gpu_id:-1, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
+    jq -n '{task_id:"t", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"ready", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
         > "${task}"
     is_retry_ready "${task}"
 }
@@ -243,7 +243,7 @@ test_handle_oom_task_clamps_batch_and_seq_len_minimums() {
     fixture_write "python3.rc" "0"
 
     local task="${TEST_TMPDIR}/t.task"
-    jq -n '{task_id:"t", task_type:"EVAL_BASELINE", model_id:"m", model_name:"n", status:"running", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, gpu_id:0, assigned_gpus:null, dependencies:[], params:{batch_size:1, seq_len:100}, priority:50}' \
+    jq -n '{task_id:"t", task_type:"EVAL_BASELINE", model_id:"m", model_name:"n", status:"running", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{batch_size:1, seq_len:100}, priority:50}' \
         > "${task}"
 
     handle_oom_task "${task}" 0 "${TEST_TMPDIR}/log.txt"
@@ -262,7 +262,7 @@ test_handle_oom_task_sanitizes_non_numeric_batch_and_seq() {
     fixture_write "python3.rc" "0"
 
     local task="${TEST_TMPDIR}/t.task"
-    jq -n '{task_id:"t", task_type:"EVAL_BASELINE", model_id:"m", model_name:"n", status:"running", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, gpu_id:0, assigned_gpus:null, dependencies:[], params:{batch_size:"nope", seq_len:"bad"}, priority:50}' \
+    jq -n '{task_id:"t", task_type:"EVAL_BASELINE", model_id:"m", model_name:"n", status:"running", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{batch_size:"nope", seq_len:"bad"}, priority:50}' \
         > "${task}"
 
     handle_oom_task "${task}" 0 "${TEST_TMPDIR}/log.txt"
@@ -392,14 +392,14 @@ test_cleanup_failed_task_branches_cover_not_found_and_incomplete_artifacts() {
     mkdir -p "${model_dir}/keep_clean" "${model_dir}/drop_clean"
     echo "{}" > "${model_dir}/keep_clean/config.json"
 
-    jq -n '{task_id:"t1", task_type:"CREATE_EDIT", model_id:"m", model_name:"m", status:"failed", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:"x", gpu_id:0, assigned_gpus:null, dependencies:[], params:{edit_spec:"quant_rtn:4:32:attn", version:"clean"}, priority:50}' \
+    jq -n '{task_id:"t1", task_type:"CREATE_EDIT", model_id:"m", model_name:"m", status:"failed", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:"x", assigned_gpus:null, dependencies:[], params:{edit_spec:"quant_rtn:4:32:attn", version:"clean"}, priority:50}' \
         > "${QUEUE_DIR}/failed/t1.task"
     cleanup_failed_task "t1" "${out}"
     [[ ! -d "${model_dir}/drop_clean" ]] || t_fail "expected incomplete edit dir removed"
 
     local error_dir="${model_dir}/error_cuda_assert"
     mkdir -p "${error_dir}"
-    jq -n '{task_id:"t2", task_type:"CREATE_ERROR", model_id:"m", model_name:"m", status:"failed", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:"x", gpu_id:0, assigned_gpus:null, dependencies:[], params:{error_type:"cuda_assert"}, priority:50}' \
+    jq -n '{task_id:"t2", task_type:"CREATE_ERROR", model_id:"m", model_name:"m", status:"failed", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:"x", assigned_gpus:null, dependencies:[], params:{error_type:"cuda_assert"}, priority:50}' \
         > "${QUEUE_DIR}/failed/t2.task"
     cleanup_failed_task "t2" "${out}"
     [[ ! -d "${error_dir}" ]] || t_fail "expected incomplete error dir removed"
@@ -424,7 +424,7 @@ test_get_error_stats_print_error_summary_and_cleanup_all_failed_cover_success_pa
 
     export QUEUE_DIR="${out}/queue"
     mkdir -p "${QUEUE_DIR}"/{pending,ready,running,completed,failed}
-    jq -n '{task_id:"t1", task_type:"CREATE_EDIT", model_id:"m", model_name:"n", status:"failed", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:"x", gpu_id:-1, assigned_gpus:null, dependencies:[], params:{edit_spec:"quant_rtn:8:128:ffn", version:"clean"}, priority:50}' \
+    jq -n '{task_id:"t1", task_type:"CREATE_EDIT", model_id:"m", model_name:"n", status:"failed", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:"x", assigned_gpus:null, dependencies:[], params:{edit_spec:"quant_rtn:8:128:ffn", version:"clean"}, priority:50}' \
         > "${QUEUE_DIR}/failed/t1.task"
 
     local called=""

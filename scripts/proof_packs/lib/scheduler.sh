@@ -1793,9 +1793,10 @@ print_scheduling_report() {
         local task_id=$(get_task_id "${task_file}")
         local model=$(get_task_field "${task_file}" "model_name")
         local type=$(get_task_type "${task_file}")
-        local gpu=$(get_task_field "${task_file}" "gpu_id")
+        local gpu
+        gpu="$(get_task_field "${task_file}" "assigned_gpus")"
         local size=$(get_task_field "${task_file}" "model_size_gb")
-        echo "  ${task_id}: ${model}/${type} on GPU ${gpu} (${size}GB)"
+        echo "  ${task_id}: ${model}/${type} on GPU ${gpu:-unassigned} (${size}GB)"
     done
     echo ""
 

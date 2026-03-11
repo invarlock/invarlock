@@ -74,9 +74,6 @@ test_task_serialization_require_jq_short_circuit_sites() {
     run mark_task_started "${TEST_TMPDIR}/nope.task" "0"
     assert_rc "1" "${RUN_RC}" "mark_task_started returns non-zero when jq missing"
 
-    run mark_task_started_multi "${TEST_TMPDIR}/nope.task" "0,1"
-    assert_rc "1" "${RUN_RC}" "mark_task_started_multi returns non-zero when jq missing"
-
     run mark_task_completed "${TEST_TMPDIR}/nope.task"
     assert_rc "1" "${RUN_RC}" "mark_task_completed returns non-zero when jq missing"
 
@@ -139,6 +136,7 @@ test_create_task_success_and_invalid_params() {
     assert_eq "77" "$(jq -r '.priority' "${task_file}")" "priority stored"
     assert_eq "2" "$(jq -r '.dependencies | length' "${task_file}")" "dependencies parsed"
     assert_eq "v" "$(jq -r '.params.k' "${task_file}")" "params stored"
+    jq -e 'has("gpu_id") | not' "${task_file}" >/dev/null
 
     # Invalid params JSON fails
     run create_task "${queue_dir}" "SETUP_BASELINE" "org/model" "model" "14" "[]" '{not-json' "50"
@@ -340,12 +338,12 @@ test_task_status_transitions() {
     local task_id="t1"
     local task_file="${queue_dir}/pending/${task_id}.task"
     jq -n --arg task_id "${task_id}" --arg task_type "SETUP_BASELINE" --arg model_id "m" --arg model_name "n" --arg status "pending" \
-        '{task_id:$task_id, task_type:$task_type, model_id:$model_id, model_name:$model_name, status:$status, retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, gpu_id:-1, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
+        '{task_id:$task_id, task_type:$task_type, model_id:$model_id, model_name:$model_name, status:$status, retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
         > "${task_file}"
 
     mark_task_started "${task_file}" "3"
     assert_eq "running" "$(jq -r '.status' "${task_file}")" "status running"
-    assert_eq "3" "$(jq -r '.gpu_id' "${task_file}")" "gpu_id set"
+    assert_eq "3" "$(jq -r '.assigned_gpus' "${task_file}")" "assigned_gpus set"
     assert_eq "2025-01-01T00:00:00Z" "$(jq -r '.started_at' "${task_file}")" "started_at set"
 
     mark_task_completed "${task_file}"
@@ -378,19 +376,18 @@ test_task_serialization_field_access_and_update_error_paths() {
     assert_rc "1" "${rc}" "update_task_field fails on missing file"
 
     local task_file="${TEST_TMPDIR}/task.json"
-    jq -n '{task_id:"x", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, gpu_id:-1, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
+    jq -n '{task_id:"x", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
         > "${task_file}"
 
-    update_task_field "${task_file}" "gpu_id" "7" "true"
-    assert_eq "7" "$(jq -r '.gpu_id' "${task_file}")" "json update writes numeric value"
+    update_task_field "${task_file}" "assigned_gpus" "0,1"
+    assert_eq "0,1" "$(jq -r '.assigned_gpus' "${task_file}")" "string update writes assigned_gpus"
 
     update_task_field "${task_file}" "status" "ready"
     assert_eq "ready" "$(jq -r '.status' "${task_file}")" "string update writes value"
 
     rc=0
-    update_task_field "${task_file}" "gpu_id" "nope" "true" || rc=$?
-    assert_rc "1" "${rc}" "invalid json value fails"
-    assert_eq "7" "$(jq -r '.gpu_id' "${task_file}")" "invalid update does not clobber file"
+    update_task_field "${task_file}" "assigned_gpus" "2"
+    assert_eq "2" "$(jq -r '.assigned_gpus' "${task_file}")" "assigned_gpus update replaces value"
 }
 
 test_task_serialization_helper_accessors_cover_wrappers() {
@@ -399,7 +396,7 @@ test_task_serialization_helper_accessors_cover_wrappers() {
     source "${TEST_ROOT}/scripts/proof_packs/lib/task_serialization.sh"
 
     local task="${TEST_TMPDIR}/helper.task"
-    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, gpu_id:-1, assigned_gpus:"0,1", dependencies:["d1","d2"], params:{batch_size:2}, priority:50}' \
+    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:"0,1", dependencies:["d1","d2"], params:{batch_size:2}, priority:50}' \
         > "${task}"
 
     assert_eq "t1" "$(get_task_id "${task}")" "task_id accessor"
@@ -410,8 +407,8 @@ test_task_serialization_helper_accessors_cover_wrappers() {
     update_task_status "${task}" "ready"
     assert_eq "ready" "$(jq -r '.status' "${task}")" "update_task_status wrapper"
 
-    assign_task_gpu "${task}" "3"
-    assert_eq "3" "$(jq -r '.gpu_id' "${task}")" "assign_task_gpu wrapper"
+    assign_task_gpus "${task}" "3"
+    assert_eq "3" "$(jq -r '.assigned_gpus' "${task}")" "assign_task_gpus wrapper"
 }
 
 test_validate_task_required_fields_and_enums() {
@@ -497,12 +494,11 @@ test_task_serialization_multi_gpu_and_jq_failure_branches() {
     _now_iso() { echo "2025-01-01T00:00:00Z"; }
 
     local task_file="${TEST_TMPDIR}/task.json"
-    jq -n '{task_id:"x", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, gpu_id:-1, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
+    jq -n '{task_id:"x", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
         > "${task_file}"
 
-    mark_task_started_multi "${task_file}" "0,1"
-    assert_eq "running" "$(jq -r '.status' "${task_file}")" "started_multi sets running"
-    assert_eq "0" "$(jq -r '.gpu_id' "${task_file}")" "primary gpu_id is first id"
+    mark_task_started "${task_file}" "0,1"
+    assert_eq "running" "$(jq -r '.status' "${task_file}")" "mark_task_started sets running"
     assert_eq "0,1" "$(jq -r '.assigned_gpus' "${task_file}")" "assigned_gpus recorded"
 
     increment_task_retries "${task_file}"
@@ -516,7 +512,6 @@ test_task_serialization_multi_gpu_and_jq_failure_branches() {
 
     local rc=0
     rc=0; mark_task_started "${bad_file}" "0" || rc=$?; assert_ne "0" "${rc}" "mark_task_started fails on invalid json"
-    rc=0; mark_task_started_multi "${bad_file}" "0,1" || rc=$?; assert_ne "0" "${rc}" "mark_task_started_multi fails on invalid json"
     rc=0; mark_task_completed "${bad_file}" || rc=$?; assert_ne "0" "${rc}" "mark_task_completed fails on invalid json"
     rc=0; mark_task_failed "${bad_file}" "boom" || rc=$?; assert_ne "0" "${rc}" "mark_task_failed fails on invalid json"
     rc=0; increment_task_retries "${bad_file}" || rc=$?; assert_ne "0" "${rc}" "increment_task_retries fails on invalid json"
