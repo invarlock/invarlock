@@ -354,7 +354,6 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
         # Early validate critical config fields required by tests
         n_heads = getattr(config, "num_attention_heads", None)
         hidden_size = getattr(config, "hidden_size", None)
-        vocab_size = getattr(config, "vocab_size", None)
         if n_heads is None or hidden_size is None:
             raise AdapterError(
                 code="E202",

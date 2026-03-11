@@ -876,11 +876,11 @@ class CoreRunner:
 
         preview_n = max(int(preview_n), 0)
         final_n = max(int(final_n), 0)
-        max_needed = max(preview_n, final_n)
-        if max_needed <= 0:
+        max_single_arm = max(preview_n, final_n)
+        if max_single_arm <= 0:
             raise ValueError("preview_n and final_n cannot both be zero.")
 
-        if max_needed > total_available:
+        if max_single_arm > total_available:
             self._log_event(
                 "eval",
                 "data_scaled",
@@ -893,13 +893,13 @@ class CoreRunner:
             )
             preview_n = min(preview_n, total_available)
             final_n = min(final_n, total_available)
-            max_needed = max(preview_n, final_n)
+            max_single_arm = max(preview_n, final_n)
 
         requested_preview = preview_n
         requested_final = final_n
 
-        max_needed = preview_n + final_n
-        if max_needed > total_available:
+        total_needed = preview_n + final_n
+        if total_needed > total_available:
             self._log_event(
                 "eval",
                 "window_shortage",
@@ -910,7 +910,7 @@ class CoreRunner:
                     "available": total_available,
                 },
             )
-            max_needed = min(total_available, max_needed)
+            total_needed = min(total_available, total_needed)
 
         preview_n = min(preview_n, total_available)
         final_start = preview_n
@@ -980,14 +980,10 @@ class CoreRunner:
         bootstrap_seed_cfg = bootstrap_cfg.get("seed")
         ci_band = float(bootstrap_cfg.get("ci_band", 0.10) or 0.10)
 
-        single_method = "bca"
-        delta_method = "bca"
         if bootstrap_method == "percentile":
-            single_method = "percentile"
-            delta_method = "percentile"
+            single_method = delta_method = "percentile"
         elif bootstrap_method == "bca_paired_delta_log":
-            single_method = "bca"
-            delta_method = "bca"
+            single_method = delta_method = "bca"
         else:
             single_method = bootstrap_method
             delta_method = bootstrap_method
@@ -1018,8 +1014,7 @@ class CoreRunner:
 
         pm_preview = 50.0
         pm_final = 50.0
-        pm_ratio = 1.0
-        ratio_ci: tuple[float, float] = (pm_ratio, pm_ratio)
+        ratio_ci: tuple[float, float] = (1.0, 1.0)
         preview_log_ci: tuple[float, float] = (
             math.log(pm_preview),
             math.log(pm_preview),
@@ -1483,15 +1478,15 @@ class CoreRunner:
                 final_mean_log = math.log(pm_final)
 
             delta_mean_log = final_mean_log - preview_mean_log
-            pm_ratio = math.exp(delta_mean_log)
+            ppl_ratio = math.exp(delta_mean_log)
 
             pm_invalid = False
             try:
-                if not (math.isfinite(delta_mean_log) and math.isfinite(pm_ratio)):
+                if not (math.isfinite(delta_mean_log) and math.isfinite(ppl_ratio)):
                     raise RuntimeError("non_finite_primary_metric")
 
                 expected_ratio = math.exp(delta_mean_log)
-                if abs(pm_ratio - expected_ratio) > 1e-6:
+                if abs(ppl_ratio - expected_ratio) > 1e-6:
                     raise RuntimeError("primary_metric_ratio_mismatch")
             except Exception as exc:
                 pm_invalid = True
@@ -1503,7 +1498,7 @@ class CoreRunner:
                         "pm_preview": float(pm_preview),
                         "pm_final": float(pm_final),
                         "delta_mean_log": float(delta_mean_log),
-                        "pm_ratio": float(pm_ratio),
+                        "pm_ratio": float(ppl_ratio),
                         "error": str(exc),
                     },
                 )
@@ -1579,7 +1574,7 @@ class CoreRunner:
                     )
             else:
                 delta_log_ci = (delta_mean_log, delta_mean_log)
-                ratio_ci = (pm_ratio, pm_ratio)
+                ratio_ci = (ppl_ratio, ppl_ratio)
 
             delta_samples: list[float] = []
             delta_weights: list[float] = []
@@ -1628,7 +1623,7 @@ class CoreRunner:
                 not math.isfinite(pm_final)
             )
             needs_delta_fallback = (not math.isfinite(delta_mean_log)) or (
-                not math.isfinite(pm_ratio)
+                not math.isfinite(ppl_ratio)
             )
 
             degraded_reason: str | None = None
@@ -1665,8 +1660,8 @@ class CoreRunner:
                 if needs_delta_fallback:
                     if not math.isfinite(delta_mean_log):
                         delta_mean_log = 0.0
-                    if not math.isfinite(pm_ratio):
-                        pm_ratio = 1.0
+                    if not math.isfinite(ppl_ratio):
+                        ppl_ratio = 1.0
 
             def _hash_tokens(tokens: list[int]) -> bytes:
                 if not tokens:
@@ -1990,8 +1985,6 @@ class CoreRunner:
                 {"message": f"Primary-metric computation failed: {exc}"},
             )
             eval_error = {"type": type(exc).__name__, "message": str(exc)}
-
-        pm_ratio = pm_final / pm_preview if pm_preview > 0 else 1.0
 
         latency_ms_per_tok = self._measure_latency(
             model, preview_data[:1] if preview_data else final_data[:1], device

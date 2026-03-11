@@ -723,8 +723,6 @@ def run_command_impl(
                 baseline_path_str=str(baseline) if baseline else None,
                 console=console,
             )
-            effective_preview = harvested["effective_preview"]
-            effective_final = harvested["effective_final"]
             dataset_meta = harvested["dataset_meta"]
             window_plan = harvested["window_plan"]
             calibration_data = harvested["calibration_data"]
