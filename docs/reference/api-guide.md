@@ -6,12 +6,12 @@
 | --- | --- |
 | **Purpose** | Programmatic interface for running the InvarLock pipeline and generating reports. |
 | **Audience** | Python callers building scripted workflows or integrations. |
-| **Supported surface** | `CoreRunner.execute`, `RunConfig`, `ModelAdapter`, `ModelEdit`, `Guard`, `invarlock.assurance` helpers. |
+| **Supported surface** | `CoreRunner.execute`, `RunConfig`, `ModelAdapter`, `ModelEdit`, `Guard`, and direct reporting helpers. |
 | **Requires** | `invarlock[adapters]` for HF adapters, `invarlock[edits]` for built-in edits, `invarlock[guards]` for guard math, `invarlock[eval]` for dataset providers. |
 | **Network** | Offline by default; set `INVARLOCK_ALLOW_NETWORK=1` to download models or datasets. |
 | **Inputs** | Model instance, adapter, edit, guard list, `RunConfig`, optional calibration data. |
 | **Outputs / Artifacts** | `RunReport` object; optional event logs/checkpoints; reports via `make_report`. |
-| **Source of truth** | `src/invarlock/core/runner.py`, `src/invarlock/core/api.py`, `src/invarlock/assurance/__init__.py`. |
+| **Source of truth** | `src/invarlock/core/runner.py`, `src/invarlock/core/api.py`, `src/invarlock/reporting/report_builder.py`, `src/invarlock/reporting/render.py`, `src/invarlock/reporting/report_schema.py`. |
 
 ## Quick Start
 
@@ -48,7 +48,7 @@ print("primary metric:", report.metrics.get("primary_metric"))
 - **Snapshots**: retries use snapshot/restore; configure via
   `context.snapshot.*` when using YAML configs.
 - **reports**: generated from `RunReport` + baseline report via
-  `invarlock.assurance.make_report`.
+  `invarlock.reporting.report_builder.make_report`.
 
 ### Responsibility lanes
 
@@ -223,10 +223,12 @@ calibration = [
 ]
 ```
 
-### reports (assurance helpers)
+### reports (canonical helpers)
 
 ```python
-from invarlock.assurance import make_report, render_report_markdown, validate_report
+from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_schema import validate_report
 
 report = make_report(report, baseline_report)
 validate_report(report)
@@ -258,7 +260,7 @@ Core exceptions live in `invarlock.core.exceptions`:
   be omitted when `INVARLOCK_STORE_EVAL_WINDOWS=0`).
 - If `RunConfig.event_path` is set, an event log is written as JSONL.
 - reports from `make_report` can be validated with
-  `invarlock.assurance.validate_report` or the CLI `invarlock verify`.
+  `invarlock.reporting.report_schema.validate_report` or the CLI `invarlock verify`.
 
 ## Related Documentation
 

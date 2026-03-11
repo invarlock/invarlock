@@ -312,6 +312,27 @@ def test_edit_name_invalid_exits(tmp_path: Path):
         )
 
 
+def test_unknown_edit_name_exits_with_code_2(tmp_path: Path):
+    cfg = _cfg(tmp_path)
+
+    class _Registry:
+        def get_adapter(self, _name: str):
+            return object()
+
+        def get_edit(self, _name: str):
+            raise KeyError("missing")
+
+    with ExitStack() as stack:
+        for ctx in _common_patches_detect_ce():
+            stack.enter_context(ctx)
+        stack.enter_context(
+            patch("invarlock.core.registry.get_registry", lambda: _Registry())
+        )
+        with pytest.raises(click.exceptions.Exit) as excinfo:
+            run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
+    assert excinfo.value.exit_code == 2
+
+
 # --- Begin: test_run_additional_branches.py ---
 
 import json

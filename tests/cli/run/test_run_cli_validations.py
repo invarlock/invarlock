@@ -55,9 +55,33 @@ def test_run_command_invalid_edit_kind(mock_resolve_edit, mock_load):
                 probes=None,
             )
         if hasattr(exc_info.value, "code"):
-            assert exc_info.value.code == 1
+            assert exc_info.value.code == 2
         else:
-            assert exc_info.value.exit_code == 1
+            assert exc_info.value.exit_code == 2
+
+
+@patch("invarlock.cli.commands.run.HAS_CORE_COMPONENTS", True)
+@patch("invarlock.cli.config.load_config")
+def test_run_command_invalid_config_key_exits_2(mock_load):
+    mock_load.side_effect = ValueError(
+        "edit.parameters is not supported; use edit.plan."
+    )
+
+    with patch("invarlock.cli.commands.run.console"):
+        with pytest.raises((SystemExit, typer.Exit)) as exc_info:
+            run_command(
+                config="test.yaml",
+                device=None,
+                profile=None,
+                out=None,
+                edit=None,
+                tier=None,
+                probes=None,
+            )
+        if hasattr(exc_info.value, "code"):
+            assert exc_info.value.code == 2
+        else:
+            assert exc_info.value.exit_code == 2
 
 
 @patch("invarlock.cli.commands.run.HAS_CORE_COMPONENTS", True)

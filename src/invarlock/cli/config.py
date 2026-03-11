@@ -262,11 +262,19 @@ def load_config(path: str | Path) -> InvarLockConfig:
     if isinstance(defaults, dict):
         raw = _deep_merge(defaults, raw)
 
+    edit_block = raw.get("edit")
+    if isinstance(edit_block, dict) and "parameters" in edit_block:
+        raise ValueError("edit.parameters is not supported; use edit.plan.")
+    if isinstance(edit_block, dict) and "kind" in edit_block:
+        raise ValueError(
+            "edit.kind is not supported; use edit.name with a canonical edit plugin name."
+        )
+
     # "assurance" (strict/fast) was removed in the GPU/MPS-first measurement-contract
     # world. Fail closed so outdated configs are updated explicitly.
     if raw.get("assurance") is not None:
         raise ValueError(
-            "assurance.* is deprecated; configure measurement contracts under guards.* "
+            "assurance.* is not supported; configure measurement contracts under guards.* "
             "(e.g., guards.spectral.estimator, guards.rmt.activation.sampling)."
         )
 
@@ -278,7 +286,7 @@ def load_config(path: str | Path) -> InvarLockConfig:
             node = guards_block.get(guard_name)
             if isinstance(node, dict) and "mode" in node:
                 raise ValueError(
-                    f"guards.{guard_name}.mode is deprecated; remove it and configure "
+                    f"guards.{guard_name}.mode is not supported; remove it and configure "
                     "measurement-contract knobs under guard policy fields instead."
                 )
 
@@ -381,15 +389,6 @@ def apply_profile(cfg: InvarLockConfig, profile: str) -> InvarLockConfig:
 
 def resolve_edit_kind(kind: str) -> str:
     kind = kind.lower().strip()
-    # Aliases for common edit types
-    mapping = {
-        "prune": "quant_rtn",
-        "quant": "quant_rtn",
-        "mixed": "orchestrator",
-    }
-    # Direct mapping for aliased kinds
-    if kind in mapping:
-        return mapping[kind]
     # Check if the kind is a registered edit name (e.g., "noop", "quant_rtn")
     try:
         from invarlock.edits.registry import get_registry
@@ -400,7 +399,7 @@ def resolve_edit_kind(kind: str) -> str:
     except ImportError:
         pass
     # Also allow well-known edit names directly
-    known_edits = {"quant_rtn", "noop"}
+    known_edits = {"quant_rtn", "noop", "orchestrator"}
     if kind in known_edits:
         return kind
     raise ValueError(f"Unknown edit kind: {kind}")
@@ -411,10 +410,5 @@ def apply_edit_override(cfg: InvarLockConfig, kind: str) -> InvarLockConfig:
     resolved = resolve_edit_kind(kind)
     edit_section = cfgd.setdefault("edit", {})
     edit_section["name"] = resolved
-    edit_section["kind"] = kind
+    edit_section.pop("kind", None)
     return InvarLockConfig(cfgd)
-
-
-# Backward-compat helper name expected by tests
-def _deep_merge_dicts(a: dict, b: dict) -> dict:  # pragma: no cover - trivial alias
-    return _deep_merge(a, b)

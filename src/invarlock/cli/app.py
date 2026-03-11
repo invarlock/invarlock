@@ -314,7 +314,11 @@ def _run_typed(
         None, "--profile", help="Profile to apply (ci|release)"
     ),
     out: str | None = typer.Option(None, "--out", help="Output directory override"),
-    edit: str | None = typer.Option(None, "--edit", help="Edit kind (quant|mixed)"),
+    edit: str | None = typer.Option(
+        None,
+        "--edit",
+        help="Edit name override (canonical plugin name, e.g. quant_rtn)",
+    ),
     edit_label: str | None = typer.Option(
         None,
         "--edit-label",

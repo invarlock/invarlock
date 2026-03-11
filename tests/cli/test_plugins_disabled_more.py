@@ -17,7 +17,8 @@ def test_plugins_discovery_disabled_for_all_categories_json():
     env = {"INVARLOCK_DISABLE_PLUGIN_DISCOVERY": "1"}
     for cat in ("adapters", "guards", "edits", "plugins"):
         p = _invoke_json(["plugins", "list", cat, "--json"], env=env)
-        assert p.get("kind") == cat
+        assert p.get("category") == cat
+        assert "kind" not in p
         assert p.get("discovery") == "disabled"
         assert isinstance(p.get("items"), list)
 

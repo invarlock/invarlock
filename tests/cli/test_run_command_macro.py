@@ -81,6 +81,9 @@ class _Registry:
     def get_adapter(self, name):
         return _Adapter()
 
+    def get_edit(self, name):
+        return types.SimpleNamespace(name=name)
+
     def get_plugin_metadata(self, name, typ):  # used for provenance
         return {"name": name, "type": typ}
 

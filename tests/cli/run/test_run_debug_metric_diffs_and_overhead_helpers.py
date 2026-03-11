@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import importlib
-import types
-
 from rich.console import Console
 
 from invarlock.cli.commands import run as run_mod
@@ -191,23 +188,3 @@ def test_print_retry_summary_swallows_summary_errors() -> None:
 
     run_mod._print_retry_summary(console, Retry())
     assert console.export_text() == ""
-
-
-def test_shutil_shim_install_failure_is_non_fatal(monkeypatch, caplog) -> None:
-    real_module_type = types.ModuleType
-
-    def _raising_module_type(name, *args, **kwargs):
-        if isinstance(name, str) and name.endswith(".shutil"):
-            raise TypeError("shim-fail")
-        return real_module_type(name, *args, **kwargs)
-
-    with monkeypatch.context() as patch_ctx:
-        patch_ctx.setattr(types, "ModuleType", _raising_module_type)
-        with caplog.at_level("DEBUG", logger=run_mod.__name__):
-            importlib.reload(run_mod)
-
-    assert any(
-        "Failed to install shutil shim" in record.getMessage()
-        for record in caplog.records
-    )
-    importlib.reload(run_mod)

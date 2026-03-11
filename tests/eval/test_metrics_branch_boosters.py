@@ -20,7 +20,6 @@ from invarlock.eval.metrics import (
     _forward_loss_causal,
     _gini_vectorized,
     _locate_transformer_blocks_enhanced,
-    analyze_rmt_changes,
     analyze_spectral_changes,
     compute_parameter_deltas,
     compute_perplexity,
@@ -234,29 +233,6 @@ def test_analyze_spectral_and_rmt_changes_happy_and_error_paths():
     with patch.dict(sys.modules, {"invarlock.guards.spectral": fake_spec_err}):
         s_err = analyze_spectral_changes(m1, m2)
         assert s_err.get("error")
-
-    # Provide temporary rmt module with expected attribute
-    fake_rmt = types.ModuleType("invarlock.guards.rmt")
-    calls_r = {"i": 0}
-
-    def _fake_mp(*args, **kwargs):
-        calls_r["i"] += 1
-        return {"l": 0.5} if calls_r["i"] == 1 else {"l": 0.55}
-
-    fake_rmt.compute_mp_stats = _fake_mp
-    with patch.dict(sys.modules, {"invarlock.guards.rmt": fake_rmt}):
-        r = analyze_rmt_changes(m1, m2)
-        assert r["total_layers"] == 1 and 0.0 <= r["stability_ratio"] <= 1.0
-
-    fake_rmt_err = types.ModuleType("invarlock.guards.rmt")
-
-    def _boom2(*a, **k):
-        raise ValueError("y")
-
-    fake_rmt_err.compute_mp_stats = _boom2
-    with patch.dict(sys.modules, {"invarlock.guards.rmt": fake_rmt_err}):
-        r_err = analyze_rmt_changes(m1, m2)
-        assert r_err.get("error")
 
 
 def test_compute_and_measure_helpers():

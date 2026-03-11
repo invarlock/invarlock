@@ -56,9 +56,7 @@ def _sort_rows(rows):
 def _emit_plugins_json(category: str, rows) -> None:
     payload = {
         "format_version": PLUGINS_FORMAT_VERSION,
-        # Provide both for back-compat with tests expecting 'kind'
         "category": category,
-        "kind": category,
         "items": _sort_rows(rows),
     }
     typer.echo(json.dumps(payload, ensure_ascii=False))
@@ -145,7 +143,6 @@ def plugins_command(
                 payload = {
                     "format_version": PLUGINS_FORMAT_VERSION,
                     "category": kind,
-                    "kind": kind,
                     "items": [],
                     "discovery": "disabled",
                 }

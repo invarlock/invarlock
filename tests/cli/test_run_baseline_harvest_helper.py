@@ -6,7 +6,7 @@ import pytest
 import typer
 
 from invarlock.cli.commands.run import _validate_and_harvest_baseline_schedule
-from invarlock.cli.errors import InvarlockError
+from invarlock.core.exceptions import InvarlockError
 
 
 class _Cfg:

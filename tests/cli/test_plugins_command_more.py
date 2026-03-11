@@ -126,7 +126,8 @@ def test_plugins_adapters_json_with_optioninfo(monkeypatch, capsys):
         json_out=True,
     )
     payload = json.loads(capsys.readouterr().out)
-    assert payload["kind"] == "adapters"
+    assert payload["category"] == "adapters"
+    assert "kind" not in payload
     # With proper patching, hf_bnb should have needs_extra status
     # The test validates that OptionInfo coercion doesn't break JSON output
     needs_extra_items = [
@@ -219,7 +220,8 @@ def test_plugins_datasets_json(monkeypatch, capsys):
     plugins_command(category="datasets", json_out=True)
     lines = capsys.readouterr().out.strip().splitlines()
     payload = json.loads(lines[-1])
-    assert payload["kind"] == "datasets"
+    assert payload["category"] == "datasets"
+    assert "kind" not in payload
 
 
 def test_plugins_datasets_json_does_not_instantiate_parameterized_providers(
@@ -248,7 +250,8 @@ def test_plugins_datasets_json_does_not_instantiate_parameterized_providers(
 
     plugins_command(category="datasets", json_out=True)
     payload = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
-    assert payload["kind"] == "datasets"
+    assert payload["category"] == "datasets"
+    assert "kind" not in payload
     assert payload["items"] == [
         {
             "name": "hf_seq2seq",

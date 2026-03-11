@@ -52,9 +52,9 @@ def run_command_impl(
             raise RuntimeError(f"run_command_impl missing dependency: {name}") from exc
 
     InvarlockError = _dep("InvarlockError")
+    ConfigError = _dep("ConfigError")
     Path = _dep("Path")
     RELEASE_MIN_WINDOWS_PER_ARM = _dep("RELEASE_MIN_WINDOWS_PER_ARM")
-    SimpleNamespace = _dep("SimpleNamespace")
     _SnapshotRestoreFailed = _dep("_SnapshotRestoreFailed")
     _apply_mlm_masks = _dep("_apply_mlm_masks")
     _apply_warning_filters = _dep("_apply_warning_filters")
@@ -242,6 +242,53 @@ def run_command_impl(
         )
 
         # cfg prepared by helper above
+        edit_payload: dict[str, Any] = {}
+        try:
+            cfg_dump = cfg.model_dump()
+        except NON_FATAL_RUNTIME_EXCEPTIONS:
+            cfg_dump = None
+        if isinstance(cfg_dump, dict):
+            edit_section = cfg_dump.get("edit")
+            if isinstance(edit_section, dict):
+                edit_payload.update(edit_section)
+        try:
+            edit_obj = getattr(cfg, "edit", None)
+        except NON_FATAL_RUNTIME_EXCEPTIONS:
+            edit_obj = None
+        edit_dict = getattr(edit_obj, "__dict__", None)
+        if isinstance(edit_dict, dict):
+            edit_payload.update(edit_dict)
+
+        try:
+            legacy_edit_kind = (
+                edit_payload.get("kind") if isinstance(edit_payload, dict) else None
+            )
+        except NON_FATAL_RUNTIME_EXCEPTIONS:
+            legacy_edit_kind = None
+        if legacy_edit_kind is not None:
+            raise ConfigError(
+                code="E007",
+                message=(
+                    "CONFIG-KEY-REMOVED: edit.kind. Use edit.name with a canonical "
+                    "edit plugin name."
+                ),
+                details={"removed_keys": ["edit.kind"]},
+            )
+
+        try:
+            legacy_edit_parameters = (
+                edit_payload.get("parameters")
+                if isinstance(edit_payload, dict)
+                else None
+            )
+        except NON_FATAL_RUNTIME_EXCEPTIONS:
+            legacy_edit_parameters = None
+        if legacy_edit_parameters is not None:
+            raise ConfigError(
+                code="E007",
+                message="CONFIG-KEY-REMOVED: edit.parameters. Use edit.plan.",
+                details={"removed_keys": ["edit.parameters"]},
+            )
 
         adapter_name = str(getattr(cfg.model, "adapter", "")).lower()
         model_id_raw = str(getattr(cfg.model, "id", ""))
@@ -537,15 +584,15 @@ def run_command_impl(
             raise typer.Exit(1)
         try:
             edit_op = registry.get_edit(edit_name.strip())
-        except (AttributeError, KeyError):
+        except (AttributeError, KeyError) as exc:
             _event(
                 console,
-                "WARN",
-                f"Unknown edit '{edit_name.strip()}'. Using pass-through shim.",
-                emoji="⚠️",
+                "FAIL",
+                f"Unknown edit '{edit_name.strip()}'.",
+                emoji="❌",
                 profile=profile_normalized,
             )
-            edit_op = SimpleNamespace(name=edit_name.strip())
+            raise typer.Exit(2) from exc
 
         adapter_meta = registry.get_plugin_metadata(cfg.model.adapter, "adapters")
         try:
@@ -1515,14 +1562,6 @@ def run_command_impl(
                         edit_config = dict(plan_data)
                     elif hasattr(plan_obj, "items"):
                         edit_config = dict(plan_obj)  # type: ignore[arg-type]
-            except (TypeError, AttributeError):
-                pass
-        elif hasattr(cfg.edit, "parameters") and cfg.edit.parameters:
-            try:
-                if hasattr(cfg.edit.parameters, "items"):
-                    edit_config = dict(cfg.edit.parameters)
-                elif isinstance(cfg.edit.parameters, dict):
-                    edit_config = cfg.edit.parameters
             except (TypeError, AttributeError):
                 pass
 
@@ -3359,7 +3398,7 @@ def run_command_impl(
                     import shutil as _sh
 
                     _sh.rmtree(snapshot_tmpdir, ignore_errors=True)
-                except OSError:
+                except Exception:
                     pass
                 finally:
                     _event(

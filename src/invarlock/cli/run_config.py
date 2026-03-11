@@ -33,7 +33,11 @@ def prepare_config_for_run(
         emoji="📋",
         profile=profile,
     )
-    cfg = load_config_fn(config_path)
+    try:
+        cfg = load_config_fn(config_path)
+    except ValueError as exc:
+        event_fn(console, "FAIL", str(exc), emoji="❌", profile=profile)
+        raise typer.Exit(2) from exc
 
     if profile and str(profile).lower() not in {"dev"}:
         event_fn(
@@ -55,14 +59,14 @@ def prepare_config_for_run(
             event_fn(
                 console,
                 "EXEC",
-                f"Edit override: {edit} → {edit_name}",
+                f"Edit override: {edit_name}",
                 emoji="✂️",
                 profile=profile,
             )
             cfg = apply_edit_override_fn(cfg, edit)
         except ValueError as exc:
             event_fn(console, "FAIL", str(exc), emoji="❌", profile=profile)
-            raise typer.Exit(1) from exc
+            raise typer.Exit(2) from exc
 
     if tier or probes is not None:
         if tier and tier not in ["conservative", "balanced", "aggressive", "none"]:

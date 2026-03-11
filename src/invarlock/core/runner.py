@@ -1937,7 +1937,7 @@ class CoreRunner:
                 )
                 # In CI/Release profiles, treat insufficient coverage as a hard error
                 if pairing_context and profile_label in {"ci", "release"}:
-                    from invarlock.cli.errors import InvarlockError
+                    from invarlock.core.exceptions import InvarlockError
 
                     raise InvarlockError(
                         code="E005",

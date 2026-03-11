@@ -15,6 +15,8 @@ def test_cli_run_help_includes_edit_label_and_metric_kind():
     stdout = strip_ansi(result.stdout)
     assert "--edit-label" in stdout
     assert "--metric-kind" in stdout
+    assert "quant_rtn" in stdout
+    assert "quant|mixed" not in stdout
 
 
 def test_cli_run_accepts_edit_label_flag():

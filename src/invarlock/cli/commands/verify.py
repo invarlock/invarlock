@@ -19,7 +19,9 @@ from typing import Any
 import typer
 from rich.console import Console
 
-from invarlock.cli.errors import InvarlockError
+from invarlock.core.exceptions import (
+    InvarlockError,
+)
 from invarlock.core.exceptions import (
     MetricsError as _MetricsError,
 )

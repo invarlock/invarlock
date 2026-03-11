@@ -149,8 +149,9 @@ used to produce guard statistics.
   - measurement contract present, and
   - baseline/subject pairing (`*_measurement_contract_match = true`).
 
-`assurance.mode` and per-guard `guards.{spectral,rmt}.mode` are not supported;
-configs containing them are rejected.
+`edit.kind`, `edit.parameters`, `assurance.*`, and per-guard
+`guards.{spectral,rmt}.mode` are not supported; configs containing them are
+rejected.
 
 ### Quickstart Commands
 

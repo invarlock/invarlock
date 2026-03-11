@@ -5,8 +5,12 @@ import json
 from pathlib import Path
 
 from invarlock.cli.commands import run as run_mod
-from invarlock.cli.errors import InvarlockError
-from invarlock.core.exceptions import ConfigError, DataError, ValidationError
+from invarlock.core.exceptions import (
+    ConfigError,
+    DataError,
+    InvarlockError,
+    ValidationError,
+)
 
 
 def test_should_measure_overhead_respects_config_and_profile() -> None:

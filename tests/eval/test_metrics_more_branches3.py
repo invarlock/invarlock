@@ -263,10 +263,10 @@ def test_calculate_perplexity_raises_when_no_valid_tokens():
     import pytest
 
     from invarlock.eval.metrics import ValidationError as MValidationError
-    from invarlock.eval.metrics import calculate_perplexity
+    from invarlock.eval.metrics import compute_perplexity
 
     with pytest.raises(MValidationError):
-        calculate_perplexity(model, dl, max_batches=1, device="cpu")
+        compute_perplexity(model, dl, max_samples=1, device="cpu")
 
 
 def test_measure_latency_returns_zero_on_empty_or_short_window():

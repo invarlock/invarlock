@@ -90,7 +90,7 @@ def test_run_cli_profile_and_edit_override_paths(
             config=str(cfg_path),
             device="cpu",
             profile="ci",  # exercise apply_profile
-            edit="quant",  # exercise resolve_edit_kind/apply_edit_override
+            edit="quant_rtn",  # exercise canonical edit override path
             tier="balanced",  # exercise auto overrides path
             probes=2,
             baseline=None,

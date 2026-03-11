@@ -41,8 +41,8 @@ output:
   resolves guard thresholds from `tiers.yaml`.
 - **Defaults merging**: the optional top-level `defaults` mapping is merged into
   the config before execution.
-- **Deprecated keys**: `assurance.*` and `guards.{spectral,rmt}.mode` are rejected
-  to keep measurement contracts explicit.
+- **Unsupported keys**: `edit.kind`, `edit.parameters`, `assurance.*`, and
+  `guards.{spectral,rmt}.mode` are rejected to keep the config surface explicit.
 
 **Precedence (highest → lowest)**
 
@@ -125,7 +125,7 @@ edit:
     max_modules: 12
 ```
 
-`edit.parameters` is accepted as an alias for `edit.plan` (the CLI normalizes it).
+Only `edit.plan` is supported for built-in edit configuration.
 
 ### Auto policy hints
 
@@ -193,7 +193,8 @@ eval:
 
 ## Troubleshooting
 
-- **Unknown keys rejected**: remove deprecated `assurance.*` or guard `mode` keys.
+- **Unsupported keys rejected**: remove `edit.kind`, `edit.parameters`,
+  `assurance.*`, or guard `mode` keys.
 - **Provider not found**: verify `dataset.provider` and install `invarlock[eval]`.
 - **Preset drift**: run `python scripts/check_config_schema_sync.py` after edits.
 

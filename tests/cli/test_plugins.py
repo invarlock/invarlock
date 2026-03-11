@@ -15,7 +15,8 @@ def test_plugins_discovery_disabled_minimal_json_adapters():
     )
     assert r.exit_code == 0
     obj = json.loads(r.stdout.strip().splitlines()[-1])
-    assert obj.get("kind") == "adapters"
+    assert obj.get("category") == "adapters"
+    assert "kind" not in obj
     assert obj.get("discovery") == "disabled"
     assert isinstance(obj.get("items"), list) and len(obj["items"]) == 0
 

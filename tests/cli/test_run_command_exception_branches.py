@@ -57,7 +57,7 @@ def test_run_command_invarlock_error_in_ci(
     cfg = tmp_path / "cfg.yaml"
     cfg.write_text("model: {id: gpt2, adapter: hf_causal}\n")
     import invarlock.cli.config as cfg_mod
-    from invarlock.cli.errors import InvarlockError
+    from invarlock.core.exceptions import InvarlockError
 
     def _raise_invarlock(*a, **k):
         raise InvarlockError(code="E001", message="boom")

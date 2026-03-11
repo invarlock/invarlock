@@ -18,7 +18,6 @@ import random
 import re
 import shutil
 import sys as _sys
-import types as _types
 import warnings
 from array import array
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
@@ -130,12 +129,14 @@ try:
 except ImportError:
     torch = None  # type: ignore[assignment]
 
-from invarlock.cli.errors import InvarlockError
 from invarlock.core.exceptions import (
     ConfigError as _CfgErr,
 )
 from invarlock.core.exceptions import (
     DataError as _DataErr,
+)
+from invarlock.core.exceptions import (
+    InvarlockError,
 )
 from invarlock.core.exceptions import (
     ValidationError as _ValErr,
@@ -1418,10 +1419,10 @@ def _build_run_command_deps() -> dict[str, Any]:
     """
 
     return {
+        "ConfigError": _CfgErr,
         "InvarlockError": InvarlockError,
         "Path": Path,
         "RELEASE_MIN_WINDOWS_PER_ARM": RELEASE_MIN_WINDOWS_PER_ARM,
-        "SimpleNamespace": SimpleNamespace,
         "_SnapshotRestoreFailed": _SnapshotRestoreFailed,
         "_apply_mlm_masks": _apply_mlm_masks,
         "_apply_warning_filters": _apply_warning_filters,
@@ -1503,7 +1504,11 @@ def run_command(
         help="Profile to apply (e.g. ci, release, ci_cpu; dev is a no-op)",
     ),
     out: str | None = typer.Option(None, "--out", help="Output directory override"),
-    edit: str | None = typer.Option(None, "--edit", help="Edit kind (quant|mixed)"),
+    edit: str | None = typer.Option(
+        None,
+        "--edit",
+        help="Edit name override (canonical plugin name, e.g. quant_rtn)",
+    ),
     edit_label: str | None = typer.Option(
         None,
         "--edit-label",
@@ -1605,22 +1610,6 @@ def _format_debug_metric_diffs(
     baseline_report_data: dict | None,
 ) -> str:
     return _format_debug_metric_diffs_impl(pm, metrics, baseline_report_data)
-
-
-# Provide a module shim so tests can patch 'src.invarlock.cli.commands.run.shutil.*'.
-try:  # best-effort; harmless in production
-    _shim = _types.ModuleType(__name__ + ".shutil")
-
-    def _shim_getattr(name: str):  # pragma: no cover
-        return getattr(shutil, name)
-
-    _shim.__getattr__ = _shim_getattr  # type: ignore[attr-defined]
-    _shim.disk_usage = shutil.disk_usage  # type: ignore[attr-defined]
-    _shim.rmtree = shutil.rmtree  # type: ignore[attr-defined]
-    _sys.modules[__name__ + ".shutil"] = _shim
-    _sys.modules["src." + __name__ + ".shutil"] = _shim
-except (AttributeError, KeyError, TypeError) as exc:
-    logging.getLogger(__name__).debug("Failed to install shutil shim: %s", exc)
 
 
 def _normalize_overhead_result(

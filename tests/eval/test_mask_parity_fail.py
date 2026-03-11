@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from invarlock.cli.commands.run import _enforce_provider_parity
-from invarlock.cli.errors import InvarlockError
+from invarlock.core.exceptions import InvarlockError
 
 
 def test_mask_parity_mismatch_aborts_in_ci():

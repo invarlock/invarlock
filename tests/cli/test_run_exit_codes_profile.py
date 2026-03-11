@@ -10,7 +10,7 @@ def _mk_err(mod_name: str, cls: str, *args, **kwargs):
 
 def test_resolve_exit_code_invarlockerror_profiles():
     run_mod = importlib.import_module("invarlock.cli.commands.run")
-    InvarlockError = importlib.import_module("invarlock.cli.errors").InvarlockError
+    InvarlockError = importlib.import_module("invarlock.core.exceptions").InvarlockError
     err = InvarlockError(code="E005", message="boom")
     assert run_mod._resolve_exit_code(err, profile="ci") == 3
     assert run_mod._resolve_exit_code(err, profile="release") == 3

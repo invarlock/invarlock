@@ -54,7 +54,7 @@ print("status:", report.status)
 ## Observability
 
 - Inspect `report.meta`, `report.guards`, and `report.metrics`.
-- For report generation, use `invarlock.assurance.make_report`.
+- For report generation, use `invarlock.reporting.report_builder.make_report`.
 
 ## Related Documentation
 

@@ -1106,25 +1106,6 @@ def _finalize_results(
     return results
 
 
-# ── Backward compatibility functions ──────────────────────────────────────
-def _gini(vec: torch.Tensor) -> float:
-    """Legacy Gini function for backward compatibility."""
-    return _gini_vectorized(vec)
-
-
-def _mi_gini_cpu_safe_path(
-    feats_cpu: torch.Tensor, targ_cpu: torch.Tensor, max_per_layer: int
-) -> float:
-    """Legacy CPU MI-Gini function for backward compatibility."""
-    config = MetricsConfig(max_samples_per_layer=max_per_layer, progress_bars=True)
-    return _mi_gini_optimized_cpu_path(feats_cpu, targ_cpu, max_per_layer, config)
-
-
-def _locate_transformer_blocks(model: nn.Module) -> list[nn.Module] | None:
-    """Legacy transformer block locator for backward compatibility."""
-    return _locate_transformer_blocks_enhanced(model)
-
-
 # ── Additional utility functions ───────────────────────────────────────────
 def get_metrics_info() -> dict[str, Any]:
     """Get information about available metrics and dependencies."""
@@ -1468,21 +1449,6 @@ def _sanitize_token_ids_for_model(
             labels = labels.masked_fill(invalid_labels, -100)
 
     return input_ids, attention_mask, labels
-
-
-# ── Perplexity calculation ─────────────────────────────────────────────────
-@torch.no_grad()
-def calculate_perplexity(
-    model: nn.Module,
-    dataloader,
-    max_batches: int = 100,
-    device: str | torch.device | None = None,
-) -> float:
-    """
-    DEPRECATED: Use compute_perplexity for new code.
-    This is an alias for backward compatibility with tests.
-    """
-    return compute_perplexity(model, dataloader, max_samples=max_batches, device=device)
 
 
 @torch.no_grad()
@@ -2221,61 +2187,6 @@ def analyze_spectral_changes(
         return {"error": str(e)}
 
 
-def analyze_rmt_changes(
-    model_before: nn.Module, model_after: nn.Module
-) -> dict[str, Any]:
-    """
-    Analyze RMT (Random Matrix Theory) changes between model states.
-
-    Args:
-        model_before: Model before edit
-        model_after: Model after edit
-
-    Returns:
-        Dictionary with RMT analysis results
-    """
-    try:
-        # Import RMT analysis if available
-        from invarlock.guards.rmt import compute_mp_stats
-
-        before_stats = compute_mp_stats(model_before)
-        after_stats = compute_mp_stats(model_after)
-
-        # Analyze changes in MP statistics
-        changes = {}
-        for layer_name in before_stats:
-            if layer_name in after_stats:
-                before_mp = before_stats[layer_name]
-                after_mp = after_stats[layer_name]
-                changes[layer_name] = {
-                    "before": before_mp,
-                    "after": after_mp,
-                    "stable": abs(before_mp - after_mp) < 0.1,  # Stability threshold
-                }
-
-        # Count stable vs unstable layers
-        stable_count = sum(
-            1 for change in changes.values() if change.get("stable", False)
-        )
-        total_count = len(changes)
-
-        summary = {
-            "layer_changes": changes,
-            "stable_layers": stable_count,
-            "total_layers": total_count,
-            "stability_ratio": stable_count / total_count if total_count > 0 else 0.0,
-        }
-
-        return summary
-
-    except ImportError:
-        logger.debug("RMT analysis not available")
-        return {"error": "rmt_analysis_unavailable"}
-    except Exception as e:
-        logger.warning(f"RMT analysis failed: {e}")
-        return {"error": str(e)}
-
-
 class Metric(Protocol):
     name: str
     kind: str  # "ppl", "accuracy", "exact_match", "bleu", "rouge"
@@ -2339,7 +2250,6 @@ try:
             "measure_memory",
             "compute_parameter_deltas",
             "analyze_spectral_changes",
-            "analyze_rmt_changes",
             "Metric",
             "PerplexityMetric",
             "AccuracyMetric",
@@ -2354,7 +2264,6 @@ except NameError:
         "measure_memory",
         "compute_parameter_deltas",
         "analyze_spectral_changes",
-        "analyze_rmt_changes",
         "Metric",
         "PerplexityMetric",
         "AccuracyMetric",
