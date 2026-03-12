@@ -137,7 +137,7 @@ onnx = [
 dev = [
   "pytest>=7.0",
   "pytest-cov>=4.0",
-  "ruff>=0.1.0",
+  "ruff==0.14.6",
   "black>=23.0",
   "mypy>=1.0",
   "hypothesis>=6.98",
@@ -154,7 +154,7 @@ dev = [
 
 ci = [
   "pytest>=7.0",
-  "ruff>=0.1.0",
+  "ruff==0.14.6",
   "mkdocs>=1.5",
   "mkdocs-material>=9.5",
   "mkdocs-mermaid2-plugin>=1.1",
