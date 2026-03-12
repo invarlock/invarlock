@@ -158,6 +158,7 @@ ci = [
   "mkdocs>=1.5",
   "mkdocs-material>=9.5",
   "mkdocs-mermaid2-plugin>=1.1",
+  "build>=0.10.0",
 ]
 
 docs-ci = [
