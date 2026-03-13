@@ -3,24 +3,37 @@
 
 .PHONY: help install dev-install test test-assurance lint format clean docsclean deepclean docs docs-ci verify coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry
 
+PYTHON ?= $(shell bash scripts/select_python.sh)
+PIP := $(PYTHON) -m pip
+PYTEST := $(PYTHON) -m pytest
+RUFF := $(PYTHON) -m ruff
+MYPY := $(PYTHON) -m mypy
+COVERAGE := $(PYTHON) -m coverage
+MKDOCS := $(PYTHON) -m mkdocs
+PRE_COMMIT := $(PYTHON) -m pre_commit
+
 help:  ## Show this help message
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 ##@ Installation
 install:  ## Install package
-	pip install -e .
+	$(MAKE) ensure-python
+	$(PIP) install -e .
 
 dev-install:  ## Install package with development dependencies
-	pip install -e ".[dev]"
+	$(MAKE) ensure-python
+	$(PIP) install -e ".[dev]"
 
 ##@ Development
 test:  ## Run tests
-	PYTHONPATH=src pytest tests/ -v
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTEST) tests/ -v
 
 ##@ Coverage
 coverage:  ## Run tests with coverage and generate XML
-	coverage erase
-	PYTHONPATH=src pytest -q \
+	$(MAKE) ensure-python
+	$(COVERAGE) erase
+	PYTHONPATH=src $(PYTEST) -q \
 		tests/core tests/guards tests/reporting tests/cli/run tests/cli/test_run_*.py tests/calibration tests/scripts \
 		tests/cli/test_run_command_*.py tests/cli/test_config_failfast.py tests/cli/test_error_codes.py \
 		tests/cli/test_verify*.py tests/cli/test_cli_command_help_smoke.py tests/cli/test_policy_commands.py \
@@ -36,31 +49,42 @@ coverage:  ## Run tests with coverage and generate XML
 
 coverage-enforce:  ## Run coverage and enforce per-file thresholds
 	$(MAKE) coverage
-	python scripts/check_coverage_thresholds.py --coverage reports/cov.xml --json reports/thresholds.json
+	$(PYTHON) scripts/check_coverage_thresholds.py --coverage reports/cov.xml --json reports/thresholds.json
 
 # Grouped test targets
 .PHONY: test-core test-cli test-eval test-guards test-edits test-adapters test-plugins test-scripts test-ci
 test-core:
-	PYTHONPATH=src pytest -q tests/core
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTEST) -q tests/core
 test-cli:
-	PYTHONPATH=src pytest -q tests/cli
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTEST) -q tests/cli
 test-eval:
-	PYTHONPATH=src pytest -q tests/eval
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTEST) -q tests/eval
 test-guards:
-	PYTHONPATH=src pytest -q tests/guards
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTEST) -q tests/guards
 test-edits:
-	PYTHONPATH=src pytest -q tests/edits
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTEST) -q tests/edits
 test-adapters:
-	PYTHONPATH=src pytest -q tests/adapters
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTEST) -q tests/adapters
 test-plugins:
-	PYTHONPATH=src pytest -q tests/plugins
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTEST) -q tests/plugins
 test-scripts:
-	PYTHONPATH=src pytest -q tests/scripts
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTEST) -q tests/scripts
 test-ci:
-	PYTHONPATH=src pytest -q tests/ci
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTEST) -q tests/ci
 
 test-assurance:  ## Run assurance-related tests only
-	PYTHONPATH=src pytest -q \
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTEST) -q \
+		tests/api/test_assurance_facade.py \
 		tests/ci/test_golden_runs_offline.py \
 		tests/ci/test_support_matrix_consistency.py \
 		tests/adapters/test_adapter_capability_contract.py \
@@ -73,24 +97,25 @@ test-assurance:  ## Run assurance-related tests only
 
 lint:  ## Run linting
 	$(MAKE) ensure-ruff
-	python -m ruff check src/ tests/ scripts/
-	mypy src/
+	$(RUFF) check src/ tests/ scripts/
+	$(MYPY) src/
 
 format:  ## Format code
 	$(MAKE) ensure-ruff
-	python -m ruff format src/ tests/ scripts/
-	python -m ruff check --fix src/ tests/ scripts/
+	$(RUFF) format src/ tests/ scripts/
+	$(RUFF) check --fix src/ tests/ scripts/
 
 verify:  ## Run verification (pytest -q, lint, format, markdownlint)
 	@echo "Running verification..."
-	PYTHONPATH=src pytest -q
-	OMP_NUM_THREADS=1 SKIP_RUFF=1 bash scripts/run_smoke_regression.sh
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTEST) -q
+	OMP_NUM_THREADS=1 SKIP_RUFF=1 INVARLOCK_PYTHON="$(PYTHON)" bash scripts/run_smoke_regression.sh
 	$(MAKE) ensure-ruff
-	python -m ruff check src/ tests/ scripts/
-	python -m ruff format --check src/ tests/ scripts/
-	python scripts/docs_lint.py --markdown
+	$(RUFF) check src/ tests/ scripts/
+	$(RUFF) format --check src/ tests/ scripts/
+	$(PYTHON) scripts/docs_lint.py --markdown
 	@if [ -n "$$VERIFY_DOCS_API" ]; then \
-		python scripts/validate_docs_api_refs.py; \
+		$(PYTHON) scripts/validate_docs_api_refs.py; \
 	fi
 	@echo "Verification completed successfully"
 
@@ -123,24 +148,30 @@ deepclean: ## Remove all generated artifacts, caches, and run outputs (destructi
 		*.pyc *.pyo
 
 docs-serve: ## Serve documentation locally
-	mkdocs serve -a 127.0.0.1:8000
+	$(MAKE) ensure-python
+	$(MKDOCS) serve -a 127.0.0.1:8000
 
 docs-deploy: ## Build and publish docs to gh-pages (local)
-	mkdocs gh-deploy --clean --force
+	$(MAKE) ensure-python
+	$(MKDOCS) gh-deploy --clean --force
 
 pre-commit-install: ## Install pre-commit hooks locally
-	python -m pip install -U pre-commit
-	pre-commit install
+	$(MAKE) ensure-python
+	$(PIP) install -U pre-commit
+	$(PRE_COMMIT) install
 
 pre-commit: ## Run pre-commit on all files
-	pre-commit run --all-files --show-diff-on-failure
+	$(MAKE) ensure-python
+	$(PRE_COMMIT) run --all-files --show-diff-on-failure
 
 docs:  ## Build docs with default mkdocs.yml (CI/networked)
-	mkdocs build --strict
+	$(MAKE) ensure-python
+	$(MKDOCS) build --strict
 
 docs-ci:  ## Build documentation and run link checker
-	mkdocs build --strict
-	python scripts/check_docs_links.py
+	$(MAKE) ensure-python
+	$(MKDOCS) build --strict
+	$(PYTHON) scripts/check_docs_links.py
 
 ## (Consolidated) Single docs-serve target defined above
 
@@ -165,11 +196,18 @@ ci-matrix:  ## Verify CI matrix
 
 
 .PHONY: ensure-ruff
+ensure-python:
+	@$(PYTHON) -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 12) else 1)" || { \
+		printf '%s\n' "Python 3.12+ required. Selected: $(PYTHON) ($$($(PYTHON) --version 2>&1))" >&2; \
+		exit 1; \
+	}
+
 ensure-ruff:
-	@if python -c "import importlib.util, sys; sys.exit(0 if importlib.util.find_spec('ruff') else 1)"; then \
+	@$(MAKE) ensure-python
+	@if $(PYTHON) -c "import importlib.util, sys; sys.exit(0 if importlib.util.find_spec('ruff') else 1)"; then \
 		:; \
 	else \
-		printf '%s\n' "ruff is required but not installed; install it in your active environment (e.g. 'python -m pip install ruff')" >&2; \
+		printf '%s\n' "ruff is required but not installed; install it in the selected environment (e.g. '$(PYTHON) -m pip install ruff')" >&2; \
 		exit 1; \
 	fi
 
@@ -177,26 +215,33 @@ ensure-ruff:
 
 .PHONY: docs-check docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell
 docs-check: ## Run consolidated docs validation (build, links, refs, examples, consistency)
-	PYTHONPATH=src python scripts/docs_check.py --all
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTHON) scripts/docs_check.py --all
 
 docs-check-build: ## Build docs strictly and run link checks
-	PYTHONPATH=src python scripts/docs_check.py --build --links
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTHON) scripts/docs_check.py --build --links
 
 docs-check-links: ## Run docs link checks only
-	PYTHONPATH=src python scripts/docs_check.py --links
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTHON) scripts/docs_check.py --links
 
 docs-lint: ## Lint docs (markdown + spell)
-	python scripts/docs_lint.py --all
+	$(MAKE) ensure-python
+	$(PYTHON) scripts/docs_lint.py --all
 
 docs-lint-markdown: ## Lint docs markdown style only
-	python scripts/docs_lint.py --markdown
+	$(MAKE) ensure-python
+	$(PYTHON) scripts/docs_lint.py --markdown
 
 docs-lint-spell: ## Spell-check docs only
-	python scripts/docs_lint.py --spell
+	$(MAKE) ensure-python
+	$(PYTHON) scripts/docs_lint.py --spell
 
 .PHONY: config-check
 config-check: ## Verify config includes and adapter availability
-	python scripts/check_config_integrity.py configs
+	$(MAKE) ensure-python
+	$(PYTHON) scripts/check_config_integrity.py configs
 
 ##@ Local CI (act)
 # Run GitHub Actions workflows locally using nektos/act

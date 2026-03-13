@@ -83,6 +83,11 @@ mock_run/
 *.log
 artifacts/
 artifacts/supply-chain/
+!tests/artifacts/
+!tests/artifacts/golden_runs/
+!tests/artifacts/golden_runs/**
+!tests/artifacts/proofpack/
+!tests/artifacts/proofpack/**
 tmp_*/
 tmp/
 .certify_tmp/
@@ -142,6 +147,8 @@ test_config.yaml
 plans/
 research/
 data/
+!contracts/
+!contracts/*.json
 
 # Local-only CI workflows (for benchmarking, not required for core CI)
 # .github/workflows/guard-effect-benchmark.yml  # Temporarily tracked for optimization
