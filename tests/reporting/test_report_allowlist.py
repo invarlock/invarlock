@@ -12,6 +12,7 @@ def test_load_validation_allowlist_prefers_contract_file(tmp_path, monkeypatch):
     contracts_dir = root / "contracts"
     contracts_dir.mkdir(exist_ok=True)
     path = contracts_dir / "validation_keys.json"
+    original_text = path.read_text(encoding="utf-8") if path.exists() else None
 
     try:
         path.write_text(json.dumps(["a", "b"]))
@@ -23,10 +24,13 @@ def test_load_validation_allowlist_prefers_contract_file(tmp_path, monkeypatch):
         # Fallback to default allowlist when file content is invalid
         assert cert._VALIDATION_ALLOWLIST_DEFAULT.issubset(keys2)
     finally:
-        try:
-            path.unlink()
-        except FileNotFoundError:
-            pass
+        if original_text is None:
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                pass
+        else:
+            path.write_text(original_text, encoding="utf-8")
         # Clean up empty contracts dir if we created it
         try:
             if contracts_dir.exists() and not any(contracts_dir.iterdir()):

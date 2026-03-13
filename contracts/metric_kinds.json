@@ -1,0 +1,7 @@
+[
+  "accuracy",
+  "ppl_causal",
+  "ppl_mlm",
+  "ppl_seq2seq",
+  "vqa_accuracy"
+]

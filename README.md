@@ -190,6 +190,7 @@ For guidance on where to ask questions, how to report bugs, and what to expect i
 
 - Contributing guide: <https://github.com/invarlock/invarlock/blob/main/CONTRIBUTING.md>
 - Fast local checks (repo clone):
+  - `make` targets auto-select Python 3.12+, preferring an active 3.12 env, `python3.12`, then the Conda env `invarlock-py312` when present.
   - `make dev-install`
   - `make test`
   - `make lint`

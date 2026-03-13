@@ -28,7 +28,7 @@ def run(cmd: list[str]) -> tuple[int, str]:
 
 
 def check_build() -> None:
-    code, out = run(["mkdocs", "build", "--strict"])
+    code, out = run([sys.executable, "-m", "mkdocs", "build", "--strict"])
     print(out, end="")
     if code != 0:
         raise SystemExit(code)
