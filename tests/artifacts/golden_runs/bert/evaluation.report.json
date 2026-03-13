@@ -1,0 +1,73 @@
+{
+  "schema_version": "v1",
+  "run_id": "golden-bert-20260313",
+  "edit_name": "noop",
+  "artifacts": {
+    "report_path": "tests/artifacts/golden_runs/bert/evaluation.report.json",
+    "events_path": "tests/artifacts/golden_runs/bert/events.jsonl"
+  },
+  "plugins": {
+    "adapters": [
+      "hf_text"
+    ],
+    "edits": [
+      "noop"
+    ],
+    "guards": [
+      "spectral",
+      "rmt",
+      "variance"
+    ]
+  },
+  "meta": {
+    "model_id": "bert-base-uncased",
+    "adapter": "hf_text",
+    "device": "cpu",
+    "seed": 11
+  },
+  "dataset": {
+    "provider": "local_jsonl",
+    "seq_len": 128,
+    "windows": {
+      "preview": 64,
+      "final": 64,
+      "stats": {
+        "paired_windows": 64,
+        "coverage_ok": true,
+        "window_match_fraction": 1.0,
+        "window_overlap_fraction": 1.0
+      }
+    }
+  },
+  "primary_metric": {
+    "kind": "ppl_mlm",
+    "preview": 1.92,
+    "final": 1.95,
+    "ratio_vs_baseline": 1.0156,
+    "display_ci": [
+      1.0,
+      1.03
+    ]
+  },
+  "validation": {
+    "guard_overhead_acceptable": true,
+    "invariants_pass": true,
+    "preview_final_drift_acceptable": true,
+    "primary_metric_acceptable": true,
+    "primary_metric_tail_acceptable": true,
+    "rmt_stable": true,
+    "spectral_stable": true
+  },
+  "variance": {
+    "enabled": false,
+    "gain": null
+  },
+  "spectral": {
+    "summary": {
+      "status": "stable"
+    }
+  },
+  "rmt": {
+    "status": "stable"
+  }
+}

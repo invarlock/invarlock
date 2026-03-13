@@ -1,14 +1,23 @@
-"""
-Placeholder for golden-run offline regression coverage.
+from __future__ import annotations
 
-The public repo does not bundle the offline golden artifacts used in
-internal CI, so this test is skipped in OSS. Keeping the file ensures
-workflow test lists remain stable.
-"""
+import json
+from pathlib import Path
 
-import pytest
+from invarlock.reporting.report_schema import validate_report
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-@pytest.mark.skip(reason="Offline golden runs are not shipped in the OSS repo.")
-def test_offline_golden_runs_placeholder() -> None:
-    pass
+def test_offline_golden_runs_public_fixtures() -> None:
+    manifest_path = REPO_ROOT / "tests/artifacts/golden_runs/manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    assert manifest["published_basis"] == ["gpt2", "bert"]
+
+    for lane in manifest["lanes"]:
+        report_path = REPO_ROOT / lane["report"]
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        assert validate_report(report) is True
+        assert report["meta"]["model_id"] == lane["model_id"]
+        assert report["primary_metric"]["kind"] == lane["primary_metric_kind"]
+        assert report["validation"]["primary_metric_acceptable"] is True

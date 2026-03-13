@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def _load_cert(cert_path: Path) -> dict:
@@ -14,7 +14,7 @@ def _load_cert(cert_path: Path) -> dict:
 
 def test_variance_enabled_for_balanced_proof_pack():
     cert = _load_cert(
-        REPO_ROOT / "artifacts/proofpack/svd95_balanced_release_cert.json"
+        REPO_ROOT / "tests/artifacts/proofpack/svd95_balanced_release_cert.json"
     )
 
     variance = cert["variance"]
@@ -29,7 +29,7 @@ def test_variance_enabled_for_balanced_proof_pack():
 
 def test_variance_disabled_for_conservative_proof_pack():
     cert = _load_cert(
-        REPO_ROOT / "artifacts/proofpack/svd95_conservative_release_cert.json"
+        REPO_ROOT / "tests/artifacts/proofpack/svd95_conservative_release_cert.json"
     )
 
     variance = cert["variance"]
