@@ -60,7 +60,7 @@ class TestBatchDimensionHandling:
 
     def test_1d_tensor_converted_to_2d(self):
         """Test that 1-D input tensors are converted to 2-D before model call."""
-        from invarlock.guards.variance import equalise_residual_variance
+        from invarlock.guards.variance_scaling import equalise_residual_variance
 
         model = MockGPT2Model(n_layers=2, hidden_size=64)
 
@@ -93,7 +93,7 @@ class TestBatchDimensionHandling:
 
     def test_2d_tensor_unchanged(self):
         """Test that 2-D tensors pass through unchanged."""
-        from invarlock.guards.variance import equalise_residual_variance
+        from invarlock.guards.variance_scaling import equalise_residual_variance
 
         model = MockGPT2Model(n_layers=2, hidden_size=64)
 
@@ -118,7 +118,7 @@ class TestBatchDimensionHandling:
 
     def test_list_input_converted_to_tensor(self):
         """Test that list inputs are converted to tensors."""
-        from invarlock.guards.variance import equalise_residual_variance
+        from invarlock.guards.variance_scaling import equalise_residual_variance
 
         model = MockGPT2Model(n_layers=2, hidden_size=64)
 
@@ -144,7 +144,7 @@ class TestBatchDimensionHandling:
 
     def test_tuple_batch_format(self):
         """Test tuple batch format (e.g., from TensorDataset)."""
-        from invarlock.guards.variance import equalise_residual_variance
+        from invarlock.guards.variance_scaling import equalise_residual_variance
 
         model = MockGPT2Model(n_layers=2, hidden_size=64)
 
@@ -169,7 +169,7 @@ class TestBatchDimensionHandling:
 
     def test_raw_tensor_batch(self):
         """Test raw tensor as batch (no dict wrapping)."""
-        from invarlock.guards.variance import equalise_residual_variance
+        from invarlock.guards.variance_scaling import equalise_residual_variance
 
         model = MockGPT2Model(n_layers=2, hidden_size=64)
 
@@ -212,7 +212,7 @@ class TestEdgeCases:
 
     def test_empty_calibration_data(self):
         """Test with empty calibration data."""
-        from invarlock.guards.variance import equalise_residual_variance
+        from invarlock.guards.variance_scaling import equalise_residual_variance
 
         model = MockGPT2Model(n_layers=2)
 
@@ -227,7 +227,7 @@ class TestEdgeCases:
 
     def test_none_input_ids_skipped(self):
         """Test that batches with None input_ids are skipped."""
-        from invarlock.guards.variance import equalise_residual_variance
+        from invarlock.guards.variance_scaling import equalise_residual_variance
 
         model = MockGPT2Model(n_layers=2)
 
@@ -249,7 +249,7 @@ class TestEdgeCases:
 
     def test_mixed_dimension_inputs(self):
         """Test with a mix of 1-D and 2-D inputs."""
-        from invarlock.guards.variance import equalise_residual_variance
+        from invarlock.guards.variance_scaling import equalise_residual_variance
 
         model = MockGPT2Model(n_layers=2)
 

@@ -1,6 +1,6 @@
 import pytest
 
-from invarlock.guards.variance import equalise_residual_variance
+from invarlock.guards.variance_scaling import equalise_residual_variance
 
 
 def test_equalise_residual_variance_raises_on_empty_when_disallowed():

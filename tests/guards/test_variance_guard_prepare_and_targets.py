@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-import invarlock.guards.variance as variance_mod
+import invarlock.guards.variance_scaling as variance_scaling_mod
 from invarlock.guards.variance import VarianceGuard
 
 
@@ -30,7 +30,9 @@ def test_compute_variance_scales_filters_raw_scales_via_scale_matches_target(
     def fake_equalise(*_a, **_k):
         return {"block0.attn": 1.1}
 
-    monkeypatch.setattr(variance_mod, "equalise_residual_variance", fake_equalise)
+    monkeypatch.setattr(
+        variance_scaling_mod, "equalise_residual_variance", fake_equalise
+    )
 
     policy = {
         "min_gain": 0.0,
@@ -75,7 +77,9 @@ def test_compute_variance_scales_topk_backstop_injects_best_candidate(
     def fake_equalise(*_a, **_k):
         return {"block0.attn": 1.3}
 
-    monkeypatch.setattr(variance_mod, "equalise_residual_variance", fake_equalise)
+    monkeypatch.setattr(
+        variance_scaling_mod, "equalise_residual_variance", fake_equalise
+    )
 
     g = VarianceGuard(
         policy={
@@ -104,7 +108,9 @@ def test_compute_variance_scales_backstop_clamps_deadband_threshold(
     def fake_equalise(*_a, **_k):
         return {"block0.attn": 1.2}
 
-    monkeypatch.setattr(variance_mod, "equalise_residual_variance", fake_equalise)
+    monkeypatch.setattr(
+        variance_scaling_mod, "equalise_residual_variance", fake_equalise
+    )
 
     g = VarianceGuard(
         policy={

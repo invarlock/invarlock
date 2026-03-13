@@ -1,12 +1,13 @@
 """Unit tests for tiered guard policies and predictive gate semantics."""
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
 
 from invarlock.core.auto_tuning import TIER_POLICIES
-from invarlock.guards.variance import _predictive_gate_outcome
+from invarlock.guards.variance_policy import predictive_gate_outcome, set_ab_results
 
 
 def test_predictive_gate_one_sided_behaviour():
@@ -15,7 +16,7 @@ def test_predictive_gate_one_sided_behaviour():
     min_effect = 9e-4
 
     # CI strictly below zero, mean negative, sufficient magnitude → pass.
-    passed, reason = _predictive_gate_outcome(
+    passed, reason = predictive_gate_outcome(
         mean_delta=-0.0015,
         delta_ci=(-0.0026, -0.0010),
         min_effect=min_effect,
@@ -25,7 +26,7 @@ def test_predictive_gate_one_sided_behaviour():
     assert reason == "ci_gain_met"
 
     # Mean not negative despite CI lower bound < 0 → fail.
-    passed, reason = _predictive_gate_outcome(
+    passed, reason = predictive_gate_outcome(
         mean_delta=0.0001,
         delta_ci=(-0.0020, -0.0003),
         min_effect=min_effect,
@@ -35,7 +36,7 @@ def test_predictive_gate_one_sided_behaviour():
     assert reason == "mean_not_negative"
 
     # Mean negative but magnitude below min_effect → fail.
-    passed, reason = _predictive_gate_outcome(
+    passed, reason = predictive_gate_outcome(
         mean_delta=-0.0004,
         delta_ci=(-0.0012, -0.0001),
         min_effect=min_effect,
@@ -51,7 +52,7 @@ def test_predictive_gate_two_sided_behaviour():
     min_effect = 0.0018
 
     # CI strictly below zero with sufficient gain → pass.
-    passed, reason = _predictive_gate_outcome(
+    passed, reason = predictive_gate_outcome(
         mean_delta=-0.0025,
         delta_ci=(-0.0040, -0.0019),
         min_effect=min_effect,
@@ -61,7 +62,7 @@ def test_predictive_gate_two_sided_behaviour():
     assert reason == "ci_gain_met"
 
     # CI crosses zero → fail.
-    passed, reason = _predictive_gate_outcome(
+    passed, reason = predictive_gate_outcome(
         mean_delta=-0.0024,
         delta_ci=(-0.0035, 0.0002),
         min_effect=min_effect,
@@ -71,7 +72,7 @@ def test_predictive_gate_two_sided_behaviour():
     assert reason == "ci_contains_zero"
 
     # CI negative but gain lower bound below min effect → fail.
-    passed, reason = _predictive_gate_outcome(
+    passed, reason = predictive_gate_outcome(
         mean_delta=-0.0015,
         delta_ci=(-0.0025, -0.0003),
         min_effect=min_effect,
@@ -129,3 +130,31 @@ def test_tier_policies_align_with_documented_knobs():
         pytest.approx(conservative_policy["min_effect_lognll"])
         == conservative_doc["min_effect_lognll"]
     )
+
+
+def test_set_ab_results_marks_numeric_error_for_non_finite_gain() -> None:
+    events: list[tuple[str, dict[str, object]]] = []
+    guard = SimpleNamespace(
+        _ppl_no_ve=None,
+        _ppl_with_ve=None,
+        _ab_windows_used=None,
+        _ab_seed_used=None,
+        _ratio_ci=None,
+        _ab_gain=None,
+        _post_edit_evaluated=False,
+        _predictive_gate_state={},
+        _log_event=lambda operation, **data: events.append((operation, data)),
+    )
+
+    set_ab_results(
+        guard,
+        ppl_no_ve=1.0,
+        ppl_with_ve=float("inf"),
+        windows_used=2,
+        seed_used=7,
+        ratio_ci=(1.0, "bad"),
+    )
+
+    assert guard._ab_gain == 0.0
+    assert guard._post_edit_evaluated is True
+    assert events[0][1]["gain_status"] == "numeric_error"

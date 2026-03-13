@@ -5,11 +5,9 @@ import torch
 import torch.nn as nn
 
 from invarlock.guards.policies import create_custom_variance_policy
-from invarlock.guards.variance import (
-    VarianceGuard,
-    _predictive_gate_outcome,
-    equalise_residual_variance,
-)
+from invarlock.guards.variance import VarianceGuard
+from invarlock.guards.variance_policy import predictive_gate_outcome
+from invarlock.guards.variance_scaling import equalise_residual_variance
 
 # Combined from: test_variance_guard_ci.py, test_variance_guard_extra.py, test_variance_guard_gate.py
 
@@ -189,8 +187,7 @@ def test_variance_guard_ci_gate_enables_on_small_gain() -> None:
 )
 def test_predictive_gate_outcome(mean_delta, delta_ci, min_effect, one_sided, expected):
     assert (
-        _predictive_gate_outcome(mean_delta, delta_ci, min_effect, one_sided)
-        == expected
+        predictive_gate_outcome(mean_delta, delta_ci, min_effect, one_sided) == expected
     )
 
 

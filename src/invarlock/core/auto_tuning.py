@@ -303,7 +303,7 @@ def _load_runtime_yaml(
     return None
 
 
-def _normalize_family_caps(caps: Any) -> dict[str, dict[str, float]]:
+def normalize_family_caps(caps: Any) -> dict[str, dict[str, float]]:
     normalized: dict[str, dict[str, float]] = {}
     if not isinstance(caps, dict):
         return normalized
@@ -352,9 +352,7 @@ def _tier_entry_to_policy(tier_entry: dict[str, Any]) -> dict[str, dict[str, Any
     if isinstance(spectral_src, dict):
         spectral = copy.deepcopy(spectral_src)
         if "family_caps" in spectral:
-            spectral["family_caps"] = _normalize_family_caps(
-                spectral.get("family_caps")
-            )
+            spectral["family_caps"] = normalize_family_caps(spectral.get("family_caps"))
         if "multiple_testing" in spectral:
             spectral["multiple_testing"] = _normalize_multiple_testing(
                 spectral.get("multiple_testing")

@@ -2149,7 +2149,7 @@ def analyze_spectral_changes(
     """
     try:
         # Import spectral analysis if available
-        from invarlock.guards.spectral import compute_spectral_norms
+        from invarlock.guards.spectral_measurement import compute_spectral_norms
 
         before_norms = compute_spectral_norms(model_before, scope=scope)
         after_norms = compute_spectral_norms(model_after, scope=scope)

@@ -1,0 +1,98 @@
+from __future__ import annotations
+
+from types import SimpleNamespace
+
+import torch
+import torch.nn as nn
+
+from invarlock.guards.variance_batching import (
+    compute_ppl_for_batches,
+    prepare_batch_tensors,
+)
+
+
+class _Guard:
+    def _prepare_batch_tensors(self, batch, device):
+        return prepare_batch_tensors(self, batch, device)
+
+
+class _TinyModel(nn.Module):
+    def forward(self, inputs, labels=None):
+        return SimpleNamespace(loss=torch.tensor(0.0))
+
+
+def test_prepare_batch_tensors_handles_none_and_attention_mask_lists() -> None:
+    guard = _Guard()
+    device = torch.device("cpu")
+
+    assert prepare_batch_tensors(guard, {"input_ids": None}, device) == (None, None)
+
+    input_ids, labels = prepare_batch_tensors(
+        guard,
+        {"inputs": [1, 2, 3], "attention_mask": [1, 1, 0]},
+        device,
+    )
+
+    assert tuple(input_ids.shape) == (1, 3)
+    assert labels.tolist() == [[1, 2, -100]]
+
+
+def test_compute_ppl_for_batches_handles_empty_batches_and_missing_inputs() -> None:
+    guard = _Guard()
+    model = _TinyModel()
+    device = torch.device("cpu")
+
+    assert compute_ppl_for_batches(guard, model, [], device, return_counts=True) == (
+        [],
+        [],
+        [],
+    )
+
+    ppl, losses = compute_ppl_for_batches(
+        guard,
+        model,
+        [{"input_ids": None}],
+        device,
+    )
+
+    assert ppl == []
+    assert losses == []
+
+
+def test_compute_ppl_for_batches_uses_count_fallbacks_when_labels_or_numel_fail() -> (
+    None
+):
+    class _NoNumelTensor:
+        def numel(self):
+            raise RuntimeError("no numel")
+
+    class _CountGuard:
+        def __init__(self, labels, inputs) -> None:
+            self._labels = labels
+            self._inputs = inputs
+
+        def _prepare_batch_tensors(self, _batch, _device):
+            return self._inputs, self._labels
+
+    model = _TinyModel()
+    device = torch.device("cpu")
+
+    guard = _CountGuard(labels=object(), inputs=torch.ones((1, 2)))
+    _, _, counts = compute_ppl_for_batches(
+        guard,
+        model,
+        [object()],
+        device,
+        return_counts=True,
+    )
+    assert counts == [2]
+
+    bad_guard = _CountGuard(labels=object(), inputs=_NoNumelTensor())
+    _, _, bad_counts = compute_ppl_for_batches(
+        bad_guard,
+        model,
+        [object()],
+        device,
+        return_counts=True,
+    )
+    assert bad_counts == [0]

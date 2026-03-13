@@ -9,11 +9,8 @@ These tests verify that:
 
 import torch.nn as nn
 
-from invarlock.guards.variance import (
-    VarianceGuard,
-    _iter_transformer_layers,
-    _unwrap_model,
-)
+from invarlock.guards.variance import VarianceGuard
+from invarlock.guards.variance_scaling import iter_transformer_layers, unwrap_model
 
 # === Test Models ===
 
@@ -98,7 +95,7 @@ class TinyGenericLayersStyle(nn.Module):
 
 
 class TinyUnknownStructure(nn.Module):
-    """Model with non-standard structure that _iter_transformer_layers won't recognize."""
+    """Model with non-standard structure that iter_transformer_layers won't recognize."""
 
     def __init__(self, n_layers: int = 2):
         super().__init__()
@@ -178,13 +175,13 @@ class MockAdapter:
         return {}
 
 
-# === Tests for _unwrap_model ===
+# === Tests for unwrap_model ===
 
 
 def test_unwrap_model_plain():
     """Plain model without wrapper returns itself."""
     model = TinyGPT2Style()
-    unwrapped = _unwrap_model(model)
+    unwrapped = unwrap_model(model)
     assert unwrapped is model
 
 
@@ -192,7 +189,7 @@ def test_unwrap_model_single_dataparallel():
     """Single DataParallel wrapper is correctly unwrapped."""
     inner = TinyGPT2Style()
     wrapped = MockDataParallel(inner)
-    unwrapped = _unwrap_model(wrapped)
+    unwrapped = unwrap_model(wrapped)
     assert unwrapped is inner
 
 
@@ -201,55 +198,55 @@ def test_unwrap_model_nested_wrappers():
     inner = TinyGPT2Style()
     dp = MockDataParallel(inner)
     ddp = MockDDP(dp)
-    unwrapped = _unwrap_model(ddp)
+    unwrapped = unwrap_model(ddp)
     assert unwrapped is inner
 
 
-# === Tests for _iter_transformer_layers with different architectures ===
+# === Tests for iter_transformer_layers with different architectures ===
 
 
 def test_iter_gpt2_style():
-    """_iter_transformer_layers handles GPT-2 (transformer.h) structure."""
+    """iter_transformer_layers handles GPT-2 (transformer.h) structure."""
     model = TinyGPT2Style(n_layers=3)
-    layers = list(_iter_transformer_layers(model))
+    layers = list(iter_transformer_layers(model))
     assert len(layers) == 3
 
 
 def test_iter_model_layers_style():
-    """_iter_transformer_layers handles model.layers structure."""
+    """iter_transformer_layers handles model.layers structure."""
     model = TinyModelLayersStyle(n_layers=3)
-    layers = list(_iter_transformer_layers(model))
+    layers = list(iter_transformer_layers(model))
     assert len(layers) == 3
 
 
 def test_iter_decoder_style():
-    """_iter_transformer_layers handles decoder (decoder.layers) structure."""
+    """iter_transformer_layers handles decoder (decoder.layers) structure."""
     model = TinyDecoderStyle(n_layers=3)
-    layers = list(_iter_transformer_layers(model))
+    layers = list(iter_transformer_layers(model))
     assert len(layers) == 3
 
 
 def test_iter_generic_layers_style():
-    """_iter_transformer_layers handles top-level layers attribute."""
+    """iter_transformer_layers handles top-level layers attribute."""
     model = TinyGenericLayersStyle(n_layers=3)
-    layers = list(_iter_transformer_layers(model))
+    layers = list(iter_transformer_layers(model))
     assert len(layers) == 3
 
 
 def test_iter_wrapped_model():
-    """_iter_transformer_layers handles DataParallel-wrapped models."""
+    """iter_transformer_layers handles DataParallel-wrapped models."""
     inner = TinyGPT2Style(n_layers=2)
     wrapped = MockDataParallel(inner)
-    layers = list(_iter_transformer_layers(wrapped))
+    layers = list(iter_transformer_layers(wrapped))
     assert len(layers) == 2
 
 
 def test_iter_nested_wrapped_model():
-    """_iter_transformer_layers handles nested wrappers."""
+    """iter_transformer_layers handles nested wrappers."""
     inner = TinyGPT2Style(n_layers=2)
     dp = MockDataParallel(inner)
     ddp = MockDDP(dp)
-    layers = list(_iter_transformer_layers(ddp))
+    layers = list(iter_transformer_layers(ddp))
     assert len(layers) == 2
 
 
@@ -279,7 +276,7 @@ def test_resolve_targets_wrapped_model():
 def test_resolve_targets_adapter_fallback_unknown_structure():
     """Adapter fallback resolves targets for unknown model structure.
 
-    This is the key regression test: when _iter_transformer_layers returns
+    This is the key regression test: when iter_transformer_layers returns
     no layers (unknown structure), the adapter fallback should use
     adapter.describe() for layer count and adapter.get_layer_modules()
     for actual modules.
@@ -289,7 +286,7 @@ def test_resolve_targets_adapter_fallback_unknown_structure():
 
     guard = VarianceGuard(policy={"scope": "ffn", "min_gain": 0.0})
 
-    # Verify that _iter_transformer_layers finds layers via fallback
+    # Verify that iter_transformer_layers finds layers via fallback
     # (modules with attn and mlp attributes)
     # But let's test the adapter path explicitly
 

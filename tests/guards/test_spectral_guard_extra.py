@@ -4,14 +4,16 @@ from typing import Any
 import pytest
 import torch
 
-from invarlock.guards.spectral import (
-    SpectralGuard,
-    _normalize_family_caps,
-    _summarize_sigmas,
+from invarlock.guards.spectral import SpectralGuard
+from invarlock.guards.spectral_control import (
     apply_relative_spectral_cap,
     apply_spectral_control,
-    compute_z_score_for_value,
 )
+from invarlock.guards.spectral_detection import (
+    compute_z_score_for_value,
+    summarize_sigmas,
+)
+from invarlock.guards.spectral_policy import normalize_family_caps
 
 
 class DummyModule:
@@ -104,26 +106,30 @@ def test_spectral_guard_validate_auto_prepare(monkeypatch):
         return {"ffn": {"mean": 1.0, "std": 0.1}}
 
     monkeypatch.setattr(
-        "invarlock.guards.spectral.capture_baseline_sigmas", fake_capture
+        "invarlock.guards.spectral_measurement.capture_baseline_sigmas", fake_capture
     )
     monkeypatch.setattr(
-        "invarlock.guards.spectral.classify_model_families", fake_classify
+        "invarlock.guards.spectral_detection.classify_model_families", fake_classify
     )
     monkeypatch.setattr(
-        "invarlock.guards.spectral.compute_family_stats", fake_family_stats
+        "invarlock.guards.spectral_detection.compute_family_stats", fake_family_stats
     )
-    monkeypatch.setattr("invarlock.guards.spectral.scan_model_gains", lambda *_: {})
-    monkeypatch.setattr("invarlock.guards.spectral.auto_sigma_target", lambda *_: 1.0)
     monkeypatch.setattr(
-        "invarlock.guards.spectral.apply_relative_spectral_cap",
+        "invarlock.guards.spectral_measurement.scan_model_gains", lambda *_: {}
+    )
+    monkeypatch.setattr(
+        "invarlock.guards.spectral_measurement.auto_sigma_target", lambda *_: 1.0
+    )
+    monkeypatch.setattr(
+        "invarlock.guards.spectral_control.apply_relative_spectral_cap",
         lambda *_, **__: {"applied": False, "capped_modules": []},
     )
     monkeypatch.setattr(
-        "invarlock.guards.spectral.apply_weight_rescale",
+        "invarlock.guards.spectral_control.apply_weight_rescale",
         lambda *_, **__: {"applied": False, "rescaled_modules": []},
     )
     monkeypatch.setattr(
-        "invarlock.guards.spectral.apply_spectral_control",
+        "invarlock.guards.spectral_control.apply_spectral_control",
         lambda *_, **__: {"applied": True, "capped_modules": ["layer.mlp.c_fc"]},
     )
 
@@ -169,7 +175,9 @@ def test_apply_relative_spectral_cap_handles_failure(monkeypatch):
     def raise_error(*_, **__):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr("invarlock.guards.spectral.compute_sigma_max", raise_error)
+    monkeypatch.setattr(
+        "invarlock.guards.spectral_measurement.compute_sigma_max", raise_error
+    )
 
     result = apply_relative_spectral_cap(
         model,
@@ -186,11 +194,11 @@ def test_apply_spectral_control_rescale_branch(monkeypatch):
     model = DummyModel({})
 
     monkeypatch.setattr(
-        "invarlock.guards.spectral.apply_relative_spectral_cap",
+        "invarlock.guards.spectral_control.apply_relative_spectral_cap",
         lambda *_, **__: {"applied": False, "capped_modules": [], "failed_modules": []},
     )
     monkeypatch.setattr(
-        "invarlock.guards.spectral.apply_weight_rescale",
+        "invarlock.guards.spectral_control.apply_weight_rescale",
         lambda *_, **__: {"applied": True, "rescaled_modules": ["layer"]},
     )
 
@@ -203,17 +211,17 @@ def test_apply_spectral_control_rescale_branch(monkeypatch):
 
 def test_normalize_family_caps_handles_invalid_entries():
     caps = {"ffn": {"kappa": 2.3}, "attn": 2.6, "embed": {"kappa": float("nan")}}
-    normalized = _normalize_family_caps(caps, default=True)
+    normalized = normalize_family_caps(caps, default=True)
     assert normalized["ffn"]["kappa"] == pytest.approx(2.3)
     assert normalized["attn"]["kappa"] == pytest.approx(2.6)
     assert "embed" not in normalized  # NaN dropped
 
-    minimal = _normalize_family_caps({}, default=False)
+    minimal = normalize_family_caps({}, default=False)
     assert minimal == {}
 
 
 def test_normalize_family_caps_returns_default_for_invalid():
-    default_caps = _normalize_family_caps("invalid", default=True)
+    default_caps = normalize_family_caps("invalid", default=True)
     assert default_caps["ffn"]["kappa"] == pytest.approx(2.5)
 
 
@@ -237,9 +245,9 @@ def test_compute_z_score_for_value_deadband_zero_std():
 
 
 def test_summarize_sigmas_handles_empty_and_values():
-    empty_summary = _summarize_sigmas({})
+    empty_summary = summarize_sigmas({})
     assert empty_summary["max_spectral_norm"] == 0.0
 
-    summary = _summarize_sigmas({"a": 1.0, "b": 3.0})
+    summary = summarize_sigmas({"a": 1.0, "b": 3.0})
     assert summary["max_spectral_norm"] == pytest.approx(3.0)
     assert summary["mean_spectral_norm"] == pytest.approx(2.0)

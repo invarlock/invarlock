@@ -33,15 +33,18 @@ from invarlock.guards.rmt_legacy import (
     mp_bulk_edge,
     rmt_detect,
 )
-from invarlock.guards.spectral import (
-    SpectralGuard,
+from invarlock.guards.spectral import SpectralGuard
+from invarlock.guards.spectral_control import (
     apply_relative_spectral_cap,
     apply_spectral_control,
+)
+from invarlock.guards.spectral_measurement import (
     capture_baseline_sigmas,
     compute_sigma_max,
     scan_model_gains,
 )
-from invarlock.guards.variance import VarianceGuard, equalise_residual_variance
+from invarlock.guards.variance import VarianceGuard
+from invarlock.guards.variance_scaling import equalise_residual_variance
 
 
 class TestInvariantsGuardComprehensive:
@@ -320,7 +323,10 @@ class TestSpectralGuardComprehensive:
         guard.family_caps = {}
 
         with (
-            patch("invarlock.guards.spectral.capture_baseline_sigmas", return_value={}),
+            patch(
+                "invarlock.guards.spectral_measurement.capture_baseline_sigmas",
+                return_value={},
+            ),
             patch.object(
                 SpectralGuard,
                 "_detect_spectral_violations",
@@ -2355,7 +2361,7 @@ class TestVarianceGuardCoverageBoost:
 
     def test_equalise_residual_variance_edge_cases(self):
         """Test equalise_residual_variance with edge cases."""
-        from invarlock.guards.variance import equalise_residual_variance
+        from invarlock.guards.variance_scaling import equalise_residual_variance
 
         # Create simple model with forward method
         class SimpleModel(nn.Module):
@@ -2435,7 +2441,7 @@ class TestSpectralGuardExceptionCoverage:
 
         # Test with problematic tensor using patching
         with patch(
-            "invarlock.guards.spectral.power_iter_sigma_max",
+            "invarlock.guards.spectral_measurement.power_iter_sigma_max",
             side_effect=RuntimeError("power_iter failed"),
         ):
             real_tensor = torch.randn(5, 3)
@@ -2444,7 +2450,7 @@ class TestSpectralGuardExceptionCoverage:
 
     def test_auto_sigma_target_exception_handling(self):
         """Test auto_sigma_target exception handling (lines 102-106)."""
-        from invarlock.guards.spectral import auto_sigma_target
+        from invarlock.guards.spectral_measurement import auto_sigma_target
 
         # Test with a valid model - the function now computes real percentiles
         target = auto_sigma_target(nn.Linear(10, 5), percentile=0.9)
@@ -2465,7 +2471,7 @@ class TestSpectralGuardExceptionCoverage:
 
     def test_apply_weight_rescale_behavior(self):
         """Test apply_weight_rescale behavior (lines 121-131)."""
-        from invarlock.guards.spectral import apply_weight_rescale
+        from invarlock.guards.spectral_control import apply_weight_rescale
 
         # Test the actual implementation - it really rescales weights
         model = nn.Linear(10, 5)
@@ -2486,7 +2492,7 @@ class TestSpectralGuardExceptionCoverage:
 
     def test_apply_relative_spectral_cap_behavior(self):
         """Test apply_relative_spectral_cap behavior (lines 146-156)."""
-        from invarlock.guards.spectral import apply_relative_spectral_cap
+        from invarlock.guards.spectral_control import apply_relative_spectral_cap
 
         # Test the actual implementation
         model = nn.Linear(10, 5)
@@ -2504,7 +2510,7 @@ class TestSpectralGuardExceptionCoverage:
 
     def test_apply_spectral_control_behavior(self):
         """Test apply_spectral_control behavior (lines 171-181)."""
-        from invarlock.guards.spectral import apply_spectral_control
+        from invarlock.guards.spectral_control import apply_spectral_control
 
         # Test the actual implementation
         model = nn.Linear(10, 5)
@@ -2523,7 +2529,7 @@ class TestSpectralGuardExceptionCoverage:
 
     def test_capture_baseline_sigmas_behavior(self):
         """Test capture_baseline_sigmas behavior (lines 194-202)."""
-        from invarlock.guards.spectral import capture_baseline_sigmas
+        from invarlock.guards.spectral_measurement import capture_baseline_sigmas
 
         # Test the actual function behavior - it returns real sigma values
         model = nn.Linear(10, 5)
@@ -2538,7 +2544,7 @@ class TestSpectralGuardExceptionCoverage:
 
     def test_scan_model_gains_behavior(self):
         """Test scan_model_gains behavior (lines 215-226)."""
-        from invarlock.guards.spectral import scan_model_gains
+        from invarlock.guards.spectral_measurement import scan_model_gains
 
         # Test the actual implementation
         model = nn.Linear(10, 5)
@@ -2707,7 +2713,7 @@ class TestRMTEnhancedCoverage:
         # Should handle SVD failure gracefully and continue
 
     def test_iter_transformer_layers(self):
-        """Test _iter_transformer_layers with different model types (lines 346-356)."""
+        """Test iter_transformer_layers with different model types (lines 346-356)."""
         from invarlock.guards.rmt_legacy import _iter_transformer_layers
 
         # Test GPT-2 style (covered in main tests)
