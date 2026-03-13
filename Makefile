@@ -18,14 +18,14 @@ COVERAGE_TESTS_CORE := \
 	tests/core tests/guards tests/reporting tests/calibration tests/scripts
 
 COVERAGE_TESTS_RUN := \
-	tests/cli/run tests/cli/test_run_*.py tests/cli/test_run_command_*.py
+	tests/cli/run
 
 COVERAGE_TESTS_VERIFY := \
 	tests/cli/test_verify*.py tests/cli/test_cli_command_help_smoke.py tests/cli/test_policy_commands.py
 
 COVERAGE_TESTS_CONFIG := \
 	tests/cli/test_config_failfast.py tests/cli/test_error_codes.py \
-	tests/cli/test_config.py tests/cli/test_config_more.py \
+	tests/cli/test_config.py tests/cli/test_config_cases.py \
 	tests/cli/test_config_runtime_loader.py tests/cli/test_config_schema_and_loader.py \
 	tests/cli/test_device.py tests/cli/test_config_and_device.py
 
