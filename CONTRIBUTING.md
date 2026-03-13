@@ -177,7 +177,7 @@ Key points:
   console handling, and guard-overhead extraction) so the project-wide floor
   reflects the real command surface instead of only the split core paths.
 
-- The project-wide floor is enforced at **85%** via pytest-cov in `make coverage`.
+- The project-wide floor is enforced at **90%** via pytest-cov in `make coverage`.
 
 - Enforce thresholds:
 

@@ -53,7 +53,7 @@ coverage:  ## Run tests with coverage and generate XML
 		--cov=src/invarlock/cli --cov=src/invarlock/core --cov=src/invarlock/reporting \
 		--cov=invarlock.public_contracts --cov=invarlock.policy_pack \
 		--cov-branch \
-		--cov-report=term --cov-report=xml:reports/cov.xml --cov-fail-under=85
+		--cov-report=term --cov-report=xml:reports/cov.xml --cov-fail-under=90
 
 coverage-enforce:  ## Run coverage and enforce per-file thresholds
 	$(MAKE) coverage
