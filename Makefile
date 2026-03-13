@@ -22,6 +22,7 @@ COVERAGE_TESTS := \
 	tests/cli/test_config.py tests/cli/test_config_more.py tests/cli/test_config_runtime_loader.py tests/cli/test_config_schema_and_loader.py \
 	tests/eval/test_metrics*.py tests/eval/test_report*.py tests/eval/test_validate_module.py tests/eval/test_baseline_artifacts.py tests/eval/test_bench.py tests/eval/test_primary_metric*.py \
 	tests/eval/test_determinism.py tests/eval/test_mask_parity_fail.py \
+	tests/cli/test_adapter_auto*.py tests/cli/test_no_color.py tests/unit/test_overhead_extraction.py \
 	tests/cli/test_doctor*.py tests/cli/test_plugins*.py tests/cli/test_evaluate*.py tests/cli/test_export_html*.py \
 	tests/cli/test_app*.py tests/cli/test_device.py tests/cli/test_config_and_device.py tests/cli/test_explain_gates*.py \
 	tests/cli/test_report*.py
@@ -52,7 +53,7 @@ coverage:  ## Run tests with coverage and generate XML
 		--cov=src/invarlock/cli --cov=src/invarlock/core --cov=src/invarlock/reporting \
 		--cov=invarlock.public_contracts --cov=invarlock.policy_pack \
 		--cov-branch \
-		--cov-report=term --cov-report=xml:reports/cov.xml --cov-fail-under=85
+		--cov-report=term --cov-report=xml:reports/cov.xml --cov-fail-under=90
 
 coverage-enforce:  ## Run coverage and enforce per-file thresholds
 	$(MAKE) coverage
