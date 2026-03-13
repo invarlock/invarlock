@@ -859,25 +859,10 @@ def test_validate_evaluation_report_rejects_invalid_flags(monkeypatch):
 
 
 def test_load_validation_allowlist_prefers_contracts_file(tmp_path, monkeypatch):
-    import json
-    from pathlib import Path
-
-    root = Path(cert.__file__).resolve().parents[3]
-    contracts_dir = root / "contracts"
-    contracts_dir.mkdir(exist_ok=True)
-    key_file = contracts_dir / "validation_keys.json"
-    original = key_file.read_text(encoding="utf-8") if key_file.exists() else None
-
     keys = ["primary_metric_acceptable", "guard_overhead_acceptable", "custom_flag"]
-    try:
-        key_file.write_text(json.dumps(keys), encoding="utf-8")
-        loaded = cert._load_validation_allowlist()
-        assert loaded == {str(k) for k in keys}
-    finally:
-        if original is None:
-            key_file.unlink(missing_ok=True)
-        else:
-            key_file.write_text(original, encoding="utf-8")
+    monkeypatch.setattr(cert, "load_json_contract", lambda _filename: keys)
+    loaded = cert._load_validation_allowlist()
+    assert loaded == {str(k) for k in keys}
 
 
 def test_validate_evaluation_report_handles_mapping_errors() -> None:

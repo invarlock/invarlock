@@ -1,6 +1,6 @@
 import types
 
-from invarlock.core.runner import _collect_cuda_flags
+from invarlock.core.runner_context import collect_cuda_flags
 
 
 def test_collect_cuda_flags_minimal_torch(monkeypatch):
@@ -11,7 +11,7 @@ def test_collect_cuda_flags_minimal_torch(monkeypatch):
     )
     monkeypatch.setitem(__import__("sys").modules, "torch", TorchStub)
 
-    flags = _collect_cuda_flags()
+    flags = collect_cuda_flags()
     assert flags.get("deterministic_algorithms") is False
     # No backends keys expected
     assert "cudnn_deterministic" not in flags
@@ -30,7 +30,7 @@ def test_collect_cuda_flags_with_cudnn_and_matmul_tf32(monkeypatch):
     )
     monkeypatch.setitem(__import__("sys").modules, "torch", TorchStub)
 
-    flags = _collect_cuda_flags()
+    flags = collect_cuda_flags()
     assert flags["deterministic_algorithms"] is True
     assert flags["cudnn_deterministic"] is True
     assert flags["cudnn_benchmark"] is False
@@ -49,7 +49,7 @@ def test_collect_cuda_flags_with_cudnn_and_matmul_without_tf32(monkeypatch):
     )
     monkeypatch.setitem(__import__("sys").modules, "torch", TorchStub)
 
-    flags = _collect_cuda_flags()
+    flags = collect_cuda_flags()
     assert flags["deterministic_algorithms"] is True
     assert flags["cudnn_deterministic"] is True
     assert flags["cudnn_benchmark"] is False

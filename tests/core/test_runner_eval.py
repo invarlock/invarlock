@@ -4,9 +4,9 @@ from unittest.mock import Mock
 import torch
 import torch.nn as nn
 
-from invarlock.core import runner as core_runner
 from invarlock.core.api import ModelAdapter, RunConfig, RunReport
 from invarlock.core.runner import CoreRunner
+from invarlock.core.runner_context import collect_cuda_flags
 from invarlock.core.types import RunStatus
 
 
@@ -190,5 +190,5 @@ def test_finalize_phase_catastrophic_spike_triggers_guard_recovery():
 
 def test_collect_cuda_flags_includes_workspace_env(monkeypatch):
     monkeypatch.setenv("CUBLAS_WORKSPACE_CONFIG", ":16:8")
-    flags = core_runner._collect_cuda_flags()
+    flags = collect_cuda_flags()
     assert flags["CUBLAS_WORKSPACE_CONFIG"] == ":16:8"

@@ -1,38 +1,19 @@
-import json
 import math
-from pathlib import Path
 
 import pytest
 
 from invarlock.reporting import report_builder as cert
 
 
-def test_load_validation_allowlist_prefers_contract_file(tmp_path, monkeypatch):
-    root = Path(cert.__file__).resolve().parents[3]
-    contracts_dir = root / "contracts"
-    contracts_dir.mkdir(exist_ok=True)
-    path = contracts_dir / "validation_keys.json"
+def test_load_validation_allowlist_prefers_contract_file(monkeypatch):
+    monkeypatch.setattr(cert, "load_json_contract", lambda _filename: ["a", "b"])
+    keys = cert._load_validation_allowlist()
+    assert "a" in keys and "b" in keys
 
-    try:
-        path.write_text(json.dumps(["a", "b"]))
-        keys = cert._load_validation_allowlist()
-        assert "a" in keys and "b" in keys
-
-        path.write_text(json.dumps({"bad": True}))
-        keys2 = cert._load_validation_allowlist()
-        # Fallback to default allowlist when file content is invalid
-        assert cert._VALIDATION_ALLOWLIST_DEFAULT.issubset(keys2)
-    finally:
-        try:
-            path.unlink()
-        except FileNotFoundError:
-            pass
-        # Clean up empty contracts dir if we created it
-        try:
-            if contracts_dir.exists() and not any(contracts_dir.iterdir()):
-                contracts_dir.rmdir()
-        except Exception:
-            pass
+    monkeypatch.setattr(cert, "load_json_contract", lambda _filename: {"bad": True})
+    keys2 = cert._load_validation_allowlist()
+    # Fallback to default allowlist when file content is invalid
+    assert cert._VALIDATION_ALLOWLIST_DEFAULT.issubset(keys2)
 
 
 def test_load_validation_allowlist_with_source_reports_fallback() -> None:

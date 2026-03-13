@@ -7,12 +7,8 @@ from typing import Any
 import pytest
 
 from invarlock.core.api import Guard, ModelAdapter, ModelEdit, RunConfig
-from invarlock.core.runner import (
-    CoreRunner,
-    _coerce_bool,
-    _collect_cuda_flags,
-    _env_flag,
-)
+from invarlock.core.runner import CoreRunner
+from invarlock.core.runner_context import coerce_bool, collect_cuda_flags, env_flag
 
 
 class DummyModel:
@@ -754,7 +750,7 @@ def test_execute_with_auto_config_passthrough(tmp_path, monkeypatch):
 
 def test_collect_cuda_flags_env_toggle(monkeypatch):
     monkeypatch.setenv("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
-    flags = _collect_cuda_flags()
+    flags = collect_cuda_flags()
     assert "CUBLAS_WORKSPACE_CONFIG" in flags
 
 
@@ -1640,18 +1636,18 @@ def test_handle_error_paths(monkeypatch):
 
 
 def test_coerce_bool_and_env_flag(monkeypatch):
-    assert _coerce_bool(True) is True
-    assert _coerce_bool(False) is False
-    assert _coerce_bool(1) is True
-    assert _coerce_bool(0) is False
-    assert _coerce_bool(" yes ") is True
-    assert _coerce_bool("off") is False
-    assert _coerce_bool("maybe") is None
+    assert coerce_bool(True) is True
+    assert coerce_bool(False) is False
+    assert coerce_bool(1) is True
+    assert coerce_bool(0) is False
+    assert coerce_bool(" yes ") is True
+    assert coerce_bool("off") is False
+    assert coerce_bool("maybe") is None
 
     monkeypatch.delenv("INVARLOCK_TEST_FLAG", raising=False)
-    assert _env_flag("INVARLOCK_TEST_FLAG") is None
+    assert env_flag("INVARLOCK_TEST_FLAG") is None
     monkeypatch.setenv("INVARLOCK_TEST_FLAG", "0")
-    assert _env_flag("INVARLOCK_TEST_FLAG") is False
+    assert env_flag("INVARLOCK_TEST_FLAG") is False
 
 
 def test_resolve_policy_flags_precedence(monkeypatch, tmp_path):
