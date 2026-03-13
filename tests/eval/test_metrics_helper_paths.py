@@ -83,7 +83,7 @@ def test_validator_tensor_nan_inf_replacement():
     assert torch.isfinite(out).all()
 
 
-def test_validator_model_and_dataloader_branches():
+def test_validator_model_and_dataloader_paths():
     cfg_strict = MetricsConfig()
     cfg_nonstrict = MetricsConfig(strict_validation=False, allow_empty_data=True)
 
@@ -260,7 +260,7 @@ def test_compute_and_measure_helpers():
     assert isinstance(ppl2, float) and ppl2 >= 1.0
 
 
-def test_compute_perplexity_strict_masked_lm_branch():
+def test_compute_perplexity_strict_masked_lm_path():
     model = DummyMaskedLM()
     seq = list(range(1, 12))
     attn = [1] * len(seq)
@@ -307,7 +307,7 @@ def test_info_and_environment_helpers():
     assert isinstance(validate_metrics_environment(), bool)
 
 
-def test_validate_perplexity_branches():
+def test_validate_perplexity_paths():
     ok, status, msg = validate_perplexity(10.0)
     assert ok and status == "excellent"
 
@@ -711,7 +711,7 @@ def test_validate_env_failure_path():
         assert real_metrics.validate_metrics_environment() is False
 
 
-def test_dependency_manager_missing_get_module_and_collect_activations_exception_branch():
+def test_dependency_manager_missing_get_module_and_collect_activations_exception_path():
     # get_module error path
     from invarlock.eval.metrics import DependencyManager
 
@@ -736,7 +736,7 @@ def test_dependency_manager_missing_get_module_and_collect_activations_exception
     assert isinstance(data, dict)
 
 
-def test_forward_loss_causal_branches():
+def test_forward_loss_causal_paths():
     # ModelOutput-like with loss
     class MO(nn.Module):
         def forward(

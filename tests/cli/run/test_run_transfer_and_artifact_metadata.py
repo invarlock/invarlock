@@ -180,7 +180,7 @@ def test_transfer_guard_extras_and_guard_recovered_flag(tmp_path: Path):
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
 
 
-def test_artifacts_events_path_empty_branch(tmp_path: Path):
+def test_artifacts_events_path_empty_path(tmp_path: Path):
     cfg = _cfg(tmp_path)
     with ExitStack() as stack:
         for ctx in _common_patches_detect_ce():
@@ -682,7 +682,7 @@ def test_auto_adapter_apply_ignored_on_error(monkeypatch, tmp_path):
     run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"), profile=None)
 
 
-def test_guard_overhead_ratio_display_branch(monkeypatch, tmp_path):
+def test_guard_overhead_ratio_display_path(monkeypatch, tmp_path):
     cfg = _cfg(tmp_path)
 
     class DummyRegistry:
@@ -880,7 +880,7 @@ def test_baseline_missing_eval_windows_fallback(monkeypatch, tmp_path):
     )
 
 
-def test_release_capacity_planner_branch():
+def test_release_capacity_planner_path():
     from invarlock.cli.commands.run import _plan_release_windows
 
     capacity = {

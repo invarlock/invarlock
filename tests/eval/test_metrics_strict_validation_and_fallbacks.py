@@ -272,7 +272,7 @@ def test_calculate_lens_metrics_non_strict_continues_on_activation_failure(
     )
 
 
-def test_perform_pre_eval_checks_handles_missing_context_attr_and_no_warning_branch() -> (
+def test_perform_pre_eval_checks_handles_missing_context_attr_and_no_warning_path() -> (
     None
 ):
     class _Cfg:
@@ -336,7 +336,7 @@ def test_extract_fc1_activations_skips_blocks_without_mlp(monkeypatch) -> None:
     assert out is None
 
 
-def test_calculate_sigma_max_all_non_finite_triggers_nan_branch() -> None:
+def test_calculate_sigma_max_all_non_finite_triggers_nan_path() -> None:
     class _DepMgr:
         def is_available(self, _name: str) -> bool:  # noqa: ANN001
             return True
@@ -454,7 +454,7 @@ def test_validate_metrics_environment_reports_missing_modules(monkeypatch) -> No
     assert metrics_mod.validate_metrics_environment() is True
 
 
-def test_validate_perplexity_hits_poor_status_branch() -> None:
+def test_validate_perplexity_hits_poor_status_path() -> None:
     ok, status, _msg = metrics_mod.validate_perplexity(200.0)
     assert ok is True and status == metrics_mod.PerplexityStatus.POOR
 

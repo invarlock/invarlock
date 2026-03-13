@@ -179,7 +179,7 @@ def test_run_audit_routes_provider_events_without_emojis(
     assert "📊" not in s
 
 
-def test_output_style_resolution_branches(monkeypatch) -> None:
+def test_output_style_resolution_paths(monkeypatch) -> None:
     monkeypatch.delenv("NO_COLOR", raising=False)
 
     audit = output_mod.OutputStyle(name="audit")

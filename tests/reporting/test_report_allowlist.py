@@ -32,7 +32,7 @@ def test_apply_validation_allowlist_schema_fails_closed() -> None:
         cert.REPORT_JSON_SCHEMA["properties"] = original
 
 
-def test_compute_edit_digest_branches():
+def test_compute_edit_digest_paths():
     quant_digest = cert._compute_edit_digest(
         {"edit": {"name": "quant_rtn", "plan": {}}}
     )

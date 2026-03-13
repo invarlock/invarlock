@@ -55,7 +55,7 @@ def _mk_baseline() -> dict:
     return b
 
 
-def test_make_evaluation_report_covers_baseline_ratio_identity_branches(
+def test_make_evaluation_report_covers_baseline_ratio_identity_paths(
     monkeypatch,
 ) -> None:
     # Avoid heavy bootstrap compute while still exercising the paired-window CI path.
@@ -201,7 +201,7 @@ def test_make_evaluation_report_synthesizes_display_ci_from_ratio_or_defaults(
         json.dumps(cert, sort_keys=True, default=str)
 
 
-def test_enforce_pairing_and_coverage_branch_matrix() -> None:
+def test_enforce_pairing_and_coverage_path_matrix() -> None:
     base = {
         "window_match_fraction": 1.0,
         "window_overlap_fraction": 0.0,
@@ -394,7 +394,7 @@ def test_compute_validation_flags_acceptance_bounds_and_accuracy_tiny_relax() ->
     assert flags2.get("primary_metric_acceptable") is True
 
 
-def test_evaluation_report_module_schema_tightening_branches(monkeypatch) -> None:
+def test_evaluation_report_module_schema_tightening_paths(monkeypatch) -> None:
     original_schema = cert_schema_mod.REPORT_JSON_SCHEMA
     try:
         monkeypatch.setattr(

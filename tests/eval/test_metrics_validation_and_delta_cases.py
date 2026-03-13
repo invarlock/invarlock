@@ -25,7 +25,7 @@ def test_bootstrap_ci_errors_and_success():
     assert lo <= hi
 
 
-def test_input_validator_branches():
+def test_input_validator_paths():
     class NoParam(torch.nn.Module):
         def parameters(self):  # noqa: D401
             if False:

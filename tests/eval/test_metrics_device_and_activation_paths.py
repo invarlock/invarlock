@@ -11,7 +11,7 @@ from invarlock.eval.metrics import (
 )
 
 
-def test_resource_manager_mps_branch(monkeypatch):
+def test_resource_manager_mps_path(monkeypatch):
     # Force CUDA not available and MPS available
     monkeypatch.setattr(torch.cuda, "is_available", lambda: False, raising=False)
 
@@ -25,7 +25,7 @@ def test_resource_manager_mps_branch(monkeypatch):
     assert getattr(rm.device, "type", str(rm.device)).startswith("mps")
 
 
-def test_get_memory_info_cuda_branch(monkeypatch):
+def test_get_memory_info_cuda_path(monkeypatch):
     cfg = MetricsConfig()
     rm = ResourceManager(cfg)
     rm.device = torch.device("cuda")

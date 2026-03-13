@@ -92,7 +92,7 @@ def test_encode_error_handles_invarlock_error(monkeypatch) -> None:
     assert encoded["context"] == {"reason": "details"}
 
 
-def test_encode_error_invarlock_branch_handles_non_dict_details(monkeypatch) -> None:
+def test_encode_error_invarlock_path_handles_non_dict_details(monkeypatch) -> None:
     class FakeInvarlockError(Exception):
         def __init__(self) -> None:
             self.code = "E_CUSTOM"

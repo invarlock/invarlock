@@ -26,7 +26,7 @@ def test__obj_attribute_access_and_get():
     assert o.get("missing", 7) == 7
 
 
-def test__obj_non_mapping_branches() -> None:
+def test__obj_non_mapping_paths() -> None:
     o = _Obj(123)
     with pytest.raises(TypeError):
         _ = o["x"]  # noqa: F841

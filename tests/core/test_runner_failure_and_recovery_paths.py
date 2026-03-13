@@ -433,7 +433,7 @@ def test_event_logger_enabled_and_closed(monkeypatch, tmp_path):
     assert report.status in {"success", "rollback"}
 
 
-def test_guard_prepare_skipped_branch(monkeypatch, tmp_path):
+def test_guard_prepare_skips_missing_guard(monkeypatch, tmp_path):
     # Guard without prepare method triggers 'skipped' branch
     class NoPrepGuard(Guard):
         name = "noprep"

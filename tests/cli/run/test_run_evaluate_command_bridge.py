@@ -18,7 +18,7 @@ def _stub_run(out_dir: Path) -> None:
     (ts_dir / "report.json").write_text(json.dumps(report), encoding="utf-8")
 
 
-def test_evaluate_command_smoke_for_coverage(monkeypatch, tmp_path) -> None:
+def test_evaluate_command_smoke_for_bridge(monkeypatch, tmp_path) -> None:
     src = tmp_path / "src_model"
     edt = tmp_path / "edt_model"
     src.mkdir()
@@ -62,7 +62,7 @@ def test_evaluate_command_smoke_for_coverage(monkeypatch, tmp_path) -> None:
     assert calls["reports"] == 1
 
 
-def test_evaluate_command_reuses_baseline_report_for_coverage(monkeypatch, tmp_path):
+def test_evaluate_command_reuses_baseline_report_for_bridge(monkeypatch, tmp_path):
     src = tmp_path / "src_model"
     edt = tmp_path / "edt_model"
     src.mkdir()

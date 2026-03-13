@@ -433,7 +433,7 @@ class TestMetricsAggregator:
         assert comparison["guard_overhead_time"] == pytest.approx(0.5)
 
 
-def test_execute_single_run_skips_tokenizer_hash_and_duration_branches(
+def test_execute_single_run_skips_tokenizer_hash_and_duration_paths(
     monkeypatch, tmp_path: Path
 ):
     import types

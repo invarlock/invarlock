@@ -134,7 +134,7 @@ def test_registry_entry_points_select_and_get_paths(monkeypatch):
     assert "ep_hello_guard" in r2.list_guards()
 
 
-def test_registry_additional_branches(monkeypatch):
+def test_registry_additional_paths(monkeypatch):
     r = reg.CoreRegistry()
 
     # Unknown adapter/edit/guard key errors paths
@@ -247,7 +247,7 @@ def test_check_runtime_dependencies_find_spec_exception_counts_missing(monkeypat
     assert r._check_runtime_dependencies(["some_dep"]) == ["some_dep"]
 
 
-def test_registry_get_paths_cover_unavailable_and_type_mismatch_branches(monkeypatch):
+def test_registry_get_paths_cover_unavailable_and_type_mismatch_paths(monkeypatch):
     import sys
     import types
 

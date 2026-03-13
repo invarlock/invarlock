@@ -47,7 +47,7 @@ def test_explain_gates_tokens_below_floor_and_drift_fail(monkeypatch, tmp_path):
     assert "Gate: Drift" in r.stdout and "FAIL" in r.stdout
 
 
-def test_explain_gates_handles_edge_cases(monkeypatch, tmp_path):
+def test_explain_gates_handles_failures_and_threshold_edges(monkeypatch, tmp_path):
     rep = tmp_path / "rep.json"
     base = tmp_path / "base.json"
     rep.write_text(

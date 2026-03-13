@@ -7,7 +7,7 @@ from invarlock.core.contracts import (
 )
 
 
-def test_enforce_relative_spectral_cap_branches():
+def test_enforce_relative_spectral_cap_paths():
     w = torch.randn(4, 4)
     # Non-finite baseline -> unchanged
     out = enforce_relative_spectral_cap(w.clone(), float("nan"), 1.0)
@@ -27,7 +27,7 @@ def test_enforce_weight_energy_bound_both_paths():
     assert torch.allclose(out2, exact)
 
 
-def test_rmt_correction_is_monotone_branches():
+def test_rmt_correction_is_monotone_paths():
     assert rmt_correction_is_monotone(-1.0, 1.0, 2.0, 0.1) is False
     assert rmt_correction_is_monotone(3.0, 1.0, 2.0, 0.1) is False
     assert rmt_correction_is_monotone(1.1, 1.0, 2.0, 0.05) is False

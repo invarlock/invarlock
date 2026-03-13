@@ -17,7 +17,7 @@ class _ExplodingDict(dict[str, Any]):
         raise RuntimeError(f"cannot read {key}")
 
 
-def test_coerce_ci_output_and_metric_family_branches() -> None:
+def test_coerce_ci_output_and_metric_family_paths() -> None:
     assert verify_output._coerce_ci_output(None) is None
     assert verify_output._coerce_ci_output([1, 2]) == [1.0, 2.0]
     assert verify_output._coerce_ci_output([_BadFloat(), 2]) is None
@@ -59,7 +59,7 @@ def test_build_recompute_summary_accuracy_and_outer_exception() -> None:
     )
 
 
-def test_build_recompute_summary_ppl_branches() -> None:
+def test_build_recompute_summary_ppl_paths() -> None:
     ppl_report = {
         "evaluation_windows": {
             "final": {"logloss": [math.log(9.0)], "token_counts": [1]}

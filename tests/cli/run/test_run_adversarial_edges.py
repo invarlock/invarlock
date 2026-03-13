@@ -195,7 +195,7 @@ def test_save_report_missing_json_key_exits(tmp_path: Path):
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
 
 
-def test_release_planner_no_adjustment_branch():
+def test_release_planner_without_adjustment():
     from invarlock.cli.commands.run import _plan_release_windows
 
     cap = {
@@ -214,7 +214,7 @@ def test_release_planner_no_adjustment_branch():
     assert plan["actual_preview"] == 300 and plan["coverage_ok"] is True
 
 
-def test_release_planner_candidate_limit_only_branch():
+def test_release_planner_candidate_limit_only_path():
     from invarlock.cli.commands.run import _plan_release_windows
 
     cap = {

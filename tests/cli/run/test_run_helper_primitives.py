@@ -386,7 +386,7 @@ def test_choose_dataset_split_sort_fallback():
     assert split2 == "apple" and used2 is True
 
 
-def test_apply_mlm_masks_original_token_branch(monkeypatch):
+def test_apply_mlm_masks_original_token_path(monkeypatch):
     tokenizer = SimpleNamespace(
         mask_token_id=101,
         vocab_size=128,
@@ -439,7 +439,7 @@ def test_apply_mlm_masks_fallback_masks_token(monkeypatch):
     assert 55 in records[0]["input_ids"]
 
 
-def test_apply_mlm_masks_fallback_random_branch(monkeypatch):
+def test_apply_mlm_masks_fallback_random_path(monkeypatch):
     """Ensure fallback branch can replace tokens via rng.randrange."""
     tokenizer = SimpleNamespace(mask_token_id=77, vocab_size=100, all_special_ids=[])
     records = [
@@ -1251,7 +1251,7 @@ def test_run_bare_control_non_finite_warns(monkeypatch):
     assert isinstance(payload, dict) and payload.get("source") == "ci_profile"
 
 
-def test_run_bare_control_mlm_branch(monkeypatch):
+def test_run_bare_control_mlm_path(monkeypatch):
     # Exercise the 'mlm' pm_kind selection path
     class DummyRunner:
         def execute(self, **kwargs):  # noqa: D401, ARG002

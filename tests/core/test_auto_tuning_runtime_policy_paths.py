@@ -111,9 +111,7 @@ bad_entry: 7
     assert "bad_entry" not in pol
 
 
-def test_profile_overrides_and_edit_adjustments_branching(
-    tmp_path, monkeypatch
-) -> None:
+def test_profile_overrides_and_edit_adjustments_paths(tmp_path, monkeypatch) -> None:
     at.clear_tier_policies_cache()
     runtime = tmp_path / "runtime"
     profiles = runtime / "profiles"

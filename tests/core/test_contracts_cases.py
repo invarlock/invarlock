@@ -3,7 +3,7 @@ import torch
 from invarlock.core import contracts as C
 
 
-def test_contracts_basic_branches():
+def test_contracts_basic_paths():
     W = torch.randn(4, 4)
     # enforce_relative_spectral_cap returns same type and caps if needed
     out = C.enforce_relative_spectral_cap(W.clone(), baseline_sigma=1.0, cap_ratio=0.5)

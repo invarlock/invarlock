@@ -47,7 +47,7 @@ def test_dependency_manager_detects_available_modules(monkeypatch):
         assert dm.is_available("mi_scores") and dm.is_available("scan_model_gains")
 
 
-def test_resource_manager_mps_branch(monkeypatch):
+def test_resource_manager_mps_path(monkeypatch):
     # Force MPS to be considered available, CUDA not available
     class FakeMPS:
         def is_available(self):

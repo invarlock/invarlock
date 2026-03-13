@@ -12,14 +12,14 @@ from invarlock.core.runner_pairing import (
 )
 
 
-def test_duplicate_fraction_branches() -> None:
+def test_duplicate_fraction_paths() -> None:
     assert duplicate_fraction([]) == 0.0
     assert duplicate_fraction([[]]) == 0.0
     assert duplicate_fraction([[1, 2, 3], [1, 2, 3]]) == pytest.approx(0.5)
     assert duplicate_fraction([[1, 2, 3], [3, 2, 1]]) == 0.0
 
 
-def test_overlap_fraction_from_context_branches() -> None:
+def test_overlap_fraction_from_context_paths() -> None:
     assert overlap_fraction_from_context(None) is None
     assert overlap_fraction_from_context({"dataset": []}) is None
     assert overlap_fraction_from_context({"dataset": {"stride": 1}}) is None
@@ -45,7 +45,7 @@ def test_overlap_fraction_from_context_branches() -> None:
     )
 
 
-def test_compare_with_baseline_branches() -> None:
+def test_compare_with_baseline_paths() -> None:
     no_baseline = compare_with_baseline([0], [[1, 2, 3]], None, "preview")
     assert no_baseline["reason"] == "no_baseline_reference"
 
@@ -95,7 +95,7 @@ def test_compare_with_baseline_branches() -> None:
     assert unexpected_only["reason"].startswith("final_unexpected_ids")
 
 
-def test_compute_window_pairing_metrics_branches() -> None:
+def test_compute_window_pairing_metrics_paths() -> None:
     no_baseline = compute_window_pairing_metrics(
         preview_window_ids=[0],
         preview_tokens=[[1, 2, 3]],
@@ -208,7 +208,7 @@ def test_compute_window_pairing_metrics_branches() -> None:
     assert zero_expected["reason"] is None
 
 
-def test_assess_bootstrap_coverage_branches() -> None:
+def test_assess_bootstrap_coverage_paths() -> None:
     summary = assess_bootstrap_coverage(
         tier="balanced",
         preview_batches=200,

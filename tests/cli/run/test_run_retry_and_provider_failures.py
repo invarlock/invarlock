@@ -122,7 +122,7 @@ def test_window_match_fraction_mismatch_exit(tmp_path: Path):
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
 
 
-def test_dataset_meta_context_non_dict_branch(tmp_path: Path):
+def test_dataset_meta_context_non_dict_path(tmp_path: Path):
     cfg = _cfg(tmp_path)
 
     class Runner:

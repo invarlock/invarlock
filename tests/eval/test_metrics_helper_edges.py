@@ -77,7 +77,7 @@ def test_dependency_manager_and_metrics_info(monkeypatch):
     assert "available_metrics" in info and "missing_dependencies" in info
 
 
-def test_resource_manager_cleanup_cuda_branch(monkeypatch):
+def test_resource_manager_cleanup_cuda_path(monkeypatch):
     cfg = MetricsConfig()
     rm = ResourceManager(cfg)
 
