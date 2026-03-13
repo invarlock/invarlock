@@ -218,19 +218,23 @@ Key points:
     `src/invarlock/reporting/report_schema.py`,
     `src/invarlock/public_contracts.py`,
     `src/invarlock/policy_pack.py`,
+    `src/invarlock/cli/commands/policy.py`,
     `src/invarlock/cli/verify_output.py`,
     `src/invarlock/core/runner_lifecycle.py`,
     `src/invarlock/core/runner_pairing.py`,
     `src/invarlock/core/runner_services.py`,
     `src/invarlock/guards/variance_policy.py`,
     `src/invarlock/guards/variance_results.py`,
+    `src/invarlock/guards/spectral_analysis.py`,
     `src/invarlock/guards/spectral_policy.py`,
     `src/invarlock/guards/spectral_results.py`,
     `src/invarlock/guards/spectral_selection.py`
-  - **≥95% branch** for numerical / mutation helpers:
+  - **≥95% branch** for numerical / mutation helpers and large validation helpers:
     `src/invarlock/core/runner_context.py`,
+    `src/invarlock/core/runner_eval_phase.py`,
     `src/invarlock/core/runner_latency.py`,
     `src/invarlock/core/runner_eval_windows.py`,
+    `src/invarlock/cli/verify_checks.py`,
     `src/invarlock/guards/variance_batching.py`,
     `src/invarlock/guards/variance_evaluation.py`,
     `src/invarlock/guards/variance_prepare.py`,
@@ -239,7 +243,10 @@ Key points:
     `src/invarlock/guards/spectral_control.py`,
     `src/invarlock/guards/spectral_measurement.py`
   - **≥90% branch** for the rest of the current critical surface until it is split further,
-    including orchestration helpers such as `src/invarlock/core/runner_guards.py`
+    including orchestration helpers such as
+    `src/invarlock/core/runner_eval_metrics.py`,
+    `src/invarlock/core/runner_finalize.py`, and
+    `src/invarlock/core/runner_guards.py`
 
 When you modify a file covered by thresholds, please:
 
