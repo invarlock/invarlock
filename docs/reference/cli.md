@@ -6,7 +6,7 @@
 | --- | --- |
 | **Purpose** | Command-line interface for evaluation, verification, and reporting. |
 | **Audience** | Operators running InvarLock from terminal/CI. |
-| **Primary commands** | `evaluate`, `verify`, `report`, `run`, `plugins`, `doctor`. |
+| **Primary commands** | `evaluate`, `verify`, `policy`, `report`, `run`, `plugins`, `doctor`. |
 | **Requires** | `invarlock[hf]` for HF workflows; optional extras for quantized adapters. |
 | **Network** | Offline by default; enable per command with `INVARLOCK_ALLOW_NETWORK=1`. |
 | **Source of truth** | `src/invarlock/cli/app.py`, `src/invarlock/cli/commands/*.py`. |
@@ -57,6 +57,7 @@ For definitions of common terms (pairing, tier policy, primary metric), see the
 | Compare baseline vs subject | `invarlock evaluate` | `runs/` reports + `reports/eval` report. |
 | Single-model run report | `invarlock run` | `report.json` + `events.jsonl`. |
 | Validate report | `invarlock verify` | Exit code + validation messages. |
+| Build / verify policy pack | `invarlock policy` | `policy-pack.json` + verification result. |
 | Explain / HTML / compare | `invarlock report` | Rendered reports/evals. |
 | Inspect environment | `invarlock plugins` / `invarlock doctor` | Plugin diagnostics. |
 
@@ -100,6 +101,7 @@ Top‑level commands:
 | ------------------- | ------------------------------------------------------------------------- |
 | `invarlock evaluate` | evaluate two checkpoints (baseline vs subject) with pinned windows         |
 | `invarlock verify`  | Verify report JSONs against schema and pairing math                  |
+| `invarlock policy`  | Build and verify policy-pack artifacts                              |
 | `invarlock report`  | Operations on reports and reports (explain, html, validate, compare) |
 | `invarlock run`     | Advanced: single‑model evaluation to produce a report                     |
 | `invarlock plugins` | Manage optional backends; list available guards/edits/adapters            |
@@ -210,6 +212,15 @@ Exhaustive command map with brief descriptions and notable options.
   - Purpose: Verify report JSON(s) against schema, pairing math, and gates.
   - Args: `reportS...`
   - Options: `--baseline`, `--tolerance`, `--profile`, `--json`.
+
+- `invarlock policy` (group)
+  - Purpose: Build and verify policy-pack artifacts for Git-native policy workflows.
+  - Subcommands:
+    - `invarlock policy build`
+      - Options: `--resolved-policy`, `--overrides`, `--compatibility`, `--tier`, `--out`.
+    - `invarlock policy verify`
+      - Args: `pack`
+      - Options: `--json`.
 
 - `invarlock run`
   - Purpose: Execute pipeline from a YAML config (edit + guards + reports).

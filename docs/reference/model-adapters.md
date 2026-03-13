@@ -76,6 +76,10 @@ Capability matrix (at a glance)
 | Quantized (`hf_bnb`, `hf_awq`, `hf_gptq`) | Best-effort | Full when modules exposed | Linux |
 | ONNX (`hf_causal_onnx`) | No | Eval-only | All |
 
+Machine-readable adapter capability metadata is published at
+`contracts/adapter_capabilities.json` and surfaced through
+`invarlock plugins adapters --json`.
+
 ## Reference
 
 ### Supported adapters

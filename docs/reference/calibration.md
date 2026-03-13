@@ -44,6 +44,9 @@ invarlock calibrate ve-sweep \
   predictive gate behavior and recommend `min_effect_lognll`.
 - **Artifacts**: Each sweep emits JSON (machine), CSV (spreadsheet), Markdown
   (human), and a `tiers_patch_*.yaml` recommendation file.
+- **Artifact contract**: The file names above are treated as stable public
+  outputs and may be consumed directly by verification, review, and policy-pack
+  workflows.
 
 ## Published Basis vs Shipped Configs
 

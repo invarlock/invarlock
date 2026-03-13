@@ -142,7 +142,6 @@ test_config.yaml
 plans/
 research/
 data/
-contracts/
 
 # Local-only CI workflows (for benchmarking, not required for core CI)
 # .github/workflows/guard-effect-benchmark.yml  # Temporarily tracked for optimization

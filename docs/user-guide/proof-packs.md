@@ -134,6 +134,10 @@ a drift summary in `results/determinism_repeats.json`.
 signed manifest cryptographically binds the checksums file (and thus all hashed artifacts).
 Signed packs also record `signing_key_fingerprint` for audit trails.
 
+The manifest contract is published at `contracts/proof_pack_manifest.schema.json`.
+`verify_pack.sh` validates this schema before checksum and signature verification so
+malformed proof packs fail deterministically.
+
 Use `verify_pack.sh`:
 
 - Default: `scripts/proof_packs/verify_pack.sh --pack <dir>`

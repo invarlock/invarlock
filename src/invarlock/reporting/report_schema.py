@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
 from typing import Any
+
+from invarlock.public_contracts import load_json_contract
 
 # Optional JSON Schema validation support (best-effort)
 try:  # pragma: no cover - exercised in integration
@@ -226,12 +226,9 @@ def _load_validation_allowlist() -> set[str]:
     (e.g., installed wheel) or when parsing fails.
     """
     try:
-        root = Path(__file__).resolve().parents[3]
-        path = root / "contracts" / "validation_keys.json"
-        if path.exists():
-            data = json.loads(path.read_text(encoding="utf-8"))
-            if isinstance(data, list):
-                return {str(k) for k in data}
+        data = load_json_contract("validation_keys.json")
+        if isinstance(data, list):
+            return {str(k) for k in data}
     except Exception:
         pass
     return set(_VALIDATION_ALLOWLIST_DEFAULT)

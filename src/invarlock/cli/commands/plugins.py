@@ -17,6 +17,12 @@ from rich.console import Console
 from rich.markup import escape as _escape
 from rich.table import Table
 
+from invarlock.public_contracts import (
+    adapter_capability,
+    contract_catalog,
+    load_support_matrix,
+)
+
 from ..constants import PLUGINS_FORMAT_VERSION
 
 console = Console()
@@ -53,12 +59,16 @@ def _sort_rows(rows):
     )
 
 
-def _emit_plugins_json(category: str, rows) -> None:
+def _emit_plugins_json(category: str, rows, extra: dict | None = None) -> None:
     payload = {
         "format_version": PLUGINS_FORMAT_VERSION,
         "category": category,
         "items": _sort_rows(rows),
+        "contracts": contract_catalog(),
+        "support_matrix": load_support_matrix(),
     }
+    if extra:
+        payload.update(extra)
     typer.echo(json.dumps(payload, ensure_ascii=False))
 
 
@@ -145,6 +155,8 @@ def plugins_command(
                     "category": kind,
                     "items": [],
                     "discovery": "disabled",
+                    "contracts": contract_catalog(),
+                    "support_matrix": load_support_matrix(),
                 }
                 _sys.stdout.write(_json.dumps(payload) + "\n")
                 return
@@ -417,6 +429,7 @@ def plugins_command(
                         else "third_party",
                         "status": r.get("status"),
                         "backend": backend_obj,
+                        "capability": adapter_capability(str(r.get("name") or "")),
                     }
                 )
             _emit_plugins_json("adapters", unified)
