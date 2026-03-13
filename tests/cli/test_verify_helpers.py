@@ -492,7 +492,7 @@ def test_validate_evaluation_report_payload_schema_failure(tmp_path: Path) -> No
     assert errs and "schema" in errs[0].lower()
 
 
-def test_validate_report_schema_strict_branches(monkeypatch) -> None:
+def test_validate_report_schema_strict_paths(monkeypatch) -> None:
     verify_mod = _import_verify_module()
 
     assert verify_mod._validate_report_schema_strict("bad") is False
@@ -526,7 +526,7 @@ def test_validate_report_schema_strict_branches(monkeypatch) -> None:
     assert verify_mod._validate_report_schema_strict(report) is True
 
 
-def test_validate_logspace_ci_identity_branch_matrix() -> None:
+def test_validate_logspace_ci_identity_path_matrix() -> None:
     verify_mod = _import_verify_module()
 
     assert (
@@ -607,7 +607,7 @@ def test_validate_logspace_ci_identity_branch_matrix() -> None:
     assert any("display_ci mismatch" in e for e in errs_mismatch)
 
 
-def test_primary_metric_validation_helper_branches_for_invalid_modes() -> None:
+def test_primary_metric_validation_helper_paths_for_invalid_modes() -> None:
     verify_mod = _import_verify_module()
 
     assert verify_mod._validate_primary_metric({"primary_metric": {}})
@@ -633,7 +633,7 @@ def test_primary_metric_validation_helper_branches_for_invalid_modes() -> None:
     assert verify_mod._validate_primary_metric(cert_invalid_prefix) == []
 
 
-def test_recompute_validation_flags_and_policy_gate_branches(monkeypatch) -> None:
+def test_recompute_validation_flags_and_policy_gate_paths(monkeypatch) -> None:
     verify_mod = _import_verify_module()
     captured: dict[str, object] = {}
 

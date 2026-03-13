@@ -63,7 +63,7 @@ def test_compute_perplexity_strict_causal_success():
     assert isinstance(ppl, float) and math.isfinite(ppl) and ppl >= 1.0
 
 
-def test_compute_perplexity_strict_masked_lm_branch():
+def test_compute_perplexity_strict_masked_lm_path():
     model = DummyBertModel()
     dl = _make_dataloader(batch_count=2, seq_len=4, with_mask=False)
     ppl = compute_perplexity_strict(model, dl)

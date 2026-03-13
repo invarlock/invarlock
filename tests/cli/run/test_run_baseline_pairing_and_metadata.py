@@ -781,7 +781,7 @@ output:
     assert captured.get("edit_config", {}).get("module_selectors") == {"heads": [0]}
 
 
-def test_skip_missing_guard_branch(tmp_path: Path):
+def test_skip_missing_guard_path(tmp_path: Path):
     cfg = tmp_path / "config.yaml"
     cfg.write_text("ok: true")
 
@@ -1342,7 +1342,7 @@ def test_metrics_inherits_masked_token_counts_from_dataset_meta_context(tmp_path
     assert metrics.get("masked_tokens_final") == 3
 
 
-def test_dataset_meta_context_non_dict_branch(tmp_path: Path):
+def test_dataset_meta_context_non_dict_path(tmp_path: Path):
     cfg = _supp_cfg(tmp_path)
 
     class Runner:

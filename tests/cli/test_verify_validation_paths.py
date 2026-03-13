@@ -39,7 +39,7 @@ def _base_cert() -> dict:
     }
 
 
-def test_validate_ratio_branches_no_logloss_block_and_bad_ci_entries_and_nonfinite():
+def test_validate_ratio_paths_no_logloss_block_and_bad_ci_entries_and_nonfinite():
     # Primary metric validation: baseline <= 0 and mismatch
     cert = _base_cert()
     cert["baseline_ref"]["primary_metric"]["final"] = 0.0
@@ -63,7 +63,7 @@ def test_validate_pairing_bootstrap_fallback_and_missing_metrics():
     assert any("missing window_overlap_fraction" in e for e in errs)
 
 
-def test_validate_counts_branches_none_expected_and_missing_coverage():
+def test_validate_counts_paths_none_expected_and_missing_coverage():
     cert = _base_cert()
     # Missing coverage blocks -> missing used error branches
     cert["dataset"]["windows"]["stats"]["coverage"] = {}

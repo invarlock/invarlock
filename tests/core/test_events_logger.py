@@ -89,7 +89,7 @@ def test_event_logger_context_manager_and_del(tmp_path: Path) -> None:
     assert lines2[0]["operation"] == "session_start"
 
 
-def test_event_logger_serializer_branches() -> None:
+def test_event_logger_serializer_paths() -> None:
     # Directly exercise serializer utility branches
     from invarlock.core.events import EventLogger
 

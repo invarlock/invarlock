@@ -122,7 +122,7 @@ def test_resolve_guard_overhead_threshold_from_config() -> None:
     ) == pytest.approx(run_mod.GUARD_OVERHEAD_THRESHOLD)
 
 
-def test_choose_dataset_split_covers_fallback_and_exception_branch() -> None:
+def test_choose_dataset_split_covers_fallback_and_exception_path() -> None:
     split, used = run_mod._choose_dataset_split(
         requested="train", available=["validation"]
     )

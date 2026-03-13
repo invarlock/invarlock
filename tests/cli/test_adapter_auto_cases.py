@@ -97,7 +97,7 @@ class _BadQuantConfig(dict):
         raise RuntimeError("broken quant config")
 
 
-def test_read_local_hf_config_and_quant_detection_edge_branches(
+def test_read_local_hf_config_and_quant_detection_paths(
     tmp_path: Path, monkeypatch
 ) -> None:
     class _BrokenPath:
@@ -119,7 +119,7 @@ def test_read_local_hf_config_and_quant_detection_edge_branches(
     )
 
 
-def test_resolve_auto_adapter_additional_family_branches(tmp_path: Path) -> None:
+def test_resolve_auto_adapter_additional_family_paths(tmp_path: Path) -> None:
     encdec = tmp_path / "encdec"
     encdec.mkdir()
     (encdec / "config.json").write_text(
@@ -151,7 +151,7 @@ def test_resolve_auto_adapter_additional_family_branches(tmp_path: Path) -> None
     assert mod.resolve_auto_adapter("org/model-t5-small") == "hf_seq2seq"
 
 
-def test_apply_auto_adapter_if_needed_exception_branch() -> None:
+def test_apply_auto_adapter_if_needed_exception_path() -> None:
     class _BrokenConfig:
         @property
         def model(self):

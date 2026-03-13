@@ -88,7 +88,7 @@ def test_wanda_with_raw_outputs_and_short_seq():
     assert scores.shape[0] == 1 and scores.shape[1] >= 8
 
 
-def test_blend_one_dimensional_scores_branch():
+def test_blend_one_dimensional_scores_path():
     a = torch.ones(6)
     b = torch.full((4,), 2.0)
     out = pa.blend_neuron_scores([a, b])

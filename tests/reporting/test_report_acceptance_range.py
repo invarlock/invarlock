@@ -3,7 +3,7 @@ import pytest
 from invarlock.reporting import report_builder as cert
 
 
-def test_resolve_pm_acceptance_range_branches(monkeypatch):
+def test_resolve_pm_acceptance_range_paths(monkeypatch):
     # No explicit bounds -> empty payload
     monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MIN", raising=False)
     monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MAX", raising=False)

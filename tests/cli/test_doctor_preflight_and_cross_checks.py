@@ -426,7 +426,7 @@ def test_doctor_config_provider_string_kind_error(monkeypatch, capsys, tmp_path)
     assert "D001" in codes
 
 
-def test_doctor_config_local_jsonl_object_branches(monkeypatch, capsys, tmp_path):
+def test_doctor_config_local_jsonl_object_paths(monkeypatch, capsys, tmp_path):
     class LocalProvider:
         kind = "local_jsonl"
         file = tmp_path / "missing.jsonl"
@@ -454,7 +454,7 @@ def test_doctor_config_local_jsonl_object_branches(monkeypatch, capsys, tmp_path
     assert "D011" in codes
 
 
-def test_doctor_config_hf_text_object_branch(monkeypatch, capsys, tmp_path):
+def test_doctor_config_hf_text_object_path(monkeypatch, capsys, tmp_path):
     class HFProvider:
         kind = "hf_text"
         text_field = ""
@@ -479,7 +479,7 @@ def test_doctor_config_hf_text_object_branch(monkeypatch, capsys, tmp_path):
     assert "D004" in codes
 
 
-def test_doctor_config_hf_text_dict_branch(monkeypatch, capsys, tmp_path):
+def test_doctor_config_hf_text_dict_path(monkeypatch, capsys, tmp_path):
     provider = {
         "kind": "hf_text",
         "text_field": "instruction",

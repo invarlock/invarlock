@@ -32,7 +32,7 @@ def test_get_provider_known_and_unknown():
         get_provider("unknown")
 
 
-def test_compute_window_hash_include_data_branch():
+def test_compute_window_hash_include_data_path():
     win = EvaluationWindow(
         input_ids=[[1, 2, 3]], attention_masks=[[1, 1, 1]], indices=[0]
     )
@@ -187,7 +187,7 @@ class DummyTok:
         return ids
 
 
-def test_synthetic_provider_branches():
+def test_synthetic_provider_paths():
     tok = DummyTok()
     sp = SyntheticProvider(base_samples=["Hello world" * 3])
     cap = sp.estimate_capacity(tokenizer=tok, seq_len=8, stride=4)

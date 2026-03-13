@@ -62,7 +62,7 @@ def test_validate_tensor_inf_non_strict_replaces() -> None:
     assert float(out[1].item()) == -123.0
 
 
-def test_validate_dataloader_empty_branches_raise_or_warn(monkeypatch) -> None:
+def test_validate_dataloader_empty_paths_raise_or_warn(monkeypatch) -> None:
     seen: list[str] = []
     monkeypatch.setattr(
         "invarlock.eval.metrics.logger.warning", lambda msg: seen.append(str(msg))

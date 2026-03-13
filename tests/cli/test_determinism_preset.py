@@ -124,7 +124,7 @@ def test_determinism_preset_marks_tolerance_when_backend_access_raises(
     assert payload.get("notes") is not None
 
 
-def test_determinism_preset_strict_with_minimal_torch_stub_hits_false_branches(
+def test_determinism_preset_strict_with_minimal_torch_stub_hits_false_paths(
     monkeypatch,
 ) -> None:
     class _Backends:

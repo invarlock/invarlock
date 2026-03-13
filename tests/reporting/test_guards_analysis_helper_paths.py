@@ -137,7 +137,7 @@ def test_extract_spectral_analysis_uses_guard_baseline_metrics_and_derives_quant
     assert out["top_z_scores"]["ffn"][0]["module"] == "m1"
 
 
-def test_extract_spectral_analysis_quantile_position_integer_branch() -> None:
+def test_extract_spectral_analysis_quantile_position_integer_path() -> None:
     final_z_scores = {f"m{i}": float(i) for i in range(21)}
     module_family_map = dict.fromkeys(final_z_scores, "ffn")
     report = {

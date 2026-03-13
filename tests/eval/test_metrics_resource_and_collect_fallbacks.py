@@ -13,7 +13,7 @@ from invarlock.eval.metrics import (
 )
 
 
-def test_resource_manager_gpu_memory_info_cuda_branch(monkeypatch):
+def test_resource_manager_gpu_memory_info_cuda_path(monkeypatch):
     cfg = MetricsConfig()
     rm = ResourceManager(cfg)
     # Force a CUDA-like device but make get_device_properties fail

@@ -232,7 +232,7 @@ def test_compute_validation_flags_respects_token_floors(monkeypatch):
     assert flags["rmt_stable"] is False
 
 
-def test_compute_validation_flags_accuracy_branch_sets_hysteresis(monkeypatch):
+def test_compute_validation_flags_accuracy_sets_hysteresis(monkeypatch):
     monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
     pm = {"kind": "accuracy", "ratio_vs_baseline": -0.5, "n_final": 50}
     flags = cert._compute_validation_flags(

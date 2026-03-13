@@ -12,7 +12,7 @@ def _write_json(path: Path, payload: dict) -> Path:
     return path
 
 
-def test_warn_adapter_family_mismatch_covers_baseline_path_branches(
+def test_warn_adapter_family_mismatch_covers_baseline_paths(
     tmp_path: Path,
 ) -> None:
     cert_path = tmp_path / "cert.json"

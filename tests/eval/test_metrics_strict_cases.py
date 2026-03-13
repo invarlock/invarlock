@@ -5,7 +5,7 @@ import torch
 from invarlock.eval import metrics as M
 
 
-def test_compute_perplexity_strict_masked_lm_branch():
+def test_compute_perplexity_strict_masked_lm_path():
     class DummyBert(torch.nn.Module):
         def __init__(self, vocab=8):
             super().__init__()
