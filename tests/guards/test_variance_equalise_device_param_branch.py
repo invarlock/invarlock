@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-from invarlock.guards.variance import equalise_residual_variance
+from invarlock.guards.variance_scaling import equalise_residual_variance
 
 
 class ParamOnly(nn.Module):

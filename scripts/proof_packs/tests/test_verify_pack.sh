@@ -442,7 +442,7 @@ test_verify_pack_rejects_manifest_missing_checksums_digest_field() {
 
     run pack_verify_pack --pack "${pack_dir}" --skip-verify
     assert_rc "1" "${RUN_RC}" "missing digest must fail"
-    assert_match "missing checksums_sha256_digest" "${RUN_ERR}" "missing digest error"
+    assert_match "manifest missing required field: checksums_sha256_digest" "${RUN_ERR}" "missing digest error"
 }
 
 test_verify_pack_rejects_manifest_with_empty_checksums_digest_field() {
@@ -465,7 +465,57 @@ test_verify_pack_rejects_manifest_with_empty_checksums_digest_field() {
 
     run pack_verify_pack --pack "${pack_dir}" --skip-verify
     assert_rc "1" "${RUN_RC}" "empty digest must fail"
-    assert_match "checksums_sha256_digest is empty" "${RUN_ERR}" "empty digest error"
+    assert_match "64-char sha256 hex" "${RUN_ERR}" "empty digest error"
+}
+
+test_verify_pack_rejects_manifest_with_wrong_format() {
+    mock_reset
+
+    source ./scripts/proof_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}"
+    echo "payload" > "${pack_dir}/payload.txt"
+
+    local sha_cmd
+    sha_cmd="$(pack_sha256_cmd)"
+    (
+        cd "${pack_dir}"
+        ${sha_cmd} payload.txt > checksums.sha256
+    )
+
+    local checksums_digest
+    checksums_digest="$(cd "${pack_dir}" && python3 -c 'import hashlib;print(hashlib.sha256(open("checksums.sha256","rb").read()).hexdigest())' < /dev/null)"
+    printf '%s\n' "{\"format\":\"proof-pack-v0\",\"generated_at\":\"2026-03-12T00:00:00Z\",\"suite\":\"subset\",\"network_mode\":\"offline\",\"determinism\":\"strict\",\"repeats\":0,\"run_dir\":\"runs/example\",\"artifacts\":[\"payload.txt\"],\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
+
+    run pack_verify_pack --pack "${pack_dir}" --skip-verify
+    assert_rc "1" "${RUN_RC}" "bad manifest format fails"
+    assert_match "proof-pack-v1" "${RUN_ERR}" "error mentions required format"
+}
+
+test_verify_pack_rejects_manifest_with_bad_checksums_pointer() {
+    mock_reset
+
+    source ./scripts/proof_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}"
+    echo "payload" > "${pack_dir}/payload.txt"
+
+    local sha_cmd
+    sha_cmd="$(pack_sha256_cmd)"
+    (
+        cd "${pack_dir}"
+        ${sha_cmd} payload.txt > checksums.sha256
+    )
+
+    local checksums_digest
+    checksums_digest="$(cd "${pack_dir}" && python3 -c 'import hashlib;print(hashlib.sha256(open("checksums.sha256","rb").read()).hexdigest())' < /dev/null)"
+    printf '%s\n' "{\"format\":\"proof-pack-v1\",\"checksums_sha256\":\"manifest.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
+
+    run pack_verify_pack --pack "${pack_dir}" --skip-verify
+    assert_rc "1" "${RUN_RC}" "bad checksum pointer fails"
+    assert_match "checksums_sha256 must point to 'checksums.sha256'" "${RUN_ERR}" "error mentions checksums pointer"
 }
 
 test_verify_pack_rejects_manifest_when_checksums_digest_computation_is_empty() {
@@ -492,7 +542,7 @@ EOF
 
     run pack_verify_pack --pack "${pack_dir}" --skip-verify
     assert_rc "1" "${RUN_RC}" "empty computed digest must fail"
-    assert_match "Failed to compute sha256" "${RUN_ERR}" "digest computation error"
+    assert_match "64-char sha256 hex" "${RUN_ERR}" "digest computation error"
 
     PATH="${original_path}"
 }
@@ -507,7 +557,7 @@ test_verify_pack_strict_requires_gpg_when_signature_present() {
     echo "payload" > "${pack_dir}/payload.txt"
     echo "sig" > "${pack_dir}/manifest.json.asc"
     echo "{}" > "${pack_dir}/checksums.sha256"
-    echo "{}" > "${pack_dir}/manifest.json"
+    printf '%s\n' '{"format":"proof-pack-v1","checksums_sha256":"checksums.sha256","checksums_sha256_digest":"0000000000000000000000000000000000000000000000000000000000000000"}' > "${pack_dir}/manifest.json"
 
     command() {
         if [[ "${1:-}" == "-v" && "${2:-}" == "gpg" ]]; then
@@ -531,7 +581,7 @@ test_verify_pack_rejects_bad_manifest_signature() {
     echo "payload" > "${pack_dir}/payload.txt"
     echo "sig" > "${pack_dir}/manifest.json.asc"
     echo "{}" > "${pack_dir}/checksums.sha256"
-    echo "{}" > "${pack_dir}/manifest.json"
+    printf '%s\n' '{"format":"proof-pack-v1","checksums_sha256":"checksums.sha256","checksums_sha256_digest":"0000000000000000000000000000000000000000000000000000000000000000"}' > "${pack_dir}/manifest.json"
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
@@ -562,7 +612,7 @@ test_verify_pack_rejects_signature_when_manifest_records_mismatched_fingerprint(
     echo "payload" > "${pack_dir}/payload.txt"
     echo "sig" > "${pack_dir}/manifest.json.asc"
     echo "{}" > "${pack_dir}/checksums.sha256"
-    echo '{"signing_key_fingerprint":"DEADBEEF"}' > "${pack_dir}/manifest.json"
+    printf '%s\n' '{"format":"proof-pack-v1","checksums_sha256":"checksums.sha256","checksums_sha256_digest":"0000000000000000000000000000000000000000000000000000000000000000","signing_key_fingerprint":"DEADBEEF"}' > "${pack_dir}/manifest.json"
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"

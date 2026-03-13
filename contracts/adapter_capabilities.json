@@ -1,0 +1,109 @@
+{
+  "format_version": "adapter-capabilities-v1",
+  "adapters": [
+    {
+      "adapter": "hf_causal",
+      "snapshot_restore": "full",
+      "guard_coverage": "full",
+      "platform_support": "all",
+      "runtime_constraints": [
+        "torch",
+        "transformers"
+      ],
+      "required_extra": "adapters",
+      "degraded_modes": []
+    },
+    {
+      "adapter": "hf_mlm",
+      "snapshot_restore": "full",
+      "guard_coverage": "full",
+      "platform_support": "all",
+      "runtime_constraints": [
+        "torch",
+        "transformers"
+      ],
+      "required_extra": "adapters",
+      "degraded_modes": []
+    },
+    {
+      "adapter": "hf_seq2seq",
+      "snapshot_restore": "full",
+      "guard_coverage": "full",
+      "platform_support": "all",
+      "runtime_constraints": [
+        "torch",
+        "transformers"
+      ],
+      "required_extra": "adapters",
+      "degraded_modes": []
+    },
+    {
+      "adapter": "hf_causal_onnx",
+      "snapshot_restore": "none",
+      "guard_coverage": "eval_only",
+      "platform_support": "all",
+      "runtime_constraints": [
+        "onnxruntime",
+        "optimum"
+      ],
+      "required_extra": "onnx",
+      "degraded_modes": [
+        "no_edit_support",
+        "no_module_level_guards"
+      ]
+    },
+    {
+      "adapter": "hf_auto",
+      "snapshot_restore": "delegated",
+      "guard_coverage": "delegated",
+      "platform_support": "all",
+      "runtime_constraints": [
+        "transformers"
+      ],
+      "required_extra": "adapters",
+      "degraded_modes": []
+    },
+    {
+      "adapter": "hf_bnb",
+      "snapshot_restore": "best_effort",
+      "guard_coverage": "full_when_modules_exposed",
+      "platform_support": "linux_cuda",
+      "runtime_constraints": [
+        "bitsandbytes",
+        "cuda"
+      ],
+      "required_extra": "gpu",
+      "degraded_modes": [
+        "device_movement_managed_by_backend"
+      ]
+    },
+    {
+      "adapter": "hf_awq",
+      "snapshot_restore": "best_effort",
+      "guard_coverage": "full_when_modules_exposed",
+      "platform_support": "linux",
+      "runtime_constraints": [
+        "autoawq",
+        "triton"
+      ],
+      "required_extra": "awq",
+      "degraded_modes": [
+        "metadata_only_without_runtime_stack"
+      ]
+    },
+    {
+      "adapter": "hf_gptq",
+      "snapshot_restore": "best_effort",
+      "guard_coverage": "full_when_modules_exposed",
+      "platform_support": "linux",
+      "runtime_constraints": [
+        "auto-gptq",
+        "triton"
+      ],
+      "required_extra": "gptq",
+      "degraded_modes": [
+        "metadata_only_without_runtime_stack"
+      ]
+    }
+  ]
+}

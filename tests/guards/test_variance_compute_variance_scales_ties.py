@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-import invarlock.guards.variance as variance_mod
+import invarlock.guards.variance_scaling as variance_scaling_mod
 from invarlock.guards.variance import VarianceGuard
 
 
@@ -14,7 +14,9 @@ def test_compute_variance_scales_ties_and_trim_order(monkeypatch):
             "block2.mlp": 1.20,  # delta 0.20
         }
 
-    monkeypatch.setattr(variance_mod, "equalise_residual_variance", fake_equalise)
+    monkeypatch.setattr(
+        variance_scaling_mod, "equalise_residual_variance", fake_equalise
+    )
 
     policy = {
         "min_gain": 0.0,

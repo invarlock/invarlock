@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-import invarlock.guards.variance as variance_mod
+import invarlock.guards.variance_scaling as variance_scaling_mod
 from invarlock.guards.variance import VarianceGuard
 
 
@@ -14,7 +14,9 @@ def test_compute_variance_scales_filters_and_topk(monkeypatch):
         }
 
     monkeypatch.setattr(
-        variance_mod, "equalise_residual_variance", fake_equalise_residual_variance
+        variance_scaling_mod,
+        "equalise_residual_variance",
+        fake_equalise_residual_variance,
     )
 
     # Policy chooses min_abs_adjust and max_scale_step and topk_backstop

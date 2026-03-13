@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 
-from invarlock.guards.variance import VarianceGuard, equalise_residual_variance
+from invarlock.guards.variance import VarianceGuard
+from invarlock.guards.variance_scaling import equalise_residual_variance
 
 
 class TinyBlock(nn.Module):

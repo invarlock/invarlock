@@ -10,7 +10,7 @@ import pytest
 
 # NOTE: import VarianceGuard only if it's part of the public surface;
 # otherwise, drive it via evaluation_report inputs in an integration test.
-from invarlock.core.runner import BOOTSTRAP_COVERAGE_REQUIREMENTS
+from invarlock.core.runner_pairing import BOOTSTRAP_COVERAGE_REQUIREMENTS
 from invarlock.guards.variance import VarianceGuard
 from invarlock.reporting.guards_analysis import _extract_rmt_analysis
 from invarlock.reporting.report_builder import make_report

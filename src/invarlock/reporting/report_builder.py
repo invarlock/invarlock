@@ -21,7 +21,6 @@ import os
 import platform
 from collections.abc import Iterable
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 # Optional JSON Schema validation support
@@ -37,6 +36,7 @@ from invarlock.core.bootstrap import (
 )
 from invarlock.eval.primary_metric import compute_primary_metric_from_report, get_metric
 from invarlock.eval.tail_stats import evaluate_metric_tail
+from invarlock.public_contracts import load_json_contract
 from invarlock.utils.digest import hash_json
 
 from . import report_schema as _report_schema
@@ -457,19 +457,15 @@ _VALIDATION_ALLOWLIST_DEFAULT = {
 def _load_validation_allowlist_with_source() -> tuple[set[str], str]:
     """Load validation key allow-list and report the source explicitly."""
     try:
-        root = Path(__file__).resolve().parents[3]
-        path = root / "contracts" / "validation_keys.json"
-        if path.exists():
-            data = json.loads(path.read_text(encoding="utf-8"))
-            if isinstance(data, list):
-                return {str(k) for k in data}, "contracts"
-            return (
-                set(_VALIDATION_ALLOWLIST_DEFAULT),
-                "fallback:invalid-contract-validation-keys",
-            )
+        data = load_json_contract("validation_keys.json")
+        if isinstance(data, list):
+            return {str(k) for k in data}, "contracts"
+        return (
+            set(_VALIDATION_ALLOWLIST_DEFAULT),
+            "fallback:invalid-contract-validation-keys",
+        )
     except Exception:  # pragma: no cover
         return set(_VALIDATION_ALLOWLIST_DEFAULT), "fallback:load-error"
-    return set(_VALIDATION_ALLOWLIST_DEFAULT), "fallback:missing-contract"
 
 
 def _load_validation_allowlist() -> set[str]:
@@ -751,7 +747,7 @@ def _enforce_pairing_and_coverage(
             f"(preview={actual_preview}, final={actual_final})."
         )
 
-    from invarlock.core.runner import BOOTSTRAP_COVERAGE_REQUIREMENTS
+    from invarlock.core.runner_pairing import BOOTSTRAP_COVERAGE_REQUIREMENTS
 
     tier_key = str(tier or "balanced").lower()
     floors = BOOTSTRAP_COVERAGE_REQUIREMENTS.get(

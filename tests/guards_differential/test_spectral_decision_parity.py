@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import random
 
-from invarlock.guards.spectral import compute_z_scores
+from invarlock.guards.spectral_detection import compute_z_scores
 from invarlock.guards_ref.spectral_ref import spectral_decide
 
 

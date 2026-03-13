@@ -147,7 +147,6 @@ test_config.yaml
 plans/
 research/
 data/
-contracts/
 !contracts/
 !contracts/*.json
 

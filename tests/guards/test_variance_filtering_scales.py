@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-import invarlock.guards.variance as var_mod
+import invarlock.guards.variance_scaling as variance_scaling_mod
 from invarlock.guards.variance import VarianceGuard
 
 
@@ -41,7 +41,7 @@ def test_compute_variance_scales_backstop_and_limit(monkeypatch):
     def fake_eq_1(*_, **__):
         return {"block0.attn": 1.001, "block0.mlp": 1.003}
 
-    monkeypatch.setattr(var_mod, "equalise_residual_variance", fake_eq_1)
+    monkeypatch.setattr(variance_scaling_mod, "equalise_residual_variance", fake_eq_1)
     out = g._compute_variance_scales(TinyModel(), dataloader=[object()])
     # One scale injected by backstop, normalized key
     assert list(out.keys()) == ["block0.mlp"] or any(k.endswith("mlp") for k in out)
@@ -63,6 +63,6 @@ def test_compute_variance_scales_backstop_and_limit(monkeypatch):
     def fake_eq_2(*_, **__):
         return {"block0.attn": 1.02, "block0.mlp": 0.98}
 
-    monkeypatch.setattr(var_mod, "equalise_residual_variance", fake_eq_2)
+    monkeypatch.setattr(variance_scaling_mod, "equalise_residual_variance", fake_eq_2)
     out2 = g2._compute_variance_scales(TinyModel(), dataloader=[object()])
     assert len(out2) == 1

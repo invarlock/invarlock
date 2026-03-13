@@ -16,9 +16,8 @@ from typing import Any
 
 # Explicit per-file overrides. Values are branch floors unless branch-rate is
 # unavailable, in which case line-rate is used as a fallback. These take
-# precedence over the global/core floors below. Most are at 85%; a few newer
-# entries use phased floors (e.g., 0.75–0.80) and should be ratcheted upward
-# over time.
+# precedence over the global/core floors below and encode the split-aware
+# coverage policy for shells, pure helpers, and tensor/mutation helpers.
 THRESHOLDS = {
     # Evaluation & reporting
     "src/invarlock/eval/metrics.py": 0.90,
@@ -35,18 +34,42 @@ THRESHOLDS = {
     # Reporting types
     "src/invarlock/reporting/report_types.py": 0.90,
     "src/invarlock/reporting/dataset_hashing.py": 0.90,
-    "src/invarlock/reporting/report_schema.py": 0.90,
     "src/invarlock/reporting/guards_analysis.py": 0.90,
     "src/invarlock/reporting/primary_metric_utils.py": 0.90,
     "src/invarlock/reporting/utils.py": 0.90,
-    # Guards (safety mechanisms)
-    "src/invarlock/guards/variance.py": 0.90,
+    # Shell modules: lifecycle/orchestration shells should stay branch-complete.
+    "src/invarlock/core/runner.py": 1.00,
+    "src/invarlock/guards/variance.py": 1.00,
+    "src/invarlock/guards/spectral.py": 1.00,
+    # Pure contract / result / policy / selection helpers.
+    "src/invarlock/reporting/report_schema.py": 1.00,
+    "src/invarlock/public_contracts.py": 1.00,
+    "src/invarlock/policy_pack.py": 1.00,
+    "src/invarlock/cli/verify_output.py": 1.00,
+    "src/invarlock/core/runner_lifecycle.py": 1.00,
+    "src/invarlock/core/runner_pairing.py": 1.00,
+    "src/invarlock/core/runner_services.py": 1.00,
+    "src/invarlock/guards/variance_policy.py": 1.00,
+    "src/invarlock/guards/variance_results.py": 1.00,
+    "src/invarlock/guards/spectral_policy.py": 1.00,
+    "src/invarlock/guards/spectral_results.py": 1.00,
+    "src/invarlock/guards/spectral_selection.py": 1.00,
+    # Numerical / mutation / tensor-processing helpers.
+    "src/invarlock/core/runner_context.py": 0.95,
+    "src/invarlock/core/runner_latency.py": 0.95,
+    "src/invarlock/core/runner_eval_windows.py": 0.95,
+    "src/invarlock/guards/variance_batching.py": 0.95,
+    "src/invarlock/guards/variance_evaluation.py": 0.95,
+    "src/invarlock/guards/variance_prepare.py": 0.95,
+    "src/invarlock/guards/variance_ops.py": 0.95,
+    "src/invarlock/guards/variance_scaling.py": 0.95,
     "src/invarlock/guards/invariants.py": 0.90,
-    "src/invarlock/guards/spectral.py": 0.90,
+    "src/invarlock/guards/spectral_control.py": 0.95,
+    "src/invarlock/guards/spectral_analysis.py": 0.90,
+    "src/invarlock/guards/spectral_measurement.py": 0.95,
     "src/invarlock/guards/rmt.py": 0.90,
     "src/invarlock/guards/policies.py": 0.90,
     # Core orchestration & runtime
-    "src/invarlock/core/runner.py": 0.90,
     "src/invarlock/core/registry.py": 0.90,
     # Omit bootstrap here due to ambiguous bare-filename records in coverage.xml
     # "src/invarlock/core/bootstrap.py": 0.85,
@@ -64,6 +87,8 @@ THRESHOLDS = {
     "src/invarlock/cli/commands/run.py": 0.90,
     "src/invarlock/cli/commands/verify.py": 0.90,
     "src/invarlock/cli/commands/calibrate.py": 0.90,
+    "src/invarlock/cli/commands/policy.py": 0.90,
+    "src/invarlock/cli/verify_checks.py": 0.90,
     # PR-4 split modules
     "src/invarlock/cli/run_analysis.py": 0.90,
     "src/invarlock/cli/run_artifacts.py": 0.90,
@@ -122,10 +147,16 @@ CORE_FILES = (
     "src/invarlock/cli/commands/run.py",
     "src/invarlock/cli/commands/verify.py",
     "src/invarlock/cli/commands/calibrate.py",
+    "src/invarlock/cli/commands/policy.py",
+    "src/invarlock/cli/verify_checks.py",
+    "src/invarlock/cli/verify_output.py",
     "src/invarlock/cli/determinism.py",
     "src/invarlock/cli/config.py",
     "src/invarlock/cli/_json.py",
     "src/invarlock/cli/_evidence.py",
+    # Public contract helpers
+    "src/invarlock/public_contracts.py",
+    "src/invarlock/policy_pack.py",
 )
 
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from invarlock.core.runner import BOOTSTRAP_COVERAGE_REQUIREMENTS
+from invarlock.core.runner_pairing import BOOTSTRAP_COVERAGE_REQUIREMENTS
 
 
 def _bash(repo_root: Path, script: str) -> str:

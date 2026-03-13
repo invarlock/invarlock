@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.guards.variance import _predictive_gate_outcome
+from invarlock.guards.variance_policy import predictive_gate_outcome
 from invarlock.guards_ref.variance_ref import variance_decide
 
 
@@ -18,7 +18,7 @@ def test_variance_decision_parity_cases():
             mu_prod = -mu_prod
             lo, hi = ci
             ci_prod = (-hi, -lo)
-        prod_pass, _ = _predictive_gate_outcome(mu_prod, ci_prod, me, one_sided)
+        prod_pass, _ = predictive_gate_outcome(mu_prod, ci_prod, me, one_sided)
         if ref["evaluated"]:
             assert bool(ref["pass"]) == bool(prod_pass)
         else:

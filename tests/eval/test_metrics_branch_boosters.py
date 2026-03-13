@@ -211,7 +211,7 @@ def test_analyze_spectral_and_rmt_changes_happy_and_error_paths():
     import sys
     import types
 
-    fake_spec = types.ModuleType("invarlock.guards.spectral")
+    fake_spec = types.ModuleType("invarlock.guards.spectral_measurement")
     calls = {"i": 0}
 
     def _fake_compute(*args, **kwargs):
@@ -219,18 +219,20 @@ def test_analyze_spectral_and_rmt_changes_happy_and_error_paths():
         return {"l0": 2.0} if calls["i"] == 1 else {"l0": 1.0}
 
     fake_spec.compute_spectral_norms = _fake_compute
-    with patch.dict(sys.modules, {"invarlock.guards.spectral": fake_spec}):
+    with patch.dict(sys.modules, {"invarlock.guards.spectral_measurement": fake_spec}):
         s = analyze_spectral_changes(m1, m2)
         assert s["layers_analyzed"] == 1 and s["mean_ratio"] > 0
 
     # Error path: compute_spectral_norms raises
-    fake_spec_err = types.ModuleType("invarlock.guards.spectral")
+    fake_spec_err = types.ModuleType("invarlock.guards.spectral_measurement")
 
     def _boom(*a, **k):
         raise RuntimeError("x")
 
     fake_spec_err.compute_spectral_norms = _boom
-    with patch.dict(sys.modules, {"invarlock.guards.spectral": fake_spec_err}):
+    with patch.dict(
+        sys.modules, {"invarlock.guards.spectral_measurement": fake_spec_err}
+    ):
         s_err = analyze_spectral_changes(m1, m2)
         assert s_err.get("error")
 

@@ -15,7 +15,7 @@ class OneBlock(nn.Module):
         self.transformer.h = [blk]
 
     def named_modules(self):
-        # Minimal iterator is fine; _iter_transformer_layers doesn't rely on this here
+        # Minimal iterator is fine; iter_transformer_layers doesn't rely on this here
         yield ("root", nn.ReLU())
 
 

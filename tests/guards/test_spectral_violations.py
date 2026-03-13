@@ -31,25 +31,29 @@ def test_spectral_detects_max_norm_and_ill_conditioned_with_thresholds():
 
     with (
         patch(
-            "invarlock.guards.spectral.capture_baseline_sigmas",
+            "invarlock.guards.spectral_measurement.capture_baseline_sigmas",
             lambda *a, **k: fake_sigmas,
         ),
         patch(
-            "invarlock.guards.spectral.classify_model_families",
+            "invarlock.guards.spectral_detection.classify_model_families",
             lambda *a, **k: fake_families,
         ),
         patch(
-            "invarlock.guards.spectral.compute_family_stats",
+            "invarlock.guards.spectral_detection.compute_family_stats",
             lambda *a, **k: fake_family_stats,
         ),
         patch(
-            "invarlock.guards.spectral.scan_model_gains", lambda *a, **k: {"gains": {}}
+            "invarlock.guards.spectral_measurement.scan_model_gains",
+            lambda *a, **k: {"gains": {}},
         ),
         patch(
-            "invarlock.guards.spectral._summarize_sigmas",
+            "invarlock.guards.spectral_detection.summarize_sigmas",
             lambda *a, **k: {"summary": {}},
         ),
-        patch("invarlock.guards.spectral.auto_sigma_target", lambda *a, **k: 1.23),
+        patch(
+            "invarlock.guards.spectral_measurement.auto_sigma_target",
+            lambda *a, **k: 1.23,
+        ),
     ):
         # Prepare to set internal maps
         guard.prepare(model, adapter=None, calib=None, policy={})

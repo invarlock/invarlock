@@ -32,14 +32,14 @@ def test_load_runtime_yaml_resource_files_error_returns_none(monkeypatch) -> Non
 
 
 def test_normalize_family_caps_and_multiple_testing_variants() -> None:
-    assert at._normalize_family_caps(None) == {}
+    assert at.normalize_family_caps(None) == {}
     caps = {
         "ffn": {"kappa": 2.0},
         "attn": 3.0,
         "embed": {"kappa": "not-a-number"},
         "other": {"kappa": None},
     }
-    assert at._normalize_family_caps(caps) == {
+    assert at.normalize_family_caps(caps) == {
         "ffn": {"kappa": 2.0},
         "attn": {"kappa": 3.0},
     }

@@ -108,6 +108,19 @@ pack_verify_manifest_binds_checksums() {
     return 0
 }
 
+pack_validate_manifest_schema() {
+    local pack_dir="$1"
+    local validator="${SCRIPT_DIR}/python/validate_manifest.py"
+    local out
+
+    if ! out="$(python3 "${validator}" "${pack_dir}/manifest.json" 2>&1)"; then
+        echo "ERROR: manifest.json failed contract validation." >&2
+        printf '%s\n' "${out}" >&2
+        return 1
+    fi
+    return 0
+}
+
 pack_verify_checksums() {
     local pack_dir="$1"
     local sha_cmd
@@ -325,6 +338,9 @@ pack_verify_pack() {
         return 1
     fi
 
+    if ! pack_validate_manifest_schema "${pack_dir}"; then
+        return 1
+    fi
     if ! pack_verify_gpg "${pack_dir}" "${strict}"; then
         return 1
     fi

@@ -336,6 +336,30 @@ def test_bootstrap_coverage_strict_flags_when_under_floor(monkeypatch, tmp_path)
     assert cov.get("replicates", {}).get("ok") is True
 
 
+def test_bootstrap_coverage_ignores_non_dict_auto_context() -> None:
+    runner = CoreRunner()
+    model = _toy_model_with_losses([1.0, 1.1, 0.9, 1.2])
+    adapter = DummyAdapter()
+    cfg = RunConfig(
+        context={
+            "auto": "balanced",
+            "eval": {"bootstrap": {"enabled": True, "replicates": 5}},
+        }
+    )
+
+    metrics, _ = runner._compute_real_metrics(
+        model,
+        _minimal_calibration(2),
+        adapter,
+        preview_n=1,
+        final_n=1,
+        config=cfg,
+    )
+
+    cov = metrics.get("bootstrap", {}).get("coverage", {})
+    assert cov.get("tier") == "balanced"
+
+
 def test_eval_device_override_env(monkeypatch, tmp_path):
     # Ensure INVARLOCK_EVAL_DEVICE env path is exercised (no-op on CPU-only)
     monkeypatch.setenv("INVARLOCK_EVAL_DEVICE", "cpu")

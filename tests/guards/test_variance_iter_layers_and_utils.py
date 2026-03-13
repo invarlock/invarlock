@@ -1,6 +1,7 @@
 import torch.nn as nn
 
-from invarlock.guards.variance import VarianceGuard, _iter_transformer_layers
+from invarlock.guards.variance import VarianceGuard
+from invarlock.guards.variance_scaling import iter_transformer_layers
 
 
 def test_iter_transformer_layers_decoder_and_bert_styles():
@@ -20,8 +21,8 @@ def test_iter_transformer_layers_decoder_and_bert_styles():
             self.encoder.layer[0].attn = nn.Module()
             self.encoder.layer[0].mlp = nn.Module()
 
-    decoder_layers = list(_iter_transformer_layers(DecoderLayers()))
-    bert_layers = list(_iter_transformer_layers(BERT()))
+    decoder_layers = list(iter_transformer_layers(DecoderLayers()))
+    bert_layers = list(iter_transformer_layers(BERT()))
     assert len(decoder_layers) == 1 and len(bert_layers) == 1
 
 

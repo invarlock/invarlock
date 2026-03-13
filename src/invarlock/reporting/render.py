@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import json
 import math
-from pathlib import Path
 
 # mypy: ignore-errors
 from typing import Any
 
 import yaml
+
+from invarlock.public_contracts import load_json_contract
 
 from .report_schema import validate_report
 
@@ -25,12 +26,9 @@ _CONSOLE_LABELS_DEFAULT = [
 def _load_console_labels() -> list[str]:
     """Load console labels allow-list from contracts with a safe fallback."""
     try:
-        root = Path(__file__).resolve().parents[3]
-        path = root / "contracts" / "console_labels.json"
-        if path.exists():
-            data = json.loads(path.read_text(encoding="utf-8"))
-            if isinstance(data, list) and all(isinstance(x, str) for x in data):
-                return list(data)
+        data = load_json_contract("console_labels.json")
+        if isinstance(data, list) and all(isinstance(x, str) for x in data):
+            return list(data)
     except Exception:
         pass
     return list(_CONSOLE_LABELS_DEFAULT)

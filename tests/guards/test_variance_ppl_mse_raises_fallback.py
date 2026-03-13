@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-import invarlock.guards.variance as variance_mod
+from invarlock.guards import variance_batching as variance_batching_mod
 from invarlock.guards.variance import VarianceGuard
 
 
@@ -25,7 +25,7 @@ def test_compute_ppl_for_batches_mse_exception_falls_back(monkeypatch):
     def boom(a, b):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(variance_mod.torch.nn.functional, "mse_loss", boom)
+    monkeypatch.setattr(variance_batching_mod.torch.nn.functional, "mse_loss", boom)
     ppl, loss = g._compute_ppl_for_batches(TensorOutSameShape(), [batch], device)
     # Sequence may be empty due to continue; assert call ran and returned list types
     assert isinstance(ppl, list) and isinstance(loss, list)

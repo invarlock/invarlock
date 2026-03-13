@@ -20,6 +20,13 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from invarlock.public_contracts import (
+    contract_catalog,
+    load_adapter_capabilities,
+    load_plugin_compatibility,
+    load_support_matrix,
+)
+
 from ..constants import DOCTOR_FORMAT_VERSION
 
 # Exact wording constant for determinism warning (kept in one place)
@@ -1337,6 +1344,10 @@ def doctor_command(
                 "warnings": sum(1 for f in findings if f.get("severity") == "warning"),
                 "notes": sum(1 for f in findings if f.get("severity") == "note"),
             },
+            "contracts": contract_catalog(),
+            "support_matrix": load_support_matrix(),
+            "adapter_capabilities": load_adapter_capabilities(),
+            "plugin_compatibility": load_plugin_compatibility(),
             "policy": POLICY_META
             if "POLICY_META" in globals()
             else {"tier": (tier or "balanced").lower()},

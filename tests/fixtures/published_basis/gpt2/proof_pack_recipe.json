@@ -1,0 +1,15 @@
+{
+  "format_version": "published-basis-proof-pack-recipe-v1",
+  "lane_id": "gpt2-causal-hf",
+  "suite": "subset",
+  "network_mode": "online_first_then_offline",
+  "commands": [
+    "PACK_TUNED_EDIT_PARAMS_FILE=./scripts/proof_packs/tuned_edit_params.json ./scripts/proof_packs/run_pack.sh --suite subset --net 1",
+    "./scripts/proof_packs/verify_pack.sh --pack ./proof_pack_runs/subset_<timestamp>/proof_pack --strict"
+  ],
+  "artifacts": [
+    "proof_pack/manifest.json",
+    "proof_pack/checksums.sha256",
+    "proof_pack/results/final_verdict.json"
+  ]
+}

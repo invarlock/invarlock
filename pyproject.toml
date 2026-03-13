@@ -352,6 +352,8 @@ include = [
     "src/invarlock/cli/*",
     "src/invarlock/reporting/*",
     "src/invarlock/core/*",
+    "src/invarlock/public_contracts.py",
+    "src/invarlock/policy_pack.py",
 ]
 exclude_lines = [
     "pragma: no cover",

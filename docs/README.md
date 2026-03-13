@@ -1,6 +1,6 @@
 # InvarLock Documentation
 
-The OSS core is edit‑agnostic (BYOE). A small built‑in quantization demo
+InvarLock is edit‑agnostic (BYOE). A small built‑in quantization demo
 (`quant_rtn`, 8‑bit) exists for CI/quickstart. See
 [Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md).
 
@@ -72,9 +72,9 @@ Tip: enable Hub downloads per command when fetching models/datasets:
 - [Programmatic Quickstart](reference/programmatic-quickstart.md)
 - [Environment Variables](reference/env-vars.md)
 
-<!-- Runbooks removed in minimal OSS footprint -->
+<!-- Runbooks removed in minimal public footprint -->
 
-<!-- Design docs removed in minimal OSS footprint -->
+<!-- Design docs removed in minimal public footprint -->
 
 ### Assurance
 
@@ -102,7 +102,7 @@ local or CI runs (typically under `runs/null_sweeps/**` and
 `reports/calibration/**`) and are not committed to the repository. Attach them
 to change proposals or releases when you update calibration.
 
-<!-- Developer docs removed in minimal OSS footprint. See project root CHANGELOG.md. -->
+<!-- Developer docs removed in minimal public footprint. See project root CHANGELOG.md. -->
 
 ### Security
 
@@ -161,6 +161,11 @@ Notes
 | Seq2Seq / local pairs | Yes | Yes | No | No |
 
 Published assurance basis currently covers GPT-2 and BERT profiles. Repo-shipped presets and pilot calibration configs for additional families, including Mistral 7B and Qwen2 7B, do not become part of the published assurance basis until supporting artifacts are attached.
+
+Machine-readable support metadata lives in `contracts/support_matrix.json`. It is
+the canonical source of truth for normalized support tiers
+(`published_basis`, `supported_experimental`, `community_experimental`) and for
+published-basis evidence references.
 
 ---
 
@@ -236,7 +241,7 @@ output:
 
 ---
 
-<!-- Quick CPU Demos section removed in minimal OSS footprint -->
+<!-- Quick CPU Demos section removed in minimal public footprint -->
 
 ```bash
 NET=1 INCLUDE_MEASURED_CLS=1 RUN=0 bash scripts/run_tiny_all_matrix.sh

@@ -76,3 +76,19 @@ def test_warn_adapter_family_mismatch_covers_baseline_path_branches(
     payload = copy.deepcopy(base_cert)
     payload["provenance"]["baseline"]["report_path"] = str(baseline_path)
     verify_mod._warn_adapter_family_mismatch(cert_path, payload)
+
+
+def test_warn_adapter_family_mismatch_swallows_invalid_baseline_json(
+    tmp_path: Path,
+) -> None:
+    cert_path = tmp_path / "cert.json"
+    cert_path.write_text("{}", encoding="utf-8")
+    baseline_path = tmp_path / "invalid.json"
+    baseline_path.write_text("{", encoding="utf-8")
+
+    payload = {
+        "plugins": {"adapter": {"provenance": {"family": "hf"}}},
+        "provenance": {"baseline": {"report_path": str(baseline_path)}},
+    }
+
+    verify_mod._warn_adapter_family_mismatch(cert_path, payload)

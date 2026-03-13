@@ -41,6 +41,7 @@ class OrderedGroup(TyperGroup):
             "calibrate",
             "report",
             "verify",
+            "policy",
             "run",
             "plugins",
             "doctor",
@@ -230,10 +231,12 @@ def _register_subapps() -> None:
     # Import sub-apps lazily to keep module import light and satisfy E402
     from .commands.doctor import doctor_command as _doctor_cmd
     from .commands.plugins import plugins_app as _plugins_app
+    from .commands.policy import policy_app as _policy_app
     from .commands.report import report_app as _report_app
 
     # Always-available subapps (lightweight imports)
     app.add_typer(_report_app, name="report")
+    app.add_typer(_policy_app, name="policy")
     app.add_typer(_plugins_app, name="plugins")
     app.command(name="doctor")(_doctor_cmd)
 

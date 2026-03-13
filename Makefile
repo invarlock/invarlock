@@ -36,13 +36,14 @@ coverage:  ## Run tests with coverage and generate XML
 	PYTHONPATH=src $(PYTEST) -q \
 		tests/core tests/guards tests/reporting tests/cli/run tests/cli/test_run_*.py tests/calibration tests/scripts \
 		tests/cli/test_run_command_*.py tests/cli/test_config_failfast.py tests/cli/test_error_codes.py \
-		tests/cli/test_verify*.py tests/cli/test_cli_command_help_smoke.py \
+		tests/cli/test_verify*.py tests/cli/test_cli_command_help_smoke.py tests/cli/test_policy_commands.py \
 		tests/cli/test_calibrate_harness_artifacts.py tests/cli/test_determinism_preset.py tests/cli/test_json_helpers.py \
 		tests/cli/test_config.py tests/cli/test_config_more.py tests/cli/test_config_runtime_loader.py tests/cli/test_config_schema_and_loader.py \
 		tests/eval/test_metrics*.py tests/eval/test_report*.py tests/eval/test_validate_module.py tests/eval/test_baseline_artifacts.py tests/eval/test_bench.py tests/eval/test_primary_metric*.py \
 		tests/eval/test_determinism.py tests/eval/test_mask_parity_fail.py \
 		--cov=src/invarlock/eval --cov=src/invarlock/guards --cov=src/invarlock/calibration \
 		--cov=src/invarlock/cli --cov=src/invarlock/core --cov=src/invarlock/reporting \
+		--cov=invarlock.public_contracts --cov=invarlock.policy_pack \
 		--cov-branch \
 		--cov-report=term --cov-report=xml:reports/cov.xml --cov-fail-under=80
 
@@ -84,9 +85,14 @@ test-assurance:  ## Run assurance-related tests only
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTEST) -q \
 		tests/api/test_assurance_facade.py \
+		tests/ci/test_golden_runs_offline.py \
+		tests/ci/test_support_matrix_consistency.py \
+		tests/adapters/test_adapter_capability_contract.py \
 		tests/eval/test_assurance_contracts.py \
 		tests/docs/test_claim_surface_consistency.py \
 		tests/docs/test_assurance_xref_linter.py \
+		tests/reporting/test_public_contracts.py \
+		tests/reporting/test_policy_pack_contract.py \
 		tests/reporting/test_policy_utils.py::test_compute_policy_digest_matches_assurance_spec
 
 lint:  ## Run linting
@@ -128,7 +134,7 @@ deepclean: ## Remove all generated artifacts, caches, and run outputs (destructi
 	rm -rf \
 		build/ dist/ *.egg-info .eggs/ \
 		site/ \
-		data/ contracts/ \
+		data/ \
 		node_modules/ \
 		reports/ reports_*/ reports_report/ \
 		runs/ runs_cfg/ run1/ run2/ \
