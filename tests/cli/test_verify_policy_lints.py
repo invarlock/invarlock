@@ -53,7 +53,7 @@ def _base_cert() -> dict:
     }
 
 
-def test_verify_profile_lints_equals_gte_lte(tmp_path: Path, capsys) -> None:
+def test_verify_policy_lints_equals_gte_lte(tmp_path: Path, capsys) -> None:
     # Passing lints
     cert_ok = _base_cert()
     cert_ok["meta"]["model_profile"] = {
