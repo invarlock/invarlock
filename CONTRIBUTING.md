@@ -172,9 +172,10 @@ Key points:
   ```
 
 - `make coverage` intentionally includes the core/guards/reporting/calibration suites,
-  the split run/verify/config coverage set, and targeted CLI command suites for
-  `doctor`, `plugins`, `evaluate`, `report`, `export-html`, `app`, `device`, and
-  `explain-gates` so the project-wide floor reflects the real command surface.
+  the split run/verify/config coverage set, targeted CLI command suites, and a
+  handful of direct helper tests (for example adapter auto-resolution, no-color
+  console handling, and guard-overhead extraction) so the project-wide floor
+  reflects the real command surface instead of only the split core paths.
 
 - The project-wide floor is enforced at **85%** via pytest-cov in `make coverage`.
 
