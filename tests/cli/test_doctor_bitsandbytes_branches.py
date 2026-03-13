@@ -10,7 +10,7 @@ import typer
 from rich.console import Console
 
 from invarlock.cli.commands import doctor as doctor_mod
-from tests.cli.test_doctor_additional import (
+from tests.cli.test_doctor_preflight_and_cross_checks import (
     DummyConsole,
     _install_fake_torch,
     _patch_minimal_doctor_env,

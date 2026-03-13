@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import builtins
+import importlib.machinery
 import io
 import json
 import sys
@@ -24,6 +25,7 @@ class DummyConsole:
 
 def _install_fake_torch(monkeypatch, *, cuda_available: bool) -> None:
     torch_mod = types.ModuleType("torch")
+    torch_mod.__spec__ = importlib.machinery.ModuleSpec("torch", loader=None)
 
     class FakeProps:
         def __init__(self, total_memory=8 * 1e9, name="FakeGPU"):
