@@ -46,6 +46,7 @@ THRESHOLDS = {
     "src/invarlock/public_contracts.py": 1.00,
     "src/invarlock/policy_pack.py": 1.00,
     "src/invarlock/cli/verify_output.py": 1.00,
+    "src/invarlock/cli/commands/policy.py": 1.00,
     "src/invarlock/core/runner_lifecycle.py": 1.00,
     "src/invarlock/core/runner_pairing.py": 1.00,
     "src/invarlock/core/runner_services.py": 1.00,
@@ -54,8 +55,10 @@ THRESHOLDS = {
     "src/invarlock/guards/spectral_policy.py": 1.00,
     "src/invarlock/guards/spectral_results.py": 1.00,
     "src/invarlock/guards/spectral_selection.py": 1.00,
+    "src/invarlock/guards/spectral_analysis.py": 1.00,
     # Numerical / mutation / tensor-processing helpers.
     "src/invarlock/core/runner_context.py": 0.95,
+    "src/invarlock/core/runner_eval_phase.py": 0.95,
     "src/invarlock/core/runner_latency.py": 0.95,
     "src/invarlock/core/runner_eval_windows.py": 0.95,
     "src/invarlock/guards/variance_batching.py": 0.95,
@@ -65,7 +68,6 @@ THRESHOLDS = {
     "src/invarlock/guards/variance_scaling.py": 0.95,
     "src/invarlock/guards/invariants.py": 0.90,
     "src/invarlock/guards/spectral_control.py": 0.95,
-    "src/invarlock/guards/spectral_analysis.py": 0.90,
     "src/invarlock/guards/spectral_measurement.py": 0.95,
     "src/invarlock/guards/rmt.py": 0.90,
     "src/invarlock/guards/policies.py": 0.90,
@@ -87,8 +89,7 @@ THRESHOLDS = {
     "src/invarlock/cli/commands/run.py": 0.90,
     "src/invarlock/cli/commands/verify.py": 0.90,
     "src/invarlock/cli/commands/calibrate.py": 0.90,
-    "src/invarlock/cli/commands/policy.py": 0.90,
-    "src/invarlock/cli/verify_checks.py": 0.90,
+    "src/invarlock/cli/verify_checks.py": 0.95,
     # PR-4 split modules
     "src/invarlock/cli/run_analysis.py": 0.90,
     "src/invarlock/cli/run_artifacts.py": 0.90,
@@ -101,6 +102,9 @@ THRESHOLDS = {
     # Core events logger
     "src/invarlock/core/events.py": 0.90,
     # PR-5 split modules
+    "src/invarlock/core/runner_eval_metrics.py": 0.90,
+    "src/invarlock/core/runner_finalize.py": 0.90,
+    "src/invarlock/core/runner_guards.py": 0.90,
     "src/invarlock/reporting/report_overhead.py": 0.90,
     "src/invarlock/reporting/report_policy.py": 0.90,
     "src/invarlock/reporting/report_provenance.py": 0.90,
