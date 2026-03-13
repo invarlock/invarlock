@@ -114,6 +114,15 @@
     "standardised",
     "matvec",
     "unprofiled",
-    "ungated"
+    "ungated",
+    "Thresholding",
+    "Typer",
+    "evals",
+    "lifecycles",
+    "psutil",
+    "Sigstore",
+    "exploitability",
+    "backdoored",
+    "safetensors"
   ]
 }
