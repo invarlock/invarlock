@@ -367,7 +367,7 @@ def main() -> int:
 
     summary = (
         f"Coverage OK: {len(THRESHOLDS)}/{len(THRESHOLDS)} files met per-file thresholds. "
-        "Project floor (80%) enforced via pytest."
+        "Project floor enforced via pytest."
     )
     print(summary)
     return 0

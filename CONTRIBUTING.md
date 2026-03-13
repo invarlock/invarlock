@@ -169,16 +169,14 @@ Key points:
 
   ```bash
   make coverage
-  # or,
-  pytest -q \\
-    --cov=src/invarlock/eval --cov=src/invarlock/guards \\
-    --cov=src/invarlock/cli --cov=src/invarlock/core --cov=src/invarlock/reporting \\
-    --cov-branch \\
-    --cov-report=term --cov-report=xml:reports/cov.xml \
-    --cov-fail-under=80
   ```
 
-- The project-wide floor is enforced at **80%** via pytest-cov in `make coverage`.
+- `make coverage` intentionally includes the core/guards/reporting/calibration suites,
+  the split run/verify/config coverage set, and targeted CLI command suites for
+  `doctor`, `plugins`, `evaluate`, `report`, `export-html`, `app`, `device`, and
+  `explain-gates` so the project-wide floor reflects the real command surface.
+
+- The project-wide floor is enforced at **85%** via pytest-cov in `make coverage`.
 
 - Enforce thresholds:
 
