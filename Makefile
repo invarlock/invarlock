@@ -12,6 +12,20 @@ COVERAGE := $(PYTHON) -m coverage
 MKDOCS := $(PYTHON) -m mkdocs
 PRE_COMMIT := $(PYTHON) -m pre_commit
 
+# Keep repo-wide coverage practical while still exercising the large CLI command
+# surfaces that were depressing the global floor.
+COVERAGE_TESTS := \
+	tests/core tests/guards tests/reporting tests/cli/run tests/cli/test_run_*.py tests/calibration tests/scripts \
+	tests/cli/test_run_command_*.py tests/cli/test_config_failfast.py tests/cli/test_error_codes.py \
+	tests/cli/test_verify*.py tests/cli/test_cli_command_help_smoke.py tests/cli/test_policy_commands.py \
+	tests/cli/test_calibrate_harness_artifacts.py tests/cli/test_determinism_preset.py tests/cli/test_json_helpers.py \
+	tests/cli/test_config.py tests/cli/test_config_more.py tests/cli/test_config_runtime_loader.py tests/cli/test_config_schema_and_loader.py \
+	tests/eval/test_metrics*.py tests/eval/test_report*.py tests/eval/test_validate_module.py tests/eval/test_baseline_artifacts.py tests/eval/test_bench.py tests/eval/test_primary_metric*.py \
+	tests/eval/test_determinism.py tests/eval/test_mask_parity_fail.py \
+	tests/cli/test_doctor*.py tests/cli/test_plugins*.py tests/cli/test_evaluate*.py tests/cli/test_export_html*.py \
+	tests/cli/test_app*.py tests/cli/test_device.py tests/cli/test_config_and_device.py tests/cli/test_explain_gates*.py \
+	tests/cli/test_report*.py
+
 help:  ## Show this help message
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
@@ -33,19 +47,12 @@ test:  ## Run tests
 coverage:  ## Run tests with coverage and generate XML
 	$(MAKE) ensure-python
 	$(COVERAGE) erase
-	PYTHONPATH=src $(PYTEST) -q \
-		tests/core tests/guards tests/reporting tests/cli/run tests/cli/test_run_*.py tests/calibration tests/scripts \
-		tests/cli/test_run_command_*.py tests/cli/test_config_failfast.py tests/cli/test_error_codes.py \
-		tests/cli/test_verify*.py tests/cli/test_cli_command_help_smoke.py tests/cli/test_policy_commands.py \
-		tests/cli/test_calibrate_harness_artifacts.py tests/cli/test_determinism_preset.py tests/cli/test_json_helpers.py \
-		tests/cli/test_config.py tests/cli/test_config_more.py tests/cli/test_config_runtime_loader.py tests/cli/test_config_schema_and_loader.py \
-		tests/eval/test_metrics*.py tests/eval/test_report*.py tests/eval/test_validate_module.py tests/eval/test_baseline_artifacts.py tests/eval/test_bench.py tests/eval/test_primary_metric*.py \
-		tests/eval/test_determinism.py tests/eval/test_mask_parity_fail.py \
+	PYTHONPATH=src $(PYTEST) -q $(COVERAGE_TESTS) \
 		--cov=src/invarlock/eval --cov=src/invarlock/guards --cov=src/invarlock/calibration \
 		--cov=src/invarlock/cli --cov=src/invarlock/core --cov=src/invarlock/reporting \
 		--cov=invarlock.public_contracts --cov=invarlock.policy_pack \
 		--cov-branch \
-		--cov-report=term --cov-report=xml:reports/cov.xml --cov-fail-under=80
+		--cov-report=term --cov-report=xml:reports/cov.xml --cov-fail-under=85
 
 coverage-enforce:  ## Run coverage and enforce per-file thresholds
 	$(MAKE) coverage
