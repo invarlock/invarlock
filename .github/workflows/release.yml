@@ -118,6 +118,7 @@ jobs:
         with:
           packages-dir: dist
           repository-url: ${{ steps.vars.outputs.publish_repository_url }}
+          skip-existing: true
 
   testpypi_smoke:
     needs: publish
@@ -190,7 +191,7 @@ jobs:
 
           mapfile -t signing_assets < <(
             find dist -maxdepth 1 -type f \
-              \( -name '*.sigstore' -o -name '*.crt' -o -name '*.sig' -o -name '*.pem' \)
+              \( -name '*.sigstore' -o -name '*.sigstore.json' -o -name '*.crt' -o -name '*.sig' -o -name '*.pem' \)
           )
           if [ ${#signing_assets[@]} -eq 0 ]; then
             echo "No Sigstore signing artifacts found in dist/" >&2

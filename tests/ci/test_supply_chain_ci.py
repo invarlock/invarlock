@@ -171,6 +171,7 @@ def test_release_workflow_uses_trusted_publishing():
     assert "password" not in step_with
     assert step_with["packages-dir"] == "dist"
     assert "steps.vars.outputs.publish_repository_url" in step_with["repository-url"]
+    assert step_with["skip-existing"] is True
 
 
 def test_release_workflow_builds_and_bundles_release_assets():
@@ -202,6 +203,7 @@ def test_release_workflow_builds_and_bundles_release_assets():
     assert sigstore_step["with"]["upload-signing-artifacts"] is True
 
     release_step = _find_step_by_name(bundle_steps, "Create or update GitHub release")
+    assert "*.sigstore.json" in release_step["run"]
     assert "gh release create" in release_step["run"]
     assert "gh release upload" in release_step["run"]
     assert "release-assets/*" in release_step["run"]
