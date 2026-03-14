@@ -22,6 +22,23 @@ def _measurement_contract_digest(contract: Any) -> str | None:
     return hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
 
+def _baseline_guard_payload(baseline: Any, guard_name: str) -> dict[str, Any]:
+    """Return baseline guard payload from either an evaluation report or run report."""
+    if not isinstance(baseline, dict):
+        return {}
+    block = baseline.get(guard_name)
+    if isinstance(block, dict) and block:
+        return block
+    for guard in baseline.get("guards", []) or []:
+        if str(guard.get("name", "")).lower() != guard_name:
+            continue
+        metrics = guard.get("metrics")
+        if isinstance(metrics, dict) and metrics:
+            return metrics
+        return {}
+    return {}
+
+
 @no_type_check
 def _extract_invariants(
     report: RunReport, baseline: RunReport | None = None
@@ -358,9 +375,7 @@ def _extract_spectral_analysis(
 
     baseline_max = None
     baseline_mean = None
-    baseline_spectral = (
-        baseline.get("spectral", {}) if isinstance(baseline, dict) else {}
-    )
+    baseline_spectral = _baseline_guard_payload(baseline, "spectral")
     if isinstance(baseline_spectral, dict) and baseline_spectral:
         baseline_max = baseline_spectral.get(
             "max_spectral_norm", baseline_spectral.get("max_spectral_norm_final")
@@ -837,7 +852,7 @@ def _extract_rmt_analysis(
     except Exception:
         pass
 
-    baseline_rmt = baseline.get("rmt", {}) if isinstance(baseline, dict) else {}
+    baseline_rmt = _baseline_guard_payload(baseline, "rmt")
     baseline_edge_by_family: dict[str, float] = {}
     baseline_contract = None
     if isinstance(baseline_rmt, dict) and baseline_rmt:
@@ -916,7 +931,7 @@ def _extract_rmt_analysis(
             )
             allowed = (1.0 + eps) * base
             if cur > allowed:
-                delta = (cur / base) - 1.0 if base > 0 else float("inf")
+                delta = (cur / base) - 1.0
                 epsilon_violations.append(
                     {
                         "family": family,
@@ -992,6 +1007,15 @@ def _extract_rmt_analysis(
         result["policy"] = policy_out
     if measurement_contract is not None:
         result["measurement_contract"] = measurement_contract
+    mode = None
+    if isinstance(measurement_contract, dict):
+        raw_mode = measurement_contract.get("kind")
+        if isinstance(raw_mode, str) and raw_mode.strip():
+            mode = raw_mode.strip()
+    if mode is None and result["evaluated"]:
+        mode = "activation_edge_risk"
+    if mode is not None:
+        result["mode"] = mode
     if mc_hash:
         result["measurement_contract_hash"] = mc_hash
     if baseline_hash:

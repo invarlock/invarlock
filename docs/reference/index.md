@@ -12,6 +12,7 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 | [Configuration Schema](config-schema.md) | YAML config structure and precedence | CLI users |
 | [Guards](guards.md) | Safety check configuration and evidence | Users tuning guards |
 | [Model Adapters](model-adapters.md) | Adapter selection and capabilities | CLI and API users |
+| [Public Contracts](contracts.md) | Stable public contracts for reports, verification, and policy artifacts | Tool authors, reviewers |
 | [Datasets](datasets.md) | Dataset providers and pairing | CLI users |
 | [reports](reports.md) | v1 schema, telemetry, and HTML export | Operators, tool authors |
 | [Architecture](architecture.md) | System layers, data flow, and dependencies | Builders, reviewers |
@@ -28,6 +29,7 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 2. [Configuration Schema](config-schema.md) — YAML presets and profiles
 3. [Datasets](datasets.md) — Provider configuration
 4. [Model Adapters](model-adapters.md) — Adapter selection
+5. [Public Contracts](contracts.md) — Machine-readable trust contracts
 
 ### Understanding reports
 
@@ -46,7 +48,8 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 1. [API Guide](api-guide.md) — `CoreRunner.execute` and helpers
 2. [Programmatic Quickstart](programmatic-quickstart.md) — Minimal examples
 3. [Architecture](architecture.md) — System layers and data flow
-4. [Observability](observability.md) — Monitoring infrastructure
+4. [Public Contracts](contracts.md) — Evidence and policy contract surfaces
+5. [Observability](observability.md) — Monitoring infrastructure
 
 ### Operations
 
@@ -57,5 +60,5 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 ## Related Documentation
 
 - [User Guide](../user-guide/getting-started.md) — Task-oriented workflows
-- [Assurance](../assurance/00-safety-case.md) — Safety claims and proofs
+- [Assurance](../assurance/00-assurance-case.md) — Assurance claims and derivations
 - [Security](../security/pip-audit-allowlist.md) — Security policies

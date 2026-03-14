@@ -2,7 +2,8 @@ import pytest
 import torch
 import torch.nn as nn
 
-from invarlock.guards.spectral import apply_weight_rescale, auto_sigma_target
+from invarlock.guards.spectral_control import apply_weight_rescale
+from invarlock.guards.spectral_measurement import auto_sigma_target
 
 
 def test_apply_weight_rescale_scales_linear_modules() -> None:

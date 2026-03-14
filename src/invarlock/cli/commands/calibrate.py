@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
@@ -66,6 +67,18 @@ def _dump_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         writer.writeheader()
         for row in rows:
             writer.writerow(row)
+
+
+def _mark_calibration_context(cfg: dict[str, Any]) -> None:
+    context = cfg.setdefault("context", {})
+    if not isinstance(context, dict):
+        context = {}
+        cfg["context"] = context
+    run_context = context.setdefault("run", {})
+    if not isinstance(run_context, dict):
+        run_context = {}
+        context["run"] = run_context
+    run_context["skip_overhead_check"] = True
 
 
 def _materialize_sweep_specs(
@@ -206,6 +219,7 @@ def null_sweep(
 
     for spec in specs:
         cfg = json.loads(json.dumps(base))  # safe deep copy without yaml anchors
+        _mark_calibration_context(cfg)
         cfg.setdefault("dataset", {})["seed"] = int(spec.seed)
         cfg.setdefault("auto", {})["tier"] = spec.tier
 
@@ -279,7 +293,7 @@ def null_sweep(
                 continue
             max_z = vals.get("max")
             try:
-                if max_z is not None and max_z == max_z:
+                if max_z is not None and not math.isnan(float(max_z)):
                     row[f"max_z_{fam}"] = float(max_z)
             except Exception:
                 continue
@@ -446,6 +460,7 @@ def ve_sweep(
     for spec in specs:
         win = int(spec.windows or 0)
         cfg = json.loads(json.dumps(base))  # safe deep copy without yaml anchors
+        _mark_calibration_context(cfg)
         cfg.setdefault("dataset", {})["seed"] = int(spec.seed)
         cfg.setdefault("auto", {})["tier"] = spec.tier
         # Keep edit deterministic when it supports a seed knob.

@@ -16,7 +16,7 @@ Options:
   --net 1|0            Enable network access for preflight/downloads (default: 0)
   --out DIR            Output directory for the run (default: ./proof_pack_runs/<suite>_<timestamp>)
   --pack-dir DIR       Output directory for the proof pack (default: <out>/proof_pack)
-  --layout NAME        Pack layout (v1|v2) (default: v1)
+  --layout NAME        Pack layout (v2 only) (default: v2)
   --determinism MODE   Determinism mode (strict|throughput)
   --repeats N          Determinism repeat count metadata (default: 0)
   --scenario-ids IDS   Comma-separated scenario IDs to include (filters scenarios.json before queue generation)
@@ -42,6 +42,24 @@ pack_sha256_cmd() {
     else
         echo "shasum -a 256"
     fi
+}
+
+pack_normalize_layout() {
+    local layout="${1:-v2}"
+    case "${layout}" in
+        ""|v2)
+            echo "v2"
+            return 0
+            ;;
+        v1|flat|legacy)
+            echo "ERROR: Legacy pack layout '${layout}' is no longer supported; use v2." >&2
+            return 2
+            ;;
+        *)
+            echo "ERROR: Unknown pack layout: ${layout} (expected v2)" >&2
+            return 2
+            ;;
+    esac
 }
 
 pack_copy_file() {
@@ -315,7 +333,7 @@ This proof pack bundles reports, summary reports, and metadata for offline
 verification. No model weights are included.
 
 By default this is evidence-grade packaging. For proof-grade attestation,
-require a signed manifest and strict verification.
+require a signed manifest, strict verification, and a PASS final verdict.
 
 ## Verify
 
@@ -358,31 +376,14 @@ pack_build_pack() {
 
     mkdir -p "${pack_dir}"
 
-    local layout="${PACK_PACK_LAYOUT:-v1}"
-    case "${layout}" in
-        v2|enhanced)
-            layout="v2"
-            ;;
-        v1|flat|legacy|"")
-            layout="v1"
-            ;;
-        *)
-            echo "ERROR: Unknown pack layout: ${layout} (expected v1|v2)" >&2
-            return 2
-            ;;
-    esac
+    local layout
+    layout="$(pack_normalize_layout "${PACK_PACK_LAYOUT:-v2}")" || return $?
 
     local results_dir="${pack_dir}/results"
-    local verdicts_dir="${results_dir}"
-    local analysis_dir="${results_dir}"
-    local revisions_dest="${pack_dir}/state/model_revisions.json"
-    local scenarios_dest="${pack_dir}/state/scenarios.json"
-    if [[ "${layout}" == "v2" ]]; then
-        verdicts_dir="${results_dir}/verdicts"
-        analysis_dir="${results_dir}/analysis"
-        revisions_dest="${pack_dir}/metadata/model_revisions.json"
-        scenarios_dest="${pack_dir}/metadata/scenarios.json"
-    fi
+    local verdicts_dir="${results_dir}/verdicts"
+    local analysis_dir="${results_dir}/analysis"
+    local revisions_dest="${pack_dir}/metadata/model_revisions.json"
+    local scenarios_dest="${pack_dir}/metadata/scenarios.json"
 
     mkdir -p "${results_dir}" "${verdicts_dir}" "${analysis_dir}"
 
@@ -430,14 +431,12 @@ pack_build_pack() {
     else
         sign_rc=$?
     fi
-    if [[ "${layout}" == "v2" ]]; then
-        mkdir -p "${pack_dir}/metadata"
-        cp "${pack_dir}/manifest.json" "${pack_dir}/metadata/manifest.json"
-        if [[ -f "${pack_dir}/manifest.json.asc" ]]; then
-            cp "${pack_dir}/manifest.json.asc" "${pack_dir}/metadata/manifest.json.asc"
-        fi
-        cp "${pack_dir}/checksums.sha256" "${pack_dir}/metadata/checksums.sha256"
+    mkdir -p "${pack_dir}/metadata"
+    cp "${pack_dir}/manifest.json" "${pack_dir}/metadata/manifest.json"
+    if [[ -f "${pack_dir}/manifest.json.asc" ]]; then
+        cp "${pack_dir}/manifest.json.asc" "${pack_dir}/metadata/manifest.json.asc"
     fi
+    cp "${pack_dir}/checksums.sha256" "${pack_dir}/metadata/checksums.sha256"
 
     if [[ "${verify_rc}" -eq 0 && "${sign_rc}" -ne 0 ]]; then
         return "${sign_rc}"
@@ -457,7 +456,7 @@ pack_run_pack() {
     local suite_mode="${PACK_SUITE_MODE:-full}"
     local resume_flag="${RESUME_FLAG:-false}"
     local pack_dir="${PACK_DIR:-}"
-    local layout="${PACK_PACK_LAYOUT:-v1}"
+    local layout="${PACK_PACK_LAYOUT:-v2}"
     local scenario_ids="${PACK_SCENARIO_IDS:-}"
 
     while [[ $# -gt 0 ]]; do
@@ -604,6 +603,7 @@ pack_run_pack() {
     fi
 
     pack_entrypoint "${run_args[@]}"
+    layout="$(pack_normalize_layout "${layout}")" || return $?
     PACK_PACK_LAYOUT="${layout}"
     export PACK_PACK_LAYOUT
 

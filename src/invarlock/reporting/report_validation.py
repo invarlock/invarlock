@@ -4,7 +4,18 @@ from __future__ import annotations
 
 import math
 import os
+from collections.abc import Callable
 from typing import Any
+
+GetTierPoliciesFn = Callable[[], dict[str, Any]]
+
+
+def _coerce_finite_float(value: Any) -> float | None:
+    try:
+        coerced = float(value)
+    except (TypeError, ValueError):
+        return None
+    return coerced if math.isfinite(coerced) else None
 
 
 def compute_validation_flags(
@@ -25,12 +36,16 @@ def compute_validation_flags(
     tiny_relax: bool = False,
     *,
     pm_drift_band_default: tuple[float, float] = (0.95, 1.05),
-    get_tier_policies_fn: Any | None = None,
+    get_tier_policies_fn: GetTierPoliciesFn | None = None,
 ) -> dict[str, bool]:
     """Compute validation flags for the evaluation report including canonical gates."""
 
     if get_tier_policies_fn is None:
-        from invarlock.core.auto_tuning import get_tier_policies as get_tier_policies_fn
+        from invarlock.core.auto_tuning import get_tier_policies
+
+        tier_policies_fn: GetTierPoliciesFn = get_tier_policies
+    else:
+        tier_policies_fn = get_tier_policies_fn
 
     tier = (tier or "balanced").lower()
     if not tiny_relax:
@@ -52,7 +67,7 @@ def compute_validation_flags(
         "aggressive": 1.20,
         "none": 1.10,
     }
-    tier_policies = get_tier_policies_fn()
+    tier_policies = tier_policies_fn()
     tier_policy = tier_policies.get(tier, tier_policies.get("balanced", {}))
     metrics_policy = (
         tier_policy.get("metrics", {}) if isinstance(tier_policy, dict) else {}
@@ -60,34 +75,21 @@ def compute_validation_flags(
     pm_policy = (
         metrics_policy.get("pm_ratio", {}) if isinstance(metrics_policy, dict) else {}
     )
-    ratio_limit_base = pm_policy.get("ratio_limit_base")
-    try:
-        if ratio_limit_base is not None:
-            ratio_limit_base = float(ratio_limit_base)
-    except Exception:
-        ratio_limit_base = None
-    if not isinstance(ratio_limit_base, (int | float)) or not math.isfinite(
-        float(ratio_limit_base)
-    ):
+    ratio_limit_base = _coerce_finite_float(pm_policy.get("ratio_limit_base"))
+    if ratio_limit_base is None:
         ratio_limit_base = float(tier_thresholds.get(tier, 1.10))
     acceptance = pm_acceptance_range if isinstance(pm_acceptance_range, dict) else {}
     ratio_min_bound = None
     ratio_max_bound = None
-    try:
-        if acceptance.get("min") is not None:
-            ratio_min_bound = float(acceptance.get("min"))
-    except Exception:
-        ratio_min_bound = None
-    try:
-        if acceptance.get("max") is not None:
-            ratio_max_bound = float(acceptance.get("max"))
-    except Exception:
-        ratio_max_bound = None
+    acceptance_min = _coerce_finite_float(acceptance.get("min"))
+    if acceptance_min is not None:
+        ratio_min_bound = acceptance_min
+    acceptance_max = _coerce_finite_float(acceptance.get("max"))
+    if acceptance_max is not None:
+        ratio_max_bound = acceptance_max
 
     ratio_limit = (
-        ratio_max_bound
-        if isinstance(ratio_max_bound, (int | float)) and math.isfinite(ratio_max_bound)
-        else float(ratio_limit_base)
+        ratio_max_bound if ratio_max_bound is not None else float(ratio_limit_base)
     )
     if isinstance(target_ratio, int | float) and target_ratio > 0:
         ratio_limit = min(ratio_limit, float(target_ratio))
@@ -140,11 +142,11 @@ def compute_validation_flags(
     if isinstance(_ppl_metrics, dict):
         pt = _ppl_metrics.get("preview_total_tokens")
         ft = _ppl_metrics.get("final_total_tokens")
-        has_pt = isinstance(pt, int | float) and math.isfinite(float(pt))
-        has_ft = isinstance(ft, int | float) and math.isfinite(float(ft))
-        if has_pt and has_ft and min_tokens > 0:
+        pt_value = _coerce_finite_float(pt)
+        ft_value = _coerce_finite_float(ft)
+        if pt_value is not None and ft_value is not None and min_tokens > 0:
             try:
-                total_tokens = int(pt) + int(ft)
+                total_tokens = int(pt_value) + int(ft_value)
                 # Dataset-scale aware floors: use fraction of available tokens when provided
                 eff_min_tokens = max(0, int(min_tokens))
                 try:
@@ -263,15 +265,13 @@ def compute_validation_flags(
         else:
             ratio = guard_overhead.get("overhead_ratio")
             threshold = guard_overhead.get("overhead_threshold", 0.01)
-            try:
-                ratio_val = float(ratio)
-                threshold_val = float(threshold)
-            except (TypeError, ValueError):
-                ratio_val = float("nan")
+            ratio_val = _coerce_finite_float(ratio)
+            threshold_val = _coerce_finite_float(threshold)
+            if threshold_val is None:
                 threshold_val = 0.01
             if tiny_relax and threshold_val < 0.10:
                 threshold_val = 0.10
-            if not math.isfinite(ratio_val):
+            if ratio_val is None:
                 # In dev/Compare-&-Evaluate flows we often lack a bare run; treat missing metric as pass
                 guard_overhead_pass = True
             else:

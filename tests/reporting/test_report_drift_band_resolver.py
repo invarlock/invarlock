@@ -3,7 +3,7 @@ import pytest
 from invarlock.reporting import report_builder as cert
 
 
-def test_resolve_pm_drift_band_from_report_branches(monkeypatch):
+def test_resolve_pm_drift_band_from_report_paths(monkeypatch):
     monkeypatch.delenv("INVARLOCK_PM_DRIFT_MIN", raising=False)
     monkeypatch.delenv("INVARLOCK_PM_DRIFT_MAX", raising=False)
 

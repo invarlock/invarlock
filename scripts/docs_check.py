@@ -28,7 +28,7 @@ def run(cmd: list[str]) -> tuple[int, str]:
 
 
 def check_build() -> None:
-    code, out = run(["mkdocs", "build", "--strict"])
+    code, out = run([sys.executable, "-m", "mkdocs", "build", "--strict"])
     print(out, end="")
     if code != 0:
         raise SystemExit(code)
@@ -85,6 +85,7 @@ def check_consistency() -> None:
     checks = [
         "scripts/check_version_consistency.py",
         "scripts/check_cli_completeness.py",
+        "scripts/check_claim_surface_consistency.py",
         "scripts/check_config_schema_sync.py",
         "scripts/check_guard_completeness.py",
         "scripts/lint_assurance_xrefs.py",

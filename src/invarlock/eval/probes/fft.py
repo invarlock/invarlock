@@ -11,6 +11,10 @@ import torch
 import torch.nn as nn
 
 
+def _call_model(model: nn.Module, /, *args: Any, **kwargs: Any) -> Any:
+    return model(*args, **kwargs)
+
+
 def compute_head_energy_scores(
     model: nn.Module,
     calib_data: Any,
@@ -81,7 +85,7 @@ def compute_head_energy_scores(
                 input_ids = input_ids.to(device)
 
                 # Forward pass to collect attention
-                _ = model(input_ids, output_attentions=True)
+                _ = _call_model(model, input_ids, output_attentions=True)
 
                 # Compute FFT energy for each head
                 for layer_idx, attn_weights in attention_outputs.items():

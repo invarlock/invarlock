@@ -65,6 +65,7 @@ def test_plugins_adapters_json_disabled_discovery():
     import json as _json
 
     payload = _json.loads(res.output)
-    assert payload.get("kind") == "adapters"
+    assert payload.get("category") == "adapters"
+    assert "kind" not in payload
     assert payload.get("items") == []
     assert payload.get("discovery") == "disabled"

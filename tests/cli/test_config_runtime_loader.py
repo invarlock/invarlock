@@ -30,9 +30,9 @@ def test_apply_profile_unknown_raises():
 
 
 def test_resolve_edit_kind_positive():
-    assert resolve_edit_kind("prune") == "quant_rtn"
-    assert resolve_edit_kind("quant") == "quant_rtn"
-    assert resolve_edit_kind("mixed") == "orchestrator"
+    assert resolve_edit_kind("quant_rtn") == "quant_rtn"
+    assert resolve_edit_kind("noop") == "noop"
+    assert resolve_edit_kind("orchestrator") == "orchestrator"
 
 
 def test_apply_profile_runtime_profile_success(tmp_path: Path, monkeypatch):

@@ -7,6 +7,7 @@ stacks unless needed. Accessing adapter classes triggers on-demand import.
 from __future__ import annotations
 
 import importlib as _importlib
+from typing import TYPE_CHECKING
 from typing import Any as _Any
 
 from invarlock.core.abi import INVARLOCK_CORE_ABI as INVARLOCK_CORE_ABI
@@ -35,6 +36,13 @@ _LAZY_MAP = {
     "HF_Causal_ONNX_Adapter": ".hf_causal_onnx",
     "HF_Auto_Adapter": ".auto",
 }
+
+if TYPE_CHECKING:  # pragma: no cover - typing aid for lazy exports
+    from .auto import HF_Auto_Adapter
+    from .hf_causal import HF_Causal_Adapter
+    from .hf_causal_onnx import HF_Causal_ONNX_Adapter
+    from .hf_mlm import HF_MLM_Adapter
+    from .hf_seq2seq import HF_Seq2Seq_Adapter
 
 
 def __getattr__(name: str) -> _Any:  # pragma: no cover - simple lazy import

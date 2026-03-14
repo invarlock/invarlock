@@ -133,16 +133,16 @@ The markdown report is structured to highlight evaluation outcomes first:
 | report block | Sourced from report | Verify checks |
 | --- | --- | --- |
 | `meta` | `report.meta` | Schema only. |
-| `dataset` / `evaluation_windows` | `report.data`, `report.dataset.windows.stats` | Pairing + count checks. |
+| `dataset` / `evaluation_windows` | `report.data`, `report.dataset.windows.stats` | Pairing + count checks; `dataset.hash.source` records whether hashes came from explicit preview/final hashes, explicit token IDs, or config fallback. |
 | `primary_metric` | `report.metrics.primary_metric` | Ratio + drift band (CI/Release). |
-| `spectral` / `rmt` / `variance` | `report.guards[]` | Measurement contracts (CI/Release). |
+| `spectral` / `rmt` / `variance` | `report.guards[]` | Measurement contracts (CI/Release); `rmt.mode` surfaces the active RMT measurement path. |
 | `provenance.provider_digest` | `report.provenance.provider_digest` | Required in CI/Release. |
 
 ### Minimal v1 report Example
 
 The example below shows a realistic, PM‑only report envelope. It follows
 the current validator in `invarlock.reporting.report_schema` and the
-fields produced by `invarlock.assurance.make_report`.
+fields produced by `invarlock.reporting.report_builder.make_report`.
 
 ```json
 {
@@ -376,6 +376,8 @@ include the execution device. CPU telemetry sweeps are collected via
 
 - `report.json` contains `metrics.latency_ms_per_tok` and `metrics.memory_mb_peak`.
 - `telemetry.summary_line` is emitted when `INVARLOCK_TELEMETRY=1`.
+- `dataset.hash.source` distinguishes content-derived, provider-derived, and config-derived dataset hashes.
+- `rmt.mode` and `rmt.measurement_contract_hash` show which RMT measurement contract produced the report evidence.
 
 ---
 
@@ -391,7 +393,7 @@ print-friendly rules.
 ### CLI
 
 ```bash
-invarlock report html -i <cert.json> -o <out.html>
+invarlock report html -i <evaluation.report.json> -o <out.html>
 ```
 
 **Flags:**
@@ -444,5 +446,5 @@ html = render_report_html(report)
 
 - [CLI Reference](cli.md)
 - [Artifact Layout](artifacts.md)
-- [Safety Case](../assurance/00-safety-case.md) — What the report guarantees
+- [Assurance Case](../assurance/00-assurance-case.md) — What the report guarantees
 - [Reading a report](../user-guide/reading-report.md) — User-oriented guide

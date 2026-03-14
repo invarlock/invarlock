@@ -76,9 +76,9 @@ resolved from tier policies (tiers.yaml + defaults) and surfaced under
 
 ### Tier scope
 
-Balanced and Conservative are the supported safety tiers; Aggressive is
-research‑oriented and explicitly outside the safety case (see
-`docs/assurance/00-safety-case.md`).
+Balanced and Conservative are the supported published assurance tiers; Aggressive is
+research‑oriented and explicitly outside the assurance case (see
+`docs/assurance/00-assurance-case.md`).
 
 ### Catalog (what + why)
 
@@ -88,7 +88,7 @@ same structure:
 - **What it controls** (runtime behavior)
 - **Where documented** (assurance notes / method write-ups)
 - **Keys** (key-by-key meaning)
-- **Observability** (where it appears in reports/evalificates)
+- **Observability** (where it appears in reports/evaluation artifacts)
 
 #### Primary-metric gates (`metrics.*`)
 

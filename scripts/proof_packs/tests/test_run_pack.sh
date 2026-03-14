@@ -65,9 +65,9 @@ EOF
     local pack_dir="${TEST_TMPDIR}/pack"
     pack_build_pack "${run_dir}" "${pack_dir}"
 
-    assert_file_exists "${pack_dir}/results/final_verdict.txt" "verdict copied"
-    assert_file_exists "${pack_dir}/state/model_revisions.json" "revisions copied"
-    assert_file_exists "${pack_dir}/state/scenarios.json" "scenarios manifest copied"
+    assert_file_exists "${pack_dir}/results/verdicts/final_verdict.txt" "verdict copied"
+    assert_file_exists "${pack_dir}/metadata/model_revisions.json" "revisions copied"
+    assert_file_exists "${pack_dir}/metadata/scenarios.json" "scenarios manifest copied"
     assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/evaluation.report.json" "cert copied"
     assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/rmt_probe.json" "probe sidecar copied"
     assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/ve_probe.json" "ve probe sidecar copied"
@@ -79,7 +79,8 @@ EOF
     assert_file_exists "${pack_dir}/checksums.sha256" "checksums written"
     assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/evaluation.html" "html rendered"
     assert_file_exists "${pack_dir}/README.md" "readme written"
-    assert_file_exists "${pack_dir}/results/guard_intervention_summary.json" "intervention summary copied"
+    assert_match "signed manifest, strict verification, and a PASS final verdict" "$(cat "${pack_dir}/README.md")" "README documents proof-grade triad"
+    assert_file_exists "${pack_dir}/results/analysis/guard_intervention_summary.json" "intervention summary copied"
 }
 
 test_run_pack_build_pack_rejects_failed_final_verdict() {
@@ -192,6 +193,33 @@ EOF
     PACK_PACK_LAYOUT="nope"
     run pack_build_pack "${run_dir}" "${TEST_TMPDIR}/pack"
     assert_rc "2" "${RUN_RC}" "unknown layout returns 2"
+}
+
+test_run_pack_build_pack_rejects_legacy_layouts() {
+    mock_reset
+
+    source ./scripts/proof_packs/run_pack.sh
+
+    local run_dir="${TEST_TMPDIR}/run"
+    mkdir -p "${run_dir}"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/invarlock" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+    chmod +x "${bin_dir}/invarlock"
+    PATH="${bin_dir}:${PATH}"
+    export PATH
+
+    local layout
+    for layout in v1 flat legacy; do
+        PACK_PACK_LAYOUT="${layout}"
+        run pack_build_pack "${run_dir}" "${TEST_TMPDIR}/pack_${layout}"
+        assert_rc "2" "${RUN_RC}" "legacy layout ${layout} returns 2"
+        assert_match "no longer supported; use v2" "${RUN_ERR}" "legacy layout ${layout} error"
+    done
 }
 
 test_run_pack_build_pack_ignores_error_injection_verify_failures() {
@@ -386,8 +414,8 @@ test_run_pack_checksums_include_files() {
     source ./scripts/proof_packs/run_pack.sh
 
     local pack_dir="${TEST_TMPDIR}/pack"
-    mkdir -p "${pack_dir}/results"
-    echo "verdict" > "${pack_dir}/results/final_verdict.txt"
+    mkdir -p "${pack_dir}/results/verdicts"
+    echo "verdict" > "${pack_dir}/results/verdicts/final_verdict.txt"
     echo "{}" > "${pack_dir}/manifest.json"
     mkdir -p "${pack_dir}/metadata" "${pack_dir}/__MACOSX"
     echo "{}" > "${pack_dir}/metadata/manifest.json"
@@ -402,7 +430,7 @@ test_run_pack_checksums_include_files() {
 
     local checksums
     checksums="$(cat "${pack_dir}/checksums.sha256")"
-    assert_match "results/final_verdict.txt" "${checksums}" "checksums include results"
+    assert_match "results/verdicts/final_verdict.txt" "${checksums}" "checksums include results"
     if [[ "${checksums}" == *manifest.json* ]]; then
         t_fail "checksums must not include manifest.json to avoid signature cycles"
     fi

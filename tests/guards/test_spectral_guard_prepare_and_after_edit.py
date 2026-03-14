@@ -3,13 +3,16 @@ from __future__ import annotations
 import numpy as np
 import torch
 
-import invarlock.guards.spectral as spectral
+import invarlock.guards.spectral as spectral_guard
+import invarlock.guards.spectral_control as spectral_control
+import invarlock.guards.spectral_detection as spectral_detection
+import invarlock.guards.spectral_measurement as spectral_measurement
 
 
 def test_capture_sigmas_clamps_iters_defaults_init_and_skips_non_tensor(
     monkeypatch,
 ) -> None:
-    guard = spectral.SpectralGuard()
+    guard = spectral_guard.SpectralGuard()
     guard.estimator = {"iters": -1, "init": "bad"}
 
     calls: dict[str, object] = {}
@@ -21,7 +24,9 @@ def test_capture_sigmas_clamps_iters_defaults_init_and_skips_non_tensor(
         calls["init"] = init
         return 2.0
 
-    monkeypatch.setattr(spectral, "power_iter_sigma_max", fake_power_iter_sigma_max)
+    monkeypatch.setattr(
+        spectral_measurement, "power_iter_sigma_max", fake_power_iter_sigma_max
+    )
 
     class Mod:
         def __init__(self, weight):
@@ -48,23 +53,23 @@ def test_capture_sigmas_clamps_iters_defaults_init_and_skips_non_tensor(
 
 def test_prepare_degeneracy_skips_non_tensor_and_invalid_sigma(monkeypatch) -> None:
     monkeypatch.setattr(
-        spectral.SpectralGuard,
+        spectral_guard.SpectralGuard,
         "_capture_sigmas",
         lambda *_a, **_k: {"t": float("nan")},
         raising=False,
     )
     monkeypatch.setattr(
-        spectral, "classify_model_families", lambda *_a, **_k: {"t": "ffn", "n": "ffn"}
+        spectral_detection,
+        "classify_model_families",
+        lambda *_a, **_k: {"t": "ffn", "n": "ffn"},
     )
     monkeypatch.setattr(
-        spectral,
+        spectral_detection,
         "compute_family_stats",
         lambda *_a, **_k: {"ffn": {"mean": 1.0, "std": 0.0}},
     )
-    monkeypatch.setattr(spectral, "scan_model_gains", lambda *_a, **_k: {})
-    monkeypatch.setattr(spectral, "auto_sigma_target", lambda *_a, **_k: 1.0)
 
-    guard = spectral.SpectralGuard(degeneracy={"enabled": True})
+    guard = spectral_guard.SpectralGuard(degeneracy={"enabled": True})
 
     class Mod:
         def __init__(self, weight):
@@ -81,25 +86,25 @@ def test_prepare_degeneracy_skips_non_tensor_and_invalid_sigma(monkeypatch) -> N
 
 
 def test_after_edit_applies_spectral_control_when_enabled(monkeypatch) -> None:
-    guard = spectral.SpectralGuard(correction_enabled=True)
+    guard = spectral_guard.SpectralGuard(correction_enabled=True)
     guard.prepared = True
     guard.baseline_sigmas = {}
     guard.target_sigma = 1.0
 
     monkeypatch.setattr(
-        spectral.SpectralGuard,
+        spectral_guard.SpectralGuard,
         "_capture_sigmas",
         lambda *_a, **_k: {"m": 1.0},
         raising=False,
     )
     monkeypatch.setattr(
-        spectral.SpectralGuard,
+        spectral_guard.SpectralGuard,
         "_detect_spectral_violations",
         lambda *_a, **_k: [{"type": "mock_violation"}],
         raising=False,
     )
     monkeypatch.setattr(
-        spectral, "apply_spectral_control", lambda *_a, **_k: {"applied": True}
+        spectral_control, "apply_spectral_control", lambda *_a, **_k: {"applied": True}
     )
 
     class Model:
@@ -113,7 +118,7 @@ def test_after_edit_applies_spectral_control_when_enabled(monkeypatch) -> None:
 def test_detect_violations_computes_sigma_and_classifies_family_when_missing(
     monkeypatch,
 ) -> None:
-    guard = spectral.SpectralGuard()
+    guard = spectral_guard.SpectralGuard()
     guard.baseline_sigmas = {}
     guard.target_sigma = 1.0
     guard.baseline_family_stats = {"ffn": {}}
@@ -125,9 +130,15 @@ def test_detect_violations_computes_sigma_and_classifies_family_when_missing(
         lambda *_a, **_k: True,
         raising=False,
     )
-    monkeypatch.setattr(spectral, "compute_sigma_max", lambda *_a, **_k: 1.0)
-    monkeypatch.setattr(spectral, "classify_module_family", lambda *_a, **_k: "ffn")
-    monkeypatch.setattr(spectral, "compute_z_score_for_value", lambda *_a, **_k: 0.0)
+    monkeypatch.setattr(
+        spectral_measurement, "compute_sigma_max", lambda *_a, **_k: 1.0
+    )
+    monkeypatch.setattr(
+        spectral_detection, "classify_module_family", lambda *_a, **_k: "ffn"
+    )
+    monkeypatch.setattr(
+        spectral_detection, "compute_z_score_for_value", lambda *_a, **_k: 0.0
+    )
 
     class Model:
         def named_modules(self):

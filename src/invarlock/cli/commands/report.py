@@ -418,7 +418,7 @@ def report_callback(
             emoji="❌",
         )
         raise typer.Exit(2)
-    return _generate_reports(
+    _generate_reports(
         run=run,
         format=format,
         compare=compare,
@@ -427,6 +427,7 @@ def report_callback(
         style=style,
         no_color=no_color,
     )
+    return
 
 
 # Backward-compatible function name expected by tests

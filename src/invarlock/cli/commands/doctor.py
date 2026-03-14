@@ -20,6 +20,13 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from invarlock.public_contracts import (
+    contract_catalog,
+    load_adapter_capabilities,
+    load_plugin_compatibility,
+    load_support_matrix,
+)
+
 from ..constants import DOCTOR_FORMAT_VERSION
 
 # Exact wording constant for determinism warning (kept in one place)
@@ -297,7 +304,7 @@ def doctor_command(
         console = Console(file=StringIO())
 
     if not json_out:
-        console.print("🏥 InvarLock Health Check")
+        console.print("InvarLock Health Check")
         console.print("=" * 50)
 
     # Environment facts (OS · Python · invarlock)
@@ -345,7 +352,7 @@ def doctor_command(
 
         device_info = get_device_info()
         if not json_out:
-            console.print("\n🖥️  Device Information")
+            console.print("\nDevice Information")
 
         for device_name, info in device_info.items():
             if device_name == "auto_selected":
@@ -397,7 +404,7 @@ def doctor_command(
             if torch.cuda.is_available():
                 free_memory = torch.cuda.get_device_properties(0).total_memory / 1e9
                 if not json_out:
-                    console.print(f"\n💾 GPU Memory: {free_memory:.1f} GB total")
+                    console.print(f"\nGPU Memory: {free_memory:.1f} GB total")
                 if free_memory < 4.0:
                     if not json_out:
                         console.print(
@@ -414,7 +421,7 @@ def doctor_command(
 
     # Check optional dependencies
     if not json_out:
-        console.print("\n📦 Optional Dependencies")
+        console.print("\nOptional Dependencies")
 
     optional_deps = [
         ("datasets", "Dataset loading (WikiText-2, etc.)"),
@@ -653,10 +660,11 @@ def doctor_command(
                     cfg, model_profile, resolved_loss_type=None
                 )
             )
+            cfg_metric_kind = str(metric_kind_resolved)
             try:
                 cfg_metric_kind = str(metric_kind_resolved)
             except NON_FATAL_EXCEPTIONS:
-                cfg_metric_kind = cfg_metric_kind
+                pass
             if not json_out:
                 console.print(
                     f"  Metric: {metric_kind_resolved} · Provider: {provider_kind}"
@@ -719,8 +727,7 @@ def doctor_command(
                         workers = provider_cfg.get("workers", None)  # type: ignore[attr-defined]
                         det = provider_cfg.get("deterministic_shards", None)  # type: ignore[attr-defined]
                     except NON_FATAL_EXCEPTIONS:
-                        workers = workers
-                        det = det
+                        pass
                 # Legacy style might place workers directly under dataset
                 if workers is None and hasattr(cfg.dataset, "workers"):
                     workers = cfg.dataset.workers
@@ -829,34 +836,30 @@ def doctor_command(
                         ex_frac = float(
                             acc_policy.get("min_examples_fraction", 0.0) or 0.0
                         )
-                        # Publish policy meta for JSON output
-                        try:
-                            global POLICY_META
-                            POLICY_META = {
-                                "tier": use_tier,
-                                "floors": {
-                                    "pm_ratio": {
-                                        "min_tokens": min_tokens,
-                                        "min_token_fraction": token_frac,
-                                    },
-                                    "accuracy": {
-                                        "min_examples": min_examples,
-                                        "min_examples_fraction": ex_frac,
-                                    },
+                        global POLICY_META
+                        POLICY_META = {
+                            "tier": use_tier,
+                            "floors": {
+                                "pm_ratio": {
+                                    "min_tokens": min_tokens,
+                                    "min_token_fraction": token_frac,
                                 },
-                            }
-                        except NON_FATAL_EXCEPTIONS:
-                            pass
+                                "accuracy": {
+                                    "min_examples": min_examples,
+                                    "min_examples_fraction": ex_frac,
+                                },
+                            },
+                        }
                         tokens_avail = cap.get("tokens_available")
                         examples_avail = cap.get("examples_available")
                         eff_tokens = int(min_tokens)
                         eff_examples = int(min_examples)
-                        if isinstance(tokens_avail, int | float) and token_frac > 0:
+                        if isinstance(tokens_avail, (int, float)) and token_frac > 0:
                             eff_tokens = max(
                                 eff_tokens,
                                 int(_math.ceil(float(tokens_avail) * token_frac)),
                             )
-                        if isinstance(examples_avail, int | float) and ex_frac > 0:
+                        if isinstance(examples_avail, (int, float)) and ex_frac > 0:
                             eff_examples = max(
                                 eff_examples,
                                 int(_math.ceil(float(examples_avail) * ex_frac)),
@@ -1014,7 +1017,7 @@ def doctor_command(
         from .plugins import _check_plugin_extras
 
         if not json_out:
-            console.print("\n🔌 Plugin Registry")
+            console.print("\nPlugin Registry")
         registry = get_registry()
         if not json_out:
             console.print(f"  Adapters: {len(registry.list_adapters())}")
@@ -1174,14 +1177,12 @@ def doctor_command(
             for r in rows:
                 backend_disp, ver_disp = _fmt_backend_ver(r["backend"], r["version"])
                 if r["mode"] == "auto-matcher":
-                    status_disp = "🧩 Auto (selects best hf_* adapter)"
+                    status_disp = "Ready"
                 elif r["status"] == "ready":
-                    status_disp = "✅ Ready"
+                    status_disp = "Ready"
                 elif r["status"] == "needs_extra":
                     status_disp = (
-                        f"⛔ Needs extra → {r['enable']}"
-                        if r["enable"]
-                        else "⛔ Needs extra"
+                        f"Needs extra: {r['enable']}" if r["enable"] else "Needs extra"
                     )
                 else:
                     status_disp = r["status"]
@@ -1254,12 +1255,12 @@ def doctor_command(
                     b, v = _fmt_backend_ver(r["backend"], r["version"])
 
                     status_disp = (
-                        "✅ Ready"
+                        "Ready"
                         if r["status"] == "ready"
                         else (
-                            f"⛔ Needs extra → {r['enable']}"
+                            f"Needs extra: {r['enable']}"
                             if r["enable"]
-                            else "⛔ Needs extra"
+                            else "Needs extra"
                         )
                     )
                     table.add_row(
@@ -1310,14 +1311,6 @@ def doctor_command(
                 console.print(dtable)
         except NON_FATAL_EXCEPTIONS:
             pass
-
-        if not json_out:
-            console.print(
-                "[dim]Legend: ✅ Ready = usable now · 🧩 Auto‑matcher = picks an adapter for you[/dim]"
-            )
-            console.print(
-                "[dim]Hints: use --json · filter with --only ready|core|plugin|auto|unsupported[/dim]"
-            )
     except NON_FATAL_EXCEPTIONS as e:
         # Gracefully handle missing optional Optimum stack
         if "optimum" in str(e).lower():
@@ -1351,6 +1344,10 @@ def doctor_command(
                 "warnings": sum(1 for f in findings if f.get("severity") == "warning"),
                 "notes": sum(1 for f in findings if f.get("severity") == "note"),
             },
+            "contracts": contract_catalog(),
+            "support_matrix": load_support_matrix(),
+            "adapter_capabilities": load_adapter_capabilities(),
+            "plugin_compatibility": load_plugin_compatibility(),
             "policy": POLICY_META
             if "POLICY_META" in globals()
             else {"tier": (tier or "balanced").lower()},

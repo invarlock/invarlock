@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 
-from invarlock.guards.spectral import SpectralGuard, capture_baseline_sigmas
+from invarlock.guards.spectral import SpectralGuard
+from invarlock.guards.spectral_measurement import capture_baseline_sigmas
 
 
 class TinyLayer(nn.Module):

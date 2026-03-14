@@ -47,3 +47,4 @@ def test_dataset_hash_uses_actual_evaluation_windows_ids():
     assert dataset_hash["final_tokens"] == 5
     # No dataset-level hash when computed from token IDs
     assert dataset_hash["dataset"] is None
+    assert dataset_hash["source"] == "explicit_token_ids"

@@ -19,7 +19,7 @@ def _touch_min_cert(tmp_path: Path) -> Path:
         (
             # InvarlockError → exit 3 in CI/Release; include structured error object
             lambda: __import__(
-                "invarlock.cli.errors", fromlist=["InvarlockError"]
+                "invarlock.core.exceptions", fromlist=["InvarlockError"]
             ).InvarlockError(
                 code="E005", message="boom", details={"x": 1}, recoverable=True
             ),

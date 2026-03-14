@@ -80,3 +80,21 @@ def test_explain_gates_hysteresis(tmp_path: Path, capsys):
     assert "effective" in out and ("threshold" in out or "limit" in out)
     # Mention token floors or min examples
     assert ("token floors" in out) or ("min examples" in out) or ("min_tokens" in out)
+
+
+def test_explain_gates_honors_tiny_relax_context(tmp_path: Path, capsys):
+    subject, baseline = _mk_pairable_reports(ratio=1.0)
+    subject["context"] = {"run": {"tiny_relax": True}}
+    subject["metrics"]["preview_total_tokens"] = 10000
+    subject["metrics"]["final_total_tokens"] = 10000
+    subj_path = tmp_path / "subject_tiny_relax.json"
+    base_path = tmp_path / "baseline_tiny_relax.json"
+    subj_path.write_text(json.dumps(subject))
+    base_path.write_text(json.dumps(baseline))
+
+    explain_gates_command(report=str(subj_path), baseline=str(base_path))
+    out = capsys.readouterr().out.lower()
+    assert "status: pass" in out
+    assert "tiny relax enabled" in out
+    assert "threshold: ≤ 1.20x" in out
+    assert "tokens: ok" in out

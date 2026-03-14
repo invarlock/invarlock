@@ -46,23 +46,30 @@ def explain_gates_command(
         if isinstance(evaluation_report.get("validation"), dict)
         else {}
     )
+    auto = (
+        evaluation_report.get("auto", {})
+        if isinstance(evaluation_report.get("auto"), dict)
+        else {}
+    )
+    tiny_relax = bool(auto.get("tiny_relax"))
 
     # Extract tier + metric policy (floors/hysteresis)
-    tier = str(
-        (evaluation_report.get("auto", {}) or {}).get("tier", "balanced")
-    ).lower()
+    tier = str(auto.get("tier", "balanced")).lower()
+    effective_tier = "aggressive" if tiny_relax else tier
     tier_policies = get_tier_policies()
-    tier_defaults = tier_policies.get(tier, tier_policies.get("balanced", {}))
+    tier_defaults = tier_policies.get(effective_tier, tier_policies.get("balanced", {}))
     resolved_policy = (
         evaluation_report.get("resolved_policy", {})
         if isinstance(evaluation_report.get("resolved_policy"), dict)
         else {}
     )
-    metrics_policy = (
-        resolved_policy.get("metrics", {})
-        if isinstance(resolved_policy.get("metrics"), dict)
-        else {}
-    )
+    metrics_policy: dict[str, object] = {}
+    if not tiny_relax:
+        metrics_policy = (
+            resolved_policy.get("metrics", {})
+            if isinstance(resolved_policy.get("metrics"), dict)
+            else {}
+        )
     if not metrics_policy:
         metrics_policy = (
             tier_defaults.get("metrics", {}) if isinstance(tier_defaults, dict) else {}
@@ -112,7 +119,7 @@ def explain_gates_command(
         total_tokens = int(telem.get("preview_total_tokens", 0)) + int(
             telem.get("final_total_tokens", 0)
         )
-        tokens_ok = (min_tokens == 0) or (total_tokens >= min_tokens)
+        tokens_ok = (min_tokens == 0) or (total_tokens >= min_tokens) or tiny_relax
     except Exception:
         tokens_ok = True
 
@@ -141,8 +148,13 @@ def explain_gates_command(
         console.print(f"  threshold: ≤ {float(limit_base):.2f}x{hyst_suffix}")
     else:
         console.print("  threshold: unavailable")
+    if tiny_relax:
+        console.print(
+            "  note: tiny relax enabled; aggressive-tier gates and token floors are informational"
+        )
+    token_state = "ok" if tokens_ok else "below floor"
     console.print(
-        f"  tokens: {'ok' if tokens_ok else 'below floor'} (token floors: min_tokens={min_tokens or 0}, total={int(telem.get('preview_total_tokens', 0)) + int(telem.get('final_total_tokens', 0)) if telem else 0})"
+        f"  tokens: {token_state} (token floors: min_tokens={min_tokens or 0}, total={int(telem.get('preview_total_tokens', 0)) + int(telem.get('final_total_tokens', 0)) if telem else 0})"
     )
     if hysteresis_applied:
         if isinstance(limit_with_hyst, int | float):

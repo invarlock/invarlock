@@ -9,7 +9,7 @@ import click
 import pytest
 
 from invarlock.cli.commands.run import _enforce_provider_parity, run_command
-from invarlock.cli.errors import InvarlockError
+from invarlock.core.exceptions import InvarlockError
 
 
 def test_enforce_provider_parity_mask_mismatch_raises_invarlock_error():

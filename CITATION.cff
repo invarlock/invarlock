@@ -3,14 +3,14 @@ title: "InvarLock: Edit-agnostic robustness evaluation reports for weight edits"
 message: "If you use InvarLock in scientific work, please cite it using the metadata below."
 type: software
 abstract: >
-  InvarLock is an edit-agnostic safety framework (“GuardChain”) for structured compression and model edits.
+  InvarLock is an edit-agnostic baseline-relative evaluation and assurance toolkit for structured compression and model edits.
   It provides paired log-space evaluation against a baseline, layered guards (Spectral, RMT, Variance),
   guard-overhead checks, and a machine-readable evaluation report artifact with determinism and provenance.
 repository-code: https://github.com/invarlock/invarlock
 repository-artifact: https://github.com/invarlock/invarlock/releases
 license: Apache-2.0
-version: 0.3.12
-date-released: 2026-02-27
+version: 0.4.0
+date-released: 2026-03-14
 authors:
   - name: "InvarLock Maintainers"
     affiliation: "InvarLock"
@@ -20,8 +20,9 @@ keywords:
   - quantization
   - robustness
   - evaluation
+  - verification
   - evaluation reports
-  - safety
+  - release assurance
   - reproducibility
 contact:
   - email: security@invarlock.dev
@@ -33,8 +34,8 @@ preferred-citation:
     - name: "InvarLock Maintainers"
   repository-code: https://github.com/invarlock/invarlock
   url: https://github.com/invarlock/invarlock
-  version: 0.3.12
-  date-released: 2026-02-27
+  version: 0.4.0
+  date-released: 2026-03-14
   license: Apache-2.0
   # identifiers:
   #   - type: doi

@@ -7,6 +7,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+UTC = getattr(dt, "UTC", dt.timezone.utc)  # noqa: UP017
+
 
 def _load_json(path: Path) -> Any:
     try:
@@ -116,7 +118,7 @@ def write_manifest(
 
     payload: dict[str, Any] = {
         "format": "proof-pack-v1",
-        "generated_at": dt.datetime.now(dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "generated_at": dt.datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "suite": suite,
         "network_mode": "online"
         if str(net) in {"1", "true", "yes", "on"}

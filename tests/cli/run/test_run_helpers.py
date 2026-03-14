@@ -465,7 +465,7 @@ def test_persist_masks_returns_none_when_mask_payload_invalid(tmp_path: Path):
     assert _persist_ref_masks(core_report, tmp_path) is None
 
 
-def test_plan_release_windows_console_adjustment_branch():
+def test_plan_release_windows_console_adjustment_path():
     capacity = {
         "available_unique": 2000,
         "available_nonoverlap": 2000,

@@ -19,7 +19,8 @@ def test_plugins_discovery_disabled_json(monkeypatch, capsys):
     out = capsys.readouterr().out.strip()
     payload = json.loads(out)
     assert payload["discovery"] == "disabled"
-    assert payload["kind"] == "adapters"
+    assert payload["category"] == "adapters"
+    assert "kind" not in payload
 
 
 def test_plugins_discovery_disabled_message(monkeypatch, capsys):

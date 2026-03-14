@@ -12,7 +12,7 @@ from invarlock.cli.config import (
     RMTGuardConfig,
     SpectralGuardConfig,
     VarianceGuardConfig,
-    _deep_merge_dicts,
+    _deep_merge,
     apply_edit_override,
     apply_profile,
     load_config,
@@ -25,10 +25,11 @@ def test_resolve_edit_kind_and_apply_override_roundtrip():
         model={"id": "gpt2", "adapter": "hf_causal"},
         edit={"name": "quant_rtn", "plan": {}},
     )
-    name = resolve_edit_kind("quant")
+    name = resolve_edit_kind("quant_rtn")
     assert name == "quant_rtn"
-    updated = apply_edit_override(cfg, "quant")
-    assert updated.edit.name == "quant_rtn" and updated.edit.kind == "quant"
+    updated = apply_edit_override(cfg, "quant_rtn")
+    assert updated.edit.name == "quant_rtn"
+    assert "kind" not in updated.data["edit"]
     with pytest.raises(ValueError):
         resolve_edit_kind("unknown")
 
@@ -110,14 +111,37 @@ def test_load_config_guard_mode_overrides_normalize_and_validate(
         "guards:\n  spectral: {mode: FAST}\n  rmt: {mode: strict}\n",
         encoding="utf-8",
     )
-    with pytest.raises(ValueError, match=r"guards\.spectral\.mode is deprecated"):
+    with pytest.raises(ValueError, match=r"guards\.spectral\.mode is not supported"):
         load_config(cfg_path)
 
 
 def test_load_config_guard_mode_overrides_reject_invalid(tmp_path: Path) -> None:
     cfg_path = tmp_path / "bad_guard_mode.yaml"
     cfg_path.write_text("guards: {spectral: {mode: turbo}}\n", encoding="utf-8")
-    with pytest.raises(ValueError, match=r"guards\.spectral\.mode is deprecated"):
+    with pytest.raises(ValueError, match=r"guards\.spectral\.mode is not supported"):
+        load_config(cfg_path)
+
+
+def test_load_config_rejects_legacy_edit_parameters(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "legacy_edit_parameters.yaml"
+    cfg_path.write_text(
+        "edit: {name: quant_rtn, parameters: {bitwidth: 8}}\n", encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match=r"edit\.parameters is not supported"):
+        load_config(cfg_path)
+
+
+def test_load_config_rejects_legacy_edit_kind(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "legacy_edit_kind.yaml"
+    cfg_path.write_text("edit: {name: quant_rtn, kind: quant}\n", encoding="utf-8")
+    with pytest.raises(ValueError, match=r"edit\.kind is not supported"):
+        load_config(cfg_path)
+
+
+def test_load_config_rejects_legacy_assurance_block(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "legacy_assurance.yaml"
+    cfg_path.write_text("assurance: {mode: strict}\n", encoding="utf-8")
+    with pytest.raises(ValueError, match=r"assurance\.\* is not supported"):
         load_config(cfg_path)
 
 
@@ -225,10 +249,10 @@ def test_rmt_guard_config_epsilon_paths_and_bootstrap_bounds():
         EvalBootstrapConfig(replicates=1, alpha=1.0)
 
 
-def test_deep_merge_dicts_merges_and_overwrites():
+def test_deep_merge_merges_and_overwrites():
     base = {"a": {"b": 1}, "x": 1}
     override = {"a": {"c": 2}, "x": {"y": 3}, "z": 4}
-    out = _deep_merge_dicts(base, override)
+    out = _deep_merge(base, override)
     assert (
         out["a"]["b"] == 1
         and out["a"]["c"] == 2

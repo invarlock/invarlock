@@ -35,7 +35,7 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
   --adapter auto \
   --profile ci \
   --preset configs/presets/causal_lm/wikitext2_512.yaml \
-  --out runs/cert_smoke \
+  --out runs/eval_smoke \
   --report-out reports/eval_smoke
 ```
 
@@ -46,7 +46,7 @@ Outputs:
 
 ## Reuse a baseline report (skip baseline evaluation)
 
-When evaluateing many subjects against the same baseline, you can reuse a single
+When evaluating many subjects against the same baseline, you can reuse a single
 baseline `report.json` and skip Phase 1/3 (baseline evaluation) by passing
 `--baseline-report`.
 
@@ -79,7 +79,7 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
   --profile ci \
   --tier balanced \
   --preset configs/presets/causal_lm/wikitext2_512.yaml \
-  --out runs/cert_subject_1 \
+  --out runs/eval_subject_1 \
   --report-out reports/eval_subject_1
 ```
 

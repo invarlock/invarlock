@@ -48,13 +48,10 @@ console = Console()
 
 
 def _render_banner_lines(title: str, context: str) -> list[str]:
-    width = max(len(title), len(context))
-    border = "─" * (width + 2)
     return [
-        f"┌{border}┐",
-        f"│ {title.ljust(width)} │",
-        f"│ {context.ljust(width)} │",
-        f"└{border}┘",
+        title,
+        context,
+        "-" * max(len(title), len(context)),
     ]
 
 
@@ -72,11 +69,8 @@ def _phase_title(index: int, total: int, title: str) -> str:
 
 
 def _print_phase_header(console: Console, title: str) -> None:
-    bar_width = max(PHASE_BAR_WIDTH, len(title))
-    bar = "═" * bar_width
-    console.print(bar)
     console.print(title)
-    console.print(bar)
+    console.print("-" * max(PHASE_BAR_WIDTH, len(title)))
 
 
 def _format_ratio(value: Any) -> str:

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-import invarlock.guards.rmt as R
+import invarlock.guards.rmt_legacy as R
 
 
 def test_apply_rmt_correction_scales_tied_params(monkeypatch):

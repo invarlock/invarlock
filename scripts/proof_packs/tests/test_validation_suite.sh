@@ -294,7 +294,7 @@ test_pack_validation_source_libs_falls_back_to_lib_dir_when_missing() {
     assert_ne "0" "${rc}" "expected pack_source_libs failure when scripts/proof_packs/lib is missing"
 }
 
-test_pack_validation_source_libs_flat_layout_errors_when_queue_manager_missing() {
+test_pack_validation_source_libs_packaged_v2_layout_succeeds() {
     mock_reset
 
     source ./scripts/proof_packs/lib/validation_suite.sh
@@ -302,19 +302,15 @@ test_pack_validation_source_libs_flat_layout_errors_when_queue_manager_missing()
     local sandbox
     sandbox="$(_make_validation_suite_sandbox)"
 
-    mv "${sandbox}/lib" "${sandbox}/lib.__bak__"
-    ln -s "lib.__bak__/runtime.sh" "${sandbox}/runtime.sh"
-    ln -s "lib.__bak__/task_serialization.sh" "${sandbox}/task_serialization.sh"
-
-    local rc=0
     (
         _pack_script_dir() { echo "${sandbox}"; }
         pack_source_libs
-    ) || rc=$?
-    assert_ne "0" "${rc}" "expected failure when queue_manager is missing in flat layout"
+        assert_eq "${sandbox}/lib" "${LIB_DIR}" "packaged v2 layout loads lib dir"
+        assert_eq "1" "${QUEUE_MANAGER_LOADED:-}" "queue_manager loaded from packaged v2 lib dir"
+    )
 }
 
-test_pack_validation_source_libs_flat_layout_errors_when_scheduler_missing() {
+test_pack_validation_source_libs_packaged_v2_layout_errors_when_queue_manager_missing() {
     mock_reset
 
     source ./scripts/proof_packs/lib/validation_suite.sh
@@ -322,62 +318,14 @@ test_pack_validation_source_libs_flat_layout_errors_when_scheduler_missing() {
     local sandbox
     sandbox="$(_make_validation_suite_sandbox)"
 
-    mv "${sandbox}/lib" "${sandbox}/lib.__bak__"
-    ln -s "lib.__bak__/runtime.sh" "${sandbox}/runtime.sh"
-    ln -s "lib.__bak__/task_serialization.sh" "${sandbox}/task_serialization.sh"
-    ln -s "lib.__bak__/queue_manager.sh" "${sandbox}/queue_manager.sh"
+    rm -f "${sandbox}/lib/queue_manager.sh"
 
     local rc=0
     (
         _pack_script_dir() { echo "${sandbox}"; }
         pack_source_libs
     ) || rc=$?
-    assert_ne "0" "${rc}" "expected failure when scheduler is missing in flat layout"
-}
-
-test_pack_validation_source_libs_flat_layout_errors_when_task_functions_missing() {
-    mock_reset
-
-    source ./scripts/proof_packs/lib/validation_suite.sh
-
-    local sandbox
-    sandbox="$(_make_validation_suite_sandbox)"
-
-    mv "${sandbox}/lib" "${sandbox}/lib.__bak__"
-    ln -s "lib.__bak__/runtime.sh" "${sandbox}/runtime.sh"
-    ln -s "lib.__bak__/task_serialization.sh" "${sandbox}/task_serialization.sh"
-    ln -s "lib.__bak__/queue_manager.sh" "${sandbox}/queue_manager.sh"
-    ln -s "lib.__bak__/scheduler.sh" "${sandbox}/scheduler.sh"
-
-    local rc=0
-    (
-        _pack_script_dir() { echo "${sandbox}"; }
-        pack_source_libs
-    ) || rc=$?
-    assert_ne "0" "${rc}" "expected failure when task_functions is missing in flat layout"
-}
-
-test_pack_validation_source_libs_flat_layout_errors_when_gpu_worker_missing() {
-    mock_reset
-
-    source ./scripts/proof_packs/lib/validation_suite.sh
-
-    local sandbox
-    sandbox="$(_make_validation_suite_sandbox)"
-
-    mv "${sandbox}/lib" "${sandbox}/lib.__bak__"
-    ln -s "lib.__bak__/runtime.sh" "${sandbox}/runtime.sh"
-    ln -s "lib.__bak__/task_serialization.sh" "${sandbox}/task_serialization.sh"
-    ln -s "lib.__bak__/queue_manager.sh" "${sandbox}/queue_manager.sh"
-    ln -s "lib.__bak__/scheduler.sh" "${sandbox}/scheduler.sh"
-    ln -s "lib.__bak__/task_functions.sh" "${sandbox}/task_functions.sh"
-
-    local rc=0
-    (
-        _pack_script_dir() { echo "${sandbox}"; }
-        pack_source_libs
-    ) || rc=$?
-    assert_ne "0" "${rc}" "expected failure when gpu_worker is missing in flat layout"
+    assert_ne "0" "${rc}" "expected failure when queue_manager is missing in packaged v2 lib dir"
 }
 
 test_pack_validation_list_run_gpu_ids_prefers_gpu_id_list_and_falls_back_to_num_gpus() {

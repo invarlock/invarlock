@@ -1,7 +1,7 @@
 import builtins
 import os
 
-from invarlock.core.runner import _collect_cuda_flags
+from invarlock.core.runner_context import collect_cuda_flags
 
 
 def test_collect_cuda_flags_env_only(monkeypatch):
@@ -16,7 +16,7 @@ def test_collect_cuda_flags_env_only(monkeypatch):
     monkeypatch.setattr(builtins, "__import__", fake_import)
     monkeypatch.setenv("CUBLAS_WORKSPACE_CONFIG", ":16:8")
 
-    flags = _collect_cuda_flags()
+    flags = collect_cuda_flags()
 
     # Only the environment-provided flag should be present when torch is absent
     assert flags == {"CUBLAS_WORKSPACE_CONFIG": os.environ["CUBLAS_WORKSPACE_CONFIG"]}

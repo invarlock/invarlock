@@ -578,8 +578,10 @@ def execute_single_run(
         from invarlock.core.registry import get_registry as _get_registry
         from invarlock.core.runner import CoreRunner as _CoreRunner
         from invarlock.eval.data import get_provider as _get_provider
-        from invarlock.guards.rmt import capture_baseline_mp_stats as _capture_mp_stats
-        from invarlock.guards.rmt import rmt_detect as _rmt_detect
+        from invarlock.guards.rmt_legacy import (
+            capture_baseline_mp_stats as _capture_mp_stats,
+        )
+        from invarlock.guards.rmt_legacy import rmt_detect as _rmt_detect
         from invarlock.model_profile import detect_model_profile as _detect_profile
 
         def _ensure_dir(path: Path) -> None:

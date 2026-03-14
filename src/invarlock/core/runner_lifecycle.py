@@ -1,0 +1,105 @@
+from __future__ import annotations
+
+import time
+from typing import Any
+
+from .api import RunConfig, RunReport
+
+
+def initialize_run_report(
+    *,
+    config: RunConfig,
+    serialized_config: dict[str, Any],
+    cuda_flags: dict[str, Any],
+    auto_config: dict[str, Any] | None = None,
+    report_factory: type[RunReport] = RunReport,
+    start_time: float | None = None,
+) -> RunReport:
+    report = report_factory()
+    report.meta["cuda_flags"] = cuda_flags
+    report.meta["start_time"] = (
+        float(start_time) if start_time is not None else float(time.time())
+    )
+    report.meta["config"] = serialized_config
+
+    if config.context:
+        try:
+            report.context.update(config.context)
+        except Exception:
+            report.context = dict(config.context)
+
+    if isinstance(config.context, dict):
+        run_id = config.context.get("run_id")
+        if run_id:
+            report.meta["run_id"] = run_id
+        plugins_meta = config.context.get("plugins")
+        if plugins_meta:
+            report.meta["plugins"] = plugins_meta
+
+    if auto_config:
+        report.meta["auto"] = auto_config
+        if isinstance(config.context, dict):
+            existing_auto = config.context.get("auto")
+            if isinstance(existing_auto, dict):
+                merged_auto = dict(existing_auto)
+                merged_auto.update(auto_config)
+                config.context["auto"] = merged_auto
+            else:
+                config.context["auto"] = dict(auto_config)
+            try:
+                report.context["auto"] = config.context["auto"]
+            except Exception:
+                pass
+
+    return report
+
+
+def finalize_run_report(
+    report: RunReport,
+    *,
+    final_status: str,
+    end_time: float | None = None,
+) -> None:
+    end_ts = float(end_time) if end_time is not None else float(time.time())
+    report.status = final_status
+    report.meta["end_time"] = end_ts
+    start_time = report.meta.get("start_time")
+    if isinstance(start_time, int | float):
+        report.meta["duration"] = end_ts - float(start_time)
+
+
+def merge_execution_metrics(
+    report: RunReport,
+    *,
+    timings: dict[str, float],
+    guard_timings: dict[str, float],
+    memory_snapshots: list[dict[str, Any]],
+    memory_summary: dict[str, Any],
+) -> None:
+    if not isinstance(report.metrics, dict):
+        report.metrics = {}
+
+    if timings:
+        report.metrics.setdefault("timings", {}).update(timings)
+
+    if guard_timings:
+        report.metrics["guard_timings"] = guard_timings
+
+    if not memory_snapshots:
+        return
+
+    report.metrics["memory_snapshots"] = memory_snapshots
+    summary = dict(memory_summary)
+    mem_peak = summary.get("memory_mb_peak")
+    if isinstance(mem_peak, int | float):
+        existing_peak = report.metrics.get("memory_mb_peak")
+        if isinstance(existing_peak, int | float):
+            summary["memory_mb_peak"] = max(float(existing_peak), float(mem_peak))
+    report.metrics.update(summary)
+
+
+__all__ = [
+    "finalize_run_report",
+    "initialize_run_report",
+    "merge_execution_metrics",
+]

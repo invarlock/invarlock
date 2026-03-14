@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Tiny Models Matrix (GPT-2 causal, BERT MLM, DistilBERT classification)
+# Tiny Models Matrix (GPT-2 causal, BERT MLM)
 # ----------------------------------------------------------------------
 # Generates a consolidated checklist of valid invarlock evaluate command permutations
-# across three tiny models and optional quantization for GPT-2.
+# across two compact smoke models and optional quantization for GPT-2.
 #
 # Usage:
 #   bash scripts/run_tiny_all_matrix.sh               # dry-run (print + write checklist)
@@ -14,6 +14,21 @@ set -euo pipefail
 
 RUN="${RUN:-0}"
 NET="${NET:-0}"
+
+if command -v invarlock >/dev/null 2>&1; then
+  CLI=(invarlock)
+else
+  export PYTHONPATH="$(pwd)/src:${PYTHONPATH:-}"
+  CLI=(python -m invarlock.cli)
+fi
+
+render_cmd() {
+  printf '%q ' "$@"
+}
+
+run_cmd() {
+  "$@" || true
+}
 
 # Profile selection
 # - If caller set PROFILE, respect it.
@@ -40,6 +55,7 @@ fi
 # Env knobs for speed and determinism
 export INVARLOCK_DEDUP_TEXTS=1
 export INVARLOCK_CAPACITY_FAST=1
+export TOKENIZERS_PARALLELISM=false
 
 # Respect NET for networked downloads vs offline cache
 if [ "$NET" = "1" ]; then
@@ -71,7 +87,7 @@ except Exception as e:
 PY
 fi
 
-echo "# Tiny Models Certification Matrix ($STAMP)" > "$TMP_DIR/checklist.md"
+echo "# Tiny Models Evaluation Matrix ($STAMP)" > "$TMP_DIR/checklist.md"
 echo "Env: INVARLOCK_DEDUP_TEXTS=1, INVARLOCK_CAPACITY_FAST=1, HF_HUB_ENABLE_HF_TRANSFER=${HF_HUB_ENABLE_HF_TRANSFER:-0}${NET:+, INVARLOCK_ALLOW_NETWORK=1, HF_DATASETS_OFFLINE=${HF_DATASETS_OFFLINE:-0}}" >> "$TMP_DIR/checklist.md"
 echo >> "$TMP_DIR/checklist.md"
 
@@ -84,47 +100,31 @@ for PRESET in \
   configs/presets/causal_lm/wikitext2_512.yaml \
   omit
 do
-  tag="gpt2_cert_${PRESET##*/}"
-  [ "$PRESET" = "omit" ] && tag="gpt2_cert_auto"
-  cmd=(invarlock evaluate --baseline "$GPT2_ID" --subject "$GPT2_ID" --adapter hf_causal --profile "$PROFILE" --tier balanced)
+  tag="gpt2_eval_${PRESET##*/}"
+  [ "$PRESET" = "omit" ] && tag="gpt2_eval_auto"
+  cmd=("${CLI[@]}" evaluate --baseline "$GPT2_ID" --subject "$GPT2_ID" --adapter hf_causal --profile "$PROFILE" --tier balanced --device cpu)
   [ "$PRESET" != "omit" ] && cmd+=(--preset "$PRESET")
-  append "$tag" "${cmd[*]}"
-  if [ "$RUN" = "1" ]; then eval "${cmd[*]}" || true; fi
+  append "$tag" "$(render_cmd "${cmd[@]}")"
+  if [ "$RUN" = "1" ]; then run_cmd "${cmd[@]}"; fi
 done
 
 echo >> "$TMP_DIR/checklist.md"
 echo "### GPT-2 Quant (demo edit)" >> "$TMP_DIR/checklist.md"
 QCFG="configs/overlays/edits/quant_rtn/tiny_demo.yaml"
-cmd=(invarlock evaluate --baseline "$GPT2_ID" --subject "$GPT2_ID" --adapter hf_causal --profile "$PROFILE" --tier balanced --preset configs/presets/causal_lm/wikitext2_512.yaml --edit-config "$QCFG")
-append "gpt2_editcert_quant8" "${cmd[*]}"
-[ "$RUN" = "1" ] && eval "${cmd[*]}" || true
+cmd=("${CLI[@]}" evaluate --baseline "$GPT2_ID" --subject "$GPT2_ID" --adapter hf_causal --profile "$PROFILE" --tier balanced --device cpu --preset configs/presets/causal_lm/wikitext2_512.yaml --edit-config "$QCFG")
+append "gpt2_eval_quant8" "$(render_cmd "${cmd[@]}")"
+[ "$RUN" = "1" ] && run_cmd "${cmd[@]}"
 
 echo >> "$TMP_DIR/checklist.md"
 
 # 2) BERT-tiny: masked LM
 BERT_ID=${BERT_ID:-"prajjwal1/bert-tiny"}
 echo "## BERT (masked LM)" >> "$TMP_DIR/checklist.md"
-cmd=(invarlock evaluate --baseline "$BERT_ID" --subject "$BERT_ID" --adapter hf_mlm --profile "$PROFILE" --tier balanced --preset configs/presets/masked_lm/wikitext2_128.yaml)
-append "bert_mlm_cert" "${cmd[*]}"
-[ "$RUN" = "1" ] && eval "${cmd[*]}" || true
+cmd=("${CLI[@]}" evaluate --baseline "$BERT_ID" --subject "$BERT_ID" --adapter hf_mlm --profile "$PROFILE" --tier balanced --device cpu --preset configs/presets/masked_lm/wikitext2_128.yaml)
+append "bert_mlm_eval" "$(render_cmd "${cmd[@]}")"
+[ "$RUN" = "1" ] && run_cmd "${cmd[@]}"
 
 echo >> "$TMP_DIR/checklist.md"
-
-# 3) DistilBERT SST-2: classification smoke
-CLS_ID=${CLS_ID:-"distilbert-base-uncased-finetuned-sst-2-english"}
-echo "## DistilBERT (classification)" >> "$TMP_DIR/checklist.md"
-cmd=(invarlock evaluate --baseline "$CLS_ID" --subject "$CLS_ID" --adapter hf_mlm --profile "$PROFILE" --tier balanced --preset configs/presets/masked_lm/wikitext2_128.yaml)
-append "distilbert_cls_cert" "${cmd[*]}"
-[ "$RUN" = "1" ] && eval "${cmd[*]}" || true
-
-# Optional: measured accuracy (requires network) when INCLUDE_MEASURED_CLS=1
-if [ "$NET" = "1" ] && [ "${INCLUDE_MEASURED_CLS:-0}" = "1" ]; then
-  echo >> "$TMP_DIR/checklist.md"
-  echo "## DistilBERT (classification, measured)" >> "$TMP_DIR/checklist.md"
-  cmd=(invarlock evaluate --baseline "$CLS_ID" --subject "$CLS_ID" --adapter hf_mlm --profile "$PROFILE" --tier balanced --preset configs/presets/masked_lm/wikitext2_128.yaml)
-  append "distilbert_cls_measured" "${cmd[*]}"
-  if [ "$RUN" = "1" ]; then eval "${cmd[*]}" || true; fi
-fi
 
 echo
 echo "Checklist written to: $TMP_DIR/checklist.md"

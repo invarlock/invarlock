@@ -29,27 +29,30 @@ def test_spectral_after_edit_applies_control_and_logs_event():
     fake_family_stats = {"ffn": {"kappa": 2.0}}
 
     with patch(
-        "invarlock.guards.spectral.capture_baseline_sigmas",
+        "invarlock.guards.spectral_measurement.capture_baseline_sigmas",
         side_effect=[fake_sigmas_small, fake_sigmas_large],
     ):
         with (
             patch(
-                "invarlock.guards.spectral.classify_model_families",
+                "invarlock.guards.spectral_detection.classify_model_families",
                 lambda *a, **k: fake_families,
             ),
             patch(
-                "invarlock.guards.spectral.compute_family_stats",
+                "invarlock.guards.spectral_detection.compute_family_stats",
                 lambda *a, **k: fake_family_stats,
             ),
             patch(
-                "invarlock.guards.spectral.scan_model_gains",
+                "invarlock.guards.spectral_measurement.scan_model_gains",
                 lambda *a, **k: {"gains": {}},
             ),
             patch(
-                "invarlock.guards.spectral._summarize_sigmas",
+                "invarlock.guards.spectral_detection.summarize_sigmas",
                 lambda *a, **k: {"summary": {}},
             ),
-            patch("invarlock.guards.spectral.auto_sigma_target", lambda *a, **k: 1.23),
+            patch(
+                "invarlock.guards.spectral_measurement.auto_sigma_target",
+                lambda *a, **k: 1.23,
+            ),
         ):
             guard.prepare(baseline, adapter=None, calib=None, policy={})
             guard.before_edit(baseline)

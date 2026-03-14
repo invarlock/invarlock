@@ -151,7 +151,7 @@ def test_edit_override_ok(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.cli.config.resolve_edit_kind", lambda name: "quant_rtn")
+            patch("invarlock.cli.config.resolve_edit_kind", lambda name: name)
         )
         stack.enter_context(
             patch("invarlock.cli.config.apply_edit_override", lambda c, e: c)
@@ -179,7 +179,7 @@ def test_edit_override_ok(tmp_path: Path):
         run_command(
             config=str(cfg),
             device="cpu",
-            edit="quant",
+            edit="quant_rtn",
             out=str(tmp_path / "runs"),
             until_pass=False,
         )

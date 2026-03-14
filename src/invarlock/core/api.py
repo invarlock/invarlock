@@ -280,7 +280,7 @@ class RunReport:
     Results from a InvarLock pipeline execution.
 
     Contains comprehensive information about what was executed
-    and the outcomes, suitable for analysis and certification.
+    and the outcomes, suitable for analysis and release assurance.
     """
 
     # Execution metadata

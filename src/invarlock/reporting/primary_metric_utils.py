@@ -31,7 +31,7 @@ def attach_primary_metric(
         if isinstance(pm, dict) and pm:
             pm_copy = copy.deepcopy(pm)
             pm_copy.setdefault("invalid", bool(pm_copy.get("invalid", False)))
-            degraded_reason = pm_copy.get("degraded_reason")
+            degraded_reason: str | None = pm_copy.get("degraded_reason")
             preview_val = pm_copy.get("preview")
             final_val = pm_copy.get("final")
             ratio_val = pm_copy.get("ratio_vs_baseline")
@@ -45,6 +45,8 @@ def attach_primary_metric(
                 return isinstance(value, (int, float)) and math.isfinite(float(value))
 
             baseline_has_reference = _is_finite(baseline_final)
+            needs_pm_fallback = False
+            needs_ratio_fallback = False
             needs_pm_fallback = not (_is_finite(preview_val) and _is_finite(final_val))
             needs_ratio_fallback = baseline_has_reference and not _is_finite(ratio_val)
 
@@ -124,7 +126,7 @@ def attach_primary_metric(
                                 else (math.nan, math.nan)
                             )
                         if (
-                            isinstance(dlci_source, tuple | list)
+                            isinstance(dlci_source, (tuple, list))
                             and len(dlci_source) == 2
                         ):
                             lo_raw, hi_raw = dlci_source[0], dlci_source[1]

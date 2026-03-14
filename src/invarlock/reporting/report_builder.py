@@ -21,7 +21,6 @@ import os
 import platform
 from collections.abc import Iterable
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 # Optional JSON Schema validation support
@@ -37,6 +36,7 @@ from invarlock.core.bootstrap import (
 )
 from invarlock.eval.primary_metric import compute_primary_metric_from_report, get_metric
 from invarlock.eval.tail_stats import evaluate_metric_tail
+from invarlock.public_contracts import load_json_contract
 from invarlock.utils.digest import hash_json
 
 from . import report_schema as _report_schema
@@ -457,19 +457,15 @@ _VALIDATION_ALLOWLIST_DEFAULT = {
 def _load_validation_allowlist_with_source() -> tuple[set[str], str]:
     """Load validation key allow-list and report the source explicitly."""
     try:
-        root = Path(__file__).resolve().parents[3]
-        path = root / "contracts" / "validation_keys.json"
-        if path.exists():
-            data = json.loads(path.read_text(encoding="utf-8"))
-            if isinstance(data, list):
-                return {str(k) for k in data}, "contracts"
-            return (
-                set(_VALIDATION_ALLOWLIST_DEFAULT),
-                "fallback:invalid-contract-validation-keys",
-            )
+        data = load_json_contract("validation_keys.json")
+        if isinstance(data, list):
+            return {str(k) for k in data}, "contracts"
+        return (
+            set(_VALIDATION_ALLOWLIST_DEFAULT),
+            "fallback:invalid-contract-validation-keys",
+        )
     except Exception:  # pragma: no cover
         return set(_VALIDATION_ALLOWLIST_DEFAULT), "fallback:load-error"
-    return set(_VALIDATION_ALLOWLIST_DEFAULT), "fallback:missing-contract"
 
 
 def _load_validation_allowlist() -> set[str]:
@@ -751,7 +747,7 @@ def _enforce_pairing_and_coverage(
             f"(preview={actual_preview}, final={actual_final})."
         )
 
-    from invarlock.core.runner import BOOTSTRAP_COVERAGE_REQUIREMENTS
+    from invarlock.core.runner_pairing import BOOTSTRAP_COVERAGE_REQUIREMENTS
 
     tier_key = str(tier or "balanced").lower()
     floors = BOOTSTRAP_COVERAGE_REQUIREMENTS.get(
@@ -827,6 +823,25 @@ def make_report(
 def _normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
     """Normalize baseline input to a consistent dictionary format."""
     if isinstance(baseline, dict):
+
+        def _guard_metrics_block(guard_name: str) -> dict[str, Any]:
+            for guard in baseline.get("guards", []) or []:
+                if str(guard.get("name", "")).lower() != guard_name:
+                    continue
+                metrics = guard.get("metrics")
+                if isinstance(metrics, dict) and metrics:
+                    return dict(metrics)
+                return {}
+            return {}
+
+        def _merged_guard_metrics(
+            guard_name: str, metrics_value: Any
+        ) -> dict[str, Any]:
+            merged = dict(metrics_value) if isinstance(metrics_value, dict) else {}
+            guard_metrics = _guard_metrics_block(guard_name)
+            if guard_metrics:
+                merged.update(guard_metrics)
+            return merged
 
         def _coerce_valid_ppl(value: Any, *, label: str) -> float:
             if not (isinstance(value, int | float) and math.isfinite(float(value))):
@@ -1048,8 +1063,10 @@ def _normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
             baseline_out: dict[str, Any] = {
                 "run_id": _generate_run_id(baseline),
                 "model_id": baseline["meta"]["model_id"],
-                "spectral": baseline["metrics"].get("spectral", {}),
-                "rmt": baseline["metrics"].get("rmt", {}),
+                "spectral": _merged_guard_metrics(
+                    "spectral", baseline["metrics"].get("spectral", {})
+                ),
+                "rmt": _merged_guard_metrics("rmt", baseline["metrics"].get("rmt", {})),
                 "invariants": baseline["metrics"].get("invariants", {}),
                 "moe": baseline["metrics"].get("moe", {}),
                 "evaluation_windows": baseline_eval_windows,

@@ -120,7 +120,7 @@ Tip: For CI or smoke demos, these snippets run offline and avoid heavy imports. 
 
 ## Related Documentation
 
-- [Evaluation Math Proof](../assurance/01-eval-math-proof.md) — Mathematical foundations for PM computation
+- [Evaluation Math Derivation](../assurance/01-eval-math-derivation.md) — Mathematical foundations for PM computation
 - [API Guide](../reference/api-guide.md) — Programmatic access to PM computation
 - [reports](../reference/reports.md) — How PM appears in reports
 - [Tier Policy Catalog](../reference/tier-policy-catalog.md) — PM gates and thresholds by tier

@@ -21,7 +21,7 @@ import time
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 import numpy as np
 import psutil
@@ -33,6 +33,10 @@ from invarlock.core.exceptions import MetricsError, ValidationError
 
 # ── Enhanced logging setup ─────────────────────────────────────────────────
 logger = logging.getLogger(__name__)
+
+
+def _call_model(model: nn.Module, /, *args: Any, **kwargs: Any) -> Any:
+    return cast(Any, model)(*args, **kwargs)
 
 
 try:  # Optional dependency: tqdm (progress bars)
@@ -762,7 +766,7 @@ def _perform_pre_eval_checks(
             k: v.to(device) if isinstance(v, torch.Tensor) else v
             for k, v in dry_batch.items()
         }
-        _ = model(**model_input)
+        _ = _call_model(model, **model_input)
         logger.debug("Pre-evaluation dry run successful")
     except Exception as e:
         logger.warning(f"Pre-evaluation dry run failed: {e}")
@@ -809,7 +813,7 @@ def _collect_activations(
                     input_ids = input_ids[:, : config.max_tokens]
 
                 # Forward pass with hidden states
-                output = model(input_ids, output_hidden_states=True)
+                output = _call_model(model, input_ids, output_hidden_states=True)
 
                 # Collect hidden states (exclude first and last)
                 if hasattr(output, "hidden_states") and len(output.hidden_states) > 2:
@@ -1102,25 +1106,6 @@ def _finalize_results(
     return results
 
 
-# ── Backward compatibility functions ──────────────────────────────────────
-def _gini(vec: torch.Tensor) -> float:
-    """Legacy Gini function for backward compatibility."""
-    return _gini_vectorized(vec)
-
-
-def _mi_gini_cpu_safe_path(
-    feats_cpu: torch.Tensor, targ_cpu: torch.Tensor, max_per_layer: int
-) -> float:
-    """Legacy CPU MI-Gini function for backward compatibility."""
-    config = MetricsConfig(max_samples_per_layer=max_per_layer, progress_bars=True)
-    return _mi_gini_optimized_cpu_path(feats_cpu, targ_cpu, max_per_layer, config)
-
-
-def _locate_transformer_blocks(model: nn.Module) -> list[nn.Module] | None:
-    """Legacy transformer block locator for backward compatibility."""
-    return _locate_transformer_blocks_enhanced(model)
-
-
 # ── Additional utility functions ───────────────────────────────────────────
 def get_metrics_info() -> dict[str, Any]:
     """Get information about available metrics and dependencies."""
@@ -1281,7 +1266,8 @@ def _forward_loss_causal(
 
     # 1) Prefer dict-style outputs
     try:
-        outputs = model(
+        outputs = _call_model(
+            model,
             input_ids=input_ids,
             attention_mask=attention_mask,
             labels=labels,
@@ -1293,8 +1279,8 @@ def _forward_loss_causal(
         logits = getattr(outputs, "logits", None)
     except (TypeError, AttributeError):
         # Some stub models/tests may not accept return_dict
-        outputs = model(
-            input_ids=input_ids, attention_mask=attention_mask, labels=labels
+        outputs = _call_model(
+            model, input_ids=input_ids, attention_mask=attention_mask, labels=labels
         )
         if isinstance(outputs, tuple | list):
             # If labels were provided, many HF models put loss first, logits second
@@ -1463,21 +1449,6 @@ def _sanitize_token_ids_for_model(
             labels = labels.masked_fill(invalid_labels, -100)
 
     return input_ids, attention_mask, labels
-
-
-# ── Perplexity calculation ─────────────────────────────────────────────────
-@torch.no_grad()
-def calculate_perplexity(
-    model: nn.Module,
-    dataloader,
-    max_batches: int = 100,
-    device: str | torch.device | None = None,
-) -> float:
-    """
-    DEPRECATED: Use compute_perplexity for new code.
-    This is an alias for backward compatibility with tests.
-    """
-    return compute_perplexity(model, dataloader, max_samples=max_batches, device=device)
 
 
 @torch.no_grad()
@@ -1823,12 +1794,8 @@ def compute_ppl(
             continue
 
         # Convert to tensors
-        input_ids_tensor = (
-            torch.tensor(input_ids, dtype=torch.long).unsqueeze(0).to(device)
-        )
-        attention_mask_tensor = (
-            torch.tensor(attention_mask, dtype=torch.long).unsqueeze(0).to(device)
-        )
+        input_ids_tensor = torch.LongTensor(input_ids).unsqueeze(0).to(device)
+        attention_mask_tensor = torch.LongTensor(attention_mask).unsqueeze(0).to(device)
 
         if model_vocab_size is not None:
             input_ids_tensor, attention_mask_tensor, _ = _sanitize_token_ids_for_model(
@@ -1845,7 +1812,8 @@ def compute_ppl(
 
         # Forward pass
         try:
-            outputs = model(
+            outputs = _call_model(
+                model,
                 input_ids=input_ids_tensor,
                 attention_mask=attention_mask_tensor,
                 return_dict=True,
@@ -1853,8 +1821,8 @@ def compute_ppl(
             logits = outputs.logits if hasattr(outputs, "logits") else outputs[0]
         except Exception:
             # Fallback for non-standard models
-            outputs = model(
-                input_ids=input_ids_tensor, attention_mask=attention_mask_tensor
+            outputs = _call_model(
+                model, input_ids=input_ids_tensor, attention_mask=attention_mask_tensor
             )
             if isinstance(outputs, tuple | list):
                 logits = outputs[0]
@@ -1958,11 +1926,9 @@ def measure_latency(
         window.input_ids, window.attention_masks, strict=False
     ):
         if len(input_ids) > 10:  # Ensure reasonable length
-            sample_input_ids = (
-                torch.tensor(input_ids, dtype=torch.long).unsqueeze(0).to(device)
-            )
+            sample_input_ids = torch.LongTensor(input_ids).unsqueeze(0).to(device)
             sample_attention_mask = (
-                torch.tensor(attention_mask, dtype=torch.long).unsqueeze(0).to(device)
+                torch.LongTensor(attention_mask).unsqueeze(0).to(device)
             )
             break
 
@@ -1973,8 +1939,10 @@ def measure_latency(
     with torch.no_grad():
         for _ in range(warmup_steps):
             try:
-                _ = model(
-                    input_ids=sample_input_ids, attention_mask=sample_attention_mask
+                _ = _call_model(
+                    model,
+                    input_ids=sample_input_ids,
+                    attention_mask=sample_attention_mask,
                 )
             except Exception:
                 # If there are issues with the model, return 0
@@ -1989,7 +1957,11 @@ def measure_latency(
 
     with torch.no_grad():
         for _ in range(measurement_steps):
-            _ = model(input_ids=sample_input_ids, attention_mask=sample_attention_mask)
+            _ = _call_model(
+                model,
+                input_ids=sample_input_ids,
+                attention_mask=sample_attention_mask,
+            )
 
     if device.type == "cuda":
         torch.cuda.synchronize()
@@ -2177,7 +2149,7 @@ def analyze_spectral_changes(
     """
     try:
         # Import spectral analysis if available
-        from invarlock.guards.spectral import compute_spectral_norms
+        from invarlock.guards.spectral_measurement import compute_spectral_norms
 
         before_norms = compute_spectral_norms(model_before, scope=scope)
         after_norms = compute_spectral_norms(model_after, scope=scope)
@@ -2212,61 +2184,6 @@ def analyze_spectral_changes(
         return {"error": "spectral_analysis_unavailable"}
     except Exception as e:
         logger.warning(f"Spectral analysis failed: {e}")
-        return {"error": str(e)}
-
-
-def analyze_rmt_changes(
-    model_before: nn.Module, model_after: nn.Module
-) -> dict[str, Any]:
-    """
-    Analyze RMT (Random Matrix Theory) changes between model states.
-
-    Args:
-        model_before: Model before edit
-        model_after: Model after edit
-
-    Returns:
-        Dictionary with RMT analysis results
-    """
-    try:
-        # Import RMT analysis if available
-        from invarlock.guards.rmt import compute_mp_stats
-
-        before_stats = compute_mp_stats(model_before)
-        after_stats = compute_mp_stats(model_after)
-
-        # Analyze changes in MP statistics
-        changes = {}
-        for layer_name in before_stats:
-            if layer_name in after_stats:
-                before_mp = before_stats[layer_name]
-                after_mp = after_stats[layer_name]
-                changes[layer_name] = {
-                    "before": before_mp,
-                    "after": after_mp,
-                    "stable": abs(before_mp - after_mp) < 0.1,  # Stability threshold
-                }
-
-        # Count stable vs unstable layers
-        stable_count = sum(
-            1 for change in changes.values() if change.get("stable", False)
-        )
-        total_count = len(changes)
-
-        summary = {
-            "layer_changes": changes,
-            "stable_layers": stable_count,
-            "total_layers": total_count,
-            "stability_ratio": stable_count / total_count if total_count > 0 else 0.0,
-        }
-
-        return summary
-
-    except ImportError:
-        logger.debug("RMT analysis not available")
-        return {"error": "rmt_analysis_unavailable"}
-    except Exception as e:
-        logger.warning(f"RMT analysis failed: {e}")
         return {"error": str(e)}
 
 
@@ -2333,7 +2250,6 @@ try:
             "measure_memory",
             "compute_parameter_deltas",
             "analyze_spectral_changes",
-            "analyze_rmt_changes",
             "Metric",
             "PerplexityMetric",
             "AccuracyMetric",
@@ -2348,7 +2264,6 @@ except NameError:
         "measure_memory",
         "compute_parameter_deltas",
         "analyze_spectral_changes",
-        "analyze_rmt_changes",
         "Metric",
         "PerplexityMetric",
         "AccuracyMetric",

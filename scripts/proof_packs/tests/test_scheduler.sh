@@ -29,7 +29,7 @@ test_is_reservation_valid_ttl_and_liveness() {
     _now_epoch() { echo "100"; }
 
     local task_id="t1"
-    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"ready", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, gpu_id:-1, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
+    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"ready", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
         > "${QUEUE_DIR}/ready/${task_id}.task"
 
     local meta_file="${GPU_RESERVATION_DIR}/task_${task_id}.meta"
@@ -64,7 +64,7 @@ test_is_gpu_available_cleans_stale_reservation() {
     GPU_RESERVATION_TTL=60
 
     local task_id="t1"
-    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"ready", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, gpu_id:-1, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
+    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"ready", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
         > "${QUEUE_DIR}/ready/${task_id}.task"
 
     echo "${task_id}" > "${GPU_RESERVATION_DIR}/gpu_0.lock"
@@ -94,7 +94,7 @@ test_find_and_claim_task_releases_reservation_when_claim_fails() {
     mkdir -p "${GPU_RESERVATION_DIR}"
 
     local task_id="t1"
-    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"ready", model_size_gb:10, required_gpus:1, retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, gpu_id:-1, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
+    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"ready", model_size_gb:10, required_gpus:1, retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
         > "${QUEUE_DIR}/ready/${task_id}.task"
 
     find_best_task() { echo "t1"; }
@@ -181,7 +181,7 @@ test_is_reservation_valid_sanitizes_invalid_ttl() {
     mkdir -p "${GPU_RESERVATION_DIR}"
 
     local task_id="t1"
-    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"ready", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, gpu_id:-1, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
+    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"ready", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
         > "${QUEUE_DIR}/ready/${task_id}.task"
     printf "timestamp=99\nowner_pid=123\ngpu_list=0\n" > "${GPU_RESERVATION_DIR}/task_${task_id}.meta"
 
@@ -362,9 +362,9 @@ test_print_scheduling_report_outputs_sections() {
     mock_nvidia_smi_set_mem_total_mib 0 184320
     fixture_write "nvidia-smi/utilization.0" "15"
 
-    jq -n '{task_id:"r1", task_type:"EVAL_BASELINE", model_id:"m", model_name:"n", status:"running", model_size_gb:14, required_gpus:1, retries:0, max_retries:3, created_at:"x", started_at:"x", completed_at:null, error_msg:null, gpu_id:0, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
+    jq -n '{task_id:"r1", task_type:"EVAL_BASELINE", model_id:"m", model_name:"n", status:"running", model_size_gb:14, required_gpus:1, retries:0, max_retries:3, created_at:"x", started_at:"x", completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
         > "${QUEUE_DIR}/running/r1.task"
-    jq -n '{task_id:"q1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"ready", model_size_gb:14, required_gpus:1, retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, gpu_id:-1, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
+    jq -n '{task_id:"q1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"ready", model_size_gb:14, required_gpus:1, retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
         > "${QUEUE_DIR}/ready/q1.task"
 
     local report
@@ -1291,4 +1291,3 @@ test_scheduler_find_and_claim_logs_reserve_failure_when_debug() {
     assert_rc "1" "${RUN_RC}" "reserve failure returns non-zero"
     assert_match "reserve_gpus failed" "${RUN_ERR}" "debug message emitted"
 }
-

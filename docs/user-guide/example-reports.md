@@ -58,7 +58,7 @@ For audits, collect the following files:
 | File | Purpose |
 |------|---------|
 | `runs/<name>/**/report.json` | Execution log, metrics, and guard telemetry |
-| `reports/<name>/evaluation.report.json` | Signed compliance payload |
+| `reports/<name>/evaluation.report.json` | Machine-readable evaluation report |
 | `reports/<name>/evaluation_report.md` | Human-friendly summary for reviewers |
 
-reports remain valid as long as `invarlock verify reports/<name>/evaluation.report.json` passes with the original baseline reference.
+Reports remain valid only for the same baseline reference, pairing assumptions, dataset/tokenizer context, and scoped claim surface, and only while `invarlock verify reports/<name>/evaluation.report.json` continues to pass.

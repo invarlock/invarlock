@@ -31,7 +31,7 @@ For Compare & evaluate, reuse the same `dataset` block in baseline and subject r
 ## Concepts
 
 - **Preview vs final windows**: the runner computes the primary metric on two
-  deterministic splits; counts are recorded in reports and reports.
+  deterministic splits; counts are recorded in run reports and evaluation reports.
 - **Pairing**: `invarlock evaluate` requires baseline window evidence to pair
   windows. Missing/invalid evidence fails closed in CI/Release profiles.
 - **Offline-first**: downloads are opt-in via `INVARLOCK_ALLOW_NETWORK=1`. Cached
@@ -67,7 +67,7 @@ Counts mismatches are enforced via `coverage.preview.used`,
 
 ### Provider field map
 
-| Provider | Required keys | Evidence fields (report/cert) |
+| Provider | Required keys | Evidence fields (run report / evaluation report) |
 | --- | --- | --- |
 | `wikitext2` | `provider`, `seq_len`, `stride`, `preview_n`, `final_n` | `report.data.*` + `report.dataset.windows.stats` |
 | `synthetic` | `provider`, `seq_len`, `preview_n`, `final_n` | `report.data.*` + `report.dataset.windows.stats` |

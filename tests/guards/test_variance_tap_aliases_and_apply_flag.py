@@ -2,10 +2,10 @@ import pytest
 import torch
 import torch.nn as nn
 
-from invarlock.guards.variance import (
-    VarianceGuard,
-    _iter_transformer_layers,
+from invarlock.guards.variance import VarianceGuard
+from invarlock.guards.variance_scaling import (
     equalise_residual_variance,
+    iter_transformer_layers,
 )
 
 
@@ -919,7 +919,7 @@ def test_iter_transformer_layers_fallback_handles_block_sparse_moe_layers():
             return x
 
     model = WeirdWrapper()
-    layers = list(_iter_transformer_layers(model))
+    layers = list(iter_transformer_layers(model))
     assert len(layers) == 2
     assert all(hasattr(layer, "block_sparse_moe") for layer in layers)
 
@@ -941,5 +941,5 @@ def test_iter_transformer_layers_handles_nested_model_model_layers():
             self.model = ToyOuter()
 
     model = ToyWrapper()
-    layers = list(_iter_transformer_layers(model))
+    layers = list(iter_transformer_layers(model))
     assert len(layers) == 2

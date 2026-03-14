@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import math
 import sys
 import types
 from pathlib import Path
@@ -251,6 +252,17 @@ def test_validate_drift_band_parses_override_shapes() -> None:
     assert verify_mod._validate_drift_band(cert_invalid)
 
 
+def test_validate_drift_band_skips_tiny_relax_reports() -> None:
+    verify_mod = _import_verify_module()
+
+    cert_tiny_relax = {
+        "auto": {"tiny_relax": True},
+        "primary_metric": {"preview": 10.0, "final": 20.0},
+    }
+
+    assert verify_mod._validate_drift_band(cert_tiny_relax) == []
+
+
 def test_coercion_helpers_and_measurement_contract_digest() -> None:
     verify_mod = _import_verify_module()
 
@@ -478,6 +490,225 @@ def test_validate_evaluation_report_payload_schema_failure(tmp_path: Path) -> No
     bad.write_text("{}\n")
     errs = verify_mod._validate_evaluation_report_payload(bad)
     assert errs and "schema" in errs[0].lower()
+
+
+def test_validate_report_schema_strict_paths(monkeypatch) -> None:
+    verify_mod = _import_verify_module()
+
+    assert verify_mod._validate_report_schema_strict("bad") is False
+    assert (
+        verify_mod._validate_report_schema_strict({"schema_version": "nope"}) is False
+    )
+
+    report = {"schema_version": verify_mod.REPORT_SCHEMA_VERSION}
+
+    monkeypatch.setattr(verify_mod._report_builder, "jsonschema", None, raising=False)
+    assert verify_mod._validate_report_schema_strict(report) is False
+
+    class _SchemaFail:
+        @staticmethod
+        def validate(*_args, **_kwargs) -> None:
+            raise RuntimeError("boom")
+
+    monkeypatch.setattr(
+        verify_mod._report_builder, "jsonschema", _SchemaFail(), raising=False
+    )
+    assert verify_mod._validate_report_schema_strict(report) is False
+
+    class _SchemaOk:
+        @staticmethod
+        def validate(*_args, **_kwargs) -> None:
+            return None
+
+    monkeypatch.setattr(
+        verify_mod._report_builder, "jsonschema", _SchemaOk(), raising=False
+    )
+    assert verify_mod._validate_report_schema_strict(report) is True
+
+
+def test_validate_logspace_ci_identity_path_matrix() -> None:
+    verify_mod = _import_verify_module()
+
+    assert (
+        verify_mod._validate_logspace_ci_identity(
+            {"primary_metric": "bad"}, profile="ci"
+        )
+        == []
+    )
+    assert (
+        verify_mod._validate_logspace_ci_identity(
+            {
+                "primary_metric": {"kind": "ppl_causal"},
+                "dataset": {"windows": {"stats": "bad"}},
+            },
+            profile="ci",
+        )
+        == []
+    )
+    assert (
+        verify_mod._validate_logspace_ci_identity(
+            {
+                "primary_metric": {"kind": "ppl_causal"},
+                "dataset": {
+                    "windows": {
+                        "stats": {
+                            "window_match_fraction": 1.0,
+                            "window_overlap_fraction": 0.0,
+                            "paired_windows": 2,
+                        }
+                    }
+                },
+                "baseline_ref": {"primary_metric": {"final": "bad"}},
+            },
+            profile="ci",
+        )
+        == []
+    )
+
+    errs_missing = verify_mod._validate_logspace_ci_identity(
+        {
+            "primary_metric": {"kind": "ppl_causal"},
+            "dataset": {
+                "windows": {
+                    "stats": {
+                        "window_match_fraction": 1.0,
+                        "window_overlap_fraction": 0.0,
+                        "paired_windows": 2,
+                    }
+                }
+            },
+            "baseline_ref": {"primary_metric": {"final": 10.0}},
+        },
+        profile="ci",
+    )
+    assert any("primary_metric.ci missing" in e for e in errs_missing)
+    assert any("primary_metric.display_ci missing" in e for e in errs_missing)
+
+    errs_mismatch = verify_mod._validate_logspace_ci_identity(
+        {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "ci": [0.0, math.log(1.1)],
+                "display_ci": [1.0, 1.5],
+            },
+            "dataset": {
+                "windows": {
+                    "stats": {
+                        "window_match_fraction": 1.0,
+                        "window_overlap_fraction": 0.0,
+                        "paired_windows": 2,
+                    }
+                }
+            },
+            "baseline_ref": {"primary_metric": {"final": 10.0}},
+        },
+        profile="ci",
+    )
+    assert any("display_ci mismatch" in e for e in errs_mismatch)
+
+
+def test_primary_metric_validation_helper_paths_for_invalid_modes() -> None:
+    verify_mod = _import_verify_module()
+
+    assert verify_mod._validate_primary_metric({"primary_metric": {}})
+
+    cert_invalid_non_ppl = {
+        "primary_metric": {
+            "kind": "accuracy",
+            "final": 0.9,
+            "ratio_vs_baseline": None,
+            "degraded_reason": "evaluation_error",
+        }
+    }
+    assert verify_mod._validate_primary_metric(cert_invalid_non_ppl) == []
+
+    cert_invalid_prefix = {
+        "primary_metric": {
+            "kind": "accuracy",
+            "final": 0.9,
+            "ratio_vs_baseline": None,
+            "degraded_reason": "non_finite_accuracy",
+        }
+    }
+    assert verify_mod._validate_primary_metric(cert_invalid_prefix) == []
+
+
+def test_recompute_validation_flags_and_policy_gate_paths(monkeypatch) -> None:
+    verify_mod = _import_verify_module()
+    captured: dict[str, object] = {}
+
+    def _fake_compute_validation_flags(**kwargs):
+        captured.update(kwargs)
+        return {"primary_metric_acceptable": False}
+
+    monkeypatch.setattr(
+        verify_mod, "compute_validation_flags", _fake_compute_validation_flags
+    )
+    monkeypatch.setattr(
+        verify_mod,
+        "resolve_tiny_relax_from_report",
+        lambda report: bool(report.get("tiny")),
+    )
+
+    report_bad = {
+        "primary_metric": "bad",
+        "telemetry": "bad",
+        "auto": "bad",
+        "resolved_policy": {"metrics": "bad"},
+        "spectral": "bad",
+        "rmt": "bad",
+        "invariants": "bad",
+        "guard_overhead": "bad",
+        "primary_metric_tail": "bad",
+    }
+    flags = verify_mod._recompute_validation_flags(report_bad)
+    assert flags["primary_metric_acceptable"] is False
+    assert captured["tier"] == "balanced"
+    assert captured["_ppl_metrics"] == {}
+    assert captured["ppl"] == {}
+    assert captured["get_tier_policies_fn"] is None
+
+    captured.clear()
+    report_good = {
+        "primary_metric": {"ratio_vs_baseline": "1.05", "preview": 10.0, "final": 10.2},
+        "telemetry": {"preview_total_tokens": "10", "final_total_tokens": 20},
+        "auto": {"tier": "Conservative", "target_pm_ratio": "1.1"},
+        "resolved_policy": {"metrics": {"pm_ratio": {"min_tokens": 1}}},
+        "spectral": {},
+        "rmt": {},
+        "invariants": {},
+        "guard_overhead": {},
+        "primary_metric_tail": {},
+        "tiny": True,
+    }
+    verify_mod._recompute_validation_flags(report_good)
+    assert captured["tier"] == "conservative"
+    assert captured["target_ratio"] == 1.1
+    assert captured["tiny_relax"] is True
+    assert captured["_ppl_metrics"] == {
+        "preview_total_tokens": 10,
+        "final_total_tokens": 20,
+    }
+    assert callable(captured["get_tier_policies_fn"])
+    tier_cfg = captured["get_tier_policies_fn"]()
+    assert tier_cfg["conservative"]["metrics"]["pm_ratio"]["min_tokens"] == 1
+
+    assert verify_mod._validate_primary_metric_policy({}, profile="dev") == []
+    monkeypatch.setattr(
+        verify_mod,
+        "_recompute_validation_flags",
+        lambda _report: {"primary_metric_acceptable": True},
+    )
+    assert verify_mod._validate_primary_metric_policy({}, profile="ci") == []
+    monkeypatch.setattr(
+        verify_mod,
+        "_recompute_validation_flags",
+        lambda _report: {"primary_metric_acceptable": False},
+    )
+    errs = verify_mod._validate_primary_metric_policy(
+        {"telemetry": {"preview_total_tokens": 10}, "auto": {}}, profile="release"
+    )
+    assert errs == ["Primary metric policy gate failed (tier=balanced)."]
 
 
 def test_warn_adapter_family_mismatch(tmp_path: Path) -> None:

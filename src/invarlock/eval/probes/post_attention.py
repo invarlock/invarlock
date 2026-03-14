@@ -11,6 +11,10 @@ import torch
 import torch.nn as nn
 
 
+def _call_model(model: nn.Module, /, *args: Any, **kwargs: Any) -> Any:
+    return model(*args, **kwargs)
+
+
 def compute_post_attention_head_scores(
     model: nn.Module,
     calib_data: Any,
@@ -97,7 +101,7 @@ def compute_post_attention_head_scores(
                 input_ids = input_ids.to(device)
 
                 # Forward pass to collect attention outputs
-                _ = model(input_ids)
+                _ = _call_model(model, input_ids)
 
                 # Analyze head contributions
                 for layer_idx, attn_output in attention_outputs.items():
@@ -205,7 +209,7 @@ def compute_wanda_neuron_scores(
             model.zero_grad()
 
             # Forward pass
-            outputs = model(input_ids)
+            outputs = _call_model(model, input_ids)
 
             # Compute loss for gradient computation
             if hasattr(outputs, "logits"):

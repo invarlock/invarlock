@@ -74,11 +74,12 @@ dataset: !include inc.yaml
         apply_profile(cfg, "ci")
     cfg2 = cfg
     # resolve_edit_kind and override
-    assert resolve_edit_kind("quant") == "quant_rtn"
+    assert resolve_edit_kind("quant_rtn") == "quant_rtn"
     with pytest.raises(ValueError):
         resolve_edit_kind("unknown")
-    cfg3 = apply_edit_override(cfg2, "quant")
-    assert cfg3.edit.name == "quant_rtn" and cfg3.edit.kind == "quant"
+    cfg3 = apply_edit_override(cfg2, "quant_rtn")
+    assert cfg3.edit.name == "quant_rtn"
+    assert "kind" not in cfg3.data["edit"]
 
 
 def test_device_helpers(monkeypatch):

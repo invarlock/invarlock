@@ -10,7 +10,7 @@ find modules to scale.
 import torch
 import torch.nn as nn
 
-import invarlock.guards.variance as var_mod
+import invarlock.guards.variance_scaling as variance_scaling_mod
 from invarlock.guards.variance import VarianceGuard
 
 
@@ -70,7 +70,7 @@ class TestScaleTargetFiltering:
                 "block1.mlp": 1.03,
             }
 
-        monkeypatch.setattr(var_mod, "equalise_residual_variance", fake_eq)
+        monkeypatch.setattr(variance_scaling_mod, "equalise_residual_variance", fake_eq)
 
         # Compute scales - should filter out attn scales
         batches = [{"input_ids": torch.randint(0, 100, (1, 8))}]
@@ -115,7 +115,7 @@ class TestScaleTargetFiltering:
                 "block1.mlp": 1.03,
             }
 
-        monkeypatch.setattr(var_mod, "equalise_residual_variance", fake_eq)
+        monkeypatch.setattr(variance_scaling_mod, "equalise_residual_variance", fake_eq)
 
         # Compute scales - should filter out mlp scales
         batches = [{"input_ids": torch.randint(0, 100, (1, 8))}]
@@ -160,7 +160,7 @@ class TestScaleTargetFiltering:
                 "block1.mlp": 1.03,
             }
 
-        monkeypatch.setattr(var_mod, "equalise_residual_variance", fake_eq)
+        monkeypatch.setattr(variance_scaling_mod, "equalise_residual_variance", fake_eq)
 
         # Compute scales - should keep all
         batches = [{"input_ids": torch.randint(0, 100, (1, 8))}]
@@ -209,7 +209,7 @@ class TestScaleTargetFiltering:
         def fake_eq(*_, **__):
             return {"block0.attn": 0.95, "block0.mlp": 1.05}
 
-        monkeypatch.setattr(var_mod, "equalise_residual_variance", fake_eq)
+        monkeypatch.setattr(variance_scaling_mod, "equalise_residual_variance", fake_eq)
 
         # Prepare - this should filter scales to only mlp
         batches = [{"input_ids": torch.randint(0, 100, (1, 8))}]

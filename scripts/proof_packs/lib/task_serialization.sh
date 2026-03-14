@@ -40,7 +40,6 @@ _task_serialization_require_jq() {
 #   required_gpus:   Number of GPUs needed based on per-device memory planning
 #   assigned_gpus:   Comma-separated list of assigned GPU IDs (set at runtime)
 #   status:          One of: pending, ready, running, completed, failed
-#   gpu_id:          Assigned GPU (-1 if unassigned) - deprecated, use assigned_gpus
 #   dependencies:    Array of task_ids that must complete first
 #   params:          Task-specific parameters object
 #   priority:        Scheduling priority (0-100, higher = more urgent)
@@ -179,7 +178,6 @@ create_task() {
         --argjson model_size_gb "${model_size_gb}" \
         --argjson required_gpus "${required_gpus}" \
         --arg status "pending" \
-        --argjson gpu_id "-1" \
         --argjson dependencies "${deps_array}" \
         --argjson params "${params}" \
         --argjson priority "${priority}" \
@@ -195,7 +193,6 @@ create_task() {
             required_gpus: $required_gpus,
             assigned_gpus: null,
             status: $status,
-            gpu_id: $gpu_id,
             dependencies: $dependencies,
             params: $params,
             priority: $priority,
@@ -383,55 +380,26 @@ update_task_status() {
     update_task_field "$1" "status" "$2"
 }
 
-# Assign GPU to task
-# Usage: assign_task_gpu <task_file> <gpu_id>
-assign_task_gpu() {
-    update_task_field "$1" "gpu_id" "$2" "true"
+# Assign GPUs to task
+# Usage: assign_task_gpus <task_file> <gpu_ids_csv>
+assign_task_gpus() {
+    update_task_field "$1" "assigned_gpus" "$2"
 }
 
 # Mark task as started
-# Usage: mark_task_started <task_file> <gpu_id>
+# Usage: mark_task_started <task_file> <gpu_ids_csv>
 mark_task_started() {
     _task_serialization_require_jq || return 1
 
     local task_file="$1"
-    local gpu_id="$2"
+    local assigned_gpus="$2"
     local now
     now=$(_now_iso)
 
     local tmp_file="${task_file}.tmp.${BASHPID:-$$}"
     local jq_rc=0
-    jq --argjson gpu "${gpu_id}" --arg time "${now}" \
-        '.status = "running" | .gpu_id = $gpu | .started_at = $time | .completed_at = null | .error_msg = null' \
-        "${task_file}" > "${tmp_file}" || jq_rc=$?
-
-    if [[ ${jq_rc} -eq 0 ]]; then
-        if mv "${tmp_file}" "${task_file}"; then
-            return 0
-        fi
-    fi
-    rm -f "${tmp_file}"
-    return 1
-}
-
-# Mark task as started with multiple GPUs
-# Usage: mark_task_started_multi <task_file> <gpu_ids_csv>
-# Example: mark_task_started_multi task.json "0,1,2,3"
-mark_task_started_multi() {
-    _task_serialization_require_jq || return 1
-
-    local task_file="$1"
-    local gpu_ids="$2"  # Comma-separated GPU IDs
-    local now
-    now=$(_now_iso)
-
-    # Extract first GPU as primary gpu_id for backward compatibility
-    local primary_gpu="${gpu_ids%%,*}"
-
-    local tmp_file="${task_file}.tmp.${BASHPID:-$$}"
-    local jq_rc=0
-    jq --argjson gpu "${primary_gpu}" --arg gpus "${gpu_ids}" --arg time "${now}" \
-        '.status = "running" | .gpu_id = $gpu | .assigned_gpus = $gpus | .started_at = $time | .completed_at = null | .error_msg = null' \
+    jq --arg gpus "${assigned_gpus}" --arg time "${now}" \
+        '.status = "running" | .assigned_gpus = $gpus | .started_at = $time | .completed_at = null | .error_msg = null' \
         "${task_file}" > "${tmp_file}" || jq_rc=$?
 
     if [[ ${jq_rc} -eq 0 ]]; then

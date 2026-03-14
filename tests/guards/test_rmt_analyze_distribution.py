@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-from invarlock.guards.rmt import analyze_weight_distribution
+from invarlock.guards.rmt_legacy import analyze_weight_distribution
 
 
 def test_analyze_weight_distribution_smoke():

@@ -1,6 +1,6 @@
 # InvarLock Documentation
 
-The OSS core is edit‑agnostic (BYOE). A small built‑in quantization demo
+InvarLock is edit‑agnostic (BYOE). A small built‑in quantization demo
 (`quant_rtn`, 8‑bit) exists for CI/quickstart. See
 [Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md).
 
@@ -72,14 +72,14 @@ Tip: enable Hub downloads per command when fetching models/datasets:
 - [Programmatic Quickstart](reference/programmatic-quickstart.md)
 - [Environment Variables](reference/env-vars.md)
 
-<!-- Runbooks removed in minimal OSS footprint -->
+<!-- Runbooks removed in minimal public footprint -->
 
-<!-- Design docs removed in minimal OSS footprint -->
+<!-- Design docs removed in minimal public footprint -->
 
 ### Assurance
 
-- [Safety Case](assurance/00-safety-case.md)
-- [Evaluation Math](assurance/01-eval-math-proof.md)
+- [Assurance Case](assurance/00-assurance-case.md)
+- [Evaluation Math Derivation](assurance/01-eval-math-derivation.md)
 - [Coverage & Pairing Plan](assurance/02-coverage-and-pairing.md)
 - [BCa Bootstrap (Paired Δlog)](assurance/03-bca-bootstrap.md)
 - [Guard Contracts & Primer](assurance/04-guard-contracts.md)
@@ -93,7 +93,7 @@ Tip: enable Hub downloads per command when fetching models/datasets:
 - [Device Drift Bands](assurance/12-device-drift-bands.md)
 - [GPU/MPS-First Guards (Decision Memo)](assurance/13-gpu-mps-first-guards.md)
 
-Note: Every safety claim is backed by automated tests and cross-referenced in
+Note: Every assurance claim is backed by automated tests and cross-referenced in
 the docs. See Guard Contracts → Coverage Reference
 (assurance/04-guard-contracts.md) for the test index.
 
@@ -102,7 +102,7 @@ local or CI runs (typically under `runs/null_sweeps/**` and
 `reports/calibration/**`) and are not committed to the repository. Attach them
 to change proposals or releases when you update calibration.
 
-<!-- Developer docs removed in minimal OSS footprint. See project root CHANGELOG.md. -->
+<!-- Developer docs removed in minimal public footprint. See project root CHANGELOG.md. -->
 
 ### Security
 
@@ -125,8 +125,8 @@ to change proposals or releases when you update calibration.
 3. **Validate** – generate reports via `invarlock report` and run `invarlock verify` for policy compliance.
 4. **Iterate** – compare runs, adjust edit plans, and reissue reports until gates pass.
 
-The guard suite (invariants, spectral, variance, and RMT) ensures edits stay
-inside safety envelopes even when aggressive compression is attempted.
+The guard suite (invariants, spectral, variance, and RMT) keeps edits inside
+configured acceptance envelopes even when aggressive compression is attempted.
 
 ---
 
@@ -152,13 +152,20 @@ Notes
 
 ## Support Matrix
 
-| Component | Support                                                               |
-| --------- | --------------------------------------------------------------------- |
-| Python    | 3.12+                                                                 |
-| Devices   | CUDA, MPS (Apple Silicon), CPU                                        |
-| Models    | GPT‑2 Small/Medium adapters                                           |
-| Edits     | RTN quantization (demo built-in); others via Compare & evaluate (BYOE) |
-| Datasets  | WikiText‑2 (paired 200/200 windows), synthetic samples                |
+| Surface | Preset shipped | Adapter available | Pilot calibration config present | Published assurance basis |
+| ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
+| GPT-2 causal LM | Yes | Yes | Yes | Yes |
+| BERT / RoBERTa MLM | Yes | Yes | Yes | Yes |
+| Mistral 7B causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
+| Qwen2 7B causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
+| Seq2Seq / local pairs | Yes | Yes | No | No |
+
+Published assurance basis currently covers GPT-2 and BERT profiles. Repo-shipped presets and pilot calibration configs for additional families, including Mistral 7B and Qwen2 7B, do not become part of the published assurance basis until supporting artifacts are attached.
+
+Machine-readable support metadata lives in `contracts/support_matrix.json`. It is
+the canonical source of truth for normalized support tiers
+(`published_basis`, `supported_experimental`, `community_experimental`) and for
+published-basis evidence references.
 
 ---
 
@@ -234,7 +241,7 @@ output:
 
 ---
 
-<!-- Quick CPU Demos section removed in minimal OSS footprint -->
+<!-- Quick CPU Demos section removed in minimal public footprint -->
 
 ```bash
 NET=1 INCLUDE_MEASURED_CLS=1 RUN=0 bash scripts/run_tiny_all_matrix.sh

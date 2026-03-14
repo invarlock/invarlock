@@ -5,7 +5,9 @@ from types import SimpleNamespace
 
 from typer.testing import CliRunner
 
+from invarlock.cli import output as output_mod
 from invarlock.cli.app import app as cli
+from tests.cli.support import RecordingConsole
 
 
 def _cfg(tmp_path: Path, *, provider: str = "synthetic") -> str:
@@ -175,3 +177,151 @@ def test_run_audit_routes_provider_events_without_emojis(
     assert "[DATA] Creating evaluation windows:" in s
     assert "📚" not in s
     assert "📊" not in s
+
+
+def test_output_style_resolution_paths(monkeypatch) -> None:
+    monkeypatch.delenv("NO_COLOR", raising=False)
+
+    audit = output_mod.OutputStyle(name="audit")
+    friendly = output_mod.OutputStyle(name="friendly")
+    assert audit.audit is True
+    assert audit.emojis is False
+    assert friendly.audit is False
+    assert friendly.emojis is True
+
+    assert output_mod.normalize_style(None) is None
+    assert output_mod.normalize_style("   ") is None
+    assert output_mod.normalize_style("friendly") == "friendly"
+    assert output_mod.normalize_style("unknown") is None
+
+    assert output_mod.resolve_style_name(None, "release") == "audit"
+    assert output_mod.resolve_style_name(None, "dev") == "friendly"
+    assert output_mod.resolve_style_name(" friendly ", "release") == "friendly"
+
+    monkeypatch.setenv("NO_COLOR", "1")
+    resolved = output_mod.resolve_output_style(
+        style=None,
+        profile="dev",
+        progress=True,
+        timing=True,
+        no_color=False,
+    )
+    assert resolved.name == "friendly"
+    assert resolved.progress is True
+    assert resolved.timing is True
+    assert resolved.color is False
+
+    explicit = output_mod.resolve_output_style(
+        style="audit",
+        profile="dev",
+        progress=False,
+        timing=False,
+        no_color=True,
+    )
+    assert explicit.name == "audit"
+    assert explicit.color is False
+
+
+def test_output_printing_and_style_assignment() -> None:
+    fallback_console = RecordingConsole(fail_with_kwargs=True)
+    output_mod._safe_console_print(
+        fallback_console, "hello", style="green", markup=False
+    )
+    assert fallback_console.calls == [(("hello",), {})]
+
+    recorder = RecordingConsole()
+    audit = output_mod.OutputStyle(name="audit", color=True)
+    friendly = output_mod.OutputStyle(name="friendly", color=True)
+    no_color = output_mod.OutputStyle(name="friendly", color=False)
+
+    output_mod.print_event(recorder, "pass", "ok", style=audit)
+    output_mod.print_event(recorder, "fail", "bad", style=audit)
+    output_mod.print_event(recorder, "warn", "careful", style=audit)
+    output_mod.print_event(recorder, "metric", "ratio=1.2", style=audit)
+    output_mod.print_event(
+        recorder,
+        "",
+        "uses default tag",
+        style=friendly,
+        emoji="✅",
+        console_style="magenta",
+    )
+    output_mod.print_event(recorder, "info", "still plain", style=audit)
+    output_mod.print_event(recorder, "info", "plain", style=no_color, emoji="🎯")
+
+    lines = [call[0][0] for call in recorder.calls]
+    kwargs = [call[1] for call in recorder.calls]
+    assert lines[0] == "[PASS] ok"
+    assert kwargs[0]["style"] == "green"
+    assert kwargs[1]["style"] == "red"
+    assert kwargs[2]["style"] == "yellow"
+    assert kwargs[3]["style"] == "cyan"
+    assert lines[4] == "✅ uses default tag"
+    assert kwargs[4]["style"] == "magenta"
+    assert lines[5] == "[INFO] still plain"
+    assert kwargs[5]["style"] is None
+    assert lines[6] == "🎯 plain"
+    assert kwargs[6]["style"] is None
+
+    assert output_mod.format_event_line("", "message", style=audit) == "[INFO] message"
+    assert (
+        output_mod.format_event_line("warn", "notice  ", style=friendly, emoji="⚠️")
+        == "⚠️ notice"
+    )
+
+
+def test_output_timing_helpers_cover_progress_and_summary(monkeypatch) -> None:
+    console = RecordingConsole()
+    style = output_mod.OutputStyle(name="audit", progress=True, timing=True, color=True)
+    perf_values = iter([10.0, 12.25, 20.0, 20.5])
+    monkeypatch.setattr(output_mod, "perf_counter", lambda: next(perf_values))
+
+    timings: dict[str, float] = {}
+    with output_mod.timed_step(
+        console=console,
+        style=style,
+        timings=timings,
+        key="phase",
+        tag="pass",
+        message="phase",
+        emoji="✅",
+    ):
+        pass
+    assert timings["phase"] == 2.25
+    assert console.calls[-1][0][0] == "[PASS] phase done (2.25s)"
+
+    no_progress = output_mod.OutputStyle(
+        name="friendly", progress=False, timing=False, color=True
+    )
+    with output_mod.timed_step(
+        console=console,
+        style=no_progress,
+        timings=None,
+        key="silent",
+        tag="info",
+        message="skip",
+    ):
+        pass
+    assert "silent" not in timings
+
+    before_summary = len(console.calls)
+    output_mod.print_timing_summary(
+        console,
+        {"phase": 2.25},
+        style=output_mod.OutputStyle(name="audit", timing=False),
+        order=[("Phase", "phase")],
+    )
+    assert len(console.calls) == before_summary
+
+    output_mod.print_timing_summary(
+        console,
+        {"phase": 2.25},
+        style=style,
+        order=[("Phase", "phase"), ("Missing", "missing")],
+        extra_lines=["  extra"],
+    )
+    rendered = [call[0][0] for call in console.calls[before_summary:]]
+    assert rendered[0] == ""
+    assert rendered[1] == "TIMING SUMMARY"
+    assert rendered[2].startswith("  Phase")
+    assert rendered[-1] == "  extra"

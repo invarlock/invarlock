@@ -35,7 +35,7 @@ test_gpu_worker_sets_waiting_deps_when_only_pending_tasks() {
     mkdir -p "${QUEUE_DIR}"/{pending,ready,running,completed,failed}
 
     # Create a pending task so pending>0 and ready==0.
-    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, gpu_id:-1, assigned_gpus:null, dependencies:["dep"], params:{}, priority:50}' \
+    jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:["dep"], params:{}, priority:50}' \
         > "${QUEUE_DIR}/pending/t1.task"
 
     get_gpu_available_memory() { echo "100"; }
@@ -74,7 +74,7 @@ test_gpu_worker_exits_on_poison_context_log() {
 
     local task_id="poison"
     local task_file="${QUEUE_DIR}/running/${task_id}.task"
-    jq -n '{task_id:"poison", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"running", retries:0, max_retries:3, created_at:"x", started_at:"x", completed_at:null, error_msg:null, gpu_id:0, assigned_gpus:"0", dependencies:[], params:{}, priority:50}' \
+    jq -n '{task_id:"poison", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"running", retries:0, max_retries:3, created_at:"x", started_at:"x", completed_at:null, error_msg:null, assigned_gpus:"0", dependencies:[], params:{}, priority:50}' \
         > "${task_file}"
 
     get_gpu_available_memory() { echo "100"; }
@@ -193,7 +193,7 @@ test_gpu_worker_success_path_with_oom_precheck_and_cleanup_hooks() {
 
     local task_id="ok1"
     local task_file="${QUEUE_DIR}/running/${task_id}.task"
-    jq -n '{task_id:"ok1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"running", retries:0, max_retries:3, created_at:"x", started_at:"x", completed_at:null, error_msg:null, gpu_id:0, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
+    jq -n '{task_id:"ok1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"running", retries:0, max_retries:3, created_at:"x", started_at:"x", completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
         > "${task_file}"
 
     get_gpu_available_memory() { echo "100"; }
@@ -230,7 +230,7 @@ test_gpu_worker_survives_risk_level_probe_failure() {
 
     local task_id="risk1"
     local task_file="${QUEUE_DIR}/running/${task_id}.task"
-    jq -n '{task_id:"risk1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"running", retries:0, max_retries:3, created_at:"x", started_at:"x", completed_at:null, error_msg:null, gpu_id:0, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
+    jq -n '{task_id:"risk1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"running", retries:0, max_retries:3, created_at:"x", started_at:"x", completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
         > "${task_file}"
 
     get_gpu_available_memory() { echo "100"; }
@@ -292,7 +292,7 @@ test_gpu_worker_failure_timeout_and_oom_branches_and_failure_threshold() {
 
     local task_id="fail1"
     local task_file="${QUEUE_DIR}/running/${task_id}.task"
-    jq -n '{task_id:"fail1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"running", retries:0, max_retries:3, created_at:"x", started_at:"x", completed_at:null, error_msg:null, gpu_id:0, assigned_gpus:"0", dependencies:[], params:{}, priority:50}' \
+    jq -n '{task_id:"fail1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"running", retries:0, max_retries:3, created_at:"x", started_at:"x", completed_at:null, error_msg:null, assigned_gpus:"0", dependencies:[], params:{}, priority:50}' \
         > "${task_file}"
 
     find_and_claim_task() { echo "${task_file}"; }

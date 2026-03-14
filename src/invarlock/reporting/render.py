@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import json
 import math
-from pathlib import Path
 
 # mypy: ignore-errors
 from typing import Any
 
 import yaml
+
+from invarlock.public_contracts import load_json_contract
 
 from .report_schema import validate_report
 
@@ -25,12 +26,9 @@ _CONSOLE_LABELS_DEFAULT = [
 def _load_console_labels() -> list[str]:
     """Load console labels allow-list from contracts with a safe fallback."""
     try:
-        root = Path(__file__).resolve().parents[3]
-        path = root / "contracts" / "console_labels.json"
-        if path.exists():
-            data = json.loads(path.read_text(encoding="utf-8"))
-            if isinstance(data, list) and all(isinstance(x, str) for x in data):
-                return list(data)
+        data = load_json_contract("console_labels.json")
+        if isinstance(data, list) and all(isinstance(x, str) for x in data):
+            return list(data)
     except Exception:
         pass
     return list(_CONSOLE_LABELS_DEFAULT)
@@ -112,6 +110,19 @@ def _format_plugin(plugin: dict[str, Any]) -> str:
 def _short_digest(v: str) -> str:
     v = str(v)
     return v if len(v) <= 16 else (v[:8] + "…" + v[-8:])
+
+
+def _dataset_hash_source_label(source: Any) -> str | None:
+    source_map = {
+        "explicit_preview_final_hashes": "provider-derived explicit preview/final hashes",
+        "explicit_token_ids": "content-derived token IDs",
+        "config_fallback": "config-derived fallback",
+    }
+    try:
+        key = str(source or "").strip()
+    except Exception:
+        return None
+    return source_map.get(key)
 
 
 def _render_executive_dashboard(cert: dict[str, Any]) -> str:
@@ -485,6 +496,9 @@ def _append_dataset_and_provenance_section(
             lines.append(f"- **Total Tokens:** {hash_blk.get('total_tokens'):,}")
         if hash_blk.get("dataset"):
             lines.append(f"- **Dataset Hash:** {hash_blk.get('dataset')}")
+        hash_source = _dataset_hash_source_label(hash_blk.get("source"))
+        if hash_source:
+            lines.append(f"- **Hash Source:** {hash_source}")
         tokenizer = dataset.get("tokenizer", {})
         if isinstance(tokenizer, dict) and (
             tokenizer.get("name") or tokenizer.get("hash")
@@ -1369,18 +1383,48 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
         families = rmt_info.get("families") or {}
         stable = bool(rmt_info.get("stable", True))
         status = "✅ OK" if stable else "❌ FAIL"
+        mode = rmt_info.get("mode")
+        if isinstance(mode, str) and mode.strip():
+            lines.append(f"- Mode: `{mode.strip()}`")
+        measurement_contract = (
+            rmt_info.get("measurement_contract")
+            if isinstance(rmt_info.get("measurement_contract"), dict)
+            else {}
+        )
+        if measurement_contract:
+            contract_parts: list[str] = []
+            estimator = measurement_contract.get("estimator")
+            if isinstance(estimator, dict) and estimator:
+                contract_parts.append(
+                    f"estimator={json.dumps(estimator, sort_keys=True)}"
+                )
+            activation_sampling = measurement_contract.get("activation_sampling")
+            if isinstance(activation_sampling, dict) and activation_sampling:
+                contract_parts.append(
+                    f"activation_sampling={json.dumps(activation_sampling, sort_keys=True)}"
+                )
+            if contract_parts:
+                lines.append(f"- Measurement Contract: {'; '.join(contract_parts)}")
         delta_total = rmt_info.get("delta_total")
         if isinstance(delta_total, int):
             lines.append(f"- Δ total: {delta_total:+d}")
         lines.append(f"- Status: {status}")
         lines.append(f"- Families: {len(families)}")
         if families:
+            edge_risk_mode = any(
+                isinstance(data, dict) and ("edge_base" in data or "edge_cur" in data)
+                for data in families.values()
+            )
             lines.append("")
             lines.append("<details>")
             lines.append("<summary>RMT family details</summary>")
             lines.append("")
-            lines.append("| Family | ε_f | Bare | Guarded | Δ |")
-            lines.append("|--------|-----|------|---------|---|")
+            if edge_risk_mode:
+                lines.append("| Family | ε_f | Edge Base | Edge Cur | Δ |")
+                lines.append("|--------|-----|-----------|----------|---|")
+            else:
+                lines.append("| Family | ε_f | Bare | Guarded | Δ |")
+                lines.append("|--------|-----|------|---------|---|")
             for family, data in families.items():
                 epsilon_val = data.get("epsilon")
                 epsilon_str = (
@@ -1388,9 +1432,30 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
                     if isinstance(epsilon_val, int | float)
                     else "-"
                 )
+                if edge_risk_mode:
+                    edge_base = data.get("edge_base")
+                    edge_cur = data.get("edge_cur")
+                    delta_val = data.get("delta")
+                    edge_base_str = (
+                        f"{edge_base:.3f}"
+                        if isinstance(edge_base, int | float)
+                        else "-"
+                    )
+                    edge_cur_str = (
+                        f"{edge_cur:.3f}" if isinstance(edge_cur, int | float) else "-"
+                    )
+                    delta_str = (
+                        f"{delta_val:+.3f}"
+                        if isinstance(delta_val, int | float)
+                        else "-"
+                    )
+                    lines.append(
+                        f"| {family} | {epsilon_str} | {edge_base_str} | {edge_cur_str} | {delta_str} |"
+                    )
+                    continue
                 bare_count = data.get("bare", 0)
                 guarded_count = data.get("guarded", 0)
-                delta_val = None
+                delta_count = None
                 try:
                     bare_str = str(int(bare_count))
                 except (TypeError, ValueError):
@@ -1400,10 +1465,10 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
                 except (TypeError, ValueError):
                     guarded_str = "-"
                 try:
-                    delta_val = int(guarded_count) - int(bare_count)  # type: ignore[arg-type]
+                    delta_count = int(guarded_count) - int(bare_count)  # type: ignore[arg-type]
                 except Exception:
-                    delta_val = None
-                delta_str = f"{delta_val:+d}" if isinstance(delta_val, int) else "-"
+                    delta_count = None
+                delta_str = f"{delta_count:+d}" if isinstance(delta_count, int) else "-"
                 lines.append(
                     f"| {family} | {epsilon_str} | {bare_str} | {guarded_str} | {delta_str} |"
                 )

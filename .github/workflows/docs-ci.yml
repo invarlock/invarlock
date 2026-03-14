@@ -2,10 +2,18 @@ name: Documentation CI
 
 on:
   # Cost optimization: main branch docs build is already in ci.yml
-  # This workflow only runs for PRs (detailed validation) and weekly link checks
+  # This workflow handles docs-only validation on integration/release branches.
+  push:
+    branches: [ main, staging/next ]
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - 'CONTRIBUTING.md'
+      - 'mkdocs.yml'
+      - '.github/workflows/docs-ci.yml'
   workflow_dispatch:
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, develop, staging/next ]
     paths:
       - 'docs/**'
       - 'README.md'
@@ -20,6 +28,9 @@ concurrency:
   group: docs-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   # Single consolidated job for docs validation (saves ~10 min setup overhead)
   docs-validate:
@@ -29,22 +40,22 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
       with:
         fetch-depth: 0
 
     - name: Setup Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
       with:
         python-version: '3.13'
 
     - name: Setup Node.js
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
       with:
         node-version: '18'
 
     - name: Cache pip
-      uses: actions/cache@v4
+      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
       # `act` can clobber PATH after setup-python on some hosts; cache is optional.
       if: ${{ !env.ACT }}
       with:
@@ -56,10 +67,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         # Install core package only (no [dev] which pulls torch/bitsandbytes ~3GB)
-        pip install -e .
-        pip install mkdocs mkdocs-material mkdocs-mermaid2-plugin linkchecker
-        # docs scripts need ruff/mypy only for lint, pytest for consistency checks
-        pip install ruff mypy pytest hypothesis
+        pip install -e .[ci,docs-ci]
 
     - name: Build docs (strict)
       run: mkdocs build --strict
@@ -69,11 +77,9 @@ jobs:
 
     - name: Lint markdown
       run: python scripts/docs_lint.py --markdown
-      continue-on-error: true
 
     - name: Spell check
       run: python scripts/docs_lint.py --spell
-      continue-on-error: true
 
     - name: Check consistency
       run: python scripts/docs_check.py --consistency
@@ -101,7 +107,7 @@ jobs:
 
     - name: Upload build artifacts
       if: github.event_name == 'pull_request'
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
       with:
         name: docs-build
         path: site/
@@ -116,15 +122,15 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
     - name: Setup Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
       with:
         python-version: '3.13'
 
     - name: Install link checker
-      run: pip install linkchecker
+      run: pip install -e .[docs-ci]
 
     - name: Check external links
       run: linkchecker --check-extern docs/
@@ -137,25 +143,28 @@ jobs:
     if: github.event_name == 'pull_request' && github.repository == 'invarlock/invarlock'
     needs: [docs-validate]
     timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
     - name: Setup Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
       with:
         python-version: '3.13'
 
     - name: Install dependencies
-      run: pip install mkdocs mkdocs-material mkdocs-mermaid2-plugin
+      run: pip install -e .[ci]
 
     - name: Build documentation
       run: mkdocs build
 
     - name: Deploy to Netlify
       if: env.NETLIFY_AUTH_TOKEN != ''
-      uses: nwtgck/actions-netlify@v3.0.0
+      uses: nwtgck/actions-netlify@dbedb29b68382c3d884447aa3968acec7af4fe73
       with:
         publish-dir: './site'
         production-branch: main

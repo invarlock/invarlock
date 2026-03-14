@@ -6,7 +6,7 @@ Loads guard policy values from the calibrated tiers.yaml source of truth.
 Provides fallback to hardcoded defaults if the YAML file is unavailable.
 
 The tiers.yaml file contains calibration values derived from pilot runs
-(November 2025 certification). This loader ensures code and config stay
+(November 2025 calibration). This loader ensures code and config stay
 synchronized.
 """
 

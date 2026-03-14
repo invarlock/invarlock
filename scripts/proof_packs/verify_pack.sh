@@ -9,7 +9,7 @@ Usage: scripts/proof_packs/verify_pack.sh --pack DIR [options]
 
 Options:
   --pack DIR          Proof pack directory to verify
-  --json-out FILE     Write verify JSON output to FILE
+  --json-out FILE     Write verify JSON output to FILE (must be outside the pack)
   --skip-verify       Skip invarlock verify step
   --strict            Fail closed on missing/invalid signatures and pack mismatches
   --help              Show this help message
@@ -60,6 +60,25 @@ else:
 PY
 }
 
+pack_path_within_dir() {
+    local dir_path="$1"
+    local candidate_path="$2"
+    python3 - "${dir_path}" "${candidate_path}" <<'PY'
+from pathlib import Path
+import sys
+
+dir_path = Path(sys.argv[1]).resolve()
+candidate_path = Path(sys.argv[2]).resolve()
+
+try:
+    candidate_path.relative_to(dir_path)
+except ValueError:
+    raise SystemExit(1)
+
+raise SystemExit(0)
+PY
+}
+
 pack_verify_manifest_binds_checksums() {
     local pack_dir="$1"
     local strict="$2"
@@ -86,6 +105,19 @@ pack_verify_manifest_binds_checksums() {
         return 1
     fi
 
+    return 0
+}
+
+pack_validate_manifest_schema() {
+    local pack_dir="$1"
+    local validator="${SCRIPT_DIR}/python/validate_manifest.py"
+    local out
+
+    if ! out="$(python3 "${validator}" "${pack_dir}/manifest.json" 2>&1)"; then
+        echo "ERROR: manifest.json failed contract validation." >&2
+        printf '%s\n' "${out}" >&2
+        return 1
+    fi
     return 0
 }
 
@@ -301,7 +333,14 @@ pack_verify_pack() {
         echo "ERROR: checksums.sha256 missing in pack." >&2
         return 1
     fi
+    if [[ -n "${json_out}" ]] && pack_path_within_dir "${pack_dir}" "${json_out}"; then
+        echo "ERROR: --json-out must point outside the pack directory." >&2
+        return 1
+    fi
 
+    if ! pack_validate_manifest_schema "${pack_dir}"; then
+        return 1
+    fi
     if ! pack_verify_gpg "${pack_dir}" "${strict}"; then
         return 1
     fi

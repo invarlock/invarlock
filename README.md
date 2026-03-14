@@ -14,6 +14,9 @@
   <a href="https://github.com/invarlock/invarlock/actions/workflows/ci.yml">
     <img alt="CI" src="https://img.shields.io/github/actions/workflow/status/invarlock/invarlock/ci.yml?branch=main&logo=github&label=CI" />
   </a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/invarlock/invarlock">
+    <img alt="OpenSSF Scorecard" src="https://api.scorecard.dev/projects/github.com/invarlock/invarlock/badge" />
+  </a>
   <a href="https://pypi.org/project/invarlock/">
     <img alt="PyPI" src="https://badge.fury.io/py/invarlock.svg" />
   </a>
@@ -34,8 +37,9 @@
 
 Quantizing, pruning, or otherwise editing a model’s weights can silently degrade quality.
 InvarLock compares an edited **subject** checkpoint against a fixed **baseline** with paired
-evaluation windows, enforces a guard pipeline (invariants → spectral → RMT → variance), and
-produces a machine‑readable Evaluation Report you can gate in CI.
+evaluation windows, enforces the canonical guard chain (`invariants` → `spectral` → `RMT`
+→ `variance` → `invariants`), and produces a machine-readable evaluation report you can gate
+in CI.
 
 ## Why InvarLock?
 
@@ -60,15 +64,15 @@ produces a machine‑readable Evaluation Report you can gate in CI.
                               │  ├─► Paired windows (deterministic)        │
 ┌───────────────────────┐     │  ├─► GuardChain pipeline                   │
 │ Subject  (checkpoint) │────►│  │   └─► invariants → spectral → RMT → VE  │
-└───────────────────────┘     │  └─► Emit: evaluation.report.json          │    
+└───────────────────────┘     │  └─► Emit: evaluation.report.json          │
                               │                                            │
-                              └────────────────────────────────────────────┘                                                                                               
-                                                     │                                                                                                                          
-                                     ┌───────────────┴───────────────┐                                                                                                          
-                                     ▼                               ▼                                                                                                          
-                                 ✅ PASS                          ❌ FAIL                                                                                                        
-                                 (ship)                          (rollback)    
-                                     
+                              └────────────────────────────────────────────┘
+                                                     │
+                                     ┌───────────────┴───────────────┐
+                                     ▼                               ▼
+                                 ✅ PASS                          ❌ FAIL
+                                 (ship)                          (rollback)
+
 ```
 
 ## Quick start
@@ -136,7 +140,7 @@ Optional extras: `invarlock[gpu]`, `invarlock[awq,gptq]`. Full setup: <https://g
 - Compare & evaluate (BYOE): <https://github.com/invarlock/invarlock/blob/main/docs/user-guide/compare-and-evaluate.md>
 - Reading a report: <https://github.com/invarlock/invarlock/blob/main/docs/user-guide/reading-report.md>
 - CLI reference: <https://github.com/invarlock/invarlock/blob/main/docs/reference/cli.md>
-- Assurance case: <https://github.com/invarlock/invarlock/blob/main/docs/assurance/00-safety-case.md>
+- Assurance case: <https://github.com/invarlock/invarlock/blob/main/docs/assurance/00-assurance-case.md>
 - Threat model: <https://github.com/invarlock/invarlock/blob/main/docs/security/threat-model.md>
 
 ## Community
@@ -187,6 +191,7 @@ For guidance on where to ask questions, how to report bugs, and what to expect i
 
 - Contributing guide: <https://github.com/invarlock/invarlock/blob/main/CONTRIBUTING.md>
 - Fast local checks (repo clone):
+  - `make` targets auto-select Python 3.12+, preferring an active 3.12 env, `python3.12`, then the Conda env `invarlock-py312` when present.
   - `make dev-install`
   - `make test`
   - `make lint`

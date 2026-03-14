@@ -13,6 +13,10 @@ import torch.nn as nn
 from sklearn.feature_selection import mutual_info_regression
 
 
+def _call_model(model: nn.Module, /, *args: Any, **kwargs: Any) -> Any:
+    return model(*args, **kwargs)
+
+
 def compute_neuron_mi_scores(
     model: nn.Module,
     calib_data: Any,
@@ -79,7 +83,7 @@ def compute_neuron_mi_scores(
                 input_ids = input_ids.to(device)
 
                 # Forward pass to collect activations
-                outputs = model(input_ids)
+                outputs = _call_model(model, input_ids)
 
                 # Use next token prediction as target
                 if hasattr(outputs, "logits"):

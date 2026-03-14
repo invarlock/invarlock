@@ -10,10 +10,10 @@
 | **Network** | `INVARLOCK_ALLOW_NETWORK=1` for model/dataset downloads. |
 | **Next step** | [Compare & evaluate](compare-and-evaluate.md) for production workflows. |
 
-This guide helps you get started with InvarLock (Edit‑agnostic robustness reports for weight edits)
+This guide helps you get started with InvarLock (Edit-agnostic robustness reports for weight edits)
 quickly. Every run flows through the **GuardChain**
-(invariants → spectral → RMT → variance) and produces a machine-readable safety
-report with drift, guard-overhead, and policy digests.
+(`invariants` → `spectral` → `RMT` → `variance` → `invariants`) and produces a
+machine-readable evaluation report with drift, guard-overhead, and policy digests.
 If any terms are unfamiliar, see the [Glossary](../assurance/glossary.md).
 
 Note: For installation and environment setup, see Getting Started. This page focuses on core commands and workflow.

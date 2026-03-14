@@ -102,7 +102,8 @@ class HF_BNB_Adapter(HFAdapterMixin, ModelAdapter):
                 "MODEL-LOAD-FAILED: bitsandbytes/transformers (pre-quantized)",
                 lambda e: {"model_id": model_id, "pre_quantized_bits": pre_quant_bits},
             ):
-                model = AutoModelForCausalLM.from_pretrained(
+                model = self._load_pretrained_model(
+                    AutoModelForCausalLM,
                     model_id,
                     device_map="auto",
                     trust_remote_code=True,
@@ -132,7 +133,8 @@ class HF_BNB_Adapter(HFAdapterMixin, ModelAdapter):
                 "MODEL-LOAD-FAILED: bitsandbytes/transformers",
                 lambda e: {"model_id": model_id},
             ):
-                model = AutoModelForCausalLM.from_pretrained(
+                model = self._load_pretrained_model(
+                    AutoModelForCausalLM,
                     model_id,
                     device_map="auto",
                     trust_remote_code=True,

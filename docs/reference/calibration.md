@@ -44,6 +44,16 @@ invarlock calibrate ve-sweep \
   predictive gate behavior and recommend `min_effect_lognll`.
 - **Artifacts**: Each sweep emits JSON (machine), CSV (spreadsheet), Markdown
   (human), and a `tiers_patch_*.yaml` recommendation file.
+- **Artifact contract**: The file names above are treated as stable public
+  outputs and may be consumed directly by verification, review, and policy-pack
+  workflows.
+
+## Published Basis vs Shipped Configs
+
+Published assurance basis currently covers GPT-2 and BERT profiles. The repo
+also ships pilot calibration configs for additional families such as Mistral 7B
+and Qwen2 7B under `configs/calibration/`, but those configs are not part of
+the published assurance basis until supporting artifacts are attached.
 
 ### Policy-Tuning Sweep → Tier Policy Flow
 

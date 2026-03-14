@@ -63,7 +63,11 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
                 "MODEL-LOAD-FAILED: transformers AutoModelForMaskedLM",
                 lambda e: {"model_id": model_id},
             ):
-                model = AutoModelForMaskedLM.from_pretrained(model_id, **kwargs)
+                model = self._load_pretrained_model(
+                    AutoModelForMaskedLM,
+                    model_id,
+                    **kwargs,
+                )
         except Exception:
             with wrap_errors(
                 ModelLoadError,
@@ -71,7 +75,11 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
                 "MODEL-LOAD-FAILED: transformers AutoModel",
                 lambda e: {"model_id": model_id},
             ):
-                model = AutoModel.from_pretrained(model_id, **kwargs)
+                model = self._load_pretrained_model(
+                    AutoModel,
+                    model_id,
+                    **kwargs,
+                )
 
         return self._safe_to_device(model, device)
 
@@ -354,7 +362,6 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
         # Early validate critical config fields required by tests
         n_heads = getattr(config, "num_attention_heads", None)
         hidden_size = getattr(config, "hidden_size", None)
-        vocab_size = getattr(config, "vocab_size", None)
         if n_heads is None or hidden_size is None:
             raise AdapterError(
                 code="E202",

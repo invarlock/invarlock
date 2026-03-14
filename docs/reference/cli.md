@@ -6,7 +6,7 @@
 | --- | --- |
 | **Purpose** | Command-line interface for evaluation, verification, and reporting. |
 | **Audience** | Operators running InvarLock from terminal/CI. |
-| **Primary commands** | `evaluate`, `verify`, `report`, `run`, `plugins`, `doctor`. |
+| **Primary commands** | `evaluate`, `verify`, `policy`, `report`, `run`, `plugins`, `doctor`. |
 | **Requires** | `invarlock[hf]` for HF workflows; optional extras for quantized adapters. |
 | **Network** | Offline by default; enable per command with `INVARLOCK_ALLOW_NETWORK=1`. |
 | **Source of truth** | `src/invarlock/cli/app.py`, `src/invarlock/cli/commands/*.py`. |
@@ -57,6 +57,7 @@ For definitions of common terms (pairing, tier policy, primary metric), see the
 | Compare baseline vs subject | `invarlock evaluate` | `runs/` reports + `reports/eval` report. |
 | Single-model run report | `invarlock run` | `report.json` + `events.jsonl`. |
 | Validate report | `invarlock verify` | Exit code + validation messages. |
+| Build / verify policy pack | `invarlock policy` | `policy-pack.json` + verification result. |
 | Explain / HTML / compare | `invarlock report` | Rendered reports/evals. |
 | Inspect environment | `invarlock plugins` / `invarlock doctor` | Plugin diagnostics. |
 
@@ -100,6 +101,7 @@ Top‑level commands:
 | ------------------- | ------------------------------------------------------------------------- |
 | `invarlock evaluate` | evaluate two checkpoints (baseline vs subject) with pinned windows         |
 | `invarlock verify`  | Verify report JSONs against schema and pairing math                  |
+| `invarlock policy`  | Build and verify policy-pack artifacts                              |
 | `invarlock report`  | Operations on reports and reports (explain, html, validate, compare) |
 | `invarlock run`     | Advanced: single‑model evaluation to produce a report                     |
 | `invarlock plugins` | Manage optional backends; list available guards/edits/adapters            |
@@ -149,8 +151,9 @@ used to produce guard statistics.
   - measurement contract present, and
   - baseline/subject pairing (`*_measurement_contract_match = true`).
 
-`assurance.mode` and per-guard `guards.{spectral,rmt}.mode` are not supported;
-configs containing them are rejected.
+`edit.kind`, `edit.parameters`, `assurance.*`, and per-guard
+`guards.{spectral,rmt}.mode` are not supported; configs containing them are
+rejected.
 
 ### Quickstart Commands
 
@@ -210,6 +213,15 @@ Exhaustive command map with brief descriptions and notable options.
   - Args: `reportS...`
   - Options: `--baseline`, `--tolerance`, `--profile`, `--json`.
 
+- `invarlock policy` (group)
+  - Purpose: Build and verify policy-pack artifacts for Git-native policy workflows.
+  - Subcommands:
+    - `invarlock policy build`
+      - Options: `--resolved-policy`, `--overrides`, `--compatibility`, `--tier`, `--out`.
+    - `invarlock policy verify`
+      - Args: `pack`
+      - Options: `--json`.
+
 - `invarlock run`
   - Purpose: Execute pipeline from a YAML config (edit + guards + reports).
   - Options: `--config/-c`, `--device`, `--profile`, `--out`, `--edit`, `--tier`,
@@ -217,12 +229,12 @@ Exhaustive command map with brief descriptions and notable options.
     `--baseline`, `--no-cleanup`, `--timing`, `--telemetry`.
 
 - `invarlock report` (group)
-  - Purpose: Operations on reports/evalificates (verify, explain, html, validate).
+  - Purpose: Operations on reports/evaluation artifacts (verify, explain, html, validate).
   - Default (no subcommand): generate report(s) from a run.
-  - Options (default callback): `--run`, `--format (json|md|html|cert|all)`,
+  - Options (default callback): `--run`, `--format (json|md|html|report|all)`,
     `--compare`, `--baseline`, `--output/-o`.
   - Subcommands:
-    - `invarlock report verify` — recompute/verify metrics for report/cert.
+    - `invarlock report verify` — recompute/verify metrics for reports/evaluation reports.
       - Args: `reportS...`
       - Options: `--baseline`, `--tolerance`, `--profile`, `--json`.
     - `invarlock report explain` — explain gates for report vs baseline (primary metric ratio,
@@ -641,7 +653,7 @@ See also: User Guide → Scripts & Utilities for preparing checkpoints
 | Flag                                             | Description                                                       |
 | ------------------------------------------------ | ----------------------------------------------------------------- |
 | --tier {balanced,conservative,aggressive,none}   | Applies tier-specific guard thresholds.                           |
-| --profile {ci,release,ci_cpu}                    | Selects evaluation window counts and bootstrap depth.             |
+| --profile {ci,release,ci_cpu,dev}                | Selects evaluation window counts and bootstrap depth.             |
 | --probes N                                       | Enables micro-probes for exploratory analysis (default 0 for CI). |
 | --out PATH                                       | Overrides the run output directory.                               |
 | --baseline-report PATH                            | Reuse baseline `report.json` and skip baseline evaluation (pinned windows required). |

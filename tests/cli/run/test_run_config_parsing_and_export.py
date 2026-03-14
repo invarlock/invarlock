@@ -7,6 +7,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
+import typer
 from rich.console import Console
 
 from invarlock.cli.commands.run import run_command
@@ -116,13 +118,10 @@ class _Cfg:
         dataset_provider: object,
         loss_type: str = "ce",
         edit_plan: object | None = None,
-        edit_parameters: object | None = None,
         output: dict[str, object] | None = None,
     ) -> None:
         self.model = SimpleNamespace(id="gpt2", adapter="hf_causal", device="cpu")
         self.edit = SimpleNamespace(name="quant_rtn", plan=(edit_plan or {}))
-        if edit_parameters is not None:
-            self.edit.parameters = edit_parameters
         self.auto = SimpleNamespace(
             enabled=False, tier="balanced", probes=0, target_pm_ratio=None
         )
@@ -159,7 +158,6 @@ class _Cfg:
             "edit": {
                 "name": self.edit.name,
                 "plan": getattr(self.edit, "plan", {}),
-                "parameters": getattr(self.edit, "parameters", None),
             },
             "auto": {
                 "enabled": self.auto.enabled,
@@ -352,9 +350,7 @@ def test_run_command_provider_mapping_like_unwraps_data_and_items_fallback(
     assert captured[1].get("dataset_name") == "wikitext"
 
 
-def test_run_command_extracts_edit_config_from_plan_and_parameters(
-    tmp_path: Path,
-) -> None:
+def test_run_command_extracts_edit_config_from_plan(tmp_path: Path) -> None:
     captured: list[dict[str, object]] = []
 
     def resolver(*_a, **_k):
@@ -384,22 +380,6 @@ def test_run_command_extracts_edit_config_from_plan_and_parameters(
         edit_plan=plan,
     )
 
-    # parameters unwrap: mapping with items()
-    cfg_params_items = _Cfg(
-        outdir=tmp_path / "runs2",
-        dataset_provider="synthetic",
-        edit_plan={},
-        edit_parameters={"gamma": 3},
-    )
-
-    # parameters unwrap: dict subclass with hidden .items to hit isinstance(dict) branch
-    cfg_params_dict = _Cfg(
-        outdir=tmp_path / "runs3",
-        dataset_provider="synthetic",
-        edit_plan={},
-        edit_parameters=_DictNoItems({"delta": 4}),
-    )
-
     extra = (
         patch("invarlock.cli.commands.run._resolve_provider_and_split", resolver),
         patch(
@@ -412,22 +392,73 @@ def test_run_command_extracts_edit_config_from_plan_and_parameters(
     _run_with_common_patches(
         cfg=cfg_plan, exec_stub=exec_stub, post_stub=post_stub, extra_patches=extra
     )
-    _run_with_common_patches(
-        cfg=cfg_params_items,
-        exec_stub=exec_stub,
-        post_stub=post_stub,
-        extra_patches=extra,
-    )
-    _run_with_common_patches(
-        cfg=cfg_params_dict,
-        exec_stub=exec_stub,
-        post_stub=post_stub,
-        extra_patches=extra,
-    )
-
     assert captured[0] == {"alpha": 1, "beta": 2}
-    assert captured[1] == {"gamma": 3}
-    assert captured[2] == {"delta": 4}
+
+
+def test_run_command_rejects_legacy_edit_parameters(tmp_path: Path) -> None:
+    cfg = _Cfg(outdir=tmp_path / "runs", dataset_provider="synthetic", edit_plan={})
+    cfg.edit.parameters = _DictNoItems({"delta": 4})
+
+    def exec_stub(**kwargs):  # noqa: ANN001
+        return _core_report(evaluation_windows={}), kwargs.get("model")
+
+    def post_stub(**kwargs):  # noqa: ANN001
+        return {"json": str(tmp_path / "report.json")}
+
+    extra = (
+        patch(
+            "invarlock.cli.commands.run._resolve_provider_and_split",
+            lambda *_a, **_k: (
+                SimpleNamespace(windows=lambda **_kw: _provider_windows(1, 1)),
+                "validation",
+                False,
+            ),
+        ),
+        patch(
+            "invarlock.eval.data.get_provider",
+            lambda *_a, **_k: SimpleNamespace(
+                windows=lambda **_kw: _provider_windows(1, 1)
+            ),
+        ),
+    )
+    with pytest.raises(typer.Exit) as excinfo:
+        _run_with_common_patches(
+            cfg=cfg, exec_stub=exec_stub, post_stub=post_stub, extra_patches=extra
+        )
+    assert excinfo.value.exit_code == 2
+
+
+def test_run_command_rejects_legacy_edit_kind(tmp_path: Path) -> None:
+    cfg = _Cfg(outdir=tmp_path / "runs", dataset_provider="synthetic", edit_plan={})
+    cfg.edit.kind = "quant"
+
+    def exec_stub(**kwargs):  # noqa: ANN001
+        return _core_report(evaluation_windows={}), kwargs.get("model")
+
+    def post_stub(**kwargs):  # noqa: ANN001
+        return {"json": str(tmp_path / "report.json")}
+
+    extra = (
+        patch(
+            "invarlock.cli.commands.run._resolve_provider_and_split",
+            lambda *_a, **_k: (
+                SimpleNamespace(windows=lambda **_kw: _provider_windows(1, 1)),
+                "validation",
+                False,
+            ),
+        ),
+        patch(
+            "invarlock.eval.data.get_provider",
+            lambda *_a, **_k: SimpleNamespace(
+                windows=lambda **_kw: _provider_windows(1, 1)
+            ),
+        ),
+    )
+    with pytest.raises(typer.Exit) as excinfo:
+        _run_with_common_patches(
+            cfg=cfg, exec_stub=exec_stub, post_stub=post_stub, extra_patches=extra
+        )
+    assert excinfo.value.exit_code == 2
 
 
 def test_run_command_writes_telemetry_report(tmp_path: Path) -> None:

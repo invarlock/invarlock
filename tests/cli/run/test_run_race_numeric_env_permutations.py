@@ -58,10 +58,53 @@ def _provider_min():
     )
 
 
+@pytest.fixture(autouse=True)
+def _offline_registry_stub():
+    class _Registry:
+        def get_adapter(self, name):
+            return SimpleNamespace(
+                name=name,
+                load_model=lambda model_id, device=None: SimpleNamespace(
+                    named_parameters=lambda: [], named_buffers=lambda: []
+                ),
+            )
+
+        def get_edit(self, name):
+            return SimpleNamespace(name=name)
+
+        def get_guard(self, name):
+            return SimpleNamespace(name=name)
+
+        def get_plugin_metadata(self, name, kind):
+            return {"name": name, "module": f"{kind}.{name}", "version": "test"}
+
+    with patch("invarlock.core.registry.get_registry", lambda: _Registry()):
+        yield
+
+
 def _common_ce_detect_ce():
+    class _Registry:
+        def get_adapter(self, name):
+            return SimpleNamespace(
+                name=name,
+                load_model=lambda model_id, device=None: SimpleNamespace(
+                    named_parameters=lambda: [], named_buffers=lambda: []
+                ),
+            )
+
+        def get_edit(self, name):
+            return SimpleNamespace(name=name)
+
+        def get_guard(self, name):
+            return SimpleNamespace(name=name)
+
+        def get_plugin_metadata(self, name, kind):
+            return {"name": name, "module": f"{kind}.{name}", "version": "test"}
+
     return (
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
+        patch("invarlock.core.registry.get_registry", lambda: _Registry()),
         patch(
             "invarlock.cli.commands.run.detect_model_profile",
             lambda model_id, adapter: SimpleNamespace(
@@ -221,7 +264,7 @@ def test_vars_failure_in_to_serialisable_dict(tmp_path: Path):
     class Cfg:
         def __init__(self):
             self.model = SimpleNamespace(id="gpt2", adapter="hf_causal", device="cpu")
-            self.edit = SimpleNamespace(name="structured", plan={})
+            self.edit = SimpleNamespace(name="quant_rtn", plan={})
             self.auto = SimpleNamespace(enabled=False, tier="balanced", probes=0)
             self.guards = SimpleNamespace(order=[])
             self.dataset = SimpleNamespace(
@@ -522,7 +565,7 @@ def test_mlm_probability_inversion(tmp_path: Path):
     class Cfg:
         def __init__(self):
             self.model = SimpleNamespace(adapter="hf_causal", id="gpt2", device="cpu")
-            self.edit = SimpleNamespace(name="structured", plan={})
+            self.edit = SimpleNamespace(name="quant_rtn", plan={})
             self.dataset = SimpleNamespace(
                 provider="synthetic",
                 id="synthetic",
@@ -637,7 +680,7 @@ def test_baseline_mlm_no_masked_tokens_exit(tmp_path: Path):
     class Cfg:
         def __init__(self):
             self.model = SimpleNamespace(adapter="hf_causal", id="gpt2", device="cpu")
-            self.edit = SimpleNamespace(name="structured", plan={})
+            self.edit = SimpleNamespace(name="quant_rtn", plan={})
             self.dataset = SimpleNamespace(
                 provider="synthetic",
                 id="synthetic",
@@ -753,7 +796,7 @@ def test_guard_order_permutations(tmp_path: Path, order):
     class DummyCfg:
         def __init__(self):
             self.model = SimpleNamespace(id="gpt2", adapter="hf_causal", device="cpu")
-            self.edit = SimpleNamespace(name="structured", plan={})
+            self.edit = SimpleNamespace(name="quant_rtn", plan={})
             self.auto = SimpleNamespace(enabled=False, tier="balanced", probes=0)
             self.guards = SimpleNamespace(order=list(order))
             self.dataset = SimpleNamespace(

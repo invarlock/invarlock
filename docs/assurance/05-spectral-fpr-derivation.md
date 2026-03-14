@@ -7,7 +7,8 @@
 ## Claim
 
 The spectral guard enforces the calibrated WARN budget by monitoring per-family
-z-scores and limiting the per-run FPR.
+z-scores and limiting the per-run FPR under the chosen null-modeling
+assumptions.
 
 ## Derivation (sketch)
 
@@ -18,7 +19,7 @@ z = \frac{s - \mu_f}{\sigma_f}
 $$
 
 for a spectral statistic $s$ (e.g., top singular value). A WARN is issued if
-$|z| \ge \kappa_f$. Under a **null** where $z \sim \mathcal{N}(0,1)$, the
+$|z| \ge \kappa_f$. Under a **modeled null** where $z \approx \mathcal{N}(0,1)$, the
 per-module two-sided tail probability becomes
 
 $$
@@ -57,6 +58,8 @@ alongside $\kappa_f$ so auditors can recover the expected per-run WARN rate.
   `spectral.multiple_testing.{method,alpha,m}`,
   `spectral.summary.{sigma_quantile,max_caps,deadband}`, and
   `spectral.family_caps[*].kappa`.
+- The FPR story is a calibration assumption under the chosen null model, not a
+  theorem about arbitrary transformer weights.
 - Empirical histograms of $z$ should be approximately standard normal; heavy
   tails → raise $\kappa_f$ or use robust $\sigma$ (MAD-scaled).
 

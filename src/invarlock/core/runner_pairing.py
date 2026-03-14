@@ -1,0 +1,280 @@
+from __future__ import annotations
+
+import hashlib
+import math
+from array import array
+from collections.abc import Sequence
+from typing import Any
+
+BOOTSTRAP_COVERAGE_REQUIREMENTS = {
+    "conservative": {"preview": 220, "final": 220, "replicates": 1500},
+    "balanced": {"preview": 180, "final": 180, "replicates": 1200},
+    "aggressive": {"preview": 140, "final": 140, "replicates": 800},
+}
+
+
+def _hash_tokens(tokens: Sequence[int]) -> bytes:
+    if not tokens:
+        return b""
+    token_array = array("I", (int(token) & 0xFFFFFFFF for token in tokens))
+    return hashlib.blake2b(token_array.tobytes(), digest_size=16).digest()
+
+
+def duplicate_fraction(seqs: Sequence[Sequence[int]]) -> float:
+    if not seqs:
+        return 0.0
+    hashes = [_hash_tokens(seq) for seq in seqs]
+    unique = len(set(hashes))
+    return max(0.0, (len(hashes) - unique) / len(hashes))
+
+
+def overlap_fraction_from_context(context: dict[str, Any] | None) -> float | None:
+    if not isinstance(context, dict):
+        return None
+    dataset_cfg = context.get("dataset", {})
+    if not isinstance(dataset_cfg, dict):
+        return None
+    seq_len_val = dataset_cfg.get("seq_len")
+    if seq_len_val is None:
+        return None
+    stride_raw = dataset_cfg.get("stride", seq_len_val)
+    if stride_raw is None:
+        return None
+    try:
+        seq_len_f = float(seq_len_val)
+        stride_f = float(stride_raw)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(seq_len_f) or seq_len_f <= 0:
+        return None
+    if not math.isfinite(stride_f) or stride_f < 0:
+        return None
+    overlap = (seq_len_f - stride_f) / seq_len_f
+    return max(0.0, min(1.0, float(overlap)))
+
+
+def compare_with_baseline(
+    run_ids: Sequence[int],
+    run_tokens: Sequence[Sequence[int]],
+    baseline_section: dict[str, Any] | None,
+    split_label: str,
+) -> dict[str, Any]:
+    stats = {
+        "matched": 0,
+        "expected": 0,
+        "missing_ids": [],
+        "mismatched_ids": [],
+        "unexpected_ids": [],
+        "reason": None,
+    }
+
+    if not baseline_section:
+        stats["matched"] = len(run_tokens)
+        stats["expected"] = len(run_tokens)
+        stats["reason"] = "no_baseline_reference"
+        return stats
+
+    base_ids = baseline_section.get("window_ids") or []
+    base_tokens = baseline_section.get("input_ids") or []
+    if not isinstance(base_ids, list) or not isinstance(base_tokens, list):
+        stats["matched"] = len(run_tokens)
+        stats["expected"] = len(run_tokens)
+        stats["reason"] = "invalid_baseline_reference"
+        return stats
+
+    base_map: dict[int, bytes] = {}
+    for base_id, seq in zip(base_ids, base_tokens, strict=False):
+        try:
+            base_id_int = int(base_id)
+        except Exception:
+            continue
+        seq_list = list(seq) if not isinstance(seq, list) else seq
+        base_map[base_id_int] = _hash_tokens(seq_list)
+
+    stats["expected"] = len(base_map)
+    matched = 0
+    seen_ids: set[int] = set()
+    mismatched: list[int] = []
+    unexpected: list[int] = []
+
+    for run_id, seq in zip(run_ids, run_tokens, strict=False):
+        try:
+            run_id_int = int(run_id)
+        except Exception:
+            unexpected.append(run_id)
+            continue
+
+        hashed = _hash_tokens(seq)
+        if run_id_int not in base_map:
+            unexpected.append(run_id_int)
+            continue
+
+        seen_ids.add(run_id_int)
+        if hashed == base_map[run_id_int]:
+            matched += 1
+        else:
+            mismatched.append(run_id_int)
+
+    missing = [base_id for base_id in base_map if base_id not in seen_ids]
+    stats.update(
+        {
+            "matched": matched,
+            "missing_ids": missing,
+            "mismatched_ids": mismatched,
+            "unexpected_ids": unexpected,
+        }
+    )
+
+    if missing:
+        stats["reason"] = f"{split_label}_missing_ids:{missing[:3]}"
+    elif mismatched:
+        stats["reason"] = f"{split_label}_token_mismatch:{mismatched[:3]}"
+    elif unexpected:
+        stats["reason"] = f"{split_label}_unexpected_ids:{unexpected[:3]}"
+    else:
+        stats["reason"] = None
+
+    return stats
+
+
+def compute_window_pairing_metrics(
+    *,
+    preview_window_ids: Sequence[int],
+    preview_tokens: Sequence[Sequence[int]],
+    final_window_ids: Sequence[int],
+    final_tokens: Sequence[Sequence[int]],
+    pairing_context: dict[str, Any] | None,
+    config_context: dict[str, Any] | None,
+    preview_batches: int,
+    final_batches: int,
+) -> dict[str, Any]:
+    baseline_preview = (
+        pairing_context.get("preview") if isinstance(pairing_context, dict) else {}
+    )
+    baseline_final = (
+        pairing_context.get("final") if isinstance(pairing_context, dict) else {}
+    )
+
+    preview_pair_stats = compare_with_baseline(
+        preview_window_ids, preview_tokens, baseline_preview, "preview"
+    )
+    final_pair_stats = compare_with_baseline(
+        final_window_ids, final_tokens, baseline_final, "final"
+    )
+
+    total_expected = preview_pair_stats["expected"] + final_pair_stats["expected"]
+    total_matched = preview_pair_stats["matched"] + final_pair_stats["matched"]
+    total_unexpected = len(preview_pair_stats["unexpected_ids"]) + len(
+        final_pair_stats["unexpected_ids"]
+    )
+    match_denominator = total_expected + total_unexpected
+    match_fraction = (
+        float(total_matched / match_denominator) if match_denominator > 0 else 1.0
+    )
+    duplicate_fraction_value = duplicate_fraction([*preview_tokens, *final_tokens])
+    overlap_fraction = overlap_fraction_from_context(config_context)
+    overlap_unknown = overlap_fraction is None
+    if overlap_unknown:
+        overlap_fraction = 1.0
+    count_mismatch = preview_batches != final_batches
+
+    pairing_reason = None
+    if total_expected > 0:
+        for stats_dict, label in (
+            (preview_pair_stats, "preview"),
+            (final_pair_stats, "final"),
+        ):
+            if (
+                stats_dict["expected"]
+                and stats_dict["matched"] < stats_dict["expected"]
+            ):
+                pairing_reason = stats_dict.get("reason") or f"{label}_mismatch"
+                break
+    if pairing_reason is None:
+        if overlap_unknown:
+            pairing_reason = "overlap_unknown"
+        elif overlap_fraction > 0.0:
+            pairing_reason = "overlapping_windows"
+        elif duplicate_fraction_value > 0.0:
+            pairing_reason = "duplicate_windows"
+        elif count_mismatch:
+            pairing_reason = "count_mismatch"
+        else:
+            pairing_reason = preview_pair_stats.get("reason") or final_pair_stats.get(
+                "reason"
+            )
+
+    return {
+        "preview": preview_pair_stats,
+        "final": final_pair_stats,
+        "match_fraction": match_fraction,
+        "overlap_fraction": float(overlap_fraction),
+        "overlap_unknown": overlap_unknown,
+        "duplicate_fraction": duplicate_fraction_value,
+        "count_mismatch": count_mismatch,
+        "reason": pairing_reason,
+    }
+
+
+def _meets_requirement(actual: int, required: int) -> bool:
+    if required <= 0:
+        return True
+    return actual >= required
+
+
+def assess_bootstrap_coverage(
+    *,
+    tier: str,
+    preview_batches: int,
+    final_batches: int,
+    bootstrap_enabled: bool,
+    bootstrap_replicates: int,
+    requirements: dict[str, dict[str, int]] | None = None,
+) -> dict[str, Any]:
+    effective_requirements = requirements or BOOTSTRAP_COVERAGE_REQUIREMENTS
+    balanced_fallback = effective_requirements.get(
+        "balanced", {"preview": 0, "final": 0, "replicates": 0}
+    )
+    coverage_requirements = effective_requirements.get(tier, balanced_fallback)
+
+    preview_required = int(coverage_requirements.get("preview", 0))
+    final_required = int(coverage_requirements.get("final", 0))
+    replicates_required = int(coverage_requirements.get("replicates", 0))
+
+    preview_ok = _meets_requirement(preview_batches, preview_required)
+    final_ok = _meets_requirement(final_batches, final_required)
+    replicates_ok = (
+        _meets_requirement(bootstrap_replicates, replicates_required)
+        if bootstrap_enabled
+        else True
+    )
+
+    coverage = {
+        "tier": tier,
+        "preview": {
+            "used": int(preview_batches),
+            "required": preview_required,
+            "ok": bool(preview_ok),
+        },
+        "final": {
+            "used": int(final_batches),
+            "required": final_required,
+            "ok": bool(final_ok),
+        },
+        "replicates": {
+            "used": int(bootstrap_replicates),
+            "required": replicates_required,
+            "ok": bool(replicates_ok),
+        },
+    }
+
+    return {
+        "ok": bool(preview_ok and final_ok and replicates_ok),
+        "preview_required": preview_required,
+        "final_required": final_required,
+        "replicates_required": replicates_required,
+        "preview_ok": bool(preview_ok),
+        "final_ok": bool(final_ok),
+        "replicates_ok": bool(replicates_ok),
+        "coverage": coverage,
+    }

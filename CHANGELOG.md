@@ -7,15 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-03-14
+
 ### Added
+- Published stable public contracts for support matrices, adapter capabilities,
+  plugin compatibility, proof-pack manifests, and policy packs, along with new
+  CLI policy tooling and shipped public evidence fixtures for published-basis
+  lanes.
+- Added dataset and RMT provenance to evaluation reports and expanded
+  claim-surface consistency checks across docs and verification flows.
 
 ### Changed
+- Refactored the trust-critical `verify`, runner, variance, and spectral paths
+  into thinner orchestration shells with split helper modules and stronger
+  per-file coverage thresholds.
+- Raised the project-wide coverage floor to 90%, expanded the enforced critical
+  surface, and reorganized CLI/core/eval/reporting tests around behavior-based
+  layouts and names.
+- Default local tooling now resolves to Python 3.12, docs linting includes
+  spellcheck, and repo housekeeping/ignore rules were tightened around generated
+  outputs and shipped fixtures.
+- Docs-only CI now runs on `staging/next` and `main`, with markdown and
+  spellcheck lint enforced as blocking checks instead of advisory-only steps.
+- Removed legacy CLI/reporting/config surfaces and dropped legacy proof-pack
+  layout compatibility.
 
 ### Fixed
+- Enforced verify-policy parity and preserved guard-contract parity when runs
+  reuse or compare baseline evidence.
+- Repaired quickstart evaluation flows, smoke helper runners, and plugin JSON
+  listing so lightweight command paths no longer instantiate dataset providers.
+- Repaired the trusted-publishing workflow pin, enabled idempotent reruns for
+  existing version uploads, and updated GitHub Release bundling to accept the
+  current Sigstore JSON signing artifacts used by the `v0.4.0` pipeline.
+- Hardened proof-pack verification to reject stray JSON outputs, use portable
+  UTC helpers, and keep pack verification behavior fail-closed.
+- Preserved tiny-relax provenance, MLM telemetry, and verify drift parity
+  across reporting and CLI flows, and skipped overhead gating during
+  calibration sweep runs where appropriate.
+- Suppressed known benign GPT-2-style Hugging Face load-report noise while
+  preserving actionable missing, unexpected, and mismatched checkpoint warnings.
+- Cleared the remaining CodeQL backlog and completed the current OpenSSF
+  hardening pass.
 
 ### Dependencies
+- Added docs spellcheck tooling and pinned repo formatter/build tooling for
+  reproducible local and CI verification.
+- Bumped GitHub `actions/cache` to v5.
 
 ### Documentation
+- Renamed and tightened assurance notes, narrowed the public claim surface, and
+  expanded reference docs for contracts, calibration, proof packs, and policy
+  provenance.
+- Refreshed README and test/example wording to match the stabilized
+  evaluate/report/verify contract and current repo structure.
+- Updated public docs to describe the canonical five-stage guard chain,
+  including the terminal invariants pass shown by current CLI output.
 
 ## [0.3.12] - 2026-02-27
 

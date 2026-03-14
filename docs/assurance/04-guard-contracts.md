@@ -12,7 +12,7 @@
 - [4. Reproducibility Kit](#4-reproducibility-kit) — how to reproduce a report
 - [5. Device Tolerance Guidance](#5-device-tolerance-guidance) — expected drift across backends
 - [6. Threshold Rationale (Defaults)](#6-threshold-rationale-defaults) — why the defaults are what they are
-- [7. Known Limitations](#7-known-limitations) — what the safety case does not cover
+- [7. Known Limitations](#7-known-limitations) — what the assurance case does not cover
 - [8. Coverage Reference](#8-coverage-reference) — tests that underpin this handbook
 
 This handbook captures the practical guarantees that underpin InvarLock's guard
@@ -233,8 +233,11 @@ Detailed derivations are in the calibration appendix (`09-tier-v1-calibration.md
 - No adversarial robustness or gradient masking guarantees.
 - CUDA kernels outside deterministic mode may exceed drift tolerances.
 - Reference mask-based flows are conservative; stronger compression requires plugins.
-- Calibration data currently covers GPT-2 and BERT profiles.
-  Contributions for additional model families are welcome—attach pilot certs
+- Published assurance basis currently covers GPT-2 and BERT profiles.
+- The repo also ships pilot calibration configs for additional families such as
+  Mistral 7B and Qwen2 7B; those configs are not part of the published
+  assurance basis until supporting artifacts are attached.
+- Contributions for additional model families are welcome; attach pilot reports
   and summary CSVs (typically written under `reports/calibration/` when running
   the calibration scripts) to change proposals or release artifacts.
 
@@ -251,7 +254,7 @@ Run them collectively with `make test` or `pytest -q -m "assurance"` where appli
 
 ## References
 
-- Evaluation math and paired ratios: `01-eval-math-proof.md`
+- Evaluation math and paired ratios: `01-eval-math-derivation.md`
 - Paired BCa bootstrap details: `03-bca-bootstrap.md`
 - Spectral FPR and multiple-testing control: `05-spectral-fpr-derivation.md`
 - RMT ε‑rule and outlier bands: `06-rmt-epsilon-rule.md`

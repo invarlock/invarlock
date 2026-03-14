@@ -1,21 +1,40 @@
-# Python
+# Python bytecode and packaging
 __pycache__/
 **/__pycache__/
 *.py[cod]
 *$py.class
 *.egg
 *.egg-info/
+.eggs/
 dist/
 build/
 pip-wheel-metadata/
+
+# Virtual environments
 .venv/
 .venv-invarlock/
 .venv-*/
 venv/
 env/
 ENV/
+.tox/
+.nox/
 
-# IDEs and OS
+# Test, coverage, and tool caches
+.pytest_cache/
+.coverage
+.coverage.*
+*/.coverage.*
+.hypothesis/
+htmlcov/
+coverage*.xml
+coverage-metrics.xml
+coverage-thresholds.json
+.mypy_cache/
+.ruff_cache/
+.pre-commit-cache/
+
+# IDE and OS cruft
 .vscode/
 .idea/
 *.swp
@@ -24,36 +43,47 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# AutoCoder specific
-output/
-logs/
-*.sqlite
-*.sqlite-journal
-chroma_db/ # If Chroma stores data locally by default in a dir
-
-# Secrets
+# Secrets and local environment files
+.env
+.env.*
 *.env
+.envrc
 secrets.py
 .pypirc
-TODO.md
-# Test results
-htmlcov/
-.pytest_cache/
-.coverage
-.coverage.*
-*/.coverage.*
-.hypothesis/
-coverage*.xml
-coverage-metrics.xml
-coverage-thresholds.json
 
-# Certificate outputs
-certificates/
+# Local scratch files
+TODO.md
+test_config.yaml
+sitecustomize.py
+fullLisk.txt
+*.clinerules
+.clinerules
+
+# Local runtime outputs
+/output/
+/logs/
+
+# Generated reports, runs, and release artifacts
+/reports/
+/reports_*/
+/reports_report/
+/runs/
+/runs_cfg/
+/demo_*/
+/mock_run/
+/artifacts/
+/tmp/
+/tmp_*/
+/.certify_tmp/
+*.log
+
+# Certificates and certify outputs
+/certificates/
 *_certificate/
 cert-*.json
 *.cert
 
-# Pruning results and test outputs
+# Pruning results and evaluation outputs
 *_pruning_results/
 *_pruning_results_*/
 test_*/
@@ -72,84 +102,39 @@ invarlock_comparison_results/
 final_model/
 step_*/
 
-# Demo and report outputs
-demo_*/
-reports_*/
-reports/
-runs_cfg/
-runs/
-reports_report/
-mock_run/
-*.log
-artifacts/
-artifacts/supply-chain/
-tmp_*/
-tmp/
-.certify_tmp/
-
-# Documentation builds and staging
-site/
-obsolete/
-node_modules/
-.npm-cache/
-.npm-prefix/
-.pre-commit-cache/
+# Documentation and frontend build outputs
+/site/
+/node_modules/
+/.npm-cache/
+/.npm-prefix/
 npm-debug.log*
 pnpm-debug.log*
 yarn-error.log*
 *.tsbuildinfo
 
-# Local override configs (user-specific)
+# Local override configs
 configs/overrides/*.yaml
 !configs/overrides/*.example.yaml
 !configs/overrides/README.md
 
-# Notebook checkpoints
+# Notebook checkpoints and notebook-local artifacts
 **/.ipynb_checkpoints/
-
-# Run artifacts
-benchmarks/results/
-
-# Datasets/cache (if any)
-.cache/
-
-# Notebooks artifacts
 notebooks/artifacts/
 notebooks/results/
 notebooks/*.csv
 
-# Misc
-*.pyc
-*.clinerules
-.mypy_cache/
-.ruff_cache/
-.clinerules
-sitecustomize.py
-fullLisk.txt
-test_config.yaml
+# Benchmarks and caches
+benchmarks/results/
+.cache/
 
-# Environments and local configs
-.env
-.envrc
+# Optional local asset trees
+/plans/
+/data/
+/.*/plans/
+/.*/reports/
 
-# Additional Python/packaging caches
-.tox/
-.nox/
-.eggs/
-
-
-# Optional local assets (not required for code/tests)
-plans/
-research/
-data/
-contracts/
-
-# Local-only CI workflows (for benchmarking, not required for core CI)
-# .github/workflows/guard-effect-benchmark.yml  # Temporarily tracked for optimization
+# Tracked public contracts and shipped test artifacts must remain visible.
+# Root-anchored output rules above avoid masking these paths.
 
 # Worktree scratch dirs
-.worktrees/
-
-# Research pipeline dirs
-research/verifai2_2026/
-scripts/verifai2_2026/
+/.worktrees/

@@ -37,6 +37,11 @@ model = adapter.load_model("gpt2", device="auto")
 print(adapter.describe(model)["model_type"])
 ```
 
+> Adapter availability is broader than the published assurance basis. GPT-2 and
+> BERT currently back the published calibrated basis; repo-shipped pilot configs
+> for Mistral 7B and Qwen2 7B are for experimentation until supporting
+> artifacts are attached.
+
 ## Concepts
 
 - **Adapters hide model-specific logic**: they handle loading, structure description,
@@ -70,6 +75,10 @@ Capability matrix (at a glance)
 | HF PyTorch (`hf_causal`, `hf_mlm`, `hf_seq2seq`) | Yes | Full | All |
 | Quantized (`hf_bnb`, `hf_awq`, `hf_gptq`) | Best-effort | Full when modules exposed | Linux |
 | ONNX (`hf_causal_onnx`) | No | Eval-only | All |
+
+Machine-readable adapter capability metadata is published at
+`contracts/adapter_capabilities.json` and surfaced through
+`invarlock plugins adapters --json`.
 
 ## Reference
 

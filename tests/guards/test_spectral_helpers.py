@@ -1,19 +1,17 @@
 import torch.nn as nn
 
-from invarlock.guards.spectral import (
-    SpectralGuard,
-    _normalize_family_caps,
-    classify_module_family,
-    scan_model_gains,
-)
+from invarlock.guards.spectral import SpectralGuard
+from invarlock.guards.spectral_detection import classify_module_family
+from invarlock.guards.spectral_measurement import scan_model_gains
+from invarlock.guards.spectral_policy import normalize_family_caps
 
 
 def test_normalize_family_caps_variants():
     # Empty or invalid returns defaults when default=True
-    caps = _normalize_family_caps(None)
+    caps = normalize_family_caps(None)
     assert isinstance(caps, dict) and caps
     # Dict with numeric and non-numeric
-    caps2 = _normalize_family_caps({"ffn": {"kappa": 2.0, "x": "y"}}, default=True)
+    caps2 = normalize_family_caps({"ffn": {"kappa": 2.0, "x": "y"}}, default=True)
     assert caps2["ffn"]["kappa"] == 2.0
 
 

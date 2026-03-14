@@ -20,7 +20,7 @@ def test_compute_edit_digest_quant_and_default() -> None:
     assert d2["family"] == "cert_only"
 
 
-def test_confidence_label_branches() -> None:
+def test_confidence_label_paths() -> None:
     # ppl-like, stable width => High, basis ppl_ratio
     c1 = {
         "validation": {"primary_metric_acceptable": True},

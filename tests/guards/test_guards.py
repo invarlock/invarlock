@@ -26,22 +26,25 @@ from invarlock.guards.policies import (
     get_spectral_policy,
     get_variance_policy,
 )
-from invarlock.guards.rmt import (
-    RMTGuard,
+from invarlock.guards.rmt import RMTGuard
+from invarlock.guards.rmt_legacy import (
     capture_baseline_mp_stats,
     layer_svd_stats,
     mp_bulk_edge,
     rmt_detect,
 )
-from invarlock.guards.spectral import (
-    SpectralGuard,
+from invarlock.guards.spectral import SpectralGuard
+from invarlock.guards.spectral_control import (
     apply_relative_spectral_cap,
     apply_spectral_control,
+)
+from invarlock.guards.spectral_measurement import (
     capture_baseline_sigmas,
     compute_sigma_max,
     scan_model_gains,
 )
-from invarlock.guards.variance import VarianceGuard, equalise_residual_variance
+from invarlock.guards.variance import VarianceGuard
+from invarlock.guards.variance_scaling import equalise_residual_variance
 
 
 class TestInvariantsGuardComprehensive:
@@ -320,7 +323,10 @@ class TestSpectralGuardComprehensive:
         guard.family_caps = {}
 
         with (
-            patch("invarlock.guards.spectral.capture_baseline_sigmas", return_value={}),
+            patch(
+                "invarlock.guards.spectral_measurement.capture_baseline_sigmas",
+                return_value={},
+            ),
             patch.object(
                 SpectralGuard,
                 "_detect_spectral_violations",
@@ -1735,7 +1741,7 @@ class TestAdditionalUtilityFunctions:
 
     def test_rmt_functions_comprehensive(self):
         """Test RMT functions comprehensively."""
-        from invarlock.guards.rmt import (
+        from invarlock.guards.rmt_legacy import (
             analyze_weight_distribution,
             clip_full_svd,
             mp_bulk_edges,
@@ -1888,7 +1894,7 @@ class TestRMTGuardCoverageBoost:
 
     def test_rmt_detect_with_names(self):
         """Test rmt_detect_with_names function."""
-        from invarlock.guards.rmt import rmt_detect_with_names
+        from invarlock.guards.rmt_legacy import rmt_detect_with_names
 
         result = rmt_detect_with_names(self.model, threshold=1.5, verbose=True)
         assert isinstance(result, dict)
@@ -1899,7 +1905,7 @@ class TestRMTGuardCoverageBoost:
 
     def test_rmt_detect_report(self):
         """Test rmt_detect_report function."""
-        from invarlock.guards.rmt import rmt_detect_report
+        from invarlock.guards.rmt_legacy import rmt_detect_report
 
         summary, per_layer = rmt_detect_report(self.model, threshold=1.5)
         assert isinstance(summary, dict)
@@ -1933,7 +1939,7 @@ class TestRMTGuardCoverageBoost:
 
     def test_mp_bulk_functions(self):
         """Test MP bulk edge functions comprehensively."""
-        from invarlock.guards.rmt import mp_bulk_edge, mp_bulk_edges
+        from invarlock.guards.rmt_legacy import mp_bulk_edge, mp_bulk_edges
 
         # Test mp_bulk_edges with different parameters
         min_edge, max_edge = mp_bulk_edges(100, 50, whitened=False)
@@ -1957,7 +1963,7 @@ class TestRMTGuardCoverageBoost:
 
     def test_clip_full_svd_edge_cases(self):
         """Test clip_full_svd with edge cases."""
-        from invarlock.guards.rmt import clip_full_svd
+        from invarlock.guards.rmt_legacy import clip_full_svd
 
         # Test with various matrix shapes
         W = torch.randn(20, 10)
@@ -1978,7 +1984,7 @@ class TestRMTGuardCoverageBoost:
 
     def test_analyze_weight_distribution(self):
         """Test analyze_weight_distribution function comprehensively."""
-        from invarlock.guards.rmt import analyze_weight_distribution
+        from invarlock.guards.rmt_legacy import analyze_weight_distribution
 
         stats = analyze_weight_distribution(self.model, n_bins=20)
         assert isinstance(stats, dict)
@@ -2355,7 +2361,7 @@ class TestVarianceGuardCoverageBoost:
 
     def test_equalise_residual_variance_edge_cases(self):
         """Test equalise_residual_variance with edge cases."""
-        from invarlock.guards.variance import equalise_residual_variance
+        from invarlock.guards.variance_scaling import equalise_residual_variance
 
         # Create simple model with forward method
         class SimpleModel(nn.Module):
@@ -2435,7 +2441,7 @@ class TestSpectralGuardExceptionCoverage:
 
         # Test with problematic tensor using patching
         with patch(
-            "invarlock.guards.spectral.power_iter_sigma_max",
+            "invarlock.guards.spectral_measurement.power_iter_sigma_max",
             side_effect=RuntimeError("power_iter failed"),
         ):
             real_tensor = torch.randn(5, 3)
@@ -2444,7 +2450,7 @@ class TestSpectralGuardExceptionCoverage:
 
     def test_auto_sigma_target_exception_handling(self):
         """Test auto_sigma_target exception handling (lines 102-106)."""
-        from invarlock.guards.spectral import auto_sigma_target
+        from invarlock.guards.spectral_measurement import auto_sigma_target
 
         # Test with a valid model - the function now computes real percentiles
         target = auto_sigma_target(nn.Linear(10, 5), percentile=0.9)
@@ -2465,7 +2471,7 @@ class TestSpectralGuardExceptionCoverage:
 
     def test_apply_weight_rescale_behavior(self):
         """Test apply_weight_rescale behavior (lines 121-131)."""
-        from invarlock.guards.spectral import apply_weight_rescale
+        from invarlock.guards.spectral_control import apply_weight_rescale
 
         # Test the actual implementation - it really rescales weights
         model = nn.Linear(10, 5)
@@ -2486,7 +2492,7 @@ class TestSpectralGuardExceptionCoverage:
 
     def test_apply_relative_spectral_cap_behavior(self):
         """Test apply_relative_spectral_cap behavior (lines 146-156)."""
-        from invarlock.guards.spectral import apply_relative_spectral_cap
+        from invarlock.guards.spectral_control import apply_relative_spectral_cap
 
         # Test the actual implementation
         model = nn.Linear(10, 5)
@@ -2504,7 +2510,7 @@ class TestSpectralGuardExceptionCoverage:
 
     def test_apply_spectral_control_behavior(self):
         """Test apply_spectral_control behavior (lines 171-181)."""
-        from invarlock.guards.spectral import apply_spectral_control
+        from invarlock.guards.spectral_control import apply_spectral_control
 
         # Test the actual implementation
         model = nn.Linear(10, 5)
@@ -2523,7 +2529,7 @@ class TestSpectralGuardExceptionCoverage:
 
     def test_capture_baseline_sigmas_behavior(self):
         """Test capture_baseline_sigmas behavior (lines 194-202)."""
-        from invarlock.guards.spectral import capture_baseline_sigmas
+        from invarlock.guards.spectral_measurement import capture_baseline_sigmas
 
         # Test the actual function behavior - it returns real sigma values
         model = nn.Linear(10, 5)
@@ -2538,7 +2544,7 @@ class TestSpectralGuardExceptionCoverage:
 
     def test_scan_model_gains_behavior(self):
         """Test scan_model_gains behavior (lines 215-226)."""
-        from invarlock.guards.spectral import scan_model_gains
+        from invarlock.guards.spectral_measurement import scan_model_gains
 
         # Test the actual implementation
         model = nn.Linear(10, 5)
@@ -2582,7 +2588,7 @@ class TestRMTEnhancedCoverage:
 
     def test_mp_bulk_functions_comprehensive(self):
         """Test MP bulk edge functions with edge cases (lines 102, 149)."""
-        from invarlock.guards.rmt import mp_bulk_edge, mp_bulk_edges
+        from invarlock.guards.rmt_legacy import mp_bulk_edge, mp_bulk_edges
 
         # Test whitened parameter variations (line 102)
         min_edge, max_edge = mp_bulk_edges(100, 50, whitened=True)
@@ -2600,14 +2606,14 @@ class TestRMTEnhancedCoverage:
         assert max_zero == 0.0
 
         # Test within_deadband function (line 149)
-        from invarlock.guards.rmt import within_deadband
+        from invarlock.guards.rmt_legacy import within_deadband
 
         assert within_deadband(1.05, 1.0, 0.1)
         assert not within_deadband(1.15, 1.0, 0.1)
 
     def test_layer_svd_stats_edge_cases(self):
         """Test layer_svd_stats with various edge cases (lines 176, 186-187, 211, 224-227)."""
-        from invarlock.guards.rmt import layer_svd_stats
+        from invarlock.guards.rmt_legacy import layer_svd_stats
 
         # Test with empty weight matrices (line 176)
         empty_layer = nn.Module()
@@ -2648,7 +2654,7 @@ class TestRMTEnhancedCoverage:
         # Test with transformers import failure simulation (lines 286-287)
         import sys
 
-        from invarlock.guards.rmt import capture_baseline_mp_stats
+        from invarlock.guards.rmt_legacy import capture_baseline_mp_stats
 
         if "transformers" in sys.modules:
             # Temporarily remove transformers to simulate import failure
@@ -2707,8 +2713,8 @@ class TestRMTEnhancedCoverage:
         # Should handle SVD failure gracefully and continue
 
     def test_iter_transformer_layers(self):
-        """Test _iter_transformer_layers with different model types (lines 346-356)."""
-        from invarlock.guards.rmt import _iter_transformer_layers
+        """Test iter_transformer_layers with different model types (lines 346-356)."""
+        from invarlock.guards.rmt_legacy import _iter_transformer_layers
 
         # Test GPT-2 style (covered in main tests)
         layers = list(_iter_transformer_layers(self.model))
@@ -2739,7 +2745,7 @@ class TestRMTEnhancedCoverage:
 
     def test_rmt_detect_comprehensive_branches(self):
         """Test rmt_detect with various parameter combinations (lines 457-470, 473-482, 487-488)."""
-        from invarlock.guards.rmt import rmt_detect
+        from invarlock.guards.rmt_legacy import rmt_detect
 
         # Test detect_only=False with correction (lines 457-470)
         baseline_mp_stats = capture_baseline_mp_stats(self.model)
@@ -2776,7 +2782,7 @@ class TestRMTEnhancedCoverage:
 
     def test_rmt_detect_iteration_and_correction(self):
         """Test rmt_detect iteration logic and correction (lines 511-515, 522-537, 542-547)."""
-        from invarlock.guards.rmt import rmt_detect
+        from invarlock.guards.rmt_legacy import rmt_detect
 
         # Test with max_iterations and correction stalling (lines 522-537)
         result = rmt_detect(
@@ -2804,7 +2810,7 @@ class TestRMTEnhancedCoverage:
 
     def test_rmt_detect_verbose_output(self):
         """Test rmt_detect verbose output and reporting (lines 555-580)."""
-        from invarlock.guards.rmt import rmt_detect
+        from invarlock.guards.rmt_legacy import rmt_detect
 
         # Create a model likely to have outliers for verbose testing
         outlier_model = nn.Module()
@@ -2827,7 +2833,7 @@ class TestRMTEnhancedCoverage:
 
     def test_rmt_detect_with_names_comprehensive(self):
         """Test rmt_detect_with_names with different model styles (lines 648-660, 681-691)."""
-        from invarlock.guards.rmt import rmt_detect_with_names
+        from invarlock.guards.rmt_legacy import rmt_detect_with_names
 
         # Test model.layers style model (lines 648-660)
         model_layers_model = nn.Module()
@@ -2874,7 +2880,7 @@ class TestRMTEnhancedCoverage:
 
     def test_rmt_detect_report_function(self):
         """Test rmt_detect_report function (lines 707-716)."""
-        from invarlock.guards.rmt import rmt_detect_report
+        from invarlock.guards.rmt_legacy import rmt_detect_report
 
         summary, per_layer = rmt_detect_report(self.model, threshold=1.5)
 
@@ -2885,7 +2891,7 @@ class TestRMTEnhancedCoverage:
 
     def test_apply_rmt_correction_comprehensive(self):
         """Test _apply_rmt_correction function (lines 744-834)."""
-        from invarlock.guards.rmt import _apply_rmt_correction
+        from invarlock.guards.rmt_legacy import _apply_rmt_correction
 
         # Create a test layer
         test_layer = nn.Linear(64, 128)
@@ -2951,7 +2957,7 @@ class TestRMTEnhancedCoverage:
 
     def test_clip_full_svd_edge_cases(self):
         """Test clip_full_svd with edge cases (lines 861-865)."""
-        from invarlock.guards.rmt import clip_full_svd
+        from invarlock.guards.rmt_legacy import clip_full_svd
 
         # Test normal case
         W = torch.randn(20, 15)
@@ -2975,7 +2981,7 @@ class TestRMTEnhancedCoverage:
 
     def test_analyze_weight_distribution_edge_cases(self):
         """Test analyze_weight_distribution with edge cases (lines 894-895, 898)."""
-        from invarlock.guards.rmt import analyze_weight_distribution
+        from invarlock.guards.rmt_legacy import analyze_weight_distribution
 
         # Test with model that has no 2D weights (line 898)
         empty_model = nn.Module()

@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-from invarlock.guards.rmt import rmt_detect_with_names
+from invarlock.guards.rmt_legacy import rmt_detect_with_names
 
 
 class TinyModel(nn.Module):

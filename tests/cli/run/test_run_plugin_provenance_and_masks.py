@@ -193,7 +193,7 @@ def test_edit_override_invalid_raises(tmp_path: Path):
             run_command(
                 config=str(cfg),
                 device="cpu",
-                edit="quant",
+                edit="quant_rtn",
                 out=str(tmp_path / "runs"),
                 until_pass=False,
             )

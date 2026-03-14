@@ -290,7 +290,7 @@ PACK_TUNED_EDIT_PARAMS_FILE="${PACK_TUNED_EDIT_PARAMS_FILE:-}"
 # Optional calibration preset reuse (skip calibration runs, copy presets in)
 PACK_CALIBRATION_PRESET_DIR="${PACK_CALIBRATION_PRESET_DIR:-}"
 PACK_CALIBRATION_PRESET_FILE="${PACK_CALIBRATION_PRESET_FILE:-}"
-# Delete edited/error models after certification to keep disk usage bounded.
+# Delete edited/error models after evaluation to keep disk usage bounded.
 # Override with PACK_CLEANUP_MODELS=0 to retain model variants for debugging.
 PACK_CLEANUP_MODELS="${PACK_CLEANUP_MODELS:-1}"
 export PACK_CLEANUP_MODELS
@@ -596,13 +596,11 @@ pack_source_libs() {
     SCRIPT_DIR="$(_pack_script_dir)"
     export SCRIPT_DIR  # Export for subshell workers
 
-    # Determine lib directory - support lib/ and flat layouts.
+    # Determine lib directory - support the repo lib dir and packaged v2 lib dir.
     if [[ -f "${SCRIPT_DIR}/task_serialization.sh" ]]; then
         LIB_DIR="${SCRIPT_DIR}"
     elif [[ -d "${SCRIPT_DIR}/lib" && -f "${SCRIPT_DIR}/lib/task_serialization.sh" ]]; then
         LIB_DIR="${SCRIPT_DIR}/lib"
-    elif [[ -d "${SCRIPT_DIR}/../lib" && -f "${SCRIPT_DIR}/../lib/task_serialization.sh" ]]; then
-        LIB_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)/lib"
     else
         LIB_DIR="${SCRIPT_DIR}"
     fi
@@ -1793,7 +1791,6 @@ main_dynamic() {
                 jq '(.params // {}) as $p
                     | .status="pending"
                     | .retries=0
-                    | .gpu_id=-1
                     | .assigned_gpus=null
                     | .started_at=null
                     | .completed_at=null

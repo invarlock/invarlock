@@ -79,7 +79,7 @@ security or alignment.
 - Strict configuration and report validation (`invarlock doctor`,
   `invarlock verify`) to detect misconfiguration and schema drift.
 - report fields for seeds, windowing, dataset/tokenizer hashes, and guard
-  telemetry so reviewers can audit the safety case.
+  telemetry so reviewers can audit the assurance evidence.
 
 ## Attack Scenarios
 
@@ -150,6 +150,6 @@ These match the assurance **non-goals**:
 
 ## See also
 
-- [Assurance Overview and scope](../assurance/00-safety-case.md)
+- [Assurance Overview and scope](../assurance/00-assurance-case.md)
 - [Security Best Practices](best-practices.md)
 - [Security Architecture](architecture.md)

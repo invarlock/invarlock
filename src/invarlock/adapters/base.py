@@ -439,10 +439,6 @@ class AdapterManager:
         return {"adapters": adapters_health}
 
 
-# Alias for backward compatibility
-AdapterMonitor = PerformanceTracker
-
-
 class AdapterUtils:
     """Adapter utility functions."""
 

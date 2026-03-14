@@ -169,16 +169,16 @@ Key points:
 
   ```bash
   make coverage
-  # or,
-  pytest -q \\
-    --cov=src/invarlock/eval --cov=src/invarlock/guards \\
-    --cov=src/invarlock/cli --cov=src/invarlock/core --cov=src/invarlock/reporting \\
-    --cov-branch \\
-    --cov-report=term --cov-report=xml:reports/cov.xml \
-    --cov-fail-under=80
   ```
 
-- The project-wide floor is enforced at **80%** via pytest-cov in `make coverage`.
+- `make coverage` intentionally includes grouped test sets for the
+  core/guards/reporting/calibration suites, the split run/verify/config
+  surfaces, targeted CLI command suites, and a small helper-coverage set
+  (for example adapter auto-resolution, no-color console handling, and
+  guard-overhead extraction) so the project-wide floor reflects the real
+  command surface instead of only the split core paths.
+
+- The project-wide floor is enforced at **90%** via pytest-cov in `make coverage`.
 
 - Enforce thresholds:
 
@@ -192,7 +192,7 @@ Key points:
   - Core runtime: everything under `src/invarlock/core/`
     (runner, registry, contracts, auto_tuning, events, types, checkpoint, api, retry)
   - Guards: everything under `src/invarlock/guards/`
-    (invariants, spectral, rmt, variance, policies)
+    (invariants, spectral, spectral_analysis, rmt, variance, policies)
   - Evaluation/reporting entry points:
     `src/invarlock/eval/metrics.py`,
     `src/invarlock/reporting/report.py`,
@@ -200,15 +200,57 @@ Key points:
     `src/invarlock/reporting/report_types.py`,
     `src/invarlock/reporting/report_schema.py`,
     `src/invarlock/reporting/validate.py`,
+    `src/invarlock/public_contracts.py`,
+    `src/invarlock/policy_pack.py`,
   - CLI commands:
     `src/invarlock/cli/commands/run.py`,
-    `src/invarlock/cli/commands/verify.py`
+    `src/invarlock/cli/commands/verify.py`,
+    `src/invarlock/cli/commands/policy.py`,
+    `src/invarlock/cli/verify_checks.py`,
+    `src/invarlock/cli/verify_output.py`
 
-- All of these surfaces are currently targeted at **≥90% branch (or line) coverage**.
+- Split-aware enforcement now uses four levels:
+  - **100% branch** for lifecycle shells:
+    `src/invarlock/core/runner.py`,
+    `src/invarlock/guards/variance.py`,
+    `src/invarlock/guards/spectral.py`
+  - **100% branch** for pure contract / policy / result / selection helpers:
+    `src/invarlock/reporting/report_schema.py`,
+    `src/invarlock/public_contracts.py`,
+    `src/invarlock/policy_pack.py`,
+    `src/invarlock/cli/commands/policy.py`,
+    `src/invarlock/cli/verify_output.py`,
+    `src/invarlock/core/runner_lifecycle.py`,
+    `src/invarlock/core/runner_pairing.py`,
+    `src/invarlock/core/runner_services.py`,
+    `src/invarlock/guards/variance_policy.py`,
+    `src/invarlock/guards/variance_results.py`,
+    `src/invarlock/guards/spectral_analysis.py`,
+    `src/invarlock/guards/spectral_policy.py`,
+    `src/invarlock/guards/spectral_results.py`,
+    `src/invarlock/guards/spectral_selection.py`
+  - **≥95% branch** for numerical / mutation helpers and large validation helpers:
+    `src/invarlock/core/runner_context.py`,
+    `src/invarlock/core/runner_eval_phase.py`,
+    `src/invarlock/core/runner_latency.py`,
+    `src/invarlock/core/runner_eval_windows.py`,
+    `src/invarlock/cli/verify_checks.py`,
+    `src/invarlock/guards/variance_batching.py`,
+    `src/invarlock/guards/variance_evaluation.py`,
+    `src/invarlock/guards/variance_prepare.py`,
+    `src/invarlock/guards/variance_ops.py`,
+    `src/invarlock/guards/variance_scaling.py`,
+    `src/invarlock/guards/spectral_control.py`,
+    `src/invarlock/guards/spectral_measurement.py`
+  - **≥90% branch** for the rest of the current critical surface until it is split further,
+    including orchestration helpers such as
+    `src/invarlock/core/runner_eval_metrics.py`,
+    `src/invarlock/core/runner_finalize.py`, and
+    `src/invarlock/core/runner_guards.py`
 
 When you modify a file covered by thresholds, please:
 
-- Add or extend tests to keep its measured coverage at or above 90%
+- Add or extend tests to keep its measured coverage at or above its enforced floor
 - Update/add entries in `scripts/check_coverage_thresholds.py` if you
   expand the critical surface or add new core modules
 

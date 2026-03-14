@@ -1,6 +1,7 @@
 import torch.nn as nn
 
-from invarlock.guards.variance import VarianceGuard, _predictive_gate_outcome
+from invarlock.guards.variance import VarianceGuard
+from invarlock.guards.variance_policy import predictive_gate_outcome
 
 
 class TinyBlock(nn.Module):
@@ -139,35 +140,35 @@ def test_set_ab_results_manual_override_predictive_gate():
 
 def test_predictive_gate_outcome_branches():
     # ci_unavailable
-    ok, reason = _predictive_gate_outcome(0.0, None, min_effect=0.0, one_sided=True)
+    ok, reason = predictive_gate_outcome(0.0, None, min_effect=0.0, one_sided=True)
     assert ok is False and reason == "ci_unavailable"
     # one-sided: lower >= 0
-    ok, reason = _predictive_gate_outcome(
+    ok, reason = predictive_gate_outcome(
         -0.1, (0.0, 0.1), min_effect=0.0, one_sided=True
     )
     assert ok is False and reason == "ci_contains_zero"
     # one-sided: mean_not_negative
-    ok, reason = _predictive_gate_outcome(
+    ok, reason = predictive_gate_outcome(
         0.1, (-0.2, -0.01), min_effect=0.0, one_sided=True
     )
     assert ok is False and reason == "mean_not_negative"
     # one-sided: gain_below_threshold
-    ok, reason = _predictive_gate_outcome(
+    ok, reason = predictive_gate_outcome(
         -0.02, (-0.2, -0.01), min_effect=0.05, one_sided=True
     )
     assert ok is False and reason == "gain_below_threshold"
     # one-sided: pass
-    ok, reason = _predictive_gate_outcome(
+    ok, reason = predictive_gate_outcome(
         -0.1, (-0.2, -0.05), min_effect=0.01, one_sided=True
     )
     assert ok is True
     # two-sided: upper >= 0
-    ok, reason = _predictive_gate_outcome(
+    ok, reason = predictive_gate_outcome(
         -0.1, (-0.2, 0.01), min_effect=0.0, one_sided=False
     )
     assert ok is False and reason == "ci_contains_zero"
     # two-sided: pass
-    ok, reason = _predictive_gate_outcome(
+    ok, reason = predictive_gate_outcome(
         -0.1, (-0.2, -0.01), min_effect=0.0, one_sided=False
     )
     assert ok is True

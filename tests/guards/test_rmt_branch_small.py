@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch.nn as nn
 
-from invarlock.guards.rmt import (
+from invarlock.guards.rmt_legacy import (
     analyze_weight_distribution,
     capture_baseline_mp_stats,
     mp_bulk_edges,

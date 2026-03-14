@@ -17,7 +17,7 @@ from abc import abstractmethod
 from collections import Counter
 from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Any, NamedTuple, Protocol
+from typing import Any, NamedTuple, Protocol, cast
 
 import numpy as np
 
@@ -57,6 +57,10 @@ except ImportError:
 
 
 EventEmitter = Callable[[str, str, str | None], None]
+
+
+def _call_tokenizer(tokenizer: Any, /, *args: Any, **kwargs: Any) -> Any:
+    return cast(Any, tokenizer)(*args, **kwargs)
 
 
 class EvaluationWindow(NamedTuple):
@@ -760,7 +764,8 @@ class WikiText2Provider:
             text = texts[idx]
 
             try:
-                tokens = tokenizer(
+                tokens = _call_tokenizer(
+                    tokenizer,
                     text,
                     truncation=True,
                     padding="max_length",

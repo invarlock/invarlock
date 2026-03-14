@@ -56,6 +56,18 @@ Copy-paste checklist for production or CI deployments:
 - Use the supply-chain workflow (SBOM + pip-audit + secret scan) as a
   reference; see the allowlist page for current exceptions.
 
+## Release verification
+
+- GitHub Releases are the canonical place to fetch published wheels, source
+  tarballs, the CycloneDX SBOM, and the Sigstore/provenance sidecar files for a
+  tagged release.
+- The `*.whl` and `*.tar.gz` files are the signed distribution artifacts.
+- The `*.sigstore` and related certificate files are the verification material
+  emitted for those distributions.
+- The release bundle also includes the GitHub build-provenance bundle captured
+  during publishing so consumers can verify the CI origin of the published
+  artifacts.
+
 ## See also
 
 - [Threat Model](threat-model.md)

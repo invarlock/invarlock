@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-import invarlock.guards.variance as variance_mod
+import invarlock.guards.variance_scaling as variance_scaling_mod
 from invarlock.guards.variance import VarianceGuard
 
 
@@ -14,7 +14,9 @@ def test_compute_variance_scales_relaxed_retry(monkeypatch):
         # second attempt returns a small non‑unity scale
         return {"block0.mlp": 1.08}
 
-    monkeypatch.setattr(variance_mod, "equalise_residual_variance", fake_equalise)
+    monkeypatch.setattr(
+        variance_scaling_mod, "equalise_residual_variance", fake_equalise
+    )
 
     policy = {
         "min_gain": 0.0,

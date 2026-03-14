@@ -214,6 +214,52 @@ def _build_sample_evaluation_report() -> dict:
     return cert
 
 
+def _make_ci_ready(cert: dict) -> dict:
+    spectral_contract = {
+        "estimator": {"type": "power_iter", "iters": 4, "init": "ones"}
+    }
+    rmt_contract = {
+        "estimator": {"type": "power_iter", "iters": 3, "init": "ones"},
+        "activation_sampling": {
+            "windows": {"count": 8, "indices_policy": "evenly_spaced"}
+        },
+    }
+    cert.setdefault("provenance", {})["provider_digest"] = {
+        "ids_sha256": "ID",
+        "tokenizer_sha256": "TOK",
+    }
+    cert.setdefault("spectral", {}).update(
+        {
+            "measurement_contract": spectral_contract,
+            "measurement_contract_hash": verify_mod._measurement_contract_digest(
+                spectral_contract
+            ),
+            "measurement_contract_match": True,
+            "evaluated": True,
+        }
+    )
+    cert.setdefault("rmt", {}).update(
+        {
+            "measurement_contract": rmt_contract,
+            "measurement_contract_hash": verify_mod._measurement_contract_digest(
+                rmt_contract
+            ),
+            "measurement_contract_match": True,
+            "evaluated": True,
+        }
+    )
+    cert.setdefault("resolved_policy", {}).update(
+        {
+            "spectral": {"measurement_contract": spectral_contract},
+            "rmt": {"measurement_contract": rmt_contract},
+        }
+    )
+    pm = cert.setdefault("primary_metric", {})
+    if "ci" not in pm and "display_ci" in pm:
+        pm["ci"] = [math.log(float(bound)) for bound in pm["display_ci"]]
+    return cert
+
+
 def _write_evaluation_report(tmp_path: Path) -> Path:
     cert_path = tmp_path / "cert.json"
     cert_path.write_text(json.dumps(_build_sample_evaluation_report()))
@@ -256,6 +302,33 @@ def test_verify_command_passes(tmp_path: Path):
     # report.verify emits JSON payload; verify success should have ok=true
     payload = json.loads(result.stdout)
     assert payload.get("format_version") == "verify-v1"
+    assert payload.get("summary", {}).get("ok") is True
+
+
+def test_verify_ci_rejects_below_token_floor(tmp_path: Path):
+    cert = _make_ci_ready(_build_sample_evaluation_report())
+    cert["telemetry"] = {"preview_total_tokens": 20_000, "final_total_tokens": 20_000}
+    cert["validation"]["primary_metric_acceptable"] = True
+    cert_path = tmp_path / "cert_ci_floor.json"
+    cert_path.write_text(json.dumps(cert))
+
+    result = runner.invoke(app, ["verify", "--profile", "ci", "--json", str(cert_path)])
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload.get("summary", {}).get("ok") is False
+    assert payload.get("summary", {}).get("reason") == "policy_fail"
+
+
+def test_verify_ci_allows_below_token_floor_with_tiny_relax(tmp_path: Path):
+    cert = _make_ci_ready(_build_sample_evaluation_report())
+    cert["telemetry"] = {"preview_total_tokens": 20_000, "final_total_tokens": 20_000}
+    cert["auto"]["tiny_relax"] = True
+    cert_path = tmp_path / "cert_ci_floor_tiny_relax.json"
+    cert_path.write_text(json.dumps(cert))
+
+    result = runner.invoke(app, ["verify", "--profile", "ci", "--json", str(cert_path)])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
     assert payload.get("summary", {}).get("ok") is True
 
 

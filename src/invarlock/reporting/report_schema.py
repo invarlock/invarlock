@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
 from typing import Any
+
+from invarlock.public_contracts import load_json_contract
 
 # Optional JSON Schema validation support (best-effort)
 try:  # pragma: no cover - exercised in integration
@@ -63,6 +63,26 @@ REPORT_JSON_SCHEMA: dict[str, Any] = {
             "properties": {
                 "provider": {"type": "string"},
                 "seq_len": {"type": "integer", "minimum": 1},
+                "hash": {
+                    "type": "object",
+                    "properties": {
+                        "preview": {"type": "string"},
+                        "final": {"type": "string"},
+                        "dataset": {"type": ["string", "null"]},
+                        "preview_tokens": {"type": ["integer", "string", "null"]},
+                        "final_tokens": {"type": ["integer", "string", "null"]},
+                        "total_tokens": {"type": "integer", "minimum": 0},
+                        "source": {
+                            "enum": [
+                                "explicit_preview_final_hashes",
+                                "explicit_token_ids",
+                                "config_fallback",
+                            ]
+                        },
+                    },
+                    "additionalProperties": True,
+                },
+                "tokenizer": {"type": "object"},
                 "windows": {
                     "type": "object",
                     "required": ["preview", "final", "stats"],
@@ -154,6 +174,14 @@ REPORT_JSON_SCHEMA: dict[str, Any] = {
             "properties": {},
             "additionalProperties": {"type": "boolean"},
         },
+        "rmt": {
+            "type": "object",
+            "properties": {
+                "mode": {"type": "string"},
+                "measurement_contract_hash": {"type": "string"},
+            },
+            "additionalProperties": True,
+        },
         "artifacts": {"type": "object"},
         "provenance": {"type": "object"},
         "resolved_policy": {"type": "object"},
@@ -198,12 +226,9 @@ def _load_validation_allowlist() -> set[str]:
     (e.g., installed wheel) or when parsing fails.
     """
     try:
-        root = Path(__file__).resolve().parents[3]
-        path = root / "contracts" / "validation_keys.json"
-        if path.exists():
-            data = json.loads(path.read_text(encoding="utf-8"))
-            if isinstance(data, list):
-                return {str(k) for k in data}
+        data = load_json_contract("validation_keys.json")
+        if isinstance(data, list):
+            return {str(k) for k in data}
     except Exception:
         pass
     return set(_VALIDATION_ALLOWLIST_DEFAULT)
