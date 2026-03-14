@@ -25,7 +25,7 @@
 
 | Term | Short Definition | report Field |
 | --- | --- | --- |
-| Four-Guard Pipeline | invariants (pre) → spectral → RMT → variance → invariants (post) | `validation.{invariants_pass,spectral_stable,rmt_stable}`, `variance.{enabled,predictive_gate.passed}` |
+| Canonical Guard Chain | invariants (pre) → spectral → RMT → variance → invariants (post) | `validation.{invariants_pass,spectral_stable,rmt_stable}`, `variance.{enabled,predictive_gate.passed}` |
 | κ (kappa) Threshold | Per-family spectral cap for z-score outliers | `spectral.family_caps.*.kappa` |
 | ε (epsilon) Band | RMT acceptance threshold for edge-risk | `rmt.epsilon_by_family.*` |
 | Guard Overhead | Performance cost of guards vs bare run | `guard_overhead.*` |
@@ -132,7 +132,7 @@ Set of files produced for audit: reports, reports, manifests, and events.
 
 ---
 
-#### Four-Guard Pipeline
+#### Canonical Guard Chain
 
 The default guard chain is `invariants` (pre) → `spectral` → `RMT` → `variance`
 → `invariants` (post).
@@ -158,7 +158,7 @@ auditable outcomes.
 | Aspect | Details |
 | --- | --- |
 | **Context** | Defined by `guards.order` in config YAML |
-| **Related terms** | Four-Guard Pipeline, Guard Overhead |
+| **Related terms** | Guard Chain (Canonical Order), Guard Overhead |
 | **report fields** | Not stored directly (order is config-driven). |
 | **See also** | [Guards Reference](../reference/guards.md) |
 
@@ -171,7 +171,7 @@ Performance impact of guard checks vs bare control run (no guards).
 | Aspect | Details |
 | --- | --- |
 | **Context** | Measured in Release profile; gate requires ≤ +1.0% PM overhead |
-| **Related terms** | Four-Guard Pipeline, Timing Summary |
+| **Related terms** | Canonical Guard Chain, Timing Summary |
 | **report fields** | `guard_overhead.{bare_ppl,guarded_ppl,overhead_ratio,overhead_percent}` |
 | **See also** | [Guard Overhead Method](10-guard-overhead-method.md) |
 
@@ -305,7 +305,7 @@ Guard that checks eigenvalue statistics against Random Matrix Theory bounds.
 | --- | --- |
 | **Focus** | Activation edge-risk growth across model families |
 | **Validation** | `validation.rmt_stable` |
-| **Related terms** | Four-Guard Pipeline, RMT ε Rule |
+| **Related terms** | Canonical Guard Chain, RMT ε Rule |
 | **report fields** | `rmt.{families,stable,max_edge_delta}` |
 | **See also** | [Guards Reference](../reference/guards.md) |
 
@@ -334,7 +334,7 @@ Guard that monitors spectral norms and z-scores for weight matrices.
 | --- | --- |
 | **Focus** | Baseline-relative weight matrix stability |
 | **Validation** | `validation.spectral_stable` |
-| **Related terms** | Four-Guard Pipeline, Spectral Cap, κ Threshold |
+| **Related terms** | Canonical Guard Chain, Spectral Cap, κ Threshold |
 | **report fields** | `spectral.{caps_applied,family_caps,top_z_scores,summary}` |
 | **See also** | [Guards Reference](../reference/guards.md) |
 
@@ -416,7 +416,7 @@ Guard that tracks variance change and applies equalization when beneficial.
 | --- | --- |
 | **Context** | A/B test compares bare vs VE-enabled evaluation |
 | **Enabling condition** | CI excludes 0 AND mean Δ ≤ -min_effect_lognll |
-| **Related terms** | Four-Guard Pipeline, Guard Overhead, Predictive Gate |
+| **Related terms** | Canonical Guard Chain, Guard Overhead, Predictive Gate |
 | **report fields** | `variance.{enabled,gain,predictive_gate.delta_ci,predictive_gate.passed}` |
 | **See also** | [VE Gate Power](07-ve-gate-power.md) |
 

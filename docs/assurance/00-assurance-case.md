@@ -1,6 +1,6 @@
 # Assurance Case Overview (v1.0)
 
-> **TL;DR:** InvarLock evaluates whether **weight edits** (quantization, pruning, etc.) regress a model beyond defined bounds. It does **not** evaluate content safety, alignment, or deployment security. The assurance case covers: (1) paired primary metrics with bootstrap CIs, (2) four guards (invariants, spectral, RMT, variance), (3) deterministic evaluation with full provenance. Each claim has tests and report evidence.
+> **TL;DR:** InvarLock evaluates whether **weight edits** (quantization, pruning, etc.) regress a model beyond defined bounds. It does **not** evaluate content safety, alignment, or deployment security. The assurance case covers: (1) paired primary metrics with bootstrap CIs, (2) the canonical five-stage guard chain (`invariants` pre, `spectral`, `RMT`, `variance`, `invariants` post), (3) deterministic evaluation with full provenance. Each claim has tests and report evidence.
 
 > **Plain language:** This overview lists every assurance claim, the evidence we ship with the repo, and the runtime contracts that enforce each claim in production.
 
