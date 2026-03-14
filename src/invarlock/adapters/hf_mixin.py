@@ -16,8 +16,11 @@ from __future__ import annotations
 
 import io
 import json
+import logging
 import os
+import re
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -29,6 +32,7 @@ if TYPE_CHECKING:
     from .capabilities import ModelCapabilities, QuantizationConfig
 
 SCALAR_TYPES = (int, float, str, bool)
+_BENIGN_HF_UNEXPECTED_KEY_RE = re.compile(r"(?:^|.*\.)attn\.(?:masked_)?bias$")
 
 
 def _sanitize_param_name(name: str) -> str:
@@ -64,6 +68,103 @@ def _resolve_named_parameter(
 
 class HFAdapterMixin:
     """Reusable utilities for HuggingFace-backed adapters."""
+
+    def _is_benign_hf_unexpected_key(self, key: object) -> bool:
+        """Return True for known benign HF checkpoint keys.
+
+        GPT-2 style checkpoints commonly surface `attn.bias` / `attn.masked_bias`
+        as unexpected keys even for identical checkpoints. They do not indicate a
+        broken load and should not leak as noisy console output.
+        """
+
+        return isinstance(key, str) and bool(_BENIGN_HF_UNEXPECTED_KEY_RE.search(key))
+
+    def _log_filtered_loading_info(
+        self,
+        model: object,
+        model_id: str,
+        loading_info: Mapping[str, Any] | None,
+    ) -> None:
+        """Log only actionable HF loading info after filtering benign keys."""
+
+        if not isinstance(loading_info, Mapping):
+            return
+
+        unexpected_keys = [
+            key
+            for key in list(loading_info.get("unexpected_keys") or [])
+            if not self._is_benign_hf_unexpected_key(key)
+        ]
+        missing_keys = list(loading_info.get("missing_keys") or [])
+        mismatched_keys = list(loading_info.get("mismatched_keys") or [])
+        error_msgs = [msg for msg in list(loading_info.get("error_msgs") or []) if msg]
+
+        if not any((unexpected_keys, missing_keys, mismatched_keys, error_msgs)):
+            return
+
+        mismatch_names: list[str] = []
+        for item in mismatched_keys:
+            if isinstance(item, Mapping):
+                name = item.get("key") or item.get("name")
+                if isinstance(name, str) and name:
+                    mismatch_names.append(name)
+                    continue
+            mismatch_names.append(str(item))
+
+        parts: list[str] = []
+        if unexpected_keys:
+            parts.append(f"unexpected={unexpected_keys}")
+        if missing_keys:
+            parts.append(f"missing={missing_keys}")
+        if mismatch_names:
+            parts.append(f"mismatched={mismatch_names}")
+        if error_msgs:
+            parts.append(f"errors={len(error_msgs)}")
+
+        model_name = getattr(model.__class__, "__name__", "model")
+        logging.getLogger(__name__).warning(
+            "Transformers load info for %s from %s: %s",
+            model_name,
+            model_id,
+            "; ".join(parts),
+        )
+
+    def _load_pretrained_model(self, loader: Any, model_id: str, **kwargs: Any) -> Any:
+        """Load a HF model while filtering known benign loading-info noise."""
+
+        tf_logger = logging.getLogger("transformers")
+        prev_tf_verbosity = os.environ.get("TRANSFORMERS_VERBOSITY")
+        prev_tf_level = tf_logger.level
+        os.environ["TRANSFORMERS_VERBOSITY"] = "error"
+        tf_logger.setLevel(logging.ERROR)
+        try:
+            try:
+                loaded = loader.from_pretrained(
+                    model_id, output_loading_info=True, **kwargs
+                )
+            except TypeError as exc:
+                if "output_loading_info" not in str(exc):
+                    raise
+                loaded = loader.from_pretrained(model_id, **kwargs)
+        finally:
+            try:
+                tf_logger.setLevel(prev_tf_level)
+            except (TypeError, ValueError):
+                pass
+            if prev_tf_verbosity is None:
+                os.environ.pop("TRANSFORMERS_VERBOSITY", None)
+            else:
+                os.environ["TRANSFORMERS_VERBOSITY"] = prev_tf_verbosity
+
+        if (
+            isinstance(loaded, tuple)
+            and len(loaded) == 2
+            and isinstance(loaded[1], Mapping)
+        ):
+            model, loading_info = loaded
+            self._log_filtered_loading_info(model, model_id, loading_info)
+            return model
+        return loaded
 
     # ------------------------------------------------------------------
     # Device helpers

@@ -47,7 +47,11 @@ class HF_Seq2Seq_Adapter(HFAdapterMixin, ModelAdapter):
             "MODEL-LOAD-FAILED: transformers AutoModelForSeq2SeqLM",
             lambda e: {"model_id": model_id},
         ):
-            model = AutoModelForSeq2SeqLM.from_pretrained(model_id, **kwargs)
+            model = self._load_pretrained_model(
+                AutoModelForSeq2SeqLM,
+                model_id,
+                **kwargs,
+            )
         return self._safe_to_device(model, device)
 
     def can_handle(self, model: ModuleType | Any) -> bool:  # type: ignore[override]

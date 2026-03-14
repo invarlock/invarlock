@@ -10,6 +10,7 @@ TDD tests for safe device movement in adapters:
 
 from __future__ import annotations
 
+import logging
 from unittest.mock import MagicMock, patch
 
 import torch.nn as nn
@@ -245,3 +246,82 @@ class TestDetectCapabilities:
             # This should handle the import error gracefully
             _ = mixin._detect_capabilities(mock_model)
             # May return None or the actual capabilities depending on import state
+
+
+class TestFilteredLoadingInfo:
+    """Tests for filtered Hugging Face loading info."""
+
+    def test_filters_benign_gpt2_bias_noise(self, caplog):
+        mixin = SimpleMixin()
+
+        class DummyModel:
+            pass
+
+        class DummyLoader:
+            @staticmethod
+            def from_pretrained(model_id: str, **kwargs: object):
+                assert model_id == "gpt2"
+                assert kwargs["output_loading_info"] is True
+                return DummyModel(), {
+                    "unexpected_keys": ["transformer.h.0.attn.bias"],
+                    "missing_keys": [],
+                    "mismatched_keys": [],
+                    "error_msgs": [],
+                }
+
+        with caplog.at_level(logging.WARNING):
+            model = mixin._load_pretrained_model(DummyLoader, "gpt2")
+
+        assert isinstance(model, DummyModel)
+        assert caplog.text == ""
+
+    def test_logs_actionable_loading_mismatches(self, caplog):
+        mixin = SimpleMixin()
+
+        class DummyModel:
+            pass
+
+        class DummyLoader:
+            @staticmethod
+            def from_pretrained(model_id: str, **kwargs: object):
+                assert kwargs["output_loading_info"] is True
+                return DummyModel(), {
+                    "unexpected_keys": ["decoder.foo.weight"],
+                    "missing_keys": ["decoder.bar.weight"],
+                    "mismatched_keys": [{"key": "decoder.baz.weight"}],
+                    "error_msgs": ["shape mismatch"],
+                }
+
+        with caplog.at_level(logging.WARNING):
+            mixin._load_pretrained_model(DummyLoader, "demo/model")
+
+        assert "Transformers load info" in caplog.text
+        assert "decoder.foo.weight" in caplog.text
+        assert "decoder.bar.weight" in caplog.text
+        assert "decoder.baz.weight" in caplog.text
+        assert "errors=1" in caplog.text
+
+    def test_retries_when_loader_rejects_output_loading_info(self):
+        mixin = SimpleMixin()
+
+        class DummyModel:
+            pass
+
+        class DummyLoader:
+            calls: list[dict[str, object]] = []
+
+            @classmethod
+            def from_pretrained(cls, model_id: str, **kwargs: object):
+                cls.calls.append({"model_id": model_id, **kwargs})
+                if "output_loading_info" in kwargs:
+                    raise TypeError(
+                        "got an unexpected keyword argument 'output_loading_info'"
+                    )
+                return DummyModel()
+
+        model = mixin._load_pretrained_model(DummyLoader, "demo/model")
+
+        assert isinstance(model, DummyModel)
+        assert len(DummyLoader.calls) == 2
+        assert DummyLoader.calls[0]["output_loading_info"] is True
+        assert "output_loading_info" not in DummyLoader.calls[1]

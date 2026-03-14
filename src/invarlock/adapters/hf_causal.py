@@ -280,7 +280,11 @@ class HF_Causal_Adapter(HFAdapterMixin, ModelAdapter):
                 "MODEL-LOAD-FAILED: transformers AutoModelForCausalLM",
                 lambda e: {"model_id": model_id},
             ):
-                model = AutoModelForCausalLM.from_pretrained(model_id, **kwargs)
+                model = self._load_pretrained_model(
+                    AutoModelForCausalLM,
+                    model_id,
+                    **kwargs,
+                )
 
             return self._safe_to_device(model, device)
         except DependencyError:
