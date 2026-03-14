@@ -37,8 +37,9 @@
 
 Quantizing, pruning, or otherwise editing a model’s weights can silently degrade quality.
 InvarLock compares an edited **subject** checkpoint against a fixed **baseline** with paired
-evaluation windows, enforces a guard pipeline (invariants → spectral → RMT → variance), and
-produces a machine‑readable Evaluation Report you can gate in CI.
+evaluation windows, enforces the canonical guard chain (`invariants` → `spectral` → `RMT`
+→ `variance` → `invariants`), and produces a machine-readable evaluation report you can gate
+in CI.
 
 ## Why InvarLock?
 
