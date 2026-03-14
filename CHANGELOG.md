@@ -37,6 +37,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reuse or compare baseline evidence.
 - Repaired quickstart evaluation flows, smoke helper runners, and plugin JSON
   listing so lightweight command paths no longer instantiate dataset providers.
+- Repaired the trusted-publishing workflow pin for `gh-action-pypi-publish` so
+  tag-triggered `v0.4.0` publication can complete through the GitHub release
+  pipeline.
 - Hardened proof-pack verification to reject stray JSON outputs, use portable
   UTC helpers, and keep pack verification behavior fail-closed.
 - Preserved tiny-relax provenance, MLM telemetry, and verify drift parity

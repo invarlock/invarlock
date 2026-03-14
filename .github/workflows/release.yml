@@ -114,7 +114,7 @@ jobs:
           if-no-files-found: error
           retention-days: 3
       - name: Publish to TestPyPI/PyPI
-        uses: pypa/gh-action-pypi-publish@106e0b0b7c337fa67ed433972f777c6357f78598
+        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e
         with:
           packages-dir: dist
           repository-url: ${{ steps.vars.outputs.publish_repository_url }}
