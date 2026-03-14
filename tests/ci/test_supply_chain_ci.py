@@ -196,6 +196,9 @@ def test_release_workflow_builds_and_bundles_release_assets():
     assert "inputs.target == 'pypi'" in bundle["if"]
 
     bundle_steps = bundle.get("steps", [])
+    checkout_step = bundle_steps[0]
+    assert checkout_step["uses"].startswith("actions/checkout@")
+
     sigstore_step = _find_step_by_uses_prefix(
         bundle_steps, "sigstore/gh-action-sigstore-python@"
     )
