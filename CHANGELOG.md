@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-03-14
+
 ### Added
 - Published stable public contracts for support matrices, adapter capabilities,
   plugin compatibility, proof-pack manifests, and policy packs, along with new
