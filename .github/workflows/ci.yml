@@ -10,14 +10,14 @@ on:
     # Allow supply-chain job to run on release tags too.
     tags: [ 'v*' ]
     paths-ignore:
-      # Cost optimization: don't run full CI for docs-only changes
-      # docs-ci.yml handles these
+      # docs-only changes are validated in docs-ci.yml on push/PR instead.
       - 'docs/**'
       - '*.md'
       - '.markdownlint*'
       - 'mkdocs.yml'
   pull_request:
     paths-ignore:
+      # docs-only changes are validated in docs-ci.yml on push/PR instead.
       - 'docs/**'
       - '*.md'
       - '.markdownlint*'

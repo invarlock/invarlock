@@ -239,6 +239,33 @@ def test_scorecard_workflow_is_configured():
     assert upload_sarif_step["with"]["sarif_file"] == "results.sarif"
 
 
+def test_docs_workflow_enforces_docs_lint_on_main_and_staging() -> None:
+    workflow = _load_workflow(Path(".github/workflows/docs-ci.yml"))
+    triggers = workflow["on"]
+
+    assert triggers["push"]["branches"] == ["main", "staging/next"]
+    assert triggers["pull_request"]["branches"] == ["main", "develop", "staging/next"]
+
+    expected_paths = [
+        "docs/**",
+        "README.md",
+        "CONTRIBUTING.md",
+        "mkdocs.yml",
+        ".github/workflows/docs-ci.yml",
+    ]
+    assert triggers["push"]["paths"] == expected_paths
+    assert triggers["pull_request"]["paths"] == expected_paths
+
+    steps = workflow["jobs"]["docs-validate"]["steps"]
+    markdown_step = _find_step_by_name(steps, "Lint markdown")
+    spell_step = _find_step_by_name(steps, "Spell check")
+
+    assert markdown_step["run"] == "python scripts/docs_lint.py --markdown"
+    assert "continue-on-error" not in markdown_step
+    assert spell_step["run"] == "python scripts/docs_lint.py --spell"
+    assert "continue-on-error" not in spell_step
+
+
 def test_readme_exposes_scorecard_badge():
     readme = Path("README.md").read_text(encoding="utf-8")
     assert "OpenSSF Scorecard" in readme

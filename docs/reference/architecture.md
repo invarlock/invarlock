@@ -11,7 +11,7 @@
 | **Source of truth** | `src/invarlock/core/runner.py`, `src/invarlock/cli/commands/*.py`, `src/invarlock/guards/*.py`. |
 
 See the [Glossary](../assurance/glossary.md) for definitions of terms such as
-four-guard pipeline, policy digest, and measurement contract.
+the canonical guard chain, policy digest, and measurement contract.
 
 ## Contents
 
@@ -48,7 +48,7 @@ four-guard pipeline, policy digest, and measurement contract.
 │                                  │                                          │
 │  ┌──────────┐    ┌───────────────▼────────────────┐    ┌──────────────┐     │
 │  │ Dataset  │───▶│          GUARD CHAIN           │───▶│    Events    │     │
-│  │(provider)│    │   invariants→spectral→rmt→var  │    │    (JSONL)   │     │
+│  │(provider)│    │ inv(pre)→spectral→rmt→var→post │    │    (JSONL)   │     │
 │  └──────────┘    └────────────────────────────────┘    └──────────────┘     │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
