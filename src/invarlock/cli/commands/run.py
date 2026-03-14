@@ -448,14 +448,7 @@ def _device_resolution_note(target_device: str, resolved_device: str) -> str:
 
 def _format_guard_chain(guards: list[Any]) -> str:
     names = [str(getattr(guard, "name", "unknown")) for guard in guards]
-    seen: set[str] = set()
-    deduped: list[str] = []
-    for name in names:
-        if name in seen:
-            continue
-        seen.add(name)
-        deduped.append(name)
-    return " → ".join(deduped)
+    return " → ".join(names)
 
 
 # Common dataset split aliases we probe in order when not explicitly set

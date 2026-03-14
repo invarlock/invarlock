@@ -10,13 +10,16 @@ from invarlock.cli.commands import evaluate as evaluate_mod
 from invarlock.cli.commands import run as run_mod
 
 
-def test_format_guard_chain_dedupes_names() -> None:
+def test_format_guard_chain_preserves_configured_order() -> None:
     guards = [
         SimpleNamespace(name="invariants"),
         SimpleNamespace(name="spectral"),
         SimpleNamespace(name="invariants"),
     ]
-    assert run_mod._format_guard_chain(guards) == "invariants \u2192 spectral"
+    assert (
+        run_mod._format_guard_chain(guards)
+        == "invariants \u2192 spectral \u2192 invariants"
+    )
 
 
 def test_device_resolution_note_variants() -> None:
