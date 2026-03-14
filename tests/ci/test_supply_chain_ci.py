@@ -221,11 +221,10 @@ def test_scorecard_workflow_is_configured():
     assert triggers["push"]["branches"] == ["main"]
     assert triggers["schedule"]
     assert "workflow_dispatch" in triggers
+    assert workflow["permissions"] == "read-all"
 
     analysis = workflow["jobs"]["analysis"]
     assert analysis["permissions"] == {
-        "actions": "read",
-        "contents": "read",
         "id-token": "write",
         "security-events": "write",
     }
@@ -241,7 +240,17 @@ def test_scorecard_workflow_is_configured():
     upload_sarif_step = _find_step_by_uses_prefix(
         steps, "github/codeql-action/upload-sarif@"
     )
+    assert (
+        upload_sarif_step["uses"]
+        == "github/codeql-action/upload-sarif@b20883b0cd1f46c72ae0ba6d1090936928f9fa30"
+    )
     assert upload_sarif_step["with"]["sarif_file"] == "results.sarif"
+
+    upload_artifact_step = _find_step_by_uses_prefix(steps, "actions/upload-artifact@")
+    assert (
+        upload_artifact_step["uses"]
+        == "actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f"
+    )
 
 
 def test_docs_workflow_enforces_docs_lint_on_main_and_staging() -> None:
