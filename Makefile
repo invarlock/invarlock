@@ -143,7 +143,7 @@ format:  ## Format code
 	$(RUFF) format src/ tests/ scripts/
 	$(RUFF) check --fix src/ tests/ scripts/
 
-verify:  ## Run verification (pytest -q, lint, format, markdownlint)
+verify:  ## Run verification (pytest -q, lint, format, markdown + spell docs lint)
 	@echo "Running verification..."
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTEST) -q
@@ -151,7 +151,7 @@ verify:  ## Run verification (pytest -q, lint, format, markdownlint)
 	$(MAKE) ensure-ruff
 	$(RUFF) check src/ tests/ scripts/
 	$(RUFF) format --check src/ tests/ scripts/
-	$(PYTHON) scripts/docs_lint.py --markdown
+	$(PYTHON) scripts/docs_lint.py --all
 	@if [ -n "$$VERIFY_DOCS_API" ]; then \
 		$(PYTHON) scripts/validate_docs_api_refs.py; \
 	fi

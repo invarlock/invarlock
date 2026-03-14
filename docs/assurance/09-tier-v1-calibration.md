@@ -28,8 +28,8 @@
 - Release evidence must meet the requested counts; runs that under‑cover preview/final windows or bootstrap replicates fail evaluation in CI/Release profiles (see Coverage & Pairing Plan).
 
 **Spectral calibration provenance.** Aggregated null-run stats are derived from
-calibration runs. Local tooling can parse report JSON files (glob pattern
-`**/cert_*.json`) to extract per-family z-scores and compute summary statistics
+calibration runs. Local tooling can parse evaluation report JSON files (glob pattern
+`**/evaluation.report.json`) to extract per-family z-scores and compute summary statistics
 (mean, stdev, quantiles). Persist results in CSV format for reproducibility and
 attach calibration reports to change proposals.
 

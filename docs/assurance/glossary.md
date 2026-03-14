@@ -25,11 +25,11 @@
 
 | Term | Short Definition | report Field |
 | --- | --- | --- |
-| Four-Guard Pipeline | invariants → spectral → RMT → variance | `validation.{invariants_pass,spectral_stable,rmt_stable}`, `variance.{enabled,predictive_gate.passed}` |
+| Four-Guard Pipeline | invariants (pre) → spectral → RMT → variance → invariants (post) | `validation.{invariants_pass,spectral_stable,rmt_stable}`, `variance.{enabled,predictive_gate.passed}` |
 | κ (kappa) Threshold | Per-family spectral cap for z-score outliers | `spectral.family_caps.*.kappa` |
 | ε (epsilon) Band | RMT acceptance threshold for edge-risk | `rmt.epsilon_by_family.*` |
 | Guard Overhead | Performance cost of guards vs bare run | `guard_overhead.*` |
-| Measurement Contract | Estimator + sampling policy recorded in certs | `spectral.measurement_contract_hash` |
+| Measurement Contract | Estimator + sampling policy recorded in reports | `spectral.measurement_contract_hash` |
 
 ### Data Terms
 
@@ -134,7 +134,8 @@ Set of files produced for audit: reports, reports, manifests, and events.
 
 #### Four-Guard Pipeline
 
-The default guard chain: invariants → spectral → RMT → variance.
+The default guard chain is `invariants` (pre) → `spectral` → `RMT` → `variance`
+→ `invariants` (post).
 
 | Aspect | Details |
 | --- | --- |
