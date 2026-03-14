@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Default local tooling now resolves to Python 3.12, docs linting includes
   spellcheck, and repo housekeeping/ignore rules were tightened around generated
   outputs and shipped fixtures.
+- Docs-only CI now runs on `staging/next` and `main`, with markdown and
+  spellcheck lint enforced as blocking checks instead of advisory-only steps.
 - Removed legacy CLI/reporting/config surfaces and dropped legacy proof-pack
   layout compatibility.
 
@@ -38,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Preserved tiny-relax provenance, MLM telemetry, and verify drift parity
   across reporting and CLI flows, and skipped overhead gating during
   calibration sweep runs where appropriate.
+- Suppressed known benign GPT-2-style Hugging Face load-report noise while
+  preserving actionable missing, unexpected, and mismatched checkpoint warnings.
 - Cleared the remaining CodeQL backlog and completed the current OpenSSF
   hardening pass.
 
@@ -52,6 +56,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   provenance.
 - Refreshed README and test/example wording to match the stabilized
   evaluate/report/verify contract and current repo structure.
+- Updated public docs to describe the canonical five-stage guard chain,
+  including the terminal invariants pass shown by current CLI output.
 
 ## [0.3.12] - 2026-02-27
 
