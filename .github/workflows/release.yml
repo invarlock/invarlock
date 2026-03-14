@@ -48,14 +48,14 @@ jobs:
       - name: Generate release SBOM
         run: bash scripts/generate_sbom.sh artifacts/supply-chain/sbom.json
       - name: Upload dist artifacts
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: dist
           path: dist/*
           if-no-files-found: error
           retention-days: 3
       - name: Upload SBOM artifact
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: release-sbom
           path: artifacts/supply-chain/sbom.json
@@ -107,7 +107,7 @@ jobs:
         with:
           subject-path: dist/*
       - name: Upload provenance bundle
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: release-provenance
           path: ${{ steps.attest_release.outputs.bundle-path }}
