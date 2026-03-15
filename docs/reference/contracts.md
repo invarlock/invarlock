@@ -29,6 +29,12 @@ The public contract surface covers:
 | Validation keys | `contracts/validation_keys.json` | Allow-list for report validation flags |
 | Console labels | `contracts/console_labels.json` | Stable report console labels |
 
+These JSON files are currently repo assets rather than wheel-packaged data.
+Installed wheels expose contract references and best-effort fallbacks, but
+proof-pack verification from a pure wheel install is not a supported workflow
+today; clone the repository to use `contracts/` and
+`scripts/proof_packs/verify_pack.sh`.
+
 ## CLI surfaces
 
 The CLI exposes these contracts directly:
@@ -39,6 +45,10 @@ The CLI exposes these contracts directly:
 - `invarlock policy build`
 - `invarlock policy verify`
 - `scripts/proof_packs/verify_pack.sh --strict`
+
+The first five surfaces are available from installed packages. The proof-pack
+verifier remains repo-first because wheels do not ship `scripts/` or
+`contracts/`.
 
 ## Policy packs
 

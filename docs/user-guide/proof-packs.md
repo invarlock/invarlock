@@ -138,6 +138,11 @@ The manifest contract is published at `contracts/proof_pack_manifest.schema.json
 `verify_pack.sh` validates this schema before checksum and signature verification so
 malformed proof packs fail deterministically.
 
+This verifier path is repo-first today: wheel installs do not include
+`contracts/proof_pack_manifest.schema.json` or `scripts/proof_packs/verify_pack.sh`.
+For proof-pack validation, clone the repository and run the verifier from the
+checked-out tree.
+
 Use `verify_pack.sh`:
 
 - Default: `scripts/proof_packs/verify_pack.sh --pack <dir>`
