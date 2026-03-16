@@ -388,6 +388,14 @@ test_task_serialization_field_access_and_update_error_paths() {
     rc=0
     update_task_field "${task_file}" "assigned_gpus" "2"
     assert_eq "2" "$(jq -r '.assigned_gpus' "${task_file}")" "assigned_gpus update replaces value"
+
+    local tmp_file="${task_file}.tmp.${BASHPID:-$$}"
+    mv() { return 1; }
+    rc=0
+    update_task_field "${task_file}" "status" "blocked" || rc=$?
+    assert_rc "1" "${rc}" "update_task_field returns non-zero when atomic rename fails"
+    [[ ! -e "${tmp_file}" ]] || t_fail "temporary update file removed on mv failure path='${tmp_file}'"
+    unset -f mv
 }
 
 test_task_serialization_helper_accessors_cover_wrappers() {

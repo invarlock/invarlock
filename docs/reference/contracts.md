@@ -24,7 +24,7 @@ The public contract surface covers:
 | Support matrix | `contracts/support_matrix.json` | Normalized support tiers and public evidence references |
 | Adapter capabilities | `contracts/adapter_capabilities.json` | Snapshot/restore, guard coverage, runtime limits, extras |
 | Plugin compatibility | `contracts/plugin_compatibility.json` | Core ABI policy and failure mode |
-| Proof-pack manifest | `contracts/proof_pack_manifest.schema.json` | Portable pack manifest schema for `verify_pack.sh` |
+| Proof-pack manifest | `contracts/proof_pack_manifest.schema.json` | Portable pack manifest schema for `verify_pack.sh`, including builder/subject/material attestation fields |
 | Policy pack | `contracts/policy_pack.schema.json` | Build/verify contract for Git-native policy packs |
 | Validation keys | `contracts/validation_keys.json` | Allow-list for report validation flags |
 | Console labels | `contracts/console_labels.json` | Stable report console labels |

@@ -47,6 +47,66 @@ def _manual_validate(payload: Any) -> list[str]:
     artifacts = payload.get("artifacts")
     if artifacts is not None and not isinstance(artifacts, list):
         errors.append("manifest artifacts must be a list")
+
+    builder = payload.get("builder")
+    if builder is not None:
+        if not isinstance(builder, dict):
+            errors.append("manifest builder must be an object")
+        else:
+            if not isinstance(builder.get("id"), str) or not builder.get("id"):
+                errors.append("manifest builder.id must be a non-empty string")
+            if not isinstance(builder.get("name"), str) or not builder.get("name"):
+                errors.append("manifest builder.name must be a non-empty string")
+
+    def _validate_digest_ref(label: str, value: Any) -> None:
+        if value is None:
+            return
+        if not isinstance(value, dict):
+            errors.append(f"manifest {label} must be an object")
+            return
+        path = value.get("path")
+        digest_value = value.get("digest")
+        if path is None and digest_value is None:
+            return
+        if not isinstance(path, str) or not path:
+            errors.append(f"manifest {label}.path must be a non-empty string")
+        if (
+            not isinstance(digest_value, str)
+            or not digest_value.startswith("sha256:")
+            or len(digest_value) != 71
+        ):
+            errors.append(f"manifest {label}.digest must be a sha256:... string")
+
+    _validate_digest_ref("subject", payload.get("subject"))
+
+    invocation = payload.get("invocation")
+    if invocation is not None:
+        if not isinstance(invocation, dict):
+            errors.append("manifest invocation must be an object")
+        else:
+            config_source = invocation.get("config_source")
+            if config_source is not None and not isinstance(config_source, dict):
+                errors.append("manifest invocation.config_source must be an object")
+            _validate_digest_ref("invocation.config_source", config_source)
+            parameters = invocation.get("parameters")
+            if parameters is not None and not isinstance(parameters, dict):
+                errors.append("manifest invocation.parameters must be an object")
+
+    _validate_digest_ref("environment", payload.get("environment"))
+
+    materials = payload.get("materials")
+    if materials is not None:
+        if not isinstance(materials, list):
+            errors.append("manifest materials must be a list")
+        else:
+            for index, material in enumerate(materials):
+                _validate_digest_ref(f"materials[{index}]", material)
+                if isinstance(material, dict):
+                    name = material.get("name")
+                    if not isinstance(name, str) or not name:
+                        errors.append(
+                            f"manifest materials[{index}].name must be a non-empty string"
+                        )
     return errors
 
 

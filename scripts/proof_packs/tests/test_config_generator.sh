@@ -232,3 +232,35 @@ EOF
     run_invarlock_evaluate "${TEST_TMPDIR}/subject" "${TEST_TMPDIR}/baseline" "${out_dir}" "run_small" "${preset_dir}" "model" 0
     assert_file_exists "${out_dir}/run_small/evaluation.report.json" "nested cert copied"
 }
+
+test_config_generator_generate_invarlock_config_writes_to_stdout_when_requested() {
+    mock_reset
+
+    # shellcheck source=../config_generator.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/config_generator.sh"
+
+    INVARLOCK_PREVIEW_WINDOWS="128"
+    INVARLOCK_FINAL_WINDOWS="128"
+    INVARLOCK_SEQ_LEN="256"
+    INVARLOCK_STRIDE="128"
+    INVARLOCK_EVAL_BATCH="1"
+    INVARLOCK_DATASET="wikitext2"
+    INVARLOCK_TIER="balanced"
+    FLASH_ATTENTION_AVAILABLE="false"
+    PACK_DETERMINISM="throughput"
+    export \
+        INVARLOCK_PREVIEW_WINDOWS \
+        INVARLOCK_FINAL_WINDOWS \
+        INVARLOCK_SEQ_LEN \
+        INVARLOCK_STRIDE \
+        INVARLOCK_EVAL_BATCH \
+        INVARLOCK_DATASET \
+        INVARLOCK_TIER \
+        FLASH_ATTENTION_AVAILABLE \
+        PACK_DETERMINISM
+
+    local out
+    out="$(generate_invarlock_config "demo/model" "/dev/stdout" "edit")"
+    assert_match $'\nmodel:' "${out}" "config emitted to stdout"
+    assert_match 'adapter:' "${out}" "config payload rendered"
+}

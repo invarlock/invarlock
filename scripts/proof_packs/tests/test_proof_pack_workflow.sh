@@ -37,6 +37,8 @@ test_pack_build_pack_and_verify_pack_end_to_end_v2_layout() {
 
     assert_file_exists "${pack_dir}/metadata/manifest.json" "manifest copied to metadata"
     assert_file_exists "${pack_dir}/metadata/checksums.sha256" "checksums copied to metadata"
+    assert_file_exists "${pack_dir}/metadata/source_repo.json" "source repo metadata copied"
+    assert_file_exists "${pack_dir}/metadata/environment.json" "environment metadata copied"
 
     local verify_json="${TEST_TMPDIR}/verify.json"
     run bash "${TEST_ROOT}/scripts/proof_packs/verify_pack.sh" --pack "${pack_dir}" --json-out "${verify_json}"

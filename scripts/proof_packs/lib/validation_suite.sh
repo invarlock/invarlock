@@ -596,14 +596,18 @@ pack_source_libs() {
     SCRIPT_DIR="$(_pack_script_dir)"
     export SCRIPT_DIR  # Export for subshell workers
 
-    # Determine lib directory - support the repo lib dir and packaged v2 lib dir.
+    # Determine lib directory - support the repo lib dir, packaged v2 lib dir,
+    # and the older packaged layout where the entrypoint lived under a child dir.
     if [[ -f "${SCRIPT_DIR}/task_serialization.sh" ]]; then
         LIB_DIR="${SCRIPT_DIR}"
     elif [[ -d "${SCRIPT_DIR}/lib" && -f "${SCRIPT_DIR}/lib/task_serialization.sh" ]]; then
         LIB_DIR="${SCRIPT_DIR}/lib"
+    elif [[ -d "${SCRIPT_DIR}/../lib" && -f "${SCRIPT_DIR}/../lib/task_serialization.sh" ]]; then
+        LIB_DIR="${SCRIPT_DIR}/../lib"
     else
         LIB_DIR="${SCRIPT_DIR}"
     fi
+    LIB_DIR="$(cd "${LIB_DIR}" 2>/dev/null && pwd || echo "${LIB_DIR}")"
     export LIB_DIR  # Export for subshell workers
 
     # Source dynamic scheduling modules (required - optimal configuration)
@@ -687,31 +691,12 @@ pack_prepare_scenarios_manifest() {
         local dest="${OUTPUT_DIR}/state/scenarios.json"
         local suite="${PACK_SUITE:-subset}"
         local scenario_ids_csv="${PACK_SCENARIO_IDS:-}"
+        local jq_filter='def suites_ok($suite): ((.suites? | type) != "array") or ((.suites | length) == 0) or ((.suites | index($suite)) != null); def trim: gsub("^\\s+|\\s+$"; ""); def ids($csv): ($csv | split(",") | map(trim) | map(select(length>0))); ._meta = (._meta | if type=="object" then . else {} end) | ._meta.applied_suite = $suite | (ids($scenario_ids_csv)) as $ids | if ($ids | length) > 0 then ._meta.scenario_ids_filter = $ids else . end | .scenarios = [.scenarios[] | select(suites_ok($suite)) | select(($ids | length) == 0 or (.id as $id | ($ids | index($id)) != null))]'
 
         if command -v jq >/dev/null 2>&1; then
             # Scenarios can optionally declare `suites: ["subset", "full", ...]`.
             # When present, the manifest is filtered to just the active PACK_SUITE.
-            jq --arg suite "${suite}" --arg scenario_ids_csv "${scenario_ids_csv}" \
-                'def suites_ok($suite):
-                    ((.suites? | type) != "array")
-                    or ((.suites | length) == 0)
-                    or ((.suites | index($suite)) != null);
-                 def trim: gsub("^\\s+|\\s+$"; "");
-                 def ids($csv): ($csv | split(",") | map(trim) | map(select(length>0)));
-                 ._meta = (._meta | if type=="object" then . else {} end)
-                 | ._meta.applied_suite = $suite
-                 | (ids($scenario_ids_csv)) as $ids
-                 | if ($ids | length) > 0 then ._meta.scenario_ids_filter = $ids else . end
-                 | .scenarios = [
-                     .scenarios[]
-                     | select(suites_ok($suite))
-                     | if ($ids | length) > 0 then
-                         select(.id as $id | ($ids | index($id)) != null)
-                       else
-                         .
-                       end
-                   ]' \
-                "${src}" > "${dest}"
+            jq --arg suite "${suite}" --arg scenario_ids_csv "${scenario_ids_csv}" "${jq_filter}" "${src}" > "${dest}"
         else
             cp "${src}" "${dest}"
         fi
@@ -1085,7 +1070,7 @@ estimate_planned_model_storage_gb() {
     local baseline_mode="${PACK_BASELINE_STORAGE_MODE:-snapshot_symlink}"
     local baseline_copy=1
     if [[ "${baseline_mode}" == "snapshot_symlink" ]]; then
-        baseline_copy=0  # baseline files are symlinks to HF hub cache blobs
+        baseline_copy=0  # baseline dir is a symlink tree backed by HF hub cache blobs
     fi
 
     local hub_cache_on_output_fs=1
@@ -1156,7 +1141,8 @@ disk_preflight() {
     log "ERROR: Estimated storage for this configuration: ~${planned_gb}GB (~$(format_gb_as_tb "${planned_gb}")TB) for model weights alone."
     log "       Free disk on output filesystem: ${free_gb}GB (~$(format_gb_as_tb "${free_gb}")TB)."
     log "       This suite saves full bf16 copies of edits (+ error models if enabled)."
-    log "       Baseline storage mode: ${PACK_BASELINE_STORAGE_MODE:-snapshot_symlink} (snapshot_symlink avoids a full extra baseline copy)."
+    log "       Baseline storage mode: ${PACK_BASELINE_STORAGE_MODE:-snapshot_symlink}."
+    log "       snapshot_symlink now builds a cache-backed symlink tree into HF cache; it still needs one full model copy in HF cache when that cache shares the output filesystem."
     log "       Fix: mount a larger volume and set OUTPUT_DIR, or run the subset suite, or set RUN_ERROR_INJECTION=false."
     log "       Override (not recommended): PACK_SKIP_DISK_PREFLIGHT=1"
 

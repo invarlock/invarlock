@@ -635,6 +635,236 @@ test_task_create_error_branches_cover_skip_missing_function_and_verify_paths() {
     fi
 }
 
+test_task_create_error_recreates_incomplete_models_and_propagates_failures() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    local out="${TEST_TMPDIR}/out"
+    local model_name="m"
+    local model_output_dir="${out}/${model_name}"
+    local baseline_dir="${model_output_dir}/models/baseline"
+    local log_file="${TEST_TMPDIR}/log.txt"
+    mkdir -p "${baseline_dir}" "$(dirname "${log_file}")" "${model_output_dir}/models"
+    echo "{}" > "${baseline_dir}/config.json"
+    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
+    : > "${log_file}"
+
+    local error_dir="${model_output_dir}/models/error_cuda_assert"
+    mkdir -p "${error_dir}"
+    echo "{}" > "${error_dir}/config.json"
+
+    local env_capture="${TEST_TMPDIR}/env.capture"
+    export INVARLOCK_SOMETHING="previous"
+    create_error_model() {
+        printf '%s\n' "${INVARLOCK_SOMETHING-}" > "${env_capture}"
+        mkdir -p "$2"
+        echo "{}" > "$2/config.json"
+        echo "{}" > "$2/error_metadata.json"
+    }
+
+    task_create_error "${model_name}" 0 cuda_assert '[]' "${out}" "${log_file}"
+    assert_eq "previous" "$(cat "${env_capture}")" "non-object env payloads are ignored"
+    assert_match "missing error_metadata" "$(cat "${log_file}")" "incomplete error model warning logged"
+
+    rm -rf "${error_dir}"
+    task_create_error "${model_name}" 0 cuda_assert '{"INVARLOCK_SOMETHING":"override"}' "${out}" "${log_file}"
+    assert_eq "override" "$(cat "${env_capture}")" "existing env values are overridden during injector execution"
+    assert_eq "previous" "${INVARLOCK_SOMETHING}" "injector env values are restored after create_error_model"
+
+    rm -rf "${error_dir}"
+    create_error_model() { return 4; }
+    run task_create_error "${model_name}" 0 cuda_assert '{}' "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "create_error_model failure returns non-zero"
+    assert_match "create_error_model failed" "${RUN_OUT}${RUN_ERR}$(cat "${log_file}")" "failure logged"
+}
+
+test_task_cleanup_edit_and_error_cover_guard_paths() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    local out="${TEST_TMPDIR}/out"
+    local model_name="m"
+    local model_output_dir="${out}/${model_name}"
+    local models_root="${model_output_dir}/models"
+    local log_file="${TEST_TMPDIR}/log.txt"
+    mkdir -p "${models_root}/baseline" "$(dirname "${log_file}")"
+    : > "${log_file}"
+
+    PACK_CLEANUP_MODELS="0"
+    task_cleanup_edit "${model_name}" "quant_rtn:4:32:all" "clean" "${out}" "${log_file}"
+    task_cleanup_error "${model_name}" "cuda_assert" "${out}" "${log_file}"
+
+    PACK_CLEANUP_MODELS="1"
+    resolve_edit_params() { jq -n '{status:"skipped", edit_dir_name:"ignored"}'; }
+    task_cleanup_edit "${model_name}" "quant_rtn:4:32:all" "clean" "${out}" "${log_file}"
+
+    resolve_edit_params() { jq -n '{status:"invalid", edit_dir_name:"ignored"}'; }
+    run task_cleanup_edit "${model_name}" "quant_rtn:4:32:all" "clean" "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "invalid edit cleanup resolution fails"
+
+    resolve_edit_params() { jq -n '{status:"selected", edit_dir_name:""}'; }
+    run task_cleanup_edit "${model_name}" "quant_rtn:4:32:all" "clean" "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "empty edit dir name fails"
+
+    rm -rf "${models_root}"
+    resolve_edit_params() { jq -n '{status:"selected", edit_dir_name:"quant_4bit_clean"}'; }
+    run task_cleanup_edit "${model_name}" "quant_rtn:4:32:all" "clean" "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "missing models root fails cleanup"
+    mkdir -p "${models_root}/baseline"
+
+    resolve_edit_params() { jq -n '{status:"selected", edit_dir_name:"baseline"}'; }
+    run task_cleanup_edit "${model_name}" "quant_rtn:4:32:all" "clean" "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "baseline path cleanup is rejected"
+
+    resolve_edit_params() { jq -n '{status:"selected", edit_dir_name:"missing_parent/edit"}'; }
+    run task_cleanup_edit "${model_name}" "quant_rtn:4:32:all" "clean" "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "missing edit parent is rejected"
+
+    resolve_edit_params() { jq -n '{status:"selected", edit_dir_name:"../../escape"}'; }
+    run task_cleanup_edit "${model_name}" "quant_rtn:4:32:all" "clean" "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "paths outside models root are rejected"
+
+    resolve_edit_params() { jq -n '{status:"selected", edit_dir_name:"quant_4bit_clean"}'; }
+    run task_cleanup_edit "${model_name}" "quant_rtn:4:32:all" "clean" "${out}" "${log_file}"
+    assert_rc "0" "${RUN_RC}" "missing edit paths are treated as already cleaned"
+
+    mkdir -p "${models_root}/quant_4bit_clean"
+    run task_cleanup_edit "${model_name}" "quant_rtn:4:32:all" "clean" "${out}" "${log_file}"
+    assert_rc "0" "${RUN_RC}" "edit cleanup removes existing model directory"
+    [[ ! -e "${models_root}/quant_4bit_clean" ]] || t_fail "edit directory removed on cleanup success path='${models_root}/quant_4bit_clean'"
+
+    mkdir -p "${models_root}/quant_4bit_clean"
+    rm() {
+        if [[ "${1:-}" == "-rf" ]]; then
+            return 1
+        fi
+        command rm "$@"
+    }
+    run task_cleanup_edit "${model_name}" "quant_rtn:4:32:all" "clean" "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "edit cleanup failure propagates"
+    unset -f rm
+
+    run task_cleanup_error "${model_name}" "" "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "cleanup_error requires an error type"
+
+    rm -rf "${models_root}"
+    run task_cleanup_error "${model_name}" "cuda_assert" "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "missing error models root fails cleanup"
+    mkdir -p "${models_root}/baseline"
+
+    run task_cleanup_error "${model_name}" "missing_parent/error" "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "cleanup_error rejects missing parent paths"
+
+    run task_cleanup_error "${model_name}" "../../escape" "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "cleanup_error rejects paths outside models root"
+
+    run task_cleanup_error "${model_name}" "cuda_assert" "${out}" "${log_file}"
+    assert_rc "0" "${RUN_RC}" "missing error paths are treated as already cleaned"
+
+    mkdir -p "${models_root}/error_cuda_assert"
+    run task_cleanup_error "${model_name}" "cuda_assert" "${out}" "${log_file}"
+    assert_rc "0" "${RUN_RC}" "error cleanup removes existing model directory"
+    [[ ! -e "${models_root}/error_cuda_assert" ]] || t_fail "error directory removed on cleanup success path='${models_root}/error_cuda_assert'"
+
+    mkdir -p "${models_root}/error_cuda_assert"
+    rm() {
+        if [[ "${1:-}" == "-rf" ]]; then
+            return 1
+        fi
+        command rm "$@"
+    }
+    run task_cleanup_error "${model_name}" "cuda_assert" "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "error cleanup failure propagates"
+    unset -f rm
+}
+
+test_task_evaluate_error_probe_warning_branches() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    local out="${TEST_TMPDIR}/out"
+    local model_name="m"
+    local model_output_dir="${out}/${model_name}"
+    local baseline_dir="${model_output_dir}/models/baseline"
+    local log_file="${TEST_TMPDIR}/log.txt"
+    mkdir -p "${baseline_dir}" "$(dirname "${log_file}")"
+    echo "{}" > "${baseline_dir}/config.json"
+    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
+    : > "${log_file}"
+
+    _estimate_model_size() { echo "7"; }
+    _ensure_evaluate_baseline_report() { echo "${TEST_TMPDIR}/baseline_report.json"; }
+    echo "{}" > "${TEST_TMPDIR}/baseline_report.json"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/invarlock" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+cmd="${1:-}"
+shift || true
+if [[ "${cmd}" != "evaluate" ]]; then
+  exit 0
+fi
+cert_out=""
+while [[ $# -gt 0 ]]; do
+  case "${1}" in
+    --report-out|--out)
+      cert_out="${2:-}"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+mkdir -p "${cert_out}"
+echo '{}' > "${cert_out}/evaluation.report.json"
+exit 0
+EOF
+    chmod +x "${bin_dir}/invarlock"
+    PATH="${bin_dir}:${PATH}"
+    export PATH
+
+    _cmd_python() { return 9; }
+
+    local rmt_dir="${model_output_dir}/models/error_rmt_norm_noise_case"
+    mkdir -p "${rmt_dir}"
+    echo "{}" > "${rmt_dir}/config.json"
+    run task_evaluate_error "${model_name}" 0 "rmt_norm_noise_case" "${out}" "${log_file}"
+    assert_rc "0" "${RUN_RC}" "probe failures do not fail evaluate_error"
+
+    rm -f "${TEST_TMPDIR}/baseline_report.json"
+    local rmt_skip_dir="${model_output_dir}/models/error_rmt_norm_noise_skip"
+    mkdir -p "${rmt_skip_dir}"
+    echo "{}" > "${rmt_skip_dir}/config.json"
+    run task_evaluate_error "${model_name}" 0 "rmt_norm_noise_skip" "${out}" "${log_file}"
+    assert_rc "0" "${RUN_RC}" "missing probe prerequisites do not fail evaluate_error"
+
+    local ve_skip_dir="${model_output_dir}/models/error_ve_mlp_scale_skew_skip"
+    mkdir -p "${ve_skip_dir}"
+    echo "{}" > "${ve_skip_dir}/config.json"
+    run task_evaluate_error "${model_name}" 0 "ve_mlp_scale_skew_skip" "${out}" "${log_file}"
+    assert_rc "0" "${RUN_RC}" "missing ve probe prerequisites do not fail evaluate_error"
+
+    echo "{}" > "${TEST_TMPDIR}/baseline_report.json"
+    local ve_dir="${model_output_dir}/models/error_ve_mlp_scale_skew_case"
+    mkdir -p "${ve_dir}"
+    echo "{}" > "${ve_dir}/config.json"
+    run task_evaluate_error "${model_name}" 0 "ve_mlp_scale_skew_case" "${out}" "${log_file}"
+    assert_rc "0" "${RUN_RC}" "ve probe failures do not fail evaluate_error"
+
+    local log_text
+    log_text="$(cat "${log_file}")"
+    assert_match "RMT cross-model probe failed" "${log_text}" "rmt probe failure warning logged"
+    assert_match "Skipping RMT cross-model probe" "${log_text}" "rmt probe skip warning logged"
+    assert_match "VE cross-model probe failed" "${log_text}" "ve probe failure warning logged"
+    assert_match "Skipping VE cross-model probe" "${log_text}" "ve probe skip warning logged"
+}
+
 test_task_helpers_cover_fallback_branches() {
     mock_reset
     # shellcheck source=../task_functions.sh
@@ -1201,8 +1431,10 @@ test_execute_task_dispatches_all_task_types() {
     task_create_edit() { :; }
     task_create_edits_batch() { :; }
     task_evaluate_edit() { :; }
+    task_cleanup_edit() { :; }
     task_create_error() { :; }
     task_evaluate_error() { :; }
+    task_cleanup_error() { :; }
     task_generate_preset() { :; }
 
     make_task() {
@@ -1217,7 +1449,7 @@ test_execute_task_dispatches_all_task_types() {
             > "${TEST_TMPDIR}/${task_id}.task"
     }
 
-    local types=(SETUP_BASELINE CALIBRATION_RUN CREATE_EDIT CREATE_EDITS_BATCH evaluate_EDIT CREATE_ERROR evaluate_ERROR GENERATE_PRESET)
+    local types=(SETUP_BASELINE CALIBRATION_RUN CREATE_EDIT CREATE_EDITS_BATCH evaluate_EDIT CLEANUP_EDIT CREATE_ERROR evaluate_ERROR CLEANUP_ERROR GENERATE_PRESET)
     local type
     for type in "${types[@]}"; do
         make_task "task_${type}" "${type}" '{}'

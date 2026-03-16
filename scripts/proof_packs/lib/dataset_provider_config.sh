@@ -35,7 +35,7 @@ _pack_indent_lines() {
         else
             echo "${prefix}${line}"
         fi
-    done <<< "${content}"
+    done < <(printf '%s\n' "${content}")
 }
 
 pack_render_dataset_provider_yaml() {

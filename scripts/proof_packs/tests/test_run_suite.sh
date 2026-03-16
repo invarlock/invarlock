@@ -189,3 +189,20 @@ test_run_suite_entrypoint_errors_on_invalid_suite() {
     run pack_entrypoint --suite nope --out "${TEST_TMPDIR}/out"
     assert_rc "2" "${RUN_RC}" "invalid suite returns 2"
 }
+
+test_run_suite_entrypoint_rejects_empty_and_oversized_model_lists() {
+    mock_reset
+
+    source ./scripts/proof_packs/run_suite.sh
+
+    pack_apply_suite() { return 0; }
+    pack_run_suite() { return 0; }
+
+    run pack_entrypoint --models " , , " --out "${TEST_TMPDIR}/out_empty"
+    assert_rc "2" "${RUN_RC}" "blank model list is rejected"
+    assert_match "no valid model ids" "${RUN_ERR}" "blank model error explains failure"
+
+    run pack_entrypoint --models "m1,m2,m3,m4,m5,m6,m7,m8,m9" --out "${TEST_TMPDIR}/out_many"
+    assert_rc "2" "${RUN_RC}" "more than eight models is rejected"
+    assert_match "up to 8 models" "${RUN_ERR}" "oversized list error explains limit"
+}

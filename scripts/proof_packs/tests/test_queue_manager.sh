@@ -1249,3 +1249,98 @@ test_generate_model_tasks_additional_batch_branches() {
     RUN_ERROR_INJECTION="true"
     generate_model_tasks "6" "org/model" "model" >/dev/null
 }
+
+test_generate_model_tasks_prefers_run_state_manifest_and_skips_blank_error_entries() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
+
+    local calls="${TEST_TMPDIR}/calls_state_manifest"
+    : > "${calls}"
+    add_task() {
+        local task_type="$1"
+        local params="${6:-}"
+        printf '%s\t%s\n' "${task_type}" "${params}" >> "${calls}"
+        local count
+        count=$(wc -l < "${calls}" | tr -d ' ')
+        echo "t${count}"
+    }
+    estimate_model_memory() { echo "14"; }
+    generate_eval_evaluate_tasks() { :; }
+
+    local run_root="${TEST_TMPDIR}/run_root"
+    export QUEUE_DIR="${run_root}/queue"
+    mkdir -p "${QUEUE_DIR}" "${run_root}/state"
+    cat > "${run_root}/state/scenarios.json" <<'EOF'
+{
+  "schema": "proof_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {
+      "id": "error_blank",
+      "generation": {"kind": "error", "error_type": "", "env": {"INVARLOCK_SKIP": "1"}}
+    },
+    {
+      "id": "error_real",
+      "generation": {
+        "kind": "error",
+        "error_type": "rmt_norm_noise",
+        "env": {"INVARLOCK_RMT_PROBE_MODE": "anisotropy"}
+      }
+    }
+  ]
+}
+EOF
+
+    PACK_PRESET_READY="true"
+    RUN_ERROR_INJECTION="true"
+    CLEAN_EDIT_RUNS="bad"
+    STRESS_EDIT_RUNS="also-bad"
+
+    generate_model_tasks "1" "org/model" "model" >/dev/null
+
+    local create_count
+    create_count="$(awk -F '\t' '$1=="CREATE_ERROR"{c++} END {print c+0}' "${calls}")"
+    assert_eq "1" "${create_count}" "blank manifest error entries are skipped"
+
+    local create_params
+    create_params="$(awk -F '\t' '$1=="CREATE_ERROR"{print $2; exit}' "${calls}")"
+    assert_eq "rmt_norm_noise" "$(printf '%s' "${create_params}" | jq -r '.error_type')" "state manifest error type used"
+    assert_eq "anisotropy" "$(printf '%s' "${create_params}" | jq -r '.error_env.INVARLOCK_RMT_PROBE_MODE')" "state manifest env propagated"
+}
+
+test_generate_model_tasks_falls_back_to_plain_error_json_when_jq_binary_missing() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
+
+    local calls="${TEST_TMPDIR}/calls_no_jq"
+    : > "${calls}"
+    add_task() {
+        local task_type="$1"
+        local params="${6:-}"
+        printf '%s\t%s\n' "${task_type}" "${params}" >> "${calls}"
+        local count
+        count=$(wc -l < "${calls}" | tr -d ' ')
+        echo "t${count}"
+    }
+    estimate_model_memory() { echo "14"; }
+    generate_eval_evaluate_tasks() { :; }
+    type() { return 1; }
+
+    PACK_PRESET_READY="true"
+    RUN_ERROR_INJECTION="true"
+    CLEAN_EDIT_RUNS="0"
+    STRESS_EDIT_RUNS="0"
+
+    generate_model_tasks "1" "org/model" "model" >/dev/null
+
+    local create_params
+    create_params="$(awk -F '\t' '$1=="CREATE_ERROR"{print $2; exit}' "${calls}")"
+    assert_match '"error_type": "nan_injection"' "${create_params}" "fallback params use stringified JSON"
+    if [[ "${create_params}" == *'"error_env"'* ]]; then
+        t_fail "fallback params should omit error_env when jq is unavailable"
+    fi
+
+    unset -f type
+}

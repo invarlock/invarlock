@@ -31,6 +31,17 @@ test_dataset_provider_config_yaml_override_supports_blank_lines() {
     assert_match '    foo: bar' "${out}" "override key preserved"
 }
 
+test_dataset_provider_config_indent_helper_handles_single_line_input() {
+    mock_reset
+
+    # shellcheck source=../lib/dataset_provider_config.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/dataset_provider_config.sh"
+
+    local out
+    out="$(_pack_indent_lines "    " "alpha: beta")"
+    assert_eq $'    alpha: beta' "${out}" "indent helper prefixes non-empty single lines"
+}
+
 test_dataset_provider_config_hf_text_defaults_c4_config_and_uses_cache_dir() {
     mock_reset
 
@@ -71,6 +82,23 @@ test_dataset_provider_config_hf_text_trust_remote_code_can_be_forced_false() {
     out="$(pack_render_dataset_provider_yaml "${INVARLOCK_DATASET}")"
     assert_match 'dataset_name: "allenai/c4"' "${out}" "dataset_name propagated"
     assert_match 'trust_remote_code: false' "${out}" "explicit false emitted"
+}
+
+test_dataset_provider_config_hf_text_trust_remote_code_truthy_values_emit_true() {
+    mock_reset
+
+    # shellcheck source=../lib/dataset_provider_config.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/dataset_provider_config.sh"
+
+    INVARLOCK_DATASET="hf_text"
+    INVARLOCK_HF_DATASET_NAME="demo/dataset"
+    INVARLOCK_HF_TRUST_REMOTE_CODE=" yes "
+    export INVARLOCK_DATASET INVARLOCK_HF_DATASET_NAME INVARLOCK_HF_TRUST_REMOTE_CODE
+
+    local out
+    out="$(pack_render_dataset_provider_yaml "${INVARLOCK_DATASET}")"
+    assert_match 'dataset_name: "demo/dataset"' "${out}" "dataset_name propagated"
+    assert_match 'trust_remote_code: true' "${out}" "truthy override emitted"
 }
 
 test_dataset_provider_config_hf_text_omits_config_and_cache_and_sanitizes_max_samples() {

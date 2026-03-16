@@ -166,6 +166,19 @@ pack_verify_certs() {
     fi
 }
 
+pack_write_source_repo_metadata() {
+    local dest="$1"
+    python3 "${RUN_PACK_SCRIPT_DIR}/python/write_source_repo_metadata.py" --out "${dest}"
+}
+
+pack_write_environment_metadata() {
+    local run_dir="$1"
+    local dest="$2"
+    python3 "${RUN_PACK_SCRIPT_DIR}/python/write_environment_metadata.py" \
+        --run-dir "${run_dir}" \
+        --out "${dest}"
+}
+
 pack_write_manifest() {
     local pack_dir="$1"
     local run_dir="$2"
@@ -352,40 +365,65 @@ Or use:
 EOF
 }
 
-pack_build_pack() {
-    local run_dir="$1"
+pack_prepare_staging_dir() {
+    local pack_dir="$1"
+    local parent_dir
+    local base_name
+    parent_dir="$(dirname "${pack_dir}")"
+    base_name="$(basename "${pack_dir}")"
+    mkdir -p "${parent_dir}" || return 1
+    mktemp -d "${parent_dir}/.${base_name}.tmp.XXXXXX"
+}
+
+pack_cleanup_staging_dir() {
+    local staging_dir="$1"
+    if [[ -n "${staging_dir}" && -d "${staging_dir}" ]]; then
+        rm -rf "${staging_dir}"
+    fi
+}
+
+pack_finalize_staging_dir() {
+    local staging_dir="$1"
     local pack_dir="$2"
-
-    if [[ -z "${run_dir}" || -z "${pack_dir}" ]]; then
-        echo "ERROR: pack_build_pack requires run_dir and pack_dir." >&2
-        return 1
-    fi
-    if [[ ! -d "${run_dir}" ]]; then
-        echo "ERROR: run_dir not found: ${run_dir}" >&2
-        return 1
-    fi
-
-    pack_require_passing_run_verdict "${run_dir}" || return 1
 
     if [[ -d "${pack_dir}" && -n "$(ls -A "${pack_dir}" 2>/dev/null)" ]]; then
         echo "ERROR: pack_dir already exists and is not empty: ${pack_dir}" >&2
         return 1
     fi
+    if [[ -e "${pack_dir}" && ! -d "${pack_dir}" ]]; then
+        echo "ERROR: pack_dir already exists and is not a directory: ${pack_dir}" >&2
+        return 1
+    fi
+    if [[ -d "${pack_dir}" ]]; then
+        if ! rmdir "${pack_dir}" 2>/dev/null; then
+            echo "ERROR: pack_dir could not be replaced atomically: ${pack_dir}" >&2
+            return 1
+        fi
+    fi
+    if ! mv "${staging_dir}" "${pack_dir}"; then
+        echo "ERROR: Failed to finalize proof pack atomically: ${pack_dir}" >&2
+        return 1
+    fi
+    return 0
+}
 
-    pack_require_cmd invarlock
-
-    mkdir -p "${pack_dir}"
-
+pack_populate_pack_dir() {
+    local run_dir="$1"
+    local pack_dir="$2"
     local layout
     layout="$(pack_normalize_layout "${PACK_PACK_LAYOUT:-v2}")" || return $?
 
     local results_dir="${pack_dir}/results"
     local verdicts_dir="${results_dir}/verdicts"
     local analysis_dir="${results_dir}/analysis"
+    local metadata_dir="${pack_dir}/metadata"
     local revisions_dest="${pack_dir}/metadata/model_revisions.json"
     local scenarios_dest="${pack_dir}/metadata/scenarios.json"
+    local tuned_edit_params_dest="${pack_dir}/metadata/tuned_edit_params.json"
+    local source_repo_dest="${pack_dir}/metadata/source_repo.json"
+    local environment_dest="${pack_dir}/metadata/environment.json"
 
-    mkdir -p "${results_dir}" "${verdicts_dir}" "${analysis_dir}"
+    mkdir -p "${results_dir}" "${verdicts_dir}" "${analysis_dir}" "${metadata_dir}"
 
     pack_copy_file "${run_dir}/reports/final_verdict.txt" "${verdicts_dir}/final_verdict.txt"
     pack_copy_file "${run_dir}/reports/final_verdict.json" "${verdicts_dir}/final_verdict.json"
@@ -397,6 +435,9 @@ pack_build_pack() {
 
     pack_copy_optional "${run_dir}/state/model_revisions.json" "${revisions_dest}"
     pack_copy_optional "${run_dir}/state/scenarios.json" "${scenarios_dest}"
+    pack_copy_optional "${run_dir}/state/tuned_edit_params.json" "${tuned_edit_params_dest}"
+    pack_write_source_repo_metadata "${source_repo_dest}"
+    pack_write_environment_metadata "${run_dir}" "${environment_dest}"
 
     local cert
     while IFS= read -r cert; do
@@ -431,7 +472,6 @@ pack_build_pack() {
     else
         sign_rc=$?
     fi
-    mkdir -p "${pack_dir}/metadata"
     cp "${pack_dir}/manifest.json" "${pack_dir}/metadata/manifest.json"
     if [[ -f "${pack_dir}/manifest.json.asc" ]]; then
         cp "${pack_dir}/manifest.json.asc" "${pack_dir}/metadata/manifest.json.asc"
@@ -442,6 +482,49 @@ pack_build_pack() {
         return "${sign_rc}"
     fi
     return "${verify_rc}"
+}
+
+pack_build_pack() {
+    local run_dir="$1"
+    local pack_dir="$2"
+    local staging_dir=""
+    local rc=0
+
+    if [[ -z "${run_dir}" || -z "${pack_dir}" ]]; then
+        echo "ERROR: pack_build_pack requires run_dir and pack_dir." >&2
+        return 1
+    fi
+    if [[ ! -d "${run_dir}" ]]; then
+        echo "ERROR: run_dir not found: ${run_dir}" >&2
+        return 1
+    fi
+
+    pack_require_passing_run_verdict "${run_dir}" || return 1
+    pack_require_cmd invarlock
+
+    if [[ -d "${pack_dir}" && -n "$(ls -A "${pack_dir}" 2>/dev/null)" ]]; then
+        echo "ERROR: pack_dir already exists and is not empty: ${pack_dir}" >&2
+        return 1
+    fi
+    if [[ -e "${pack_dir}" && ! -d "${pack_dir}" ]]; then
+        echo "ERROR: pack_dir already exists and is not a directory: ${pack_dir}" >&2
+        return 1
+    fi
+
+    staging_dir="$(pack_prepare_staging_dir "${pack_dir}")" || return 1
+
+    pack_populate_pack_dir "${run_dir}" "${staging_dir}"
+    rc=$?
+    if [[ "${rc}" -ne 0 ]]; then
+        pack_cleanup_staging_dir "${staging_dir}"
+        return "${rc}"
+    fi
+    if ! pack_finalize_staging_dir "${staging_dir}" "${pack_dir}"; then
+        rc=$?
+        pack_cleanup_staging_dir "${staging_dir}"
+        return "${rc}"
+    fi
+    return 0
 }
 
 pack_run_pack() {

@@ -519,10 +519,30 @@ Large runs can be storage-heavy (baseline + edits + error models):
 - Disk preflight estimates required storage and aborts early when insufficient.
   - Override with `PACK_SKIP_DISK_PREFLIGHT=1` (not recommended).
   - The minimum free space guard is `MIN_FREE_DISK_GB` (default 200).
-- `PACK_BASELINE_STORAGE_MODE=snapshot_symlink` stores baseline weights as
-  symlinks to HF cache files to reduce duplication.
+- `PACK_BASELINE_STORAGE_MODE=snapshot_symlink` now builds a local symlink tree
+  that points into the Hugging Face cache snapshot. This avoids a second
+  baseline copy under `OUTPUT_DIR`, but it still requires one full model copy in
+  `HF_HUB_CACHE` when that cache shares the output filesystem.
+- `PACK_BASELINE_STORAGE_MODE=snapshot_copy` materializes a full baseline copy
+  under `OUTPUT_DIR/models/<model>/baseline`.
+- Baseline downloads prefer one weight format only. When both `.safetensors` and
+  `.bin` weights are published, proof packs download the safetensors set and
+  ignore the `.bin` copy.
 - HF caches default to `OUTPUT_DIR/.hf` (override with `HF_HOME`, `HF_HUB_CACHE`,
   `HF_DATASETS_CACHE`).
+
+For the default `subset` suite (`mistralai/Mistral-7B-v0.1`), the model-weight
+budget is roughly:
+
+- ~42 GB on the output filesystem with `snapshot_symlink` when `HF_HUB_CACHE`
+  lives on the same filesystem as `OUTPUT_DIR` (one cached baseline + one clean
+  edit peak + one error-model peak under cleanup mode).
+- ~28 GB on the output filesystem with `snapshot_symlink` when `HF_HUB_CACHE`
+  is on a separate volume.
+- ~56 GB on the output filesystem with `snapshot_copy` on the same filesystem.
+
+Those figures are for model weights only; the default preflight also requires
+`MIN_FREE_DISK_GB=200` headroom.
 
 ## Proof pack packaging and verification
 
@@ -531,8 +551,13 @@ Large runs can be storage-heavy (baseline + edits + error models):
 - Copies `reports/final_verdict.{txt,json}` plus verdict sidecars (`category_summary`,
   `guard_signal_summary`, `scenario_signal_summary`) and key `analysis/*` artifacts.
 - Collects all reports into `proof_pack/certs/...`.
-- Generates `manifest.json`, `checksums.sha256`, and optional
+- Generates `manifest.json`, `checksums.sha256`, optional
   `manifest.json.asc`.
+- Writes pack-contained provenance metadata such as `metadata/source_repo.json`
+  and `metadata/environment.json` before sealing the pack.
+- Stages the pack in a hidden sibling temporary directory and renames it into
+  place only after sealing succeeds, so failed builds do not leave partial
+  `proof_pack/` output behind.
 - Optional HTML export can be disabled with `PACK_SKIP_HTML=1`.
 
 ### Packaging flow
@@ -548,10 +573,14 @@ run_pack.sh
 `verify_pack.sh` checks the pack:
 
 - Verifies `manifest.json` binds `checksums.sha256` via `checksums_sha256_digest`.
+- Verifies digest-backed manifest references (`subject`, `invocation.config_source`,
+  `environment`, and `materials`) against on-pack files.
 - Verifies `checksums.sha256` (and thus all hashed artifacts).
 - Verifies the GPG signature when present; `--strict` requires it.
 - Enforces “no extra files” semantics in `--strict` mode.
 - Runs `invarlock verify` across all certs (JSON output optional).
+- Returns structured exit codes so callers can distinguish usage, missing-file,
+  manifest-format, signature, integrity, and cert-verification failures.
 
 ## Remote setup helper
 
@@ -659,7 +688,7 @@ Primary metric acceptance/drift gates should be configured via profile/config
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `PACK_BASELINE_STORAGE_MODE` | `snapshot_symlink` | Baseline storage mode |
+| `PACK_BASELINE_STORAGE_MODE` | `snapshot_symlink` | Baseline storage mode (`snapshot_symlink`, `snapshot_copy`, or `save_pretrained`) |
 | `MIN_FREE_DISK_GB` | `200` | Disk pressure threshold |
 | `PACK_SKIP_DISK_PREFLIGHT` | `0` | Skip storage preflight |
 | `CUDA_MEMORY_FRACTION` | `0.92` | Target GPU memory fraction |

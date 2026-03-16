@@ -1508,14 +1508,28 @@ task_cleanup_edit() {
     fi
 
     local models_root="${model_output_dir}/models"
-    local edit_path="${models_root}/${edit_dir_name}"
-    local baseline_path="${models_root}/baseline"
+    local models_root_abs
+    models_root_abs="$(cd "${models_root}" 2>/dev/null && pwd -P)" || {
+        echo "ERROR: Models root missing for cleanup: ${models_root}" >> "${log_file}"
+        return 1
+    }
+    local edit_parent_rel
+    edit_parent_rel="$(dirname "${edit_dir_name}")"
+    local edit_basename
+    edit_basename="$(basename "${edit_dir_name}")"
+    local edit_parent_abs
+    edit_parent_abs="$(cd "${models_root_abs}/${edit_parent_rel}" 2>/dev/null && pwd -P)" || {
+        echo "ERROR: Refusing to delete path outside models root: ${models_root}/${edit_dir_name}" >> "${log_file}"
+        return 1
+    }
+    local edit_path="${edit_parent_abs}/${edit_basename}"
+    local baseline_path="${models_root_abs}/baseline"
 
     if [[ "${edit_path}" == "${baseline_path}" ]]; then
         echo "ERROR: Refusing to delete baseline path: ${edit_path}" >> "${log_file}"
         return 1
     fi
-    if [[ "${edit_path}" != "${models_root}/"* ]]; then
+    if [[ "${edit_path}" != "${models_root_abs}/"* ]]; then
         echo "ERROR: Refusing to delete path outside models root: ${edit_path}" >> "${log_file}"
         return 1
     fi
@@ -1573,16 +1587,13 @@ task_create_error() {
     if [[ -n "${error_env_json}" && "${error_env_json}" != "null" ]]; then
         mapfile -t injector_env < <(
             printf '%s\n' "${error_env_json}" | jq -r '
-                if type=="object" then
-                    to_entries[]
-                    | select((.key | type) == "string")
-                    | select(.key | startswith("INVARLOCK_"))
-                    | select(.key | test("^[A-Z][A-Z0-9_]*$"))
-                    | select((.value | type) as $t | ($t == "string" or $t == "number" or $t == "boolean"))
-                    | "\(.key)=\(.value | tostring)"
-                else
-                    empty
-                end
+                objects
+                | to_entries[]
+                | select((.key | type) == "string")
+                | select(.key | startswith("INVARLOCK_"))
+                | select(.key | test("^[A-Z][A-Z0-9_]*$"))
+                | select((.value | type) as $t | ($t == "string" or $t == "number" or $t == "boolean"))
+                | "\(.key)=\(.value | tostring)"
             ' 2>/dev/null
         )
     fi
@@ -1593,12 +1604,30 @@ task_create_error() {
     local create_rc=0
     if type create_error_model &>/dev/null; then
         if [[ ${#injector_env[@]} -gt 0 ]]; then
-            (
-                for entry in "${injector_env[@]}"; do
-                    export "${entry}"
-                done
-                create_error_model "${baseline_path}" "${error_path}" "${error_type}" "${gpu_id}"
-            ) >> "${log_file}" 2>&1 || create_rc=$?
+            local -a injector_keys=()
+            local -a injector_prev_values=()
+            local -a injector_had_prev=()
+            local idx=0
+            for entry in "${injector_env[@]}"; do
+                local env_key="${entry%%=*}"
+                injector_keys+=("${env_key}")
+                if [[ ${!env_key+x} ]]; then
+                    injector_had_prev+=("1")
+                    injector_prev_values+=("${!env_key}")
+                else
+                    injector_had_prev+=("0")
+                    injector_prev_values+=("")
+                fi
+                export "${entry}"
+            done
+            create_error_model "${baseline_path}" "${error_path}" "${error_type}" "${gpu_id}" >> "${log_file}" 2>&1 || create_rc=$?
+            for idx in "${!injector_keys[@]}"; do
+                if [[ "${injector_had_prev[$idx]}" == "1" ]]; then
+                    export "${injector_keys[$idx]}=${injector_prev_values[$idx]}"
+                else
+                    unset "${injector_keys[$idx]}"
+                fi
+            done
         else
             create_error_model "${baseline_path}" "${error_path}" "${error_type}" "${gpu_id}" >> "${log_file}" 2>&1 || create_rc=$?
         fi
@@ -1945,14 +1974,23 @@ task_cleanup_error() {
 
     local model_output_dir="${output_dir}/${model_name}"
     local models_root="${model_output_dir}/models"
-    local error_path="${models_root}/error_${error_type}"
-    local baseline_path="${models_root}/baseline"
-
-    if [[ "${error_path}" == "${baseline_path}" ]]; then
-        echo "ERROR: Refusing to delete baseline path: ${error_path}" >> "${log_file}"
+    local models_root_abs
+    models_root_abs="$(cd "${models_root}" 2>/dev/null && pwd -P)" || {
+        echo "ERROR: Models root missing for cleanup: ${models_root}" >> "${log_file}"
         return 1
-    fi
-    if [[ "${error_path}" != "${models_root}/"* ]]; then
+    }
+    local error_parent_rel
+    error_parent_rel="$(dirname "${error_type}")"
+    local error_basename
+    error_basename="error_$(basename "${error_type}")"
+    local error_parent_abs
+    error_parent_abs="$(cd "${models_root_abs}/${error_parent_rel}" 2>/dev/null && pwd -P)" || {
+        echo "ERROR: Refusing to delete path outside models root: ${models_root}/error_${error_type}" >> "${log_file}"
+        return 1
+    }
+    local error_path="${error_parent_abs}/${error_basename}"
+
+    if [[ "${error_path}" != "${models_root_abs}/"* ]]; then
         echo "ERROR: Refusing to delete path outside models root: ${error_path}" >> "${log_file}"
         return 1
     fi

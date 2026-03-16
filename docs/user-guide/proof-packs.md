@@ -71,6 +71,13 @@ models via `MODEL_1`–`MODEL_8`.
 | `workshop3` | 7B–32B ungated models | Workshop-friendly 3-model suite (architecture diversity) |
 | `full` | 7B–72B ungated models | Multi-GPU recommended |
 
+Storage note: a default `subset` run on Mistral-7B typically needs about 42 GB
+of model-weight space on the output filesystem with the default
+`PACK_BASELINE_STORAGE_MODE=snapshot_symlink` when the Hugging Face cache lives
+on the same filesystem as `OUTPUT_DIR`, or about 28 GB if the cache is on a
+separate volume. `snapshot_copy` is heavier at about 56 GB. The suite's disk
+preflight also enforces `MIN_FREE_DISK_GB` headroom (200 GB by default).
+
 Scenario selection is driven by `scripts/proof_packs/scenarios.json`. Scenarios can
 optionally declare `suites: ["subset", "showcase", "full", ...]`; during execution the
 suite writes the effective (filtered) manifest to `OUTPUT_DIR/state/scenarios.json`,
@@ -109,6 +116,13 @@ A suite run writes artifacts under `OUTPUT_DIR` (default: `./proof_pack_runs/<su
 - `certs/**/evaluation.html` + `certs/**/verify.json`
 - `README.md`, `manifest.json`, `checksums.sha256`
 - `manifest.json.asc` if GPG signing is available
+- `metadata/source_repo.json`, `metadata/environment.json`, and other input metadata sidecars when present
+
+Pack assembly is atomic at the directory level. `run_pack.sh` stages the pack in
+a hidden sibling temporary directory and only renames it into the final
+`proof_pack/` path after manifest generation, checksum sealing, optional HTML
+export, and optional signing succeed. Failed pack builds do not leave a partial
+pack behind at the final destination.
 
 ## Edit Provenance Labels
 
@@ -132,6 +146,8 @@ a drift summary in `results/determinism_repeats.json`.
 
 `manifest.json` includes `checksums_sha256_digest` (sha256 of `checksums.sha256`) so a
 signed manifest cryptographically binds the checksums file (and thus all hashed artifacts).
+Newer packs also carry a repo-native attestation block in the same signed manifest:
+`builder`, `subject`, `invocation`, `environment`, and digest-backed `materials`.
 Signed packs also record `signing_key_fingerprint` for audit trails.
 
 The manifest contract is published at `contracts/proof_pack_manifest.schema.json`.
@@ -146,11 +162,32 @@ checked-out tree.
 Use `verify_pack.sh`:
 
 - Default: `scripts/proof_packs/verify_pack.sh --pack <dir>`
-  - Verifies `checksums_sha256_digest`, validates `checksums.sha256`, and runs `invarlock verify`.
+  - Verifies `checksums_sha256_digest`, validates digest-backed manifest references, validates `checksums.sha256`, and runs `invarlock verify`.
   - Warns (but does not fail) if the pack is unsigned; this is evidence-grade verification.
 - Strict (recommended for distributable evidence): `scripts/proof_packs/verify_pack.sh --pack <dir> --strict`
   - Fails if `manifest.json.asc` is missing, `gpg` verification fails, or extra files exist outside `checksums.sha256`.
   - Alternative: set `PACK_STRICT_MODE=1` (e.g., `PACK_STRICT_MODE=1 scripts/proof_packs/verify_pack.sh --pack <dir>`).
+
+`verify_pack.sh` returns structured exit codes:
+
+- `0`: verified successfully
+- `2`: invalid usage or unsupported flag combination
+- `3`: missing pack directory or required files
+- `4`: manifest format or schema validation failure
+- `5`: signature verification failure
+- `6`: integrity failure (`checksums_sha256_digest`, `checksums.sha256`,
+  digest-backed manifest references, or strict extra-file checks)
+- `7`: cert verification failure (`invarlock verify`)
+
+Reviewer checklist:
+
+- `scripts/proof_packs/verify_pack.sh --pack <dir> --strict` returns `0`
+- `jq -e . <dir>/manifest.json` succeeds
+- `sha256sum -c <dir>/checksums.sha256` succeeds
+- `gpg --verify <dir>/manifest.json.asc <dir>/manifest.json` succeeds when the
+  pack is published as signed evidence
+- `manifest.json` includes builder, subject, invocation, environment, and
+  material digests for the distributed pack
 
 For proof-grade attestation, require all three: signed manifest, strict verification, and PASS final verdict.
 

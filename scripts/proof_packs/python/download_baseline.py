@@ -8,6 +8,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
+_BIN_IGNORE_PATTERNS = ["*.bin", "*.bin.index.json"]
+_SAFETENSORS_IGNORE_PATTERNS = ["*.safetensors", "*.safetensors.index.json"]
+
 
 def _truthy(value: str | None) -> bool:
     if value is None:
@@ -55,6 +58,10 @@ def sanitize_generation_config(model_dir: Path) -> None:
             )
             gen["top_p"] = None
         try:
+            if gen_path.is_symlink():
+                original = gen_path.read_text(encoding="utf-8")
+                gen_path.unlink()
+                gen_path.write_text(original, encoding="utf-8")
             gen_path.write_text(json.dumps(gen, indent=2) + "\n")
         except Exception:
             pass
@@ -93,22 +100,79 @@ def write_model_profile(model_dir: Path, model_id: str, revision: str | None) ->
     (model_dir / "model_profile.json").write_text(json.dumps(profile, indent=2) + "\n")
 
 
+def _select_weight_download_policy(
+    repo_id: str, revision: str | None
+) -> tuple[str, list[str]]:
+    try:
+        from huggingface_hub import list_repo_files
+    except Exception as exc:
+        raise RuntimeError(f"huggingface_hub not available: {exc}") from exc
+
+    repo_files = list_repo_files(repo_id, repo_type="model", revision=revision)
+    has_safetensors = any(
+        path.endswith(".safetensors") or path.endswith(".safetensors.index.json")
+        for path in repo_files
+    )
+    has_bin = any(
+        path.endswith(".bin") or path.endswith(".bin.index.json")
+        for path in repo_files
+    )
+
+    if has_safetensors:
+        return "safetensors", _BIN_IGNORE_PATTERNS
+    if has_bin:
+        return "bin", _SAFETENSORS_IGNORE_PATTERNS
+    return "unknown", []
+
+
+def _symlink_snapshot_tree(snapshot_dir: Path, output_dir: Path) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    for source in snapshot_dir.rglob("*"):
+        relative = source.relative_to(snapshot_dir)
+        destination = output_dir / relative
+        if source.is_dir():
+            destination.mkdir(parents=True, exist_ok=True)
+            continue
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        if destination.exists() or destination.is_symlink():
+            destination.unlink()
+        try:
+            target = os.path.relpath(str(source), str(destination.parent))
+            destination.symlink_to(target)
+        except OSError as exc:
+            raise RuntimeError(
+                "PACK_BASELINE_STORAGE_MODE=snapshot_symlink requires symlink support. "
+                "Use snapshot_copy or save_pretrained if symlink creation is unavailable."
+            ) from exc
+
+
 def download_snapshot(
     repo_id: str, model_dir: Path, mode: str, revision: str | None
-) -> None:
+) -> str:
     try:
         from huggingface_hub import snapshot_download
     except Exception as exc:
         raise RuntimeError(f"huggingface_hub not available: {exc}") from exc
 
-    local_dir_use_symlinks = mode == "snapshot_symlink"
-    snapshot_download(
-        repo_id=repo_id,
-        local_dir=str(model_dir),
-        local_dir_use_symlinks=local_dir_use_symlinks,
-        cache_dir=os.environ.get("HF_HUB_CACHE"),
-        revision=revision,
-    )
+    weight_format, ignore_patterns = _select_weight_download_policy(repo_id, revision)
+    download_kwargs: dict[str, Any] = {
+        "repo_id": repo_id,
+        "cache_dir": os.environ.get("HF_HUB_CACHE"),
+        "revision": revision,
+    }
+    if ignore_patterns:
+        download_kwargs["ignore_patterns"] = ignore_patterns
+
+    if mode == "snapshot_copy":
+        snapshot_download(local_dir=str(model_dir), **download_kwargs)
+        return weight_format
+
+    if mode == "snapshot_symlink":
+        snapshot_path = Path(snapshot_download(**download_kwargs))
+        _symlink_snapshot_tree(snapshot_path, model_dir)
+        return weight_format
+
+    raise RuntimeError(f"Unsupported snapshot mode: {mode}")
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -143,17 +207,35 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if baseline_mode in ("snapshot_symlink", "snapshot_copy"):
             try:
-                download_snapshot(model_id, output_dir, baseline_mode, revision)
+                weight_format = download_snapshot(
+                    model_id, output_dir, baseline_mode, revision
+                )
                 sanitize_generation_config(output_dir)
                 write_model_profile(output_dir, model_id, revision)
                 if success_marker is not None:
                     success_marker.parent.mkdir(parents=True, exist_ok=True)
                     success_marker.touch()
-                print(f"Saved to {output_dir} (snapshot)")
+                mode_label = (
+                    "snapshot cache symlink"
+                    if baseline_mode == "snapshot_symlink"
+                    else "snapshot copy"
+                )
+                if weight_format != "unknown":
+                    print(f"Weight format: {weight_format} only")
+                print(f"Saved to {output_dir} ({mode_label})")
                 return 0
             except Exception as snap_err:
+                message = str(snap_err)
+                if baseline_mode == "snapshot_symlink":
+                    print(
+                        "ERROR: snapshot_symlink requires a cache-backed symlink tree "
+                        f"and could not be prepared: {message}",
+                        file=sys.stderr,
+                    )
+                    return 1
                 print(
-                    f"WARNING: snapshot_download failed, falling back to save_pretrained: {snap_err}",
+                    "WARNING: snapshot_copy failed, falling back to save_pretrained: "
+                    f"{message}",
                     file=sys.stderr,
                 )
                 baseline_mode = "save_pretrained"

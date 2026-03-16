@@ -588,6 +588,44 @@ test_pack_validation_disk_preflight_returns_ok_when_disk_is_sufficient() {
     disk_preflight
 }
 
+test_pack_validation_estimate_planned_storage_counts_snapshot_copy_baseline_materialization() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    EDIT_TYPES_CLEAN=()
+    EDIT_TYPES_STRESS=()
+    RUN_ERROR_INJECTION="false"
+    PACK_BASELINE_STORAGE_MODE="snapshot_copy"
+
+    pack_model_list() { printf '%s\n' "org/model"; }
+    estimate_model_weights_gb() { echo "10"; }
+
+    local total
+    total="$(estimate_planned_model_storage_gb)"
+    assert_eq "20" "${total}" "snapshot_copy counts cache download plus baseline materialization"
+}
+
+test_pack_validation_disk_preflight_describes_cache_backed_symlink_mode() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
+
+    get_free_disk_gb() { echo "10"; }
+    estimate_planned_model_storage_gb() { echo "1000"; }
+
+    PACK_BASELINE_STORAGE_MODE="snapshot_symlink"
+    MIN_FREE_DISK_GB="200"
+
+    local rc=0
+    ( disk_preflight ) || rc=$?
+    assert_eq "1" "${rc}" "disk preflight aborts through error_exit"
+    assert_match "cache-backed symlink tree" "$(cat "${OUTPUT_DIR}/logs/main.log")" "message explains snapshot_symlink semantics"
+}
+
 test_pack_validation_handle_disk_pressure_shutdown_and_reclaim_branches() {
     mock_reset
 
@@ -744,6 +782,319 @@ test_pack_validation_check_dependencies_errors_when_missing() {
     PATH=""
     ( check_dependencies ) || rc=$?
     assert_eq "11" "${rc}" "missing dependencies trigger error_exit"
+}
+
+test_pack_validation_preflight_datasets_success_and_offline_failure_paths() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    LOG_FILE="${TEST_TMPDIR}/preflight.log"
+    LOG_LOCK="${TEST_TMPDIR}/preflight.lock"
+    PACK_NET="0"
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    : > "${LOG_FILE}"
+    error_exit() { return 1; }
+
+    local repo_root
+    repo_root="$(pwd)"
+    python3() {
+        if [[ "${1:-}" == "${repo_root}/scripts/proof_packs/python/dataset_preflight.py" ]]; then
+            if [[ "${DATASET_PREFLIGHT_MODE:-ok}" == "ok" ]]; then
+                printf '%s\n' "dataset ok"
+                return 0
+            fi
+            printf '%s\n' "dataset missing"
+            return 1
+        fi
+        command python3 "$@"
+    }
+
+    pack_preflight_datasets
+    assert_match "Dataset preflight: OK" "$(cat "${LOG_FILE}")" "successful preflight is logged"
+
+    : > "${LOG_FILE}"
+    DATASET_PREFLIGHT_MODE="fail"
+    run pack_preflight_datasets
+    assert_rc "1" "${RUN_RC}" "failing preflight returns non-zero"
+}
+
+test_pack_validation_source_libs_errors_when_required_libs_are_missing() {
+    mock_reset
+
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    local file
+    for file in scheduler.sh task_functions.sh gpu_worker.sh; do
+        local sandbox
+        sandbox="$(_make_validation_suite_sandbox)"
+        rm -f "${sandbox}/lib/${file}"
+
+        local rc=0
+        (
+            _pack_script_dir() { echo "${sandbox}"; }
+            pack_source_libs
+        ) || rc=$?
+        assert_ne "0" "${rc}" "missing ${file} fails pack_source_libs"
+    done
+}
+
+test_pack_validation_check_dependencies_covers_pip_bootstrap_and_missing_install_paths() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    PACK_NET="1"
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
+
+    log_section() { :; }
+    log() { printf '%s\n' "$*" >> "${TEST_TMPDIR}/dep.log"; }
+    error_exit() { exit 17; }
+    timeout() { shift; "$@"; }
+    command() {
+        if [[ "${1:-}" == "-v" && "${2:-}" == "invarlock" ]]; then
+            return 0
+        fi
+        builtin command "$@"
+    }
+
+    local pip_version_calls=0
+    local mode="bootstrap"
+    python3() {
+        if [[ "${1:-}" == "-m" && "${2:-}" == "pip" && "${3:-}" == "--version" ]]; then
+            pip_version_calls=$((pip_version_calls + 1))
+            case "${mode}" in
+                bootstrap)
+                    [[ ${pip_version_calls} -ge 2 ]]
+                    return $?
+                    ;;
+                nopip)
+                    return 1
+                    ;;
+                *)
+                    return 0
+                    ;;
+            esac
+        fi
+        if [[ "${1:-}" == "-m" && "${2:-}" == "ensurepip" ]]; then
+            [[ "${mode}" == "bootstrap" ]]
+            return $?
+        fi
+        if [[ "${1:-}" == "-m" && "${2:-}" == "pip" && "${3:-}" == "install" ]]; then
+            case "${4:-}" in
+                huggingface_hub|accelerate|pyyaml|protobuf|sentencepiece)
+                    if [[ "${mode}" == "failinstalls" ]]; then
+                        return 1
+                    fi
+                    return 0
+                    ;;
+                flash-attn)
+                    if [[ "${mode}" == "flashfail" ]]; then
+                        return 1
+                    fi
+                    return 0
+                    ;;
+            esac
+            return 0
+        fi
+        if [[ "${1:-}" == "-c" ]]; then
+            local code="${2:-}"
+            case "${code}" in
+                *"import torch; assert torch.cuda.is_available"*) return 0 ;;
+                *"import transformers"*) return 0 ;;
+                *"import invarlock"*) return 0 ;;
+                *"import flash_attn; print('Flash Attention OK')"*) return 1 ;;
+                *"import sysconfig; exit(0 if sysconfig.get_config_var('INCLUDEPY')"*) return 0 ;;
+                *"print(sysconfig.get_config_var('INCLUDEPY'))"*) echo "${TEST_TMPDIR}/include"; return 0 ;;
+                *"import flash_attn"*)
+                    if [[ "${mode}" == "bootstrap" ]]; then
+                        return 0
+                    fi
+                    return 1
+                    ;;
+                *"import huggingface_hub"*)
+                    return 1
+                    ;;
+                *"import accelerate"*)
+                    return 1
+                    ;;
+                *"import yaml"*)
+                    return 1
+                    ;;
+                *"import google.protobuf"*)
+                    return 1
+                    ;;
+                *"import sentencepiece"*)
+                    return 1
+                    ;;
+            esac
+        fi
+        return 0
+    }
+
+    mkdir -p "${TEST_TMPDIR}/include"
+    : > "${TEST_TMPDIR}/include/Python.h"
+    check_dependencies
+
+    mode="failinstalls"
+    pip_version_calls=0
+    : > "${TEST_TMPDIR}/dep.log"
+    local rc=0
+    ( check_dependencies ) || rc=$?
+    assert_eq "17" "${rc}" "failed dependency installs abort via error_exit"
+
+    mode="nopip"
+    pip_version_calls=0
+    : > "${TEST_TMPDIR}/dep.log"
+    rc=0
+    ( check_dependencies ) || rc=$?
+    assert_eq "17" "${rc}" "missing pip/install dependencies abort via error_exit"
+
+    PACK_NET="0"
+    : > "${TEST_TMPDIR}/dep.log"
+    rc=0
+    ( check_dependencies ) || rc=$?
+    assert_eq "17" "${rc}" "offline missing optional deps still aborts"
+    assert_match "Flash Attention 2: Not found \\(offline\\), using eager attention" "$(cat "${TEST_TMPDIR}/dep.log")" "offline flash-attn fallback logged"
+}
+
+test_pack_validation_main_dynamic_marks_suite_failed_when_final_verdict_fails() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
+
+    check_dependencies() { :; }
+    configure_gpu_pool() { NUM_GPUS=1; GPU_ID_LIST="0"; export NUM_GPUS GPU_ID_LIST; }
+    disk_preflight() { :; }
+    setup_pack_environment() { :; }
+    handle_disk_pressure() { return 0; }
+    RESUME_FLAG="false"
+
+    init_queue() {
+        QUEUE_DIR="${OUTPUT_DIR}/queue"
+        mkdir -p "${QUEUE_DIR}"/{pending,ready,running,completed,failed} "${OUTPUT_DIR}/workers" "${OUTPUT_DIR}/reports"
+        export QUEUE_DIR
+    }
+    generate_all_tasks() { :; }
+    resolve_dependencies() { echo 0; }
+    count_tasks() { echo 0; }
+    print_queue_stats() { :; }
+    compile_results() { :; }
+    run_analysis() { :; }
+    generate_verdict() {
+        mkdir -p "${OUTPUT_DIR}/reports"
+        printf '%s\n' '{"verdict":"FAIL"}' > "${OUTPUT_DIR}/reports/final_verdict.json"
+        printf '%s\n' 'FAIL' > "${OUTPUT_DIR}/reports/final_verdict.txt"
+    }
+    list_run_gpu_ids() { printf '0\n'; }
+    is_queue_empty() { return 0; }
+    get_free_disk_gb() { echo "999"; }
+
+    local stub_lib="${TEST_TMPDIR}/stub_lib"
+    mkdir -p "${stub_lib}"
+    for f in task_serialization.sh queue_manager.sh scheduler.sh task_functions.sh fault_tolerance.sh; do
+        printf '%s\n' "#!/usr/bin/env bash" > "${stub_lib}/${f}"
+    done
+    cat > "${stub_lib}/gpu_worker.sh" <<'EOF'
+#!/usr/bin/env bash
+gpu_worker() { return 0; }
+EOF
+    LIB_DIR="${stub_lib}"
+    export LIB_DIR
+
+    run main_dynamic
+    assert_rc "1" "${RUN_RC}" "failed final verdict makes suite fail"
+    assert_match "Final verdict is FAIL" "${RUN_OUT}${RUN_ERR}" "failure reason is logged"
+}
+
+test_pack_validation_pack_run_suite_returns_nonzero_when_dataset_preflight_fails() {
+    mock_reset
+
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    cleanup() { return 0; }
+    pack_apply_network_mode() { :; }
+    pack_source_libs() { return 0; }
+    pack_setup_output_dirs() { return 0; }
+    pack_prepare_scenarios_manifest() { return 0; }
+    pack_setup_hf_cache_dirs() { return 0; }
+    pack_preflight_datasets() { return 1; }
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    PACK_NET="0"
+    pack_require_bash4() { return 0; }
+
+    run pack_run_suite
+    assert_rc "1" "${RUN_RC}" "dataset preflight failure propagates from pack_run_suite"
+    trap - EXIT INT TERM HUP QUIT
+}
+
+test_pack_prepare_scenarios_manifest_copies_source_when_jq_is_unavailable() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    local manifest="${TEST_TMPDIR}/scenarios_copy.json"
+    cat > "${manifest}" <<'EOF'
+{
+  "_meta": {},
+  "schema": "proof_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [{"id": "a", "generation": {"kind": "edit", "edit_spec": "x", "version": "clean"}}]
+}
+EOF
+
+    local bin_dir="${TEST_TMPDIR}/no_jq_bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/cp" <<'EOF'
+#!/usr/bin/env bash
+exec /bin/cp "$@"
+EOF
+    chmod +x "${bin_dir}/cp"
+    local original_path="${PATH}"
+    PATH="${bin_dir}:/bin"
+    PACK_SCENARIOS_MANIFEST_FILE="${manifest}"
+    PACK_SCENARIO_IDS=""
+
+    pack_prepare_scenarios_manifest
+    PATH="${original_path}"
+    assert_eq "null" "$(jq -r '._meta.applied_suite' "${OUTPUT_DIR}/state/scenarios.json")" "cp fallback leaves manifest metadata unchanged"
+    assert_eq "a" "$(jq -r '.scenarios[0].id' "${OUTPUT_DIR}/state/scenarios.json")" "scenario content preserved under cp fallback"
+}
+
+test_pack_validation_estimate_planned_storage_covers_error_fallback_and_batch_cleanup() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    HF_HUB_CACHE=""
+    MODEL_1="mistralai/Mistral-7B-v0.1"
+    MODEL_2=""
+    MODEL_3=""
+    MODEL_4=""
+    MODEL_5=""
+    MODEL_6=""
+    MODEL_7=""
+    MODEL_8=""
+    RUN_ERROR_INJECTION="true"
+    PACK_CLEANUP_MODELS="1"
+    PACK_USE_BATCH_EDITS="true"
+    CLEAN_EDIT_RUNS="oops"
+    STRESS_EDIT_RUNS="bad"
+    jq() { echo "not-a-number"; }
+
+    local total
+    total="$(estimate_planned_model_storage_gb)"
+    assert_match '^[0-9]+$' "${total}" "storage estimate falls back when error count is invalid"
+
+    CLEAN_EDIT_RUNS="1"
+    STRESS_EDIT_RUNS="2"
+    PACK_USE_BATCH_EDITS="true"
+    total="$(estimate_planned_model_storage_gb)"
+    assert_match '^[0-9]+$' "${total}" "batch cleanup estimate supports truthy pack_use_batch_edits"
 }
 
 test_pack_validation_setup_model_early_returns_for_local_or_cached_paths_and_errors_on_failed_download() {

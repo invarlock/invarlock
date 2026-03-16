@@ -414,19 +414,29 @@ reclaim_orphaned_tasks() {
     for task_file in "${running_dir}"/*.task; do
         [[ -f "${task_file}" ]] || continue
 
+        local task_id
+        task_id=$(get_task_id "${task_file}")
+
+        local pid_file="${running_dir}/${task_id}.pid"
+        local pid=""
+        if [[ -f "${pid_file}" ]]; then
+            pid=$(cat "${pid_file}" 2>/dev/null || true)
+        fi
+
         local assigned_gpus
         assigned_gpus=$(get_task_assigned_gpus "${task_file}")
         assigned_gpus="${assigned_gpus// /}"
+
+        local should_reclaim="false"
         if [[ -n "${assigned_gpus}" && "${assigned_gpus}" != "null" && "${assigned_gpus%%,*}" == "${gpu_id}" ]]; then
-            local task_id
-            task_id=$(get_task_id "${task_file}")
+            should_reclaim="true"
+        elif [[ -n "${pid}" && ( -z "${assigned_gpus}" || "${assigned_gpus}" == "null" ) ]]; then
+            # Older or partially-updated running tasks may still have a live PID file
+            # before assigned_gpus is recorded. Reclaim those inconsistent entries too.
+            should_reclaim="true"
+        fi
 
-            local pid_file="${running_dir}/${task_id}.pid"
-            local pid=""
-            if [[ -f "${pid_file}" ]]; then
-                pid=$(cat "${pid_file}" 2>/dev/null || true)
-            fi
-
+        if [[ "${should_reclaim}" == "true" ]]; then
             task_ids+=("${task_id}")
             task_assigned+=("${assigned_gpus}")
             task_pids+=("${pid}")
@@ -1320,8 +1330,9 @@ generate_model_tasks() {
 
             local params_json
             if [[ -n "${jq_bin}" ]]; then
+                local jq_params_builder="${jq_bin}"
                 params_json="$(
-                    "${jq_bin}" -cn \
+                    "${jq_params_builder}" -cn \
                         --arg error_type "${error_type}" \
                         --argjson error_env "${error_env_json}" \
                         '{error_type: $error_type, error_env: $error_env}'
