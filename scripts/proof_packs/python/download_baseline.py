@@ -114,8 +114,7 @@ def _select_weight_download_policy(
         for path in repo_files
     )
     has_bin = any(
-        path.endswith(".bin") or path.endswith(".bin.index.json")
-        for path in repo_files
+        path.endswith(".bin") or path.endswith(".bin.index.json") for path in repo_files
     )
 
     if has_safetensors:

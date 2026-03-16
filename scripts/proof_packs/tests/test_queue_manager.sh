@@ -1250,6 +1250,61 @@ test_generate_model_tasks_additional_batch_branches() {
     generate_model_tasks "6" "org/model" "model" >/dev/null
 }
 
+test_generate_model_tasks_honors_one_sided_state_manifest_without_edit_fallback() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
+
+    local calls="${TEST_TMPDIR}/calls_one_sided_manifest"
+    : > "${calls}"
+    add_task() {
+        local task_type="$1"
+        local params="${6:-}"
+        printf '%s\t%s\n' "${task_type}" "${params}" >> "${calls}"
+        local count
+        count=$(wc -l < "${calls}" | tr -d ' ')
+        echo "t${count}"
+    }
+    estimate_model_memory() { echo "14"; }
+    generate_eval_evaluate_tasks() { :; }
+
+    local run_root="${TEST_TMPDIR}/run_one_clean"
+    export QUEUE_DIR="${run_root}/queue"
+    mkdir -p "${QUEUE_DIR}" "${run_root}/state"
+    cat > "${run_root}/state/scenarios.json" <<'EOF'
+{
+  "schema": "proof_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {
+      "id": "svd_rank32_l31_clean",
+      "generation": {"kind": "edit", "edit_spec": "lowrank_svd:clean:ffn", "version": "clean"}
+    }
+  ]
+}
+EOF
+
+    PACK_USE_BATCH_EDITS="false"
+    PACK_PRESET_READY="true"
+    CLEAN_EDIT_RUNS="1"
+    STRESS_EDIT_RUNS="1"
+    DRIFT_CALIBRATION_RUNS="0"
+    RUN_ERROR_INJECTION="false"
+
+    generate_model_tasks "1" "org/model" "model" >/dev/null
+
+    local create_count
+    create_count="$(awk -F '\t' '$1=="CREATE_EDIT"{c++} END {print c+0}' "${calls}")"
+    assert_eq "1" "${create_count}" "one clean scenario creates one edit task"
+    assert_match "lowrank_svd:clean:ffn" "$(cat "${calls}")" "selected clean edit spec used"
+
+    local all_calls
+    all_calls="$(cat "${calls}")"
+    if [[ "${all_calls}" == *"quant_rtn:clean:ffn"* || "${all_calls}" == *"fp8_quant:clean:ffn"* || "${all_calls}" == *"magnitude_prune:clean:ffn"* || "${all_calls}" == *'"version": "stress"'* || "${all_calls}" == *'"version":"stress"'* ]]; then
+        t_fail "one-sided manifest should not fall back to default clean/stress edit sets"
+    fi
+}
+
 test_generate_model_tasks_prefers_run_state_manifest_and_skips_blank_error_entries() {
     mock_reset
     # shellcheck source=../queue_manager.sh

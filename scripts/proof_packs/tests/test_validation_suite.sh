@@ -604,7 +604,7 @@ test_pack_validation_estimate_planned_storage_counts_snapshot_copy_baseline_mate
 
     local total
     total="$(estimate_planned_model_storage_gb)"
-    assert_eq "20" "${total}" "snapshot_copy counts cache download plus baseline materialization"
+    assert_eq "30" "${total}" "snapshot_copy counts cache download, baseline materialization, and one edit peak copy"
 }
 
 test_pack_validation_disk_preflight_describes_cache_backed_symlink_mode() {
@@ -1946,6 +1946,38 @@ test_pack_validation_estimate_planned_model_storage_mapfile() {
     total="$(estimate_planned_model_storage_gb)"
     unset -f mapfile
     assert_eq "20" "${total}" "planned storage sums weights and edits"
+}
+
+
+test_pack_validation_estimate_planned_storage_honors_one_sided_state_manifest() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    mkdir -p "${OUTPUT_DIR}/state"
+    source ./scripts/proof_packs/lib/validation_suite.sh
+
+    cat > "${OUTPUT_DIR}/state/scenarios.json" <<'EOF'
+{
+  "schema": "proof_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {
+      "id": "svd_rank32_l31_clean",
+      "generation": {"kind": "edit", "edit_spec": "lowrank_svd:clean:ffn", "version": "clean"}
+    }
+  ]
+}
+EOF
+
+    RUN_ERROR_INJECTION="false"
+    PACK_CLEANUP_MODELS="0"
+
+    pack_model_list() { printf '%s\n' "org/model"; }
+    estimate_model_weights_gb() { echo "10"; }
+
+    local total
+    total="$(estimate_planned_model_storage_gb)"
+    assert_eq "20" "${total}" "one clean scenario counts as one edit copy without fallback expansion"
 }
 
 

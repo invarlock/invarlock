@@ -703,6 +703,48 @@ pack_prepare_scenarios_manifest() {
     fi
 }
 
+pack_resolve_active_scenarios_manifest() {
+    if [[ -n "${OUTPUT_DIR:-}" ]]; then
+        local state_manifest="${OUTPUT_DIR}/state/scenarios.json"
+        if [[ -f "${state_manifest}" ]]; then
+            printf '%s\n' "${state_manifest}"
+            return 0
+        fi
+    fi
+
+    local repo_root
+    repo_root="$(cd "${_PACK_VALIDATION_LIB_DIR}/../../.." && pwd)"
+    local src="${PACK_SCENARIOS_MANIFEST_FILE:-${repo_root}/scripts/proof_packs/scenarios.json}"
+    if [[ -f "${src}" ]]; then
+        printf '%s\n' "${src}"
+        return 0
+    fi
+
+    return 1
+}
+
+pack_count_edit_scenarios() {
+    local scenarios_file=""
+    scenarios_file="$(pack_resolve_active_scenarios_manifest 2>/dev/null || true)"
+
+    if command -v jq >/dev/null 2>&1 && [[ -n "${scenarios_file}" && -f "${scenarios_file}" ]]; then
+        local clean_scenarios=""
+        local stress_scenarios=""
+        clean_scenarios="$(jq -r '[.scenarios[] | select(.generation.kind=="edit" and .generation.version=="clean")] | length' "${scenarios_file}" 2>/dev/null || true)"
+        stress_scenarios="$(jq -r '[.scenarios[] | select(.generation.kind=="edit" and .generation.version=="stress")] | length' "${scenarios_file}" 2>/dev/null || true)"
+        if [[ "${clean_scenarios}" =~ ^[0-9]+$ && "${stress_scenarios}" =~ ^[0-9]+$ ]]; then
+            local source_label="scenarios.json"
+            if [[ -n "${OUTPUT_DIR:-}" && "${scenarios_file}" == "${OUTPUT_DIR}/state/scenarios.json" ]]; then
+                source_label="state/scenarios.json"
+            fi
+            printf '%s|%s|%s\n' "${clean_scenarios}" "${stress_scenarios}" "${source_label}"
+            return 0
+        fi
+    fi
+
+    printf '%s|%s|defaults\n' "${#EDIT_TYPES_CLEAN[@]}" "${#EDIT_TYPES_STRESS[@]}"
+}
+
 pack_resolve_tuned_edit_params_file() {
     if [[ -n "${PACK_TUNED_EDIT_PARAMS_FILE:-}" ]]; then
         return 0
@@ -1021,7 +1063,18 @@ estimate_planned_model_storage_gb() {
         done < <(pack_model_list)
     fi
 
-    local edits_total=$(( ${#EDIT_TYPES_CLEAN[@]} + ${#EDIT_TYPES_STRESS[@]} ))
+    local edit_counts=""
+    edit_counts="$(pack_count_edit_scenarios)"
+    local edits_clean=0
+    local edits_stress=0
+    IFS='|' read -r edits_clean edits_stress _ <<< "${edit_counts}"
+    if ! [[ "${edits_clean}" =~ ^[0-9]+$ ]]; then
+        edits_clean=0
+    fi
+    if ! [[ "${edits_stress}" =~ ^[0-9]+$ ]]; then
+        edits_stress=0
+    fi
+    local edits_total=$((edits_clean + edits_stress))
     local errors_total=0
     if [[ "${RUN_ERROR_INJECTION}" == "true" ]]; then
         # Derive count from scenarios.json when available to keep disk estimates aligned with the suite.
@@ -1666,20 +1719,16 @@ main_dynamic() {
     local model_count
     model_count=$(pack_model_list | wc -l | tr -d ' ')
     log "Models: ${model_count} (PACK_SUITE=${PACK_SUITE})"
-    local scenarios_file="${OUTPUT_DIR}/state/scenarios.json"
     local clean_scenarios=0
     local stress_scenarios=0
     local error_scenarios=0
     local edit_scenarios_source="defaults"
     local error_scenarios_source="defaults"
 
-    if command -v jq >/dev/null 2>&1 && [[ -f "${scenarios_file}" ]]; then
-        clean_scenarios="$(jq -r '[.scenarios[] | select(.generation.kind=="edit" and .generation.version=="clean")] | length' "${scenarios_file}" 2>/dev/null || echo 0)"
-        stress_scenarios="$(jq -r '[.scenarios[] | select(.generation.kind=="edit" and .generation.version=="stress")] | length' "${scenarios_file}" 2>/dev/null || echo 0)"
-        error_scenarios="$(jq -r '[.scenarios[] | select(.generation.kind=="error")] | length' "${scenarios_file}" 2>/dev/null || echo 0)"
-        edit_scenarios_source="state/scenarios.json"
-        error_scenarios_source="state/scenarios.json"
-    fi
+    local scenarios_file="${OUTPUT_DIR}/state/scenarios.json"
+    local edit_counts=""
+    edit_counts="$(pack_count_edit_scenarios)"
+    IFS='|' read -r clean_scenarios stress_scenarios edit_scenarios_source <<< "${edit_counts}"
 
     if ! [[ "${clean_scenarios}" =~ ^[0-9]+$ ]]; then
         clean_scenarios=0
@@ -1691,11 +1740,12 @@ main_dynamic() {
         error_scenarios=0
     fi
 
-    # Match queue_manager fallback behavior when the manifest is missing or incomplete.
-    if [[ ${clean_scenarios} -le 0 || ${stress_scenarios} -le 0 ]]; then
-        clean_scenarios=4
-        stress_scenarios=4
-        edit_scenarios_source="defaults"
+    if command -v jq >/dev/null 2>&1 && [[ -f "${scenarios_file}" ]]; then
+        error_scenarios="$(jq -r '[.scenarios[] | select(.generation.kind=="error")] | length' "${scenarios_file}" 2>/dev/null || echo 0)"
+        error_scenarios_source="state/scenarios.json"
+    fi
+    if ! [[ "${error_scenarios}" =~ ^[0-9]+$ ]]; then
+        error_scenarios=0
     fi
 
     local clean_runs="${CLEAN_EDIT_RUNS:-0}"

@@ -1090,40 +1090,34 @@ generate_model_tasks() {
 
     local clean_edits=()
     local stress_edits=()
-    local all_edit_specs=""
+    local loaded_edit_manifest="false"
 
     if command -v jq >/dev/null 2>&1 && [[ -f "${scenarios_file}" ]]; then
+        local edit_specs_json=""
+        edit_specs_json="$(
+            jq -c '[.scenarios[]
+                | select(.generation.kind=="edit")
+                | {spec: .generation.edit_spec, version: .generation.version}]' "${scenarios_file}" 2>/dev/null
+        )"
+        if [[ -n "${edit_specs_json}" ]]; then
+            loaded_edit_manifest="true"
+        fi
         mapfile -t clean_edits < <(
             jq -r '.scenarios[]
                 | select(.generation.kind=="edit" and .generation.version=="clean")
-                | .generation.edit_spec' "${scenarios_file}"
+                | .generation.edit_spec' "${scenarios_file}" 2>/dev/null
         )
         mapfile -t stress_edits < <(
             jq -r '.scenarios[]
                 | select(.generation.kind=="edit" and .generation.version=="stress")
-                | .generation.edit_spec' "${scenarios_file}"
+                | .generation.edit_spec' "${scenarios_file}" 2>/dev/null
         )
-        all_edit_specs="$(
-            jq -c '[.scenarios[]
-                | select(.generation.kind=="edit")
-                | {spec: .generation.edit_spec, version: .generation.version}]' "${scenarios_file}"
-        )"
     fi
 
-    if [[ ${#clean_edits[@]} -eq 0 || ${#stress_edits[@]} -eq 0 || -z "${all_edit_specs}" ]]; then
+    if [[ "${loaded_edit_manifest}" != "true" ]]; then
         # Fallback defaults (kept for standalone script use).
         clean_edits=("quant_rtn:clean:ffn" "fp8_quant:clean:ffn" "magnitude_prune:clean:ffn" "lowrank_svd:clean:ffn")
         stress_edits=("quant_rtn:4:32:all" "fp8_quant:e5m2:all" "magnitude_prune:0.5:all" "lowrank_svd:32:all")
-        all_edit_specs='[
-            {"spec": "quant_rtn:clean:ffn", "version": "clean"},
-            {"spec": "fp8_quant:clean:ffn", "version": "clean"},
-            {"spec": "magnitude_prune:clean:ffn", "version": "clean"},
-            {"spec": "lowrank_svd:clean:ffn", "version": "clean"},
-            {"spec": "quant_rtn:4:32:all", "version": "stress"},
-            {"spec": "fp8_quant:e5m2:all", "version": "stress"},
-            {"spec": "magnitude_prune:0.5:all", "version": "stress"},
-            {"spec": "lowrank_svd:32:all", "version": "stress"}
-        ]'
     fi
 
     # Ensure use_batch is defined (defensive for set -u)

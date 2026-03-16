@@ -10,7 +10,9 @@ from pathlib import Path
 def _load_download_baseline_module():
     repo_root = Path(__file__).resolve().parents[2]
     script = repo_root / "scripts" / "proof_packs" / "python" / "download_baseline.py"
-    spec = importlib.util.spec_from_file_location("proof_pack_download_baseline", script)
+    spec = importlib.util.spec_from_file_location(
+        "proof_pack_download_baseline", script
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -29,7 +31,9 @@ def _stub_huggingface_hub(
     monkeypatch.setitem(sys.modules, "huggingface_hub", module)
 
 
-def test_download_snapshot_copy_prefers_safetensors(monkeypatch, tmp_path: Path) -> None:
+def test_download_snapshot_copy_prefers_safetensors(
+    monkeypatch, tmp_path: Path
+) -> None:
     download_baseline = _load_download_baseline_module()
     calls: list[dict[str, object]] = []
 
