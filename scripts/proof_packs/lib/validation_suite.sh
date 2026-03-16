@@ -1230,6 +1230,25 @@ setup_pack_environment() {
 }
 
 # ============ DEPENDENCY CHECK ============
+pack_proof_pack_requirement_path() {
+    local requirement_name="$1"
+    local repo_root
+    repo_root="$(cd "${_PACK_VALIDATION_LIB_DIR}/../../.." && pwd)"
+    echo "${repo_root}/requirements/proof-packs/${requirement_name}.txt"
+}
+
+pack_install_pinned_requirement() {
+    local requirement_name="$1"
+    shift
+    local requirement_path
+    requirement_path="$(pack_proof_pack_requirement_path "${requirement_name}")"
+    if [[ ! -f "${requirement_path}" ]]; then
+        log "ERROR: pinned requirement file missing: ${requirement_path}"
+        return 1
+    fi
+    python3 -m pip install --require-hashes -r "${requirement_path}" "$@"
+}
+
 check_dependencies() {
     log_section "PHASE 0: DEPENDENCY CHECK"
 
@@ -1268,7 +1287,7 @@ check_dependencies() {
             log "Installing huggingface_hub..."
             if [[ "${pip_available}" != "true" ]]; then
                 missing+=("huggingface_hub")
-            elif ! python3 -m pip install huggingface_hub; then
+            elif ! pack_install_pinned_requirement "huggingface_hub"; then
                 missing+=("huggingface_hub")
             fi
         fi
@@ -1279,7 +1298,7 @@ check_dependencies() {
         if [[ "${PACK_NET}" == "1" ]]; then
             log "Installing accelerate..."
             if [[ "${pip_available}" == "true" ]]; then
-                python3 -m pip install accelerate || missing+=("accelerate")
+                pack_install_pinned_requirement "accelerate" || missing+=("accelerate")
             else
                 missing+=("accelerate")
             fi
@@ -1318,8 +1337,10 @@ check_dependencies() {
                     log "Flash Attention 2: Not found (offline), using eager attention"
                 else
                     log "Flash Attention 2: Not found, attempting install..."
+                    local flash_attn_requirement
+                    flash_attn_requirement="$(pack_proof_pack_requirement_path "flash-attn")"
                     # Use timeout to prevent hanging on slow builds
-                    if [[ "${pip_available}" == "true" ]] && timeout 600 python3 -m pip install flash-attn --no-build-isolation 2>&1 | tee -a "${LOG_FILE}"; then
+                    if [[ "${pip_available}" == "true" ]] && [[ -f "${flash_attn_requirement}" ]] && timeout 600 python3 -m pip install --require-hashes -r "${flash_attn_requirement}" --no-deps --no-build-isolation 2>&1 | tee -a "${LOG_FILE}"; then
                         # Verify it actually imported
                         if python3 -c "import flash_attn" 2>/dev/null; then
                             export FLASH_ATTENTION_AVAILABLE="true"
@@ -1330,7 +1351,11 @@ check_dependencies() {
                         fi
                     else
                         export FLASH_ATTENTION_AVAILABLE="false"
-                        log "WARNING: flash-attn install failed (build error), using eager attention"
+                        if [[ ! -f "${flash_attn_requirement}" ]]; then
+                            log "WARNING: pinned flash-attn requirement file missing, using eager attention"
+                        else
+                            log "WARNING: flash-attn install failed (build error), using eager attention"
+                        fi
                         log "         This is OK - script will work without flash attention, just slower."
                     fi
                 fi
@@ -1343,7 +1368,7 @@ check_dependencies() {
         if [[ "${PACK_NET}" == "1" ]]; then
             log "Installing pyyaml..."
             if [[ "${pip_available}" == "true" ]]; then
-                python3 -m pip install pyyaml || missing+=("pyyaml")
+                pack_install_pinned_requirement "pyyaml" || missing+=("pyyaml")
             else
                 missing+=("pyyaml")
             fi
@@ -1357,7 +1382,7 @@ check_dependencies() {
         if [[ "${PACK_NET}" == "1" ]]; then
             log "Installing protobuf..."
             if [[ "${pip_available}" == "true" ]]; then
-                python3 -m pip install protobuf || missing+=("protobuf")
+                pack_install_pinned_requirement "protobuf" || missing+=("protobuf")
             else
                 missing+=("protobuf")
             fi
@@ -1371,7 +1396,7 @@ check_dependencies() {
         if [[ "${PACK_NET}" == "1" ]]; then
             log "Installing sentencepiece..."
             if [[ "${pip_available}" == "true" ]]; then
-                python3 -m pip install sentencepiece || missing+=("sentencepiece")
+                pack_install_pinned_requirement "sentencepiece" || missing+=("sentencepiece")
             else
                 missing+=("sentencepiece")
             fi

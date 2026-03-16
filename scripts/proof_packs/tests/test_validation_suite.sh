@@ -880,14 +880,19 @@ test_pack_validation_check_dependencies_covers_pip_bootstrap_and_missing_install
             return $?
         fi
         if [[ "${1:-}" == "-m" && "${2:-}" == "pip" && "${3:-}" == "install" ]]; then
-            case "${4:-}" in
-                huggingface_hub|accelerate|pyyaml|protobuf|sentencepiece)
+            local pip_args="$*"
+            case "${pip_args}" in
+                *"requirements/proof-packs/huggingface_hub.txt"*|\
+                *"requirements/proof-packs/accelerate.txt"*|\
+                *"requirements/proof-packs/pyyaml.txt"*|\
+                *"requirements/proof-packs/protobuf.txt"*|\
+                *"requirements/proof-packs/sentencepiece.txt"*)
                     if [[ "${mode}" == "failinstalls" ]]; then
                         return 1
                     fi
                     return 0
                     ;;
-                flash-attn)
+                *"requirements/proof-packs/flash-attn.txt"*)
                     if [[ "${mode}" == "flashfail" ]]; then
                         return 1
                     fi
