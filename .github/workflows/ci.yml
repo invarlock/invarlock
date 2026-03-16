@@ -153,6 +153,7 @@ jobs:
       INVARLOCK_LIGHT_IMPORT: "1"
       INVARLOCK_DISABLE_PLUGIN_DISCOVERY: "0"
       PYTHONWARNINGS: "default"
+      PYTHON: "python"
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
