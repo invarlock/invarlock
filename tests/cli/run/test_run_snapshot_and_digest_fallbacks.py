@@ -309,6 +309,7 @@ def test_gfm_invariants_profile_checks_existing_string_and_model_invariants_merg
 
 
 def test_snapshot_mode_bytes(monkeypatch, tmp_path):
+    _base_patches_gfm(monkeypatch)
     cfg = _cfg_gfm(tmp_path)
 
     class DummyRegistry:
@@ -341,6 +342,7 @@ def test_snapshot_mode_bytes(monkeypatch, tmp_path):
 
 
 def test_snapshot_mode_chunked(monkeypatch, tmp_path):
+    _base_patches_gfm(monkeypatch)
     cfg = _cfg_gfm(tmp_path)
 
     class DummyRegistry:
@@ -373,6 +375,7 @@ def test_snapshot_mode_chunked(monkeypatch, tmp_path):
 
 
 def test_snapshot_mode_reload_fallback(monkeypatch, tmp_path):
+    _base_patches_gfm(monkeypatch)
     cfg = _cfg_gfm(tmp_path)
 
     class MinimalRegistry:
@@ -399,6 +402,7 @@ def test_snapshot_mode_reload_fallback(monkeypatch, tmp_path):
 
 
 def test_snapshot_mode_auto_prefers_bytes(monkeypatch, tmp_path):
+    _base_patches_gfm(monkeypatch)
     cfg = _cfg_gfm(tmp_path)
 
     class DummyRegistry:

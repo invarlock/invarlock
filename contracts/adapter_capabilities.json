@@ -44,12 +44,14 @@
       "platform_support": "all",
       "runtime_constraints": [
         "onnxruntime",
-        "optimum"
+        "optimum",
+        "transformers<5-compatible optimum stack"
       ],
       "required_extra": "onnx",
       "degraded_modes": [
         "no_edit_support",
-        "no_module_level_guards"
+        "no_module_level_guards",
+        "requires_transformers4_compatible_onnx_stack"
       ]
     },
     {
@@ -67,10 +69,9 @@
       "adapter": "hf_bnb",
       "snapshot_restore": "best_effort",
       "guard_coverage": "full_when_modules_exposed",
-      "platform_support": "linux_cuda",
+      "platform_support": "platform_dependent",
       "runtime_constraints": [
-        "bitsandbytes",
-        "cuda"
+        "bitsandbytes"
       ],
       "required_extra": "gpu",
       "degraded_modes": [

@@ -12,7 +12,6 @@ import os as _os
 import platform as _platform
 import shutil as _shutil
 import sys
-import warnings
 from collections.abc import Callable
 from pathlib import Path
 
@@ -27,6 +26,10 @@ from invarlock.public_contracts import (
     load_support_matrix,
 )
 
+from ..backend_runtime import (
+    bitsandbytes_runtime_available,
+    onnx_causal_runtime_available,
+)
 from ..constants import DOCTOR_FORMAT_VERSION
 
 # Exact wording constant for determinism warning (kept in one place)
@@ -34,6 +37,15 @@ DETERMINISM_SHARDS_WARNING = "Provider workers > 0 without deterministic_shards=
 
 console = Console()
 LOGGER = logging.getLogger(__name__)
+
+
+def _find_spec_safe(module_name: str) -> object | None:
+    """Best-effort spec lookup that tolerates broken import hooks."""
+
+    try:
+        return importlib.util.find_spec(module_name)
+    except Exception:
+        return None
 
 
 def _cross_check_reports(
@@ -440,7 +452,7 @@ def doctor_command(
         has_cuda = False
 
     for dep, description in optional_deps:
-        spec = importlib.util.find_spec(dep)
+        spec = _find_spec_safe(dep)
         present = spec is not None
         extra_hint = {
             "datasets": "eval",
@@ -451,41 +463,41 @@ def doctor_command(
         }.get(dep, dep)
 
         if dep == "bitsandbytes":
-            # Avoid importing bnb to suppress noisy CPU-only warnings. Report based on CUDA.
-            if not has_cuda:
-                # GPU-only library; note and skip import
+            runtime_available = present and bitsandbytes_runtime_available()
+            if runtime_available:
+                if not json_out:
+                    if has_cuda:
+                        console.print(
+                            "  [green]✅ bitsandbytes — 8/4-bit loading (GPU)[/green]"
+                        )
+                    else:
+                        console.print(
+                            "  [green]✅ bitsandbytes — runtime available on this host[/green]"
+                        )
+            elif not has_cuda:
                 if present:
                     if not json_out:
                         console.print(
-                            "  [yellow]⚠️  bitsandbytes — CUDA-only; GPU not detected on this host[/yellow]"
+                            "  [yellow]⚠️  bitsandbytes — GPU not detected and runtime unavailable on this host[/yellow]"
                         )
                 else:
                     if not json_out:
                         console.print(
-                            "  [dim]⚠️  bitsandbytes — CUDA-only; not installed[/dim]"
+                            "  [dim]⚠️  bitsandbytes — not installed[/dim]"
                         )
                         console.print(
                             "     → Install: pip install 'invarlock[gpu]'",
                             markup=False,
                         )
             else:
-                # CUDA available; try a quiet import and detect CPU-only builds
-                try:
-                    with warnings.catch_warnings():
-                        warnings.simplefilter("ignore")
-                    if not json_out:
-                        console.print(
-                            "  [green]✅ bitsandbytes — 8/4-bit loading (GPU)[/green]"
-                        )
-                except NON_FATAL_EXCEPTIONS:
-                    if not json_out:
-                        console.print(
-                            "  [yellow]⚠️  bitsandbytes — Present but CPU-only build detected[/yellow]"
-                        )
-                        console.print(
-                            "     → Reinstall with: pip install 'invarlock[gpu]' on a CUDA host",
-                            markup=False,
-                        )
+                if not json_out:
+                    console.print(
+                        "  [yellow]⚠️  bitsandbytes — Present but runtime unavailable on this host[/yellow]"
+                    )
+                    console.print(
+                        "     → Reinstall with: pip install 'invarlock[gpu]' on a compatible host",
+                        markup=False,
+                    )
             continue
 
         if not json_out:
@@ -1087,8 +1099,7 @@ def doctor_command(
                 if support == "optional":
                     # Check install presence
                     present = (
-                        importlib.util.find_spec((backend or "").replace("-", "_"))
-                        is not None
+                        _find_spec_safe((backend or "").replace("-", "_")) is not None
                         if backend
                         else False
                     )
@@ -1104,20 +1115,24 @@ def doctor_command(
                 # Special-case: ONNX causal adapter is core but requires Optimum/ONNXRuntime
                 if n == "hf_causal_onnx":
                     backend = backend or "onnxruntime"
-                    present = (
-                        importlib.util.find_spec("optimum.onnxruntime") is not None
-                        or importlib.util.find_spec("onnxruntime") is not None
-                    )
+                    present = onnx_causal_runtime_available()
                     if not present:
                         status = "needs_extra"
-                        enable = "pip install 'invarlock[onnx]'"
+                        enable = "Use a transformers<5 env with 'invarlock[onnx]'"
                 # Platform checks
                 if backend in {"auto-gptq", "autoawq"} and not is_linux:
                     status = "unsupported"
                     enable = "Linux-only"
-                if backend == "bitsandbytes" and not has_cuda:
+                if (
+                    backend == "bitsandbytes"
+                    and _find_spec_safe("bitsandbytes") is not None
+                    and not bitsandbytes_runtime_available()
+                ):
                     status = "unsupported"
-                    enable = "Requires CUDA"
+                    if has_cuda:
+                        enable = "bitsandbytes unavailable on this host"
+                    else:
+                        enable = "Requires CUDA or a compatible bitsandbytes runtime"
 
                 rows.append(
                     {

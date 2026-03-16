@@ -161,10 +161,10 @@ rejected.
 # Core HF adapter + evaluation stack
 pip install "invarlock[hf]"
 
-# Optional GPU kernels / optimised kernels
+# Optional GPU / quantization runtime
 pip install "invarlock[gpu]"
 
-# Optional PTQ backends (install together with hf/gpu extras)
+# Optional PTQ backends (Linux-only; install together with hf/gpu extras)
 pip install "invarlock[awq,gptq]"
 
 # Compare & evaluate two checkpoints (hero path)
@@ -184,6 +184,9 @@ invarlock verify reports/eval/evaluation.report.json
 ```
 
 Use `invarlock plugins` to review available adapters, edits, and guards.
+
+`invarlock[gptq]` follows upstream `auto-gptq` packaging; on newer Python/CUDA
+stacks you may need a pinned or vendor wheel even on a supported Linux host.
 
 Core installs (`pip install invarlock`) keep the CLI entry points
 (`invarlock --help`, `invarlock version`) torch‑free; adapter‑based flows
@@ -314,8 +317,8 @@ Adapter listing defaults:
 
 Extras helpers:
 
-- Install: `invarlock plugins install <gptq|awq|gpu|adapters>` (adds the right extras)
-- Uninstall: `invarlock plugins uninstall <gptq|awq|gpu>` (removes backend packages)
+- Install: `invarlock plugins install <gptq|awq|gpu|onnx|adapters>` (adds the right extras)
+- Uninstall: `invarlock plugins uninstall <gptq|awq|gpu|onnx>` (removes backend packages)
 
 #### JSON Output (verify and plugins)
 
@@ -498,7 +501,7 @@ $ invarlock plugins list
 ┡━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
 │ hf_mlm         │ Core   │ Adapter      │ transformers │ ==<ver>  │ ✅ Ready                            │
 │ hf_causal      │ Core   │ Adapter      │ transformers │ ==<ver>  │ ✅ Ready                            │
-│ hf_causal_onnx │ Core   │ Adapter      │ transformers │ ==<ver>  │ ✅ Ready                            │
+│ hf_causal_onnx │ Core   │ Adapter      │ onnxruntime  │ ==<ver>  │ Needs extra or ready (env-dependent)│
 │ hf_seq2seq     │ Core   │ Adapter      │ transformers │ ==<ver>  │ ✅ Ready                            │
 ├────────────────┼────────┼──────────────┼──────────────┼──────────┼─────────────────────────────────────┤
 │ hf_auto        │ Core   │ Auto-matcher │ transformers │ ==<ver>  │ 🧩 Auto (selects best hf_* adapter) │

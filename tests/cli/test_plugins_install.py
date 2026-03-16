@@ -22,6 +22,7 @@ def test_plugins_install_dry_run_extras():
     assert "Package: invarlock[gptq]" in out
     assert "Mode:" in out
     assert "Result: ok" in out
+    assert "auto-gptq packaging is upstream-dependent" in out
 
     result2 = runner.invoke(app, ["plugins", "install", "awq", "gpu", "--dry-run"])
     assert result2.exit_code == 0, result2.output
@@ -114,3 +115,26 @@ def test_plugins_install_apply_handles_timeout(monkeypatch):
         )
 
     assert exc.value.exit_code == 1
+
+
+def test_plugins_install_apply_failure_surfaces_gptq_note(monkeypatch):
+    outputs: list[str] = []
+
+    class CaptureConsole:
+        def print(self, *args, **kwargs):
+            outputs.append(" ".join(str(arg) for arg in args))
+
+    def fake_run(cmd, capture_output, text, check, timeout):  # noqa: ANN001
+        return SimpleNamespace(returncode=42, stdout="", stderr="boom")
+
+    monkeypatch.setattr(plugins_mod, "console", CaptureConsole(), raising=False)
+    monkeypatch.setattr("invarlock.cli.commands.plugins.subprocess.run", fake_run)
+    monkeypatch.delenv("INVARLOCK_PLUGINS_DRY_RUN", raising=False)
+
+    with pytest.raises(typer.Exit):
+        plugins_mod.plugins_install_command(
+            ["gptq"], upgrade=False, dry_run=False, apply=True
+        )
+
+    joined = " ".join(outputs)
+    assert "auto-gptq packaging is upstream-dependent" in joined

@@ -72,7 +72,12 @@ def test_doctor_helpers_get_adapter_rows(monkeypatch) -> None:
 
     monkeypatch.setattr("invarlock.core.registry.get_registry", lambda: DummyRegistry())
     monkeypatch.setattr(doctor_helpers._platform, "system", lambda: "Darwin")
-    monkeypatch.setattr(doctor_helpers.importlib.util, "find_spec", lambda _n: None)
+    monkeypatch.setattr(
+        doctor_helpers, "bitsandbytes_runtime_available", lambda: False, raising=False
+    )
+    monkeypatch.setattr(
+        doctor_helpers, "onnx_causal_runtime_available", lambda: False, raising=False
+    )
 
     rows = doctor_helpers.get_adapter_rows()
     by_name = {row["name"]: row for row in rows}

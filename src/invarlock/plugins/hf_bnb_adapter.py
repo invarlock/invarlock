@@ -21,6 +21,7 @@ from invarlock.adapters.capabilities import (
     QuantizationMethod,
     detect_quantization_from_config,
 )
+from invarlock.adapters.hf_loading import resolve_trust_remote_code
 from invarlock.adapters.hf_mixin import HFAdapterMixin
 from invarlock.core.api import ModelAdapter
 from invarlock.core.error_utils import wrap_errors
@@ -77,6 +78,10 @@ class HF_BNB_Adapter(HFAdapterMixin, ModelAdapter):
     name = "hf_bnb"
 
     def load_model(self, model_id: str, device: str = "auto", **kwargs: Any):
+        load_kwargs = dict(kwargs)
+        trust_remote_code = resolve_trust_remote_code(load_kwargs)
+        load_kwargs.pop("trust_remote_code", None)
+
         with wrap_errors(
             DependencyError,
             "E203",
@@ -106,12 +111,12 @@ class HF_BNB_Adapter(HFAdapterMixin, ModelAdapter):
                     AutoModelForCausalLM,
                     model_id,
                     device_map="auto",
-                    trust_remote_code=True,
-                    **kwargs,
+                    trust_remote_code=trust_remote_code,
+                    **load_kwargs,
                 )
         else:
             # Fresh quantization of FP16 model
-            quantization_config = kwargs.pop("quantization_config", None)
+            quantization_config = load_kwargs.pop("quantization_config", None)
             if quantization_config is None:
                 quantization_config = BitsAndBytesConfig(load_in_8bit=True)
             elif isinstance(quantization_config, dict):
@@ -137,9 +142,9 @@ class HF_BNB_Adapter(HFAdapterMixin, ModelAdapter):
                     AutoModelForCausalLM,
                     model_id,
                     device_map="auto",
-                    trust_remote_code=True,
+                    trust_remote_code=trust_remote_code,
                     quantization_config=quantization_config,
-                    **kwargs,
+                    **load_kwargs,
                 )
 
         # BNB models handle their own device placement via device_map="auto"

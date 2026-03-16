@@ -1,8 +1,12 @@
 from __future__ import annotations
 
-import importlib
 import platform as _platform
 from typing import Any
+
+from .backend_runtime import (
+    bitsandbytes_runtime_available,
+    onnx_causal_runtime_available,
+)
 
 
 def get_adapter_rows() -> list[dict[str, Any]]:
@@ -12,13 +16,6 @@ def get_adapter_rows() -> list[dict[str, Any]]:
     registered as a core adapter, so missing extras are surfaced.
     """
     from invarlock.core.registry import get_registry
-
-    try:
-        import torch as _t  # noqa: F401
-
-        has_cuda = bool(getattr(_t, "cuda", None) and _t.cuda.is_available())
-    except Exception:
-        has_cuda = False
 
     registry = get_registry()
     is_linux = _platform.system().lower() == "linux"
@@ -46,17 +43,17 @@ def get_adapter_rows() -> list[dict[str, Any]]:
                 status, enable = "unsupported", "Linux-only"
         elif name == "hf_bnb":
             backend = "bitsandbytes"
-            if not has_cuda:
-                status, enable = "unsupported", "Requires CUDA"
+            if not bitsandbytes_runtime_available():
+                status, enable = (
+                    "unsupported",
+                    "Requires CUDA or a compatible bitsandbytes runtime",
+                )
         elif name == "hf_causal_onnx":
             backend = "onnxruntime"
-            present = (
-                importlib.util.find_spec("optimum.onnxruntime") is not None
-                or importlib.util.find_spec("onnxruntime") is not None
-            )
+            present = onnx_causal_runtime_available()
             if not present:
                 status = "needs_extra"
-                enable = "pip install 'invarlock[onnx]'"
+                enable = "Use a transformers<5 env with 'invarlock[onnx]'"
 
         rows.append(
             {

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from invarlock.adapters.hf_loading import resolve_trust_remote_code
 from invarlock.core.api import ModelAdapter
 from invarlock.core.error_utils import wrap_errors
 from invarlock.core.exceptions import DependencyError, ModelLoadError
@@ -48,8 +49,8 @@ class HF_Causal_ONNX_Adapter(ModelAdapter):
         if providers is None:
             providers = ["CPUExecutionProvider"]
 
-        # Trust remote code where necessary; users can set to False via kwargs
-        trust_remote_code = kwargs.pop("trust_remote_code", True)
+        trust_remote_code = resolve_trust_remote_code(kwargs)
+        kwargs.pop("trust_remote_code", None)
 
         # Some repos use non-default file names; accept overrides but default to standard
         file_name = kwargs.pop("file_name", None)

@@ -83,6 +83,7 @@ def _release_ready_cert(*, include_guard_overhead: bool) -> dict:
             "invariants_pass": True,
             "spectral_stable": True,
             "rmt_stable": True,
+            "guard_overhead_acceptable": True,
         },
         "provenance": {"provider_digest": {"ids_sha256": "deadbeef"}},
     }
@@ -174,6 +175,7 @@ def test_verify_release_passes_when_overhead_ratio_present(
         "overhead_threshold": 0.01,
         "evaluated": True,
         "overhead_ratio": 1.0,
+        "passed": True,
     }
     path = _write_cert(tmp_path, cert, "with_ratio.json")
 
@@ -183,3 +185,40 @@ def test_verify_release_passes_when_overhead_ratio_present(
     out = json.loads(capsys.readouterr().out)
     assert out["resolution"]["exit_code"] == 0
     assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 0
+
+
+def test_verify_release_fails_when_guard_overhead_gate_failed(
+    tmp_path: Path, capsys
+) -> None:
+    cert = _release_ready_cert(include_guard_overhead=False)
+    cert["guard_overhead"] = {
+        "mode": "measured",
+        "overhead_threshold": 0.01,
+        "evaluated": True,
+        "overhead_ratio": 1.5,
+        "passed": False,
+    }
+    cert["validation"]["guard_overhead_acceptable"] = False
+    path = _write_cert(tmp_path, cert, "failed_overhead_gate.json")
+
+    with pytest.raises(typer.Exit) as ei:
+        verify_command([path], baseline=None, profile="release", json_out=True)
+
+    out = json.loads(capsys.readouterr().out)
+    assert out["resolution"]["exit_code"] == 1
+    assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 1
+
+
+def test_verify_release_fails_when_canonical_gate_flagged(
+    tmp_path: Path, capsys
+) -> None:
+    cert = _release_ready_cert(include_guard_overhead=True)
+    cert["validation"]["spectral_stable"] = False
+    path = _write_cert(tmp_path, cert, "failed_spectral_gate.json")
+
+    with pytest.raises(typer.Exit) as ei:
+        verify_command([path], baseline=None, profile="release", json_out=True)
+
+    out = json.loads(capsys.readouterr().out)
+    assert out["resolution"]["exit_code"] == 1
+    assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 1

@@ -23,6 +23,10 @@ from invarlock.public_contracts import (
     load_support_matrix,
 )
 
+from ..backend_runtime import (
+    bitsandbytes_runtime_available,
+    onnx_causal_runtime_available,
+)
 from ..constants import PLUGINS_FORMAT_VERSION
 
 console = Console()
@@ -44,6 +48,16 @@ def _resolve_plugin_pip_timeout() -> int:
     except ValueError:
         return PLUGIN_PIP_TIMEOUT_SECONDS
     return parsed if parsed > 0 else PLUGIN_PIP_TIMEOUT_SECONDS
+
+
+def _plugin_runtime_note(targets: list[str]) -> str:
+    normalized = {str(target).strip().lower() for target in targets}
+    if {"invarlock[gptq]", "auto-gptq", "auto_gptq"} & normalized:
+        return (
+            "auto-gptq packaging is upstream-dependent; current Python/CUDA "
+            "stacks may require a pinned or vendor wheel."
+        )
+    return ""
 
 
 def _sort_rows(rows):
@@ -239,6 +253,7 @@ def plugins_command(
                 backend_name = ""
                 backend_version = None
                 present = False
+                backend_present = False
                 try:
                     from invarlock.cli.provenance import extract_adapter_provenance
 
@@ -246,6 +261,7 @@ def plugins_command(
                     backend_name = prov.library or ""
                     backend_version = prov.version
                     present = backend_version is not None
+                    backend_present = present
                 except Exception:
                     pass
                 status = "ready"
@@ -273,9 +289,17 @@ def plugins_command(
                     hint = extras_status.split("missing", 1)[-1].strip()
                     if hint:
                         enable = f"pip install '{hint}'"
-                if backend_name == "bitsandbytes" and present and not has_cuda:
-                    status = "unsupported"
-                    enable = "Requires CUDA"
+                if n == "hf_causal_onnx" and present and not onnx_causal_runtime_available():
+                    status = "needs_extra"
+                    enable = "Use a transformers<5 env with 'invarlock[onnx]'"
+                if backend_name == "bitsandbytes" and present:
+                    backend_present = bitsandbytes_runtime_available()
+                    if not backend_present:
+                        status = "unsupported"
+                        if has_cuda:
+                            enable = "bitsandbytes unavailable on this host"
+                        else:
+                            enable = "Requires CUDA or a compatible bitsandbytes runtime"
                 extra_hint = {
                     "hf_gptq": "invarlock[gptq]",
                     "hf_awq": "invarlock[awq]",
@@ -288,6 +312,7 @@ def plugins_command(
                         "name": n,
                         "backend": backend_name,
                         "backend_version": backend_version,
+                        "backend_present": backend_present,
                         "support": support,
                         "origin": origin,
                         "mode": mode,
@@ -354,10 +379,7 @@ def plugins_command(
                 elif r["status"] == "needs_extra":
                     status_disp = f"Needs extra: {r['enable'] or ''}".rstrip(": ")
                 elif r["status"] == "unsupported":
-                    if r["backend"] == "bitsandbytes":
-                        status_disp = "Unsupported (requires CUDA)"
-                    else:
-                        status_disp = "Unsupported on this platform"
+                    status_disp = "Unsupported on this platform"
                 else:
                     status_disp = r["status"]
                 next_support = rows[idx + 1]["support"] if idx + 1 < len(rows) else None
@@ -413,11 +435,12 @@ def plugins_command(
                 backend_ver = r.get("backend_version")
                 backend_obj = None
                 if backend_name:
-                    backend_obj = {"name": backend_name}
+                    backend_obj = {
+                        "name": backend_name,
+                        "present": bool(r.get("backend_present")),
+                    }
                     if backend_ver:
                         backend_obj["version"] = backend_ver
-                    else:
-                        backend_obj["present"] = True
                 unified.append(
                     {
                         "name": r.get("name"),
@@ -463,7 +486,8 @@ def plugins_command(
                     "  Matches     : AutoGPTQ-quantized HF repos (from_quantized)"
                 )
                 console.print(
-                    "  Notes       : GPU recommended; metadata ingestion on CPU"
+                    "  Notes       : Linux/CUDA recommended; upstream auto-gptq "
+                    "packaging may require a pinned or vendor wheel"
                 )
             elif r["name"] == "hf_awq":
                 console.print("  Matches     : AWQ-quantized HF repos")
@@ -822,11 +846,12 @@ def plugins_command(
                     backend_ver = r.get("backend_version")
                     backend_obj = None
                     if backend_name:
-                        backend_obj = {"name": backend_name}
+                        backend_obj = {
+                            "name": backend_name,
+                            "present": bool(r.get("backend_present")),
+                        }
                         if backend_ver:
                             backend_obj["version"] = backend_ver
-                        else:
-                            backend_obj["present"] = True
                     adapters_unified.append(
                         {
                             "name": r.get("name"),
@@ -919,6 +944,11 @@ def _check_plugin_extras(plugin_name: str, plugin_type: str) -> str:
     if not plugin_info or not plugin_info["packages"]:
         return ""  # No extra dependencies needed
 
+    if plugin_name == "hf_causal_onnx":
+        if onnx_causal_runtime_available():
+            return f"✓ {plugin_info['extra']}"
+        return f"⚠️ missing {plugin_info['extra']}"
+
     # Check each required package. For most packages we use a light import so
     # tests can monkeypatch __import__. For GPU-only stacks (bitsandbytes) and
     # packages with noisy import-time warnings (awq), we probe presence via
@@ -926,12 +956,15 @@ def _check_plugin_extras(plugin_name: str, plugin_type: str) -> str:
     missing_packages: list[str] = []
     for pkg in plugin_info["packages"]:
         try:
-            if pkg in {"bitsandbytes", "awq"}:
+            if pkg == "bitsandbytes":
+                if not bitsandbytes_runtime_available():
+                    raise ImportError("bitsandbytes not importable")
+            elif pkg == "awq":
                 import importlib.util as _util
 
                 spec = _util.find_spec(pkg)
                 if spec is None:
-                    raise ImportError("bitsandbytes not importable")
+                    raise ImportError("awq not importable")
             else:
                 __import__(pkg)
         except Exception:
@@ -969,6 +1002,7 @@ def _resolve_uninstall_targets(target: str) -> list[str]:
     - gptq / hf_gptq / auto-gptq -> ["auto-gptq"]
     - awq / hf_awq / autoawq     -> ["autoawq"]
     - bnb / hf_bnb / gpu         -> ["bitsandbytes"]
+    - onnx / hf_causal_onnx      -> ["onnxruntime", "optimum", "optimum-onnx"]
     - invarlock[awq] / invarlock[gptq] / invarlock[gpu] -> respective packages
     """
     name = (target or "").strip().lower()
@@ -992,9 +1026,11 @@ def _resolve_uninstall_targets(target: str) -> list[str]:
         "gpu": ["bitsandbytes"],
         "bitsandbytes": ["bitsandbytes"],
         # ONNX/Optimum family
-        "onnx": ["onnxruntime"],
-        "hf_causal_onnx": ["onnxruntime"],
-        "optimum": ["optimum"],
+        "onnx": ["onnxruntime", "optimum", "optimum-onnx"],
+        "hf_causal_onnx": ["onnxruntime", "optimum", "optimum-onnx"],
+        "optimum": ["optimum", "optimum-onnx"],
+        "optimum_onnx": ["optimum-onnx"],
+        "onnxruntime": ["onnxruntime"],
     }
     return mapping.get(name, [])
 
@@ -1176,6 +1212,9 @@ def plugins_install_command(
         console.print(f"Package: {_escape(' '.join(pkgs))}")
         console.print(f"Mode: {mode}")
         console.print(f"Result: {result}")
+        note = _plugin_runtime_note(pkgs)
+        if note:
+            console.print(f"Note: {_escape(note)}")
 
     if unknown:
         _print_normalized(
@@ -1347,8 +1386,8 @@ def _plugins_install(
     Examples:
       invarlock plugins install invarlock[gptq]        # Linux + CUDA only
       invarlock plugins install invarlock[awq]         # Linux + CUDA only
-      invarlock plugins install invarlock[gpu]         # bitsandbytes (CUDA-only)
-      invarlock plugins install invarlock[onnx]        # Optimum + ONNX Runtime
+      invarlock plugins install invarlock[gpu]         # bitsandbytes (host/runtime dependent)
+      invarlock plugins install invarlock[onnx]        # Optimum ONNX stack (pins transformers<5)
 
     Use --dry-run (default) to preview the action; pass --apply to execute.
     """
@@ -1374,7 +1413,7 @@ def _plugins_uninstall(
     """Uninstall optional plugin backends via pip.
 
     Accepts either extras (invarlock[gptq], invarlock[awq], invarlock[gpu], invarlock[onnx])
-    or direct package names (auto-gptq, autoawq, bitsandbytes, onnxruntime).
+    or direct package names (auto-gptq, autoawq, bitsandbytes, onnxruntime, optimum).
 
     Use --dry-run (default) to preview; pass --apply to execute.
     """

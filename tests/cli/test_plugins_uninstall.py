@@ -48,6 +48,8 @@ def test_plugins_uninstall_aliases():
     result_onnx = runner.invoke(app, ["plugins", "uninstall", "onnx", "--dry-run"])
     assert result_onnx.exit_code == 0, result_onnx.output
     assert "onnxruntime" in result_onnx.output
+    assert "optimum" in result_onnx.output
+    assert "optimum-onnx" in result_onnx.output
 
 
 def test_plugins_uninstall_unknown():

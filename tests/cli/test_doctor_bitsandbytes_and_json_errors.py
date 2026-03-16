@@ -50,6 +50,9 @@ def test_doctor_bitsandbytes_warns_when_gpu_missing(monkeypatch: pytest.MonkeyPa
     dummy = _setup_bitsandbytes_env(
         monkeypatch, cuda_available=False, bitsandbytes_present=True
     )
+    monkeypatch.setattr(
+        doctor_mod, "bitsandbytes_runtime_available", lambda: False, raising=False
+    )
     lines = _run_doctor_and_capture(dummy)
     assert any("GPU not detected" in line for line in lines)
 
@@ -67,33 +70,40 @@ def test_doctor_bitsandbytes_cuda_ready_marker(monkeypatch: pytest.MonkeyPatch):
     dummy = _setup_bitsandbytes_env(
         monkeypatch, cuda_available=True, bitsandbytes_present=True
     )
+    monkeypatch.setattr(
+        doctor_mod, "bitsandbytes_runtime_available", lambda: True, raising=False
+    )
     lines = _run_doctor_and_capture(dummy)
     assert any("✅ bitsandbytes" in line for line in lines)
 
 
-def test_doctor_bitsandbytes_cpu_only_warning(monkeypatch: pytest.MonkeyPatch):
+def test_doctor_bitsandbytes_host_runtime_ready_without_cuda(
+    monkeypatch: pytest.MonkeyPatch,
+):
     dummy = _setup_bitsandbytes_env(
-        monkeypatch, cuda_available=True, bitsandbytes_present=True
+        monkeypatch, cuda_available=False, bitsandbytes_present=True
     )
-
-    class ExplodingCtx:
-        def __enter__(self):
-            raise RuntimeError("cpu-only build detected")
-
-        def __exit__(self, exc_type, exc, tb):
-            return False
-
     monkeypatch.setattr(
         doctor_mod,
-        "warnings",
-        SimpleNamespace(
-            catch_warnings=lambda: ExplodingCtx(), simplefilter=lambda *a, **k: None
-        ),
+        "bitsandbytes_runtime_available",
+        lambda: True,
         raising=False,
     )
     lines = _run_doctor_and_capture(dummy)
-    assert any("CPU-only build detected" in line for line in lines)
-    assert any("Reinstall with: pip install 'invarlock[gpu]'" in line for line in lines)
+    assert any("runtime available on this host" in line for line in lines)
+
+
+def test_doctor_bitsandbytes_runtime_unavailable_with_cuda(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    dummy = _setup_bitsandbytes_env(
+        monkeypatch, cuda_available=True, bitsandbytes_present=True
+    )
+    monkeypatch.setattr(
+        doctor_mod, "bitsandbytes_runtime_available", lambda: False, raising=False
+    )
+    lines = _run_doctor_and_capture(dummy)
+    assert any("runtime unavailable on this host" in line for line in lines)
 
 
 def test_cross_check_reports_ignore_missing_paths(tmp_path):

@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import Any
 
 from invarlock.adapters.capabilities import ModelCapabilities
+from invarlock.adapters.hf_loading import resolve_trust_remote_code
 from invarlock.adapters.hf_mixin import HFAdapterMixin
 from invarlock.core.api import ModelAdapter
 from invarlock.core.error_utils import wrap_errors
@@ -24,6 +25,10 @@ class HF_AWQ_Adapter(HFAdapterMixin, ModelAdapter):
     name = "hf_awq"
 
     def load_model(self, model_id: str, device: str = "auto", **kwargs: Any):
+        load_kwargs = {k: v for k, v in kwargs.items() if k != "device"}
+        trust_remote_code = resolve_trust_remote_code(load_kwargs)
+        load_kwargs.pop("trust_remote_code", None)
+
         # Try common import paths used by AWQ projects
         AutoAWQForCausalLM = None
         with wrap_errors(
@@ -57,8 +62,8 @@ class HF_AWQ_Adapter(HFAdapterMixin, ModelAdapter):
         ):
             model = AutoAWQForCausalLM.from_quantized(
                 model_id,
-                trust_remote_code=True,
-                **{k: v for k, v in kwargs.items() if k != "device"},
+                trust_remote_code=trust_remote_code,
+                **load_kwargs,
             )
 
         # AWQ models are pre-quantized; use safe device movement
