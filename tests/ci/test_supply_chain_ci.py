@@ -219,6 +219,7 @@ def test_scorecard_workflow_is_configured():
     workflow = _load_workflow(workflow_path)
     triggers = workflow["on"]
     assert triggers["push"]["branches"] == ["main"]
+    assert "branch_protection_rule" in triggers
     assert triggers["schedule"]
     assert "workflow_dispatch" in triggers
     assert workflow["permissions"] == "read-all"
@@ -232,6 +233,7 @@ def test_scorecard_workflow_is_configured():
     steps = analysis.get("steps", [])
     scorecard_step = _find_step_by_uses_prefix(steps, "ossf/scorecard-action@")
     assert scorecard_step["with"] == {
+        "repo_token": "${{ secrets.SCORECARD_TOKEN || github.token }}",
         "publish_results": True,
         "results_file": "results.sarif",
         "results_format": "sarif",
@@ -292,8 +294,20 @@ def test_readme_exposes_scorecard_badge():
 
 def test_codeql_workflow_uses_repo_config():
     workflow = _load_workflow(Path(".github/workflows/codeql.yml"))
+    assert workflow["permissions"] == {
+        "contents": "read",
+        "actions": "read",
+    }
+
+    analyze = workflow["jobs"]["analyze"]
+    assert analyze["permissions"] == {
+        "contents": "read",
+        "actions": "read",
+        "security-events": "write",
+    }
+
     init_step = _find_step_by_uses_prefix(
-        workflow["jobs"]["analyze"]["steps"], "github/codeql-action/init@"
+        analyze["steps"], "github/codeql-action/init@"
     )
     assert init_step["with"]["config-file"] == ".github/codeql/codeql-config.yml"
 
