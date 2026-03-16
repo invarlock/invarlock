@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from pathlib import Path
+from typing import Any, cast
 
 AutoTokenizer: Any | None = None
 
@@ -58,6 +60,112 @@ def _hash_tokenizer(tokenizer: PreTrainedTokenizerBase) -> str:
     name_path = getattr(tokenizer, "name_or_path", "")
     hasher.update(str(name_path).encode("utf-8", "ignore"))
     return hasher.hexdigest()
+
+
+def _read_local_hf_config(model_id: str) -> dict[str, Any] | None:
+    """Read a local Hugging Face config.json when `model_id` is a directory."""
+
+    try:
+        cfg_path = Path(model_id) / "config.json"
+    except Exception:
+        return None
+    if not cfg_path.exists():
+        return None
+    try:
+        data = json.loads(cfg_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _tokenizer_candidates(model_id: str) -> list[str]:
+    """Return ordered tokenizer identifiers tied to the requested model."""
+
+    raw_candidates = [str(model_id).strip()]
+    cfg = _read_local_hf_config(model_id)
+    if isinstance(cfg, dict):
+        for key in (
+            "tokenizer_name",
+            "_name_or_path",
+            "name_or_path",
+            "base_model_name_or_path",
+        ):
+            value = cfg.get(key)
+            if isinstance(value, str):
+                raw_candidates.append(value.strip())
+
+    candidates: list[str] = []
+    seen: set[str] = set()
+    for candidate in raw_candidates:
+        if not candidate or candidate in seen:
+            continue
+        seen.add(candidate)
+        candidates.append(candidate)
+    return candidates
+
+
+def _load_tokenizer_for_model(
+    model_id: str, *, family_label: str
+) -> PreTrainedTokenizerBase:
+    """Load a tokenizer without falling back to unrelated model families."""
+
+    if AutoTokenizer is None:
+        raise RuntimeError(
+            f"{family_label} tokenizers require the 'transformers' extra. "
+            "Install it with: pip install 'invarlock[adapters]'."
+        )
+
+    candidates = _tokenizer_candidates(model_id)
+    for candidate in candidates:
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(
+                candidate, local_files_only=True
+            )
+            return cast("PreTrainedTokenizerBase", tokenizer)
+        except Exception:
+            continue
+
+    for candidate in candidates:
+        try:
+            candidate_path = Path(candidate)
+        except Exception:
+            candidate_path = None
+        if candidate_path is not None and candidate_path.exists():
+            continue
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(candidate)
+            return cast("PreTrainedTokenizerBase", tokenizer)
+        except Exception:
+            continue
+
+    raise RuntimeError(
+        f"Unable to load a {family_label} tokenizer for '{model_id}'. "
+        "Set INVARLOCK_ALLOW_NETWORK=1 to allow fetching from the Hugging Face Hub, "
+        "or pre-cache the tokenizer locally."
+    )
+
+
+def _profile_hints(model_id: str) -> tuple[str, str, bool]:
+    """Collect lightweight model-family hints from path/config metadata."""
+
+    cfg = _read_local_hf_config(model_id)
+    model_type = ""
+    arch_blob = ""
+    is_encoder_decoder = False
+    parts = [str(model_id or "").lower()]
+    if isinstance(cfg, dict):
+        model_type = str(cfg.get("model_type", "") or "").lower()
+        arch_blob = " ".join(
+            str(arch).lower()
+            for arch in cfg.get("architectures", [])
+            if isinstance(arch, str)
+        )
+        is_encoder_decoder = bool(cfg.get("is_encoder_decoder", False))
+        if model_type:
+            parts.append(model_type)
+        if arch_blob:
+            parts.append(arch_blob)
+    return " ".join(parts), arch_blob, is_encoder_decoder
 
 
 @dataclass(frozen=True)
@@ -128,32 +236,7 @@ def _unknown_selectors() -> dict[str, list[str]]:
 
 def _make_bert_tokenizer(model_id: str):
     def factory() -> tuple[PreTrainedTokenizerBase, str]:
-        if AutoTokenizer is None:
-            raise RuntimeError(
-                "BERT tokenizers require the 'transformers' extra. "
-                "Install it with: pip install 'invarlock[adapters]'."
-            )
-        # Prefer offline/local cache first to respect network guard
-        tokenizer: PreTrainedTokenizerBase | None = None
-        try:
-            tokenizer = AutoTokenizer.from_pretrained(model_id, local_files_only=True)
-        except Exception:
-            # Try a common local BERT if specific model is not cached
-            try:
-                tokenizer = AutoTokenizer.from_pretrained(
-                    "bert-base-uncased", local_files_only=True
-                )
-            except Exception:
-                # If network is permitted, attempt remote fetch; otherwise propagate
-                try:
-                    tokenizer = AutoTokenizer.from_pretrained(model_id)
-                except Exception:
-                    tokenizer = None
-        if tokenizer is None:
-            raise RuntimeError(
-                "Unable to load a BERT tokenizer locally. Set INVARLOCK_ALLOW_NETWORK=1 "
-                "to allow fetching from the Hugging Face Hub, or pre-cache a BERT tokenizer."
-            )
+        tokenizer = _load_tokenizer_for_model(model_id, family_label="BERT")
         if getattr(tokenizer, "mask_token", None) is None:
             raise ValueError(
                 f"Tokenizer for '{model_id}' does not expose [MASK]; cannot run MLM evaluation."
@@ -174,12 +257,7 @@ def _make_bert_tokenizer(model_id: str):
 
 def _make_gpt2_tokenizer(model_id: str):
     def factory() -> tuple[PreTrainedTokenizerBase, str]:
-        if AutoTokenizer is None:
-            raise RuntimeError(
-                "GPT-2 tokenizers require the 'transformers' extra. "
-                "Install it with: pip install 'invarlock[adapters]'."
-            )
-        tokenizer = AutoTokenizer.from_pretrained("gpt2")
+        tokenizer = _load_tokenizer_for_model(model_id, family_label="causal")
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
         hash_value = _hash_tokenizer(tokenizer)
@@ -190,24 +268,7 @@ def _make_gpt2_tokenizer(model_id: str):
 
 def _make_causal_auto_tokenizer(model_id: str):
     def factory() -> tuple[PreTrainedTokenizerBase, str]:
-        if AutoTokenizer is None:
-            raise RuntimeError(
-                "Causal tokenizers require the 'transformers' extra. "
-                "Install it with: pip install 'invarlock[adapters]'."
-            )
-        # Try offline-first to respect InvarLock network guard; fall back to a
-        # local GPT-2 tokenizer if the model assets are not cached or network
-        # access is denied.
-        tokenizer = None
-        try:
-            tokenizer = AutoTokenizer.from_pretrained(model_id, local_files_only=True)
-        except Exception:
-            try:
-                tokenizer = AutoTokenizer.from_pretrained(model_id)
-            except Exception:
-                tokenizer = None
-        if tokenizer is None:
-            tokenizer = AutoTokenizer.from_pretrained("gpt2")
+        tokenizer = _load_tokenizer_for_model(model_id, family_label="causal")
         # Ensure padding/bos tokens are configured so downstream encoding
         # yields stable non-zero ids and a valid attention mask regardless of
         # environment defaults or tokenizer variants.
@@ -235,22 +296,7 @@ def _make_causal_auto_tokenizer(model_id: str):
 
 def _make_unknown_tokenizer(model_id: str):
     def factory() -> tuple[PreTrainedTokenizerBase, str]:
-        if AutoTokenizer is None:
-            raise RuntimeError(
-                "Text tokenization requires the 'transformers' extra. "
-                "Install it with: pip install 'invarlock[adapters]'."
-            )
-        # Unknown families: try local-only first, then remote, then degrade to GPT-2
-        tokenizer = None
-        try:
-            tokenizer = AutoTokenizer.from_pretrained(model_id, local_files_only=True)
-        except Exception:
-            try:
-                tokenizer = AutoTokenizer.from_pretrained(model_id)
-            except Exception:
-                tokenizer = None
-        if tokenizer is None:
-            tokenizer = AutoTokenizer.from_pretrained("gpt2")
+        tokenizer = _load_tokenizer_for_model(model_id, family_label="text")
         if getattr(tokenizer, "pad_token", None) is None:
             eos_token = getattr(tokenizer, "eos_token", None)
             if eos_token is not None:
@@ -267,11 +313,19 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
     """
 
     adapter_lower = (adapter or "").lower()
-    model_lower = (model_id or "").lower()
+    model_lower, arch_blob, is_encoder_decoder = _profile_hints(model_id)
+    masked_arch = "maskedlm" in arch_blob
+    causal_arch = "causallm" in arch_blob or "forcausallm" in arch_blob
+    seq2seq_arch = "conditionalgeneration" in arch_blob or "seq2seqlm" in arch_blob
 
-    if any(
-        keyword in adapter_lower for keyword in ("hf_mlm", "bert", "roberta", "deberta")
-    ) or any(keyword in model_lower for keyword in ("bert", "roberta", "deberta")):
+    if (
+        any(
+            keyword in adapter_lower
+            for keyword in ("hf_mlm", "bert", "roberta", "deberta")
+        )
+        or masked_arch
+        or any(keyword in model_lower for keyword in ("bert", "roberta", "deberta"))
+    ):
         return ModelProfile(
             family="bert",
             default_loss="mlm",
@@ -296,8 +350,10 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
             ),
         )
 
-    if any(keyword in adapter_lower for keyword in ("hf_seq2seq", "t5", "bart")) or any(
-        keyword in model_lower for keyword in ("t5", "bart")
+    if any(keyword in adapter_lower for keyword in ("hf_seq2seq", "t5", "bart")) or (
+        is_encoder_decoder
+        or seq2seq_arch
+        or any(keyword in model_lower for keyword in ("t5", "bart"))
     ):
         return ModelProfile(
             family="seq2seq",
@@ -308,27 +364,6 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
             module_selectors=_unknown_selectors(),
             invariants=(),
             cert_lints=(),
-        )
-
-    if any(
-        keyword in adapter_lower for keyword in ("gpt", "neox", "opt", "phi")
-    ) or any(keyword in model_lower for keyword in ("gpt", "neox", "opt", "phi")):
-        return ModelProfile(
-            family="gpt2",
-            default_loss="causal",
-            make_tokenizer=_make_gpt2_tokenizer(model_id),
-            default_metric="ppl_causal",
-            default_provider="wikitext2",
-            module_selectors=_gpt2_selectors(),
-            invariants=("causal_masking",),
-            cert_lints=(
-                {
-                    "type": "equals",
-                    "path": "primary_metric.kind",
-                    "value": "ppl_causal",
-                    "message": "GPT-style cert must use causal ppl metric.",
-                },
-            ),
         )
 
     if any(
@@ -355,6 +390,29 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
                     "path": "primary_metric.kind",
                     "value": "ppl_causal",
                     "message": "Causal cert must use causal ppl metric.",
+                },
+            ),
+        )
+
+    if (
+        any(keyword in adapter_lower for keyword in ("gpt", "neox", "opt", "phi"))
+        or causal_arch
+        or any(keyword in model_lower for keyword in ("gpt", "neox", "opt", "phi"))
+    ):
+        return ModelProfile(
+            family="gpt2",
+            default_loss="causal",
+            make_tokenizer=_make_gpt2_tokenizer(model_id),
+            default_metric="ppl_causal",
+            default_provider="wikitext2",
+            module_selectors=_gpt2_selectors(),
+            invariants=("causal_masking",),
+            cert_lints=(
+                {
+                    "type": "equals",
+                    "path": "primary_metric.kind",
+                    "value": "ppl_causal",
+                    "message": "GPT-style cert must use causal ppl metric.",
                 },
             ),
         )

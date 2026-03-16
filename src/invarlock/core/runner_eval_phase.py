@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import math
 import os
-from typing import Any
+from collections.abc import Callable
+from typing import Any, cast
 
 from invarlock.eval.tail_stats import evaluate_metric_tail
 
 from .types import LogLevel
+
+EvaluateMetricTailFn = Callable[..., dict[str, Any]]
 
 
 def eval_phase(
@@ -19,7 +22,7 @@ def eval_phase(
     final_n: int | None = None,
     config: Any | None = None,
     *,
-    evaluate_metric_tail_fn: Any = evaluate_metric_tail,
+    evaluate_metric_tail_fn: EvaluateMetricTailFn = evaluate_metric_tail,
 ) -> dict[str, Any]:
     """Run the final evaluation phase and attach metrics to the report."""
     runner._log_event("eval", "start", LogLevel.INFO)
@@ -28,7 +31,7 @@ def eval_phase(
         if os.environ.get("INVARLOCK_DEBUG_TRACE"):
             length_hint = None
             try:
-                length_hint = len(calibration_data)  # type: ignore[arg-type]
+                length_hint = len(calibration_data)
             except Exception:  # pragma: no cover - defensive
                 length_hint = None
             first_batch = None
@@ -38,7 +41,7 @@ def eval_phase(
                     first_batch = calibration_data[0]
             elif indexable:
                 try:
-                    first_batch = calibration_data[0]  # type: ignore[index]
+                    first_batch = calibration_data[0]
                 except Exception:  # pragma: no cover - defensive
                     first_batch = None
             masked_preview = None
@@ -65,7 +68,7 @@ def eval_phase(
                     "first_batch_masked": masked_preview,
                 },
             )
-        metrics, eval_windows = runner._compute_real_metrics(
+        computed_metrics, computed_windows = runner._compute_real_metrics(
             model,
             calibration_data,
             adapter,
@@ -73,6 +76,8 @@ def eval_phase(
             final_n,
             config,
         )
+        metrics = cast("dict[str, Any]", computed_metrics)
+        eval_windows = cast("dict[str, Any]", computed_windows)
     else:
         runner._log_event(
             "eval",
@@ -96,7 +101,7 @@ def eval_phase(
         pm_kind = str(pm.get("kind", "")).lower() if isinstance(pm, dict) else ""
         is_ppl_metric = pm_kind.startswith("ppl")
 
-        baseline_eval = {}
+        baseline_eval: dict[str, Any] = {}
         if (
             is_ppl_metric
             and config

@@ -35,7 +35,7 @@ def compute_real_metrics(
     coverage_requirements: Any = BOOTSTRAP_COVERAGE_REQUIREMENTS,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Compute evaluation metrics from calibration data."""
-    import psutil
+    import psutil  # type: ignore[import-untyped]
     import torch
 
     _ = adapter

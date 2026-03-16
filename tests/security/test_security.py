@@ -17,6 +17,10 @@ def test_network_guard_blocks_connections():
 
     with pytest.raises(RuntimeError):
         socket.create_connection(("example.com", 80), timeout=0.1)
+    with pytest.raises(RuntimeError):
+        socket.socket().connect_ex(("127.0.0.1", 9))
+    with pytest.raises(RuntimeError):
+        socket.socket(socket.AF_INET, socket.SOCK_DGRAM).sendto(b"x", ("127.0.0.1", 9))
 
     guard.restore()
 
@@ -73,12 +77,13 @@ def test_temporarily_allow_network_concurrent_contexts() -> None:
 
     assert entered_a.wait(timeout=5)
     assert entered_b.wait(timeout=5)
-    assert security.network_policy_allows()
+    # Allowance should stay scoped to the worker threads.
+    assert not security.network_policy_allows()
 
     release_a.set()
     thread_a.join(timeout=5)
     assert not thread_a.is_alive()
-    assert security.network_policy_allows()
+    assert not security.network_policy_allows()
 
     release_b.set()
     thread_b.join(timeout=5)

@@ -214,7 +214,7 @@ def create_empty_report() -> RunReport:
     )
 
 
-def validate_report(report: RunReport) -> bool:
+def validate_report(report: object) -> bool:
     """
     Validate that a RunReport has all required fields.
 
@@ -224,49 +224,44 @@ def validate_report(report: RunReport) -> bool:
     Returns:
         True if valid, False otherwise
     """
-    try:
-        # Check that all top-level keys exist
-        required_keys = {
-            "meta",
-            "data",
-            "edit",
-            "guards",
-            "metrics",
-            "artifacts",
-            "flags",
-        }
-        if not all(key in report for key in required_keys):
-            return False
-
-        # Basic type checks
-        guards = report.get("guards")
-        if not isinstance(guards, list):
-            return False
-
-        metrics = report.get("metrics", {})
-        # Canonical: require a primary_metric dict (kind/finals are checked downstream)
-        pm = metrics.get("primary_metric") if isinstance(metrics, dict) else None
-        if isinstance(pm, dict) and pm:
-            pm_kind = pm.get("kind")
-            pm_final = pm.get("final")
-            # kind must be a non-empty string; if 'final' is present it must be numeric
-            if not (isinstance(pm_kind, str) and pm_kind):
-                return False
-            if pm_final is not None and not isinstance(pm_final, int | float):
-                return False
-        else:
-            # PM-only: ppl_* acceptance removed
-            return False
-
-        meta = report.get("meta", {})
-        seed = meta.get("seed")
-        if not isinstance(seed, int):
-            return False
-
-        return True
-
-    except (KeyError, TypeError):
+    if not isinstance(report, dict):
         return False
+
+    required_keys = {
+        "meta",
+        "data",
+        "edit",
+        "guards",
+        "metrics",
+        "artifacts",
+        "flags",
+    }
+    if not all(key in report for key in required_keys):
+        return False
+
+    guards = report.get("guards")
+    if not isinstance(guards, list):
+        return False
+
+    metrics = report.get("metrics")
+    if not isinstance(metrics, dict):
+        return False
+
+    pm = metrics.get("primary_metric")
+    if not isinstance(pm, dict) or not pm:
+        return False
+
+    pm_kind = pm.get("kind")
+    pm_final = pm.get("final")
+    if not (isinstance(pm_kind, str) and pm_kind):
+        return False
+    if pm_final is not None and not isinstance(pm_final, int | float):
+        return False
+
+    meta = report.get("meta")
+    if not isinstance(meta, dict):
+        return False
+    return isinstance(meta.get("seed"), int)
 
 
 # Export all types for type hints

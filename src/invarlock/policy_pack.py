@@ -92,7 +92,7 @@ def write_policy_pack(path: Path, pack: dict[str, Any]) -> None:
     path.write_text(json.dumps(pack, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
-def verify_policy_pack(pack: dict[str, Any]) -> list[str]:
+def verify_policy_pack(pack: object) -> list[str]:
     errors: list[str] = []
     if not isinstance(pack, dict):
         return ["policy pack must be a mapping"]

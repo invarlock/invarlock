@@ -9,6 +9,7 @@ Provides centralized access to adapters, edits, and guards.
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import warnings
 from collections.abc import Iterable
 from dataclasses import dataclass
