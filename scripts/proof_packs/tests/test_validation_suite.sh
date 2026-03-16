@@ -1040,6 +1040,7 @@ test_pack_prepare_scenarios_manifest_copies_source_when_jq_is_unavailable() {
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
     source ./scripts/proof_packs/lib/validation_suite.sh
+    _pack_validation_has_jq() { return 1; }
 
     local manifest="${TEST_TMPDIR}/scenarios_copy.json"
     cat > "${manifest}" <<'EOF'
@@ -1051,20 +1052,10 @@ test_pack_prepare_scenarios_manifest_copies_source_when_jq_is_unavailable() {
 }
 EOF
 
-    local bin_dir="${TEST_TMPDIR}/no_jq_bin"
-    mkdir -p "${bin_dir}"
-    cat > "${bin_dir}/cp" <<'EOF'
-#!/usr/bin/env bash
-exec /bin/cp "$@"
-EOF
-    chmod +x "${bin_dir}/cp"
-    local original_path="${PATH}"
-    PATH="${bin_dir}:/bin"
     PACK_SCENARIOS_MANIFEST_FILE="${manifest}"
     PACK_SCENARIO_IDS=""
 
     pack_prepare_scenarios_manifest
-    PATH="${original_path}"
     assert_eq "null" "$(jq -r '._meta.applied_suite' "${OUTPUT_DIR}/state/scenarios.json")" "cp fallback leaves manifest metadata unchanged"
     assert_eq "a" "$(jq -r '.scenarios[0].id' "${OUTPUT_DIR}/state/scenarios.json")" "scenario content preserved under cp fallback"
 }

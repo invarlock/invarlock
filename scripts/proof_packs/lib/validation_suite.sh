@@ -100,6 +100,10 @@ pack_is_bash4() {
     [[ "${BASH_VERSINFO[0]}" -ge 4 ]]
 }
 
+_pack_validation_has_jq() {
+    command -v jq >/dev/null 2>&1
+}
+
 pack_read_final_verdict() {
     local verdict_path="$1"
     python3 - "${verdict_path}" <<'PY'
@@ -693,7 +697,7 @@ pack_prepare_scenarios_manifest() {
         local scenario_ids_csv="${PACK_SCENARIO_IDS:-}"
         local jq_filter='def suites_ok($suite): ((.suites? | type) != "array") or ((.suites | length) == 0) or ((.suites | index($suite)) != null); def trim: gsub("^\\s+|\\s+$"; ""); def ids($csv): ($csv | split(",") | map(trim) | map(select(length>0))); ._meta = (._meta | if type=="object" then . else {} end) | ._meta.applied_suite = $suite | (ids($scenario_ids_csv)) as $ids | if ($ids | length) > 0 then ._meta.scenario_ids_filter = $ids else . end | .scenarios = [.scenarios[] | select(suites_ok($suite)) | select(($ids | length) == 0 or (.id as $id | ($ids | index($id)) != null))]'
 
-        if command -v jq >/dev/null 2>&1; then
+        if _pack_validation_has_jq; then
             # Scenarios can optionally declare `suites: ["subset", "full", ...]`.
             # When present, the manifest is filtered to just the active PACK_SUITE.
             jq --arg suite "${suite}" --arg scenario_ids_csv "${scenario_ids_csv}" "${jq_filter}" "${src}" > "${dest}"
