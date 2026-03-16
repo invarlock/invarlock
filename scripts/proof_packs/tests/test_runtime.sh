@@ -86,8 +86,14 @@ test_pid_is_alive_proc_checks_proc_pid_dir() {
     # shellcheck source=../runtime.sh
     source "${TEST_ROOT}/scripts/proof_packs/lib/runtime.sh"
 
-    run _pid_is_alive_proc "123"
-    assert_rc "1" "${RUN_RC}" "macOS has no /proc, so pid is not alive via proc backend"
+    local pid="$$"
+    local expected_rc="1"
+    if [[ -d "/proc/${pid}" ]]; then
+        expected_rc="0"
+    fi
+
+    run _pid_is_alive_proc "${pid}"
+    assert_rc "${expected_rc}" "${RUN_RC}" "proc backend follows /proc/<pid> directory presence"
 }
 
 test_pid_is_alive_ps_calls_ps_for_valid_pid() {

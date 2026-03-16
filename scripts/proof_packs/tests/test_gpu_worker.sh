@@ -29,6 +29,7 @@ test_gpu_worker_sets_waiting_deps_when_only_pending_tasks() {
     local out="${TEST_TMPDIR}/out"
     rm -rf "${out}"
     mkdir -p "${out}/workers" "${out}/logs/tasks"
+    rm -f "${out}/workers/SHUTDOWN" "${out}/workers/gpu_0.shutdown"
 
     WORKER_DEP_RESOLVE_INTERVAL=0
 
@@ -53,6 +54,7 @@ test_gpu_worker_sets_waiting_deps_when_only_pending_tasks() {
             saw_waiting="true"
             break
         fi
+        sleep 0.01
     done
 
     touch "${out}/workers/SHUTDOWN"
