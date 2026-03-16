@@ -6,9 +6,7 @@ import zipfile
 import pytest
 
 
-@pytest.mark.skipif(os.getenv("SKIP_BUILD_TESTS") == "1", reason="skip build tests")
-def test_sitecustomize_not_in_wheel(tmp_path):
-    # Build wheel locally
+def _build_wheel(tmp_path):
     subprocess.run(
         [
             sys.executable,
@@ -21,10 +19,26 @@ def test_sitecustomize_not_in_wheel(tmp_path):
         ],
         check=True,
     )
-    wheel = next(tmp_path.glob("*.whl"))
+    return next(tmp_path.glob("*.whl"))
+
+
+@pytest.mark.skipif(os.getenv("SKIP_BUILD_TESTS") == "1", reason="skip build tests")
+def test_sitecustomize_not_in_wheel(tmp_path):
+    wheel = _build_wheel(tmp_path)
     with zipfile.ZipFile(wheel) as z:
         names = z.namelist()
         assert "sitecustomize.py" not in names
+
+
+@pytest.mark.skipif(os.getenv("SKIP_BUILD_TESTS") == "1", reason="skip build tests")
+def test_proof_pack_repo_assets_not_in_wheel(tmp_path):
+    wheel = _build_wheel(tmp_path)
+    with zipfile.ZipFile(wheel) as z:
+        names = z.namelist()
+        assert "invarlock/public_contracts.py" in names
+        assert not any("proof_pack_manifest.schema.json" in name for name in names)
+        assert not any(name.startswith("contracts/") for name in names)
+        assert not any(name.startswith("scripts/proof_packs/") for name in names)
 
 
 pytestmark = pytest.mark.integration
