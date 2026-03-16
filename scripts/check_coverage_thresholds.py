@@ -20,10 +20,22 @@ from typing import Any
 # coverage policy for shells, pure helpers, and tensor/mutation helpers.
 THRESHOLDS = {
     # Evaluation & reporting
+    "src/invarlock/eval/data.py": 0.75,
+    "src/invarlock/eval/bootstrap.py": 1.00,
+    "src/invarlock/eval/bench_regression.py": 1.00,
+    "src/invarlock/eval/probes/fft.py": 0.90,
+    "src/invarlock/eval/probes/mi.py": 0.90,
+    "src/invarlock/eval/probes/post_attention.py": 0.90,
+    "src/invarlock/eval/providers/base.py": 0.90,
+    "src/invarlock/eval/providers/seq2seq.py": 0.90,
     "src/invarlock/eval/metrics.py": 0.90,
     # Guard-effect benchmark harness (Step 14) + primary metric core
     "src/invarlock/eval/bench.py": 0.90,
     "src/invarlock/eval/primary_metric.py": 0.90,
+    "src/invarlock/eval/tail_stats.py": 0.90,
+    "src/invarlock/eval/tasks/classification.py": 1.00,
+    "src/invarlock/eval/tasks/qa.py": 1.00,
+    "src/invarlock/eval/tasks/text_generation.py": 0.90,
     # Calibration (release artifacts / tier updates)
     "src/invarlock/calibration/spectral_null.py": 0.90,
     "src/invarlock/calibration/variance_ve.py": 0.90,
@@ -73,8 +85,7 @@ THRESHOLDS = {
     "src/invarlock/guards/policies.py": 0.90,
     # Core orchestration & runtime
     "src/invarlock/core/registry.py": 0.90,
-    # Omit bootstrap here due to ambiguous bare-filename records in coverage.xml
-    # "src/invarlock/core/bootstrap.py": 0.85,
+    "src/invarlock/core/bootstrap.py": 0.80,
     "src/invarlock/core/contracts.py": 0.90,
     "src/invarlock/core/auto_tuning.py": 0.90,
     # Newly added core modules to critical surface
@@ -131,9 +142,21 @@ CORE_PREFIXES = (
 # Individual core files outside of the broad prefixes
 CORE_FILES = (
     # Evaluation & reporting (key entry points)
+    "src/invarlock/eval/data.py",
+    "src/invarlock/eval/bootstrap.py",
+    "src/invarlock/eval/bench_regression.py",
+    "src/invarlock/eval/probes/fft.py",
+    "src/invarlock/eval/probes/mi.py",
+    "src/invarlock/eval/probes/post_attention.py",
+    "src/invarlock/eval/providers/base.py",
+    "src/invarlock/eval/providers/seq2seq.py",
     "src/invarlock/eval/metrics.py",
     "src/invarlock/eval/bench.py",
     "src/invarlock/eval/primary_metric.py",
+    "src/invarlock/eval/tail_stats.py",
+    "src/invarlock/eval/tasks/classification.py",
+    "src/invarlock/eval/tasks/qa.py",
+    "src/invarlock/eval/tasks/text_generation.py",
     "src/invarlock/calibration/spectral_null.py",
     "src/invarlock/calibration/variance_ve.py",
     "src/invarlock/reporting/report.py",

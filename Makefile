@@ -32,8 +32,21 @@ COVERAGE_TESTS_CONFIG := \
 COVERAGE_TESTS_EVAL := \
 	tests/eval/test_metrics*.py tests/eval/test_report*.py \
 	tests/eval/test_validate_module.py tests/eval/test_baseline_artifacts.py \
-	tests/eval/test_bench.py tests/eval/test_primary_metric*.py \
-	tests/eval/test_determinism.py tests/eval/test_mask_parity_fail.py
+	tests/eval/test_bench.py tests/eval/test_metric_tail_gate.py \
+	tests/eval/test_primary_metric*.py \
+	tests/eval/test_determinism.py tests/eval/test_mask_parity_fail.py \
+	tests/eval/test_task_metrics.py tests/eval/test_eval_bootstrap_wrapper.py \
+	tests/eval/test_data*.py tests/eval/test_hf_text_provider*.py \
+	tests/eval/test_local_jsonl*.py tests/eval/test_synthetic_provider_cases.py \
+	tests/eval/test_wikitext2_fast_capacity.py \
+	tests/eval/test_provider_deterministic_loader_cases.py \
+	tests/eval/test_difficulty_scorer_modes.py \
+	tests/eval/providers
+
+COVERAGE_TESTS_EVAL_PROBES := \
+	tests/eval/test_fft.py tests/eval/test_fft_probe_cases.py \
+	tests/eval/test_mi.py \
+	tests/eval/test_post_attention_probes.py tests/eval/test_post_attention_probe_cases.py
 
 COVERAGE_TESTS_CLI_COMMANDS := \
 	tests/cli/test_doctor*.py tests/cli/test_plugins*.py tests/cli/test_evaluate*.py \
@@ -58,6 +71,11 @@ COVERAGE_MODULES := \
 	--cov=src/invarlock/eval --cov=src/invarlock/guards --cov=src/invarlock/calibration \
 	--cov=src/invarlock/cli --cov=src/invarlock/core --cov=src/invarlock/reporting \
 	--cov=invarlock.public_contracts --cov=invarlock.policy_pack
+
+COVERAGE_INCLUDE := \
+	src/invarlock/eval/*,src/invarlock/guards/*,src/invarlock/calibration/*,\
+	src/invarlock/cli/*,src/invarlock/core/*,src/invarlock/reporting/*,\
+	src/invarlock/public_contracts.py,src/invarlock/policy_pack.py
 
 help:  ## Show this help message
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
@@ -84,6 +102,10 @@ coverage:  ## Run tests with coverage and generate XML
 		$(COVERAGE_MODULES) \
 		--cov-branch \
 		--cov-report=term --cov-report=xml:reports/cov.xml --cov-fail-under=90
+	PYTHONPATH=src $(COVERAGE) run --append -m pytest -q -p no:cov \
+		$(COVERAGE_TESTS_EVAL_PROBES)
+	$(COVERAGE) report --include="$(COVERAGE_INCLUDE)" --fail-under=90
+	$(COVERAGE) xml --include="$(COVERAGE_INCLUDE)" -o reports/cov.xml
 
 coverage-enforce:  ## Run coverage and enforce per-file thresholds
 	$(MAKE) coverage
