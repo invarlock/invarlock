@@ -482,9 +482,7 @@ def doctor_command(
                         )
                 else:
                     if not json_out:
-                        console.print(
-                            "  [dim]⚠️  bitsandbytes — not installed[/dim]"
-                        )
+                        console.print("  [dim]⚠️  bitsandbytes — not installed[/dim]")
                         console.print(
                             "     → Install: pip install 'invarlock[gpu]'",
                             markup=False,

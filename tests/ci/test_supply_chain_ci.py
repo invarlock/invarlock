@@ -271,8 +271,7 @@ def test_release_workflow_builds_and_bundles_release_assets():
 
     assert sigstore_steps[1]["name"] == "Sign offline verification bundle"
     assert (
-        sigstore_steps[1]["with"]["inputs"]
-        == "release-assets/*-offline-bundle.tar.gz"
+        sigstore_steps[1]["with"]["inputs"] == "release-assets/*-offline-bundle.tar.gz"
     )
     assert sigstore_steps[1]["with"]["upload-signing-artifacts"] is True
 
@@ -280,7 +279,7 @@ def test_release_workflow_builds_and_bundles_release_assets():
     assert bundle_steps.index(sigstore_steps[1]) < bundle_steps.index(release_step)
     assert "*.sigstore.json" in release_step["run"]
     assert "cp dist/* release-assets/" in release_step["run"]
-    assert "gh release upload \"$tag\" release-assets/* --clobber" in release_step["run"]
+    assert 'gh release upload "$tag" release-assets/* --clobber' in release_step["run"]
     assert "release-assets/*-offline-bundle.tar.gz" not in release_step["run"]
     assert "gh release create" in release_step["run"]
     assert "gh release upload" in release_step["run"]

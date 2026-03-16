@@ -289,7 +289,11 @@ def plugins_command(
                     hint = extras_status.split("missing", 1)[-1].strip()
                     if hint:
                         enable = f"pip install '{hint}'"
-                if n == "hf_causal_onnx" and present and not onnx_causal_runtime_available():
+                if (
+                    n == "hf_causal_onnx"
+                    and present
+                    and not onnx_causal_runtime_available()
+                ):
                     status = "needs_extra"
                     enable = "Use a transformers<5 env with 'invarlock[onnx]'"
                 if backend_name == "bitsandbytes" and present:
@@ -299,7 +303,9 @@ def plugins_command(
                         if has_cuda:
                             enable = "bitsandbytes unavailable on this host"
                         else:
-                            enable = "Requires CUDA or a compatible bitsandbytes runtime"
+                            enable = (
+                                "Requires CUDA or a compatible bitsandbytes runtime"
+                            )
                 extra_hint = {
                     "hf_gptq": "invarlock[gptq]",
                     "hf_awq": "invarlock[awq]",

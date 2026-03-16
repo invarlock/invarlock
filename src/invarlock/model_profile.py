@@ -118,9 +118,7 @@ def _load_tokenizer_for_model(
     candidates = _tokenizer_candidates(model_id)
     for candidate in candidates:
         try:
-            tokenizer = AutoTokenizer.from_pretrained(
-                candidate, local_files_only=True
-            )
+            tokenizer = AutoTokenizer.from_pretrained(candidate, local_files_only=True)
             return cast("PreTrainedTokenizerBase", tokenizer)
         except Exception:
             continue

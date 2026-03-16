@@ -86,9 +86,7 @@ def test_make_offline_bundle_packages_release_materials(tmp_path: Path) -> None:
         assert f"{root}/dist/invarlock-0.3.12-py3-none-any.whl.sigstore.json" in names
 
         manifest = json.loads(
-            archive.extractfile(f"{root}/release_manifest.json")
-            .read()
-            .decode("utf-8")
+            archive.extractfile(f"{root}/release_manifest.json").read().decode("utf-8")
         )
 
     assert manifest["schema"] == "invarlock/release-offline-bundle-v1"
