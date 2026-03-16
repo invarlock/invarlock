@@ -58,14 +58,7 @@ jobs:
           ${{ runner.os }}-pip-
 
     - name: Install core dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e .
-
-    - name: Install optional dependencies
-      run: |
-        # Try to install GPTQ support for adapter loading (may fail on some systems)
-        pip install auto-gptq transformers || echo "GPTQ not available on this system"
+      run: python -m pip install --require-hashes -r requirements/workflows/hf-py313.txt
 
     - name: Verify installation
       run: |
@@ -170,11 +163,7 @@ jobs:
         python-version: "3.13"
 
     - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e .
-        pip install peft transformers
-        pip install auto-gptq || echo "GPTQ not available"
+      run: python -m pip install --require-hashes -r requirements/workflows/hf-py313.txt
 
     - name: Run release benchmark
       run: |

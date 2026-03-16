@@ -59,6 +59,19 @@ def _find_step_by_uses_prefix(
     )
 
 
+def _iter_pip_install_commands(workflow: dict[str, Any]) -> list[str]:
+    commands: list[str] = []
+    for step in _iter_job_steps(workflow):
+        run = step.get("run")
+        if not isinstance(run, str):
+            continue
+        for line in run.splitlines():
+            stripped = line.strip()
+            if "pip install" in stripped:
+                commands.append(stripped)
+    return commands
+
+
 def test_supply_chain_job_configured():
     """Test supply-chain job includes core security checks.
 
@@ -143,6 +156,28 @@ def test_workflows_declare_explicit_permissions():
     )
 
 
+def test_workflows_pin_pip_installs_by_hash() -> None:
+    offenders: list[str] = []
+    for workflow_path in _workflow_paths():
+        workflow = _load_workflow(workflow_path)
+        for command in _iter_pip_install_commands(workflow):
+            if "--require-hashes" not in command:
+                offenders.append(f"{workflow_path.name}: {command}")
+
+    assert not offenders, "Unhashed workflow pip installs:\n" + "\n".join(offenders)
+
+
+def test_scorecards_workflow_uses_least_privilege_top_level_permissions() -> None:
+    workflow = _load_workflow(Path(".github/workflows/scorecards.yml"))
+    assert workflow["permissions"] == {"contents": "read"}
+
+    analysis = workflow["jobs"]["analysis"]
+    assert analysis["permissions"] == {
+        "id-token": "write",
+        "security-events": "write",
+    }
+
+
 def test_release_workflow_uses_trusted_publishing():
     workflow = _load_workflow(Path(".github/workflows/release.yml"))
     publish = workflow["jobs"]["publish"]
@@ -189,7 +224,14 @@ def test_release_workflow_builds_and_bundles_release_assets():
     build_steps = build_check.get("steps", [])
 
     install_step = _find_step_by_name(build_steps, "Install build tooling")
-    assert ".[release-ci,security-ci]" in install_step["run"]
+    assert (
+        install_step["run"]
+        == "python -m pip install --require-hashes -r requirements/workflows/release-security-py313.txt"
+    )
+
+    smoke_step = _find_step_by_name(build_steps, "Install smoke from wheel")
+    assert "dist/smoke-requirements.txt" in smoke_step["run"]
+    assert "--require-hashes" in smoke_step["run"]
 
     assert _find_step_by_name(build_steps, "Generate release SBOM")
     sbom_upload = _find_step_by_name(build_steps, "Upload SBOM artifact")
@@ -244,6 +286,18 @@ def test_release_workflow_builds_and_bundles_release_assets():
     assert "gh release upload" in release_step["run"]
     assert "release-assets/*" in release_step["run"]
 
+    testpypi_smoke = workflow["jobs"]["testpypi_smoke"]
+    smoke_steps = testpypi_smoke.get("steps", [])
+    download_step = _find_step_by_name(smoke_steps, "Download published TestPyPI wheel")
+    assert "https://test.pypi.org/pypi/invarlock/" in download_step["run"]
+    assert "wheelhouse/requirements.txt" in download_step["run"]
+
+    install_published_step = _find_step_by_name(
+        smoke_steps, "Install published wheel and smoke test"
+    )
+    assert "--require-hashes" in install_published_step["run"]
+    assert "wheelhouse/requirements.txt" in install_published_step["run"]
+
 
 def test_ci_verify_full_pins_make_to_setup_python() -> None:
     workflow = _load_workflow(Path(".github/workflows/ci.yml"))
@@ -268,7 +322,7 @@ def test_scorecard_workflow_is_configured():
     assert "branch_protection_rule" in triggers
     assert triggers["schedule"]
     assert "workflow_dispatch" in triggers
-    assert workflow["permissions"] == "read-all"
+    assert workflow["permissions"] == {"contents": "read"}
 
     analysis = workflow["jobs"]["analysis"]
     assert analysis["permissions"] == {

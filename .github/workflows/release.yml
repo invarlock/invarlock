@@ -30,9 +30,7 @@ jobs:
         with:
           python-version: '3.13'
       - name: Install build tooling
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e .[release-ci,security-ci]
+        run: python -m pip install --require-hashes -r requirements/workflows/release-security-py313.txt
       - name: Build wheel/sdist
         run: python -m build
       - name: Twine check
@@ -43,7 +41,18 @@ jobs:
         run: |
           python -m venv .venv
           . .venv/bin/activate
-          pip install dist/*.whl
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          wheel = next(Path("dist").glob("*.whl"))
+          digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
+          Path("dist/smoke-requirements.txt").write_text(
+              f"{wheel.resolve()} --hash=sha256:{digest}\n",
+              encoding="utf-8",
+          )
+          PY
+          python -m pip install --no-deps --require-hashes -r dist/smoke-requirements.txt
           python -c "import invarlock; import sys; print('invarlock version', getattr(invarlock, '__version__', 'n/a')); sys.exit(0)"
       - name: Generate release SBOM
         run: bash scripts/generate_sbom.sh artifacts/supply-chain/sbom.json
@@ -131,14 +140,47 @@ jobs:
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: '3.13'
-      - name: Install from TestPyPI and smoke test
+      - name: Download published TestPyPI wheel
+        env:
+          INVARLOCK_RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p wheelhouse
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import urllib.request
+          from pathlib import Path
+
+          version = os.environ["INVARLOCK_RELEASE_VERSION"].removeprefix("v")
+          metadata_url = f"https://test.pypi.org/pypi/invarlock/{version}/json"
+          with urllib.request.urlopen(metadata_url) as response:
+              payload = json.load(response)
+
+          wheel = next(item for item in payload["urls"] if item["filename"].endswith(".whl"))
+          destination = Path("wheelhouse") / wheel["filename"]
+          with urllib.request.urlopen(wheel["url"]) as response:
+              destination.write_bytes(response.read())
+
+          digest = hashlib.sha256(destination.read_bytes()).hexdigest()
+          if digest != wheel["digests"]["sha256"]:
+              raise SystemExit("TestPyPI wheel digest mismatch")
+
+          requirements = Path("wheelhouse/requirements.txt")
+          requirements.write_text(
+              f"{destination.resolve()} --hash=sha256:{digest}\n",
+              encoding="utf-8",
+          )
+          print(f"Downloaded {destination.name}")
+          PY
+      - name: Install published wheel and smoke test
         env:
           INVARLOCK_LIGHT_IMPORT: "1"
         run: |
           python -m venv .venv
           . .venv/bin/activate
-          python -m pip install --upgrade pip
-          pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple invarlock
+          python -m pip install --no-deps --require-hashes -r wheelhouse/requirements.txt
           invarlock --help || python -c "import invarlock; import sys; print('invarlock version', getattr(invarlock,'__version__','n/a')); sys.exit(0)"
 
   bundle_release:

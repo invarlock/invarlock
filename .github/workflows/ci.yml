@@ -47,6 +47,7 @@ jobs:
     env:
       INVARLOCK_LIGHT_IMPORT: "1"
       INVARLOCK_DISABLE_PLUGIN_DISCOVERY: "0"
+      PYTHONPATH: ${{ github.workspace }}/src
       PYTHONWARNINGS: "default"
     timeout-minutes: 20
     steps:
@@ -68,9 +69,7 @@ jobs:
             ${{ runner.os }}-pip-3.13-
 
       - name: Install (core + hf + docs)
-        run: |
-          python -m pip install -U pip wheel
-          pip install -e .[hf,ci]
+        run: python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
 
       - name: Curated tests (light import for help/doctor)
         run: |
@@ -112,6 +111,7 @@ jobs:
     env:
       INVARLOCK_LIGHT_IMPORT: "1"
       INVARLOCK_DISABLE_PLUGIN_DISCOVERY: "0"
+      PYTHONPATH: ${{ github.workspace }}/src
       PYTHONWARNINGS: "default"
     timeout-minutes: 20
     steps:
@@ -133,9 +133,7 @@ jobs:
             ${{ runner.os }}-pip-3.12-
 
       - name: Install (core + hf)
-        run: |
-          python -m pip install -U pip wheel
-          pip install -e .[hf,ci]
+        run: python -m pip install --require-hashes -r requirements/workflows/ci-hf-py312.txt
 
       - name: Min supported smoke
         run: |
@@ -154,6 +152,7 @@ jobs:
       INVARLOCK_DISABLE_PLUGIN_DISCOVERY: "0"
       PYTHONWARNINGS: "default"
       PYTHON: "python"
+      PYTHONPATH: ${{ github.workspace }}/src
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
@@ -174,9 +173,7 @@ jobs:
             ${{ runner.os }}-pip-3.13-full-
 
       - name: Install (core + hf + verify tools)
-        run: |
-          python -m pip install -U pip wheel
-          pip install -e .[hf,ci]
+        run: python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
 
       - name: Full verify
         run: |
@@ -197,9 +194,7 @@ jobs:
           python-version: "3.13"
 
       - name: Install supply-chain tools
-        run: |
-          python -m pip install -U pip
-          pip install -e .[security-ci]
+        run: python -m pip install --require-hashes -r requirements/workflows/security-ci-py313.txt
 
       - name: Generate SBOM
         run: bash scripts/generate_sbom.sh

@@ -37,6 +37,8 @@ jobs:
     name: Docs Build & Validate
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      PYTHONPATH: ${{ github.workspace }}/src
 
     steps:
     - name: Checkout
@@ -64,10 +66,7 @@ jobs:
         restore-keys: docs-pip-
 
     - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        # Install core package only (no [dev] which pulls torch/bitsandbytes ~3GB)
-        pip install -e .[ci,docs-ci]
+      run: python -m pip install --require-hashes -r requirements/workflows/docs-ci-py313.txt
 
     - name: Build docs (strict)
       run: mkdocs build --strict
@@ -119,6 +118,8 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule'
     timeout-minutes: 15
+    env:
+      PYTHONPATH: ${{ github.workspace }}/src
 
     steps:
     - name: Checkout
@@ -130,7 +131,7 @@ jobs:
         python-version: '3.13'
 
     - name: Install link checker
-      run: pip install -e .[docs-ci]
+      run: python -m pip install --require-hashes -r requirements/workflows/docs-ci-py313.txt
 
     - name: Check external links
       run: linkchecker --check-extern docs/
@@ -146,6 +147,8 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+    env:
+      PYTHONPATH: ${{ github.workspace }}/src
 
     steps:
     - name: Checkout
@@ -157,7 +160,7 @@ jobs:
         python-version: '3.13'
 
     - name: Install dependencies
-      run: pip install -e .[ci]
+      run: python -m pip install --require-hashes -r requirements/workflows/docs-ci-py313.txt
 
     - name: Build documentation
       run: mkdocs build
