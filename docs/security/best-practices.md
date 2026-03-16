@@ -61,12 +61,21 @@ Copy-paste checklist for production or CI deployments:
 - GitHub Releases are the canonical place to fetch published wheels, source
   tarballs, the CycloneDX SBOM, and the Sigstore/provenance sidecar files for a
   tagged release.
+- Tagged releases also include `invarlock-<version>-offline-bundle.tar.gz`, a
+  procurement-friendly archive that groups the signed distributions, their
+  Sigstore sidecars, the GitHub provenance bundle, the CycloneDX SBOM, a
+  release manifest, and verification hints for offline review.
+  See [Release Verification](release-verification.md) for the exact offline
+  verification flow.
 - The `*.whl` and `*.tar.gz` files are the signed distribution artifacts.
 - The `*.sigstore` and related certificate files are the verification material
   emitted for those distributions.
 - The release bundle also includes the GitHub build-provenance bundle captured
   during publishing so consumers can verify the CI origin of the published
   artifacts.
+- The offline bundle tarball itself is also Sigstore-signed on release, so
+  buyers can verify the archive before extraction and then verify the inner
+  distributions individually.
 
 ## See also
 

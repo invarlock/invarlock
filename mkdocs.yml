@@ -54,6 +54,7 @@ nav:
       - GPU/MPS-First Guards: assurance/13-gpu-mps-first-guards.md
   - Security:
       - Best Practices: security/best-practices.md
+      - Release Verification: security/release-verification.md
       - Threat Model: security/threat-model.md
       - Architecture: security/architecture.md
       - Pip Audit Allowlist: security/pip-audit-allowlist.md

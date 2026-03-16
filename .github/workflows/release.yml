@@ -178,6 +178,27 @@ jobs:
         with:
           inputs: dist/*
           upload-signing-artifacts: true
+      - name: Create offline verification bundle
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          bash scripts/release/make_offline_bundle.sh \
+            --version "${version}" \
+            --tag "${tag}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --dist-dir dist \
+            --sbom artifacts/supply-chain/sbom.json \
+            --provenance-dir provenance \
+            --output-dir release-assets
+      - name: Sign offline verification bundle
+        uses: sigstore/gh-action-sigstore-python@a5caf349bc536fbef3668a10ed7f5cd309a4b53d
+        with:
+          inputs: release-assets/*-offline-bundle.tar.gz
+          upload-signing-artifacts: true
       - name: Create or update GitHub release
         env:
           GITHUB_TOKEN: ${{ github.token }}

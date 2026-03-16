@@ -93,6 +93,15 @@ def test_generate_sbom_script_exists():
     assert "SBOM written to" in contents
 
 
+def test_offline_bundle_script_exists():
+    script_path = Path("scripts/release/make_offline_bundle.sh")
+    assert script_path.exists(), "offline bundle generator script missing"
+
+    contents = script_path.read_text(encoding="utf-8")
+    assert "release-offline-bundle-v1" in contents
+    assert "Offline release bundle written to" in contents
+
+
 def test_workflows_pin_github_actions_to_full_shas():
     offenders: list[str] = []
     for workflow_path in _workflow_paths():
@@ -199,17 +208,54 @@ def test_release_workflow_builds_and_bundles_release_assets():
     checkout_step = bundle_steps[0]
     assert checkout_step["uses"].startswith("actions/checkout@")
 
-    sigstore_step = _find_step_by_uses_prefix(
-        bundle_steps, "sigstore/gh-action-sigstore-python@"
+    sigstore_steps = [
+        step
+        for step in bundle_steps
+        if str(step.get("uses", "")).startswith("sigstore/gh-action-sigstore-python@")
+    ]
+    assert len(sigstore_steps) == 2
+    assert sigstore_steps[0]["name"] == "Sign release artifacts"
+    assert sigstore_steps[0]["with"]["inputs"] == "dist/*"
+    assert sigstore_steps[0]["with"]["upload-signing-artifacts"] is True
+
+    bundle_build_step = _find_step_by_name(
+        bundle_steps, "Create offline verification bundle"
     )
-    assert sigstore_step["with"]["inputs"] == "dist/*"
-    assert sigstore_step["with"]["upload-signing-artifacts"] is True
+    assert "scripts/release/make_offline_bundle.sh" in bundle_build_step["run"]
+    assert "--dist-dir dist" in bundle_build_step["run"]
+    assert "--sbom artifacts/supply-chain/sbom.json" in bundle_build_step["run"]
+    assert "--provenance-dir provenance" in bundle_build_step["run"]
+    assert "--output-dir release-assets" in bundle_build_step["run"]
+
+    assert sigstore_steps[1]["name"] == "Sign offline verification bundle"
+    assert (
+        sigstore_steps[1]["with"]["inputs"]
+        == "release-assets/*-offline-bundle.tar.gz"
+    )
+    assert sigstore_steps[1]["with"]["upload-signing-artifacts"] is True
 
     release_step = _find_step_by_name(bundle_steps, "Create or update GitHub release")
+    assert bundle_steps.index(sigstore_steps[1]) < bundle_steps.index(release_step)
     assert "*.sigstore.json" in release_step["run"]
+    assert "cp dist/* release-assets/" in release_step["run"]
+    assert "gh release upload \"$tag\" release-assets/* --clobber" in release_step["run"]
+    assert "release-assets/*-offline-bundle.tar.gz" not in release_step["run"]
     assert "gh release create" in release_step["run"]
     assert "gh release upload" in release_step["run"]
     assert "release-assets/*" in release_step["run"]
+
+
+def test_ci_verify_full_pins_make_to_setup_python() -> None:
+    workflow = _load_workflow(Path(".github/workflows/ci.yml"))
+    verify_full = workflow["jobs"]["verify-full"]
+
+    env = verify_full.get("env", {})
+    assert env["PYTHON"] == "python"
+
+    steps = verify_full.get("steps", [])
+    verify_step = _find_step_by_name(steps, "Full verify")
+    assert "make verify" in verify_step["run"]
+    assert "mkdocs build --strict" in verify_step["run"]
 
 
 def test_scorecard_workflow_is_configured():
