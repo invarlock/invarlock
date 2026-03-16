@@ -17,7 +17,7 @@ task graph, scheduling, and artifact generation. It complements
 | Version | `proof-packs-v1` |
 | Hardware | NVIDIA GPUs where models fit VRAM; multi-GPU recommended for `full` |
 | Models | `subset` (1 model), `showcase`/`workshop3` (3 models), or `full` (6 models); all ungated public |
-| Edits | 4 types × 2 versions per model; clean variants use tuned presets |
+| Edits | Scenario-driven; default suites use 4 clean + 4 stress edit scenarios per model, and filtered manifests may select any subset |
 | Preset Derivation | `CALIBRATION_RUN` + `GENERATE_PRESET` create run-scoped calibrated presets |
 | Scheduling | Dynamic work-stealing, `small_first` priority strategy |
 | Multi-GPU | Profile-based; `required_gpus` grows only when memory requires it |

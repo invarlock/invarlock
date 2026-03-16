@@ -82,6 +82,11 @@ Scenario selection is driven by `scripts/proof_packs/scenarios.json`. Scenarios 
 optionally declare `suites: ["subset", "showcase", "full", ...]`; during execution the
 suite writes the effective (filtered) manifest to `OUTPUT_DIR/state/scenarios.json`,
 and both task generation and final verdict compilation use that state manifest.
+`--scenario-ids` filters that manifest before queue generation, and the runtime now
+honors one-sided selections exactly: clean-only, stress-only, or single-scenario
+smokes no longer expand back to the default 8 edit scenarios. Disk estimation uses
+the same filtered state manifest, so storage preflight reflects the selected
+scenario set rather than the suite defaults.
 
 ## Network & Model Revisions
 
