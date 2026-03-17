@@ -112,14 +112,14 @@ def run_command_impl(
     np = _dep("np")
     os = _dep("os")
     perf_counter = _dep("perf_counter")
-    psutil = _dep("psutil")
+    get_psutil = _dep("get_psutil")
     print_timing_summary = _dep("print_timing_summary")
     resolve_output_style = _dep("resolve_output_style")
     resolve_tokenizer = _dep("resolve_tokenizer")
     set_seed = _dep("set_seed")
     shutil = _dep("shutil")
     timed_step = _dep("timed_step")
-    torch = _dep("torch")
+    get_torch = _dep("get_torch")
     typer = _dep("typer")
     validate_guard_overhead = _dep("validate_guard_overhead")
 
@@ -193,13 +193,28 @@ def run_command_impl(
             profile=profile_normalized,
         )
 
-    # Fail fast when torch is missing so users see a clear extras hint instead of
-    # a raw ModuleNotFoundError from deeper imports.
-    try:
-        import torch as _torch  # type: ignore[import]
+    _optional_dep_unset = object()
+    _optional_torch_cache = _optional_dep_unset
+    _optional_psutil_cache = _optional_dep_unset
 
-        _ = _torch  # pragma: no cover
-    except (ImportError, ModuleNotFoundError) as e:
+    def _optional_torch() -> Any | None:
+        nonlocal _optional_torch_cache
+        if _optional_torch_cache is _optional_dep_unset:
+            loaded = get_torch()
+            _optional_torch_cache = loaded if loaded else None
+        return _optional_torch_cache
+
+    def _optional_psutil() -> Any | None:
+        nonlocal _optional_psutil_cache
+        if _optional_psutil_cache is _optional_dep_unset:
+            loaded = get_psutil()
+            _optional_psutil_cache = loaded if loaded else None
+        return _optional_psutil_cache
+
+    def _require_torch() -> Any:
+        loaded = _optional_torch()
+        if loaded is not None:
+            return loaded
         _event(
             console,
             "FAIL",
@@ -209,7 +224,7 @@ def run_command_impl(
             emoji="❌",
             profile=profile_normalized,
         )
-        raise typer.Exit(1) from e
+        raise typer.Exit(1)
 
     # use module-level _extract_pairing_schedule
 
@@ -222,6 +237,8 @@ def run_command_impl(
     # use module-level _apply_mlm_masks
 
     # use module-level _tokenizer_digest
+
+    _require_torch()
 
     try:
         # Import InvarLock components
@@ -333,7 +350,8 @@ def run_command_impl(
         set_seed(seed_value)
         # Enforce deterministic algorithms in CI/Release profiles when torch is available
         profile_label = profile_normalized or None
-        if torch is not None and profile_label in {"ci", "release"}:
+        torch_mod = _optional_torch()
+        if torch_mod is not None and profile_label in {"ci", "release"}:
             try:  # pragma: no cover - behavior depends on torch availability
                 determinism_mode = (
                     os.environ.get("PACK_DETERMINISM")
@@ -346,12 +364,12 @@ def run_command_impl(
                 warn_only_env = os.environ.get("INVARLOCK_DETERMINISM_WARN_ONLY", "")
                 if warn_only_env.strip().lower() in {"1", "true", "yes", "y", "on"}:
                     warn_only = True
-                if hasattr(torch, "use_deterministic_algorithms"):
-                    torch.use_deterministic_algorithms(True, warn_only=warn_only)
-                if hasattr(torch.backends, "cudnn"):
-                    torch.backends.cudnn.benchmark = False
+                if hasattr(torch_mod, "use_deterministic_algorithms"):
+                    torch_mod.use_deterministic_algorithms(True, warn_only=warn_only)
+                if hasattr(torch_mod.backends, "cudnn"):
+                    torch_mod.backends.cudnn.benchmark = False
                     try:
-                        torch.backends.cudnn.deterministic = True  # type: ignore[attr-defined]
+                        torch_mod.backends.cudnn.deterministic = True  # type: ignore[attr-defined]
                     except (AttributeError, TypeError, RuntimeError):
                         pass
             except NON_FATAL_RUNTIME_EXCEPTIONS:
@@ -368,9 +386,9 @@ def run_command_impl(
         ):
             numpy_seed = seed_value
         torch_seed = None
-        if torch is not None:
+        if torch_mod is not None:
             try:
-                torch_seed = int(torch.initial_seed())
+                torch_seed = int(torch_mod.initial_seed())
             except (AttributeError, TypeError, ValueError, OverflowError, RuntimeError):
                 torch_seed = seed_value
         seed_bundle = {
@@ -1689,7 +1707,10 @@ def run_command_impl(
                 est_mb = _estimate_model_bytes(model) / (1024.0 * 1024.0)
                 # RAM-based heuristic
                 try:
-                    ram = psutil.virtual_memory()
+                    psutil_mod = _optional_psutil()
+                    if psutil_mod is None:
+                        raise AttributeError("psutil unavailable")
+                    ram = psutil_mod.virtual_memory()
                     avail_mb = float(getattr(ram, "available", 0)) / (1024.0 * 1024.0)
                 except (
                     AttributeError,
@@ -2053,10 +2074,11 @@ def run_command_impl(
             try:
                 import os as _os
 
-                if torch is not None:
+                torch_mod = _optional_torch()
+                if torch_mod is not None:
                     try:
                         det_enabled = getattr(
-                            torch, "are_deterministic_algorithms_enabled", None
+                            torch_mod, "are_deterministic_algorithms_enabled", None
                         )
                         if callable(det_enabled):
                             env_flags["torch_deterministic_algorithms"] = bool(
@@ -2066,7 +2088,9 @@ def run_command_impl(
                         pass
                     try:
                         tf32_matmul = getattr(
-                            getattr(torch.backends, "cuda", object()), "matmul", None
+                            getattr(torch_mod.backends, "cuda", object()),
+                            "matmul",
+                            None,
                         )
                         if tf32_matmul is not None and hasattr(
                             tf32_matmul, "allow_tf32"
@@ -2077,7 +2101,7 @@ def run_command_impl(
                     except (AttributeError, RuntimeError, TypeError):
                         pass
                     try:
-                        cudnn_mod = getattr(torch.backends, "cudnn", None)
+                        cudnn_mod = getattr(torch_mod.backends, "cudnn", None)
                         if cudnn_mod is not None:
                             env_flags["cudnn_allow_tf32"] = bool(
                                 getattr(cudnn_mod, "allow_tf32", None)
@@ -2092,8 +2116,8 @@ def run_command_impl(
                         pass
                     try:
                         env_flags["mps_available"] = bool(
-                            getattr(torch.backends, "mps", None)
-                            and torch.backends.mps.is_available()
+                            getattr(torch_mod.backends, "mps", None)
+                            and torch_mod.backends.mps.is_available()
                         )
                     except (AttributeError, RuntimeError, TypeError):
                         pass

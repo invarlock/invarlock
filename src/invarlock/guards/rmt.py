@@ -533,7 +533,7 @@ class RMTGuard(Guard):
         device = mat.device
         dtype = mat.dtype
 
-        with torch.no_grad():
+        with torch.inference_mode():
             if init == "ones":
                 v = torch.ones((n,), device=device, dtype=dtype)
             else:
@@ -618,7 +618,7 @@ class RMTGuard(Guard):
         token_weight_total = 0
 
         try:
-            with torch.no_grad():
+            with torch.inference_mode():
                 for batch in batches:
                     inputs, attention_mask = self._prepare_activation_inputs(
                         batch, device
@@ -790,7 +790,7 @@ class RMTGuard(Guard):
         token_weight_total = 0
 
         try:
-            with torch.no_grad():
+            with torch.inference_mode():
                 for batch in batches:
                     inputs, attention_mask = self._prepare_activation_inputs(
                         batch, device

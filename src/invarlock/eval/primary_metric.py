@@ -20,6 +20,10 @@ import numpy as np
 
 from invarlock.core.bootstrap import compute_paired_delta_log_ci
 from invarlock.core.exceptions import ValidationError
+from invarlock.utils.bootstrap import (
+    bootstrap_mean_statistics,
+    percentile_interval_from_statistics,
+)
 
 
 @dataclass
@@ -477,18 +481,13 @@ class _Accuracy:
             float(ci_level) if (ci_level is not None) else self.defaults.ci_level
         )
         alpha = 1.0 - ci_level_eff
-        # Percentile bootstrap on paired diffs
         rng = np.random.default_rng(seed_eff)  # type: ignore[name-defined]
-        stats = []
-        for _ in range(reps_eff):
-            idx = rng.integers(0, m, size=m)
-            s = 0.0
-            for i in idx:
-                s += diffs[i]
-            stats.append(s / float(m))
-        stats.sort()
-        lo = float(np.percentile(stats, 100.0 * (alpha / 2.0)))  # type: ignore[name-defined]
-        hi = float(np.percentile(stats, 100.0 * (1.0 - alpha / 2.0)))  # type: ignore[name-defined]
+        stats = bootstrap_mean_statistics(
+            np.asarray(diffs, dtype=float),
+            n_bootstrap=reps_eff,
+            random_state=rng,
+        )
+        lo, hi = percentile_interval_from_statistics(stats, alpha=alpha)
         return {
             "kind": self.kind,
             "unit": self.unit,

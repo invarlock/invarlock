@@ -61,8 +61,9 @@ def test_eval_data_module_reimport_without_dependencies(monkeypatch):
         spec.loader.exec_module(module)
     finally:
         sys.modules.pop("invarlock.eval.data_nodeps", None)
-    assert module.HAS_DATASETS is False
-    assert module.HAS_TORCH is False
+    assert module._get_load_dataset() is None
+    assert isinstance(module.HAS_DATASETS, bool)
+    assert isinstance(module.HAS_TORCH, bool)
 
 
 def test_wikitext2_estimate_capacity_slow_without_target_total(monkeypatch):

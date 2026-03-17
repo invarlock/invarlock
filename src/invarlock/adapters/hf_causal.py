@@ -22,6 +22,7 @@ from invarlock.core.api import ModelAdapter
 from invarlock.core.error_utils import wrap_errors
 from invarlock.core.exceptions import AdapterError, DependencyError, ModelLoadError
 
+from .hf_loading import resolve_core_loader_strategy
 from .hf_mixin import HFAdapterMixin
 
 TensorType = torch.Tensor
@@ -32,6 +33,7 @@ LIGHT_IMPORT = os.getenv("INVARLOCK_LIGHT_IMPORT", "").strip().lower() in {
     "true",
     "yes",
 }
+_ALLOW_DIRECT_SUBMODULE = False
 
 
 def _first_item(seq: Any) -> Any | None:
@@ -272,19 +274,53 @@ class HF_Causal_Adapter(HFAdapterMixin, ModelAdapter):
                 "DEPENDENCY-MISSING: transformers",
                 lambda e: {"dependency": "transformers"},
             ):
-                from transformers import AutoModelForCausalLM  # type: ignore
-
-            with wrap_errors(
-                ModelLoadError,
-                "E201",
-                "MODEL-LOAD-FAILED: transformers AutoModelForCausalLM",
-                lambda e: {"model_id": model_id},
-            ):
-                model = self._load_pretrained_model(
-                    AutoModelForCausalLM,
-                    model_id,
-                    **kwargs,
+                strategy = resolve_core_loader_strategy(
+                    task="causal",
+                    model_id=model_id,
+                    kwargs=kwargs,
+                    allow_direct_submodule=_ALLOW_DIRECT_SUBMODULE,
                 )
+                auto_strategy = (
+                    strategy
+                    if strategy.strategy == "auto"
+                    else resolve_core_loader_strategy(
+                        task="causal",
+                        model_id=model_id,
+                        kwargs=kwargs,
+                        allow_direct_submodule=False,
+                    )
+                )
+            self._last_loader_strategy = strategy.strategy
+            self._last_loader_label = strategy.loader_label
+
+            try:
+                with wrap_errors(
+                    ModelLoadError,
+                    "E201",
+                    f"MODEL-LOAD-FAILED: {strategy.loader_label}",
+                    lambda e: {"model_id": model_id},
+                ):
+                    model = self._load_pretrained_model(
+                        strategy.loader,
+                        model_id,
+                        **kwargs,
+                    )
+            except ModelLoadError:
+                if strategy.strategy == "auto":
+                    raise
+                self._last_loader_strategy = auto_strategy.strategy
+                self._last_loader_label = auto_strategy.loader_label
+                with wrap_errors(
+                    ModelLoadError,
+                    "E201",
+                    f"MODEL-LOAD-FAILED: {auto_strategy.loader_label}",
+                    lambda e: {"model_id": model_id},
+                ):
+                    model = self._load_pretrained_model(
+                        auto_strategy.loader,
+                        model_id,
+                        **kwargs,
+                    )
 
             return self._safe_to_device(model, device)
         except DependencyError:

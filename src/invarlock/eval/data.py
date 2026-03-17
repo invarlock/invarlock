@@ -8,6 +8,7 @@ Pluggable data loading system with deterministic windowing for reproducible eval
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import math
 import os
@@ -33,34 +34,262 @@ _LIGHT_IMPORT = os.getenv("INVARLOCK_LIGHT_IMPORT", "").strip().lower() in {
     "yes",
 }
 
-try:
-    from datasets import load_dataset
-
-    HAS_DATASETS = True
-except ImportError:
-    HAS_DATASETS = False
-
-    def load_dataset(*args, **kwargs):  # type: ignore[no-redef]
-        raise _DepErr(
-            code="E301",
-            message="DEPENDENCY-MISSING: datasets library required for dataset loading",
-            details={"dependency": "datasets"},
-        )
-
-
-try:
-    import torch
-
-    HAS_TORCH = True
-except ImportError:
-    HAS_TORCH = False
+HAS_DATASETS = importlib.util.find_spec("datasets") is not None
+HAS_TORCH = importlib.util.find_spec("torch") is not None
+_DATASETS_UNSET = object()
+_load_dataset_cached: Any = _DATASETS_UNSET
+load_dataset: Any = None
 
 
 EventEmitter = Callable[[str, str, str | None], None]
 
 
+def _get_load_dataset() -> Any | None:
+    global HAS_DATASETS, _load_dataset_cached
+    if callable(load_dataset):
+        HAS_DATASETS = True
+        return load_dataset
+    if HAS_DATASETS is False:
+        return None
+    if _load_dataset_cached is _DATASETS_UNSET:
+        try:
+            from datasets import load_dataset as _datasets_load_dataset
+        except ImportError:
+            HAS_DATASETS = False
+            _load_dataset_cached = None
+        else:
+            HAS_DATASETS = True
+            _load_dataset_cached = _datasets_load_dataset
+    return None if _load_dataset_cached is _DATASETS_UNSET else _load_dataset_cached
+
+
+def _require_load_dataset(message: str) -> Any:
+    load_dataset_fn = _get_load_dataset()
+    if load_dataset_fn is None:
+        raise _DepErr(
+            code="E301",
+            message=message,
+            details={"dependency": "datasets"},
+        )
+    return load_dataset_fn
+
+
 def _call_tokenizer(tokenizer: Any, /, *args: Any, **kwargs: Any) -> Any:
     return cast(Any, tokenizer)(*args, **kwargs)
+
+
+def _to_python_token_rows(value: Any, *, batch_size: int) -> list[list[int]]:
+    candidate = value
+    if batch_size == 1 and hasattr(candidate, "squeeze"):
+        try:
+            candidate = candidate.squeeze(0)
+        except Exception:
+            pass
+    if hasattr(candidate, "detach"):
+        try:
+            candidate = candidate.detach()
+        except Exception:
+            pass
+    if hasattr(candidate, "cpu"):
+        try:
+            candidate = candidate.cpu()
+        except Exception:
+            pass
+    if hasattr(candidate, "tolist"):
+        try:
+            candidate = candidate.tolist()
+        except Exception:
+            pass
+    if batch_size == 1:
+        if (
+            isinstance(candidate, list)
+            and candidate
+            and isinstance(candidate[0], (list, tuple))
+        ):
+            rows = candidate[:1]
+        else:
+            rows = [candidate]
+    else:
+        if not isinstance(candidate, list) or (
+            candidate and not isinstance(candidate[0], (list, tuple))
+        ):
+            raise TypeError("Tokenizer did not return batched rows")
+        rows = candidate[:batch_size]
+    return [[int(token) for token in row] for row in rows]
+
+
+def _pad_token_ids_and_mask(
+    token_ids: Sequence[int],
+    *,
+    seq_len: int,
+    pad_id: int,
+) -> tuple[list[int], list[int]]:
+    raw_ids = [int(token) for token in token_ids[:seq_len]]
+    real_tokens = len(raw_ids)
+    if real_tokens < seq_len:
+        raw_ids.extend([pad_id] * (seq_len - real_tokens))
+    attention_mask = [1] * real_tokens
+    if real_tokens < seq_len:
+        attention_mask.extend([0] * (seq_len - real_tokens))
+    return raw_ids, attention_mask
+
+
+def _call_tokenizer_compat(tokenizer: Any, text_or_texts: Any, seq_len: int) -> Any:
+    option_sets = (
+        {
+            "truncation": True,
+            "padding": "max_length",
+            "max_length": seq_len,
+            "return_attention_mask": False,
+        },
+        {
+            "truncation": True,
+            "padding": "max_length",
+            "max_length": seq_len,
+        },
+        {
+            "truncation": True,
+            "max_length": seq_len,
+        },
+    )
+    for kwargs in option_sets:
+        try:
+            return _call_tokenizer(tokenizer, text_or_texts, **kwargs)
+        except TypeError:
+            continue
+    return _call_tokenizer(
+        tokenizer,
+        text_or_texts,
+        truncation=True,
+        max_length=seq_len,
+    )
+
+
+def _extract_padded_token_rows(
+    tokens: Any,
+    *,
+    batch_size: int,
+    seq_len: int,
+    pad_id: int,
+) -> tuple[list[list[int]], list[list[int]]]:
+    token_rows = _to_python_token_rows(tokens["input_ids"], batch_size=batch_size)
+    if len(token_rows) != batch_size:
+        raise ValueError("Tokenizer returned unexpected row count")
+
+    attention_value = tokens.get("attention_mask")
+    attention_rows = (
+        _to_python_token_rows(attention_value, batch_size=batch_size)
+        if attention_value is not None
+        else []
+    )
+
+    input_ids_list: list[list[int]] = []
+    attention_masks_list: list[list[int]] = []
+    for index, token_row in enumerate(token_rows):
+        padded_ids, inferred_mask = _pad_token_ids_and_mask(
+            token_row, seq_len=seq_len, pad_id=pad_id
+        )
+        if attention_rows:
+            mask_row = [int(mask) for mask in attention_rows[index][:seq_len]]
+            if len(mask_row) < seq_len:
+                mask_row.extend([0] * (seq_len - len(mask_row)))
+        elif len(token_row) < seq_len:
+            mask_row = inferred_mask
+        else:
+            mask_row = [1 if token != pad_id else 0 for token in padded_ids]
+        input_ids_list.append(padded_ids)
+        attention_masks_list.append(mask_row)
+    return input_ids_list, attention_masks_list
+
+
+def _encode_text_compat(tokenizer: Any, text: str, seq_len: int) -> list[int]:
+    try:
+        encoded = tokenizer.encode(
+            text,
+            truncation=True,
+            max_length=seq_len,
+            padding="max_length",
+        )
+    except TypeError:
+        encoded = tokenizer.encode(text, truncation=True, max_length=seq_len)
+    return [int(token) for token in encoded]
+
+
+def _tokenize_texts_padded(
+    texts: Sequence[str],
+    tokenizer: Any,
+    seq_len: int,
+    *,
+    positions: Sequence[int] | None = None,
+    warn_on_failure: bool = False,
+    batch_size: int = 128,
+) -> tuple[list[list[int]], list[list[int]], list[int]]:
+    if positions is None:
+        positions = list(range(len(texts)))
+    if len(texts) != len(positions):
+        raise ValueError("texts and positions must have matching lengths")
+
+    pad_id = int(getattr(tokenizer, "pad_token_id", 0) or 0)
+    input_ids_list: list[list[int]] = []
+    attention_masks_list: list[list[int]] = []
+    kept_positions: list[int] = []
+    use_batch_call = callable(tokenizer)
+    chunk_size = max(1, min(int(batch_size), len(texts) or 1))
+
+    for start in range(0, len(texts), chunk_size):
+        stop = min(start + chunk_size, len(texts))
+        chunk_texts = list(texts[start:stop])
+        chunk_positions = [int(pos) for pos in positions[start:stop]]
+        chunk_processed = False
+
+        if use_batch_call:
+            try:
+                batch_tokens = _call_tokenizer_compat(tokenizer, chunk_texts, seq_len)
+                chunk_input_ids, chunk_attention_masks = _extract_padded_token_rows(
+                    batch_tokens,
+                    batch_size=len(chunk_texts),
+                    seq_len=seq_len,
+                    pad_id=pad_id,
+                )
+                input_ids_list.extend(chunk_input_ids)
+                attention_masks_list.extend(chunk_attention_masks)
+                kept_positions.extend(chunk_positions)
+                chunk_processed = True
+            except Exception:
+                chunk_processed = False
+
+        if chunk_processed:
+            continue
+
+        for text, position in zip(chunk_texts, chunk_positions, strict=False):
+            try:
+                if hasattr(tokenizer, "encode"):
+                    input_ids, attention_mask = _pad_token_ids_and_mask(
+                        _encode_text_compat(tokenizer, text, seq_len),
+                        seq_len=seq_len,
+                        pad_id=pad_id,
+                    )
+                else:
+                    single_tokens = _call_tokenizer_compat(tokenizer, text, seq_len)
+                    token_rows, mask_rows = _extract_padded_token_rows(
+                        single_tokens,
+                        batch_size=1,
+                        seq_len=seq_len,
+                        pad_id=pad_id,
+                    )
+                    input_ids = token_rows[0]
+                    attention_mask = mask_rows[0]
+                input_ids_list.append(input_ids)
+                attention_masks_list.append(attention_mask)
+                kept_positions.append(position)
+            except Exception as exc:
+                if warn_on_failure:
+                    warnings.warn(
+                        f"Failed to tokenize sample {position}: {exc}",
+                        stacklevel=2,
+                    )
+
+    return input_ids_list, attention_masks_list, kept_positions
 
 
 class EvaluationWindow(NamedTuple):
@@ -81,6 +310,116 @@ class EvaluationWindow(NamedTuple):
             "indices": self.indices,
             "length": len(self.input_ids),
         }
+
+
+def _split_window_by_index(
+    window: EvaluationWindow, *, split_index: int
+) -> tuple[EvaluationWindow, EvaluationWindow]:
+    preview_input_ids: list[list[int]] = []
+    preview_attention_masks: list[list[int]] = []
+    preview_indices: list[int] = []
+    final_input_ids: list[list[int]] = []
+    final_attention_masks: list[list[int]] = []
+    final_indices: list[int] = []
+
+    for input_ids, attention_mask, index in zip(
+        window.input_ids,
+        window.attention_masks,
+        window.indices,
+        strict=False,
+    ):
+        if index < split_index:
+            preview_input_ids.append(input_ids)
+            preview_attention_masks.append(attention_mask)
+            preview_indices.append(index)
+        else:
+            final_input_ids.append(input_ids)
+            final_attention_masks.append(attention_mask)
+            final_indices.append(index)
+
+    return (
+        EvaluationWindow(preview_input_ids, preview_attention_masks, preview_indices),
+        EvaluationWindow(final_input_ids, final_attention_masks, final_indices),
+    )
+
+
+def _tokenize_combined_pairs(
+    pairs: Sequence[tuple[str, str]],
+    *,
+    tokenizer: Any,
+    seq_len: int,
+    positions: Sequence[int],
+) -> tuple[EvaluationWindow, list[list[int]]]:
+    source_texts = [src for src, _ in pairs]
+    target_texts = [tgt for _, tgt in pairs]
+    src_ids, src_masks, src_positions = _tokenize_texts_padded(
+        source_texts,
+        tokenizer,
+        seq_len,
+        positions=positions,
+    )
+    tgt_ids, tgt_masks, tgt_positions = _tokenize_texts_padded(
+        target_texts,
+        tokenizer,
+        seq_len,
+        positions=positions,
+    )
+    src_map = {
+        position: (input_ids, attention_mask)
+        for position, input_ids, attention_mask in zip(
+            src_positions, src_ids, src_masks, strict=False
+        )
+    }
+    tgt_map = {
+        position: [
+            int(token) if int(mask) else -100
+            for token, mask in zip(target_ids, target_mask, strict=False)
+        ]
+        for position, target_ids, target_mask in zip(
+            tgt_positions, tgt_ids, tgt_masks, strict=False
+        )
+    }
+    kept_positions = [
+        int(position)
+        for position in positions
+        if position in src_map and position in tgt_map
+    ]
+    window = EvaluationWindow(
+        [src_map[position][0] for position in kept_positions],
+        [src_map[position][1] for position in kept_positions],
+        kept_positions,
+    )
+    labels = [tgt_map[position] for position in kept_positions]
+    return window, labels
+
+
+def _split_labels_by_index(
+    labels: Sequence[list[int]],
+    indices: Sequence[int],
+    *,
+    split_index: int,
+) -> tuple[list[list[int]], list[list[int]]]:
+    preview_labels: list[list[int]] = []
+    final_labels: list[list[int]] = []
+    for index, label in zip(indices, labels, strict=False):
+        if index < split_index:
+            preview_labels.append(label)
+        else:
+            final_labels.append(label)
+    return preview_labels, final_labels
+
+
+def _local_files_signature(files: Sequence[Path]) -> tuple[tuple[str, int, int], ...]:
+    signature: list[tuple[str, int, int]] = []
+    for file_path in files:
+        try:
+            stat = file_path.stat()
+            signature.append(
+                (file_path.as_posix(), int(stat.st_mtime_ns), int(stat.st_size))
+            )
+        except OSError:
+            signature.append((file_path.as_posix(), -1, -1))
+    return tuple(signature)
 
 
 class DatasetProvider(Protocol):
@@ -211,14 +550,9 @@ class WikiText2Provider:
 
     def _validate_dependencies(self) -> None:
         """Check that required dependencies are available."""
-        if not HAS_DATASETS:
-            raise _DepErr(
-                code="E301",
-                message=(
-                    "DEPENDENCY-MISSING: datasets library required for WikiText-2 loading"
-                ),
-                details={"dependency": "datasets"},
-            )
+        _require_load_dataset(
+            "DEPENDENCY-MISSING: datasets library required for WikiText-2 loading"
+        )
 
     def estimate_capacity(
         self,
@@ -355,6 +689,9 @@ class WikiText2Provider:
 
         # Load dataset with size limit for efficiency
         dataset_slice = f"{split}[:{max_samples}]" if max_samples > 0 else split
+        load_dataset = _require_load_dataset(
+            "DEPENDENCY-MISSING: datasets library required for WikiText-2 loading"
+        )
         dataset = load_dataset(
             "wikitext",
             "wikitext-2-raw-v1",
@@ -756,50 +1093,32 @@ class WikiText2Provider:
         seq_len: int,
     ) -> list[tuple[int, list[int], list[int], int]]:
         """Tokenize samples and return raw sequences without logging."""
-        results: list[tuple[int, list[int], list[int], int]] = []
+        batch_texts: list[str] = []
+        batch_indices: list[int] = []
         for idx in indices:
             if idx >= len(texts):
                 continue
+            batch_indices.append(int(idx))
+            batch_texts.append(texts[idx])
 
-            text = texts[idx]
+        input_ids_list, attention_masks_list, valid_indices = _tokenize_texts_padded(
+            batch_texts,
+            tokenizer,
+            seq_len,
+            positions=batch_indices,
+            warn_on_failure=True,
+        )
 
-            try:
-                tokens = _call_tokenizer(
-                    tokenizer,
-                    text,
-                    truncation=True,
-                    padding="max_length",
-                    max_length=seq_len,
-                    return_tensors="pt" if HAS_TORCH else None,
-                )
-
-                if HAS_TORCH and hasattr(tokens["input_ids"], "squeeze"):
-                    input_ids = tokens["input_ids"].squeeze(0).tolist()
-                    attention_mask = (
-                        tokens.get(
-                            "attention_mask", torch.ones_like(tokens["input_ids"])
-                        )
-                        .squeeze(0)
-                        .tolist()
-                    )
-                else:
-                    input_ids = tokens["input_ids"]
-                    attention_mask = tokens.get("attention_mask", [1] * len(input_ids))
-
-                real_tokens = int(sum(attention_mask))
-                if real_tokens > 1:
-                    results.append(
-                        (
-                            idx,
-                            [int(token) for token in input_ids],
-                            [int(mask) for mask in attention_mask],
-                            real_tokens,
-                        )
-                    )
-
-            except Exception as e:
-                warnings.warn(f"Failed to tokenize sample {idx}: {e}", stacklevel=2)
-                continue
+        results: list[tuple[int, list[int], list[int], int]] = []
+        for idx, input_ids, attention_mask in zip(
+            valid_indices,
+            input_ids_list,
+            attention_masks_list,
+            strict=False,
+        ):
+            real_tokens = int(sum(attention_mask))
+            if real_tokens > 1:
+                results.append((idx, input_ids, attention_mask, real_tokens))
 
         return results
 
@@ -813,37 +1132,52 @@ class WikiText2Provider:
         pad_token = int(self._BYTE_NGRAM_PAD)
         alpha = float(self._BYTE_NGRAM_ALPHA)
         vocab_size = pad_token + 1
+        context_width = max(order - 1, 0)
+        context_modulus = vocab_size ** max(context_width - 1, 0)
 
-        context_counts: Counter[tuple[int, ...]] = Counter()
-        ngram_counts: Counter[tuple[int, ...]] = Counter()
-        sequences: list[list[int]] = []
+        def _initial_context_key() -> int:
+            key = 0
+            for _ in range(context_width):
+                key = (key * vocab_size) + pad_token
+            return key
+
+        def _next_context_key(current_key: int, token: int) -> int:
+            if context_width <= 0:
+                return 0
+            if context_width == 1:
+                return int(token)
+            return int((current_key % context_modulus) * vocab_size + int(token))
+
+        context_counts: Counter[int] = Counter()
+        ngram_counts: Counter[int] = Counter()
+        sequences: list[bytes] = []
         start_time = time.perf_counter()
 
         for candidate in candidates:
             text = candidate.get("text")
             if not isinstance(text, str):
                 text = ""
-            byte_values = list(text.encode("utf-8", errors="replace"))
-            tokens = ([pad_token] * (order - 1)) + byte_values
-            sequences.append(tokens)
-            for idx in range(order - 1, len(tokens)):
-                context = tuple(tokens[idx - order + 1 : idx])
-                ngram = context + (tokens[idx],)
-                context_counts[context] += 1
-                ngram_counts[ngram] += 1
+            byte_values = text.encode("utf-8", errors="replace")
+            sequences.append(byte_values)
+            context_key = _initial_context_key()
+            for token in byte_values:
+                context_counts[context_key] += 1
+                ngram_counts[(context_key * vocab_size) + int(token)] += 1
+                context_key = _next_context_key(context_key, int(token))
 
         total_tokens = 0
-        for candidate, tokens in zip(candidates, sequences, strict=False):
+        for candidate, byte_values in zip(candidates, sequences, strict=False):
             loss_sum = 0.0
             token_count = 0
-            for idx in range(order - 1, len(tokens)):
-                context = tuple(tokens[idx - order + 1 : idx])
-                ngram = context + (tokens[idx],)
-                context_count = context_counts.get(context, 0)
-                ngram_count = ngram_counts.get(ngram, 0)
+            context_key = _initial_context_key()
+            for token in byte_values:
+                context_count = context_counts.get(context_key, 0)
+                ngram_key = (context_key * vocab_size) + int(token)
+                ngram_count = ngram_counts.get(ngram_key, 0)
                 prob = (ngram_count + alpha) / (context_count + alpha * vocab_size)
                 loss_sum += -math.log(prob)
                 token_count += 1
+                context_key = _next_context_key(context_key, int(token))
             candidate["difficulty"] = loss_sum / max(token_count, 1)
             total_tokens += token_count
 
@@ -921,6 +1255,7 @@ class SyntheticProvider:
     def __init__(self, base_samples: list[str] | None = None):
         """Initialize with optional base text samples."""
         self.base_samples = base_samples or self._default_samples()
+        self._load_cache: dict[int, list[str]] = {}
 
     def _default_samples(self) -> list[str]:
         """Generate default synthetic text samples."""
@@ -970,6 +1305,10 @@ class SyntheticProvider:
         self, split: str = "validation", max_samples: int = 500, **kwargs
     ) -> list[str]:
         """Generate synthetic text samples."""
+        cached = self._load_cache.get(int(max_samples))
+        if cached is not None:
+            return cached
+
         # Expand base samples to meet requirement, preferring unique variations
         # to avoid duplicate-token windows (important for stratified pairing).
         expanded_samples: list[str] = []
@@ -986,6 +1325,7 @@ class SyntheticProvider:
             for base_text in self.base_samples:
                 expanded_samples.append(variation(base_text))
                 if len(expanded_samples) >= max_samples:
+                    self._load_cache[int(max_samples)] = expanded_samples
                     return expanded_samples
 
         # If callers request more than the unique combination space, keep
@@ -999,6 +1339,7 @@ class SyntheticProvider:
             )
             idx += 1
 
+        self._load_cache[int(max_samples)] = expanded_samples
         return expanded_samples
 
     def windows(
@@ -1014,56 +1355,47 @@ class SyntheticProvider:
     ) -> tuple[EvaluationWindow, EvaluationWindow]:
         """Create synthetic evaluation windows."""
         texts = self.load(split=split, max_samples=preview_n + final_n)
-
-        # Deterministic split
-        preview_texts = texts[:preview_n]
-        final_texts = texts[preview_n : preview_n + final_n]
-
-        # Create windows (simplified tokenization)
-        preview_window = self._simple_tokenize(
-            preview_texts, tokenizer, seq_len, list(range(preview_n))
+        total = min(len(texts), int(preview_n) + int(final_n))
+        combined_window = self._simple_tokenize(
+            texts[:total], tokenizer, seq_len, list(range(total))
         )
-        final_window = self._simple_tokenize(
-            final_texts, tokenizer, seq_len, list(range(preview_n, preview_n + final_n))
-        )
-
-        return preview_window, final_window
+        return _split_window_by_index(combined_window, split_index=preview_n)
 
     def _simple_tokenize(
         self, texts: list[str], tokenizer: Any, seq_len: int, indices: list[int]
     ) -> EvaluationWindow:
         """Simple tokenization for synthetic samples."""
-        input_ids_list = []
-        attention_masks_list = []
+        if callable(tokenizer) or hasattr(tokenizer, "encode"):
+            input_ids_list, attention_masks_list, valid_indices = (
+                _tokenize_texts_padded(
+                    texts,
+                    tokenizer,
+                    seq_len,
+                    positions=indices,
+                )
+            )
+            if input_ids_list:
+                return EvaluationWindow(
+                    input_ids=input_ids_list,
+                    attention_masks=attention_masks_list,
+                    indices=valid_indices,
+                )
 
-        for text in texts:
-            # Simple tokenization fallback
-            if hasattr(tokenizer, "encode"):
-                input_ids = tokenizer.encode(
-                    text, max_length=seq_len, truncation=True, padding="max_length"
-                )
-                attention_mask = (
-                    [
-                        1 if token_id != tokenizer.pad_token_id else 0
-                        for token_id in input_ids
-                    ]
-                    if hasattr(tokenizer, "pad_token_id")
-                    else [1] * len(input_ids)
-                )
-            else:
-                # Fallback for test scenarios
-                input_ids = list(range(1, min(seq_len + 1, 50))) + [0] * max(
-                    0, seq_len - 49
-                )
-                attention_mask = [1] * min(seq_len, 49) + [0] * max(0, seq_len - 49)
-
+        input_ids_list: list[list[int]] = []
+        attention_masks_list: list[list[int]] = []
+        for _text in texts:
+            # Fallback for lightweight test scenarios without tokenizer support.
+            input_ids = list(range(1, min(seq_len + 1, 50))) + [0] * max(
+                0, seq_len - 49
+            )
+            attention_mask = [1] * min(seq_len, 49) + [0] * max(0, seq_len - 49)
             input_ids_list.append(input_ids)
             attention_masks_list.append(attention_mask)
 
         return EvaluationWindow(
             input_ids=input_ids_list,
             attention_masks=attention_masks_list,
-            indices=indices,
+            indices=list(indices[: len(input_ids_list)]),
         )
 
     def info(self) -> dict[str, Any]:
@@ -1097,22 +1429,24 @@ class HFTextProvider:
         trust_remote_code: bool = False,
         max_samples: int = 2000,
     ):
-        if not HAS_DATASETS:
-            raise _DepErr(
-                code="E301",
-                message=(
-                    "DEPENDENCY-MISSING: datasets library required for hf_text provider"
-                ),
-                details={"dependency": "datasets"},
-            )
+        _require_load_dataset(
+            "DEPENDENCY-MISSING: datasets library required for hf_text provider"
+        )
         self.dataset_name = dataset_name or "wikitext"
         self.config_name = config_name or None
         self.text_field = text_field
         self.cache_dir = cache_dir
         self.trust_remote_code = bool(trust_remote_code)
         self.max_samples = int(max_samples)
+        self._texts_cache: dict[str, list[str]] = {}
 
     def load(self, split: str = "validation", **kwargs) -> list[str]:
+        cached = self._texts_cache.get(split)
+        if cached is not None:
+            return cached
+        load_dataset = _require_load_dataset(
+            "DEPENDENCY-MISSING: datasets library required for hf_text provider"
+        )
         ds = load_dataset(
             path=self.dataset_name,
             name=self.config_name,
@@ -1132,35 +1466,22 @@ class HFTextProvider:
                 count += 1
                 if count >= self.max_samples:
                     break
+        self._texts_cache[split] = texts
         return texts
 
     def _simple_tokenize(
         self, texts: list[str], tokenizer: Any, seq_len: int, indices: list[int]
     ) -> EvaluationWindow:
-        input_ids_list: list[list[int]] = []
-        attention_masks_list: list[list[int]] = []
-        for text in texts:
-            try:
-                if hasattr(tokenizer, "encode"):
-                    input_ids = tokenizer.encode(
-                        text, truncation=True, max_length=seq_len
-                    )
-                else:
-                    encoded = tokenizer(text, truncation=True, max_length=seq_len)
-                    input_ids = encoded["input_ids"]
-                # Pad if needed
-                pad_id = getattr(tokenizer, "pad_token_id", 0)
-                input_ids = (input_ids + [pad_id] * (seq_len - len(input_ids)))[
-                    :seq_len
-                ]
-                attn = [1 if tid != pad_id else 0 for tid in input_ids]
-                input_ids_list.append(input_ids)
-                attention_masks_list.append(attn)
-            except Exception:
-                # Skip bad rows
-                continue
+        input_ids_list, attention_masks_list, valid_indices = _tokenize_texts_padded(
+            texts,
+            tokenizer,
+            seq_len,
+            positions=indices,
+        )
         return EvaluationWindow(
-            input_ids_list, attention_masks_list, indices[: len(input_ids_list)]
+            input_ids_list,
+            attention_masks_list,
+            valid_indices,
         )
 
     def windows(
@@ -1185,15 +1506,14 @@ class HFTextProvider:
                 ),
             )
         # Deterministic selection: first N for preview, next N for final
-        preview_texts = texts[:preview_n]
-        final_texts = texts[preview_n : preview_n + final_n]
-        preview_window = self._simple_tokenize(
-            preview_texts, tokenizer, seq_len, list(range(preview_n))
+        total = min(len(texts), int(preview_n) + int(final_n))
+        combined_window = self._simple_tokenize(
+            texts[:total],
+            tokenizer,
+            seq_len,
+            list(range(total)),
         )
-        final_window = self._simple_tokenize(
-            final_texts, tokenizer, seq_len, list(range(preview_n, preview_n + final_n))
-        )
-        return preview_window, final_window
+        return _split_window_by_index(combined_window, split_index=preview_n)
 
     def estimate_capacity(
         self,
@@ -1237,14 +1557,9 @@ class HFSeq2SeqProvider:
         cache_dir: str | None = None,
         max_samples: int = 2000,
     ) -> None:
-        if not HAS_DATASETS:
-            raise _DepErr(
-                code="E301",
-                message=(
-                    "DEPENDENCY-MISSING: datasets library required for hf_seq2seq provider"
-                ),
-                details={"dependency": "datasets"},
-            )
+        _require_load_dataset(
+            "DEPENDENCY-MISSING: datasets library required for hf_seq2seq provider"
+        )
         self.dataset_name = dataset_name
         self.config_name = config_name
         self.src_field = src_field
@@ -1253,8 +1568,15 @@ class HFSeq2SeqProvider:
         self.max_samples = int(max_samples)
         self.last_preview_labels: list[list[int]] | None = None
         self.last_final_labels: list[list[int]] | None = None
+        self._pairs_cache: dict[str, list[tuple[str, str]]] = {}
 
     def _load_pairs(self, split: str) -> list[tuple[str, str]]:
+        cached = self._pairs_cache.get(split)
+        if cached is not None:
+            return cached
+        load_dataset = _require_load_dataset(
+            "DEPENDENCY-MISSING: datasets library required for hf_seq2seq provider"
+        )
         ds = load_dataset(
             path=self.dataset_name,
             name=self.config_name,
@@ -1276,6 +1598,7 @@ class HFSeq2SeqProvider:
                 count += 1
                 if count >= self.max_samples:
                     break
+        self._pairs_cache[split] = out
         return out
 
     def windows(
@@ -1300,45 +1623,23 @@ class HFSeq2SeqProvider:
         # Deterministic slicing
         prev_pairs = pairs[:preview_n]
         fin_pairs = pairs[preview_n : preview_n + final_n]
-
-        def _tok_src(src: str) -> list[int]:
-            ids = (
-                tokenizer.encode(src, truncation=True, max_length=seq_len)
-                if hasattr(tokenizer, "encode")
-                else tokenizer(src, truncation=True, max_length=seq_len)["input_ids"]
-            )
-            pad_id = getattr(tokenizer, "pad_token_id", 0)
-            return (ids + [pad_id] * (seq_len - len(ids)))[:seq_len]
-
-        def _tok_tgt(tgt: str) -> list[int]:
-            ids = (
-                tokenizer.encode(tgt, truncation=True, max_length=seq_len)
-                if hasattr(tokenizer, "encode")
-                else tokenizer(tgt, truncation=True, max_length=seq_len)["input_ids"]
-            )
-            # Use -100 for ignored positions to align with HF loss expectations
-            return (ids + [-100] * (seq_len - len(ids)))[:seq_len]
-
-        prev_ids = [_tok_src(s) for s, _ in prev_pairs]
-        prev_masks = [
-            [1 if t != getattr(tokenizer, "pad_token_id", 0) else 0 for t in seq]
-            for seq in prev_ids
-        ]
-        fin_ids = [_tok_src(s) for s, _ in fin_pairs]
-        fin_masks = [
-            [1 if t != getattr(tokenizer, "pad_token_id", 0) else 0 for t in seq]
-            for seq in fin_ids
-        ]
-
-        # Prepare labels
-        self.last_preview_labels = [_tok_tgt(t) for _, t in prev_pairs]
-        self.last_final_labels = [_tok_tgt(t) for _, t in fin_pairs]
-
-        preview_window = EvaluationWindow(
-            prev_ids, prev_masks, list(range(len(prev_ids)))
+        combined_pairs = prev_pairs + fin_pairs
+        combined_positions = list(range(len(prev_pairs))) + list(
+            range(preview_n, preview_n + len(fin_pairs))
         )
-        final_window = EvaluationWindow(
-            fin_ids, fin_masks, list(range(preview_n, preview_n + len(fin_ids)))
+        combined_window, combined_labels = _tokenize_combined_pairs(
+            combined_pairs,
+            tokenizer=tokenizer,
+            seq_len=seq_len,
+            positions=combined_positions,
+        )
+        preview_window, final_window = _split_window_by_index(
+            combined_window, split_index=preview_n
+        )
+        self.last_preview_labels, self.last_final_labels = _split_labels_by_index(
+            combined_labels,
+            combined_window.indices,
+            split_index=preview_n,
         )
         return preview_window, final_window
 
@@ -1391,6 +1692,7 @@ class LocalJSONLProvider:
         self.data_files = data_files
         self.text_field = text_field or "text"
         self.max_samples = int(max_samples)
+        self._load_cache: tuple[tuple[Any, ...], list[str]] | None = None
 
     def _resolve_files(self) -> list[Path]:
         files: list[Path] = []
@@ -1430,9 +1732,13 @@ class LocalJSONLProvider:
         return uniq
 
     def load(self, split: str = "validation", **kwargs) -> list[str]:
+        files = self._resolve_files()
+        cache_key = (_local_files_signature(files), self.text_field, self.max_samples)
+        if self._load_cache is not None and self._load_cache[0] == cache_key:
+            return self._load_cache[1]
         texts: list[str] = []
         count = 0
-        for fp in self._resolve_files():
+        for fp in files:
             try:
                 with fp.open("r", encoding="utf-8") as handle:
                     for line in handle:
@@ -1448,36 +1754,26 @@ class LocalJSONLProvider:
                             texts.append(val)
                             count += 1
                             if count >= self.max_samples:
+                                self._load_cache = (cache_key, texts)
                                 return texts
             except Exception:
                 continue
+        self._load_cache = (cache_key, texts)
         return texts
 
     def _simple_tokenize(
         self, texts: list[str], tokenizer: Any, seq_len: int, indices: list[int]
     ) -> EvaluationWindow:
-        input_ids_list: list[list[int]] = []
-        attention_masks_list: list[list[int]] = []
-        for text in texts:
-            try:
-                if hasattr(tokenizer, "encode"):
-                    input_ids = tokenizer.encode(
-                        text, truncation=True, max_length=seq_len
-                    )
-                else:
-                    encoded = tokenizer(text, truncation=True, max_length=seq_len)
-                    input_ids = encoded["input_ids"]
-                pad_id = getattr(tokenizer, "pad_token_id", 0)
-                input_ids = (input_ids + [pad_id] * (seq_len - len(input_ids)))[
-                    :seq_len
-                ]
-                attn = [1 if tid != pad_id else 0 for tid in input_ids]
-                input_ids_list.append(input_ids)
-                attention_masks_list.append(attn)
-            except Exception:
-                continue
+        input_ids_list, attention_masks_list, valid_indices = _tokenize_texts_padded(
+            texts,
+            tokenizer,
+            seq_len,
+            positions=indices,
+        )
         return EvaluationWindow(
-            input_ids_list, attention_masks_list, indices[: len(input_ids_list)]
+            input_ids_list,
+            attention_masks_list,
+            valid_indices,
         )
 
     def windows(
@@ -1499,18 +1795,14 @@ class LocalJSONLProvider:
                     "NO-SAMPLES: local_jsonl produced no samples; check file/path/data_files"
                 ),
             )
-        preview_texts = texts[:preview_n]
-        final_texts = texts[preview_n : preview_n + final_n]
-        preview_window = self._simple_tokenize(
-            preview_texts, tokenizer, seq_len, list(range(preview_n))
-        )
-        final_window = self._simple_tokenize(
-            final_texts,
+        total = min(len(texts), int(preview_n) + int(final_n))
+        combined_window = self._simple_tokenize(
+            texts[:total],
             tokenizer,
             seq_len,
-            list(range(preview_n, preview_n + final_n)),
+            list(range(total)),
         )
-        return preview_window, final_window
+        return _split_window_by_index(combined_window, split_index=preview_n)
 
     def estimate_capacity(
         self,
@@ -1561,6 +1853,7 @@ class LocalJSONLPairsProvider:
         self.max_samples = int(max_samples)
         self.last_preview_labels: list[list[int]] | None = None
         self.last_final_labels: list[list[int]] | None = None
+        self._pairs_cache: tuple[tuple[Any, ...], list[tuple[str, str]]] | None = None
 
     def _resolve_files(self) -> list[Path]:
         files: list[Path] = []
@@ -1597,9 +1890,18 @@ class LocalJSONLPairsProvider:
         return uniq
 
     def _load_pairs(self) -> list[tuple[str, str]]:
+        files = self._resolve_files()
+        cache_key = (
+            _local_files_signature(files),
+            self.src_field,
+            self.tgt_field,
+            self.max_samples,
+        )
+        if self._pairs_cache is not None and self._pairs_cache[0] == cache_key:
+            return self._pairs_cache[1]
         pairs: list[tuple[str, str]] = []
         count = 0
-        for fp in self._resolve_files():
+        for fp in files:
             try:
                 with fp.open("r", encoding="utf-8") as handle:
                     for line in handle:
@@ -1621,9 +1923,11 @@ class LocalJSONLPairsProvider:
                             pairs.append((src, tgt))
                             count += 1
                             if count >= self.max_samples:
+                                self._pairs_cache = (cache_key, pairs)
                                 return pairs
             except Exception:
                 continue
+        self._pairs_cache = (cache_key, pairs)
         return pairs
 
     def windows(
@@ -1644,37 +1948,23 @@ class LocalJSONLPairsProvider:
             )
         prev_pairs = pairs[:preview_n]
         fin_pairs = pairs[preview_n : preview_n + final_n]
-
-        pad_id = getattr(tokenizer, "pad_token_id", 0)
-
-        def _tok_src(src: str) -> list[int]:
-            ids = (
-                tokenizer.encode(src, truncation=True, max_length=seq_len)
-                if hasattr(tokenizer, "encode")
-                else tokenizer(src, truncation=True, max_length=seq_len)["input_ids"]
-            )
-            return (ids + [pad_id] * (seq_len - len(ids)))[:seq_len]
-
-        def _tok_tgt(tgt: str) -> list[int]:
-            ids = (
-                tokenizer.encode(tgt, truncation=True, max_length=seq_len)
-                if hasattr(tokenizer, "encode")
-                else tokenizer(tgt, truncation=True, max_length=seq_len)["input_ids"]
-            )
-            return (ids + [-100] * (seq_len - len(ids)))[:seq_len]
-
-        prev_ids = [_tok_src(s) for s, _ in prev_pairs]
-        fin_ids = [_tok_src(s) for s, _ in fin_pairs]
-        prev_masks = [[1 if t != pad_id else 0 for t in seq] for seq in prev_ids]
-        fin_masks = [[1 if t != pad_id else 0 for t in seq] for seq in fin_ids]
-        self.last_preview_labels = [_tok_tgt(t) for _, t in prev_pairs]
-        self.last_final_labels = [_tok_tgt(t) for _, t in fin_pairs]
-
-        preview_window = EvaluationWindow(
-            prev_ids, prev_masks, list(range(len(prev_ids)))
+        combined_pairs = prev_pairs + fin_pairs
+        combined_positions = list(range(len(prev_pairs))) + list(
+            range(preview_n, preview_n + len(fin_pairs))
         )
-        final_window = EvaluationWindow(
-            fin_ids, fin_masks, list(range(preview_n, preview_n + len(fin_ids)))
+        combined_window, combined_labels = _tokenize_combined_pairs(
+            combined_pairs,
+            tokenizer=tokenizer,
+            seq_len=seq_len,
+            positions=combined_positions,
+        )
+        preview_window, final_window = _split_window_by_index(
+            combined_window, split_index=preview_n
+        )
+        self.last_preview_labels, self.last_final_labels = _split_labels_by_index(
+            combined_labels,
+            combined_window.indices,
+            split_index=preview_n,
         )
         return preview_window, final_window
 

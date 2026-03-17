@@ -2,7 +2,11 @@ import types
 
 import torch.nn as nn
 
-from invarlock.guards.invariants import InvariantsGuard
+from invarlock.guards.invariants import (
+    InvariantsGuard,
+    _check_standard_invariants,
+    check_all_invariants,
+)
 
 
 class ModelBadParams(nn.Module):
@@ -62,3 +66,16 @@ def test_weight_tying_exception_path_returns_false_not_crash():
     wt = guard.baseline_checks.get("weight_tying")
     # Either not applicable (None) or False due to _is_tied exception path
     assert wt in (None, False)
+
+
+def test_check_standard_invariants_fail_closed_on_parameter_errors():
+    checks = _check_standard_invariants(ModelBadParams())
+    assert checks["parameter_count"]["passed"] is False
+    assert checks["no_nan_parameters"]["passed"] is False
+
+
+def test_check_all_invariants_rejects_missing_named_parameters() -> None:
+    outcome = check_all_invariants(object())
+    assert outcome.passed is False
+    assert outcome.action == "reject"
+    assert outcome.violations[0]["type"] == "structure_violation"

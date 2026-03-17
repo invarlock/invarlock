@@ -59,9 +59,13 @@ def prepare_guard(
     )
 
     try:
+        scoped_modules = guard._get_scoped_modules(model)
         guard.baseline_sigmas = guard._capture_sigmas(model, phase="prepare")
         guard.module_family_map = classify_model_families_fn(
-            model, scope=guard.scope, existing=guard.module_family_map
+            model,
+            scope=guard.scope,
+            existing=guard.module_family_map,
+            modules=scoped_modules,
         )
         if not guard.baseline_family_stats:
             guard.baseline_family_stats = compute_family_stats_fn(
@@ -83,9 +87,7 @@ def prepare_guard(
         guard.baseline_degeneracy = {}
         if bool((guard.degeneracy or {}).get("enabled")):
             eps = 1e-12
-            for name, module in model.named_modules():
-                if not guard._should_check_module(name, module):
-                    continue
+            for name, module in scoped_modules:
                 weight = getattr(module, "weight", None)
                 if not isinstance(weight, torch.Tensor) or weight.ndim != 2:
                     continue

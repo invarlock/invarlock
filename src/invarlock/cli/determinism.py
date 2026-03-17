@@ -18,10 +18,20 @@ import numpy as np
 
 from invarlock.model_utils import set_seed
 
-try:  # optional torch
-    import torch
-except Exception:  # pragma: no cover
-    torch = None  # type: ignore[assignment]
+_TORCH_UNSET = object()
+torch: Any = _TORCH_UNSET
+
+
+def _get_torch() -> Any:
+    global torch
+    if torch is _TORCH_UNSET:
+        try:
+            import torch as _torch
+        except Exception:  # pragma: no cover
+            torch = None
+        else:
+            torch = _torch
+    return None if torch is _TORCH_UNSET else torch
 
 
 _THREAD_ENV_VARS: tuple[str, ...] = (
@@ -87,6 +97,7 @@ def apply_determinism_preset(
         fallback = ":16:8"
         if "CUBLAS_WORKSPACE_CONFIG" not in os.environ:
             selected = preferred
+            torch = _get_torch()
             if torch is not None:
                 try:
                     mem_bytes = int(torch.cuda.get_device_properties(0).total_memory)
@@ -115,6 +126,7 @@ def apply_determinism_preset(
         seed_bundle["numpy"] = int(numpy_seed)
     except Exception:
         pass
+    torch = _get_torch()
     if torch is not None:
         try:
             seed_bundle["torch"] = int(torch.initial_seed())

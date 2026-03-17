@@ -7,25 +7,48 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
 
-AutoTokenizer: Any | None = None
+_TRANSFORMERS_UNSET = object()
+AutoTokenizer: Any = _TRANSFORMERS_UNSET
+_TOKENIZERS_UNSET = object()
+TokenizerImpl: Any = _TOKENIZERS_UNSET
 
-try:
-    from transformers import AutoTokenizer as _AutoTokenizer
-    from transformers.tokenization_utils_base import PreTrainedTokenizerBase
-except Exception:  # pragma: no cover - exercised only when transformers is absent
 
-    class PreTrainedTokenizerBase:  # type: ignore[no-redef]
-        """Lightweight stub used when transformers is not installed."""
+class PreTrainedTokenizerBase:
+    """Lightweight stub used when transformers is not installed."""
 
-        def __call__(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
-            raise RuntimeError(
-                "Tokenization requires the 'transformers' extra. "
-                "Install it with: pip install 'invarlock[adapters]'."
+    def __call__(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        raise RuntimeError(
+            "Tokenization requires the 'transformers' extra. "
+            "Install it with: pip install 'invarlock[adapters]'."
+        )
+
+
+def _ensure_transformers_tokenizer_support() -> Any:
+    global AutoTokenizer, PreTrainedTokenizerBase
+    if AutoTokenizer is _TRANSFORMERS_UNSET:
+        try:
+            from transformers import AutoTokenizer as _AutoTokenizer
+            from transformers.tokenization_utils_base import (
+                PreTrainedTokenizerBase as _PreTrainedTokenizerBase,
             )
+        except Exception:
+            AutoTokenizer = None
+        else:  # pragma: no cover - transformers optional
+            AutoTokenizer = _AutoTokenizer
+            PreTrainedTokenizerBase = _PreTrainedTokenizerBase
+    return AutoTokenizer
 
 
-else:  # pragma: no cover - transformers optional
-    AutoTokenizer = _AutoTokenizer
+def _ensure_tokenizers_support() -> Any:
+    global TokenizerImpl
+    if TokenizerImpl is _TOKENIZERS_UNSET:
+        try:
+            from tokenizers import Tokenizer as _TokenizerImpl
+        except Exception:
+            TokenizerImpl = None
+        else:  # pragma: no cover - tokenizers optional
+            TokenizerImpl = _TokenizerImpl
+    return None if TokenizerImpl is _TOKENIZERS_UNSET else TokenizerImpl
 
 
 TokenizerFactory = Callable[[], tuple[PreTrainedTokenizerBase, str]]
@@ -78,6 +101,280 @@ def _read_local_hf_config(model_id: str) -> dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 
+def _read_local_json_file(path: Path) -> dict[str, Any] | None:
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _load_local_tokenizer_metadata(model_dir: Path) -> dict[str, str | None]:
+    metadata: dict[str, str | None] = {
+        "bos_token": None,
+        "cls_token": None,
+        "eos_token": None,
+        "mask_token": None,
+        "pad_token": None,
+        "sep_token": None,
+        "unk_token": None,
+    }
+    for path in (
+        model_dir / "special_tokens_map.json",
+        model_dir / "tokenizer_config.json",
+    ):
+        data = _read_local_json_file(path)
+        if not isinstance(data, dict):
+            continue
+        for key in tuple(metadata):
+            value = data.get(key)
+            if isinstance(value, str) and value:
+                metadata[key] = value
+    return metadata
+
+
+class _LocalFastTokenizer(PreTrainedTokenizerBase):
+    """Lightweight wrapper around `tokenizers.Tokenizer` for local checkpoints."""
+
+    def __init__(
+        self,
+        *,
+        tokenizer: Any,
+        name_or_path: str,
+        special_tokens: dict[str, str | None],
+    ) -> None:
+        self._tokenizer = tokenizer
+        self._vocab = dict(tokenizer.get_vocab())
+        self.name_or_path = name_or_path
+        self.add_bos_token = False
+        self._special_tokens = dict(special_tokens)
+
+    def _token_to_id(self, token: str | None) -> int | None:
+        if not token:
+            return None
+        try:
+            token_id = self._tokenizer.token_to_id(token)
+        except Exception:
+            return None
+        return None if token_id is None else int(token_id)
+
+    @property
+    def bos_token(self) -> str | None:
+        return self._special_tokens.get("bos_token")
+
+    @bos_token.setter
+    def bos_token(self, value: str | None) -> None:
+        self._special_tokens["bos_token"] = value
+
+    @property
+    def bos_token_id(self) -> int | None:
+        return self._token_to_id(self.bos_token)
+
+    @property
+    def cls_token(self) -> str | None:
+        return self._special_tokens.get("cls_token")
+
+    @cls_token.setter
+    def cls_token(self, value: str | None) -> None:
+        self._special_tokens["cls_token"] = value
+
+    @property
+    def cls_token_id(self) -> int | None:
+        return self._token_to_id(self.cls_token)
+
+    @property
+    def eos_token(self) -> str | None:
+        return self._special_tokens.get("eos_token")
+
+    @eos_token.setter
+    def eos_token(self, value: str | None) -> None:
+        self._special_tokens["eos_token"] = value
+
+    @property
+    def eos_token_id(self) -> int | None:
+        return self._token_to_id(self.eos_token)
+
+    @property
+    def mask_token(self) -> str | None:
+        return self._special_tokens.get("mask_token")
+
+    @mask_token.setter
+    def mask_token(self, value: str | None) -> None:
+        self._special_tokens["mask_token"] = value
+
+    @property
+    def mask_token_id(self) -> int | None:
+        return self._token_to_id(self.mask_token)
+
+    @property
+    def pad_token(self) -> str | None:
+        return self._special_tokens.get("pad_token")
+
+    @pad_token.setter
+    def pad_token(self, value: str | None) -> None:
+        self._special_tokens["pad_token"] = value
+
+    @property
+    def pad_token_id(self) -> int | None:
+        return self._token_to_id(self.pad_token)
+
+    @property
+    def sep_token(self) -> str | None:
+        return self._special_tokens.get("sep_token")
+
+    @sep_token.setter
+    def sep_token(self, value: str | None) -> None:
+        self._special_tokens["sep_token"] = value
+
+    @property
+    def sep_token_id(self) -> int | None:
+        return self._token_to_id(self.sep_token)
+
+    @property
+    def unk_token(self) -> str | None:
+        return self._special_tokens.get("unk_token")
+
+    @unk_token.setter
+    def unk_token(self, value: str | None) -> None:
+        self._special_tokens["unk_token"] = value
+
+    @property
+    def unk_token_id(self) -> int | None:
+        return self._token_to_id(self.unk_token)
+
+    @property
+    def all_special_ids(self) -> list[int]:
+        ids: list[int] = []
+        for key in (
+            "bos_token",
+            "cls_token",
+            "eos_token",
+            "mask_token",
+            "pad_token",
+            "sep_token",
+            "unk_token",
+        ):
+            token_id = self._token_to_id(self._special_tokens.get(key))
+            if token_id is not None and token_id not in ids:
+                ids.append(token_id)
+        return ids
+
+    @property
+    def vocab_size(self) -> int:
+        return int(len(self._vocab))
+
+    @property
+    def vocab(self) -> dict[str, int]:
+        return self.get_vocab()
+
+    def get_vocab(self) -> dict[str, int]:
+        return dict(self._vocab)
+
+    def _prepare_ids(
+        self,
+        token_ids: list[int],
+        *,
+        truncation: bool,
+        max_length: int | None,
+        padding: str | bool | None,
+    ) -> tuple[list[int], list[int]]:
+        ids = [int(token) for token in token_ids]
+        bos_token_id = self.bos_token_id
+        if self.add_bos_token and bos_token_id is not None:
+            if not ids or ids[0] != bos_token_id:
+                ids = [bos_token_id, *ids]
+        if truncation and max_length is not None:
+            ids = ids[:max_length]
+        attention_mask = [1] * len(ids)
+        if padding == "max_length" and max_length is not None and len(ids) < max_length:
+            pad_token_id = int(self.pad_token_id or 0)
+            pad_count = max_length - len(ids)
+            ids.extend([pad_token_id] * pad_count)
+            attention_mask.extend([0] * pad_count)
+        return ids, attention_mask
+
+    def encode(
+        self,
+        text: str,
+        *,
+        truncation: bool = False,
+        max_length: int | None = None,
+        padding: str | bool | None = None,
+        **_: Any,
+    ) -> list[int]:
+        encoding = self._tokenizer.encode(text)
+        ids, _attention_mask = self._prepare_ids(
+            [int(token) for token in encoding.ids],
+            truncation=truncation,
+            max_length=max_length,
+            padding=padding,
+        )
+        return ids
+
+    def __call__(
+        self,
+        text_or_texts: str | list[str],
+        *,
+        truncation: bool = False,
+        padding: str | bool | None = None,
+        max_length: int | None = None,
+        return_attention_mask: bool = True,
+        **_: Any,
+    ) -> dict[str, Any]:
+        if isinstance(text_or_texts, str):
+            texts = [text_or_texts]
+            single = True
+        else:
+            texts = [str(text) for text in text_or_texts]
+            single = False
+        encodings = self._tokenizer.encode_batch(texts)
+        input_ids: list[list[int]] = []
+        attention_masks: list[list[int]] = []
+        for encoding in encodings:
+            ids, attention_mask = self._prepare_ids(
+                [int(token) for token in encoding.ids],
+                truncation=truncation,
+                max_length=max_length,
+                padding=padding,
+            )
+            input_ids.append(ids)
+            attention_masks.append(attention_mask)
+        result: dict[str, Any] = {
+            "input_ids": input_ids[0] if single else input_ids,
+        }
+        if return_attention_mask:
+            result["attention_mask"] = attention_masks[0] if single else attention_masks
+        return result
+
+
+def _load_local_fast_tokenizer(candidate: str) -> PreTrainedTokenizerBase | None:
+    try:
+        candidate_path = Path(candidate)
+    except Exception:
+        return None
+    tokenizer_path = candidate_path / "tokenizer.json"
+    if (
+        not candidate_path.exists()
+        or not candidate_path.is_dir()
+        or not tokenizer_path.exists()
+    ):
+        return None
+    tokenizer_impl = _ensure_tokenizers_support()
+    if tokenizer_impl is None:
+        return None
+    try:
+        tokenizer = tokenizer_impl.from_file(str(tokenizer_path))
+    except Exception:
+        return None
+    return _LocalFastTokenizer(
+        tokenizer=tokenizer,
+        name_or_path=str(candidate_path),
+        special_tokens=_load_local_tokenizer_metadata(candidate_path),
+    )
+
+
 def _tokenizer_candidates(model_id: str) -> list[str]:
     """Return ordered tokenizer identifiers tied to the requested model."""
 
@@ -109,16 +406,24 @@ def _load_tokenizer_for_model(
 ) -> PreTrainedTokenizerBase:
     """Load a tokenizer without falling back to unrelated model families."""
 
-    if AutoTokenizer is None:
+    candidates = _tokenizer_candidates(model_id)
+    for candidate in candidates:
+        tokenizer = _load_local_fast_tokenizer(candidate)
+        if tokenizer is not None:
+            return tokenizer
+
+    tokenizer_factory = _ensure_transformers_tokenizer_support()
+    if tokenizer_factory is None:
         raise RuntimeError(
             f"{family_label} tokenizers require the 'transformers' extra. "
             "Install it with: pip install 'invarlock[adapters]'."
         )
 
-    candidates = _tokenizer_candidates(model_id)
     for candidate in candidates:
         try:
-            tokenizer = AutoTokenizer.from_pretrained(candidate, local_files_only=True)
+            tokenizer = tokenizer_factory.from_pretrained(
+                candidate, local_files_only=True
+            )
             return cast("PreTrainedTokenizerBase", tokenizer)
         except Exception:
             continue
@@ -131,7 +436,7 @@ def _load_tokenizer_for_model(
         if candidate_path is not None and candidate_path.exists():
             continue
         try:
-            tokenizer = AutoTokenizer.from_pretrained(candidate)
+            tokenizer = tokenizer_factory.from_pretrained(candidate)
             return cast("PreTrainedTokenizerBase", tokenizer)
         except Exception:
             continue

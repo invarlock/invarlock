@@ -68,6 +68,7 @@ def capture_baseline_sigmas(
     *,
     should_process_module_fn: Any | None = None,
     compute_sigma_max_fn: Any = compute_sigma_max,
+    modules: list[tuple[str, Any]] | tuple[tuple[str, Any], ...] | None = None,
 ) -> dict[str, float]:
     """Capture baseline singular values for model layers."""
     if should_process_module_fn is None:
@@ -77,10 +78,14 @@ def capture_baseline_sigmas(
 
     try:
         baseline_sigmas = {}
-        for name, module in model.named_modules():
-            if should_process_module_fn(name, module, scope):
-                if hasattr(module, "weight") and module.weight.ndim == 2:
-                    baseline_sigmas[name] = compute_sigma_max_fn(module.weight)
+        module_iter = modules
+        if module_iter is None:
+            module_iter = tuple(model.named_modules())
+        for name, module in module_iter:
+            if not should_process_module_fn(name, module, scope):
+                continue
+            if hasattr(module, "weight") and module.weight.ndim == 2:
+                baseline_sigmas[name] = compute_sigma_max_fn(module.weight)
         return baseline_sigmas
     except Exception:
         return {}
@@ -92,6 +97,7 @@ def scan_model_gains(
     *,
     should_process_module_fn: Any | None = None,
     compute_sigma_max_fn: Any = compute_sigma_max,
+    modules: list[tuple[str, Any]] | tuple[tuple[str, Any], ...] | None = None,
 ) -> dict[str, Any]:
     """Scan model for gain values and spectral statistics."""
     if should_process_module_fn is None:
@@ -107,7 +113,10 @@ def scan_model_gains(
     }
 
     try:
-        for name, module in model.named_modules():
+        module_iter = modules
+        if module_iter is None:
+            module_iter = tuple(model.named_modules())
+        for name, module in module_iter:
             results["total_layers"] += 1
             if should_process_module_fn(name, module, scope):
                 if hasattr(module, "weight") and module.weight.ndim == 2:
@@ -164,9 +173,16 @@ def capture_sigmas(
     if init not in {"ones", "e0"}:
         init = "ones"
 
-    for name, module in model.named_modules():
-        if not guard._should_check_module(name, module):
-            continue
+    if hasattr(guard, "_get_scoped_modules"):
+        module_iter = guard._get_scoped_modules(model)
+    else:
+        module_iter = tuple(
+            (name, module)
+            for name, module in model.named_modules()
+            if guard._should_check_module(name, module)
+        )
+
+    for name, module in module_iter:
         weight = getattr(module, "weight", None)
         if not isinstance(weight, torch.Tensor) or weight.ndim != 2:
             continue

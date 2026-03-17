@@ -75,6 +75,12 @@ def test_accuracy_point_from_windows_handles_bad_policy_safely() -> None:
     assert acc == pytest.approx(0.5)
 
 
+def test_accuracy_point_from_windows_all_invalid_examples_returns_nan() -> None:
+    metric = _Accuracy()
+    acc = metric.point_from_windows(windows={"example_correct": [object(), "bad"]})
+    assert math.isnan(acc)
+
+
 def test_compute_primary_metric_from_report_empty_windows_returns_nan() -> None:
     payload = compute_primary_metric_from_report({}, kind="ppl_causal", baseline=None)
     assert math.isnan(payload["preview"])
@@ -135,3 +141,21 @@ def test_infer_binary_label_from_ids_handles_negative_tokens() -> None:
     # Deterministic parity path should not fail on ints
     label = infer_binary_label_from_ids([-1, 2, 3])
     assert label in {0, 1}
+
+
+def test_accuracy_accumulate_invalid_value_keeps_metric_empty() -> None:
+    metric = _Accuracy()
+    metric.accumulate(MetricContribution(value="bad"))
+    assert math.isnan(metric.finalize())
+
+
+def test_compute_primary_metric_accuracy_handles_non_dict_preview_window() -> None:
+    report = {
+        "evaluation_windows": {
+            "preview": "bad-window",
+            "final": {"input_ids": [[1, 2, 3], [4, 5, 6]]},
+        }
+    }
+    payload = compute_primary_metric_from_report(report, kind="accuracy")
+    assert math.isnan(payload["preview"])
+    assert 0.0 <= payload["final"] <= 1.0
