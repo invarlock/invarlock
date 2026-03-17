@@ -6,6 +6,7 @@ updates:
   # Python dependencies (pip)
   - package-ecosystem: "pip"
     directory: "/"
+    target-branch: "staging/next"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -43,6 +44,7 @@ updates:
   # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
+    target-branch: "staging/next"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -67,6 +69,7 @@ updates:
   # npm (for docs tooling: markdownlint, cspell, etc.)
   - package-ecosystem: "npm"
     directory: "/"
+    target-branch: "staging/next"
     schedule:
       interval: "monthly"
     open-pull-requests-limit: 3
