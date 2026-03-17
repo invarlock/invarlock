@@ -167,7 +167,7 @@ jobs:
 
     - name: Deploy to Netlify
       if: env.NETLIFY_AUTH_TOKEN != ''
-      uses: nwtgck/actions-netlify@dbedb29b68382c3d884447aa3968acec7af4fe73
+      uses: nwtgck/actions-netlify@4cbaf4c08f1a7bfa537d6113472ef4424e4eb654
       with:
         publish-dir: './site'
         production-branch: main
