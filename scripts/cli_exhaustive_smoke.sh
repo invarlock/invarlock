@@ -19,6 +19,30 @@ LOG_FILE="$(mktemp -t invarlock_cli_smoke.XXXXXX.log)"
 echo "[info] $(ts) CLI runner: $CLI" | tee -a "$LOG_FILE"
 echo "[info] $(ts) Log file: $LOG_FILE"
 
+ensure_writable_hf_cache() {
+  local candidate_root=""
+  if [[ -n "${HF_HOME:-}" ]]; then
+    candidate_root="${HF_HOME}"
+  else
+    candidate_root="${HOME}/.cache/huggingface"
+  fi
+
+  local probe_dir="${HF_DATASETS_CACHE:-${candidate_root}/datasets}"
+  if mkdir -p "$probe_dir" >/dev/null 2>&1 && touch "$probe_dir/.ivl_smoke_probe" >/dev/null 2>&1; then
+    rm -f "$probe_dir/.ivl_smoke_probe" >/dev/null 2>&1 || true
+    return
+  fi
+
+  local smoke_cache_root
+  smoke_cache_root="$(mktemp -d -t invarlock_cli_hf_cache.XXXXXX)"
+  export HF_HOME="$smoke_cache_root"
+  export HF_DATASETS_CACHE="$smoke_cache_root/datasets"
+  mkdir -p "$HF_DATASETS_CACHE"
+  echo "[info] $(ts) Falling back to writable HF cache: $smoke_cache_root" | tee -a "$LOG_FILE"
+}
+
+ensure_writable_hf_cache
+
 # Run a single command string via bash -lc, capturing stdout+stderr and exit code.
 run() {
   local label="$1"
