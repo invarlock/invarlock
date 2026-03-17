@@ -30,6 +30,10 @@ import torch.nn as nn
 
 from invarlock.core.error_utils import wrap_errors
 from invarlock.core.exceptions import MetricsError, ValidationError
+from invarlock.utils.bootstrap import (
+    bootstrap_statistics,
+    percentile_interval_from_statistics,
+)
 
 # ── Enhanced logging setup ─────────────────────────────────────────────────
 logger = logging.getLogger(__name__)
@@ -139,13 +143,13 @@ def bootstrap_confidence_interval(
 
     with wrap_errors(MetricsError, "E401", "METRICS-COMPUTE-FAILED"):
         rng = random_state or np.random.default_rng()
-        stats = np.empty(n_bootstrap, dtype=float)
-        for i in range(n_bootstrap):
-            indices = rng.integers(0, data.size, size=data.size)
-            stats[i] = statistic(data[indices])
-
-        lower = float(np.percentile(stats, 100 * (alpha / 2)))
-        upper = float(np.percentile(stats, 100 * (1 - alpha / 2)))
+        stats = bootstrap_statistics(
+            data,
+            n_bootstrap=int(n_bootstrap),
+            random_state=rng,
+            statistic=statistic,
+        )
+        lower, upper = percentile_interval_from_statistics(stats, alpha=alpha)
         return lower, upper
 
 
@@ -1936,7 +1940,7 @@ def measure_latency(
         return 0.0
 
     # Warmup
-    with torch.no_grad():
+    with torch.inference_mode():
         for _ in range(warmup_steps):
             try:
                 _ = _call_model(
@@ -1953,9 +1957,9 @@ def measure_latency(
         torch.cuda.synchronize()
 
     # Measure latency
-    start_time = time.time()
+    start_time = time.perf_counter()
 
-    with torch.no_grad():
+    with torch.inference_mode():
         for _ in range(measurement_steps):
             _ = _call_model(
                 model,
@@ -1966,7 +1970,7 @@ def measure_latency(
     if device.type == "cuda":
         torch.cuda.synchronize()
 
-    end_time = time.time()
+    end_time = time.perf_counter()
 
     # Calculate per-token latency
     total_time_ms = (end_time - start_time) * 1000  # Convert to milliseconds
@@ -2021,7 +2025,7 @@ def measure_memory(
     # Run inference on a few samples to measure memory
     max_memory = baseline_memory
 
-    with torch.no_grad():
+    with torch.inference_mode():
         for i, (input_ids, attention_mask) in enumerate(
             zip(window.input_ids, window.attention_masks, strict=False)
         ):

@@ -178,6 +178,15 @@ class Histogram:
         # Use RLock to allow nested acquisitions when get_stats calls get_percentile
         self._lock = threading.RLock()
 
+    @staticmethod
+    def _percentile_from_sorted(
+        sorted_observations: list[float], percentile: float
+    ) -> float:
+        if not sorted_observations:
+            return 0.0
+        index = int(len(sorted_observations) * percentile / 100)
+        return float(sorted_observations[min(index, len(sorted_observations) - 1)])
+
     def observe(self, value: float, labels: dict[str, str] | None = None):
         """Observe a value."""
         labels = labels or {}
@@ -213,8 +222,7 @@ class Histogram:
                 return 0.0
 
             sorted_obs = sorted(observations)
-            index = int(len(sorted_obs) * percentile / 100)
-            return float(sorted_obs[min(index, len(sorted_obs) - 1)])
+            return self._percentile_from_sorted(sorted_obs, percentile)
 
     def get_stats(self, labels: dict[str, str] | None = None) -> dict[str, float]:
         """Get histogram statistics."""
@@ -228,17 +236,18 @@ class Histogram:
 
             count = self._count[label_key]
             total = self._sum[label_key]
+            sorted_obs = sorted(observations)
 
             return {
                 "count": count,
                 "sum": total,
                 "mean": total / count if count > 0 else 0,
-                "min": min(observations),
-                "max": max(observations),
-                "p50": self.get_percentile(50, labels),
-                "p90": self.get_percentile(90, labels),
-                "p95": self.get_percentile(95, labels),
-                "p99": self.get_percentile(99, labels),
+                "min": float(sorted_obs[0]),
+                "max": float(sorted_obs[-1]),
+                "p50": self._percentile_from_sorted(sorted_obs, 50),
+                "p90": self._percentile_from_sorted(sorted_obs, 90),
+                "p95": self._percentile_from_sorted(sorted_obs, 95),
+                "p99": self._percentile_from_sorted(sorted_obs, 99),
             }
 
     def get_buckets(self, labels: dict[str, str] | None = None) -> dict[float, int]:

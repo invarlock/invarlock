@@ -288,20 +288,14 @@ class InvariantsGuard(Guard):
         except Exception:
             checks["parameter_count"] = -1
 
-        # Record LayerNorm module paths for later comparison
         layer_norm_paths: list[str] = []
+        embedding_vocab_sizes: dict[str, int] = {}
+        structure_items: list[str] = []
         try:
             for name, module in model.named_modules():
+                structure_items.append(f"{name}:{type(module).__name__}")
                 if isinstance(module, nn.LayerNorm):
                     layer_norm_paths.append(name)
-        except Exception:
-            layer_norm_paths = []
-        checks["layer_norm_paths"] = tuple(layer_norm_paths)
-
-        # Capture embedding vocab sizes (num_embeddings) for tokenizer alignment
-        embedding_vocab_sizes: dict[str, int] = {}
-        try:
-            for name, module in model.named_modules():
                 if isinstance(module, nn.Embedding):
                     try:
                         embedding_vocab_sizes[name] = int(module.num_embeddings)
@@ -310,7 +304,10 @@ class InvariantsGuard(Guard):
                         if getattr(weight, "shape", None):
                             embedding_vocab_sizes[name] = int(weight.shape[0])
         except Exception:
+            layer_norm_paths = []
             embedding_vocab_sizes = {}
+            structure_items = []
+        checks["layer_norm_paths"] = tuple(layer_norm_paths)
         if embedding_vocab_sizes:
             checks["embedding_vocab_sizes"] = embedding_vocab_sizes
 
@@ -380,9 +377,6 @@ class InvariantsGuard(Guard):
 
         # Check model structure hash (basic)
         try:
-            structure_items = []
-            for name, module in model.named_modules():
-                structure_items.append(f"{name}:{type(module).__name__}")
             canonical = "\n".join(sorted(structure_items))
             checks["structure_hash"] = hashlib.sha256(
                 canonical.encode("utf-8")

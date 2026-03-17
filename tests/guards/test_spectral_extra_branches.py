@@ -7,6 +7,20 @@ import invarlock.guards.spectral_measurement as spectral_measurement
 import invarlock.guards.spectral_policy as spectral_policy
 
 
+class _TinyModel:
+    def __init__(self, modules: dict[str, torch.nn.Module]) -> None:
+        self._modules = modules
+
+    def named_modules(self):
+        yield from self._modules.items()
+
+
+class _TinyWeightModule(torch.nn.Module):
+    def __init__(self, weight: torch.Tensor) -> None:
+        super().__init__()
+        self.weight = weight
+
+
 def test_normalize_family_caps_numeric_and_default_false():
     # Numeric shorthand becomes mapping with kappa
     caps = spectral_policy.normalize_family_caps({"ffn": 3.3})
@@ -258,3 +272,70 @@ def test_classify_module_family_moe_and_module_type_branches() -> None:
     assert (
         spectral_detection.should_process_module("any.name", m, "unknown-scope") is True
     )
+
+
+def test_classify_module_family_uses_embedding_module_type_without_name_hint() -> None:
+    assert (
+        spectral_detection.classify_module_family("plain.module", torch.nn.Embedding(2, 2))
+        == "embed"
+    )
+
+
+def test_detect_spectral_violations_uses_default_kappa_and_degeneracy_defaults() -> None:
+    guard = spectral_guard.SpectralGuard(scope="all", correction_enabled=False)
+    guard.deadband = 0.0
+    guard.ignore_preview_inflation = False
+    guard.prepared = True
+    guard.baseline_sigmas = {"plain.linear": 1.0}
+    guard.baseline_family_stats = {"other": {"mean": 0.0, "std": 1.0}}
+    guard.module_family_map = {"plain.linear": "other"}
+    guard.family_caps = {"other": {"kappa": "bad"}}
+    guard.target_sigma = 1.0
+    guard.degeneracy = {
+        "enabled": True,
+        "stable_rank": {"warn_ratio": "bad"},
+    }
+    guard.baseline_degeneracy = {"plain.linear": {"stable_rank": 10.0}}
+
+    model = _TinyModel({"plain.linear": _TinyWeightModule(torch.eye(2))})
+    violations = guard._detect_spectral_violations(
+        model,
+        metrics={"plain.linear": 1.0},
+        phase="finalize",
+    )
+
+    assert any(v["type"] == "degeneracy_stable_rank_drop" for v in violations)
+
+
+def test_detect_spectral_violations_logs_module_errors() -> None:
+    guard = spectral_guard.SpectralGuard(scope="all", correction_enabled=False)
+    guard.deadband = 0.0
+    guard.ignore_preview_inflation = False
+    guard.prepared = True
+    guard.baseline_sigmas = {}
+    guard.baseline_family_stats = {}
+    guard.module_family_map = {}
+    guard.family_caps = {}
+    guard.target_sigma = 1.0
+    guard.degeneracy = {}
+    guard.baseline_degeneracy = {}
+
+    events: list[tuple[str, dict[str, object]]] = []
+
+    def _log_event(operation: str, **kwargs: object) -> None:
+        events.append((operation, kwargs))
+
+    guard._log_event = _log_event  # type: ignore[method-assign]
+
+    model = _TinyModel({"plain.linear": _TinyWeightModule(torch.eye(2))})
+    violations = spectral_detection.detect_spectral_violations(
+        guard,
+        model,
+        metrics={},
+        compute_sigma_max_fn=lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            RuntimeError("boom")
+        ),
+    )
+
+    assert violations == []
+    assert events and events[0][0] == "violation_check_error"

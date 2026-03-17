@@ -48,6 +48,14 @@ class OrderedGroup(TyperGroup):
             "version",
         ]
 
+    def get_command(self, ctx, cmd_name):  # type: ignore[override]
+        command = super().get_command(ctx, cmd_name)
+        if command is not None:
+            return command
+        if _load_lazy_subapp(self, cmd_name):
+            return super().get_command(ctx, cmd_name)
+        return None
+
 
 # Initialize CLI app
 app = typer.Typer(
@@ -228,30 +236,42 @@ def _evaluate_lazy(
 
 
 def _register_subapps() -> None:
-    # Import sub-apps lazily to keep module import light and satisfy E402
+    # Keep single-command registration light; group-style subapps are loaded on
+    # demand by OrderedGroup.get_command().
     from .commands.doctor import doctor_command as _doctor_cmd
-    from .commands.plugins import plugins_app as _plugins_app
-    from .commands.policy import policy_app as _policy_app
-    from .commands.report import report_app as _report_app
 
-    # Always-available subapps (lightweight imports)
-    app.add_typer(_report_app, name="report")
-    app.add_typer(_policy_app, name="policy")
-    app.add_typer(_plugins_app, name="plugins")
     app.command(name="doctor")(_doctor_cmd)
 
-    # Optional: calibration subapp. This transitively imports guards, which may
-    # depend on torch/transformers. In minimal environments (no heavy deps),
-    # skip registration so `python -m invarlock --help` stays import-safe.
-    try:
-        from .commands.calibrate import calibrate_app as _calibrate_app
-    except ModuleNotFoundError as exc:  # pragma: no cover - exercised in venv test
-        missing = getattr(exc, "name", "") or ""
-        if missing in {"torch", "transformers"}:
-            return
-        raise
-    else:
-        app.add_typer(_calibrate_app, name="calibrate")
+
+def _load_lazy_subapp(group: TyperGroup, name: str) -> bool:
+    def _register_lazy(name: str, subapp: typer.Typer) -> bool:
+        command = typer.main.get_command(subapp)
+        command.name = name
+        group.add_command(command, name=name)
+        return True
+
+    if name == "report":
+        from .commands.report import report_app as _report_app
+
+        return _register_lazy(name, _report_app)
+    if name == "policy":
+        from .commands.policy import policy_app as _policy_app
+
+        return _register_lazy(name, _policy_app)
+    if name == "plugins":
+        from .commands.plugins import plugins_app as _plugins_app
+
+        return _register_lazy(name, _plugins_app)
+    if name == "calibrate":
+        try:
+            from .commands.calibrate import calibrate_app as _calibrate_app
+        except ModuleNotFoundError as exc:  # pragma: no cover - exercised in venv test
+            missing = getattr(exc, "name", "") or ""
+            if missing in {"torch", "transformers"}:
+                return False
+            raise
+        return _register_lazy(name, _calibrate_app)
+    return False
 
 
 @app.command(

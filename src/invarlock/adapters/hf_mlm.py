@@ -14,10 +14,12 @@ from invarlock.core.api import ModelAdapter
 from invarlock.core.error_utils import wrap_errors
 from invarlock.core.exceptions import AdapterError, DependencyError, ModelLoadError
 
+from .hf_loading import resolve_core_loader_strategy
 from .hf_mixin import HFAdapterMixin
 
 TensorType = torch.Tensor
 ModuleType = nn.Module
+_ALLOW_DIRECT_SUBMODULE = False
 
 
 class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
@@ -54,32 +56,83 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
             "DEPENDENCY-MISSING: transformers",
             lambda e: {"dependency": "transformers"},
         ):
-            from transformers import AutoModel, AutoModelForMaskedLM  # type: ignore
+            strategy = resolve_core_loader_strategy(
+                task="mlm",
+                model_id=model_id,
+                kwargs=kwargs,
+                allow_direct_submodule=_ALLOW_DIRECT_SUBMODULE,
+            )
+            auto_strategy = resolve_core_loader_strategy(
+                task="mlm",
+                model_id=model_id,
+                kwargs=kwargs,
+                allow_direct_submodule=False,
+            )
+            fallback_strategy = resolve_core_loader_strategy(
+                task="mlm_base",
+                model_id=model_id,
+                kwargs=kwargs,
+                allow_direct_submodule=False,
+            )
 
         try:
+            self._last_loader_strategy = strategy.strategy
+            self._last_loader_label = strategy.loader_label
             with wrap_errors(
                 ModelLoadError,
                 "E201",
-                "MODEL-LOAD-FAILED: transformers AutoModelForMaskedLM",
+                f"MODEL-LOAD-FAILED: {strategy.loader_label}",
                 lambda e: {"model_id": model_id},
             ):
                 model = self._load_pretrained_model(
-                    AutoModelForMaskedLM,
+                    strategy.loader,
                     model_id,
                     **kwargs,
                 )
         except Exception:
-            with wrap_errors(
-                ModelLoadError,
-                "E201",
-                "MODEL-LOAD-FAILED: transformers AutoModel",
-                lambda e: {"model_id": model_id},
-            ):
-                model = self._load_pretrained_model(
-                    AutoModel,
-                    model_id,
-                    **kwargs,
-                )
+            if strategy.strategy != "auto":
+                try:
+                    self._last_loader_strategy = auto_strategy.strategy
+                    self._last_loader_label = auto_strategy.loader_label
+                    with wrap_errors(
+                        ModelLoadError,
+                        "E201",
+                        f"MODEL-LOAD-FAILED: {auto_strategy.loader_label}",
+                        lambda e: {"model_id": model_id},
+                    ):
+                        model = self._load_pretrained_model(
+                            auto_strategy.loader,
+                            model_id,
+                            **kwargs,
+                        )
+                except Exception:
+                    self._last_loader_strategy = fallback_strategy.strategy
+                    self._last_loader_label = fallback_strategy.loader_label
+                    with wrap_errors(
+                        ModelLoadError,
+                        "E201",
+                        f"MODEL-LOAD-FAILED: {fallback_strategy.loader_label}",
+                        lambda e: {"model_id": model_id},
+                    ):
+                        model = self._load_pretrained_model(
+                            fallback_strategy.loader,
+                            model_id,
+                            **kwargs,
+                        )
+            else:
+                self._last_loader_strategy = fallback_strategy.strategy
+                self._last_loader_label = fallback_strategy.loader_label
+                with wrap_errors(
+                    ModelLoadError,
+                    "E201",
+                    f"MODEL-LOAD-FAILED: {fallback_strategy.loader_label}",
+                    lambda e: {"model_id": model_id},
+                ):
+                    model = self._load_pretrained_model(
+                        fallback_strategy.loader,
+                        model_id,
+                        **kwargs,
+                    )
 
         return self._safe_to_device(model, device)
 

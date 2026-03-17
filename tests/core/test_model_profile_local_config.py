@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 import invarlock.model_profile as mp
 
 
@@ -103,3 +105,87 @@ def test_resolve_tokenizer_uses_same_origin_fallback_for_local_checkpoint(
         (str(model_dir), True),
         ("mistralai/Mistral-7B-v0.1", True),
     ]
+
+
+def test_resolve_tokenizer_uses_local_tokenizer_json_fast_path(
+    monkeypatch, tmp_path: Path
+) -> None:
+    tokenizers = pytest.importorskip("tokenizers")
+
+    model_dir = tmp_path / "local-fast-gpt2"
+    model_dir.mkdir()
+    (model_dir / "config.json").write_text(
+        json.dumps(
+            {
+                "model_type": "gpt2",
+                "architectures": ["GPT2LMHeadModel"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (model_dir / "tokenizer_config.json").write_text(
+        json.dumps(
+            {
+                "bos_token": "[BOS]",
+                "eos_token": "[EOS]",
+                "pad_token": "[PAD]",
+                "unk_token": "[UNK]",
+                "tokenizer_class": "PreTrainedTokenizerFast",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (model_dir / "special_tokens_map.json").write_text(
+        json.dumps(
+            {
+                "bos_token": "[BOS]",
+                "eos_token": "[EOS]",
+                "pad_token": "[PAD]",
+                "unk_token": "[UNK]",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    tokenizer = tokenizers.Tokenizer(
+        tokenizers.models.WordLevel(
+            {
+                "[PAD]": 0,
+                "[UNK]": 1,
+                "[BOS]": 2,
+                "[EOS]": 3,
+                "hello": 4,
+                "world": 5,
+            },
+            unk_token="[UNK]",
+        )
+    )
+    tokenizer.pre_tokenizer = tokenizers.pre_tokenizers.Whitespace()
+    tokenizer.save(str(model_dir / "tokenizer.json"))
+
+    def _unexpected_transformers() -> None:
+        raise AssertionError("transformers tokenizer path should not be used")
+
+    monkeypatch.setattr(
+        mp,
+        "_ensure_transformers_tokenizer_support",
+        _unexpected_transformers,
+    )
+
+    profile = mp.detect_model_profile(str(model_dir), adapter="hf_causal")
+    resolved, hash_value = mp.resolve_tokenizer(profile)
+    encoded = resolved(
+        "hello world",
+        truncation=True,
+        padding="max_length",
+        max_length=6,
+    )
+
+    assert resolved.name_or_path == str(model_dir)
+    assert resolved.pad_token == "[PAD]"
+    assert resolved.pad_token_id == 0
+    assert resolved.eos_token == "[EOS]"
+    assert isinstance(hash_value, str) and hash_value
+    assert len(encoded["input_ids"]) == 6
+    assert encoded["input_ids"][:2] == [4, 5]
+    assert encoded["attention_mask"] == [1, 1, 0, 0, 0, 0]

@@ -9,6 +9,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from invarlock.utils.bootstrap import (
+    bootstrap_mean_statistics,
+    percentile_interval_from_statistics,
+)
+
 from .variance_types import CalibrationBatchContext
 
 
@@ -297,13 +302,12 @@ def bootstrap_mean_ci(
         raise ValueError("Cannot compute CI on empty samples")
     data = np.asarray(samples, dtype=float)
     rng = np.random.default_rng(seed)
-    stats = np.empty(n_bootstrap, dtype=float)
-    for index in range(n_bootstrap):
-        indices = rng.integers(0, data.size, size=data.size)
-        stats[index] = float(np.mean(data[indices]))
-    lower = float(np.percentile(stats, 100 * (alpha / 2)))
-    upper = float(np.percentile(stats, 100 * (1 - alpha / 2)))
-    return lower, upper
+    stats = bootstrap_mean_statistics(
+        data,
+        n_bootstrap=int(n_bootstrap),
+        random_state=rng,
+    )
+    return percentile_interval_from_statistics(stats, alpha=alpha)
 
 
 __all__ = [
