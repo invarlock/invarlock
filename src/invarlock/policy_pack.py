@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -7,7 +8,6 @@ from typing import Any
 import yaml
 
 from invarlock.public_contracts import load_policy_pack_schema
-from invarlock.reporting.policy_utils import _compute_policy_digest
 
 try:  # pragma: no cover - exercised in integration/tests
     import jsonschema
@@ -44,6 +44,11 @@ def _normalize_overrides(overrides: Any) -> list[dict[str, Any]]:
     return [{"value": overrides}]
 
 
+def _compute_policy_pack_digest(policy: dict[str, Any]) -> str:
+    canonical = json.dumps(policy, sort_keys=True, default=str)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
+
+
 def compute_policy_pack_digest(
     *, resolved_policy: dict[str, Any], overrides: list[dict[str, Any]]
 ) -> str:
@@ -51,7 +56,7 @@ def compute_policy_pack_digest(
         "resolved_policy": resolved_policy,
         "overrides": overrides,
     }
-    return _compute_policy_digest(digest_payload)
+    return _compute_policy_pack_digest(digest_payload)
 
 
 def build_policy_pack(
