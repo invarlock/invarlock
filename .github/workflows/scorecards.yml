@@ -2,7 +2,8 @@ name: OpenSSF Scorecard
 
 on:
   push:
-    branches: [ main, staging/next ]
+    # scorecard-action only supports push/schedule on the default branch.
+    branches: [ main ]
   branch_protection_rule:
   schedule:
     - cron: '18 4 * * 1'

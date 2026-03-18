@@ -17,11 +17,15 @@ except Exception:  # pragma: no cover
 POLICY_PACK_FORMAT = "policy-pack-v1"
 
 
-def _load_structured_file(path: Path) -> Any:
-    text = path.read_text(encoding="utf-8")
-    if path.suffix.lower() in {".yaml", ".yml"}:
+def _load_structured_text(text: str, *, suffix: str) -> Any:
+    if suffix.lower() in {".yaml", ".yml"}:
         return yaml.safe_load(text)
     return json.loads(text)
+
+
+def _load_structured_file(path: Path) -> Any:
+    text = path.read_text(encoding="utf-8")
+    return _load_structured_text(text, suffix=path.suffix)
 
 
 def _normalize_overrides(overrides: Any) -> list[dict[str, Any]]:
