@@ -29,6 +29,7 @@ nav:
       - Reports: reference/reports.md
       - Environment Variables: reference/env-vars.md
       - Model Adapters: reference/model-adapters.md
+      - Model Family Catalog: reference/model-family-catalog.md
       - Public Contracts: reference/contracts.md
       - Configuration Schema: reference/config-schema.md
       - Tier Policy Catalog: reference/tier-policy-catalog.md

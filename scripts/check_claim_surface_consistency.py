@@ -56,14 +56,23 @@ def main() -> int:
             "Mistral 7B",
             "Qwen2 7B",
             "pilot calibration configs",
+            "Model Family Catalog",
         ],
         "mkdocs.yml": [
+            "Model Family Catalog: reference/model-family-catalog.md",
             "Assurance Case: assurance/00-assurance-case.md",
             "Evaluation Math Derivation: assurance/01-eval-math-derivation.md",
         ],
         "README.md": ["docs/assurance/00-assurance-case.md"],
         "docs/user-guide/reading-report.md": ["Assurance Case"],
         "docs/reference/index.md": ["Assurance claims and derivations"],
+        "docs/reference/contracts.md": ["Model family catalog"],
+        "docs/reference/model-family-catalog.md": [
+            "support tier",
+            "coverage state",
+            "Declared Support",
+            "Recommended Additions",
+        ],
         "docs/assurance/00-assurance-case.md": [
             "assurance case",
             "assurance claims",

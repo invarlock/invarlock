@@ -20,6 +20,7 @@ from rich.table import Table
 from invarlock.public_contracts import (
     adapter_capability,
     contract_catalog,
+    load_model_family_catalog,
     load_support_matrix,
 )
 
@@ -80,6 +81,7 @@ def _emit_plugins_json(category: str, rows, extra: dict | None = None) -> None:
         "items": _sort_rows(rows),
         "contracts": contract_catalog(),
         "support_matrix": load_support_matrix(),
+        "model_family_catalog": load_model_family_catalog(),
     }
     if extra:
         payload.update(extra)
@@ -171,6 +173,7 @@ def plugins_command(
                     "discovery": "disabled",
                     "contracts": contract_catalog(),
                     "support_matrix": load_support_matrix(),
+                    "model_family_catalog": load_model_family_catalog(),
                 }
                 _sys.stdout.write(_json.dumps(payload) + "\n")
                 return

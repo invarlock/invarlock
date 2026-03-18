@@ -22,6 +22,7 @@ The public contract surface covers:
 | Contract | Path | Purpose |
 | --- | --- | --- |
 | Support matrix | `contracts/support_matrix.json` | Normalized support tiers and public evidence references |
+| Model family catalog | `contracts/model_family_catalog.json` | Broader inventory for declared support, code-level coverage, usage-only checkpoints, and recommended additions |
 | Adapter capabilities | `contracts/adapter_capabilities.json` | Snapshot/restore, guard coverage, runtime limits, extras |
 | Plugin compatibility | `contracts/plugin_compatibility.json` | Core ABI policy and failure mode |
 | Proof-pack manifest | `contracts/proof_pack_manifest.schema.json` | Portable pack manifest schema for `verify_pack.sh`, including builder/subject/material attestation fields |
@@ -49,6 +50,10 @@ The CLI exposes these contracts directly:
 The first five surfaces are available from installed packages. The proof-pack
 verifier remains repo-first because wheels do not ship `scripts/` or
 `contracts/`.
+
+For support-related automation, `plugins adapters --json` and `doctor --json`
+now expose both the strict `support_matrix` contract and the broader
+`model_family_catalog` contract.
 
 ## Policy packs
 

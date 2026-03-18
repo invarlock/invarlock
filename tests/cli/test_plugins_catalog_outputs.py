@@ -82,6 +82,12 @@ def test_plugins_discovery_disabled_json(monkeypatch, capsys):
     payload = json.loads(capsys.readouterr().out.strip())
     assert payload["discovery"] == "disabled"
     assert payload["items"] == []
+    assert payload["contracts"]["model_family_catalog"]["format_version"] == (
+        "model-family-catalog-v1"
+    )
+    assert payload["model_family_catalog"]["format_version"] == (
+        "model-family-catalog-v1"
+    )
 
 
 def test_plugins_adapters_json_with_optioninfo(monkeypatch, capsys):
@@ -168,6 +174,12 @@ def test_plugins_adapters_json_statuses(monkeypatch, capsys):
     )
     lines = capsys.readouterr().out.strip().splitlines()
     payload = json.loads(lines[-1])
+    assert payload["contracts"]["model_family_catalog"]["format_version"] == (
+        "model-family-catalog-v1"
+    )
+    assert payload["model_family_catalog"]["format_version"] == (
+        "model-family-catalog-v1"
+    )
     statuses = {item["name"]: item["status"] for item in payload["items"]}
     assert statuses["hf_auto"] == "ready"
     assert statuses["hf_gptq"] == "needs_extra"

@@ -22,6 +22,7 @@ from rich.table import Table
 from invarlock.public_contracts import (
     contract_catalog,
     load_adapter_capabilities,
+    load_model_family_catalog,
     load_plugin_compatibility,
     load_support_matrix,
 )
@@ -1359,6 +1360,7 @@ def doctor_command(
             },
             "contracts": contract_catalog(),
             "support_matrix": load_support_matrix(),
+            "model_family_catalog": load_model_family_catalog(),
             "adapter_capabilities": load_adapter_capabilities(),
             "plugin_compatibility": load_plugin_compatibility(),
             "policy": POLICY_META
