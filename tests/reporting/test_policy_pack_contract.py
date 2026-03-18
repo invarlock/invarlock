@@ -91,12 +91,12 @@ def test_policy_pack_load_yaml_and_normalize_override_shapes(tmp_path: Path) -> 
 
 
 def test_policy_pack_structured_text_loader_supports_json_and_yaml() -> None:
-    assert policy_pack_mod._load_structured_text('{"tier":"balanced"}', suffix=".json") == {
-        "tier": "balanced"
-    }
-    assert policy_pack_mod._load_structured_text("tier: balanced\n", suffix=".yaml") == {
-        "tier": "balanced"
-    }
+    assert policy_pack_mod._load_structured_text(
+        '{"tier":"balanced"}', suffix=".json"
+    ) == {"tier": "balanced"}
+    assert policy_pack_mod._load_structured_text(
+        "tier: balanced\n", suffix=".yaml"
+    ) == {"tier": "balanced"}
 
 
 def test_policy_pack_build_defaults_and_metadata() -> None:

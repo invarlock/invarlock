@@ -1,7 +1,10 @@
 #!/bin/bash -eu
 
 cd "$SRC/invarlock"
-python3 -m pip install .
+# ClusterFuzzLite's Python base image currently builds with Python 3.11.
+# Install the package for fuzzing even though the project metadata targets
+# the repo's supported runtime floor of Python 3.12+.
+python3 -m pip install --ignore-requires-python .
 
 for fuzzer in $(find "$SRC/invarlock/fuzzers" -name '*_fuzzer.py' | sort); do
   fuzzer_basename=$(basename -s .py "$fuzzer")
