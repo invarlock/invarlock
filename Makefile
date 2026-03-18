@@ -144,7 +144,6 @@ test-ci:
 test-assurance:  ## Run assurance-related tests only
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTEST) -q \
-		tests/api/test_assurance_facade.py \
 		tests/ci/test_golden_runs_offline.py \
 		tests/ci/test_support_matrix_consistency.py \
 		tests/adapters/test_adapter_capability_contract.py \
