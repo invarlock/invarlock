@@ -30,13 +30,6 @@ def bitsandbytes_runtime_available() -> bool:
     return _safe_import("bitsandbytes")
 
 
-def onnx_causal_runtime_available() -> bool:
-    """Return True when Optimum exposes ORTModelForCausalLM in this environment."""
-
-    return _safe_import("optimum.onnxruntime", "ORTModelForCausalLM")
-
-
 __all__ = [
     "bitsandbytes_runtime_available",
-    "onnx_causal_runtime_available",
 ]

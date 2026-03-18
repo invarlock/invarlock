@@ -148,13 +148,6 @@ class CoreRegistry:
         _fallback(
             self._adapters, "hf_seq2seq", "invarlock.adapters", "HF_Seq2Seq_Adapter"
         )
-        _fallback(
-            self._adapters,
-            "hf_causal_onnx",
-            "invarlock.adapters",
-            "HF_Causal_ONNX_Adapter",
-            required_deps=["optimum"],
-        )
         _fallback(self._adapters, "hf_auto", "invarlock.adapters", "HF_Auto_Adapter")
         # Optional plugin adapters (verify runtime dependencies)
         _fallback(

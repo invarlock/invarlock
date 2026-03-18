@@ -216,35 +216,6 @@ def test_plugins_adapters_json_bnb_ready_without_cuda_when_runtime_is_available(
         "version": "0.49.2",
     }
 
-
-def test_plugins_adapters_json_marks_onnx_runtime_incompatibility(monkeypatch, capsys):
-    adapters = {
-        "hf_causal_onnx": {
-            "module": "invarlock.adapters.hf_causal_onnx",
-            "entry_point": "HF_Causal_ONNX_Adapter",
-        }
-    }
-    _patch_registry(monkeypatch, adapters)
-    monkeypatch.setattr(
-        plugins_mod, "onnx_causal_runtime_available", lambda: False, raising=False
-    )
-    monkeypatch.setattr(
-        "invarlock.cli.provenance.extract_adapter_provenance",
-        lambda name: SimpleNamespace(library="onnxruntime", version="1.24.3"),
-        raising=False,
-    )
-
-    plugins_command(category="adapters", json_out=True, hide_unsupported=False)
-    payload = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
-    item = next(x for x in payload["items"] if x["name"] == "hf_causal_onnx")
-    assert item["status"] == "needs_extra"
-    assert item["backend"] == {
-        "name": "onnxruntime",
-        "present": True,
-        "version": "1.24.3",
-    }
-
-
 def test_plugins_adapters_json_marks_missing_backends_not_present(monkeypatch, capsys):
     adapters = {
         "hf_awq": {"module": "invarlock.plugins.awq", "entry_point": "awq"},

@@ -2,8 +2,7 @@
 Auto adapter resolution utilities.
 
 These helpers map a model identifier (HF directory or Hub ID) to a
-concrete built-in adapter name (hf_causal, hf_mlm, hf_seq2seq, hf_causal_onnx)
-without
+concrete built-in adapter name (hf_causal, hf_mlm, hf_seq2seq) without
 adding a hard dependency on Transformers.
 """
 
@@ -125,22 +124,6 @@ def resolve_auto_adapter(
         if "CausalLM" in arch_blob or "ForCausalLM" in arch_blob:
             return "hf_causal"
         return None
-
-    # If local directory contains ONNX model files, prefer the ONNX causal adapter.
-    try:
-        p = Path(model_id)
-        if p.exists() and p.is_dir():
-            # Common Optimum export names
-            onnx_files = [
-                "model.onnx",
-                "decoder_model.onnx",
-                "decoder_with_past_model.onnx",
-                "encoder_model.onnx",
-            ]
-            if any((p / fname).exists() for fname in onnx_files):
-                return "hf_causal_onnx"
-    except Exception:
-        pass
 
     if isinstance(cfg, dict):
         resolved = _from_cfg(cfg)

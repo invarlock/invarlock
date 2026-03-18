@@ -38,23 +38,6 @@
       "degraded_modes": []
     },
     {
-      "adapter": "hf_causal_onnx",
-      "snapshot_restore": "none",
-      "guard_coverage": "eval_only",
-      "platform_support": "all",
-      "runtime_constraints": [
-        "onnxruntime",
-        "optimum",
-        "transformers<5-compatible optimum stack"
-      ],
-      "required_extra": "onnx",
-      "degraded_modes": [
-        "no_edit_support",
-        "no_module_level_guards",
-        "requires_transformers4_compatible_onnx_stack"
-      ]
-    },
-    {
       "adapter": "hf_auto",
       "snapshot_restore": "delegated",
       "guard_coverage": "delegated",

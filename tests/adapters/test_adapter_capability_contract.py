@@ -28,7 +28,6 @@ def test_adapter_capabilities_contract_is_exposed_through_plugins_json() -> None
         "hf_causal",
         "hf_mlm",
         "hf_seq2seq",
-        "hf_causal_onnx",
         "hf_bnb",
         "hf_awq",
         "hf_gptq",

@@ -44,13 +44,6 @@ def test_plugins_uninstall_aliases():
     assert "Mode:" in out_gpu
     assert ("Result: ok" in out_gpu) or ("Result: skipped" in out_gpu)
 
-    # ONNX alias
-    result_onnx = runner.invoke(app, ["plugins", "uninstall", "onnx", "--dry-run"])
-    assert result_onnx.exit_code == 0, result_onnx.output
-    assert "onnxruntime" in result_onnx.output
-    assert "optimum" in result_onnx.output
-    assert "optimum-onnx" in result_onnx.output
-
 
 def test_plugins_uninstall_unknown():
     result = runner.invoke(app, ["plugins", "uninstall", "does_not_exist", "--dry-run"])

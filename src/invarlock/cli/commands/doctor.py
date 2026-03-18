@@ -27,10 +27,7 @@ from invarlock.public_contracts import (
     load_support_matrix,
 )
 
-from ..backend_runtime import (
-    bitsandbytes_runtime_available,
-    onnx_causal_runtime_available,
-)
+from ..backend_runtime import bitsandbytes_runtime_available
 from ..constants import DOCTOR_FORMAT_VERSION
 
 # Exact wording constant for determinism warning (kept in one place)
@@ -1111,13 +1108,6 @@ def doctor_command(
                         }.get(n)
                         if hint:
                             enable = f"pip install '{hint}'"
-                # Special-case: ONNX causal adapter is core but requires Optimum/ONNXRuntime
-                if n == "hf_causal_onnx":
-                    backend = backend or "onnxruntime"
-                    present = onnx_causal_runtime_available()
-                    if not present:
-                        status = "needs_extra"
-                        enable = "Use a transformers<5 env with 'invarlock[onnx]'"
                 # Platform checks
                 if backend in {"auto-gptq", "autoawq"} and not is_linux:
                     status = "unsupported"
@@ -1153,23 +1143,7 @@ def doctor_command(
             v = f"=={version}" if backend and version else "—"
             return b, v
 
-        # Build adapter rows; gracefully handle optional Optimum import errors by
-        # falling back to a lightweight rows helper that only probes availability.
-        try:
-            all_rows = _gather_adapter_rows()
-        except NON_FATAL_EXCEPTIONS as _adapter_exc:
-            # Known benign case: optional Optimum/ONNXRuntime missing on host
-            if "optimum" in str(_adapter_exc).lower():
-                try:
-                    from invarlock.cli.doctor_helpers import (
-                        get_adapter_rows as _rows_fallback,
-                    )
-
-                    all_rows = _rows_fallback()
-                except NON_FATAL_EXCEPTIONS:
-                    raise  # re-raise if fallback also fails
-            else:
-                raise
+        all_rows = _gather_adapter_rows()
         if all_rows:
             # Counts over full set
             total = len(all_rows)
@@ -1326,17 +1300,9 @@ def doctor_command(
         except NON_FATAL_EXCEPTIONS:
             pass
     except NON_FATAL_EXCEPTIONS as e:
-        # Gracefully handle missing optional Optimum stack
-        if "optimum" in str(e).lower():
-            if not json_out:
-                console.print(
-                    "  [yellow]⚠️  Optional Optimum/ONNXRuntime missing; hf_causal_onnx will be shown as needs_extra[/yellow]"
-                )
-            # Do not mark overall health as failed for optional extras
-        else:
-            if not json_out:
-                console.print(f"  [red]❌ Registry error: {e}[/red]")
-            health_status = False
+        if not json_out:
+            console.print(f"  [red]❌ Registry error: {e}[/red]")
+        health_status = False
 
     # Final status / JSON output
     exit_code = 0 if (health_status and not had_error) else 1

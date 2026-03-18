@@ -33,14 +33,12 @@ _LAZY_MAP = {
     "HF_Causal_Adapter": ".hf_causal",
     "HF_MLM_Adapter": ".hf_mlm",
     "HF_Seq2Seq_Adapter": ".hf_seq2seq",
-    "HF_Causal_ONNX_Adapter": ".hf_causal_onnx",
     "HF_Auto_Adapter": ".auto",
 }
 
 if TYPE_CHECKING:  # pragma: no cover - typing aid for lazy exports
     from .auto import HF_Auto_Adapter
     from .hf_causal import HF_Causal_Adapter
-    from .hf_causal_onnx import HF_Causal_ONNX_Adapter
     from .hf_mlm import HF_MLM_Adapter
     from .hf_seq2seq import HF_Seq2Seq_Adapter
 
@@ -100,7 +98,6 @@ __all__ = [
     "HF_Causal_Adapter",
     "HF_MLM_Adapter",
     "HF_Seq2Seq_Adapter",
-    "HF_Causal_ONNX_Adapter",
     "HF_Auto_Adapter",
     "BaseAdapter",
     "AdapterConfig",

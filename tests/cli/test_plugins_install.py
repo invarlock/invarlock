@@ -44,11 +44,7 @@ def test_plugins_install_alias_and_unknown():
     assert "Result: not-found" in bad.output
 
 
-def test_plugins_install_aliases_onnx_and_transformers():
-    result = runner.invoke(app, ["plugins", "install", "onnx", "--dry-run"])
-    assert result.exit_code == 0, result.output
-    assert "invarlock[onnx]" in result.output
-
+def test_plugins_install_aliases_transformers():
     adapters = runner.invoke(app, ["plugins", "install", "transformers", "--dry-run"])
     assert adapters.exit_code == 0, adapters.output
     assert "invarlock[adapters]" in adapters.output

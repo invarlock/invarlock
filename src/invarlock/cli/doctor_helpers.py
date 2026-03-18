@@ -3,17 +3,13 @@ from __future__ import annotations
 import platform as _platform
 from typing import Any
 
-from .backend_runtime import (
-    bitsandbytes_runtime_available,
-    onnx_causal_runtime_available,
-)
+from .backend_runtime import bitsandbytes_runtime_available
 
 
 def get_adapter_rows() -> list[dict[str, Any]]:
     """Build adapter rows similar to doctor output for testing.
 
-    Applies optional-extra detection for hf_causal_onnx (optimum/onnxruntime) even if
-    registered as a core adapter, so missing extras are surfaced.
+    Mirrors doctor adapter output without importing heavy optional backends.
     """
     from invarlock.core.registry import get_registry
 
@@ -48,12 +44,6 @@ def get_adapter_rows() -> list[dict[str, Any]]:
                     "unsupported",
                     "Requires CUDA or a compatible bitsandbytes runtime",
                 )
-        elif name == "hf_causal_onnx":
-            backend = "onnxruntime"
-            present = onnx_causal_runtime_available()
-            if not present:
-                status = "needs_extra"
-                enable = "Use a transformers<5 env with 'invarlock[onnx]'"
 
         rows.append(
             {

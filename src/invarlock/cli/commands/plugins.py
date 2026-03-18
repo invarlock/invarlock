@@ -24,10 +24,7 @@ from invarlock.public_contracts import (
     load_support_matrix,
 )
 
-from ..backend_runtime import (
-    bitsandbytes_runtime_available,
-    onnx_causal_runtime_available,
-)
+from ..backend_runtime import bitsandbytes_runtime_available
 from ..constants import PLUGINS_FORMAT_VERSION
 
 console = Console()
@@ -242,9 +239,6 @@ def plugins_command(
                 if module.startswith("invarlock.adapters"):
                     if n in {"hf_auto"}:
                         support = "auto"
-                    elif n in {"hf_causal_onnx"}:
-                        # ONNX relies on optional extras (optimum + onnxruntime)
-                        support = "optional"
                     else:
                         support = "core"
                 else:
@@ -277,7 +271,7 @@ def plugins_command(
                 if backend_name in {"auto-gptq", "autoawq"} and not is_linux:
                     status = "unsupported"
                     enable = "Linux-only"
-                # Extras completeness for certain adapters (e.g., hf_causal_onnx needs optimum + onnxruntime)
+                # Extras completeness for optional adapters.
                 try:
                     extras_status = _check_plugin_extras(n, "adapters")
                 except Exception:
@@ -292,13 +286,6 @@ def plugins_command(
                     hint = extras_status.split("missing", 1)[-1].strip()
                     if hint:
                         enable = f"pip install '{hint}'"
-                if (
-                    n == "hf_causal_onnx"
-                    and present
-                    and not onnx_causal_runtime_available()
-                ):
-                    status = "needs_extra"
-                    enable = "Use a transformers<5 env with 'invarlock[onnx]'"
                 if backend_name == "bitsandbytes" and present:
                     backend_present = bitsandbytes_runtime_available()
                     if not backend_present:
@@ -938,10 +925,6 @@ def _check_plugin_extras(plugin_name: str, plugin_type: str) -> str:
         "hf_mlm": {"packages": ["transformers"], "extra": "invarlock[adapters]"},
         "hf_seq2seq": {"packages": ["transformers"], "extra": "invarlock[adapters]"},
         "hf_auto": {"packages": ["transformers"], "extra": "invarlock[adapters]"},
-        "hf_causal_onnx": {
-            "packages": ["optimum", "onnxruntime"],
-            "extra": "invarlock[onnx]",
-        },
         # Optional adapter plugins
         "hf_gptq": {"packages": ["auto_gptq"], "extra": "invarlock[gptq]"},
         # `autoawq` installs the `awq` import name (not `autoawq`) in practice.
@@ -952,11 +935,6 @@ def _check_plugin_extras(plugin_name: str, plugin_type: str) -> str:
     plugin_info = extras_map.get(plugin_name)
     if not plugin_info or not plugin_info["packages"]:
         return ""  # No extra dependencies needed
-
-    if plugin_name == "hf_causal_onnx":
-        if onnx_causal_runtime_available():
-            return f"✓ {plugin_info['extra']}"
-        return f"⚠️ missing {plugin_info['extra']}"
 
     # Check each required package. For most packages we use a light import so
     # tests can monkeypatch __import__. For GPU-only stacks (bitsandbytes) and
@@ -1011,7 +989,6 @@ def _resolve_uninstall_targets(target: str) -> list[str]:
     - gptq / hf_gptq / auto-gptq -> ["auto-gptq"]
     - awq / hf_awq / autoawq     -> ["autoawq"]
     - bnb / hf_bnb / gpu         -> ["bitsandbytes"]
-    - onnx / hf_causal_onnx      -> ["onnxruntime", "optimum", "optimum-onnx"]
     - invarlock[awq] / invarlock[gptq] / invarlock[gpu] -> respective packages
     """
     name = (target or "").strip().lower()
@@ -1034,12 +1011,6 @@ def _resolve_uninstall_targets(target: str) -> list[str]:
         "hf_bnb": ["bitsandbytes"],
         "gpu": ["bitsandbytes"],
         "bitsandbytes": ["bitsandbytes"],
-        # ONNX/Optimum family
-        "onnx": ["onnxruntime", "optimum", "optimum-onnx"],
-        "hf_causal_onnx": ["onnxruntime", "optimum", "optimum-onnx"],
-        "optimum": ["optimum", "optimum-onnx"],
-        "optimum_onnx": ["optimum-onnx"],
-        "onnxruntime": ["onnxruntime"],
     }
     return mapping.get(name, [])
 
@@ -1053,7 +1024,7 @@ def _resolve_install_targets(target: str) -> list[str]:
     - gptq / hf_gptq / auto-gptq -> ["invarlock[gptq]"]
     - awq / hf_awq / autoawq     -> ["invarlock[awq]"]
     - bnb / hf_bnb / gpu         -> ["invarlock[gpu]"]
-    - adapters / transformers     -> ["invarlock[adapters]"]
+    - adapters / transformers    -> ["invarlock[adapters]"]
     - direct package names pass through: auto-gptq, autoawq, bitsandbytes
     """
     name = (target or "").strip().lower()
@@ -1075,10 +1046,6 @@ def _resolve_install_targets(target: str) -> list[str]:
         "gpu": ["invarlock[gpu]"],
         "adapters": ["invarlock[adapters]"],
         "transformers": ["invarlock[adapters]"],
-        # ONNX/Optimum
-        "onnx": ["invarlock[onnx]"],
-        "hf_causal_onnx": ["invarlock[onnx]"],
-        "optimum": ["invarlock[onnx]"],
         # Direct packages passthrough
         "bitsandbytes": ["bitsandbytes"],
     }
@@ -1396,7 +1363,6 @@ def _plugins_install(
       invarlock plugins install invarlock[gptq]        # Linux + CUDA only
       invarlock plugins install invarlock[awq]         # Linux + CUDA only
       invarlock plugins install invarlock[gpu]         # bitsandbytes (host/runtime dependent)
-      invarlock plugins install invarlock[onnx]        # Optimum ONNX stack (pins transformers<5)
 
     Use --dry-run (default) to preview the action; pass --apply to execute.
     """
@@ -1421,8 +1387,8 @@ def _plugins_uninstall(
 ):
     """Uninstall optional plugin backends via pip.
 
-    Accepts either extras (invarlock[gptq], invarlock[awq], invarlock[gpu], invarlock[onnx])
-    or direct package names (auto-gptq, autoawq, bitsandbytes, onnxruntime, optimum).
+    Accepts either extras (invarlock[gptq], invarlock[awq], invarlock[gpu])
+    or direct package names (auto-gptq, autoawq, bitsandbytes).
 
     Use --dry-run (default) to preview; pass --apply to execute.
     """

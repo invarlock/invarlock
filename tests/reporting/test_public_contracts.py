@@ -36,10 +36,6 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     assert gpt2_lane is not None
     assert gpt2_lane["support_tier"] == "published_basis"
 
-    onnx_capability = contracts.adapter_capability("hf_causal_onnx")
-    assert onnx_capability is not None
-    assert onnx_capability["guard_coverage"] == "eval_only"
-
     catalog = contracts.contract_catalog()
     assert catalog["support_matrix"]["format_version"] == "support-matrix-v1"
     assert (

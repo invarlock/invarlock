@@ -117,11 +117,6 @@ class _DelegatingAdapter(ModelAdapter):
                 ".hf_seq2seq", __package__
             ).HF_Seq2Seq_Adapter
             return HF_Seq2Seq_Adapter()
-        if adapter_name == "hf_causal_onnx":
-            HF_Causal_ONNX_Adapter = _importlib.import_module(
-                ".hf_causal_onnx", __package__
-            ).HF_Causal_ONNX_Adapter
-            return HF_Causal_ONNX_Adapter()
         elif adapter_name == "hf_bnb":
             HF_BNB_Adapter = _importlib.import_module(
                 "invarlock.plugins.hf_bnb_adapter"

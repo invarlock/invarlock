@@ -143,10 +143,10 @@ def test_resolve_auto_adapter_additional_family_paths(tmp_path: Path) -> None:
     )
     assert mod.resolve_auto_adapter(unknown, default="fallback") == "fallback"
 
-    onnx_dir = tmp_path / "onnx"
-    onnx_dir.mkdir()
-    (onnx_dir / "model.onnx").write_text("fake", encoding="utf-8")
-    assert mod.resolve_auto_adapter(onnx_dir) == "hf_causal_onnx"
+    local_export = tmp_path / "onnx"
+    local_export.mkdir()
+    (local_export / "model.onnx").write_text("fake", encoding="utf-8")
+    assert mod.resolve_auto_adapter(local_export) == "hf_causal"
 
     assert mod.resolve_auto_adapter("org/model-t5-small") == "hf_seq2seq"
 

@@ -30,8 +30,6 @@ _FAMILY_MAP: dict[str, tuple[str, str, list[str]]] = {
     "hf_gptq": ("gptq", "auto-gptq", []),
     "hf_awq": ("awq", "autoawq", []),
     "hf_bnb": ("bnb", "bitsandbytes", []),
-    # ONNX stack (requires extras: invarlock[onnx])
-    "hf_causal_onnx": ("onnx", "onnxruntime", []),
 }
 
 
