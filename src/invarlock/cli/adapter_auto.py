@@ -14,6 +14,42 @@ import os
 from pathlib import Path
 from typing import Any
 
+_CAUSAL_MODEL_TYPES = {
+    "deepseek",
+    "deepseek_v3",
+    "falcon",
+    "gemma",
+    "gemma2",
+    "gemma3",
+    "glm",
+    "gpt2",
+    "gpt_neox",
+    "gptj",
+    "llama",
+    "mistral",
+    "mixtral",
+    "olmo",
+    "olmo2",
+    "opt",
+    "phi",
+    "phi3",
+    "qwen",
+    "qwen2",
+    "qwen2_moe",
+    "qwen3",
+    "qwen3_moe",
+    "yi",
+}
+
+_MLM_MODEL_TYPES = {
+    "albert",
+    "bert",
+    "deberta",
+    "deberta-v2",
+    "distilbert",
+    "roberta",
+}
+
 
 def _read_local_hf_config(model_id: str | os.PathLike[str]) -> dict[str, Any] | None:
     """Read config.json from a local HF directory if present."""
@@ -74,6 +110,8 @@ def resolve_auto_adapter(
         if fam:
             return fam
         mt = str(c.get("model_type", "")).lower()
+        if mt in _CAUSAL_MODEL_TYPES:
+            return "hf_causal"
         if bool(c.get("is_encoder_decoder", False)):
             return "hf_seq2seq"
         archs = [str(a) for a in c.get("architectures", []) if isinstance(a, str)]
@@ -81,30 +119,10 @@ def resolve_auto_adapter(
         if "ConditionalGeneration" in arch_blob or "Seq2SeqLM" in arch_blob:
             return "hf_seq2seq"
         # Treat masked-LM families as BERT-like
-        if (
-            mt in {"bert", "roberta", "distilbert", "albert", "deberta", "deberta-v2"}
-            or "MaskedLM" in arch_blob
-        ):
+        if mt in _MLM_MODEL_TYPES or "MaskedLM" in arch_blob:
             return "hf_mlm"
         # Causal LM families (best-effort; structural validation happens in the adapter).
         if "CausalLM" in arch_blob or "ForCausalLM" in arch_blob:
-            return "hf_causal"
-        if mt in {
-            "mistral",
-            "mixtral",
-            "qwen",
-            "qwen2",
-            "qwen2_moe",
-            "yi",
-            "gpt2",
-            "gpt_neox",
-            "opt",
-            "gptj",
-            "phi",
-            "falcon",
-            "glm",
-            "deepseek",
-        }:
             return "hf_causal"
         return None
 

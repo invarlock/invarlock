@@ -68,6 +68,26 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
     assert families["BERT / RoBERTa MLM"]["support_tier"] == "published_basis"
     assert families["Mistral 7B causal LM"]["support_tier"] != "published_basis"
     assert families["Qwen2 7B causal LM"]["support_tier"] != "published_basis"
+    assert (
+        families["Llama 3.1 / 3.3 causal LM"]["support_tier"]
+        == "supported_experimental"
+    )
+    assert families["Qwen3 causal LM"]["support_tier"] == "supported_experimental"
+    assert (
+        families["Gemma 3 causal LM (text-only eval)"]["support_tier"]
+        == "supported_experimental"
+    )
+    assert (
+        families["DeepSeek-R1-Distill-Qwen causal LM"]["support_tier"]
+        == "supported_experimental"
+    )
+    assert (
+        families["Phi-4 causal LM (text-only eval)"]["support_tier"]
+        == "supported_experimental"
+    )
+    assert families["OLMo 2 causal LM"]["support_tier"] == "supported_experimental"
+    assert families["Qwen3.5 causal LM"]["support_tier"] == "supported_experimental"
+    assert families["DeepSeek-V3 causal LM"]["support_tier"] == "supported_experimental"
 
     for family, lane in families.items():
         assert docs_labels[family] == lane["docs_label"]

@@ -530,6 +530,43 @@ def _rope_decoder_selectors() -> dict[str, list[str]]:
     }
 
 
+def _phi_selectors() -> dict[str, list[str]]:
+    return {
+        "attention": [
+            "self_attn.q_proj",
+            "self_attn.k_proj",
+            "self_attn.v_proj",
+            "self_attn.dense",
+            "self_attn.o_proj",
+            "self_attn.qkv_proj",
+        ],
+        "ffn": [
+            "mlp.fc1",
+            "mlp.fc2",
+            "mlp.gate_up_proj",
+            "mlp.down_proj",
+        ],
+    }
+
+
+def _deepseek_v3_selectors() -> dict[str, list[str]]:
+    return {
+        "attention": [
+            "self_attn.q_proj",
+            "self_attn.q_a_proj",
+            "self_attn.q_b_proj",
+            "self_attn.kv_a_proj_with_mqa",
+            "self_attn.kv_b_proj",
+            "self_attn.o_proj",
+        ],
+        "ffn": [
+            "mlp.gate_proj",
+            "mlp.up_proj",
+            "mlp.down_proj",
+        ],
+    }
+
+
 def _unknown_selectors() -> dict[str, list[str]]:
     return {
         "attention": ["attention"],
@@ -655,7 +692,7 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
 
     if any(keyword in adapter_lower for keyword in ("hf_seq2seq", "t5", "bart")) or (
         is_encoder_decoder
-        or seq2seq_arch
+        or (seq2seq_arch and "gemma3" not in model_lower)
         or any(keyword in model_lower for keyword in ("t5", "bart"))
     ):
         return ModelProfile(
@@ -670,12 +707,14 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
         )
 
     if any(
-        keyword in adapter_lower for keyword in ("mistral", "mixtral", "qwen", "yi")
+        keyword in adapter_lower
+        for keyword in ("llama", "mistral", "mixtral", "qwen", "yi", "gemma", "olmo")
     ) or any(
-        keyword in model_lower for keyword in ("mistral", "mixtral", "qwen", "yi")
+        keyword in model_lower
+        for keyword in ("llama", "mistral", "mixtral", "qwen", "yi", "gemma", "olmo")
     ):
         family = "causal"
-        for keyword in ("mixtral", "mistral", "qwen", "yi"):
+        for keyword in ("mixtral", "mistral", "qwen", "yi", "llama", "gemma", "olmo"):
             if keyword in adapter_lower or keyword in model_lower:
                 family = keyword
                 break
@@ -697,10 +736,61 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
             ),
         )
 
+    if any(
+        keyword in adapter_lower
+        for keyword in ("deepseek_v3", "deepseek-v3", "deepseekv3")
+    ) or any(
+        keyword in model_lower
+        for keyword in ("deepseek_v3", "deepseek-v3", "deepseekv3")
+    ):
+        return ModelProfile(
+            family="deepseek_v3",
+            default_loss="causal",
+            make_tokenizer=_make_causal_auto_tokenizer(model_id),
+            default_metric="ppl_causal",
+            default_provider="wikitext2",
+            module_selectors=_deepseek_v3_selectors(),
+            invariants=("rope_rotary_embedding",),
+            cert_lints=(
+                {
+                    "type": "equals",
+                    "path": "primary_metric.kind",
+                    "value": "ppl_causal",
+                    "message": "Causal cert must use causal ppl metric.",
+                },
+            ),
+        )
+
+    if any(keyword in adapter_lower for keyword in ("phi",)) or any(
+        keyword in model_lower for keyword in ("phi",)
+    ):
+        family = "phi"
+        if any(keyword in adapter_lower for keyword in ("phi4", "phi-4", "phi_4")) or (
+            any(keyword in model_lower for keyword in ("phi4", "phi-4", "phi_4"))
+        ):
+            family = "phi4"
+        return ModelProfile(
+            family=family,
+            default_loss="causal",
+            make_tokenizer=_make_causal_auto_tokenizer(model_id),
+            default_metric="ppl_causal",
+            default_provider="wikitext2",
+            module_selectors=_phi_selectors(),
+            invariants=("causal_masking",),
+            cert_lints=(
+                {
+                    "type": "equals",
+                    "path": "primary_metric.kind",
+                    "value": "ppl_causal",
+                    "message": "Causal cert must use causal ppl metric.",
+                },
+            ),
+        )
+
     if (
-        any(keyword in adapter_lower for keyword in ("gpt", "neox", "opt", "phi"))
+        any(keyword in adapter_lower for keyword in ("gpt", "neox", "opt"))
         or causal_arch
-        or any(keyword in model_lower for keyword in ("gpt", "neox", "opt", "phi"))
+        or any(keyword in model_lower for keyword in ("gpt", "neox", "opt"))
     ):
         return ModelProfile(
             family="gpt2",

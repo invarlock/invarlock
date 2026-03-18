@@ -164,6 +164,52 @@ def test_resolve_core_loader_strategy_uses_direct_submodule_when_allowed(
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize(
+    ("model_type", "loader_label"),
+    [
+        ("qwen3", "transformers.models.qwen3.modeling_qwen3.Qwen3ForCausalLM"),
+        (
+            "qwen3_moe",
+            "transformers.models.qwen3_moe.modeling_qwen3_moe.Qwen3MoeForCausalLM",
+        ),
+        (
+            "gemma3",
+            "transformers.models.gemma3.modeling_gemma3.Gemma3ForConditionalGeneration",
+        ),
+        ("olmo2", "transformers.models.olmo2.modeling_olmo2.Olmo2ForCausalLM"),
+        (
+            "deepseek_v3",
+            "transformers.models.deepseek_v3.modeling_deepseek_v3.DeepseekV3ForCausalLM",
+        ),
+    ],
+)
+def test_resolve_core_loader_strategy_supports_new_direct_submodule_families(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    model_type: str,
+    loader_label: str,
+) -> None:
+    import invarlock.adapters.hf_loading as hf_loading
+
+    model_dir = _write_local_config(tmp_path / model_type, model_type)
+    monkeypatch.setattr(
+        hf_loading,
+        "_import_symbol",
+        lambda module_path, symbol_name: f"{module_path}.{symbol_name}",
+    )
+
+    strategy = hf_loading.resolve_core_loader_strategy(
+        task="causal",
+        model_id=str(model_dir),
+        allow_direct_submodule=True,
+    )
+
+    assert strategy.strategy == "direct_submodule"
+    assert strategy.model_type == model_type
+    assert strategy.loader_label == loader_label
+
+
+@pytest.mark.unit
 def test_resolve_core_loader_strategy_trust_remote_code_forces_auto(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

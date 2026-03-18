@@ -63,6 +63,7 @@ Tip: enable Hub downloads per command when fetching models/datasets:
 - [Configuration Schema](reference/config-schema.md)
 - [Guards](reference/guards.md)
 - [Model Adapters](reference/model-adapters.md)
+- [Model Family Catalog](reference/model-family-catalog.md)
 - [reports](reference/reports.md) — Schema, telemetry, and HTML export
 - [Tier Policy Catalog (runtime tiers.yaml)](reference/tier-policy-catalog.md)
 - [Datasets](reference/datasets.md)
@@ -159,14 +160,31 @@ Notes
 | BERT / RoBERTa MLM | Yes | Yes | Yes | Yes |
 | Mistral 7B causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
 | Qwen2 7B causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
+| Llama 3.1 / 3.3 causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
+| Qwen3 causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
+| Gemma 3 causal LM (text-only eval) | Yes | Yes | Yes | No, repo-shipped pilot config only |
+| DeepSeek-R1-Distill-Qwen causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
+| Phi-4 causal LM (text-only eval) | Yes | Yes | Yes | No, repo-shipped pilot config only |
+| OLMo 2 causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
+| Qwen3.5 causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
+| DeepSeek-V3 causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
 | Seq2Seq / local pairs | Yes | Yes | No | No |
 
-Published assurance basis currently covers GPT-2 and BERT profiles. Repo-shipped presets and pilot calibration configs for additional families, including Mistral 7B and Qwen2 7B, do not become part of the published assurance basis until supporting artifacts are attached.
+Published assurance basis currently covers GPT-2 and BERT profiles. Repo-shipped
+presets and pilot calibration configs for additional experimental families,
+including Mistral 7B, Qwen2 7B, Llama 3.1 / 3.3, Qwen3, Gemma 3 (text-only),
+DeepSeek-R1-Distill-Qwen, Phi-4 (text-only), OLMo 2, Qwen3.5, and DeepSeek-V3,
+do not become part of the published assurance basis until supporting artifacts
+are attached.
 
 Machine-readable support metadata lives in `contracts/support_matrix.json`. It is
 the canonical source of truth for normalized support tiers
 (`published_basis`, `supported_experimental`, `community_experimental`) and for
 published-basis evidence references.
+
+For the broader inventory of declared support, implemented-but-not-public
+coverage, usage-only checkpoint families, and recommended additions, see
+[Model Family Catalog](reference/model-family-catalog.md).
 
 ---
 

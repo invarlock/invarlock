@@ -13,6 +13,25 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "bert-mlm-hf",
     }
 
+    family_catalog = contracts.load_model_family_catalog()
+    assert family_catalog["format_version"] == "model-family-catalog-v1"
+    assert family_catalog["as_of"] == "2026-03-18"
+    assert family_catalog["declared_support"][0]["display_name"] == "GPT-2 causal LM"
+    assert (
+        family_catalog["recommended_additions"][0]["display_name"]
+        == "Full multimodal evaluation pipeline"
+    )
+    assert {item["display_name"] for item in family_catalog["declared_support"]} >= {
+        "Llama 3.1 / 3.3 causal LM",
+        "Qwen3 causal LM",
+        "Gemma 3 causal LM (text-only eval)",
+        "DeepSeek-R1-Distill-Qwen causal LM",
+        "Phi-4 causal LM (text-only eval)",
+        "OLMo 2 causal LM",
+        "Qwen3.5 causal LM",
+        "DeepSeek-V3 causal LM",
+    }
+
     gpt2_lane = contracts.support_lane_by_id("gpt2-causal-hf")
     assert gpt2_lane is not None
     assert gpt2_lane["support_tier"] == "published_basis"
@@ -23,6 +42,9 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
 
     catalog = contracts.contract_catalog()
     assert catalog["support_matrix"]["format_version"] == "support-matrix-v1"
+    assert (
+        catalog["model_family_catalog"]["format_version"] == "model-family-catalog-v1"
+    )
     assert catalog["plugin_compatibility"]["core_abi"] == "0.1"
     assert catalog["plugin_compatibility"]["match_policy"] == "exact_match"
     assert catalog["policy_pack"]["path"] == "contracts/policy_pack.schema.json"
@@ -65,6 +87,13 @@ def test_public_contract_helpers_fall_back_when_contracts_are_unavailable(
         "format_version": "adapter-capabilities-v1",
         "adapters": [],
     }
+    assert contracts.load_model_family_catalog() == {
+        "format_version": "model-family-catalog-v1",
+        "declared_support": [],
+        "implemented_coverage": [],
+        "usage_only": [],
+        "recommended_additions": [],
+    }
     assert contracts.load_plugin_compatibility() == {
         "format_version": "plugin-compatibility-v1"
     }
@@ -80,6 +109,7 @@ def test_public_contract_helpers_fall_back_when_contracts_are_unavailable(
 def test_public_contract_helpers_reject_non_mapping_payloads(monkeypatch) -> None:
     payloads = {
         "support_matrix.json": ["unexpected"],
+        "model_family_catalog.json": "unexpected",
         "adapter_capabilities.json": "unexpected",
         "plugin_compatibility.json": ["unexpected"],
         "policy_pack.schema.json": ["unexpected"],
@@ -98,6 +128,13 @@ def test_public_contract_helpers_reject_non_mapping_payloads(monkeypatch) -> Non
     assert contracts.load_adapter_capabilities() == {
         "format_version": "adapter-capabilities-v1",
         "adapters": [],
+    }
+    assert contracts.load_model_family_catalog() == {
+        "format_version": "model-family-catalog-v1",
+        "declared_support": [],
+        "implemented_coverage": [],
+        "usage_only": [],
+        "recommended_additions": [],
     }
     assert contracts.load_plugin_compatibility() == {
         "format_version": "plugin-compatibility-v1"
@@ -129,6 +166,16 @@ def test_public_contract_lane_and_adapter_helpers_cover_non_matching_entries(
                     "bad",
                 ],
             },
+            "model_family_catalog.json": {
+                "format_version": "model-family-catalog-v1",
+                "declared_support": [
+                    {"family_id": "gpt2-causal-lm", "display_name": "GPT-2 causal LM"},
+                    "bad",
+                ],
+                "implemented_coverage": [],
+                "usage_only": [],
+                "recommended_additions": [],
+            },
             "plugin_compatibility.json": {
                 "format_version": "plugin-compatibility-v1",
                 "format": "compatibility-doc",
@@ -145,6 +192,10 @@ def test_public_contract_lane_and_adapter_helpers_cover_non_matching_entries(
     }
     assert contracts.adapter_capability_map() == {
         "good": {"adapter": "good", "guard_coverage": "full"}
+    }
+    assert contracts.load_model_family_catalog()["declared_support"][0] == {
+        "family_id": "gpt2-causal-lm",
+        "display_name": "GPT-2 causal LM",
     }
     assert contracts.contract_reference("plugin_compatibility.json") == {
         "path": "contracts/plugin_compatibility.json",

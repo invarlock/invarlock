@@ -39,8 +39,9 @@ print(adapter.describe(model)["model_type"])
 
 > Adapter availability is broader than the published assurance basis. GPT-2 and
 > BERT currently back the published calibrated basis; repo-shipped pilot configs
-> for Mistral 7B and Qwen2 7B are for experimentation until supporting
-> artifacts are attached.
+> for Mistral 7B, Qwen2 7B, and additional experimental families are for
+> experimentation until supporting artifacts are attached. See the Model Family
+> Catalog for the authoritative family-by-family inventory.
 
 ## Concepts
 
@@ -61,7 +62,7 @@ print(adapter.describe(model)["model_type"])
 
 | `model_type` family | Adapter |
 | --- | --- |
-| mistral / mixtral / qwen / yi | `hf_causal` |
+| llama / mistral / mixtral / qwen / gemma / OLMo / DeepSeek-V3 / yi | `hf_causal` |
 | gpt2 / opt / neo-x / phi | `hf_causal` |
 | bert / roberta | `hf_mlm` |
 | t5 / bart | `hf_seq2seq` |

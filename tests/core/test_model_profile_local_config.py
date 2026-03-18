@@ -49,6 +49,58 @@ def test_detect_model_profile_uses_local_config_hints_for_auto_adapter(
     assert profile.default_provider == "hf_text"
 
 
+@pytest.mark.parametrize(
+    ("payload", "expected_family"),
+    [
+        (
+            {
+                "model_type": "llama",
+                "architectures": ["LlamaForCausalLM"],
+            },
+            "llama",
+        ),
+        (
+            {
+                "model_type": "gemma3",
+                "architectures": ["Gemma3ForConditionalGeneration"],
+            },
+            "gemma",
+        ),
+        (
+            {
+                "model_type": "olmo2",
+                "architectures": ["Olmo2ForCausalLM"],
+            },
+            "olmo",
+        ),
+        (
+            {
+                "model_type": "deepseek_v3",
+                "architectures": ["DeepseekV3ForCausalLM"],
+            },
+            "deepseek_v3",
+        ),
+    ],
+)
+def test_detect_model_profile_uses_local_config_hints_for_new_causal_families(
+    tmp_path: Path,
+    payload: dict[str, object],
+    expected_family: str,
+) -> None:
+    model_dir = tmp_path / expected_family
+    model_dir.mkdir()
+    (model_dir / "config.json").write_text(
+        json.dumps(payload),
+        encoding="utf-8",
+    )
+
+    profile = mp.detect_model_profile(str(model_dir), adapter="auto")
+
+    assert profile.family == expected_family
+    assert profile.default_loss == "causal"
+    assert profile.default_provider == "wikitext2"
+
+
 def test_resolve_tokenizer_uses_model_specific_identifier_for_opt_like_models(
     monkeypatch,
 ) -> None:

@@ -1,0 +1,38 @@
+# Calibration config: Null sweep for DeepSeek-V3-0324 spectral/RMT calibration.
+
+model:
+  id: "deepseek-ai/DeepSeek-V3-0324"
+  adapter: "hf_causal"
+  device: "auto"
+
+dataset:
+  provider: "wikitext2"
+  split: "validation"
+  seq_len: 512
+  stride: 512
+  preview_n: 64
+  final_n: 64
+  seed: 42
+
+edit:
+  name: noop
+  plan: {}
+
+eval:
+  metric:
+    kind: ppl_causal
+  loss:
+    type: causal
+
+auto:
+  enabled: true
+  tier: balanced
+  probes: 0
+
+guards:
+  order: ["invariants", "spectral", "rmt", "variance", "invariants"]
+
+output:
+  dir: runs/null_sweeps/deepseek_v3_0324
+  save_model: false
+  save_report: true
