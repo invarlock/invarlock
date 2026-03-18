@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Added an offline release-verification bundle generator and reference docs for
+  auditing release artifacts without network access.
+- Added stronger proof-pack manifest and attestation tooling, including a
+  public manifest schema, manifest validation and attestation helpers, and
+  source/environment metadata capture for packaged runs.
+
+### Changed
+- Optimized evaluation data loading, Hugging Face adapter/model-loading paths,
+  model-profile resolution, and CLI run/bootstrap startup flows to reduce local
+  evaluation overhead.
+- Pinned workflow and proof-pack helper dependencies into checked-in
+  requirements files, and updated CI/release automation to run against the
+  configured `setup-python` interpreter with tighter permission scopes.
+- Hardened the exhaustive CLI smoke runner, expanded active eval coverage
+  thresholds, and retargeted Dependabot automation to `staging/next`.
+
+### Fixed
+- Hardened CLI backend, doctor, plugin, and verification checks, including
+  safer remote-code defaults, plugin catalog/install surfaces, and
+  release-profile overhead enforcement.
+- Tightened core profiling, security, typing, report-type validation, and local
+  model-profile resolution behavior.
+- Proof-pack execution now honors one-sided scenario manifests, pins helper
+  installs, keeps no-`jq` scenario flows deterministic, and improves shell-test
+  portability across hosts.
+- Aligned the Scorecards workflow with upstream pinning, tightened
+  Scorecards/CodeQL permissions, and fixed notebook ordering needed for release
+  pre-commit validation.
+
+### Dependencies
+- Bumped `actions/download-artifact` from `7` to `8`.
+- Bumped `actions/upload-artifact` from `5` to `7`.
+- Bumped `katex` from `0.16.28` to `0.16.33`.
+
+### Documentation
+- Added a release-verification guide covering the new offline bundle flow and
+  refreshed related security best-practice references.
+- Clarified proof-pack wheel-boundary, scenario, and verification guidance, and
+  refreshed related CLI, contracts, and adapter reference material.
+
 ## [0.4.0] - 2026-03-14
 
 ### Added
