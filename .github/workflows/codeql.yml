@@ -2,9 +2,9 @@ name: CodeQL Security Analysis
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, staging/next ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, staging/next ]
   # Keep scheduled scans for drift detection and manual trigger for audits.
   schedule:
     # Run weekly on Sunday at 3 AM UTC
