@@ -276,12 +276,16 @@ def test_classify_module_family_moe_and_module_type_branches() -> None:
 
 def test_classify_module_family_uses_embedding_module_type_without_name_hint() -> None:
     assert (
-        spectral_detection.classify_module_family("plain.module", torch.nn.Embedding(2, 2))
+        spectral_detection.classify_module_family(
+            "plain.module", torch.nn.Embedding(2, 2)
+        )
         == "embed"
     )
 
 
-def test_detect_spectral_violations_uses_default_kappa_and_degeneracy_defaults() -> None:
+def test_detect_spectral_violations_uses_default_kappa_and_degeneracy_defaults() -> (
+    None
+):
     guard = spectral_guard.SpectralGuard(scope="all", correction_enabled=False)
     guard.deadband = 0.0
     guard.ignore_preview_inflation = False
