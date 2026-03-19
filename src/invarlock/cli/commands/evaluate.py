@@ -19,6 +19,7 @@ import io
 import json
 import math
 import os
+import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -207,13 +208,17 @@ def _resolve_evaluate_tmp_dir() -> Path:
     Evaluate generates merged YAML configs for baseline/subject runs so
     downstream `invarlock run` flows remain traceable. We keep these files
     under `./tmp/.evaluate` by default to avoid cluttering the working tree.
+    Each invocation gets an isolated subdirectory so concurrent evaluate
+    commands cannot overwrite each other's generated YAMLs.
     """
 
     candidate = os.environ.get("INVARLOCK_EVALUATE_TMP_DIR")
     if candidate:
         tmp_dir = Path(candidate).expanduser()
     else:
-        tmp_dir = Path("tmp") / ".evaluate"
+        scratch_root = Path("tmp") / ".evaluate"
+        scratch_root.mkdir(parents=True, exist_ok=True)
+        tmp_dir = Path(tempfile.mkdtemp(prefix="run-", dir=str(scratch_root))).resolve()
     tmp_dir.mkdir(parents=True, exist_ok=True)
     return tmp_dir
 

@@ -112,7 +112,9 @@ def test_evaluate_uses_inline_preset_when_repo_preset_missing(monkeypatch, tmp_p
         profile="dev",
     )
 
-    cfg_path = Path("tmp") / ".evaluate" / "baseline_noop.yaml"
+    cfg_candidates = list((Path("tmp") / ".evaluate").rglob("baseline_noop.yaml"))
+    assert len(cfg_candidates) == 1
+    cfg_path = cfg_candidates[0]
     cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     assert cfg["dataset"]["provider"] == "wikitext2"
     assert calls["runs"] == 2 and calls["reports"] == 1
@@ -164,9 +166,9 @@ def test_evaluate_edit_config_successfully_merges_subject(monkeypatch, tmp_path)
         profile="dev",
     )
 
-    merged = yaml.safe_load(
-        (Path("tmp") / ".evaluate" / "edited_merged.yaml").read_text(encoding="utf-8")
-    )
+    merged_candidates = list((Path("tmp") / ".evaluate").rglob("edited_merged.yaml"))
+    assert len(merged_candidates) == 1
+    merged = yaml.safe_load(merged_candidates[0].read_text(encoding="utf-8"))
     assert merged["model"]["id"] == str(edt)
     assert merged["model"]["adapter"] == "hf_causal"
     assert calls["runs"] == 2
@@ -478,6 +480,17 @@ def test_evaluate_yaml_tmp_dir_and_successful_quiet_summary(
     monkeypatch.setenv("INVARLOCK_EVALUATE_TMP_DIR", str(tmp_dir))
     assert mod._resolve_evaluate_tmp_dir() == tmp_dir
     assert tmp_dir.exists()
+
+    monkeypatch.delenv("INVARLOCK_EVALUATE_TMP_DIR")
+    monkeypatch.chdir(tmp_path)
+    isolated_a = mod._resolve_evaluate_tmp_dir()
+    isolated_b = mod._resolve_evaluate_tmp_dir()
+    expected_parent = tmp_path / "tmp" / ".evaluate"
+    assert isolated_a != isolated_b
+    assert isolated_a.parent == expected_parent
+    assert isolated_b.parent == expected_parent
+    assert isolated_a.exists()
+    assert isolated_b.exists()
 
     assert mod._normalize_model_id("hf:demo/model", "hf_causal") == "demo/model"
 

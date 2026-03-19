@@ -261,8 +261,9 @@ def test_evaluate_autogen_uses_device_auto(monkeypatch, tmp_path):
     )
 
     # Assert: temp baseline config exists and does not pin device=cpu
-    baseline_yaml = tmp_path / "tmp" / ".evaluate" / "baseline_noop.yaml"
-    assert baseline_yaml.exists()
+    scratch_files = list((tmp_path / "tmp" / ".evaluate").rglob("baseline_noop.yaml"))
+    assert len(scratch_files) == 1
+    baseline_yaml = scratch_files[0]
     data = yaml.safe_load(baseline_yaml.read_text(encoding="utf-8")) or {}
     model_block = data.get("model") or {}
     # Ensure the preset did not pin device=cpu
