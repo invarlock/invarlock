@@ -1,7 +1,7 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
 
-.PHONY: help install dev-install test test-assurance lint format clean docsclean deepclean docs docs-ci verify coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync
+.PHONY: help install dev-install test test-assurance lint format clean docsclean deepclean docs docs-ci verify coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync model-evidence-list model-evidence-sweep
 
 PYTHON ?= $(shell bash scripts/select_python.sh)
 PIP := $(PYTHON) -m pip
@@ -11,6 +11,7 @@ MYPY := $(PYTHON) -m mypy
 COVERAGE := $(PYTHON) -m coverage
 MKDOCS := $(PYTHON) -m mkdocs
 PRE_COMMIT := $(PYTHON) -m pre_commit
+MODEL_EVIDENCE_ARGS ?=
 
 # Keep repo-wide coverage practical while still exercising the CLI command
 # surface that would otherwise pull the project floor below the real trust core.
@@ -182,6 +183,14 @@ verify:  ## Run verification (pytest -q, lint, format, markdown + spell docs lin
 		$(PYTHON) scripts/validate_docs_api_refs.py; \
 	fi
 	@echo "Verification completed successfully"
+
+model-evidence-list:  ## Print the maintained shipped-model evidence manifest
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTHON) scripts/model_evidence_sweep.py --list-json $(MODEL_EVIDENCE_ARGS)
+
+model-evidence-sweep:  ## Run the maintained shipped-model evidence sweep
+	$(MAKE) ensure-python
+	PYTHONPATH=src INVARLOCK_ALLOW_NETWORK=1 $(PYTHON) scripts/model_evidence_sweep.py $(MODEL_EVIDENCE_ARGS)
 
 ##@ CI/Build
 clean:  ## Clean build artifacts
