@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -35,6 +36,56 @@ def _write_checksums(pack_dir: Path, rel_paths: list[str]) -> None:
     )
 
 
+def _build_cert_payload() -> dict[str, object]:
+    return {
+        "schema_version": "v1",
+        "run_id": "proof-pack-cli-test",
+        "artifacts": {"generated_at": "2024-01-01T00:00:00"},
+        "plugins": {},
+        "meta": {},
+        "dataset": {
+            "provider": "unit",
+            "seq_len": 8,
+            "windows": {
+                "preview": 2,
+                "final": 2,
+                "stats": {
+                    "window_match_fraction": 1.0,
+                    "window_overlap_fraction": 0.0,
+                    "coverage": {"preview": {"used": 2}, "final": {"used": 2}},
+                    "paired_windows": 2,
+                },
+            },
+        },
+        "validation": {
+            "primary_metric_acceptable": True,
+            "preview_final_drift_acceptable": True,
+            "invariants_pass": True,
+            "spectral_stable": True,
+            "rmt_stable": True,
+        },
+        "baseline_ref": {
+            "run_id": "baseline-run",
+            "model_id": "model",
+            "primary_metric": {"kind": "ppl_causal", "final": 10.0},
+        },
+        "artifacts_extra": {},
+        "primary_metric": {
+            "kind": "ppl_causal",
+            "final": 10.0,
+            "preview": 10.0,
+            "ratio_vs_baseline": 1.0,
+            "display_ci": [1.0, 1.0],
+        },
+        "evaluation_windows": {
+            "final": {
+                "logloss": [math.log(10.0)],
+                "token_counts": [1],
+            }
+        },
+    }
+
+
 def _build_pack(pack_dir: Path, *, cert_rel_path: str) -> Path:
     final_verdict = pack_dir / "results/final_verdict.json"
     source_repo = pack_dir / "metadata/source_repo.json"
@@ -46,8 +97,7 @@ def _build_pack(pack_dir: Path, *, cert_rel_path: str) -> Path:
     _write_json(source_repo, {"commit": "abc123"})
     _write_json(environment, {"platform": "test"})
     _write_json(materials, {"models": {"org/model": {"revision": "rev1"}}})
-    cert.parent.mkdir(parents=True, exist_ok=True)
-    cert.write_text("{}", encoding="utf-8")
+    _write_json(cert, _build_cert_payload())
 
     covered = [
         "results/final_verdict.json",
@@ -85,6 +135,8 @@ def test_proof_pack_help_lists_verify() -> None:
     result = CliRunner().invoke(app, ["proof-pack", "--help"])
     assert result.exit_code == 0
     assert "verify" in result.output
+    assert "inspect" in result.output
+    assert "build" in result.output
 
 
 def test_proof_pack_verify_json_round_trip(monkeypatch, tmp_path: Path) -> None:
@@ -154,6 +206,24 @@ def test_proof_pack_verify_human_success(monkeypatch, tmp_path: Path) -> None:
     assert "Proof pack verified" in result.output
 
 
+def test_proof_pack_verify_json_round_trip_with_real_nested_verify(
+    tmp_path: Path,
+) -> None:
+    pack_dir = _build_pack(
+        tmp_path / "pack",
+        cert_rel_path="certs/model/clean/noop/evaluation.report.json",
+    )
+
+    result = CliRunner().invoke(app, ["proof-pack", "verify", str(pack_dir), "--json"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout.strip())
+    assert payload["format_version"] == "proof-pack-verify-v1"
+    assert payload["ok"] is True
+    assert payload["verify"]["format_version"] == "verify-v1"
+    assert payload["verify"]["resolution"]["exit_code"] == 0
+
+
 def test_proof_pack_verify_rejects_missing_pack(tmp_path: Path) -> None:
     result = CliRunner().invoke(
         app,
@@ -174,3 +244,103 @@ def test_proof_pack_verify_human_failure(tmp_path: Path) -> None:
     assert result.exit_code == 3
     assert "ERROR:" in result.output
     assert "Pack directory not found" in result.output
+
+
+def test_proof_pack_inspect_json_summary(tmp_path: Path) -> None:
+    pack_dir = _build_pack(
+        tmp_path / "pack",
+        cert_rel_path="certs/model/clean/noop/evaluation.report.json",
+    )
+
+    result = CliRunner().invoke(app, ["proof-pack", "inspect", str(pack_dir), "--json"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout.strip())
+    assert payload["format_version"] == "proof-pack-inspect-v1"
+    assert payload["ok"] is True
+    assert payload["certs"]["total"] == 1
+    assert payload["certs"]["clean"] == 1
+    assert payload["certs"]["errors"] == 0
+    assert payload["signature"]["present"] is False
+    assert payload["integrity"]["checksums_bound"] is True
+    assert payload["integrity"]["manifest_attestation_ok"] is True
+    assert payload["strict_ready"] is False
+    assert any("manifest.json.asc missing" in issue for issue in payload["issues"])
+
+
+def test_proof_pack_build_json_round_trip(tmp_path: Path) -> None:
+    final_verdict = tmp_path / "final_verdict.json"
+    source_repo = tmp_path / "source_repo.json"
+    environment = tmp_path / "environment.json"
+    model_revisions = tmp_path / "model_revisions.json"
+    cert = tmp_path / "evaluation.report.json"
+    out_dir = tmp_path / "proof_pack"
+
+    _write_json(final_verdict, {"verdict": "PASS"})
+    _write_json(source_repo, {"commit": "abc123"})
+    _write_json(environment, {"platform": "test"})
+    _write_json(model_revisions, {"models": {"org/model": {"revision": "rev1"}}})
+    _write_json(cert, _build_cert_payload())
+
+    build = CliRunner().invoke(
+        app,
+        [
+            "proof-pack",
+            "build",
+            str(out_dir),
+            "--final-verdict",
+            str(final_verdict),
+            "--source-repo",
+            str(source_repo),
+            "--environment",
+            str(environment),
+            "--material",
+            f"model_revisions={model_revisions}",
+            "--cert",
+            str(cert),
+            "--json",
+        ],
+    )
+
+    assert build.exit_code == 0, build.output
+    payload = json.loads(build.stdout.strip())
+    assert payload["format_version"] == "proof-pack-build-v1"
+    assert payload["ok"] is True
+    assert payload["certs"]["total"] == 1
+    assert payload["pack"] == str(out_dir)
+    assert (out_dir / "manifest.json").is_file()
+    assert (out_dir / "checksums.sha256").is_file()
+    assert (out_dir / "results" / "final_verdict.json").is_file()
+    assert (out_dir / "metadata" / "source_repo.json").is_file()
+    assert (out_dir / "metadata" / "environment.json").is_file()
+    assert (out_dir / "metadata" / "model_revisions.json").is_file()
+    assert len(list(out_dir.glob("certs/**/evaluation.report.json"))) == 1
+
+    verify = CliRunner().invoke(app, ["proof-pack", "verify", str(out_dir), "--json"])
+    assert verify.exit_code == 0, verify.output
+    verify_payload = json.loads(verify.stdout.strip())
+    assert verify_payload["ok"] is True
+    assert verify_payload["verify"]["resolution"]["exit_code"] == 0
+
+
+def test_proof_pack_build_requires_certs(tmp_path: Path) -> None:
+    final_verdict = tmp_path / "final_verdict.json"
+    _write_json(final_verdict, {"verdict": "PASS"})
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "proof-pack",
+            "build",
+            str(tmp_path / "pack"),
+            "--final-verdict",
+            str(final_verdict),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 2
+    payload = json.loads(result.stdout.strip())
+    assert payload["format_version"] == "proof-pack-build-v1"
+    assert payload["ok"] is False
+    assert any("at least one --cert" in error for error in payload["errors"])

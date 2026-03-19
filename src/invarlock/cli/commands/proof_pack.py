@@ -6,8 +6,17 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from invarlock.cli.constants import PROOF_PACK_VERIFY_FORMAT_VERSION
-from invarlock.proof_pack import verify_proof_pack
+from invarlock.cli.constants import (
+    PROOF_PACK_BUILD_FORMAT_VERSION,
+    PROOF_PACK_INSPECT_FORMAT_VERSION,
+    PROOF_PACK_VERIFY_FORMAT_VERSION,
+)
+from invarlock.proof_pack import (
+    _material_spec,
+    build_proof_pack,
+    inspect_proof_pack,
+    verify_proof_pack,
+)
 
 console = Console()
 proof_pack_app = typer.Typer(
@@ -68,6 +77,135 @@ def verify_command(
             console.print(f"[yellow]WARNING:[/yellow] {warning}")
         if payload["ok"]:
             console.print("[green]Proof pack verified[/green]")
+        else:
+            for error in payload["errors"]:
+                console.print(f"[red]ERROR:[/red] {error}")
+    raise typer.Exit(exit_code)
+
+
+@proof_pack_app.command(
+    "inspect",
+    help="Inspect a proof-pack summary without running nested report verification.",
+)
+def inspect_command(
+    pack: str = typer.Argument(..., help="Path to the proof-pack directory."),
+    json_out: bool = typer.Option(
+        False, "--json", help="Emit machine-readable inspection JSON."
+    ),
+) -> None:
+    payload, exit_code = inspect_proof_pack(Path(pack))
+    payload = {
+        "format_version": PROOF_PACK_INSPECT_FORMAT_VERSION,
+        **payload,
+    }
+
+    if json_out:
+        typer.echo(json.dumps(payload))
+    else:
+        if payload["ok"]:
+            console.print("[green]Proof pack inspected[/green]")
+            for issue in payload["issues"]:
+                console.print(f"[yellow]ISSUE:[/yellow] {issue}")
+        else:
+            for issue in payload["issues"]:
+                console.print(f"[red]ERROR:[/red] {issue}")
+    raise typer.Exit(exit_code)
+
+
+@proof_pack_app.command(
+    "build",
+    help="Assemble a proof pack from existing verdict, metadata, and cert artifacts.",
+)
+def build_command(
+    out: str = typer.Argument(..., help="Output directory for the proof-pack."),
+    final_verdict: str = typer.Option(
+        ...,
+        "--final-verdict",
+        help="Path to the final verdict JSON to package as the proof-pack subject.",
+    ),
+    certs: list[str] = typer.Option(
+        [],
+        "--cert",
+        help="Path to an evaluation.report.json file to verify and package.",
+    ),
+    source_repo: str | None = typer.Option(
+        None,
+        "--source-repo",
+        help="Optional source_repo.json provenance sidecar.",
+    ),
+    environment: str | None = typer.Option(
+        None,
+        "--environment",
+        help="Optional environment.json provenance sidecar.",
+    ),
+    materials: list[str] = typer.Option(
+        [],
+        "--material",
+        help="Optional metadata sidecar as NAME=PATH. Repeat to include multiple.",
+    ),
+    readme: str | None = typer.Option(
+        None,
+        "--readme",
+        help="Optional README markdown file to copy into the pack root.",
+    ),
+    profile: str = typer.Option(
+        "dev",
+        "--profile",
+        help="Execution profile to use for cert pre-verification (dev|ci|release).",
+    ),
+    json_out: bool = typer.Option(
+        False, "--json", help="Emit machine-readable build JSON."
+    ),
+) -> None:
+    errors: list[str] = []
+    material_specs: list[tuple[str, Path]] = []
+    for material in materials:
+        spec = _material_spec(material)
+        if spec is None:
+            errors.append(f"Invalid --material value {material!r}; expected NAME=PATH.")
+            continue
+        material_specs.append(spec)
+
+    if errors:
+        payload = {
+            "format_version": PROOF_PACK_BUILD_FORMAT_VERSION,
+            "pack": str(Path(out)),
+            "ok": False,
+            "warnings": [],
+            "errors": errors,
+            "certs": {"total": 0},
+            "verify": None,
+            "files": None,
+        }
+        if json_out:
+            typer.echo(json.dumps(payload))
+        else:
+            for error in errors:
+                console.print(f"[red]ERROR:[/red] {error}")
+        raise typer.Exit(2)
+
+    payload, exit_code = build_proof_pack(
+        Path(out),
+        final_verdict_path=Path(final_verdict),
+        cert_paths=[Path(path) for path in certs],
+        source_repo_path=Path(source_repo) if source_repo else None,
+        environment_path=Path(environment) if environment else None,
+        material_specs=material_specs,
+        readme_path=Path(readme) if readme else None,
+        profile=profile,
+    )
+    payload = {
+        "format_version": PROOF_PACK_BUILD_FORMAT_VERSION,
+        **payload,
+    }
+
+    if json_out:
+        typer.echo(json.dumps(payload))
+    else:
+        for warning in payload["warnings"]:
+            console.print(f"[yellow]WARNING:[/yellow] {warning}")
+        if payload["ok"]:
+            console.print("[green]Proof pack built[/green]")
         else:
             for error in payload["errors"]:
                 console.print(f"[red]ERROR:[/red] {error}")

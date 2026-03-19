@@ -35,6 +35,8 @@ verify reported outcomes, and provide structured outputs for downstream analysis
 | `run_pack.sh` | Full proof pack: runs suite + packages artifacts | Proof pack directory with manifest + checksums | Default: distributable validation evidence |
 | `run_suite.sh` | Suite execution only | Reports + certs under the run directory | Development/debugging, iterative runs |
 | `verify_pack.sh` | Validate an existing proof pack | Verification status | Validating received proof packs |
+| `invarlock proof-pack inspect` | Read-only proof-pack summary | Manifest/integrity/cert inventory summary | Auditing a received pack without nested report verification |
+| `invarlock proof-pack build` | Assemble a proof pack from existing artifacts | Proof pack directory with manifest + checksums | Packaging already-produced verdicts, metadata, and certs |
 | `invarlock proof-pack verify` | Package-native proof-pack verification | Verification status + optional JSON | Validating received proof packs from a wheel install |
 
 ## Quick Start
@@ -46,6 +48,17 @@ PACK_TUNED_EDIT_PARAMS_FILE=./scripts/proof_packs/tuned_edit_params.json \
 
 # Development/debugging only (runs the suite, but does not build a proof pack)
 ./scripts/proof_packs/run_suite.sh --suite subset --resume
+
+# Inspect a received proof pack without nested cert verification
+invarlock proof-pack inspect ./proof_pack_runs/subset_20250101_000000/proof_pack --json
+
+# Build a proof pack from existing artifacts
+invarlock proof-pack build ./tmp/proof_pack \
+  --final-verdict ./reports/final_verdict.json \
+  --source-repo ./metadata/source_repo.json \
+  --environment ./metadata/environment.json \
+  --material model_revisions=./metadata/model_revisions.json \
+  --cert ./runs/model/evaluation.report.json
 
 # Verify an existing proof pack
 invarlock proof-pack verify ./proof_pack_runs/subset_20250101_000000/proof_pack --strict
@@ -161,10 +174,19 @@ The manifest contract is published at `contracts/proof_pack_manifest.schema.json
 malformed proof packs fail deterministically.
 
 Installed wheels now ship the public contracts and support package-native
-verification via `invarlock proof-pack verify`. The repo shell verifier remains
+inspection, assembly, and verification via `invarlock proof-pack inspect`,
+`invarlock proof-pack build`, and `invarlock proof-pack verify`. The repo shell verifier remains
 available for maintainers using the proof-pack harness directly.
 
-Use `invarlock proof-pack verify`:
+Use the package-native subcommands:
+
+- `invarlock proof-pack inspect <dir>`
+  - Summarizes manifest validity, checksum coverage, attestation references, cert inventory, and strict-readiness.
+  - Does not run nested `invarlock verify`; use this for quick received-artifact triage.
+- `invarlock proof-pack build <out> --final-verdict <json> --cert <report> [...more --cert]`
+  - Packages existing JSON artifacts into a proof pack and pre-verifies the supplied clean certs with `invarlock verify`.
+  - Intended for wheel users packaging already-produced evidence, not for running the full suite.
+- `invarlock proof-pack verify <dir>`
 
 - Default: `invarlock proof-pack verify <dir>`
   - Verifies `checksums_sha256_digest`, validates digest-backed manifest references, validates `checksums.sha256`, and runs `invarlock verify`.

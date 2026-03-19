@@ -4,10 +4,13 @@ import hashlib
 import io
 import json
 import re
+import shutil
 import subprocess
 from contextlib import redirect_stdout
 from pathlib import Path
 from typing import Any
+
+import typer
 
 from invarlock.public_contracts import load_proof_pack_manifest_schema
 
@@ -34,6 +37,7 @@ _CONTROL_FILES = {
     "metadata/checksums.sha256",
 }
 _CHECKSUM_LINE_RE = re.compile(r"^([A-Fa-f0-9]{64}) [ *](.+)$")
+_MATERIAL_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 
 def _load_json(path: Path) -> Any:
@@ -164,6 +168,63 @@ def validate_manifest(path: Path) -> list[str]:
         except Exception as exc:
             return [f"manifest schema validation failed: {exc}"]
     return _manual_validate_manifest(payload)
+
+
+def _relative_file_paths(pack_dir: Path) -> list[str]:
+    return sorted(
+        str(path.relative_to(pack_dir)).replace("\\", "/")
+        for path in pack_dir.rglob("*")
+        if path.is_file() and path.name != ".DS_Store" and "__MACOSX" not in path.parts
+    )
+
+
+def _write_checksums_file(pack_dir: Path, rel_paths: list[str]) -> None:
+    lines = [
+        f"{_sha256_bytes((pack_dir / rel_path).read_bytes())}  {rel_path}"
+        for rel_path in rel_paths
+    ]
+    (pack_dir / "checksums.sha256").write_text(
+        "\n".join(lines) + "\n", encoding="utf-8"
+    )
+
+
+def _copy_file(source_path: Path, dest_path: Path) -> None:
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source_path, dest_path)
+
+
+def _load_json_object(
+    path: Path, *, label: str
+) -> tuple[dict[str, Any] | None, list[str]]:
+    if not path.is_file():
+        return None, [f"{label} file not found: {path}"]
+    try:
+        payload = _load_json(path)
+    except Exception as exc:
+        return None, [f"{label} is not valid JSON: {exc}"]
+    if not isinstance(payload, dict):
+        return None, [f"{label} must decode to a JSON object: {path}"]
+    return payload, []
+
+
+def _material_spec(name_and_path: str) -> tuple[str, Path] | None:
+    name, sep, raw_path = name_and_path.partition("=")
+    if not sep:
+        return None
+    material_name = name.strip()
+    material_path = Path(raw_path.strip())
+    if not material_name or not raw_path.strip():
+        return None
+    return material_name, material_path
+
+
+def _validate_material_name(name: str) -> str | None:
+    if _MATERIAL_NAME_RE.fullmatch(name):
+        return None
+    return (
+        "material names must match "
+        "[A-Za-z0-9][A-Za-z0-9._-]* and must not contain path separators"
+    )
 
 
 def _validate_reference(*, pack_dir: Path, label: str, payload: Any) -> list[str]:
@@ -385,8 +446,8 @@ def _run_verify_command(
     with redirect_stdout(buffer):
         try:
             verify_command(reports=reports, profile=profile, json_out=True)
-        except SystemExit as exc:
-            raw_code = exc.code
+        except (SystemExit, typer.Exit) as exc:
+            raw_code = getattr(exc, "exit_code", getattr(exc, "code", 1))
             exit_code = int(raw_code) if isinstance(raw_code, int) else 1
     output = buffer.getvalue().strip()
     payload = json.loads(output.splitlines()[-1]) if output else None
@@ -422,6 +483,256 @@ def _verify_certs(
     if exit_code != 0:
         return ["invarlock verify reported cert verification failures."], payload
     return [], payload
+
+
+def inspect_proof_pack(pack_dir: Path) -> tuple[dict[str, Any], int]:
+    issues: list[str] = []
+    payload: dict[str, Any] = {
+        "pack": str(pack_dir),
+        "ok": False,
+        "manifest": {"valid": False, "format": None},
+        "signature": {"present": False, "signer_fingerprint": None},
+        "certs": {"total": 0, "clean": 0, "errors": 0},
+        "artifacts": {"files": 0, "hashed": 0},
+        "integrity": {
+            "checksums_bound": False,
+            "checksums_ok": False,
+            "manifest_attestation_ok": False,
+            "extra_files": [],
+        },
+        "issues": issues,
+        "strict_ready": False,
+    }
+    if not pack_dir.is_dir():
+        issues.append(f"Pack directory not found: {pack_dir}")
+        return payload, PROOF_PACK_VERIFY_MISSING
+    manifest_path = pack_dir / "manifest.json"
+    checksums_path = pack_dir / "checksums.sha256"
+    if not manifest_path.is_file():
+        issues.append("manifest.json missing in pack.")
+        return payload, PROOF_PACK_VERIFY_MISSING
+    if not checksums_path.is_file():
+        issues.append("checksums.sha256 missing in pack.")
+        return payload, PROOF_PACK_VERIFY_MISSING
+
+    manifest_errors = validate_manifest(manifest_path)
+    if manifest_errors:
+        issues.extend(manifest_errors)
+        return payload, PROOF_PACK_VERIFY_FORMAT
+
+    manifest = _load_json(manifest_path)
+    payload["manifest"] = {
+        "valid": True,
+        "format": manifest.get("format") if isinstance(manifest, dict) else None,
+    }
+
+    signature_present = (pack_dir / "manifest.json.asc").is_file()
+    payload["signature"] = {
+        "present": signature_present,
+        "signer_fingerprint": (
+            manifest.get("signing_key_fingerprint")
+            if isinstance(manifest, dict)
+            else None
+        ),
+    }
+    if not signature_present:
+        issues.append("manifest.json.asc missing; strict verification would fail.")
+
+    certs = sorted(pack_dir.glob("certs/**/evaluation.report.json"))
+    clean = [path for path in certs if "/errors/" not in path.as_posix()]
+    error_reports = [path for path in certs if path not in clean]
+    payload["certs"] = {
+        "total": len(certs),
+        "clean": len(clean),
+        "errors": len(error_reports),
+    }
+
+    bind_errors = _verify_manifest_binds_checksums(pack_dir)
+    checksum_errors, covered_paths = _verify_checksums(pack_dir)
+    attestation_errors = verify_manifest_attestation(pack_dir)
+    extra_files = sorted(
+        set(_relative_file_paths(pack_dir)) - covered_paths - _CONTROL_FILES
+    )
+    if extra_files:
+        issues.append(
+            "Pack contains extra files not covered by checksums.sha256: "
+            + ", ".join(extra_files)
+        )
+    issues.extend(bind_errors)
+    issues.extend(checksum_errors)
+    issues.extend(attestation_errors)
+
+    payload["artifacts"] = {
+        "files": len(_relative_file_paths(pack_dir)),
+        "hashed": len(covered_paths),
+    }
+    payload["integrity"] = {
+        "checksums_bound": not bind_errors,
+        "checksums_ok": not checksum_errors,
+        "manifest_attestation_ok": not attestation_errors,
+        "extra_files": extra_files,
+    }
+    payload["ok"] = True
+    payload["strict_ready"] = (
+        signature_present
+        and not bind_errors
+        and not checksum_errors
+        and not attestation_errors
+        and not extra_files
+    )
+    return payload, PROOF_PACK_VERIFY_OK
+
+
+def build_proof_pack(
+    out_dir: Path,
+    *,
+    final_verdict_path: Path,
+    cert_paths: list[Path],
+    source_repo_path: Path | None = None,
+    environment_path: Path | None = None,
+    material_specs: list[tuple[str, Path]] | None = None,
+    readme_path: Path | None = None,
+    profile: str = "dev",
+) -> tuple[dict[str, Any], int]:
+    warnings: list[str] = []
+    errors: list[str] = []
+    verify_payload: dict[str, Any] | None = None
+    payload: dict[str, Any] = {
+        "pack": str(out_dir),
+        "ok": False,
+        "warnings": warnings,
+        "errors": errors,
+        "certs": {"total": 0},
+        "verify": None,
+        "files": None,
+    }
+    material_specs = material_specs or []
+
+    if not cert_paths:
+        errors.append("proof-pack build requires at least one --cert input.")
+        return payload, PROOF_PACK_VERIFY_USAGE
+    if out_dir.exists():
+        errors.append(f"Output pack directory already exists: {out_dir}")
+        return payload, PROOF_PACK_VERIFY_USAGE
+    seen_material_names: set[str] = set()
+    for material_name, _material_path in material_specs:
+        name_error = _validate_material_name(material_name)
+        if name_error is not None:
+            errors.append(f"Invalid material name {material_name!r}: {name_error}")
+        if material_name in seen_material_names:
+            errors.append(f"Duplicate material name: {material_name}")
+        seen_material_names.add(material_name)
+
+    _, final_errors = _load_json_object(final_verdict_path, label="final_verdict")
+    errors.extend(final_errors)
+    if source_repo_path is not None:
+        _, source_repo_errors = _load_json_object(source_repo_path, label="source_repo")
+        errors.extend(source_repo_errors)
+    if environment_path is not None:
+        _, environment_errors = _load_json_object(environment_path, label="environment")
+        errors.extend(environment_errors)
+    for material_name, material_path in material_specs:
+        _, material_errors = _load_json_object(
+            material_path, label=f"material {material_name}"
+        )
+        errors.extend(material_errors)
+    for cert_path in cert_paths:
+        _, cert_errors = _load_json_object(cert_path, label="cert")
+        errors.extend(cert_errors)
+    if errors:
+        return payload, PROOF_PACK_VERIFY_FORMAT
+
+    verify_exit_code, verify_payload = _run_verify_command(cert_paths, profile=profile)
+    if verify_exit_code != 0:
+        payload["verify"] = verify_payload
+        errors.append("Provided cert inputs failed `invarlock verify`.")
+        return payload, PROOF_PACK_VERIFY_CERTS
+
+    out_dir.mkdir(parents=True, exist_ok=False)
+    rel_paths: list[str] = []
+
+    final_dest = out_dir / "results" / "final_verdict.json"
+    _copy_file(final_verdict_path, final_dest)
+    rel_paths.append("results/final_verdict.json")
+
+    if source_repo_path is not None:
+        source_repo_dest = out_dir / "metadata" / "source_repo.json"
+        _copy_file(source_repo_path, source_repo_dest)
+        rel_paths.append("metadata/source_repo.json")
+    if environment_path is not None:
+        environment_dest = out_dir / "metadata" / "environment.json"
+        _copy_file(environment_path, environment_dest)
+        rel_paths.append("metadata/environment.json")
+
+    material_refs: list[dict[str, Any]] = []
+    for material_name, material_path in material_specs:
+        suffix = material_path.suffix or ".json"
+        rel_path = f"metadata/{material_name}{suffix}"
+        material_dest = out_dir / rel_path
+        _copy_file(material_path, material_dest)
+        rel_paths.append(rel_path)
+        material_refs.append(
+            {
+                "name": material_name,
+                "path": rel_path,
+                "digest": _sha256_file(material_dest),
+            }
+        )
+
+    for index, cert_path in enumerate(cert_paths, start=1):
+        rel_path = f"certs/cert-{index:03d}/evaluation.report.json"
+        cert_dest = out_dir / rel_path
+        _copy_file(cert_path, cert_dest)
+        rel_paths.append(rel_path)
+
+    if readme_path is not None:
+        if not readme_path.is_file():
+            warnings.append(f"README file not found; skipping copy: {readme_path}")
+        else:
+            readme_dest = out_dir / "README.md"
+            _copy_file(readme_path, readme_dest)
+            rel_paths.append("README.md")
+
+    _write_checksums_file(out_dir, rel_paths)
+    manifest: dict[str, Any] = {
+        "format": PROOF_PACK_FORMAT,
+        "checksums_sha256": "checksums.sha256",
+        "checksums_sha256_digest": _sha256_bytes(
+            (out_dir / "checksums.sha256").read_bytes()
+        ),
+        "subject": {
+            "name": "final_verdict",
+            "path": "results/final_verdict.json",
+            "digest": _sha256_file(final_dest),
+        },
+    }
+    if source_repo_path is not None:
+        manifest["invocation"] = {
+            "config_source": {
+                "path": "metadata/source_repo.json",
+                "digest": _sha256_file(out_dir / "metadata" / "source_repo.json"),
+            }
+        }
+    if environment_path is not None:
+        manifest["environment"] = {
+            "path": "metadata/environment.json",
+            "digest": _sha256_file(out_dir / "metadata" / "environment.json"),
+        }
+    if material_refs:
+        manifest["materials"] = material_refs
+    (out_dir / "manifest.json").write_text(
+        json.dumps(manifest, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+    payload["ok"] = True
+    payload["certs"] = {"total": len(cert_paths)}
+    payload["verify"] = verify_payload
+    payload["files"] = {
+        "hashed": len(rel_paths),
+        "manifest": "manifest.json",
+        "checksums": "checksums.sha256",
+    }
+    return payload, PROOF_PACK_VERIFY_OK
 
 
 def verify_proof_pack(

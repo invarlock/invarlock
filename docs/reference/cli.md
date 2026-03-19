@@ -57,6 +57,8 @@ For definitions of common terms (pairing, tier policy, primary metric), see the
 | Compare baseline vs subject | `invarlock evaluate` | `runs/` reports + `reports/eval` report. |
 | Single-model run report | `invarlock run` | `report.json` + `events.jsonl`. |
 | Validate report | `invarlock verify` | Exit code + validation messages. |
+| Inspect proof pack | `invarlock proof-pack inspect` | Read-only proof-pack summary. |
+| Build proof pack | `invarlock proof-pack build` | Pack directory with manifest + checksums. |
 | Validate proof pack | `invarlock proof-pack verify` | Exit code + proof-pack verification result. |
 | Build / verify policy pack | `invarlock policy` | `policy-pack.json` + verification result. |
 | Explain / HTML / compare | `invarlock report` | Rendered reports/evals. |
@@ -78,6 +80,8 @@ invarlock evaluate --baseline <BASELINE_MODEL> --subject <SUBJECT_MODEL>
 | `invarlock run` | Yes (`--out`) | No | No | Produces `report.json` + `events.jsonl`. |
 | `invarlock report` | No | Yes (`--output`) | Optional (`--format report/html`) | Renders from existing reports. |
 | `invarlock verify` | No | No | No | Reads report JSON(s). |
+| `invarlock proof-pack inspect` | No | No | No | Reads proof-pack manifests and checksum/inventory state only. |
+| `invarlock proof-pack build` | Yes (`<out>/`) | No | No | Packages existing verdict/metadata/cert artifacts into a proof pack. |
 | `invarlock proof-pack verify` | No | No | No | Reads proof-pack manifests, checksums, and bundled certs. |
 | `invarlock plugins` / `doctor` | No | No | No | Diagnostics only. |
 
@@ -95,8 +99,8 @@ Note on presets and scripts
 - Presets and scripts in this repository (`configs/`, `scripts/`) are not
   shipped in wheels.
 - Public contracts are shipped in wheels under `invarlock/_data/contracts/`.
-- Proof-pack verification is available from wheels via
-  `invarlock proof-pack verify`.
+- Proof-pack inspection, build, and verification are available from wheels via
+  `invarlock proof-pack inspect|build|verify`.
 - When installing from PyPI, prefer flag‑only `invarlock evaluate` (no preset
   paths), or clone this repo to use presets and matrix scripts.
 
@@ -106,7 +110,7 @@ Top‑level commands:
 | ------------------- | ------------------------------------------------------------------------- |
 | `invarlock evaluate` | evaluate two checkpoints (baseline vs subject) with pinned windows         |
 | `invarlock verify`  | Verify report JSONs against schema and pairing math                  |
-| `invarlock proof-pack` | Verify portable proof-pack evidence bundles                      |
+| `invarlock proof-pack` | Inspect, build, and verify portable proof-pack evidence bundles |
 | `invarlock policy`  | Build and verify policy-pack artifacts                              |
 | `invarlock report`  | Operations on reports and reports (explain, html, validate, compare) |
 | `invarlock run`     | Advanced: single‑model evaluation to produce a report                     |
@@ -190,6 +194,14 @@ invarlock verify reports/eval/evaluation.report.json
 
 # Validate a proof pack from a wheel install
 invarlock proof-pack verify proof_pack_runs/subset_<timestamp>/proof_pack --strict
+
+# Inspect a proof pack without nested cert verification
+invarlock proof-pack inspect proof_pack_runs/subset_<timestamp>/proof_pack --json
+
+# Build a proof pack from existing artifacts
+invarlock proof-pack build tmp/proof_pack \
+  --final-verdict reports/final_verdict.json \
+  --cert runs/subject/evaluation.report.json
 ```
 
 Use `invarlock plugins` to review available adapters, edits, and guards.
@@ -235,8 +247,15 @@ Exhaustive command map with brief descriptions and notable options.
       - Options: `--json`.
 
 - `invarlock proof-pack` (group)
-  - Purpose: Verify proof-pack manifests, checksums, attestation refs, and bundled certs.
+  - Purpose: Inspect, build, and verify proof-pack evidence bundles.
   - Subcommands:
+    - `invarlock proof-pack inspect`
+      - Args: `pack`
+      - Options: `--json`
+    - `invarlock proof-pack build`
+      - Args: `out`
+      - Options: `--final-verdict`, `--cert`, `--source-repo`, `--environment`,
+        `--material`, `--readme`, `--profile`, `--json`
     - `invarlock proof-pack verify`
       - Args: `pack`
       - Options: `--json`, `--json-out`, `--skip-verify`, `--strict`, `--profile`.
