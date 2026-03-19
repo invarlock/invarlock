@@ -25,7 +25,15 @@ def test_invarlock_help_layout_and_exit_codes():
     assert "2=schema invalid" in normalized and "3=hard abort" in normalized
 
     # Command names presence (order may vary with Typer versions)
-    for name in ("evaluate", "report", "run", "plugins", "doctor", "version"):
+    for name in (
+        "evaluate",
+        "report",
+        "proof-pack",
+        "run",
+        "plugins",
+        "doctor",
+        "version",
+    ):
         assert name in out
 
 

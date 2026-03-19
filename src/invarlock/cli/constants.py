@@ -8,6 +8,7 @@ DOCTOR_FORMAT_VERSION = "doctor-v1"
 PLUGINS_FORMAT_VERSION = "plugins-v1"
 VERIFY_FORMAT_VERSION = "verify-v1"
 POLICY_PACK_VERIFY_FORMAT_VERSION = "policy-pack-verify-v1"
+PROOF_PACK_VERIFY_FORMAT_VERSION = "proof-pack-verify-v1"
 
 PROVIDER_NOTES: dict[str, str] = {
     # WikiText-2 is loaded via datasets; works offline if cached.
@@ -62,6 +63,7 @@ __all__ = [
     "DOCTOR_FORMAT_VERSION",
     "PLUGINS_FORMAT_VERSION",
     "POLICY_PACK_VERIFY_FORMAT_VERSION",
+    "PROOF_PACK_VERIFY_FORMAT_VERSION",
     "VERIFY_FORMAT_VERSION",
     "PROVIDER_NOTES",
     "PROVIDER_PARAMS",

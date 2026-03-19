@@ -1,0 +1,618 @@
+from __future__ import annotations
+
+import hashlib
+import io
+import json
+import re
+import subprocess
+from contextlib import redirect_stdout
+from pathlib import Path
+from typing import Any
+
+from invarlock.public_contracts import load_proof_pack_manifest_schema
+
+try:  # pragma: no cover - exercised through tests/integration
+    import jsonschema
+except Exception:  # pragma: no cover
+    jsonschema = None
+
+PROOF_PACK_FORMAT = "proof-pack-v1"
+PROOF_PACK_VERIFY_OK = 0
+PROOF_PACK_VERIFY_USAGE = 2
+PROOF_PACK_VERIFY_MISSING = 3
+PROOF_PACK_VERIFY_FORMAT = 4
+PROOF_PACK_VERIFY_SIGNATURE = 5
+PROOF_PACK_VERIFY_INTEGRITY = 6
+PROOF_PACK_VERIFY_CERTS = 7
+
+_CONTROL_FILES = {
+    "checksums.sha256",
+    "manifest.json",
+    "manifest.json.asc",
+    "metadata/manifest.json",
+    "metadata/manifest.json.asc",
+    "metadata/checksums.sha256",
+}
+_CHECKSUM_LINE_RE = re.compile(r"^([A-Fa-f0-9]{64}) [ *](.+)$")
+
+
+def _load_json(path: Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _sha256_bytes(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _sha256_file(path: Path) -> str:
+    return f"sha256:{_sha256_bytes(path.read_bytes())}"
+
+
+def _normalize_pack_path(pack_dir: Path, rel_path: str) -> Path | None:
+    candidate = (pack_dir / rel_path).resolve()
+    try:
+        candidate.relative_to(pack_dir.resolve())
+    except ValueError:
+        return None
+    return candidate
+
+
+def _path_within_dir(dir_path: Path, candidate_path: Path) -> bool:
+    try:
+        candidate_path.resolve().relative_to(dir_path.resolve())
+    except ValueError:
+        return False
+    return True
+
+
+def _manual_validate_manifest(payload: Any) -> list[str]:
+    errors: list[str] = []
+    if not isinstance(payload, dict):
+        return ["manifest must decode to a JSON object"]
+    required = ["format", "checksums_sha256", "checksums_sha256_digest"]
+    for field in required:
+        if field not in payload:
+            errors.append(f"manifest missing required field: {field}")
+    if payload.get("format") != PROOF_PACK_FORMAT:
+        errors.append(
+            f"manifest format must be {PROOF_PACK_FORMAT!r} (found {payload.get('format')!r})"
+        )
+    if payload.get("checksums_sha256") != "checksums.sha256":
+        errors.append("manifest checksums_sha256 must point to 'checksums.sha256'")
+    digest = payload.get("checksums_sha256_digest")
+    if not isinstance(digest, str) or len(digest) != 64:
+        errors.append("manifest checksums_sha256_digest must be a 64-char sha256 hex")
+    network_mode = payload.get("network_mode")
+    if network_mode is not None and network_mode not in {"offline", "online"}:
+        errors.append("manifest network_mode must be 'offline' or 'online'")
+    artifacts = payload.get("artifacts")
+    if artifacts is not None and not isinstance(artifacts, list):
+        errors.append("manifest artifacts must be a list")
+
+    builder = payload.get("builder")
+    if builder is not None:
+        if not isinstance(builder, dict):
+            errors.append("manifest builder must be an object")
+        else:
+            if not isinstance(builder.get("id"), str) or not builder.get("id"):
+                errors.append("manifest builder.id must be a non-empty string")
+            if not isinstance(builder.get("name"), str) or not builder.get("name"):
+                errors.append("manifest builder.name must be a non-empty string")
+
+    def _validate_digest_ref(label: str, value: Any) -> None:
+        if value is None:
+            return
+        if not isinstance(value, dict):
+            errors.append(f"manifest {label} must be an object")
+            return
+        path = value.get("path")
+        digest_value = value.get("digest")
+        if path is None and digest_value is None:
+            return
+        if not isinstance(path, str) or not path:
+            errors.append(f"manifest {label}.path must be a non-empty string")
+        if (
+            not isinstance(digest_value, str)
+            or not digest_value.startswith("sha256:")
+            or len(digest_value) != 71
+        ):
+            errors.append(f"manifest {label}.digest must be a sha256:... string")
+
+    _validate_digest_ref("subject", payload.get("subject"))
+
+    invocation = payload.get("invocation")
+    if invocation is not None:
+        if not isinstance(invocation, dict):
+            errors.append("manifest invocation must be an object")
+        else:
+            config_source = invocation.get("config_source")
+            if config_source is not None and not isinstance(config_source, dict):
+                errors.append("manifest invocation.config_source must be an object")
+            _validate_digest_ref("invocation.config_source", config_source)
+            parameters = invocation.get("parameters")
+            if parameters is not None and not isinstance(parameters, dict):
+                errors.append("manifest invocation.parameters must be an object")
+
+    _validate_digest_ref("environment", payload.get("environment"))
+
+    materials = payload.get("materials")
+    if materials is not None:
+        if not isinstance(materials, list):
+            errors.append("manifest materials must be a list")
+        else:
+            for index, material in enumerate(materials):
+                _validate_digest_ref(f"materials[{index}]", material)
+                if isinstance(material, dict):
+                    name = material.get("name")
+                    if not isinstance(name, str) or not name:
+                        errors.append(
+                            f"manifest materials[{index}].name must be a non-empty string"
+                        )
+    return errors
+
+
+def validate_manifest(path: Path) -> list[str]:
+    try:
+        payload = _load_json(path)
+    except Exception as exc:
+        return [f"manifest is not valid JSON: {exc}"]
+
+    schema = load_proof_pack_manifest_schema()
+    if schema and jsonschema is not None:
+        try:
+            jsonschema.validate(instance=payload, schema=schema)
+        except Exception as exc:
+            return [f"manifest schema validation failed: {exc}"]
+    return _manual_validate_manifest(payload)
+
+
+def _validate_reference(*, pack_dir: Path, label: str, payload: Any) -> list[str]:
+    if not isinstance(payload, dict):
+        return []
+    rel_path = payload.get("path")
+    digest = payload.get("digest")
+    if rel_path is None and digest is None:
+        return []
+    if not isinstance(rel_path, str) or not rel_path:
+        return [
+            f"{label} must include a non-empty path when digest verification is enabled"
+        ]
+    if (
+        not isinstance(digest, str)
+        or not digest.startswith("sha256:")
+        or len(digest) != 71
+    ):
+        return [f"{label} digest must be a sha256:... string"]
+    resolved = _normalize_pack_path(pack_dir, rel_path)
+    if resolved is None:
+        return [f"{label} path escapes the pack root: {rel_path}"]
+    if not resolved.is_file():
+        return [f"{label} path is missing: {rel_path}"]
+    actual = _sha256_file(resolved)
+    if actual != digest:
+        return [
+            f"{label} digest mismatch for {rel_path} (expected {digest}, got {actual})"
+        ]
+    return []
+
+
+def verify_manifest_attestation(pack_dir: Path) -> list[str]:
+    payload = _load_json(pack_dir / "manifest.json")
+    if not isinstance(payload, dict):
+        return ["manifest must decode to a JSON object"]
+
+    errors: list[str] = []
+    errors.extend(
+        _validate_reference(
+            pack_dir=pack_dir, label="subject", payload=payload.get("subject")
+        )
+    )
+    invocation = payload.get("invocation")
+    if isinstance(invocation, dict):
+        errors.extend(
+            _validate_reference(
+                pack_dir=pack_dir,
+                label="invocation.config_source",
+                payload=invocation.get("config_source"),
+            )
+        )
+    errors.extend(
+        _validate_reference(
+            pack_dir=pack_dir, label="environment", payload=payload.get("environment")
+        )
+    )
+    materials = payload.get("materials")
+    if isinstance(materials, list):
+        for index, material in enumerate(materials):
+            errors.extend(
+                _validate_reference(
+                    pack_dir=pack_dir,
+                    label=f"materials[{index}]",
+                    payload=material,
+                )
+            )
+    return errors
+
+
+def _verify_manifest_binds_checksums(pack_dir: Path) -> list[str]:
+    payload = _load_json(pack_dir / "manifest.json")
+    expected = payload.get("checksums_sha256_digest")
+    if expected is None:
+        return [
+            "manifest.json missing checksums_sha256_digest (pack is not tamper-evident)."
+        ]
+    if not isinstance(expected, str) or not expected:
+        return ["manifest.json checksums_sha256_digest is empty."]
+    actual = _sha256_bytes((pack_dir / "checksums.sha256").read_bytes())
+    if expected != actual:
+        return [
+            f"checksums.sha256 digest mismatch (expected {expected}, got {actual})."
+        ]
+    return []
+
+
+def _parse_checksums(pack_dir: Path) -> tuple[list[tuple[str, str]], list[str]]:
+    entries: list[tuple[str, str]] = []
+    errors: list[str] = []
+    checksums_path = pack_dir / "checksums.sha256"
+    for index, raw_line in enumerate(
+        checksums_path.read_text(encoding="utf-8").splitlines(), start=1
+    ):
+        line = raw_line.rstrip()
+        if not line:
+            continue
+        match = _CHECKSUM_LINE_RE.match(line)
+        if not match:
+            errors.append(f"checksums.sha256 line {index} is not a valid sha256 entry")
+            continue
+        digest, rel_path = match.groups()
+        entries.append((digest.lower(), rel_path))
+    return entries, errors
+
+
+def _verify_checksums(pack_dir: Path) -> tuple[list[str], set[str]]:
+    entries, errors = _parse_checksums(pack_dir)
+    covered_paths: set[str] = set()
+    for digest, rel_path in entries:
+        covered_paths.add(rel_path)
+        resolved = _normalize_pack_path(pack_dir, rel_path)
+        if resolved is None:
+            errors.append(f"checksums entry escapes the pack root: {rel_path}")
+            continue
+        if not resolved.is_file():
+            errors.append(f"checksums entry missing from pack: {rel_path}")
+            continue
+        actual = _sha256_bytes(resolved.read_bytes())
+        if actual != digest:
+            errors.append(
+                f"checksum mismatch for {rel_path} (expected {digest}, got {actual})"
+            )
+    return errors, covered_paths
+
+
+def _verify_no_extra_files(
+    pack_dir: Path, *, covered_paths: set[str], strict: bool
+) -> tuple[list[str], list[str]]:
+    actual_paths = {
+        str(path.relative_to(pack_dir)).replace("\\", "/")
+        for path in pack_dir.rglob("*")
+        if path.is_file() and path.name != ".DS_Store" and "__MACOSX" not in path.parts
+    }
+    extras = sorted(actual_paths - covered_paths - _CONTROL_FILES)
+    if not extras:
+        return [], []
+    if strict:
+        return (
+            [
+                f"Pack contains extra files not covered by checksums.sha256: {', '.join(extras)}"
+            ],
+            [],
+        )
+    return [], [
+        f"Pack contains extra files not covered by checksums.sha256: {', '.join(extras)}"
+    ]
+
+
+def _verify_gpg(
+    pack_dir: Path, *, strict: bool
+) -> tuple[list[str], list[str], str | None]:
+    signature_path = pack_dir / "manifest.json.asc"
+    if not signature_path.is_file():
+        if strict:
+            return (
+                ["manifest.json.asc missing (strict mode requires a signed manifest)."],
+                [],
+                None,
+            )
+        return [], ["manifest.json.asc missing; pack is unsigned."], None
+    try:
+        result = subprocess.run(
+            [
+                "gpg",
+                "--status-fd",
+                "1",
+                "--verify",
+                str(signature_path),
+                str(pack_dir / "manifest.json"),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        if strict:
+            return (
+                ["gpg not found (strict mode requires signature verification)."],
+                [],
+                None,
+            )
+        return [], ["gpg not found; skipping manifest signature verification."], None
+    if result.returncode != 0:
+        message = (result.stdout + result.stderr).strip()
+        error = "manifest signature verification failed."
+        if message:
+            error = f"{error} {message}"
+        return [error], [], None
+    signer_fpr = None
+    for line in result.stdout.splitlines():
+        if "VALIDSIG " not in line:
+            continue
+        parts = line.split()
+        if len(parts) >= 3:
+            signer_fpr = parts[2]
+            break
+    if signer_fpr:
+        manifest = _load_json(pack_dir / "manifest.json")
+        recorded = manifest.get("signing_key_fingerprint")
+        if recorded and recorded != signer_fpr:
+            return (
+                [
+                    f"manifest.json signing_key_fingerprint ({recorded}) does not match signature key ({signer_fpr})."
+                ],
+                [],
+                signer_fpr,
+            )
+    return [], [], signer_fpr
+
+
+def _run_verify_command(
+    reports: list[Path], *, profile: str
+) -> tuple[int, dict[str, Any] | None]:
+    from invarlock.cli.commands.verify import verify_command
+
+    buffer = io.StringIO()
+    exit_code = 0
+    with redirect_stdout(buffer):
+        try:
+            verify_command(reports=reports, profile=profile, json_out=True)
+        except SystemExit as exc:
+            raw_code = exc.code
+            exit_code = int(raw_code) if isinstance(raw_code, int) else 1
+    output = buffer.getvalue().strip()
+    payload = json.loads(output.splitlines()[-1]) if output else None
+    return exit_code, payload
+
+
+def _verify_certs(
+    pack_dir: Path,
+    *,
+    json_out_path: Path | None,
+    profile: str,
+) -> tuple[list[str], dict[str, Any] | None]:
+    certs = sorted(pack_dir.glob("certs/**/evaluation.report.json"))
+    if not certs:
+        return ["No reports found in pack."], None
+    clean = [path for path in certs if "/errors/" not in path.as_posix()]
+    error_reports = [path for path in certs if path not in clean]
+    if not clean:
+        return [
+            "No clean reports found in pack (only error-injection reports present)."
+        ], None
+
+    exit_code, payload = _run_verify_command(clean, profile=profile)
+    if json_out_path is not None and payload is not None:
+        json_out_path.write_text(
+            json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8"
+        )
+    if error_reports:
+        try:
+            _run_verify_command(error_reports, profile=profile)
+        except Exception:
+            pass
+    if exit_code != 0:
+        return ["invarlock verify reported cert verification failures."], payload
+    return [], payload
+
+
+def verify_proof_pack(
+    pack_dir: Path,
+    *,
+    json_out_path: Path | None = None,
+    skip_verify: bool = False,
+    strict: bool = False,
+    profile: str = "dev",
+) -> tuple[dict[str, Any], int]:
+    warnings: list[str] = []
+    errors: list[str] = []
+    verify_payload: dict[str, Any] | None = None
+    signer_fingerprint: str | None = None
+
+    if not pack_dir.is_dir():
+        errors.append(f"Pack directory not found: {pack_dir}")
+        return _build_verify_result(
+            pack_dir=pack_dir,
+            ok=False,
+            strict=strict,
+            skip_verify=skip_verify,
+            warnings=warnings,
+            errors=errors,
+            signer_fingerprint=signer_fingerprint,
+            verify_payload=verify_payload,
+            exit_code=PROOF_PACK_VERIFY_MISSING,
+        ), PROOF_PACK_VERIFY_MISSING
+    if not (pack_dir / "manifest.json").is_file():
+        errors.append("manifest.json missing in pack.")
+        return _build_verify_result(
+            pack_dir=pack_dir,
+            ok=False,
+            strict=strict,
+            skip_verify=skip_verify,
+            warnings=warnings,
+            errors=errors,
+            signer_fingerprint=signer_fingerprint,
+            verify_payload=verify_payload,
+            exit_code=PROOF_PACK_VERIFY_MISSING,
+        ), PROOF_PACK_VERIFY_MISSING
+    if not (pack_dir / "checksums.sha256").is_file():
+        errors.append("checksums.sha256 missing in pack.")
+        return _build_verify_result(
+            pack_dir=pack_dir,
+            ok=False,
+            strict=strict,
+            skip_verify=skip_verify,
+            warnings=warnings,
+            errors=errors,
+            signer_fingerprint=signer_fingerprint,
+            verify_payload=verify_payload,
+            exit_code=PROOF_PACK_VERIFY_MISSING,
+        ), PROOF_PACK_VERIFY_MISSING
+    if json_out_path is not None and _path_within_dir(pack_dir, json_out_path):
+        errors.append("--json-out must point outside the pack directory.")
+        return _build_verify_result(
+            pack_dir=pack_dir,
+            ok=False,
+            strict=strict,
+            skip_verify=skip_verify,
+            warnings=warnings,
+            errors=errors,
+            signer_fingerprint=signer_fingerprint,
+            verify_payload=verify_payload,
+            exit_code=PROOF_PACK_VERIFY_USAGE,
+        ), PROOF_PACK_VERIFY_USAGE
+
+    errors.extend(validate_manifest(pack_dir / "manifest.json"))
+    if errors:
+        return _build_verify_result(
+            pack_dir=pack_dir,
+            ok=False,
+            strict=strict,
+            skip_verify=skip_verify,
+            warnings=warnings,
+            errors=errors,
+            signer_fingerprint=signer_fingerprint,
+            verify_payload=verify_payload,
+            exit_code=PROOF_PACK_VERIFY_FORMAT,
+        ), PROOF_PACK_VERIFY_FORMAT
+
+    signature_errors, signature_warnings, signer_fingerprint = _verify_gpg(
+        pack_dir, strict=strict
+    )
+    warnings.extend(signature_warnings)
+    if signature_errors:
+        errors.extend(signature_errors)
+        return _build_verify_result(
+            pack_dir=pack_dir,
+            ok=False,
+            strict=strict,
+            skip_verify=skip_verify,
+            warnings=warnings,
+            errors=errors,
+            signer_fingerprint=signer_fingerprint,
+            verify_payload=verify_payload,
+            exit_code=PROOF_PACK_VERIFY_SIGNATURE,
+        ), PROOF_PACK_VERIFY_SIGNATURE
+
+    errors.extend(_verify_manifest_binds_checksums(pack_dir))
+    checksum_errors, covered_paths = _verify_checksums(pack_dir)
+    errors.extend(checksum_errors)
+    errors.extend(verify_manifest_attestation(pack_dir))
+    extra_errors, extra_warnings = _verify_no_extra_files(
+        pack_dir, covered_paths=covered_paths, strict=strict
+    )
+    errors.extend(extra_errors)
+    warnings.extend(extra_warnings)
+    if errors:
+        return _build_verify_result(
+            pack_dir=pack_dir,
+            ok=False,
+            strict=strict,
+            skip_verify=skip_verify,
+            warnings=warnings,
+            errors=errors,
+            signer_fingerprint=signer_fingerprint,
+            verify_payload=verify_payload,
+            exit_code=PROOF_PACK_VERIFY_INTEGRITY,
+        ), PROOF_PACK_VERIFY_INTEGRITY
+
+    if not skip_verify:
+        cert_errors, verify_payload = _verify_certs(
+            pack_dir, json_out_path=json_out_path, profile=profile
+        )
+        if cert_errors:
+            errors.extend(cert_errors)
+            return _build_verify_result(
+                pack_dir=pack_dir,
+                ok=False,
+                strict=strict,
+                skip_verify=skip_verify,
+                warnings=warnings,
+                errors=errors,
+                signer_fingerprint=signer_fingerprint,
+                verify_payload=verify_payload,
+                exit_code=PROOF_PACK_VERIFY_CERTS,
+            ), PROOF_PACK_VERIFY_CERTS
+
+    return _build_verify_result(
+        pack_dir=pack_dir,
+        ok=True,
+        strict=strict,
+        skip_verify=skip_verify,
+        warnings=warnings,
+        errors=errors,
+        signer_fingerprint=signer_fingerprint,
+        verify_payload=verify_payload,
+        exit_code=PROOF_PACK_VERIFY_OK,
+    ), PROOF_PACK_VERIFY_OK
+
+
+def _build_verify_result(
+    *,
+    pack_dir: Path,
+    ok: bool,
+    strict: bool,
+    skip_verify: bool,
+    warnings: list[str],
+    errors: list[str],
+    signer_fingerprint: str | None,
+    verify_payload: dict[str, Any] | None,
+    exit_code: int,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "pack": str(pack_dir),
+        "ok": ok,
+        "strict": strict,
+        "skip_verify": skip_verify,
+        "warnings": warnings,
+        "errors": errors,
+        "resolution": {"exit_code": exit_code},
+    }
+    if signer_fingerprint:
+        payload["signer_fingerprint"] = signer_fingerprint
+    if verify_payload is not None:
+        payload["verify"] = verify_payload
+    return payload
+
+
+__all__ = [
+    "PROOF_PACK_FORMAT",
+    "PROOF_PACK_VERIFY_CERTS",
+    "PROOF_PACK_VERIFY_FORMAT",
+    "PROOF_PACK_VERIFY_INTEGRITY",
+    "PROOF_PACK_VERIFY_MISSING",
+    "PROOF_PACK_VERIFY_OK",
+    "PROOF_PACK_VERIFY_SIGNATURE",
+    "PROOF_PACK_VERIFY_USAGE",
+    "validate_manifest",
+    "verify_manifest_attestation",
+    "verify_proof_pack",
+]

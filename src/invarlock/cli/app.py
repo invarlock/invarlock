@@ -41,6 +41,7 @@ class OrderedGroup(TyperGroup):
             "calibrate",
             "report",
             "verify",
+            "proof-pack",
             "policy",
             "run",
             "plugins",
@@ -258,6 +259,10 @@ def _load_lazy_subapp(group: TyperGroup, name: str) -> bool:
         from .commands.policy import policy_app as _policy_app
 
         return _register_lazy(name, _policy_app)
+    if name == "proof-pack":
+        from .commands.proof_pack import proof_pack_app as _proof_pack_app
+
+        return _register_lazy(name, _proof_pack_app)
     if name == "plugins":
         from .commands.plugins import plugins_app as _plugins_app
 

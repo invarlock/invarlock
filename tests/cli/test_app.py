@@ -47,7 +47,15 @@ def test_cli_help_lists_core_commands():
     output = strip_ansi(result.stdout)
     assert "evaluate model changes" in output.lower()
     # Verify the new grouped layout mentions key groups
-    for command in ("evaluate", "report", "run", "plugins", "doctor", "version"):
+    for command in (
+        "evaluate",
+        "report",
+        "proof-pack",
+        "run",
+        "plugins",
+        "doctor",
+        "version",
+    ):
         assert command in output
 
 

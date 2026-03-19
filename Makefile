@@ -21,7 +21,8 @@ COVERAGE_TESTS_RUN := \
 	tests/cli/run
 
 COVERAGE_TESTS_VERIFY := \
-	tests/cli/test_verify*.py tests/cli/test_cli_command_help_smoke.py tests/cli/test_policy_commands.py
+	tests/cli/test_verify*.py tests/cli/test_cli_command_help_smoke.py \
+	tests/cli/test_policy_commands.py tests/cli/test_proof_pack_commands.py
 
 COVERAGE_TESTS_CONFIG := \
 	tests/cli/test_config_failfast.py tests/cli/test_error_codes.py \
@@ -70,12 +71,14 @@ COVERAGE_TESTS := \
 COVERAGE_MODULES := \
 	--cov=src/invarlock/eval --cov=src/invarlock/guards --cov=src/invarlock/calibration \
 	--cov=src/invarlock/cli --cov=src/invarlock/core --cov=src/invarlock/reporting \
-	--cov=invarlock.public_contracts --cov=invarlock.policy_pack
+	--cov=invarlock.public_contracts --cov=invarlock.policy_pack \
+	--cov=invarlock.proof_pack
 
 COVERAGE_INCLUDE := \
 	src/invarlock/eval/*,src/invarlock/guards/*,src/invarlock/calibration/*,\
 	src/invarlock/cli/*,src/invarlock/core/*,src/invarlock/reporting/*,\
-	src/invarlock/public_contracts.py,src/invarlock/policy_pack.py
+	src/invarlock/public_contracts.py,src/invarlock/policy_pack.py,\
+	src/invarlock/proof_pack.py
 
 help:  ## Show this help message
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
@@ -151,6 +154,7 @@ test-assurance:  ## Run assurance-related tests only
 		tests/docs/test_claim_surface_consistency.py \
 		tests/docs/test_assurance_xref_linter.py \
 		tests/reporting/test_public_contracts.py \
+		tests/reporting/test_proof_pack_contract.py \
 		tests/reporting/test_policy_pack_contract.py \
 		tests/reporting/test_policy_utils.py::test_compute_policy_digest_matches_assurance_spec
 

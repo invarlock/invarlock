@@ -24,6 +24,10 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "plugins_command": ("invarlock.cli.commands.plugins", "plugins_command"),
     "policy_build_command": ("invarlock.cli.commands.policy", "build_command"),
     "policy_verify_command": ("invarlock.cli.commands.policy", "verify_command"),
+    "proof_pack_verify_command": (
+        "invarlock.cli.commands.proof_pack",
+        "verify_command",
+    ),
     "report_command": ("invarlock.cli.commands.report", "report_command"),
     "run_command": ("invarlock.cli.commands.run", "run_command"),
     "verify_command": ("invarlock.cli.commands.verify", "verify_command"),

@@ -57,8 +57,10 @@ THRESHOLDS = {
     "src/invarlock/reporting/report_schema.py": 1.00,
     "src/invarlock/public_contracts.py": 1.00,
     "src/invarlock/policy_pack.py": 1.00,
+    "src/invarlock/proof_pack.py": 1.00,
     "src/invarlock/cli/verify_output.py": 1.00,
     "src/invarlock/cli/commands/policy.py": 1.00,
+    "src/invarlock/cli/commands/proof_pack.py": 1.00,
     "src/invarlock/core/runner_lifecycle.py": 1.00,
     "src/invarlock/core/runner_pairing.py": 1.00,
     "src/invarlock/core/runner_services.py": 1.00,
@@ -184,6 +186,8 @@ CORE_FILES = (
     # Public contract helpers
     "src/invarlock/public_contracts.py",
     "src/invarlock/policy_pack.py",
+    "src/invarlock/proof_pack.py",
+    "src/invarlock/cli/commands/proof_pack.py",
 )
 
 
