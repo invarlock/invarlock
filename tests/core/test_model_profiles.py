@@ -20,6 +20,7 @@ pytest.importorskip("transformers")
         ("Qwen/Qwen2-7B", "hf_causal", "qwen", "causal"),
         ("Qwen/Qwen3-8B", "hf_causal", "qwen", "causal"),
         ("Qwen/Qwen3.5-9B", "hf_causal", "qwen", "causal"),
+        ("Qwen/QwQ-32B", "hf_causal", "qwen", "causal"),
         ("TinyLlama/TinyLlama-1.1B-Chat-v1.0", "hf_causal", "llama", "causal"),
         ("unsloth/gemma-2-9b-it-bnb-4bit", "hf_causal", "gemma", "causal"),
         (
@@ -30,6 +31,7 @@ pytest.importorskip("transformers")
         ),
         ("microsoft/Phi-4-reasoning-plus", "hf_causal", "phi4", "causal"),
         ("allenai/OLMo-2-1124-7B", "hf_causal", "olmo", "causal"),
+        ("allenai/OLMo-2-1124-13B-Instruct", "hf_causal", "olmo", "causal"),
     ],
 )
 def test_detect_profile_core(model_id, adapter, expected_family, expected_loss):
