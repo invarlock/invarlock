@@ -18,7 +18,8 @@ class _EncodeTokenizer:
     pad_token_id = 0
 
     def encode(self, text, truncation=True, max_length=8):
-        ids = list(range(1, min(len(text), max_length) + 1))
+        base = (sum(ord(ch) for ch in text) % 97) + 1
+        ids = [base + idx for idx in range(min(len(text), max_length))]
         return ids
 
 

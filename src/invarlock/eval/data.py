@@ -1508,7 +1508,9 @@ class HFTextProvider:
         chunk_size = max(64, min(256, int(target_total or 1)))
 
         for start in range(0, len(positions), chunk_size):
-            batch_positions = [int(pos) for pos in positions[start : start + chunk_size]]
+            batch_positions = [
+                int(pos) for pos in positions[start : start + chunk_size]
+            ]
             batch_texts = [texts[pos] for pos in batch_positions]
             tokenized_window = self._simple_tokenize(
                 batch_texts,
@@ -1584,7 +1586,10 @@ class HFTextProvider:
                 message=(
                     "TOKENIZE-INSUFFICIENT: failed to gather enough unique tokenized samples"
                 ),
-                details={"needed": int(total_required), "got": int(len(unique_samples))},
+                details={
+                    "needed": int(total_required),
+                    "got": int(len(unique_samples)),
+                },
             )
 
         preview_samples = unique_samples[: int(preview_n)]
