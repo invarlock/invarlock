@@ -216,6 +216,7 @@ def test_plugins_adapters_json_bnb_ready_without_cuda_when_runtime_is_available(
         "version": "0.49.2",
     }
 
+
 def test_plugins_adapters_json_marks_missing_backends_not_present(monkeypatch, capsys):
     adapters = {
         "hf_awq": {"module": "invarlock.plugins.awq", "entry_point": "awq"},
