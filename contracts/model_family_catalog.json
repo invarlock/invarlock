@@ -195,13 +195,17 @@
       "modalities": ["text"],
       "task_role": "causal_lm",
       "state": "profile_first_class",
-      "representative_models": ["Qwen/Qwen2.5-14B", "Qwen/Qwen3.5-9B"],
+      "representative_models": [
+        "Qwen/Qwen2.5-14B",
+        "Qwen/Qwen3.5-9B",
+        "Qwen/QwQ-32B"
+      ],
       "repo_evidence": [
         "src/invarlock/model_profile.py",
         "src/invarlock/cli/adapter_auto.py",
         "docs/reference/model-adapters.md"
       ],
-      "notes": "Shared qwen-family heuristics still cover aliases beyond the declared Qwen2, Qwen3, and Qwen3.5 public lanes."
+      "notes": "Shared qwen-family heuristics still cover aliases beyond the declared Qwen2, Qwen3, and Qwen3.5 public lanes, including the nongated QwQ reasoning branch."
     },
     {
       "family_id": "yi",
@@ -381,6 +385,60 @@
     }
   ],
   "recommended_additions": [
+    {
+      "family_id": "qwq-32b-reasoning-causal-lm",
+      "display_name": "QwQ-32B reasoning causal LM",
+      "modalities": ["text"],
+      "task_role": "causal_lm",
+      "state": "recommended_p1",
+      "priority": "P1",
+      "planned_support_mode": "text_only_eval",
+      "representative_models": [
+        "Qwen/QwQ-32B",
+        "Qwen/QwQ-32B-AWQ"
+      ],
+      "repo_evidence": [
+        "src/invarlock/model_profile.py",
+        "src/invarlock/cli/adapter_auto.py",
+        "src/invarlock/plugins/hf_awq_adapter.py"
+      ],
+      "repo_gaps": [
+        "No shipped preset, calibration config, or empirical evidence currently exists for the QwQ reasoning branch"
+      ],
+      "blockers": [
+        "Needs a clean evaluate/verify lane on the ungated dense checkpoint or the official AWQ checkpoint before it can enter declared support"
+      ],
+      "source_refs": [
+        "https://huggingface.co/Qwen/QwQ-32B",
+        "https://huggingface.co/Qwen/QwQ-32B-AWQ"
+      ],
+      "notes": "Best nongated reasoning replacement for the removed DeepSeek-V3 lane because it stays inside the repo's Qwen-family path and the official AWQ checkpoint is a plausible fit for 2x96GiB bring-up."
+    },
+    {
+      "family_id": "olmo-2-13b-causal-lm",
+      "display_name": "OLMo 2 13B causal LM",
+      "modalities": ["text"],
+      "task_role": "causal_lm",
+      "state": "recommended_p1",
+      "priority": "P1",
+      "planned_support_mode": "text_only_eval",
+      "representative_models": ["allenai/OLMo-2-1124-13B-Instruct"],
+      "repo_evidence": [
+        "src/invarlock/model_profile.py",
+        "configs/presets/causal_lm/olmo2_7b_512.yaml",
+        "configs/calibration/null_sweep_olmo2_7b.yaml"
+      ],
+      "repo_gaps": [
+        "Current declared OLMo support only ships a 7B pilot lane; there is no 13B preset, calibration config, or evidence run yet"
+      ],
+      "blockers": [
+        "Needs a 13B-specific pilot preset plus evaluate/verify/calibration evidence before it can be added as a declared scale-up lane"
+      ],
+      "source_refs": [
+        "https://huggingface.co/allenai/OLMo-2-1124-13B-Instruct"
+      ],
+      "notes": "Best nongated larger-scale replacement candidate inside a family that already runs cleanly in repo, making it lower risk than introducing a new architecture."
+    },
     {
       "family_id": "full-multimodal-evaluation",
       "display_name": "Full multimodal evaluation pipeline",
