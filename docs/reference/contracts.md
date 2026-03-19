@@ -29,12 +29,12 @@ The public contract surface covers:
 | Policy pack | `contracts/policy_pack.schema.json` | Build/verify contract for Git-native policy packs |
 | Validation keys | `contracts/validation_keys.json` | Allow-list for report validation flags |
 | Console labels | `contracts/console_labels.json` | Stable report console labels |
+| Metric kinds | `contracts/metric_kinds.json` | Stable metric kind catalog for report surfaces |
 
-These JSON files are currently repo assets rather than wheel-packaged data.
-Installed wheels expose contract references and best-effort fallbacks, but
-proof-pack verification from a pure wheel install is not a supported workflow
-today; clone the repository to use `contracts/` and
-`scripts/proof_packs/verify_pack.sh`.
+These JSON files are shipped in installed wheels under
+`invarlock/_data/contracts/*.json`. The logical public contract names remain
+`contracts/<name>.json`, and `invarlock.public_contracts` resolves them from the
+repo checkout when present or from packaged wheel data otherwise.
 
 ## CLI surfaces
 
@@ -43,13 +43,14 @@ The CLI exposes these contracts directly:
 - `invarlock verify --json`
 - `invarlock plugins adapters --json`
 - `invarlock doctor --json`
+- `invarlock proof-pack verify --json`
 - `invarlock policy build`
 - `invarlock policy verify`
 - `scripts/proof_packs/verify_pack.sh --strict`
 
-The first five surfaces are available from installed packages. The proof-pack
-verifier remains repo-first because wheels do not ship `scripts/` or
-`contracts/`.
+The first six surfaces are available from installed packages. The repo shell
+verifier remains available for proof-pack workflow maintainers, but pure wheel
+installs can now verify packs with `invarlock proof-pack verify`.
 
 For support-related automation, `plugins adapters --json` and `doctor --json`
 now expose both the strict `support_matrix` contract and the broader

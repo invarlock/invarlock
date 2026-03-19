@@ -35,6 +35,7 @@ verify reported outcomes, and provide structured outputs for downstream analysis
 | `run_pack.sh` | Full proof pack: runs suite + packages artifacts | Proof pack directory with manifest + checksums | Default: distributable validation evidence |
 | `run_suite.sh` | Suite execution only | Reports + certs under the run directory | Development/debugging, iterative runs |
 | `verify_pack.sh` | Validate an existing proof pack | Verification status | Validating received proof packs |
+| `invarlock proof-pack verify` | Package-native proof-pack verification | Verification status + optional JSON | Validating received proof packs from a wheel install |
 
 ## Quick Start
 
@@ -47,7 +48,7 @@ PACK_TUNED_EDIT_PARAMS_FILE=./scripts/proof_packs/tuned_edit_params.json \
 ./scripts/proof_packs/run_suite.sh --suite subset --resume
 
 # Verify an existing proof pack
-./scripts/proof_packs/verify_pack.sh --pack ./proof_pack_runs/subset_20250101_000000/proof_pack
+invarlock proof-pack verify ./proof_pack_runs/subset_20250101_000000/proof_pack --strict
 ```
 
 Note: clean edits require tuned preset parameters. Either set
@@ -156,24 +157,23 @@ Newer packs also carry a repo-native attestation block in the same signed manife
 Signed packs also record `signing_key_fingerprint` for audit trails.
 
 The manifest contract is published at `contracts/proof_pack_manifest.schema.json`.
-`verify_pack.sh` validates this schema before checksum and signature verification so
+`invarlock proof-pack verify` validates this schema before checksum and signature verification so
 malformed proof packs fail deterministically.
 
-This verifier path is repo-first today: wheel installs do not include
-`contracts/proof_pack_manifest.schema.json` or `scripts/proof_packs/verify_pack.sh`.
-For proof-pack validation, clone the repository and run the verifier from the
-checked-out tree.
+Installed wheels now ship the public contracts and support package-native
+verification via `invarlock proof-pack verify`. The repo shell verifier remains
+available for maintainers using the proof-pack harness directly.
 
-Use `verify_pack.sh`:
+Use `invarlock proof-pack verify`:
 
-- Default: `scripts/proof_packs/verify_pack.sh --pack <dir>`
+- Default: `invarlock proof-pack verify <dir>`
   - Verifies `checksums_sha256_digest`, validates digest-backed manifest references, validates `checksums.sha256`, and runs `invarlock verify`.
   - Warns (but does not fail) if the pack is unsigned; this is evidence-grade verification.
-- Strict (recommended for distributable evidence): `scripts/proof_packs/verify_pack.sh --pack <dir> --strict`
+- Strict (recommended for distributable evidence): `invarlock proof-pack verify <dir> --strict`
   - Fails if `manifest.json.asc` is missing, `gpg` verification fails, or extra files exist outside `checksums.sha256`.
-  - Alternative: set `PACK_STRICT_MODE=1` (e.g., `PACK_STRICT_MODE=1 scripts/proof_packs/verify_pack.sh --pack <dir>`).
+  - Repo-harness alternative: `PACK_STRICT_MODE=1 scripts/proof_packs/verify_pack.sh --pack <dir>`.
 
-`verify_pack.sh` returns structured exit codes:
+`invarlock proof-pack verify` returns structured exit codes:
 
 - `0`: verified successfully
 - `2`: invalid usage or unsupported flag combination
@@ -186,7 +186,7 @@ Use `verify_pack.sh`:
 
 Reviewer checklist:
 
-- `scripts/proof_packs/verify_pack.sh --pack <dir> --strict` returns `0`
+- `invarlock proof-pack verify <dir> --strict` returns `0`
 - `jq -e . <dir>/manifest.json` succeeds
 - `sha256sum -c <dir>/checksums.sha256` succeeds
 - `gpg --verify <dir>/manifest.json.asc <dir>/manifest.json` succeeds when the

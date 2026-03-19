@@ -57,7 +57,8 @@ cosign verify-blob dist/invarlock-<version>-py3-none-any.whl \
 ## Notes
 
 - Release verification and proof-pack verification are intentionally separate.
-- Proof packs use signed `manifest.json` + `checksums.sha256` + `verify_pack.sh`.
+- Proof packs use signed `manifest.json` + `checksums.sha256` +
+  `invarlock proof-pack verify` (repo workflows may still use `verify_pack.sh`).
 - Release bundles use Sigstore-signed distribution artifacts plus the GitHub
   provenance bundle and release manifest.
 - GPG detached signatures are not currently part of the release offline bundle.

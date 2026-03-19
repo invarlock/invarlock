@@ -6,7 +6,7 @@
 | --- | --- |
 | **Purpose** | Command-line interface for evaluation, verification, and reporting. |
 | **Audience** | Operators running InvarLock from terminal/CI. |
-| **Primary commands** | `evaluate`, `verify`, `policy`, `report`, `run`, `plugins`, `doctor`. |
+| **Primary commands** | `evaluate`, `verify`, `proof-pack`, `policy`, `report`, `run`, `plugins`, `doctor`. |
 | **Requires** | `invarlock[hf]` for HF workflows; optional extras for quantized adapters. |
 | **Network** | Offline by default; enable per command with `INVARLOCK_ALLOW_NETWORK=1`. |
 | **Source of truth** | `src/invarlock/cli/app.py`, `src/invarlock/cli/commands/*.py`. |
@@ -57,6 +57,7 @@ For definitions of common terms (pairing, tier policy, primary metric), see the
 | Compare baseline vs subject | `invarlock evaluate` | `runs/` reports + `reports/eval` report. |
 | Single-model run report | `invarlock run` | `report.json` + `events.jsonl`. |
 | Validate report | `invarlock verify` | Exit code + validation messages. |
+| Validate proof pack | `invarlock proof-pack verify` | Exit code + proof-pack verification result. |
 | Build / verify policy pack | `invarlock policy` | `policy-pack.json` + verification result. |
 | Explain / HTML / compare | `invarlock report` | Rendered reports/evals. |
 | Inspect environment | `invarlock plugins` / `invarlock doctor` | Plugin diagnostics. |
@@ -77,6 +78,7 @@ invarlock evaluate --baseline <BASELINE_MODEL> --subject <SUBJECT_MODEL>
 | `invarlock run` | Yes (`--out`) | No | No | Produces `report.json` + `events.jsonl`. |
 | `invarlock report` | No | Yes (`--output`) | Optional (`--format report/html`) | Renders from existing reports. |
 | `invarlock verify` | No | No | No | Reads report JSON(s). |
+| `invarlock proof-pack verify` | No | No | No | Reads proof-pack manifests, checksums, and bundled certs. |
 | `invarlock plugins` / `doctor` | No | No | No | Diagnostics only. |
 
 ### CLI → Report → report → Verify
@@ -92,6 +94,9 @@ Note on presets and scripts
 
 - Presets and scripts in this repository (`configs/`, `scripts/`) are not
   shipped in wheels.
+- Public contracts are shipped in wheels under `invarlock/_data/contracts/`.
+- Proof-pack verification is available from wheels via
+  `invarlock proof-pack verify`.
 - When installing from PyPI, prefer flag‑only `invarlock evaluate` (no preset
   paths), or clone this repo to use presets and matrix scripts.
 
@@ -101,6 +106,7 @@ Top‑level commands:
 | ------------------- | ------------------------------------------------------------------------- |
 | `invarlock evaluate` | evaluate two checkpoints (baseline vs subject) with pinned windows         |
 | `invarlock verify`  | Verify report JSONs against schema and pairing math                  |
+| `invarlock proof-pack` | Verify portable proof-pack evidence bundles                      |
 | `invarlock policy`  | Build and verify policy-pack artifacts                              |
 | `invarlock report`  | Operations on reports and reports (explain, html, validate, compare) |
 | `invarlock run`     | Advanced: single‑model evaluation to produce a report                     |
@@ -181,6 +187,9 @@ invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/eva
 
 # Validate a report
 invarlock verify reports/eval/evaluation.report.json
+
+# Validate a proof pack from a wheel install
+invarlock proof-pack verify proof_pack_runs/subset_<timestamp>/proof_pack --strict
 ```
 
 Use `invarlock plugins` to review available adapters, edits, and guards.
@@ -224,6 +233,13 @@ Exhaustive command map with brief descriptions and notable options.
     - `invarlock policy verify`
       - Args: `pack`
       - Options: `--json`.
+
+- `invarlock proof-pack` (group)
+  - Purpose: Verify proof-pack manifests, checksums, attestation refs, and bundled certs.
+  - Subcommands:
+    - `invarlock proof-pack verify`
+      - Args: `pack`
+      - Options: `--json`, `--json-out`, `--skip-verify`, `--strict`, `--profile`.
 
 - `invarlock run`
   - Purpose: Execute pipeline from a YAML config (edit + guards + reports).

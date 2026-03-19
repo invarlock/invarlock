@@ -361,6 +361,8 @@ require a signed manifest, strict verification, and a PASS final verdict.
    invarlock verify --json certs/**/evaluation.report.json
 
 Or use:
+  invarlock proof-pack verify <pack-dir> [--strict]
+Repo workflow alternative:
   scripts/proof_packs/verify_pack.sh --pack <pack-dir> [--strict]
 EOF
 }

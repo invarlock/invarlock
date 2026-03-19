@@ -117,10 +117,12 @@ Output: reports/eval/evaluation.report.json
 Proof packs bundle reports + verification metadata into a distributable artifact.
 
 - Guide: <https://github.com/invarlock/invarlock/blob/main/docs/user-guide/proof-packs.md>
-- Verify: `scripts/proof_packs/verify_pack.sh --pack <dir> --strict` (or `PACK_STRICT_MODE=1 ...`)
+- Verify from an installed wheel: `invarlock proof-pack verify <dir> --strict`
+- Repo harness alternative: `scripts/proof_packs/verify_pack.sh --pack <dir> --strict`
 
-Note: `configs/` and `scripts/` are repo resources and are not shipped in wheels; clone the repo to use
-presets and proof-pack helpers.
+Note: `configs/` and most `scripts/` remain repo resources and are not shipped in
+wheels. Installed wheels now include the public contracts and the
+`invarlock proof-pack verify` verifier.
 
 ## Installation
 
