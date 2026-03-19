@@ -1,7 +1,7 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
 
-.PHONY: help install dev-install test test-assurance lint format clean docsclean deepclean docs docs-ci verify coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry
+.PHONY: help install dev-install test test-assurance lint format clean docsclean deepclean docs docs-ci verify coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync
 
 PYTHON ?= $(shell bash scripts/select_python.sh)
 PIP := $(PYTHON) -m pip
@@ -176,6 +176,7 @@ verify:  ## Run verification (pytest -q, lint, format, markdown + spell docs lin
 	$(MAKE) ensure-ruff
 	$(RUFF) check src/ tests/ scripts/
 	$(RUFF) format --check src/ tests/ scripts/
+	$(PYTHON) scripts/sync_packaged_contracts.py --check
 	$(PYTHON) scripts/docs_lint.py --all
 	@if [ -n "$$VERIFY_DOCS_API" ]; then \
 		$(PYTHON) scripts/validate_docs_api_refs.py; \
@@ -254,6 +255,14 @@ eval-loop:  ## Run automated evaluation loop (baseline + quant8 quickstart)
 ##@ Utilities
 ci-matrix:  ## Verify CI matrix
 	bash scripts/verify_ci_matrix.sh
+
+contracts-check:  ## Ensure packaged contracts match the repo contract source
+	$(MAKE) ensure-python
+	$(PYTHON) scripts/sync_packaged_contracts.py --check
+
+contracts-sync:  ## Copy repo contracts into src/invarlock/_data/contracts
+	$(MAKE) ensure-python
+	$(PYTHON) scripts/sync_packaged_contracts.py --write
 
 ## (manual-tests target removed)
 
