@@ -672,6 +672,16 @@ def test_recompute_validation_flags_and_policy_gate_paths(monkeypatch) -> None:
     report_good = {
         "primary_metric": {"ratio_vs_baseline": "1.05", "preview": 10.0, "final": 10.2},
         "telemetry": {"preview_total_tokens": "10", "final_total_tokens": 20},
+        "dataset": {
+            "windows": {
+                "stats": {
+                    "coverage": {
+                        "preview": {"used": 10, "required": 8, "ok": True},
+                        "final": {"used": 20, "required": 8, "ok": True},
+                    }
+                }
+            }
+        },
         "auto": {"tier": "Conservative", "target_pm_ratio": "1.1"},
         "resolved_policy": {"metrics": {"pm_ratio": {"min_tokens": 1}}},
         "meta": {
@@ -692,6 +702,12 @@ def test_recompute_validation_flags_and_policy_gate_paths(monkeypatch) -> None:
     assert captured["_ppl_metrics"] == {
         "preview_total_tokens": 10,
         "final_total_tokens": 20,
+        "bootstrap": {
+            "coverage": {
+                "preview": {"used": 10, "required": 8, "ok": True},
+                "final": {"used": 20, "required": 8, "ok": True},
+            }
+        },
     }
     assert captured["pm_acceptance_range"] == {"min": 0.95, "max": 1.15}
     assert captured["pm_drift_band"] == {"min": 0.9, "max": 1.3}

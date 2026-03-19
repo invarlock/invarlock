@@ -266,6 +266,26 @@ def _recompute_validation_flags(
             if value is not None:
                 ppl_metrics[key] = value
 
+    dataset_windows = report.get("dataset", {}).get("windows", {})
+    stats = dataset_windows.get("stats", {}) if isinstance(dataset_windows, dict) else {}
+    if isinstance(stats, dict):
+        coverage = stats.get("coverage")
+        bootstrap = stats.get("bootstrap")
+        bootstrap_metrics = (
+            dict(ppl_metrics.get("bootstrap", {}))
+            if isinstance(ppl_metrics.get("bootstrap"), dict)
+            else {}
+        )
+        coverage_obj = None
+        if isinstance(coverage, dict) and coverage:
+            coverage_obj = coverage
+        elif isinstance(bootstrap, dict) and isinstance(bootstrap.get("coverage"), dict):
+            coverage_obj = bootstrap.get("coverage")
+        if isinstance(coverage_obj, dict) and coverage_obj:
+            bootstrap_metrics["coverage"] = coverage_obj
+        if bootstrap_metrics:
+            ppl_metrics["bootstrap"] = bootstrap_metrics
+
     auto = report.get("auto")
     if not isinstance(auto, dict):
         auto = {}
