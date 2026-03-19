@@ -77,6 +77,40 @@ def _detect_pre_quantized_bnb(model_id: str) -> tuple[bool, int]:
 class HF_BNB_Adapter(HFAdapterMixin, ModelAdapter):
     name = "hf_bnb"
 
+    def _raise_load_error(
+        self,
+        exc: Exception,
+        *,
+        model_id: str,
+        pre_quantized_bits: int | None = None,
+    ) -> None:
+        details: dict[str, object] = {"model_id": model_id}
+        if pre_quantized_bits:
+            details["pre_quantized_bits"] = pre_quantized_bits
+
+        text = str(exc)
+        if "FineGrainedFP8Config" in text and "BitsAndBytesConfig" in text:
+            details["checkpoint_quantization"] = "FineGrainedFP8Config"
+            details["requested_quantization"] = "BitsAndBytesConfig"
+            details["recommended_adapter"] = "hf_causal"
+            raise ModelLoadError(
+                code="E201",
+                message=(
+                    "MODEL-LOAD-FAILED: bitsandbytes incompatible with checkpoint "
+                    "quantization_config"
+                ),
+                details=details,
+            ) from exc
+
+        load_label = "bitsandbytes/transformers"
+        if pre_quantized_bits:
+            load_label = "bitsandbytes/transformers (pre-quantized)"
+        raise ModelLoadError(
+            code="E201",
+            message=f"MODEL-LOAD-FAILED: {load_label}",
+            details=details,
+        ) from exc
+
     def load_model(self, model_id: str, device: str = "auto", **kwargs: Any):
         load_kwargs = dict(kwargs)
         trust_remote_code = resolve_trust_remote_code(load_kwargs)
@@ -101,18 +135,19 @@ class HF_BNB_Adapter(HFAdapterMixin, ModelAdapter):
 
         if is_pre_quantized:
             # Load pre-quantized checkpoint WITHOUT re-applying quantization
-            with wrap_errors(
-                ModelLoadError,
-                "E201",
-                "MODEL-LOAD-FAILED: bitsandbytes/transformers (pre-quantized)",
-                lambda e: {"model_id": model_id, "pre_quantized_bits": pre_quant_bits},
-            ):
+            try:
                 model = self._load_pretrained_model(
                     AutoModelForCausalLM,
                     model_id,
                     device_map="auto",
                     trust_remote_code=trust_remote_code,
                     **load_kwargs,
+                )
+            except Exception as exc:
+                self._raise_load_error(
+                    exc,
+                    model_id=model_id,
+                    pre_quantized_bits=pre_quant_bits,
                 )
         else:
             # Fresh quantization of FP16 model
@@ -132,12 +167,7 @@ class HF_BNB_Adapter(HFAdapterMixin, ModelAdapter):
                         qdict.setdefault("load_in_4bit", False)
                 quantization_config = BitsAndBytesConfig(**qdict)
 
-            with wrap_errors(
-                ModelLoadError,
-                "E201",
-                "MODEL-LOAD-FAILED: bitsandbytes/transformers",
-                lambda e: {"model_id": model_id},
-            ):
+            try:
                 model = self._load_pretrained_model(
                     AutoModelForCausalLM,
                     model_id,
@@ -146,6 +176,8 @@ class HF_BNB_Adapter(HFAdapterMixin, ModelAdapter):
                     quantization_config=quantization_config,
                     **load_kwargs,
                 )
+            except Exception as exc:
+                self._raise_load_error(exc, model_id=model_id)
 
         # BNB models handle their own device placement via device_map="auto"
         # Do NOT call .to() on BNB models - it will raise an error

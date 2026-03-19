@@ -62,7 +62,7 @@ print(adapter.describe(model)["model_type"])
 
 | `model_type` family | Adapter |
 | --- | --- |
-| llama / mistral / mixtral / qwen / gemma / OLMo / DeepSeek-V3 / yi | `hf_causal` |
+| llama / mistral / mixtral / qwen / gemma / OLMo / yi | `hf_causal` |
 | gpt2 / opt / neo-x / phi | `hf_causal` |
 | bert / roberta | `hf_mlm` |
 | t5 / bart | `hf_seq2seq` |

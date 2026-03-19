@@ -177,10 +177,6 @@ def test_resolve_core_loader_strategy_uses_direct_submodule_when_allowed(
             "transformers.models.gemma3.modeling_gemma3.Gemma3ForConditionalGeneration",
         ),
         ("olmo2", "transformers.models.olmo2.modeling_olmo2.Olmo2ForCausalLM"),
-        (
-            "deepseek_v3",
-            "transformers.models.deepseek_v3.modeling_deepseek_v3.DeepseekV3ForCausalLM",
-        ),
     ],
 )
 def test_resolve_core_loader_strategy_supports_new_direct_submodule_families(

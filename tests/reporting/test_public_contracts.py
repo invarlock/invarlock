@@ -26,6 +26,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "Qwen2 7B causal LM",
         "Qwen3 causal LM",
         "DeepSeek-R1-Distill-Qwen causal LM",
+        "Phi-4 causal LM (text-only eval)",
         "TinyLlama 1.1B causal LM",
         "OLMo 2 causal LM",
         "Qwen3.5 causal LM",
@@ -34,11 +35,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     recommended = {
         item["display_name"] for item in family_catalog["recommended_additions"]
     }
-    assert recommended == {
-        "Phi-4 causal LM (text-only eval)",
-        "DeepSeek-V3 causal LM",
-        "Full multimodal evaluation pipeline",
-    }
+    assert recommended == {"Full multimodal evaluation pipeline"}
 
     gpt2_lane = contracts.support_lane_by_id("gpt2-causal-hf")
     assert gpt2_lane is not None

@@ -24,23 +24,17 @@ def test_causal_lm_family_presets_load() -> None:
         "tinyllama_1_1b_512.yaml": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
         "olmo2_7b_512.yaml": "allenai/OLMo-2-1124-7B",
         "qwen3_5_9b_512.yaml": "Qwen/Qwen3.5-9B",
-        "deepseek_v3_0324_512.yaml": "deepseek-ai/DeepSeek-V3-0324",
-    }
-    expected_adapters = {
-        "deepseek_v3_0324_512.yaml": "hf_bnb",
     }
     expected_provider_kinds = {
         "phi4_reasoning_plus_512.yaml": "hf_text",
-        "deepseek_v3_0324_512.yaml": "hf_text",
     }
     expected_skip_overhead = {
         "phi4_reasoning_plus_512.yaml",
-        "deepseek_v3_0324_512.yaml",
     }
     for name, model_id in presets.items():
         cfg = load_config(root / "configs/presets/causal_lm" / name)
         assert cfg.model.id == model_id
-        assert cfg.model.adapter == expected_adapters.get(name, "hf_causal")
+        assert cfg.model.adapter == "hf_causal"
         provider = cfg.data["dataset"]["provider"]
         if name in expected_provider_kinds:
             assert provider["kind"] == expected_provider_kinds[name]
@@ -64,16 +58,12 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
         "null_sweep_tinyllama_1_1b.yaml": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
         "null_sweep_olmo2_7b.yaml": "allenai/OLMo-2-1124-7B",
         "null_sweep_qwen3_5_9b.yaml": "Qwen/Qwen3.5-9B",
-        "null_sweep_deepseek_v3_0324.yaml": "deepseek-ai/DeepSeek-V3-0324",
     }
     for name, model_id in configs.items():
         data = yaml.safe_load(
             (root / "configs/calibration" / name).read_text(encoding="utf-8")
         )
         assert data["model"]["id"] == model_id
-        if name == "null_sweep_deepseek_v3_0324.yaml":
-            assert data["model"]["adapter"] == "hf_bnb"
-            assert data["dataset"]["provider"]["kind"] == "hf_text"
-        elif name == "null_sweep_phi4_reasoning_plus.yaml":
+        if name == "null_sweep_phi4_reasoning_plus.yaml":
             assert data["dataset"]["provider"]["kind"] == "hf_text"
         assert data["primary_metric"]["drift_band"] == expected_drift_band

@@ -15,7 +15,6 @@ from typing import Any
 
 _CAUSAL_MODEL_TYPES = {
     "deepseek",
-    "deepseek_v3",
     "falcon",
     "gemma",
     "gemma2",

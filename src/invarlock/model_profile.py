@@ -549,24 +549,6 @@ def _phi_selectors() -> dict[str, list[str]]:
     }
 
 
-def _deepseek_v3_selectors() -> dict[str, list[str]]:
-    return {
-        "attention": [
-            "self_attn.q_proj",
-            "self_attn.q_a_proj",
-            "self_attn.q_b_proj",
-            "self_attn.kv_a_proj_with_mqa",
-            "self_attn.kv_b_proj",
-            "self_attn.o_proj",
-        ],
-        "ffn": [
-            "mlp.gate_proj",
-            "mlp.up_proj",
-            "mlp.down_proj",
-        ],
-    }
-
-
 def _unknown_selectors() -> dict[str, list[str]]:
     return {
         "attention": ["attention"],
@@ -725,31 +707,6 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
             default_metric="ppl_causal",
             default_provider="wikitext2",
             module_selectors=_rope_decoder_selectors(),
-            invariants=("rope_rotary_embedding",),
-            cert_lints=(
-                {
-                    "type": "equals",
-                    "path": "primary_metric.kind",
-                    "value": "ppl_causal",
-                    "message": "Causal cert must use causal ppl metric.",
-                },
-            ),
-        )
-
-    if any(
-        keyword in adapter_lower
-        for keyword in ("deepseek_v3", "deepseek-v3", "deepseekv3")
-    ) or any(
-        keyword in model_lower
-        for keyword in ("deepseek_v3", "deepseek-v3", "deepseekv3")
-    ):
-        return ModelProfile(
-            family="deepseek_v3",
-            default_loss="causal",
-            make_tokenizer=_make_causal_auto_tokenizer(model_id),
-            default_metric="ppl_causal",
-            default_provider="wikitext2",
-            module_selectors=_deepseek_v3_selectors(),
             invariants=("rope_rotary_embedding",),
             cert_lints=(
                 {

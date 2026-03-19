@@ -54,10 +54,6 @@ _DIRECT_SUBMODULE_SPECS: dict[str, dict[str, tuple[str, str]]] = {
         "olmo2": ("transformers.models.olmo2.modeling_olmo2", "Olmo2ForCausalLM"),
         "phi": ("transformers.models.phi.modeling_phi", "PhiForCausalLM"),
         "phi3": ("transformers.models.phi3.modeling_phi3", "Phi3ForCausalLM"),
-        "deepseek_v3": (
-            "transformers.models.deepseek_v3.modeling_deepseek_v3",
-            "DeepseekV3ForCausalLM",
-        ),
     },
     "mlm": {
         "bert": ("transformers.models.bert.modeling_bert", "BertForMaskedLM"),

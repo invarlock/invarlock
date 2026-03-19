@@ -73,13 +73,6 @@ def test_detect_model_profile_uses_local_config_hints_for_auto_adapter(
             },
             "olmo",
         ),
-        (
-            {
-                "model_type": "deepseek_v3",
-                "architectures": ["DeepseekV3ForCausalLM"],
-            },
-            "deepseek_v3",
-        ),
     ],
 )
 def test_detect_model_profile_uses_local_config_hints_for_new_causal_families(

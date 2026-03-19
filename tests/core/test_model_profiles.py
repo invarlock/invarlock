@@ -30,7 +30,6 @@ pytest.importorskip("transformers")
         ),
         ("microsoft/Phi-4-reasoning-plus", "hf_causal", "phi4", "causal"),
         ("allenai/OLMo-2-1124-7B", "hf_causal", "olmo", "causal"),
-        ("deepseek-ai/DeepSeek-V3-0324", "hf_causal", "deepseek_v3", "causal"),
     ],
 )
 def test_detect_profile_core(model_id, adapter, expected_family, expected_loss):
