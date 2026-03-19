@@ -183,6 +183,11 @@ the canonical source of truth for normalized support tiers
 (`published_basis`, `supported_experimental`, `community_experimental`) and for
 published-basis evidence references.
 
+Maintained shipped-model evidence automation lives in
+`scripts/model_evidence_sweep.py`, with tmux-based remote launch support in
+`scripts/run_model_evidence_remote.py` and a nightly/manual runner workflow in
+`.github/workflows/model-evidence-sweep.yml`.
+
 For the broader inventory of declared support, implemented-but-not-public
 coverage, usage-only checkpoint families, and recommended additions, see
 [Model Family Catalog](reference/model-family-catalog.md).
