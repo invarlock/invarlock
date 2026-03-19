@@ -15,6 +15,10 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_REMOTE_REPO = "/root/invarlock-public"
 DEFAULT_SUITE = "current-supported-experimental"
+DEFAULT_REMOTE_VENV_CANDIDATES = (
+    "{remote_repo}/.venv/bin/python",
+    "/root/venvs/invarlock/bin/python",
+)
 
 
 @dataclass(frozen=True)
@@ -119,10 +123,25 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _remote_python(remote_repo: str, remote_python: str | None) -> str:
+def _remote_python(
+    remote_repo: str, remote_python: str | None
+) -> tuple[str, list[str], list[str]]:
     if remote_python:
-        return remote_python
-    return f"{remote_repo.rstrip('/')}/.venv/bin/python"
+        return remote_python, [], [remote_python]
+    candidate_paths = [
+        template.format(remote_repo=remote_repo.rstrip("/"))
+        for template in DEFAULT_REMOTE_VENV_CANDIDATES
+    ]
+    setup = [
+        'PYTHON_BIN=""',
+        "for candidate in "
+        + " ".join(shlex.quote(path) for path in candidate_paths)
+        + '; do if [ -x "$candidate" ]; then PYTHON_BIN="$candidate"; break; fi; done',
+        'if [ -z "$PYTHON_BIN" ] && command -v python3.12 >/dev/null 2>&1; then PYTHON_BIN="$(command -v python3.12)"; fi',
+        'if [ -z "$PYTHON_BIN" ] && command -v python3 >/dev/null 2>&1; then PYTHON_BIN="$(command -v python3)"; fi',
+        'if [ -z "$PYTHON_BIN" ]; then echo "No remote Python runtime found" >&2; exit 127; fi',
+    ]
+    return "$PYTHON_BIN", setup, candidate_paths
 
 
 def _stamp(value: str | None) -> str:
@@ -140,14 +159,33 @@ def _shell_join(args: list[str]) -> str:
     return shlex.join(args)
 
 
-def build_sync_command(*, remote_repo: str, branch: str, remote_python: str) -> str:
+def _shell_command(args: list[str]) -> str:
+    rendered: list[str] = []
+    for idx, arg in enumerate(args):
+        if idx == 0 and arg.startswith("$"):
+            rendered.append(arg)
+        else:
+            rendered.append(shlex.quote(arg))
+    return " ".join(rendered)
+
+
+def build_sync_command(
+    *,
+    remote_repo: str,
+    branch: str,
+    remote_python: str,
+    python_setup: list[str],
+) -> str:
     return " && ".join(
         [
             f"cd {shlex.quote(remote_repo)}",
             "git fetch origin",
             f"git checkout {shlex.quote(branch)}",
             f"git pull --ff-only origin {shlex.quote(branch)}",
-            f"{shlex.quote(remote_python)} scripts/sync_packaged_contracts.py --check",
+            *python_setup,
+            _shell_command(
+                [remote_python, "scripts/sync_packaged_contracts.py", "--check"]
+            ),
         ]
     )
 
@@ -166,6 +204,7 @@ def build_launches(
     gpus: list[str],
     session_prefix: str,
     stamp: str,
+    python_setup: list[str],
 ) -> list[RemoteLaunch]:
     launches: list[RemoteLaunch] = []
     shard_count = len(gpus)
@@ -199,11 +238,12 @@ def build_launches(
             [
                 f"cd {shlex.quote(remote_repo)}",
                 f"mkdir -p {shlex.quote(shard_output_root)}",
+                *python_setup,
                 (
                     "export PYTHONPATH=src INVARLOCK_ALLOW_NETWORK=1 "
                     f"CUDA_VISIBLE_DEVICES={shlex.quote(gpu)}"
                 ),
-                _shell_join(sweep_cmd),
+                _shell_command(sweep_cmd),
             ]
         )
         remote_command = (
@@ -249,7 +289,9 @@ def _monitor_commands(host: str, launches: list[RemoteLaunch]) -> dict[str, obje
 def run_remote(args: argparse.Namespace) -> int:
     stamp = _stamp(args.stamp)
     remote_repo = args.remote_repo
-    remote_python = _remote_python(remote_repo, args.remote_python)
+    remote_python, python_setup, remote_python_candidates = _remote_python(
+        remote_repo, args.remote_python
+    )
     remote_output_root = args.remote_output_root or _default_remote_output_root(stamp)
     gpus = _parse_gpus(args.gpus)
 
@@ -259,6 +301,7 @@ def run_remote(args: argparse.Namespace) -> int:
             remote_repo=remote_repo,
             branch=args.branch,
             remote_python=remote_python,
+            python_setup=python_setup,
         )
 
     launches = build_launches(
@@ -274,12 +317,14 @@ def run_remote(args: argparse.Namespace) -> int:
         gpus=gpus,
         session_prefix=args.session_prefix,
         stamp=stamp,
+        python_setup=python_setup,
     )
     payload = {
         "host": args.host,
         "branch": args.branch,
         "remote_repo": remote_repo,
-        "remote_python": remote_python,
+        "remote_python": args.remote_python or "auto",
+        "remote_python_candidates": remote_python_candidates,
         "remote_output_root": remote_output_root,
         "suite": args.suite,
         "gpus": gpus,

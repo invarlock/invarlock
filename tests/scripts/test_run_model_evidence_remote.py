@@ -38,9 +38,16 @@ def test_run_model_evidence_remote_dry_run_emits_tmux_launch_plan(
     payload = json.loads(proc.stdout)
     assert payload["host"] == "root@example.test"
     assert payload["gpus"] == ["0", "1"]
+    assert payload["remote_python"] == "auto"
+    assert "/root/venvs/invarlock/bin/python" in payload["remote_python_candidates"]
     assert "git checkout staging/next" in payload["sync_command"]
+    assert "$PYTHON_BIN scripts/sync_packaged_contracts.py --check" in payload["sync_command"]
     assert len(payload["launches"]) == 2
     assert payload["launches"][0]["session"] == "model-evidence-20260319T120000Z-g0"
+    assert (
+        "$PYTHON_BIN scripts/model_evidence_sweep.py"
+        in payload["launches"][0]["remote_command"]
+    )
     assert "CUDA_VISIBLE_DEVICES=0" in payload["launches"][0]["remote_command"]
     assert "--shard-index 0" in payload["launches"][0]["remote_command"]
     assert "--shard-count 2" in payload["launches"][0]["remote_command"]
