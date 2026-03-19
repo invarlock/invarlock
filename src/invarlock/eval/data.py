@@ -12,6 +12,7 @@ import importlib.util
 import json
 import math
 import os
+import random
 import time
 import warnings
 from abc import abstractmethod
@@ -1484,6 +1485,59 @@ class HFTextProvider:
             valid_indices,
         )
 
+    def _token_signature(
+        self, input_ids: Sequence[int], attention_mask: Sequence[int]
+    ) -> tuple[int, ...]:
+        return tuple(
+            int(token_id)
+            for token_id, mask in zip(input_ids, attention_mask, strict=False)
+            if int(mask)
+        )
+
+    def _collect_unique_window_samples(
+        self,
+        texts: Sequence[str],
+        tokenizer: Any,
+        *,
+        seq_len: int,
+        positions: Sequence[int],
+        target_total: int,
+    ) -> list[tuple[int, list[int], list[int]]]:
+        unique_samples: list[tuple[int, list[int], list[int]]] = []
+        seen_signatures: set[tuple[int, ...]] = set()
+        chunk_size = max(64, min(256, int(target_total or 1)))
+
+        for start in range(0, len(positions), chunk_size):
+            batch_positions = [int(pos) for pos in positions[start : start + chunk_size]]
+            batch_texts = [texts[pos] for pos in batch_positions]
+            tokenized_window = self._simple_tokenize(
+                batch_texts,
+                tokenizer,
+                seq_len,
+                batch_positions,
+            )
+            for idx, input_ids, attention_mask in zip(
+                tokenized_window.indices,
+                tokenized_window.input_ids,
+                tokenized_window.attention_masks,
+                strict=False,
+            ):
+                signature = self._token_signature(input_ids, attention_mask)
+                if len(signature) <= 1 or signature in seen_signatures:
+                    continue
+                seen_signatures.add(signature)
+                unique_samples.append(
+                    (
+                        int(idx),
+                        [int(token) for token in input_ids],
+                        [int(mask) for mask in attention_mask],
+                    )
+                )
+                if len(unique_samples) >= target_total:
+                    return unique_samples
+
+        return unique_samples
+
     def windows(
         self,
         tokenizer: Any,
@@ -1505,15 +1559,47 @@ class HFTextProvider:
                     "NO-SAMPLES: hf_text produced no samples; check dataset_name/config_name/text_field"
                 ),
             )
-        # Deterministic selection: first N for preview, next N for final
-        total = min(len(texts), int(preview_n) + int(final_n))
-        combined_window = self._simple_tokenize(
-            texts[:total],
+        total_required = int(preview_n) + int(final_n)
+        if total_required <= 0:
+            raise _ValErr(
+                code="E302", message="VALIDATION-FAILED: preview/final must be positive"
+            )
+        # Deterministic seeded sampling: avoid contiguous split bias on long
+        # training corpora where early records can differ materially from later
+        # ones. Continue sampling until enough unique non-trivial token windows
+        # are collected so CI lanes do not collapse on padded/duplicate rows.
+        selected_positions = list(range(len(texts)))
+        random.Random(int(seed)).shuffle(selected_positions)
+
+        unique_samples = self._collect_unique_window_samples(
+            texts,
             tokenizer,
-            seq_len,
-            list(range(total)),
+            seq_len=seq_len,
+            positions=selected_positions,
+            target_total=total_required,
         )
-        return _split_window_by_index(combined_window, split_index=preview_n)
+        if len(unique_samples) < total_required:
+            raise _DataErr(
+                code="E304",
+                message=(
+                    "TOKENIZE-INSUFFICIENT: failed to gather enough unique tokenized samples"
+                ),
+                details={"needed": int(total_required), "got": int(len(unique_samples))},
+            )
+
+        preview_samples = unique_samples[: int(preview_n)]
+        final_samples = unique_samples[int(preview_n) : total_required]
+        preview_window = EvaluationWindow(
+            input_ids=[sample[1] for sample in preview_samples],
+            attention_masks=[sample[2] for sample in preview_samples],
+            indices=[sample[0] for sample in preview_samples],
+        )
+        final_window = EvaluationWindow(
+            input_ids=[sample[1] for sample in final_samples],
+            attention_masks=[sample[2] for sample in final_samples],
+            indices=[sample[0] for sample in final_samples],
+        )
+        return preview_window, final_window
 
     def estimate_capacity(
         self,

@@ -17,12 +17,16 @@ def test_hf_text_provider_windows_success(monkeypatch):
         dataset_name="dummy", config_name=None, text_field="text", max_samples=10
     )
     # Provide enough texts and stub tokenizer to avoid external deps
-    monkeypatch.setattr(hp, "load", lambda **kw: ["hello world"] * 4)
+    monkeypatch.setattr(
+        hp,
+        "load",
+        lambda **kw: [f"hello world {idx}" for idx in range(4)],
+    )
 
     # Monkeypatch simple tokenizer to a deterministic minimal implementation
     def simple_tok(texts, tokenizer, seq_len, indices):  # noqa: ARG001
-        ids = [[1] for _ in texts]
-        masks = [[1] for _ in texts]
+        ids = [[index + 1, index + 2] for index in indices]
+        masks = [[1, 1] for _ in texts]
         return EvaluationWindow(ids, masks, indices[: len(ids)])
 
     monkeypatch.setattr(hp, "_simple_tokenize", simple_tok)
