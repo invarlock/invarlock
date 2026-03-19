@@ -28,7 +28,14 @@ def test_causal_lm_family_presets_load() -> None:
         "qwen3_5_9b_512.yaml": "Qwen/Qwen3.5-9B",
     }
     expected_provider_kinds = {
+        "deepseek_r1_distill_qwen_7b_512.yaml": "hf_text",
+        "olmo2_13b_512.yaml": "hf_text",
+        "olmo2_7b_512.yaml": "hf_text",
         "phi4_reasoning_plus_512.yaml": "hf_text",
+        "qwen2_7b_512.yaml": "hf_text",
+        "qwen3_5_9b_512.yaml": "hf_text",
+        "qwen3_8b_512.yaml": "hf_text",
+        "qwq_32b_512.yaml": "hf_text",
     }
     expected_skip_overhead = {
         "phi4_reasoning_plus_512.yaml",
@@ -68,6 +75,15 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
             (root / "configs/calibration" / name).read_text(encoding="utf-8")
         )
         assert data["model"]["id"] == model_id
-        if name == "null_sweep_phi4_reasoning_plus.yaml":
+        if name in {
+            "null_sweep_deepseek_r1_distill_qwen_7b.yaml",
+            "null_sweep_olmo2_13b.yaml",
+            "null_sweep_olmo2_7b.yaml",
+            "null_sweep_phi4_reasoning_plus.yaml",
+            "null_sweep_qwen2_7b.yaml",
+            "null_sweep_qwen3_5_9b.yaml",
+            "null_sweep_qwen3_8b.yaml",
+            "null_sweep_qwq_32b.yaml",
+        }:
             assert data["dataset"]["provider"]["kind"] == "hf_text"
         assert data["primary_metric"]["drift_band"] == expected_drift_band
