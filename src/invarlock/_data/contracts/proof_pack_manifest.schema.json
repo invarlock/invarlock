@@ -1,0 +1,255 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "InvarLock Proof Pack Manifest",
+  "type": "object",
+  "required": [
+    "format",
+    "checksums_sha256",
+    "checksums_sha256_digest"
+  ],
+  "properties": {
+    "format": {
+      "const": "proof-pack-v1"
+    },
+    "generated_at": {
+      "type": "string",
+      "minLength": 20
+    },
+    "suite": {
+      "type": "string",
+      "minLength": 1
+    },
+    "network_mode": {
+      "enum": [
+        "offline",
+        "online"
+      ]
+    },
+    "determinism": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repeats": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "determinism_repeats": {
+      "type": [
+        "object",
+        "array",
+        "null"
+      ]
+    },
+    "run_dir": {
+      "type": "string",
+      "minLength": 1
+    },
+    "invarlock_version": {
+      "type": "string"
+    },
+    "builder": {
+      "type": "object",
+      "required": [
+        "id",
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "subject": {
+      "type": "object",
+      "required": [
+        "name",
+        "path",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      },
+      "additionalProperties": true
+    },
+    "invocation": {
+      "type": "object",
+      "properties": {
+        "config_source": {
+          "type": "object",
+          "properties": {
+            "uri": {
+              "type": "string"
+            },
+            "commit": {
+              "type": "string"
+            },
+            "branch": {
+              "type": "string"
+            },
+            "describe": {
+              "type": "string"
+            },
+            "dirty": {
+              "type": "boolean"
+            },
+            "path": {
+              "type": "string"
+            },
+            "digest": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            }
+          },
+          "additionalProperties": true
+        },
+        "parameters": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": true
+    },
+    "environment": {
+      "type": "object",
+      "properties": {
+        "recorded_at": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string"
+        },
+        "python_version": {
+          "type": "string"
+        },
+        "gpu_name": {
+          "type": "string"
+        },
+        "gpu_count": {
+          "type": [
+            "integer",
+            "number",
+            "null"
+          ]
+        },
+        "gpu_memory_gb": {
+          "type": [
+            "integer",
+            "number",
+            "null"
+          ]
+        },
+        "fp8_native_support": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      },
+      "additionalProperties": true
+    },
+    "model_list": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "models": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "model_id",
+          "revision"
+        ],
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "revision": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "materials": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "path",
+          "digest"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "checksums_sha256": {
+      "const": "checksums.sha256"
+    },
+    "checksums_sha256_digest": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64
+    },
+    "model_licenses": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "verification": {
+      "type": "object"
+    },
+    "signing_key_fingerprint": {
+      "type": "string",
+      "minLength": 16
+    }
+  },
+  "additionalProperties": true
+}

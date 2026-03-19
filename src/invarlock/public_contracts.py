@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import importlib.resources
 import json
 from pathlib import Path
 from typing import Any
 
 CONTRACTS_ROOT = Path(__file__).resolve().parents[2] / "contracts"
+PACKAGE_CONTRACTS_ROOT = importlib.resources.files("invarlock").joinpath(
+    "_data", "contracts"
+)
 
 
 def contract_path(filename: str) -> Path:
@@ -17,7 +21,11 @@ def contract_relpath(filename: str) -> str:
 
 def load_json_contract(filename: str) -> Any:
     path = contract_path(filename)
-    return json.loads(path.read_text(encoding="utf-8"))
+    if path.is_file():
+        return json.loads(path.read_text(encoding="utf-8"))
+    return json.loads(
+        PACKAGE_CONTRACTS_ROOT.joinpath(filename).read_text(encoding="utf-8")
+    )
 
 
 def _safe_load(filename: str, default: Any) -> Any:
@@ -147,6 +155,7 @@ def contract_catalog() -> dict[str, Any]:
 
 __all__ = [
     "CONTRACTS_ROOT",
+    "PACKAGE_CONTRACTS_ROOT",
     "adapter_capability",
     "adapter_capability_map",
     "contract_catalog",

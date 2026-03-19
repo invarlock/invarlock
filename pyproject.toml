@@ -205,6 +205,9 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "*" = ["py.typed"]
+"invarlock" = [
+  "_data/contracts/*.json",
+]
 "invarlock._data.runtime" = [
   "profiles/*.yaml",
   "tiers.yaml",

@@ -36,7 +36,10 @@ def test_proof_pack_repo_assets_not_in_wheel(tmp_path):
     with zipfile.ZipFile(wheel) as z:
         names = z.namelist()
         assert "invarlock/public_contracts.py" in names
-        assert not any("proof_pack_manifest.schema.json" in name for name in names)
+        assert "invarlock/_data/contracts/proof_pack_manifest.schema.json" in names
+        assert "invarlock/_data/contracts/policy_pack.schema.json" in names
+        assert "invarlock/_data/contracts/support_matrix.json" in names
+        assert "invarlock/_data/contracts/model_family_catalog.json" in names
         assert not any(name.startswith("contracts/") for name in names)
         assert not any(name.startswith("scripts/proof_packs/") for name in names)
 

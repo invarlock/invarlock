@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import invarlock.public_contracts as contracts
@@ -64,6 +65,28 @@ def test_public_contract_paths_are_repo_relative() -> None:
     assert Path(
         contracts.contract_reference("support_matrix.json")["path"]
     ).as_posix() == ("contracts/support_matrix.json")
+
+
+def test_public_contract_loader_falls_back_to_packaged_contracts(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(contracts, "CONTRACTS_ROOT", tmp_path / "missing")
+
+    payload = contracts.load_support_matrix()
+    assert payload["format_version"] == "support-matrix-v1"
+    assert payload["lanes"]
+
+
+def test_packaged_contract_copies_match_repo_contracts() -> None:
+    repo_contracts = sorted(contracts.CONTRACTS_ROOT.glob("*.json"))
+    assert repo_contracts
+
+    for repo_path in repo_contracts:
+        packaged = contracts.PACKAGE_CONTRACTS_ROOT.joinpath(repo_path.name)
+        assert packaged.is_file(), repo_path.name
+        assert json.loads(packaged.read_text(encoding="utf-8")) == json.loads(
+            repo_path.read_text(encoding="utf-8")
+        )
 
 
 def test_public_contract_helpers_fall_back_when_contracts_are_unavailable(
