@@ -4,8 +4,9 @@
 # runtime data so policy behavior does not depend on implicit fallback logic.
 
 dataset:
-  preview_n: 200
-  final_n: 200
+  # Keep CI above the balanced min-token floor for shipped pilot causal families.
+  preview_n: 240
+  final_n: 240
 
 eval:
   bootstrap:

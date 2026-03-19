@@ -21,8 +21,8 @@ dataset:
   provider: wikitext2
   seq_len: 512
   stride: 512
-  preview_n: 200
-  final_n: 200
+  preview_n: 240
+  final_n: 240
 
 edit:
   name: quant_rtn
@@ -64,7 +64,7 @@ output:
 Confirm in `report.meta.device`, `report.meta.auto`, and `report.data.preview_n/final_n`.
 
 **Worked example**: if YAML sets `preview_n: 64` and you run `--profile ci`, the
-report shows `preview_n=200` because the CI profile overrides the YAML counts.
+report shows `preview_n=240` because the CI profile overrides the YAML counts.
 
 ### Config → Report → report → Verify
 
@@ -103,8 +103,8 @@ dataset:
   split: validation
   seq_len: 512
   stride: 512
-  preview_n: 200
-  final_n: 200
+  preview_n: 240
+  final_n: 240
   seed: 42
 ```
 
@@ -135,6 +135,15 @@ auto:
   tier: balanced
   probes: 0
   target_pm_ratio: 2.0
+```
+
+### Primary metric policy hints
+
+```yaml
+primary_metric:
+  acceptance_range: {min: 0.95, max: 1.10}
+  drift_band: {min: 0.90, max: 1.20}
+  overhead_threshold: 0.01
 ```
 
 ### Guards

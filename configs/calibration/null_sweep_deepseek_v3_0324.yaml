@@ -1,13 +1,29 @@
-# Calibration config: Null sweep for DeepSeek-V3-0324 spectral/RMT calibration.
+# Calibration config: Null sweep for DeepSeek-V3-0324 4-bit bring-up on WikiText-103 via hf_text.
 
 model:
   id: "deepseek-ai/DeepSeek-V3-0324"
-  adapter: "hf_causal"
+  adapter: "hf_bnb"
   device: "auto"
+  dtype: "bfloat16"
+  low_cpu_mem_usage: true
+  offload_folder: "tmp/deepseek_v3_offload"
+  max_memory:
+    0: "92GiB"
+    1: "92GiB"
+    cpu: "160GiB"
+  quantization_config:
+    bits: 4
+    bnb_4bit_quant_type: "nf4"
+    bnb_4bit_use_double_quant: true
 
 dataset:
-  provider: "wikitext2"
-  split: "validation"
+  provider:
+    kind: "hf_text"
+    dataset_name: "wikitext"
+    config_name: "wikitext-103-v1"
+    text_field: "text"
+    max_samples: 10000
+  split: "train"
   seq_len: 512
   stride: 512
   preview_n: 64
@@ -24,6 +40,11 @@ eval:
   loss:
     type: causal
 
+primary_metric:
+  drift_band:
+    min: 0.90
+    max: 1.20
+
 auto:
   enabled: true
   tier: balanced
@@ -31,6 +52,18 @@ auto:
 
 guards:
   order: ["invariants", "spectral", "rmt", "variance", "invariants"]
+  spectral:
+    family_caps:
+      ffn: 3.849
+      attn: 3.018
+      embed: 1.05
+      other: 0.0
+      router: 5.0
+      expert_ffn: 4.0
+    multiple_testing:
+      method: bh
+      alpha: 0.05
+      m: 6
 
 output:
   dir: runs/null_sweeps/deepseek_v3_0324

@@ -602,8 +602,8 @@ dataset:
   provider: wikitext2
   seq_len: 768
   stride: 768
-  preview_n: 200
-  final_n: 200
+  preview_n: 240
+  final_n: 240
 edit:
   name: quant_rtn
 guards:
@@ -611,6 +611,8 @@ guards:
     enabled: true
   variance:
     tier: balanced
+primary_metric:
+  drift_band: {min: 0.90, max: 1.20}
 auto:
   tier: balanced
   probes: 0

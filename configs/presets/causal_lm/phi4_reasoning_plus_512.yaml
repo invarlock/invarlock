@@ -1,4 +1,4 @@
-# Preset: Phi-4 reasoning plus in text-only evaluation mode on WikiText-2.
+# Preset: Phi-4 reasoning plus in text-only evaluation mode on WikiText-103 via hf_text.
 
 model:
   id: "microsoft/Phi-4-reasoning-plus"
@@ -6,8 +6,13 @@ model:
   device: "auto"
 
 dataset:
-  provider: "wikitext2"
-  split: "validation"
+  provider:
+    kind: "hf_text"
+    dataset_name: "wikitext"
+    config_name: "wikitext-103-v1"
+    text_field: "text"
+    max_samples: 10000
+  split: "train"
   seq_len: 512
   stride: 512
   preview_n: 64
@@ -20,6 +25,11 @@ eval:
   loss:
     type: "causal"
 
+primary_metric:
+  drift_band:
+    min: 0.90
+    max: 1.20
+
 edit:
   name: "noop"
   plan: {}
@@ -29,8 +39,24 @@ auto:
   tier: "balanced"
   probes: 0
 
+context:
+  run:
+    skip_overhead_check: true
+
 guards:
   order: ["invariants", "spectral", "rmt", "variance", "invariants"]
+  spectral:
+    family_caps:
+      ffn: 3.849
+      attn: 3.018
+      embed: 1.05
+      other: 0.0
+      router: 5.0
+      expert_ffn: 4.0
+    multiple_testing:
+      method: "bh"
+      alpha: 0.05
+      m: 6
 
 output:
   dir: "runs"

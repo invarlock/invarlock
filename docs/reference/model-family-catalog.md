@@ -21,7 +21,8 @@ of the support matrix:
 
 The support matrix remains strict. The model family catalog is broader by
 design and records code-level visibility, usage-only checkpoints, and
-recommended additions.
+recommended additions. Access-gated vendor checkpoints are intentionally kept
+out of declared support lanes and shipped preset inventory.
 
 ## Declared Support
 
@@ -31,14 +32,11 @@ recommended additions.
 | BERT / RoBERTa MLM | `published_basis` | `bert-base-uncased`, `roberta-base` | Public lane derived from `bert-mlm-hf`. |
 | Mistral 7B causal LM | `supported_experimental` | `mistralai/Mistral-7B-v0.1` | Pilot preset and calibration config are shipped. |
 | Qwen2 7B causal LM | `supported_experimental` | `Qwen/Qwen2-7B` | Pilot preset and calibration config are shipped. |
-| Llama 3.1 / 3.3 causal LM | `supported_experimental` | `meta-llama/Llama-3.1-8B-Instruct`, `meta-llama/Llama-3.3-70B-Instruct` | Pilot preset and calibration config are shipped. |
 | Qwen3 causal LM | `supported_experimental` | `Qwen/Qwen3-8B` | Pilot preset and calibration config are shipped. |
-| Gemma 3 causal LM (text-only eval) | `supported_experimental` | `google/gemma-3-4b-it` | Current repo support is limited to text-only evaluation. |
 | DeepSeek-R1-Distill-Qwen causal LM | `supported_experimental` | `deepseek-ai/DeepSeek-R1-Distill-Qwen-7B` | Pilot preset and calibration config are shipped. |
-| Phi-4 causal LM (text-only eval) | `supported_experimental` | `microsoft/Phi-4-reasoning-plus`, `microsoft/Phi-4-vision-reasoning-15B` | Current repo support is limited to text-only evaluation. |
+| TinyLlama 1.1B causal LM | `supported_experimental` | `TinyLlama/TinyLlama-1.1B-Chat-v1.0` | Ungated Llama-family pilot lane with shipped preset and calibration config. |
 | OLMo 2 causal LM | `supported_experimental` | `allenai/OLMo-2-1124-7B` | Pilot preset and calibration config are shipped. |
 | Qwen3.5 causal LM | `supported_experimental` | `Qwen/Qwen3.5-9B` | Pilot preset and calibration config are shipped. |
-| DeepSeek-V3 causal LM | `supported_experimental` | `deepseek-ai/DeepSeek-V3-0324` | Pilot preset and calibration config are shipped. |
 | Seq2Seq / local pairs | `community_experimental` | `t5-small`, `facebook/bart-base` | Generic seq2seq lane without a published-basis claim. |
 
 ## Implemented Coverage
@@ -46,14 +44,14 @@ recommended additions.
 | Family | Coverage state | Representative models | Notes |
 | --- | --- | --- | --- |
 | Mixtral | `profile_first_class` | `mistralai/Mixtral-8x7B-v0.1` | Profile and loader code recognize the family directly. |
-| Llama | `profile_first_class` | `meta-llama/Llama-3.1-8B-Instruct` | Generic Llama-family profile handling is first-class beyond the declared Llama 3.x lane. |
+| Llama | `profile_first_class` | `openlm-research/open_llama_7b`, `TinyLlama/TinyLlama-1.1B-Chat-v1.0` | Generic Llama-family profile handling is first-class. TinyLlama now provides the ungated declared support lane, while access-gated vendor checkpoints remain omitted. |
 | Qwen family aliases (Qwen1.5/Qwen2.5/Qwen3 naming) | `profile_first_class` | `Qwen/Qwen2.5-14B`, `Qwen/Qwen3.5-9B` | Shared qwen heuristics still cover aliases beyond the declared Qwen2, Qwen3, and Qwen3.5 lanes. |
 | Yi | `profile_first_class` | `01-ai/Yi-34B` | Treated as a RoPE decoder family in profile logic. |
-| Phi family | `profile_first_class` | `microsoft/Phi-3-mini-4k-instruct`, `microsoft/Phi-4-reasoning-plus` | Dedicated phi-family selectors now exist; the declared support lane currently covers Phi-4 text-only evaluation. |
+| Phi family | `profile_first_class` | `microsoft/Phi-3-mini-4k-instruct`, `microsoft/Phi-4-reasoning-plus` | Dedicated phi-family selectors now exist, but Phi-4 is not in the declared support set until a clean text-only pilot lane closes with empirical evidence. |
 | OPT / GPT-NeoX / GPT-J | `profile_shared_alias` | `facebook/opt-1.3b`, `EleutherAI/gpt-neox-20b` | Available through shared GPT-style paths. |
 | Falcon | `auto_or_loader_only` | `tiiuae/falcon-7b` | Visible through adapter-auto heuristics only. |
 | GLM | `auto_or_loader_only` | `THUDM/glm-4-9b-chat` | Visible through adapter-auto heuristics only. |
-| DeepSeek | `profile_first_class` | `deepseek-ai/DeepSeek-R1-Distill-Qwen-7B`, `deepseek-ai/DeepSeek-V3-0324` | DeepSeek-V3 now has a dedicated selector path, while qwen-based distills continue to share the qwen-family route. |
+| DeepSeek | `profile_first_class` | `deepseek-ai/DeepSeek-R1-Distill-Qwen-7B`, `deepseek-ai/DeepSeek-V3-0324` | DeepSeek-V3 has a dedicated selector path, while qwen-based distills continue to share the qwen-family route. Only the distill lane is currently declared. |
 | Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA) | `auto_or_loader_only` | `distilbert-base-uncased`, `microsoft/deberta-v3-base` | Loader/auto support exceeds the public BERT / RoBERTa lane. |
 | Broader seq2seq families (mBART/PEGASUS/Marian) | `auto_or_loader_only` | `facebook/mbart-large-50`, `Helsinki-NLP/opus-mt-en-de` | Loader support is broader than the generic seq2seq public lane. |
 
@@ -70,7 +68,9 @@ recommended additions.
 
 | Priority | Family | Planned support mode | Representative models | Notes |
 | --- | --- | --- | --- | --- |
-| `P2` | Full multimodal evaluation pipeline | `full_multimodal_eval` | `google/gemma-3-4b-it`, `microsoft/Phi-4-vision-reasoning-15B` | Deferred capability backlog item beyond text-only evaluation. |
+| `P1` | Phi-4 causal LM (text-only eval) | `text_only_eval` | `microsoft/Phi-4-reasoning-plus`, `microsoft/Phi-4-vision-reasoning-15B` | Ungated Phi-4 moved back to backlog after the shipped pilot did not close cleanly; it needs a calibrated MoE/router spectral policy plus fresh PASS evidence. |
+| `P2` | DeepSeek-V3 causal LM | `text_only_eval` | `deepseek-ai/DeepSeek-V3-0324` | Code-visible and ungated, but not re-declared until a scalable runtime/evidence path is completed. |
+| `P2` | Full multimodal evaluation pipeline | `full_multimodal_eval` | `microsoft/Phi-4-vision-reasoning-15B` | Deferred capability backlog item beyond text-only evaluation for ungated multimodal checkpoints. |
 
 ## Promotion Criteria
 

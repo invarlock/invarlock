@@ -14,13 +14,14 @@ pytest.importorskip("transformers")
     [
         ("openai-community/gpt2", "hf_causal", "gpt2", "causal"),
         ("bert-base-uncased", "hf_mlm", "bert", "mlm"),
-        ("meta-llama/Llama-3.1-8B-Instruct", "hf_causal", "llama", "causal"),
+        ("openlm-research/open_llama_7b", "hf_causal", "llama", "causal"),
         ("mistralai/Mistral-7B-v0.1", "hf_causal", "mistral", "causal"),
         ("mistralai/Mixtral-8x7B-v0.1", "hf_causal", "mixtral", "causal"),
         ("Qwen/Qwen2-7B", "hf_causal", "qwen", "causal"),
         ("Qwen/Qwen3-8B", "hf_causal", "qwen", "causal"),
         ("Qwen/Qwen3.5-9B", "hf_causal", "qwen", "causal"),
-        ("google/gemma-3-4b-it", "hf_causal", "gemma", "causal"),
+        ("TinyLlama/TinyLlama-1.1B-Chat-v1.0", "hf_causal", "llama", "causal"),
+        ("unsloth/gemma-2-9b-it-bnb-4bit", "hf_causal", "gemma", "causal"),
         (
             "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
             "hf_causal",
@@ -29,12 +30,7 @@ pytest.importorskip("transformers")
         ),
         ("microsoft/Phi-4-reasoning-plus", "hf_causal", "phi4", "causal"),
         ("allenai/OLMo-2-1124-7B", "hf_causal", "olmo", "causal"),
-        (
-            "deepseek-ai/DeepSeek-V3-0324",
-            "hf_causal",
-            "deepseek_v3",
-            "causal",
-        ),
+        ("deepseek-ai/DeepSeek-V3-0324", "hf_causal", "deepseek_v3", "causal"),
     ],
 )
 def test_detect_profile_core(model_id, adapter, expected_family, expected_loss):

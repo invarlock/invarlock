@@ -1,7 +1,7 @@
-# Preset: Gemma 3 4B IT in text-only evaluation mode on WikiText-2.
+# Calibration config: Null sweep for TinyLlama 1.1B spectral/RMT calibration.
 
 model:
-  id: "google/gemma-3-4b-it"
+  id: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
   adapter: "hf_causal"
   device: "auto"
 
@@ -14,25 +14,30 @@ dataset:
   final_n: 64
   seed: 42
 
+edit:
+  name: noop
+  plan: {}
+
 eval:
   metric:
-    kind: "ppl_causal"
+    kind: ppl_causal
   loss:
-    type: "causal"
+    type: causal
 
-edit:
-  name: "noop"
-  plan: {}
+primary_metric:
+  drift_band:
+    min: 0.90
+    max: 1.20
 
 auto:
   enabled: true
-  tier: "balanced"
+  tier: balanced
   probes: 0
 
 guards:
   order: ["invariants", "spectral", "rmt", "variance", "invariants"]
 
 output:
-  dir: "runs"
+  dir: runs/null_sweeps/tinyllama_1_1b
   save_model: false
   save_report: true

@@ -55,28 +55,8 @@
       "provenance_source": "docs/README.md#support-matrix"
     },
     {
-      "lane_id": "llama-3x-causal-hf",
-      "family": "Llama 3.1 / 3.3 causal LM",
-      "runtime": "huggingface-pytorch",
-      "adapter": "hf_causal",
-      "support_tier": "supported_experimental",
-      "evidence_status": "repo_shipped_pilot_config",
-      "docs_label": "No, repo-shipped pilot config only",
-      "provenance_source": "docs/README.md#support-matrix"
-    },
-    {
       "lane_id": "qwen3-causal-hf",
       "family": "Qwen3 causal LM",
-      "runtime": "huggingface-pytorch",
-      "adapter": "hf_causal",
-      "support_tier": "supported_experimental",
-      "evidence_status": "repo_shipped_pilot_config",
-      "docs_label": "No, repo-shipped pilot config only",
-      "provenance_source": "docs/README.md#support-matrix"
-    },
-    {
-      "lane_id": "gemma-3-text-causal-hf",
-      "family": "Gemma 3 causal LM (text-only eval)",
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "supported_experimental",
@@ -95,8 +75,8 @@
       "provenance_source": "docs/README.md#support-matrix"
     },
     {
-      "lane_id": "phi-4-text-causal-hf",
-      "family": "Phi-4 causal LM (text-only eval)",
+      "lane_id": "tinyllama-1-1b-causal-hf",
+      "family": "TinyLlama 1.1B causal LM",
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "supported_experimental",
@@ -117,16 +97,6 @@
     {
       "lane_id": "qwen3-5-causal-hf",
       "family": "Qwen3.5 causal LM",
-      "runtime": "huggingface-pytorch",
-      "adapter": "hf_causal",
-      "support_tier": "supported_experimental",
-      "evidence_status": "repo_shipped_pilot_config",
-      "docs_label": "No, repo-shipped pilot config only",
-      "provenance_source": "docs/README.md#support-matrix"
-    },
-    {
-      "lane_id": "deepseek-v3-causal-hf",
-      "family": "DeepSeek-V3 causal LM",
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "supported_experimental",

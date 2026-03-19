@@ -64,30 +64,32 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
     assert _lane_tiers(doctor_payload) == contract_tiers
 
     families = {lane["family"]: lane for lane in contract["lanes"]}
+    assert set(families) == {
+        "GPT-2 causal LM",
+        "BERT / RoBERTa MLM",
+        "Mistral 7B causal LM",
+        "Qwen2 7B causal LM",
+        "Qwen3 causal LM",
+        "DeepSeek-R1-Distill-Qwen causal LM",
+        "TinyLlama 1.1B causal LM",
+        "OLMo 2 causal LM",
+        "Qwen3.5 causal LM",
+        "Seq2Seq / local pairs",
+    }
     assert families["GPT-2 causal LM"]["support_tier"] == "published_basis"
     assert families["BERT / RoBERTa MLM"]["support_tier"] == "published_basis"
     assert families["Mistral 7B causal LM"]["support_tier"] != "published_basis"
     assert families["Qwen2 7B causal LM"]["support_tier"] != "published_basis"
-    assert (
-        families["Llama 3.1 / 3.3 causal LM"]["support_tier"]
-        == "supported_experimental"
-    )
     assert families["Qwen3 causal LM"]["support_tier"] == "supported_experimental"
-    assert (
-        families["Gemma 3 causal LM (text-only eval)"]["support_tier"]
-        == "supported_experimental"
-    )
     assert (
         families["DeepSeek-R1-Distill-Qwen causal LM"]["support_tier"]
         == "supported_experimental"
     )
     assert (
-        families["Phi-4 causal LM (text-only eval)"]["support_tier"]
-        == "supported_experimental"
+        families["TinyLlama 1.1B causal LM"]["support_tier"] == "supported_experimental"
     )
     assert families["OLMo 2 causal LM"]["support_tier"] == "supported_experimental"
     assert families["Qwen3.5 causal LM"]["support_tier"] == "supported_experimental"
-    assert families["DeepSeek-V3 causal LM"]["support_tier"] == "supported_experimental"
 
     for family, lane in families.items():
         assert docs_labels[family] == lane["docs_label"]
