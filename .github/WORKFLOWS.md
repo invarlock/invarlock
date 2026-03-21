@@ -26,6 +26,7 @@ self-hosted-runner:
 ### Security Workflows
 
 - **`codeql.yml`** - CodeQL static analysis (SAST) for security vulnerabilities
+- **`dependabot-main-guard.yml`** - Blocks direct Dependabot PRs to `main`; maintainers must land equivalent dependency fixes on `staging/next` first
 - **`dependabot.yml`** (config file) - Automated dependency updates (Python, GitHub Actions, npm)
 
 See also: [`SECURITY.md`](../SECURITY.md) for vulnerability reporting policy.
@@ -58,11 +59,19 @@ Key environment variables used across workflows:
 Workflows should keep these privilege toggles scoped to the narrowest possible
 job or step, emit attested outputs, and verify them without bypasses.
 
+## Dependency Update Policy
+
+- Dependabot version-update PRs target `staging/next`.
+- Dependabot security-update PRs still originate against the default branch (`main`) because GitHub security updates do not honor `target-branch`.
+- The `dependabot-main-guard.yml` workflow intentionally fails direct Dependabot PRs to `main`.
+- Maintainers must land the equivalent dependency fix on `staging/next`, validate it there, and let it reach `main` through the normal promotion/release flow.
+
 ## Troubleshooting
 
 ### Jobs Pending Indefinitely
 
 If GPU jobs are stuck in "pending" state, ensure:
+
 1. A self-hosted runner with matching labels is online
 2. The runner has access to the repository
 3. The runner service is running (`./run.sh` or systemd service)
@@ -140,6 +149,7 @@ act push --graph
 ### Configuration
 
 The repository includes `.actrc` with default settings:
+
 - Uses `catthehacker/ubuntu:act-22.04` image (good balance of size/compatibility)
 - Container reuse enabled for faster iteration
 - Reads `.env.local` for secrets (create this file locally)

@@ -1,5 +1,12 @@
 # Dependabot configuration for automated dependency updates
 # https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+#
+# Repo policy:
+# - Version-update PRs target staging/next directly.
+# - GitHub security-update PRs still target the default branch (main).
+# - Direct Dependabot PRs to main are blocked by the dependabot-main-guard
+#   workflow; maintainers must land the equivalent fix on staging/next first
+#   and promote it through the normal release flow.
 
 version: 2
 updates:
