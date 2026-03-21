@@ -8,6 +8,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
+try:
+    from runtime_tools import require_remote_code_opt_in
+except ImportError:  # pragma: no cover - direct module load under pytest
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from runtime_tools import require_remote_code_opt_in
+
 _BIN_IGNORE_PATTERNS = ["*.bin", "*.bin.index.json"]
 _SAFETENSORS_IGNORE_PATTERNS = ["*.safetensors", "*.safetensors.index.json"]
 
@@ -251,15 +257,19 @@ def main(argv: list[str] | None = None) -> int:
             torch.backends.cudnn.allow_tf32 = True
 
         cache_dir = os.environ.get("HF_HUB_CACHE")
+        trust_remote_code = require_remote_code_opt_in("download_baseline.py")
         tokenizer = AutoTokenizer.from_pretrained(
-            model_id, trust_remote_code=True, cache_dir=cache_dir, revision=revision
+            model_id,
+            trust_remote_code=trust_remote_code,
+            cache_dir=cache_dir,
+            revision=revision,
         )
         tokenizer.save_pretrained(output_dir)
 
         use_fa2 = flash_available and model_supports_flash_attention(model_id)
         model_kwargs: dict[str, Any] = {
             "dtype": torch.bfloat16,
-            "trust_remote_code": True,
+            "trust_remote_code": trust_remote_code,
             "device_map": "auto",
             "low_cpu_mem_usage": True,
             "cache_dir": cache_dir,

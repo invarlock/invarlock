@@ -10,7 +10,8 @@ auditing workflows.
 The public contract surface covers:
 
 - `evaluation.report.json` semantics and report schema validation
-- `invarlock verify` JSON and exit semantics
+- `invarlock verify` JSON and exit semantics, including runtime-manifest
+  attestation for attested outputs via `runtime.manifest.json`
 - proof-pack manifest format and strict verification rules
 - plugin ABI compatibility rules
 - adapter capability metadata

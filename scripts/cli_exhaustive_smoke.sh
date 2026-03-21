@@ -177,10 +177,10 @@ run "invarlock plugins uninstall --dry-run awq"  "$CLI plugins uninstall --dry-r
 # Extended: verify, evaluate/run with and without network
 # Create a tiny invalid report to exercise verify paths
 TMP_DIR="$(mktemp -d -t invarlock_cli_smoke.XXXXXX.dir)"
-echo '{"schema_version": "v1", "primary_metric": {}}' >"$TMP_DIR/cert_invalid.json"
+echo '{"schema_version": "v1", "primary_metric": {}}' >"$TMP_DIR/report_invalid.json"
 
-run "invarlock verify (human, invalid)" "$CLI verify \"$TMP_DIR/cert_invalid.json\""
-run "invarlock verify --json (invalid)" "$CLI verify --json \"$TMP_DIR/cert_invalid.json\""
+run "invarlock verify (human, invalid)" "$CLI verify \"$TMP_DIR/report_invalid.json\""
+run "invarlock verify --json (invalid)" "$CLI verify --json \"$TMP_DIR/report_invalid.json\""
 
 # Offline runs (force quick failure if uncached)
 OFFLINE_ENV="HF_DATASETS_OFFLINE=1 TRANSFORMERS_OFFLINE=1 TOKENIZERS_PARALLELISM=false"
@@ -188,7 +188,7 @@ OFFLINE_EVAL_ENV="$OFFLINE_ENV INVARLOCK_DEDUP_TEXTS=1 INVARLOCK_TINY_RELAX=1"
 
 if have_adapters_stack; then
   run_to "invarlock run (offline)" 90 "$OFFLINE_ENV $CLI run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --device cpu --out \"$TMP_DIR/run_offline\""
-  run_to "invarlock evaluate (offline)" 150 "$OFFLINE_EVAL_ENV $CLI evaluate --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --device cpu --out \"$TMP_DIR/cert_offline\" --report-out \"$TMP_DIR/cert_offline_out\""
+  run_to "invarlock evaluate (offline)" 150 "$OFFLINE_EVAL_ENV $CLI evaluate --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --device cpu --out \"$TMP_DIR/report_offline\" --report-out \"$TMP_DIR/report_offline_out\""
 else
   {
     echo "\n==== BEGIN invarlock run (offline) ===="
@@ -205,7 +205,7 @@ NET_ENV="INVARLOCK_ALLOW_NETWORK=1 TOKENIZERS_PARALLELISM=false"
 NET_EVAL_ENV="$NET_ENV INVARLOCK_DEDUP_TEXTS=1 INVARLOCK_TINY_RELAX=1"
 if have_adapters_stack; then
   run_to "invarlock run (network)" 90 "$NET_ENV $CLI run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --device cpu --out \"$TMP_DIR/run_net\""
-  run_to "invarlock evaluate (network)" 150 "$NET_EVAL_ENV $CLI evaluate --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --device cpu --out \"$TMP_DIR/cert_net\" --report-out \"$TMP_DIR/cert_net_out\""
+  run_to "invarlock evaluate (network)" 150 "$NET_EVAL_ENV $CLI evaluate --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --device cpu --out \"$TMP_DIR/report_net\" --report-out \"$TMP_DIR/report_net_out\""
 else
   {
     echo "\n==== BEGIN invarlock run (network) ===="

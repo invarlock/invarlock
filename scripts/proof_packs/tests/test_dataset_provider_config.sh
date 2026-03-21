@@ -93,12 +93,32 @@ test_dataset_provider_config_hf_text_trust_remote_code_truthy_values_emit_true()
     INVARLOCK_DATASET="hf_text"
     INVARLOCK_HF_DATASET_NAME="demo/dataset"
     INVARLOCK_HF_TRUST_REMOTE_CODE=" yes "
-    export INVARLOCK_DATASET INVARLOCK_HF_DATASET_NAME INVARLOCK_HF_TRUST_REMOTE_CODE
+    INVARLOCK_ALLOW_REMOTE_CODE="1"
+    export INVARLOCK_DATASET INVARLOCK_HF_DATASET_NAME INVARLOCK_HF_TRUST_REMOTE_CODE INVARLOCK_ALLOW_REMOTE_CODE
 
     local out
     out="$(pack_render_dataset_provider_yaml "${INVARLOCK_DATASET}")"
     assert_match 'dataset_name: "demo/dataset"' "${out}" "dataset_name propagated"
     assert_match 'trust_remote_code: true' "${out}" "truthy override emitted"
+}
+
+test_dataset_provider_config_hf_text_trust_remote_code_requires_explicit_allow() {
+    mock_reset
+
+    # shellcheck source=../lib/dataset_provider_config.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/dataset_provider_config.sh"
+
+    INVARLOCK_DATASET="hf_text"
+    INVARLOCK_HF_DATASET_NAME="demo/dataset"
+    INVARLOCK_HF_TRUST_REMOTE_CODE="true"
+    unset INVARLOCK_ALLOW_REMOTE_CODE
+    export INVARLOCK_DATASET INVARLOCK_HF_DATASET_NAME INVARLOCK_HF_TRUST_REMOTE_CODE
+
+    local out=""
+    local rc=0
+    out="$(pack_render_dataset_provider_yaml "${INVARLOCK_DATASET}" 2>&1)" || rc=$?
+    assert_eq "2" "${rc}" "missing explicit allow aborts remote-code dataset config"
+    assert_match 'requires INVARLOCK_ALLOW_REMOTE_CODE=1' "${out}" "error explains remote-code opt-in"
 }
 
 test_dataset_provider_config_hf_text_omits_config_and_cache_and_sanitizes_max_samples() {

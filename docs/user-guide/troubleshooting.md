@@ -15,12 +15,14 @@
 # Check environment and configuration
 invarlock doctor --config <config.yaml> --profile ci
 
-# Validate a report
+# Validate an attested report bundle
 invarlock verify reports/eval/evaluation.report.json --profile ci
 
 # Enable debug output for detailed traces
-INVARLOCK_DEBUG_TRACE=1 invarlock run -c <config.yaml>
+INVARLOCK_DEBUG_TRACE=1 INVARLOCK_ALLOW_HOST_EXECUTION=1 invarlock run -c <config.yaml>
 ```
+
+`verify` expects `runtime.manifest.json` next to evaluation outputs.
 
 ## Error Code Reference
 

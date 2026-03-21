@@ -210,6 +210,26 @@ def _evaluate_lazy(
     no_color: bool = typer.Option(
         False, "--no-color", help="Disable ANSI colors (respects NO_COLOR=1)"
     ),
+    allow_network: bool = typer.Option(
+        False,
+        "--allow-network",
+        help="Allow network access, including runtime-image pulls and model fetches.",
+    ),
+    allow_host_execution: bool = typer.Option(
+        False,
+        "--allow-host-execution",
+        help="Allow running directly on the host instead of the runtime container.",
+    ),
+    allow_third_party_plugins: bool = typer.Option(
+        False,
+        "--allow-third-party-plugins",
+        help="Allow third-party plugin discovery for this command.",
+    ),
+    allow_remote_code: bool = typer.Option(
+        False,
+        "--allow-remote-code",
+        help="Allow trust_remote_code-style model loading for this command.",
+    ),
 ):
     from .commands.evaluate import evaluate_command as _eval
 
@@ -233,6 +253,10 @@ def _evaluate_lazy(
         timing=timing,
         progress=progress,
         no_color=no_color,
+        allow_network=allow_network,
+        allow_host_execution=allow_host_execution,
+        allow_third_party_plugins=allow_third_party_plugins,
+        allow_remote_code=allow_remote_code,
     )
 
 
@@ -308,6 +332,11 @@ def _verify_typed(
         "--json",
         help="Emit machine-readable JSON (suppresses human-readable output)",
     ),
+    allow_unattested_artifacts: bool = typer.Option(
+        False,
+        "--allow-unattested-artifacts",
+        help="Allow verification of reports without runtime attestation metadata.",
+    ),
 ):
     from pathlib import Path as _Path
 
@@ -321,6 +350,7 @@ def _verify_typed(
         tolerance=tolerance,
         profile=profile,
         json_out=json_out,
+        allow_unattested_artifacts=allow_unattested_artifacts,
     )
 
 
@@ -397,6 +427,26 @@ def _run_typed(
     no_color: bool = typer.Option(
         False, "--no-color", help="Disable ANSI colors (respects NO_COLOR=1)"
     ),
+    allow_network: bool = typer.Option(
+        False,
+        "--allow-network",
+        help="Allow network access, including runtime-image pulls and model fetches.",
+    ),
+    allow_host_execution: bool = typer.Option(
+        False,
+        "--allow-host-execution",
+        help="Allow running directly on the host instead of the runtime container.",
+    ),
+    allow_third_party_plugins: bool = typer.Option(
+        False,
+        "--allow-third-party-plugins",
+        help="Allow third-party plugin discovery for this command.",
+    ),
+    allow_remote_code: bool = typer.Option(
+        False,
+        "--allow-remote-code",
+        help="Allow trust_remote_code-style model loading for this command.",
+    ),
 ):
     from .commands.run import run_command as _run
 
@@ -419,6 +469,10 @@ def _run_typed(
         progress=progress,
         timing=timing,
         no_color=no_color,
+        allow_network=allow_network,
+        allow_host_execution=allow_host_execution,
+        allow_third_party_plugins=allow_third_party_plugins,
+        allow_remote_code=allow_remote_code,
     )
 
 

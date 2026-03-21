@@ -84,8 +84,11 @@ invarlock run -c byod.yaml --profile dev --out runs/base
 invarlock run -c byod.yaml --profile dev --out runs/subj
 
 # 4) Generate report
-invarlock report --run runs/subj --format report --baseline runs/base -o cert
+invarlock report --run runs/subj --format report --baseline runs/base -o report_bundle
 ```
+
+The `invarlock run` steps follow the secure-default runtime container path
+unless a trusted local workflow explicitly sets `--allow-host-execution`.
 
 Common pitfalls:
 

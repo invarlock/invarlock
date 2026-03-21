@@ -129,12 +129,13 @@ nan_check = "my_plugin.my_guard:NaNCheckGuard"
 # Install in editable mode
 pip install -e ./my_invarlock_plugin
 
-# Verify registration
-invarlock plugins guards
+# Verify registration (third-party discovery is explicit opt-in)
+invarlock plugins guards --allow-third-party-plugins
 # Should show: nan_check | Plugin | Guard | — | — | ✅ Ready
 
-# Use in a run
-invarlock run -c config.yaml
+# Use in a trusted local run
+INVARLOCK_ALLOW_HOST_EXECUTION=1 INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=1 \
+  invarlock run -c config.yaml
 ```
 
 ### Step 5: Add to Config

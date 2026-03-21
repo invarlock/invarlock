@@ -24,6 +24,25 @@ pack_dataset_provider_kind() {
     echo "${kind}"
 }
 
+pack_truthy() {
+    local value="${1:-}"
+    value="$(echo "${value}" | tr '[:upper:]' '[:lower:]' | xargs)"
+    [[ "${value}" == "1" || "${value}" == "true" || "${value}" == "yes" || "${value}" == "y" || "${value}" == "on" ]]
+}
+
+pack_remote_code_allowed() {
+    pack_truthy "${INVARLOCK_ALLOW_REMOTE_CODE:-}"
+}
+
+pack_model_trust_remote_code_yaml() {
+    local indent="${1:-}"
+    if pack_remote_code_allowed; then
+        echo "${indent}trust_remote_code: true"
+    else
+        echo "${indent}trust_remote_code: false"
+    fi
+}
+
 _pack_indent_lines() {
     local prefix="$1"
     local content="$2"
@@ -88,6 +107,10 @@ pack_render_dataset_provider_yaml() {
         if [[ -n "${trust_remote_code}" ]]; then
             case "$(echo "${trust_remote_code}" | tr '[:upper:]' '[:lower:]' | xargs)" in
                 1|true|yes|y|on)
+                    if ! pack_remote_code_allowed; then
+                        echo "proof-pack dataset provider remote code requires INVARLOCK_ALLOW_REMOTE_CODE=1" >&2
+                        return 2
+                    fi
                     echo "    trust_remote_code: true"
                     ;;
                 0|false|no|n|off)

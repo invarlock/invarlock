@@ -76,7 +76,7 @@ model:
   device: "auto"
   device_map: "auto"
   dtype: "bfloat16"
-  trust_remote_code: true
+$(pack_model_trust_remote_code_yaml "  ")
   low_cpu_mem_usage: true
   ${attn_impl_yaml}
 
@@ -179,9 +179,16 @@ run_single_calibration() {
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Large model (${model_size}): using INVARLOCK_SKIP_OVERHEAD_CHECK=1 for calibration" >> "${log_file}"
     fi
 
-    INVARLOCK_WINDOW_OVERLAP_FRACTION=0.0 \
-    INVARLOCK_SKIP_OVERHEAD_CHECK=1 \
-    CUDA_VISIBLE_DEVICES="${cuda_devices}" invarlock run \
+    local -a run_env=(
+        INVARLOCK_WINDOW_OVERLAP_FRACTION=0.0
+        INVARLOCK_SKIP_OVERHEAD_CHECK=1
+        CUDA_VISIBLE_DEVICES="${cuda_devices}"
+    )
+    if pack_remote_code_allowed; then
+        run_env+=(INVARLOCK_ALLOW_REMOTE_CODE=1)
+    fi
+
+    env "${run_env[@]}" invarlock run \
         --config "${config_yaml}" \
         --profile ci \
         --out "${run_dir}" \

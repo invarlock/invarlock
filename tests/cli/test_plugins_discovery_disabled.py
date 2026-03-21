@@ -5,9 +5,9 @@ import json
 
 
 def test_plugins_discovery_disabled_json(monkeypatch, capsys):
-    monkeypatch.setenv("INVARLOCK_DISABLE_PLUGIN_DISCOVERY", "1")
+    monkeypatch.setenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "0")
     mod = importlib.import_module("invarlock.cli.commands.plugins")
-    # JSON output path returns a stable payload
+    # JSON output still includes built-ins while keeping third-party discovery off.
     mod.plugins_command(
         category="adapters",
         only=None,
@@ -18,15 +18,15 @@ def test_plugins_discovery_disabled_json(monkeypatch, capsys):
     )
     out = capsys.readouterr().out.strip()
     payload = json.loads(out)
-    assert payload["discovery"] == "disabled"
     assert payload["category"] == "adapters"
     assert "kind" not in payload
+    assert any(item["name"] == "hf_causal" for item in payload["items"])
 
 
 def test_plugins_discovery_disabled_message(monkeypatch, capsys):
-    monkeypatch.setenv("INVARLOCK_DISABLE_PLUGIN_DISCOVERY", "1")
+    monkeypatch.setenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "0")
     mod = importlib.import_module("invarlock.cli.commands.plugins")
-    # Table/text path emits a terse message when discovery is disabled
+    # Table/text path still renders built-ins while keeping third-party discovery off.
     mod.plugins_command(
         category=None,
         only=None,
@@ -36,4 +36,4 @@ def test_plugins_discovery_disabled_message(monkeypatch, capsys):
         hide_unsupported=True,
     )
     out = capsys.readouterr().out
-    assert "Plugin discovery disabled" in out
+    assert "hf_causal" in out

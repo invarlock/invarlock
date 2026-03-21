@@ -1032,11 +1032,12 @@ def doctor_command(
             console.print(f"  Edits: {len(registry.list_edits())}")
             console.print(f"  Guards: {len(registry.list_guards())}")
         # Use module-level _os (avoid shadowing earlier uses)
-        if _os.getenv("INVARLOCK_DISABLE_PLUGIN_DISCOVERY", "").strip() == "1":
+        if _os.getenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "").strip() == "1":
             _add(
                 "D006",
                 "note",
-                "Plugin discovery disabled; doctor will not check optional adapters.",
+                "Third-party plugin discovery is explicitly enabled by environment; "
+                "doctor will include optional third-party adapters in registry checks.",
             )
 
         # Detail adapters with Origin/Mode/Backend/Version table

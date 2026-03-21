@@ -15,11 +15,15 @@ high-quality PRs that match the current repo layout and tooling.
 - **PyTorch / extras** are pulled in via optional dependencies when needed
 - **Node.js + npm** (recommended for docs linting: markdownlint/cspell via `npx`)
 
-InvarLock runs offline by default. For commands that need downloads (models/datasets),
-enable network explicitly per run:
+InvarLock runs offline by default. For commands that need downloads
+(models/datasets), enable network explicitly per run. Model-loading commands use
+the runtime container by default; trusted local development outside that
+container must opt into host execution explicitly:
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 invarlock run -c ...   # or invarlock evaluate ...
+INVARLOCK_ALLOW_HOST_EXECUTION=1 INVARLOCK_ALLOW_NETWORK=1 invarlock run -c ...
+# or:
+INVARLOCK_ALLOW_HOST_EXECUTION=1 INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate ...
 ```
 
 ### 1.2 Quick setup (recommended)

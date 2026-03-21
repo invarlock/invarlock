@@ -48,6 +48,9 @@ case "${cmd}" in
         fi
         ;;
     verify)
+        for arg in "$@"; do
+            [[ "${arg}" != "--allow-unattested-artifacts" ]] || exit 97
+        done
         echo '{"ok": true}'
         exit 0
         ;;
@@ -70,16 +73,16 @@ EOF
     assert_file_exists "${pack_dir}/results/verdicts/final_verdict.txt" "verdict copied"
     assert_file_exists "${pack_dir}/metadata/model_revisions.json" "revisions copied"
     assert_file_exists "${pack_dir}/metadata/scenarios.json" "scenarios manifest copied"
-    assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/evaluation.report.json" "cert copied"
-    assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/rmt_probe.json" "probe sidecar copied"
-    assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/ve_probe.json" "ve probe sidecar copied"
-    assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/verify.json" "verify output captured"
+    assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/evaluation.report.json" "report copied"
+    assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/rmt_probe.json" "probe sidecar copied"
+    assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/ve_probe.json" "ve probe sidecar copied"
+    assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/verify.json" "verify output captured"
     assert_file_exists "${pack_dir}/results/verification_summary.json" "verification summary written"
     run python3 -c 'import json,sys; json.load(open(sys.argv[1], encoding="utf-8"))' "${pack_dir}/results/verification_summary.json"
     assert_rc "0" "${RUN_RC}" "verification summary is valid JSON"
     assert_file_exists "${pack_dir}/manifest.json" "manifest written"
     assert_file_exists "${pack_dir}/checksums.sha256" "checksums written"
-    assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/evaluation.html" "html rendered"
+    assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/evaluation.html" "html rendered"
     assert_file_exists "${pack_dir}/README.md" "readme written"
     assert_match "signed manifest, strict verification, and a PASS final verdict" "$(cat "${pack_dir}/README.md")" "README documents proof-grade triad"
     assert_file_exists "${pack_dir}/results/analysis/guard_intervention_summary.json" "intervention summary copied"
@@ -150,6 +153,9 @@ case "${cmd}" in
         fi
         ;;
     verify)
+        for arg in "$@"; do
+            [[ "${arg}" != "--allow-unattested-artifacts" ]] || exit 97
+        done
         echo '{"ok": true}'
         exit 0
         ;;
@@ -276,9 +282,12 @@ case "${cmd}" in
         fi
         ;;
     verify)
-        cert="${@: -1}"
+        for arg in "$@"; do
+            [[ "${arg}" != "--allow-unattested-artifacts" ]] || exit 97
+        done
+        report="${@: -1}"
         echo '{"ok": false}'
-        if [[ "${cert}" == */errors/*/evaluation.report.json ]]; then
+        if [[ "${report}" == */errors/*/evaluation.report.json ]]; then
             exit 1
         fi
         exit 0
@@ -294,14 +303,14 @@ EOF
     local pack_dir="${TEST_TMPDIR}/pack"
     pack_build_pack "${run_dir}" "${pack_dir}"
 
-    assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/verify.json" "clean verify output captured"
-    assert_file_exists "${pack_dir}/certs/modelA/errors/nan_injection/verify.json" "error injection verify output captured"
+    assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/verify.json" "clean verify output captured"
+    assert_file_exists "${pack_dir}/reports/modelA/errors/nan_injection/verify.json" "error injection verify output captured"
     assert_file_exists "${pack_dir}/results/verification_summary.json" "verification summary written"
     run python3 -c 'import json,sys; json.load(open(sys.argv[1], encoding="utf-8"))' "${pack_dir}/results/verification_summary.json"
     assert_rc "0" "${RUN_RC}" "verification summary is valid JSON"
-    assert_match "\"clean_certs\": 1" "$(cat "${pack_dir}/results/verification_summary.json")" "clean count recorded"
-    assert_match "\"error_injection_certs\": 1" "$(cat "${pack_dir}/results/verification_summary.json")" "error injection count recorded"
-    assert_match "\"failed_certs\": 0" "$(cat "${pack_dir}/results/verification_summary.json")" "failed count recorded"
+    assert_match "\"clean_reports\": 1" "$(cat "${pack_dir}/results/verification_summary.json")" "clean count recorded"
+    assert_match "\"error_injection_reports\": 1" "$(cat "${pack_dir}/results/verification_summary.json")" "error injection count recorded"
+    assert_match "\"failed_reports\": 0" "$(cat "${pack_dir}/results/verification_summary.json")" "failed count recorded"
 }
 
 test_run_pack_build_pack_continues_when_html_report_fails() {
@@ -334,6 +343,9 @@ case "${cmd}" in
         fi
         ;;
     verify)
+        for arg in "$@"; do
+            [[ "${arg}" != "--allow-unattested-artifacts" ]] || exit 97
+        done
         echo '{"ok": true}'
         exit 0
         ;;
@@ -396,6 +408,9 @@ case "${cmd}" in
         fi
         ;;
     verify)
+        for arg in "$@"; do
+            [[ "${arg}" != "--allow-unattested-artifacts" ]] || exit 97
+        done
         echo '{"ok": false}'
         exit 1
         ;;
@@ -465,13 +480,13 @@ test_run_pack_helpers_cover_error_paths() {
     run pack_copy_file "${TEST_TMPDIR}/missing.txt" "${TEST_TMPDIR}/dest.txt"
     assert_rc "1" "${RUN_RC}" "missing artifact returns non-zero"
 
-    run pack_cert_rel_path "${TEST_TMPDIR}/run" "${TEST_TMPDIR}/nope"
-    assert_rc "1" "${RUN_RC}" "invalid cert path returns non-zero"
+    run pack_report_rel_path "${TEST_TMPDIR}/run" "${TEST_TMPDIR}/nope"
+    assert_rc "1" "${RUN_RC}" "invalid report path returns non-zero"
 
     local pack_dir="${TEST_TMPDIR}/pack"
-    mkdir -p "${pack_dir}/certs"
-    run pack_verify_certs "${pack_dir}"
-    assert_rc "1" "${RUN_RC}" "missing certs returns non-zero"
+    mkdir -p "${pack_dir}/reports"
+    run pack_verify_reports "${pack_dir}"
+    assert_rc "1" "${RUN_RC}" "missing reports returns non-zero"
 }
 
 test_run_pack_sha256_cmd_fallback_and_sign_warning() {

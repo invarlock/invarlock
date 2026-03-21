@@ -23,9 +23,11 @@ from invarlock.public_contracts import (
     load_model_family_catalog,
     load_support_matrix,
 )
+from invarlock.runtime_security import network_allowed, third_party_plugins_allowed
 
 from ..backend_runtime import bitsandbytes_runtime_available
 from ..constants import PLUGINS_FORMAT_VERSION
+from ..security_helpers import configure_runtime_security
 
 console = Console()
 
@@ -108,6 +110,11 @@ def plugins_command(
         "--hide-unsupported/--show-unsupported",
         help="Hide adapters unsupported on this platform (default: hide)",
     ),
+    allow_third_party_plugins: bool = typer.Option(
+        False,
+        "--allow-third-party-plugins",
+        help="Allow third-party plugin discovery for this command.",
+    ),
 ):
     """
     List available plugins with entry point information.
@@ -116,76 +123,13 @@ def plugins_command(
 
     Examples:
         invarlock plugins              # List all plugins
-        invarlock plugins guards       # List only guard plugins
-        invarlock plugins edits        # List only edit plugins
-        invarlock plugins adapters     # List only adapter plugins
-        invarlock plugins datasets     # List only dataset providers
+        invarlock plugins guards       # List built-in guard plugins
+        invarlock plugins edits        # List built-in edit plugins
+        invarlock plugins adapters     # List built-in adapter plugins
+        invarlock plugins datasets     # List built-in dataset providers
+        invarlock plugins adapters --allow-third-party-plugins
     """
     try:
-        # Light import guard for docs/tests
-        disable_discovery = os.getenv(
-            "INVARLOCK_DISABLE_PLUGIN_DISCOVERY", ""
-        ).strip().lower() in {
-            "1",
-            "true",
-            "yes",
-        }
-        if disable_discovery:
-            # Validate category even when discovery is disabled so unknown
-            # categories still report a proper error code for tests/CLI.
-            valid_categories = {
-                None,
-                "guards",
-                "edits",
-                "adapters",
-                "adapter",
-                "datasets",
-                "list",
-                "all",
-                "plugins",
-            }
-            if category not in valid_categories:
-                console.print(
-                    f"[red]❌ Unknown category '{category}'. Valid: guards, edits, "
-                    "adapters, datasets, list, all[/red]"
-                )
-                raise typer.Exit(2)
-
-            # Provide a minimal but structurally stable JSON envelope for all
-            # categories when discovery is disabled. Tests rely on an empty
-            # items array in this mode.
-            if json_out:
-                import json as _json
-                import sys as _sys
-
-                kind = (
-                    "adapters"
-                    if category in {"adapters", "adapter"}
-                    else (category or "list")
-                )
-                payload = {
-                    "format_version": PLUGINS_FORMAT_VERSION,
-                    "category": kind,
-                    "items": [],
-                    "discovery": "disabled",
-                    "contracts": contract_catalog(),
-                    "support_matrix": load_support_matrix(),
-                    "model_family_catalog": load_model_family_catalog(),
-                }
-                _sys.stdout.write(_json.dumps(payload) + "\n")
-                return
-
-            # Fall back to a terse message when discovery is disabled
-            console.print(
-                "[dim]Plugin discovery disabled (INVARLOCK_DISABLE_PLUGIN_DISCOVERY=1).[/dim]"
-            )
-            return
-
-        from invarlock.core.registry import get_registry
-        from invarlock.eval.data import list_providers
-
-        registry = get_registry()
-
         # Coerce Typer OptionInfo defaults when invoked programmatically
         try:
             from typer.models import OptionInfo as _OptionInfo  # type: ignore
@@ -204,6 +148,17 @@ def plugins_command(
             explain = None
         if isinstance(hide_unsupported, _OptionInfo):
             hide_unsupported = True
+        if isinstance(allow_third_party_plugins, _OptionInfo):
+            allow_third_party_plugins = False
+
+        configure_runtime_security(
+            allow_third_party_plugins=bool(allow_third_party_plugins)
+        )
+
+        from invarlock.core.registry import get_registry
+        from invarlock.eval.data import list_providers
+
+        registry = get_registry()
 
         def _is_minimal() -> bool:
             val = os.environ.get("INVARLOCK_MINIMAL", "").strip().lower()
@@ -1064,14 +1019,15 @@ def plugins_uninstall_command(
         True, "--dry-run", help="Show what would be uninstalled without making changes"
     ),
     apply: bool = typer.Option(False, "--apply", help="Actually uninstall packages"),
+    allow_third_party_plugins: bool = False,
 ):
     """Uninstall optional plugin backends (mirror to extras install).
 
     Examples:
-        invarlock plugins-uninstall gptq
-        invarlock plugins-uninstall awq --dry-run
-        invarlock plugins-uninstall hf_bnb -y
-        invarlock plugins-uninstall 'invarlock[gpu]'
+        invarlock plugins uninstall gptq --dry-run --allow-third-party-plugins
+        invarlock plugins uninstall awq --dry-run --allow-third-party-plugins
+        invarlock plugins uninstall hf_bnb -y --apply --allow-third-party-plugins
+        invarlock plugins uninstall 'invarlock[gpu]' --dry-run --allow-third-party-plugins
     """
     all_pkgs: list[str] = []
     unknown: list[str] = []
@@ -1112,6 +1068,17 @@ def plugins_uninstall_command(
     if (not bool(apply)) or bool(dry_run) or force_dry:
         _print_normalized("uninstall", all_pkgs, "dry-run", "ok")
         raise typer.Exit(0)
+
+    configure_runtime_security(
+        allow_third_party_plugins=bool(allow_third_party_plugins)
+    )
+    if not third_party_plugins_allowed():
+        console.print(
+            "[red]❌ Third-party plugin management is disabled by default. "
+            "Re-run with --allow-third-party-plugins or "
+            "INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=1.[/red]"
+        )
+        raise typer.Exit(1)
 
     if not yes:
         proceed = typer.confirm(
@@ -1163,14 +1130,16 @@ def plugins_install_command(
         True, "--dry-run", help="Show what would be installed without making changes"
     ),
     apply: bool = typer.Option(False, "--apply", help="Actually install packages"),
+    allow_third_party_plugins: bool = False,
+    allow_network: bool = False,
 ):
     """Install optional plugin extras (mirror to extras install).
 
     Examples:
-        invarlock plugins-install gptq
-        invarlock plugins-install awq gpu --upgrade
-        invarlock plugins-install hf_bnb --dry-run
-        invarlock plugins-install adapters
+        invarlock plugins install gptq --dry-run --allow-third-party-plugins
+        invarlock plugins install awq gpu --upgrade --dry-run --allow-third-party-plugins
+        invarlock plugins install hf_bnb --dry-run --allow-third-party-plugins
+        invarlock plugins install adapters --dry-run --allow-third-party-plugins
     """
     all_targets: list[str] = []
     unknown: list[str] = []
@@ -1215,6 +1184,24 @@ def plugins_install_command(
         _print_normalized("install", all_targets, "dry-run", "ok")
         raise typer.Exit(0)
 
+    configure_runtime_security(
+        allow_network=bool(allow_network),
+        allow_third_party_plugins=bool(allow_third_party_plugins),
+    )
+    if not third_party_plugins_allowed():
+        console.print(
+            "[red]❌ Third-party plugin management is disabled by default. "
+            "Re-run with --allow-third-party-plugins or "
+            "INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=1.[/red]"
+        )
+        raise typer.Exit(1)
+    if not network_allowed():
+        console.print(
+            "[red]❌ Network access is disabled by default. Re-run with "
+            "--allow-network or INVARLOCK_ALLOW_NETWORK=1 to install plugins.[/red]"
+        )
+        raise typer.Exit(1)
+
     try:
         cmd = [sys.executable, "-m", "pip", "install", *all_targets]
         if upgrade:
@@ -1255,9 +1242,19 @@ def _plugins_list(
     ),
     json_out: bool = typer.Option(False, "--json", help="Emit JSON output"),
     verbose: bool = typer.Option(False, "--verbose", help="Verbose table output"),
+    allow_third_party_plugins: bool = typer.Option(
+        False,
+        "--allow-third-party-plugins",
+        help="Allow third-party plugin discovery for this command.",
+    ),
 ):
     """List installed plugin entry points and adapters for a given category."""
-    return plugins_command(category, verbose=verbose, json_out=json_out)
+    return plugins_command(
+        category,
+        verbose=verbose,
+        json_out=json_out,
+        allow_third_party_plugins=allow_third_party_plugins,
+    )
 
 
 @plugins_app.command("guards")
@@ -1267,13 +1264,24 @@ def _plugins_guards(
     ),
     verbose: bool = typer.Option(False, "--verbose", help="Verbose table output"),
     json_out: bool = typer.Option(False, "--json", help="Emit JSON output"),
+    allow_third_party_plugins: bool = typer.Option(
+        False,
+        "--allow-third-party-plugins",
+        help="Allow third-party plugin discovery for this command.",
+    ),
 ):
     """List available guard plugins.
 
     Shows built-in and third-party guards discovered via entry points.
     Use --json for machine-readable output.
     """
-    return plugins_command("guards", only=only, verbose=verbose, json_out=json_out)
+    return plugins_command(
+        "guards",
+        only=only,
+        verbose=verbose,
+        json_out=json_out,
+        allow_third_party_plugins=allow_third_party_plugins,
+    )
 
 
 @plugins_app.command("edits")
@@ -1283,13 +1291,24 @@ def _plugins_edits(
     ),
     verbose: bool = typer.Option(False, "--verbose", help="Verbose table output"),
     json_out: bool = typer.Option(False, "--json", help="Emit JSON output"),
+    allow_third_party_plugins: bool = typer.Option(
+        False,
+        "--allow-third-party-plugins",
+        help="Allow third-party plugin discovery for this command.",
+    ),
 ):
     """List available edit plugins.
 
     Includes built-in edits like quant_rtn and any discovered third-party edits.
     Use --json for machine-readable output.
     """
-    return plugins_command("edits", only=only, verbose=verbose, json_out=json_out)
+    return plugins_command(
+        "edits",
+        only=only,
+        verbose=verbose,
+        json_out=json_out,
+        allow_third_party_plugins=allow_third_party_plugins,
+    )
 
 
 @plugins_app.command("adapters")
@@ -1307,6 +1326,11 @@ def _plugins_adapters(
         "--hide-unsupported/--show-unsupported",
         help="Hide adapters unsupported on this platform (default: hide)",
     ),
+    allow_third_party_plugins: bool = typer.Option(
+        False,
+        "--allow-third-party-plugins",
+        help="Allow third-party plugin discovery for this command.",
+    ),
 ):
     """List available model adapters.
 
@@ -1320,6 +1344,7 @@ def _plugins_adapters(
         json_out=json_out,
         explain=explain,
         hide_unsupported=hide_unsupported,
+        allow_third_party_plugins=allow_third_party_plugins,
     )
 
 
@@ -1339,6 +1364,11 @@ def _plugins_adapter_alias(
         "--hide-unsupported/--show-unsupported",
         help="Hide adapters unsupported on this platform (default: hide)",
     ),
+    allow_third_party_plugins: bool = typer.Option(
+        False,
+        "--allow-third-party-plugins",
+        help="Allow third-party plugin discovery for this command.",
+    ),
 ):
     return plugins_command(
         "adapters",
@@ -1347,6 +1377,7 @@ def _plugins_adapter_alias(
         json_out=json_out,
         explain=explain,
         hide_unsupported=hide_unsupported,
+        allow_third_party_plugins=allow_third_party_plugins,
     )
 
 
@@ -1356,13 +1387,23 @@ def _plugins_install(
     upgrade: bool = typer.Option(False, "--upgrade", "-U"),
     dry_run: bool = typer.Option(True, "--dry-run"),
     apply: bool = typer.Option(False, "--apply"),
+    allow_network: bool = typer.Option(
+        False,
+        "--allow-network",
+        help="Allow network access for plugin installation.",
+    ),
+    allow_third_party_plugins: bool = typer.Option(
+        False,
+        "--allow-third-party-plugins",
+        help="Allow third-party plugin management for this command.",
+    ),
 ):
     """Install optional plugin backends via pip.
 
     Examples:
-      invarlock plugins install invarlock[gptq]        # Linux + CUDA only
-      invarlock plugins install invarlock[awq]         # Linux + CUDA only
-      invarlock plugins install invarlock[gpu]         # bitsandbytes (host/runtime dependent)
+      invarlock plugins install invarlock[gptq] --dry-run --allow-third-party-plugins
+      invarlock plugins install invarlock[awq] --dry-run --allow-third-party-plugins
+      invarlock plugins install invarlock[gpu] --dry-run --allow-third-party-plugins
 
     Use --dry-run (default) to preview the action; pass --apply to execute.
     """
@@ -1372,7 +1413,14 @@ def _plugins_install(
     if eff_dry_run:
         os.environ["INVARLOCK_PLUGINS_DRY_RUN"] = "1"
     try:
-        return plugins_install_command(names, upgrade, eff_dry_run, eff_apply)
+        return plugins_install_command(
+            names,
+            upgrade,
+            eff_dry_run,
+            eff_apply,
+            allow_third_party_plugins=allow_third_party_plugins,
+            allow_network=allow_network,
+        )
     finally:
         if os.environ.get("INVARLOCK_PLUGINS_DRY_RUN") == "1":
             os.environ.pop("INVARLOCK_PLUGINS_DRY_RUN", None)
@@ -1384,11 +1432,21 @@ def _plugins_uninstall(
     yes: bool = typer.Option(False, "--yes", "-y"),
     dry_run: bool = typer.Option(True, "--dry-run"),
     apply: bool = typer.Option(False, "--apply"),
+    allow_third_party_plugins: bool = typer.Option(
+        False,
+        "--allow-third-party-plugins",
+        help="Allow third-party plugin management for this command.",
+    ),
 ):
     """Uninstall optional plugin backends via pip.
 
     Accepts either extras (invarlock[gptq], invarlock[awq], invarlock[gpu])
     or direct package names (auto-gptq, autoawq, bitsandbytes).
+
+    Examples:
+      invarlock plugins uninstall invarlock[gptq] --dry-run --allow-third-party-plugins
+      invarlock plugins uninstall autoawq --dry-run --allow-third-party-plugins
+      invarlock plugins uninstall bitsandbytes --yes --apply --allow-third-party-plugins
 
     Use --dry-run (default) to preview; pass --apply to execute.
     """
@@ -1397,7 +1455,13 @@ def _plugins_uninstall(
     if eff_dry_run:
         os.environ["INVARLOCK_PLUGINS_DRY_RUN"] = "1"
     try:
-        return plugins_uninstall_command(names, yes, eff_dry_run, eff_apply)
+        return plugins_uninstall_command(
+            names,
+            yes,
+            eff_dry_run,
+            eff_apply,
+            allow_third_party_plugins=allow_third_party_plugins,
+        )
     finally:
         if os.environ.get("INVARLOCK_PLUGINS_DRY_RUN") == "1":
             os.environ.pop("INVARLOCK_PLUGINS_DRY_RUN", None)

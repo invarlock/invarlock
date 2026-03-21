@@ -22,7 +22,7 @@ Options:
   --scenario-ids IDS   Comma-separated scenario IDs to include (filters scenarios.json before queue generation)
   --calibrate-only     Only run calibration tasks (implies PACK_SUITE_MODE=calibrate-only)
   --errors-only        Only run error injection scenarios (still performs calibration unless presets are provided)
-  --run-only           Run edits/certs only (implies resume)
+  --run-only           Run edits/reports only (implies resume)
   --resume             Resume an existing run directory
   --help               Show this help message
 EOF
@@ -82,15 +82,15 @@ pack_copy_optional() {
     fi
 }
 
-pack_collect_certs() {
+pack_collect_reports() {
     local run_dir="$1"
-    find "${run_dir}" -type f -name "evaluation.report.json" -path "*/reports/*" ! -path "*/cert/*" | sort
+    find "${run_dir}" -type f -name "evaluation.report.json" -path "*/reports/*" | sort
 }
 
-pack_cert_rel_path() {
+pack_report_rel_path() {
     local run_dir="$1"
-    local cert_path="$2"
-    local rel="${cert_path#"${run_dir}/"}"
+    local report_path="$2"
+    local rel="${report_path#"${run_dir}/"}"
     local model="${rel%%/*}"
     local remainder="${rel#*/reports/}"
     remainder="${remainder%/evaluation.report.json}"
@@ -102,41 +102,41 @@ pack_cert_rel_path() {
 
 pack_generate_html() {
     local pack_dir="$1"
-    local cert
-    while IFS= read -r cert; do
-        [[ -n "${cert}" ]] || continue
-        local html="${cert%.report.json}.html"
-        if ! invarlock report html --input "${cert}" --output "${html}" --force >/dev/null; then
-            echo "WARNING: Failed to render HTML report for ${cert}" >&2
+    local report
+    while IFS= read -r report; do
+        [[ -n "${report}" ]] || continue
+        local html="${report%.report.json}.html"
+        if ! invarlock report html --input "${report}" --output "${html}" --force >/dev/null; then
+            echo "WARNING: Failed to render HTML report for ${report}" >&2
         fi
-    done < <(find "${pack_dir}/certs" -type f -name "evaluation.report.json" | sort)
+    done < <(find "${pack_dir}/reports" -type f -name "evaluation.report.json" | sort)
 }
 
-pack_verify_certs() {
+pack_verify_reports() {
     local pack_dir="$1"
     local profile="${PACK_VERIFY_PROFILE:-dev}"
     local count_clean=0
     local count_error=0
     local count_failed=0
-    local cert
-    while IFS= read -r cert; do
-        [[ -n "${cert}" ]] || continue
-        local cert_dir
-        cert_dir="$(dirname "${cert}")"
-        if [[ "${cert}" == */errors/*/evaluation.report.json ]]; then
-            # Error injection certs are expected to fail verify (unsafe edits by design).
-            invarlock verify --json --profile "${profile}" "${cert}" > "${cert_dir}/verify.json" || true
+    local report
+    while IFS= read -r report; do
+        [[ -n "${report}" ]] || continue
+        local report_dir
+        report_dir="$(dirname "${report}")"
+        if [[ "${report}" == */errors/*/evaluation.report.json ]]; then
+            # Error injection reports are expected to fail verify (unsafe edits by design).
+            invarlock verify --json --profile "${profile}" "${report}" > "${report_dir}/verify.json" || true
             count_error=$((count_error + 1))
             continue
         fi
 
-        if invarlock verify --json --profile "${profile}" "${cert}" > "${cert_dir}/verify.json"; then
+        if invarlock verify --json --profile "${profile}" "${report}" > "${report_dir}/verify.json"; then
             count_clean=$((count_clean + 1))
         else
-            echo "ERROR: Unexpected verify failure: ${cert}" >&2
+            echo "ERROR: Unexpected verify failure: ${report}" >&2
             count_failed=$((count_failed + 1))
         fi
-    done < <(find "${pack_dir}/certs" -type f -name "evaluation.report.json" | sort)
+    done < <(find "${pack_dir}/reports" -type f -name "evaluation.report.json" | sort)
 
     local total=$((count_clean + count_error + count_failed))
     if [[ ${total} -eq 0 ]]; then
@@ -358,7 +358,7 @@ require a signed manifest, strict verification, and a PASS final verdict.
    # macOS: shasum -a 256 -c checksums.sha256
 
 3) Verify report integrity:
-   invarlock verify --json certs/**/evaluation.report.json
+   invarlock verify --json reports/**/evaluation.report.json
 
 Or use:
   invarlock proof-pack verify <pack-dir> [--strict]
@@ -441,21 +441,21 @@ pack_populate_pack_dir() {
     pack_write_source_repo_metadata "${source_repo_dest}"
     pack_write_environment_metadata "${run_dir}" "${environment_dest}"
 
-    local cert
-    while IFS= read -r cert; do
-        [[ -n "${cert}" ]] || continue
+    local report
+    while IFS= read -r report; do
+        [[ -n "${report}" ]] || continue
         local rel
-        rel="$(pack_cert_rel_path "${run_dir}" "${cert}")" || continue
-        local dest_dir="${pack_dir}/certs/${rel}"
+        rel="$(pack_report_rel_path "${run_dir}" "${report}")" || continue
+        local dest_dir="${pack_dir}/reports/${rel}"
         mkdir -p "${dest_dir}"
-        cp "${cert}" "${dest_dir}/evaluation.report.json"
+        cp "${report}" "${dest_dir}/evaluation.report.json"
         # Optional sidecar artifacts (used by some detectors; safe to omit when absent).
-        pack_copy_optional "$(dirname "${cert}")/rmt_probe.json" "${dest_dir}/rmt_probe.json"
-        pack_copy_optional "$(dirname "${cert}")/ve_probe.json" "${dest_dir}/ve_probe.json"
-    done < <(pack_collect_certs "${run_dir}")
+        pack_copy_optional "$(dirname "${report}")/rmt_probe.json" "${dest_dir}/rmt_probe.json"
+        pack_copy_optional "$(dirname "${report}")/ve_probe.json" "${dest_dir}/ve_probe.json"
+    done < <(pack_collect_reports "${run_dir}")
 
     local verify_rc=0
-    if pack_verify_certs "${pack_dir}"; then
+    if pack_verify_reports "${pack_dir}"; then
         verify_rc=0
     else
         verify_rc=$?

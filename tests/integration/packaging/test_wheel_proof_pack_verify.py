@@ -2,11 +2,18 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import subprocess
 from pathlib import Path
 
 import pytest
+
+from invarlock.cli.commands import verify as verify_mod
+from invarlock.runtime_security import (
+    RUNTIME_MANIFEST_FILENAME,
+    RUNTIME_VERIFIER_CONTRACT_VERSION,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -83,6 +90,26 @@ def _digest_ref(path: Path, rel_path: str) -> dict[str, str]:
     }
 
 
+def _write_runtime_manifest(report_path: Path) -> None:
+    _write_json(
+        report_path.parent / RUNTIME_MANIFEST_FILENAME,
+        {
+            "execution_mode": "container",
+            "report": {
+                "filename": report_path.name,
+                "path": report_path.as_posix(),
+                "sha256": _sha256_file(report_path),
+            },
+            "runtime": {
+                "container_execution": True,
+                "image_digest": "sha256:test-runtime-image",
+                "image_ref": "invarlock-runtime:local",
+            },
+            "verifier_contract_version": RUNTIME_VERIFIER_CONTRACT_VERSION,
+        },
+    )
+
+
 def _write_json(path: Path, payload: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
@@ -98,7 +125,16 @@ def _write_checksums(pack_dir: Path, rel_paths: list[str]) -> None:
     )
 
 
-def _build_cert_report() -> dict[str, object]:
+def _build_attested_report() -> dict[str, object]:
+    spectral_contract = {
+        "estimator": {"type": "power_iter", "iters": 4, "init": "ones"}
+    }
+    rmt_contract = {
+        "estimator": {"type": "power_iter", "iters": 3, "init": "ones"},
+        "activation_sampling": {
+            "windows": {"count": 8, "indices_policy": "evenly_spaced"}
+        },
+    }
     return {
         "schema_version": "v1",
         "run_id": "proof-pack-wheel-smoke",
@@ -139,9 +175,29 @@ def _build_cert_report() -> dict[str, object]:
             "ratio_vs_baseline": 1.0,
             "display_ci": [1.0, 1.0],
         },
+        "spectral": {
+            "evaluated": True,
+            "measurement_contract": spectral_contract,
+            "measurement_contract_hash": verify_mod._measurement_contract_digest(
+                spectral_contract
+            ),
+            "measurement_contract_match": True,
+        },
+        "rmt": {
+            "evaluated": True,
+            "measurement_contract": rmt_contract,
+            "measurement_contract_hash": verify_mod._measurement_contract_digest(
+                rmt_contract
+            ),
+            "measurement_contract_match": True,
+        },
+        "resolved_policy": {
+            "spectral": {"measurement_contract": spectral_contract},
+            "rmt": {"measurement_contract": rmt_contract},
+        },
         "evaluation_windows": {
             "final": {
-                "logloss": [2.302585092994046],
+                "logloss": [math.log(10.0)],
                 "token_counts": [1],
             }
         },
@@ -153,21 +209,23 @@ def _build_proof_pack(pack_dir: Path) -> Path:
     source_repo = pack_dir / "metadata" / "source_repo.json"
     environment = pack_dir / "metadata" / "environment.json"
     materials = pack_dir / "metadata" / "model_revisions.json"
-    cert_rel_path = "certs/model/clean/noop/evaluation.report.json"
-    cert_path = pack_dir / cert_rel_path
+    report_rel_path = "reports/model/clean/noop/evaluation.report.json"
+    report_path = pack_dir / report_rel_path
 
     _write_json(final_verdict, {"verdict": "PASS"})
     _write_json(source_repo, {"commit": "abc123"})
     _write_json(environment, {"platform": "test"})
     _write_json(materials, {"models": {"org/model": {"revision": "rev1"}}})
-    _write_json(cert_path, _build_cert_report())
+    _write_json(report_path, _build_attested_report())
+    _write_runtime_manifest(report_path)
 
     covered = [
         "results/final_verdict.json",
         "metadata/source_repo.json",
         "metadata/environment.json",
         "metadata/model_revisions.json",
-        cert_rel_path,
+        report_rel_path,
+        str((Path(report_rel_path).parent / RUNTIME_MANIFEST_FILENAME).as_posix()),
     ]
     _write_checksums(pack_dir, covered)
     manifest = {

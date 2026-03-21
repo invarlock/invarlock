@@ -8,7 +8,7 @@ PACK_VERIFY_MISSING=3
 PACK_VERIFY_FORMAT=4
 PACK_VERIFY_SIGNATURE=5
 PACK_VERIFY_INTEGRITY=6
-PACK_VERIFY_CERTS=7
+PACK_VERIFY_REPORTS=7
 
 pack_usage() {
     cat <<'EOF'
@@ -21,6 +21,12 @@ Options:
   --strict            Fail closed on missing/invalid signatures and pack mismatches
   --help              Show this help message
 
+Notes:
+  - Clean reports are re-verified with `invarlock verify` and must satisfy
+    runtime.manifest.json attestation checks.
+  - Error-injection reports are also rechecked, but their non-zero verify status
+    remains expected and does not fail the pack on its own.
+
 Exit codes:
   0  verified
   2  invalid usage / arguments
@@ -28,7 +34,7 @@ Exit codes:
   4  manifest format / schema validation failed
   5  signature verification failed
   6  integrity verification failed (checksum binding, checksums, attestation refs, or strict extra-file checks)
-  7  cert verification failed
+  7  report verification failed
 EOF
 }
 
@@ -258,40 +264,40 @@ pack_verify_gpg() {
     return 0
 }
 
-pack_verify_certs() {
+pack_verify_reports() {
     local pack_dir="$1"
     local json_out="$2"
     local profile="${PACK_VERIFY_PROFILE:-dev}"
-    local -a certs=()
-    local -a certs_clean=()
-    local -a certs_error=()
-    while IFS= read -r cert; do
-        [[ -n "${cert}" ]] || continue
-        certs+=("${cert}")
-        if [[ "${cert}" == */errors/*/evaluation.report.json ]]; then
-            certs_error+=("${cert}")
+    local -a reports=()
+    local -a reports_clean=()
+    local -a reports_error=()
+    while IFS= read -r report; do
+        [[ -n "${report}" ]] || continue
+        reports+=("${report}")
+        if [[ "${report}" == */errors/*/evaluation.report.json ]]; then
+            reports_error+=("${report}")
         else
-            certs_clean+=("${cert}")
+            reports_clean+=("${report}")
         fi
-    done < <(find "${pack_dir}/certs" -type f -name "evaluation.report.json" | sort)
-    if [[ ${#certs[@]} -eq 0 ]]; then
+    done < <(find "${pack_dir}/reports" -type f -name "evaluation.report.json" | sort)
+    if [[ ${#reports[@]} -eq 0 ]]; then
         echo "ERROR: No reports found in pack." >&2
         return 1
     fi
 
-    if [[ ${#certs_clean[@]} -eq 0 ]]; then
+    if [[ ${#reports_clean[@]} -eq 0 ]]; then
         echo "ERROR: No clean reports found in pack (only error-injection reports present)." >&2
         return 1
     fi
 
     if [[ -n "${json_out}" ]]; then
-        invarlock verify --json --profile "${profile}" "${certs_clean[@]}" > "${json_out}"
+        invarlock verify --json --profile "${profile}" "${reports_clean[@]}" > "${json_out}"
     else
-        invarlock verify --json --profile "${profile}" "${certs_clean[@]}"
+        invarlock verify --json --profile "${profile}" "${reports_clean[@]}"
     fi
 
-    if [[ ${#certs_error[@]} -gt 0 ]]; then
-        invarlock verify --json --profile "${profile}" "${certs_error[@]}" >/dev/null || true
+    if [[ ${#reports_error[@]} -gt 0 ]]; then
+        invarlock verify --json --profile "${profile}" "${reports_error[@]}" >/dev/null || true
     fi
 }
 
@@ -387,8 +393,8 @@ pack_verify_pack() {
     fi
 
     if [[ "${skip_verify}" -eq 0 ]]; then
-        if ! pack_verify_certs "${pack_dir}" "${json_out}"; then
-            return "${PACK_VERIFY_CERTS}"
+        if ! pack_verify_reports "${pack_dir}" "${json_out}"; then
+            return "${PACK_VERIFY_REPORTS}"
         fi
     fi
 

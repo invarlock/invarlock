@@ -14,6 +14,14 @@ from transformers import AutoModelForCausalLM
 
 from invarlock.guards.rmt import RMTGuard
 
+try:
+    from runtime_tools import require_remote_code_opt_in
+except ImportError:  # pragma: no cover - direct module load under pytest
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from runtime_tools import require_remote_code_opt_in
+
 
 def _load_json(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
@@ -149,6 +157,12 @@ def _load_model(
         device_map="auto",
         low_cpu_mem_usage=True,
     )
+
+
+def _resolve_trust_remote_code(enabled: bool) -> bool:
+    if not enabled:
+        return False
+    return require_remote_code_opt_in("rmt_cross_model_probe.py")
 
 
 def _model_cleanup(model: Any) -> None:
@@ -338,11 +352,12 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
         baseline_report, windows_count=max(8, int(args.activation_windows))
     )
     dtype = _resolve_dtype(args.dtype)
+    trust_remote_code = _resolve_trust_remote_code(bool(args.trust_remote_code))
 
     guard = RMTGuard(correct=False)
 
     baseline_model = _load_model(
-        baseline_model_path, dtype=dtype, trust_remote_code=bool(args.trust_remote_code)
+        baseline_model_path, dtype=dtype, trust_remote_code=trust_remote_code
     )
     try:
         guard.prepare(baseline_model, calib=batches, policy=policy)
@@ -350,7 +365,7 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
         _model_cleanup(baseline_model)
 
     subject_model = _load_model(
-        subject_model_path, dtype=dtype, trust_remote_code=bool(args.trust_remote_code)
+        subject_model_path, dtype=dtype, trust_remote_code=trust_remote_code
     )
     try:
         guard.after_edit(subject_model)
@@ -468,7 +483,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--tier", default="balanced")
     parser.add_argument("--profile", default="ci")
     parser.add_argument("--dtype", default="bfloat16")
-    parser.add_argument("--trust-remote-code", action="store_true", default=True)
+    parser.add_argument(
+        "--trust-remote-code",
+        action="store_true",
+        default=False,
+        help=(
+            "Allow remote code for custom model repos; also requires "
+            "INVARLOCK_ALLOW_REMOTE_CODE=1"
+        ),
+    )
     parser.add_argument(
         "--activation-windows",
         type=int,

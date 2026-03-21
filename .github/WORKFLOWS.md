@@ -49,9 +49,14 @@ Key environment variables used across workflows:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `INVARLOCK_ALLOW_NETWORK` | Enable network access for model downloads | `0` |
+| `INVARLOCK_ALLOW_HOST_EXECUTION` | Permit trusted host-side model-loading commands in workflows that need it | `0` |
+| `INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS` | Permit trusted third-party plugin discovery or management | `0` |
+| `INVARLOCK_ALLOW_REMOTE_CODE` | Permit trusted remote model code execution when a workflow explicitly needs it | `0` |
 | `INVARLOCK_LIGHT_IMPORT` | Light import mode (skip heavy dependencies) | `0` |
-| `INVARLOCK_DISABLE_PLUGIN_DISCOVERY` | Disable plugin auto-discovery | `0` |
 | `INVARLOCK_OMP_THREADS` | OpenMP thread count | System default |
+
+Workflows should keep these privilege toggles scoped to the narrowest possible
+job or step, emit attested outputs, and verify them without bypasses.
 
 ## Troubleshooting
 

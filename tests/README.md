@@ -14,14 +14,14 @@ via `tests/integration/conftest.py`.
 Run fast/unit tests:
 
 ```
-INVARLOCK_LIGHT_IMPORT=1 INVARLOCK_DISABLE_PLUGIN_DISCOVERY=1 \
+INVARLOCK_LIGHT_IMPORT=1 INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=0 \
 pytest -q -m "not integration and not slow and not manual" tests
 ```
 
 Run the curated CI subset locally:
 
 ```
-INVARLOCK_LIGHT_IMPORT=1 INVARLOCK_DISABLE_PLUGIN_DISCOVERY=1 \
+INVARLOCK_LIGHT_IMPORT=1 INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=0 \
 pytest -q \
   tests/cli/test_python_m_invarlock.py \
   tests/cli/test_report_help_and_html.py \
@@ -39,4 +39,5 @@ pytest -q \
 ## Runtime artifacts
 
 - CLI commands and scripts write run artifacts under `runs/` and evaluation reports under `reports/eval/` at the repository (or working directory) root.
+- Attested evaluation outputs now include `runtime.manifest.json` adjacent to `evaluation.report.json`; archive both when they are emitted.
 - Test fixtures should live under `tests/fixtures` (or per-area test dirs), not under `tests/runs` or `tests/reports`.

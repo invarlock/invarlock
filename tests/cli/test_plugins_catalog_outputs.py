@@ -77,11 +77,10 @@ class DummyConsole:
 
 
 def test_plugins_discovery_disabled_json(monkeypatch, capsys):
-    monkeypatch.setenv("INVARLOCK_DISABLE_PLUGIN_DISCOVERY", "1")
+    monkeypatch.setenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "0")
     plugins_command(category="adapters", json_out=True)
     payload = json.loads(capsys.readouterr().out.strip())
-    assert payload["discovery"] == "disabled"
-    assert payload["items"] == []
+    assert any(item["name"] == "hf_causal" for item in payload["items"])
     assert payload["contracts"]["model_family_catalog"]["format_version"] == (
         "model-family-catalog-v1"
     )

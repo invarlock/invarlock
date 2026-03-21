@@ -61,7 +61,13 @@ def test_plugins_uninstall_apply_invokes_pip(monkeypatch):
 
     monkeypatch.setattr("invarlock.cli.commands.plugins.subprocess.run", fake_run)
     monkeypatch.delenv("INVARLOCK_PLUGINS_DRY_RUN", raising=False)
-    plugins_mod.plugins_uninstall_command(["gptq"], yes=True, dry_run=False, apply=True)
+    plugins_mod.plugins_uninstall_command(
+        ["gptq"],
+        yes=True,
+        dry_run=False,
+        apply=True,
+        allow_third_party_plugins=True,
+    )
     assert called["cmd"][0] == sys.executable
     assert called["cmd"][1:4] == ["-m", "pip", "uninstall"]
     assert "-y" in called["cmd"]
@@ -76,7 +82,11 @@ def test_plugins_uninstall_apply_normalizes_pip_failure_exit_code(monkeypatch):
 
     with pytest.raises(typer.Exit) as exc:
         plugins_mod.plugins_uninstall_command(
-            ["gptq"], yes=True, dry_run=False, apply=True
+            ["gptq"],
+            yes=True,
+            dry_run=False,
+            apply=True,
+            allow_third_party_plugins=True,
         )
 
     assert exc.value.exit_code == 1
@@ -91,7 +101,11 @@ def test_plugins_uninstall_apply_handles_timeout(monkeypatch):
 
     with pytest.raises(typer.Exit) as exc:
         plugins_mod.plugins_uninstall_command(
-            ["gptq"], yes=True, dry_run=False, apply=True
+            ["gptq"],
+            yes=True,
+            dry_run=False,
+            apply=True,
+            allow_third_party_plugins=True,
         )
 
     assert exc.value.exit_code == 1
@@ -109,7 +123,11 @@ def test_plugins_uninstall_prompt_cancel(monkeypatch):
     monkeypatch.delenv("INVARLOCK_PLUGINS_DRY_RUN", raising=False)
     with pytest.raises(typer.Exit) as exc:
         plugins_mod.plugins_uninstall_command(
-            ["gptq"], yes=False, dry_run=False, apply=True
+            ["gptq"],
+            yes=False,
+            dry_run=False,
+            apply=True,
+            allow_third_party_plugins=True,
         )
     assert exc.value.exit_code == 0
     joined = " ".join(outputs)

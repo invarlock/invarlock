@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 
-test_verify_pack_validates_checksums_and_certs() {
+test_verify_pack_validates_checksums_and_reports() {
     mock_reset
 
     source ./scripts/proof_packs/verify_pack.sh
 
     local pack_dir="${TEST_TMPDIR}/pack"
-    mkdir -p "${pack_dir}/certs"
-    echo "{}" > "${pack_dir}/certs/evaluation.report.json"
+    mkdir -p "${pack_dir}/reports"
+    echo "{}" > "${pack_dir}/reports/evaluation.report.json"
 
     local sha_cmd
     sha_cmd="$(pack_sha256_cmd)"
     (
         cd "${pack_dir}"
-        ${sha_cmd} certs/evaluation.report.json > checksums.sha256
+        ${sha_cmd} reports/evaluation.report.json > checksums.sha256
     )
 
     local checksums_digest
@@ -25,6 +25,9 @@ test_verify_pack_validates_checksums_and_certs() {
     cat > "${bin_dir}/invarlock" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
+for arg in "$@"; do
+    [[ "${arg}" != "--allow-unattested-artifacts" ]] || exit 97
+done
 echo '{"ok": true}'
 EOF
     chmod +x "${bin_dir}/invarlock"
@@ -61,14 +64,14 @@ test_verify_pack_rejects_json_output_inside_pack() {
     source ./scripts/proof_packs/verify_pack.sh
 
     local pack_dir="${TEST_TMPDIR}/pack"
-    mkdir -p "${pack_dir}/certs"
-    echo "{}" > "${pack_dir}/certs/evaluation.report.json"
+    mkdir -p "${pack_dir}/reports"
+    echo "{}" > "${pack_dir}/reports/evaluation.report.json"
 
     local sha_cmd
     sha_cmd="$(pack_sha256_cmd)"
     (
         cd "${pack_dir}"
-        ${sha_cmd} certs/evaluation.report.json > checksums.sha256
+        ${sha_cmd} reports/evaluation.report.json > checksums.sha256
     )
 
     local checksums_digest
@@ -158,14 +161,14 @@ test_verify_pack_manifest_attestation_rejects_digest_mismatch() {
 }
 
 
-test_verify_pack_verify_certs_without_json_out() {
+test_verify_pack_verify_reports_without_json_out() {
     mock_reset
 
     source ./scripts/proof_packs/verify_pack.sh
 
     local pack_dir="${TEST_TMPDIR}/pack"
-    mkdir -p "${pack_dir}/certs"
-    echo "{}" > "${pack_dir}/certs/evaluation.report.json"
+    mkdir -p "${pack_dir}/reports"
+    echo "{}" > "${pack_dir}/reports/evaluation.report.json"
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
@@ -176,7 +179,7 @@ EOF
     chmod +x "${bin_dir}/invarlock"
     PATH="${bin_dir}:${PATH}"
 
-    run pack_verify_certs "${pack_dir}" ""
+    run pack_verify_reports "${pack_dir}" ""
     assert_rc "0" "${RUN_RC}" "verify without json_out succeeds"
 }
 
@@ -215,7 +218,7 @@ test_verify_pack_reports_missing_pack_dir_and_files() {
     assert_rc "3" "${RUN_RC}" "missing checksums fails"
 }
 
-test_verify_pack_sha256_cmd_fallback_and_no_certs() {
+test_verify_pack_sha256_cmd_fallback_and_no_reports() {
     mock_reset
 
     source ./scripts/proof_packs/verify_pack.sh
@@ -253,7 +256,7 @@ EOF
     printf '%s\n' "{\"format\":\"proof-pack-v1\",\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
 
     run pack_verify_pack --pack "${pack_dir}"
-    assert_rc "7" "${RUN_RC}" "missing certs fails"
+    assert_rc "7" "${RUN_RC}" "missing reports fails"
 
     PATH="${original_path}"
 }
@@ -694,15 +697,15 @@ EOF
     PATH="${original_path}"
 }
 
-test_verify_pack_verify_certs_attempts_error_injection_reports_best_effort() {
+test_verify_pack_verify_reports_attempts_error_injection_reports_best_effort() {
     mock_reset
 
     source ./scripts/proof_packs/verify_pack.sh
 
     local pack_dir="${TEST_TMPDIR}/pack"
-    mkdir -p "${pack_dir}/certs/modelA/edit/run_1" "${pack_dir}/certs/modelA/errors/nan_injection"
-    echo "{}" > "${pack_dir}/certs/modelA/edit/run_1/evaluation.report.json"
-    echo "{}" > "${pack_dir}/certs/modelA/errors/nan_injection/evaluation.report.json"
+    mkdir -p "${pack_dir}/reports/modelA/edit/run_1" "${pack_dir}/reports/modelA/errors/nan_injection"
+    echo "{}" > "${pack_dir}/reports/modelA/edit/run_1/evaluation.report.json"
+    echo "{}" > "${pack_dir}/reports/modelA/errors/nan_injection/evaluation.report.json"
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
@@ -722,23 +725,23 @@ EOF
     local original_path="${PATH}"
     PATH="${bin_dir}:${PATH}"
 
-    run pack_verify_certs "${pack_dir}" ""
-    assert_rc "0" "${RUN_RC}" "verify succeeds when error-injection certs fail"
+    run pack_verify_reports "${pack_dir}" ""
+    assert_rc "0" "${RUN_RC}" "verify succeeds when error-injection reports fail"
     assert_match "errors/nan_injection/evaluation\\.report\\.json" "$(cat "${TEST_TMPDIR}/invarlock.calls")" "attempts error-injection reports"
 
     PATH="${original_path}"
 }
 
-test_verify_pack_verify_certs_errors_when_only_error_injection_reports_present() {
+test_verify_pack_verify_reports_errors_when_only_error_injection_reports_present() {
     mock_reset
 
     source ./scripts/proof_packs/verify_pack.sh
 
     local pack_dir="${TEST_TMPDIR}/pack"
-    mkdir -p "${pack_dir}/certs/modelA/errors/nan_injection"
-    echo "{}" > "${pack_dir}/certs/modelA/errors/nan_injection/evaluation.report.json"
+    mkdir -p "${pack_dir}/reports/modelA/errors/nan_injection"
+    echo "{}" > "${pack_dir}/reports/modelA/errors/nan_injection/evaluation.report.json"
 
-    run pack_verify_certs "${pack_dir}" ""
+    run pack_verify_reports "${pack_dir}" ""
     assert_rc "1" "${RUN_RC}" "only error-injection reports must fail"
     assert_match "No clean reports found" "${RUN_ERR}" "clean report requirement surfaced"
 }

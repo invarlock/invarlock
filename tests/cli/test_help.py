@@ -64,10 +64,10 @@ def test_plugins_group_help_lists_subcommands():
 
 def test_plugins_adapters_json_disabled_discovery():
     runner = CliRunner()
-    # Disable plugin discovery to enforce lightweight path and stable JSON
+    # Keep third-party discovery off to enforce lightweight path and stable JSON
     import os as _os
 
-    _os.environ["INVARLOCK_DISABLE_PLUGIN_DISCOVERY"] = "1"
+    _os.environ["INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS"] = "0"
     res = runner.invoke(app, ["plugins", "adapters", "--json"])
     assert res.exit_code == 0, res.output
     import json as _json
@@ -75,5 +75,5 @@ def test_plugins_adapters_json_disabled_discovery():
     payload = _json.loads(res.output)
     assert payload.get("category") == "adapters"
     assert "kind" not in payload
-    assert payload.get("items") == []
-    assert payload.get("discovery") == "disabled"
+    names = {item.get("name") for item in payload.get("items", [])}
+    assert "hf_causal" in names

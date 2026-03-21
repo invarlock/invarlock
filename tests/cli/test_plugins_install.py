@@ -76,7 +76,12 @@ def test_plugins_install_apply_invokes_pip(monkeypatch):
     monkeypatch.setattr("invarlock.cli.commands.plugins.subprocess.run", fake_run)
     monkeypatch.delenv("INVARLOCK_PLUGINS_DRY_RUN", raising=False)
     plugins_mod.plugins_install_command(
-        ["gptq"], upgrade=True, dry_run=False, apply=True
+        ["gptq"],
+        upgrade=True,
+        dry_run=False,
+        apply=True,
+        allow_third_party_plugins=True,
+        allow_network=True,
     )
     assert called["cmd"][0] == sys.executable
     assert called["cmd"][1:4] == ["-m", "pip", "install"]
@@ -92,7 +97,12 @@ def test_plugins_install_apply_normalizes_pip_failure_exit_code(monkeypatch):
 
     with pytest.raises(typer.Exit) as exc:
         plugins_mod.plugins_install_command(
-            ["gptq"], upgrade=False, dry_run=False, apply=True
+            ["gptq"],
+            upgrade=False,
+            dry_run=False,
+            apply=True,
+            allow_third_party_plugins=True,
+            allow_network=True,
         )
 
     assert exc.value.exit_code == 1
@@ -107,7 +117,12 @@ def test_plugins_install_apply_handles_timeout(monkeypatch):
 
     with pytest.raises(typer.Exit) as exc:
         plugins_mod.plugins_install_command(
-            ["gptq"], upgrade=False, dry_run=False, apply=True
+            ["gptq"],
+            upgrade=False,
+            dry_run=False,
+            apply=True,
+            allow_third_party_plugins=True,
+            allow_network=True,
         )
 
     assert exc.value.exit_code == 1
@@ -129,7 +144,12 @@ def test_plugins_install_apply_failure_surfaces_gptq_note(monkeypatch):
 
     with pytest.raises(typer.Exit):
         plugins_mod.plugins_install_command(
-            ["gptq"], upgrade=False, dry_run=False, apply=True
+            ["gptq"],
+            upgrade=False,
+            dry_run=False,
+            apply=True,
+            allow_third_party_plugins=True,
+            allow_network=True,
         )
 
     joined = " ".join(outputs)

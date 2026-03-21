@@ -95,3 +95,17 @@ def test_run_commands_records_parse_errors(tmp_path: Path, monkeypatch) -> None:
     assert len(records) == 1
     assert records[0]["exit_code"] is None
     assert "invalid command syntax" in records[0]["error"]
+
+
+def test_env_for_does_not_inject_execution_or_attestation_bypasses(
+    monkeypatch,
+) -> None:
+    module = _load_script_module()
+    monkeypatch.delenv("INVARLOCK_ALLOW_HOST_EXECUTION", raising=False)
+    monkeypatch.delenv("INVARLOCK_ALLOW_UNATTESTED_ARTIFACTS", raising=False)
+
+    env = module._env_for("invarlock verify reports/eval/evaluation.report.json")
+
+    assert env["INVARLOCK_ALLOW_NETWORK"] == "1"
+    assert "INVARLOCK_ALLOW_HOST_EXECUTION" not in env
+    assert "INVARLOCK_ALLOW_UNATTESTED_ARTIFACTS" not in env

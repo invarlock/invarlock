@@ -322,6 +322,7 @@ def build_evaluate_command(
         str(spec.preset_path),
         "--profile",
         profile,
+        "--allow-network",
         "--device",
         device,
         "--out",

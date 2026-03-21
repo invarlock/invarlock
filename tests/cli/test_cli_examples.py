@@ -16,7 +16,7 @@ def test_cli_examples_help_smoke():
     env.update(
         {
             "INVARLOCK_LIGHT_IMPORT": "1",
-            "INVARLOCK_DISABLE_PLUGIN_DISCOVERY": "1",
+            "INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS": "0",
         }
     )
     # Use the installed console script if available, else module entry

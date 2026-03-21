@@ -1,7 +1,7 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
 
-.PHONY: help install dev-install test test-assurance lint format clean docsclean deepclean docs docs-ci verify coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync model-evidence-list model-evidence-sweep
+.PHONY: help install dev-install test test-assurance lint format clean docsclean deepclean docs docs-ci verify coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync model-evidence-list model-evidence-sweep runtime-image runtime-smoke runtime-verify
 
 PYTHON ?= $(shell bash scripts/select_python.sh)
 PIP := $(PYTHON) -m pip
@@ -12,6 +12,10 @@ COVERAGE := $(PYTHON) -m coverage
 MKDOCS := $(PYTHON) -m mkdocs
 PRE_COMMIT := $(PYTHON) -m pre_commit
 MODEL_EVIDENCE_ARGS ?=
+CARGO ?= cargo
+CONTAINER_ENGINE ?= $(shell if command -v docker >/dev/null 2>&1; then echo docker; elif command -v podman >/dev/null 2>&1; then echo podman; fi)
+RUNTIME_IMAGE ?= invarlock-runtime:local
+RUNTIME_IMAGE_DIGEST ?= sha256:local-runtime-image
 
 # Keep repo-wide coverage practical while still exercising the CLI command
 # surface that would otherwise pull the project floor below the real trust core.
@@ -191,6 +195,29 @@ model-evidence-list:  ## Print the maintained shipped-model evidence manifest
 model-evidence-sweep:  ## Run the maintained shipped-model evidence sweep
 	$(MAKE) ensure-python
 	PYTHONPATH=src INVARLOCK_ALLOW_NETWORK=1 $(PYTHON) scripts/model_evidence_sweep.py $(MODEL_EVIDENCE_ARGS)
+
+runtime-image:  ## Build the local container runtime image used for secure-default execution
+	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ Docker or Podman is required."; exit 1; }
+	$(CONTAINER_ENGINE) build -f runtime/Dockerfile -t $(RUNTIME_IMAGE) .
+
+runtime-smoke:  ## Smoke the local container runtime image
+	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ Docker or Podman is required."; exit 1; }
+	$(CONTAINER_ENGINE) run --rm \
+		-e INVARLOCK_CONTAINER_EXECUTION=1 \
+		-e INVARLOCK_RUNTIME_IMAGE=$(RUNTIME_IMAGE) \
+		-e INVARLOCK_RUNTIME_IMAGE_DIGEST=$(RUNTIME_IMAGE_DIGEST) \
+		-e PYTHONPATH=/workspace/src \
+		-v "$(CURDIR):/workspace" \
+		-w /workspace \
+		$(RUNTIME_IMAGE) \
+		--version
+
+runtime-verify:  ## Build and smoke the Rust runtime verifier on the fixture bundle
+	$(CARGO) build -p invarlock-runtime-verify
+	./target/debug/invarlock-runtime-verify \
+		--report tests/fixtures/runtime_attestation/evaluation.report.json \
+		--manifest tests/fixtures/runtime_attestation/runtime.manifest.json \
+		--json
 
 ##@ CI/Build
 clean:  ## Clean build artifacts

@@ -18,6 +18,10 @@
 
 ## Quick Start
 
+The commands below use the secure-default runtime container. Add
+`--allow-host-execution` only for trusted local calibration workflows that
+intentionally bypass that boundary.
+
 ```bash
 # Run spectral null-sweep (noop edit) to calibrate κ/alpha
 invarlock calibrate null-sweep \

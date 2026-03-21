@@ -36,6 +36,10 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
 Tip: enable Hub downloads per command when fetching models/datasets:
 `INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate ...`
 
+Security-default note: `evaluate`, `run`, and `calibrate` use the runtime
+container by default. Use `--allow-host-execution` only for trusted local
+workflows that intentionally bypass that boundary.
+
 ---
 
 ## Documentation Map
@@ -98,7 +102,7 @@ Note: Every assurance claim is backed by automated tests and cross-referenced in
 the docs. See Guard Contracts → Coverage Reference
 (assurance/04-guard-contracts.md) for the test index.
 
-Calibration CSVs and proof certs referenced in these notes are produced by
+Calibration CSVs and proof reports referenced in these notes are produced by
 local or CI runs (typically under `runs/null_sweeps/**` and
 `reports/calibration/**`) and are not committed to the repository. Attach them
 to change proposals or releases when you update calibration.
@@ -122,9 +126,11 @@ to change proposals or releases when you update calibration.
 ## Core Concepts
 
 1. **Configure** – describe model, dataset, edit, and guard policies in YAML.
-2. **Execute** – run `invarlock run` under a CI or release profile with pairing
-   enforced.
-3. **Validate** – generate reports via `invarlock report` and run `invarlock verify` for policy compliance.
+2. **Execute** – run `invarlock run` or `evaluate` under a CI or release profile;
+   model-loading commands use the runtime container by default.
+3. **Validate** – generate reports via `invarlock report` and run `invarlock verify`;
+   attested outputs include `runtime.manifest.json` next to
+   `evaluation.report.json`.
 4. **Iterate** – compare runs, adjust edit plans, and reissue reports until gates pass.
 
 The guard suite (invariants, spectral, variance, and RMT) keeps edits inside
@@ -227,6 +233,7 @@ INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
   --profile release \
   --preset configs/presets/causal_lm/wikitext2_512.yaml
 invarlock verify reports/eval/evaluation.report.json
+# expects reports/eval/runtime.manifest.json next to the report
 ```
 
 ---

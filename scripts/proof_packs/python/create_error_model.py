@@ -13,6 +13,12 @@ from typing import Any
 
 import torch
 from error_injection_config import fix_layer_drop_config
+
+try:
+    from runtime_tools import require_remote_code_opt_in
+except ImportError:  # pragma: no cover - direct module load under pytest
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from runtime_tools import require_remote_code_opt_in
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
@@ -299,7 +305,10 @@ def main(argv: list[str]) -> int:
     error_type = argv[3]
 
     print(f"Loading baseline from {baseline_path}...")
-    tokenizer = AutoTokenizer.from_pretrained(baseline_path, trust_remote_code=True)
+    trust_remote_code = require_remote_code_opt_in("create_error_model.py")
+    tokenizer = AutoTokenizer.from_pretrained(
+        baseline_path, trust_remote_code=trust_remote_code
+    )
 
     if error_type == "shape_mismatch":
         # Large sharded models can be OOM-killed during save_pretrained() shard writes.
@@ -328,7 +337,7 @@ def main(argv: list[str]) -> int:
         model = AutoModelForCausalLM.from_pretrained(
             baseline_path,
             dtype=torch.bfloat16,
-            trust_remote_code=True,
+            trust_remote_code=trust_remote_code,
             device_map="auto",
             low_cpu_mem_usage=True,
         )
@@ -340,7 +349,7 @@ def main(argv: list[str]) -> int:
         model = AutoModelForCausalLM.from_pretrained(
             baseline_path,
             dtype=torch.bfloat16,
-            trust_remote_code=True,
+            trust_remote_code=trust_remote_code,
             device_map="cpu",
             low_cpu_mem_usage=True,
         )
