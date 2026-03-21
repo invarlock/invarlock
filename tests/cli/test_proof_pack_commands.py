@@ -14,6 +14,8 @@ from invarlock.runtime_security import (
     RUNTIME_VERIFIER_CONTRACT_VERSION,
 )
 
+_VALID_TEST_IMAGE_DIGEST = "sha256:" + ("a" * 64)
+
 
 def _write_json(path: Path, payload: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -33,20 +35,39 @@ def _digest_ref(path: Path, rel_path: str) -> dict[str, str]:
 
 def _write_runtime_manifest(report_path: Path) -> None:
     payload = {
+        "manifest_version": 1,
+        "generated_at_utc": "2026-03-21T00:00:00+00:00",
+        "verifier_contract_version": RUNTIME_VERIFIER_CONTRACT_VERSION,
         "execution_mode": "container",
         "report": {
             "filename": report_path.name,
             "path": report_path.as_posix(),
             "sha256": _sha256_file(report_path),
         },
+        "config": {
+            "path": None,
+            "sha256": None,
+            "source": "missing",
+        },
         "runtime": {
             "container_execution": True,
-            "image_digest": "sha256:test-runtime-image",
+            "image_digest": _VALID_TEST_IMAGE_DIGEST,
             "image_ref": "invarlock-runtime:local",
+            "allow_network": False,
+            "allow_remote_code": False,
+            "allow_third_party_plugins": False,
         },
-        "verifier_contract_version": RUNTIME_VERIFIER_CONTRACT_VERSION,
     }
     _write_json(report_path.parent / RUNTIME_MANIFEST_FILENAME, payload)
+
+
+def _successful_verify_payload(reports: list[Path]) -> dict[str, object]:
+    return {
+        "format_version": "verify-v1",
+        "ok": True,
+        "reports": [str(path) for path in reports],
+        "resolution": {"exit_code": 0},
+    }
 
 
 def _write_checksums(pack_dir: Path, rel_paths: list[str]) -> None:
@@ -202,15 +223,7 @@ def test_proof_pack_verify_json_round_trip(monkeypatch, tmp_path: Path) -> None:
 
     monkeypatch.setattr(
         "invarlock.proof_pack._run_verify_command",
-        lambda reports, profile: (
-            0,
-            {
-                "format_version": "verify-v1",
-                "ok": True,
-                "reports": [str(path) for path in reports],
-                "resolution": {"exit_code": 0},
-            },
-        ),
+        lambda reports, profile: (0, _successful_verify_payload(reports)),
         raising=False,
     )
 
@@ -241,15 +254,7 @@ def test_proof_pack_verify_human_success(monkeypatch, tmp_path: Path) -> None:
     )
     monkeypatch.setattr(
         "invarlock.proof_pack._run_verify_command",
-        lambda reports, profile: (
-            0,
-            {
-                "format_version": "verify-v1",
-                "ok": True,
-                "reports": [str(path) for path in reports],
-                "resolution": {"exit_code": 0},
-            },
-        ),
+        lambda reports, profile: (0, _successful_verify_payload(reports)),
         raising=False,
     )
 
@@ -260,12 +265,17 @@ def test_proof_pack_verify_human_success(monkeypatch, tmp_path: Path) -> None:
     assert "Proof pack verified" in result.output
 
 
-def test_proof_pack_verify_json_round_trip_with_real_nested_verify(
-    tmp_path: Path,
+def test_proof_pack_verify_json_round_trip_with_verify_payload(
+    monkeypatch, tmp_path: Path
 ) -> None:
     pack_dir = _build_pack(
         tmp_path / "pack",
         report_rel_path="reports/model/clean/noop/evaluation.report.json",
+    )
+    monkeypatch.setattr(
+        "invarlock.proof_pack._run_verify_command",
+        lambda reports, profile: (0, _successful_verify_payload(reports)),
+        raising=False,
     )
 
     result = CliRunner().invoke(app, ["proof-pack", "verify", str(pack_dir), "--json"])
@@ -276,6 +286,25 @@ def test_proof_pack_verify_json_round_trip_with_real_nested_verify(
     assert payload["ok"] is True
     assert payload["verify"]["format_version"] == "verify-v1"
     assert payload["verify"]["resolution"]["exit_code"] == 0
+
+
+def test_proof_pack_verify_json_round_trip_with_real_nested_verify_rejection(
+    tmp_path: Path,
+) -> None:
+    pack_dir = _build_pack(
+        tmp_path / "pack",
+        report_rel_path="reports/model/clean/noop/evaluation.report.json",
+    )
+
+    result = CliRunner().invoke(app, ["proof-pack", "verify", str(pack_dir), "--json"])
+
+    assert result.exit_code == 7, result.output
+    payload = json.loads(result.stdout.strip())
+    assert payload["format_version"] == "proof-pack-verify-v1"
+    assert payload["ok"] is False
+    assert payload["verify"]["format_version"] == "verify-v1"
+    assert payload["verify"]["summary"]["reason"] == "policy_fail"
+    assert payload["verify"]["resolution"]["exit_code"] == 1
 
 
 def test_proof_pack_verify_rejects_missing_pack(tmp_path: Path) -> None:
@@ -322,7 +351,7 @@ def test_proof_pack_inspect_json_summary(tmp_path: Path) -> None:
     assert any("manifest.json.asc missing" in issue for issue in payload["issues"])
 
 
-def test_proof_pack_build_json_round_trip(tmp_path: Path) -> None:
+def test_proof_pack_build_json_round_trip(monkeypatch, tmp_path: Path) -> None:
     final_verdict = tmp_path / "final_verdict.json"
     source_repo = tmp_path / "source_repo.json"
     environment = tmp_path / "environment.json"
@@ -336,6 +365,11 @@ def test_proof_pack_build_json_round_trip(tmp_path: Path) -> None:
     _write_json(model_revisions, {"models": {"org/model": {"revision": "rev1"}}})
     _write_json(report, _build_report_payload())
     _write_runtime_manifest(report)
+    monkeypatch.setattr(
+        "invarlock.proof_pack._run_verify_command",
+        lambda reports, profile: (0, _successful_verify_payload(reports)),
+        raising=False,
+    )
 
     build = CliRunner().invoke(
         app,

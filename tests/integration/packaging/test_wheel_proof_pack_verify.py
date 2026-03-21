@@ -15,6 +15,8 @@ from invarlock.runtime_security import (
     RUNTIME_VERIFIER_CONTRACT_VERSION,
 )
 
+_VALID_TEST_IMAGE_DIGEST = "sha256:" + ("a" * 64)
+
 pytestmark = pytest.mark.integration
 
 
@@ -94,18 +96,28 @@ def _write_runtime_manifest(report_path: Path) -> None:
     _write_json(
         report_path.parent / RUNTIME_MANIFEST_FILENAME,
         {
+            "manifest_version": 1,
+            "generated_at_utc": "2026-03-21T00:00:00+00:00",
+            "verifier_contract_version": RUNTIME_VERIFIER_CONTRACT_VERSION,
             "execution_mode": "container",
             "report": {
                 "filename": report_path.name,
                 "path": report_path.as_posix(),
                 "sha256": _sha256_file(report_path),
             },
+            "config": {
+                "path": None,
+                "sha256": None,
+                "source": "missing",
+            },
             "runtime": {
                 "container_execution": True,
-                "image_digest": "sha256:test-runtime-image",
+                "image_digest": _VALID_TEST_IMAGE_DIGEST,
                 "image_ref": "invarlock-runtime:local",
+                "allow_network": False,
+                "allow_remote_code": False,
+                "allow_third_party_plugins": False,
             },
-            "verifier_contract_version": RUNTIME_VERIFIER_CONTRACT_VERSION,
         },
     )
 

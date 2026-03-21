@@ -26,6 +26,7 @@ The public contract surface covers:
 | Model family catalog | `contracts/model_family_catalog.json` | Broader inventory for declared support, code-level coverage, usage-only checkpoints, and recommended additions |
 | Adapter capabilities | `contracts/adapter_capabilities.json` | Snapshot/restore, guard coverage, runtime limits, extras |
 | Plugin compatibility | `contracts/plugin_compatibility.json` | Core ABI policy and failure mode |
+| Runtime manifest | `contracts/runtime_manifest.schema.json` | Runtime attestation schema for `runtime.manifest.json` sidecars |
 | Proof-pack manifest | `contracts/proof_pack_manifest.schema.json` | Portable pack manifest schema for `verify_pack.sh`, including builder/subject/material attestation fields |
 | Policy pack | `contracts/policy_pack.schema.json` | Build/verify contract for Git-native policy packs |
 | Validation keys | `contracts/validation_keys.json` | Allow-list for report validation flags |

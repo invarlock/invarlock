@@ -49,6 +49,9 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     )
     assert catalog["plugin_compatibility"]["core_abi"] == "0.1"
     assert catalog["plugin_compatibility"]["match_policy"] == "exact_match"
+    assert (
+        catalog["runtime_manifest"]["path"] == "contracts/runtime_manifest.schema.json"
+    )
     assert catalog["policy_pack"]["path"] == "contracts/policy_pack.schema.json"
 
     schema = contracts.load_policy_pack_schema()
@@ -56,6 +59,10 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     assert (
         contracts.load_proof_pack_manifest_schema()["title"]
         == "InvarLock Proof Pack Manifest"
+    )
+    assert (
+        contracts.load_runtime_manifest_schema()["title"]
+        == "InvarLock Runtime Manifest"
     )
 
 
@@ -123,6 +130,7 @@ def test_public_contract_helpers_fall_back_when_contracts_are_unavailable(
     }
     assert contracts.load_policy_pack_schema() == {}
     assert contracts.load_proof_pack_manifest_schema() == {}
+    assert contracts.load_runtime_manifest_schema() == {}
     assert contracts.support_lane_by_id("missing") is None
     assert contracts.adapter_capability("missing") is None
     assert contracts.contract_reference("support_matrix.json") == {
@@ -136,6 +144,7 @@ def test_public_contract_helpers_reject_non_mapping_payloads(monkeypatch) -> Non
         "model_family_catalog.json": "unexpected",
         "adapter_capabilities.json": "unexpected",
         "plugin_compatibility.json": ["unexpected"],
+        "runtime_manifest.schema.json": ["unexpected"],
         "policy_pack.schema.json": ["unexpected"],
         "proof_pack_manifest.schema.json": ["unexpected"],
     }
@@ -165,6 +174,7 @@ def test_public_contract_helpers_reject_non_mapping_payloads(monkeypatch) -> Non
     }
     assert contracts.load_policy_pack_schema() == {}
     assert contracts.load_proof_pack_manifest_schema() == {}
+    assert contracts.load_runtime_manifest_schema() == {}
 
 
 def test_public_contract_lane_and_adapter_helpers_cover_non_matching_entries(

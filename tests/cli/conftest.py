@@ -13,6 +13,8 @@ from invarlock.runtime_security import (
     RUNTIME_VERIFIER_CONTRACT_VERSION,
 )
 
+_VALID_TEST_IMAGE_DIGEST = "sha256:" + ("a" * 64)
+
 
 @pytest.fixture(autouse=True)
 def _reset_plugin_env(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
@@ -53,7 +55,7 @@ def _write_test_runtime_manifest(report_path: Path) -> None:
         "execution_mode": "container",
         "runtime": {
             "image_ref": "ghcr.io/invarlock/invarlock-runtime:test",
-            "image_digest": "sha256:test-runtime-image",
+            "image_digest": _VALID_TEST_IMAGE_DIGEST,
             "container_execution": True,
             "allow_network": False,
             "allow_remote_code": False,
@@ -86,8 +88,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import jsonschema
 from pathlib import Path
 import sys
+
+from invarlock.public_contracts import load_runtime_manifest_schema
 
 
 def main() -> int:
@@ -110,6 +115,13 @@ def main() -> int:
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         except Exception as exc:
             errors.append(f"invalid manifest: {exc}")
+    if not errors:
+        try:
+            jsonschema.validate(
+                instance=manifest, schema=load_runtime_manifest_schema()
+            )
+        except jsonschema.ValidationError as exc:
+            errors.append(f"schema invalid: {exc.message}")
     if not errors:
         expected = hashlib.sha256(report_path.read_bytes()).hexdigest()
         actual = ((manifest.get("report") or {}).get("sha256"))
