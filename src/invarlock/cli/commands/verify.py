@@ -31,6 +31,7 @@ from .. import verify_checks as _verify_checks
 from .. import verify_output as _verify_output
 from .._json import emit as _emit_json
 from .._json import encode_error as _encode_error
+from ..security_helpers import configure_runtime_security, verify_runtime_attestation
 from .run import _enforce_provider_parity, _resolve_exit_code
 
 console = Console()
@@ -204,6 +205,11 @@ def verify_command(
         "--json",
         help="Emit machine-readable JSON (suppresses human-readable output)",
     ),
+    allow_unattested_artifacts: bool = typer.Option(
+        False,
+        "--allow-unattested-artifacts",
+        help="Allow verification of reports that do not have container attestation.",
+    ),
 ) -> None:
     """
     Verify evaluation report integrity.
@@ -212,7 +218,20 @@ def verify_command(
     and strict pairing requirements (match=1.0, overlap=0.0).
     """
 
+    try:
+        from typer.models import OptionInfo as _OptionInfo  # type: ignore
+    except Exception:  # pragma: no cover
+
+        class _OptionInfo:  # type: ignore
+            pass
+
+    if isinstance(allow_unattested_artifacts, _OptionInfo):
+        allow_unattested_artifacts = False
+
     overall_ok = True
+    configure_runtime_security(
+        allow_unattested_artifacts=bool(allow_unattested_artifacts)
+    )
     # Coerce tolerance for programmatic calls where typer.Option may be passed
     try:
         tol = float(tolerance)
@@ -266,6 +285,12 @@ def verify_command(
 
             # Structural checks
             errors = _validate_evaluation_report_payload(cert_path, profile=profile)
+            errors.extend(
+                verify_runtime_attestation(
+                    cert_path,
+                    allow_unattested=bool(allow_unattested_artifacts),
+                )
+            )
             # JSON path: emit a typed ValidationError for schema failures to include error.code
             if json_out and any(
                 "schema validation failed" in str(e).lower() for e in errors

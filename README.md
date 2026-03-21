@@ -80,6 +80,11 @@ in CI.
 Colab (CPU-friendly):
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_quickstart_cpu.ipynb)
 
+The secure-default CLI path runs model-loading commands inside the official
+runtime container. Trusted notebook or local-shell workflows can opt into host
+execution explicitly with `INVARLOCK_ALLOW_HOST_EXECUTION=1`, but the public
+quick start below shows the default attested path.
+
 ```bash
 # HF adapter stack (torch/transformers)
 pip install "invarlock[hf]"
@@ -88,15 +93,19 @@ pip install "invarlock[hf]"
 invarlock --version
 
 # Compare baseline vs subject (downloads require explicit network enable)
+# Secure-default execution uses the runtime container and writes
+# reports/eval/runtime.manifest.json next to evaluation.report.json.
 INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate \
   --baseline gpt2 \
   --subject  gpt2 \
   --adapter auto \
   --profile dev \
+  --report-out reports/eval \
   --quiet
 
-# Validate the evaluation report
-invarlock verify reports/eval/evaluation.report.json
+# Validate the attested evaluation report
+test -f reports/eval/runtime.manifest.json
+invarlock verify --json reports/eval/evaluation.report.json
 
 # Render HTML for sharing
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
@@ -110,6 +119,7 @@ Baseline: gpt2 -> Subject: gpt2 · Profile: dev
 Status: PASS · Gates: <passed>/<total> passed
 Primary metric ratio: <ratio>
 Output: reports/eval/evaluation.report.json
+Attestation: reports/eval/runtime.manifest.json
 ```
 
 ## Proof packs (portable evidence bundles)

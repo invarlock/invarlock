@@ -27,8 +27,8 @@ def test_cli_plugins_unknown_category_exits_error():
     # Use the 'list' subcommand with an invalid category name
     import os as _os
 
-    # Ensure discovery is enabled for this test
-    _os.environ["INVARLOCK_DISABLE_PLUGIN_DISCOVERY"] = "0"
+    # Ensure discovery gating is not the reason this path fails
+    _os.environ["INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS"] = "0"
     result = runner.invoke(app, ["plugins", "list", "unknown_cat"])
     # Expect a non-zero exit in this path
     assert result.exit_code != 0

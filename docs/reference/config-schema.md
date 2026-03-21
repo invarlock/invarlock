@@ -8,6 +8,7 @@
 | **Audience** | CLI users authoring presets or overrides. |
 | **Source of truth** | `src/invarlock/cli/config.py`, runtime profiles under `invarlock/_data/runtime`. |
 | **Network** | Offline by default; enable downloads via `INVARLOCK_ALLOW_NETWORK=1`. |
+| **Execution** | Model-loading commands run in the runtime container by default; trusted host execution requires `INVARLOCK_ALLOW_HOST_EXECUTION=1` or `--allow-host-execution`. |
 
 ## Quick Start
 

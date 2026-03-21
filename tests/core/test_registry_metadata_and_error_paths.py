@@ -1,3 +1,5 @@
+import sys
+import types
 import warnings
 from typing import Any
 
@@ -25,7 +27,68 @@ class _EP:
         return getattr(m, attr)
 
 
+class _Dist:
+    def __init__(self, name: str, version: str):
+        self.name = name
+        self.version = version
+        self.metadata = {"Name": name}
+
+
+def _install_plugin_module(
+    monkeypatch: pytest.MonkeyPatch,
+    module_name: str,
+    *,
+    abi: str,
+) -> tuple[type[reg.ModelAdapter], type[reg.ModelEdit], type[reg.Guard]]:
+    module = types.ModuleType(module_name)
+    module.INVARLOCK_CORE_ABI = abi
+
+    class DummyAdapter(reg.ModelAdapter):
+        name = "dummy_adapter"
+
+        def can_handle(self, model: Any) -> bool:
+            return True
+
+        def describe(self, model: Any) -> dict[str, Any]:
+            return {"n_layer": 1}
+
+        def snapshot(self, model: Any) -> bytes:
+            return b"snapshot"
+
+        def restore(self, model: Any, blob: bytes) -> None:
+            return None
+
+    class DummyEdit(reg.ModelEdit):
+        name = "dummy_edit"
+
+        def can_edit(self, model_desc: dict[str, Any]) -> bool:
+            return True
+
+        def apply(
+            self, model: Any, adapter: reg.ModelAdapter, **kwargs: Any
+        ) -> dict[str, Any]:
+            return {"ok": True}
+
+    class DummyGuard(reg.Guard):
+        name = "dummy_guard"
+
+        def validate(
+            self, model: Any, adapter: reg.ModelAdapter, context: dict[str, Any]
+        ) -> dict[str, Any]:
+            return {"passed": True}
+
+    DummyAdapter.__module__ = module_name
+    DummyEdit.__module__ = module_name
+    DummyGuard.__module__ = module_name
+    module.DummyAdapter = DummyAdapter
+    module.DummyEdit = DummyEdit
+    module.DummyGuard = DummyGuard
+    monkeypatch.setitem(sys.modules, module_name, module)
+    return DummyAdapter, DummyEdit, DummyGuard
+
+
 def test_registry_fallback_on_entry_points_error(monkeypatch, tmp_path):
+    monkeypatch.setenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "1")
     # Force entry_points() to error to exercise warning + fallback path
     monkeypatch.setattr(
         reg, "entry_points", lambda: (_ for _ in ()).throw(RuntimeError("boom"))
@@ -74,13 +137,8 @@ def test_registry_fallback_on_entry_points_error(monkeypatch, tmp_path):
 
 
 def test_registry_entry_points_select_and_get_paths(monkeypatch):
+    monkeypatch.setenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "1")
     # Build stubs that exercise both eps.select(...) and eps.get(...)
-
-    class _Dist:
-        def __init__(self, name: str, version: str):
-            self.name = name
-            self.version = version
-            self.metadata = {"Name": name}
 
     # One entry point that resolves to a valid guard via .load()
     from invarlock.plugins.hello_guard import HelloGuard
@@ -134,6 +192,64 @@ def test_registry_entry_points_select_and_get_paths(monkeypatch):
     assert "ep_hello_guard" in r2.list_guards()
 
 
+def test_registry_entry_point_collision_and_typed_getters(monkeypatch):
+    monkeypatch.setenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "1")
+    adapter_cls, edit_cls, guard_cls = _install_plugin_module(
+        monkeypatch,
+        "invarlock_test_registry_entry_points",
+        abi=reg.INVARLOCK_CORE_ABI,
+    )
+
+    adapter_ep = _EP(
+        name="hf_causal",
+        value="invarlock_test_registry_entry_points:DummyAdapter",
+        dist=_Dist("third-party-adapter", "1.2.3"),
+        loader=adapter_cls,
+    )
+    edit_ep = _EP(
+        name="quant_rtn",
+        value="invarlock_test_registry_entry_points:DummyEdit",
+        dist=_Dist("third-party-edit", "2.3.4"),
+        loader=edit_cls,
+    )
+    guard_ep = _EP(
+        name="hello_guard",
+        value="invarlock_test_registry_entry_points:DummyGuard",
+        dist=_Dist("third-party-guard", "3.4.5"),
+        loader=guard_cls,
+    )
+
+    class _EPContainerSelect:
+        def select(self, *, group: str):
+            if group == "invarlock.adapters":
+                return [adapter_ep]
+            if group == "invarlock.edits":
+                return [edit_ep]
+            if group == "invarlock.guards":
+                return [guard_ep]
+            return []
+
+    monkeypatch.setattr(reg, "entry_points", lambda: _EPContainerSelect())
+    registry = reg.CoreRegistry()
+
+    assert registry.get_plugin_info("hf_causal", "adapters")["package"] == (
+        "third-party-adapter"
+    )
+    assert registry.get_plugin_info("quant_rtn", "edits")["package"] == (
+        "third-party-edit"
+    )
+    assert registry.get_plugin_info("hello_guard", "guards")["package"] == (
+        "third-party-guard"
+    )
+
+    adapter = registry.get_adapter_typed("hf_causal")
+    edit = registry.get_edit_typed("quant_rtn")
+    guard = registry.get_guard("hello_guard")
+    assert isinstance(adapter, adapter_cls)
+    assert isinstance(edit, edit_cls)
+    assert isinstance(guard, guard_cls)
+
+
 def test_registry_additional_paths(monkeypatch):
     r = reg.CoreRegistry()
 
@@ -152,9 +268,6 @@ def test_registry_additional_paths(monkeypatch):
     # Guard fallback import path with type-mismatch (not a Guard instance)
     # Use a synthetic module so importlib.import_module can resolve it even though
     # tests/ is not a package.
-    import sys
-    import types
-
     module_name = "invarlock_test_registry_type_mismatch"
     dummy_mod = types.ModuleType(module_name)
 
@@ -248,9 +361,6 @@ def test_check_runtime_dependencies_find_spec_exception_counts_missing(monkeypat
 
 
 def test_registry_get_paths_cover_unavailable_and_type_mismatch_paths(monkeypatch):
-    import sys
-    import types
-
     r = reg.CoreRegistry()
     r._initialized = True
 
@@ -301,3 +411,79 @@ def test_registry_get_paths_cover_unavailable_and_type_mismatch_paths(monkeypatc
     )
     with pytest.raises(ImportError):
         r.get_edit("bad_edit")
+
+
+def test_registry_unavailable_and_abi_mismatch_paths(monkeypatch):
+    bad_adapter_cls, bad_edit_cls, bad_guard_cls = _install_plugin_module(
+        monkeypatch,
+        "invarlock_test_registry_bad_abi",
+        abi="9999",
+    )
+    registry = reg.CoreRegistry()
+    registry._initialized = True
+
+    registry._edits["unavailable_edit"] = reg.PluginInfo(
+        name="unavailable_edit",
+        module="invarlock.edits.noop",
+        class_name="NoopEdit",
+        available=False,
+        status="disabled",
+        entry_point=None,
+    )
+    registry._guards["unavailable_guard"] = reg.PluginInfo(
+        name="unavailable_guard",
+        module="invarlock.plugins.hello_guard",
+        class_name="HelloGuard",
+        available=False,
+        status="disabled",
+        entry_point=None,
+    )
+
+    with pytest.raises(ImportError, match="unavailable"):
+        registry.get_edit("unavailable_edit")
+    with pytest.raises(ImportError, match="unavailable"):
+        registry.get_guard("unavailable_guard")
+
+    registry._adapters["bad_abi_adapter"] = reg.PluginInfo(
+        name="bad_abi_adapter",
+        module="invarlock_test_registry_bad_abi",
+        class_name="DummyAdapter",
+        available=True,
+        status="Available",
+        entry_point=_EP(
+            "bad_abi_adapter",
+            "invarlock_test_registry_bad_abi:DummyAdapter",
+            loader=bad_adapter_cls,
+        ),
+    )
+    registry._edits["bad_abi_edit"] = reg.PluginInfo(
+        name="bad_abi_edit",
+        module="invarlock_test_registry_bad_abi",
+        class_name="DummyEdit",
+        available=True,
+        status="Available",
+        entry_point=_EP(
+            "bad_abi_edit",
+            "invarlock_test_registry_bad_abi:DummyEdit",
+            loader=bad_edit_cls,
+        ),
+    )
+    registry._guards["bad_abi_guard"] = reg.PluginInfo(
+        name="bad_abi_guard",
+        module="invarlock_test_registry_bad_abi",
+        class_name="DummyGuard",
+        available=True,
+        status="Available",
+        entry_point=_EP(
+            "bad_abi_guard",
+            "invarlock_test_registry_bad_abi:DummyGuard",
+            loader=bad_guard_cls,
+        ),
+    )
+
+    with pytest.raises(ImportError, match="ABI mismatch"):
+        registry.get_adapter("bad_abi_adapter")
+    with pytest.raises(ImportError, match="ABI mismatch"):
+        registry.get_edit("bad_abi_edit")
+    with pytest.raises(ImportError, match="ABI mismatch"):
+        registry.get_guard("bad_abi_guard")

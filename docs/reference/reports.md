@@ -35,8 +35,9 @@ telemetry fields, and HTML export.
 # Generate a report from a run report
 invarlock report --run runs/subject/report.json --baseline runs/baseline/report.json --format report
 
-# Validate report structure
+# Validate an attested report bundle
 invarlock verify reports/eval/evaluation.report.json
+# expects reports/eval/runtime.manifest.json next to the report
 
 # Inspect telemetry fields
 jq '.telemetry' reports/eval/evaluation.report.json
@@ -48,6 +49,9 @@ invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/eva
 ## report Layout
 
 The markdown report is structured to highlight evaluation outcomes first:
+
+Attested evaluations also emit `runtime.manifest.json` next to
+`evaluation.report.json`. Archive and verify them together.
 
 - **Evaluation Dashboard**: one-line PASS/FAIL + core gates (primary metric, drift, invariants, spectral, RMT, overhead).
 - **Quality Gates**: table of canonical gating checks with measured values.
@@ -109,7 +113,8 @@ The markdown report is structured to highlight evaluation outcomes first:
 │                                    ▼                                    │
 │   ┌────────────────────────────────────────────────────────────────┐    │
 │   │                    invarlock verify                            │    │
-│   │ schema + pairing + ratio math + measurement contracts          │    │
+│   │ schema + pairing + ratio math + measurement contracts +        │    │
+│   │ runtime-manifest attestation                                   │    │
 │   └────────────────────────────────────────────────────────────────┘    │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘

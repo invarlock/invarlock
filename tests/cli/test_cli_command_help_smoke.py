@@ -6,7 +6,7 @@ from typer.testing import CliRunner
 def test_cli_top_level_help_smoke(monkeypatch):
     # Avoid heavy discovery in help smoke
     monkeypatch.setenv("INVARLOCK_LIGHT_IMPORT", "1")
-    monkeypatch.setenv("INVARLOCK_DISABLE_PLUGIN_DISCOVERY", "1")
+    monkeypatch.setenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "0")
     from invarlock.cli.app import app
 
     runner = CliRunner()
@@ -19,6 +19,8 @@ def test_cli_top_level_help_smoke(monkeypatch):
         ["run", "--help"],
         ["policy", "--help"],
         ["plugins", "--help"],
+        ["plugins", "install", "--help"],
+        ["plugins", "uninstall", "--help"],
         ["doctor", "--help"],
     ):
         res = runner.invoke(app, args)

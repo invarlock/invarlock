@@ -13,6 +13,7 @@ from typing import Any
 import typer
 
 from invarlock.public_contracts import load_proof_pack_manifest_schema
+from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
 
 try:  # pragma: no cover - exercised through tests/integration
     import jsonschema
@@ -26,7 +27,7 @@ PROOF_PACK_VERIFY_MISSING = 3
 PROOF_PACK_VERIFY_FORMAT = 4
 PROOF_PACK_VERIFY_SIGNATURE = 5
 PROOF_PACK_VERIFY_INTEGRITY = 6
-PROOF_PACK_VERIFY_CERTS = 7
+PROOF_PACK_VERIFY_REPORTS = 7
 
 _CONTROL_FILES = {
     "checksums.sha256",
@@ -454,23 +455,23 @@ def _run_verify_command(
     return exit_code, payload
 
 
-def _verify_certs(
+def _verify_reports(
     pack_dir: Path,
     *,
     json_out_path: Path | None,
     profile: str,
 ) -> tuple[list[str], dict[str, Any] | None]:
-    certs = sorted(pack_dir.glob("certs/**/evaluation.report.json"))
-    if not certs:
+    reports = sorted(pack_dir.glob("reports/**/evaluation.report.json"))
+    if not reports:
         return ["No reports found in pack."], None
-    clean = [path for path in certs if "/errors/" not in path.as_posix()]
-    error_reports = [path for path in certs if path not in clean]
-    if not clean:
+    clean_reports = [path for path in reports if "/errors/" not in path.as_posix()]
+    error_reports = [path for path in reports if path not in clean_reports]
+    if not clean_reports:
         return [
             "No clean reports found in pack (only error-injection reports present)."
         ], None
 
-    exit_code, payload = _run_verify_command(clean, profile=profile)
+    exit_code, payload = _run_verify_command(clean_reports, profile=profile)
     if json_out_path is not None and payload is not None:
         json_out_path.write_text(
             json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8"
@@ -481,7 +482,7 @@ def _verify_certs(
         except Exception:
             pass
     if exit_code != 0:
-        return ["invarlock verify reported cert verification failures."], payload
+        return ["invarlock verify reported report verification failures."], payload
     return [], payload
 
 
@@ -492,7 +493,7 @@ def inspect_proof_pack(pack_dir: Path) -> tuple[dict[str, Any], int]:
         "ok": False,
         "manifest": {"valid": False, "format": None},
         "signature": {"present": False, "signer_fingerprint": None},
-        "certs": {"total": 0, "clean": 0, "errors": 0},
+        "reports": {"total": 0, "clean": 0, "errors": 0},
         "artifacts": {"files": 0, "hashed": 0},
         "integrity": {
             "checksums_bound": False,
@@ -538,12 +539,12 @@ def inspect_proof_pack(pack_dir: Path) -> tuple[dict[str, Any], int]:
     if not signature_present:
         issues.append("manifest.json.asc missing; strict verification would fail.")
 
-    certs = sorted(pack_dir.glob("certs/**/evaluation.report.json"))
-    clean = [path for path in certs if "/errors/" not in path.as_posix()]
-    error_reports = [path for path in certs if path not in clean]
-    payload["certs"] = {
-        "total": len(certs),
-        "clean": len(clean),
+    reports = sorted(pack_dir.glob("reports/**/evaluation.report.json"))
+    clean_reports = [path for path in reports if "/errors/" not in path.as_posix()]
+    error_reports = [path for path in reports if path not in clean_reports]
+    payload["reports"] = {
+        "total": len(reports),
+        "clean": len(clean_reports),
         "errors": len(error_reports),
     }
 
@@ -587,7 +588,7 @@ def build_proof_pack(
     out_dir: Path,
     *,
     final_verdict_path: Path,
-    cert_paths: list[Path],
+    report_paths: list[Path],
     source_repo_path: Path | None = None,
     environment_path: Path | None = None,
     material_specs: list[tuple[str, Path]] | None = None,
@@ -602,14 +603,14 @@ def build_proof_pack(
         "ok": False,
         "warnings": warnings,
         "errors": errors,
-        "certs": {"total": 0},
+        "reports": {"total": 0},
         "verify": None,
         "files": None,
     }
     material_specs = material_specs or []
 
-    if not cert_paths:
-        errors.append("proof-pack build requires at least one --cert input.")
+    if not report_paths:
+        errors.append("proof-pack build requires at least one --report input.")
         return payload, PROOF_PACK_VERIFY_USAGE
     if out_dir.exists():
         errors.append(f"Output pack directory already exists: {out_dir}")
@@ -636,17 +637,27 @@ def build_proof_pack(
             material_path, label=f"material {material_name}"
         )
         errors.extend(material_errors)
-    for cert_path in cert_paths:
-        _, cert_errors = _load_json_object(cert_path, label="cert")
-        errors.extend(cert_errors)
+    for report_path in report_paths:
+        _, report_errors = _load_json_object(report_path, label="report")
+        errors.extend(report_errors)
+        runtime_manifest_path = report_path.parent / RUNTIME_MANIFEST_FILENAME
+        if not runtime_manifest_path.is_file():
+            errors.append(f"report sidecar file not found: {runtime_manifest_path}")
+        else:
+            _, runtime_manifest_errors = _load_json_object(
+                runtime_manifest_path, label="runtime manifest"
+            )
+            errors.extend(runtime_manifest_errors)
     if errors:
         return payload, PROOF_PACK_VERIFY_FORMAT
 
-    verify_exit_code, verify_payload = _run_verify_command(cert_paths, profile=profile)
+    verify_exit_code, verify_payload = _run_verify_command(
+        report_paths, profile=profile
+    )
     if verify_exit_code != 0:
         payload["verify"] = verify_payload
-        errors.append("Provided cert inputs failed `invarlock verify`.")
-        return payload, PROOF_PACK_VERIFY_CERTS
+        errors.append("Provided report inputs failed `invarlock verify`.")
+        return payload, PROOF_PACK_VERIFY_REPORTS
 
     out_dir.mkdir(parents=True, exist_ok=False)
     rel_paths: list[str] = []
@@ -679,11 +690,18 @@ def build_proof_pack(
             }
         )
 
-    for index, cert_path in enumerate(cert_paths, start=1):
-        rel_path = f"certs/cert-{index:03d}/evaluation.report.json"
-        cert_dest = out_dir / rel_path
-        _copy_file(cert_path, cert_dest)
+    for index, report_path in enumerate(report_paths, start=1):
+        report_dir_rel = f"reports/report-{index:03d}"
+        rel_path = f"{report_dir_rel}/evaluation.report.json"
+        report_dest = out_dir / rel_path
+        _copy_file(report_path, report_dest)
         rel_paths.append(rel_path)
+        runtime_manifest_rel = f"{report_dir_rel}/{RUNTIME_MANIFEST_FILENAME}"
+        _copy_file(
+            report_path.parent / RUNTIME_MANIFEST_FILENAME,
+            out_dir / runtime_manifest_rel,
+        )
+        rel_paths.append(runtime_manifest_rel)
 
     if readme_path is not None:
         if not readme_path.is_file():
@@ -725,7 +743,7 @@ def build_proof_pack(
     )
 
     payload["ok"] = True
-    payload["certs"] = {"total": len(cert_paths)}
+    payload["reports"] = {"total": len(report_paths)}
     payload["verify"] = verify_payload
     payload["files"] = {
         "hashed": len(rel_paths),
@@ -856,11 +874,11 @@ def verify_proof_pack(
         ), PROOF_PACK_VERIFY_INTEGRITY
 
     if not skip_verify:
-        cert_errors, verify_payload = _verify_certs(
+        report_errors, verify_payload = _verify_reports(
             pack_dir, json_out_path=json_out_path, profile=profile
         )
-        if cert_errors:
-            errors.extend(cert_errors)
+        if report_errors:
+            errors.extend(report_errors)
             return _build_verify_result(
                 pack_dir=pack_dir,
                 ok=False,
@@ -870,8 +888,8 @@ def verify_proof_pack(
                 errors=errors,
                 signer_fingerprint=signer_fingerprint,
                 verify_payload=verify_payload,
-                exit_code=PROOF_PACK_VERIFY_CERTS,
-            ), PROOF_PACK_VERIFY_CERTS
+                exit_code=PROOF_PACK_VERIFY_REPORTS,
+            ), PROOF_PACK_VERIFY_REPORTS
 
     return _build_verify_result(
         pack_dir=pack_dir,
@@ -916,7 +934,7 @@ def _build_verify_result(
 
 __all__ = [
     "PROOF_PACK_FORMAT",
-    "PROOF_PACK_VERIFY_CERTS",
+    "PROOF_PACK_VERIFY_REPORTS",
     "PROOF_PACK_VERIFY_FORMAT",
     "PROOF_PACK_VERIFY_INTEGRITY",
     "PROOF_PACK_VERIFY_MISSING",

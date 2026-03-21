@@ -26,20 +26,13 @@ def test_version_outputs_schema(monkeypatch):
     assert "schema=" in result.output
 
 
-def test_light_import_sets_disable_discovery(monkeypatch):
-    """Test that LIGHT_IMPORT mode no longer sets DISABLE_PLUGIN_DISCOVERY.
-
-    The behavior was intentionally changed so that INVARLOCK_LIGHT_IMPORT=1
-    no longer auto-sets INVARLOCK_DISABLE_PLUGIN_DISCOVERY. Individual commands
-    may gate discovery based on their own flags.
-    """
+def test_light_import_does_not_force_plugin_policy_env(monkeypatch):
+    """Test that LIGHT_IMPORT mode stays out of plugin policy env handling."""
     monkeypatch.setenv("INVARLOCK_LIGHT_IMPORT", "1")
-    # Ensure var not already set
-    monkeypatch.delenv("INVARLOCK_DISABLE_PLUGIN_DISCOVERY", raising=False)
+    monkeypatch.delenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", raising=False)
     app_mod = importlib.import_module("invarlock.cli.app")
     importlib.reload(app_mod)
-    # LIGHT_IMPORT no longer forces DISABLE_PLUGIN_DISCOVERY
-    assert os.getenv("INVARLOCK_DISABLE_PLUGIN_DISCOVERY") is None
+    assert os.getenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS") is None
 
 
 def test_version_fallbacks(monkeypatch):

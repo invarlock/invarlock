@@ -26,7 +26,7 @@ Options:
   --scenario-ids IDS   Comma-separated scenario IDs to include (filters scenarios.json before queue generation)
   --calibrate-only     Only run calibration tasks (implies PACK_SUITE_MODE=calibrate-only)
   --errors-only        Only run error injection scenarios (still performs calibration unless presets are provided)
-  --run-only           Run edits/certs only (implies resume)
+  --run-only           Run edits/reports only (implies resume)
   --resume             Resume an existing run directory
   --help               Show this help message
 EOF

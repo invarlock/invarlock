@@ -43,10 +43,10 @@ invarlock plugins adapters
 See [Plugin Workflow](plugins.md) for extending adapters and guards, or use Compare & evaluate (BYOE) when you
 already have two checkpoints.
 
-**Safety tip:** After any run that produces a report, execute
+**Safety tip:** After any run that produces an attested report bundle, execute
 `invarlock verify reports/eval/evaluation.report.json`. The verifier re-checks paired
-log‑space math, guard‑overhead (<= 1%), drift gates, and schema compliance before
-you promote results.
+log‑space math, guard‑overhead (<= 1%), drift gates, schema compliance, and the
+adjacent `runtime.manifest.json` before you promote results.
 
 ### 2. Run a Simple Edit or Compare & evaluate
 
@@ -75,6 +75,9 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
 invarlock report explain --report runs/edited/report.json --baseline runs/source/report.json
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 ```
+
+The `evaluate` examples above use the secure-default runtime container. For a
+trusted local host run, add `--allow-host-execution`.
 
 ### 3. Generate Reports
 

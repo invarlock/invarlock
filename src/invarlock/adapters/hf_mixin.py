@@ -14,7 +14,7 @@ Provides reusable functionality for InvarLock's HuggingFace adapters:
 
 from __future__ import annotations
 
-import io
+import base64
 import json
 import logging
 import os
@@ -64,6 +64,68 @@ def _resolve_named_parameter(
     if isinstance(leaf, torch.nn.Parameter):
         return leaf
     return None
+
+
+def _require_safetensors_runtime() -> tuple[Any, Any, Any, Any]:
+    try:
+        from safetensors.torch import load as load_tensors
+        from safetensors.torch import load_file as load_tensor_file
+        from safetensors.torch import save as save_tensors
+        from safetensors.torch import save_file as save_tensor_file
+    except ModuleNotFoundError as exc:  # pragma: no cover - optional dependency
+        raise RuntimeError(
+            "safetensors is required for secure HF snapshot restore. "
+            "Install the adapters extra or add safetensors to the runtime image."
+        ) from exc
+    return save_tensors, load_tensors, save_tensor_file, load_tensor_file
+
+
+def _serialize_snapshot_blob(
+    *,
+    tensors: Mapping[str, torch.Tensor],
+    metadata: dict[str, Any],
+) -> bytes:
+    save_tensors, _, _, _ = _require_safetensors_runtime()
+    tensor_blob = save_tensors(
+        {name: tensor.detach().cpu().contiguous() for name, tensor in tensors.items()}
+    )
+    envelope = {
+        "format": "invarlock-safetensors-v1",
+        "metadata": metadata,
+        "tensors_base64": base64.b64encode(tensor_blob).decode("ascii"),
+    }
+    return json.dumps(envelope, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
+def _deserialize_snapshot_blob(
+    blob: bytes,
+) -> tuple[dict[str, Any], Mapping[str, torch.Tensor]]:
+    _, load_tensors, _, _ = _require_safetensors_runtime()
+    envelope = json.loads(blob.decode("utf-8"))
+    if not isinstance(envelope, dict):
+        raise TypeError("Invalid snapshot payload")
+    if envelope.get("format") != "invarlock-safetensors-v1":
+        raise ValueError("Unsupported snapshot payload format")
+    metadata = envelope.get("metadata")
+    if not isinstance(metadata, dict):
+        raise TypeError("Invalid snapshot payload metadata")
+    encoded = envelope.get("tensors_base64")
+    if not isinstance(encoded, str) or not encoded:
+        raise TypeError("Invalid snapshot payload tensors")
+    tensor_blob = base64.b64decode(encoded.encode("ascii"))
+    tensors = load_tensors(tensor_blob)
+    if not isinstance(tensors, Mapping):
+        raise TypeError("Invalid snapshot tensor mapping")
+    return metadata, tensors
+
+
+def _load_chunked_tensor(path: Path) -> torch.Tensor:
+    _, _, _, load_tensor_file = _require_safetensors_runtime()
+    payload = load_tensor_file(str(path))
+    tensor = payload.get("tensor") if isinstance(payload, Mapping) else None
+    if not isinstance(tensor, torch.Tensor):
+        raise TypeError(f"Invalid snapshot tensor payload for {path.name}")
+    return tensor
 
 
 class HFAdapterMixin:
@@ -354,10 +416,10 @@ class HFAdapterMixin:
             model: HuggingFace model instance.
 
         Returns:
-            Bytes payload produced by torch.save.
+            Bytes payload backed by safetensors plus JSON metadata.
         """
 
-        state_dict: dict[str, Any] = {}
+        state_dict: dict[str, torch.Tensor] = {}
         device_map: dict[str, str] = {}
 
         for name, param in model.named_parameters():
@@ -370,16 +432,15 @@ class HFAdapterMixin:
             state_dict[state_key] = buffer.detach().cpu().clone()
             device_map[state_key] = str(buffer.device)
 
-        if hasattr(model, "config"):
-            state_dict["config"] = self._serialize_config(model.config)
-
-        state_dict["device_map"] = device_map
-        state_dict["model_class"] = model.__class__.__name__
-        state_dict["weight_tying"] = self._extract_weight_tying_info(model)
-
-        buffer = io.BytesIO()
-        torch.save(state_dict, buffer)
-        return buffer.getvalue()
+        metadata: dict[str, Any] = {
+            "config": self._serialize_config(model.config)
+            if hasattr(model, "config")
+            else {},
+            "device_map": device_map,
+            "model_class": model.__class__.__name__,
+            "weight_tying": self._extract_weight_tying_info(model),
+        }
+        return _serialize_snapshot_blob(tensors=state_dict, metadata=metadata)
 
     def restore(self, model: torch.nn.Module, blob: bytes) -> None:
         """
@@ -390,10 +451,10 @@ class HFAdapterMixin:
             blob: Bytes payload from snapshot.
         """
 
-        buffer = io.BytesIO(blob)
-        state_dict = torch.load(buffer, map_location="cpu", weights_only=False)
-
-        device_map: dict[str, str] = state_dict.get("device_map", {})
+        metadata, state_dict = _deserialize_snapshot_blob(blob)
+        device_map = metadata.get("device_map", {})
+        if not isinstance(device_map, dict):
+            device_map = {}
 
         for name, param in model.named_parameters():
             state_key = f"params.{name}"
@@ -410,7 +471,7 @@ class HFAdapterMixin:
             target_device = torch.device(device_map.get(state_key, "cpu"))
             buffer_param.copy_(state_dict[state_key].to(target_device))
 
-        original_tying = state_dict.get("weight_tying", {})
+        original_tying = metadata.get("weight_tying", {})
         if isinstance(original_tying, dict) and original_tying:
             current_tying = self._extract_weight_tying_info(model)
             for tied_param, source_param in original_tying.items():
@@ -432,12 +493,14 @@ class HFAdapterMixin:
 
         snapshot_dir = Path(tempfile.mkdtemp(prefix=prefix))
         _ensure_secure_dir(snapshot_dir)
+        _, _, save_tensor_file, _ = _require_safetensors_runtime()
 
         manifest: dict[str, Any] = {
             "model_class": model.__class__.__name__,
             "config": self._serialize_config(model.config)
             if hasattr(model, "config")
             else {},
+            "tensor_format": "safetensors",
             "params": {},
             "params_meta": {},
             "buffers": {},
@@ -447,9 +510,12 @@ class HFAdapterMixin:
         }
 
         for name, param in model.named_parameters():
-            filename = f"param__{_sanitize_param_name(name)}.pt"
+            filename = f"param__{_sanitize_param_name(name)}.safetensors"
             file_path = snapshot_dir / filename
-            torch.save(param.detach().cpu(), file_path)
+            save_tensor_file(
+                {"tensor": param.detach().cpu().contiguous()},
+                str(file_path),
+            )
             manifest["params"][name] = filename
             manifest["params_meta"][name] = {
                 "shape": [int(x) for x in param.shape],
@@ -458,9 +524,12 @@ class HFAdapterMixin:
             manifest["device_map"][name] = str(param.device)
 
         for name, buffer in model.named_buffers():
-            filename = f"buffer__{_sanitize_param_name(name)}.pt"
+            filename = f"buffer__{_sanitize_param_name(name)}.safetensors"
             file_path = snapshot_dir / filename
-            torch.save(buffer.detach().cpu(), file_path)
+            save_tensor_file(
+                {"tensor": buffer.detach().cpu().contiguous()},
+                str(file_path),
+            )
             manifest["buffers"][name] = filename
             manifest["buffers_meta"][name] = {
                 "shape": [int(x) for x in buffer.shape],
@@ -512,9 +581,7 @@ class HFAdapterMixin:
                 raise FileNotFoundError(
                     f"Missing snapshot tensor for param: {file_path}"
                 )
-            tensor = torch.load(file_path, map_location="cpu")
-            if not isinstance(tensor, torch.Tensor):
-                raise TypeError(f"Invalid snapshot tensor payload for param: {name}")
+            tensor = _load_chunked_tensor(file_path)
             meta = params_meta.get(name) if isinstance(params_meta, dict) else None
             if isinstance(meta, dict):
                 expected_shape = meta.get("shape")
@@ -543,9 +610,7 @@ class HFAdapterMixin:
                 raise FileNotFoundError(
                     f"Missing snapshot tensor for buffer: {file_path}"
                 )
-            tensor = torch.load(file_path, map_location="cpu")
-            if not isinstance(tensor, torch.Tensor):
-                raise TypeError(f"Invalid snapshot tensor payload for buffer: {name}")
+            tensor = _load_chunked_tensor(file_path)
             meta = buffers_meta.get(name) if isinstance(buffers_meta, dict) else None
             if isinstance(meta, dict):
                 expected_shape = meta.get("shape")
@@ -566,7 +631,7 @@ class HFAdapterMixin:
         for name, filename in params_manifest.items():
             target = param_map[name]
             target_device = torch.device(device_map.get(name, str(target.device)))
-            tensor = torch.load(snapshot_dir / filename, map_location="cpu")
+            tensor = _load_chunked_tensor(snapshot_dir / filename)
             with torch.no_grad():
                 target.copy_(tensor.to(target_device))
 
@@ -574,7 +639,7 @@ class HFAdapterMixin:
             target = buffer_map[name]
             key = f"buffer::{name}"
             target_device = torch.device(device_map.get(key, str(target.device)))
-            tensor = torch.load(snapshot_dir / filename, map_location="cpu")
+            tensor = _load_chunked_tensor(snapshot_dir / filename)
             target.copy_(tensor.to(target_device))
 
         original_tying = manifest.get("weight_tying", {})

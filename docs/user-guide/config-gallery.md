@@ -17,6 +17,10 @@ Note: Adapter‑based flows such as `invarlock evaluate` and `invarlock run` wit
 HF models require extras like `invarlock[hf]` or `invarlock[adapters]`. The
 core install (`pip install invarlock`) remains torch‑free.
 
+The `evaluate` examples below use the secure-default runtime container. Add
+`--allow-host-execution` only for trusted local workflows that intentionally
+bypass that boundary.
+
 ## Presets (Runnable)
 
 ### Causal LM (decoder-only)
@@ -29,7 +33,7 @@ core install (`pip install invarlock`) remains torch‑free.
 provide good coverage while keeping runtime reasonable.
 
 ```bash
-invarlock evaluate --baseline gpt2 --subject /path/to/edited \
+INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --baseline gpt2 --subject /path/to/edited \
   --preset configs/presets/causal_lm/wikitext2_512.yaml --profile ci
 ```
 
@@ -44,7 +48,7 @@ invarlock evaluate --baseline gpt2 --subject /path/to/edited \
 network access is unavailable or for CI smoke tests.
 
 ```bash
-invarlock evaluate --baseline bert-base-uncased --subject /path/to/edited \
+INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --baseline bert-base-uncased --subject /path/to/edited \
   --preset configs/presets/masked_lm/wikitext2_128.yaml --profile ci
 ```
 
@@ -72,7 +76,7 @@ own pre-edited checkpoint instead.
 **Example (demo edit):**
 
 ```bash
-invarlock evaluate --baseline gpt2 --subject gpt2 \
+INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --baseline gpt2 --subject gpt2 \
   --preset configs/presets/causal_lm/wikitext2_512.yaml \
   --edit-config configs/overlays/edits/quant_rtn/8bit_attn.yaml \
   --profile ci

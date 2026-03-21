@@ -14,13 +14,13 @@ def _invoke_json(args, env=None):
 
 
 def test_plugins_discovery_disabled_for_all_categories_json():
-    env = {"INVARLOCK_DISABLE_PLUGIN_DISCOVERY": "1"}
+    env = {"INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS": "0"}
     for cat in ("adapters", "guards", "edits", "plugins"):
         p = _invoke_json(["plugins", "list", cat, "--json"], env=env)
         assert p.get("category") == cat
         assert "kind" not in p
-        assert p.get("discovery") == "disabled"
         assert isinstance(p.get("items"), list)
+        assert p.get("items")
 
 
 def test_plugins_datasets_json_shape():

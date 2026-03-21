@@ -12,8 +12,9 @@ Heuristics:
   - Strip '$ ' prompt prefixes when present.
   - Deduplicate identical commands while preserving the first location.
   - When running, apply a cautious env unless the command already sets it:
-      INVARLOCK_ALLOW_NETWORK=1, INVARLOCK_DEDUP_TEXTS=1, TRANSFORMERS_NO_TORCHVISION=1,
-      TOKENIZERS_PARALLELISM=false
+      INVARLOCK_ALLOW_NETWORK=1, INVARLOCK_DEDUP_TEXTS=1,
+      TRANSFORMERS_NO_TORCHVISION=1, TOKENIZERS_PARALLELISM=false.
+      Execution and verification bypasses must be explicit in the example.
   - Timeout per command: 180s by default; 60s for doctor/help,
     300s for run/evaluate, 120s for report/html/verify.
 """
@@ -96,7 +97,7 @@ SKIP_TOKENS = [
     "<edited>",
     "<ts>",
     "<hf_dir_or_id>",
-    "<cert.json>",
+    "<report.json>",
     "<out.html>",
     "<edited_report.json>",
     "<baseline_report.json>",

@@ -21,7 +21,7 @@ task graph, scheduling, and artifact generation. It complements
 | Preset Derivation | `CALIBRATION_RUN` + `GENERATE_PRESET` create run-scoped calibrated presets |
 | Scheduling | Dynamic work-stealing, `small_first` priority strategy |
 | Multi-GPU | Profile-based; `required_gpus` grows only when memory requires it |
-| Output | Proof pack with `manifest.json`, `checksums.sha256`, and cert bundles (`--layout v2` nests results + metadata) |
+| Output | Proof pack with `manifest.json`, `checksums.sha256`, and report bundles (`--layout v2` nests results + metadata) |
 
 ## Quick Start (Context)
 
@@ -52,7 +52,7 @@ invarlock proof-pack verify ./proof_pack_runs/subset_20250101_000000/proof_pack 
 - `scripts/proof_packs/run_suite.sh` runs a suite and sets `PACK_*` runtime flags
   before calling the main orchestrator.
 - `scripts/proof_packs/run_pack.sh` runs a suite, then packages artifacts into a
-  portable proof pack (manifest + checksums + certs).
+  portable proof pack (manifest + checksums + reports).
 - `scripts/proof_packs/verify_pack.sh` validates a proof pack in repo workflows.
 - `invarlock proof-pack verify` provides the package-native verifier path for
   installed wheels.
@@ -83,7 +83,7 @@ invarlock proof-pack verify ./proof_pack_runs/subset_20250101_000000/proof_pack 
 ├───────────────────────────────────────────────────────────────────────┤
 │ ENTRYPOINTS                                                           │
 │   run_pack.sh | run_suite.sh | verify_pack.sh                         │
-│   (pack+run) | (run only)  | (checksums+certs verify)                 │
+│   (pack+run) | (run only)  | (checksums+reports verify)               │
 │                                   │                                   │
 │                                   ▼                                   │
 │ ORCHESTRATION LAYER                                                   │
@@ -206,12 +206,12 @@ Enabled when `RUN_ERROR_INJECTION=true` (default):
   `rank_collapse`, `norm_collapse`, `weight_tying_break`
 - Informational detection: `rmt_norm_noise`, `spectral_moderate_scale`, `ve_mlp_scale_skew`
 
-`rmt_norm_noise` additionally emits an `rmt_probe.json` sidecar next to the error cert.
+`rmt_norm_noise` additionally emits an `rmt_probe.json` sidecar next to the error report.
 This runs an explicit cross-model RMT probe on shared calibration windows (stored in the
 baseline report) so the proof pack can demonstrate RMT’s delta policy even when compare-mode
 evaluation keeps `validation.rmt_stable=true`.
 
-`ve_mlp_scale_skew` additionally emits a `ve_probe.json` sidecar next to the error cert.
+`ve_mlp_scale_skew` additionally emits a `ve_probe.json` sidecar next to the error report.
 Variance (DD-VE) is a remediation guard and compare-mode evaluation runs the subject model
 with a no-op edit, which can mute VE’s in-report evidence. The VE probe runs VE calibration
 directly on shared windows and records whether VE proposes scales and produces a meaningful
@@ -470,7 +470,7 @@ OUTPUT_DIR/
 Some scenarios emit additional sidecar artifacts alongside `evaluation.report.json`
 (for example `reports/errors/rmt_norm_noise/rmt_probe.json` or
 `reports/errors/ve_mlp_scale_skew/ve_probe.json`). When present, `run_pack.sh` copies
-these sidecars into the packaged proof pack under `certs/**/`.
+these sidecars into the packaged proof pack under `reports/**/`.
 
 ## Run modes
 
@@ -551,7 +551,7 @@ Those figures are for model weights only; the default preflight also requires
 
 - Copies `reports/final_verdict.{txt,json}` plus verdict sidecars (`category_summary`,
   `guard_signal_summary`, `scenario_signal_summary`) and key `analysis/*` artifacts.
-- Collects all reports into `proof_pack/certs/...`.
+- Collects all reports into `proof_pack/reports/...`.
 - Generates `manifest.json`, `checksums.sha256`, optional
   `manifest.json.asc`.
 - Writes pack-contained provenance metadata such as `metadata/source_repo.json`
@@ -566,7 +566,7 @@ Those figures are for model weights only; the default preflight also requires
 ```text
 run_pack.sh
   ├─ run_suite.sh → OUTPUT_DIR
-  ├─ collect certs + reports
+  ├─ collect reports + sidecars
   ├─ write manifest + checksums
   └─ optional HTML + GPG signature
 ```
@@ -579,9 +579,11 @@ run_pack.sh
 - Verifies `checksums.sha256` (and thus all hashed artifacts).
 - Verifies the GPG signature when present; `--strict` requires it.
 - Enforces “no extra files” semantics in `--strict` mode.
-- Runs `invarlock verify` across all certs (JSON output optional).
+- Runs `invarlock verify` across all bundled reports (JSON output optional) with
+  runtime-manifest enforcement on; each packaged `evaluation.report.json`
+  carries an adjacent `runtime.manifest.json`.
 - Returns structured exit codes so callers can distinguish usage, missing-file,
-  manifest-format, signature, integrity, and cert-verification failures.
+  manifest-format, signature, integrity, and report-verification failures.
 
 ## Remote setup helper
 

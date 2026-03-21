@@ -7,7 +7,7 @@ from typer.testing import CliRunner
 def _load_app(monkeypatch):
     # Ensure lightweight import path and skip heavy discovery
     monkeypatch.setenv("INVARLOCK_LIGHT_IMPORT", "1")
-    monkeypatch.setenv("INVARLOCK_DISABLE_PLUGIN_DISCOVERY", "1")
+    monkeypatch.setenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "0")
     from invarlock.cli.app import app
 
     return app
@@ -61,3 +61,13 @@ def test_groups_help_list_subcommands(monkeypatch):
         out = strip_ansi(res.stdout)
         for token in expected:
             assert token in out
+
+
+def test_plugin_management_help_exposes_explicit_opt_in(monkeypatch):
+    app = _load_app(monkeypatch)
+    runner = CliRunner()
+    for args in (["plugins", "install", "--help"], ["plugins", "uninstall", "--help"]):
+        res = runner.invoke(app, args)
+        assert res.exit_code == 0, res.output
+        out = strip_ansi(res.stdout)
+        assert "--allow-third-party-plugins" in out

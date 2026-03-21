@@ -140,6 +140,11 @@ from ..config import (
     InvarLockConfig,
 )
 from ..overhead_utils import _extract_pm_snapshot_for_overhead
+from ..security_helpers import (
+    configure_runtime_security,
+    emit_runtime_manifest,
+    maybe_delegate_model_command,
+)
 
 console = make_console()
 _IMPORT_UNSET = object()
@@ -1640,6 +1645,26 @@ def run_command(
     telemetry: bool = typer.Option(
         False, "--telemetry", help="Write telemetry JSON alongside the report"
     ),
+    allow_network: bool = typer.Option(
+        False,
+        "--allow-network",
+        help="Explicitly allow outbound network access for this command.",
+    ),
+    allow_host_execution: bool = typer.Option(
+        False,
+        "--allow-host-execution",
+        help="Run on the host instead of auto-delegating to the runtime container.",
+    ),
+    allow_third_party_plugins: bool = typer.Option(
+        False,
+        "--allow-third-party-plugins",
+        help="Enable third-party entry-point plugin discovery for this command.",
+    ),
+    allow_remote_code: bool = typer.Option(
+        False,
+        "--allow-remote-code",
+        help="Allow trust_remote_code-style model loading for this command.",
+    ),
     no_color: bool = typer.Option(
         False, "--no-color", help="Disable ANSI colors (respects NO_COLOR=1)"
     ),
@@ -1653,8 +1678,19 @@ def run_command(
     and emits a run report plus JSONL
     events suitable for evaluation report generation.
     """
+    allow_network = bool(_coerce_option(allow_network, False))
+    allow_host_execution = bool(_coerce_option(allow_host_execution, False))
+    allow_third_party_plugins = bool(_coerce_option(allow_third_party_plugins, False))
+    allow_remote_code = bool(_coerce_option(allow_remote_code, False))
+    configure_runtime_security(
+        allow_network=allow_network,
+        allow_host_execution=allow_host_execution,
+        allow_third_party_plugins=allow_third_party_plugins,
+        allow_remote_code=allow_remote_code,
+    )
+    maybe_delegate_model_command()
 
-    return _run_command_impl(
+    report_path = _run_command_impl(
         config=config,
         device=device,
         profile=profile,
@@ -1676,6 +1712,18 @@ def run_command(
         no_color=no_color,
         deps=_build_run_command_deps(),
     )
+    emit_runtime_manifest(
+        report_path,
+        config_path=config,
+        extra={
+            "command": "run",
+            "profile": profile,
+            "allow_network": allow_network,
+            "allow_remote_code": allow_remote_code,
+            "allow_third_party_plugins": allow_third_party_plugins,
+        },
+    )
+    return report_path
 
 
 def _merge_primary_metric_health(

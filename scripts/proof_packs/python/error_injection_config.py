@@ -50,8 +50,8 @@ def fix_layer_drop_config(
         return
 
     # Some configs can lose optional attributes during save/load (custom
-    # transformers configs + trust_remote_code). Preserve baseline settings
-    # when they are present but become null on the mutated config.
+    # transformers configs + remote-code-backed configs). Preserve baseline
+    # settings when they are present but become null on the mutated config.
     if (
         hasattr(config, "sliding_window")
         and getattr(config, "sliding_window", None) is None

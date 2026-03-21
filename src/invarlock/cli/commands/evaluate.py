@@ -33,6 +33,11 @@ from invarlock import __version__ as INVARLOCK_VERSION
 from ...core.exceptions import MetricsError
 from ..adapter_auto import resolve_auto_adapter
 from ..config import _deep_merge as _merge  # reuse helper
+from ..security_helpers import (
+    configure_runtime_security,
+    emit_runtime_manifest,
+    maybe_delegate_model_command,
+)
 
 # Use the report group's programmatic entry for report generation
 from .report import report_command as _report
@@ -303,6 +308,26 @@ def evaluate_command(
     progress: bool = typer.Option(
         True, "--progress/--no-progress", help="Show progress done messages"
     ),
+    allow_network: bool = typer.Option(
+        False,
+        "--allow-network",
+        help="Explicitly allow outbound network access for this command.",
+    ),
+    allow_host_execution: bool = typer.Option(
+        False,
+        "--allow-host-execution",
+        help="Run on the host instead of auto-delegating to the runtime container.",
+    ),
+    allow_third_party_plugins: bool = typer.Option(
+        False,
+        "--allow-third-party-plugins",
+        help="Enable third-party entry-point plugin discovery for this command.",
+    ),
+    allow_remote_code: bool = typer.Option(
+        False,
+        "--allow-remote-code",
+        help="Allow trust_remote_code-style model loading for this command.",
+    ),
     no_color: bool = typer.Option(
         False, "--no-color", help="Disable ANSI colors (respects NO_COLOR=1)"
     ),
@@ -337,7 +362,19 @@ def evaluate_command(
     style = _coerce_option(style, "audit")
     timing = bool(_coerce_option(timing, False))
     progress = bool(_coerce_option(progress, True))
+    allow_network = bool(_coerce_option(allow_network, False))
+    allow_host_execution = bool(_coerce_option(allow_host_execution, False))
+    allow_third_party_plugins = bool(_coerce_option(allow_third_party_plugins, False))
+    allow_remote_code = bool(_coerce_option(allow_remote_code, False))
     no_color = bool(_coerce_option(no_color, False))
+
+    configure_runtime_security(
+        allow_network=allow_network,
+        allow_host_execution=allow_host_execution,
+        allow_third_party_plugins=allow_third_party_plugins,
+        allow_remote_code=allow_remote_code,
+    )
+    maybe_delegate_model_command()
 
     verbosity = _resolve_verbosity(bool(quiet), bool(verbose))
 
@@ -866,6 +903,30 @@ def evaluate_command(
                 if quiet_buffer is not None:
                     console.print(quiet_buffer.getvalue(), markup=False)
                 raise
+        emit_runtime_manifest(
+            Path(report_out) / "evaluation.report.json",
+            config_payload={
+                "command": "evaluate",
+                "source": source,
+                "edited": edited,
+                "adapter": adapter,
+                "profile": profile,
+                "tier": tier,
+                "preset": preset,
+                "out": out,
+                "report_out": report_out,
+                "edit_config": edit_config,
+                "edit_label": edit_label,
+                "allow_network": allow_network,
+                "allow_remote_code": allow_remote_code,
+                "allow_third_party_plugins": allow_third_party_plugins,
+            },
+            extra={
+                "command": "evaluate",
+                "profile": profile,
+                "tier": tier,
+            },
+        )
 
     # CI/Release hard‑abort: fail fast when primary metric is not computable.
     try:

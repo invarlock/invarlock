@@ -60,7 +60,7 @@ Suppose you ran a baseline and extracted z-scores from the report:
 
 ```bash
 # 1. Run baseline
-invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml \
+INVARLOCK_ALLOW_HOST_EXECUTION=1 invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml \
   --profile ci --tier balanced --out runs/baseline_calib
 
 # 2. Extract z-scores (example using jq)
@@ -101,7 +101,7 @@ With 120 total modules distributed as: FFN=40, Attn=40, Embed=8, Other=32.
 6. **Re-run with override:**
 
    ```bash
-   invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml \
+   INVARLOCK_ALLOW_HOST_EXECUTION=1 invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml \
      -c configs/overrides/spectral_local.yaml \
      --profile ci --tier balanced
    ```

@@ -46,7 +46,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       INVARLOCK_LIGHT_IMPORT: "1"
-      INVARLOCK_DISABLE_PLUGIN_DISCOVERY: "0"
       PYTHONPATH: ${{ github.workspace }}/src
       PYTHONWARNINGS: "default"
     timeout-minutes: 20
@@ -110,7 +109,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       INVARLOCK_LIGHT_IMPORT: "1"
-      INVARLOCK_DISABLE_PLUGIN_DISCOVERY: "0"
       PYTHONPATH: ${{ github.workspace }}/src
       PYTHONWARNINGS: "default"
     timeout-minutes: 20
@@ -149,7 +147,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       INVARLOCK_LIGHT_IMPORT: "1"
-      INVARLOCK_DISABLE_PLUGIN_DISCOVERY: "0"
       PYTHONWARNINGS: "default"
       PYTHON: "python"
       PYTHONPATH: ${{ github.workspace }}/src

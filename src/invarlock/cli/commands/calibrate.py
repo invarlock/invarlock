@@ -21,6 +21,8 @@ import typer
 import yaml
 from rich.console import Console
 
+from ..security_helpers import configure_runtime_security, maybe_delegate_model_command
+
 console = Console()
 
 calibrate_app = typer.Typer(
@@ -177,6 +179,26 @@ def null_sweep(
         "ci", "--profile", help="Run profile (ci|release|ci_cpu|dev)."
     ),
     device: str | None = typer.Option(None, "--device", help="Device override."),
+    allow_network: bool = typer.Option(
+        False,
+        "--allow-network",
+        help="Explicitly allow outbound network access for this command.",
+    ),
+    allow_host_execution: bool = typer.Option(
+        False,
+        "--allow-host-execution",
+        help="Run on the host instead of auto-delegating to the runtime container.",
+    ),
+    allow_third_party_plugins: bool = typer.Option(
+        False,
+        "--allow-third-party-plugins",
+        help="Enable third-party entry-point plugin discovery for this command.",
+    ),
+    allow_remote_code: bool = typer.Option(
+        False,
+        "--allow-remote-code",
+        help="Allow trust_remote_code-style model loading for this command.",
+    ),
     safety_margin: float = typer.Option(
         0.05, "--safety-margin", help="Safety margin applied to κ recommendations."
     ),
@@ -186,6 +208,29 @@ def null_sweep(
         help="Target run-level spectral warning rate under the null.",
     ),
 ) -> None:
+    try:
+        from typer.models import OptionInfo as _OptionInfo  # type: ignore
+    except Exception:  # pragma: no cover
+
+        class _OptionInfo:  # type: ignore
+            pass
+
+    if isinstance(allow_network, _OptionInfo):
+        allow_network = False
+    if isinstance(allow_host_execution, _OptionInfo):
+        allow_host_execution = False
+    if isinstance(allow_third_party_plugins, _OptionInfo):
+        allow_third_party_plugins = False
+    if isinstance(allow_remote_code, _OptionInfo):
+        allow_remote_code = False
+    configure_runtime_security(
+        allow_network=allow_network,
+        allow_host_execution=allow_host_execution,
+        allow_third_party_plugins=allow_third_party_plugins,
+        allow_remote_code=allow_remote_code,
+    )
+    maybe_delegate_model_command()
+
     # Keep import light: only pull run machinery when invoked.
     from .run import run_command
 
@@ -414,12 +459,55 @@ def ve_sweep(
         "ci", "--profile", help="Run profile (ci|release|ci_cpu|dev)."
     ),
     device: str | None = typer.Option(None, "--device", help="Device override."),
+    allow_network: bool = typer.Option(
+        False,
+        "--allow-network",
+        help="Explicitly allow outbound network access for this command.",
+    ),
+    allow_host_execution: bool = typer.Option(
+        False,
+        "--allow-host-execution",
+        help="Run on the host instead of auto-delegating to the runtime container.",
+    ),
+    allow_third_party_plugins: bool = typer.Option(
+        False,
+        "--allow-third-party-plugins",
+        help="Enable third-party entry-point plugin discovery for this command.",
+    ),
+    allow_remote_code: bool = typer.Option(
+        False,
+        "--allow-remote-code",
+        help="Allow trust_remote_code-style model loading for this command.",
+    ),
     safety_margin: float = typer.Option(
         0.0,
         "--safety-margin",
         help="Safety margin applied to min_effect recommendations.",
     ),
 ) -> None:
+    try:
+        from typer.models import OptionInfo as _OptionInfo  # type: ignore
+    except Exception:  # pragma: no cover
+
+        class _OptionInfo:  # type: ignore
+            pass
+
+    if isinstance(allow_network, _OptionInfo):
+        allow_network = False
+    if isinstance(allow_host_execution, _OptionInfo):
+        allow_host_execution = False
+    if isinstance(allow_third_party_plugins, _OptionInfo):
+        allow_third_party_plugins = False
+    if isinstance(allow_remote_code, _OptionInfo):
+        allow_remote_code = False
+    configure_runtime_security(
+        allow_network=allow_network,
+        allow_host_execution=allow_host_execution,
+        allow_third_party_plugins=allow_third_party_plugins,
+        allow_remote_code=allow_remote_code,
+    )
+    maybe_delegate_model_command()
+
     # Keep import light: only pull run machinery when invoked.
     from .run import run_command
 

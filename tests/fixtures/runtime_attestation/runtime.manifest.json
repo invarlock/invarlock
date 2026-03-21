@@ -1,0 +1,14 @@
+{
+  "execution_mode": "container",
+  "report": {
+    "filename": "evaluation.report.json",
+    "path": "tests/fixtures/runtime_attestation/evaluation.report.json",
+    "sha256": "e5f1eb4d806641698a35efe20e098efd20d7d57a9b90ee69079d5bb650920726"
+  },
+  "runtime": {
+    "container_execution": true,
+    "image_digest": "sha256:test-runtime-image",
+    "image_ref": "invarlock-runtime:local"
+  },
+  "verifier_contract_version": "runtime-manifest-v1"
+}

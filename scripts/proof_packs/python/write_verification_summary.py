@@ -21,9 +21,9 @@ def main(argv: list[str] | None = None) -> int:
     profile = argv[4]
 
     payload = {
-        "clean_certs": count_clean,
-        "error_injection_certs": count_error,
-        "failed_certs": count_failed,
+        "clean_reports": count_clean,
+        "error_injection_reports": count_error,
+        "failed_reports": count_failed,
         "policy_profile": profile,
     }
 

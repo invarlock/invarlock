@@ -6,13 +6,17 @@ from pathlib import Path
 
 import invarlock.proof_pack as proof_pack_mod
 from invarlock.proof_pack import (
-    PROOF_PACK_VERIFY_CERTS,
     PROOF_PACK_VERIFY_INTEGRITY,
     PROOF_PACK_VERIFY_OK,
+    PROOF_PACK_VERIFY_REPORTS,
     PROOF_PACK_VERIFY_USAGE,
     validate_manifest,
     verify_manifest_attestation,
     verify_proof_pack,
+)
+from invarlock.runtime_security import (
+    RUNTIME_MANIFEST_FILENAME,
+    RUNTIME_VERIFIER_CONTRACT_VERSION,
 )
 
 
@@ -32,6 +36,26 @@ def _digest_ref(path: Path, rel_path: str) -> dict[str, str]:
     }
 
 
+def _write_runtime_manifest(report_path: Path) -> None:
+    _write_json(
+        report_path.parent / RUNTIME_MANIFEST_FILENAME,
+        {
+            "execution_mode": "container",
+            "report": {
+                "filename": report_path.name,
+                "path": report_path.as_posix(),
+                "sha256": _sha256_file(report_path),
+            },
+            "runtime": {
+                "container_execution": True,
+                "image_digest": "sha256:test-runtime-image",
+                "image_ref": "invarlock-runtime:local",
+            },
+            "verifier_contract_version": RUNTIME_VERIFIER_CONTRACT_VERSION,
+        },
+    )
+
+
 def _write_checksums(pack_dir: Path, rel_paths: list[str]) -> None:
     lines = []
     for rel_path in rel_paths:
@@ -42,26 +66,28 @@ def _write_checksums(pack_dir: Path, rel_paths: list[str]) -> None:
     )
 
 
-def _build_pack(pack_dir: Path, *, cert_rel_path: str) -> Path:
+def _build_pack(pack_dir: Path, *, report_rel_path: str) -> Path:
     final_verdict = pack_dir / "results/final_verdict.json"
     source_repo = pack_dir / "metadata/source_repo.json"
     environment = pack_dir / "metadata/environment.json"
     materials = pack_dir / "metadata/model_revisions.json"
-    cert = pack_dir / cert_rel_path
+    report = pack_dir / report_rel_path
 
     _write_json(final_verdict, {"verdict": "PASS"})
     _write_json(source_repo, {"commit": "abc123"})
     _write_json(environment, {"platform": "test"})
     _write_json(materials, {"models": {"org/model": {"revision": "rev1"}}})
-    cert.parent.mkdir(parents=True, exist_ok=True)
-    cert.write_text("{}", encoding="utf-8")
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text("{}", encoding="utf-8")
+    _write_runtime_manifest(report)
 
     covered = [
         "results/final_verdict.json",
         "metadata/source_repo.json",
         "metadata/environment.json",
         "metadata/model_revisions.json",
-        cert_rel_path,
+        report_rel_path,
+        str((Path(report_rel_path).parent / RUNTIME_MANIFEST_FILENAME).as_posix()),
     ]
     _write_checksums(pack_dir, covered)
 
@@ -91,7 +117,7 @@ def _build_pack(pack_dir: Path, *, cert_rel_path: str) -> Path:
 def test_proof_pack_manifest_and_attestation_round_trip(tmp_path: Path) -> None:
     pack_dir = _build_pack(
         tmp_path / "pack",
-        cert_rel_path="certs/model/clean/noop/evaluation.report.json",
+        report_rel_path="reports/model/clean/noop/evaluation.report.json",
     )
 
     assert validate_manifest(pack_dir / "manifest.json") == []
@@ -106,7 +132,7 @@ def test_proof_pack_manifest_and_attestation_round_trip(tmp_path: Path) -> None:
 def test_proof_pack_verify_rejects_json_out_inside_pack(tmp_path: Path) -> None:
     pack_dir = _build_pack(
         tmp_path / "pack",
-        cert_rel_path="certs/model/clean/noop/evaluation.report.json",
+        report_rel_path="reports/model/clean/noop/evaluation.report.json",
     )
 
     payload, exit_code = verify_proof_pack(
@@ -121,7 +147,7 @@ def test_proof_pack_verify_rejects_json_out_inside_pack(tmp_path: Path) -> None:
 def test_proof_pack_verify_strict_rejects_extra_files(tmp_path: Path) -> None:
     pack_dir = _build_pack(
         tmp_path / "pack",
-        cert_rel_path="certs/model/clean/noop/evaluation.report.json",
+        report_rel_path="reports/model/clean/noop/evaluation.report.json",
     )
     (pack_dir / "extra.txt").write_text("extra", encoding="utf-8")
     original_verify_gpg = proof_pack_mod._verify_gpg
@@ -140,12 +166,12 @@ def test_proof_pack_verify_strict_rejects_extra_files(tmp_path: Path) -> None:
 def test_proof_pack_verify_requires_clean_reports(tmp_path: Path) -> None:
     pack_dir = _build_pack(
         tmp_path / "pack",
-        cert_rel_path="certs/model/errors/noop/evaluation.report.json",
+        report_rel_path="reports/model/errors/noop/evaluation.report.json",
     )
 
     payload, exit_code = verify_proof_pack(pack_dir)
 
-    assert exit_code == PROOF_PACK_VERIFY_CERTS
+    assert exit_code == PROOF_PACK_VERIFY_REPORTS
     assert payload["ok"] is False
     assert any("No clean reports found" in error for error in payload["errors"])
 
@@ -155,7 +181,7 @@ def test_proof_pack_verify_writes_nested_verify_json(
 ) -> None:
     pack_dir = _build_pack(
         tmp_path / "pack",
-        cert_rel_path="certs/model/clean/noop/evaluation.report.json",
+        report_rel_path="reports/model/clean/noop/evaluation.report.json",
     )
     json_out = tmp_path / "verify.json"
 

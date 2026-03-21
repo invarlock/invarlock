@@ -4,7 +4,7 @@ import sys
 def test_python_m_invarlock_shows_help(monkeypatch, capsys):
     # Keep imports light during test
     monkeypatch.setenv("INVARLOCK_LIGHT_IMPORT", "1")
-    monkeypatch.setenv("INVARLOCK_DISABLE_PLUGIN_DISCOVERY", "1")
+    monkeypatch.setenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "0")
 
     # Simulate: python -m invarlock --help
     from invarlock.__main__ import main

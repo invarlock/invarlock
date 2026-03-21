@@ -32,7 +32,7 @@ def proof_pack_callback() -> None:
 
 @proof_pack_app.command(
     "verify",
-    help="Verify a proof-pack manifest, checksums, attestation refs, and bundled certs.",
+    help="Verify a proof-pack manifest, checksums, attestation refs, and bundled reports.",
 )
 def verify_command(
     pack: str = typer.Argument(..., help="Path to the proof-pack directory."),
@@ -42,7 +42,7 @@ def verify_command(
     json_file: str | None = typer.Option(
         None,
         "--json-out",
-        help="Write nested cert verification JSON to FILE (must be outside the pack).",
+        help="Write nested report verification JSON to FILE (must be outside the pack).",
     ),
     skip_verify: bool = typer.Option(
         False, "--skip-verify", help="Skip bundled evaluation.report.json verification."
@@ -55,7 +55,7 @@ def verify_command(
     profile: str = typer.Option(
         "dev",
         "--profile",
-        help="Execution profile to use for bundled cert verification (dev|ci|release).",
+        help="Execution profile to use for bundled report verification (dev|ci|release).",
     ),
 ) -> None:
     payload, exit_code = verify_proof_pack(
@@ -114,7 +114,7 @@ def inspect_command(
 
 @proof_pack_app.command(
     "build",
-    help="Assemble a proof pack from existing verdict, metadata, and cert artifacts.",
+    help="Assemble a proof pack from existing verdict, metadata, and report artifacts.",
 )
 def build_command(
     out: str = typer.Argument(..., help="Output directory for the proof-pack."),
@@ -123,9 +123,9 @@ def build_command(
         "--final-verdict",
         help="Path to the final verdict JSON to package as the proof-pack subject.",
     ),
-    certs: list[str] = typer.Option(
+    reports: list[str] = typer.Option(
         [],
-        "--cert",
+        "--report",
         help="Path to an evaluation.report.json file to verify and package.",
     ),
     source_repo: str | None = typer.Option(
@@ -151,7 +151,7 @@ def build_command(
     profile: str = typer.Option(
         "dev",
         "--profile",
-        help="Execution profile to use for cert pre-verification (dev|ci|release).",
+        help="Execution profile to use for report pre-verification (dev|ci|release).",
     ),
     json_out: bool = typer.Option(
         False, "--json", help="Emit machine-readable build JSON."
@@ -173,7 +173,7 @@ def build_command(
             "ok": False,
             "warnings": [],
             "errors": errors,
-            "certs": {"total": 0},
+            "reports": {"total": 0},
             "verify": None,
             "files": None,
         }
@@ -187,7 +187,7 @@ def build_command(
     payload, exit_code = build_proof_pack(
         Path(out),
         final_verdict_path=Path(final_verdict),
-        cert_paths=[Path(path) for path in certs],
+        report_paths=[Path(path) for path in reports],
         source_repo_path=Path(source_repo) if source_repo else None,
         environment_path=Path(environment) if environment else None,
         material_specs=material_specs,

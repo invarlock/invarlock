@@ -36,6 +36,9 @@ For Compare & evaluate, reuse the same `dataset` block in baseline and subject r
   windows. Missing/invalid evidence fails closed in CI/Release profiles.
 - **Offline-first**: downloads are opt-in via `INVARLOCK_ALLOW_NETWORK=1`. Cached
   datasets can be enforced via `HF_DATASETS_OFFLINE=1`.
+- **Secure-default execution**: dataset-backed model-loading commands run in the
+  runtime container by default; trusted host execution requires
+  `INVARLOCK_ALLOW_HOST_EXECUTION=1`.
 - **Dedupe & capacity**: `INVARLOCK_DEDUP_TEXTS=1` removes exact duplicates;
   `INVARLOCK_CAPACITY_FAST=1` speeds up capacity checks for quick runs.
 

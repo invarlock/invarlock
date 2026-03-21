@@ -29,6 +29,10 @@ INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate \
   --adapter auto
 ```
 
+The CLI example above uses the secure-default runtime container. Add
+`--allow-host-execution` only for trusted local workflows that intentionally
+bypass that boundary.
+
 ```python
 from invarlock.adapters import HF_Auto_Adapter
 
@@ -146,7 +150,7 @@ Adapter loaders pass through standard Hugging Face `from_pretrained` arguments:
 | --- | --- | --- |
 | `dtype` | Force `float16`/`bfloat16` | HF adapters |
 | `device_map` | Sharding/placement | HF adapters |
-| `trust_remote_code` | Enable custom model code | HF adapters |
+| `trust_remote_code` | Enable custom model code only with explicit `--allow-remote-code` / `INVARLOCK_ALLOW_REMOTE_CODE=1` | HF adapters |
 | `revision` | Pin model revision | HF adapters |
 | `cache_dir` | Cache location | HF adapters |
 

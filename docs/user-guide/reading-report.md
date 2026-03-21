@@ -7,7 +7,7 @@
 | **Purpose** | Understand and interpret InvarLock v1 reports. |
 | **Audience** | Reviewers validating evaluation evidence. |
 | **Key sections** | Evaluation Dashboard, Quality Gates, Primary Metric, Provenance, Measurement contracts. |
-| **Validation** | Use `invarlock verify <evaluation.report.json>` to check schema and pairing. |
+| **Validation** | Use `invarlock verify <evaluation.report.json>` to check schema, pairing, and required runtime attestation via `runtime.manifest.json`. |
 | **Source of truth** | [reports](../reference/reports.md) for full schema. |
 
 This guide highlights the key sections of a v1 report and how to
@@ -48,7 +48,8 @@ interpret them.
 - Confidence label
   - High/Medium/Low based on CI width and stability; see thresholds and `unstable` flag.
 
-Tip: Use `invarlock verify` to recheck schema, pairing, and ratio math.
+Tip: Use `invarlock verify` to recheck schema, pairing, ratio math, and the
+adjacent `runtime.manifest.json`.
 
 ### Evaluation Dashboard Interpretation
 

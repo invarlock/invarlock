@@ -8,6 +8,7 @@ __pycache__/
 .eggs/
 dist/
 build/
+target/
 pip-wheel-metadata/
 
 # Virtual environments

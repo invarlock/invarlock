@@ -11,6 +11,7 @@ import torch
 def test_resolve_trust_remote_code_defaults_false(monkeypatch):
     from invarlock.adapters.hf_loading import resolve_trust_remote_code
 
+    monkeypatch.delenv("INVARLOCK_ALLOW_REMOTE_CODE", raising=False)
     monkeypatch.delenv("INVARLOCK_TRUST_REMOTE_CODE", raising=False)
     monkeypatch.delenv("ALLOW_REMOTE_CODE", raising=False)
     monkeypatch.delenv("TRUST_REMOTE_CODE_BOOL", raising=False)
@@ -22,6 +23,7 @@ def test_resolve_trust_remote_code_defaults_false(monkeypatch):
 def test_resolve_trust_remote_code_env_opt_in(monkeypatch):
     from invarlock.adapters.hf_loading import resolve_trust_remote_code
 
+    monkeypatch.setenv("INVARLOCK_ALLOW_REMOTE_CODE", "1")
     monkeypatch.setenv("INVARLOCK_TRUST_REMOTE_CODE", "1")
     assert resolve_trust_remote_code({}) is True
 
@@ -30,8 +32,18 @@ def test_resolve_trust_remote_code_env_opt_in(monkeypatch):
 def test_resolve_trust_remote_code_kwargs_override(monkeypatch):
     from invarlock.adapters.hf_loading import resolve_trust_remote_code
 
+    monkeypatch.setenv("INVARLOCK_ALLOW_REMOTE_CODE", "1")
     monkeypatch.setenv("INVARLOCK_TRUST_REMOTE_CODE", "0")
     assert resolve_trust_remote_code({"trust_remote_code": True}) is True
+
+
+@pytest.mark.unit
+def test_resolve_trust_remote_code_rejects_without_explicit_allow(monkeypatch):
+    from invarlock.adapters.hf_loading import resolve_trust_remote_code
+
+    monkeypatch.delenv("INVARLOCK_ALLOW_REMOTE_CODE", raising=False)
+    with pytest.raises(RuntimeError, match="Remote model code is disabled by default"):
+        resolve_trust_remote_code({"trust_remote_code": True})
 
 
 @pytest.mark.unit
@@ -218,6 +230,7 @@ def test_resolve_core_loader_strategy_trust_remote_code_forces_auto(
         "_import_symbol",
         lambda module_path, symbol_name: f"{module_path}.{symbol_name}",
     )
+    monkeypatch.setenv("INVARLOCK_ALLOW_REMOTE_CODE", "1")
 
     strategy = hf_loading.resolve_core_loader_strategy(
         task="causal",

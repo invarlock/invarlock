@@ -37,8 +37,9 @@ pip install "invarlock[hf]"
 # Compare & evaluate two checkpoints
 INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --baseline gpt2 --subject gpt2
 
-# Validate a report
+# Validate an attested report bundle
 invarlock verify reports/eval/evaluation.report.json
+# expects reports/eval/runtime.manifest.json next to the report
 ```
 
 ## Concepts
@@ -72,17 +73,21 @@ InvarLock groups commands by task. The recommended path is Compare & evaluate (b
 invarlock evaluate --baseline <BASELINE_MODEL> --subject <SUBJECT_MODEL>
 ```
 
+The example above uses the secure-default runtime container. Add
+`--allow-host-execution` only for trusted local workflows that intentionally
+bypass that boundary.
+
 ### Artifact outputs matrix
 
 | Command | Writes `runs/` | Writes `reports/` | Emits report | Notes |
 | --- | --- | --- | --- | --- |
-| `invarlock evaluate` | Yes (`--out`, default `runs/`) | Yes (`--report-out`, default `reports/eval`) | Yes | Emits cert even on degraded PM (`E111`). |
+| `invarlock evaluate` | Yes (`--out`, default `runs/`) | Yes (`--report-out`, default `reports/eval`) | Yes | Emits an attested report bundle even on degraded PM (`E111`). |
 | `invarlock run` | Yes (`--out`) | No | No | Produces `report.json` + `events.jsonl`. |
 | `invarlock report` | No | Yes (`--output`) | Optional (`--format report/html`) | Renders from existing reports. |
 | `invarlock verify` | No | No | No | Reads report JSON(s). |
 | `invarlock proof-pack inspect` | No | No | No | Reads proof-pack manifests and checksum/inventory state only. |
-| `invarlock proof-pack build` | Yes (`<out>/`) | No | No | Packages existing verdict/metadata/cert artifacts into a proof pack. |
-| `invarlock proof-pack verify` | No | No | No | Reads proof-pack manifests, checksums, and bundled certs. |
+| `invarlock proof-pack build` | Yes (`<out>/`) | No | No | Packages existing verdict/metadata/report artifacts into a proof pack. |
+| `invarlock proof-pack verify` | No | No | No | Reads proof-pack manifests, checksums, and bundled reports. |
 | `invarlock plugins` / `doctor` | No | No | No | Diagnostics only. |
 
 ### CLI → Report → report → Verify
@@ -92,7 +97,7 @@ invarlock evaluate --baseline <BASELINE_MODEL> --subject <SUBJECT_MODEL>
 | `invarlock run` | `report.json`, `events.jsonl` | None | Use `invarlock report` or `verify` later. |
 | `invarlock evaluate` | `report.json` (baseline + subject) | `evaluation.report.json` | Exit `3` in CI/Release on pairing/gate failures. |
 | `invarlock report --format report` | None (reads reports) | `evaluation.report.json` | Same verify rules as `evaluate`. |
-| `invarlock verify` | None | None | Schema + pairing + profile gates. |
+| `invarlock verify` | None | None | Schema + pairing + profile gates plus required runtime-manifest attestation for evaluation outputs. |
 
 Note on presets and scripts
 
@@ -177,11 +182,11 @@ pip install "invarlock[gpu]"
 # Optional PTQ backends (Linux-only; install together with hf/gpu extras)
 pip install "invarlock[awq,gptq]"
 
-# Compare & evaluate two checkpoints (hero path)
+# Compare & evaluate two checkpoints (hero path; secure-default container path)
 invarlock evaluate --baseline gpt2 --subject gpt2-quant
 
-# Force CPU execution when no accelerator is available (baseline smoke)
-invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml \
+# Force trusted host-side CPU execution when no accelerator is available
+INVARLOCK_ALLOW_HOST_EXECUTION=1 invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml \
   --profile release --tier balanced --device cpu --out runs/baseline_cpu
 
 # Explain decisions, compare, and render HTML
@@ -189,19 +194,20 @@ invarlock report explain --report runs/subject/report.json --baseline runs/basel
 invarlock report --run runs/subject/report.json --compare runs/baseline/report.json -o reports/compare
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 
-# Validate a report
+# Validate an attested report bundle
 invarlock verify reports/eval/evaluation.report.json
+# expects reports/eval/runtime.manifest.json next to the report
 
 # Validate a proof pack from a wheel install
 invarlock proof-pack verify proof_pack_runs/subset_<timestamp>/proof_pack --strict
 
-# Inspect a proof pack without nested cert verification
+# Inspect a proof pack without nested report verification
 invarlock proof-pack inspect proof_pack_runs/subset_<timestamp>/proof_pack --json
 
 # Build a proof pack from existing artifacts
 invarlock proof-pack build tmp/proof_pack \
   --final-verdict reports/final_verdict.json \
-  --cert runs/subject/evaluation.report.json
+  --report runs/subject/evaluation.report.json
 ```
 
 Use `invarlock plugins` to review available adapters, edits, and guards.
@@ -254,7 +260,7 @@ Exhaustive command map with brief descriptions and notable options.
       - Options: `--json`
     - `invarlock proof-pack build`
       - Args: `out`
-      - Options: `--final-verdict`, `--cert`, `--source-repo`, `--environment`,
+      - Options: `--final-verdict`, `--report`, `--source-repo`, `--environment`,
         `--material`, `--readme`, `--profile`, `--json`
     - `invarlock proof-pack verify`
       - Args: `pack`
@@ -264,7 +270,8 @@ Exhaustive command map with brief descriptions and notable options.
   - Purpose: Execute pipeline from a YAML config (edit + guards + reports).
   - Options: `--config/-c`, `--device`, `--profile`, `--out`, `--edit`, `--tier`,
     `--metric-kind`, `--probes`, `--until-pass`, `--max-attempts`, `--timeout`,
-    `--baseline`, `--no-cleanup`, `--timing`, `--telemetry`.
+    `--baseline`, `--no-cleanup`, `--timing`, `--telemetry`, `--allow-network`,
+    `--allow-host-execution`, `--allow-third-party-plugins`, `--allow-remote-code`.
 
 - `invarlock report` (group)
   - Purpose: Operations on reports/evaluation artifacts (verify, explain, html, validate).
@@ -287,19 +294,29 @@ Exhaustive command map with brief descriptions and notable options.
   - Subcommands:
     - `invarlock plugins list [CATEGORY]` — show plugins for a category or all.
       - CATEGORY: `adapters|guards|edits|datasets|plugins|all` (default all).
-      - Options: `--json`, `--verbose`, `--explain <name>`, adapters-only
+      - Options: `--json`, `--verbose`, `--allow-third-party-plugins`, adapters-only
         `--hide-unsupported/--show-unsupported`.
     - `invarlock plugins adapters` — list adapter plugins.
       - Options: `--only`, `--verbose`, `--json`, `--explain`,
+        `--allow-third-party-plugins`,
         `--hide-unsupported/--show-unsupported`.
     - `invarlock plugins guards` — list guard plugins.
-      - Options: `--only`, `--verbose`, `--json`.
+      - Options: `--only`, `--verbose`, `--json`, `--allow-third-party-plugins`.
     - `invarlock plugins edits` — list edit plugins.
-      - Options: `--only`, `--verbose`, `--json`.
+      - Options: `--only`, `--verbose`, `--json`, `--allow-third-party-plugins`.
     - `invarlock plugins install NAMES...` — install extras/backends.
-      - Options: `--upgrade/-U`, `--dry-run` (default), `--apply`.
+      - Options: `--upgrade/-U`, `--dry-run` (default), `--apply`,
+        `--allow-network`, `--allow-third-party-plugins`.
     - `invarlock plugins uninstall NAMES...` — uninstall extras/backends.
-      - Options: `--yes/-y`, `--dry-run` (default), `--apply`.
+      - Options: `--yes/-y`, `--dry-run` (default), `--apply`,
+        `--allow-third-party-plugins`.
+
+Security-default behavior:
+
+- `evaluate`, `run`, and `calibrate` auto-delegate to the runtime container unless
+  `--allow-host-execution` is used.
+- Third-party plugin discovery is off by default; built-ins still remain available.
+- `verify` fails closed on evaluation outputs missing `runtime.manifest.json`.
 
 - `invarlock doctor`
   - Purpose: Health checks for environment and configuration.
@@ -352,8 +369,8 @@ Adapter listing defaults:
 
 Extras helpers:
 
-- Install: `invarlock plugins install <gptq|awq|gpu|onnx|adapters>` (adds the right extras)
-- Uninstall: `invarlock plugins uninstall <gptq|awq|gpu|onnx>` (removes backend packages)
+- Install: `invarlock plugins install <gptq|awq|gpu|adapters>` (adds the right extras)
+- Uninstall: `invarlock plugins uninstall <gptq|awq|gpu>` (removes backend packages)
 
 #### JSON Output (verify and plugins)
 
@@ -443,12 +460,12 @@ derived from the embedded inputs. Common causes and quick fixes:
 - PPL mismatches:
   - Cause: `evaluation_windows.final.{logloss,token_counts}` don’t correspond to the
     displayed `primary_metric.final`.
-  - Fix: verify the windows used for the PM match those stored in the cert (same
-    window IDs and counts). Regenerate the cert if windows changed.
+  - Fix: verify the windows used for the PM match those stored in the report bundle (same
+    window IDs and counts). Regenerate the report bundle if windows changed.
 - Baseline reference drift:
   - Cause: report’s `baseline_ref.primary_metric.final` doesn’t reflect the baseline
     actually used when computing the ratio.
-  - Fix: keep the baseline report next to the cert or regenerate the cert with the
+  - Fix: keep the baseline report next to the report bundle or regenerate the report bundle with the
     intended baseline.
 - Tolerance/precision:
   - Cause: Very small floating‑point differences.

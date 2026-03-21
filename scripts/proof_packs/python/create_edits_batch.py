@@ -8,6 +8,12 @@ import sys
 from pathlib import Path
 
 import torch
+
+try:
+    from runtime_tools import require_remote_code_opt_in
+except ImportError:  # pragma: no cover - direct module load under pytest
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from runtime_tools import require_remote_code_opt_in
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
@@ -95,11 +101,14 @@ def main(argv: list[str] | None = None) -> int:
         torch.backends.cudnn.allow_tf32 = True
     torch.set_grad_enabled(False)
 
-    tokenizer = AutoTokenizer.from_pretrained(baseline_path, trust_remote_code=True)
+    trust_remote_code = require_remote_code_opt_in("create_edits_batch.py")
+    tokenizer = AutoTokenizer.from_pretrained(
+        baseline_path, trust_remote_code=trust_remote_code
+    )
     model = AutoModelForCausalLM.from_pretrained(
         baseline_path,
         dtype=torch.bfloat16,
-        trust_remote_code=True,
+        trust_remote_code=trust_remote_code,
         device_map="auto",
         low_cpu_mem_usage=True,
     )

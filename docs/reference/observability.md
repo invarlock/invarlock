@@ -267,6 +267,9 @@ The CLI doesn't start full monitoring by default, but you can enable telemetry:
 INVARLOCK_TELEMETRY=1 invarlock evaluate --baseline gpt2 --subject gpt2
 ```
 
+This uses the secure-default runtime container unless `--allow-host-execution`
+is added for a trusted local workflow.
+
 Reports include telemetry under `report.metrics`:
 
 - `latency_ms_per_tok` — mean latency per token

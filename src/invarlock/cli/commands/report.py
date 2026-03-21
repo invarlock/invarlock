@@ -499,6 +499,11 @@ def report_verify_command(
         "--profile",
         help="Execution profile affecting parity enforcement and exit codes (dev|ci|release).",
     ),
+    allow_unattested_artifacts: bool = typer.Option(
+        False,
+        "--allow-unattested-artifacts",
+        help="Allow verification of reports without runtime attestation metadata.",
+    ),
 ):  # pragma: no cover - thin wrapper around verify_command
     from pathlib import Path as _Path
 
@@ -511,6 +516,7 @@ def report_verify_command(
         baseline=baseline_path,
         tolerance=tolerance,
         profile=profile,
+        allow_unattested_artifacts=allow_unattested_artifacts,
     )
 
 

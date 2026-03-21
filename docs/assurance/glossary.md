@@ -64,6 +64,7 @@ The unedited reference model run used for comparison and gating.
 | **See also** | [Compare & evaluate](../user-guide/compare-and-evaluate.md) |
 
 **Example:** `invarlock evaluate --baseline gpt2 --subject gpt2-quant`
+This follows the secure-default runtime-container path unless `--allow-host-execution` is used.
 
 ---
 
@@ -203,7 +204,7 @@ Guard measurement procedure signature and digest recorded in reports.
 | Aspect | Details |
 | --- | --- |
 | **Context** | Spectral and RMT guards record estimator + sampling policy |
-| **Verified by** | `invarlock verify --profile ci\|release` |
+| **Verified by** | `invarlock verify --profile ci\|release` (plus `runtime.manifest.json` attestation for attested outputs) |
 | **report fields** | `spectral.measurement_contract_hash`, `rmt.measurement_contract_hash` |
 | **See also** | [Guard Contracts](04-guard-contracts.md) |
 

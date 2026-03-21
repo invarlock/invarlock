@@ -91,7 +91,17 @@ echo "# Tiny Models Evaluation Matrix ($STAMP)" > "$TMP_DIR/checklist.md"
 echo "Env: INVARLOCK_DEDUP_TEXTS=1, INVARLOCK_CAPACITY_FAST=1, HF_HUB_ENABLE_HF_TRANSFER=${HF_HUB_ENABLE_HF_TRANSFER:-0}${NET:+, INVARLOCK_ALLOW_NETWORK=1, HF_DATASETS_OFFLINE=${HF_DATASETS_OFFLINE:-0}}" >> "$TMP_DIR/checklist.md"
 echo >> "$TMP_DIR/checklist.md"
 
-append() { printf -- "- [ ] %s\n      \`%s\`\n" "$1" "$2" >> "$TMP_DIR/checklist.md"; }
+render_runtime_prefix() {
+  if [ "$NET" = "1" ]; then
+    printf 'INVARLOCK_ALLOW_NETWORK=1 '
+  else
+    printf ''
+  fi
+}
+
+append() {
+  printf -- "- [ ] %s\n      \`%s%s\`\n" "$1" "$(render_runtime_prefix)" "$2" >> "$TMP_DIR/checklist.md"
+}
 
 # 1) GPT-2: causal LM (Compare & evaluate + quant demo edit)
 GPT2_ID=${GPT2_ID:-"sshleifer/tiny-gpt2"}

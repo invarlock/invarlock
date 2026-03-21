@@ -263,4 +263,10 @@ test_config_generator_generate_invarlock_config_writes_to_stdout_when_requested(
     out="$(generate_invarlock_config "demo/model" "/dev/stdout" "edit")"
     assert_match $'\nmodel:' "${out}" "config emitted to stdout"
     assert_match 'adapter:' "${out}" "config payload rendered"
+    assert_match 'trust_remote_code: false' "${out}" "remote code disabled by default"
+
+    INVARLOCK_ALLOW_REMOTE_CODE="1"
+    export INVARLOCK_ALLOW_REMOTE_CODE
+    out="$(generate_invarlock_config "demo/model" "/dev/stdout" "edit")"
+    assert_match 'trust_remote_code: true' "${out}" "remote code emitted only with explicit allow"
 }

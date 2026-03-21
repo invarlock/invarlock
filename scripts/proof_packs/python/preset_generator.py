@@ -11,6 +11,14 @@ from pathlib import Path
 from typing import Any
 
 try:
+    from runtime_tools import env_truthy
+except ImportError:  # pragma: no cover - direct module load under pytest
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from runtime_tools import env_truthy
+
+try:
     import yaml
 
     _YAML_AVAILABLE = True
@@ -123,6 +131,11 @@ def _resolve_dataset_provider_spec(
         if trust_raw is not None:
             norm = trust_raw.strip().lower()
             if norm in {"1", "true", "yes", "y", "on"}:
+                if not env_truthy("INVARLOCK_ALLOW_REMOTE_CODE"):
+                    raise ValueError(
+                        "INVARLOCK_HF_TRUST_REMOTE_CODE=true requires "
+                        "INVARLOCK_ALLOW_REMOTE_CODE=1."
+                    )
                 trust_remote_code = True
             elif norm in {"0", "false", "no", "n", "off"}:
                 trust_remote_code = False

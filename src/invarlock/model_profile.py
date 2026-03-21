@@ -661,13 +661,13 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
                     "type": "equals",
                     "path": "primary_metric.kind",
                     "value": "ppl_mlm",
-                    "message": "BERT cert must use MLM metric.",
+                    "message": "BERT evaluation report must use MLM metric.",
                 },
                 {
                     "type": "gte",
                     "path": "telemetry.masked_tokens_total",
                     "value": "1",
-                    "message": "BERT cert must report masked tokens.",
+                    "message": "BERT evaluation report must report masked tokens.",
                 },
             ),
         )
@@ -713,7 +713,7 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
                     "type": "equals",
                     "path": "primary_metric.kind",
                     "value": "ppl_causal",
-                    "message": "Causal cert must use causal ppl metric.",
+                    "message": "Causal evaluation report must use causal ppl metric.",
                 },
             ),
         )
@@ -739,7 +739,7 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
                     "type": "equals",
                     "path": "primary_metric.kind",
                     "value": "ppl_causal",
-                    "message": "Causal cert must use causal ppl metric.",
+                    "message": "Causal evaluation report must use causal ppl metric.",
                 },
             ),
         )
@@ -762,7 +762,7 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
                     "type": "equals",
                     "path": "primary_metric.kind",
                     "value": "ppl_causal",
-                    "message": "GPT-style cert must use causal ppl metric.",
+                    "message": "GPT-style evaluation report must use causal ppl metric.",
                 },
             ),
         )

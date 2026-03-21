@@ -326,7 +326,7 @@ _ensure_evaluate_baseline_report() {
 model:
   device_map: "auto"
   dtype: "bfloat16"
-  trust_remote_code: true
+$(pack_model_trust_remote_code_yaml "  ")
   low_cpu_mem_usage: true
 dataset:
   seq_len: ${seq_len}
@@ -370,7 +370,7 @@ model:
   device: "auto"
   device_map: "auto"
   dtype: "bfloat16"
-  trust_remote_code: true
+$(pack_model_trust_remote_code_yaml "  ")
   low_cpu_mem_usage: true
 
 dataset:
@@ -409,6 +409,9 @@ YAML
             extra_env+=(INVARLOCK_SKIP_OVERHEAD_CHECK=1)
         fi
         extra_env+=(INVARLOCK_STORE_EVAL_WINDOWS=1)
+        if pack_remote_code_allowed; then
+            extra_env+=(INVARLOCK_ALLOW_REMOTE_CODE=1)
+        fi
         extra_env+=("INVARLOCK_CONFIG_ROOT=${baseline_config_root}")
 
         local exit_code=0
@@ -906,7 +909,7 @@ task_calibration_run() {
 model:
   device_map: "auto"
   dtype: "bfloat16"
-  trust_remote_code: true
+$(pack_model_trust_remote_code_yaml "  ")
   low_cpu_mem_usage: true
 dataset:
   preview_n: ${preview_n}
@@ -951,7 +954,7 @@ model:
   device: "auto"
   device_map: "auto"
   dtype: "bfloat16"
-  trust_remote_code: true
+$(pack_model_trust_remote_code_yaml "  ")
   low_cpu_mem_usage: true
 
 dataset:
@@ -1339,6 +1342,9 @@ task_evaluate_edit() {
         echo "  Large model (${model_size}): SKIP_OVERHEAD_CHECK=1" >> "${log_file}"
     fi
     extra_env+=(INVARLOCK_STORE_EVAL_WINDOWS=1)
+    if pack_remote_code_allowed; then
+        extra_env+=(INVARLOCK_ALLOW_REMOTE_CODE=1)
+    fi
 
     local config_root_base
     config_root_base="$(cd "${cert_dir}" && pwd)"
@@ -1348,7 +1354,7 @@ task_evaluate_edit() {
 model:
   device_map: "auto"
   dtype: "bfloat16"
-  trust_remote_code: true
+$(pack_model_trust_remote_code_yaml "  ")
   low_cpu_mem_usage: true
 dataset:
   seq_len: ${seq_len}
@@ -1796,6 +1802,9 @@ task_evaluate_error() {
         echo "  Large model (${model_size}): SKIP_OVERHEAD_CHECK=1" >> "${log_file}"
     fi
     extra_env+=(INVARLOCK_STORE_EVAL_WINDOWS=1)
+    if pack_remote_code_allowed; then
+        extra_env+=(INVARLOCK_ALLOW_REMOTE_CODE=1)
+    fi
 
     local config_root_base
     config_root_base="$(cd "${cert_dir}" && pwd)"
@@ -1805,7 +1814,7 @@ task_evaluate_error() {
 model:
   device_map: "auto"
   dtype: "bfloat16"
-  trust_remote_code: true
+$(pack_model_trust_remote_code_yaml "  ")
   low_cpu_mem_usage: true
 dataset:
   seq_len: ${seq_len}
@@ -1902,6 +1911,10 @@ PRESET_YAML
         local probe_out="${cert_dir}/rmt_probe.json"
         if [[ -f "${probe_script}" && -n "${baseline_report_file}" && -f "${baseline_report_file}" ]]; then
             local probe_rc=0
+            local probe_args=()
+            if pack_remote_code_allowed; then
+                probe_args+=(--trust-remote-code)
+            fi
             _cmd_python "${probe_script}" \
                 --baseline-model "${abs_baseline_path}" \
                 --subject-model "${abs_error_path}" \
@@ -1910,6 +1923,7 @@ PRESET_YAML
                 --tier "${tier}" \
                 --profile "${profile_flag}" \
                 --activation-windows "${PACK_RMT_PROBE_WINDOWS:-64}" \
+                "${probe_args[@]}" \
                 >> "${log_file}" 2>&1 || probe_rc=$?
             if [[ ${probe_rc} -ne 0 ]]; then
                 echo "  WARNING: RMT cross-model probe failed (exit=${probe_rc})" >> "${log_file}"
@@ -1927,6 +1941,10 @@ PRESET_YAML
         local ve_probe_out="${cert_dir}/ve_probe.json"
         if [[ -f "${ve_probe_script}" && -n "${baseline_report_file}" && -f "${baseline_report_file}" ]]; then
             local ve_probe_rc=0
+            local ve_probe_args=()
+            if pack_remote_code_allowed; then
+                ve_probe_args+=(--trust-remote-code)
+            fi
             _cmd_python "${ve_probe_script}" \
                 --baseline-model "${abs_baseline_path}" \
                 --subject-model "${abs_error_path}" \
@@ -1936,6 +1954,7 @@ PRESET_YAML
                 --profile "${profile_flag}" \
                 --calibration-windows "${PACK_VE_PROBE_WINDOWS:-12}" \
                 --min-coverage "${PACK_VE_PROBE_MIN_COVERAGE:-10}" \
+                "${ve_probe_args[@]}" \
                 >> "${log_file}" 2>&1 || ve_probe_rc=$?
             if [[ ${ve_probe_rc} -ne 0 ]]; then
                 echo "  WARNING: VE cross-model probe failed (exit=${ve_probe_rc})" >> "${log_file}"

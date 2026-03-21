@@ -65,7 +65,8 @@ InvarLock blocks outbound network by default. When you need to download models o
 datasets, opt in per run with `INVARLOCK_ALLOW_NETWORK=1`:
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci
+INVARLOCK_ALLOW_NETWORK=1 \
+  invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci
 ```
 
 For offline use, pre‑download assets and enforce offline reads with
@@ -91,7 +92,8 @@ For quick local/CI checks, enable an approximate capacity pass to shorten
 dataset prep:
 
 ```bash
-INVARLOCK_CAPACITY_FAST=1 invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci
+INVARLOCK_CAPACITY_FAST=1 \
+  invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci
 ```
 
 Note: this skips full capacity/dedupe work; don’t use for release evidence.
@@ -110,6 +112,8 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
 Notes
 
 - Prefer Compare & evaluate (BYOE) for production. Use `--edit-config` overlays for quick smokes.
+- `evaluate` uses the runtime container by default; add `--allow-host-execution`
+  only for trusted local host workflows.
 
 ## Device Support
 

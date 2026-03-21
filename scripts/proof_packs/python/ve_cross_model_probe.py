@@ -15,6 +15,14 @@ from transformers import AutoModelForCausalLM
 from invarlock.adapters.hf_causal import HF_Causal_Adapter
 from invarlock.guards.variance import VarianceGuard
 
+try:
+    from runtime_tools import require_remote_code_opt_in
+except ImportError:  # pragma: no cover - direct module load under pytest
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from runtime_tools import require_remote_code_opt_in
+
 
 def _load_json(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
@@ -153,6 +161,12 @@ def _load_model(
     )
 
 
+def _resolve_trust_remote_code(enabled: bool) -> bool:
+    if not enabled:
+        return False
+    return require_remote_code_opt_in("ve_cross_model_probe.py")
+
+
 def _model_cleanup(model: Any) -> None:
     del model
     gc.collect()
@@ -188,6 +202,7 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
         calibration_windows=int(args.calibration_windows),
         min_coverage=int(args.min_coverage),
     )
+    trust_remote_code = _resolve_trust_remote_code(bool(args.trust_remote_code))
 
     guard = VarianceGuard(policy)
     adapter = HF_Causal_Adapter()
@@ -197,7 +212,7 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
     target_module_names: Any = None
 
     subject_model = _load_model(
-        subject_model_path, dtype=dtype, trust_remote_code=bool(args.trust_remote_code)
+        subject_model_path, dtype=dtype, trust_remote_code=trust_remote_code
     )
     try:
         prep_result = guard.prepare(
@@ -304,7 +319,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--tier", default="balanced")
     parser.add_argument("--profile", default="ci")
     parser.add_argument("--dtype", default="bfloat16")
-    parser.add_argument("--trust-remote-code", action="store_true", default=True)
+    parser.add_argument(
+        "--trust-remote-code",
+        action="store_true",
+        default=False,
+        help=(
+            "Allow remote code for custom model repos; also requires "
+            "INVARLOCK_ALLOW_REMOTE_CODE=1"
+        ),
+    )
     parser.add_argument(
         "--calibration-windows",
         type=int,
