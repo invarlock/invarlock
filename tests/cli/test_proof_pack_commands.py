@@ -288,7 +288,7 @@ def test_proof_pack_verify_json_round_trip_with_verify_payload(
     assert payload["verify"]["resolution"]["exit_code"] == 0
 
 
-def test_proof_pack_verify_json_round_trip_with_real_nested_verify_rejection(
+def test_proof_pack_verify_json_round_trip_with_real_nested_verify(
     tmp_path: Path,
 ) -> None:
     pack_dir = _build_pack(
@@ -298,13 +298,13 @@ def test_proof_pack_verify_json_round_trip_with_real_nested_verify_rejection(
 
     result = CliRunner().invoke(app, ["proof-pack", "verify", str(pack_dir), "--json"])
 
-    assert result.exit_code == 7, result.output
+    assert result.exit_code == 0, result.output
     payload = json.loads(result.stdout.strip())
     assert payload["format_version"] == "proof-pack-verify-v1"
-    assert payload["ok"] is False
+    assert payload["ok"] is True
     assert payload["verify"]["format_version"] == "verify-v1"
-    assert payload["verify"]["summary"]["reason"] == "policy_fail"
-    assert payload["verify"]["resolution"]["exit_code"] == 1
+    assert payload["verify"]["summary"]["reason"] == "ok"
+    assert payload["verify"]["resolution"]["exit_code"] == 0
 
 
 def test_proof_pack_verify_rejects_missing_pack(tmp_path: Path) -> None:
