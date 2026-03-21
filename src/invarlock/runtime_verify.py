@@ -5,6 +5,9 @@ import hashlib
 import json
 from pathlib import Path
 
+import jsonschema
+
+from invarlock.public_contracts import load_runtime_manifest_schema
 from invarlock.runtime_security import RUNTIME_VERIFIER_CONTRACT_VERSION
 
 
@@ -36,6 +39,14 @@ def verify_report_manifest(report_path: Path, manifest_path: Path) -> list[str]:
 
     if not isinstance(manifest, dict):
         return ["manifest payload must be a JSON object"]
+
+    schema = load_runtime_manifest_schema()
+    if not schema:
+        return ["runtime manifest schema is unavailable"]
+    try:
+        jsonschema.validate(instance=manifest, schema=schema)
+    except jsonschema.ValidationError as exc:
+        return [f"runtime manifest schema validation failed: {exc.message}"]
 
     contract_version = manifest.get("verifier_contract_version")
     if contract_version != RUNTIME_VERIFIER_CONTRACT_VERSION:

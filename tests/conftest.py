@@ -5,6 +5,8 @@ from pathlib import Path
 
 import pytest
 
+_VALID_TEST_IMAGE_DIGEST = "sha256:" + ("a" * 64)
+
 
 @pytest.fixture(autouse=True)
 def _restore_invarlock_env():
@@ -36,7 +38,7 @@ def _default_security_bypass_for_local_tests(monkeypatch: pytest.MonkeyPatch):
     # trusted host execution unless an individual test opts back into the
     # security-default path explicitly.
     monkeypatch.setenv("INVARLOCK_ALLOW_HOST_EXECUTION", "1")
-    monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE_DIGEST", "sha256:test-runtime-image")
+    monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE_DIGEST", _VALID_TEST_IMAGE_DIGEST)
     yield
 
 

@@ -91,6 +91,11 @@ def load_proof_pack_manifest_schema() -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
+def load_runtime_manifest_schema() -> dict[str, Any]:
+    data = _safe_load("runtime_manifest.schema.json", {})
+    return data if isinstance(data, dict) else {}
+
+
 def support_lanes() -> list[dict[str, Any]]:
     lanes = load_support_matrix().get("lanes", [])
     return [lane for lane in lanes if isinstance(lane, dict)]
@@ -148,6 +153,7 @@ def contract_catalog() -> dict[str, Any]:
         "model_family_catalog": contract_reference("model_family_catalog.json"),
         "adapter_capabilities": contract_reference("adapter_capabilities.json"),
         "plugin_compatibility": contract_reference("plugin_compatibility.json"),
+        "runtime_manifest": contract_reference("runtime_manifest.schema.json"),
         "proof_pack_manifest": contract_reference("proof_pack_manifest.schema.json"),
         "policy_pack": contract_reference("policy_pack.schema.json"),
     }
@@ -168,6 +174,7 @@ __all__ = [
     "load_plugin_compatibility",
     "load_policy_pack_schema",
     "load_proof_pack_manifest_schema",
+    "load_runtime_manifest_schema",
     "load_support_matrix",
     "published_basis_lanes",
     "support_lane_by_id",

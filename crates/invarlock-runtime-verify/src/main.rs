@@ -145,7 +145,7 @@ fn verify(report_path: &Path, manifest_path: &Path) -> Verdict {
         errors.push("runtime.image_digest must be present".to_string());
     }
 
-    let expected_report_sha = extract_json_string(&manifest_text, "sha256");
+    let expected_report_sha = extract_json_object_string(&manifest_text, "report", "sha256");
     match (expected_report_sha, compute_sha256(report_path)) {
         (Some(expected), Ok(actual)) => {
             if expected != actual {
@@ -182,6 +182,54 @@ fn extract_json_string(text: &str, key: &str) -> Option<String> {
         return None;
     }
     parse_json_string(text, index + 1)
+}
+
+fn extract_json_object_string(text: &str, object_key: &str, field_key: &str) -> Option<String> {
+    let object_text = extract_json_object(text, object_key)?;
+    extract_json_string(object_text, field_key)
+}
+
+fn extract_json_object<'a>(text: &'a str, key: &str) -> Option<&'a str> {
+    let key_pattern = format!("\"{key}\"");
+    let start = text.find(&key_pattern)?;
+    let mut index = start + key_pattern.len();
+    index = skip_whitespace(text, index);
+    if text.as_bytes().get(index).copied()? != b':' {
+        return None;
+    }
+    index = skip_whitespace(text, index + 1);
+    if text.as_bytes().get(index).copied()? != b'{' {
+        return None;
+    }
+
+    let bytes = text.as_bytes();
+    let mut depth = 0usize;
+    let mut cursor = index;
+    while cursor < bytes.len() {
+        match bytes[cursor] {
+            b'{' => depth += 1,
+            b'}' => {
+                depth = depth.checked_sub(1)?;
+                if depth == 0 {
+                    return text.get(index..=cursor);
+                }
+            }
+            b'"' => {
+                cursor += 1;
+                while cursor < bytes.len() {
+                    match bytes[cursor] {
+                        b'\\' => cursor += 1,
+                        b'"' => break,
+                        _ => {}
+                    }
+                    cursor += 1;
+                }
+            }
+            _ => {}
+        }
+        cursor += 1;
+    }
+    None
 }
 
 fn extract_json_bool(text: &str, key: &str) -> Option<bool> {
@@ -337,5 +385,25 @@ mod tests {
             .errors
             .iter()
             .any(|item| item.contains("runtime.image_digest must be present")));
+    }
+
+    #[test]
+    fn verify_reads_report_sha256_even_when_config_sha256_is_null() {
+        let dir = unique_dir("runtime-verify-nested-report-sha");
+        let report_path = dir.join("evaluation.report.json");
+        fs::write(&report_path, "{\"ok\":true}\n").expect("write report");
+        let digest = compute_sha256(&report_path).expect("digest");
+        let manifest_path = dir.join("runtime.manifest.json");
+        fs::write(
+            &manifest_path,
+            format!(
+                "{{\n  \"config\": {{\"path\": null, \"sha256\": null, \"source\": \"missing\"}},\n  \"execution_mode\": \"container\",\n  \"report\": {{\"filename\": \"evaluation.report.json\", \"path\": \"{}\", \"sha256\": \"{digest}\"}},\n  \"runtime\": {{\"container_execution\": true, \"image_digest\": \"sha256:abc\"}},\n  \"verifier_contract_version\": \"{CONTRACT_VERSION}\"\n}}\n",
+                report_path.display()
+            ),
+        )
+        .expect("write manifest");
+
+        let verdict = verify(&report_path, &manifest_path);
+        assert!(verdict.ok, "{:?}", verdict.errors);
     }
 }
