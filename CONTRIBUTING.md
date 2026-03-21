@@ -21,9 +21,9 @@ the runtime container by default; trusted local development outside that
 container must opt into host execution explicitly:
 
 ```bash
-INVARLOCK_ALLOW_HOST_EXECUTION=1 INVARLOCK_ALLOW_NETWORK=1 invarlock run -c ...
+INVARLOCK_ALLOW_HOST_EXECUTION=1 INVARLOCK_ALLOW_NETWORK=1 invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci
 # or:
-INVARLOCK_ALLOW_HOST_EXECUTION=1 INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate ...
+INVARLOCK_ALLOW_HOST_EXECUTION=1 INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --source gpt2 --edited distilgpt2 --adapter auto
 ```
 
 ### 1.2 Quick setup (recommended)
