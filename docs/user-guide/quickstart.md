@@ -76,10 +76,11 @@ invarlock report explain --report runs/edited/report.json --baseline runs/source
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 ```
 
-The `evaluate` examples above use the secure-default runtime container. In a
-repo checkout, run `make runtime-image` once; InvarLock automatically prefers
-the local `invarlock-runtime:local` image when it is present. For a trusted
-local host run, add `--allow-host-execution`.
+The `evaluate` examples above use the secure-default runtime container and
+expect an OCI container engine such as `docker` or `podman`. In a repo
+checkout, run `make runtime-image` once; InvarLock automatically prefers the
+local `invarlock-runtime:local` image when it is present. For a trusted local
+host run, add `--allow-host-execution`.
 
 ### 3. Generate Reports
 
