@@ -27,7 +27,8 @@ smoke_timeout() {
 
 RUN_TIMEOUT_SECONDS="$(smoke_timeout INVARLOCK_SMOKE_RUN_TIMEOUT 180)"
 EVALUATE_TIMEOUT_SECONDS="$(smoke_timeout INVARLOCK_SMOKE_EVALUATE_TIMEOUT 420)"
-echo "[info] $(ts) Timeout budget: run=${RUN_TIMEOUT_SECONDS}s evaluate=${EVALUATE_TIMEOUT_SECONDS}s" | tee -a "$LOG_FILE"
+CALIBRATE_TIMEOUT_SECONDS="$(smoke_timeout INVARLOCK_SMOKE_CALIBRATE_TIMEOUT 420)"
+echo "[info] $(ts) Timeout budget: run=${RUN_TIMEOUT_SECONDS}s evaluate=${EVALUATE_TIMEOUT_SECONDS}s calibrate=${CALIBRATE_TIMEOUT_SECONDS}s" | tee -a "$LOG_FILE"
 
 ensure_writable_hf_cache() {
   local candidate_root=""
@@ -150,6 +151,13 @@ run "invarlock version"               "$CLI version"
 run "invarlock evaluate --help"        "$CLI evaluate --help"
 run "invarlock verify --help"         "$CLI verify --help"
 run "invarlock run --help"            "$CLI run --help"
+run "invarlock calibrate --help"      "$CLI calibrate --help"
+run "invarlock calibrate null-sweep --help" "$CLI calibrate null-sweep --help"
+run "invarlock calibrate ve-sweep --help" "$CLI calibrate ve-sweep --help"
+run "invarlock proof-pack --help"     "$CLI proof-pack --help"
+run "invarlock proof-pack build --help" "$CLI proof-pack build --help"
+run "invarlock proof-pack inspect --help" "$CLI proof-pack inspect --help"
+run "invarlock proof-pack verify --help" "$CLI proof-pack verify --help"
 run "invarlock report --help"         "$CLI report --help"
 run "invarlock report verify --help"  "$CLI report verify --help"
 run "invarlock report explain --help" "$CLI report explain --help"
@@ -188,9 +196,148 @@ run "invarlock plugins uninstall --dry-run awq"  "$CLI plugins uninstall --dry-r
 # Create a tiny invalid report to exercise verify paths
 TMP_DIR="$(mktemp -d -t invarlock_cli_smoke.XXXXXX.dir)"
 echo '{"schema_version": "v1", "primary_metric": {}}' >"$TMP_DIR/report_invalid.json"
+printf '%s\n' '{"verdict":"PASS","summary":{"status":"smoke"}}' >"$TMP_DIR/final_verdict.json"
+printf '%s\n' '{"commit":"smoke","branch":"staging/next"}' >"$TMP_DIR/source_repo.json"
+printf '%s\n' '{"platform":"cli-smoke","mode":"attested-fixture"}' >"$TMP_DIR/environment.json"
+printf '%s\n' '{"models":{"sshleifer/tiny-gpt2":{"revision":"fixture"}}}' >"$TMP_DIR/model_revisions.json"
+PROOF_PACK_REPORT_DIR="$TMP_DIR/proof_pack_report"
+mkdir -p "$PROOF_PACK_REPORT_DIR"
+PROOF_PACK_REPORT_DIR="$PROOF_PACK_REPORT_DIR" python - <<'PY'
+import hashlib
+import json
+import math
+import os
+from pathlib import Path
+
+from invarlock.cli.commands import verify as verify_mod
+from invarlock.runtime_security import (
+    RUNTIME_MANIFEST_FILENAME,
+    RUNTIME_VERIFIER_CONTRACT_VERSION,
+)
+
+
+def sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+report_dir = Path(os.environ["PROOF_PACK_REPORT_DIR"])
+report_path = report_dir / "evaluation.report.json"
+spectral_contract = {
+    "estimator": {"type": "power_iter", "iters": 4, "init": "ones"}
+}
+rmt_contract = {
+    "estimator": {"type": "power_iter", "iters": 3, "init": "ones"},
+    "activation_sampling": {
+        "windows": {"count": 8, "indices_policy": "evenly_spaced"}
+    },
+}
+report_payload = {
+    "schema_version": "v1",
+    "run_id": "proof-pack-cli-smoke",
+    "artifacts": {"generated_at": "2024-01-01T00:00:00"},
+    "plugins": {},
+    "meta": {},
+    "provenance": {
+        "provider_digest": {
+            "ids_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+    },
+    "dataset": {
+        "provider": "unit",
+        "seq_len": 8,
+        "windows": {
+            "preview": 2,
+            "final": 2,
+            "stats": {
+                "window_match_fraction": 1.0,
+                "window_overlap_fraction": 0.0,
+                "coverage": {"preview": {"used": 2}, "final": {"used": 2}},
+                "paired_windows": 2,
+            },
+        },
+    },
+    "validation": {
+        "primary_metric_acceptable": True,
+        "preview_final_drift_acceptable": True,
+        "invariants_pass": True,
+        "spectral_stable": True,
+        "rmt_stable": True,
+    },
+    "baseline_ref": {
+        "run_id": "baseline-run",
+        "model_id": "model",
+        "primary_metric": {"kind": "ppl_causal", "final": 10.0},
+    },
+    "artifacts_extra": {},
+    "primary_metric": {
+        "kind": "ppl_causal",
+        "final": 10.0,
+        "preview": 10.0,
+        "ratio_vs_baseline": 1.0,
+        "display_ci": [1.0, 1.0],
+    },
+    "spectral": {
+        "evaluated": True,
+        "measurement_contract": spectral_contract,
+        "measurement_contract_hash": verify_mod._measurement_contract_digest(
+            spectral_contract
+        ),
+        "measurement_contract_match": True,
+    },
+    "rmt": {
+        "evaluated": True,
+        "measurement_contract": rmt_contract,
+        "measurement_contract_hash": verify_mod._measurement_contract_digest(
+            rmt_contract
+        ),
+        "measurement_contract_match": True,
+    },
+    "resolved_policy": {
+        "spectral": {"measurement_contract": spectral_contract},
+        "rmt": {"measurement_contract": rmt_contract},
+    },
+    "evaluation_windows": {
+        "final": {
+            "logloss": [math.log(10.0)],
+            "token_counts": [1],
+        }
+    },
+}
+report_path.write_text(json.dumps(report_payload, sort_keys=True), encoding="utf-8")
+runtime_manifest = {
+    "manifest_version": 1,
+    "generated_at_utc": "2026-03-21T00:00:00+00:00",
+    "verifier_contract_version": RUNTIME_VERIFIER_CONTRACT_VERSION,
+    "execution_mode": "container",
+    "report": {
+        "filename": report_path.name,
+        "path": report_path.as_posix(),
+        "sha256": sha256_file(report_path),
+    },
+    "config": {
+        "path": None,
+        "sha256": None,
+        "source": "missing",
+    },
+    "runtime": {
+        "container_execution": True,
+        "image_digest": "sha256:" + ("a" * 64),
+        "image_ref": "invarlock-runtime:local",
+        "allow_network": False,
+        "allow_remote_code": False,
+        "allow_third_party_plugins": False,
+    },
+}
+(report_dir / RUNTIME_MANIFEST_FILENAME).write_text(
+    json.dumps(runtime_manifest, sort_keys=True), encoding="utf-8"
+)
+PY
 
 run "invarlock verify (human, invalid)" "$CLI verify \"$TMP_DIR/report_invalid.json\""
 run "invarlock verify --json (invalid)" "$CLI verify --json \"$TMP_DIR/report_invalid.json\""
+run "invarlock proof-pack build" "$CLI proof-pack build \"$TMP_DIR/proof_pack_cli\" --final-verdict \"$TMP_DIR/final_verdict.json\" --source-repo \"$TMP_DIR/source_repo.json\" --environment \"$TMP_DIR/environment.json\" --material model_revisions=\"$TMP_DIR/model_revisions.json\" --report \"$PROOF_PACK_REPORT_DIR/evaluation.report.json\" --profile ci --json"
+run "invarlock proof-pack inspect --json" "$CLI proof-pack inspect \"$TMP_DIR/proof_pack_cli\" --json"
+run "invarlock proof-pack verify --json" "$CLI proof-pack verify \"$TMP_DIR/proof_pack_cli\" --json"
 
 # Offline runs (force quick failure if uncached)
 OFFLINE_ENV="HF_DATASETS_OFFLINE=1 TRANSFORMERS_OFFLINE=1 TOKENIZERS_PARALLELISM=false"
@@ -203,6 +350,10 @@ if have_adapters_stack; then
   run_to "invarlock evaluate (offline)" "$EVALUATE_TIMEOUT_SECONDS" "$OFFLINE_EVAL_ENV $CLI evaluate --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --device cpu --out \"$TMP_DIR/report_offline\" --report-out \"$TMP_DIR/report_offline_out\""
   run_to "invarlock run (offline, host)" "$RUN_TIMEOUT_SECONDS" "$OFFLINE_HOST_ENV $CLI run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --device cpu --out \"$TMP_DIR/run_offline_host\""
   run_to "invarlock evaluate (offline, host)" "$EVALUATE_TIMEOUT_SECONDS" "$OFFLINE_HOST_EVAL_ENV $CLI evaluate --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --device cpu --out \"$TMP_DIR/report_offline_host\" --report-out \"$TMP_DIR/report_offline_host_out\""
+  run_to "invarlock calibrate null-sweep (network)" "$CALIBRATE_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI calibrate null-sweep --allow-network --config configs/calibration/null_sweep_ci.yaml --out \"$TMP_DIR/calibrate_null\" --profile ci --device cpu --tier balanced --n-seeds 1 --seed-start 42"
+  run_to "invarlock calibrate ve-sweep (network)" "$CALIBRATE_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI calibrate ve-sweep --allow-network --config configs/calibration/rmt_ve_sweep_ci.yaml --out \"$TMP_DIR/calibrate_ve\" --profile ci --device cpu --tier balanced --window 6 --n-seeds 1 --seed-start 42"
+  run_to "invarlock calibrate null-sweep (network, host)" "$CALIBRATE_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI calibrate null-sweep --allow-network --allow-host-execution --config configs/calibration/null_sweep_ci.yaml --out \"$TMP_DIR/calibrate_null_host\" --profile ci --device cpu --tier balanced --n-seeds 1 --seed-start 42"
+  run_to "invarlock calibrate ve-sweep (network, host)" "$CALIBRATE_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI calibrate ve-sweep --allow-network --allow-host-execution --config configs/calibration/rmt_ve_sweep_ci.yaml --out \"$TMP_DIR/calibrate_ve_host\" --profile ci --device cpu --tier balanced --window 6 --n-seeds 1 --seed-start 42"
 else
   {
     echo "\n==== BEGIN invarlock run (offline) ===="
@@ -217,6 +368,18 @@ else
     echo "\n==== BEGIN invarlock evaluate (offline, host) ===="
     echo "[skip] adapters stack (torch/transformers) not available"
     echo "==== END invarlock evaluate (offline, host) ====\n"
+    echo "\n==== BEGIN invarlock calibrate null-sweep (network) ===="
+    echo "[skip] adapters stack (torch/transformers) not available"
+    echo "==== END invarlock calibrate null-sweep (network) ====\n"
+    echo "\n==== BEGIN invarlock calibrate ve-sweep (network) ===="
+    echo "[skip] adapters stack (torch/transformers) not available"
+    echo "==== END invarlock calibrate ve-sweep (network) ====\n"
+    echo "\n==== BEGIN invarlock calibrate null-sweep (network, host) ===="
+    echo "[skip] adapters stack (torch/transformers) not available"
+    echo "==== END invarlock calibrate null-sweep (network, host) ====\n"
+    echo "\n==== BEGIN invarlock calibrate ve-sweep (network, host) ===="
+    echo "[skip] adapters stack (torch/transformers) not available"
+    echo "==== END invarlock calibrate ve-sweep (network, host) ====\n"
   } >>"$LOG_FILE"
 fi
 
