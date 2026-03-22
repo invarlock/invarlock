@@ -160,6 +160,30 @@ def test_model_evidence_sweep_host_mode_emits_host_bypass_flags(
     assert manifest["execution_mode"] == "host"
 
 
+def test_build_evaluate_command_uses_container_safe_repo_relative_paths(
+    tmp_path: Path,
+) -> None:
+    mod = _load_script_module("model_evidence_sweep")
+    spec = next(lane for lane in mod.CURRENT_SUPPORTED_EXPERIMENTAL_LANES if lane.slug == "qwen3_8b")
+    external_output_root = tmp_path / "external-container-evidence"
+    execution_root = mod._execution_root(external_output_root, execution_mode="container")
+    lane_root = execution_root / "eval" / spec.slug
+
+    command = mod.build_evaluate_command(
+        spec,
+        python_exe=sys.executable,
+        profile="ci",
+        device="cuda",
+        execution_mode="container",
+        lane_root=lane_root,
+    )
+
+    out_idx = command.index("--out") + 1
+    report_idx = command.index("--report-out") + 1
+    assert command[out_idx] == f"tmp/model_evidence_container/{execution_root.name}/eval/qwen3_8b/runs"
+    assert command[report_idx] == f"tmp/model_evidence_container/{execution_root.name}/eval/qwen3_8b/report"
+
+
 def test_model_evidence_sweep_returns_failure_when_verify_fails(
     tmp_path: Path,
 ) -> None:

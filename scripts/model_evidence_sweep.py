@@ -345,9 +345,9 @@ def build_evaluate_command(
         "--device",
         device,
         "--out",
-        str(lane_root / "runs"),
+        _command_path(lane_root / "runs", execution_mode=execution_mode),
         "--report-out",
-        str(lane_root / "report"),
+        _command_path(lane_root / "report", execution_mode=execution_mode),
     ]
     if execution_mode == "host":
         command.append("--allow-host-execution")
@@ -398,6 +398,12 @@ def _execution_root(output_root: Path, *, execution_mode: str) -> Path:
         output_root.resolve().as_posix().encode("utf-8")
     ).hexdigest()[:16]
     return REPO_ROOT / "tmp" / "model_evidence_container" / suffix
+
+
+def _command_path(path: Path, *, execution_mode: str) -> str:
+    if execution_mode == "container" and _is_within_repo(path):
+        return path.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
+    return str(path)
 
 
 def _publish_lane_artifacts(source: Path, destination: Path) -> None:
