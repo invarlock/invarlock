@@ -15,6 +15,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SUPPORT_MATRIX_PATH = REPO_ROOT / "contracts" / "support_matrix.json"
 DEFAULT_SUITE = "current-supported-experimental"
+EXECUTION_MODES = ("container", "host")
 
 
 @dataclass(frozen=True)
@@ -235,6 +236,16 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Device passed through to evaluate.",
     )
     parser.add_argument(
+        "--execution-mode",
+        default="container",
+        choices=EXECUTION_MODES,
+        help=(
+            "How to execute model-loading commands. 'container' keeps the "
+            "secure-default runtime-container path; 'host' adds the explicit "
+            "host-bypass and verify override flags."
+        ),
+    )
+    parser.add_argument(
         "--python",
         default=sys.executable,
         help="Python executable used for `python -m invarlock ...` subprocesses.",
@@ -305,9 +316,10 @@ def build_evaluate_command(
     python_exe: str,
     profile: str,
     device: str,
+    execution_mode: str,
     lane_root: Path,
 ) -> list[str]:
-    return [
+    command = [
         python_exe,
         "-m",
         "invarlock",
@@ -330,15 +342,19 @@ def build_evaluate_command(
         "--report-out",
         str(lane_root / "report"),
     ]
+    if execution_mode == "host":
+        command.append("--allow-host-execution")
+    return command
 
 
 def build_verify_command(
     *,
     python_exe: str,
     profile: str,
+    execution_mode: str,
     report_path: Path,
 ) -> list[str]:
-    return [
+    command = [
         python_exe,
         "-m",
         "invarlock",
@@ -348,6 +364,9 @@ def build_verify_command(
         "--json",
         str(report_path),
     ]
+    if execution_mode == "host":
+        command.insert(-1, "--allow-unattested-artifacts")
+    return command
 
 
 def runtime_env() -> dict[str, str]:
@@ -364,6 +383,7 @@ def run_lane(
     python_exe: str,
     profile: str,
     device: str,
+    execution_mode: str,
     env: dict[str, str],
 ) -> LaneResult:
     lane_root = output_root / "eval" / spec.slug
@@ -379,6 +399,7 @@ def run_lane(
         python_exe=python_exe,
         profile=profile,
         device=device,
+        execution_mode=execution_mode,
         lane_root=lane_root,
     )
     with log_path.open("w", encoding="utf-8") as log_file:
@@ -398,6 +419,7 @@ def run_lane(
         verify_cmd = build_verify_command(
             python_exe=python_exe,
             profile=profile,
+            execution_mode=execution_mode,
             report_path=report_path,
         )
         with (
@@ -432,6 +454,7 @@ def write_summary(
     output_root: Path,
     *,
     suite: str,
+    execution_mode: str,
     shard_index: int,
     shard_count: int,
     results: list[LaneResult],
@@ -450,6 +473,7 @@ def write_summary(
 
     payload = {
         "suite": suite,
+        "execution_mode": execution_mode,
         "shard_index": shard_index,
         "shard_count": shard_count,
         "ok": all(result.ok for result in results),
@@ -461,10 +485,17 @@ def write_summary(
     )
 
 
-def write_manifest(output_root: Path, *, suite: str, specs: list[EvidenceLane]) -> None:
+def write_manifest(
+    output_root: Path,
+    *,
+    suite: str,
+    execution_mode: str,
+    specs: list[EvidenceLane],
+) -> None:
     payload = {
         "generated_at": datetime.now(UTC).isoformat(),
         "suite": suite,
+        "execution_mode": execution_mode,
         "lanes": [spec.to_manifest_entry() for spec in specs],
     }
     (output_root / "manifest.json").write_text(
@@ -496,7 +527,12 @@ def run_sweep(args: argparse.Namespace) -> int:
         else default_output_root()
     )
     output_root.mkdir(parents=True, exist_ok=True)
-    write_manifest(output_root, suite=args.suite, specs=specs)
+    write_manifest(
+        output_root,
+        suite=args.suite,
+        execution_mode=args.execution_mode,
+        specs=specs,
+    )
     if args.dry_run:
         payload = []
         for spec in specs:
@@ -504,16 +540,19 @@ def run_sweep(args: argparse.Namespace) -> int:
             payload.append(
                 {
                     "slug": spec.slug,
+                    "execution_mode": args.execution_mode,
                     "evaluate": build_evaluate_command(
                         spec,
                         python_exe=args.python,
                         profile=args.profile,
                         device=args.device,
+                        execution_mode=args.execution_mode,
                         lane_root=lane_root,
                     ),
                     "verify": build_verify_command(
                         python_exe=args.python,
                         profile=args.profile,
+                        execution_mode=args.execution_mode,
                         report_path=lane_root / "report" / "evaluation.report.json",
                     ),
                 }
@@ -535,6 +574,7 @@ def run_sweep(args: argparse.Namespace) -> int:
                 python_exe=args.python,
                 profile=args.profile,
                 device=args.device,
+                execution_mode=args.execution_mode,
                 env=env,
             )
             results.append(result)
@@ -552,6 +592,7 @@ def run_sweep(args: argparse.Namespace) -> int:
     write_summary(
         output_root,
         suite=args.suite,
+        execution_mode=args.execution_mode,
         shard_index=args.shard_index,
         shard_count=args.shard_count,
         results=results,

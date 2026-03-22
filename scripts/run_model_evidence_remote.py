@@ -19,6 +19,7 @@ DEFAULT_REMOTE_VENV_CANDIDATES = (
     "{remote_repo}/.venv/bin/python",
     "/root/venvs/invarlock/bin/python",
 )
+EXECUTION_MODES = ("container", "host")
 
 
 @dataclass(frozen=True)
@@ -94,6 +95,16 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--device",
         default="cuda",
         help="Device passed through to the sweep script.",
+    )
+    parser.add_argument(
+        "--execution-mode",
+        default="container",
+        choices=EXECUTION_MODES,
+        help=(
+            "Execution mode passed through to scripts/model_evidence_sweep.py. "
+            "'container' keeps the secure-default path; 'host' uses the "
+            "explicit host-bypass matrix."
+        ),
     )
     parser.add_argument(
         "--gpus",
@@ -201,6 +212,7 @@ def build_launches(
     lane_ids: list[str],
     profile: str,
     device: str,
+    execution_mode: str,
     gpus: list[str],
     session_prefix: str,
     stamp: str,
@@ -222,6 +234,8 @@ def build_launches(
             profile,
             "--device",
             device,
+            "--execution-mode",
+            execution_mode,
             "--output-root",
             shard_output_root,
             "--shard-index",
@@ -314,6 +328,7 @@ def run_remote(args: argparse.Namespace) -> int:
         lane_ids=args.lane_id,
         profile=args.profile,
         device=args.device,
+        execution_mode=args.execution_mode,
         gpus=gpus,
         session_prefix=args.session_prefix,
         stamp=stamp,
@@ -327,6 +342,7 @@ def run_remote(args: argparse.Namespace) -> int:
         "remote_python_candidates": remote_python_candidates,
         "remote_output_root": remote_output_root,
         "suite": args.suite,
+        "execution_mode": args.execution_mode,
         "gpus": gpus,
         "sync_command": sync_command,
         "launches": [launch.to_payload() for launch in launches],

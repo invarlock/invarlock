@@ -59,12 +59,22 @@ def test_main_writes_summary_and_invokes_both_surfaces(
 
     out_root = tmp_path / "artifacts"
     exit_code = module.main(
-        ["--paths", "README.md", "notebooks", "--output-root", str(out_root)]
+        [
+            "--paths",
+            "README.md",
+            "notebooks",
+            "--output-root",
+            str(out_root),
+            "--markdown-execution-mode",
+            "host",
+        ]
     )
 
     assert exit_code == 0
     assert len(calls) == 2
     assert calls[0][1].endswith("verify_markdown_bash_blocks.py")
+    assert "--execution-mode" in calls[0]
+    assert "host" in calls[0]
     assert calls[1][1].endswith("verify_notebooks_smoke.py")
 
     summary = json.loads((out_root / "summary.json").read_text(encoding="utf-8"))

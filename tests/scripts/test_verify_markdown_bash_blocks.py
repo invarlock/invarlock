@@ -71,6 +71,42 @@ def test_sanitize_script_skips_pip_installs() -> None:
     assert "[skip] python -m pip install foo" in rendered
 
 
+def test_sanitize_script_host_mode_injects_host_bypass_and_verify_override() -> None:
+    module = _load_script_module()
+    block = module.BashBlock(
+        file="README.md",
+        line=1,
+        block_index=1,
+        text=(
+            "invarlock evaluate --baseline gpt2 --subject gpt2\n"
+            "invarlock verify reports/eval/evaluation.report.json\n"
+        ),
+    )
+
+    rendered = module._sanitize_script(block, execution_mode="host")
+
+    assert "INVARLOCK_ALLOW_HOST_EXECUTION=1" in rendered
+    assert "--allow-unattested-artifacts" in rendered
+
+
+def test_sanitize_script_container_mode_strips_host_bypass_flags() -> None:
+    module = _load_script_module()
+    block = module.BashBlock(
+        file="README.md",
+        line=1,
+        block_index=1,
+        text=(
+            "INVARLOCK_ALLOW_HOST_EXECUTION=1 invarlock run -c config.yaml\n"
+            "invarlock verify --allow-unattested-artifacts reports/eval/evaluation.report.json\n"
+        ),
+    )
+
+    rendered = module._sanitize_script(block, execution_mode="container")
+
+    assert "INVARLOCK_ALLOW_HOST_EXECUTION=1" not in rendered
+    assert "--allow-unattested-artifacts" not in rendered
+
+
 def test_run_blocks_writes_results(tmp_path: Path, monkeypatch) -> None:
     module = _load_script_module()
     repo_root = tmp_path / "repo"
@@ -102,4 +138,5 @@ def test_run_blocks_writes_results(tmp_path: Path, monkeypatch) -> None:
         .splitlines()
     ]
     assert len(records) == 1
+    assert records[0]["execution_mode"] == "container"
     assert records[0]["status"] == "ok"

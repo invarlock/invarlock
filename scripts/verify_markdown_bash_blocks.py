@@ -27,6 +27,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TMP = ROOT / "tmp"
+EXECUTION_MODES = ("container", "host")
+HOST_EXECUTION_ENV = "INVARLOCK_ALLOW_HOST_EXECUTION"
+MODEL_LOADING_COMMANDS = {"evaluate", "run", "calibrate"}
 
 EXCLUDE_TOP_LEVEL_DIRS = {
     ".git",
@@ -186,7 +189,85 @@ def _prepare_workspace(workspace: Path) -> None:
     shutil.copytree(ROOT, workspace, ignore=_ignore_copytree)
 
 
-def _sanitize_script(block: BashBlock) -> str:
+def _split_env_prefix(tokens: list[str]) -> tuple[list[str], list[str]]:
+    env_prefix: list[str] = []
+    idx = 0
+    for token in tokens:
+        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=.*$", token):
+            env_prefix.append(token)
+            idx += 1
+            continue
+        break
+    return env_prefix, tokens[idx:]
+
+
+def _command_tokens(argv: list[str]) -> list[str]:
+    if argv[:1] == ["invarlock"]:
+        return argv[1:]
+    if (
+        len(argv) >= 3
+        and argv[0] in {"python", "python3"}
+        and argv[1] == "-m"
+        and argv[2].startswith("invarlock")
+    ):
+        return argv[3:]
+    return []
+
+
+def _insert_option_after_command(argv: list[str], option: str) -> list[str]:
+    if argv[:1] == ["invarlock"]:
+        insert_at = 2
+        if len(argv) >= 3 and argv[1] == "report" and argv[2] == "verify":
+            insert_at = 3
+        return [*argv[:insert_at], option, *argv[insert_at:]]
+    if (
+        len(argv) >= 3
+        and argv[0] in {"python", "python3"}
+        and argv[1] == "-m"
+        and argv[2].startswith("invarlock")
+    ):
+        insert_at = 4
+        if len(argv) >= 5 and argv[3] == "report" and argv[4] == "verify":
+            insert_at = 5
+        return [*argv[:insert_at], option, *argv[insert_at:]]
+    return [*argv, option]
+
+
+def _rewrite_invarlock_tokens(
+    *,
+    env_prefix: list[str],
+    argv: list[str],
+    execution_mode: str,
+) -> tuple[list[str], list[str]]:
+    command_tokens = _command_tokens(argv)
+    if not command_tokens:
+        return env_prefix, argv
+
+    env_prefix = [
+        token
+        for token in env_prefix
+        if not token.startswith(f"{HOST_EXECUTION_ENV}=")
+    ]
+
+    if execution_mode == "container":
+        argv = [token for token in argv if token != "--allow-host-execution"]
+        if command_tokens[:1] == ["verify"] or command_tokens[:2] == ["report", "verify"]:
+            argv = [
+                token for token in argv if token != "--allow-unattested-artifacts"
+            ]
+        return env_prefix, argv
+
+    if command_tokens[:1] and command_tokens[0] in MODEL_LOADING_COMMANDS:
+        if "--allow-host-execution" not in argv:
+            env_prefix.append(f"{HOST_EXECUTION_ENV}=1")
+    if (
+        command_tokens[:1] == ["verify"] or command_tokens[:2] == ["report", "verify"]
+    ) and "--allow-unattested-artifacts" not in argv:
+        argv = _insert_option_after_command(argv, "--allow-unattested-artifacts")
+    return env_prefix, argv
+
+
+def _sanitize_script(block: BashBlock, *, execution_mode: str = "container") -> str:
     rendered: list[str] = []
     py = shlex.quote(sys.executable)
     for raw in block.text.splitlines():
@@ -222,15 +303,12 @@ def _sanitize_script(block: BashBlock) -> str:
         except ValueError:
             parsed_tokens = []
         if parsed_tokens:
-            env_prefix: list[str] = []
-            idx = 0
-            for token in parsed_tokens:
-                if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=.*$", token):
-                    env_prefix.append(token)
-                    idx += 1
-                    continue
-                break
-            argv = parsed_tokens[idx:]
+            env_prefix, argv = _split_env_prefix(parsed_tokens)
+            env_prefix, argv = _rewrite_invarlock_tokens(
+                env_prefix=env_prefix,
+                argv=argv,
+                execution_mode=execution_mode,
+            )
             if argv[:1] == ["invarlock"]:
                 rebuilt = env_prefix + [py, "-m", "invarlock", *argv[1:]]
                 line = indent + shlex.join(rebuilt)
@@ -265,6 +343,7 @@ def run_blocks(
     blocks: list[BashBlock],
     *,
     output_root: Path,
+    execution_mode: str = "container",
 ) -> int:
     output_root.mkdir(parents=True, exist_ok=True)
     results_path = output_root / "results.jsonl"
@@ -300,7 +379,10 @@ def run_blocks(
                     out.flush()
                     continue
 
-                script_path.write_text(_sanitize_script(block), encoding="utf-8")
+                script_path.write_text(
+                    _sanitize_script(block, execution_mode=execution_mode),
+                    encoding="utf-8",
+                )
                 completed = subprocess.run(
                     ["bash", "-euo", "pipefail", str(script_path.name)],
                     cwd=str(workspace),
@@ -319,6 +401,7 @@ def run_blocks(
                     "id": block_id,
                     "file": block.file,
                     "line": block.line,
+                    "execution_mode": execution_mode,
                     "status": "ok" if completed.returncode == 0 else "failed",
                     "exit_code": int(completed.returncode),
                     "log_path": str(log_path),
@@ -355,6 +438,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=str(TMP / "markdown_live"),
         help="Output directory for logs, workspaces, and result JSONL.",
     )
+    parser.add_argument(
+        "--execution-mode",
+        default="container",
+        choices=EXECUTION_MODES,
+        help=(
+            "Replay markdown commands as secure-default container commands or "
+            "as explicit trusted-host commands."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -362,7 +454,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     md_files = iter_markdown_files(ROOT, paths=args.paths)
     blocks = extract_bash_blocks(md_files)
-    return run_blocks(blocks, output_root=Path(args.output_root).expanduser().resolve())
+    return run_blocks(
+        blocks,
+        output_root=Path(args.output_root).expanduser().resolve(),
+        execution_mode=args.execution_mode,
+    )
 
 
 if __name__ == "__main__":

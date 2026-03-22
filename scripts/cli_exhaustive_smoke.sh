@@ -185,10 +185,14 @@ run "invarlock verify --json (invalid)" "$CLI verify --json \"$TMP_DIR/report_in
 # Offline runs (force quick failure if uncached)
 OFFLINE_ENV="HF_DATASETS_OFFLINE=1 TRANSFORMERS_OFFLINE=1 TOKENIZERS_PARALLELISM=false"
 OFFLINE_EVAL_ENV="$OFFLINE_ENV INVARLOCK_DEDUP_TEXTS=1 INVARLOCK_TINY_RELAX=1"
+OFFLINE_HOST_ENV="$OFFLINE_ENV INVARLOCK_ALLOW_HOST_EXECUTION=1"
+OFFLINE_HOST_EVAL_ENV="$OFFLINE_EVAL_ENV INVARLOCK_ALLOW_HOST_EXECUTION=1"
 
 if have_adapters_stack; then
   run_to "invarlock run (offline)" 90 "$OFFLINE_ENV $CLI run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --device cpu --out \"$TMP_DIR/run_offline\""
   run_to "invarlock evaluate (offline)" 150 "$OFFLINE_EVAL_ENV $CLI evaluate --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --device cpu --out \"$TMP_DIR/report_offline\" --report-out \"$TMP_DIR/report_offline_out\""
+  run_to "invarlock run (offline, host)" 90 "$OFFLINE_HOST_ENV $CLI run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --device cpu --out \"$TMP_DIR/run_offline_host\""
+  run_to "invarlock evaluate (offline, host)" 150 "$OFFLINE_HOST_EVAL_ENV $CLI evaluate --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --device cpu --out \"$TMP_DIR/report_offline_host\" --report-out \"$TMP_DIR/report_offline_host_out\""
 else
   {
     echo "\n==== BEGIN invarlock run (offline) ===="
@@ -197,15 +201,27 @@ else
     echo "\n==== BEGIN invarlock evaluate (offline) ===="
     echo "[skip] adapters stack (torch/transformers) not available"
     echo "==== END invarlock evaluate (offline) ====\n"
+    echo "\n==== BEGIN invarlock run (offline, host) ===="
+    echo "[skip] adapters stack (torch/transformers) not available"
+    echo "==== END invarlock run (offline, host) ====\n"
+    echo "\n==== BEGIN invarlock evaluate (offline, host) ===="
+    echo "[skip] adapters stack (torch/transformers) not available"
+    echo "==== END invarlock evaluate (offline, host) ====\n"
   } >>"$LOG_FILE"
 fi
 
 # With network allowed (may still fail fast if extras missing)
 NET_ENV="INVARLOCK_ALLOW_NETWORK=1 TOKENIZERS_PARALLELISM=false"
 NET_EVAL_ENV="$NET_ENV INVARLOCK_DEDUP_TEXTS=1 INVARLOCK_TINY_RELAX=1"
+NET_HOST_ENV="$NET_ENV INVARLOCK_ALLOW_HOST_EXECUTION=1"
+NET_HOST_EVAL_ENV="$NET_EVAL_ENV INVARLOCK_ALLOW_HOST_EXECUTION=1"
 if have_adapters_stack; then
   run_to "invarlock run (network)" 90 "$NET_ENV $CLI run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --device cpu --out \"$TMP_DIR/run_net\""
   run_to "invarlock evaluate (network)" 150 "$NET_EVAL_ENV $CLI evaluate --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --device cpu --out \"$TMP_DIR/report_net\" --report-out \"$TMP_DIR/report_net_out\""
+  run "invarlock verify (network output)" "if [ -f \"$TMP_DIR/report_net_out/evaluation.report.json\" ]; then $CLI verify --json \"$TMP_DIR/report_net_out/evaluation.report.json\"; else echo '[skip] report missing'; fi"
+  run_to "invarlock run (network, host)" 90 "$NET_HOST_ENV $CLI run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --device cpu --out \"$TMP_DIR/run_net_host\""
+  run_to "invarlock evaluate (network, host)" 150 "$NET_HOST_EVAL_ENV $CLI evaluate --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --device cpu --out \"$TMP_DIR/report_net_host\" --report-out \"$TMP_DIR/report_net_host_out\""
+  run "invarlock verify (network host output)" "if [ -f \"$TMP_DIR/report_net_host_out/evaluation.report.json\" ]; then $CLI verify --allow-unattested-artifacts --json \"$TMP_DIR/report_net_host_out/evaluation.report.json\"; else echo '[skip] report missing'; fi"
 else
   {
     echo "\n==== BEGIN invarlock run (network) ===="
@@ -214,6 +230,18 @@ else
     echo "\n==== BEGIN invarlock evaluate (network) ===="
     echo "[skip] adapters stack (torch/transformers) not available"
     echo "==== END invarlock evaluate (network) ====\n"
+    echo "\n==== BEGIN invarlock verify (network output) ===="
+    echo "[skip] adapters stack (torch/transformers) not available"
+    echo "==== END invarlock verify (network output) ====\n"
+    echo "\n==== BEGIN invarlock run (network, host) ===="
+    echo "[skip] adapters stack (torch/transformers) not available"
+    echo "==== END invarlock run (network, host) ====\n"
+    echo "\n==== BEGIN invarlock evaluate (network, host) ===="
+    echo "[skip] adapters stack (torch/transformers) not available"
+    echo "==== END invarlock evaluate (network, host) ====\n"
+    echo "\n==== BEGIN invarlock verify (network host output) ===="
+    echo "[skip] adapters stack (torch/transformers) not available"
+    echo "==== END invarlock verify (network host output) ====\n"
   } >>"$LOG_FILE"
 fi
 

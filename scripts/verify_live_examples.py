@@ -4,7 +4,7 @@
 This orchestrates the two runnable documentation surfaces that materially drift
 in practice:
 
-- Markdown CLI snippets, executed through `extract_and_run_invarlock_cmds.py`
+- Markdown CLI snippets, executed through `verify_markdown_bash_blocks.py`
 - Jupyter notebooks, executed through `verify_notebooks_smoke.py`
 
 Outputs are written under `tmp/live_examples/` by default so CI and local runs
@@ -121,6 +121,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Skip markdown CLI snippet execution.",
     )
     parser.add_argument(
+        "--markdown-execution-mode",
+        default="container",
+        choices=("container", "host"),
+        help=(
+            "Execution mode forwarded to verify_markdown_bash_blocks.py for "
+            "markdown command replay."
+        ),
+    )
+    parser.add_argument(
         "--skip-notebooks",
         action="store_true",
         help="Skip notebook execution.",
@@ -165,6 +174,8 @@ def main(argv: list[str] | None = None) -> int:
             "scripts/verify_markdown_bash_blocks.py",
             "--output-root",
             str(output_root / "markdown"),
+            "--execution-mode",
+            args.markdown_execution_mode,
         ]
         if markdown_paths:
             markdown_cmd.extend(["--paths", *markdown_paths])

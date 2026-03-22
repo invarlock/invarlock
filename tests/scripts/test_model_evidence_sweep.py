@@ -106,6 +106,7 @@ def test_model_evidence_sweep_dry_run_emits_commands_and_manifest(
     payload = json.loads(proc.stdout)
     assert len(payload) == 1
     assert payload[0]["slug"] == "qwen3_8b"
+    assert payload[0]["execution_mode"] == "container"
     assert "invarlock" in " ".join(payload[0]["evaluate"])
     assert "evaluation.report.json" in " ".join(payload[0]["verify"])
     assert "--allow-host-execution" not in payload[0]["evaluate"]
@@ -113,7 +114,44 @@ def test_model_evidence_sweep_dry_run_emits_commands_and_manifest(
 
     manifest = json.loads((output_root / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["suite"] == "current-supported-experimental"
+    assert manifest["execution_mode"] == "container"
     assert manifest["lanes"][0]["slug"] == "qwen3_8b"
+
+
+def test_model_evidence_sweep_host_mode_emits_host_bypass_flags(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "model_evidence_sweep.py"
+    output_root = tmp_path / "evidence-host"
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--slug",
+            "tinyllama_1_1b",
+            "--execution-mode",
+            "host",
+            "--output-root",
+            str(output_root),
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(proc.stdout)
+    assert len(payload) == 1
+    assert payload[0]["execution_mode"] == "host"
+    assert "--allow-host-execution" in payload[0]["evaluate"]
+    assert "--allow-unattested-artifacts" in payload[0]["verify"]
+
+    manifest = json.loads((output_root / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["execution_mode"] == "host"
 
 
 def test_model_evidence_sweep_returns_failure_when_verify_fails(
@@ -144,6 +182,7 @@ def test_model_evidence_sweep_returns_failure_when_verify_fails(
 
     assert proc.returncode == 1, proc.stderr
     summary = json.loads((output_root / "summary.json").read_text(encoding="utf-8"))
+    assert summary["execution_mode"] == "container"
     assert summary["ok"] is False
     assert len(summary["results"]) == 1
     result = summary["results"][0]
