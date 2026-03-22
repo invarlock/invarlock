@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 from dataclasses import asdict, dataclass
@@ -381,18 +383,46 @@ def runtime_env() -> dict[str, str]:
     return env
 
 
+def _is_within_repo(path: Path) -> bool:
+    try:
+        path.resolve().relative_to(REPO_ROOT)
+    except ValueError:
+        return False
+    return True
+
+
+def _execution_root(output_root: Path, *, execution_mode: str) -> Path:
+    if execution_mode != "container" or _is_within_repo(output_root):
+        return output_root
+    suffix = hashlib.sha256(
+        output_root.resolve().as_posix().encode("utf-8")
+    ).hexdigest()[:16]
+    return REPO_ROOT / "tmp" / "model_evidence_container" / suffix
+
+
+def _publish_lane_artifacts(source: Path, destination: Path) -> None:
+    if source == destination or not source.exists():
+        return
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if destination.exists():
+        shutil.rmtree(destination)
+    shutil.copytree(source, destination)
+
+
 def run_lane(
     spec: EvidenceLane,
     *,
     output_root: Path,
+    execution_root: Path,
     python_exe: str,
     profile: str,
     device: str,
     execution_mode: str,
     env: dict[str, str],
 ) -> LaneResult:
-    lane_root = output_root / "eval" / spec.slug
+    lane_root = execution_root / "eval" / spec.slug
     lane_root.mkdir(parents=True, exist_ok=True)
+    published_lane_root = output_root / "eval" / spec.slug
     log_dir = output_root / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / f"{spec.slug}.log"
@@ -443,6 +473,10 @@ def run_lane(
             )
             verify_exit = verify_proc.returncode
 
+    _publish_lane_artifacts(lane_root, published_lane_root)
+    published_report_path = published_lane_root / "report" / "evaluation.report.json"
+    published_verify_path = published_lane_root / "verify.json"
+
     return LaneResult(
         slug=spec.slug,
         lane_id=spec.lane_id,
@@ -450,8 +484,8 @@ def run_lane(
         preset=spec.preset_relpath,
         evaluate_exit=eval_proc.returncode,
         verify_exit=verify_exit,
-        report_path=str(report_path),
-        verify_path=str(verify_path) if verify_path.is_file() else None,
+        report_path=str(published_report_path),
+        verify_path=str(published_verify_path) if published_verify_path.is_file() else None,
     )
 
 
@@ -532,6 +566,9 @@ def run_sweep(args: argparse.Namespace) -> int:
         else default_output_root()
     )
     output_root.mkdir(parents=True, exist_ok=True)
+    execution_root = _execution_root(output_root, execution_mode=args.execution_mode)
+    if execution_root != output_root:
+        execution_root.mkdir(parents=True, exist_ok=True)
     write_manifest(
         output_root,
         suite=args.suite,
@@ -541,7 +578,7 @@ def run_sweep(args: argparse.Namespace) -> int:
     if args.dry_run:
         payload = []
         for spec in specs:
-            lane_root = output_root / "eval" / spec.slug
+            lane_root = execution_root / "eval" / spec.slug
             payload.append(
                 {
                     "slug": spec.slug,
@@ -574,12 +611,13 @@ def run_sweep(args: argparse.Namespace) -> int:
             handle.write(f"[{datetime.now(UTC).isoformat()}] START {spec.slug}\n")
             handle.flush()
             result = run_lane(
-                spec,
-                output_root=output_root,
-                python_exe=args.python,
-                profile=args.profile,
-                device=args.device,
-                execution_mode=args.execution_mode,
+            spec,
+            output_root=output_root,
+            execution_root=execution_root,
+            python_exe=args.python,
+            profile=args.profile,
+            device=args.device,
+            execution_mode=args.execution_mode,
                 env=env,
             )
             results.append(result)

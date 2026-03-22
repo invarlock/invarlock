@@ -197,3 +197,37 @@ def test_model_evidence_sweep_returns_failure_when_verify_fails(
     assert result["verify_exit"] == 1
     assert result["ok"] is False
     assert (output_root / "eval" / "tinyllama_1_1b" / "verify.json").is_file()
+
+
+def test_model_evidence_sweep_container_mode_publishes_external_output_root(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "model_evidence_sweep.py"
+    fake_python = tmp_path / "fake-python"
+    _write_fake_python(fake_python)
+    output_root = tmp_path / "external-container-evidence"
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--slug",
+            "tinyllama_1_1b",
+            "--execution-mode",
+            "container",
+            "--output-root",
+            str(output_root),
+            "--python",
+            str(fake_python),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+    )
+
+    assert proc.returncode == 1, proc.stderr
+    published_lane = output_root / "eval" / "tinyllama_1_1b"
+    assert (published_lane / "report" / "evaluation.report.json").is_file()
+    assert (published_lane / "verify.json").is_file()
