@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added stronger proof-pack manifest and attestation tooling, including a
   public manifest schema, manifest validation and attestation helpers, and
   source/environment metadata capture for packaged runs.
+- Added public model-family and runtime-manifest contracts, packaged contract
+  artifacts in wheels, and contract-sync automation for shipped distributions.
+- Added package-native proof-pack verification plus new proof-pack `inspect`
+  and `build` command flows for packaged verification artifacts.
+- Added replacement-model support lanes, pilot presets, and automated model
+  evidence-sweep tooling/workflows for maintaining shipped support claims.
 
 ### Changed
 - Optimized evaluation data loading, Hugging Face adapter/model-loading paths,
@@ -23,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   configured `setup-python` interpreter with tighter permission scopes.
 - Hardened the exhaustive CLI smoke runner, expanded active eval coverage
   thresholds, and retargeted Dependabot automation to `staging/next`.
+- Moved runtime and repo workflows to secure-by-default behavior, including
+  safer runtime-image resolution/container defaults and tighter integration
+  protections around Dependabot activity.
+- Refreshed shipped model lanes and presets around evidence-backed support,
+  including `hf_text` causal-eval defaults, updated pilot/backlog family
+  coverage, and removal of the legacy ONNX adapter surface.
+- Tightened evaluate/verify isolation so generated configs stay invocation
+  local and policy/coverage recomputation remains aligned with current runs.
 
 ### Fixed
 - Hardened CLI backend, doctor, plugin, and verification checks, including
@@ -36,6 +50,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Aligned the Scorecards workflow with upstream pinning, tightened
   Scorecards/CodeQL permissions, and fixed notebook ordering needed for release
   pre-commit validation.
+- Repaired local runtime evaluation and security-default quickstart flows so
+  repo checkouts prefer a locally built runtime image, respect the runtime
+  container entrypoint, and document the current `plugins list` CLI form.
+- Fixed remote-evidence launcher Python discovery and aligned proof-pack nested
+  verification expectations with the packaged verifier behavior.
+- Hardened ClusterFuzzLite/runtime security integration and policy-pack digest
+  verification in fail-closed paths.
 
 ### Dependencies
 - Bumped `actions/download-artifact` from `7` to `8`.
@@ -47,6 +68,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refreshed related security best-practice references.
 - Clarified proof-pack wheel-boundary, scenario, and verification guidance, and
   refreshed related CLI, contracts, and adapter reference material.
+- Added live execution verification for runnable Markdown examples in CI and
+  documented the new `docs-live` workflow plus runtime-image prerequisites for
+  repo quickstarts.
+- Documented proof-pack wheel verification and the nongated replacement backlog
+  lanes used for evidence-backed model support planning.
 
 ## [0.4.0] - 2026-03-14
 
