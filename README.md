@@ -87,13 +87,15 @@ In a repo checkout, build the local runtime image once with
 `invarlock-runtime:local` when it is present. Trusted notebook or local-shell
 workflows can opt into host execution explicitly with
 `INVARLOCK_ALLOW_HOST_EXECUTION=1`, but the attested verification step below
-expects container execution.
+expects container execution. The quickstart block below assumes a repo checkout;
+do not skip `make runtime-image` if you want the attested container path.
 
 ```bash
+# Repo-checkout quickstart for the attested container path
 # HF adapter stack (torch/transformers)
 pip install "invarlock[hf]"
 
-# Repo checkout only: build the local OCI runtime image once for the attested path.
+# Required in a repo checkout for the attested path; do not skip this step.
 make runtime-image
 
 # Version + report schema (when available)

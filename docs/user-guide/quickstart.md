@@ -80,7 +80,8 @@ The `evaluate` examples above use the secure-default runtime container and
 expect an OCI container engine such as `docker` or `podman`. In a repo
 checkout, run `make runtime-image` once; InvarLock automatically prefers the
 local `invarlock-runtime:local` image when it is present. For a trusted local
-host run, add `--allow-host-execution`.
+host run, add `--allow-host-execution`. Do not skip `make runtime-image` if you
+want the attested container path shown in the examples above.
 
 ### 3. Generate Reports
 

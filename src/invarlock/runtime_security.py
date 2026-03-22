@@ -192,7 +192,6 @@ def _inspect_container_image(engine: str, image: str) -> tuple[bool, str | None]
     if len(lines) >= 2 and lines[1].startswith("sha256:"):
         return True, lines[1]
     return True, None
-    return None
 
 
 def resolve_container_engine() -> str | None:

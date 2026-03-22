@@ -1384,7 +1384,7 @@ class SyntheticProvider:
 
         input_ids_list: list[list[int]] = []
         attention_masks_list: list[list[int]] = []
-        for _text in texts:
+        for _ in texts:
             # Fallback for lightweight test scenarios without tokenizer support.
             input_ids = list(range(1, min(seq_len + 1, 50))) + [0] * max(
                 0, seq_len - 49
