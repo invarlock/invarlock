@@ -19,6 +19,16 @@ LOG_FILE="$(mktemp -t invarlock_cli_smoke.XXXXXX.log)"
 echo "[info] $(ts) CLI runner: $CLI" | tee -a "$LOG_FILE"
 echo "[info] $(ts) Log file: $LOG_FILE"
 
+smoke_timeout() {
+  local var_name="$1"
+  local default_value="$2"
+  printf '%s' "${!var_name:-$default_value}"
+}
+
+RUN_TIMEOUT_SECONDS="$(smoke_timeout INVARLOCK_SMOKE_RUN_TIMEOUT 180)"
+EVALUATE_TIMEOUT_SECONDS="$(smoke_timeout INVARLOCK_SMOKE_EVALUATE_TIMEOUT 420)"
+echo "[info] $(ts) Timeout budget: run=${RUN_TIMEOUT_SECONDS}s evaluate=${EVALUATE_TIMEOUT_SECONDS}s" | tee -a "$LOG_FILE"
+
 ensure_writable_hf_cache() {
   local candidate_root=""
   if [[ -n "${HF_HOME:-}" ]]; then
@@ -189,10 +199,10 @@ OFFLINE_HOST_ENV="$OFFLINE_ENV INVARLOCK_ALLOW_HOST_EXECUTION=1"
 OFFLINE_HOST_EVAL_ENV="$OFFLINE_EVAL_ENV INVARLOCK_ALLOW_HOST_EXECUTION=1"
 
 if have_adapters_stack; then
-  run_to "invarlock run (offline)" 90 "$OFFLINE_ENV $CLI run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --device cpu --out \"$TMP_DIR/run_offline\""
-  run_to "invarlock evaluate (offline)" 150 "$OFFLINE_EVAL_ENV $CLI evaluate --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --device cpu --out \"$TMP_DIR/report_offline\" --report-out \"$TMP_DIR/report_offline_out\""
-  run_to "invarlock run (offline, host)" 90 "$OFFLINE_HOST_ENV $CLI run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --device cpu --out \"$TMP_DIR/run_offline_host\""
-  run_to "invarlock evaluate (offline, host)" 150 "$OFFLINE_HOST_EVAL_ENV $CLI evaluate --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --device cpu --out \"$TMP_DIR/report_offline_host\" --report-out \"$TMP_DIR/report_offline_host_out\""
+  run_to "invarlock run (offline)" "$RUN_TIMEOUT_SECONDS" "$OFFLINE_ENV $CLI run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --device cpu --out \"$TMP_DIR/run_offline\""
+  run_to "invarlock evaluate (offline)" "$EVALUATE_TIMEOUT_SECONDS" "$OFFLINE_EVAL_ENV $CLI evaluate --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --device cpu --out \"$TMP_DIR/report_offline\" --report-out \"$TMP_DIR/report_offline_out\""
+  run_to "invarlock run (offline, host)" "$RUN_TIMEOUT_SECONDS" "$OFFLINE_HOST_ENV $CLI run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --device cpu --out \"$TMP_DIR/run_offline_host\""
+  run_to "invarlock evaluate (offline, host)" "$EVALUATE_TIMEOUT_SECONDS" "$OFFLINE_HOST_EVAL_ENV $CLI evaluate --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --device cpu --out \"$TMP_DIR/report_offline_host\" --report-out \"$TMP_DIR/report_offline_host_out\""
 else
   {
     echo "\n==== BEGIN invarlock run (offline) ===="
@@ -216,11 +226,11 @@ NET_EVAL_ENV="$NET_ENV INVARLOCK_DEDUP_TEXTS=1 INVARLOCK_TINY_RELAX=1"
 NET_HOST_ENV="$NET_ENV INVARLOCK_ALLOW_HOST_EXECUTION=1"
 NET_HOST_EVAL_ENV="$NET_EVAL_ENV INVARLOCK_ALLOW_HOST_EXECUTION=1"
 if have_adapters_stack; then
-  run_to "invarlock run (network)" 90 "$NET_ENV $CLI run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --device cpu --out \"$TMP_DIR/run_net\""
-  run_to "invarlock evaluate (network)" 150 "$NET_EVAL_ENV $CLI evaluate --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --device cpu --out \"$TMP_DIR/report_net\" --report-out \"$TMP_DIR/report_net_out\""
+  run_to "invarlock run (network)" "$RUN_TIMEOUT_SECONDS" "$NET_ENV $CLI run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --device cpu --out \"$TMP_DIR/run_net\""
+  run_to "invarlock evaluate (network)" "$EVALUATE_TIMEOUT_SECONDS" "$NET_EVAL_ENV $CLI evaluate --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --device cpu --out \"$TMP_DIR/report_net\" --report-out \"$TMP_DIR/report_net_out\""
   run "invarlock verify (network output)" "if [ -f \"$TMP_DIR/report_net_out/evaluation.report.json\" ]; then $CLI verify --json \"$TMP_DIR/report_net_out/evaluation.report.json\"; else echo '[skip] report missing'; fi"
-  run_to "invarlock run (network, host)" 90 "$NET_HOST_ENV $CLI run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --device cpu --out \"$TMP_DIR/run_net_host\""
-  run_to "invarlock evaluate (network, host)" 150 "$NET_HOST_EVAL_ENV $CLI evaluate --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --device cpu --out \"$TMP_DIR/report_net_host\" --report-out \"$TMP_DIR/report_net_host_out\""
+  run_to "invarlock run (network, host)" "$RUN_TIMEOUT_SECONDS" "$NET_HOST_ENV $CLI run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --device cpu --out \"$TMP_DIR/run_net_host\""
+  run_to "invarlock evaluate (network, host)" "$EVALUATE_TIMEOUT_SECONDS" "$NET_HOST_EVAL_ENV $CLI evaluate --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --device cpu --out \"$TMP_DIR/report_net_host\" --report-out \"$TMP_DIR/report_net_host_out\""
   run "invarlock verify (network host output)" "if [ -f \"$TMP_DIR/report_net_host_out/evaluation.report.json\" ]; then $CLI verify --allow-unattested-artifacts --json \"$TMP_DIR/report_net_host_out/evaluation.report.json\"; else echo '[skip] report missing'; fi"
 else
   {
