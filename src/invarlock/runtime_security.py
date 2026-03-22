@@ -23,6 +23,7 @@ RUNTIME_MANIFEST_VERSION = 1
 RUNTIME_VERIFIER_BINARY_ENV = "INVARLOCK_RUNTIME_VERIFIER"
 RUNTIME_VERIFIER_BINARY_DEFAULT = "invarlock-runtime-verify"
 RUNTIME_VERIFIER_CONTRACT_VERSION = "runtime-manifest-v1"
+RUNTIME_IMAGE_LOCAL_DEFAULT = "invarlock-runtime:local"
 RUNTIME_IMAGE_DEFAULT = "ghcr.io/invarlock/invarlock-runtime:latest"
 
 _TRUE_VALUES = {"1", "true", "yes", "on"}
@@ -136,7 +137,14 @@ def current_execution_mode() -> str:
 
 def resolve_runtime_image() -> str:
     image = os.environ.get(RUNTIME_IMAGE_ENV, "").strip()
-    return image or RUNTIME_IMAGE_DEFAULT
+    if image:
+        return image
+    engine = resolve_container_engine()
+    if engine is not None and container_image_available_locally(
+        RUNTIME_IMAGE_LOCAL_DEFAULT, engine=engine
+    ):
+        return RUNTIME_IMAGE_LOCAL_DEFAULT
+    return RUNTIME_IMAGE_DEFAULT
 
 
 def resolve_runtime_image_digest() -> str | None:
@@ -291,7 +299,8 @@ def build_container_command(argv: list[str] | None = None) -> list[str]:
     command.extend(["-v", f"{cwd}:/workspace", "-w", "/workspace"])
     for key, value in env_pairs.items():
         command.extend(["-e", f"{key}={value}"])
-    command.extend([image, "python", "-m", "invarlock", *argv])
+    # The runtime image already sets `python -m invarlock` as its entrypoint.
+    command.extend([image, *argv])
     return command
 
 

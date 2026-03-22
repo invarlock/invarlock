@@ -80,14 +80,20 @@ in CI.
 Colab (CPU-friendly):
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_quickstart_cpu.ipynb)
 
-The secure-default CLI path runs model-loading commands inside the official
-runtime container. Trusted notebook or local-shell workflows can opt into host
-execution explicitly with `INVARLOCK_ALLOW_HOST_EXECUTION=1`, but the public
-quick start below shows the default attested path.
+The secure-default CLI path runs model-loading commands inside the runtime
+container. In a repo checkout, build the local runtime image once with
+`make runtime-image`; InvarLock automatically prefers
+`invarlock-runtime:local` when it is present. Trusted notebook or local-shell
+workflows can opt into host execution explicitly with
+`INVARLOCK_ALLOW_HOST_EXECUTION=1`, but the attested verification step below
+expects container execution.
 
 ```bash
 # HF adapter stack (torch/transformers)
 pip install "invarlock[hf]"
+
+# Repo checkout only: build the local runtime image once for the attested path.
+make runtime-image
 
 # Version + report schema (when available)
 invarlock --version
@@ -207,6 +213,7 @@ For guidance on where to ask questions, how to report bugs, and what to expect i
   - `make dev-install`
   - `make test`
   - `make lint`
+  - `make docs-live`
 
 ## License
 

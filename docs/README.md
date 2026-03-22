@@ -138,6 +138,19 @@ configured acceptance envelopes even when aggressive compression is attempted.
 
 ---
 
+## Live Example Verification
+
+- Runnable documentation surfaces are verified with
+  `python scripts/verify_live_examples.py`.
+- This live check executes concrete Markdown CLI snippets through the current
+  checkout and smoke-runs notebooks under `notebooks/`.
+- Artifacts land under `tmp/live_examples/`, including per-command JSONL
+  results, notebook stdout/stderr logs, and a machine-readable `summary.json`.
+- Placeholder/template snippets still need to stay parseable, but only concrete
+  runnable examples should be treated as copy-paste-ready.
+
+---
+
 ## Building Docs Offline vs Online
 
 - Offline (default): mkdocs builds without contacting the Internet. Mermaid

@@ -122,11 +122,10 @@ def plugins_command(
     Shows plugin names, module paths, and availability status without instantiation.
 
     Examples:
-        invarlock plugins              # List all plugins
+        invarlock plugins list         # List all plugins
         invarlock plugins guards       # List built-in guard plugins
         invarlock plugins edits        # List built-in edit plugins
         invarlock plugins adapters     # List built-in adapter plugins
-        invarlock plugins datasets     # List built-in dataset providers
         invarlock plugins adapters --allow-third-party-plugins
     """
     try:

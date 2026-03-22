@@ -21,6 +21,7 @@ Heuristics:
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import re
@@ -191,6 +192,30 @@ def extract_commands(paths: Iterable[Path]) -> list[tuple[str, int, str]]:
     return deduped
 
 
+def iter_markdown_files(root: Path, *, paths: list[str] | None = None) -> list[Path]:
+    if paths:
+        candidates: set[Path] = set()
+        for item in paths:
+            path = (Path(item) if Path(item).is_absolute() else (root / item)).resolve()
+            if path.is_dir():
+                candidates.update(
+                    p.resolve() for p in path.rglob("*.md") if p.is_file()
+                )
+            elif path.is_file() and path.suffix.lower() == ".md":
+                candidates.add(path)
+        return sorted(candidates)
+
+    md_files: list[Path] = []
+    for path in root.glob("**/*.md"):
+        if not path.is_file():
+            continue
+        rel_parts = path.relative_to(root).parts
+        if rel_parts and rel_parts[0] in EXCLUDE_TOP_LEVEL_DIRS:
+            continue
+        md_files.append(path)
+    return sorted(md_files, key=lambda p: str(p))
+
+
 def write_commands(
     commands: list[tuple[str, int, str]], out_path: Path
 ) -> list[Command]:
@@ -275,16 +300,13 @@ def _split_env_and_argv(cmd_str: str) -> tuple[dict[str, str], list[str]]:
     return inline_env, argv
 
 
-def run_commands(commands: list[Command], results_path: Path) -> None:
-    # Optional limit via env to keep CI/dev fast
-    try:
-        limit = int(os.environ.get("CMDS_LIMIT", "0"))
-    except Exception:
-        limit = 0
-    try:
-        start = int(os.environ.get("CMDS_OFFSET", "0"))
-    except Exception:
-        start = 0
+def run_commands(
+    commands: list[Command],
+    results_path: Path,
+    *,
+    limit: int = 0,
+    start: int = 0,
+) -> None:
     if start or limit:
         end = start + limit if limit and limit > 0 else None
         commands = commands[start:end]
@@ -351,22 +373,56 @@ def run_commands(commands: list[Command], results_path: Path) -> None:
             out.flush()
 
 
-def main() -> int:
-    md_files: list[Path] = []
-    for path in ROOT.glob("**/*.md"):
-        if not path.is_file():
-            continue
-        rel_parts = path.relative_to(ROOT).parts
-        if rel_parts and rel_parts[0] in EXCLUDE_TOP_LEVEL_DIRS:
-            continue
-        md_files.append(path)
-    # Prefer deterministic ordering
-    md_files.sort(key=lambda p: str(p))
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--paths",
+        nargs="*",
+        default=None,
+        help="Markdown files or directories to scan (default: repo-wide).",
+    )
+    parser.add_argument(
+        "--commands-path",
+        default=str(TMP / "invarlock_commands.tsv"),
+        help="Path for the extracted command inventory TSV.",
+    )
+    parser.add_argument(
+        "--results-path",
+        default=str(TMP / "invarlock_command_results.jsonl"),
+        help="Path for the per-command execution results JSONL.",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=int(os.environ.get("CMDS_LIMIT", "0") or 0),
+        help="Optional command limit after deduplication.",
+    )
+    parser.add_argument(
+        "--offset",
+        type=int,
+        default=int(os.environ.get("CMDS_OFFSET", "0") or 0),
+        help="Optional command offset after deduplication.",
+    )
+    parser.add_argument(
+        "--allow-errors",
+        action="store_true",
+        help="Return success even when one or more commands fail.",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    md_files = iter_markdown_files(ROOT, paths=args.paths)
     commands = extract_commands(md_files)
-    tsv = TMP / "invarlock_commands.tsv"
+    tsv = Path(args.commands_path).expanduser().resolve()
+    tsv.parent.mkdir(parents=True, exist_ok=True)
     cmd_objs = write_commands(commands, tsv)
-    results_path = TMP / "invarlock_command_results.jsonl"
-    run_commands(cmd_objs, results_path)
+    results_path = Path(args.results_path).expanduser().resolve()
+    results_path.parent.mkdir(parents=True, exist_ok=True)
+    run_commands(
+        cmd_objs, results_path, limit=max(0, args.limit), start=max(0, args.offset)
+    )
     print(f"Extracted {len(cmd_objs)} commands → {tsv}")
     print(f"Ran commands → {results_path}")
 
@@ -393,7 +449,12 @@ def main() -> int:
     if failed:
         print("--- failures (first 10) ---")
         print("\n\n".join(failed[:10]))
-        if os.getenv("FAIL_ON_ERROR", "1") in {"1", "true", "True"}:
+        fail_on_error = not args.allow_errors and os.getenv("FAIL_ON_ERROR", "1") in {
+            "1",
+            "true",
+            "True",
+        }
+        if fail_on_error:
             return 1
     return 0
 

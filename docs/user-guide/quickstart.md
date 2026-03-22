@@ -32,7 +32,7 @@ installed an appropriate extra such as `invarlock[hf]` or `invarlock[adapters]`.
 
 ```bash
 # List all plugins
-invarlock plugins
+invarlock plugins list
 
 # List specific categories
 invarlock plugins edits
@@ -76,8 +76,10 @@ invarlock report explain --report runs/edited/report.json --baseline runs/source
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 ```
 
-The `evaluate` examples above use the secure-default runtime container. For a
-trusted local host run, add `--allow-host-execution`.
+The `evaluate` examples above use the secure-default runtime container. In a
+repo checkout, run `make runtime-image` once; InvarLock automatically prefers
+the local `invarlock-runtime:local` image when it is present. For a trusted
+local host run, add `--allow-host-execution`.
 
 ### 3. Generate Reports
 

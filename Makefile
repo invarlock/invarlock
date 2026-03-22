@@ -1,7 +1,7 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
 
-.PHONY: help install dev-install test test-assurance lint format clean docsclean deepclean docs docs-ci verify coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync model-evidence-list model-evidence-sweep runtime-image runtime-smoke runtime-verify
+.PHONY: help install dev-install test test-assurance lint format clean docsclean deepclean docs docs-ci verify coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync model-evidence-list model-evidence-sweep runtime-image runtime-smoke runtime-verify
 
 PYTHON ?= $(shell bash scripts/select_python.sh)
 PIP := $(PYTHON) -m pip
@@ -203,14 +203,9 @@ runtime-image:  ## Build the local container runtime image used for secure-defau
 runtime-smoke:  ## Smoke the local container runtime image
 	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ Docker or Podman is required."; exit 1; }
 	$(CONTAINER_ENGINE) run --rm \
-		-e INVARLOCK_CONTAINER_EXECUTION=1 \
-		-e INVARLOCK_RUNTIME_IMAGE=$(RUNTIME_IMAGE) \
-		-e INVARLOCK_RUNTIME_IMAGE_DIGEST=$(RUNTIME_IMAGE_DIGEST) \
-		-e PYTHONPATH=/workspace/src \
-		-v "$(CURDIR):/workspace" \
-		-w /workspace \
+		--entrypoint python \
 		$(RUNTIME_IMAGE) \
-		--version
+		-c "import datasets, safetensors, torch, transformers; print('runtime image imports ok')"
 
 runtime-verify:  ## Build and smoke the Rust runtime verifier on the fixture bundle
 	$(CARGO) build -p invarlock-runtime-verify
@@ -321,10 +316,14 @@ ensure-ruff:
 
 ## (verify-ci and verify-release targets removed)
 
-.PHONY: docs-check docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell
+.PHONY: docs-check docs-live docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell
 docs-check: ## Run consolidated docs validation (build, links, refs, examples, consistency)
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTHON) scripts/docs_check.py --all
+
+docs-live: ## Live-run runnable markdown CLI examples and notebooks
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTHON) scripts/verify_live_examples.py
 
 docs-check-build: ## Build docs strictly and run link checks
 	$(MAKE) ensure-python

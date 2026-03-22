@@ -26,7 +26,7 @@ not add additional edit algorithms beyond the built‑in RTN quantization.
 
 ```bash
 # List all plugins
-invarlock plugins
+invarlock plugins list
 
 # List by category
 invarlock plugins adapters
