@@ -274,6 +274,7 @@ report_payload = {
         "final": 10.0,
         "preview": 10.0,
         "ratio_vs_baseline": 1.0,
+        "ci": [1.0, 1.0],
         "display_ci": [1.0, 1.0],
     },
     "spectral": {
