@@ -201,6 +201,38 @@ def resolve_container_engine() -> str | None:
     return None
 
 
+def _host_nvidia_visible() -> bool:
+    if Path("/dev/nvidiactl").exists():
+        return True
+    return shutil.which("nvidia-smi") is not None
+
+
+def _command_tokens(argv: list[str]) -> list[str]:
+    return [token for token in argv if not token.startswith("-")]
+
+
+def _requested_device(argv: list[str]) -> str | None:
+    if "--device" in argv:
+        idx = argv.index("--device")
+        if idx + 1 < len(argv):
+            return str(argv[idx + 1]).strip().lower()
+        return None
+
+    command_tokens = _command_tokens(argv)
+    if not command_tokens:
+        return None
+    if command_tokens[0] in {"evaluate", "run", "calibrate"}:
+        return "auto"
+    return None
+
+
+def _needs_gpu_passthrough(argv: list[str]) -> bool:
+    requested = _requested_device(argv)
+    if requested not in {"auto", "cuda"}:
+        return False
+    return _host_nvidia_visible()
+
+
 def container_image_available_locally(
     image: str | None = None, *, engine: str | None = None
 ) -> bool:
@@ -293,6 +325,8 @@ def build_container_command(argv: list[str] | None = None) -> list[str]:
         "PYTHONPATH": "/workspace/src",
     }
     command = [engine, "run", "--rm"]
+    if _needs_gpu_passthrough(argv):
+        command.extend(["--gpus", "all"])
     if not network_allowed():
         command.extend(["--network", "none"])
     command.extend(["-v", f"{cwd}:/workspace", "-w", "/workspace"])

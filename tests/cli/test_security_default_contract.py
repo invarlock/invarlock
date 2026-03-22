@@ -134,3 +134,87 @@ def test_container_launch_uses_runtime_image_entrypoint(
 
     assert command[-3:] == ["invarlock-runtime:local", "evaluate", "--help"]
     assert "python" not in command[command.index("invarlock-runtime:local") + 1 :]
+
+
+def test_container_launch_adds_gpu_passthrough_for_cuda_model_commands(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_container_engine",
+        lambda: "docker",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "container_image_available_locally",
+        lambda image=None, *, engine=None: True,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image",
+        lambda: "invarlock-runtime:local",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image_digest",
+        lambda: "sha256:test",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "_host_nvidia_visible",
+        lambda: True,
+        raising=True,
+    )
+
+    command = runtime_security.build_container_command(
+        ["evaluate", "--device", "cuda", "--help"]
+    )
+
+    assert command[:5] == ["docker", "run", "--rm", "--gpus", "all"]
+
+
+def test_container_launch_skips_gpu_passthrough_for_cpu_model_commands(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_container_engine",
+        lambda: "docker",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "container_image_available_locally",
+        lambda image=None, *, engine=None: True,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image",
+        lambda: "invarlock-runtime:local",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image_digest",
+        lambda: "sha256:test",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "_host_nvidia_visible",
+        lambda: True,
+        raising=True,
+    )
+
+    command = runtime_security.build_container_command(
+        ["evaluate", "--device", "cpu", "--help"]
+    )
+
+    assert "--gpus" not in command
