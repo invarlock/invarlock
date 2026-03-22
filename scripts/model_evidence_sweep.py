@@ -32,6 +32,11 @@ class EvidenceLane:
     def preset_path(self) -> Path:
         return REPO_ROOT / self.preset_relpath
 
+    def preset_arg(self, *, execution_mode: str) -> str:
+        if execution_mode == "container":
+            return self.preset_relpath
+        return str(self.preset_path)
+
     def to_manifest_entry(self) -> dict[str, str]:
         return {
             "slug": self.slug,
@@ -331,7 +336,7 @@ def build_evaluate_command(
         "--adapter",
         spec.adapter,
         "--preset",
-        str(spec.preset_path),
+        spec.preset_arg(execution_mode=execution_mode),
         "--profile",
         profile,
         "--allow-network",

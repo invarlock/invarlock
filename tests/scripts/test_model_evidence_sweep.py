@@ -109,6 +109,8 @@ def test_model_evidence_sweep_dry_run_emits_commands_and_manifest(
     assert payload[0]["execution_mode"] == "container"
     assert "invarlock" in " ".join(payload[0]["evaluate"])
     assert "evaluation.report.json" in " ".join(payload[0]["verify"])
+    preset_idx = payload[0]["evaluate"].index("--preset") + 1
+    assert payload[0]["evaluate"][preset_idx] == "configs/presets/causal_lm/qwen3_8b_512.yaml"
     assert "--allow-host-execution" not in payload[0]["evaluate"]
     assert "--allow-unattested-artifacts" not in payload[0]["verify"]
 
@@ -149,6 +151,10 @@ def test_model_evidence_sweep_host_mode_emits_host_bypass_flags(
     assert payload[0]["execution_mode"] == "host"
     assert "--allow-host-execution" in payload[0]["evaluate"]
     assert "--allow-unattested-artifacts" in payload[0]["verify"]
+    preset_idx = payload[0]["evaluate"].index("--preset") + 1
+    assert payload[0]["evaluate"][preset_idx] == str(
+        repo_root / "configs/presets/causal_lm/tinyllama_1_1b_512.yaml"
+    )
 
     manifest = json.loads((output_root / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["execution_mode"] == "host"
