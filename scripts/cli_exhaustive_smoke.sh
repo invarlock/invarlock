@@ -27,8 +27,9 @@ smoke_timeout() {
 
 RUN_TIMEOUT_SECONDS="$(smoke_timeout INVARLOCK_SMOKE_RUN_TIMEOUT 180)"
 EVALUATE_TIMEOUT_SECONDS="$(smoke_timeout INVARLOCK_SMOKE_EVALUATE_TIMEOUT 420)"
-CALIBRATE_TIMEOUT_SECONDS="$(smoke_timeout INVARLOCK_SMOKE_CALIBRATE_TIMEOUT 900)"
-echo "[info] $(ts) Timeout budget: run=${RUN_TIMEOUT_SECONDS}s evaluate=${EVALUATE_TIMEOUT_SECONDS}s calibrate=${CALIBRATE_TIMEOUT_SECONDS}s" | tee -a "$LOG_FILE"
+CALIBRATE_NULL_TIMEOUT_SECONDS="$(smoke_timeout INVARLOCK_SMOKE_CALIBRATE_NULL_TIMEOUT 900)"
+CALIBRATE_VE_TIMEOUT_SECONDS="$(smoke_timeout INVARLOCK_SMOKE_CALIBRATE_VE_TIMEOUT 1200)"
+echo "[info] $(ts) Timeout budget: run=${RUN_TIMEOUT_SECONDS}s evaluate=${EVALUATE_TIMEOUT_SECONDS}s calibrate_null=${CALIBRATE_NULL_TIMEOUT_SECONDS}s calibrate_ve=${CALIBRATE_VE_TIMEOUT_SECONDS}s" | tee -a "$LOG_FILE"
 
 ensure_writable_hf_cache() {
   local candidate_root=""
@@ -351,10 +352,10 @@ if have_adapters_stack; then
   run_to "invarlock evaluate (offline)" "$EVALUATE_TIMEOUT_SECONDS" "$OFFLINE_EVAL_ENV $CLI evaluate --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --device cpu --out \"$TMP_DIR/report_offline\" --report-out \"$TMP_DIR/report_offline_out\""
   run_to "invarlock run (offline, host)" "$RUN_TIMEOUT_SECONDS" "$OFFLINE_HOST_ENV $CLI run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --device cpu --out \"$TMP_DIR/run_offline_host\""
   run_to "invarlock evaluate (offline, host)" "$EVALUATE_TIMEOUT_SECONDS" "$OFFLINE_HOST_EVAL_ENV $CLI evaluate --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --device cpu --out \"$TMP_DIR/report_offline_host\" --report-out \"$TMP_DIR/report_offline_host_out\""
-  run_to "invarlock calibrate null-sweep (network)" "$CALIBRATE_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI calibrate null-sweep --allow-network --config configs/calibration/null_sweep_ci.yaml --out \"$TMP_DIR/calibrate_null\" --profile ci --device cpu --tier balanced --n-seeds 1 --seed-start 42"
-  run_to "invarlock calibrate ve-sweep (network)" "$CALIBRATE_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI calibrate ve-sweep --allow-network --config configs/calibration/rmt_ve_sweep_ci.yaml --out \"$TMP_DIR/calibrate_ve\" --profile ci --device cpu --tier balanced --window 6 --n-seeds 1 --seed-start 42"
-  run_to "invarlock calibrate null-sweep (network, host)" "$CALIBRATE_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI calibrate null-sweep --allow-network --allow-host-execution --config configs/calibration/null_sweep_ci.yaml --out \"$TMP_DIR/calibrate_null_host\" --profile ci --device cpu --tier balanced --n-seeds 1 --seed-start 42"
-  run_to "invarlock calibrate ve-sweep (network, host)" "$CALIBRATE_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI calibrate ve-sweep --allow-network --allow-host-execution --config configs/calibration/rmt_ve_sweep_ci.yaml --out \"$TMP_DIR/calibrate_ve_host\" --profile ci --device cpu --tier balanced --window 6 --n-seeds 1 --seed-start 42"
+  run_to "invarlock calibrate null-sweep (network)" "$CALIBRATE_NULL_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI calibrate null-sweep --allow-network --config configs/calibration/null_sweep_ci.yaml --out \"$TMP_DIR/calibrate_null\" --profile ci --device cpu --tier balanced --n-seeds 1 --seed-start 42"
+  run_to "invarlock calibrate ve-sweep (network)" "$CALIBRATE_VE_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI calibrate ve-sweep --allow-network --config configs/calibration/rmt_ve_sweep_ci.yaml --out \"$TMP_DIR/calibrate_ve\" --profile ci --device cpu --tier balanced --window 6 --n-seeds 1 --seed-start 42"
+  run_to "invarlock calibrate null-sweep (network, host)" "$CALIBRATE_NULL_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI calibrate null-sweep --allow-network --allow-host-execution --config configs/calibration/null_sweep_ci.yaml --out \"$TMP_DIR/calibrate_null_host\" --profile ci --device cpu --tier balanced --n-seeds 1 --seed-start 42"
+  run_to "invarlock calibrate ve-sweep (network, host)" "$CALIBRATE_VE_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI calibrate ve-sweep --allow-network --allow-host-execution --config configs/calibration/rmt_ve_sweep_ci.yaml --out \"$TMP_DIR/calibrate_ve_host\" --profile ci --device cpu --tier balanced --window 6 --n-seeds 1 --seed-start 42"
 else
   {
     echo "\n==== BEGIN invarlock run (offline) ===="
