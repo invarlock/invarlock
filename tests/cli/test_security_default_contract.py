@@ -326,7 +326,9 @@ def test_container_launch_maps_repo_pythonpath_to_workspace_src(
         raising=True,
     )
 
-    command = runtime_security.build_container_command(["run", "--config", "/tmp/dummy"])
+    command = runtime_security.build_container_command(
+        ["run", "--config", "/tmp/dummy"]
+    )
 
     assert _env_value(command, "PYTHONPATH") == "/workspace/src"
 
@@ -367,7 +369,9 @@ def test_container_launch_mounts_absolute_pythonpath_when_running_from_workdir(
         raising=True,
     )
 
-    command = runtime_security.build_container_command(["run", "--config", "/tmp/dummy"])
+    command = runtime_security.build_container_command(
+        ["run", "--config", "/tmp/dummy"]
+    )
 
     assert _env_value(command, "PYTHONPATH") == str(src_dir)
     assert ["-v", f"{src_dir}:{src_dir}"] in _mounts(command)

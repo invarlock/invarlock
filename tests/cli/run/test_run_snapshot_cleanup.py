@@ -103,8 +103,7 @@ def _stub_env(monkeypatch, tmp_path: Path, *, with_snapshot: bool = True):
             windows=lambda **kw: (
                 SimpleNamespace(
                     input_ids=[
-                        [idx + 1, idx + 2]
-                        for idx in range(int(kw.get("preview_n", 1)))
+                        [idx + 1, idx + 2] for idx in range(int(kw.get("preview_n", 1)))
                     ],
                     attention_masks=[
                         [1, 1] for _ in range(int(kw.get("preview_n", 1)))
@@ -115,9 +114,7 @@ def _stub_env(monkeypatch, tmp_path: Path, *, with_snapshot: bool = True):
                         [10_000 + idx + 1, 10_000 + idx + 2]
                         for idx in range(int(kw.get("final_n", 1)))
                     ],
-                    attention_masks=[
-                        [1, 1] for _ in range(int(kw.get("final_n", 1)))
-                    ],
+                    attention_masks=[[1, 1] for _ in range(int(kw.get("final_n", 1)))],
                 ),
             ),
             estimate_capacity=lambda **kw: {
@@ -165,7 +162,9 @@ def test_no_cleanup_flag_skips_deletion(tmp_path: Path, monkeypatch):
     assert "Cleanup: skipped" in s
 
 
-def test_ci_skip_overhead_reuses_loaded_model_without_snapshot(tmp_path: Path, monkeypatch):
+def test_ci_skip_overhead_reuses_loaded_model_without_snapshot(
+    tmp_path: Path, monkeypatch
+):
     _stub_env(monkeypatch, tmp_path, with_snapshot=False)
     monkeypatch.setattr("invarlock.cli.commands.run.RELEASE_MIN_WINDOWS_PER_ARM", 1)
 
