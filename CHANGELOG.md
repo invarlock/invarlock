@@ -60,6 +60,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed secure-default runtime delegation for GPU-backed evaluation flows by
   passing through CUDA GPUs, mounting absolute host output paths, and preserving
   delegated reports written outside the repo mount.
+- Fixed secure-default runtime delegation for local-model flows by mounting
+  absolute `--baseline` / `--subject` paths and absolute model paths referenced
+  inside YAML configs, so containerized runs can load local checkpoints.
 - Fixed container-backed model evidence sweeps to use container-safe preset and
   report paths, and to publish generated artifacts back to the requested host
   output root.

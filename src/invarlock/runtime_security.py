@@ -10,6 +10,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 ALLOW_HOST_EXECUTION_ENV = "INVARLOCK_ALLOW_HOST_EXECUTION"
 ALLOW_NETWORK_ENV = "INVARLOCK_ALLOW_NETWORK"
 ALLOW_REMOTE_CODE_ENV = "INVARLOCK_ALLOW_REMOTE_CODE"
@@ -227,18 +229,21 @@ def _requested_device(argv: list[str]) -> str | None:
 
 
 _PATH_ARG_FLAGS = {"--out", "--report-out", "--config", "-c"}
+_CONFIG_ARG_FLAGS = {"--config", "-c"}
+_LOCAL_MODEL_ARG_FLAGS = {"--baseline", "--subject"}
 
 
-def _iter_path_args(argv: list[str]) -> list[Path]:
+def _iter_path_args(argv: list[str], *, flags: set[str] | None = None) -> list[Path]:
+    active_flags = flags or _PATH_ARG_FLAGS
     paths: list[Path] = []
     idx = 0
     while idx < len(argv):
         token = argv[idx]
-        if token in _PATH_ARG_FLAGS and idx + 1 < len(argv):
+        if token in active_flags and idx + 1 < len(argv):
             paths.append(Path(argv[idx + 1]).expanduser())
             idx += 2
             continue
-        for flag in _PATH_ARG_FLAGS:
+        for flag in active_flags:
             prefix = f"{flag}="
             if token.startswith(prefix):
                 paths.append(Path(token[len(prefix) :]).expanduser())
@@ -247,9 +252,47 @@ def _iter_path_args(argv: list[str]) -> list[Path]:
     return paths
 
 
+def _iter_absolute_path_strings(payload: Any) -> list[Path]:
+    paths: list[Path] = []
+    if isinstance(payload, str):
+        text = payload.strip()
+        if not text:
+            return paths
+        candidate = Path(text).expanduser()
+        if candidate.is_absolute():
+            paths.append(candidate)
+        return paths
+    if isinstance(payload, dict):
+        for value in payload.values():
+            paths.extend(_iter_absolute_path_strings(value))
+        return paths
+    if isinstance(payload, (list, tuple, set)):
+        for item in payload:
+            paths.extend(_iter_absolute_path_strings(item))
+    return paths
+
+
+def _iter_config_referenced_paths(argv: list[str], *, cwd: Path) -> list[Path]:
+    paths: list[Path] = []
+    for config_arg in _iter_path_args(argv, flags=_CONFIG_ARG_FLAGS):
+        config_path = config_arg if config_arg.is_absolute() else (cwd / config_arg)
+        resolved_config = config_path.resolve(strict=False)
+        if not resolved_config.is_file():
+            continue
+        try:
+            payload = yaml.safe_load(resolved_config.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        paths.extend(_iter_absolute_path_strings(payload))
+    return paths
+
+
 def _extra_container_mounts(argv: list[str], *, cwd: Path) -> list[Path]:
     mounts: set[Path] = set()
-    for path in _iter_path_args(argv):
+    candidate_paths = _iter_path_args(argv)
+    candidate_paths.extend(_iter_path_args(argv, flags=_LOCAL_MODEL_ARG_FLAGS))
+    candidate_paths.extend(_iter_config_referenced_paths(argv, cwd=cwd))
+    for path in candidate_paths:
         if not path.is_absolute():
             continue
         resolved = path.resolve(strict=False)

@@ -283,3 +283,103 @@ def test_container_launch_mounts_absolute_output_and_report_paths(
     assert ["-v", f"{report_parent}:{report_parent}"] in [
         command[idx : idx + 2] for idx in range(len(command) - 1)
     ]
+
+
+def test_container_launch_mounts_absolute_model_paths_from_cli(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    monkeypatch.chdir(repo_dir)
+    monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_container_engine",
+        lambda: "docker",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "container_image_available_locally",
+        lambda image=None, *, engine=None: True,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image",
+        lambda: "invarlock-runtime:local",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image_digest",
+        lambda: "sha256:test",
+        raising=True,
+    )
+
+    baseline_dir = tmp_path / "baseline-model"
+    baseline_dir.mkdir()
+    subject_dir = tmp_path / "subject-model"
+    subject_dir.mkdir()
+
+    command = runtime_security.build_container_command(
+        [
+            "evaluate",
+            "--baseline",
+            str(baseline_dir),
+            "--subject",
+            str(subject_dir),
+        ]
+    )
+
+    mounts = [command[idx : idx + 2] for idx in range(len(command) - 1)]
+    assert ["-v", f"{baseline_dir}:{baseline_dir}"] in mounts
+    assert ["-v", f"{subject_dir}:{subject_dir}"] in mounts
+
+
+def test_container_launch_mounts_absolute_model_paths_from_config(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    monkeypatch.chdir(repo_dir)
+    monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_container_engine",
+        lambda: "docker",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "container_image_available_locally",
+        lambda image=None, *, engine=None: True,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image",
+        lambda: "invarlock-runtime:local",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image_digest",
+        lambda: "sha256:test",
+        raising=True,
+    )
+
+    subject_dir = tmp_path / "subject-model"
+    subject_dir.mkdir()
+    config_path = repo_dir / "subject.yaml"
+    config_path.write_text(
+        f"model:\n  id: {subject_dir}\n  adapter: hf_causal\n",
+        encoding="utf-8",
+    )
+
+    command = runtime_security.build_container_command(
+        ["run", "--config", str(config_path)]
+    )
+
+    mounts = [command[idx : idx + 2] for idx in range(len(command) - 1)]
+    assert ["-v", f"{subject_dir}:{subject_dir}"] in mounts
