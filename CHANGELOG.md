@@ -67,6 +67,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   authoritative for bounded clean/stress lanes, and queue monitoring now exits
   into an explicit resumable blocked state when all remaining pending work is
   blocked on failed dependencies.
+- Fixed secure-default direct `invarlock evaluate` to mount absolute
+  `--preset` and `--baseline-report` paths, and updated the maintained Qwen2.5
+  14B sentinels to stage and normalize their evaluate inputs against the saved
+  baseline schedule before replaying saved-model checks.
 - Aligned the Scorecards workflow with upstream pinning, tightened
   Scorecards/CodeQL permissions, and fixed notebook ordering needed for release
   pre-commit validation.

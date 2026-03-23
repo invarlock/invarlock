@@ -3,6 +3,8 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 usage() {
     cat <<'EOF'
 Usage: scripts/proof_packs/run_qwen14_sentinels.sh --run-dir DIR --model-name NAME [options]
@@ -41,6 +43,46 @@ require_file() {
         echo "ERROR: ${label} not found: ${path}" >&2
         return 1
     }
+}
+
+resolve_python_bin() {
+    if [[ -n "${PYTHON_BIN:-}" ]] && command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
+        printf '%s\n' "${PYTHON_BIN}"
+        return 0
+    fi
+    if command -v python >/dev/null 2>&1; then
+        printf '%s\n' "python"
+        return 0
+    fi
+    if command -v python3 >/dev/null 2>&1; then
+        printf '%s\n' "python3"
+        return 0
+    fi
+    echo "ERROR: python interpreter not found for preset normalization" >&2
+    return 1
+}
+
+stage_runtime_input() {
+    local source_file="$1"
+    local staged_dir="$2"
+    local label="$3"
+
+    require_file "${source_file}" "${label}" || return 1
+    mkdir -p "${staged_dir}"
+    local staged_file="${staged_dir}/$(basename "${source_file}")"
+    cp -f "${source_file}" "${staged_file}"
+    printf '%s\n' "${staged_file}"
+}
+
+normalize_staged_preset_for_baseline_report() {
+    local staged_preset="$1"
+    local staged_baseline_report="$2"
+    local python_bin=""
+    python_bin="$(resolve_python_bin)"
+    "${python_bin}" "${SCRIPT_DIR}/python/normalize_staged_preset.py" \
+        --preset "${staged_preset}" \
+        --baseline-report "${staged_baseline_report}" \
+        --skip-overhead-check
 }
 
 resolve_baseline_path() {
@@ -100,6 +142,12 @@ run_evaluate_sentinel() {
     local device="$8"
 
     mkdir -p "${out_dir}"
+    local runtime_inputs_dir="${out_dir}/runtime_inputs"
+    local staged_preset=""
+    staged_preset="$(stage_runtime_input "${preset_path}" "${runtime_inputs_dir}" "preset")"
+    local staged_baseline_report=""
+    staged_baseline_report="$(stage_runtime_input "${baseline_report}" "${runtime_inputs_dir}" "baseline report")"
+    normalize_staged_preset_for_baseline_report "${staged_preset}" "${staged_baseline_report}"
 
     local rc=0
     if ! invarlock evaluate \
@@ -107,8 +155,8 @@ run_evaluate_sentinel() {
         --subject "${subject_path}" \
         --adapter "${adapter}" \
         --profile "${profile}" \
-        --preset "${preset_path}" \
-        --baseline-report "${baseline_report}" \
+        --preset "${staged_preset}" \
+        --baseline-report "${staged_baseline_report}" \
         --device "${device}" \
         --out "${out_dir}/report.json" \
         --report-out "${out_dir}"; then

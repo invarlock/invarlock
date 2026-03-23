@@ -13,7 +13,9 @@ test_run_qwen14_sentinels_runs_saved_model_and_public_quant_modes() {
         "${model_dir}/baseline_reports/ci_balanced_seq1536_pv48_fn48" \
         "${run_dir}/presets"
     printf '%s\n' "${model_dir}/models/baseline" > "${model_dir}/.baseline_path"
-    printf '{"windows":"ok"}\n' > "${model_dir}/baseline_reports/ci_balanced_seq1536_pv48_fn48/baseline_report.json"
+    cat > "${model_dir}/baseline_reports/ci_balanced_seq1536_pv48_fn48/baseline_report.json" <<'EOF'
+{"data":{"seq_len":1536,"stride":1536,"preview_n":48,"final_n":48}}
+EOF
     printf 'dataset:\n  seq_len: 1536\n' > "${run_dir}/presets/calibrated_preset_${model_name}__quant_rtn.yaml"
     printf 'dataset:\n  seq_len: 1536\n' > "${run_dir}/presets/calibrated_preset_${model_name}.yaml"
 
@@ -46,6 +48,8 @@ case "${cmd}" in
         done
         printf 'evaluate\t%s\t%s\t%s\t%s\t%s\t%s\n' "${subject}" "${preset}" "${baseline}" "${baseline_report}" "${report_out}" "${out}" >> "${calls_file}"
         mkdir -p "${report_out}"
+        cp "${preset}" "${report_out}/observed_preset.yaml"
+        cp "${baseline_report}" "${report_out}/observed_baseline_report.json"
         printf '{"ok":true}\n' > "${report_out}/evaluation.report.json"
         printf '{"report":"ok"}\n' > "${out}"
         if [[ "${subject}" == *"quant_4bit_clean" ]]; then
@@ -95,9 +99,18 @@ EOF
 
     local calls
     calls="$(cat "${TEST_QWEN14_SENTINEL_CALLS}")"
-    assert_match "quant_4bit_clean.*calibrated_preset_${model_name}__quant_rtn\\.yaml" "${calls}" "quant sentinel uses quant-specific preset"
-    assert_match "prune_12pct_clean.*calibrated_preset_${model_name}\\.yaml" "${calls}" "prune sentinel falls back to base preset"
+    assert_match "quant_4bit_clean.*runtime_inputs/calibrated_preset_${model_name}__quant_rtn\\.yaml" "${calls}" "quant sentinel stages the quant-specific preset"
+    assert_match "prune_12pct_clean.*runtime_inputs/calibrated_preset_${model_name}\\.yaml" "${calls}" "prune sentinel stages the base preset"
+    assert_match "runtime_inputs/baseline_report\\.json" "${calls}" "sentinel stages the baseline report"
     assert_match "verify.*quant_4bit_clean/evaluation\\.report\\.json" "${calls}" "public quant verify runs"
+
+    local quant_preset
+    quant_preset="$(cat "${TEST_TMPDIR}/sentinels/quant_4bit_clean/observed_preset.yaml")"
+    assert_match "seq_len: 1536" "${quant_preset}" "quant preset uses baseline seq_len"
+    assert_match "stride: 1536" "${quant_preset}" "quant preset uses baseline stride"
+    assert_match "preview_n: 48" "${quant_preset}" "quant preset uses baseline preview count"
+    assert_match "final_n: 48" "${quant_preset}" "quant preset uses baseline final count"
+    assert_match "skip_overhead_check: true" "${quant_preset}" "quant preset injects skip_overhead_check"
 }
 
 test_run_qwen14_sentinels_requires_inputs_and_rejects_bad_mode() {
