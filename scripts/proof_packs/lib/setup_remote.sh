@@ -6,7 +6,12 @@
 #
 # After setup, run:
 #   ssh root@<host> 'cd /root/invarlock-public && . .venv/bin/activate && \
-#     ./scripts/proof_packs/run_pack.sh --suite subset --net 1'
+#     INVARLOCK_ALLOW_REMOTE_CODE=1 ./scripts/proof_packs/run_pack.sh --suite subset --net 1'
+#
+# If you later validate a different clean worktree on the same host, either
+# reinstall that worktree into its own venv or export PYTHONPATH=src so the
+# proof-pack commands use the intended checkout instead of an older editable
+# install.
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     set -euo pipefail
@@ -119,7 +124,7 @@ main() {
     install_invarlock_stack
     post_setup
 
-    log "Setup complete. Run ./scripts/proof_packs/run_pack.sh --suite subset --net 1"
+    log "Setup complete. Run INVARLOCK_ALLOW_REMOTE_CODE=1 ./scripts/proof_packs/run_pack.sh --suite subset --net 1"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

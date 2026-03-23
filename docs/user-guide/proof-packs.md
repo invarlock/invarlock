@@ -54,16 +54,19 @@ make dev-install
 make runtime-image
 
 # RECOMMENDED: Full proof pack with verification artifacts
+INVARLOCK_ALLOW_REMOTE_CODE=1 \
 PACK_TUNED_EDIT_PARAMS_FILE=./scripts/proof_packs/tuned_edit_params.json \
   ./scripts/proof_packs/run_pack.sh --suite subset --net 1
 
 # Trusted local host workflow (skips the attested container path)
+INVARLOCK_ALLOW_REMOTE_CODE=1 \
 INVARLOCK_ALLOW_HOST_EXECUTION=1 \
 PACK_TUNED_EDIT_PARAMS_FILE=./scripts/proof_packs/tuned_edit_params.json \
   ./scripts/proof_packs/run_pack.sh --suite subset --net 1
 
 # Development/debugging only (runs the suite, but does not build a proof pack)
-./scripts/proof_packs/run_suite.sh --suite subset --resume
+INVARLOCK_ALLOW_REMOTE_CODE=1 \
+  ./scripts/proof_packs/run_suite.sh --suite subset --resume
 
 # Inspect a received proof pack without nested report verification
 invarlock proof-pack inspect ./proof_pack_runs/subset_20250101_000000/proof_pack --json
@@ -91,6 +94,11 @@ The proof-pack shell wrappers do not expose a top-level
 commands use the secure-default runtime container path and expect `docker` or
 `podman`, plus a locally built `invarlock-runtime:local` image from
 `make runtime-image`.
+
+Bulk proof-pack entrypoints now default to `SKIP_FLASH_ATTN=true` and
+`PACK_BASELINE_STORAGE_MODE=snapshot_copy`. That is the safe default for remote
+secure-default runs. Only opt back into flash-attn builds or
+`snapshot_symlink` baselines when you intentionally want the extra complexity.
 
 ## How It Works
 
@@ -134,6 +142,37 @@ Proof packs require pinned model revisions for reproducibility:
   `OUTPUT_DIR/state/model_revisions.json`.
 - Offline runs use `--net 0` (default) and error if the cache is missing.
 - The `PACK_NET` environment variable is exported as `1` or `0` to gate `HF_*_OFFLINE` settings.
+- Bulk proof-pack runs also require `INVARLOCK_ALLOW_REMOTE_CODE=1`; the
+  entrypoint now fails fast before queue creation when that opt-in is missing.
+
+## Promotion Sentinels
+
+For Qwen2.5-14B promotion work, use the maintained sentinel helper from a fresh
+repo worktree:
+
+```bash
+INVARLOCK_ALLOW_REMOTE_CODE=1 \
+INVARLOCK_ALLOW_NETWORK=1 \
+  ./scripts/proof_packs/run_qwen14_sentinels.sh \
+    --run-dir /path/to/proof_pack_run \
+    --model-name qwen__qwen2.5-14b
+```
+
+What it checks:
+
+- saved-model direct evaluate for `quant_4bit_clean`
+- saved-model direct evaluate for `prune_12pct_clean`
+- the promotion-grade public quant smoke (`quant_4bit_clean` + `invarlock verify`)
+
+Acceptance for these sentinels is load-path completion, not scientific PASS:
+
+- `evaluation.report.json` must be emitted for each sentinel
+- the public quant smoke must also produce `verify.json`
+- a primary-metric `FAIL` is acceptable for this infrastructure/load-path gate
+
+Use a fresh worktree on remote hosts. If you intentionally run from a checkout
+that is not the editable install used by `.venv`, either reinstall the checkout
+or run with `PYTHONPATH=src` so `invarlock` uses the intended source tree.
 
 ## Output Layout
 

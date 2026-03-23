@@ -56,6 +56,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Proof-pack execution now honors one-sided scenario manifests, pins helper
   installs, keeps no-`jq` scenario flows deterministic, and improves shell-test
   portability across hosts.
+- Fixed proof-pack staged evaluate preset normalization so sparse YAML and JSON
+  presets are rewritten consistently, and proof-pack shell helpers now honor
+  the active Python interpreter instead of assuming a global `python3`.
+- Fixed proof-pack bulk-run entrypoints to fail fast on missing
+  `INVARLOCK_ALLOW_REMOTE_CODE`, default to eager attention plus copied
+  baselines for secure-default remote runs, and log the effective runtime mode
+  before queue creation.
+- Fixed proof-pack queue generation so filtered state manifests stay
+  authoritative for bounded clean/stress lanes, and queue monitoring now exits
+  into an explicit resumable blocked state when all remaining pending work is
+  blocked on failed dependencies.
 - Aligned the Scorecards workflow with upstream pinning, tightened
   Scorecards/CodeQL permissions, and fixed notebook ordering needed for release
   pre-commit validation.
@@ -95,6 +106,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refreshed related security best-practice references.
 - Clarified proof-pack wheel-boundary, scenario, and verification guidance, and
   refreshed related CLI, contracts, and adapter reference material.
+- Documented the maintained Qwen2.5-14B proof-pack sentinels, fresh-worktree
+  remote guidance, and the new secure-default proof-pack bulk-run defaults.
 - Updated report-reading/reference docs to match the streamlined Executive
   Summary-first Markdown report layout.
 - Added live execution verification for runnable Markdown examples in CI and

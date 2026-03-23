@@ -591,6 +591,20 @@ run_pack.sh
 fresh GPU hosts. It clones the repo, creates a venv, installs PyTorch and
 InvarLock, and leaves the host ready to run `run_pack.sh`.
 
+Operational guidance for remote proof-pack work:
+
+- Prefer a fresh clone or worktree per campaign instead of reusing an older
+  editable-install checkout.
+- If you intentionally run from a worktree that is not the editable install
+  behind `.venv`, either reinstall that worktree or export `PYTHONPATH=src` so
+  `invarlock` resolves to the intended source tree.
+- `run_suite.sh` and `run_pack.sh` now default to `SKIP_FLASH_ATTN=true` and
+  `PACK_BASELINE_STORAGE_MODE=snapshot_copy` for bulk secure-default runs.
+- Bulk proof-pack runs fail fast unless `INVARLOCK_ALLOW_REMOTE_CODE=1` is set.
+- After Qwen2.5-14B campaigns, run
+  `scripts/proof_packs/run_qwen14_sentinels.sh` from the same fresh worktree to
+  validate saved-model direct evaluate and the public quant smoke.
+
 Common knobs for the setup script:
 
 - `REPO_DIR`, `REPO_URL`, `BRANCH`, `PYTHON_BIN`, `VENV_DIR`.

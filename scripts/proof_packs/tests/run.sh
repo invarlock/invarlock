@@ -68,6 +68,7 @@ coverage_owner_hint() {
         scripts/proof_packs/lib/validation_suite.sh) echo "scripts/proof_packs/tests/test_validation_suite.sh" ;;
         scripts/proof_packs/lib/setup_remote.sh) echo "scripts/proof_packs/tests/test_setup_remote.sh" ;;
         scripts/proof_packs/suites.sh) echo "scripts/proof_packs/tests/test_suites.sh" ;;
+        scripts/proof_packs/run_qwen14_sentinels.sh) echo "scripts/proof_packs/tests/test_run_qwen14_sentinels.sh" ;;
         scripts/proof_packs/run_suite.sh) echo "scripts/proof_packs/tests/test_run_suite.sh" ;;
         scripts/proof_packs/run_pack.sh) echo "scripts/proof_packs/tests/test_run_pack.sh" ;;
         scripts/proof_packs/verify_pack.sh) echo "scripts/proof_packs/tests/test_verify_pack.sh" ;;
