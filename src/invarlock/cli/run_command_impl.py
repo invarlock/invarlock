@@ -1644,182 +1644,7 @@ def run_command_impl(
                     warning_context={"phase": "load_model", "run_id": run_id},
                 )
 
-            # No edit-specific bootstrap logic
-
-            def _estimate_model_bytes(m: Any) -> int:
-                total = 0
-                try:
-                    for _, p in getattr(m, "named_parameters", lambda: [])():
-                        try:
-                            total += int(p.element_size() * p.nelement())
-                        except (AttributeError, TypeError, ValueError):
-                            pass
-                    for _, b in getattr(m, "named_buffers", lambda: [])():
-                        try:
-                            total += int(b.element_size() * b.nelement())
-                        except (AttributeError, TypeError, ValueError):
-                            pass
-                except (AttributeError, TypeError):
-                    return 0
-                return total
-
-            # Load snapshot config from config.context.snapshot (highest precedence)
-            cfg_snapshot = {}
-            try:
-                cfg_context = _to_serialisable_dict(getattr(cfg, "context", {}))
-                if isinstance(cfg_context, dict):
-                    cfg_snapshot = _to_serialisable_dict(
-                        cfg_context.get("snapshot", {})
-                    )
-                    if not isinstance(cfg_snapshot, dict):
-                        cfg_snapshot = {}
-            except NON_FATAL_RUNTIME_EXCEPTIONS:
-                cfg_snapshot = {}
-
-            def _choose_snapshot_mode() -> str:
-                if direct_reuse_loaded_model:
-                    return "reuse_loaded"
-                # Precedence: config > env > auto
-                cfg_mode = (
-                    str(cfg_snapshot.get("mode", "")).lower()
-                    if isinstance(cfg_snapshot, dict)
-                    else ""
-                )
-                mode_env = str(
-                    os.environ.get("INVARLOCK_SNAPSHOT_MODE", "auto")
-                ).lower()
-                supports_chunked = hasattr(adapter, "snapshot_chunked") and hasattr(
-                    adapter, "restore_chunked"
-                )
-                supports_bytes = hasattr(adapter, "snapshot") and hasattr(
-                    adapter, "restore"
-                )
-                if cfg_mode in {"bytes", "chunked"}:
-                    if cfg_mode == "bytes" and supports_bytes:
-                        return "bytes"
-                    if cfg_mode == "chunked" and supports_chunked:
-                        return "chunked"
-                    # fallback preference
-                    if supports_bytes:
-                        return "bytes"
-                    if supports_chunked:
-                        return "chunked"
-                    return "reload"
-                if mode_env in {"bytes", "chunked"}:
-                    if mode_env == "bytes" and supports_bytes:
-                        return "bytes"
-                    if mode_env == "chunked" and supports_chunked:
-                        return "chunked"
-                    # fallback preference
-                    if supports_bytes:
-                        return "bytes"
-                    if supports_chunked:
-                        return "chunked"
-                    return "reload"
-                # auto
-                est_mb = _estimate_model_bytes(model) / (1024.0 * 1024.0)
-                # RAM-based heuristic
-                try:
-                    psutil_mod = _optional_psutil()
-                    if psutil_mod is None:
-                        raise AttributeError("psutil unavailable")
-                    ram = psutil_mod.virtual_memory()
-                    avail_mb = float(getattr(ram, "available", 0)) / (1024.0 * 1024.0)
-                except (
-                    AttributeError,
-                    RuntimeError,
-                    OSError,
-                    TypeError,
-                    ValueError,
-                ):
-                    avail_mb = 0.0
-                # fraction: config override > env > default 0.4
-                frac = 0.4
-                try:
-                    if (
-                        isinstance(cfg_snapshot, dict)
-                        and cfg_snapshot.get("ram_fraction") is not None
-                    ):
-                        frac = float(cfg_snapshot.get("ram_fraction"))
-                    else:
-                        frac = float(
-                            os.environ.get("INVARLOCK_SNAPSHOT_AUTO_RAM_FRACTION", frac)
-                        )
-                except (TypeError, ValueError):
-                    pass
-                # threshold mb: if no RAM info, use config threshold_mb or env fallback; else derive from avail*frac
-                if avail_mb > 0:
-                    threshold_mb = avail_mb * max(0.0, min(frac, 1.0))
-                else:
-                    try:
-                        if (
-                            isinstance(cfg_snapshot, dict)
-                            and cfg_snapshot.get("threshold_mb") is not None
-                        ):
-                            threshold_mb = float(cfg_snapshot.get("threshold_mb"))
-                        else:
-                            threshold_mb = float(
-                                os.environ.get("INVARLOCK_SNAPSHOT_THRESHOLD_MB", "768")
-                            )
-                    except (TypeError, ValueError):
-                        threshold_mb = 768.0
-                # Disk availability for chunked
-                try:
-                    tmpdir = None
-                    if isinstance(cfg_snapshot, dict):
-                        tmpdir = cfg_snapshot.get("temp_dir") or None
-                    if not tmpdir:
-                        tmpdir = (
-                            os.environ.get("TMPDIR")
-                            or os.environ.get("TMP")
-                            or tempfile.gettempdir()
-                        )
-                    du = shutil.disk_usage(tmpdir)
-                    free_mb = float(du.free) / (1024.0 * 1024.0)
-                except (OSError, TypeError, ValueError):
-                    free_mb = 0.0
-                # Disk margin ratio: config > default 1.2
-                margin = 1.2
-                try:
-                    if (
-                        isinstance(cfg_snapshot, dict)
-                        and cfg_snapshot.get("disk_free_margin_ratio") is not None
-                    ):
-                        margin = float(cfg_snapshot.get("disk_free_margin_ratio"))
-                except (TypeError, ValueError):
-                    pass
-                # Choose chunked if model snapshot is a large fraction of available RAM and disk has room
-                if (
-                    supports_chunked
-                    and est_mb >= threshold_mb
-                    and (free_mb <= 0.0 or est_mb * margin <= free_mb)
-                ):
-                    return "chunked"
-                # Otherwise prefer bytes when supported
-                if supports_bytes:
-                    # If RAM is extremely low and even bytes snapshot likely risky, fallback to chunked when possible
-                    if (
-                        supports_chunked
-                        and avail_mb > 0
-                        and est_mb >= max(64.0, avail_mb * 0.8)
-                        and (free_mb <= 0.0 or est_mb * margin <= free_mb)
-                    ):
-                        return "chunked"
-                    return "bytes"
-                if supports_chunked:
-                    return "chunked"
-                return "reload"
-
-            mode = _choose_snapshot_mode()
-            enabled = mode in {"bytes", "chunked"}
-            _event(
-                console,
-                "INIT",
-                f"Snapshot mode: {'enabled' if enabled else 'disabled'}",
-                emoji="💾",
-                profile=profile_normalized,
-            )
-            if mode == "reuse_loaded":
+            if direct_reuse_loaded_model:
                 skip_model_load = True
                 source_note = (
                     f" ({skip_overhead_source})" if skip_overhead_source else ""
@@ -1839,39 +1664,219 @@ def run_command_impl(
                     profile=profile_normalized,
                 )
                 emitted_skip_overhead_warning = True
-            elif mode == "chunked":
-                snapshot_tmpdir = adapter.snapshot_chunked(model)  # type: ignore[attr-defined]
+            else:
+                # No edit-specific bootstrap logic
 
-                def _restore():
-                    adapter.restore_chunked(model, snapshot_tmpdir)  # type: ignore[attr-defined]
+                def _estimate_model_bytes(m: Any) -> int:
+                    total = 0
+                    try:
+                        for _, p in getattr(m, "named_parameters", lambda: [])():
+                            try:
+                                total += int(p.element_size() * p.nelement())
+                            except (AttributeError, TypeError, ValueError):
+                                pass
+                        for _, b in getattr(m, "named_buffers", lambda: [])():
+                            try:
+                                total += int(b.element_size() * b.nelement())
+                            except (AttributeError, TypeError, ValueError):
+                                pass
+                    except (AttributeError, TypeError):
+                        return 0
+                    return total
 
-                restore_fn = _restore
-            elif mode == "bytes":
-                supports_chunked = hasattr(adapter, "snapshot_chunked") and hasattr(
-                    adapter, "restore_chunked"
-                )
+                # Load snapshot config from config.context.snapshot (highest precedence)
+                cfg_snapshot = {}
                 try:
-                    base_blob = adapter.snapshot(model)  # type: ignore[attr-defined]
+                    cfg_context = _to_serialisable_dict(getattr(cfg, "context", {}))
+                    if isinstance(cfg_context, dict):
+                        cfg_snapshot = _to_serialisable_dict(
+                            cfg_context.get("snapshot", {})
+                        )
+                        if not isinstance(cfg_snapshot, dict):
+                            cfg_snapshot = {}
                 except NON_FATAL_RUNTIME_EXCEPTIONS:
-                    if not supports_chunked:
-                        raise
+                    cfg_snapshot = {}
+
+                def _choose_snapshot_mode() -> str:
+                    # Precedence: config > env > auto
+                    cfg_mode = (
+                        str(cfg_snapshot.get("mode", "")).lower()
+                        if isinstance(cfg_snapshot, dict)
+                        else ""
+                    )
+                    mode_env = str(
+                        os.environ.get("INVARLOCK_SNAPSHOT_MODE", "auto")
+                    ).lower()
+                    supports_chunked = hasattr(adapter, "snapshot_chunked") and hasattr(
+                        adapter, "restore_chunked"
+                    )
+                    supports_bytes = hasattr(adapter, "snapshot") and hasattr(
+                        adapter, "restore"
+                    )
+                    if cfg_mode in {"bytes", "chunked"}:
+                        if cfg_mode == "bytes" and supports_bytes:
+                            return "bytes"
+                        if cfg_mode == "chunked" and supports_chunked:
+                            return "chunked"
+                        # fallback preference
+                        if supports_bytes:
+                            return "bytes"
+                        if supports_chunked:
+                            return "chunked"
+                        return "reload"
+                    if mode_env in {"bytes", "chunked"}:
+                        if mode_env == "bytes" and supports_bytes:
+                            return "bytes"
+                        if mode_env == "chunked" and supports_chunked:
+                            return "chunked"
+                        # fallback preference
+                        if supports_bytes:
+                            return "bytes"
+                        if supports_chunked:
+                            return "chunked"
+                        return "reload"
+                    # auto
+                    est_mb = _estimate_model_bytes(model) / (1024.0 * 1024.0)
+                    # RAM-based heuristic
+                    try:
+                        psutil_mod = _optional_psutil()
+                        if psutil_mod is None:
+                            raise AttributeError("psutil unavailable")
+                        ram = psutil_mod.virtual_memory()
+                        avail_mb = float(getattr(ram, "available", 0)) / (
+                            1024.0 * 1024.0
+                        )
+                    except (
+                        AttributeError,
+                        RuntimeError,
+                        OSError,
+                        TypeError,
+                        ValueError,
+                    ):
+                        avail_mb = 0.0
+                    # fraction: config override > env > default 0.4
+                    frac = 0.4
+                    try:
+                        if (
+                            isinstance(cfg_snapshot, dict)
+                            and cfg_snapshot.get("ram_fraction") is not None
+                        ):
+                            frac = float(cfg_snapshot.get("ram_fraction"))
+                        else:
+                            frac = float(
+                                os.environ.get(
+                                    "INVARLOCK_SNAPSHOT_AUTO_RAM_FRACTION", frac
+                                )
+                            )
+                    except (TypeError, ValueError):
+                        pass
+                    # threshold mb: if no RAM info, use config threshold_mb or env fallback; else derive from avail*frac
+                    if avail_mb > 0:
+                        threshold_mb = avail_mb * max(0.0, min(frac, 1.0))
+                    else:
+                        try:
+                            if (
+                                isinstance(cfg_snapshot, dict)
+                                and cfg_snapshot.get("threshold_mb") is not None
+                            ):
+                                threshold_mb = float(cfg_snapshot.get("threshold_mb"))
+                            else:
+                                threshold_mb = float(
+                                    os.environ.get(
+                                        "INVARLOCK_SNAPSHOT_THRESHOLD_MB", "768"
+                                    )
+                                )
+                        except (TypeError, ValueError):
+                            threshold_mb = 768.0
+                    # Disk availability for chunked
+                    try:
+                        tmpdir = None
+                        if isinstance(cfg_snapshot, dict):
+                            tmpdir = cfg_snapshot.get("temp_dir") or None
+                        if not tmpdir:
+                            tmpdir = (
+                                os.environ.get("TMPDIR")
+                                or os.environ.get("TMP")
+                                or tempfile.gettempdir()
+                            )
+                        du = shutil.disk_usage(tmpdir)
+                        free_mb = float(du.free) / (1024.0 * 1024.0)
+                    except (OSError, TypeError, ValueError):
+                        free_mb = 0.0
+                    # Disk margin ratio: config > default 1.2
+                    margin = 1.2
+                    try:
+                        if (
+                            isinstance(cfg_snapshot, dict)
+                            and cfg_snapshot.get("disk_free_margin_ratio") is not None
+                        ):
+                            margin = float(cfg_snapshot.get("disk_free_margin_ratio"))
+                    except (TypeError, ValueError):
+                        pass
+                    # Choose chunked if model snapshot is a large fraction of available RAM and disk has room
+                    if (
+                        supports_chunked
+                        and est_mb >= threshold_mb
+                        and (free_mb <= 0.0 or est_mb * margin <= free_mb)
+                    ):
+                        return "chunked"
+                    # Otherwise prefer bytes when supported
+                    if supports_bytes:
+                        # If RAM is extremely low and even bytes snapshot likely risky, fallback to chunked when possible
+                        if (
+                            supports_chunked
+                            and avail_mb > 0
+                            and est_mb >= max(64.0, avail_mb * 0.8)
+                            and (free_mb <= 0.0 or est_mb * margin <= free_mb)
+                        ):
+                            return "chunked"
+                        return "bytes"
+                    if supports_chunked:
+                        return "chunked"
+                    return "reload"
+
+                mode = _choose_snapshot_mode()
+                enabled = mode in {"bytes", "chunked"}
+                _event(
+                    console,
+                    "INIT",
+                    f"Snapshot mode: {'enabled' if enabled else 'disabled'}",
+                    emoji="💾",
+                    profile=profile_normalized,
+                )
+                if mode == "chunked":
                     snapshot_tmpdir = adapter.snapshot_chunked(model)  # type: ignore[attr-defined]
 
-                    def _restore_fallback_chunked():
+                    def _restore():
                         adapter.restore_chunked(model, snapshot_tmpdir)  # type: ignore[attr-defined]
 
-                    restore_fn = _restore_fallback_chunked
+                    restore_fn = _restore
+                elif mode == "bytes":
+                    supports_chunked = hasattr(adapter, "snapshot_chunked") and hasattr(
+                        adapter, "restore_chunked"
+                    )
+                    try:
+                        base_blob = adapter.snapshot(model)  # type: ignore[attr-defined]
+                    except NON_FATAL_RUNTIME_EXCEPTIONS:
+                        if not supports_chunked:
+                            raise
+                        snapshot_tmpdir = adapter.snapshot_chunked(model)  # type: ignore[attr-defined]
+
+                        def _restore_fallback_chunked():
+                            adapter.restore_chunked(model, snapshot_tmpdir)  # type: ignore[attr-defined]
+
+                        restore_fn = _restore_fallback_chunked
+                    else:
+
+                        def _restore2():
+                            adapter.restore(model, base_blob)  # type: ignore[attr-defined]
+
+                        restore_fn = _restore2
                 else:
-
-                    def _restore2():
-                        adapter.restore(model, base_blob)  # type: ignore[attr-defined]
-
-                    restore_fn = _restore2
-            else:
-                # reload path - properly free GPU memory before setting to None
-                _free_model_memory(model)
-                model = None
-                restore_fn = None
+                    # reload path - properly free GPU memory before setting to None
+                    _free_model_memory(model)
+                    model = None
+                    restore_fn = None
         except NON_FATAL_RUNTIME_EXCEPTIONS:
             # On any failure, fall back to reload-per-attempt path
             _free_model_memory(model)
