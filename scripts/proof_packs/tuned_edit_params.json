@@ -20,22 +20,22 @@
         "scope": "ffn@layer=31",
         "status": "selected"
       },
-      "magnitude_prune": {
-        "edit_dir_name": "prune_12pct_clean",
-        "reason": "selected_by_evaluate_pass:sparsity120_ffn",
-        "scope": "ffn",
-        "sparsity": 0.12,
-        "status": "selected"
-      },
-      "quant_rtn": {
-        "bits": 4,
-        "edit_dir_name": "quant_4bit_clean",
-        "group_size": 32,
-        "reason": "selected_by_evaluate_pass:bits4_g32_ffn",
-        "scope": "ffn",
-        "status": "selected"
-      }
+    "magnitude_prune": {
+      "edit_dir_name": "prune_12pct_clean",
+      "reason": "selected_by_evaluate_pass:sparsity120_attn",
+      "scope": "attn",
+      "sparsity": 0.12,
+      "status": "selected"
     },
+    "quant_rtn": {
+      "bits": 4,
+      "edit_dir_name": "quant_4bit_clean",
+      "group_size": 32,
+      "reason": "selected_by_evaluate_pass:bits4_g32_attn",
+      "scope": "attn",
+      "status": "selected"
+    }
+  },
     "Qwen/Qwen1.5-72B": {
       "fp8_quant": {
         "edit_dir_name": "fp8_e5m2_clean",
