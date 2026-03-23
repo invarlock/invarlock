@@ -244,17 +244,16 @@ def _rewrite_invarlock_tokens(
         return env_prefix, argv
 
     env_prefix = [
-        token
-        for token in env_prefix
-        if not token.startswith(f"{HOST_EXECUTION_ENV}=")
+        token for token in env_prefix if not token.startswith(f"{HOST_EXECUTION_ENV}=")
     ]
 
     if execution_mode == "container":
         argv = [token for token in argv if token != "--allow-host-execution"]
-        if command_tokens[:1] == ["verify"] or command_tokens[:2] == ["report", "verify"]:
-            argv = [
-                token for token in argv if token != "--allow-unattested-artifacts"
-            ]
+        if command_tokens[:1] == ["verify"] or command_tokens[:2] == [
+            "report",
+            "verify",
+        ]:
+            argv = [token for token in argv if token != "--allow-unattested-artifacts"]
         return env_prefix, argv
 
     if command_tokens[:1] and command_tokens[0] in MODEL_LOADING_COMMANDS:

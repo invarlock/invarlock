@@ -491,7 +491,9 @@ def run_lane(
         evaluate_exit=eval_proc.returncode,
         verify_exit=verify_exit,
         report_path=str(published_report_path),
-        verify_path=str(published_verify_path) if published_verify_path.is_file() else None,
+        verify_path=str(published_verify_path)
+        if published_verify_path.is_file()
+        else None,
     )
 
 
@@ -617,13 +619,13 @@ def run_sweep(args: argparse.Namespace) -> int:
             handle.write(f"[{datetime.now(UTC).isoformat()}] START {spec.slug}\n")
             handle.flush()
             result = run_lane(
-            spec,
-            output_root=output_root,
-            execution_root=execution_root,
-            python_exe=args.python,
-            profile=args.profile,
-            device=args.device,
-            execution_mode=args.execution_mode,
+                spec,
+                output_root=output_root,
+                execution_root=execution_root,
+                python_exe=args.python,
+                profile=args.profile,
+                device=args.device,
+                execution_mode=args.execution_mode,
                 env=env,
             )
             results.append(result)

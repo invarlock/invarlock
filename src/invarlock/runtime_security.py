@@ -305,7 +305,9 @@ def _extra_container_mounts(argv: list[str], *, cwd: Path) -> list[Path]:
     ordered = sorted(mounts, key=lambda item: (len(item.parts), str(item)))
     minimized: list[Path] = []
     for mount in ordered:
-        if any(existing == mount or existing in mount.parents for existing in minimized):
+        if any(
+            existing == mount or existing in mount.parents for existing in minimized
+        ):
             continue
         minimized.append(mount)
     return minimized
