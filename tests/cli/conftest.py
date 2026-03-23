@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 from collections.abc import Generator
 from pathlib import Path
 
@@ -33,8 +34,8 @@ def _should_auto_attest_verify_test(node: pytest.FixtureRequest) -> bool:
     path = Path(str(node.node.path))
     return (
         path.name.startswith("test_verify")
-        and path.name != "test_unattested_verify_gate.py"
-    )
+        or path.name == "test_proof_pack_commands.py"
+    ) and path.name != "test_unattested_verify_gate.py"
 
 
 def _write_test_runtime_manifest(report_path: Path) -> None:
@@ -82,8 +83,8 @@ def _auto_attest_verify_reports(
         tmp_path_factory.mktemp("runtime-verifier") / "invarlock-runtime-verify"
     )
     verifier_path.write_text(
-        """#!/usr/bin/env python3
-from __future__ import annotations
+        f"#!{sys.executable}\n"
+        + """from __future__ import annotations
 
 import argparse
 import hashlib
