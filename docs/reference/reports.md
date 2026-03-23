@@ -16,7 +16,7 @@ telemetry fields, and HTML export.
 
 - [Quick Start](#quick-start)
 - [report Layout](#report-layout)
-  - [Evaluation Dashboard Interpretation](#evaluation-dashboard-interpretation)
+  - [Executive Summary Interpretation](#executive-summary-interpretation)
 - [Schema](#schema)
   - [Minimal v1 report Example](#minimal-v1-report-example)
   - [Schema Summary](#schema-summary-validator-view)
