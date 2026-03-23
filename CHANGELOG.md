@@ -57,6 +57,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   verification expectations with the packaged verifier behavior.
 - Hardened ClusterFuzzLite/runtime security integration and policy-pack digest
   verification in fail-closed paths.
+- Fixed exported Hugging Face checkpoint directories to save tokenizer assets
+  alongside edited model weights so local reruns can reload subject models from
+  the saved path.
 
 ### Dependencies
 - Bumped `actions/download-artifact` from `7` to `8`.

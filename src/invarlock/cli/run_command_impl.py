@@ -2699,6 +2699,18 @@ def run_command_impl(
                     if hasattr(adapter, "save_pretrained") and model is not None:
                         ok = bool(adapter.save_pretrained(model, export_dir))  # type: ignore[attr-defined]
                     if ok:
+                        save_tokenizer = getattr(tokenizer, "save_pretrained", None)
+                        if callable(save_tokenizer):
+                            try:
+                                save_tokenizer(str(export_dir))
+                            except NON_FATAL_RUNTIME_EXCEPTIONS:
+                                _event(
+                                    console,
+                                    "WARN",
+                                    "Exported model checkpoint without tokenizer artifacts; local tokenizer reload may fail.",
+                                    emoji="⚠️",
+                                    profile=profile_normalized,
+                                )
                         report["artifacts"]["checkpoint_path"] = str(export_dir)
                     else:
                         _event(
