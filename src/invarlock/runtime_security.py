@@ -287,6 +287,50 @@ def _iter_config_referenced_paths(argv: list[str], *, cwd: Path) -> list[Path]:
     return paths
 
 
+def _mount_root_for_path(path: Path) -> Path:
+    expanded = path.expanduser()
+    return expanded if expanded.exists() and expanded.is_dir() else expanded.parent
+
+
+def _mount_root_for_resolved_path(path: Path) -> Path:
+    resolved = path.resolve(strict=False)
+    return resolved if resolved.exists() and resolved.is_dir() else resolved.parent
+
+
+def _mount_is_already_covered(mount: Path, *, cwd: Path) -> bool:
+    return mount == cwd or cwd in mount.parents
+
+
+def _iter_external_symlink_target_mounts(path: Path, *, cwd: Path) -> list[Path]:
+    expanded = path.expanduser()
+    root_mount = _mount_root_for_path(expanded)
+    mounts: set[Path] = set()
+
+    def _record_symlink_target(link_path: Path) -> None:
+        target_mount = _mount_root_for_resolved_path(link_path)
+        if target_mount == root_mount or root_mount in target_mount.parents:
+            return
+        if _mount_is_already_covered(target_mount, cwd=cwd):
+            return
+        mounts.add(target_mount)
+
+    if expanded.is_symlink():
+        _record_symlink_target(expanded)
+
+    walk_root = expanded.resolve(strict=False) if expanded.is_symlink() else expanded
+    if not walk_root.exists() or not walk_root.is_dir():
+        return sorted(mounts, key=lambda item: (len(item.parts), str(item)))
+
+    for current, dirnames, filenames in os.walk(walk_root, followlinks=False):
+        current_path = Path(current)
+        for name in (*dirnames, *filenames):
+            entry = current_path / name
+            if entry.is_symlink():
+                _record_symlink_target(entry)
+
+    return sorted(mounts, key=lambda item: (len(item.parts), str(item)))
+
+
 def _extra_container_mounts(argv: list[str], *, cwd: Path) -> list[Path]:
     mounts: set[Path] = set()
     candidate_paths = _iter_path_args(argv)
@@ -295,13 +339,10 @@ def _extra_container_mounts(argv: list[str], *, cwd: Path) -> list[Path]:
     for path in candidate_paths:
         if not path.is_absolute():
             continue
-        resolved = path.resolve(strict=False)
-        if resolved == cwd or cwd in resolved.parents:
-            continue
-        mount = resolved if resolved.exists() and resolved.is_dir() else resolved.parent
-        if mount == cwd or cwd in mount.parents:
-            continue
-        mounts.add(mount)
+        mount = _mount_root_for_path(path)
+        if not _mount_is_already_covered(mount, cwd=cwd):
+            mounts.add(mount)
+        mounts.update(_iter_external_symlink_target_mounts(path, cwd=cwd))
     ordered = sorted(mounts, key=lambda item: (len(item.parts), str(item)))
     minimized: list[Path] = []
     for mount in ordered:
