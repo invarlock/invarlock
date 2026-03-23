@@ -1744,8 +1744,10 @@ test_task_calibration_run_guard_order_branches() {
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
-    cat > "${bin_dir}/invarlock" <<'EOF'
+    local captured_py="${TEST_TMPDIR}/captured_pythonpath.txt"
+    cat > "${bin_dir}/invarlock" <<EOF
 #!/usr/bin/env bash
+printf '%s\n' "\${PYTHONPATH:-}" > "${captured_py}"
 exit 0
 EOF
     chmod +x "${bin_dir}/invarlock"
@@ -1755,6 +1757,7 @@ EOF
     PACK_GUARDS_ORDER="variance"
     task_calibration_run "${model_name}" 0 "1" "42" "${out}" "${log_file}"
     assert_match "variance" "$(cat "${model_output_dir}/reports/calibration/run_1/calibration_config.yaml")" "explicit guard order used"
+    assert_eq "${PACK_REPO_PYTHONPATH}" "$(cat "${captured_py}")" "calibration injects repo pythonpath"
 
     PACK_GUARDS_ORDER=" , "
     task_calibration_run "${model_name}" 0 "2" "43" "${out}" "${log_file}"

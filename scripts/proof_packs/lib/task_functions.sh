@@ -1036,6 +1036,7 @@ eval:
     alpha: 0.05
 YAML
 
+    extra_env+=("PYTHONPATH=${PACK_REPO_PYTHONPATH}")
     extra_env+=("INVARLOCK_CONFIG_ROOT=${config_root}")
 
     # Generate config YAML
