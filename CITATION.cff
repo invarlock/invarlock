@@ -12,7 +12,7 @@ license: Apache-2.0
 version: 0.4.0
 date-released: 2026-03-14
 authors:
-  - name: "InvarLock Maintainers"
+  - name: "InvarLock"
     affiliation: "InvarLock"
 keywords:
   - machine learning
@@ -31,7 +31,7 @@ preferred-citation:
   type: software
   title: "InvarLock: Edit-agnostic robustness evaluation reports for weight edits"
   authors:
-    - name: "InvarLock Maintainers"
+    - name: "InvarLock"
   repository-code: https://github.com/invarlock/invarlock
   url: https://github.com/invarlock/invarlock
   version: 0.4.0

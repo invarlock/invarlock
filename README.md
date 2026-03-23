@@ -177,7 +177,7 @@ If you use InvarLock in scientific work, please cite it (canonical metadata is i
 ```bibtex
 @software{invarlock,
   title  = {InvarLock: Edit-agnostic robustness evaluation reports for weight edits},
-  author = {{InvarLock Maintainers}},
+  author = {{InvarLock}},
   url    = {https://github.com/invarlock/invarlock},
 }
 ```
