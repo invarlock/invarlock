@@ -40,6 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   coverage, and removal of the legacy ONNX adapter surface.
 - Tightened evaluate/verify isolation so generated configs stay invocation
   local and policy/coverage recomputation remains aligned with current runs.
+- Simplified the human-readable Markdown evaluation report by folding the
+  dashboard into a single Executive Summary section and removing the
+  hand-maintained contents block.
 
 ### Fixed
 - Hardened CLI backend, doctor, plugin, and verification checks, including
@@ -75,6 +78,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed exported Hugging Face checkpoint directories to save tokenizer assets
   alongside edited model weights so local reruns can reload subject models from
   the saved path.
+- Fixed Markdown report rendering for schema-valid reports that omit
+  `artifacts.generated_at`, and suppressed empty window-plan placeholders in
+  first-screen summaries.
 
 ### Dependencies
 - Bumped `actions/download-artifact` from `7` to `8`.
@@ -86,6 +92,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refreshed related security best-practice references.
 - Clarified proof-pack wheel-boundary, scenario, and verification guidance, and
   refreshed related CLI, contracts, and adapter reference material.
+- Updated report-reading/reference docs to match the streamlined Executive
+  Summary-first Markdown report layout.
 - Added live execution verification for runnable Markdown examples in CI and
   documented the new `docs-live` workflow plus runtime-image prerequisites for
   repo quickstarts.
