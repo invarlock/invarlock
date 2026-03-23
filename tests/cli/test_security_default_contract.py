@@ -429,6 +429,58 @@ def test_container_launch_mounts_absolute_model_paths_from_cli(
     assert ["-v", f"{subject_dir}:{subject_dir}"] in mounts
 
 
+def test_container_launch_mounts_absolute_source_and_edited_paths(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    monkeypatch.chdir(repo_dir)
+    monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_container_engine",
+        lambda: "docker",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "container_image_available_locally",
+        lambda image=None, *, engine=None: True,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image",
+        lambda: "invarlock-runtime:local",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image_digest",
+        lambda: "sha256:test",
+        raising=True,
+    )
+
+    source_dir = tmp_path / "source-model"
+    source_dir.mkdir()
+    edited_dir = tmp_path / "edited-model"
+    edited_dir.mkdir()
+
+    command = runtime_security.build_container_command(
+        [
+            "evaluate",
+            "--source",
+            str(source_dir),
+            "--edited",
+            str(edited_dir),
+        ]
+    )
+
+    mounts = [command[idx : idx + 2] for idx in range(len(command) - 1)]
+    assert ["-v", f"{source_dir}:{source_dir}"] in mounts
+    assert ["-v", f"{edited_dir}:{edited_dir}"] in mounts
+
+
 def test_container_launch_mounts_absolute_preset_and_baseline_report_paths(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -491,6 +543,48 @@ def test_container_launch_mounts_absolute_preset_and_baseline_report_paths(
     mounts = [command[idx : idx + 2] for idx in range(len(command) - 1)]
     assert ["-v", f"{preset_dir}:{preset_dir}"] in mounts
     assert ["-v", f"{baseline_report_dir}:{baseline_report_dir}"] in mounts
+
+
+def test_container_launch_mounts_absolute_config_root_from_env(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    monkeypatch.chdir(repo_dir)
+    monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
+    monkeypatch.setenv("INVARLOCK_CONFIG_ROOT", str(tmp_path / "config-root"))
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_container_engine",
+        lambda: "docker",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "container_image_available_locally",
+        lambda image=None, *, engine=None: True,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image",
+        lambda: "invarlock-runtime:local",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image_digest",
+        lambda: "sha256:test",
+        raising=True,
+    )
+
+    config_root = tmp_path / "config-root"
+    config_root.mkdir()
+
+    command = runtime_security.build_container_command(["evaluate", "--help"])
+
+    mounts = [command[idx : idx + 2] for idx in range(len(command) - 1)]
+    assert ["-v", f"{config_root}:{config_root}"] in mounts
 
 
 def test_container_launch_mounts_external_symlink_targets_for_local_model_paths(

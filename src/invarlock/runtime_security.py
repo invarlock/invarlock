@@ -237,7 +237,7 @@ _PATH_ARG_FLAGS = {
     "--baseline-report",
 }
 _CONFIG_ARG_FLAGS = {"--config", "-c"}
-_LOCAL_MODEL_ARG_FLAGS = {"--baseline", "--subject"}
+_LOCAL_MODEL_ARG_FLAGS = {"--baseline", "--subject", "--source", "--edited"}
 
 
 def _iter_path_args(argv: list[str], *, flags: set[str] | None = None) -> list[Path]:
@@ -392,6 +392,9 @@ def _extra_container_mounts(argv: list[str], *, cwd: Path) -> list[Path]:
     candidate_paths = _iter_path_args(argv)
     candidate_paths.extend(_iter_path_args(argv, flags=_LOCAL_MODEL_ARG_FLAGS))
     candidate_paths.extend(_iter_config_referenced_paths(argv, cwd=cwd))
+    config_root_value = os.environ.get("INVARLOCK_CONFIG_ROOT", "").strip()
+    if config_root_value:
+        candidate_paths.append(Path(config_root_value).expanduser())
     for path in candidate_paths:
         if not path.is_absolute():
             continue
