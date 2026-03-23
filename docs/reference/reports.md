@@ -53,7 +53,7 @@ The markdown report is structured to highlight evaluation outcomes first:
 Attested evaluations also emit `runtime.manifest.json` next to
 `evaluation.report.json`. Archive and verify them together.
 
-- **Evaluation Dashboard**: one-line PASS/FAIL + core gates (primary metric, drift, invariants, spectral, RMT, overhead).
+- **Executive Summary**: one-line PASS/FAIL + compact gate table (primary metric, drift, invariants, spectral, RMT, overhead).
 - **Quality Gates**: table of canonical gating checks with measured values.
 - **Guard Check Details**: invariants, spectral stability, RMT health, and pairing snapshots.
 - **Primary Metric**: task-specific metric summary with CI + baseline comparison.
@@ -61,7 +61,7 @@ Attested evaluations also emit `runtime.manifest.json` next to
 - **Policy Configuration**: tier + digest summary with resolved policy details in `<details>`.
 - **Appendix**: environment, inference diagnostics, and variance guard details.
 
-### Evaluation Dashboard Interpretation
+### Executive Summary Interpretation
 
 | Row | Meaning | Action |
 | --- | --- | --- |
@@ -443,7 +443,7 @@ html = render_report_html(report)
 - `primary_metric_tail` appears only for ppl-like metrics with paired windows.
 - The rendered HTML is derived from the Markdown report. If values look wrong,
   inspect the underlying `evaluation.report.json`.
-- The Markdown report is a human-readable view (starts with an Evaluation Dashboard + Contents); the JSON report is the canonical evidence artifact.
+- The Markdown report is a human-readable view that starts with the Executive Summary; the JSON report is the canonical evidence artifact.
 
 ---
 

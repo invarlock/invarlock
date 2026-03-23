@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from invarlock.reporting.report_builder import (
     render_report_markdown,
     validate_report,
@@ -53,3 +56,37 @@ def test_validate_evaluation_report_rejects_unknown_validation_keys() -> None:
     cert["validation"]["unexpected_key_for_test"] = True  # type: ignore[index]
     # validate_report uses JSONSchema first; since schema disallows unknown keys in validation, it will fall back
     assert validate_report(cert) is True
+
+
+def test_render_report_markdown_tolerates_missing_generated_at() -> None:
+    cert = _mk_cert()
+    cert["artifacts"] = {}
+
+    assert validate_report(cert) is True
+    md = render_report_markdown(cert)
+
+    assert "**Generated:** (not recorded)" in md
+    assert "## Contents" not in md
+    assert "## Evaluation Dashboard" not in md
+    assert "## Executive Summary" in md
+
+
+def test_render_report_markdown_hides_empty_window_plan_summary() -> None:
+    cert = _mk_cert()
+    cert["dataset"]["seq_len"] = 16
+    cert["dataset"]["windows"] = {"preview": 1, "final": 1, "stats": {}}
+
+    md = render_report_markdown(cert)
+
+    assert "Window Plan:" not in md
+
+
+def test_render_report_markdown_accepts_legacy_minimal_fixture() -> None:
+    fixture = Path("tests/artifacts/golden_runs/gpt2/evaluation.report.json")
+    cert = json.loads(fixture.read_text())
+
+    assert validate_report(cert) is True
+    md = render_report_markdown(cert)
+
+    assert "# InvarLock Evaluation Report" in md
+    assert "**Generated:** (not recorded)" in md
