@@ -1,7 +1,7 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
 
-.PHONY: help install dev-install test test-assurance lint format clean docsclean deepclean docs docs-ci verify coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync model-evidence-list model-evidence-sweep runtime-image runtime-smoke runtime-verify
+.PHONY: help install dev-install test test-assurance lint format clean docsclean deepclean docs docs-ci verify verify-ruff coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync model-evidence-list model-evidence-sweep runtime-image runtime-smoke runtime-verify
 
 PYTHON ?= $(shell bash scripts/select_python.sh)
 PIP := $(PYTHON) -m pip
@@ -85,6 +85,8 @@ COVERAGE_INCLUDE := \
 	src/invarlock/public_contracts.py,src/invarlock/policy_pack.py,\
 	src/invarlock/proof_pack.py
 
+TEST_DIR_TARGETS := core cli eval guards edits adapters plugins scripts ci
+
 help:  ## Show this help message
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
@@ -120,34 +122,28 @@ coverage-enforce:  ## Run coverage and enforce per-file thresholds
 	$(PYTHON) scripts/check_coverage_thresholds.py --coverage reports/cov.xml --json reports/thresholds.json
 
 # Grouped test targets
-.PHONY: test-core test-cli test-eval test-guards test-edits test-adapters test-plugins test-scripts test-ci
-test-core:
+.PHONY: $(addprefix test-,$(TEST_DIR_TARGETS))
+test-core: TEST_DIR = core
+test-core: ## Run tests/core
+test-cli: TEST_DIR = cli
+test-cli: ## Run tests/cli
+test-eval: TEST_DIR = eval
+test-eval: ## Run tests/eval
+test-guards: TEST_DIR = guards
+test-guards: ## Run tests/guards
+test-edits: TEST_DIR = edits
+test-edits: ## Run tests/edits
+test-adapters: TEST_DIR = adapters
+test-adapters: ## Run tests/adapters
+test-plugins: TEST_DIR = plugins
+test-plugins: ## Run tests/plugins
+test-scripts: TEST_DIR = scripts
+test-scripts: ## Run tests/scripts
+test-ci: TEST_DIR = ci
+test-ci: ## Run tests/ci
+$(addprefix test-,$(TEST_DIR_TARGETS)):
 	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTEST) -q tests/core
-test-cli:
-	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTEST) -q tests/cli
-test-eval:
-	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTEST) -q tests/eval
-test-guards:
-	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTEST) -q tests/guards
-test-edits:
-	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTEST) -q tests/edits
-test-adapters:
-	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTEST) -q tests/adapters
-test-plugins:
-	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTEST) -q tests/plugins
-test-scripts:
-	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTEST) -q tests/scripts
-test-ci:
-	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTEST) -q tests/ci
+	PYTHONPATH=src $(PYTEST) -q tests/$(TEST_DIR)
 
 test-assurance:  ## Run assurance-related tests only
 	$(MAKE) ensure-python
@@ -178,15 +174,18 @@ verify:  ## Run verification (pytest -q, lint, format, markdown + spell docs lin
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTEST) -q
 	OMP_NUM_THREADS=1 SKIP_RUFF=1 INVARLOCK_PYTHON="$(PYTHON)" bash scripts/run_smoke_regression.sh
-	$(MAKE) ensure-ruff
-	$(RUFF) check src/ tests/ scripts/
-	$(RUFF) format --check src/ tests/ scripts/
-	$(PYTHON) scripts/sync_packaged_contracts.py --check
-	$(PYTHON) scripts/docs_lint.py --all
+	$(MAKE) verify-ruff
+	$(MAKE) contracts-check
+	$(MAKE) docs-lint
 	@if [ -n "$$VERIFY_DOCS_API" ]; then \
 		$(PYTHON) scripts/validate_docs_api_refs.py; \
 	fi
 	@echo "Verification completed successfully"
+
+verify-ruff:  ## Run the Ruff checks used by make verify
+	$(MAKE) ensure-ruff
+	$(RUFF) check src/ tests/ scripts/
+	$(RUFF) format --check src/ tests/ scripts/
 
 model-evidence-list:  ## Print the maintained shipped-model evidence manifest
 	$(MAKE) ensure-python
