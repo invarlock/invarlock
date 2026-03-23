@@ -10,6 +10,8 @@
 
 # Source dependencies
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PACK_REPO_ROOT="${PACK_REPO_ROOT:-$(cd "${SCRIPT_DIR}/../../.." && pwd)}"
+PACK_REPO_PYTHONPATH="${PACK_REPO_ROOT}/src"
 # shellcheck source=runtime.sh
 source "${SCRIPT_DIR}/runtime.sh"
 # shellcheck source=dataset_provider_config.sh
@@ -233,18 +235,18 @@ _task_get_model_revision() {
 }
 
 # Check if model is large (30B+) and needs special handling.
-# Changed threshold from 70 to 30 to fix hang on 30-40B models:
-# - Skips overhead check (avoids loading model twice, which can exceed 180GB)
+# Changed threshold from 70 to 13 to cover 14B-class dense checkpoints:
+# - Skips overhead check (avoids loading the edited model twice in compare-mode runs)
 _is_large_model() {
     local model_size="$1"
     if [[ "${model_size}" == "moe" ]]; then
         return 0
     fi
     if [[ "${model_size}" =~ ^[0-9]+$ ]]; then
-        [[ ${model_size} -ge 30 ]]
+        [[ ${model_size} -ge 13 ]]
         return
     fi
-    [[ "${model_size}" =~ 30 || "${model_size}" =~ 32 || "${model_size}" =~ 34 || "${model_size}" =~ 40 || "${model_size}" =~ 70 || "${model_size}" =~ 72 || "${model_size}" =~ 65 || "${model_size}" =~ 80 || "${model_size}" =~ 90 ]]
+    [[ "${model_size}" =~ 13 || "${model_size}" =~ 14 || "${model_size}" =~ 30 || "${model_size}" =~ 32 || "${model_size}" =~ 34 || "${model_size}" =~ 40 || "${model_size}" =~ 70 || "${model_size}" =~ 72 || "${model_size}" =~ 65 || "${model_size}" =~ 80 || "${model_size}" =~ 90 ]]
 }
 
 # Resolve the concrete InvarLock adapter name for a model path/ID.
@@ -268,6 +270,119 @@ _validate_evaluate_baseline_report() {
 
     _cmd_python "${SCRIPT_DIR}/../python/validate_baseline_report.py" \
         "${report_path}" "${expected_adapter}" "${expected_profile}" "${expected_tier}"
+}
+
+_stage_runtime_input_for_eval() {
+    local source_file="$1"
+    local cert_dir="$2"
+    local log_file="$3"
+    local label="$4"
+
+    if [[ -z "${source_file}" || ! -f "${source_file}" ]]; then
+        return 1
+    fi
+
+    local staged_dir="${cert_dir}/runtime_inputs"
+    mkdir -p "${staged_dir}" || return 1
+
+    local staged_file="${staged_dir}/$(basename "${source_file}")"
+    cp -f "${source_file}" "${staged_file}" >> "${log_file}" 2>&1 || return 1
+    if [[ -n "${label}" ]]; then
+        echo "  Staged ${label} for evaluate runtime: ${staged_file}" >> "${log_file}"
+    fi
+    printf '%s\n' "$(cd "$(dirname "${staged_file}")" && pwd)/$(basename "${staged_file}")"
+}
+
+_stage_preset_for_eval() {
+    _stage_runtime_input_for_eval "$1" "$2" "$3" "preset"
+}
+
+_stage_baseline_report_for_eval() {
+    _stage_runtime_input_for_eval "$1" "$2" "$3" "baseline report"
+}
+
+_normalize_staged_preset_for_eval() {
+    local staged_preset="$1"
+    local seq_len="$2"
+    local stride="$3"
+    local preview_n="$4"
+    local final_n="$5"
+    local skip_overhead="$6"
+    local log_file="$7"
+
+    if [[ -z "${staged_preset}" || ! -f "${staged_preset}" ]]; then
+        return 1
+    fi
+
+    local tmp_file="${staged_preset}.tmp"
+    awk \
+        -v seq_len="${seq_len}" \
+        -v stride="${stride}" \
+        -v preview_n="${preview_n}" \
+        -v final_n="${final_n}" \
+        '
+        function emit_missing() {
+            if (!s_seq_len) print "  seq_len: " seq_len
+            if (!s_stride) print "  stride: " stride
+            if (!s_preview_n) print "  preview_n: " preview_n
+            if (!s_final_n) print "  final_n: " final_n
+        }
+        /^dataset:[[:space:]]*$/ {
+            in_dataset=1
+            print
+            next
+        }
+        {
+            if (in_dataset && $0 ~ /^[^[:space:]#]/) {
+                emit_missing()
+                in_dataset=0
+            }
+            if (in_dataset) {
+                if ($0 ~ /^  seq_len:[[:space:]]*/) {
+                    print "  seq_len: " seq_len
+                    s_seq_len=1
+                    next
+                }
+                if ($0 ~ /^  stride:[[:space:]]*/) {
+                    print "  stride: " stride
+                    s_stride=1
+                    next
+                }
+                if ($0 ~ /^  preview_n:[[:space:]]*/) {
+                    print "  preview_n: " preview_n
+                    s_preview_n=1
+                    next
+                }
+                if ($0 ~ /^  final_n:[[:space:]]*/) {
+                    print "  final_n: " final_n
+                    s_final_n=1
+                    next
+                }
+            }
+            print
+        }
+        END {
+            if (in_dataset) {
+                emit_missing()
+            }
+        }
+        ' "${staged_preset}" > "${tmp_file}" || return 1
+
+    if [[ "${skip_overhead}" == "1" ]]; then
+        if ! grep -q '^context:[[:space:]]*$' "${tmp_file}"; then
+            cat >> "${tmp_file}" <<'YAML'
+context:
+  run:
+    skip_overhead_check: true
+YAML
+        fi
+    fi
+
+    mv "${tmp_file}" "${staged_preset}" || return 1
+    echo "  Normalized staged preset dataset for evaluate runtime: seq=${seq_len}, stride=${stride}, preview=${preview_n}, final=${final_n}" >> "${log_file}"
+    if [[ "${skip_overhead}" == "1" ]]; then
+        echo "  Injected context.run.skip_overhead_check=true into staged preset" >> "${log_file}"
+    fi
 }
 
 _ensure_evaluate_baseline_report() {
@@ -408,6 +523,7 @@ YAML
         if _is_large_model "${model_size}"; then
             extra_env+=(INVARLOCK_SKIP_OVERHEAD_CHECK=1)
         fi
+        extra_env+=("PYTHONPATH=${PACK_REPO_PYTHONPATH}")
         extra_env+=(INVARLOCK_STORE_EVAL_WINDOWS=1)
         if pack_remote_code_allowed; then
             extra_env+=(INVARLOCK_ALLOW_REMOTE_CODE=1)
@@ -1330,16 +1446,25 @@ task_evaluate_edit() {
     )
     local -a baseline_report_args=()
     if [[ -n "${baseline_report_file}" && -f "${baseline_report_file}" ]]; then
-        baseline_report_args=(--baseline-report "${baseline_report_file}")
+        local abs_baseline_report_file
+        abs_baseline_report_file="$(_stage_baseline_report_for_eval "${baseline_report_file}" "${cert_dir}" "${log_file}")" || {
+            echo "ERROR: Failed to stage baseline report for evaluate runtime: ${baseline_report_file}" >> "${log_file}"
+            return 1
+        }
+        baseline_report_args=(--baseline-report "${abs_baseline_report_file}")
         echo "  Reusing baseline report: ${baseline_report_file}" >> "${log_file}"
     else
         echo "  WARNING: Baseline report unavailable; will run per-cert baseline evaluation" >> "${log_file}"
     fi
 
     local -a extra_env=()
+    extra_env+=("PYTHONPATH=${PACK_REPO_PYTHONPATH}")
+    local skip_overhead_config_yaml=""
+    local skip_overhead_in_preset="0"
     if _is_large_model "${model_size}"; then
-        extra_env+=(INVARLOCK_SKIP_OVERHEAD_CHECK=1)
-        echo "  Large model (${model_size}): SKIP_OVERHEAD_CHECK=1" >> "${log_file}"
+        skip_overhead_config_yaml=$'context:\n  run:\n    skip_overhead_check: true'
+        skip_overhead_in_preset="1"
+        echo "  Large model (${model_size}): context.run.skip_overhead_check=true" >> "${log_file}"
     fi
     extra_env+=(INVARLOCK_STORE_EVAL_WINDOWS=1)
     if pack_remote_code_allowed; then
@@ -1365,6 +1490,7 @@ eval:
   bootstrap:
     replicates: ${bootstrap_replicates}
     alpha: 0.05
+${skip_overhead_config_yaml}
 YAML
 
     extra_env+=("INVARLOCK_CONFIG_ROOT=${config_root}")
@@ -1422,7 +1548,14 @@ PRESET_YAML
     local work_dir="${cert_dir}/.workdir"
     mkdir -p "${work_dir}"
     local abs_preset_file
-    abs_preset_file="$(cd "$(dirname "${preset_file}")" && pwd)/$(basename "${preset_file}")"
+    abs_preset_file="$(_stage_preset_for_eval "${preset_file}" "${cert_dir}" "${log_file}")" || {
+        echo "ERROR: Failed to stage preset for evaluate runtime: ${preset_file}" >> "${log_file}"
+        return 1
+    }
+    _normalize_staged_preset_for_eval "${abs_preset_file}" "${seq_len}" "${stride}" "${preview_n}" "${final_n}" "${skip_overhead_in_preset}" "${log_file}" || {
+        echo "ERROR: Failed to normalize staged preset for evaluate runtime: ${abs_preset_file}" >> "${log_file}"
+        return 1
+    }
     local edit_label
     edit_label="$(basename "${abs_edit_path}")"
     edit_label="${edit_label%_stress}"
@@ -1790,16 +1923,25 @@ task_evaluate_error() {
     )
     local -a baseline_report_args=()
     if [[ -n "${baseline_report_file}" && -f "${baseline_report_file}" ]]; then
-        baseline_report_args=(--baseline-report "${baseline_report_file}")
+        local abs_baseline_report_file
+        abs_baseline_report_file="$(_stage_baseline_report_for_eval "${baseline_report_file}" "${cert_dir}" "${log_file}")" || {
+            echo "ERROR: Failed to stage baseline report for evaluate runtime: ${baseline_report_file}" >> "${log_file}"
+            return 1
+        }
+        baseline_report_args=(--baseline-report "${abs_baseline_report_file}")
         echo "  Reusing baseline report: ${baseline_report_file}" >> "${log_file}"
     else
         echo "  WARNING: Baseline report unavailable; will run per-cert baseline evaluation" >> "${log_file}"
     fi
 
     local -a extra_env=()
+    extra_env+=("PYTHONPATH=${PACK_REPO_PYTHONPATH}")
+    local skip_overhead_config_yaml=""
+    local skip_overhead_in_preset="0"
     if _is_large_model "${model_size}"; then
-        extra_env+=(INVARLOCK_SKIP_OVERHEAD_CHECK=1)
-        echo "  Large model (${model_size}): SKIP_OVERHEAD_CHECK=1" >> "${log_file}"
+        skip_overhead_config_yaml=$'context:\n  run:\n    skip_overhead_check: true'
+        skip_overhead_in_preset="1"
+        echo "  Large model (${model_size}): context.run.skip_overhead_check=true" >> "${log_file}"
     fi
     extra_env+=(INVARLOCK_STORE_EVAL_WINDOWS=1)
     if pack_remote_code_allowed; then
@@ -1825,6 +1967,7 @@ eval:
   bootstrap:
     replicates: ${bootstrap_replicates}
     alpha: 0.05
+${skip_overhead_config_yaml}
 YAML
 
     extra_env+=("INVARLOCK_CONFIG_ROOT=${config_root}")
@@ -1867,7 +2010,14 @@ PRESET_YAML
     local work_dir="${cert_dir}/.workdir"
     mkdir -p "${work_dir}"
     local abs_preset_file
-    abs_preset_file="$(cd "$(dirname "${preset_file}")" && pwd)/$(basename "${preset_file}")"
+    abs_preset_file="$(_stage_preset_for_eval "${preset_file}" "${cert_dir}" "${log_file}")" || {
+        echo "ERROR: Failed to stage preset for evaluate runtime: ${preset_file}" >> "${log_file}"
+        return 1
+    }
+    _normalize_staged_preset_for_eval "${abs_preset_file}" "${seq_len}" "${stride}" "${preview_n}" "${final_n}" "${skip_overhead_in_preset}" "${log_file}" || {
+        echo "ERROR: Failed to normalize staged preset for evaluate runtime: ${abs_preset_file}" >> "${log_file}"
+        return 1
+    }
 
     # CUDA_VISIBLE_DEVICES is inherited from execute_task() for multi-GPU support
     local exit_code=0

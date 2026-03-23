@@ -456,6 +456,17 @@ def run_command_impl(
             baseline=baseline,
             console=console,
         )
+        (
+            measure_guard_overhead,
+            skip_overhead,
+            skip_overhead_source,
+        ) = _should_measure_overhead(profile_normalized, cfg)
+        direct_reuse_loaded_model = (
+            skip_overhead
+            and profile_normalized in {"ci", "release"}
+            and retry_controller is None
+        )
+        emitted_skip_overhead_warning = False
 
         baseline_report_data: dict[str, Any] | None = None
         pairing_schedule: dict[str, Any] | None = None
@@ -1666,6 +1677,8 @@ def run_command_impl(
                 cfg_snapshot = {}
 
             def _choose_snapshot_mode() -> str:
+                if direct_reuse_loaded_model:
+                    return "reuse_loaded"
                 # Precedence: config > env > auto
                 cfg_mode = (
                     str(cfg_snapshot.get("mode", "")).lower()
@@ -1806,7 +1819,27 @@ def run_command_impl(
                 emoji="💾",
                 profile=profile_normalized,
             )
-            if mode == "chunked":
+            if mode == "reuse_loaded":
+                skip_model_load = True
+                source_note = (
+                    f" ({skip_overhead_source})" if skip_overhead_source else ""
+                )
+                _event(
+                    console,
+                    "WARN",
+                    f"Overhead check skipped via config policy{source_note}",
+                    emoji="⚠️",
+                    profile=profile_normalized,
+                )
+                _event(
+                    console,
+                    "WARN",
+                    "Reusing initially loaded model for guarded execution.",
+                    emoji="⚠️",
+                    profile=profile_normalized,
+                )
+                emitted_skip_overhead_warning = True
+            elif mode == "chunked":
                 snapshot_tmpdir = adapter.snapshot_chunked(model)  # type: ignore[attr-defined]
 
                 def _restore():
@@ -1847,20 +1880,32 @@ def run_command_impl(
 
         # RETRY LOOP - All report processing inside loop
         attempt = 1
-        (
-            measure_guard_overhead,
-            skip_overhead,
-            skip_overhead_source,
-        ) = _should_measure_overhead(profile_normalized, cfg)
         if skip_overhead and profile_normalized in {"ci", "release"}:
-            source_note = f" ({skip_overhead_source})" if skip_overhead_source else ""
-            _event(
-                console,
-                "WARN",
-                f"Overhead check skipped via config policy{source_note}",
-                emoji="⚠️",
-                profile=profile_normalized,
-            )
+            if not emitted_skip_overhead_warning:
+                source_note = (
+                    f" ({skip_overhead_source})" if skip_overhead_source else ""
+                )
+                _event(
+                    console,
+                    "WARN",
+                    f"Overhead check skipped via config policy{source_note}",
+                    emoji="⚠️",
+                    profile=profile_normalized,
+                )
+            if (
+                retry_controller is None
+                and model is not None
+                and restore_fn is None
+                and not skip_model_load
+            ):
+                skip_model_load = True
+                _event(
+                    console,
+                    "WARN",
+                    "Snapshot restore unavailable; reusing initially loaded model for guarded execution.",
+                    emoji="⚠️",
+                    profile=profile_normalized,
+                )
 
         while True:
             # Reset RNG streams each attempt to guarantee determinism across retries

@@ -331,6 +331,55 @@ def _iter_external_symlink_target_mounts(path: Path, *, cwd: Path) -> list[Path]
     return sorted(mounts, key=lambda item: (len(item.parts), str(item)))
 
 
+def _iter_absolute_pythonpath_entries() -> list[Path]:
+    raw_value = os.environ.get("PYTHONPATH", "")
+    if not raw_value:
+        return []
+    entries: list[Path] = []
+    seen: set[Path] = set()
+    for raw_entry in raw_value.split(os.pathsep):
+        text = raw_entry.strip()
+        if not text:
+            continue
+        entry = Path(text).expanduser()
+        if not entry.is_absolute():
+            continue
+        resolved = entry.resolve(strict=False)
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        entries.append(resolved)
+    return entries
+
+
+def _container_pythonpath_entries(*, cwd: Path) -> tuple[list[str], list[Path]]:
+    host_entries = _iter_absolute_pythonpath_entries()
+    if not host_entries:
+        return ["/workspace/src"], []
+
+    container_entries: list[str] = []
+    mounts: set[Path] = set()
+    for entry in host_entries:
+        if entry == cwd or cwd in entry.parents:
+            rel = entry.relative_to(cwd)
+            container_entries.append(str(Path("/workspace") / rel))
+            continue
+        container_entries.append(str(entry))
+        mount = _mount_root_for_path(entry)
+        if not _mount_is_already_covered(mount, cwd=cwd):
+            mounts.add(mount)
+        mounts.update(_iter_external_symlink_target_mounts(entry, cwd=cwd))
+    ordered_mounts = sorted(mounts, key=lambda item: (len(item.parts), str(item)))
+    minimized: list[Path] = []
+    for mount in ordered_mounts:
+        if any(
+            existing == mount or existing in mount.parents for existing in minimized
+        ):
+            continue
+        minimized.append(mount)
+    return container_entries, minimized
+
+
 def _extra_container_mounts(argv: list[str], *, cwd: Path) -> list[Path]:
     mounts: set[Path] = set()
     candidate_paths = _iter_path_args(argv)
@@ -441,6 +490,7 @@ def build_container_command(argv: list[str] | None = None) -> list[str]:
         )
     if argv is None:
         argv = list(sys.argv[1:])
+    pythonpath_entries, pythonpath_mounts = _container_pythonpath_entries(cwd=cwd)
     env_pairs = {
         ALLOW_NETWORK_ENV: "1" if network_allowed() else "0",
         ALLOW_REMOTE_CODE_ENV: "1" if remote_code_allowed() else "0",
@@ -450,7 +500,7 @@ def build_container_command(argv: list[str] | None = None) -> list[str]:
         ),
         CONTAINER_EXECUTION_ENV: "1",
         RUNTIME_IMAGE_DIGEST_ENV: digest,
-        "PYTHONPATH": "/workspace/src",
+        "PYTHONPATH": os.pathsep.join(pythonpath_entries),
     }
     command = [engine, "run", "--rm"]
     if _needs_gpu_passthrough(argv):
@@ -458,7 +508,13 @@ def build_container_command(argv: list[str] | None = None) -> list[str]:
     if not network_allowed():
         command.extend(["--network", "none"])
     command.extend(["-v", f"{cwd}:/workspace", "-w", "/workspace"])
-    for mount in _extra_container_mounts(argv, cwd=cwd):
+    extra_mounts = _extra_container_mounts(argv, cwd=cwd)
+    for mount in pythonpath_mounts:
+        if any(existing == mount for existing in extra_mounts):
+            continue
+        extra_mounts.append(mount)
+    extra_mounts.sort(key=lambda item: (len(item.parts), str(item)))
+    for mount in extra_mounts:
         command.extend(["-v", f"{mount}:{mount}"])
     for key, value in env_pairs.items():
         command.extend(["-e", f"{key}={value}"])

@@ -11,6 +11,18 @@ from invarlock.cli.run_config import extract_model_load_kwargs
 from invarlock.core.exceptions import InvarlockError
 
 
+def _env_value(command: list[str], key: str) -> str:
+    needle = f"{key}="
+    for idx, token in enumerate(command[:-1]):
+        if token == "-e" and command[idx + 1].startswith(needle):
+            return command[idx + 1][len(needle) :]
+    raise AssertionError(f"environment variable {key} not found")
+
+
+def _mounts(command: list[str]) -> list[list[str]]:
+    return [command[idx : idx + 2] for idx in range(len(command) - 1)]
+
+
 def test_third_party_plugin_discovery_disabled_by_default(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -274,15 +286,91 @@ def test_container_launch_mounts_absolute_output_and_report_paths(
         ]
     )
 
-    assert ["-v", f"{config_parent}:{config_parent}"] in [
-        command[idx : idx + 2] for idx in range(len(command) - 1)
-    ]
-    assert ["-v", f"{out_parent}:{out_parent}"] in [
-        command[idx : idx + 2] for idx in range(len(command) - 1)
-    ]
-    assert ["-v", f"{report_parent}:{report_parent}"] in [
-        command[idx : idx + 2] for idx in range(len(command) - 1)
-    ]
+    mounts = _mounts(command)
+    assert ["-v", f"{config_parent}:{config_parent}"] in mounts
+    assert ["-v", f"{out_parent}:{out_parent}"] in mounts
+    assert ["-v", f"{report_parent}:{report_parent}"] in mounts
+
+
+def test_container_launch_maps_repo_pythonpath_to_workspace_src(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_dir = tmp_path / "repo"
+    src_dir = repo_dir / "src"
+    src_dir.mkdir(parents=True)
+    monkeypatch.chdir(repo_dir)
+    monkeypatch.setenv("PYTHONPATH", str(src_dir))
+    monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_container_engine",
+        lambda: "docker",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "container_image_available_locally",
+        lambda image=None, *, engine=None: True,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image",
+        lambda: "invarlock-runtime:local",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image_digest",
+        lambda: "sha256:test",
+        raising=True,
+    )
+
+    command = runtime_security.build_container_command(["run", "--config", "/tmp/dummy"])
+
+    assert _env_value(command, "PYTHONPATH") == "/workspace/src"
+
+
+def test_container_launch_mounts_absolute_pythonpath_when_running_from_workdir(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_dir = tmp_path / "repo"
+    src_dir = repo_dir / "src"
+    src_dir.mkdir(parents=True)
+    workdir = tmp_path / "run-root" / ".workdir"
+    workdir.mkdir(parents=True)
+    monkeypatch.chdir(workdir)
+    monkeypatch.setenv("PYTHONPATH", str(src_dir))
+    monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_container_engine",
+        lambda: "docker",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "container_image_available_locally",
+        lambda image=None, *, engine=None: True,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image",
+        lambda: "invarlock-runtime:local",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image_digest",
+        lambda: "sha256:test",
+        raising=True,
+    )
+
+    command = runtime_security.build_container_command(["run", "--config", "/tmp/dummy"])
+
+    assert _env_value(command, "PYTHONPATH") == str(src_dir)
+    assert ["-v", f"{src_dir}:{src_dir}"] in _mounts(command)
 
 
 def test_container_launch_mounts_absolute_model_paths_from_cli(

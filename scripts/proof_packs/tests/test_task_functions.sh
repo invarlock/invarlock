@@ -64,6 +64,18 @@ test_default_ci_min_windows_accounts_for_padding() {
     assert_eq "300" "$(_default_ci_min_windows "128")" "env override wins"
 }
 
+test_large_model_threshold_covers_14b_dense_checkpoints() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    _is_large_model "13" || t_fail "expected 13B-class model sizes to skip overhead check"
+    _is_large_model "14" || t_fail "expected 14B-class model sizes to skip overhead check"
+    if _is_large_model "7"; then
+        t_fail "expected 7B-class model sizes to keep overhead check enabled"
+    fi
+}
+
 test_model_size_and_eval_batch_selection() {
     mock_reset
     # shellcheck source=../task_functions.sh
@@ -334,7 +346,7 @@ test_task_evaluate_edit_and_error_cover_preset_discovery_overrides_and_report_co
     export TASK_PARAMS='{"seq_len":100,"stride":200}'
     export INVARLOCK_BOOTSTRAP_N="1234"
     export INVARLOCK_CERT_MIN_WINDOWS="256"
-    _estimate_model_size() { echo "7"; }
+    _estimate_model_size() { echo "13"; }
 
     mkdir -p "${out}/presets"
     cat > "${out}/presets/calibrated_preset_${model_name}__quant_rtn.yaml" <<'YAML'
@@ -357,6 +369,7 @@ YAML
     assert_match "stride: 100" "${profile_contents}" "profile override stride uses pairing"
     assert_match "preview_n: 256" "${profile_contents}" "profile override preview_n"
     assert_match "final_n: 256" "${profile_contents}" "profile override final_n"
+    assert_match "skip_overhead_check: true" "${profile_contents}" "large-model profile disables overhead check via config"
 
     local calls
     calls="$(cat "${TEST_TMPDIR}/fixtures/invarlock.calls")"
@@ -364,6 +377,9 @@ YAML
     if [[ "${calls}" =~ oom_override_preset\.yaml ]]; then
         t_fail "expected evaluate to avoid override preset file"
     fi
+    local staged_quant_preset
+    staged_quant_preset="$(cat "${cert_dir}/runtime_inputs/calibrated_preset_${model_name}__quant_rtn.yaml")"
+    assert_match "skip_overhead_check: true" "${staged_quant_preset}" "staged preset carries skip_overhead policy"
     # Skip branch when cert already exists.
     task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean 1 "${out}" "${log_file}"
 
@@ -1305,6 +1321,34 @@ test_task_evaluate_edit_reuses_baseline_report_applies_ci_override_and_falls_bac
     source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
 
     fixture_write "invarlock.create_cert" ""
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/invarlock" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+fixtures="${TEST_TMPDIR}/fixtures"
+mkdir -p "${fixtures}"
+echo "PYTHONPATH=${PYTHONPATH:-}" >> "${fixtures}/invarlock.calls"
+echo "invarlock $*" >> "${fixtures}/invarlock.calls"
+target=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --report-out|--out)
+            shift
+            target="${1:-}"
+            ;;
+    esac
+    shift || true
+done
+if [[ -n "${target}" && -f "${fixtures}/invarlock.create_cert" ]]; then
+    mkdir -p "${target}"
+    printf '{"ok":true}\n' > "${target}/evaluation.report.json"
+fi
+exit 0
+EOF
+    chmod +x "${bin_dir}/invarlock"
+    local original_path="${PATH}"
+    PATH="${bin_dir}:${PATH}"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -1339,11 +1383,27 @@ test_task_evaluate_edit_reuses_baseline_report_applies_ci_override_and_falls_bac
 
     assert_match "CI window override" "$(cat "${log_file}")" "CI window override applied"
     assert_match "Reusing baseline report" "$(cat "${log_file}")" "baseline report reused"
+    assert_match "Staged baseline report for evaluate runtime" "$(cat "${log_file}")" "baseline report staged into cert dir"
+    assert_match "Staged preset for evaluate runtime" "$(cat "${log_file}")" "preset staged into cert dir"
+    assert_match "Normalized staged preset dataset for evaluate runtime: seq=128, stride=128, preview=192, final=192" "$(cat "${log_file}")" "preset dataset normalized for evaluate edit"
+    assert_file_exists "${model_output_dir}/reports/_clean/run_1/runtime_inputs/baseline_report.json" "staged baseline report exists for evaluate edit"
+    assert_file_exists "${model_output_dir}/reports/_clean/run_1/runtime_inputs/calibrated_preset_${model_name}.yaml" "staged preset exists for evaluate edit"
+    local staged_preset_contents
+    staged_preset_contents="$(cat "${model_output_dir}/reports/_clean/run_1/runtime_inputs/calibrated_preset_${model_name}.yaml")"
+    assert_match "seq_len: 128" "${staged_preset_contents}" "staged preset seq_len normalized for evaluate edit"
+    assert_match "stride: 128" "${staged_preset_contents}" "staged preset stride normalized for evaluate edit"
+    assert_match "preview_n: 192" "${staged_preset_contents}" "staged preset preview_n normalized for evaluate edit"
+    assert_match "final_n: 192" "${staged_preset_contents}" "staged preset final_n normalized for evaluate edit"
 
     local calls
     calls="$(cat "${TEST_TMPDIR}/fixtures/invarlock.calls")"
+    assert_match "PYTHONPATH=${TEST_ROOT}/src" "${calls}" "absolute repo PYTHONPATH forwarded to evaluate"
     assert_match "--baseline-report" "${calls}" "baseline report forwarded to invarlock evaluate"
     assert_match "--edit-label custom" "${calls}" "empty edit label falls back to custom"
+    assert_match "/reports/_clean/run_1/runtime_inputs/baseline_report\\.json" "${calls}" "staged baseline report path forwarded to evaluate"
+    assert_match "/reports/_clean/run_1/runtime_inputs/calibrated_preset_${model_name}\\.yaml" "${calls}" "staged preset path forwarded to evaluate"
+
+    PATH="${original_path}"
 }
 
 test_task_evaluate_error_reuses_baseline_report_and_applies_ci_override() {
@@ -1380,7 +1440,18 @@ test_task_evaluate_error_reuses_baseline_report_and_applies_ci_override() {
 
     assert_match "CI window override" "$(cat "${log_file}")" "CI window override applied"
     assert_match "Reusing baseline report" "$(cat "${log_file}")" "baseline report reused"
+    assert_match "Staged baseline report for evaluate runtime" "$(cat "${log_file}")" "baseline report staged into error cert dir"
+    assert_match "Staged preset for evaluate runtime" "$(cat "${log_file}")" "preset staged into error cert dir"
+    assert_match "Normalized staged preset dataset for evaluate runtime: seq=128, stride=128, preview=192, final=192" "$(cat "${log_file}")" "preset dataset normalized for evaluate error"
     assert_file_exists "${model_output_dir}/reports/errors/nan_injection/evaluation.report.json" "error cert written"
+    assert_file_exists "${model_output_dir}/reports/errors/nan_injection/runtime_inputs/baseline_report.json" "staged baseline report exists for evaluate error"
+    assert_file_exists "${model_output_dir}/reports/errors/nan_injection/runtime_inputs/calibrated_preset_${model_name}.yaml" "staged preset exists for evaluate error"
+    local staged_error_preset_contents
+    staged_error_preset_contents="$(cat "${model_output_dir}/reports/errors/nan_injection/runtime_inputs/calibrated_preset_${model_name}.yaml")"
+    assert_match "seq_len: 128" "${staged_error_preset_contents}" "staged preset seq_len normalized for evaluate error"
+    assert_match "stride: 128" "${staged_error_preset_contents}" "staged preset stride normalized for evaluate error"
+    assert_match "preview_n: 192" "${staged_error_preset_contents}" "staged preset preview_n normalized for evaluate error"
+    assert_match "final_n: 192" "${staged_error_preset_contents}" "staged preset final_n normalized for evaluate error"
 }
 
 test_task_timeout_and_profile_helpers() {
