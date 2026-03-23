@@ -24,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optimized evaluation data loading, Hugging Face adapter/model-loading paths,
   model-profile resolution, and CLI run/bootstrap startup flows to reduce local
   evaluation overhead.
+- Refactored grouped `make test-*` targets to share a single recipe body, and
+  `make verify` now includes `make runtime-verify` so the Rust runtime-manifest
+  verifier is exercised as part of the main verification gate.
 - Pinned workflow and proof-pack helper dependencies into checked-in
   requirements files, and updated CI/release automation to run against the
   configured `setup-python` interpreter with tighter permission scopes.
@@ -42,6 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Hardened CLI backend, doctor, plugin, and verification checks, including
   safer remote-code defaults, plugin catalog/install surfaces, and
   release-profile overhead enforcement.
+- Fixed the CLI runtime-verifier test shim to use the active test interpreter,
+  which keeps nested verify/proof-pack attestation tests aligned with the
+  installed Python environment.
 - Tightened core profiling, security, typing, report-type validation, and local
   model-profile resolution behavior.
 - Proof-pack execution now honors one-sided scenario manifests, pins helper
