@@ -169,11 +169,12 @@ format:  ## Format code
 	$(RUFF) format src/ tests/ scripts/
 	$(RUFF) check --fix src/ tests/ scripts/
 
-verify:  ## Run verification (pytest -q, lint, format, markdown + spell docs lint)
+verify:  ## Run verification (pytest -q, runtime verifier, lint, format, markdown + spell docs lint)
 	@echo "Running verification..."
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTEST) -q
 	OMP_NUM_THREADS=1 SKIP_RUFF=1 INVARLOCK_PYTHON="$(PYTHON)" bash scripts/run_smoke_regression.sh
+	$(MAKE) runtime-verify
 	$(MAKE) verify-ruff
 	$(MAKE) contracts-check
 	$(MAKE) docs-lint
