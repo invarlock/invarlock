@@ -226,6 +226,48 @@ def _requested_device(argv: list[str]) -> str | None:
     return None
 
 
+_PATH_ARG_FLAGS = {"--out", "--report-out", "--config", "-c"}
+
+
+def _iter_path_args(argv: list[str]) -> list[Path]:
+    paths: list[Path] = []
+    idx = 0
+    while idx < len(argv):
+        token = argv[idx]
+        if token in _PATH_ARG_FLAGS and idx + 1 < len(argv):
+            paths.append(Path(argv[idx + 1]).expanduser())
+            idx += 2
+            continue
+        for flag in _PATH_ARG_FLAGS:
+            prefix = f"{flag}="
+            if token.startswith(prefix):
+                paths.append(Path(token[len(prefix) :]).expanduser())
+                break
+        idx += 1
+    return paths
+
+
+def _extra_container_mounts(argv: list[str], *, cwd: Path) -> list[Path]:
+    mounts: set[Path] = set()
+    for path in _iter_path_args(argv):
+        if not path.is_absolute():
+            continue
+        resolved = path.resolve(strict=False)
+        if resolved == cwd or cwd in resolved.parents:
+            continue
+        mount = resolved if resolved.exists() and resolved.is_dir() else resolved.parent
+        if mount == cwd or cwd in mount.parents:
+            continue
+        mounts.add(mount)
+    ordered = sorted(mounts, key=lambda item: (len(item.parts), str(item)))
+    minimized: list[Path] = []
+    for mount in ordered:
+        if any(existing == mount or existing in mount.parents for existing in minimized):
+            continue
+        minimized.append(mount)
+    return minimized
+
+
 def _needs_gpu_passthrough(argv: list[str]) -> bool:
     requested = _requested_device(argv)
     if requested not in {"auto", "cuda"}:
@@ -330,6 +372,8 @@ def build_container_command(argv: list[str] | None = None) -> list[str]:
     if not network_allowed():
         command.extend(["--network", "none"])
     command.extend(["-v", f"{cwd}:/workspace", "-w", "/workspace"])
+    for mount in _extra_container_mounts(argv, cwd=cwd):
+        command.extend(["-v", f"{mount}:{mount}"])
     for key, value in env_pairs.items():
         command.extend(["-e", f"{key}={value}"])
     # The runtime image already sets `python -m invarlock` as its entrypoint.

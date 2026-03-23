@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -218,3 +219,67 @@ def test_container_launch_skips_gpu_passthrough_for_cpu_model_commands(
     )
 
     assert "--gpus" not in command
+
+
+def test_container_launch_mounts_absolute_output_and_report_paths(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    monkeypatch.chdir(repo_dir)
+    monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_container_engine",
+        lambda: "docker",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "container_image_available_locally",
+        lambda image=None, *, engine=None: True,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image",
+        lambda: "invarlock-runtime:local",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image_digest",
+        lambda: "sha256:test",
+        raising=True,
+    )
+
+    config_parent = tmp_path / "config-parent"
+    config_parent.mkdir()
+    config_path = config_parent / "preset.yaml"
+    config_path.write_text("model: {}\n", encoding="utf-8")
+    out_parent = tmp_path / "out-parent"
+    report_parent = tmp_path / "report-parent"
+    out_path = out_parent / "run-out"
+    report_path = report_parent / "report-out"
+
+    command = runtime_security.build_container_command(
+        [
+            "evaluate",
+            "--config",
+            str(config_path),
+            "--out",
+            str(out_path),
+            "--report-out",
+            str(report_path),
+        ]
+    )
+
+    assert ["-v", f"{config_parent}:{config_parent}"] in [
+        command[idx : idx + 2] for idx in range(len(command) - 1)
+    ]
+    assert ["-v", f"{out_parent}:{out_parent}"] in [
+        command[idx : idx + 2] for idx in range(len(command) - 1)
+    ]
+    assert ["-v", f"{report_parent}:{report_parent}"] in [
+        command[idx : idx + 2] for idx in range(len(command) - 1)
+    ]
