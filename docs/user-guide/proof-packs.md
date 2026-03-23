@@ -6,7 +6,7 @@
 | --- | --- |
 | **Purpose** | Hardware-agnostic validation runs that bundle reports into portable evidence artifacts. |
 | **Audience** | CI operators producing validation evidence across GPU topologies. |
-| **Requires** | GPU capable of fitting selected models; HF cache or network for model download. |
+| **Requires** | Active repo environment, GPU capable of fitting selected models, and HF cache or network for model download. Secure-default runs also require an OCI container engine. |
 | **Outputs** | Proof pack directory with reports, checksums, and optional GPG signature. |
 | **Source of truth** | `scripts/proof_packs/run_suite.sh`, `scripts/proof_packs/run_pack.sh`. |
 
@@ -46,7 +46,19 @@ verify reported outcomes, and provide structured outputs for downstream analysis
 ## Quick Start
 
 ```bash
+# In a repo checkout, install the CLI into the active environment once.
+make dev-install
+
+# Secure-default proof-pack runs call `invarlock run` / `evaluate` under the
+# runtime container. Build it once per checkout.
+make runtime-image
+
 # RECOMMENDED: Full proof pack with verification artifacts
+PACK_TUNED_EDIT_PARAMS_FILE=./scripts/proof_packs/tuned_edit_params.json \
+  ./scripts/proof_packs/run_pack.sh --suite subset --net 1
+
+# Trusted local host workflow (skips the attested container path)
+INVARLOCK_ALLOW_HOST_EXECUTION=1 \
 PACK_TUNED_EDIT_PARAMS_FILE=./scripts/proof_packs/tuned_edit_params.json \
   ./scripts/proof_packs/run_pack.sh --suite subset --net 1
 
@@ -71,6 +83,14 @@ invarlock proof-pack verify ./proof_pack_runs/subset_20250101_000000/proof_pack 
 Note: clean edits require tuned preset parameters. Either set
 `PACK_TUNED_EDIT_PARAMS_FILE` or place the file at
 `scripts/proof_packs/tuned_edit_params.json`.
+
+The proof-pack shell wrappers do not expose a top-level
+`--allow-host-execution` flag. For trusted local host execution, set
+`INVARLOCK_ALLOW_HOST_EXECUTION=1` in the environment before calling
+`run_pack.sh` or `run_suite.sh`. Otherwise, the underlying model-loading
+commands use the secure-default runtime container path and expect `docker` or
+`podman`, plus a locally built `invarlock-runtime:local` image from
+`make runtime-image`.
 
 ## How It Works
 
