@@ -337,6 +337,63 @@ def test_container_launch_mounts_absolute_model_paths_from_cli(
     assert ["-v", f"{subject_dir}:{subject_dir}"] in mounts
 
 
+def test_container_launch_mounts_external_symlink_targets_for_local_model_paths(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    monkeypatch.chdir(repo_dir)
+    monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_container_engine",
+        lambda: "docker",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "container_image_available_locally",
+        lambda image=None, *, engine=None: True,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image",
+        lambda: "invarlock-runtime:local",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image_digest",
+        lambda: "sha256:test",
+        raising=True,
+    )
+
+    baseline_dir = tmp_path / "baseline-model"
+    baseline_dir.mkdir()
+    subject_dir = tmp_path / "subject-model"
+    subject_dir.mkdir()
+    cache_dir = tmp_path / "hf-cache" / "blobs"
+    cache_dir.mkdir(parents=True)
+    blob_path = cache_dir / "weights.bin"
+    blob_path.write_bytes(b"weights")
+    (baseline_dir / "model.safetensors").symlink_to(blob_path)
+
+    command = runtime_security.build_container_command(
+        [
+            "evaluate",
+            "--baseline",
+            str(baseline_dir),
+            "--subject",
+            str(subject_dir),
+        ]
+    )
+
+    mounts = [command[idx : idx + 2] for idx in range(len(command) - 1)]
+    assert ["-v", f"{baseline_dir}:{baseline_dir}"] in mounts
+    assert ["-v", f"{cache_dir}:{cache_dir}"] in mounts
+
+
 def test_container_launch_mounts_absolute_model_paths_from_config(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
