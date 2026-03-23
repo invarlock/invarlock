@@ -228,7 +228,14 @@ def _requested_device(argv: list[str]) -> str | None:
     return None
 
 
-_PATH_ARG_FLAGS = {"--out", "--report-out", "--config", "-c"}
+_PATH_ARG_FLAGS = {
+    "--out",
+    "--report-out",
+    "--config",
+    "-c",
+    "--preset",
+    "--baseline-report",
+}
 _CONFIG_ARG_FLAGS = {"--config", "-c"}
 _LOCAL_MODEL_ARG_FLAGS = {"--baseline", "--subject"}
 

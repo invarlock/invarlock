@@ -429,6 +429,70 @@ def test_container_launch_mounts_absolute_model_paths_from_cli(
     assert ["-v", f"{subject_dir}:{subject_dir}"] in mounts
 
 
+def test_container_launch_mounts_absolute_preset_and_baseline_report_paths(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    monkeypatch.chdir(repo_dir)
+    monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_container_engine",
+        lambda: "docker",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "container_image_available_locally",
+        lambda image=None, *, engine=None: True,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image",
+        lambda: "invarlock-runtime:local",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image_digest",
+        lambda: "sha256:test",
+        raising=True,
+    )
+
+    baseline_dir = tmp_path / "baseline-model"
+    baseline_dir.mkdir()
+    subject_dir = tmp_path / "subject-model"
+    subject_dir.mkdir()
+    preset_dir = tmp_path / "preset-root"
+    preset_dir.mkdir()
+    preset_path = preset_dir / "preset.yaml"
+    preset_path.write_text("dataset:\n  seq_len: 128\n", encoding="utf-8")
+    baseline_report_dir = tmp_path / "baseline-report-root"
+    baseline_report_dir.mkdir()
+    baseline_report_path = baseline_report_dir / "baseline_report.json"
+    baseline_report_path.write_text('{"ok": true}\n', encoding="utf-8")
+
+    command = runtime_security.build_container_command(
+        [
+            "evaluate",
+            "--baseline",
+            str(baseline_dir),
+            "--subject",
+            str(subject_dir),
+            "--preset",
+            str(preset_path),
+            "--baseline-report",
+            str(baseline_report_path),
+        ]
+    )
+
+    mounts = [command[idx : idx + 2] for idx in range(len(command) - 1)]
+    assert ["-v", f"{preset_dir}:{preset_dir}"] in mounts
+    assert ["-v", f"{baseline_report_dir}:{baseline_report_dir}"] in mounts
+
+
 def test_container_launch_mounts_external_symlink_targets_for_local_model_paths(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
