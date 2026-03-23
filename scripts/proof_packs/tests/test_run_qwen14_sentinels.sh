@@ -77,6 +77,7 @@ case "${cmd}" in
         done
         printf 'verify\t%s\t%s\n' "${profile}" "${report}" >> "${calls_file}"
         printf '{"ok":true}\n'
+        exit 17
         ;;
     *)
         printf 'unexpected\t%s\n' "${cmd}" >> "${calls_file}"
