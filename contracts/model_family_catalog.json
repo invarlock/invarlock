@@ -1,6 +1,6 @@
 {
   "format_version": "model-family-catalog-v1",
-  "as_of": "2026-03-19",
+  "as_of": "2026-03-23",
   "declared_support": [
     {
       "family_id": "gpt2-causal-lm",
@@ -57,6 +57,20 @@
         "configs/calibration/null_sweep_qwen2_7b.yaml"
       ],
       "notes": "Derived from support_matrix lane qwen2-7b-causal-hf."
+    },
+    {
+      "family_id": "qwen2-5-14b-causal-lm",
+      "display_name": "Qwen2.5 14B causal LM",
+      "modalities": ["text"],
+      "task_role": "causal_lm",
+      "state": "supported_experimental",
+      "representative_models": ["Qwen/Qwen2.5-14B"],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/causal_lm/qwen2_5_14b_512.yaml",
+        "configs/calibration/null_sweep_qwen2_5_14b.yaml"
+      ],
+      "notes": "Derived from support_matrix lane qwen2-5-14b-causal-hf."
     },
     {
       "family_id": "qwen3-causal-lm",
@@ -224,7 +238,7 @@
         "src/invarlock/cli/adapter_auto.py",
         "docs/reference/model-adapters.md"
       ],
-      "notes": "Shared qwen-family heuristics still cover aliases beyond the declared Qwen2, Qwen3, and Qwen3.5 public lanes, including the ungated QwQ reasoning branch."
+      "notes": "Shared qwen-family heuristics still cover aliases beyond the declared Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 public lanes, including the ungated QwQ reasoning branch and larger usage-only Qwen2.5 checkpoints."
     },
     {
       "family_id": "yi",
@@ -350,7 +364,6 @@
       "state": "usage_only",
       "representative_models": [
         "Qwen/Qwen2.5-7B",
-        "Qwen/Qwen2.5-14B",
         "Qwen/Qwen2.5-32B"
       ],
       "repo_evidence": [
@@ -358,7 +371,7 @@
         "scripts/proof_packs/suites.sh",
         "scripts/proof_packs/lib/validation_suite.sh"
       ],
-      "notes": "Used in proof-pack suites and validation defaults without becoming a public support-matrix family."
+      "notes": "Used in proof-pack suites and validation defaults outside the declared Qwen2.5 14B support lane."
     },
     {
       "family_id": "qwen1-5-72b",

@@ -55,6 +55,16 @@
       "provenance_source": "docs/README.md#support-matrix"
     },
     {
+      "lane_id": "qwen2-5-14b-causal-hf",
+      "family": "Qwen2.5 14B causal LM",
+      "runtime": "huggingface-pytorch",
+      "adapter": "hf_causal",
+      "support_tier": "supported_experimental",
+      "evidence_status": "repo_shipped_pilot_config",
+      "docs_label": "No, repo-shipped pilot config only",
+      "provenance_source": "docs/README.md#support-matrix"
+    },
+    {
       "lane_id": "qwen3-causal-hf",
       "family": "Qwen3 causal LM",
       "runtime": "huggingface-pytorch",

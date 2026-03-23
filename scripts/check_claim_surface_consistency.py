@@ -55,6 +55,7 @@ def main() -> int:
             "Published assurance basis currently covers GPT-2 and BERT profiles.",
             "Mistral 7B",
             "Qwen2 7B",
+            "Qwen2.5 14B",
             "pilot calibration configs",
             "Model Family Catalog",
         ],
@@ -82,18 +83,21 @@ def main() -> int:
             "Published assurance basis currently covers GPT-2 and BERT profiles.",
             "Mistral 7B",
             "Qwen2 7B",
+            "Qwen2.5 14B",
             "not part of the published",
         ],
         "docs/reference/calibration.md": [
             "Published assurance basis currently covers GPT-2 and BERT profiles.",
             "Mistral 7B",
             "Qwen2 7B",
+            "Qwen2.5 14B",
         ],
         "docs/reference/guards.md": [
             "GPT-2",
             "BERT profiles",
             "Mistral 7B",
             "Qwen2 7B",
+            "Qwen2.5 14B",
             "published assurance basis",
         ],
         "docs/reference/model-adapters.md": [
@@ -102,6 +106,7 @@ def main() -> int:
             "BERT",
             "Mistral 7B",
             "Qwen2 7B",
+            "Qwen2.5 14B",
         ],
         "docs/user-guide/proof-packs.md": [
             "signed manifest",

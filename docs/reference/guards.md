@@ -37,7 +37,7 @@ guards:
 >
 > Assurance scope note: the published assurance basis currently covers GPT-2
 > and BERT profiles. Repo-shipped presets and pilot configs for families such
-> as Mistral 7B and Qwen2 7B expand runnable coverage, not the published
+> as Mistral 7B, Qwen2 7B, and Qwen2.5 14B expand runnable coverage, not the published
 > assurance basis.
 
 ## Guard Pipeline Flow

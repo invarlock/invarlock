@@ -180,6 +180,7 @@ Notes
 | BERT / RoBERTa MLM | Yes | Yes | Yes | Yes |
 | Mistral 7B causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
 | Qwen2 7B causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
+| Qwen2.5 14B causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
 | Qwen3 causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
 | QwQ-32B reasoning causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
 | DeepSeek-R1-Distill-Qwen causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
@@ -191,7 +192,7 @@ Notes
 
 Published assurance basis currently covers GPT-2 and BERT profiles. Repo-shipped
 presets and pilot calibration configs for additional experimental families,
-including Mistral 7B, Qwen2 7B, Qwen3, QwQ-32B, DeepSeek-R1-Distill-Qwen,
+including Mistral 7B, Qwen2 7B, Qwen2.5 14B, Qwen3, QwQ-32B, DeepSeek-R1-Distill-Qwen,
 Phi-4 text-only, TinyLlama 1.1B, OLMo 2, and Qwen3.5, do not become part of the published
 assurance basis until supporting artifacts are attached. Access-gated vendor
 checkpoints are intentionally excluded from the shipped support matrix and
