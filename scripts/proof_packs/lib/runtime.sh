@@ -46,7 +46,10 @@ fi
 
 if ! declare -F _cmd_python >/dev/null 2>&1; then
     :
-    _cmd_python() { command python3 "$@"; }
+    _cmd_python() {
+        local python_bin="${PYTHON_BIN:-python3}"
+        command "${python_bin}" "$@"
+    }
 fi
 
 if ! declare -F _runtime_python >/dev/null 2>&1; then

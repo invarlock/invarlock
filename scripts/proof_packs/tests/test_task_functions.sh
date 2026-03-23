@@ -798,6 +798,7 @@ test_task_cleanup_edit_and_error_cover_guard_paths() {
 
 test_task_evaluate_error_probe_warning_branches() {
     mock_reset
+    push_active_python_bin
     # shellcheck source=../task_functions.sh
     source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
 
@@ -845,7 +846,16 @@ EOF
     PATH="${bin_dir}:${PATH}"
     export PATH
 
-    _cmd_python() { return 9; }
+    _cmd_python() {
+        case "${1:-}" in
+            *rmt_cross_model_probe.py|*ve_cross_model_probe.py)
+                return 9
+                ;;
+            *)
+                command "${PYTHON_BIN}" "$@"
+                ;;
+        esac
+    }
 
     local rmt_dir="${model_output_dir}/models/error_rmt_norm_noise_case"
     mkdir -p "${rmt_dir}"
@@ -879,6 +889,7 @@ EOF
     assert_match "Skipping RMT cross-model probe" "${log_text}" "rmt probe skip warning logged"
     assert_match "VE cross-model probe failed" "${log_text}" "ve probe failure warning logged"
     assert_match "Skipping VE cross-model probe" "${log_text}" "ve probe skip warning logged"
+    pop_active_python_bin
 }
 
 test_task_helpers_cover_fallback_branches() {
@@ -1317,6 +1328,7 @@ test_task_baseline_report_helpers_remove_invalid_baseline_report_after_lock_acqu
 
 test_task_evaluate_edit_reuses_baseline_report_applies_ci_override_and_falls_back_label() {
     mock_reset
+    push_active_python_bin
     # shellcheck source=../task_functions.sh
     source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
 
@@ -1397,17 +1409,57 @@ EOF
 
     local calls
     calls="$(cat "${TEST_TMPDIR}/fixtures/invarlock.calls")"
-    assert_match "PYTHONPATH=${TEST_ROOT}/src" "${calls}" "absolute repo PYTHONPATH forwarded to evaluate"
+    assert_match "PYTHONPATH=${PACK_REPO_PYTHONPATH}" "${calls}" "absolute repo PYTHONPATH forwarded to evaluate"
     assert_match "--baseline-report" "${calls}" "baseline report forwarded to invarlock evaluate"
     assert_match "--edit-label custom" "${calls}" "empty edit label falls back to custom"
     assert_match "/reports/_clean/run_1/runtime_inputs/baseline_report\\.json" "${calls}" "staged baseline report path forwarded to evaluate"
     assert_match "/reports/_clean/run_1/runtime_inputs/calibrated_preset_${model_name}\\.yaml" "${calls}" "staged preset path forwarded to evaluate"
 
     PATH="${original_path}"
+    pop_active_python_bin
+}
+
+test_normalize_staged_preset_for_eval_handles_sparse_yaml_and_json_inputs() {
+    mock_reset
+    push_active_python_bin
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    local log_file="${TEST_TMPDIR}/normalize.log"
+    : > "${log_file}"
+
+    local sparse_yaml="${TEST_TMPDIR}/sparse.yaml"
+    cat > "${sparse_yaml}" <<'YAML'
+guards:
+  spectral:
+    max_caps: 15
+YAML
+
+    _normalize_staged_preset_for_eval "${sparse_yaml}" 128 128 192 192 1 "${log_file}"
+    local sparse_yaml_contents
+    sparse_yaml_contents="$(cat "${sparse_yaml}")"
+    assert_match "seq_len: 128" "${sparse_yaml_contents}" "yaml preset gets seq_len when dataset is absent"
+    assert_match "stride: 128" "${sparse_yaml_contents}" "yaml preset gets stride when dataset is absent"
+    assert_match "preview_n: 192" "${sparse_yaml_contents}" "yaml preset gets preview_n when dataset is absent"
+    assert_match "final_n: 192" "${sparse_yaml_contents}" "yaml preset gets final_n when dataset is absent"
+    assert_match "skip_overhead_check: true" "${sparse_yaml_contents}" "yaml preset gets skip_overhead policy"
+    assert_match "guards:" "${sparse_yaml_contents}" "yaml preset keeps existing sections"
+
+    local json_preset="${TEST_TMPDIR}/preset.json"
+    echo '{}' > "${json_preset}"
+    _normalize_staged_preset_for_eval "${json_preset}" 256 256 200 220 0 "${log_file}"
+    local json_contents
+    json_contents="$(cat "${json_preset}")"
+    assert_match "seq_len: 256" "${json_contents}" "json preset gets seq_len"
+    assert_match "stride: 256" "${json_contents}" "json preset gets stride"
+    assert_match "preview_n: 200" "${json_contents}" "json preset gets preview_n"
+    assert_match "final_n: 220" "${json_contents}" "json preset gets final_n"
+    pop_active_python_bin
 }
 
 test_task_evaluate_error_reuses_baseline_report_and_applies_ci_override() {
     mock_reset
+    push_active_python_bin
     # shellcheck source=../task_functions.sh
     source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
 
@@ -1452,6 +1504,7 @@ test_task_evaluate_error_reuses_baseline_report_and_applies_ci_override() {
     assert_match "stride: 128" "${staged_error_preset_contents}" "staged preset stride normalized for evaluate error"
     assert_match "preview_n: 192" "${staged_error_preset_contents}" "staged preset preview_n normalized for evaluate error"
     assert_match "final_n: 192" "${staged_error_preset_contents}" "staged preset final_n normalized for evaluate error"
+    pop_active_python_bin
 }
 
 test_task_timeout_and_profile_helpers() {

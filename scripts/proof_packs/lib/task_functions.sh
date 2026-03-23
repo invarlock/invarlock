@@ -314,71 +314,44 @@ _normalize_staged_preset_for_eval() {
         return 1
     fi
 
-    local tmp_file="${staged_preset}.tmp"
-    awk \
-        -v seq_len="${seq_len}" \
-        -v stride="${stride}" \
-        -v preview_n="${preview_n}" \
-        -v final_n="${final_n}" \
-        '
-        function emit_missing() {
-            if (!s_seq_len) print "  seq_len: " seq_len
-            if (!s_stride) print "  stride: " stride
-            if (!s_preview_n) print "  preview_n: " preview_n
-            if (!s_final_n) print "  final_n: " final_n
-        }
-        /^dataset:[[:space:]]*$/ {
-            in_dataset=1
-            print
-            next
-        }
-        {
-            if (in_dataset && $0 ~ /^[^[:space:]#]/) {
-                emit_missing()
-                in_dataset=0
-            }
-            if (in_dataset) {
-                if ($0 ~ /^  seq_len:[[:space:]]*/) {
-                    print "  seq_len: " seq_len
-                    s_seq_len=1
-                    next
-                }
-                if ($0 ~ /^  stride:[[:space:]]*/) {
-                    print "  stride: " stride
-                    s_stride=1
-                    next
-                }
-                if ($0 ~ /^  preview_n:[[:space:]]*/) {
-                    print "  preview_n: " preview_n
-                    s_preview_n=1
-                    next
-                }
-                if ($0 ~ /^  final_n:[[:space:]]*/) {
-                    print "  final_n: " final_n
-                    s_final_n=1
-                    next
-                }
-            }
-            print
-        }
-        END {
-            if (in_dataset) {
-                emit_missing()
-            }
-        }
-        ' "${staged_preset}" > "${tmp_file}" || return 1
-
+    local normalize_args=(
+        "normalize_staged_preset.py"
+        --preset "${staged_preset}"
+        --seq-len "${seq_len}"
+        --stride "${stride}"
+        --preview-n "${preview_n}"
+        --final-n "${final_n}"
+    )
     if [[ "${skip_overhead}" == "1" ]]; then
-        if ! grep -q '^context:[[:space:]]*$' "${tmp_file}"; then
-            cat >> "${tmp_file}" <<'YAML'
-context:
-  run:
-    skip_overhead_check: true
-YAML
+        normalize_args+=(--skip-overhead-check)
+    fi
+
+    local previous_python_bin="${PYTHON_BIN:-}"
+    local had_python_bin="0"
+    if [[ -v PYTHON_BIN ]]; then
+        had_python_bin="1"
+    fi
+    if [[ "${had_python_bin}" != "1" ]]; then
+        local active_python=""
+        active_python="$(command -v python 2>/dev/null || true)"
+        if [[ -n "${active_python}" ]] && "${active_python}" -c "import yaml" >/dev/null 2>&1; then
+            export PYTHON_BIN="${active_python}"
         fi
     fi
 
-    mv "${tmp_file}" "${staged_preset}" || return 1
+    _runtime_python "${normalize_args[@]}" >> "${log_file}" 2>&1 || {
+        if [[ "${had_python_bin}" == "1" ]]; then
+            export PYTHON_BIN="${previous_python_bin}"
+        else
+            unset PYTHON_BIN
+        fi
+        return 1
+    }
+    if [[ "${had_python_bin}" == "1" ]]; then
+        export PYTHON_BIN="${previous_python_bin}"
+    else
+        unset PYTHON_BIN
+    fi
     echo "  Normalized staged preset dataset for evaluate runtime: seq=${seq_len}, stride=${stride}, preview=${preview_n}, final=${final_n}" >> "${log_file}"
     if [[ "${skip_overhead}" == "1" ]]; then
         echo "  Injected context.run.skip_overhead_check=true into staged preset" >> "${log_file}"

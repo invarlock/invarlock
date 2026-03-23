@@ -2,6 +2,14 @@
 # verify_pack.sh - Validate proof pack checksums and reports.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/runtime.sh
+source "${SCRIPT_DIR}/lib/runtime.sh"
+if [[ -z "${PYTHON_BIN:-}" ]]; then
+    if command -v python >/dev/null 2>&1; then
+        PYTHON_BIN="$(command -v python)"
+        export PYTHON_BIN
+    fi
+fi
 PACK_VERIFY_OK=0
 PACK_VERIFY_USAGE=2
 PACK_VERIFY_MISSING=3
@@ -64,7 +72,7 @@ pack_file_sha256() {
 pack_manifest_field() {
     local manifest_path="$1"
     local field="$2"
-    python3 - "${manifest_path}" "${field}" <<'PY'
+    _cmd_python - "${manifest_path}" "${field}" <<'PY'
 import json
 import sys
 
@@ -85,7 +93,7 @@ PY
 pack_path_within_dir() {
     local dir_path="$1"
     local candidate_path="$2"
-    python3 - "${dir_path}" "${candidate_path}" <<'PY'
+    _cmd_python - "${dir_path}" "${candidate_path}" <<'PY'
 from pathlib import Path
 import sys
 
@@ -135,7 +143,7 @@ pack_validate_manifest_schema() {
     local validator="${SCRIPT_DIR}/python/validate_manifest.py"
     local out
 
-    if ! out="$(python3 "${validator}" "${pack_dir}/manifest.json" 2>&1)"; then
+    if ! out="$(_cmd_python "${validator}" "${pack_dir}/manifest.json" 2>&1)"; then
         echo "ERROR: manifest.json failed contract validation." >&2
         printf '%s\n' "${out}" >&2
         return 1
@@ -148,7 +156,7 @@ pack_verify_manifest_attestation() {
     local verifier="${SCRIPT_DIR}/python/verify_manifest_attestation.py"
     local out
 
-    if ! out="$(python3 "${verifier}" "${pack_dir}" 2>&1)"; then
+    if ! out="$(_cmd_python "${verifier}" "${pack_dir}" 2>&1)"; then
         echo "ERROR: manifest.json attestation references failed verification." >&2
         printf '%s\n' "${out}" >&2
         return 1

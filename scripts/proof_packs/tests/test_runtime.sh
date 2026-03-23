@@ -30,6 +30,36 @@ test_runtime_python_wrapper_invokes_repo_helper() {
     assert_eq "ok" "${RUN_OUT}" "forwards helper stdout"
 }
 
+test_cmd_python_honors_python_bin_override() {
+    mock_reset
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/python-override" <<'EOF'
+#!/usr/bin/env bash
+printf 'override %s\n' "$*"
+EOF
+    chmod +x "${bin_dir}/python-override"
+    local had_python_bin="0"
+    local previous_python_bin="${PYTHON_BIN:-}"
+    if [[ -v PYTHON_BIN ]]; then
+        had_python_bin="1"
+    fi
+    export PYTHON_BIN="${bin_dir}/python-override"
+
+    # shellcheck source=../runtime.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/runtime.sh"
+
+    run _cmd_python --version
+    assert_rc "0" "${RUN_RC}" "_cmd_python uses PYTHON_BIN"
+    assert_eq "override --version" "${RUN_OUT}" "PYTHON_BIN command receives arguments"
+
+    if [[ "${had_python_bin}" == "1" ]]; then
+        export PYTHON_BIN="${previous_python_bin}"
+    else
+        unset PYTHON_BIN
+    fi
+}
+
 test_rand_jitter_ms_positive_returns_value_in_range() {
     mock_reset
     # shellcheck source=../runtime.sh
