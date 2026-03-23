@@ -458,6 +458,11 @@ test_update_progress_state_status_and_percent_branches() {
         > "${QUEUE_DIR}/failed/t.task"
     update_progress_state
     assert_match '\"status\": \"completed_with_failures\"' "$(cat "${out_dir}/state/progress.json")" "completed_with_failures status"
+
+    jq -n '{task_id:"child", task_type:"EVAL_BASELINE", model_id:"m", model_name:"n", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:["t"], params:{}, priority:50}' \
+        > "${QUEUE_DIR}/pending/child.task"
+    update_progress_state
+    assert_match '\"status\": \"blocked_failed_dependencies\"' "$(cat "${out_dir}/state/progress.json")" "blocked dependency state"
 }
 
 test_find_and_refresh_branches() {
@@ -752,6 +757,23 @@ test_print_queue_stats_and_is_queue_complete_cover_success_and_failure() {
 
     rm -f "${QUEUE_DIR}/failed/${task_id}.task"
     is_queue_complete
+}
+
+test_queue_terminal_state_reports_blocked_failed_dependencies() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
+
+    local out_dir="${TEST_TMPDIR}/out"
+    init_queue "${out_dir}" >/dev/null
+
+    jq -n '{task_id:"dep", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"failed", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:"x", error_msg:"x", assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
+        > "${QUEUE_DIR}/failed/dep.task"
+    jq -n '{task_id:"child", task_type:"EVAL_BASELINE", model_id:"m", model_name:"n", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:["dep"], params:{}, priority:50}' \
+        > "${QUEUE_DIR}/pending/child.task"
+
+    assert_eq "1" "$(count_pending_tasks_blocked_by_failed_dependencies)" "blocked pending count"
+    assert_eq "blocked_failed_dependencies" "$(queue_terminal_state)" "queue reports blocked terminal state"
 }
 
 test_mark_task_ready_and_claim_task_return_nonzero_when_source_missing() {
@@ -1119,6 +1141,56 @@ EOF
     local created
     created="$(grep -c '^CREATE_ERROR' "${calls}" || true)"
     assert_eq "9" "${created}" "fallback creates 9 default error injections"
+}
+
+test_generate_model_tasks_state_manifest_without_errors_does_not_fallback_to_defaults() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
+
+    local calls="${TEST_TMPDIR}/calls_state_manifest_no_errors"
+    : > "${calls}"
+    add_task() {
+        local task_type="$1"
+        local params="${6:-}"
+        printf '%s\t%s\n' "${task_type}" "${params}" >> "${calls}"
+        local count
+        count=$(wc -l < "${calls}" | tr -d ' ')
+        echo "t${count}"
+    }
+    estimate_model_memory() { echo "14"; }
+    generate_eval_evaluate_tasks() { :; }
+
+    local out_dir="${TEST_TMPDIR}/out"
+    init_queue "${out_dir}" >/dev/null
+    mkdir -p "${out_dir}/state"
+    cat > "${out_dir}/state/scenarios.json" <<'EOF'
+{
+  "schema": "proof_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {
+      "id": "quant_4bit_clean",
+      "generation": {"kind": "edit", "edit_spec": "quant_rtn:clean:ffn", "version": "clean"}
+    },
+    {
+      "id": "quant_4bit_stress",
+      "generation": {"kind": "edit", "edit_spec": "quant_rtn:4:32:all", "version": "stress"}
+    }
+  ]
+}
+EOF
+
+    PACK_USE_BATCH_EDITS="true"
+    CLEAN_EDIT_RUNS="1"
+    STRESS_EDIT_RUNS="1"
+    DRIFT_CALIBRATION_RUNS=1
+    RUN_ERROR_INJECTION="true"
+    generate_model_tasks "1" "org/model" "model" >/dev/null
+
+    local created
+    created="$(grep -c '^CREATE_ERROR' "${calls}" || true)"
+    assert_eq "0" "${created}" "state manifest without errors remains authoritative"
 }
 
 test_generate_model_tasks_propagates_error_env_from_manifest() {

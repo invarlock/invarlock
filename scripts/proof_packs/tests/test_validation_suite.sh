@@ -1505,6 +1505,76 @@ EOF
     assert_file_exists "${TEST_TMPDIR}/shutdown.calls" "signal_shutdown called on empty queue"
 }
 
+test_pack_validation_main_dynamic_exits_with_resumable_blocked_state() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/proof_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
+
+    check_dependencies() { :; }
+    configure_gpu_pool() { NUM_GPUS=1; GPU_ID_LIST="0"; export NUM_GPUS GPU_ID_LIST; }
+    disk_preflight() { :; }
+    setup_pack_environment() { :; }
+    handle_disk_pressure() { return 0; }
+
+    RESUME_FLAG="false"
+
+    init_queue() {
+        QUEUE_DIR="${OUTPUT_DIR}/queue"
+        GPU_RESERVATION_DIR="${OUTPUT_DIR}/gpu_reservations"
+        mkdir -p "${QUEUE_DIR}"/{pending,ready,running,completed,failed} "${OUTPUT_DIR}/workers" "${OUTPUT_DIR}/logs" "${GPU_RESERVATION_DIR}"
+        export QUEUE_DIR GPU_RESERVATION_DIR
+    }
+    generate_all_tasks() { :; }
+    resolve_dependencies() { echo 0; }
+    cancel_tasks_with_failed_dependencies() { echo 0; }
+    get_queue_stats() { echo "1:0:0:0:1:2"; }
+    queue_terminal_state() { echo "blocked_failed_dependencies"; }
+    apply_work_stealing_boost() { :; }
+    count_tasks() {
+        if [[ "${1:-}" == "failed" ]]; then
+            echo 1
+        else
+            echo 0
+        fi
+    }
+    print_queue_stats() { :; }
+    get_task_id() { echo "dep"; }
+    get_task_field() { echo "dependency failed"; }
+    compile_results() { echo "compile" >> "${TEST_TMPDIR}/analysis.calls"; }
+    run_analysis() { echo "analysis" >> "${TEST_TMPDIR}/analysis.calls"; }
+    generate_verdict() { echo "verdict" >> "${TEST_TMPDIR}/analysis.calls"; }
+
+    list_run_gpu_ids() { printf '0\n'; }
+    is_queue_empty() { return 1; }
+    sleep() { :; }
+    get_free_disk_gb() { echo "999"; }
+    signal_shutdown() { echo "shutdown:$1" >> "${TEST_TMPDIR}/shutdown.calls"; }
+
+    local stub_lib="${TEST_TMPDIR}/stub_lib"
+    mkdir -p "${stub_lib}"
+    for f in task_serialization.sh queue_manager.sh scheduler.sh task_functions.sh fault_tolerance.sh; do
+        printf '%s\n' "#!/usr/bin/env bash" > "${stub_lib}/${f}"
+    done
+    cat > "${stub_lib}/gpu_worker.sh" <<'EOF'
+#!/usr/bin/env bash
+gpu_worker() { return 0; }
+EOF
+    LIB_DIR="${stub_lib}"
+    export LIB_DIR
+
+    init_queue
+    printf '{"status":"failed"}\n' > "${QUEUE_DIR}/failed/dep.task"
+
+    run main_dynamic
+    assert_rc "1" "${RUN_RC}" "blocked queue exits nonzero"
+    assert_file_exists "${TEST_TMPDIR}/shutdown.calls" "blocked queue signals shutdown"
+    assert_match '"status": "blocked_failed_dependencies"' "$(cat "${OUTPUT_DIR}/state/progress.json")" "progress records blocked state"
+    assert_match '"detail": "all pending tasks are blocked on failed dependencies"' "$(cat "${OUTPUT_DIR}/state/progress.json")" "progress records blocked detail"
+    [[ ! -f "${TEST_TMPDIR}/analysis.calls" ]] || t_fail "analysis should not run after blocked terminal state"
+}
+
 test_pack_validation_main_dynamic_fresh_task_generation_and_touch_shutdown_branch() {
     mock_reset
 

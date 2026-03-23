@@ -1950,6 +1950,7 @@ main_dynamic() {
         local completed="$2"
         local failed="$3"
         local status="$4"
+        local detail="${5:-}"
 
         mkdir -p "${OUTPUT_DIR}/state"
         cat > "${OUTPUT_DIR}/state/progress.json" <<EOF
@@ -1958,6 +1959,7 @@ main_dynamic() {
   "completed_tasks": ${completed},
   "failed_tasks": ${failed},
   "status": "${status}",
+  "detail": "${detail}",
   "updated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 EOF
@@ -1968,6 +1970,7 @@ EOF
     local check_interval=60
     local worker_timeout="${WORKER_TIMEOUT:-2700}"
     local workers_started=0
+    local terminal_queue_state=""
     while true; do
         if [[ ${workers_started} -eq 0 ]]; then
             for gpu_id in $(list_run_gpu_ids); do
@@ -2093,6 +2096,21 @@ EOF
         failed=${failed:-0}
         total=${total:-0}
 
+        local terminal_state=""
+        terminal_state="$(queue_terminal_state 2>/dev/null || true)"
+        if [[ "${terminal_state}" == "blocked_failed_dependencies" ]]; then
+            log "Queue reached resumable terminal state: blocked_failed_dependencies"
+            if type signal_shutdown &>/dev/null; then
+                signal_shutdown "${OUTPUT_DIR}"
+            else
+                touch "${OUTPUT_DIR}/workers/SHUTDOWN"
+            fi
+            update_progress "${total}" "${completed}" "${failed}" "${terminal_state}" "all pending tasks are blocked on failed dependencies"
+            terminal_queue_state="${terminal_state}"
+            suite_status=1
+            break
+        fi
+
         pct=0
         [[ ${total} -gt 0 ]] && pct=$((completed * 100 / total))
 
@@ -2138,6 +2156,13 @@ EOF
             local error=$(get_task_field "${task_file}" "error_msg")
             log "  - ${task_id}: ${error:-unknown error}"
         done
+    fi
+
+    if [[ -n "${terminal_queue_state}" ]]; then
+        log_section "BLOCKED"
+        log "Queue entered resumable terminal state: ${terminal_queue_state}"
+        log "Resume after fixing failed work with: OUTPUT_DIR=${OUTPUT_DIR} $0 --resume"
+        return "${suite_status}"
     fi
 
     if [[ "${PACK_SUITE_MODE:-full}" == "calibrate-only" ]]; then

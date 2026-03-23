@@ -243,6 +243,55 @@ is_queue_complete() {
     [[ $((pending + ready + running)) -eq 0 && ${failed} -eq 0 ]]
 }
 
+count_pending_tasks_blocked_by_failed_dependencies() {
+    local blocked=0
+    local task_file
+    local dep
+
+    for task_file in "${QUEUE_DIR}/pending"/*.task; do
+        [[ -f "${task_file}" ]] || continue
+
+        local blocked_by_failed_dep="false"
+        while IFS= read -r dep; do
+            [[ -n "${dep}" ]] || continue
+            if [[ -f "${QUEUE_DIR}/failed/${dep}.task" ]]; then
+                blocked_by_failed_dep="true"
+                break
+            fi
+        done < <(get_task_dependencies "${task_file}" 2>/dev/null || true)
+
+        if [[ "${blocked_by_failed_dep}" == "true" ]]; then
+            blocked=$((blocked + 1))
+        fi
+    done
+
+    echo "${blocked}"
+}
+
+queue_terminal_state() {
+    IFS=':' read -r pending ready running completed failed total <<< "$(get_queue_stats)"
+
+    if [[ $((pending + ready + running)) -eq 0 ]]; then
+        if [[ ${failed} -eq 0 ]]; then
+            echo "completed"
+        else
+            echo "completed_with_failures"
+        fi
+        return 0
+    fi
+
+    if [[ ${pending} -gt 0 && ${ready} -eq 0 && ${running} -eq 0 && ${failed} -gt 0 ]]; then
+        local blocked_pending=0
+        blocked_pending="$(count_pending_tasks_blocked_by_failed_dependencies)"
+        if [[ "${blocked_pending}" == "${pending}" ]]; then
+            echo "blocked_failed_dependencies"
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
 # ============ TASK STATE TRANSITIONS ============
 
 # Move task from pending to ready (when dependencies are satisfied)
@@ -784,12 +833,10 @@ update_progress_state() {
     IFS=':' read -r pending ready running completed failed total <<< "$(get_queue_stats)"
 
     local status="running"
-    if [[ $((pending + ready + running)) -eq 0 ]]; then
-        if [[ ${failed} -eq 0 ]]; then
-            status="completed"
-        else
-            status="completed_with_failures"
-        fi
+    local terminal_state=""
+    terminal_state="$(queue_terminal_state 2>/dev/null || true)"
+    if [[ -n "${terminal_state}" ]]; then
+        status="${terminal_state}"
     fi
 
     local progress_pct=0
@@ -1075,6 +1122,7 @@ generate_model_tasks() {
     pack_root="$(cd "${SCRIPT_DIR}/.." && pwd)"
     local scenarios_file=""
     local suite_manifest=""
+    local using_state_manifest="false"
     # Prefer the run's state manifest (may be filtered by suite tags) when available.
     if [[ -n "${QUEUE_DIR:-}" ]]; then
         local run_root
@@ -1082,6 +1130,7 @@ generate_model_tasks() {
         suite_manifest="${run_root}/state/scenarios.json"
         if [[ -f "${suite_manifest}" ]]; then
             scenarios_file="${suite_manifest}"
+            using_state_manifest="true"
         fi
     fi
     if [[ -z "${scenarios_file}" ]]; then
@@ -1298,7 +1347,7 @@ generate_model_tasks() {
                     | @tsv' "${scenarios_file}"
             )
         fi
-        if [[ ${#error_pairs[@]} -eq 0 ]]; then
+        if [[ ${#error_pairs[@]} -eq 0 && "${using_state_manifest}" != "true" ]]; then
             :
             error_pairs=(
                 $'nan_injection\t{}'
