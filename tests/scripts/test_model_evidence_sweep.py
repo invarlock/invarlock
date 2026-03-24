@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 
 def _load_script_module(script_name: str):
     repo_root = Path(__file__).resolve().parents[2]
@@ -198,6 +200,40 @@ def test_build_evaluate_command_uses_container_safe_repo_relative_paths(
         command[report_idx]
         == f"tmp/model_evidence_container/{execution_root.name}/eval/qwen3_8b/report"
     )
+
+
+def test_runtime_env_preserves_security_default_runtime_overrides(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    mod = _load_script_module("model_evidence_sweep")
+    config_root = tmp_path / "config-root"
+    config_root.mkdir()
+    hf_home = tmp_path / "hf-home"
+    hf_home.mkdir()
+    tmpdir = tmp_path / "tmpdir"
+    tmpdir.mkdir()
+    export_dir = tmp_path / "exports"
+    export_dir.mkdir()
+
+    monkeypatch.delenv("PYTHONPATH", raising=False)
+    monkeypatch.delenv("INVARLOCK_ALLOW_NETWORK", raising=False)
+    monkeypatch.setenv("INVARLOCK_CONFIG_ROOT", str(config_root))
+    monkeypatch.setenv("HF_HOME", str(hf_home))
+    monkeypatch.setenv("TMPDIR", str(tmpdir))
+    monkeypatch.setenv("INVARLOCK_EXPORT_DIR", str(export_dir))
+    monkeypatch.setenv("INVARLOCK_STORE_EVAL_WINDOWS", "1")
+    monkeypatch.setenv("INVARLOCK_SNAPSHOT_MODE", "auto")
+
+    env = mod.runtime_env()
+
+    assert env["PYTHONPATH"] == str(mod.REPO_ROOT / "src")
+    assert env["INVARLOCK_ALLOW_NETWORK"] == "1"
+    assert env["INVARLOCK_CONFIG_ROOT"] == str(config_root)
+    assert env["HF_HOME"] == str(hf_home)
+    assert env["TMPDIR"] == str(tmpdir)
+    assert env["INVARLOCK_EXPORT_DIR"] == str(export_dir)
+    assert env["INVARLOCK_STORE_EVAL_WINDOWS"] == "1"
+    assert env["INVARLOCK_SNAPSHOT_MODE"] == "auto"
 
 
 def test_model_evidence_sweep_returns_failure_when_verify_fails(

@@ -22,6 +22,16 @@ fi
 if [[ -n "${TEST_TMPDIR:-}" ]]; then
     mkdir -p "${fixtures}"
     echo "invarlock ${subcmd} $*" >> "${fixtures}/invarlock.calls" 2>/dev/null || true
+    if [[ -f "${fixtures}/invarlock.capture_env_keys" ]]; then
+        while IFS= read -r key; do
+            [[ -z "${key}" ]] && continue
+            value=""
+            if [[ "${!key+x}" == "x" ]]; then
+                value="${!key}"
+            fi
+            printf '%s=%s\n' "${key}" "${value}" >> "${fixtures}/invarlock.env"
+        done < "${fixtures}/invarlock.capture_env_keys"
+    fi
 fi
 
 get_flag_val() {

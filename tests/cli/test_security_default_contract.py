@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -21,6 +22,66 @@ def _env_value(command: list[str], key: str) -> str:
 
 def _mounts(command: list[str]) -> list[list[str]]:
     return [command[idx : idx + 2] for idx in range(len(command) - 1)]
+
+
+def _canonical_path(path: str | Path) -> Path:
+    return Path(os.path.realpath(os.path.abspath(str(path))))
+
+
+def _mounted_roots(command: list[str]) -> list[Path]:
+    roots: list[Path] = []
+    for idx, token in enumerate(command[:-1]):
+        if token != "-v":
+            continue
+        host_root, _, _ = command[idx + 1].partition(":")
+        roots.append(_canonical_path(host_root))
+    return roots
+
+
+def _path_is_mounted(command: list[str], path: str | Path) -> bool:
+    target = _canonical_path(path)
+    for root in _mounted_roots(command):
+        try:
+            target.relative_to(root)
+        except ValueError:
+            continue
+        return True
+    return False
+
+
+def _delegated_argv(
+    command: list[str], image: str = "invarlock-runtime:local"
+) -> list[str]:
+    image_idx = command.index(image)
+    return command[image_idx + 1 :]
+
+
+def _stub_container_launch(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_container_engine",
+        lambda: "docker",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "container_image_available_locally",
+        lambda image=None, *, engine=None: True,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image",
+        lambda: "invarlock-runtime:local",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image_digest",
+        lambda: "sha256:test",
+        raising=True,
+    )
 
 
 def test_third_party_plugin_discovery_disabled_by_default(
@@ -286,10 +347,9 @@ def test_container_launch_mounts_absolute_output_and_report_paths(
         ]
     )
 
-    mounts = _mounts(command)
-    assert ["-v", f"{config_parent}:{config_parent}"] in mounts
-    assert ["-v", f"{out_parent}:{out_parent}"] in mounts
-    assert ["-v", f"{report_parent}:{report_parent}"] in mounts
+    assert _path_is_mounted(command, config_parent)
+    assert _path_is_mounted(command, out_parent)
+    assert _path_is_mounted(command, report_parent)
 
 
 def test_container_launch_maps_repo_pythonpath_to_workspace_src(
@@ -298,6 +358,8 @@ def test_container_launch_maps_repo_pythonpath_to_workspace_src(
     repo_dir = tmp_path / "repo"
     src_dir = repo_dir / "src"
     src_dir.mkdir(parents=True)
+    config_path = repo_dir / "config.yaml"
+    config_path.write_text("model: {}\n", encoding="utf-8")
     monkeypatch.chdir(repo_dir)
     monkeypatch.setenv("PYTHONPATH", str(src_dir))
     monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
@@ -327,7 +389,7 @@ def test_container_launch_maps_repo_pythonpath_to_workspace_src(
     )
 
     command = runtime_security.build_container_command(
-        ["run", "--config", "/tmp/dummy"]
+        ["run", "--config", "config.yaml"]
     )
 
     assert _env_value(command, "PYTHONPATH") == "/workspace/src"
@@ -341,6 +403,8 @@ def test_container_launch_mounts_absolute_pythonpath_when_running_from_workdir(
     src_dir.mkdir(parents=True)
     workdir = tmp_path / "run-root" / ".workdir"
     workdir.mkdir(parents=True)
+    config_path = workdir / "config.yaml"
+    config_path.write_text("model: {}\n", encoding="utf-8")
     monkeypatch.chdir(workdir)
     monkeypatch.setenv("PYTHONPATH", str(src_dir))
     monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
@@ -370,11 +434,11 @@ def test_container_launch_mounts_absolute_pythonpath_when_running_from_workdir(
     )
 
     command = runtime_security.build_container_command(
-        ["run", "--config", "/tmp/dummy"]
+        ["run", "--config", "config.yaml"]
     )
 
     assert _env_value(command, "PYTHONPATH") == str(src_dir)
-    assert ["-v", f"{src_dir}:{src_dir}"] in _mounts(command)
+    assert _path_is_mounted(command, src_dir)
 
 
 def test_container_launch_mounts_absolute_model_paths_from_cli(
@@ -424,9 +488,8 @@ def test_container_launch_mounts_absolute_model_paths_from_cli(
         ]
     )
 
-    mounts = [command[idx : idx + 2] for idx in range(len(command) - 1)]
-    assert ["-v", f"{baseline_dir}:{baseline_dir}"] in mounts
-    assert ["-v", f"{subject_dir}:{subject_dir}"] in mounts
+    assert _path_is_mounted(command, baseline_dir)
+    assert _path_is_mounted(command, subject_dir)
 
 
 def test_container_launch_mounts_absolute_source_and_edited_paths(
@@ -476,9 +539,8 @@ def test_container_launch_mounts_absolute_source_and_edited_paths(
         ]
     )
 
-    mounts = [command[idx : idx + 2] for idx in range(len(command) - 1)]
-    assert ["-v", f"{source_dir}:{source_dir}"] in mounts
-    assert ["-v", f"{edited_dir}:{edited_dir}"] in mounts
+    assert _path_is_mounted(command, source_dir)
+    assert _path_is_mounted(command, edited_dir)
 
 
 def test_container_launch_mounts_absolute_preset_and_baseline_report_paths(
@@ -540,9 +602,8 @@ def test_container_launch_mounts_absolute_preset_and_baseline_report_paths(
         ]
     )
 
-    mounts = [command[idx : idx + 2] for idx in range(len(command) - 1)]
-    assert ["-v", f"{preset_dir}:{preset_dir}"] in mounts
-    assert ["-v", f"{baseline_report_dir}:{baseline_report_dir}"] in mounts
+    assert _path_is_mounted(command, preset_dir)
+    assert _path_is_mounted(command, baseline_report_dir)
 
 
 def test_container_launch_mounts_absolute_config_root_from_env(
@@ -583,8 +644,7 @@ def test_container_launch_mounts_absolute_config_root_from_env(
 
     command = runtime_security.build_container_command(["evaluate", "--help"])
 
-    mounts = [command[idx : idx + 2] for idx in range(len(command) - 1)]
-    assert ["-v", f"{config_root}:{config_root}"] in mounts
+    assert _path_is_mounted(command, config_root)
 
 
 def test_container_launch_mounts_external_symlink_targets_for_local_model_paths(
@@ -639,9 +699,8 @@ def test_container_launch_mounts_external_symlink_targets_for_local_model_paths(
         ]
     )
 
-    mounts = [command[idx : idx + 2] for idx in range(len(command) - 1)]
-    assert ["-v", f"{baseline_dir}:{baseline_dir}"] in mounts
-    assert ["-v", f"{cache_dir}:{cache_dir}"] in mounts
+    assert _path_is_mounted(command, baseline_dir)
+    assert _path_is_mounted(command, cache_dir)
 
 
 def test_container_launch_mounts_absolute_model_paths_from_config(
@@ -688,5 +747,213 @@ def test_container_launch_mounts_absolute_model_paths_from_config(
         ["run", "--config", str(config_path)]
     )
 
-    mounts = [command[idx : idx + 2] for idx in range(len(command) - 1)]
-    assert ["-v", f"{subject_dir}:{subject_dir}"] in mounts
+    assert _path_is_mounted(command, subject_dir)
+
+
+def test_container_launch_preserves_repo_relative_output_args_and_mirrors_cwd_for_configs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    config_path = repo_dir / "config.yaml"
+    config_path.write_text("model: {}\n", encoding="utf-8")
+    monkeypatch.chdir(repo_dir)
+    _stub_container_launch(monkeypatch)
+
+    command = runtime_security.build_container_command(
+        [
+            "evaluate",
+            "--config",
+            "config.yaml",
+            "--out",
+            "runs/eval",
+            "--report-out",
+            "reports/eval",
+        ]
+    )
+
+    delegated = _delegated_argv(command)
+    assert _path_is_mounted(command, repo_dir)
+    assert delegated[delegated.index("--config") + 1] == str(config_path)
+    assert delegated[delegated.index("--out") + 1] == "runs/eval"
+    assert delegated[delegated.index("--report-out") + 1] == "reports/eval"
+
+
+def test_container_launch_mounts_absolute_edit_config_paths(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    monkeypatch.chdir(repo_dir)
+    _stub_container_launch(monkeypatch)
+
+    edit_root = tmp_path / "edit-root"
+    edit_root.mkdir()
+    edit_path = edit_root / "overlay.yaml"
+    edit_path.write_text("edit:\n  name: noop\n  plan: {}\n", encoding="utf-8")
+
+    command = runtime_security.build_container_command(
+        [
+            "evaluate",
+            "--baseline",
+            "sshleifer/tiny-gpt2",
+            "--subject",
+            "sshleifer/tiny-gpt2",
+            "--edit-config",
+            str(edit_path),
+        ]
+    )
+
+    delegated = _delegated_argv(command)
+    assert _path_is_mounted(command, edit_root)
+    assert delegated[delegated.index("--edit-config") + 1] == str(edit_path)
+
+
+def test_container_launch_leaves_missing_local_model_args_as_model_ids(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    monkeypatch.chdir(repo_dir)
+    _stub_container_launch(monkeypatch)
+
+    command = runtime_security.build_container_command(
+        [
+            "evaluate",
+            "--baseline",
+            "sshleifer/tiny-gpt2",
+            "--subject",
+            "org/model-name",
+        ]
+    )
+
+    delegated = _delegated_argv(command)
+    mounts = _mounts(command)
+    assert delegated[delegated.index("--baseline") + 1] == "sshleifer/tiny-gpt2"
+    assert delegated[delegated.index("--subject") + 1] == "org/model-name"
+    assert not any(
+        token == "-v" and value.endswith("org/model-name:org/model-name")
+        for token, value in mounts
+    )
+
+
+def test_container_launch_forwards_reviewed_runtime_env_contract(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    config_path = repo_dir / "config.yaml"
+    config_path.write_text("model: {}\n", encoding="utf-8")
+    export_dir = repo_dir / "exports"
+    export_dir.mkdir()
+    eval_tmp_dir = repo_dir / "tmp-eval"
+    eval_tmp_dir.mkdir()
+    config_root = tmp_path / "config-root"
+    config_root.mkdir()
+    hf_home = tmp_path / "hf-home"
+    hf_home.mkdir()
+    hub_cache = hf_home / "hub"
+    hub_cache.mkdir()
+    datasets_cache = hf_home / "datasets"
+    datasets_cache.mkdir()
+    transformers_cache = tmp_path / "transformers-cache"
+    transformers_cache.mkdir()
+    tmpdir = tmp_path / "tmpdir"
+    tmpdir.mkdir()
+
+    monkeypatch.chdir(repo_dir)
+    _stub_container_launch(monkeypatch)
+    monkeypatch.setenv("INVARLOCK_CONFIG_ROOT", str(config_root))
+    monkeypatch.setenv("INVARLOCK_EVALUATE_TMP_DIR", str(eval_tmp_dir))
+    monkeypatch.setenv("INVARLOCK_EXPORT_DIR", str(export_dir))
+    monkeypatch.setenv("HF_HOME", str(hf_home))
+    monkeypatch.setenv("HF_HUB_CACHE", str(hub_cache))
+    monkeypatch.setenv("HF_DATASETS_CACHE", str(datasets_cache))
+    monkeypatch.setenv("TRANSFORMERS_CACHE", str(transformers_cache))
+    monkeypatch.setenv("TMPDIR", str(tmpdir))
+    monkeypatch.setenv("INVARLOCK_STORE_EVAL_WINDOWS", "1")
+    monkeypatch.setenv("INVARLOCK_SNAPSHOT_MODE", "auto")
+    monkeypatch.setenv("INVARLOCK_SKIP_OVERHEAD_CHECK", "1")
+    monkeypatch.setenv("INVARLOCK_DETERMINISM", "strict")
+    monkeypatch.setenv("HF_DATASETS_OFFLINE", "1")
+
+    command = runtime_security.build_container_command(
+        ["run", "--config", str(config_path)]
+    )
+
+    assert _path_is_mounted(command, config_root)
+    assert _path_is_mounted(command, hf_home)
+    assert _path_is_mounted(command, transformers_cache)
+    assert _path_is_mounted(command, tmpdir)
+
+    assert _env_value(command, "INVARLOCK_CONFIG_ROOT") == str(config_root)
+    assert _env_value(command, "INVARLOCK_EVALUATE_TMP_DIR") == "/workspace/tmp-eval"
+    assert _env_value(command, "INVARLOCK_EXPORT_DIR") == "/workspace/exports"
+    assert _env_value(command, "HF_HOME") == str(hf_home)
+    assert _env_value(command, "HF_HUB_CACHE") == str(hub_cache)
+    assert _env_value(command, "HF_DATASETS_CACHE") == str(datasets_cache)
+    assert _env_value(command, "TRANSFORMERS_CACHE") == str(transformers_cache)
+    assert _env_value(command, "TMPDIR") == str(tmpdir)
+    assert _env_value(command, "INVARLOCK_STORE_EVAL_WINDOWS") == "1"
+    assert _env_value(command, "INVARLOCK_SNAPSHOT_MODE") == "auto"
+    assert _env_value(command, "INVARLOCK_SKIP_OVERHEAD_CHECK") == "1"
+    assert _env_value(command, "INVARLOCK_DETERMINISM") == "strict"
+    assert _env_value(command, "HF_DATASETS_OFFLINE") == "1"
+
+
+def test_container_launch_scans_config_includes_and_absolute_references(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    external_root = tmp_path / "external"
+    external_root.mkdir()
+    dataset_dir = external_root / "dataset"
+    dataset_dir.mkdir()
+    include_path = external_root / "include.yaml"
+    include_path.write_text(
+        "dataset:\n"
+        f"  file: {dataset_dir / 'corpus.jsonl'}\n"
+        "model:\n"
+        "  id: sshleifer/tiny-gpt2\n"
+        "  adapter: hf_causal\n",
+        encoding="utf-8",
+    )
+    config_path = repo_dir / "config.yaml"
+    config_path.write_text(
+        f"defaults: !include ../external/{include_path.name}\nedit:\n  name: noop\n  plan: {{}}\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(repo_dir)
+    _stub_container_launch(monkeypatch)
+    monkeypatch.setenv("INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE", "1")
+
+    command = runtime_security.build_container_command(
+        ["run", "--config", "config.yaml"]
+    )
+
+    assert _path_is_mounted(command, external_root)
+    assert _env_value(command, "INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE") == "1"
+
+
+def test_container_launch_fails_closed_when_config_scan_rejects_include(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    external_root = tmp_path / "external"
+    external_root.mkdir()
+    include_path = external_root / "include.yaml"
+    include_path.write_text("model: {}\n", encoding="utf-8")
+    config_path = repo_dir / "config.yaml"
+    config_path.write_text(
+        f"defaults: !include ../external/{include_path.name}\nedit:\n  name: noop\n  plan: {{}}\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(repo_dir)
+    _stub_container_launch(monkeypatch)
+
+    with pytest.raises(RuntimeError, match="Delegated runtime config"):
+        runtime_security.build_container_command(["run", "--config", "config.yaml"])

@@ -593,17 +593,35 @@ InvarLock, and leaves the host ready to run `run_pack.sh`.
 
 Operational guidance for remote proof-pack work:
 
-- Prefer a fresh clone or worktree per campaign instead of reusing an older
+- Prefer a fresh clone or work tree per campaign instead of reusing an older
   editable-install checkout.
-- If you intentionally run from a worktree that is not the editable install
-  behind `.venv`, either reinstall that worktree or export `PYTHONPATH=src` so
+- If you intentionally run from a work tree that is not the editable install
+  behind `.venv`, either reinstall that work tree or export `PYTHONPATH=src` so
   `invarlock` resolves to the intended source tree.
 - `run_suite.sh` and `run_pack.sh` now default to `SKIP_FLASH_ATTN=true` and
   `PACK_BASELINE_STORAGE_MODE=snapshot_copy` for bulk secure-default runs.
 - Bulk proof-pack runs fail fast unless `INVARLOCK_ALLOW_REMOTE_CODE=1` is set.
+- Export non-default runtime roots before launching the suite when you expect
+  them inside delegated container jobs:
+  `INVARLOCK_CONFIG_ROOT`, `HF_HOME`, `HF_HUB_CACHE`, `HF_DATASETS_CACHE`,
+  `TRANSFORMERS_CACHE`, `TMPDIR`, `TMP`.
+- If a staged preset or profile uses `!include` outside its config directory,
+  set `INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE=1` on the remote host before the
+  proof-pack entrypoint; the secure-default launcher now rejects that config
+  graph before container start when the override is missing.
 - After Qwen2.5-14B campaigns, run
-  `scripts/proof_packs/run_qwen14_sentinels.sh` from the same fresh worktree to
+  `scripts/proof_packs/run_qwen14_sentinels.sh` from the same fresh work tree to
   validate saved-model direct evaluate and the public quant smoke.
+
+Recommended remote validation checklist after security-default changes:
+
+1. Run a proof-pack subset lane with explicit external `HF_HOME` and
+   `INVARLOCK_CONFIG_ROOT` overrides.
+2. Run one delegated `invarlock evaluate` with external `--edit-config`,
+   `TMPDIR`, and `INVARLOCK_EXPORT_DIR` roots.
+3. Run one `scripts/model_evidence_sweep.py --execution-mode container` lane
+   with an external output root and confirm the published report path is
+   populated.
 
 Common knobs for the setup script:
 

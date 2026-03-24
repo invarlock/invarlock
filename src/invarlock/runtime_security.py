@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import yaml
+from invarlock.cli.config import inspect_config_dependencies
 
 ALLOW_HOST_EXECUTION_ENV = "INVARLOCK_ALLOW_HOST_EXECUTION"
 ALLOW_NETWORK_ENV = "INVARLOCK_ALLOW_NETWORK"
@@ -228,16 +228,41 @@ def _requested_device(argv: list[str]) -> str | None:
     return None
 
 
-_PATH_ARG_FLAGS = {
-    "--out",
-    "--report-out",
-    "--config",
-    "-c",
-    "--preset",
-    "--baseline-report",
-}
-_CONFIG_ARG_FLAGS = {"--config", "-c"}
+_CONFIG_SCAN_ARG_FLAGS = {"--config", "-c", "--preset", "--edit-config"}
+_CONFIG_PATH_ARG_FLAGS = _CONFIG_SCAN_ARG_FLAGS | {"--baseline-report"}
+_OUTPUT_PATH_ARG_FLAGS = {"--out", "--report-out"}
+_PATH_ARG_FLAGS = _OUTPUT_PATH_ARG_FLAGS | _CONFIG_PATH_ARG_FLAGS
 _LOCAL_MODEL_ARG_FLAGS = {"--baseline", "--subject", "--source", "--edited"}
+_PATH_ENV_VARS = {
+    "INVARLOCK_CONFIG_ROOT",
+    "INVARLOCK_EVALUATE_TMP_DIR",
+    "INVARLOCK_EXPORT_DIR",
+    "HF_HOME",
+    "HF_HUB_CACHE",
+    "HF_DATASETS_CACHE",
+    "TRANSFORMERS_CACHE",
+    "TMPDIR",
+    "TMP",
+}
+_BEHAVIOR_ENV_VARS = {
+    "INVARLOCK_STORE_EVAL_WINDOWS",
+    "INVARLOCK_SNAPSHOT_MODE",
+    "INVARLOCK_SNAPSHOT_AUTO_RAM_FRACTION",
+    "INVARLOCK_SNAPSHOT_THRESHOLD_MB",
+    "INVARLOCK_SKIP_OVERHEAD_CHECK",
+    "INVARLOCK_WINDOW_OVERLAP_FRACTION",
+    "INVARLOCK_DETERMINISM",
+    "PACK_DETERMINISM",
+    "INVARLOCK_DETERMINISM_WARN_ONLY",
+    "INVARLOCK_OMP_THREADS",
+    "INVARLOCK_DEDUP_TEXTS",
+    "INVARLOCK_CAPACITY_FAST",
+    "INVARLOCK_TINY_RELAX",
+    "TOKENIZERS_PARALLELISM",
+    "HF_DATASETS_OFFLINE",
+    "TRANSFORMERS_OFFLINE",
+    "INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE",
+}
 
 
 def _iter_path_args(argv: list[str], *, flags: set[str] | None = None) -> list[Path]:
@@ -259,39 +284,71 @@ def _iter_path_args(argv: list[str], *, flags: set[str] | None = None) -> list[P
     return paths
 
 
-def _iter_absolute_path_strings(payload: Any) -> list[Path]:
-    paths: list[Path] = []
-    if isinstance(payload, str):
-        text = payload.strip()
-        if not text:
-            return paths
-        candidate = Path(text).expanduser()
-        if candidate.is_absolute():
-            paths.append(candidate)
-        return paths
-    if isinstance(payload, dict):
-        for value in payload.values():
-            paths.extend(_iter_absolute_path_strings(value))
-        return paths
-    if isinstance(payload, (list, tuple, set)):
-        for item in payload:
-            paths.extend(_iter_absolute_path_strings(item))
-    return paths
+def _minimize_mounts(mounts: list[Path] | set[Path]) -> list[Path]:
+    ordered = sorted(set(mounts), key=lambda item: (len(item.parts), str(item)))
+    minimized: list[Path] = []
+    for mount in ordered:
+        if any(
+            existing == mount or existing in mount.parents for existing in minimized
+        ):
+            continue
+        minimized.append(mount)
+    return minimized
 
 
-def _iter_config_referenced_paths(argv: list[str], *, cwd: Path) -> list[Path]:
-    paths: list[Path] = []
-    for config_arg in _iter_path_args(argv, flags=_CONFIG_ARG_FLAGS):
-        config_path = config_arg if config_arg.is_absolute() else (cwd / config_arg)
-        resolved_config = config_path.resolve(strict=False)
-        if not resolved_config.is_file():
+def _iter_flag_occurrences(
+    argv: list[str], *, flags: set[str]
+) -> list[tuple[int, str, str, int | None]]:
+    occurrences: list[tuple[int, str, str, int | None]] = []
+    idx = 0
+    while idx < len(argv):
+        token = argv[idx]
+        if token in flags and idx + 1 < len(argv):
+            occurrences.append((idx, token, argv[idx + 1], idx + 1))
+            idx += 2
             continue
-        try:
-            payload = yaml.safe_load(resolved_config.read_text(encoding="utf-8"))
-        except Exception:
-            continue
-        paths.extend(_iter_absolute_path_strings(payload))
-    return paths
+        matched = False
+        for flag in flags:
+            prefix = f"{flag}="
+            if token.startswith(prefix):
+                occurrences.append((idx, flag, token[len(prefix) :], None))
+                matched = True
+                break
+        idx += 1 if not matched else 1
+    return occurrences
+
+
+def _replace_flag_value(
+    argv: list[str],
+    *,
+    token_index: int,
+    flag: str,
+    value_index: int | None,
+    new_value: str,
+) -> None:
+    if value_index is None:
+        argv[token_index] = f"{flag}={new_value}"
+    else:
+        argv[value_index] = new_value
+
+
+def _absolute_host_path(path: str | Path, *, cwd: Path) -> Path:
+    candidate = Path(path).expanduser()
+    if candidate.is_absolute():
+        return Path(os.path.abspath(str(candidate)))
+    return Path(os.path.abspath(str(cwd / candidate)))
+
+
+def _path_is_within(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
+def _workspace_path(path: Path, *, cwd: Path) -> str:
+    return str(Path("/workspace") / path.relative_to(cwd))
 
 
 def _mount_root_for_path(path: Path) -> Path:
@@ -376,41 +433,172 @@ def _container_pythonpath_entries(*, cwd: Path) -> tuple[list[str], list[Path]]:
         if not _mount_is_already_covered(mount, cwd=cwd):
             mounts.add(mount)
         mounts.update(_iter_external_symlink_target_mounts(entry, cwd=cwd))
-    ordered_mounts = sorted(mounts, key=lambda item: (len(item.parts), str(item)))
-    minimized: list[Path] = []
-    for mount in ordered_mounts:
-        if any(
-            existing == mount or existing in mount.parents for existing in minimized
-        ):
-            continue
-        minimized.append(mount)
-    return container_entries, minimized
+    return container_entries, _minimize_mounts(mounts)
 
 
-def _extra_container_mounts(argv: list[str], *, cwd: Path) -> list[Path]:
+def _record_path_dependencies(path: Path, mounts: set[Path], *, cwd: Path) -> bool:
+    mounts.update(_iter_external_symlink_target_mounts(path, cwd=cwd))
+    if _path_is_within(path, cwd):
+        return True
+    mount = _mount_root_for_path(path)
+    if not _mount_is_already_covered(mount, cwd=cwd):
+        mounts.add(mount)
+    return False
+
+
+def _normalize_output_path_for_container(
+    raw_value: str, *, cwd: Path
+) -> tuple[str, set[Path]]:
+    host_path = _absolute_host_path(raw_value, cwd=cwd)
     mounts: set[Path] = set()
-    candidate_paths = _iter_path_args(argv)
-    candidate_paths.extend(_iter_path_args(argv, flags=_LOCAL_MODEL_ARG_FLAGS))
-    candidate_paths.extend(_iter_config_referenced_paths(argv, cwd=cwd))
-    config_root_value = os.environ.get("INVARLOCK_CONFIG_ROOT", "").strip()
-    if config_root_value:
-        candidate_paths.append(Path(config_root_value).expanduser())
-    for path in candidate_paths:
-        if not path.is_absolute():
+    inside_cwd = _record_path_dependencies(host_path, mounts, cwd=cwd)
+    if inside_cwd:
+        return raw_value, mounts
+    return str(host_path), mounts
+
+
+def _normalize_local_model_path_for_container(
+    raw_value: str, *, cwd: Path
+) -> tuple[str, set[Path], bool]:
+    host_path = _absolute_host_path(raw_value, cwd=cwd)
+    if not host_path.exists():
+        return raw_value, set(), False
+    mounts: set[Path] = set()
+    inside_cwd = _record_path_dependencies(host_path, mounts, cwd=cwd)
+    if inside_cwd:
+        return _workspace_path(host_path, cwd=cwd), mounts, True
+    return str(host_path), mounts, True
+
+
+def _normalize_config_path_for_container(
+    raw_value: str,
+    *,
+    cwd: Path,
+    scan_dependencies: bool,
+) -> tuple[str, set[Path], bool]:
+    host_path = _absolute_host_path(raw_value, cwd=cwd)
+    mounts: set[Path] = set()
+    needs_cwd_host_mirror = _record_path_dependencies(host_path, mounts, cwd=cwd)
+    if scan_dependencies:
+        try:
+            scan = inspect_config_dependencies(host_path)
+        except (FileNotFoundError, ValueError) as exc:
+            raise RuntimeError(
+                f"Delegated runtime config {host_path} is not mountable: {exc}"
+            ) from exc
+        for config_path in scan.config_paths:
+            if _record_path_dependencies(config_path, mounts, cwd=cwd):
+                needs_cwd_host_mirror = True
+        for referenced_path in scan.referenced_paths:
+            if _record_path_dependencies(referenced_path, mounts, cwd=cwd):
+                needs_cwd_host_mirror = True
+    return str(host_path), mounts, needs_cwd_host_mirror
+
+
+def _normalize_delegated_argv(
+    argv: list[str], *, cwd: Path
+) -> tuple[list[str], list[Path], bool]:
+    rewritten = list(argv)
+    mounts: set[Path] = set()
+    needs_cwd_host_mirror = False
+
+    for token_index, flag, value, value_index in _iter_flag_occurrences(
+        rewritten, flags=_CONFIG_PATH_ARG_FLAGS
+    ):
+        scan_dependencies = flag in _CONFIG_SCAN_ARG_FLAGS
+        new_value, extra_mounts, needs_mirror = _normalize_config_path_for_container(
+            value,
+            cwd=cwd,
+            scan_dependencies=scan_dependencies,
+        )
+        mounts.update(extra_mounts)
+        needs_cwd_host_mirror = needs_cwd_host_mirror or needs_mirror
+        _replace_flag_value(
+            rewritten,
+            token_index=token_index,
+            flag=flag,
+            value_index=value_index,
+            new_value=new_value,
+        )
+
+    for token_index, flag, value, value_index in _iter_flag_occurrences(
+        rewritten, flags=_OUTPUT_PATH_ARG_FLAGS
+    ):
+        new_value, extra_mounts = _normalize_output_path_for_container(
+            value,
+            cwd=cwd,
+        )
+        mounts.update(extra_mounts)
+        _replace_flag_value(
+            rewritten,
+            token_index=token_index,
+            flag=flag,
+            value_index=value_index,
+            new_value=new_value,
+        )
+
+    for token_index, flag, value, value_index in _iter_flag_occurrences(
+        rewritten, flags=_LOCAL_MODEL_ARG_FLAGS
+    ):
+        new_value, extra_mounts, treated_as_path = (
+            _normalize_local_model_path_for_container(
+                value,
+                cwd=cwd,
+            )
+        )
+        if not treated_as_path:
             continue
-        mount = _mount_root_for_path(path)
-        if not _mount_is_already_covered(mount, cwd=cwd):
-            mounts.add(mount)
-        mounts.update(_iter_external_symlink_target_mounts(path, cwd=cwd))
-    ordered = sorted(mounts, key=lambda item: (len(item.parts), str(item)))
-    minimized: list[Path] = []
-    for mount in ordered:
-        if any(
-            existing == mount or existing in mount.parents for existing in minimized
-        ):
+        mounts.update(extra_mounts)
+        _replace_flag_value(
+            rewritten,
+            token_index=token_index,
+            flag=flag,
+            value_index=value_index,
+            new_value=new_value,
+        )
+
+    return rewritten, _minimize_mounts(mounts), needs_cwd_host_mirror
+
+
+def _path_env_value_for_container(
+    raw_value: str,
+    *,
+    cwd: Path,
+) -> tuple[str, list[Path]]:
+    host_path = _absolute_host_path(raw_value, cwd=cwd)
+    mounts: set[Path] = set()
+    inside_cwd = _record_path_dependencies(host_path, mounts, cwd=cwd)
+    if inside_cwd:
+        return _workspace_path(host_path, cwd=cwd), _minimize_mounts(mounts)
+    return str(host_path), _minimize_mounts(mounts)
+
+
+def _delegated_env_pairs(*, cwd: Path) -> tuple[dict[str, str], list[Path]]:
+    env_pairs: dict[str, str] = {
+        ALLOW_NETWORK_ENV: "1" if network_allowed() else "0",
+        ALLOW_REMOTE_CODE_ENV: "1" if remote_code_allowed() else "0",
+        ALLOW_THIRD_PARTY_PLUGINS_ENV: "1" if third_party_plugins_allowed() else "0",
+        ALLOW_UNATTESTED_ARTIFACTS_ENV: (
+            "1" if unattested_artifacts_allowed() else "0"
+        ),
+        CONTAINER_EXECUTION_ENV: "1",
+    }
+    mounts: list[Path] = []
+    for name in sorted(_BEHAVIOR_ENV_VARS):
+        value = os.environ.get(name)
+        if value is not None:
+            env_pairs[name] = value
+    for name in sorted(_PATH_ENV_VARS):
+        value = os.environ.get(name)
+        if value is None or not value.strip():
             continue
-        minimized.append(mount)
-    return minimized
+        container_value, extra_mounts = _path_env_value_for_container(
+            value,
+            cwd=cwd,
+        )
+        env_pairs[name] = container_value
+        mounts.extend(extra_mounts)
+    return env_pairs, _minimize_mounts(mounts)
 
 
 def _needs_gpu_passthrough(argv: list[str]) -> bool:
@@ -500,31 +688,26 @@ def build_container_command(argv: list[str] | None = None) -> list[str]:
         )
     if argv is None:
         argv = list(sys.argv[1:])
+    argv, argv_mounts, needs_cwd_host_mirror = _normalize_delegated_argv(argv, cwd=cwd)
     pythonpath_entries, pythonpath_mounts = _container_pythonpath_entries(cwd=cwd)
-    env_pairs = {
-        ALLOW_NETWORK_ENV: "1" if network_allowed() else "0",
-        ALLOW_REMOTE_CODE_ENV: "1" if remote_code_allowed() else "0",
-        ALLOW_THIRD_PARTY_PLUGINS_ENV: "1" if third_party_plugins_allowed() else "0",
-        ALLOW_UNATTESTED_ARTIFACTS_ENV: (
-            "1" if unattested_artifacts_allowed() else "0"
-        ),
-        CONTAINER_EXECUTION_ENV: "1",
-        RUNTIME_IMAGE_DIGEST_ENV: digest,
-        "PYTHONPATH": os.pathsep.join(pythonpath_entries),
-    }
+    env_pairs, env_mounts = _delegated_env_pairs(cwd=cwd)
+    env_pairs[RUNTIME_IMAGE_DIGEST_ENV] = digest
+    env_pairs["PYTHONPATH"] = os.pathsep.join(pythonpath_entries)
     command = [engine, "run", "--rm"]
     if _needs_gpu_passthrough(argv):
         command.extend(["--gpus", "all"])
     if not network_allowed():
         command.extend(["--network", "none"])
     command.extend(["-v", f"{cwd}:/workspace", "-w", "/workspace"])
-    extra_mounts = _extra_container_mounts(argv, cwd=cwd)
+    if needs_cwd_host_mirror:
+        command.extend(["-v", f"{cwd}:{cwd}"])
+    extra_mounts = list(argv_mounts)
+    extra_mounts.extend(env_mounts)
     for mount in pythonpath_mounts:
         if any(existing == mount for existing in extra_mounts):
             continue
         extra_mounts.append(mount)
-    extra_mounts.sort(key=lambda item: (len(item.parts), str(item)))
-    for mount in extra_mounts:
+    for mount in _minimize_mounts(extra_mounts):
         command.extend(["-v", f"{mount}:{mount}"])
     for key, value in env_pairs.items():
         command.extend(["-e", f"{key}={value}"])

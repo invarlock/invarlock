@@ -95,6 +95,19 @@ commands use the secure-default runtime container path and expect `docker` or
 `podman`, plus a locally built `invarlock-runtime:local` image from
 `make runtime-image`.
 
+Validated secure-default parity contract for proof-pack wrappers:
+
+- Wrapper-provided `INVARLOCK_CONFIG_ROOT` and `INVARLOCK_STORE_EVAL_WINDOWS`
+  now survive delegated `invarlock run` / `evaluate` calls.
+- External cache and temp overrides such as `HF_HOME`, `HF_HUB_CACHE`,
+  `HF_DATASETS_CACHE`, `TRANSFORMERS_CACHE`, `TMPDIR`, and `TMP` remain visible
+  inside the runtime container.
+- Staged or external `--preset`, `--baseline-report`, and `--edit-config`
+  inputs are mounted automatically before delegation.
+- Configs that rely on `!include` outside the config directory must set
+  `INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE=1`; otherwise the proof-pack wrapper
+  now fails before launch instead of starting an unusable container job.
+
 Bulk proof-pack entrypoints now default to `SKIP_FLASH_ATTN=true` and
 `PACK_BASELINE_STORAGE_MODE=snapshot_copy`. That is the safe default for remote
 secure-default runs. Only opt back into flash-attn builds or
@@ -148,7 +161,7 @@ Proof packs require pinned model revisions for reproducibility:
 ## Promotion Sentinels
 
 For Qwen2.5-14B promotion work, use the maintained sentinel helper from a fresh
-repo worktree:
+repo work tree:
 
 ```bash
 INVARLOCK_ALLOW_REMOTE_CODE=1 \
@@ -170,7 +183,7 @@ Acceptance for these sentinels is load-path completion, not scientific PASS:
 - the public quant smoke must also produce `verify.json`
 - a primary-metric `FAIL` is acceptable for this infrastructure/load-path gate
 
-Use a fresh worktree on remote hosts. If you intentionally run from a checkout
+Use a fresh work tree on remote hosts. If you intentionally run from a checkout
 that is not the editable install used by `.venv`, either reinstall the checkout
 or run with `PYTHONPATH=src` so `invarlock` uses the intended source tree.
 

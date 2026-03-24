@@ -1324,14 +1324,30 @@ test_task_baseline_report_helpers_cover_generate_baseline_report_path() {
     _validate_evaluate_baseline_report() { return 0; }
 
     export PACK_GUARDS_ORDER="invariants, spectral , rmt"
+    export HF_HOME="${TEST_TMPDIR}/hf-home"
+    mkdir -p "${HF_HOME}"
     fixture_write "invarlock.create_report_nested" ""
+    cat > "${TEST_TMPDIR}/fixtures/invarlock.capture_env_keys" <<'EOF'
+PYTHONPATH
+INVARLOCK_CONFIG_ROOT
+INVARLOCK_STORE_EVAL_WINDOWS
+INVARLOCK_SKIP_OVERHEAD_CHECK
+HF_HOME
+EOF
 
     local generated
-    generated="$(_ensure_evaluate_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "7" "${log_file}")"
+    generated="$(_ensure_evaluate_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "14" "${log_file}")"
 
     assert_eq "${baseline_report}" "${generated}" "baseline report path returned"
     assert_file_exists "${baseline_report}" "baseline report generated"
     assert_match "Generating reusable baseline report" "$(cat "${log_file}")" "generation logged"
+    local env_capture
+    env_capture="$(cat "${TEST_TMPDIR}/fixtures/invarlock.env")"
+    assert_match "PYTHONPATH=${PACK_REPO_PYTHONPATH}" "${env_capture}" "baseline run forwards repo pythonpath"
+    assert_match "INVARLOCK_CONFIG_ROOT=${baseline_root}/config_root" "${env_capture}" "baseline run forwards config root"
+    assert_match "INVARLOCK_STORE_EVAL_WINDOWS=1" "${env_capture}" "baseline run stores eval windows"
+    assert_match "INVARLOCK_SKIP_OVERHEAD_CHECK=1" "${env_capture}" "large-model baseline run skips overhead check"
+    assert_match "HF_HOME=${HF_HOME}" "${env_capture}" "baseline run preserves inherited HF cache root"
 }
 
 test_task_baseline_report_helpers_remove_invalid_baseline_report_and_timeout_wait() {
@@ -1406,6 +1422,9 @@ set -euo pipefail
 fixtures="${TEST_TMPDIR}/fixtures"
 mkdir -p "${fixtures}"
 echo "PYTHONPATH=${PYTHONPATH:-}" >> "${fixtures}/invarlock.calls"
+echo "INVARLOCK_CONFIG_ROOT=${INVARLOCK_CONFIG_ROOT:-}" >> "${fixtures}/invarlock.calls"
+echo "INVARLOCK_STORE_EVAL_WINDOWS=${INVARLOCK_STORE_EVAL_WINDOWS:-}" >> "${fixtures}/invarlock.calls"
+echo "HF_HOME=${HF_HOME:-}" >> "${fixtures}/invarlock.calls"
 echo "invarlock $*" >> "${fixtures}/invarlock.calls"
 target=""
 while [[ $# -gt 0 ]]; do
@@ -1437,8 +1456,11 @@ EOF
     echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
     echo "org/model" > "${model_output_dir}/.model_id"
     : > "${log_file}"
+    export HF_HOME="${TEST_TMPDIR}/hf-home"
+    mkdir -p "${HF_HOME}"
 
     # Force CI window override by returning tiny preview/final windows.
+    _estimate_model_size() { echo "30"; }
     _get_invarlock_config() { echo "128:128:1:1:1"; }
     export INVARLOCK_CERT_MIN_WINDOWS="192"
 
@@ -1475,10 +1497,14 @@ EOF
     local calls
     calls="$(cat "${TEST_TMPDIR}/fixtures/invarlock.calls")"
     assert_match "PYTHONPATH=${PACK_REPO_PYTHONPATH}" "${calls}" "absolute repo PYTHONPATH forwarded to evaluate"
+    assert_match "INVARLOCK_CONFIG_ROOT=${model_output_dir}/reports/_clean/run_1/config_root" "${calls}" "evaluate forwards config root"
+    assert_match "INVARLOCK_STORE_EVAL_WINDOWS=1" "${calls}" "evaluate enables stored windows"
+    assert_match "HF_HOME=${HF_HOME}" "${calls}" "evaluate preserves inherited HF cache root"
     assert_match "--baseline-report" "${calls}" "baseline report forwarded to invarlock evaluate"
     assert_match "--edit-label custom" "${calls}" "empty edit label falls back to custom"
     assert_match "/reports/_clean/run_1/runtime_inputs/baseline_report\\.json" "${calls}" "staged baseline report path forwarded to evaluate"
     assert_match "/reports/_clean/run_1/runtime_inputs/calibrated_preset_${model_name}\\.yaml" "${calls}" "staged preset path forwarded to evaluate"
+    assert_match "skip_overhead_check: true" "$(cat "${model_output_dir}/reports/_clean/run_1/config_root/runtime/profiles/ci.yaml")" "large-model evaluate profile carries skip_overhead setting"
 
     PATH="${original_path}"
     pop_active_python_bin
@@ -1863,19 +1889,31 @@ test_task_calibration_run_guard_order_branches() {
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
     local captured_py="${TEST_TMPDIR}/captured_pythonpath.txt"
+    local captured_cfg="${TEST_TMPDIR}/captured_config_root.txt"
+    local captured_tmp="${TEST_TMPDIR}/captured_tmpdir.txt"
+    local captured_hf="${TEST_TMPDIR}/captured_hf_home.txt"
     cat > "${bin_dir}/invarlock" <<EOF
 #!/usr/bin/env bash
 printf '%s\n' "\${PYTHONPATH:-}" > "${captured_py}"
+printf '%s\n' "\${INVARLOCK_CONFIG_ROOT:-}" > "${captured_cfg}"
+printf '%s\n' "\${TMPDIR:-}" > "${captured_tmp}"
+printf '%s\n' "\${HF_HOME:-}" > "${captured_hf}"
 exit 0
 EOF
     chmod +x "${bin_dir}/invarlock"
     PATH="${bin_dir}:${PATH}"
     export PATH
+    export TMPDIR="${TEST_TMPDIR}/tmpdir"
+    export HF_HOME="${TEST_TMPDIR}/hf-home"
+    mkdir -p "${TMPDIR}" "${HF_HOME}"
 
     PACK_GUARDS_ORDER="variance"
     task_calibration_run "${model_name}" 0 "1" "42" "${out}" "${log_file}"
     assert_match "variance" "$(cat "${model_output_dir}/reports/calibration/run_1/calibration_config.yaml")" "explicit guard order used"
     assert_eq "${PACK_REPO_PYTHONPATH}" "$(cat "${captured_py}")" "calibration injects repo pythonpath"
+    assert_eq "${model_output_dir}/reports/calibration/run_1/config_root" "$(cat "${captured_cfg}")" "calibration injects config root"
+    assert_eq "${TMPDIR}" "$(cat "${captured_tmp}")" "calibration preserves tmpdir override"
+    assert_eq "${HF_HOME}" "$(cat "${captured_hf}")" "calibration preserves HF cache root"
 
     PACK_GUARDS_ORDER=" , "
     task_calibration_run "${model_name}" 0 "2" "43" "${out}" "${log_file}"
