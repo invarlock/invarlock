@@ -150,6 +150,15 @@ def test_dataset_dedupe_reduction_then_success(tmp_path: Path):
 
     data = captured["report"]["data"]
     wp = data.get("window_plan", {})
-    # After dedupe reduction, per-arm should be reduced from 20 to 15 (reduction min=5)
-    assert wp.get("actual_preview") in {15, 20} and wp.get("actual_final") in {15, 20}
-    # Note: dedupe_adjustments are recorded only when a window_plan exists earlier (e.g., release).
+    # Two duplicate windows per arm collapse the effective plan from 20 to 15.
+    assert wp.get("actual_preview") == 15
+    assert wp.get("actual_final") == 15
+    assert wp.get("preview_total_tokens") == 45
+    assert wp.get("final_total_tokens") == 45
+    assert wp.get("min_tokens_target") == 50000
+    assert wp.get("tokens_floor_met") is False
+    assert wp.get("dedupe_adjustments") == [{"deficit": 4, "proposed_per_arm": 15}]
+    assert data.get("preview_total_tokens") == 45
+    assert data.get("final_total_tokens") == 45
+    assert data.get("min_tokens_target") == 50000
+    assert data.get("tokens_floor_met") is False

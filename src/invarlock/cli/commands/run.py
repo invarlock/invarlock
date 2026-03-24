@@ -122,6 +122,9 @@ from invarlock.cli.utils import (
 from invarlock.cli.utils import (
     coerce_option as _coerce_option,
 )
+from invarlock.core.auto_tuning import (
+    resolve_tier_policies as _resolve_tier_policies,
+)
 from invarlock.core.exceptions import (
     ConfigError as _CfgErr,
 )
@@ -133,6 +136,9 @@ from invarlock.core.exceptions import (
 )
 from invarlock.core.exceptions import (
     ValidationError as _ValErr,
+)
+from invarlock.eval.window_planning import (
+    resolve_effective_windows as _resolve_effective_windows_impl,
 )
 from invarlock.model_utils import set_seed
 
@@ -1033,6 +1039,57 @@ def _maybe_plan_release_windows(
     )
 
 
+def _resolve_effective_windows(
+    *,
+    data_provider: Any,
+    tokenizer: Any,
+    seq_len: int,
+    stride: int,
+    preview_n: int,
+    final_n: int,
+    seed: int,
+    split: str,
+    requested_preview: int | None = None,
+    requested_final: int | None = None,
+    profile: str | None = None,
+    signature_transform: Callable[
+        [list[dict[str, Any]], list[dict[str, Any]]], list[dict[str, Any]]
+    ]
+    | None = None,
+    event_fn: Callable[[str], None] | None = None,
+) -> dict[str, Any]:
+    return _resolve_effective_windows_impl(
+        data_provider=data_provider,
+        tokenizer=tokenizer,
+        seq_len=seq_len,
+        stride=stride,
+        preview_n=preview_n,
+        final_n=final_n,
+        seed=seed,
+        split=split,
+        requested_preview=requested_preview,
+        requested_final=requested_final,
+        profile=profile,
+        release_min_windows_per_arm=RELEASE_MIN_WINDOWS_PER_ARM,
+        signature_transform=signature_transform,
+        event_fn=event_fn,
+    )
+
+
+def _resolve_pm_min_tokens_target(
+    *,
+    tier: str | None,
+    profile: str | None,
+) -> int:
+    resolved = _resolve_tier_policies((tier or "balanced").lower(), profile=profile)
+    metrics = resolved.get("metrics", {}) if isinstance(resolved, dict) else {}
+    pm_ratio = metrics.get("pm_ratio", {}) if isinstance(metrics, dict) else {}
+    try:
+        return int(pm_ratio.get("min_tokens", 0) or 0)
+    except Exception:
+        return 0
+
+
 def _print_pipeline_start(console: Console) -> None:
     _event(console, "INIT", "Starting InvarLock pipeline...", emoji="🚀")
 
@@ -1530,6 +1587,8 @@ def _build_run_command_deps() -> dict[str, Any]:
         "_init_retry_controller": _init_retry_controller,
         "_load_model_with_cfg": _load_model_with_cfg,
         "_maybe_plan_release_windows": _maybe_plan_release_windows,
+        "_resolve_effective_windows": _resolve_effective_windows,
+        "_resolve_pm_min_tokens_target": _resolve_pm_min_tokens_target,
         "_merge_primary_metric_health": _merge_primary_metric_health,
         "_normalize_overhead_result": _normalize_overhead_result,
         "_persist_ref_masks": _persist_ref_masks,
