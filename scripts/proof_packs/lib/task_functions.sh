@@ -64,7 +64,7 @@ _get_model_invarlock_config_fallback() {
             echo "512:512:192:192:96"
             ;;
         "13")
-            echo "1536:1536:192:192:64"
+            echo "512:512:192:192:64"
             ;;
         "30")
             echo "1024:1024:192:192:48"
@@ -154,6 +154,94 @@ _default_ci_min_windows() {
     fi
 
     echo "${default_windows}"
+}
+
+_effective_ci_planning_target() {
+    local model_size="$1"
+    local tier="${2:-balanced}"
+    local dataset_kind="${3:-wikitext2}"
+    [[ "${model_size}" == "13" && "${tier}" == "balanced" && "${dataset_kind}" == "wikitext2" ]]
+}
+
+_plan_effective_ci_schedule() {
+    local model_ref="$1"
+    local model_size="$2"
+    local tier="$3"
+    local dataset_kind="$4"
+    local split="$5"
+    local seed="$6"
+
+    if ! _effective_ci_planning_target "${model_size}" "${tier}" "${dataset_kind}"; then
+        return 0
+    fi
+    if [[ -n "${INVARLOCK_CERT_MIN_WINDOWS:-}" ]]; then
+        jq -n --arg reason "manual_window_override" '{status:"skipped", reason:$reason}'
+        return 0
+    fi
+    if [[ -z "${model_ref}" || ! -e "${model_ref}" ]]; then
+        jq -n --arg reason "missing_model_ref" '{status:"skipped", reason:$reason}'
+        return 0
+    fi
+
+    local planner="${SCRIPT_DIR}/../python/plan_effective_windows.py"
+    local -a candidate_args=()
+    local seq_len=""
+    for seq_len in 512 768 1024 1536; do
+        local min_windows=""
+        min_windows="$(_default_ci_min_windows "${seq_len}" "${tier}" "${dataset_kind}")"
+        candidate_args+=(--candidate "${seq_len}:${min_windows}:${min_windows}")
+    done
+
+    PYTHONPATH="${PACK_REPO_PYTHONPATH}" \
+        INVARLOCK_ALLOW_REMOTE_CODE="${INVARLOCK_ALLOW_REMOTE_CODE:-}" \
+        _cmd_python "${planner}" \
+            --model-path "${model_ref}" \
+            --dataset-provider "${dataset_kind}" \
+            --split "${split}" \
+            --seed "${seed}" \
+            --tier "${tier}" \
+            --profile "ci" \
+            "${candidate_args[@]}"
+}
+
+_apply_effective_ci_schedule() {
+    local plan_json="$1"
+    local log_file="$2"
+
+    [[ -n "${plan_json}" ]] || return 0
+
+    local status=""
+    status="$(printf '%s' "${plan_json}" | jq -r '.status // "unknown"')"
+    if [[ "${status}" == "skipped" ]]; then
+        echo "  Effective CI planning skipped: $(printf '%s' "${plan_json}" | jq -r '.reason // "unknown"')" >> "${log_file}"
+        return 0
+    fi
+
+    local min_tokens_target=""
+    local effective_min_tokens=""
+    min_tokens_target="$(printf '%s' "${plan_json}" | jq -r '.min_tokens_target // 0')"
+    effective_min_tokens="$(printf '%s' "${plan_json}" | jq -r '.effective_min_tokens // 0')"
+    echo "  Effective CI planning target: min_tokens=${min_tokens_target}, with_headroom=${effective_min_tokens}" >> "${log_file}"
+    while IFS= read -r candidate; do
+        [[ -n "${candidate}" ]] || continue
+        echo "  Candidate: ${candidate}" >> "${log_file}"
+    done < <(
+        printf '%s' "${plan_json}" | jq -r '
+            .candidates[]? |
+            "seq=\(.seq_len) stride=\(.stride) requested=\(.requested_preview)+\(.requested_final) actual=\(.actual_preview)+\(.actual_final) tokens=\(.total_tokens) floor=\(.effective_min_tokens) floor_met=\(.tokens_floor_met) reason=\(.reason)"
+        '
+    )
+
+    if [[ "${status}" == "selected" ]]; then
+        local selected=""
+        selected="$(printf '%s' "${plan_json}" | jq -r '.selected | "\(.seq_len):\(.stride):\(.actual_preview):\(.actual_final)"')"
+        echo "  Selected effective CI schedule: ${selected}" >> "${log_file}"
+        printf '%s\n' "${selected}"
+        return 0
+    fi
+
+    echo "ERROR: Effective CI planning found no viable balanced WikiText-2 schedule. Switch dataset provider (for example hf_text/allenai-c4)." >> "${log_file}"
+    return 1
 }
 
 # Wrapper to get model size - tries main script function first, then fallback
@@ -985,6 +1073,27 @@ task_calibration_run() {
             echo "  CI window override: preview=${preview_n}, final=${final_n}" >> "${log_file}"
         fi
     fi
+    local tier="${INVARLOCK_TIER:-balanced}"
+    local dataset_kind=""
+    dataset_kind="$(pack_dataset_provider_kind "${INVARLOCK_DATASET:-}")"
+    local effective_plan_json=""
+    effective_plan_json="$(
+        _plan_effective_ci_schedule \
+            "${baseline_path}" \
+            "${model_size}" \
+            "${tier}" \
+            "${dataset_kind}" \
+            "validation" \
+            "${seed}"
+    )" || {
+        echo "ERROR: Effective CI planning failed unexpectedly" >> "${log_file}"
+        return 1
+    }
+    local selected_schedule=""
+    selected_schedule="$(_apply_effective_ci_schedule "${effective_plan_json}" "${log_file}")" || return 1
+    if [[ -n "${selected_schedule}" ]]; then
+        IFS=':' read -r seq_len stride preview_n final_n <<< "${selected_schedule}"
+    fi
     local bootstrap_replicates=2000
 
 
@@ -1082,7 +1191,7 @@ eval:
 
 auto:
   enabled: true
-  tier: "${INVARLOCK_TIER:-balanced}"
+  tier: "${tier}"
   probes: 0
 YAML_EOF
 
@@ -1149,6 +1258,27 @@ task_generate_preset() {
     config=$(_get_invarlock_config "${model_size}")
 
     IFS=':' read -r seq_len stride preview_n final_n eval_batch <<< "${config}"
+    local tier="${INVARLOCK_TIER:-balanced}"
+    local dataset_kind=""
+    dataset_kind="$(pack_dataset_provider_kind "${INVARLOCK_DATASET:-}")"
+    local effective_plan_json=""
+    effective_plan_json="$(
+        _plan_effective_ci_schedule \
+            "${baseline_path}" \
+            "${model_size}" \
+            "${tier}" \
+            "${dataset_kind}" \
+            "validation" \
+            "42"
+    )" || {
+        echo "ERROR: Effective CI planning failed unexpectedly" >> "${log_file}"
+        return 1
+    }
+    local selected_schedule=""
+    selected_schedule="$(_apply_effective_ci_schedule "${effective_plan_json}" "${log_file}")" || return 1
+    if [[ -n "${selected_schedule}" ]]; then
+        IFS=':' read -r seq_len stride preview_n final_n <<< "${selected_schedule}"
+    fi
 
     # Export for use in Python script
     export PRESET_SEQ_LEN="${seq_len}"
@@ -1165,7 +1295,7 @@ task_generate_preset() {
         --preset-file "${preset_base}.yaml" \
         --model-name "${model_name}" \
         --model-path "${baseline_path}" \
-        --tier "${INVARLOCK_TIER:-balanced}" \
+        --tier "${tier}" \
         --dataset-provider "${INVARLOCK_DATASET:-wikitext2}" \
         --seq-len "${seq_len}" \
         --stride "${stride}" \
@@ -1409,6 +1539,26 @@ task_evaluate_edit() {
         fi
     fi
     local tier="${INVARLOCK_TIER:-balanced}"
+    local dataset_kind=""
+    dataset_kind="$(pack_dataset_provider_kind "${INVARLOCK_DATASET:-}")"
+    local effective_plan_json=""
+    effective_plan_json="$(
+        _plan_effective_ci_schedule \
+            "${abs_baseline_path}" \
+            "${model_size}" \
+            "${tier}" \
+            "${dataset_kind}" \
+            "validation" \
+            "42"
+    )" || {
+        echo "ERROR: Effective CI planning failed unexpectedly" >> "${log_file}"
+        return 1
+    }
+    local selected_schedule=""
+    selected_schedule="$(_apply_effective_ci_schedule "${effective_plan_json}" "${log_file}")" || return 1
+    if [[ -n "${selected_schedule}" ]]; then
+        IFS=':' read -r seq_len stride preview_n final_n <<< "${selected_schedule}"
+    fi
     local bootstrap_replicates
     bootstrap_replicates="$(_resolve_bootstrap_replicates "${model_size}" "${tier}")"
     local baseline_report_root="${model_output_dir}/baseline_reports/${profile_flag}_${tier}_seq${seq_len}_pv${preview_n}_fn${final_n}"
@@ -1886,6 +2036,26 @@ task_evaluate_error() {
         fi
     fi
     local tier="${INVARLOCK_TIER:-balanced}"
+    local dataset_kind=""
+    dataset_kind="$(pack_dataset_provider_kind "${INVARLOCK_DATASET:-}")"
+    local effective_plan_json=""
+    effective_plan_json="$(
+        _plan_effective_ci_schedule \
+            "${abs_baseline_path}" \
+            "${model_size}" \
+            "${tier}" \
+            "${dataset_kind}" \
+            "validation" \
+            "42"
+    )" || {
+        echo "ERROR: Effective CI planning failed unexpectedly" >> "${log_file}"
+        return 1
+    }
+    local selected_schedule=""
+    selected_schedule="$(_apply_effective_ci_schedule "${effective_plan_json}" "${log_file}")" || return 1
+    if [[ -n "${selected_schedule}" ]]; then
+        IFS=':' read -r seq_len stride preview_n final_n <<< "${selected_schedule}"
+    fi
     local bootstrap_replicates
     bootstrap_replicates="$(_resolve_bootstrap_replicates "${model_size}" "${tier}")"
     local baseline_report_root="${model_output_dir}/baseline_reports/${profile_flag}_${tier}_seq${seq_len}_pv${preview_n}_fn${final_n}"

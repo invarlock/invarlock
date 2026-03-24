@@ -75,6 +75,60 @@ test_default_ci_min_windows_accounts_for_padding() {
     assert_eq "300" "$(_default_ci_min_windows "128")" "env override wins"
 }
 
+test_effective_ci_schedule_selects_and_logs_viable_candidate() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    local model_dir="${TEST_TMPDIR}/model"
+    mkdir -p "${model_dir}"
+    echo "{}" > "${model_dir}/config.json"
+
+    local planner_calls="${TEST_TMPDIR}/planner.calls"
+    _cmd_python() {
+        echo "$*" > "${planner_calls}"
+        cat <<'EOF'
+{"status":"selected","min_tokens_target":50000,"effective_min_tokens":52500,"candidates":[{"seq_len":512,"stride":512,"requested_preview":400,"requested_final":400,"actual_preview":360,"actual_final":360,"total_tokens":53000,"effective_min_tokens":52500,"tokens_floor_met":true,"reason":"selected"}],"selected":{"seq_len":512,"stride":512,"requested_preview":400,"requested_final":400,"actual_preview":360,"actual_final":360,"total_tokens":53000,"effective_min_tokens":52500,"tokens_floor_met":true,"reason":"selected"}}
+EOF
+    }
+
+    local plan_json
+    plan_json="$(_plan_effective_ci_schedule "${model_dir}" "13" "balanced" "wikitext2" "validation" "42")"
+    assert_match '"status":"selected"' "${plan_json}" "planner result returned"
+    assert_match "--candidate 512:400:400" "$(cat "${planner_calls}")" "planner considers 512 candidate first"
+    assert_match "--candidate 1536:400:400" "$(cat "${planner_calls}")" "planner keeps long-sequence candidate available"
+
+    local log_file="${TEST_TMPDIR}/plan.log"
+    : > "${log_file}"
+    local selected
+    selected="$(_apply_effective_ci_schedule "${plan_json}" "${log_file}")"
+    assert_eq "512:512:360:360" "${selected}" "selected schedule uses effective post-dedupe counts"
+    local log_text
+    log_text="$(cat "${log_file}")"
+    assert_match "Effective CI planning target: min_tokens=50000, with_headroom=52500" "${log_text}" "token target logged"
+    assert_match "Candidate: seq=512 stride=512 requested=400\\+400 actual=360\\+360 tokens=53000 floor=52500 floor_met=true reason=selected" "${log_text}" "candidate summary logged"
+    assert_match "Selected effective CI schedule: 512:512:360:360" "${log_text}" "selected schedule logged"
+}
+
+test_effective_ci_schedule_fails_fast_when_no_candidate_clears_floor() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    local log_file="${TEST_TMPDIR}/plan_fail.log"
+    : > "${log_file}"
+    local rc=0
+    if _apply_effective_ci_schedule \
+        '{"status":"no_candidate","min_tokens_target":50000,"effective_min_tokens":52500,"candidates":[{"seq_len":512,"stride":512,"requested_preview":400,"requested_final":400,"actual_preview":220,"actual_final":220,"total_tokens":45723,"effective_min_tokens":52500,"tokens_floor_met":false,"reason":"below_token_floor"}]}' \
+        "${log_file}" >/dev/null; then
+        rc=0
+    else
+        rc=$?
+    fi
+    assert_ne "0" "${rc}" "planner should fail when every candidate misses the floor"
+    assert_match "Switch dataset provider" "$(cat "${log_file}")" "failure message recommends dataset switch"
+}
+
 test_large_model_threshold_covers_14b_dense_checkpoints() {
     mock_reset
     # shellcheck source=../task_functions.sh
@@ -914,7 +968,7 @@ test_task_helpers_cover_fallback_branches() {
     assert_eq "40" "$(_get_model_size_from_name "01-ai/Yi-34B")" "40B detection"
     assert_eq "30" "$(_get_model_size_from_name "Qwen2.5-32B")" "30B detection"
 
-    assert_eq "1536:1536:192:192:64" "$(_get_model_invarlock_config_fallback "13")" "13B config"
+    assert_eq "512:512:192:192:64" "$(_get_model_invarlock_config_fallback "13")" "13B config"
     assert_eq "1024:1024:192:192:48" "$(_get_model_invarlock_config_fallback "30")" "30B config"
     assert_eq "1024:1024:192:192:32" "$(_get_model_invarlock_config_fallback "40")" "40B config"
     assert_eq "1024:1024:192:192:24" "$(_get_model_invarlock_config_fallback "moe")" "moe config"

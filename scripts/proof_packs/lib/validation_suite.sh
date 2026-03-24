@@ -1639,9 +1639,10 @@ get_model_invarlock_config() {
             echo "512:512:64:64:96"
             ;;
         "13")
-            # 13-14B models: ~26-28GB, moderate settings
-            # Note: estimate_model_params() returns "13" for both 13B and 14B
-            echo "1536:768:48:48:64"
+            # 13-14B models: use shorter WT-2 windows by default because
+            # long sequences tend to be heavily padded and under-deliver
+            # effective PM token coverage on balanced CI lanes.
+            echo "512:512:64:64:64"
             ;;
         "30")
             # 30B models: ~60GB, reduced settings
