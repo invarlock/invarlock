@@ -129,6 +129,12 @@ _resolve_bootstrap_replicates() {
 
 _default_ci_min_windows() {
     local seq_len="${1:-}"
+    local tier="${2:-${INVARLOCK_TIER:-balanced}}"
+    local dataset_kind="${3:-}"
+
+    if [[ -z "${dataset_kind}" ]]; then
+        dataset_kind="$(pack_dataset_provider_kind "${INVARLOCK_DATASET:-}")"
+    fi
 
     if [[ -n "${INVARLOCK_CERT_MIN_WINDOWS:-}" ]]; then
         echo "${INVARLOCK_CERT_MIN_WINDOWS}"
@@ -136,9 +142,14 @@ _default_ci_min_windows() {
     fi
 
     local default_windows=256
-    # The balanced tier enforces a 50k token minimum; short seq_len on short-text
-    # datasets (e.g., WikiText-2) can fall below that floor due to padding.
-    if [[ "${seq_len}" =~ ^[0-9]+$ && "${seq_len}" -le 256 ]]; then
+    # The balanced tier enforces a 50k token minimum. On short-text datasets like
+    # WikiText-2, larger seq_len does not imply larger effective token counts
+    # because many windows are heavily padded. The Qwen2.5-14B clean controls only
+    # reached 45,723 total tokens at 352+352 windows, so keep a higher proof-pack
+    # floor for balanced WikiText-2 runs instead of weakening the public policy.
+    if [[ "${tier}" == "balanced" && "${dataset_kind}" == "wikitext2" && "${seq_len}" =~ ^[0-9]+$ && "${seq_len}" -ge 512 ]]; then
+        default_windows=400
+    elif [[ "${seq_len}" =~ ^[0-9]+$ && "${seq_len}" -le 256 ]]; then
         default_windows=352
     fi
 

@@ -57,8 +57,19 @@ test_default_ci_min_windows_accounts_for_padding() {
     source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
 
     unset INVARLOCK_CERT_MIN_WINDOWS
-    assert_eq "256" "$(_default_ci_min_windows "512")" "default is 256 for longer sequences"
+    unset INVARLOCK_DATASET
+    unset INVARLOCK_TIER
+    assert_eq "400" "$(_default_ci_min_windows "512")" "default proof-pack dataset is WikiText-2 with the higher balanced floor"
     assert_eq "352" "$(_default_ci_min_windows "128")" "small seq_len uses higher default to meet token floors"
+
+    INVARLOCK_DATASET="wikitext2"
+    INVARLOCK_TIER="balanced"
+    assert_eq "400" "$(_default_ci_min_windows "1536")" "balanced WikiText-2 uses higher window floor for long sequences"
+    assert_eq "400" "$(_default_ci_min_windows "512")" "balanced WikiText-2 uses higher window floor at 512 seq_len"
+    assert_eq "352" "$(_default_ci_min_windows "128")" "tiny seq_len still uses the padding-aware floor"
+
+    INVARLOCK_DATASET="hf_text"
+    assert_eq "256" "$(_default_ci_min_windows "1536")" "non-WikiText datasets keep the generic long-sequence floor"
 
     INVARLOCK_CERT_MIN_WINDOWS="300"
     assert_eq "300" "$(_default_ci_min_windows "128")" "env override wins"
