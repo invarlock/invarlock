@@ -10,13 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added an offline release-verification bundle generator and reference docs for
   auditing release artifacts without network access.
-- Added stronger proof-pack manifest and attestation tooling, including a
-  public manifest schema, manifest validation and attestation helpers, and
-  source/environment metadata capture for packaged runs.
 - Added public model-family and runtime-manifest contracts, packaged contract
   artifacts in wheels, and contract-sync automation for shipped distributions.
-- Added package-native proof-pack verification plus new proof-pack `inspect`
-  and `build` command flows for packaged verification artifacts.
+- Added stronger proof-pack manifest and attestation tooling, package-native
+  proof-pack verification, and new proof-pack `inspect` / `build` command
+  flows for packaged verification artifacts.
 - Added replacement-model support lanes, pilot presets, and automated model
   evidence-sweep tooling/workflows for maintaining shipped support claims.
 
@@ -25,6 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `doctor`, and `advanced`; proof-pack, policy, plugin, and calibration flows
   now live under the `advanced` namespace, and core trusted-host evaluation now
   uses `--mode local`.
+- Replaced the hidden proof-pack `_run` shim with a repo-only Python config
+  runner backed by a shared internal config-execution API, so proof-pack and
+  calibration internals no longer depend on a shadow CLI command surface.
+- Tightened evaluate/verify isolation so generated configs stay invocation
+  local and policy/coverage recomputation remains aligned with current runs.
+- Moved runtime and repo workflows to secure-by-default behavior, including
+  safer runtime-image resolution/container defaults and tighter integration
+  protections around Dependabot activity.
 - Optimized evaluation data loading, Hugging Face adapter/model-loading paths,
   model-profile resolution, and CLI run/bootstrap startup flows to reduce local
   evaluation overhead.
@@ -36,14 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   configured `setup-python` interpreter with tighter permission scopes.
 - Hardened the exhaustive CLI smoke runner, expanded active eval coverage
   thresholds, and retargeted Dependabot automation to `staging/next`.
-- Moved runtime and repo workflows to secure-by-default behavior, including
-  safer runtime-image resolution/container defaults and tighter integration
-  protections around Dependabot activity.
 - Refreshed shipped model lanes and presets around evidence-backed support,
   including `hf_text` causal-eval defaults, updated pilot/backlog family
   coverage, and removal of the legacy ONNX adapter surface.
-- Tightened evaluate/verify isolation so generated configs stay invocation
-  local and policy/coverage recomputation remains aligned with current runs.
 - Simplified the human-readable Markdown evaluation report by folding the
   dashboard into a single Executive Summary section and removing the
   hand-maintained contents block.
@@ -57,20 +58,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   installed Python environment.
 - Tightened core profiling, security, typing, report-type validation, and local
   model-profile resolution behavior.
-- Proof-pack execution now honors one-sided scenario manifests, pins helper
-  installs, keeps no-`jq` scenario flows deterministic, and improves shell-test
-  portability across hosts.
-- Fixed proof-pack staged evaluate preset normalization so sparse YAML and JSON
-  presets are rewritten consistently, and proof-pack shell helpers now honor
-  the active Python interpreter instead of assuming a global `python3`.
-- Fixed proof-pack bulk-run entrypoints to fail fast on missing
+- Proof-pack scenario, staging, and shell execution flows now honor one-sided
+  manifests, pin helper installs, normalize sparse YAML/JSON staged presets,
+  use the active Python interpreter, keep no-`jq` paths deterministic, and
+  remain portable across hosts.
+- Proof-pack remote/bulk-run and replay flows now fail fast on missing
   `INVARLOCK_ALLOW_REMOTE_CODE`, default to eager attention plus copied
-  baselines for secure-default remote runs, and log the effective runtime mode
-  before queue creation.
-- Fixed proof-pack queue generation so filtered state manifests stay
-  authoritative for bounded clean/stress lanes, and queue monitoring now exits
-  into an explicit resumable blocked state when all remaining pending work is
-  blocked on failed dependencies.
+  baselines for secure-default remote runs, keep bounded queues authoritative,
+  log the effective runtime mode, reuse generated checkpoints, and keep
+  maintained sentinel lanes aligned with the actual evaluated window plan.
+- Secure-default runtime delegation now mounts absolute preset, baseline,
+  subject, model, and output paths, passes CUDA GPUs through, preserves
+  delegated reports written outside the repo mount, and mounts external
+  symlink targets needed by local-checkpoint flows.
+- Fixed per-file coverage enforcement to include the full thresholded surface
+  in generated coverage reports, and ratcheted additional CLI/core/reporting
+  branch floors to 95% and 100% where the current suite now supports them.
 - Fixed secure-default direct `invarlock evaluate` to mount absolute
   `--preset` and `--baseline-report` paths, and updated the maintained Qwen2.5
   14B sentinels to stage and normalize their evaluate inputs against the saved
@@ -85,24 +88,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   verification expectations with the packaged verifier behavior.
 - Hardened ClusterFuzzLite/runtime security integration and policy-pack digest
   verification in fail-closed paths.
-- Fixed secure-default runtime delegation for GPU-backed evaluation flows by
-  passing through CUDA GPUs, mounting absolute host output paths, and preserving
-  delegated reports written outside the repo mount.
-- Fixed secure-default runtime delegation for local-model flows by mounting
-  absolute `--baseline` / `--subject` paths and absolute model paths referenced
-  inside YAML configs, so containerized runs can load local checkpoints.
-- Fixed secure-default runtime delegation for snapshot-symlink local model
-  directories by mounting external symlink targets needed by containerized
-  proof-pack and other local-checkpoint flows.
-- Fixed container-backed model evidence sweeps to use container-safe preset and
-  report paths, and to publish generated artifacts back to the requested host
-  output root.
-- Fixed exported Hugging Face checkpoint directories to save tokenizer assets
-  alongside edited model weights so local reruns can reload subject models from
-  the saved path.
+- Fixed container-backed model evidence sweeps and exported checkpoint flows to
+  use container-safe preset/report paths, publish generated artifacts back to
+  the requested host output root, and save tokenizer assets alongside edited
+  model weights for local reruns.
 - Fixed Markdown report rendering for schema-valid reports that omit
   `artifacts.generated_at`, and suppressed empty window-plan placeholders in
   first-screen summaries.
+
+### Removed
+- Removed the `QwQ-32B` model lane from the repo, including its maintained
+  catalog/support references and its shipped preset and calibration configs.
 
 ### Dependencies
 - Bumped `actions/download-artifact` from `7` to `8`.
@@ -121,9 +117,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   remote guidance, and the new secure-default proof-pack bulk-run defaults.
 - Updated report-reading/reference docs to match the streamlined Executive
   Summary-first Markdown report layout.
-- Added live execution verification for runnable Markdown examples in CI and
-  documented the new `docs-live` workflow plus runtime-image prerequisites for
-  repo quickstarts.
+- Added live execution verification for runnable Markdown examples in the
+  maintainer docs workflow, documented the new `docs-live` path plus
+  runtime-image prerequisites for repo quickstarts, and kept hosted docs CI on
+  the non-live validation path.
 - Documented proof-pack wheel verification and the nongated replacement backlog
   lanes used for evidence-backed model support planning.
 
