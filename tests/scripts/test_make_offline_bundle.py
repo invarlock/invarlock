@@ -200,3 +200,56 @@ def test_make_offline_bundle_requires_real_distribution_artifacts(
     assert "requires at least one wheel or sdist artifact" in (
         proc.stderr or proc.stdout
     )
+
+
+def test_make_offline_bundle_supports_relative_output_dir(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "release" / "make_offline_bundle.sh"
+
+    dist_dir = tmp_path / "dist"
+    provenance_dir = tmp_path / "provenance"
+    sbom_path = tmp_path / "sbom.json"
+    relative_output_dir = Path("release-assets")
+
+    _write(dist_dir / "invarlock-0.3.12-py3-none-any.whl", "wheel-bytes")
+    _write(
+        dist_dir / "invarlock-0.3.12-py3-none-any.whl.sigstore.json",
+        '{"bundle":"wheel"}',
+    )
+    _write(dist_dir / "invarlock-0.3.12.tar.gz", "sdist-bytes")
+    _write(
+        dist_dir / "invarlock-0.3.12.tar.gz.sigstore.json",
+        '{"bundle":"sdist"}',
+    )
+    _write(provenance_dir / "bundle.jsonl", '{"provenance":"ok"}')
+    _write(sbom_path, '{"bomFormat":"CycloneDX","specVersion":"1.4"}')
+
+    proc = subprocess.run(
+        [
+            "bash",
+            str(script),
+            "--version",
+            "0.3.12",
+            "--tag",
+            "v0.3.12",
+            "--repo",
+            "invarlock/invarlock",
+            "--dist-dir",
+            str(dist_dir),
+            "--sbom",
+            str(sbom_path),
+            "--provenance-dir",
+            str(provenance_dir),
+            "--output-dir",
+            str(relative_output_dir),
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert proc.returncode == 0, proc.stderr or proc.stdout
+    assert (
+        tmp_path / relative_output_dir / "invarlock-0.3.12-offline-bundle.tar.gz"
+    ).exists()

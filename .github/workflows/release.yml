@@ -15,6 +15,10 @@ on:
         type: choice
         options: [ testpypi, pypi ]
         default: testpypi
+      release_tag:
+        description: "Existing release tag to rebuild/publish (for example v0.5.0)"
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -26,6 +30,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.event_name == 'push' && github.ref || inputs.release_tag }}
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: '3.13'
@@ -47,12 +53,14 @@ jobs:
 
           wheel = next(Path("dist").glob("*.whl"))
           digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
-          Path("dist/smoke-requirements.txt").write_text(
+          requirements = Path(".smoke/smoke-requirements.txt")
+          requirements.parent.mkdir(parents=True, exist_ok=True)
+          requirements.write_text(
               f"{wheel.resolve()} --hash=sha256:{digest}\n",
               encoding="utf-8",
           )
           PY
-          python -m pip install --no-deps --require-hashes -r dist/smoke-requirements.txt
+          python -m pip install --no-deps --require-hashes -r .smoke/smoke-requirements.txt
           python -c "import invarlock; import sys; print('invarlock version', getattr(invarlock, '__version__', 'n/a')); sys.exit(0)"
       - name: Generate release SBOM
         run: bash scripts/generate_sbom.sh artifacts/supply-chain/sbom.json
@@ -60,7 +68,9 @@ jobs:
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: dist
-          path: dist/*
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
           if-no-files-found: error
           retention-days: 3
       - name: Upload SBOM artifact
@@ -81,14 +91,13 @@ jobs:
       attestations: write
     if: >-
       ${{
-        startsWith(github.ref, 'refs/tags/v') &&
-        (
-          github.event_name == 'push' ||
-          (github.event_name == 'workflow_dispatch' && inputs.publish == true)
-        )
+        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+        (github.event_name == 'workflow_dispatch' && inputs.publish == true && inputs.release_tag != '')
       }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.event_name == 'push' && github.ref || inputs.release_tag }}
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: '3.13'
@@ -132,7 +141,7 @@ jobs:
   testpypi_smoke:
     needs: publish
     if: >-
-      ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true && inputs.target == 'testpypi' }}
+      ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true && inputs.target == 'testpypi' && inputs.release_tag != '' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -142,7 +151,7 @@ jobs:
           python-version: '3.13'
       - name: Download published TestPyPI wheel
         env:
-          INVARLOCK_RELEASE_VERSION: ${{ github.ref_name }}
+          INVARLOCK_RELEASE_VERSION: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
           mkdir -p wheelhouse
@@ -192,10 +201,9 @@ jobs:
     if: >-
       ${{
         needs.publish.result == 'success' &&
-        startsWith(github.ref, 'refs/tags/v') &&
         (
-          github.event_name == 'push' ||
-          (github.event_name == 'workflow_dispatch' && inputs.publish == true && inputs.target == 'pypi')
+          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+          (github.event_name == 'workflow_dispatch' && inputs.publish == true && inputs.target == 'pypi' && inputs.release_tag != '')
         )
       }}
     steps:
@@ -223,10 +231,10 @@ jobs:
       - name: Create offline verification bundle
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_REF_NAME: ${{ github.ref_name }}
+          INVARLOCK_RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}
         run: |
           set -euo pipefail
-          tag="${GITHUB_REF_NAME}"
+          tag="${INVARLOCK_RELEASE_TAG}"
           version="${tag#v}"
           bash scripts/release/make_offline_bundle.sh \
             --version "${version}" \
@@ -240,13 +248,14 @@ jobs:
         uses: sigstore/gh-action-sigstore-python@a5caf349bc536fbef3668a10ed7f5cd309a4b53d
         with:
           inputs: release-assets/*-offline-bundle.tar.gz
-          upload-signing-artifacts: true
+          upload-signing-artifacts: false
       - name: Create or update GitHub release
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          INVARLOCK_RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}
         run: |
           set -euo pipefail
-          tag="${GITHUB_REF_NAME}"
+          tag="${INVARLOCK_RELEASE_TAG}"
           version="${tag#v}"
           mkdir -p release-assets
           cp dist/* release-assets/
