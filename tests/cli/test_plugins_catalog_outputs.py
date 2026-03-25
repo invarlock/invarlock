@@ -77,11 +77,16 @@ class DummyConsole:
 
 
 def test_plugins_discovery_disabled_json(monkeypatch, capsys):
-    monkeypatch.setenv("INVARLOCK_DISABLE_PLUGIN_DISCOVERY", "1")
+    monkeypatch.setenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "0")
     plugins_command(category="adapters", json_out=True)
     payload = json.loads(capsys.readouterr().out.strip())
-    assert payload["discovery"] == "disabled"
-    assert payload["items"] == []
+    assert any(item["name"] == "hf_causal" for item in payload["items"])
+    assert payload["contracts"]["model_family_catalog"]["format_version"] == (
+        "model-family-catalog-v1"
+    )
+    assert payload["model_family_catalog"]["format_version"] == (
+        "model-family-catalog-v1"
+    )
 
 
 def test_plugins_adapters_json_with_optioninfo(monkeypatch, capsys):
@@ -168,9 +173,72 @@ def test_plugins_adapters_json_statuses(monkeypatch, capsys):
     )
     lines = capsys.readouterr().out.strip().splitlines()
     payload = json.loads(lines[-1])
+    assert payload["contracts"]["model_family_catalog"]["format_version"] == (
+        "model-family-catalog-v1"
+    )
+    assert payload["model_family_catalog"]["format_version"] == (
+        "model-family-catalog-v1"
+    )
     statuses = {item["name"]: item["status"] for item in payload["items"]}
     assert statuses["hf_auto"] == "ready"
     assert statuses["hf_gptq"] == "needs_extra"
+
+
+def test_plugins_adapters_json_bnb_ready_without_cuda_when_runtime_is_available(
+    monkeypatch, capsys
+):
+    adapters = {
+        "hf_bnb": {"module": "invarlock.plugins.bitsandbytes", "entry_point": "bnb"},
+    }
+    _patch_registry(monkeypatch, adapters)
+    monkeypatch.setitem(
+        sys.modules,
+        "torch",
+        SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: False)),
+    )
+    monkeypatch.setattr(
+        plugins_mod, "bitsandbytes_runtime_available", lambda: True, raising=False
+    )
+    monkeypatch.setattr(
+        "invarlock.cli.provenance.extract_adapter_provenance",
+        lambda name: SimpleNamespace(library="bitsandbytes", version="0.49.2"),
+        raising=False,
+    )
+
+    plugins_command(category="adapters", json_out=True, hide_unsupported=False)
+    payload = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    item = next(x for x in payload["items"] if x["name"] == "hf_bnb")
+    assert item["status"] == "ready"
+    assert item["backend"] == {
+        "name": "bitsandbytes",
+        "present": True,
+        "version": "0.49.2",
+    }
+
+
+def test_plugins_adapters_json_marks_missing_backends_not_present(monkeypatch, capsys):
+    adapters = {
+        "hf_awq": {"module": "invarlock.plugins.awq", "entry_point": "awq"},
+        "hf_gptq": {"module": "invarlock.plugins.gptq", "entry_point": "gptq"},
+    }
+    _patch_registry(monkeypatch, adapters)
+    monkeypatch.setattr(plugins_mod.platform, "system", lambda: "Linux", raising=False)
+
+    def fake_extract(name):
+        lib = "autoawq" if name == "hf_awq" else "auto-gptq"
+        return SimpleNamespace(library=lib, version=None)
+
+    monkeypatch.setattr(
+        "invarlock.cli.provenance.extract_adapter_provenance",
+        fake_extract,
+        raising=False,
+    )
+
+    plugins_command(category="adapters", json_out=True, hide_unsupported=False)
+    payload = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    by_name = {item["name"]: item for item in payload["items"]}
+    assert by_name["hf_awq"]["backend"] == {"name": "autoawq", "present": False}
+    assert by_name["hf_gptq"]["backend"] == {"name": "auto-gptq", "present": False}
 
 
 def test_plugins_adapters_minimal_only_ready(monkeypatch, capsys):
@@ -308,6 +376,9 @@ def test_plugins_adapters_handle_torch_and_extra_errors(monkeypatch, capsys):
         "invarlock.cli.commands.plugins._check_plugin_extras",
         fake_extras,
         raising=False,
+    )
+    monkeypatch.setattr(
+        plugins_mod, "bitsandbytes_runtime_available", lambda: False, raising=False
     )
     monkeypatch.setattr(
         plugins_mod, "console", Console(file=io.StringIO()), raising=False
@@ -531,7 +602,7 @@ def test_plugins_adapters_show_unsupported_backend_present(monkeypatch, capsys):
     )
     payload = json.loads(capsys.readouterr().out)
     assert payload["items"][0]["status"] == "unsupported"
-    assert payload["items"][0]["backend"] == {"name": "auto-gptq", "present": True}
+    assert payload["items"][0]["backend"] == {"name": "auto-gptq", "present": False}
 
 
 def test_plugins_adapters_explain_enable_hint(monkeypatch):
@@ -580,6 +651,7 @@ def test_plugins_adapters_explain_special_notes(monkeypatch):
     monkeypatch.setattr(plugins_mod, "console", dummy_console, raising=False)
     plugins_command(category="adapters", explain="hf_gptq")
     assert any("AutoGPTQ-quantized" in line for line in dummy_console.lines)
+    assert any("pinned or vendor wheel" in line for line in dummy_console.lines)
     dummy_console.lines.clear()
     plugins_command(category="adapters", explain="hf_awq")
     assert any("AWQ-quantized" in line for line in dummy_console.lines)

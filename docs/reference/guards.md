@@ -37,7 +37,7 @@ guards:
 >
 > Assurance scope note: the published assurance basis currently covers GPT-2
 > and BERT profiles. Repo-shipped presets and pilot configs for families such
-> as Mistral 7B and Qwen2 7B expand runnable coverage, not the published
+> as Mistral 7B, Qwen2 7B, and Qwen2.5 14B expand runnable coverage, not the published
 > assurance basis.
 
 ## Guard Pipeline Flow
@@ -87,7 +87,8 @@ guards:
 - **Tier policies**: `--tier balanced|conservative|aggressive` resolves a full
   policy bundle from `runtime/tiers.yaml`; overrides in config are merged on top.
 - **Measurement contracts**: Spectral and RMT guards record estimator + sampling
-  contracts in reports and are enforced by `invarlock verify` in CI/Release.
+  contracts in reports and are enforced by `invarlock verify` in CI/Release,
+  alongside required `runtime.manifest.json` attestation for evaluation outputs.
 
 ### Guard hooks
 

@@ -55,3 +55,27 @@ def test_hf_causal_invalid_model_id_maps_to_model_load_error(
     assert isinstance(err, ModelLoadError)
     assert getattr(err, "code", "") == "E201"
     assert "MODEL-LOAD-FAILED" in str(err)
+
+
+def test_gptq_missing_runtime_maps_to_dependency_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from invarlock.plugins.hf_gptq_adapter import HF_GPTQ_Adapter
+
+    real_import = builtins.__import__
+
+    def _imp(name, *a, **k):  # type: ignore[no-untyped-def]
+        if name == "auto_gptq":
+            raise ImportError("auto_gptq unavailable")
+        return real_import(name, *a, **k)
+
+    monkeypatch.setattr(builtins, "__import__", _imp)
+    adapter = HF_GPTQ_Adapter()
+    with pytest.raises(Exception) as ei:
+        adapter.load_model("demo/model")
+    err = ei.value
+    from invarlock.core.exceptions import DependencyError
+
+    assert isinstance(err, DependencyError)
+    assert getattr(err, "code", "") == "E203"
+    assert "DEPENDENCY-MISSING" in str(err)

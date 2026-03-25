@@ -100,6 +100,10 @@ pack_is_bash4() {
     [[ "${BASH_VERSINFO[0]}" -ge 4 ]]
 }
 
+_pack_validation_has_jq() {
+    command -v jq >/dev/null 2>&1
+}
+
 pack_read_final_verdict() {
     local verdict_path="$1"
     python3 - "${verdict_path}" <<'PY'
@@ -596,14 +600,18 @@ pack_source_libs() {
     SCRIPT_DIR="$(_pack_script_dir)"
     export SCRIPT_DIR  # Export for subshell workers
 
-    # Determine lib directory - support the repo lib dir and packaged v2 lib dir.
+    # Determine lib directory - support the repo lib dir, packaged v2 lib dir,
+    # and the older packaged layout where the entrypoint lived under a child dir.
     if [[ -f "${SCRIPT_DIR}/task_serialization.sh" ]]; then
         LIB_DIR="${SCRIPT_DIR}"
     elif [[ -d "${SCRIPT_DIR}/lib" && -f "${SCRIPT_DIR}/lib/task_serialization.sh" ]]; then
         LIB_DIR="${SCRIPT_DIR}/lib"
+    elif [[ -d "${SCRIPT_DIR}/../lib" && -f "${SCRIPT_DIR}/../lib/task_serialization.sh" ]]; then
+        LIB_DIR="${SCRIPT_DIR}/../lib"
     else
         LIB_DIR="${SCRIPT_DIR}"
     fi
+    LIB_DIR="$(cd "${LIB_DIR}" 2>/dev/null && pwd || echo "${LIB_DIR}")"
     export LIB_DIR  # Export for subshell workers
 
     # Source dynamic scheduling modules (required - optimal configuration)
@@ -687,35 +695,58 @@ pack_prepare_scenarios_manifest() {
         local dest="${OUTPUT_DIR}/state/scenarios.json"
         local suite="${PACK_SUITE:-subset}"
         local scenario_ids_csv="${PACK_SCENARIO_IDS:-}"
+        local jq_filter='def suites_ok($suite): ((.suites? | type) != "array") or ((.suites | length) == 0) or ((.suites | index($suite)) != null); def trim: gsub("^\\s+|\\s+$"; ""); def ids($csv): ($csv | split(",") | map(trim) | map(select(length>0))); ._meta = (._meta | if type=="object" then . else {} end) | ._meta.applied_suite = $suite | (ids($scenario_ids_csv)) as $ids | if ($ids | length) > 0 then ._meta.scenario_ids_filter = $ids else . end | .scenarios = [.scenarios[] | select(suites_ok($suite)) | select(($ids | length) == 0 or (.id as $id | ($ids | index($id)) != null))]'
 
-        if command -v jq >/dev/null 2>&1; then
+        if _pack_validation_has_jq; then
             # Scenarios can optionally declare `suites: ["subset", "full", ...]`.
             # When present, the manifest is filtered to just the active PACK_SUITE.
-            jq --arg suite "${suite}" --arg scenario_ids_csv "${scenario_ids_csv}" \
-                'def suites_ok($suite):
-                    ((.suites? | type) != "array")
-                    or ((.suites | length) == 0)
-                    or ((.suites | index($suite)) != null);
-                 def trim: gsub("^\\s+|\\s+$"; "");
-                 def ids($csv): ($csv | split(",") | map(trim) | map(select(length>0)));
-                 ._meta = (._meta | if type=="object" then . else {} end)
-                 | ._meta.applied_suite = $suite
-                 | (ids($scenario_ids_csv)) as $ids
-                 | if ($ids | length) > 0 then ._meta.scenario_ids_filter = $ids else . end
-                 | .scenarios = [
-                     .scenarios[]
-                     | select(suites_ok($suite))
-                     | if ($ids | length) > 0 then
-                         select(.id as $id | ($ids | index($id)) != null)
-                       else
-                         .
-                       end
-                   ]' \
-                "${src}" > "${dest}"
+            jq --arg suite "${suite}" --arg scenario_ids_csv "${scenario_ids_csv}" "${jq_filter}" "${src}" > "${dest}"
         else
             cp "${src}" "${dest}"
         fi
     fi
+}
+
+pack_resolve_active_scenarios_manifest() {
+    if [[ -n "${OUTPUT_DIR:-}" ]]; then
+        local state_manifest="${OUTPUT_DIR}/state/scenarios.json"
+        if [[ -f "${state_manifest}" ]]; then
+            printf '%s\n' "${state_manifest}"
+            return 0
+        fi
+    fi
+
+    local repo_root
+    repo_root="$(cd "${_PACK_VALIDATION_LIB_DIR}/../../.." && pwd)"
+    local src="${PACK_SCENARIOS_MANIFEST_FILE:-${repo_root}/scripts/proof_packs/scenarios.json}"
+    if [[ -f "${src}" ]]; then
+        printf '%s\n' "${src}"
+        return 0
+    fi
+
+    return 1
+}
+
+pack_count_edit_scenarios() {
+    local scenarios_file=""
+    scenarios_file="$(pack_resolve_active_scenarios_manifest 2>/dev/null || true)"
+
+    if command -v jq >/dev/null 2>&1 && [[ -n "${scenarios_file}" && -f "${scenarios_file}" ]]; then
+        local clean_scenarios=""
+        local stress_scenarios=""
+        clean_scenarios="$(jq -r '[.scenarios[] | select(.generation.kind=="edit" and .generation.version=="clean")] | length' "${scenarios_file}" 2>/dev/null || true)"
+        stress_scenarios="$(jq -r '[.scenarios[] | select(.generation.kind=="edit" and .generation.version=="stress")] | length' "${scenarios_file}" 2>/dev/null || true)"
+        if [[ "${clean_scenarios}" =~ ^[0-9]+$ && "${stress_scenarios}" =~ ^[0-9]+$ ]]; then
+            local source_label="scenarios.json"
+            if [[ -n "${OUTPUT_DIR:-}" && "${scenarios_file}" == "${OUTPUT_DIR}/state/scenarios.json" ]]; then
+                source_label="state/scenarios.json"
+            fi
+            printf '%s|%s|%s\n' "${clean_scenarios}" "${stress_scenarios}" "${source_label}"
+            return 0
+        fi
+    fi
+
+    printf '%s|%s|defaults\n' "${#EDIT_TYPES_CLEAN[@]}" "${#EDIT_TYPES_STRESS[@]}"
 }
 
 pack_resolve_tuned_edit_params_file() {
@@ -1036,7 +1067,18 @@ estimate_planned_model_storage_gb() {
         done < <(pack_model_list)
     fi
 
-    local edits_total=$(( ${#EDIT_TYPES_CLEAN[@]} + ${#EDIT_TYPES_STRESS[@]} ))
+    local edit_counts=""
+    edit_counts="$(pack_count_edit_scenarios)"
+    local edits_clean=0
+    local edits_stress=0
+    IFS='|' read -r edits_clean edits_stress _ <<< "${edit_counts}"
+    if ! [[ "${edits_clean}" =~ ^[0-9]+$ ]]; then
+        edits_clean=0
+    fi
+    if ! [[ "${edits_stress}" =~ ^[0-9]+$ ]]; then
+        edits_stress=0
+    fi
+    local edits_total=$((edits_clean + edits_stress))
     local errors_total=0
     if [[ "${RUN_ERROR_INJECTION}" == "true" ]]; then
         # Derive count from scenarios.json when available to keep disk estimates aligned with the suite.
@@ -1085,7 +1127,7 @@ estimate_planned_model_storage_gb() {
     local baseline_mode="${PACK_BASELINE_STORAGE_MODE:-snapshot_symlink}"
     local baseline_copy=1
     if [[ "${baseline_mode}" == "snapshot_symlink" ]]; then
-        baseline_copy=0  # baseline files are symlinks to HF hub cache blobs
+        baseline_copy=0  # baseline dir is a symlink tree backed by HF hub cache blobs
     fi
 
     local hub_cache_on_output_fs=1
@@ -1156,7 +1198,8 @@ disk_preflight() {
     log "ERROR: Estimated storage for this configuration: ~${planned_gb}GB (~$(format_gb_as_tb "${planned_gb}")TB) for model weights alone."
     log "       Free disk on output filesystem: ${free_gb}GB (~$(format_gb_as_tb "${free_gb}")TB)."
     log "       This suite saves full bf16 copies of edits (+ error models if enabled)."
-    log "       Baseline storage mode: ${PACK_BASELINE_STORAGE_MODE:-snapshot_symlink} (snapshot_symlink avoids a full extra baseline copy)."
+    log "       Baseline storage mode: ${PACK_BASELINE_STORAGE_MODE:-snapshot_symlink}."
+    log "       snapshot_symlink now builds a cache-backed symlink tree into HF cache; it still needs one full model copy in HF cache when that cache shares the output filesystem."
     log "       Fix: mount a larger volume and set OUTPUT_DIR, or run the subset suite, or set RUN_ERROR_INJECTION=false."
     log "       Override (not recommended): PACK_SKIP_DISK_PREFLIGHT=1"
 
@@ -1244,6 +1287,25 @@ setup_pack_environment() {
 }
 
 # ============ DEPENDENCY CHECK ============
+pack_proof_pack_requirement_path() {
+    local requirement_name="$1"
+    local repo_root
+    repo_root="$(cd "${_PACK_VALIDATION_LIB_DIR}/../../.." && pwd)"
+    echo "${repo_root}/requirements/proof-packs/${requirement_name}.txt"
+}
+
+pack_install_pinned_requirement() {
+    local requirement_name="$1"
+    shift
+    local requirement_path
+    requirement_path="$(pack_proof_pack_requirement_path "${requirement_name}")"
+    if [[ ! -f "${requirement_path}" ]]; then
+        log "ERROR: pinned requirement file missing: ${requirement_path}"
+        return 1
+    fi
+    python3 -m pip install --require-hashes -r "${requirement_path}" "$@"
+}
+
 check_dependencies() {
     log_section "PHASE 0: DEPENDENCY CHECK"
 
@@ -1282,7 +1344,7 @@ check_dependencies() {
             log "Installing huggingface_hub..."
             if [[ "${pip_available}" != "true" ]]; then
                 missing+=("huggingface_hub")
-            elif ! python3 -m pip install huggingface_hub; then
+            elif ! pack_install_pinned_requirement "huggingface_hub"; then
                 missing+=("huggingface_hub")
             fi
         fi
@@ -1293,7 +1355,7 @@ check_dependencies() {
         if [[ "${PACK_NET}" == "1" ]]; then
             log "Installing accelerate..."
             if [[ "${pip_available}" == "true" ]]; then
-                python3 -m pip install accelerate || missing+=("accelerate")
+                pack_install_pinned_requirement "accelerate" || missing+=("accelerate")
             else
                 missing+=("accelerate")
             fi
@@ -1332,8 +1394,10 @@ check_dependencies() {
                     log "Flash Attention 2: Not found (offline), using eager attention"
                 else
                     log "Flash Attention 2: Not found, attempting install..."
+                    local flash_attn_requirement
+                    flash_attn_requirement="$(pack_proof_pack_requirement_path "flash-attn")"
                     # Use timeout to prevent hanging on slow builds
-                    if [[ "${pip_available}" == "true" ]] && timeout 600 python3 -m pip install flash-attn --no-build-isolation 2>&1 | tee -a "${LOG_FILE}"; then
+                    if [[ "${pip_available}" == "true" ]] && [[ -f "${flash_attn_requirement}" ]] && timeout 600 python3 -m pip install --require-hashes -r "${flash_attn_requirement}" --no-deps --no-build-isolation 2>&1 | tee -a "${LOG_FILE}"; then
                         # Verify it actually imported
                         if python3 -c "import flash_attn" 2>/dev/null; then
                             export FLASH_ATTENTION_AVAILABLE="true"
@@ -1344,7 +1408,11 @@ check_dependencies() {
                         fi
                     else
                         export FLASH_ATTENTION_AVAILABLE="false"
-                        log "WARNING: flash-attn install failed (build error), using eager attention"
+                        if [[ ! -f "${flash_attn_requirement}" ]]; then
+                            log "WARNING: pinned flash-attn requirement file missing, using eager attention"
+                        else
+                            log "WARNING: flash-attn install failed (build error), using eager attention"
+                        fi
                         log "         This is OK - script will work without flash attention, just slower."
                     fi
                 fi
@@ -1357,7 +1425,7 @@ check_dependencies() {
         if [[ "${PACK_NET}" == "1" ]]; then
             log "Installing pyyaml..."
             if [[ "${pip_available}" == "true" ]]; then
-                python3 -m pip install pyyaml || missing+=("pyyaml")
+                pack_install_pinned_requirement "pyyaml" || missing+=("pyyaml")
             else
                 missing+=("pyyaml")
             fi
@@ -1371,7 +1439,7 @@ check_dependencies() {
         if [[ "${PACK_NET}" == "1" ]]; then
             log "Installing protobuf..."
             if [[ "${pip_available}" == "true" ]]; then
-                python3 -m pip install protobuf || missing+=("protobuf")
+                pack_install_pinned_requirement "protobuf" || missing+=("protobuf")
             else
                 missing+=("protobuf")
             fi
@@ -1385,7 +1453,7 @@ check_dependencies() {
         if [[ "${PACK_NET}" == "1" ]]; then
             log "Installing sentencepiece..."
             if [[ "${pip_available}" == "true" ]]; then
-                python3 -m pip install sentencepiece || missing+=("sentencepiece")
+                pack_install_pinned_requirement "sentencepiece" || missing+=("sentencepiece")
             else
                 missing+=("sentencepiece")
             fi
@@ -1571,9 +1639,10 @@ get_model_invarlock_config() {
             echo "512:512:64:64:96"
             ;;
         "13")
-            # 13-14B models: ~26-28GB, moderate settings
-            # Note: estimate_model_params() returns "13" for both 13B and 14B
-            echo "1536:768:48:48:64"
+            # 13-14B models: use shorter WT-2 windows by default because
+            # long sequences tend to be heavily padded and under-deliver
+            # effective PM token coverage on balanced CI lanes.
+            echo "512:512:64:64:64"
             ;;
         "30")
             # 30B models: ~60GB, reduced settings
@@ -1655,20 +1724,16 @@ main_dynamic() {
     local model_count
     model_count=$(pack_model_list | wc -l | tr -d ' ')
     log "Models: ${model_count} (PACK_SUITE=${PACK_SUITE})"
-    local scenarios_file="${OUTPUT_DIR}/state/scenarios.json"
     local clean_scenarios=0
     local stress_scenarios=0
     local error_scenarios=0
     local edit_scenarios_source="defaults"
     local error_scenarios_source="defaults"
 
-    if command -v jq >/dev/null 2>&1 && [[ -f "${scenarios_file}" ]]; then
-        clean_scenarios="$(jq -r '[.scenarios[] | select(.generation.kind=="edit" and .generation.version=="clean")] | length' "${scenarios_file}" 2>/dev/null || echo 0)"
-        stress_scenarios="$(jq -r '[.scenarios[] | select(.generation.kind=="edit" and .generation.version=="stress")] | length' "${scenarios_file}" 2>/dev/null || echo 0)"
-        error_scenarios="$(jq -r '[.scenarios[] | select(.generation.kind=="error")] | length' "${scenarios_file}" 2>/dev/null || echo 0)"
-        edit_scenarios_source="state/scenarios.json"
-        error_scenarios_source="state/scenarios.json"
-    fi
+    local scenarios_file="${OUTPUT_DIR}/state/scenarios.json"
+    local edit_counts=""
+    edit_counts="$(pack_count_edit_scenarios)"
+    IFS='|' read -r clean_scenarios stress_scenarios edit_scenarios_source <<< "${edit_counts}"
 
     if ! [[ "${clean_scenarios}" =~ ^[0-9]+$ ]]; then
         clean_scenarios=0
@@ -1680,11 +1745,12 @@ main_dynamic() {
         error_scenarios=0
     fi
 
-    # Match queue_manager fallback behavior when the manifest is missing or incomplete.
-    if [[ ${clean_scenarios} -le 0 || ${stress_scenarios} -le 0 ]]; then
-        clean_scenarios=4
-        stress_scenarios=4
-        edit_scenarios_source="defaults"
+    if command -v jq >/dev/null 2>&1 && [[ -f "${scenarios_file}" ]]; then
+        error_scenarios="$(jq -r '[.scenarios[] | select(.generation.kind=="error")] | length' "${scenarios_file}" 2>/dev/null || echo 0)"
+        error_scenarios_source="state/scenarios.json"
+    fi
+    if ! [[ "${error_scenarios}" =~ ^[0-9]+$ ]]; then
+        error_scenarios=0
     fi
 
     local clean_runs="${CLEAN_EDIT_RUNS:-0}"
@@ -1885,6 +1951,7 @@ main_dynamic() {
         local completed="$2"
         local failed="$3"
         local status="$4"
+        local detail="${5:-}"
 
         mkdir -p "${OUTPUT_DIR}/state"
         cat > "${OUTPUT_DIR}/state/progress.json" <<EOF
@@ -1893,6 +1960,7 @@ main_dynamic() {
   "completed_tasks": ${completed},
   "failed_tasks": ${failed},
   "status": "${status}",
+  "detail": "${detail}",
   "updated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 EOF
@@ -1903,6 +1971,7 @@ EOF
     local check_interval=60
     local worker_timeout="${WORKER_TIMEOUT:-2700}"
     local workers_started=0
+    local terminal_queue_state=""
     while true; do
         if [[ ${workers_started} -eq 0 ]]; then
             for gpu_id in $(list_run_gpu_ids); do
@@ -2028,6 +2097,21 @@ EOF
         failed=${failed:-0}
         total=${total:-0}
 
+        local terminal_state=""
+        terminal_state="$(queue_terminal_state 2>/dev/null || true)"
+        if [[ "${terminal_state}" == "blocked_failed_dependencies" ]]; then
+            log "Queue reached resumable terminal state: blocked_failed_dependencies"
+            if type signal_shutdown &>/dev/null; then
+                signal_shutdown "${OUTPUT_DIR}"
+            else
+                touch "${OUTPUT_DIR}/workers/SHUTDOWN"
+            fi
+            update_progress "${total}" "${completed}" "${failed}" "${terminal_state}" "all pending tasks are blocked on failed dependencies"
+            terminal_queue_state="${terminal_state}"
+            suite_status=1
+            break
+        fi
+
         pct=0
         [[ ${total} -gt 0 ]] && pct=$((completed * 100 / total))
 
@@ -2073,6 +2157,13 @@ EOF
             local error=$(get_task_field "${task_file}" "error_msg")
             log "  - ${task_id}: ${error:-unknown error}"
         done
+    fi
+
+    if [[ -n "${terminal_queue_state}" ]]; then
+        log_section "BLOCKED"
+        log "Queue entered resumable terminal state: ${terminal_queue_state}"
+        log "Resume after fixing failed work with: OUTPUT_DIR=${OUTPUT_DIR} $0 --resume"
+        return "${suite_status}"
     fi
 
     if [[ "${PACK_SUITE_MODE:-full}" == "calibrate-only" ]]; then

@@ -10,7 +10,7 @@ runner = CliRunner()
 
 
 def test_cli_evaluate_help():
-    result = runner.invoke(app, ["evaluate", "--help"])
+    result = runner.invoke(app, ["evaluate", "--help"], env={"COLUMNS": "240"})
     assert result.exit_code == 0
     stdout = strip_ansi(result.stdout)
     assert "--baseline" in stdout and "--subject" in stdout

@@ -174,8 +174,7 @@ def compute_window_pairing_metrics(
     duplicate_fraction_value = duplicate_fraction([*preview_tokens, *final_tokens])
     overlap_fraction = overlap_fraction_from_context(config_context)
     overlap_unknown = overlap_fraction is None
-    if overlap_unknown:
-        overlap_fraction = 1.0
+    overlap_fraction_value = overlap_fraction if overlap_fraction is not None else 1.0
     count_mismatch = preview_batches != final_batches
 
     pairing_reason = None
@@ -193,7 +192,7 @@ def compute_window_pairing_metrics(
     if pairing_reason is None:
         if overlap_unknown:
             pairing_reason = "overlap_unknown"
-        elif overlap_fraction > 0.0:
+        elif overlap_fraction_value > 0.0:
             pairing_reason = "overlapping_windows"
         elif duplicate_fraction_value > 0.0:
             pairing_reason = "duplicate_windows"
@@ -208,7 +207,7 @@ def compute_window_pairing_metrics(
         "preview": preview_pair_stats,
         "final": final_pair_stats,
         "match_fraction": match_fraction,
-        "overlap_fraction": float(overlap_fraction),
+        "overlap_fraction": float(overlap_fraction_value),
         "overlap_unknown": overlap_unknown,
         "duplicate_fraction": duplicate_fraction_value,
         "count_mismatch": count_mismatch,

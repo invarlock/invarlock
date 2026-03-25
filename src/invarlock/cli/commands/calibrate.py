@@ -21,6 +21,8 @@ import typer
 import yaml
 from rich.console import Console
 
+from invarlock.core.config_execution import RuntimeDelegationError, run_from_config
+
 console = Console()
 
 calibrate_app = typer.Typer(
@@ -79,6 +81,36 @@ def _mark_calibration_context(cfg: dict[str, Any]) -> None:
         run_context = {}
         context["run"] = run_context
     run_context["skip_overhead_check"] = True
+
+
+def _run_calibration_config(
+    *,
+    config: Path,
+    device: str | None,
+    profile: str | None,
+    out: Path,
+    tier: str,
+    allow_network: bool,
+    allow_host_execution: bool,
+    allow_third_party_plugins: bool,
+    allow_remote_code: bool,
+) -> str | None:
+    try:
+        return run_from_config(
+            config=str(config),
+            device=device,
+            profile=profile,
+            out=str(out),
+            tier=tier,
+            allow_network=allow_network,
+            allow_host_execution=allow_host_execution,
+            allow_third_party_plugins=allow_third_party_plugins,
+            allow_remote_code=allow_remote_code,
+            command_name="calibrate",
+        )
+    except RuntimeDelegationError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
 
 
 def _materialize_sweep_specs(
@@ -177,6 +209,26 @@ def null_sweep(
         "ci", "--profile", help="Run profile (ci|release|ci_cpu|dev)."
     ),
     device: str | None = typer.Option(None, "--device", help="Device override."),
+    allow_network: bool = typer.Option(
+        False,
+        "--allow-network",
+        help="Explicitly allow outbound network access for this command.",
+    ),
+    allow_host_execution: bool = typer.Option(
+        False,
+        "--allow-host-execution",
+        help="Run on the host instead of auto-delegating to the runtime container.",
+    ),
+    allow_third_party_plugins: bool = typer.Option(
+        False,
+        "--allow-third-party-plugins",
+        help="Enable third-party entry-point plugin discovery for this command.",
+    ),
+    allow_remote_code: bool = typer.Option(
+        False,
+        "--allow-remote-code",
+        help="Allow trust_remote_code-style model loading for this command.",
+    ),
     safety_margin: float = typer.Option(
         0.05, "--safety-margin", help="Safety margin applied to κ recommendations."
     ),
@@ -186,8 +238,21 @@ def null_sweep(
         help="Target run-level spectral warning rate under the null.",
     ),
 ) -> None:
-    # Keep import light: only pull run machinery when invoked.
-    from .run import run_command
+    try:
+        from typer.models import OptionInfo as _OptionInfo  # type: ignore
+    except Exception:  # pragma: no cover
+
+        class _OptionInfo:  # type: ignore
+            pass
+
+    if isinstance(allow_network, _OptionInfo):
+        allow_network = False
+    if isinstance(allow_host_execution, _OptionInfo):
+        allow_host_execution = False
+    if isinstance(allow_third_party_plugins, _OptionInfo):
+        allow_third_party_plugins = False
+    if isinstance(allow_remote_code, _OptionInfo):
+        allow_remote_code = False
 
     # Optional deps: calibration sweeps require torch/guards, but docs/tests may
     # import this module without heavy deps. Import lazily so CLI example
@@ -229,12 +294,16 @@ def null_sweep(
         cfg_path = cfg_root / f"null_{spec.tier}_{spec.seed}.yaml"
         cfg_path.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
 
-        report_path = run_command(
-            config=str(cfg_path),
+        report_path = _run_calibration_config(
+            config=cfg_path,
             device=device,
             profile=profile,
-            out=str(run_out),
+            out=run_out,
             tier=spec.tier,
+            allow_network=allow_network,
+            allow_host_execution=allow_host_execution,
+            allow_third_party_plugins=allow_third_party_plugins,
+            allow_remote_code=allow_remote_code,
         )
         if not isinstance(report_path, str):
             continue
@@ -414,14 +483,47 @@ def ve_sweep(
         "ci", "--profile", help="Run profile (ci|release|ci_cpu|dev)."
     ),
     device: str | None = typer.Option(None, "--device", help="Device override."),
+    allow_network: bool = typer.Option(
+        False,
+        "--allow-network",
+        help="Explicitly allow outbound network access for this command.",
+    ),
+    allow_host_execution: bool = typer.Option(
+        False,
+        "--allow-host-execution",
+        help="Run on the host instead of auto-delegating to the runtime container.",
+    ),
+    allow_third_party_plugins: bool = typer.Option(
+        False,
+        "--allow-third-party-plugins",
+        help="Enable third-party entry-point plugin discovery for this command.",
+    ),
+    allow_remote_code: bool = typer.Option(
+        False,
+        "--allow-remote-code",
+        help="Allow trust_remote_code-style model loading for this command.",
+    ),
     safety_margin: float = typer.Option(
         0.0,
         "--safety-margin",
         help="Safety margin applied to min_effect recommendations.",
     ),
 ) -> None:
-    # Keep import light: only pull run machinery when invoked.
-    from .run import run_command
+    try:
+        from typer.models import OptionInfo as _OptionInfo  # type: ignore
+    except Exception:  # pragma: no cover
+
+        class _OptionInfo:  # type: ignore
+            pass
+
+    if isinstance(allow_network, _OptionInfo):
+        allow_network = False
+    if isinstance(allow_host_execution, _OptionInfo):
+        allow_host_execution = False
+    if isinstance(allow_third_party_plugins, _OptionInfo):
+        allow_third_party_plugins = False
+    if isinstance(allow_remote_code, _OptionInfo):
+        allow_remote_code = False
 
     # Optional deps: see null_sweep() note.
     try:
@@ -486,12 +588,16 @@ def ve_sweep(
         cfg_path = cfg_root / f"ve_{spec.tier}_w{win}_{spec.seed}.yaml"
         cfg_path.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
 
-        report_path = run_command(
-            config=str(cfg_path),
+        report_path = _run_calibration_config(
+            config=cfg_path,
             device=device,
             profile=profile,
-            out=str(run_out),
+            out=run_out,
             tier=spec.tier,
+            allow_network=allow_network,
+            allow_host_execution=allow_host_execution,
+            allow_third_party_plugins=allow_third_party_plugins,
+            allow_remote_code=allow_remote_code,
         )
         if not isinstance(report_path, str):
             continue

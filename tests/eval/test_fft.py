@@ -77,6 +77,23 @@ class MockGPT2Model(nn.Module):
         return outputs
 
 
+class HookedMockGPT2Model(MockGPT2Model):
+    """Model variant that actually runs attention blocks so hooks fire."""
+
+    def forward(self, input_ids, output_attentions=False, **kwargs):
+        batch_size, seq_len = input_ids.shape
+        hidden = torch.randn(batch_size, seq_len, 768)
+
+        blocks = self.transformer.h if hasattr(self, "transformer") else self.h
+        for block in blocks:
+            attn_out = block.attn(hidden)
+            hidden = attn_out[0] if isinstance(attn_out, tuple) else attn_out
+
+        outputs = Mock()
+        outputs.logits = torch.randn(batch_size, seq_len, 50257, requires_grad=True)
+        return outputs
+
+
 class MockAlternativeModel(nn.Module):
     """Alternative model structure without transformer attribute."""
 
@@ -269,7 +286,7 @@ class TestComputeHeadEnergyScores:
 
     def test_attention_without_weights(self):
         """Test handling when attention doesn't return weights."""
-        model = MockGPT2Model()
+        model = HookedMockGPT2Model()
         calib_data = [{"input_ids": torch.randint(0, 1000, (1, 4))}]
 
         # Mock attention that doesn't return weights
@@ -282,6 +299,21 @@ class TestComputeHeadEnergyScores:
             scores = compute_head_energy_scores(model, calib_data, oracle_windows=1)
 
             # Should handle gracefully with zero scores
+            assert scores.shape == (2, 12)
+            assert torch.all(scores == 0)
+
+    def test_attention_without_tuple_output(self):
+        """Test handling when attention output omits attention weights entirely."""
+        model = HookedMockGPT2Model()
+        calib_data = [{"input_ids": torch.randint(0, 1000, (1, 4))}]
+
+        def mock_attention_tensor_only(self, x, **kwargs):
+            batch_size, seq_len, hidden_size = x.shape
+            return torch.randn(batch_size, seq_len, hidden_size)
+
+        with patch.object(MockAttentionModule, "forward", mock_attention_tensor_only):
+            scores = compute_head_energy_scores(model, calib_data, oracle_windows=1)
+
             assert scores.shape == (2, 12)
             assert torch.all(scores == 0)
 
@@ -307,6 +339,17 @@ class TestComputeHeadEnergyScores:
 
             # Should handle gracefully - only process up to config.n_head
             assert scores.shape == (2, 4)
+
+    def test_attention_from_extra_hooked_layers_is_ignored(self):
+        """Test that hooks beyond config.n_layer do not index past the accumulator."""
+        model = HookedMockGPT2Model(n_layers=2, n_heads=4)
+        model.config.n_layer = 1
+        calib_data = [{"input_ids": torch.randint(0, 1000, (1, 5))}]
+
+        scores = compute_head_energy_scores(model, calib_data, oracle_windows=1)
+
+        assert scores.shape == (1, 4)
+        assert torch.all(scores >= 0)
 
     def test_exception_during_processing(self):
         """Test hook cleanup when exception occurs."""

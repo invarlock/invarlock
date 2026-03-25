@@ -384,6 +384,10 @@ def test_baseline_pairing_propagates_window_plan_capacity(tmp_path: Path):
                         "actual_preview": 2,
                         "actual_final": 2,
                         "coverage_ok": True,
+                        "preview_total_tokens": 2,
+                        "final_total_tokens": 2,
+                        "min_tokens_target": 50000,
+                        "tokens_floor_met": False,
                         "capacity": {"available_unique": 123},
                     }
                 },
@@ -464,6 +468,10 @@ def test_baseline_pairing_propagates_window_plan_capacity(tmp_path: Path):
     r = captured["report"]
     wc = r["data"].get("window_capacity", {})
     assert wc.get("available_unique") == 123
+    assert r["data"]["window_plan"]["preview_total_tokens"] == 2
+    assert r["data"]["window_plan"]["final_total_tokens"] == 2
+    assert r["data"]["window_plan"]["min_tokens_target"] == 50000
+    assert r["data"]["window_plan"]["tokens_floor_met"] is False
 
 
 def test_invalid_edit_name_triggers_exit(tmp_path: Path):
@@ -927,6 +935,11 @@ def test_metrics_window_plan_stats_and_capacity_mapping(tmp_path: Path):
                         "actual_preview": 2,
                         "actual_final": 2,
                         "coverage_ok": True,
+                        "preview_total_tokens": 24,
+                        "final_total_tokens": 18,
+                        "min_tokens_target": 50000,
+                        "tokens_floor_met": False,
+                        "dedupe_adjustments": [{"deficit": 2, "proposed_per_arm": 2}],
                         "capacity": {"available_unique": 999},
                     },
                 }
@@ -985,6 +998,13 @@ def test_metrics_window_plan_stats_and_capacity_mapping(tmp_path: Path):
     assert metrics["stats"]["requested_final"] == 4
     assert metrics["stats"]["actual_preview"] == 2
     assert metrics["stats"]["actual_final"] == 2
+    assert metrics["stats"]["preview_total_tokens"] == 24
+    assert metrics["stats"]["final_total_tokens"] == 18
+    assert metrics["stats"]["min_tokens_target"] == 50000
+    assert metrics["stats"]["tokens_floor_met"] is False
+    assert metrics["stats"]["dedupe_adjustments"] == [
+        {"deficit": 2, "proposed_per_arm": 2}
+    ]
     assert metrics.get("window_capacity", {}).get("available_unique") == 999
 
 

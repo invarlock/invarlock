@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from typer.testing import CliRunner
 
 from invarlock.cli import output as output_mod
-from invarlock.cli.app import app as cli
+from tests.cli.run._internal_cli import internal_run_app as cli
 from tests.cli.support import RecordingConsole
 
 

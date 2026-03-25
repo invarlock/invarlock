@@ -8,6 +8,8 @@ from typing import Any
 import typer
 from rich.console import Console
 
+from invarlock.runtime_security import remote_code_allowed
+
 
 def prepare_config_for_run(
     *,
@@ -239,6 +241,21 @@ def extract_model_load_kwargs(
         for key, value in model.items()
         if key not in {"id", "adapter", "device"} and value is not None
     }
+
+    trust_remote_code = extra.get("trust_remote_code")
+    if (
+        isinstance(trust_remote_code, bool)
+        and trust_remote_code
+        and not remote_code_allowed()
+    ):
+        raise invarlock_error_cls(
+            code="E008",
+            message=(
+                "REMOTE-CODE-DISABLED: model.trust_remote_code requires "
+                "--allow-remote-code or INVARLOCK_ALLOW_REMOTE_CODE=1."
+            ),
+            details={"key": "model.trust_remote_code"},
+        )
 
     removed_keys: list[str] = []
     for key in ("torch_dtype", "load_in_8bit", "load_in_4bit"):

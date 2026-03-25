@@ -9,7 +9,11 @@ from typing import Any
 
 from invarlock.reporting import report_builder as _report_builder
 from invarlock.reporting.report_builder import validate_report
-from invarlock.reporting.report_policy import resolve_tiny_relax_from_report
+from invarlock.reporting.report_policy import (
+    resolve_pm_acceptance_range_from_report,
+    resolve_pm_drift_band_from_report,
+    resolve_tiny_relax_from_report,
+)
 from invarlock.reporting.report_schema import REPORT_JSON_SCHEMA, REPORT_SCHEMA_VERSION
 from invarlock.reporting.report_validation import compute_validation_flags
 
@@ -230,6 +234,12 @@ def _recompute_validation_flags(
     compute_validation_flags_fn: Callable[
         ..., dict[str, bool]
     ] = compute_validation_flags,
+    resolve_pm_acceptance_range_from_report_fn: Callable[
+        [dict[str, Any]], dict[str, float]
+    ] = resolve_pm_acceptance_range_from_report,
+    resolve_pm_drift_band_from_report_fn: Callable[
+        [dict[str, Any]], dict[str, float]
+    ] = resolve_pm_drift_band_from_report,
     resolve_tiny_relax_from_report_fn: Callable[[dict[str, Any]], bool]
     | Callable[[dict[str, Any]], Any] = resolve_tiny_relax_from_report,
 ) -> dict[str, bool]:
@@ -256,11 +266,37 @@ def _recompute_validation_flags(
             if value is not None:
                 ppl_metrics[key] = value
 
+    dataset_windows = report.get("dataset", {}).get("windows", {})
+    stats = (
+        dataset_windows.get("stats", {}) if isinstance(dataset_windows, dict) else {}
+    )
+    if isinstance(stats, dict):
+        coverage = stats.get("coverage")
+        bootstrap = stats.get("bootstrap")
+        bootstrap_metrics = (
+            dict(ppl_metrics.get("bootstrap", {}))
+            if isinstance(ppl_metrics.get("bootstrap"), dict)
+            else {}
+        )
+        coverage_obj = None
+        if isinstance(coverage, dict) and coverage:
+            coverage_obj = coverage
+        elif isinstance(bootstrap, dict) and isinstance(
+            bootstrap.get("coverage"), dict
+        ):
+            coverage_obj = bootstrap.get("coverage")
+        if isinstance(coverage_obj, dict) and coverage_obj:
+            bootstrap_metrics["coverage"] = coverage_obj
+        if bootstrap_metrics:
+            ppl_metrics["bootstrap"] = bootstrap_metrics
+
     auto = report.get("auto")
     if not isinstance(auto, dict):
         auto = {}
     tier = str(auto.get("tier") or "balanced").strip().lower() or "balanced"
     target_ratio = _coerce_float(auto.get("target_pm_ratio"))
+    pm_acceptance_range = resolve_pm_acceptance_range_from_report_fn(report)
+    pm_drift_band = resolve_pm_drift_band_from_report_fn(report)
     tiny_relax = resolve_tiny_relax_from_report_fn(report)
 
     metrics_policy = None
@@ -290,6 +326,8 @@ def _recompute_validation_flags(
         tier=tier,
         _ppl_metrics=ppl_metrics,
         target_ratio=target_ratio,
+        pm_acceptance_range=pm_acceptance_range,
+        pm_drift_band=pm_drift_band,
         guard_overhead=report.get("guard_overhead")
         if isinstance(report.get("guard_overhead"), dict)
         else None,
@@ -337,6 +375,55 @@ def _validate_primary_metric_policy(
     if total_tokens is not None:
         detail += f", total_tokens={total_tokens}"
     return [f"Primary metric policy gate failed ({detail})."]
+
+
+def _validate_release_gate_outcomes(report: dict[str, Any]) -> list[str]:
+    """Require release reports to preserve PASS on canonical gate outcomes."""
+    errors: list[str] = []
+    validation = report.get("validation")
+    if not isinstance(validation, dict):
+        return ["Release verification requires a validation block."]
+
+    required_true = (
+        "primary_metric_acceptable",
+        "preview_final_drift_acceptable",
+        "invariants_pass",
+        "spectral_stable",
+        "rmt_stable",
+    )
+    for key in required_true:
+        if validation.get(key) is not True:
+            errors.append(
+                f"Release verification requires validation.{key} == true "
+                f"(found {validation.get(key)!r})."
+            )
+
+    if (
+        "primary_metric_tail" in report
+        or "primary_metric_tail_acceptable" in validation
+    ) and validation.get("primary_metric_tail_acceptable") is not True:
+        errors.append(
+            "Release verification requires validation.primary_metric_tail_acceptable == "
+            f"true (found {validation.get('primary_metric_tail_acceptable')!r})."
+        )
+
+    guard_overhead = report.get("guard_overhead")
+    skipped = isinstance(guard_overhead, dict) and (
+        bool(guard_overhead.get("skipped", False))
+        or str(guard_overhead.get("mode", "")).strip().lower() == "skipped"
+    )
+    if (
+        isinstance(guard_overhead, dict)
+        and guard_overhead
+        and not skipped
+        and validation.get("guard_overhead_acceptable") is not True
+    ):
+        errors.append(
+            "Release verification requires validation.guard_overhead_acceptable == "
+            f"true (found {validation.get('guard_overhead_acceptable')!r})."
+        )
+
+    return errors
 
 
 def _validate_pairing(report: dict[str, Any]) -> list[str]:
@@ -708,6 +795,7 @@ def _validate_evaluation_report_payload(
         errors.extend(validate_measurement_contracts_fn(report, profile=prof))
 
     if prof == "release":
+        errors.extend(_validate_release_gate_outcomes(report))
         go = report.get("guard_overhead")
         if not isinstance(go, dict) or not go:
             errors.append(
@@ -750,6 +838,7 @@ __all__ = [
     "_validate_pairing",
     "_validate_primary_metric",
     "_validate_primary_metric_policy",
+    "_validate_release_gate_outcomes",
     "_validate_report_schema_strict",
     "_validate_tokenizer_hash",
 ]

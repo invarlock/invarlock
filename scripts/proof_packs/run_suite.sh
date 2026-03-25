@@ -26,7 +26,7 @@ Options:
   --scenario-ids IDS   Comma-separated scenario IDs to include (filters scenarios.json before queue generation)
   --calibrate-only     Only run calibration tasks (implies PACK_SUITE_MODE=calibrate-only)
   --errors-only        Only run error injection scenarios (still performs calibration unless presets are provided)
-  --run-only           Run edits/certs only (implies resume)
+  --run-only           Run edits/reports only (implies resume)
   --resume             Resume an existing run directory
   --help               Show this help message
 EOF
@@ -52,6 +52,46 @@ pack_apply_entrypoint_determinism() {
         export CUDNN_BENCHMARK=1
         unset CUBLAS_WORKSPACE_CONFIG 2>/dev/null || true
     fi
+}
+
+pack_apply_entrypoint_bulk_defaults() {
+    if [[ -z "${SKIP_FLASH_ATTN:-}" ]]; then
+        export SKIP_FLASH_ATTN="true"
+    fi
+    if [[ -z "${PACK_BASELINE_STORAGE_MODE:-}" ]]; then
+        export PACK_BASELINE_STORAGE_MODE="snapshot_copy"
+    fi
+}
+
+pack_entrypoint_execution_mode() {
+    if pack_truthy "${INVARLOCK_ALLOW_HOST_EXECUTION:-}"; then
+        echo "trusted host"
+        return 0
+    fi
+    echo "secure-default container"
+}
+
+pack_print_entrypoint_preflight_banner() {
+    local execution_mode="$1"
+    local network_opt_in="${INVARLOCK_ALLOW_NETWORK:-0}"
+    local remote_code_opt_in="${INVARLOCK_ALLOW_REMOTE_CODE:-0}"
+    cat <<EOF
+=== Proof-Pack Preflight ===
+Execution mode: ${execution_mode}
+Network mode: PACK_NET=${PACK_NET} (INVARLOCK_ALLOW_NETWORK=${network_opt_in})
+Remote code opt-in: INVARLOCK_ALLOW_REMOTE_CODE=${remote_code_opt_in}
+Baseline storage mode: ${PACK_BASELINE_STORAGE_MODE}
+Flash-attn policy: SKIP_FLASH_ATTN=${SKIP_FLASH_ATTN}
+EOF
+}
+
+pack_require_entrypoint_security_opt_ins() {
+    if pack_remote_code_allowed; then
+        return 0
+    fi
+    echo "ERROR: proof-pack bulk runs require INVARLOCK_ALLOW_REMOTE_CODE=1." >&2
+    echo "       Export INVARLOCK_ALLOW_REMOTE_CODE=1 before running run_suite.sh or run_pack.sh." >&2
+    return 2
 }
 
 pack_entrypoint() {
@@ -190,6 +230,12 @@ pack_entrypoint() {
     export PACK_SUITE PACK_NET PACK_DETERMINISM PACK_REPEATS PACK_SUITE_MODE RESUME_FLAG OUTPUT_DIR PACK_SCENARIO_IDS PACK_MODELS_CSV
 
     pack_apply_entrypoint_determinism
+    pack_apply_entrypoint_bulk_defaults
+    pack_apply_network_mode "${PACK_NET}"
+    local execution_mode
+    execution_mode="$(pack_entrypoint_execution_mode)"
+    pack_print_entrypoint_preflight_banner "${execution_mode}"
+    pack_require_entrypoint_security_opt_ins || return $?
     pack_apply_suite "${PACK_SUITE}" || return 2
 
     if [[ -n "${PACK_MODELS_CSV}" ]]; then

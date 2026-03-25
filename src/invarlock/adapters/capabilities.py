@@ -22,7 +22,6 @@ class QuantizationMethod(Enum):
     BNB_4BIT = "bnb_4bit"
     AWQ = "awq"
     GPTQ = "gptq"
-    ONNX = "onnx"
 
 
 @dataclass(frozen=True)

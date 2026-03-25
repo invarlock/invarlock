@@ -1,7 +1,7 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
 
-.PHONY: help install dev-install test test-assurance lint format clean docsclean deepclean docs docs-ci verify coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry
+.PHONY: help install dev-install test test-assurance lint format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync model-evidence-list model-evidence-sweep runtime-image runtime-smoke runtime-verify
 
 PYTHON ?= $(shell bash scripts/select_python.sh)
 PIP := $(PYTHON) -m pip
@@ -11,6 +11,11 @@ MYPY := $(PYTHON) -m mypy
 COVERAGE := $(PYTHON) -m coverage
 MKDOCS := $(PYTHON) -m mkdocs
 PRE_COMMIT := $(PYTHON) -m pre_commit
+MODEL_EVIDENCE_ARGS ?=
+CARGO ?= cargo
+CONTAINER_ENGINE ?= $(shell if command -v docker >/dev/null 2>&1; then echo docker; elif command -v podman >/dev/null 2>&1; then echo podman; fi)
+RUNTIME_IMAGE ?= invarlock-runtime:local
+RUNTIME_IMAGE_DIGEST ?= sha256:local-runtime-image
 
 # Keep repo-wide coverage practical while still exercising the CLI command
 # surface that would otherwise pull the project floor below the real trust core.
@@ -21,7 +26,8 @@ COVERAGE_TESTS_RUN := \
 	tests/cli/run
 
 COVERAGE_TESTS_VERIFY := \
-	tests/cli/test_verify*.py tests/cli/test_cli_command_help_smoke.py tests/cli/test_policy_commands.py
+	tests/cli/test_verify*.py tests/cli/test_cli_command_help_smoke.py \
+	tests/cli/test_policy_commands.py tests/cli/test_proof_pack_commands.py
 
 COVERAGE_TESTS_CONFIG := \
 	tests/cli/test_config_failfast.py tests/cli/test_error_codes.py \
@@ -32,18 +38,39 @@ COVERAGE_TESTS_CONFIG := \
 COVERAGE_TESTS_EVAL := \
 	tests/eval/test_metrics*.py tests/eval/test_report*.py \
 	tests/eval/test_validate_module.py tests/eval/test_baseline_artifacts.py \
-	tests/eval/test_bench.py tests/eval/test_primary_metric*.py \
-	tests/eval/test_determinism.py tests/eval/test_mask_parity_fail.py
+	tests/eval/test_bench.py tests/eval/test_metric_tail_gate.py \
+	tests/eval/test_primary_metric*.py \
+	tests/eval/test_determinism.py tests/eval/test_mask_parity_fail.py \
+	tests/eval/test_task_metrics.py tests/eval/test_eval_bootstrap_wrapper.py \
+	tests/eval/test_data*.py tests/eval/test_hf_text_provider*.py \
+	tests/eval/test_local_jsonl*.py tests/eval/test_synthetic_provider_cases.py \
+	tests/eval/test_wikitext2_fast_capacity.py \
+	tests/eval/test_provider_deterministic_loader_cases.py \
+	tests/eval/test_difficulty_scorer_modes.py \
+	tests/eval/providers
+
+COVERAGE_TESTS_EVAL_PROBES := \
+	tests/eval/test_fft.py tests/eval/test_fft_probe_cases.py \
+	tests/eval/test_mi.py \
+	tests/eval/test_post_attention_probes.py tests/eval/test_post_attention_probe_cases.py
 
 COVERAGE_TESTS_CLI_COMMANDS := \
 	tests/cli/test_doctor*.py tests/cli/test_plugins*.py tests/cli/test_evaluate*.py \
 	tests/cli/test_export_html*.py tests/cli/test_app*.py \
+	tests/cli/test_core_command_surface.py tests/cli/test_execution_mode.py \
+	tests/cli/test_removed_command_migrations.py tests/cli/test_python_m_invarlock.py \
 	tests/cli/test_explain_gates*.py tests/cli/test_report*.py \
 	tests/cli/test_calibrate_harness_artifacts.py tests/cli/test_determinism_preset.py
 
 COVERAGE_TESTS_CLI_HELPERS := \
 	tests/cli/test_adapter_auto*.py tests/cli/test_no_color.py \
 	tests/cli/test_json_helpers.py tests/unit/test_overhead_extraction.py
+
+COVERAGE_TESTS_RUNTIME := \
+	tests/cli/test_security_default_contract.py \
+	tests/cli/test_container_delegation.py \
+	tests/reporting/test_runtime_manifest_contract.py \
+	tests/unit/test_runtime_security_helpers.py
 
 COVERAGE_TESTS := \
 	$(COVERAGE_TESTS_CORE) \
@@ -57,7 +84,12 @@ COVERAGE_TESTS := \
 COVERAGE_MODULES := \
 	--cov=src/invarlock/eval --cov=src/invarlock/guards --cov=src/invarlock/calibration \
 	--cov=src/invarlock/cli --cov=src/invarlock/core --cov=src/invarlock/reporting \
-	--cov=invarlock.public_contracts --cov=invarlock.policy_pack
+	--cov=invarlock.public_contracts --cov=invarlock.policy_pack \
+	--cov=invarlock.proof_pack
+
+COVERAGE_INCLUDE := src/invarlock/eval/*,src/invarlock/guards/*,src/invarlock/calibration/*,src/invarlock/cli/*,src/invarlock/cli/commands/*,src/invarlock/core/*,src/invarlock/reporting/*,src/invarlock/public_contracts.py,src/invarlock/policy_pack.py,src/invarlock/proof_pack.py,src/invarlock/runtime_security.py,invarlock/eval/*,invarlock/guards/*,invarlock/calibration/*,invarlock/cli/*,invarlock/cli/commands/*,invarlock/core/*,invarlock/reporting/*,invarlock/public_contracts.py,invarlock/policy_pack.py,invarlock/proof_pack.py,invarlock/runtime_security.py
+
+TEST_DIR_TARGETS := core cli eval guards edits adapters plugins scripts ci
 
 help:  ## Show this help message
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
@@ -84,45 +116,44 @@ coverage:  ## Run tests with coverage and generate XML
 		$(COVERAGE_MODULES) \
 		--cov-branch \
 		--cov-report=term --cov-report=xml:reports/cov.xml --cov-fail-under=90
+	PYTHONPATH=src $(COVERAGE) run --append -m pytest -q -p no:cov \
+		$(COVERAGE_TESTS_EVAL_PROBES)
+	PYTHONPATH=src $(COVERAGE) run --append -m pytest -q -p no:cov \
+		$(COVERAGE_TESTS_RUNTIME)
+	$(COVERAGE) report --include="$(COVERAGE_INCLUDE)" --fail-under=90
+	$(COVERAGE) xml --include="$(COVERAGE_INCLUDE)" -o reports/cov.xml
 
 coverage-enforce:  ## Run coverage and enforce per-file thresholds
 	$(MAKE) coverage
 	$(PYTHON) scripts/check_coverage_thresholds.py --coverage reports/cov.xml --json reports/thresholds.json
 
 # Grouped test targets
-.PHONY: test-core test-cli test-eval test-guards test-edits test-adapters test-plugins test-scripts test-ci
-test-core:
+.PHONY: $(addprefix test-,$(TEST_DIR_TARGETS))
+test-core: TEST_DIR = core
+test-core: ## Run tests/core
+test-cli: TEST_DIR = cli
+test-cli: ## Run tests/cli
+test-eval: TEST_DIR = eval
+test-eval: ## Run tests/eval
+test-guards: TEST_DIR = guards
+test-guards: ## Run tests/guards
+test-edits: TEST_DIR = edits
+test-edits: ## Run tests/edits
+test-adapters: TEST_DIR = adapters
+test-adapters: ## Run tests/adapters
+test-plugins: TEST_DIR = plugins
+test-plugins: ## Run tests/plugins
+test-scripts: TEST_DIR = scripts
+test-scripts: ## Run tests/scripts
+test-ci: TEST_DIR = ci
+test-ci: ## Run tests/ci
+$(addprefix test-,$(TEST_DIR_TARGETS)):
 	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTEST) -q tests/core
-test-cli:
-	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTEST) -q tests/cli
-test-eval:
-	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTEST) -q tests/eval
-test-guards:
-	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTEST) -q tests/guards
-test-edits:
-	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTEST) -q tests/edits
-test-adapters:
-	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTEST) -q tests/adapters
-test-plugins:
-	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTEST) -q tests/plugins
-test-scripts:
-	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTEST) -q tests/scripts
-test-ci:
-	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTEST) -q tests/ci
+	PYTHONPATH=src $(PYTEST) -q tests/$(TEST_DIR)
 
 test-assurance:  ## Run assurance-related tests only
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTEST) -q \
-		tests/api/test_assurance_facade.py \
 		tests/ci/test_golden_runs_offline.py \
 		tests/ci/test_support_matrix_consistency.py \
 		tests/adapters/test_adapter_capability_contract.py \
@@ -130,6 +161,7 @@ test-assurance:  ## Run assurance-related tests only
 		tests/docs/test_claim_surface_consistency.py \
 		tests/docs/test_assurance_xref_linter.py \
 		tests/reporting/test_public_contracts.py \
+		tests/reporting/test_proof_pack_contract.py \
 		tests/reporting/test_policy_pack_contract.py \
 		tests/reporting/test_policy_utils.py::test_compute_policy_digest_matches_assurance_spec
 
@@ -143,19 +175,68 @@ format:  ## Format code
 	$(RUFF) format src/ tests/ scripts/
 	$(RUFF) check --fix src/ tests/ scripts/
 
-verify:  ## Run verification (pytest -q, lint, format, markdown + spell docs lint)
+verify:  ## Run verification (pytest -q, runtime verifier, lint, format, markdown + spell docs lint)
 	@echo "Running verification..."
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTEST) -q
 	OMP_NUM_THREADS=1 SKIP_RUFF=1 INVARLOCK_PYTHON="$(PYTHON)" bash scripts/run_smoke_regression.sh
-	$(MAKE) ensure-ruff
-	$(RUFF) check src/ tests/ scripts/
-	$(RUFF) format --check src/ tests/ scripts/
-	$(PYTHON) scripts/docs_lint.py --all
+	$(MAKE) cli-smoke-core
+	$(MAKE) cli-smoke-advanced
+	$(MAKE) runtime-verify
+	$(MAKE) verify-ruff
+	$(MAKE) contracts-check
+	$(MAKE) docs-lint
 	@if [ -n "$$VERIFY_DOCS_API" ]; then \
 		$(PYTHON) scripts/validate_docs_api_refs.py; \
 	fi
 	@echo "Verification completed successfully"
+
+verify-ruff:  ## Run the Ruff checks used by make verify
+	$(MAKE) ensure-ruff
+	$(RUFF) check src/ tests/ scripts/
+	$(RUFF) format --check src/ tests/ scripts/
+
+cli-smoke-core:  ## Smoke the simplified core CLI surface
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTHON) -m invarlock --help >/dev/null
+	PYTHONPATH=src $(PYTHON) -m invarlock evaluate --help >/dev/null
+	PYTHONPATH=src $(PYTHON) -m invarlock verify --help >/dev/null
+	PYTHONPATH=src $(PYTHON) -m invarlock report html --help >/dev/null
+	PYTHONPATH=src $(PYTHON) -m invarlock doctor --json >/dev/null
+
+cli-smoke-advanced:  ## Smoke the advanced CLI namespace
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTHON) -m invarlock advanced --help >/dev/null
+	PYTHONPATH=src $(PYTHON) -m invarlock advanced proof-pack --help >/dev/null
+	PYTHONPATH=src $(PYTHON) -m invarlock advanced policy --help >/dev/null
+	PYTHONPATH=src $(PYTHON) -m invarlock advanced plugins --help >/dev/null
+	PYTHONPATH=src $(PYTHON) -m invarlock advanced calibrate --help >/dev/null
+
+model-evidence-list:  ## Print the maintained shipped-model evidence manifest
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTHON) scripts/model_evidence_sweep.py --list-json $(MODEL_EVIDENCE_ARGS)
+
+model-evidence-sweep:  ## Run the maintained shipped-model evidence sweep
+	$(MAKE) ensure-python
+	PYTHONPATH=src INVARLOCK_ALLOW_NETWORK=1 $(PYTHON) scripts/model_evidence_sweep.py $(MODEL_EVIDENCE_ARGS)
+
+runtime-image:  ## Build the local container runtime image used for secure-default execution
+	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ Docker or Podman is required."; exit 1; }
+	$(CONTAINER_ENGINE) build -f runtime/Dockerfile -t $(RUNTIME_IMAGE) .
+
+runtime-smoke:  ## Smoke the local container runtime image
+	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ Docker or Podman is required."; exit 1; }
+	$(CONTAINER_ENGINE) run --rm \
+		--entrypoint python \
+		$(RUNTIME_IMAGE) \
+		-c "import datasets, safetensors, torch, transformers; print('runtime image imports ok')"
+
+runtime-verify:  ## Build and smoke the Rust runtime verifier on the fixture bundle
+	$(CARGO) build -p invarlock-runtime-verify
+	./target/debug/invarlock-runtime-verify \
+		--report tests/fixtures/runtime_attestation/evaluation.report.json \
+		--manifest tests/fixtures/runtime_attestation/runtime.manifest.json \
+		--json
 
 ##@ CI/Build
 clean:  ## Clean build artifacts
@@ -230,6 +311,14 @@ eval-loop:  ## Run automated evaluation loop (baseline + quant8 quickstart)
 ci-matrix:  ## Verify CI matrix
 	bash scripts/verify_ci_matrix.sh
 
+contracts-check:  ## Ensure packaged contracts match the repo contract source
+	$(MAKE) ensure-python
+	$(PYTHON) scripts/sync_packaged_contracts.py --check
+
+contracts-sync:  ## Copy repo contracts into src/invarlock/_data/contracts
+	$(MAKE) ensure-python
+	$(PYTHON) scripts/sync_packaged_contracts.py --write
+
 ## (manual-tests target removed)
 
 
@@ -251,10 +340,14 @@ ensure-ruff:
 
 ## (verify-ci and verify-release targets removed)
 
-.PHONY: docs-check docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell
+.PHONY: docs-check docs-live docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell
 docs-check: ## Run consolidated docs validation (build, links, refs, examples, consistency)
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTHON) scripts/docs_check.py --all
+
+docs-live: ## Live-run runnable markdown CLI examples and notebooks
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTHON) scripts/verify_live_examples.py
 
 docs-check-build: ## Build docs strictly and run link checks
 	$(MAKE) ensure-python

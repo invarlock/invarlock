@@ -6,19 +6,21 @@ from typer.testing import CliRunner
 def test_cli_top_level_help_smoke(monkeypatch):
     # Avoid heavy discovery in help smoke
     monkeypatch.setenv("INVARLOCK_LIGHT_IMPORT", "1")
-    monkeypatch.setenv("INVARLOCK_DISABLE_PLUGIN_DISCOVERY", "1")
+    monkeypatch.setenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "0")
     from invarlock.cli.app import app
 
     runner = CliRunner()
     for args in (
         ["--help"],
         ["evaluate", "--help"],
-        ["calibrate", "--help"],
         ["report", "--help"],
-        ["run", "--help"],
-        ["policy", "--help"],
-        ["plugins", "--help"],
+        ["verify", "--help"],
         ["doctor", "--help"],
+        ["advanced", "--help"],
+        ["advanced", "calibrate", "--help"],
+        ["advanced", "proof-pack", "--help"],
+        ["advanced", "policy", "--help"],
+        ["advanced", "plugins", "--help"],
     ):
         res = runner.invoke(app, args)
         assert res.exit_code == 0, f"help failed for: {' '.join(args)} -> {res.output}"
@@ -34,8 +36,10 @@ def test_command_wrappers_importable():
         plugins_command,
         policy_build_command,
         policy_verify_command,
+        proof_pack_build_command,
+        proof_pack_inspect_command,
+        proof_pack_verify_command,
         report_command,
-        run_command,
         verify_command,
     )
     from invarlock.cli.commands.calibrate import calibrate_app
@@ -49,8 +53,10 @@ def test_command_wrappers_importable():
         export_html_command,
         policy_build_command,
         policy_verify_command,
+        proof_pack_build_command,
+        proof_pack_inspect_command,
+        proof_pack_verify_command,
         plugins_command,
-        run_command,
         verify_command,
         report_command,
     ):

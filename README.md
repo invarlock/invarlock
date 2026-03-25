@@ -80,23 +80,41 @@ in CI.
 Colab (CPU-friendly):
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_quickstart_cpu.ipynb)
 
+The secure-default CLI path runs model-loading commands inside the runtime
+container and expects an OCI container engine such as `docker` or `podman`.
+In a repo checkout, build the local runtime image once with
+`make runtime-image`; InvarLock automatically prefers
+`invarlock-runtime:local` when it is present. Trusted local workflows can opt
+into host execution explicitly with `--mode local` on `invarlock evaluate`, but
+the attested verification step below expects container execution. The
+quickstart block below assumes a repo checkout; do not skip
+`make runtime-image` if you want the attested container path.
+
 ```bash
+# Repo-checkout quickstart for the attested container path
 # HF adapter stack (torch/transformers)
 pip install "invarlock[hf]"
+
+# Required in a repo checkout for the attested path; do not skip this step.
+make runtime-image
 
 # Version + report schema (when available)
 invarlock --version
 
 # Compare baseline vs subject (downloads require explicit network enable)
+# Secure-default execution uses the runtime container and writes
+# reports/eval/runtime.manifest.json next to evaluation.report.json.
 INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate \
   --baseline gpt2 \
-  --subject  gpt2 \
+  --subject  distilgpt2 \
   --adapter auto \
   --profile dev \
+  --report-out reports/eval \
   --quiet
 
-# Validate the evaluation report
-invarlock verify reports/eval/evaluation.report.json
+# Validate the attested evaluation report
+test -f reports/eval/runtime.manifest.json
+invarlock verify --json reports/eval/evaluation.report.json
 
 # Render HTML for sharing
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
@@ -110,17 +128,30 @@ Baseline: gpt2 -> Subject: gpt2 · Profile: dev
 Status: PASS · Gates: <passed>/<total> passed
 Primary metric ratio: <ratio>
 Output: reports/eval/evaluation.report.json
+Attestation: reports/eval/runtime.manifest.json
 ```
+
+## Breaking Surface Changes
+
+- Core workflow: `invarlock evaluate` → `invarlock verify` →
+  `invarlock report html`.
+- Advanced workflows now live under `invarlock advanced ...`.
+- Trusted host execution for the core evaluate path now uses `--mode local`.
+- Optional adapter/backend installs use normal Python extras such as
+  `pip install "invarlock[hf]"` rather than CLI install commands.
 
 ## Proof packs (portable evidence bundles)
 
 Proof packs bundle reports + verification metadata into a distributable artifact.
 
 - Guide: <https://github.com/invarlock/invarlock/blob/main/docs/user-guide/proof-packs.md>
-- Verify: `scripts/proof_packs/verify_pack.sh --pack <dir> --strict` (or `PACK_STRICT_MODE=1 ...`)
+- Verify from an installed wheel:
+  `invarlock advanced proof-pack verify <dir> --strict`
+- Repo harness alternative: `scripts/proof_packs/verify_pack.sh --pack <dir> --strict`
 
-Note: `configs/` and `scripts/` are repo resources and are not shipped in wheels; clone the repo to use
-presets and proof-pack helpers.
+Note: `configs/` and most `scripts/` remain repo resources and are not shipped in
+wheels. Installed wheels now include the public contracts and the
+`invarlock advanced proof-pack verify` verifier.
 
 ## Installation
 
@@ -156,7 +187,7 @@ If you use InvarLock in scientific work, please cite it (canonical metadata is i
 ```bibtex
 @software{invarlock,
   title  = {InvarLock: Edit-agnostic robustness evaluation reports for weight edits},
-  author = {{InvarLock Maintainers}},
+  author = {{InvarLock}},
   url    = {https://github.com/invarlock/invarlock},
 }
 ```
@@ -195,6 +226,7 @@ For guidance on where to ask questions, how to report bugs, and what to expect i
   - `make dev-install`
   - `make test`
   - `make lint`
+  - `make docs-live`
 
 ## License
 

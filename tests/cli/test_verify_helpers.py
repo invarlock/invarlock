@@ -672,8 +672,22 @@ def test_recompute_validation_flags_and_policy_gate_paths(monkeypatch) -> None:
     report_good = {
         "primary_metric": {"ratio_vs_baseline": "1.05", "preview": 10.0, "final": 10.2},
         "telemetry": {"preview_total_tokens": "10", "final_total_tokens": 20},
+        "dataset": {
+            "windows": {
+                "stats": {
+                    "coverage": {
+                        "preview": {"used": 10, "required": 8, "ok": True},
+                        "final": {"used": 20, "required": 8, "ok": True},
+                    }
+                }
+            }
+        },
         "auto": {"tier": "Conservative", "target_pm_ratio": "1.1"},
         "resolved_policy": {"metrics": {"pm_ratio": {"min_tokens": 1}}},
+        "meta": {
+            "pm_acceptance_range": {"min": 0.95, "max": 1.15},
+            "pm_drift_band": {"min": 0.9, "max": 1.3},
+        },
         "spectral": {},
         "rmt": {},
         "invariants": {},
@@ -688,7 +702,15 @@ def test_recompute_validation_flags_and_policy_gate_paths(monkeypatch) -> None:
     assert captured["_ppl_metrics"] == {
         "preview_total_tokens": 10,
         "final_total_tokens": 20,
+        "bootstrap": {
+            "coverage": {
+                "preview": {"used": 10, "required": 8, "ok": True},
+                "final": {"used": 20, "required": 8, "ok": True},
+            }
+        },
     }
+    assert captured["pm_acceptance_range"] == {"min": 0.95, "max": 1.15}
+    assert captured["pm_drift_band"] == {"min": 0.9, "max": 1.3}
     assert callable(captured["get_tier_policies_fn"])
     tier_cfg = captured["get_tier_policies_fn"]()
     assert tier_cfg["conservative"]["metrics"]["pm_ratio"]["min_tokens"] == 1
@@ -708,6 +730,35 @@ def test_recompute_validation_flags_and_policy_gate_paths(monkeypatch) -> None:
     errs = verify_mod._validate_primary_metric_policy(
         {"telemetry": {"preview_total_tokens": 10}, "auto": {}}, profile="release"
     )
+    assert errs == ["Primary metric policy gate failed (tier=balanced)."]
+
+
+def test_primary_metric_policy_uses_serialized_acceptance_range() -> None:
+    verify_mod = _import_verify_module()
+
+    relaxed = {
+        "primary_metric": {
+            "kind": "ppl_causal",
+            "preview": 10.0,
+            "final": 11.2,
+            "ratio_vs_baseline": 1.12,
+        },
+        "baseline_ref": {"primary_metric": {"final": 10.0}},
+        "meta": {"pm_acceptance_range": {"min": 0.95, "max": 1.15}},
+    }
+    assert verify_mod._validate_primary_metric_policy(relaxed, profile="release") == []
+
+    strict = {
+        "primary_metric": {
+            "kind": "ppl_causal",
+            "preview": 10.0,
+            "final": 10.8,
+            "ratio_vs_baseline": 1.08,
+        },
+        "baseline_ref": {"primary_metric": {"final": 10.0}},
+        "meta": {"pm_acceptance_range": {"min": 0.95, "max": 1.05}},
+    }
+    errs = verify_mod._validate_primary_metric_policy(strict, profile="release")
     assert errs == ["Primary metric policy gate failed (tier=balanced)."]
 
 

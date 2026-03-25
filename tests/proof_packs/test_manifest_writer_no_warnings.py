@@ -52,3 +52,7 @@ def test_manifest_writer_runs_with_warnings_as_errors(tmp_path: Path) -> None:
     assert manifest.get("format") == "proof-pack-v1"
     assert manifest.get("suite") == "subset"
     assert str(manifest.get("generated_at", "")).endswith("Z")
+    assert manifest.get("builder", {}).get("id") == "invarlock/proof-pack@v1"
+    assert manifest.get("subject", {}).get("path") == "results/final_verdict.json"
+    assert isinstance(manifest.get("materials"), list)
+    assert "config_source" in (manifest.get("invocation") or {})

@@ -6,13 +6,17 @@
 | --- | --- |
 | **Purpose** | Show how to generate and interpret InvarLock reports. |
 | **Audience** | Users learning the evaluation workflow. |
-| **Outputs** | `evaluation.report.json`, `evaluation_report.md`, `report.json`. |
+| **Outputs** | `evaluation.report.json`, `evaluation_report.md`, `report.json`, and `runtime.manifest.json` for attested outputs. |
 | **Requires** | `invarlock[hf]` for HF adapter workflows. |
 
 InvarLock emits both machine-readable reports and human-friendly summaries.
 Use the steps below to reproduce representative artifacts from the current release.
 
 ## 1. Generate a report Bundle
+
+The command below shows the secure-default runtime-container path. It writes an
+attested `runtime.manifest.json` next to `evaluation.report.json`. Trusted
+public host-side workflows use `--mode local` and are verified differently.
 
 ```bash
 INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
@@ -27,7 +31,8 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
   --report-out reports/quant8_demo
 ```
 
-The command writes `evaluation.report.json` and `evaluation_report.md` under `reports/quant8_demo/`.
+The command writes `evaluation.report.json`, `evaluation_report.md`, and
+`runtime.manifest.json` under `reports/quant8_demo/`.
 Each report contains:
 
 - Model and edit metadata (model id, adapter, commit hash, edit plan)
@@ -59,6 +64,10 @@ For audits, collect the following files:
 |------|---------|
 | `runs/<name>/**/report.json` | Execution log, metrics, and guard telemetry |
 | `reports/<name>/evaluation.report.json` | Machine-readable evaluation report |
+| `reports/<name>/runtime.manifest.json` | Runtime attestation for secure-default outputs |
 | `reports/<name>/evaluation_report.md` | Human-friendly summary for reviewers |
 
-Reports remain valid only for the same baseline reference, pairing assumptions, dataset/tokenizer context, and scoped claim surface, and only while `invarlock verify reports/<name>/evaluation.report.json` continues to pass.
+Reports remain valid only for the same baseline reference, pairing assumptions,
+dataset/tokenizer context, and scoped claim surface, and only while
+`invarlock verify --json reports/<name>/evaluation.report.json` continues to pass
+against the adjacent `runtime.manifest.json`.

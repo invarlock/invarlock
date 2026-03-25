@@ -260,6 +260,8 @@ def save_report(
         try:
             from datetime import datetime as _dt
 
+            meta_obj: object = report.get("meta")
+            meta_dict: dict[str, Any] = meta_obj if isinstance(meta_obj, dict) else {}
             manifest: dict[str, Any] = {
                 "generated_at": _dt.now().isoformat(),
                 "files": {
@@ -267,9 +269,9 @@ def save_report(
                     "evaluation_report_markdown": str(report_md_path),
                 },
                 "summary": {
-                    "run_model": (report.get("meta", {}) or {}).get("model_id"),
-                    "device": (report.get("meta", {}) or {}).get("device"),
-                    "seed": (report.get("meta", {}) or {}).get("seed"),
+                    "run_model": meta_dict.get("model_id"),
+                    "device": meta_dict.get("device"),
+                    "seed": meta_dict.get("seed"),
                 },
             }
 

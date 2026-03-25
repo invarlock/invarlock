@@ -6,15 +6,15 @@
 | --- | --- |
 | **Purpose** | Understand and interpret InvarLock v1 reports. |
 | **Audience** | Reviewers validating evaluation evidence. |
-| **Key sections** | Evaluation Dashboard, Quality Gates, Primary Metric, Provenance, Measurement contracts. |
-| **Validation** | Use `invarlock verify <evaluation.report.json>` to check schema and pairing. |
+| **Key sections** | Executive Summary, Quality Gates, Primary Metric, Provenance, Measurement contracts. |
+| **Validation** | Use `invarlock verify <evaluation.report.json>` to check schema, pairing, and required runtime attestation via `runtime.manifest.json`. |
 | **Source of truth** | [reports](../reference/reports.md) for full schema. |
 
 This guide highlights the key sections of a v1 report and how to
 interpret them.
 
-- Evaluation Dashboard
-  - First-screen summary of overall PASS/FAIL plus key gates (primary metric, drift, invariants, guards, overhead when evaluated).
+- Executive Summary
+  - First-screen summary of overall PASS/FAIL plus the compact gate table (primary metric, drift, invariants, guards, overhead when evaluated).
 - Primary Metric row
   - Shows the task‑appropriate metric (ppl_* or accuracy), its point estimates,
     and paired CI. The ratio/Δpp vs baseline drives the gate.
@@ -48,9 +48,10 @@ interpret them.
 - Confidence label
   - High/Medium/Low based on CI width and stability; see thresholds and `unstable` flag.
 
-Tip: Use `invarlock verify` to recheck schema, pairing, and ratio math.
+Tip: Use `invarlock verify` to recheck schema, pairing, ratio math, and the
+adjacent `runtime.manifest.json`.
 
-### Evaluation Dashboard Interpretation
+### Executive Summary Interpretation
 
 - **Overall** mirrors the canonical gate allow-list. A FAIL means at least one gate failed.
 - **Primary Metric** shows ratio/Δpp vs baseline; compare to tier thresholds in the gate table.

@@ -11,6 +11,7 @@ Runtime hardening helpers used by the CLI and automation surfaces.
 from __future__ import annotations
 
 import contextlib
+import contextvars
 import os
 import shutil
 import socket
@@ -35,6 +36,23 @@ _NETWORK_DISABLED_ERROR = RuntimeError(
     "Network access disabled by InvarLock security policy. "
     "Set INVARLOCK_ALLOW_NETWORK=1 if connectivity is required."
 )
+_NETWORK_ALLOW_SCOPE = contextvars.ContextVar(
+    "invarlock_network_allow_scope", default=0
+)
+
+
+def _context_allows_network() -> bool:
+    try:
+        return int(_NETWORK_ALLOW_SCOPE.get()) > 0
+    except Exception:
+        return False
+
+
+def _is_network_target(sock: socket.socket, address: Any | None = None) -> bool:
+    family = getattr(sock, "family", None)
+    if family in {getattr(socket, "AF_INET", None), getattr(socket, "AF_INET6", None)}:
+        return True
+    return isinstance(address, tuple)
 
 
 class NetworkGuard:
@@ -59,19 +77,63 @@ class NetworkGuard:
         self._original_create_connection = socket.create_connection
 
         guard_error = _NETWORK_DISABLED_ERROR
+        original_create_connection = self._original_create_connection
 
         class GuardedSocket(socket.socket):
             """Socket subclass that blocks connect calls."""
 
             def connect(self_inner, address: Any) -> None:
-                raise guard_error
+                if (
+                    _is_network_target(self_inner, address)
+                    and not _context_allows_network()
+                ):
+                    raise guard_error
+                return super().connect(address)
+
+            def connect_ex(self_inner, address: Any) -> int:
+                if (
+                    _is_network_target(self_inner, address)
+                    and not _context_allows_network()
+                ):
+                    raise guard_error
+                return super().connect_ex(address)
+
+            def sendto(self_inner, data: Any, *args: Any) -> int:
+                address = args[-1] if args else None
+                if (
+                    _is_network_target(self_inner, address)
+                    and not _context_allows_network()
+                ):
+                    raise guard_error
+                return super().sendto(data, *args)
+
+            if hasattr(socket.socket, "sendmsg"):
+
+                def sendmsg(
+                    self_inner,
+                    buffers: Any,
+                    ancdata: Any = (),
+                    flags: int = 0,
+                    address: Any | None = None,
+                ) -> int:
+                    if (
+                        _is_network_target(self_inner, address)
+                        and not _context_allows_network()
+                    ):
+                        raise guard_error
+                    return super().sendmsg(buffers, ancdata, flags, address)
 
         def guarded_create_connection(
             address: Any,
             timeout: float | None = None,
             source_address: Any | None = None,
         ) -> socket.socket:
-            raise guard_error
+            if not _context_allows_network():
+                raise guard_error
+            assert original_create_connection is not None
+            return original_create_connection(
+                address, timeout=timeout, source_address=source_address
+            )
 
         setattr(socket, "socket", GuardedSocket)  # noqa: B010
         setattr(socket, "create_connection", guarded_create_connection)  # noqa: B010
@@ -91,7 +153,6 @@ class NetworkGuard:
 
 _GUARD = NetworkGuard()
 _NETWORK_POLICY_LOCK = threading.RLock()
-_NETWORK_ALLOW_SCOPE_COUNT = 0
 _NETWORK_BLOCKED = _GUARD.installed
 
 
@@ -106,8 +167,7 @@ def enforce_network_policy(allow: bool) -> None:
     with _NETWORK_POLICY_LOCK:
         _NETWORK_BLOCKED = not bool(allow)
         if _NETWORK_BLOCKED:
-            if _NETWORK_ALLOW_SCOPE_COUNT == 0:
-                _GUARD.install()
+            _GUARD.install()
         else:
             _GUARD.restore()
 
@@ -115,7 +175,7 @@ def enforce_network_policy(allow: bool) -> None:
 def network_policy_allows() -> bool:
     """Return True if outbound connections are currently permitted."""
     with _NETWORK_POLICY_LOCK:
-        return not _GUARD.installed
+        return (not _GUARD.installed) or _context_allows_network()
 
 
 def enforce_default_security() -> None:
@@ -136,17 +196,12 @@ def temporarily_allow_network() -> Iterator[None]:
 
     Restores the previous policy when exiting the context.
     """
-    global _NETWORK_ALLOW_SCOPE_COUNT
-    with _NETWORK_POLICY_LOCK:
-        _NETWORK_ALLOW_SCOPE_COUNT += 1
-        _GUARD.restore()
+    current_scope = int(_NETWORK_ALLOW_SCOPE.get())
+    token = _NETWORK_ALLOW_SCOPE.set(current_scope + 1)
     try:
         yield
     finally:
-        with _NETWORK_POLICY_LOCK:
-            _NETWORK_ALLOW_SCOPE_COUNT = max(0, _NETWORK_ALLOW_SCOPE_COUNT - 1)
-            if _NETWORK_ALLOW_SCOPE_COUNT == 0 and _NETWORK_BLOCKED:
-                _GUARD.install()
+        _NETWORK_ALLOW_SCOPE.reset(token)
 
 
 @contextlib.contextmanager

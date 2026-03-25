@@ -60,7 +60,6 @@ def test_doctor_helpers_get_adapter_rows(monkeypatch) -> None:
                 "hf_gptq",
                 "hf_awq",
                 "hf_bnb",
-                "hf_causal_onnx",
                 "hf_auto",
                 "plugin_adapter",
             ]
@@ -72,7 +71,9 @@ def test_doctor_helpers_get_adapter_rows(monkeypatch) -> None:
 
     monkeypatch.setattr("invarlock.core.registry.get_registry", lambda: DummyRegistry())
     monkeypatch.setattr(doctor_helpers._platform, "system", lambda: "Darwin")
-    monkeypatch.setattr(doctor_helpers.importlib.util, "find_spec", lambda _n: None)
+    monkeypatch.setattr(
+        doctor_helpers, "bitsandbytes_runtime_available", lambda: False, raising=False
+    )
 
     rows = doctor_helpers.get_adapter_rows()
     by_name = {row["name"]: row for row in rows}
@@ -80,7 +81,5 @@ def test_doctor_helpers_get_adapter_rows(monkeypatch) -> None:
     assert by_name["hf_gptq"]["status"] == "unsupported"
     assert by_name["hf_gptq"]["enable"] == "Linux-only"
     assert by_name["hf_awq"]["status"] == "unsupported"
-    assert by_name["hf_causal_onnx"]["status"] == "needs_extra"
-    assert "invarlock[onnx]" in by_name["hf_causal_onnx"]["enable"]
     assert by_name["hf_auto"]["mode"] == "auto-matcher"
     assert by_name["plugin_adapter"]["origin"] == "plugin"

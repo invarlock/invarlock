@@ -709,8 +709,8 @@ def test_run_command_classification_pseudo_counts_and_export_env_dir(
         def get_plugin_metadata(self, name, plugin_type):  # noqa: ARG002
             return {"name": name, "module": f"{plugin_type}.{name}", "version": "test"}
 
-    def exec_stub(**kwargs):  # noqa: ANN001
-        return _core_report(evaluation_windows=None), kwargs.get("model")
+    def exec_stub(**kwargs):  # noqa: ANN001,ARG001
+        return _core_report(evaluation_windows=None), object()
 
     def post_stub(**kwargs):  # noqa: ANN001
         captured["report"] = kwargs.get("report")
@@ -791,6 +791,136 @@ def test_run_command_classification_pseudo_counts_and_export_env_dir(
     clf = report.get("metrics", {}).get("classification", {})
     assert clf.get("counts_source") == "pseudo_config"
     assert "metric_notes" in (report.get("provenance", {}) or {})
+
+
+def test_run_command_export_saves_tokenizer_artifacts(
+    tmp_path: Path, monkeypatch
+) -> None:
+    captured: dict[str, object] = {}
+
+    class _Tokenizer:
+        name_or_path = "Qwen/Qwen3-8B"
+        eos_token = "</s>"
+        pad_token = "</s>"
+        vocab_size = 151_936
+
+        def save_pretrained(self, output_dir: str) -> None:
+            path = Path(output_dir)
+            path.mkdir(parents=True, exist_ok=True)
+            (path / "tokenizer_config.json").write_text("{}", encoding="utf-8")
+            captured["tokenizer_saved_to"] = str(path)
+
+    tokenizer = _Tokenizer()
+
+    class Adapter:
+        name = "hf_causal"
+
+        def load_model(self, model_id: str, device: str | None = None):  # noqa: ARG002
+            return object()
+
+        def save_pretrained(self, model, output_dir: Path):  # noqa: ANN001,ARG002
+            output_dir.mkdir(parents=True, exist_ok=True)
+            (output_dir / "config.json").write_text("{}", encoding="utf-8")
+            captured["model_saved_to"] = str(output_dir)
+            return True
+
+    adapter = Adapter()
+
+    class Registry:
+        def get_adapter(self, name):  # noqa: ARG002
+            return adapter
+
+        def get_edit(self, name):  # noqa: ARG002
+            return SimpleNamespace(name=name)
+
+        def get_guard(self, name):  # noqa: ARG002
+            return SimpleNamespace(name=name)
+
+        def get_plugin_metadata(self, name, plugin_type):  # noqa: ARG002
+            return {"name": name, "module": f"{plugin_type}.{name}", "version": "test"}
+
+    def exec_stub(**kwargs):  # noqa: ANN001,ARG001
+        return _core_report(evaluation_windows=None), object()
+
+    def post_stub(**kwargs):  # noqa: ANN001
+        captured["report"] = kwargs.get("report")
+        return {"json": str(tmp_path / "report.json")}
+
+    monkeypatch.setenv("INVARLOCK_EXPORT_MODEL", "1")
+    monkeypatch.delenv("INVARLOCK_EXPORT_DIR", raising=False)
+
+    cfg = _Cfg(
+        outdir=tmp_path / "runs",
+        dataset_provider="synthetic",
+        output={"model_dir": "exported_model"},
+    )
+
+    with ExitStack() as stack:
+        for p in (
+            patch(
+                "invarlock.cli.commands.run._prepare_config_for_run", lambda **k: cfg
+            ),
+            patch("invarlock.cli.commands.run.detect_model_profile", _detect_profile),
+            patch(
+                "invarlock.cli.commands.run.resolve_tokenizer",
+                lambda *_a, **_k: (tokenizer, "tokhash123"),
+            ),
+            patch("invarlock.cli.device.resolve_device", lambda d: d),
+            patch(
+                "invarlock.cli.device.validate_device_for_config", lambda d: (True, "")
+            ),
+            patch(
+                "invarlock.cli.commands.run._should_measure_overhead",
+                lambda *_a: (False, False, None),
+            ),
+            patch(
+                "invarlock.cli.commands.run._resolve_provider_and_split",
+                lambda *_a, **_k: (
+                    SimpleNamespace(
+                        windows=lambda **_kw: (
+                            SimpleNamespace(
+                                input_ids=[], attention_masks=[], indices=[]
+                            ),
+                            SimpleNamespace(
+                                input_ids=[], attention_masks=[], indices=[]
+                            ),
+                        )
+                    ),
+                    "validation",
+                    False,
+                ),
+            ),
+            patch("invarlock.cli.commands.run._execute_guarded_run", exec_stub),
+            patch("invarlock.cli.commands.run._postprocess_and_summarize", post_stub),
+            patch(
+                "invarlock.cli.commands.run._resolve_metric_and_provider",
+                lambda *_a, **_k: ("ppl_causal", None, {}),
+            ),
+            patch(
+                "invarlock.eval.primary_metric.compute_primary_metric_from_report",
+                _pm_stub,
+            ),
+            patch("invarlock.core.registry.get_registry", lambda: Registry()),
+        ):
+            stack.enter_context(p)
+        run_command(
+            config="dummy.yaml",
+            device="cpu",
+            profile=None,
+            out=str(tmp_path / "runs"),
+            until_pass=False,
+        )
+
+    report = captured["report"]
+    assert isinstance(report, dict)
+    checkpoint_path = report.get("artifacts", {}).get("checkpoint_path")
+    assert isinstance(checkpoint_path, str)
+    export_dir = Path(checkpoint_path)
+    assert captured["model_saved_to"] == checkpoint_path
+    assert captured["tokenizer_saved_to"] == checkpoint_path
+    assert export_dir.name == "exported_model"
+    assert (export_dir / "config.json").is_file()
+    assert (export_dir / "tokenizer_config.json").is_file()
 
 
 def test_run_command_until_pass_auto_tune_head_budget_paths(tmp_path: Path) -> None:

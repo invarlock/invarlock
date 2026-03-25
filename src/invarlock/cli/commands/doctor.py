@@ -12,7 +12,6 @@ import os as _os
 import platform as _platform
 import shutil as _shutil
 import sys
-import warnings
 from collections.abc import Callable
 from pathlib import Path
 
@@ -23,10 +22,12 @@ from rich.table import Table
 from invarlock.public_contracts import (
     contract_catalog,
     load_adapter_capabilities,
+    load_model_family_catalog,
     load_plugin_compatibility,
     load_support_matrix,
 )
 
+from ..backend_runtime import bitsandbytes_runtime_available
 from ..constants import DOCTOR_FORMAT_VERSION
 
 # Exact wording constant for determinism warning (kept in one place)
@@ -34,6 +35,15 @@ DETERMINISM_SHARDS_WARNING = "Provider workers > 0 without deterministic_shards=
 
 console = Console()
 LOGGER = logging.getLogger(__name__)
+
+
+def _find_spec_safe(module_name: str) -> object | None:
+    """Best-effort spec lookup that tolerates broken import hooks."""
+
+    try:
+        return importlib.util.find_spec(module_name)
+    except Exception:
+        return None
 
 
 def _cross_check_reports(
@@ -440,7 +450,7 @@ def doctor_command(
         has_cuda = False
 
     for dep, description in optional_deps:
-        spec = importlib.util.find_spec(dep)
+        spec = _find_spec_safe(dep)
         present = spec is not None
         extra_hint = {
             "datasets": "eval",
@@ -451,41 +461,39 @@ def doctor_command(
         }.get(dep, dep)
 
         if dep == "bitsandbytes":
-            # Avoid importing bnb to suppress noisy CPU-only warnings. Report based on CUDA.
-            if not has_cuda:
-                # GPU-only library; note and skip import
+            runtime_available = present and bitsandbytes_runtime_available()
+            if runtime_available:
+                if not json_out:
+                    if has_cuda:
+                        console.print(
+                            "  [green]✅ bitsandbytes — 8/4-bit loading (GPU)[/green]"
+                        )
+                    else:
+                        console.print(
+                            "  [green]✅ bitsandbytes — runtime available on this host[/green]"
+                        )
+            elif not has_cuda:
                 if present:
                     if not json_out:
                         console.print(
-                            "  [yellow]⚠️  bitsandbytes — CUDA-only; GPU not detected on this host[/yellow]"
+                            "  [yellow]⚠️  bitsandbytes — GPU not detected and runtime unavailable on this host[/yellow]"
                         )
                 else:
                     if not json_out:
-                        console.print(
-                            "  [dim]⚠️  bitsandbytes — CUDA-only; not installed[/dim]"
-                        )
+                        console.print("  [dim]⚠️  bitsandbytes — not installed[/dim]")
                         console.print(
                             "     → Install: pip install 'invarlock[gpu]'",
                             markup=False,
                         )
             else:
-                # CUDA available; try a quiet import and detect CPU-only builds
-                try:
-                    with warnings.catch_warnings():
-                        warnings.simplefilter("ignore")
-                    if not json_out:
-                        console.print(
-                            "  [green]✅ bitsandbytes — 8/4-bit loading (GPU)[/green]"
-                        )
-                except NON_FATAL_EXCEPTIONS:
-                    if not json_out:
-                        console.print(
-                            "  [yellow]⚠️  bitsandbytes — Present but CPU-only build detected[/yellow]"
-                        )
-                        console.print(
-                            "     → Reinstall with: pip install 'invarlock[gpu]' on a CUDA host",
-                            markup=False,
-                        )
+                if not json_out:
+                    console.print(
+                        "  [yellow]⚠️  bitsandbytes — Present but runtime unavailable on this host[/yellow]"
+                    )
+                    console.print(
+                        "     → Reinstall with: pip install 'invarlock[gpu]' on a compatible host",
+                        markup=False,
+                    )
             continue
 
         if not json_out:
@@ -1024,11 +1032,12 @@ def doctor_command(
             console.print(f"  Edits: {len(registry.list_edits())}")
             console.print(f"  Guards: {len(registry.list_guards())}")
         # Use module-level _os (avoid shadowing earlier uses)
-        if _os.getenv("INVARLOCK_DISABLE_PLUGIN_DISCOVERY", "").strip() == "1":
+        if _os.getenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "").strip() == "1":
             _add(
                 "D006",
                 "note",
-                "Plugin discovery disabled; doctor will not check optional adapters.",
+                "Third-party plugin discovery is explicitly enabled by environment; "
+                "doctor will include optional third-party adapters in registry checks.",
             )
 
         # Detail adapters with Origin/Mode/Backend/Version table
@@ -1087,8 +1096,7 @@ def doctor_command(
                 if support == "optional":
                     # Check install presence
                     present = (
-                        importlib.util.find_spec((backend or "").replace("-", "_"))
-                        is not None
+                        _find_spec_safe((backend or "").replace("-", "_")) is not None
                         if backend
                         else False
                     )
@@ -1101,23 +1109,20 @@ def doctor_command(
                         }.get(n)
                         if hint:
                             enable = f"pip install '{hint}'"
-                # Special-case: ONNX causal adapter is core but requires Optimum/ONNXRuntime
-                if n == "hf_causal_onnx":
-                    backend = backend or "onnxruntime"
-                    present = (
-                        importlib.util.find_spec("optimum.onnxruntime") is not None
-                        or importlib.util.find_spec("onnxruntime") is not None
-                    )
-                    if not present:
-                        status = "needs_extra"
-                        enable = "pip install 'invarlock[onnx]'"
                 # Platform checks
                 if backend in {"auto-gptq", "autoawq"} and not is_linux:
                     status = "unsupported"
                     enable = "Linux-only"
-                if backend == "bitsandbytes" and not has_cuda:
+                if (
+                    backend == "bitsandbytes"
+                    and _find_spec_safe("bitsandbytes") is not None
+                    and not bitsandbytes_runtime_available()
+                ):
                     status = "unsupported"
-                    enable = "Requires CUDA"
+                    if has_cuda:
+                        enable = "bitsandbytes unavailable on this host"
+                    else:
+                        enable = "Requires CUDA or a compatible bitsandbytes runtime"
 
                 rows.append(
                     {
@@ -1139,23 +1144,7 @@ def doctor_command(
             v = f"=={version}" if backend and version else "—"
             return b, v
 
-        # Build adapter rows; gracefully handle optional Optimum import errors by
-        # falling back to a lightweight rows helper that only probes availability.
-        try:
-            all_rows = _gather_adapter_rows()
-        except NON_FATAL_EXCEPTIONS as _adapter_exc:
-            # Known benign case: optional Optimum/ONNXRuntime missing on host
-            if "optimum" in str(_adapter_exc).lower():
-                try:
-                    from invarlock.cli.doctor_helpers import (
-                        get_adapter_rows as _rows_fallback,
-                    )
-
-                    all_rows = _rows_fallback()
-                except NON_FATAL_EXCEPTIONS:
-                    raise  # re-raise if fallback also fails
-            else:
-                raise
+        all_rows = _gather_adapter_rows()
         if all_rows:
             # Counts over full set
             total = len(all_rows)
@@ -1312,17 +1301,9 @@ def doctor_command(
         except NON_FATAL_EXCEPTIONS:
             pass
     except NON_FATAL_EXCEPTIONS as e:
-        # Gracefully handle missing optional Optimum stack
-        if "optimum" in str(e).lower():
-            if not json_out:
-                console.print(
-                    "  [yellow]⚠️  Optional Optimum/ONNXRuntime missing; hf_causal_onnx will be shown as needs_extra[/yellow]"
-                )
-            # Do not mark overall health as failed for optional extras
-        else:
-            if not json_out:
-                console.print(f"  [red]❌ Registry error: {e}[/red]")
-            health_status = False
+        if not json_out:
+            console.print(f"  [red]❌ Registry error: {e}[/red]")
+        health_status = False
 
     # Final status / JSON output
     exit_code = 0 if (health_status and not had_error) else 1
@@ -1346,6 +1327,7 @@ def doctor_command(
             },
             "contracts": contract_catalog(),
             "support_matrix": load_support_matrix(),
+            "model_family_catalog": load_model_family_catalog(),
             "adapter_capabilities": load_adapter_capabilities(),
             "plugin_compatibility": load_plugin_compatibility(),
             "policy": POLICY_META

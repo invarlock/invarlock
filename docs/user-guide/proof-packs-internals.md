@@ -17,11 +17,11 @@ task graph, scheduling, and artifact generation. It complements
 | Version | `proof-packs-v1` |
 | Hardware | NVIDIA GPUs where models fit VRAM; multi-GPU recommended for `full` |
 | Models | `subset` (1 model), `showcase`/`workshop3` (3 models), or `full` (6 models); all ungated public |
-| Edits | 4 types × 2 versions per model; clean variants use tuned presets |
+| Edits | Scenario-driven; default suites use 4 clean + 4 stress edit scenarios per model, and filtered manifests may select any subset |
 | Preset Derivation | `CALIBRATION_RUN` + `GENERATE_PRESET` create run-scoped calibrated presets |
 | Scheduling | Dynamic work-stealing, `small_first` priority strategy |
 | Multi-GPU | Profile-based; `required_gpus` grows only when memory requires it |
-| Output | Proof pack with `manifest.json`, `checksums.sha256`, and cert bundles (`--layout v2` nests results + metadata) |
+| Output | Proof pack with `manifest.json`, `checksums.sha256`, and report bundles (`--layout v2` nests results + metadata) |
 
 ## Quick Start (Context)
 
@@ -33,7 +33,7 @@ task graph, scheduling, and artifact generation. It complements
 ./scripts/proof_packs/run_pack.sh --suite full --net 1
 
 # Verify an existing proof pack
-./scripts/proof_packs/verify_pack.sh --pack ./proof_pack_runs/subset_20250101_000000/proof_pack
+invarlock advanced proof-pack verify ./proof_pack_runs/subset_20250101_000000/proof_pack --strict
 ```
 
 ## Hardware Target
@@ -52,9 +52,10 @@ task graph, scheduling, and artifact generation. It complements
 - `scripts/proof_packs/run_suite.sh` runs a suite and sets `PACK_*` runtime flags
   before calling the main orchestrator.
 - `scripts/proof_packs/run_pack.sh` runs a suite, then packages artifacts into a
-  portable proof pack (manifest + checksums + certs).
-- `scripts/proof_packs/verify_pack.sh` validates a proof pack: checksums,
-  optional GPG signature, and `invarlock verify`.
+  portable proof pack (manifest + checksums + reports).
+- `scripts/proof_packs/verify_pack.sh` validates a proof pack in repo workflows.
+- `invarlock advanced proof-pack verify` provides the package-native verifier path for
+  installed wheels.
 - `scripts/proof_packs/suites.sh` defines the model suites and allows
   `MODEL_1`–`MODEL_8` overrides.
 - `scripts/proof_packs/lib/validation_suite.sh` orchestrates the run: preflight,
@@ -82,7 +83,7 @@ task graph, scheduling, and artifact generation. It complements
 ├───────────────────────────────────────────────────────────────────────┤
 │ ENTRYPOINTS                                                           │
 │   run_pack.sh | run_suite.sh | verify_pack.sh                         │
-│   (pack+run) | (run only)  | (checksums+certs verify)                 │
+│   (pack+run) | (run only)  | (checksums+reports verify)               │
 │                                   │                                   │
 │                                   ▼                                   │
 │ ORCHESTRATION LAYER                                                   │
@@ -205,12 +206,12 @@ Enabled when `RUN_ERROR_INJECTION=true` (default):
   `rank_collapse`, `norm_collapse`, `weight_tying_break`
 - Informational detection: `rmt_norm_noise`, `spectral_moderate_scale`, `ve_mlp_scale_skew`
 
-`rmt_norm_noise` additionally emits an `rmt_probe.json` sidecar next to the error cert.
+`rmt_norm_noise` additionally emits an `rmt_probe.json` sidecar next to the error report.
 This runs an explicit cross-model RMT probe on shared calibration windows (stored in the
 baseline report) so the proof pack can demonstrate RMT’s delta policy even when compare-mode
 evaluation keeps `validation.rmt_stable=true`.
 
-`ve_mlp_scale_skew` additionally emits a `ve_probe.json` sidecar next to the error cert.
+`ve_mlp_scale_skew` additionally emits a `ve_probe.json` sidecar next to the error report.
 Variance (DD-VE) is a remediation guard and compare-mode evaluation runs the subject model
 with a no-op edit, which can mute VE’s in-report evidence. The VE probe runs VE calibration
 directly on shared windows and records whether VE proposes scales and produces a meaningful
@@ -469,7 +470,7 @@ OUTPUT_DIR/
 Some scenarios emit additional sidecar artifacts alongside `evaluation.report.json`
 (for example `reports/errors/rmt_norm_noise/rmt_probe.json` or
 `reports/errors/ve_mlp_scale_skew/ve_probe.json`). When present, `run_pack.sh` copies
-these sidecars into the packaged proof pack under `certs/**/`.
+these sidecars into the packaged proof pack under `reports/**/`.
 
 ## Run modes
 
@@ -519,10 +520,30 @@ Large runs can be storage-heavy (baseline + edits + error models):
 - Disk preflight estimates required storage and aborts early when insufficient.
   - Override with `PACK_SKIP_DISK_PREFLIGHT=1` (not recommended).
   - The minimum free space guard is `MIN_FREE_DISK_GB` (default 200).
-- `PACK_BASELINE_STORAGE_MODE=snapshot_symlink` stores baseline weights as
-  symlinks to HF cache files to reduce duplication.
+- `PACK_BASELINE_STORAGE_MODE=snapshot_symlink` now builds a local symlink tree
+  that points into the Hugging Face cache snapshot. This avoids a second
+  baseline copy under `OUTPUT_DIR`, but it still requires one full model copy in
+  `HF_HUB_CACHE` when that cache shares the output filesystem.
+- `PACK_BASELINE_STORAGE_MODE=snapshot_copy` materializes a full baseline copy
+  under `OUTPUT_DIR/models/<model>/baseline`.
+- Baseline downloads prefer one weight format only. When both `.safetensors` and
+  `.bin` weights are published, proof packs download the safetensors set and
+  ignore the `.bin` copy.
 - HF caches default to `OUTPUT_DIR/.hf` (override with `HF_HOME`, `HF_HUB_CACHE`,
   `HF_DATASETS_CACHE`).
+
+For the default `subset` suite (`mistralai/Mistral-7B-v0.1`), the model-weight
+budget is roughly:
+
+- ~42 GB on the output filesystem with `snapshot_symlink` when `HF_HUB_CACHE`
+  lives on the same filesystem as `OUTPUT_DIR` (one cached baseline + one clean
+  edit peak + one error-model peak under cleanup mode).
+- ~28 GB on the output filesystem with `snapshot_symlink` when `HF_HUB_CACHE`
+  is on a separate volume.
+- ~56 GB on the output filesystem with `snapshot_copy` on the same filesystem.
+
+Those figures are for model weights only; the default preflight also requires
+`MIN_FREE_DISK_GB=200` headroom.
 
 ## Proof pack packaging and verification
 
@@ -530,9 +551,14 @@ Large runs can be storage-heavy (baseline + edits + error models):
 
 - Copies `reports/final_verdict.{txt,json}` plus verdict sidecars (`category_summary`,
   `guard_signal_summary`, `scenario_signal_summary`) and key `analysis/*` artifacts.
-- Collects all reports into `proof_pack/certs/...`.
-- Generates `manifest.json`, `checksums.sha256`, and optional
+- Collects all reports into `proof_pack/reports/...`.
+- Generates `manifest.json`, `checksums.sha256`, optional
   `manifest.json.asc`.
+- Writes pack-contained provenance metadata such as `metadata/source_repo.json`
+  and `metadata/environment.json` before sealing the pack.
+- Stages the pack in a hidden sibling temporary directory and renames it into
+  place only after sealing succeeds, so failed builds do not leave partial
+  `proof_pack/` output behind.
 - Optional HTML export can be disabled with `PACK_SKIP_HTML=1`.
 
 ### Packaging flow
@@ -540,24 +566,62 @@ Large runs can be storage-heavy (baseline + edits + error models):
 ```text
 run_pack.sh
   ├─ run_suite.sh → OUTPUT_DIR
-  ├─ collect certs + reports
+  ├─ collect reports + sidecars
   ├─ write manifest + checksums
   └─ optional HTML + GPG signature
 ```
 
-`verify_pack.sh` checks the pack:
+`invarlock advanced proof-pack verify` checks the pack:
 
 - Verifies `manifest.json` binds `checksums.sha256` via `checksums_sha256_digest`.
+- Verifies digest-backed manifest references (`subject`, `invocation.config_source`,
+  `environment`, and `materials`) against on-pack files.
 - Verifies `checksums.sha256` (and thus all hashed artifacts).
 - Verifies the GPG signature when present; `--strict` requires it.
 - Enforces “no extra files” semantics in `--strict` mode.
-- Runs `invarlock verify` across all certs (JSON output optional).
+- Runs `invarlock verify` across all bundled reports (JSON output optional) with
+  runtime-manifest enforcement on; each packaged `evaluation.report.json`
+  carries an adjacent `runtime.manifest.json`.
+- Returns structured exit codes so callers can distinguish usage, missing-file,
+  manifest-format, signature, integrity, and report-verification failures.
 
 ## Remote setup helper
 
 `scripts/proof_packs/lib/setup_remote.sh` is an optional bootstrap script for
 fresh GPU hosts. It clones the repo, creates a venv, installs PyTorch and
 InvarLock, and leaves the host ready to run `run_pack.sh`.
+
+Operational guidance for remote proof-pack work:
+
+- Prefer a fresh clone or work tree per campaign instead of reusing an older
+  editable-install checkout.
+- If you intentionally run from a work tree that is not the editable install
+  behind `.venv`, either reinstall that work tree or export `PYTHONPATH=src` so
+  `invarlock` resolves to the intended source tree.
+- `run_suite.sh` and `run_pack.sh` now default to `SKIP_FLASH_ATTN=true` and
+  `PACK_BASELINE_STORAGE_MODE=snapshot_copy` for bulk secure-default runs.
+- Bulk proof-pack runs fail fast unless `INVARLOCK_ALLOW_REMOTE_CODE=1` is set.
+- Export non-default runtime roots before launching the suite when you expect
+  them inside delegated container jobs:
+  `INVARLOCK_CONFIG_ROOT`, `HF_HOME`, `HF_HUB_CACHE`, `HF_DATASETS_CACHE`,
+  `TRANSFORMERS_CACHE`, `TMPDIR`, `TMP`.
+- If a staged preset or profile uses `!include` outside its config directory,
+  set `INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE=1` on the remote host before the
+  proof-pack entrypoint; the secure-default launcher now rejects that config
+  graph before container start when the override is missing.
+- After Qwen2.5-14B campaigns, run
+  `scripts/proof_packs/run_qwen14_sentinels.sh` from the same fresh work tree to
+  validate saved-model direct evaluate and the public quant smoke.
+
+Recommended remote validation checklist after security-default changes:
+
+1. Run a proof-pack subset lane with explicit external `HF_HOME` and
+   `INVARLOCK_CONFIG_ROOT` overrides.
+2. Run one delegated `invarlock evaluate` with external `--edit-config`,
+   `TMPDIR`, and `INVARLOCK_EXPORT_DIR` roots.
+3. Run one `scripts/model_evidence_sweep.py --execution-mode container` lane
+   with an external output root and confirm the published report path is
+   populated.
 
 Common knobs for the setup script:
 
@@ -659,7 +723,7 @@ Primary metric acceptance/drift gates should be configured via profile/config
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `PACK_BASELINE_STORAGE_MODE` | `snapshot_symlink` | Baseline storage mode |
+| `PACK_BASELINE_STORAGE_MODE` | `snapshot_symlink` | Baseline storage mode (`snapshot_symlink`, `snapshot_copy`, or `save_pretrained`) |
 | `MIN_FREE_DISK_GB` | `200` | Disk pressure threshold |
 | `PACK_SKIP_DISK_PREFLIGHT` | `0` | Skip storage preflight |
 | `CUDA_MEMORY_FRACTION` | `0.92` | Target GPU memory fraction |

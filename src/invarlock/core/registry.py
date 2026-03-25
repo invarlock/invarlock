@@ -9,6 +9,7 @@ Provides centralized access to adapters, edits, and guards.
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import warnings
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -23,6 +24,7 @@ from importlib.metadata import (
 from typing import Any, cast
 
 from invarlock import __version__ as INVARLOCK_VERSION
+from invarlock.runtime_security import third_party_plugins_allowed
 
 from .abi import INVARLOCK_CORE_ABI
 from .api import Guard, ModelAdapter, ModelEdit
@@ -80,30 +82,31 @@ class CoreRegistry:
 
     def _discover_plugins(self) -> None:
         """Discover all plugins through entry points with fallback registration."""
-        # Try entry points first
-        try:
-            eps = entry_points()
+        # Try third-party entry points only when explicitly enabled.
+        if third_party_plugins_allowed():
+            try:
+                eps = entry_points()
 
-            # Discover adapters
-            adapter_eps = _select_entry_points(eps, "invarlock.adapters")
-            for ep in adapter_eps:
-                info = self._create_plugin_info(ep, "adapters")
-                self._adapters[ep.name] = info
+                # Discover adapters
+                adapter_eps = _select_entry_points(eps, "invarlock.adapters")
+                for ep in adapter_eps:
+                    info = self._create_plugin_info(ep, "adapters")
+                    self._adapters[ep.name] = info
 
-            # Discover edits
-            edit_eps = _select_entry_points(eps, "invarlock.edits")
-            for ep in edit_eps:
-                info = self._create_plugin_info(ep, "edits")
-                self._edits[ep.name] = info
+                # Discover edits
+                edit_eps = _select_entry_points(eps, "invarlock.edits")
+                for ep in edit_eps:
+                    info = self._create_plugin_info(ep, "edits")
+                    self._edits[ep.name] = info
 
-            # Discover guards
-            guard_eps = _select_entry_points(eps, "invarlock.guards")
-            for ep in guard_eps:
-                info = self._create_plugin_info(ep, "guards")
-                self._guards[ep.name] = info
+                # Discover guards
+                guard_eps = _select_entry_points(eps, "invarlock.guards")
+                for ep in guard_eps:
+                    info = self._create_plugin_info(ep, "guards")
+                    self._guards[ep.name] = info
 
-        except Exception as e:
-            warnings.warn(f"Plugin discovery failed: {e}", stacklevel=2)
+            except Exception as e:
+                warnings.warn(f"Plugin discovery failed: {e}", stacklevel=2)
 
         # Fallback registration for development
         self._register_fallback_plugins()
@@ -146,13 +149,6 @@ class CoreRegistry:
         _fallback(self._adapters, "hf_mlm", "invarlock.adapters", "HF_MLM_Adapter")
         _fallback(
             self._adapters, "hf_seq2seq", "invarlock.adapters", "HF_Seq2Seq_Adapter"
-        )
-        _fallback(
-            self._adapters,
-            "hf_causal_onnx",
-            "invarlock.adapters",
-            "HF_Causal_ONNX_Adapter",
-            required_deps=["optimum"],
         )
         _fallback(self._adapters, "hf_auto", "invarlock.adapters", "HF_Auto_Adapter")
         # Optional plugin adapters (verify runtime dependencies)

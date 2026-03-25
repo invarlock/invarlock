@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Lightweight CPU-only telemetry sweep for CI profile edits.
-# Produces certs under reports/telemetry/cpu-ci with latency/memory metrics.
+# Produces attested reports under reports/telemetry/cpu-ci with latency/memory metrics.
 
 set -euo pipefail
 
@@ -26,9 +26,9 @@ PRESET="${PRESET:-configs/presets/causal_lm/wikitext2_512.yaml}"
 EDIT_CFG="${EDIT_CFG:-configs/overlays/edits/quant_rtn/8bit_attn.yaml}"
 
 RUN_ROOT="${ROOT}/runs/telemetry_cpu/quant8"
-CERT_ROOT="${OUT_ROOT}/quant8"
+REPORT_ROOT="${OUT_ROOT}/quant8"
 
-invarlock evaluate \
+INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate \
   --baseline "${MODEL_ID}" \
   --subject "${MODEL_ID}" \
   --adapter auto \
@@ -37,8 +37,8 @@ invarlock evaluate \
   --preset "${PRESET}" \
   --edit-config "${EDIT_CFG}" \
   --out "${RUN_ROOT}" \
-  --report-out "${CERT_ROOT}" >/dev/null
+  --report-out "${REPORT_ROOT}" >/dev/null
 
-invarlock verify "${CERT_ROOT}/evaluation.report.json" >/dev/null
+invarlock verify "${REPORT_ROOT}/evaluation.report.json" >/dev/null
 
-echo "Telemetry certs written to ${CERT_ROOT}"
+echo "Telemetry reports written to ${REPORT_ROOT}"

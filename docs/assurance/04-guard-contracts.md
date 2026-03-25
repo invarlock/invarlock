@@ -235,7 +235,7 @@ Detailed derivations are in the calibration appendix (`09-tier-v1-calibration.md
 - Reference mask-based flows are conservative; stronger compression requires plugins.
 - Published assurance basis currently covers GPT-2 and BERT profiles.
 - The repo also ships pilot calibration configs for additional families such as
-  Mistral 7B and Qwen2 7B; those configs are not part of the published
+  Mistral 7B, Qwen2 7B, and Qwen2.5 14B; those configs are not part of the published
   assurance basis until supporting artifacts are attached.
 - Contributions for additional model families are welcome; attach pilot reports
   and summary CSVs (typically written under `reports/calibration/` when running

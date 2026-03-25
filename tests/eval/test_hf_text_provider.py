@@ -39,8 +39,8 @@ def test_hf_text_provider_windows_monkeypatched(monkeypatch):
         pad_token_id = 0
 
         def encode(self, text, truncation=True, max_length=8):  # noqa: ARG002
-            # return a few token ids
-            return [1, 2, 3]
+            suffix = int(text.rsplit(" ", 1)[-1])
+            return [1, suffix + 2, suffix + 3]
 
     tokenizer = T()
     preview, final = prov.windows(tokenizer, seq_len=8, preview_n=3, final_n=2)
@@ -63,3 +63,94 @@ def test_get_provider_hf_text_kwargs(monkeypatch):
         max_samples=10,
     )
     assert isinstance(prov, data_mod.HFTextProvider)
+
+
+def test_hf_text_provider_windows_respects_seeded_sampling(monkeypatch):
+    import invarlock.eval.data as data_mod
+
+    hp = data_mod.HFTextProvider(
+        dataset_name="dummy", config_name=None, text_field="text", max_samples=10
+    )
+    monkeypatch.setattr(hp, "load", lambda **kw: [f"text-{i}" for i in range(10)])
+
+    def simple_tok(texts, tokenizer, seq_len, indices):  # noqa: ARG001
+        ids = [[position + 1, position + 2] for position in indices]
+        masks = [[1, 1] for _ in texts]
+        return data_mod.EvaluationWindow(ids, masks, list(indices))
+
+    monkeypatch.setattr(hp, "_simple_tokenize", simple_tok)
+
+    prev_a, fin_a = hp.windows(
+        tokenizer=object(), seq_len=8, preview_n=3, final_n=2, seed=7
+    )
+    prev_b, fin_b = hp.windows(
+        tokenizer=object(), seq_len=8, preview_n=3, final_n=2, seed=7
+    )
+    prev_c, fin_c = hp.windows(
+        tokenizer=object(), seq_len=8, preview_n=3, final_n=2, seed=8
+    )
+
+    assert prev_a.indices == prev_b.indices
+    assert fin_a.indices == fin_b.indices
+    assert prev_a.indices != [0, 1, 2]
+    assert fin_a.indices != [3, 4]
+    assert prev_a.indices != prev_c.indices or fin_a.indices != fin_c.indices
+    assert len(prev_a) == 3 and len(fin_a) == 2
+
+
+def test_hf_text_provider_windows_keep_sampling_until_unique(monkeypatch):
+    import invarlock.eval.data as data_mod
+
+    hp = data_mod.HFTextProvider(
+        dataset_name="dummy", config_name=None, text_field="text", max_samples=16
+    )
+    texts = [
+        "dup-a",
+        "dup-a",
+        "dup-a",
+        "dup-b",
+        "dup-b",
+        "unique-0",
+        "unique-1",
+        "unique-2",
+        "unique-3",
+        "unique-4",
+        "unique-5",
+    ]
+    monkeypatch.setattr(hp, "load", lambda **kw: texts)
+
+    class NoShuffle:
+        def __init__(self, seed):  # noqa: ARG002
+            pass
+
+        def shuffle(self, values):
+            return None
+
+    monkeypatch.setattr(data_mod.random, "Random", NoShuffle)
+
+    token_map = {
+        "dup-a": [11, 12],
+        "dup-b": [21, 22],
+        "unique-0": [31, 32],
+        "unique-1": [41, 42],
+        "unique-2": [51, 52],
+        "unique-3": [61, 62],
+        "unique-4": [71, 72],
+        "unique-5": [81, 82],
+    }
+
+    def simple_tok(texts, tokenizer, seq_len, indices):  # noqa: ARG001
+        ids = [token_map[text] for text in texts]
+        masks = [[1, 1] for _ in texts]
+        return data_mod.EvaluationWindow(ids, masks, list(indices))
+
+    monkeypatch.setattr(hp, "_simple_tokenize", simple_tok)
+
+    prev, final = hp.windows(
+        tokenizer=object(), seq_len=8, preview_n=3, final_n=3, seed=42
+    )
+
+    combined = prev.input_ids + final.input_ids
+    assert len(prev) == 3
+    assert len(final) == 3
+    assert len({tuple(row) for row in combined}) == 6

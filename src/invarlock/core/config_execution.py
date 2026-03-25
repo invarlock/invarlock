@@ -1,0 +1,115 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+from invarlock.runtime_security import (
+    apply_runtime_allowances,
+    delegate_current_process_to_container,
+    host_execution_allowed,
+    running_inside_container,
+    write_runtime_manifest,
+)
+
+
+class RuntimeDelegationError(RuntimeError):
+    """Raised when secure-default container delegation cannot start."""
+
+
+def _default_run_impl_and_deps() -> tuple[Any, Any]:
+    from invarlock.cli.commands.run import _build_run_command_deps
+    from invarlock.cli.run_command_impl import run_command_impl
+
+    return run_command_impl, _build_run_command_deps
+
+
+def run_from_config(
+    *,
+    config: str,
+    device: str | None = None,
+    profile: str | None = None,
+    out: str | None = None,
+    edit: str | None = None,
+    edit_label: str | None = None,
+    tier: str | None = None,
+    metric_kind: str | None = None,
+    probes: int | None = None,
+    until_pass: bool = False,
+    max_attempts: int = 3,
+    timeout: int | None = None,
+    baseline: str | None = None,
+    no_cleanup: bool = False,
+    style: str | None = None,
+    progress: bool = False,
+    timing: bool = False,
+    telemetry: bool = False,
+    no_color: bool = False,
+    allow_network: bool = False,
+    allow_host_execution: bool = False,
+    allow_third_party_plugins: bool = False,
+    allow_remote_code: bool = False,
+    command_name: str = "run",
+    delegate: bool = True,
+    run_impl: Any | None = None,
+    deps_builder: Any | None = None,
+) -> str | None:
+    """Run a config-driven job and persist runtime attestation metadata."""
+
+    apply_runtime_allowances(
+        allow_network=allow_network,
+        allow_host_execution=allow_host_execution,
+        allow_third_party_plugins=allow_third_party_plugins,
+        allow_remote_code=allow_remote_code,
+    )
+
+    if delegate and not running_inside_container() and not host_execution_allowed():
+        try:
+            exit_code = delegate_current_process_to_container()
+        except RuntimeError as exc:
+            raise RuntimeDelegationError(str(exc)) from exc
+        raise SystemExit(exit_code)
+
+    resolved_run_impl = run_impl
+    resolved_deps_builder = deps_builder
+    if resolved_run_impl is None or resolved_deps_builder is None:
+        resolved_run_impl, resolved_deps_builder = _default_run_impl_and_deps()
+
+    report_path = resolved_run_impl(
+        config=config,
+        device=device,
+        profile=profile,
+        out=out,
+        edit=edit,
+        edit_label=edit_label,
+        tier=tier,
+        metric_kind=metric_kind,
+        probes=probes,
+        until_pass=until_pass,
+        max_attempts=max_attempts,
+        timeout=timeout,
+        baseline=baseline,
+        no_cleanup=no_cleanup,
+        style=style,
+        progress=progress,
+        timing=timing,
+        telemetry=telemetry,
+        no_color=no_color,
+        deps=resolved_deps_builder(),
+    )
+
+    if report_path:
+        report = Path(report_path)
+        if report.exists():
+            write_runtime_manifest(
+                report,
+                config_path=config,
+                extra={
+                    "command": command_name,
+                    "profile": profile,
+                    "allow_network": allow_network,
+                    "allow_remote_code": allow_remote_code,
+                    "allow_third_party_plugins": allow_third_party_plugins,
+                },
+            )
+
+    return str(report_path) if report_path is not None else None

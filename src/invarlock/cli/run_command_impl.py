@@ -54,7 +54,6 @@ def run_command_impl(
     InvarlockError = _dep("InvarlockError")
     ConfigError = _dep("ConfigError")
     Path = _dep("Path")
-    RELEASE_MIN_WINDOWS_PER_ARM = _dep("RELEASE_MIN_WINDOWS_PER_ARM")
     _SnapshotRestoreFailed = _dep("_SnapshotRestoreFailed")
     _apply_mlm_masks = _dep("_apply_mlm_masks")
     _apply_warning_filters = _dep("_apply_warning_filters")
@@ -85,9 +84,11 @@ def run_command_impl(
     _print_pipeline_start = _dep("_print_pipeline_start")
     _print_retry_summary = _dep("_print_retry_summary")
     _resolve_device_and_output = _dep("_resolve_device_and_output")
+    _resolve_effective_windows = _dep("_resolve_effective_windows")
     _resolve_exit_code = _dep("_resolve_exit_code")
     _resolve_guard_overhead_threshold = _dep("_resolve_guard_overhead_threshold")
     _resolve_metric_and_provider = _dep("_resolve_metric_and_provider")
+    _resolve_pm_min_tokens_target = _dep("_resolve_pm_min_tokens_target")
     _resolve_pm_acceptance_range = _dep("_resolve_pm_acceptance_range")
     _resolve_pm_drift_band = _dep("_resolve_pm_drift_band")
     _resolve_provider_and_split = _dep("_resolve_provider_and_split")
@@ -112,14 +113,14 @@ def run_command_impl(
     np = _dep("np")
     os = _dep("os")
     perf_counter = _dep("perf_counter")
-    psutil = _dep("psutil")
+    get_psutil = _dep("get_psutil")
     print_timing_summary = _dep("print_timing_summary")
     resolve_output_style = _dep("resolve_output_style")
     resolve_tokenizer = _dep("resolve_tokenizer")
     set_seed = _dep("set_seed")
     shutil = _dep("shutil")
     timed_step = _dep("timed_step")
-    torch = _dep("torch")
+    get_torch = _dep("get_torch")
     typer = _dep("typer")
     validate_guard_overhead = _dep("validate_guard_overhead")
 
@@ -193,13 +194,28 @@ def run_command_impl(
             profile=profile_normalized,
         )
 
-    # Fail fast when torch is missing so users see a clear extras hint instead of
-    # a raw ModuleNotFoundError from deeper imports.
-    try:
-        import torch as _torch  # type: ignore[import]
+    _optional_dep_unset = object()
+    _optional_torch_cache = _optional_dep_unset
+    _optional_psutil_cache = _optional_dep_unset
 
-        _ = _torch  # pragma: no cover
-    except (ImportError, ModuleNotFoundError) as e:
+    def _optional_torch() -> Any | None:
+        nonlocal _optional_torch_cache
+        if _optional_torch_cache is _optional_dep_unset:
+            loaded = get_torch()
+            _optional_torch_cache = loaded if loaded else None
+        return _optional_torch_cache
+
+    def _optional_psutil() -> Any | None:
+        nonlocal _optional_psutil_cache
+        if _optional_psutil_cache is _optional_dep_unset:
+            loaded = get_psutil()
+            _optional_psutil_cache = loaded if loaded else None
+        return _optional_psutil_cache
+
+    def _require_torch() -> Any:
+        loaded = _optional_torch()
+        if loaded is not None:
+            return loaded
         _event(
             console,
             "FAIL",
@@ -209,7 +225,7 @@ def run_command_impl(
             emoji="❌",
             profile=profile_normalized,
         )
-        raise typer.Exit(1) from e
+        raise typer.Exit(1)
 
     # use module-level _extract_pairing_schedule
 
@@ -223,12 +239,14 @@ def run_command_impl(
 
     # use module-level _tokenizer_digest
 
+    _require_torch()
+
     try:
         # Import InvarLock components
         from invarlock.core.api import RunConfig
         from invarlock.core.registry import get_registry
         from invarlock.core.runner import CoreRunner
-        from invarlock.eval.data import EvaluationWindow, get_provider
+        from invarlock.eval.data import get_provider
         from invarlock.reporting.report_types import create_empty_report
 
         # Load and validate configuration via helper (preserves console prints)
@@ -333,7 +351,8 @@ def run_command_impl(
         set_seed(seed_value)
         # Enforce deterministic algorithms in CI/Release profiles when torch is available
         profile_label = profile_normalized or None
-        if torch is not None and profile_label in {"ci", "release"}:
+        torch_mod = _optional_torch()
+        if torch_mod is not None and profile_label in {"ci", "release"}:
             try:  # pragma: no cover - behavior depends on torch availability
                 determinism_mode = (
                     os.environ.get("PACK_DETERMINISM")
@@ -346,12 +365,12 @@ def run_command_impl(
                 warn_only_env = os.environ.get("INVARLOCK_DETERMINISM_WARN_ONLY", "")
                 if warn_only_env.strip().lower() in {"1", "true", "yes", "y", "on"}:
                     warn_only = True
-                if hasattr(torch, "use_deterministic_algorithms"):
-                    torch.use_deterministic_algorithms(True, warn_only=warn_only)
-                if hasattr(torch.backends, "cudnn"):
-                    torch.backends.cudnn.benchmark = False
+                if hasattr(torch_mod, "use_deterministic_algorithms"):
+                    torch_mod.use_deterministic_algorithms(True, warn_only=warn_only)
+                if hasattr(torch_mod.backends, "cudnn"):
+                    torch_mod.backends.cudnn.benchmark = False
                     try:
-                        torch.backends.cudnn.deterministic = True  # type: ignore[attr-defined]
+                        torch_mod.backends.cudnn.deterministic = True  # type: ignore[attr-defined]
                     except (AttributeError, TypeError, RuntimeError):
                         pass
             except NON_FATAL_RUNTIME_EXCEPTIONS:
@@ -368,9 +387,9 @@ def run_command_impl(
         ):
             numpy_seed = seed_value
         torch_seed = None
-        if torch is not None:
+        if torch_mod is not None:
             try:
-                torch_seed = int(torch.initial_seed())
+                torch_seed = int(torch_mod.initial_seed())
             except (AttributeError, TypeError, ValueError, OverflowError, RuntimeError):
                 torch_seed = seed_value
         seed_bundle = {
@@ -438,6 +457,17 @@ def run_command_impl(
             baseline=baseline,
             console=console,
         )
+        (
+            measure_guard_overhead,
+            skip_overhead,
+            skip_overhead_source,
+        ) = _should_measure_overhead(profile_normalized, cfg)
+        direct_reuse_loaded_model = (
+            skip_overhead
+            and profile_normalized in {"ci", "release"}
+            and retry_controller is None
+        )
+        emitted_skip_overhead_warning = False
 
         baseline_report_data: dict[str, Any] | None = None
         pairing_schedule: dict[str, Any] | None = None
@@ -1001,6 +1031,32 @@ def run_command_impl(
                     "capacity": window_capacity or {},
                 }
             if isinstance(window_plan, dict):
+                preview_masks = pairing_schedule["preview"].get("attention_masks") or []
+                final_masks = pairing_schedule["final"].get("attention_masks") or []
+                preview_total_tokens = sum(
+                    sum(_tensor_or_list_to_ints(mask)) for mask in preview_masks
+                ) or int(dataset_meta.get("preview_total_tokens", 0) or 0)
+                final_total_tokens = sum(
+                    sum(_tensor_or_list_to_ints(mask)) for mask in final_masks
+                ) or int(dataset_meta.get("final_total_tokens", 0) or 0)
+                min_tokens_target = _resolve_pm_min_tokens_target(
+                    tier=tier
+                    or getattr(
+                        getattr(cfg, "auto", None),
+                        "tier",
+                        None,
+                    ),
+                    profile=profile,
+                )
+                window_plan["preview_total_tokens"] = int(preview_total_tokens)
+                window_plan["final_total_tokens"] = int(final_total_tokens)
+                window_plan["min_tokens_target"] = int(min_tokens_target)
+                window_plan["tokens_floor_met"] = (
+                    int(preview_total_tokens) + int(final_total_tokens)
+                ) >= int(min_tokens_target)
+                dataset_meta["min_tokens_target"] = int(min_tokens_target)
+                dataset_meta["tokens_floor_met"] = bool(window_plan["tokens_floor_met"])
+            if isinstance(window_plan, dict):
                 dataset_meta.setdefault("window_plan", window_plan)
                 capacity_meta = window_plan.get("capacity")
                 if capacity_meta and "window_capacity" not in dataset_meta:
@@ -1139,131 +1195,16 @@ def run_command_impl(
                         profile=profile_normalized,
                     )
 
-            preview_records: list[tuple[list[int], list[int]]] = []
-            final_records: list[tuple[list[int], list[int]]] = []
+            preview_records: list[dict[str, Any]] = []
+            final_records: list[dict[str, Any]] = []
 
-            while True:
-                preview_window, final_window = data_provider.windows(
-                    tokenizer=tokenizer,
-                    seq_len=cfg.dataset.seq_len,
-                    stride=getattr(cfg.dataset, "stride", cfg.dataset.seq_len // 2),
-                    preview_n=effective_preview,
-                    final_n=effective_final,
-                    seed=getattr(cfg.dataset, "seed", 42),
-                    split=resolved_split,
-                )
+            signature_transform = None
+            if use_mlm:
 
-                preview_count = len(getattr(preview_window, "input_ids", []))
-                final_count = len(getattr(final_window, "input_ids", []))
-                is_eval_window = isinstance(
-                    preview_window, EvaluationWindow
-                ) and isinstance(final_window, EvaluationWindow)
-                if is_eval_window:
-                    if (
-                        preview_count != effective_preview
-                        or final_count != effective_final
-                    ):
-                        _fail_run(
-                            "Dataset provider returned mismatched preview/final counts "
-                            f"({preview_count}/{final_count}) "
-                            f"expected ({effective_preview}/{effective_final}). "
-                            "CI/Release profiles require exact parity."
-                        )
-                else:
-                    preview_count = effective_preview
-                    final_count = effective_final
-
-                # Optional: provider-supplied labels for seq2seq
-                provider_labels_prev = None
-                provider_labels_fin = None
-                try:
-                    provider_labels_prev = getattr(
-                        data_provider, "last_preview_labels", None
-                    )
-                    provider_labels_fin = getattr(
-                        data_provider, "last_final_labels", None
-                    )
-                except (AttributeError, TypeError):
-                    provider_labels_prev = None
-                    provider_labels_fin = None
-
-                preview_records = []
-                preview_indices_raw = getattr(preview_window, "indices", [])
-                if isinstance(preview_indices_raw, list):
-                    preview_indices = preview_indices_raw
-                else:
-                    try:
-                        preview_indices = list(preview_indices_raw)
-                    except TypeError:
-                        preview_indices = []
-                for idx_local, (input_ids, attention_mask) in enumerate(
-                    zip(
-                        preview_window.input_ids,
-                        preview_window.attention_masks,
-                        strict=False,
-                    )
-                ):
-                    input_ids_list = _tensor_or_list_to_ints(input_ids)
-                    attention_mask_list = (
-                        _tensor_or_list_to_ints(attention_mask)
-                        if attention_mask is not None
-                        else [1] * len(input_ids_list)
-                    )
-                    dataset_index = (
-                        _safe_int(preview_indices[idx_local])
-                        if idx_local < len(preview_indices)
-                        else idx_local
-                    )
-                    rec = {
-                        "input_ids": input_ids_list,
-                        "attention_mask": attention_mask_list,
-                        "dataset_index": dataset_index,
-                    }
-                    # Attach provider labels for seq2seq if available
-                    if provider_labels_prev is not None and idx_local < len(
-                        provider_labels_prev
-                    ):
-                        rec["labels"] = _tensor_or_list_to_ints(
-                            provider_labels_prev[idx_local]
-                        )
-                    preview_records.append(rec)
-
-                final_records = []
-                final_indices_raw = getattr(final_window, "indices", [])
-                if isinstance(final_indices_raw, list):
-                    final_indices = final_indices_raw
-                else:
-                    try:
-                        final_indices = list(final_indices_raw)
-                    except TypeError:
-                        final_indices = []
-                for idx_local, (input_ids, attention_mask) in enumerate(
-                    zip(
-                        final_window.input_ids,
-                        final_window.attention_masks,
-                        strict=False,
-                    )
-                ):
-                    input_ids_list = _tensor_or_list_to_ints(input_ids)
-                    attention_mask_list = (
-                        _tensor_or_list_to_ints(attention_mask)
-                        if attention_mask is not None
-                        else [1] * len(input_ids_list)
-                    )
-                    dataset_index = (
-                        _safe_int(final_indices[idx_local])
-                        if idx_local < len(final_indices)
-                        else idx_local
-                    )
-                    final_records.append(
-                        {
-                            "input_ids": input_ids_list,
-                            "attention_mask": attention_mask_list,
-                            "dataset_index": dataset_index,
-                        }
-                    )
-
-                if use_mlm:
+                def _signature_transform(
+                    preview_records_in: list[dict[str, Any]],
+                    final_records_in: list[dict[str, Any]],
+                ) -> list[dict[str, Any]]:
                     temp_preview_records = [
                         {
                             "input_ids": list(rec["input_ids"]),
@@ -1271,7 +1212,7 @@ def run_command_impl(
                             "dataset_index": rec.get("dataset_index"),
                             "window_id": rec.get("window_id"),
                         }
-                        for rec in preview_records
+                        for rec in preview_records_in
                     ]
                     temp_final_records = [
                         {
@@ -1280,7 +1221,7 @@ def run_command_impl(
                             "dataset_index": rec.get("dataset_index"),
                             "window_id": rec.get("window_id"),
                         }
-                        for rec in final_records
+                        for rec in final_records_in
                     ]
                     _apply_mlm_masks(
                         temp_preview_records,
@@ -1300,83 +1241,100 @@ def run_command_impl(
                         original_token_prob=original_token_prob,
                         prefix="final",
                     )
-                    records_for_signatures = temp_preview_records + temp_final_records
-                else:
-                    records_for_signatures = preview_records + final_records
+                    return temp_preview_records + temp_final_records
 
-                signatures = []
-                for record in records_for_signatures:
-                    tokens = record["input_ids"]
-                    masks = record["attention_mask"]
-                    signatures.append(
-                        tuple(
-                            tok
-                            for tok, mask in zip(tokens, masks, strict=False)
-                            if mask
-                        )
-                    )
+                signature_transform = _signature_transform
 
-                unique_sequences = len(set(signatures))
-                combined_total = len(signatures)
-                if unique_sequences == combined_total:
-                    break
-
-                deficit = combined_total - unique_sequences
-                reduction = max(5, int(deficit) if deficit > 0 else 1)
-                proposed_per_arm = preview_count - reduction
-                if proposed_per_arm >= preview_count:
-                    proposed_per_arm = preview_count - 1
-                min_per_arm_floor = RELEASE_MIN_WINDOWS_PER_ARM
-                if window_plan is None or window_plan.get("profile") != "release":
-                    min_per_arm_floor = max(
-                        10,
-                        min(
-                            int(requested_preview or 0) or RELEASE_MIN_WINDOWS_PER_ARM,
-                            int(requested_final or 0) or RELEASE_MIN_WINDOWS_PER_ARM,
-                        )
-                        // 2,
-                    )
-                if proposed_per_arm < min_per_arm_floor:
-                    raise RuntimeError(
-                        "Unable to construct non-overlapping windows within minimum window floor."
-                    )
-                _event(
-                    console,
-                    "WARN",
-                    f"Detected {deficit} duplicate windows; reducing per-arm windows to {proposed_per_arm} and retrying stratification.",
-                    emoji="⚠️",
+            try:
+                effective_windows = _resolve_effective_windows(
+                    data_provider=data_provider,
+                    tokenizer=tokenizer,
+                    seq_len=cfg.dataset.seq_len,
+                    stride=getattr(cfg.dataset, "stride", cfg.dataset.seq_len // 2),
+                    preview_n=effective_preview,
+                    final_n=effective_final,
+                    seed=getattr(cfg.dataset, "seed", 42),
+                    split=resolved_split,
+                    requested_preview=requested_preview,
+                    requested_final=requested_final,
                     profile=profile_normalized,
+                    signature_transform=signature_transform,
+                    event_fn=lambda message: _event(
+                        console,
+                        "WARN",
+                        message,
+                        emoji="⚠️",
+                        profile=profile_normalized,
+                    ),
                 )
+            except RuntimeError as err:
+                _fail_run(str(err))
 
-                effective_preview = proposed_per_arm
-                effective_final = proposed_per_arm
-                if window_plan is not None:
-                    window_plan.setdefault("dedupe_adjustments", []).append(
-                        {
-                            "deficit": int(deficit),
-                            "proposed_per_arm": int(proposed_per_arm),
-                        }
+            preview_records = effective_windows["preview_records"]
+            final_records = effective_windows["final_records"]
+            preview_count = int(effective_windows["actual_preview"])
+            final_count = int(effective_windows["actual_final"])
+            effective_preview = preview_count
+            effective_final = final_count
+
+            # Optional: provider-supplied labels for seq2seq
+            provider_labels_prev = None
+            provider_labels_fin = None
+            try:
+                provider_labels_prev = getattr(
+                    data_provider, "last_preview_labels", None
+                )
+                provider_labels_fin = getattr(data_provider, "last_final_labels", None)
+            except (AttributeError, TypeError):
+                provider_labels_prev = None
+                provider_labels_fin = None
+
+            for idx_local, rec in enumerate(preview_records):
+                if provider_labels_prev is not None and idx_local < len(
+                    provider_labels_prev
+                ):
+                    rec["labels"] = _tensor_or_list_to_ints(
+                        provider_labels_prev[idx_local]
                     )
-                    window_plan["actual_preview"] = proposed_per_arm
-                    window_plan["actual_final"] = proposed_per_arm
-                continue
+
+            min_tokens_target = _resolve_pm_min_tokens_target(
+                tier=tier
+                or getattr(
+                    getattr(cfg, "auto", None),
+                    "tier",
+                    None,
+                ),
+                profile=profile,
+            )
+            tokens_floor_met = (
+                int(effective_windows["preview_total_tokens"])
+                + int(effective_windows["final_total_tokens"])
+            ) >= int(min_tokens_target)
 
             if window_plan is None:
                 window_plan = {
                     "profile": (profile or "").lower() or "default",
                     "requested_preview": int(requested_preview),
                     "requested_final": int(requested_final),
-                    "actual_preview": int(preview_count),
-                    "actual_final": int(final_count),
-                    "coverage_ok": preview_count == final_count,
                     "capacity": {},
                 }
-            else:
-                window_plan["actual_preview"] = int(preview_count)
-                window_plan["actual_final"] = int(final_count)
-                window_plan["coverage_ok"] = (
-                    window_plan.get("coverage_ok", True)
-                    and preview_count == final_count
+
+            window_plan["actual_preview"] = int(preview_count)
+            window_plan["actual_final"] = int(final_count)
+            window_plan["coverage_ok"] = (
+                window_plan.get("coverage_ok", True) and preview_count == final_count
+            )
+            window_plan["preview_total_tokens"] = int(
+                effective_windows["preview_total_tokens"]
+            )
+            window_plan["final_total_tokens"] = int(
+                effective_windows["final_total_tokens"]
+            )
+            window_plan["min_tokens_target"] = int(min_tokens_target)
+            window_plan["tokens_floor_met"] = bool(tokens_floor_met)
+            if effective_windows["dedupe_adjustments"]:
+                window_plan["dedupe_adjustments"] = list(
+                    effective_windows["dedupe_adjustments"]
                 )
 
             calibration_data: list[dict[str, Any]] = []
@@ -1457,8 +1415,10 @@ def run_command_impl(
                 ).hexdigest(),
                 "preview_hash": preview_hash,
                 "final_hash": final_hash,
-                "preview_total_tokens": sum(len(seq) for seq in preview_sequences),
-                "final_total_tokens": sum(len(seq) for seq in final_sequences),
+                "preview_total_tokens": int(effective_windows["preview_total_tokens"]),
+                "final_total_tokens": int(effective_windows["final_total_tokens"]),
+                "min_tokens_target": int(min_tokens_target),
+                "tokens_floor_met": bool(tokens_floor_met),
             }
             dataset_meta["loss_type"] = resolved_loss_type
             if use_mlm:
@@ -1615,209 +1575,239 @@ def run_command_impl(
                     warning_context={"phase": "load_model", "run_id": run_id},
                 )
 
-            # No edit-specific bootstrap logic
+            if direct_reuse_loaded_model:
+                skip_model_load = True
+                source_note = (
+                    f" ({skip_overhead_source})" if skip_overhead_source else ""
+                )
+                _event(
+                    console,
+                    "WARN",
+                    f"Overhead check skipped via config policy{source_note}",
+                    emoji="⚠️",
+                    profile=profile_normalized,
+                )
+                _event(
+                    console,
+                    "WARN",
+                    "Reusing initially loaded model for guarded execution.",
+                    emoji="⚠️",
+                    profile=profile_normalized,
+                )
+                emitted_skip_overhead_warning = True
+            else:
+                # No edit-specific bootstrap logic
 
-            def _estimate_model_bytes(m: Any) -> int:
-                total = 0
-                try:
-                    for _, p in getattr(m, "named_parameters", lambda: [])():
-                        try:
-                            total += int(p.element_size() * p.nelement())
-                        except (AttributeError, TypeError, ValueError):
-                            pass
-                    for _, b in getattr(m, "named_buffers", lambda: [])():
-                        try:
-                            total += int(b.element_size() * b.nelement())
-                        except (AttributeError, TypeError, ValueError):
-                            pass
-                except (AttributeError, TypeError):
-                    return 0
-                return total
+                def _estimate_model_bytes(m: Any) -> int:
+                    total = 0
+                    try:
+                        for _, p in getattr(m, "named_parameters", lambda: [])():
+                            try:
+                                total += int(p.element_size() * p.nelement())
+                            except (AttributeError, TypeError, ValueError):
+                                pass
+                        for _, b in getattr(m, "named_buffers", lambda: [])():
+                            try:
+                                total += int(b.element_size() * b.nelement())
+                            except (AttributeError, TypeError, ValueError):
+                                pass
+                    except (AttributeError, TypeError):
+                        return 0
+                    return total
 
-            # Load snapshot config from config.context.snapshot (highest precedence)
-            cfg_snapshot = {}
-            try:
-                cfg_context = _to_serialisable_dict(getattr(cfg, "context", {}))
-                if isinstance(cfg_context, dict):
-                    cfg_snapshot = _to_serialisable_dict(
-                        cfg_context.get("snapshot", {})
-                    )
-                    if not isinstance(cfg_snapshot, dict):
-                        cfg_snapshot = {}
-            except NON_FATAL_RUNTIME_EXCEPTIONS:
+                # Load snapshot config from config.context.snapshot (highest precedence)
                 cfg_snapshot = {}
-
-            def _choose_snapshot_mode() -> str:
-                # Precedence: config > env > auto
-                cfg_mode = (
-                    str(cfg_snapshot.get("mode", "")).lower()
-                    if isinstance(cfg_snapshot, dict)
-                    else ""
-                )
-                mode_env = str(
-                    os.environ.get("INVARLOCK_SNAPSHOT_MODE", "auto")
-                ).lower()
-                supports_chunked = hasattr(adapter, "snapshot_chunked") and hasattr(
-                    adapter, "restore_chunked"
-                )
-                supports_bytes = hasattr(adapter, "snapshot") and hasattr(
-                    adapter, "restore"
-                )
-                if cfg_mode in {"bytes", "chunked"}:
-                    if cfg_mode == "bytes" and supports_bytes:
-                        return "bytes"
-                    if cfg_mode == "chunked" and supports_chunked:
-                        return "chunked"
-                    # fallback preference
-                    if supports_bytes:
-                        return "bytes"
-                    if supports_chunked:
-                        return "chunked"
-                    return "reload"
-                if mode_env in {"bytes", "chunked"}:
-                    if mode_env == "bytes" and supports_bytes:
-                        return "bytes"
-                    if mode_env == "chunked" and supports_chunked:
-                        return "chunked"
-                    # fallback preference
-                    if supports_bytes:
-                        return "bytes"
-                    if supports_chunked:
-                        return "chunked"
-                    return "reload"
-                # auto
-                est_mb = _estimate_model_bytes(model) / (1024.0 * 1024.0)
-                # RAM-based heuristic
                 try:
-                    ram = psutil.virtual_memory()
-                    avail_mb = float(getattr(ram, "available", 0)) / (1024.0 * 1024.0)
-                except (
-                    AttributeError,
-                    RuntimeError,
-                    OSError,
-                    TypeError,
-                    ValueError,
-                ):
-                    avail_mb = 0.0
-                # fraction: config override > env > default 0.4
-                frac = 0.4
-                try:
-                    if (
-                        isinstance(cfg_snapshot, dict)
-                        and cfg_snapshot.get("ram_fraction") is not None
-                    ):
-                        frac = float(cfg_snapshot.get("ram_fraction"))
-                    else:
-                        frac = float(
-                            os.environ.get("INVARLOCK_SNAPSHOT_AUTO_RAM_FRACTION", frac)
+                    cfg_context = _to_serialisable_dict(getattr(cfg, "context", {}))
+                    if isinstance(cfg_context, dict):
+                        cfg_snapshot = _to_serialisable_dict(
+                            cfg_context.get("snapshot", {})
                         )
-                except (TypeError, ValueError):
-                    pass
-                # threshold mb: if no RAM info, use config threshold_mb or env fallback; else derive from avail*frac
-                if avail_mb > 0:
-                    threshold_mb = avail_mb * max(0.0, min(frac, 1.0))
-                else:
+                        if not isinstance(cfg_snapshot, dict):
+                            cfg_snapshot = {}
+                except NON_FATAL_RUNTIME_EXCEPTIONS:
+                    cfg_snapshot = {}
+
+                def _choose_snapshot_mode() -> str:
+                    # Precedence: config > env > auto
+                    cfg_mode = (
+                        str(cfg_snapshot.get("mode", "")).lower()
+                        if isinstance(cfg_snapshot, dict)
+                        else ""
+                    )
+                    mode_env = str(
+                        os.environ.get("INVARLOCK_SNAPSHOT_MODE", "auto")
+                    ).lower()
+                    supports_chunked = hasattr(adapter, "snapshot_chunked") and hasattr(
+                        adapter, "restore_chunked"
+                    )
+                    supports_bytes = hasattr(adapter, "snapshot") and hasattr(
+                        adapter, "restore"
+                    )
+                    if cfg_mode in {"bytes", "chunked"}:
+                        if cfg_mode == "bytes" and supports_bytes:
+                            return "bytes"
+                        if cfg_mode == "chunked" and supports_chunked:
+                            return "chunked"
+                        # fallback preference
+                        if supports_bytes:
+                            return "bytes"
+                        if supports_chunked:
+                            return "chunked"
+                        return "reload"
+                    if mode_env in {"bytes", "chunked"}:
+                        if mode_env == "bytes" and supports_bytes:
+                            return "bytes"
+                        if mode_env == "chunked" and supports_chunked:
+                            return "chunked"
+                        # fallback preference
+                        if supports_bytes:
+                            return "bytes"
+                        if supports_chunked:
+                            return "chunked"
+                        return "reload"
+                    # auto
+                    est_mb = _estimate_model_bytes(model) / (1024.0 * 1024.0)
+                    # RAM-based heuristic
+                    try:
+                        psutil_mod = _optional_psutil()
+                        if psutil_mod is None:
+                            raise AttributeError("psutil unavailable")
+                        ram = psutil_mod.virtual_memory()
+                        avail_mb = float(getattr(ram, "available", 0)) / (
+                            1024.0 * 1024.0
+                        )
+                    except (
+                        AttributeError,
+                        RuntimeError,
+                        OSError,
+                        TypeError,
+                        ValueError,
+                    ):
+                        avail_mb = 0.0
+                    # fraction: config override > env > default 0.4
+                    frac = 0.4
                     try:
                         if (
                             isinstance(cfg_snapshot, dict)
-                            and cfg_snapshot.get("threshold_mb") is not None
+                            and cfg_snapshot.get("ram_fraction") is not None
                         ):
-                            threshold_mb = float(cfg_snapshot.get("threshold_mb"))
+                            frac = float(cfg_snapshot.get("ram_fraction"))
                         else:
-                            threshold_mb = float(
-                                os.environ.get("INVARLOCK_SNAPSHOT_THRESHOLD_MB", "768")
+                            frac = float(
+                                os.environ.get(
+                                    "INVARLOCK_SNAPSHOT_AUTO_RAM_FRACTION", frac
+                                )
                             )
                     except (TypeError, ValueError):
-                        threshold_mb = 768.0
-                # Disk availability for chunked
-                try:
-                    tmpdir = None
-                    if isinstance(cfg_snapshot, dict):
-                        tmpdir = cfg_snapshot.get("temp_dir") or None
-                    if not tmpdir:
-                        tmpdir = (
-                            os.environ.get("TMPDIR")
-                            or os.environ.get("TMP")
-                            or tempfile.gettempdir()
-                        )
-                    du = shutil.disk_usage(tmpdir)
-                    free_mb = float(du.free) / (1024.0 * 1024.0)
-                except (OSError, TypeError, ValueError):
-                    free_mb = 0.0
-                # Disk margin ratio: config > default 1.2
-                margin = 1.2
-                try:
-                    if (
-                        isinstance(cfg_snapshot, dict)
-                        and cfg_snapshot.get("disk_free_margin_ratio") is not None
-                    ):
-                        margin = float(cfg_snapshot.get("disk_free_margin_ratio"))
-                except (TypeError, ValueError):
-                    pass
-                # Choose chunked if model snapshot is a large fraction of available RAM and disk has room
-                if (
-                    supports_chunked
-                    and est_mb >= threshold_mb
-                    and (free_mb <= 0.0 or est_mb * margin <= free_mb)
-                ):
-                    return "chunked"
-                # Otherwise prefer bytes when supported
-                if supports_bytes:
-                    # If RAM is extremely low and even bytes snapshot likely risky, fallback to chunked when possible
+                        pass
+                    # threshold mb: if no RAM info, use config threshold_mb or env fallback; else derive from avail*frac
+                    if avail_mb > 0:
+                        threshold_mb = avail_mb * max(0.0, min(frac, 1.0))
+                    else:
+                        try:
+                            if (
+                                isinstance(cfg_snapshot, dict)
+                                and cfg_snapshot.get("threshold_mb") is not None
+                            ):
+                                threshold_mb = float(cfg_snapshot.get("threshold_mb"))
+                            else:
+                                threshold_mb = float(
+                                    os.environ.get(
+                                        "INVARLOCK_SNAPSHOT_THRESHOLD_MB", "768"
+                                    )
+                                )
+                        except (TypeError, ValueError):
+                            threshold_mb = 768.0
+                    # Disk availability for chunked
+                    try:
+                        tmpdir = None
+                        if isinstance(cfg_snapshot, dict):
+                            tmpdir = cfg_snapshot.get("temp_dir") or None
+                        if not tmpdir:
+                            tmpdir = (
+                                os.environ.get("TMPDIR")
+                                or os.environ.get("TMP")
+                                or tempfile.gettempdir()
+                            )
+                        du = shutil.disk_usage(tmpdir)
+                        free_mb = float(du.free) / (1024.0 * 1024.0)
+                    except (OSError, TypeError, ValueError):
+                        free_mb = 0.0
+                    # Disk margin ratio: config > default 1.2
+                    margin = 1.2
+                    try:
+                        if (
+                            isinstance(cfg_snapshot, dict)
+                            and cfg_snapshot.get("disk_free_margin_ratio") is not None
+                        ):
+                            margin = float(cfg_snapshot.get("disk_free_margin_ratio"))
+                    except (TypeError, ValueError):
+                        pass
+                    # Choose chunked if model snapshot is a large fraction of available RAM and disk has room
                     if (
                         supports_chunked
-                        and avail_mb > 0
-                        and est_mb >= max(64.0, avail_mb * 0.8)
+                        and est_mb >= threshold_mb
                         and (free_mb <= 0.0 or est_mb * margin <= free_mb)
                     ):
                         return "chunked"
-                    return "bytes"
-                if supports_chunked:
-                    return "chunked"
-                return "reload"
+                    # Otherwise prefer bytes when supported
+                    if supports_bytes:
+                        # If RAM is extremely low and even bytes snapshot likely risky, fallback to chunked when possible
+                        if (
+                            supports_chunked
+                            and avail_mb > 0
+                            and est_mb >= max(64.0, avail_mb * 0.8)
+                            and (free_mb <= 0.0 or est_mb * margin <= free_mb)
+                        ):
+                            return "chunked"
+                        return "bytes"
+                    if supports_chunked:
+                        return "chunked"
+                    return "reload"
 
-            mode = _choose_snapshot_mode()
-            enabled = mode in {"bytes", "chunked"}
-            _event(
-                console,
-                "INIT",
-                f"Snapshot mode: {'enabled' if enabled else 'disabled'}",
-                emoji="💾",
-                profile=profile_normalized,
-            )
-            if mode == "chunked":
-                snapshot_tmpdir = adapter.snapshot_chunked(model)  # type: ignore[attr-defined]
-
-                def _restore():
-                    adapter.restore_chunked(model, snapshot_tmpdir)  # type: ignore[attr-defined]
-
-                restore_fn = _restore
-            elif mode == "bytes":
-                supports_chunked = hasattr(adapter, "snapshot_chunked") and hasattr(
-                    adapter, "restore_chunked"
+                mode = _choose_snapshot_mode()
+                enabled = mode in {"bytes", "chunked"}
+                _event(
+                    console,
+                    "INIT",
+                    f"Snapshot mode: {'enabled' if enabled else 'disabled'}",
+                    emoji="💾",
+                    profile=profile_normalized,
                 )
-                try:
-                    base_blob = adapter.snapshot(model)  # type: ignore[attr-defined]
-                except NON_FATAL_RUNTIME_EXCEPTIONS:
-                    if not supports_chunked:
-                        raise
+                if mode == "chunked":
                     snapshot_tmpdir = adapter.snapshot_chunked(model)  # type: ignore[attr-defined]
 
-                    def _restore_fallback_chunked():
+                    def _restore():
                         adapter.restore_chunked(model, snapshot_tmpdir)  # type: ignore[attr-defined]
 
-                    restore_fn = _restore_fallback_chunked
+                    restore_fn = _restore
+                elif mode == "bytes":
+                    supports_chunked = hasattr(adapter, "snapshot_chunked") and hasattr(
+                        adapter, "restore_chunked"
+                    )
+                    try:
+                        base_blob = adapter.snapshot(model)  # type: ignore[attr-defined]
+                    except NON_FATAL_RUNTIME_EXCEPTIONS:
+                        if not supports_chunked:
+                            raise
+                        snapshot_tmpdir = adapter.snapshot_chunked(model)  # type: ignore[attr-defined]
+
+                        def _restore_fallback_chunked():
+                            adapter.restore_chunked(model, snapshot_tmpdir)  # type: ignore[attr-defined]
+
+                        restore_fn = _restore_fallback_chunked
+                    else:
+
+                        def _restore2():
+                            adapter.restore(model, base_blob)  # type: ignore[attr-defined]
+
+                        restore_fn = _restore2
                 else:
-
-                    def _restore2():
-                        adapter.restore(model, base_blob)  # type: ignore[attr-defined]
-
-                    restore_fn = _restore2
-            else:
-                # reload path - properly free GPU memory before setting to None
-                _free_model_memory(model)
-                model = None
-                restore_fn = None
+                    # reload path - properly free GPU memory before setting to None
+                    _free_model_memory(model)
+                    model = None
+                    restore_fn = None
         except NON_FATAL_RUNTIME_EXCEPTIONS:
             # On any failure, fall back to reload-per-attempt path
             _free_model_memory(model)
@@ -1826,20 +1816,32 @@ def run_command_impl(
 
         # RETRY LOOP - All report processing inside loop
         attempt = 1
-        (
-            measure_guard_overhead,
-            skip_overhead,
-            skip_overhead_source,
-        ) = _should_measure_overhead(profile_normalized, cfg)
         if skip_overhead and profile_normalized in {"ci", "release"}:
-            source_note = f" ({skip_overhead_source})" if skip_overhead_source else ""
-            _event(
-                console,
-                "WARN",
-                f"Overhead check skipped via config policy{source_note}",
-                emoji="⚠️",
-                profile=profile_normalized,
-            )
+            if not emitted_skip_overhead_warning:
+                source_note = (
+                    f" ({skip_overhead_source})" if skip_overhead_source else ""
+                )
+                _event(
+                    console,
+                    "WARN",
+                    f"Overhead check skipped via config policy{source_note}",
+                    emoji="⚠️",
+                    profile=profile_normalized,
+                )
+            if (
+                retry_controller is None
+                and model is not None
+                and restore_fn is None
+                and not skip_model_load
+            ):
+                skip_model_load = True
+                _event(
+                    console,
+                    "WARN",
+                    "Snapshot restore unavailable; reusing initially loaded model for guarded execution.",
+                    emoji="⚠️",
+                    profile=profile_normalized,
+                )
 
         while True:
             # Reset RNG streams each attempt to guarantee determinism across retries
@@ -2053,10 +2055,11 @@ def run_command_impl(
             try:
                 import os as _os
 
-                if torch is not None:
+                torch_mod = _optional_torch()
+                if torch_mod is not None:
                     try:
                         det_enabled = getattr(
-                            torch, "are_deterministic_algorithms_enabled", None
+                            torch_mod, "are_deterministic_algorithms_enabled", None
                         )
                         if callable(det_enabled):
                             env_flags["torch_deterministic_algorithms"] = bool(
@@ -2066,7 +2069,9 @@ def run_command_impl(
                         pass
                     try:
                         tf32_matmul = getattr(
-                            getattr(torch.backends, "cuda", object()), "matmul", None
+                            getattr(torch_mod.backends, "cuda", object()),
+                            "matmul",
+                            None,
                         )
                         if tf32_matmul is not None and hasattr(
                             tf32_matmul, "allow_tf32"
@@ -2077,7 +2082,7 @@ def run_command_impl(
                     except (AttributeError, RuntimeError, TypeError):
                         pass
                     try:
-                        cudnn_mod = getattr(torch.backends, "cudnn", None)
+                        cudnn_mod = getattr(torch_mod.backends, "cudnn", None)
                         if cudnn_mod is not None:
                             env_flags["cudnn_allow_tf32"] = bool(
                                 getattr(cudnn_mod, "allow_tf32", None)
@@ -2092,8 +2097,8 @@ def run_command_impl(
                         pass
                     try:
                         env_flags["mps_available"] = bool(
-                            getattr(torch.backends, "mps", None)
-                            and torch.backends.mps.is_available()
+                            getattr(torch_mod.backends, "mps", None)
+                            and torch_mod.backends.mps.is_available()
                         )
                     except (AttributeError, RuntimeError, TypeError):
                         pass
@@ -2271,6 +2276,21 @@ def run_command_impl(
                                 "actual_preview": window_plan_ctx.get("actual_preview"),
                                 "actual_final": window_plan_ctx.get("actual_final"),
                                 "coverage_ok": window_plan_ctx.get("coverage_ok"),
+                                "preview_total_tokens": window_plan_ctx.get(
+                                    "preview_total_tokens"
+                                ),
+                                "final_total_tokens": window_plan_ctx.get(
+                                    "final_total_tokens"
+                                ),
+                                "min_tokens_target": window_plan_ctx.get(
+                                    "min_tokens_target"
+                                ),
+                                "tokens_floor_met": window_plan_ctx.get(
+                                    "tokens_floor_met"
+                                ),
+                                "dedupe_adjustments": window_plan_ctx.get(
+                                    "dedupe_adjustments"
+                                ),
                             }
                         )
                 optional_keys = [
@@ -2675,6 +2695,18 @@ def run_command_impl(
                     if hasattr(adapter, "save_pretrained") and model is not None:
                         ok = bool(adapter.save_pretrained(model, export_dir))  # type: ignore[attr-defined]
                     if ok:
+                        save_tokenizer = getattr(tokenizer, "save_pretrained", None)
+                        if callable(save_tokenizer):
+                            try:
+                                save_tokenizer(str(export_dir))
+                            except NON_FATAL_RUNTIME_EXCEPTIONS:
+                                _event(
+                                    console,
+                                    "WARN",
+                                    "Exported model checkpoint without tokenizer artifacts; local tokenizer reload may fail.",
+                                    emoji="⚠️",
+                                    profile=profile_normalized,
+                                )
                         report["artifacts"]["checkpoint_path"] = str(export_dir)
                     else:
                         _event(
@@ -3002,6 +3034,16 @@ def run_command_impl(
                 try:
                     if isinstance(window_plan, dict) and "coverage_ok" in window_plan:
                         stats["coverage"] = bool(window_plan.get("coverage_ok"))
+                        stats["preview_total_tokens"] = window_plan.get(
+                            "preview_total_tokens"
+                        )
+                        stats["final_total_tokens"] = window_plan.get(
+                            "final_total_tokens"
+                        )
+                        stats["min_tokens_target"] = window_plan.get(
+                            "min_tokens_target"
+                        )
+                        stats["tokens_floor_met"] = window_plan.get("tokens_floor_met")
                 except (AttributeError, KeyError, TypeError):
                     pass
             except (AttributeError, KeyError, TypeError):

@@ -5,11 +5,22 @@ from pathlib import Path
 
 import pytest
 
+_VALID_TEST_IMAGE_DIGEST = "sha256:" + ("a" * 64)
+
 
 @pytest.fixture(autouse=True)
 def _restore_invarlock_env():
     # Snapshot environment variables that some tests may mutate without cleanup
-    keys = ["INVARLOCK_DISABLE_PLUGIN_DISCOVERY"]
+    keys = [
+        "INVARLOCK_ALLOW_HOST_EXECUTION",
+        "INVARLOCK_ALLOW_UNATTESTED_ARTIFACTS",
+        "INVARLOCK_ALLOW_NETWORK",
+        "INVARLOCK_ALLOW_REMOTE_CODE",
+        "INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS",
+        "INVARLOCK_RUNTIME_IMAGE",
+        "INVARLOCK_RUNTIME_IMAGE_DIGEST",
+        "INVARLOCK_RUNTIME_VERIFIER",
+    ]
     saved = {k: os.environ.get(k) for k in keys}
     try:
         yield
@@ -19,6 +30,16 @@ def _restore_invarlock_env():
                 os.environ.pop(k, None)
             else:
                 os.environ[k] = v
+
+
+@pytest.fixture(autouse=True)
+def _default_security_bypass_for_local_tests(monkeypatch: pytest.MonkeyPatch):
+    # The product is container-first, but the general pytest harness stays on
+    # trusted host execution unless an individual test opts back into the
+    # security-default path explicitly.
+    monkeypatch.setenv("INVARLOCK_ALLOW_HOST_EXECUTION", "1")
+    monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE_DIGEST", _VALID_TEST_IMAGE_DIGEST)
+    yield
 
 
 @pytest.fixture(autouse=True)

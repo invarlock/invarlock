@@ -19,6 +19,7 @@ import io
 import json
 import math
 import os
+import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -32,6 +33,11 @@ from invarlock import __version__ as INVARLOCK_VERSION
 from ...core.exceptions import MetricsError
 from ..adapter_auto import resolve_auto_adapter
 from ..config import _deep_merge as _merge  # reuse helper
+from ..security_helpers import (
+    configure_runtime_security,
+    emit_runtime_manifest,
+    maybe_delegate_model_command,
+)
 
 # Use the report group's programmatic entry for report generation
 from .report import report_command as _report
@@ -207,13 +213,17 @@ def _resolve_evaluate_tmp_dir() -> Path:
     Evaluate generates merged YAML configs for baseline/subject runs so
     downstream `invarlock run` flows remain traceable. We keep these files
     under `./tmp/.evaluate` by default to avoid cluttering the working tree.
+    Each invocation gets an isolated subdirectory so concurrent evaluate
+    commands cannot overwrite each other's generated YAMLs.
     """
 
     candidate = os.environ.get("INVARLOCK_EVALUATE_TMP_DIR")
     if candidate:
         tmp_dir = Path(candidate).expanduser()
     else:
-        tmp_dir = Path("tmp") / ".evaluate"
+        scratch_root = Path("tmp") / ".evaluate"
+        scratch_root.mkdir(parents=True, exist_ok=True)
+        tmp_dir = Path(tempfile.mkdtemp(prefix="run-", dir=str(scratch_root))).resolve()
     tmp_dir.mkdir(parents=True, exist_ok=True)
     return tmp_dir
 
@@ -274,7 +284,7 @@ def evaluate_command(
         "reports/eval", "--report-out", help="Evaluation report output directory"
     ),
     edit_config: str | None = typer.Option(
-        None, "--edit-config", help="Edit preset to apply a demo edit (quant_rtn)"
+        None, "--edit-config", help="Edit preset to apply a demo edit"
     ),
     edit_label: str | None = typer.Option(
         None,
@@ -297,6 +307,31 @@ def evaluate_command(
     timing: bool = typer.Option(False, "--timing", help="Show timing summary"),
     progress: bool = typer.Option(
         True, "--progress/--no-progress", help="Show progress done messages"
+    ),
+    mode: str = typer.Option(
+        "attested",
+        "--mode",
+        help="Execution mode for model-loading steps (attested|local).",
+    ),
+    allow_network: bool = typer.Option(
+        False,
+        "--allow-network",
+        help="Explicitly allow outbound network access for this command.",
+    ),
+    allow_host_execution: bool = typer.Option(
+        False,
+        "--allow-host-execution",
+        help="Run on the host instead of auto-delegating to the runtime container.",
+    ),
+    allow_third_party_plugins: bool = typer.Option(
+        False,
+        "--allow-third-party-plugins",
+        help="Enable third-party entry-point plugin discovery for this command.",
+    ),
+    allow_remote_code: bool = typer.Option(
+        False,
+        "--allow-remote-code",
+        help="Allow trust_remote_code-style model loading for this command.",
     ),
     no_color: bool = typer.Option(
         False, "--no-color", help="Disable ANSI colors (respects NO_COLOR=1)"
@@ -332,7 +367,27 @@ def evaluate_command(
     style = _coerce_option(style, "audit")
     timing = bool(_coerce_option(timing, False))
     progress = bool(_coerce_option(progress, True))
+    mode = str(_coerce_option(mode, "attested")).strip().lower()
+    allow_network = bool(_coerce_option(allow_network, False))
+    allow_host_execution = bool(_coerce_option(allow_host_execution, False))
+    allow_third_party_plugins = bool(_coerce_option(allow_third_party_plugins, False))
+    allow_remote_code = bool(_coerce_option(allow_remote_code, False))
     no_color = bool(_coerce_option(no_color, False))
+
+    if mode not in {"attested", "local"}:
+        raise typer.BadParameter(
+            "Execution mode must be one of: attested, local.",
+            param_hint="--mode",
+        )
+    allow_host_execution = allow_host_execution or mode == "local"
+
+    configure_runtime_security(
+        allow_network=allow_network,
+        allow_host_execution=allow_host_execution,
+        allow_third_party_plugins=allow_third_party_plugins,
+        allow_remote_code=allow_remote_code,
+    )
+    maybe_delegate_model_command()
 
     verbosity = _resolve_verbosity(bool(quiet), bool(verbose))
 
@@ -629,10 +684,17 @@ def evaluate_command(
                         out=str(Path(out) / "source"),
                         tier=tier,
                         device=device,
+                        until_pass=False,
+                        max_attempts=1,
+                        timeout=None,
                         edit_label=baseline_label,
                         style=output_style.name,
                         progress=progress,
                         timing=False,
+                        allow_network=allow_network,
+                        allow_host_execution=allow_host_execution,
+                        allow_third_party_plugins=allow_third_party_plugins,
+                        allow_remote_code=allow_remote_code,
                         no_color=no_color,
                     )
             except Exception:
@@ -739,10 +801,17 @@ def evaluate_command(
                         tier=tier,
                         baseline=str(baseline_report_path),
                         device=device,
+                        until_pass=False,
+                        max_attempts=1,
+                        timeout=None,
                         edit_label=subject_label if edit_label else None,
                         style=output_style.name,
                         progress=progress,
                         timing=False,
+                        allow_network=allow_network,
+                        allow_host_execution=allow_host_execution,
+                        allow_third_party_plugins=allow_third_party_plugins,
+                        allow_remote_code=allow_remote_code,
                         no_color=no_color,
                     )
             except Exception:
@@ -785,10 +854,17 @@ def evaluate_command(
                         tier=tier,
                         baseline=str(baseline_report_path),
                         device=device,
+                        until_pass=False,
+                        max_attempts=1,
+                        timeout=None,
                         edit_label=subject_label,
                         style=output_style.name,
                         progress=progress,
                         timing=False,
+                        allow_network=allow_network,
+                        allow_host_execution=allow_host_execution,
+                        allow_third_party_plugins=allow_third_party_plugins,
+                        allow_remote_code=allow_remote_code,
                         no_color=no_color,
                     )
             except Exception:
@@ -861,6 +937,30 @@ def evaluate_command(
                 if quiet_buffer is not None:
                     console.print(quiet_buffer.getvalue(), markup=False)
                 raise
+        emit_runtime_manifest(
+            Path(report_out) / "evaluation.report.json",
+            config_payload={
+                "command": "evaluate",
+                "source": source,
+                "edited": edited,
+                "adapter": adapter,
+                "profile": profile,
+                "tier": tier,
+                "preset": preset,
+                "out": out,
+                "report_out": report_out,
+                "edit_config": edit_config,
+                "edit_label": edit_label,
+                "allow_network": allow_network,
+                "allow_remote_code": allow_remote_code,
+                "allow_third_party_plugins": allow_third_party_plugins,
+            },
+            extra={
+                "command": "evaluate",
+                "profile": profile,
+                "tier": tier,
+            },
+        )
 
     # CI/Release hard‑abort: fail fast when primary metric is not computable.
     try:

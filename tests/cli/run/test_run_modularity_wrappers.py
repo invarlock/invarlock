@@ -285,3 +285,29 @@ def test_run_command_injects_explicit_deps(monkeypatch):
     assert isinstance(deps, dict)
     assert deps["_resolve_pm_acceptance_range"] is sentinel
     assert deps["console"] is run_mod.console
+    assert callable(deps["get_torch"])
+    assert callable(deps["get_psutil"])
+
+
+def test_build_run_command_deps_keeps_optional_modules_lazy(monkeypatch):
+    calls = {"torch": 0, "psutil": 0}
+
+    def _fake_get_torch():
+        calls["torch"] += 1
+        return object()
+
+    def _fake_get_psutil():
+        calls["psutil"] += 1
+        return object()
+
+    monkeypatch.setattr(run_mod, "_get_torch", _fake_get_torch)
+    monkeypatch.setattr(run_mod, "_get_psutil", _fake_get_psutil)
+
+    deps = run_mod._build_run_command_deps()
+
+    assert callable(deps["get_torch"])
+    assert callable(deps["get_psutil"])
+    assert calls == {"torch": 0, "psutil": 0}
+    assert deps["get_torch"]() is not None
+    assert deps["get_psutil"]() is not None
+    assert calls == {"torch": 1, "psutil": 1}

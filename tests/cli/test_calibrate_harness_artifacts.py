@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import builtins
 import json
+import sys
+import types
 from pathlib import Path
 from unittest.mock import patch
 
@@ -168,15 +170,109 @@ def test_calibrate_commands_exit_on_missing_optional_deps(
         )
 
 
+def test_null_sweep_optioninfo_runtime_flags_do_not_block_missing_dep_error(
+    tmp_path: Path,
+) -> None:
+    cfg = _write_base_config(tmp_path)
+    out = tmp_path / "out"
+    real_import = builtins.__import__
+
+    def _missing_spectral(
+        name: str,
+        globals=None,
+        locals=None,
+        fromlist=(),
+        level: int = 0,
+    ):
+        if name == "invarlock.calibration.spectral_null":
+            exc = ModuleNotFoundError("missing torch")
+            exc.name = "torch"
+            raise exc
+        return real_import(name, globals, locals, fromlist, level)
+
+    with (
+        patch.object(calibrate_mod, "_run_calibration_config") as run_calibration,
+        patch("builtins.__import__", _missing_spectral),
+        pytest.raises(typer.Exit),
+    ):
+        calibrate_mod.null_sweep(
+            config=cfg,
+            out=out,
+            tiers=["balanced"],
+            seed=[42],
+            n_seeds=1,
+            seed_start=42,
+            profile="ci",
+            device=None,
+            allow_network=typer.Option(True),
+            allow_host_execution=typer.Option(True),
+            allow_third_party_plugins=typer.Option(True),
+            allow_remote_code=typer.Option(True),
+            safety_margin=0.05,
+            target_any_warning_rate=0.01,
+        )
+
+    run_calibration.assert_not_called()
+
+
+def test_ve_sweep_optioninfo_runtime_flags_do_not_block_missing_dep_error(
+    tmp_path: Path,
+) -> None:
+    cfg = _write_base_config(tmp_path)
+    out = tmp_path / "out"
+    real_import = builtins.__import__
+
+    def _missing_variance(
+        name: str,
+        globals=None,
+        locals=None,
+        fromlist=(),
+        level: int = 0,
+    ):
+        if name == "invarlock.calibration.variance_ve":
+            exc = ModuleNotFoundError("missing transformers")
+            exc.name = "transformers"
+            raise exc
+        return real_import(name, globals, locals, fromlist, level)
+
+    with (
+        patch.object(calibrate_mod, "_run_calibration_config") as run_calibration,
+        patch("builtins.__import__", _missing_variance),
+        pytest.raises(typer.Exit),
+    ):
+        calibrate_mod.ve_sweep(
+            config=cfg,
+            out=out,
+            tiers=["balanced"],
+            seed=[42],
+            n_seeds=1,
+            seed_start=42,
+            window=[6],
+            target_enable_rate=0.05,
+            profile="ci",
+            device=None,
+            allow_network=typer.Option(True),
+            allow_host_execution=typer.Option(True),
+            allow_third_party_plugins=typer.Option(True),
+            allow_remote_code=typer.Option(True),
+            safety_margin=0.0,
+        )
+
+    run_calibration.assert_not_called()
+
+
 def test_null_sweep_emits_json_csv_md_and_tier_patch(tmp_path: Path) -> None:
     cfg = _write_base_config(tmp_path)
     out = tmp_path / "out"
 
-    def _fake_run_command(*, out: str, tier: str, config: str, **_kwargs) -> str | None:  # noqa: ARG001
+    def _fake_run_command(
+        *, out: Path, tier: str, config: Path, **_kwargs
+    ) -> str | None:  # noqa: ARG001
         loaded = yaml.safe_load(Path(config).read_text(encoding="utf-8"))
         assert loaded["context"]["run"]["skip_overhead_check"] is True
+        out_str = str(out)
         # Exercise both branches: one run produces a report; one is skipped.
-        if "seed_43" in out:
+        if "seed_43" in out_str:
             return None
         report_path = Path(out) / "report.json"
         report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -202,12 +298,12 @@ def test_null_sweep_emits_json_csv_md_and_tier_patch(tmp_path: Path) -> None:
                     "violations": [{"family": None}, {"family": "ffn"}, "not-a-dict"],
                 }
             ],
-            "meta": {"tier": tier, "seed": 0, "config": config},
+            "meta": {"tier": tier, "seed": 0, "config": str(config)},
         }
         report_path.write_text(json.dumps(payload), encoding="utf-8")
         return str(report_path)
 
-    with patch("invarlock.cli.commands.run.run_command", _fake_run_command):
+    with patch.object(calibrate_mod, "_run_calibration_config", _fake_run_command):
         calibrate_mod.null_sweep(
             config=cfg,
             out=out,
@@ -238,11 +334,65 @@ def test_null_sweep_emits_json_csv_md_and_tier_patch(tmp_path: Path) -> None:
     assert "spectral_guard" in tiers_patch["balanced"]
 
 
+def test_ve_sweep_handles_reports_without_variance_guard(tmp_path: Path) -> None:
+    cfg = _write_base_config(tmp_path)
+    out = tmp_path / "out"
+    fake_module = types.SimpleNamespace(
+        summarize_ve_sweep_reports=lambda reports, **kwargs: {
+            "n_runs": len(reports),
+            "recommendations": {"min_effect_lognll": 0.12},
+        }
+    )
+
+    def _fake_run_command(*, out: Path, tier: str, config: Path, **_kwargs) -> str:  # noqa: ARG001
+        report_path = Path(out) / "report.json"
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(
+            json.dumps(
+                {
+                    "guards": [{"name": "other", "metrics": {}}],
+                    "meta": {"tier": tier, "config": str(config)},
+                }
+            ),
+            encoding="utf-8",
+        )
+        return str(report_path)
+
+    with (
+        patch.object(calibrate_mod, "_run_calibration_config", _fake_run_command),
+        patch.object(
+            calibrate_mod,
+            "get_tier_guard_config",
+            return_value={"predictive_one_sided": True},
+        ),
+        patch.dict(sys.modules, {"invarlock.calibration.variance_ve": fake_module}),
+    ):
+        calibrate_mod.ve_sweep(
+            config=cfg,
+            out=out,
+            tiers=["balanced"],
+            seed=[42],
+            n_seeds=1,
+            seed_start=42,
+            window=[6],
+            target_enable_rate=0.05,
+            profile="ci",
+            device=None,
+            safety_margin=0.0,
+        )
+
+    runs_csv = (out / "ve_sweep_runs.csv").read_text(encoding="utf-8")
+    power_csv = (out / "ve_power_curve.csv").read_text(encoding="utf-8")
+    assert "predictive_evaluated" in runs_csv
+    assert "False" in runs_csv
+    assert "mean_ci_width" in power_csv
+
+
 def test_null_sweep_handles_missing_spectral_and_bad_metrics(tmp_path: Path) -> None:
     cfg = _write_base_config(tmp_path)
     out = tmp_path / "out"
 
-    def _fake_run_command(*, out: str, tier: str, config: str, **_kwargs) -> str:  # noqa: ARG001
+    def _fake_run_command(*, out: Path, tier: str, config: Path, **_kwargs) -> str:  # noqa: ARG001
         report_path = Path(out) / "report.json"
         report_path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
@@ -262,12 +412,12 @@ def test_null_sweep_handles_missing_spectral_and_bad_metrics(tmp_path: Path) -> 
                 },
                 {"name": "other", "metrics": {}},
             ],
-            "meta": {"tier": tier, "config": config},
+            "meta": {"tier": tier, "config": str(config)},
         }
         report_path.write_text(json.dumps(payload), encoding="utf-8")
         return str(report_path)
 
-    with patch("invarlock.cli.commands.run.run_command", _fake_run_command):
+    with patch.object(calibrate_mod, "_run_calibration_config", _fake_run_command):
         calibrate_mod.null_sweep(
             config=cfg,
             out=out,
@@ -288,15 +438,15 @@ def test_null_sweep_covers_guard_search_empty_and_non_dict_guards(
     cfg = _write_base_config(tmp_path)
     out = tmp_path / "out"
 
-    def _fake_run_command(*, out: str, tier: str, config: str, **_kwargs) -> str:  # noqa: ARG001
+    def _fake_run_command(*, out: Path, tier: str, config: Path, **_kwargs) -> str:  # noqa: ARG001
         report_path = Path(out) / "report.json"
         report_path.parent.mkdir(parents=True, exist_ok=True)
-        guards = [] if "seed_42" in out else ["not-a-dict"]
-        payload = {"guards": guards, "meta": {"tier": tier, "config": config}}
+        guards = [] if "seed_42" in str(out) else ["not-a-dict"]
+        payload = {"guards": guards, "meta": {"tier": tier, "config": str(config)}}
         report_path.write_text(json.dumps(payload), encoding="utf-8")
         return str(report_path)
 
-    with patch("invarlock.cli.commands.run.run_command", _fake_run_command):
+    with patch.object(calibrate_mod, "_run_calibration_config", _fake_run_command):
         calibrate_mod.null_sweep(
             config=cfg,
             out=out,
@@ -315,13 +465,13 @@ def test_ve_sweep_emits_json_csv_power_curve_and_tier_patch(tmp_path: Path) -> N
     cfg = _write_base_config(tmp_path)
     out = tmp_path / "out"
 
-    def _fake_run_command(*, out: str, tier: str, config: str, **_kwargs) -> str:  # noqa: ARG001
+    def _fake_run_command(*, out: Path, tier: str, config: Path, **_kwargs) -> str:  # noqa: ARG001
         loaded = yaml.safe_load(Path(config).read_text(encoding="utf-8"))
         assert loaded["context"]["run"]["skip_overhead_check"] is True
         report_path = Path(out) / "report.json"
         report_path.parent.mkdir(parents=True, exist_ok=True)
         # Vary CI width by window size to exercise branches and power curve.
-        if "windows_6" in out:
+        if "windows_6" in str(out):
             delta_ci = [-0.002, -0.001]
         else:
             delta_ci = None
@@ -338,13 +488,13 @@ def test_ve_sweep_emits_json_csv_power_curve_and_tier_patch(tmp_path: Path) -> N
                     },
                 }
             ],
-            "meta": {"tier": tier, "config": config},
+            "meta": {"tier": tier, "config": str(config)},
         }
         report_path.write_text(json.dumps(payload), encoding="utf-8")
         return str(report_path)
 
     with (
-        patch("invarlock.cli.commands.run.run_command", _fake_run_command),
+        patch.object(calibrate_mod, "_run_calibration_config", _fake_run_command),
         patch(
             "invarlock.cli.commands.calibrate.get_tier_guard_config",
             lambda *_a, **_k: {"predictive_one_sided": True},
@@ -393,8 +543,10 @@ def test_ve_sweep_covers_guard_search_and_ci_width_exceptions(tmp_path: Path) ->
     )
     out = tmp_path / "out"
 
-    def _fake_run_command(*, out: str, tier: str, config: str, **_kwargs) -> str | None:  # noqa: ARG001
-        if "seed_43" in out:
+    def _fake_run_command(
+        *, out: Path, tier: str, config: Path, **_kwargs
+    ) -> str | None:  # noqa: ARG001
+        if "seed_43" in str(out):
             return None
         report_path = Path(out) / "report.json"
         report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -411,13 +563,13 @@ def test_ve_sweep_covers_guard_search_and_ci_width_exceptions(tmp_path: Path) ->
                 },
                 {"name": "other", "metrics": {}},
             ],
-            "meta": {"tier": tier, "config": config},
+            "meta": {"tier": tier, "config": str(config)},
         }
         report_path.write_text(json.dumps(payload), encoding="utf-8")
         return str(report_path)
 
     with (
-        patch("invarlock.cli.commands.run.run_command", _fake_run_command),
+        patch.object(calibrate_mod, "_run_calibration_config", _fake_run_command),
         patch(
             "invarlock.cli.commands.calibrate.get_tier_guard_config",
             lambda *_a, **_k: {"predictive_one_sided": True},
@@ -456,7 +608,7 @@ def test_ve_sweep_covers_non_dict_variance_config_and_guard_loop_continue(
     )
     out = tmp_path / "out"
 
-    def _fake_run_command(*, out: str, tier: str, config: str, **_kwargs) -> str:  # noqa: ARG001
+    def _fake_run_command(*, out: Path, tier: str, config: Path, **_kwargs) -> str:  # noqa: ARG001
         report_path = Path(out) / "report.json"
         report_path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
@@ -473,13 +625,13 @@ def test_ve_sweep_covers_non_dict_variance_config_and_guard_loop_continue(
                     },
                 },
             ],
-            "meta": {"tier": tier, "config": config},
+            "meta": {"tier": tier, "config": str(config)},
         }
         report_path.write_text(json.dumps(payload), encoding="utf-8")
         return str(report_path)
 
     with (
-        patch("invarlock.cli.commands.run.run_command", _fake_run_command),
+        patch.object(calibrate_mod, "_run_calibration_config", _fake_run_command),
         patch(
             "invarlock.cli.commands.calibrate.get_tier_guard_config",
             lambda *_a, **_k: {"predictive_one_sided": True},

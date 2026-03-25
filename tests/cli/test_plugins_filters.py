@@ -47,14 +47,19 @@ def test_plugins_adapters_json_backend_and_filters(monkeypatch):
     import invarlock.cli.provenance as prov_mod
 
     monkeypatch.setattr(prov_mod, "extract_adapter_provenance", _prov)
+    monkeypatch.setattr(
+        plug_mod, "bitsandbytes_runtime_available", lambda: False, raising=False
+    )
     # Force Linux to avoid Linux-only gating → needs_extra instead of unsupported
     monkeypatch.setattr(plug_mod.platform, "system", lambda: "Linux")
 
-    r = CliRunner().invoke(app, ["plugins", "adapters", "--json", "--show-unsupported"])
+    r = CliRunner().invoke(
+        app, ["advanced", "plugins", "adapters", "--json", "--show-unsupported"]
+    )
     assert r.exit_code == 0, r.output
     payload = json.loads(r.stdout.strip().splitlines()[-1])
     items = payload.get("items", [])
-    # hf_bnb present without CUDA → unsupported
+    # hf_bnb present but runtime unavailable → unsupported
     bnb = next((x for x in items if x.get("name") == "hf_bnb"), None)
     assert bnb and bnb.get("status") == "unsupported"
     assert bnb.get("backend", {}).get("name") == "bitsandbytes"
@@ -68,7 +73,15 @@ def test_plugins_adapters_json_backend_and_filters(monkeypatch):
     # only=missing filter should return only needs_extra
     r2 = CliRunner().invoke(
         app,
-        ["plugins", "adapters", "--json", "--only", "missing", "--show-unsupported"],
+        [
+            "advanced",
+            "plugins",
+            "adapters",
+            "--json",
+            "--only",
+            "missing",
+            "--show-unsupported",
+        ],
     )
     assert r2.exit_code == 0
     payload2 = json.loads(r2.stdout.strip().splitlines()[-1])

@@ -2,9 +2,9 @@ name: CodeQL Security Analysis
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, staging/next ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, staging/next ]
   # Keep scheduled scans for drift detection and manual trigger for audits.
   schedule:
     # Run weekly on Sunday at 3 AM UTC
@@ -13,7 +13,6 @@ on:
 
 permissions:
   contents: read
-  security-events: write
   actions: read
 
 concurrency:
@@ -24,6 +23,10 @@ jobs:
   analyze:
     name: Analyze Python
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
 
     steps:
       - name: Checkout repository

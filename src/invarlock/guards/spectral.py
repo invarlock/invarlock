@@ -119,6 +119,9 @@ class SpectralGuard(Guard):
         self.baseline_degeneracy: dict[str, dict[str, float]] = {}
         self.target_sigma = float(self.sigma_quantile)
         self._run_profile: str | None = None
+        self._scoped_modules_model_id: int | None = None
+        self._scoped_modules_scope: str | None = None
+        self._scoped_modules: tuple[tuple[str, Any], ...] = ()
 
     def _log_event(
         self, operation: str, level: str = "INFO", message: str = "", **data: Any
@@ -142,6 +145,24 @@ class SpectralGuard(Guard):
 
     def _serialize_policy(self) -> dict[str, Any]:
         return _spectral_policy.serialize_policy(self)
+
+    def _get_scoped_modules(self, model: Any) -> tuple[tuple[str, Any], ...]:
+        model_id = id(model)
+        if (
+            self._scoped_modules_model_id == model_id
+            and self._scoped_modules_scope == self.scope
+        ):
+            return self._scoped_modules
+
+        scoped_modules = tuple(
+            (name, module)
+            for name, module in model.named_modules()
+            if self._should_check_module(name, module)
+        )
+        self._scoped_modules_model_id = model_id
+        self._scoped_modules_scope = self.scope
+        self._scoped_modules = scoped_modules
+        return scoped_modules
 
     def prepare(
         self, model: Any, adapter: Any, calib: Any, policy: dict[str, Any]

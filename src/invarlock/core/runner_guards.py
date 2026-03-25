@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from typing import Any
 
 from .api import Guard, GuardWithContext, GuardWithPrepare, RunConfig, RunReport
 from .auto_tuning import resolve_tier_policies
 from .types import LogLevel
+
+ResolveTierPoliciesFn = Callable[
+    [str, str | None, dict[str, Any]], dict[str, dict[str, Any]]
+]
 
 
 def resolve_guard_policies(
@@ -13,7 +18,7 @@ def resolve_guard_policies(
     report: RunReport,
     auto_config: dict[str, Any] | None = None,
     *,
-    resolver: Any = resolve_tier_policies,
+    resolver: ResolveTierPoliciesFn = resolve_tier_policies,
 ) -> dict[str, dict[str, Any]]:
     """Resolve tier-based guard policies from configuration."""
     auto_cfg: dict[str, Any] | None = auto_config

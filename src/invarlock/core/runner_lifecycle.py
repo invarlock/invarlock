@@ -76,26 +76,30 @@ def merge_execution_metrics(
     memory_snapshots: list[dict[str, Any]],
     memory_summary: dict[str, Any],
 ) -> None:
-    if not isinstance(report.metrics, dict):
+    metrics_obj: object = report.metrics
+    if isinstance(metrics_obj, dict):
+        metrics = metrics_obj
+    else:
         report.metrics = {}
+        metrics = report.metrics
 
     if timings:
-        report.metrics.setdefault("timings", {}).update(timings)
+        metrics.setdefault("timings", {}).update(timings)
 
     if guard_timings:
-        report.metrics["guard_timings"] = guard_timings
+        metrics["guard_timings"] = guard_timings
 
     if not memory_snapshots:
         return
 
-    report.metrics["memory_snapshots"] = memory_snapshots
+    metrics["memory_snapshots"] = memory_snapshots
     summary = dict(memory_summary)
     mem_peak = summary.get("memory_mb_peak")
     if isinstance(mem_peak, int | float):
-        existing_peak = report.metrics.get("memory_mb_peak")
+        existing_peak = metrics.get("memory_mb_peak")
         if isinstance(existing_peak, int | float):
             summary["memory_mb_peak"] = max(float(existing_peak), float(mem_peak))
-    report.metrics.update(summary)
+    metrics.update(summary)
 
 
 __all__ = [

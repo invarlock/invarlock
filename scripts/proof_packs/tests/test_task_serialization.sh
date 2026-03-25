@@ -274,13 +274,20 @@ test_create_task_returns_error_when_task_file_write_fails() {
 
     local queue_dir="${TEST_TMPDIR}/queue"
     mkdir -p "${queue_dir}/pending"
-    chmod 500 "${queue_dir}/pending"
+
+    printf() {
+        if [[ "${1:-}" == '%s\n' ]]; then
+            return 1
+        fi
+        builtin printf "$@"
+    }
 
     run create_task "${queue_dir}" "SETUP_BASELINE" "org/model" "model" "14" "[]" '{}' "50"
+    unset -f printf
+
     assert_rc "1" "${RUN_RC}" "write failure returns non-zero"
     assert_match 'Failed to write task file' "${RUN_ERR}" "error message"
-
-    chmod 700 "${queue_dir}/pending"
+    assert_eq "" "$(ls -A "${queue_dir}/pending" 2>/dev/null || true)" "tmp file cleaned up after write failure"
 }
 
 test_create_task_returns_error_when_task_file_finalize_fails() {
@@ -388,6 +395,14 @@ test_task_serialization_field_access_and_update_error_paths() {
     rc=0
     update_task_field "${task_file}" "assigned_gpus" "2"
     assert_eq "2" "$(jq -r '.assigned_gpus' "${task_file}")" "assigned_gpus update replaces value"
+
+    local tmp_file="${task_file}.tmp.${BASHPID:-$$}"
+    mv() { return 1; }
+    rc=0
+    update_task_field "${task_file}" "status" "blocked" || rc=$?
+    assert_rc "1" "${rc}" "update_task_field returns non-zero when atomic rename fails"
+    [[ ! -e "${tmp_file}" ]] || t_fail "temporary update file removed on mv failure path='${tmp_file}'"
+    unset -f mv
 }
 
 test_task_serialization_helper_accessors_cover_wrappers() {

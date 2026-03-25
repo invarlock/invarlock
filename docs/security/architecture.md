@@ -11,6 +11,17 @@ Overview of the core security-related components and defaults.
 - Use `invarlock.security.temporarily_allow_network()` in controlled code blocks
   when you must fetch artifacts during an otherwise offline run.
 
+## Runtime boundary (default containerized execution)
+
+- `invarlock evaluate`, `invarlock advanced calibrate`, and internal `run`
+  flows delegate to the runtime container by default.
+- Use `--mode local` on `invarlock evaluate` for trusted public local runs, or
+  `INVARLOCK_ALLOW_HOST_EXECUTION=1` / `--allow-host-execution` for advanced
+  and internal workflows that intentionally bypass that boundary.
+- Third-party plugin discovery and remote model code execution are separate
+  explicit opt-ins (`INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=1`,
+  `INVARLOCK_ALLOW_REMOTE_CODE=1`).
+
 ## Secure temp directories
 
 - `invarlock.security.secure_tempdir()` creates 0o700 temp dirs and removes them on
@@ -19,7 +30,8 @@ Overview of the core security-related components and defaults.
 
 ## report verification
 
-- `invarlock verify` re-checks schema, pairing math (Δlog → ratio), and drift/overhead gates.
+- `invarlock verify` re-checks schema, pairing math (Δlog → ratio),
+  drift/overhead gates, and runtime attestation via `runtime.manifest.json`.
 - Use it before promotion or downstream automation to prevent policy regressions.
 
 ## Supply chain (reference)

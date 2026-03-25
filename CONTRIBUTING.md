@@ -15,11 +15,15 @@ high-quality PRs that match the current repo layout and tooling.
 - **PyTorch / extras** are pulled in via optional dependencies when needed
 - **Node.js + npm** (recommended for docs linting: markdownlint/cspell via `npx`)
 
-InvarLock runs offline by default. For commands that need downloads (models/datasets),
-enable network explicitly per run:
+InvarLock runs offline by default. For commands that need downloads
+(models/datasets), enable network explicitly per run. Model-loading commands use
+the runtime container by default; trusted local development outside that
+container should use `--mode local` on the public `evaluate` path:
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 invarlock run -c ...   # or invarlock evaluate ...
+INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --mode local --baseline gpt2 --subject distilgpt2 --adapter auto
+# repo preset example:
+INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --mode local --baseline gpt2 --subject gpt2 --adapter auto --preset configs/presets/causal_lm/wikitext2_512.yaml --profile ci
 ```
 
 ### 1.2 Quick setup (recommended)
@@ -429,7 +433,7 @@ At a high level, maintainers:
 2. Update `CHANGELOG.md` with release notes.
 3. Run the full verification and coverage gates (for example, `make verify` and `make coverage-enforce`).
 4. Build distribution artifacts (for example, `python -m build` to produce wheel and sdist under `dist/`).
-5. Run a pre‑release smoke test from the built artifacts, including a minimal `invarlock run`/`invarlock evaluate` flow.
+5. Run a pre‑release smoke test from the built artifacts, including a minimal `invarlock evaluate`/`invarlock verify` flow.
 6. Tag the release and push tags to GitHub.
 7. Let CI publish to PyPI/TestPyPI.
 

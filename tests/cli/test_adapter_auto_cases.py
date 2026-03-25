@@ -143,12 +143,23 @@ def test_resolve_auto_adapter_additional_family_paths(tmp_path: Path) -> None:
     )
     assert mod.resolve_auto_adapter(unknown, default="fallback") == "fallback"
 
-    onnx_dir = tmp_path / "onnx"
-    onnx_dir.mkdir()
-    (onnx_dir / "model.onnx").write_text("fake", encoding="utf-8")
-    assert mod.resolve_auto_adapter(onnx_dir) == "hf_causal_onnx"
+    local_export = tmp_path / "onnx"
+    local_export.mkdir()
+    (local_export / "model.onnx").write_text("fake", encoding="utf-8")
+    assert mod.resolve_auto_adapter(local_export) == "hf_causal"
 
     assert mod.resolve_auto_adapter("org/model-t5-small") == "hf_seq2seq"
+
+
+def test_resolve_auto_adapter_causal_model_type_only_hints(tmp_path: Path) -> None:
+    for model_type in ("llama", "qwen3", "qwen3_moe", "gemma3", "olmo2"):
+        model_dir = tmp_path / model_type
+        model_dir.mkdir()
+        (model_dir / "config.json").write_text(
+            json.dumps({"model_type": model_type}),
+            encoding="utf-8",
+        )
+        assert mod.resolve_auto_adapter(model_dir) == "hf_causal"
 
 
 def test_apply_auto_adapter_if_needed_exception_path() -> None:

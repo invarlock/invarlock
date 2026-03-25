@@ -34,6 +34,10 @@ def test_emit_adds_ts_and_component_for_dict_payload(monkeypatch, capsys) -> Non
     assert ei.value.exit_code == 5
 
 
+def test_ts_returns_utc_isoformat_string() -> None:
+    assert _json._ts().endswith("+00:00")
+
+
 def test_emit_accepts_dataclass_payload(monkeypatch, capsys) -> None:
     monkeypatch.setattr(_json, "_ts", lambda: "X")
 
@@ -119,3 +123,18 @@ def test_encode_error_handles_category_introspection_failure() -> None:
 
     encoded = _json.encode_error(BrokenExc())
     assert encoded["category"] == "Exception"
+
+
+def test_encode_error_falls_back_when_invarlock_type_check_raises(monkeypatch) -> None:
+    class _Meta(type):
+        def __instancecheck__(cls, instance):  # type: ignore[override]
+            raise RuntimeError("boom")
+
+    class FakeInvarlockError(Exception, metaclass=_Meta): ...
+
+    monkeypatch.setattr(_json, "InvarlockError", FakeInvarlockError)
+
+    encoded = _json.encode_error(RuntimeError("boom"))
+    assert encoded["code"] == "E_GENERIC"
+    assert encoded["category"] == "RuntimeError"
+    assert encoded["context"] == {}

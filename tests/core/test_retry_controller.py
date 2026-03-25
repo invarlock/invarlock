@@ -69,6 +69,13 @@ class TestRetryController:
         controller.record_attempt(1, {"passed": False}, {})
         assert controller.should_retry(False) is False
 
+    def test_verbose_timeout_budget_prints_stop_message(self, capsys) -> None:
+        controller = RetryController(max_attempts=3, timeout=0, verbose=True)
+        controller.start_time = time.time() - 1
+
+        assert controller.should_retry(False) is False
+        assert "Timeout 0s exceeded" in capsys.readouterr().out
+
 
 class TestAdjustEditParams:
     def test_adjust_quant_adds_clamp_ratio(self) -> None:

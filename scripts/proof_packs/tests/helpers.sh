@@ -97,6 +97,31 @@ mock_reset() {
     mkdir -p "${TEST_TMPDIR}/fixtures"
 }
 
+push_active_python_bin() {
+    if [[ -v PYTHON_BIN ]]; then
+        TEST_PREV_PYTHON_BIN="${PYTHON_BIN}"
+        TEST_PREV_PYTHON_BIN_WAS_SET="1"
+    else
+        TEST_PREV_PYTHON_BIN=""
+        TEST_PREV_PYTHON_BIN_WAS_SET="0"
+    fi
+
+    local active_python=""
+    active_python="$(command -v python 2>/dev/null || true)"
+    [[ -n "${active_python}" ]] || t_fail "python executable not found for PYTHON_BIN override"
+    export PYTHON_BIN="${active_python}"
+}
+
+pop_active_python_bin() {
+    if [[ "${TEST_PREV_PYTHON_BIN_WAS_SET:-0}" == "1" ]]; then
+        export PYTHON_BIN="${TEST_PREV_PYTHON_BIN}"
+    else
+        unset PYTHON_BIN
+    fi
+    unset TEST_PREV_PYTHON_BIN
+    unset TEST_PREV_PYTHON_BIN_WAS_SET
+}
+
 mock_nvidia_smi_set_mem_free_mib() {
     local gpu_id="$1"
     local mib="$2"

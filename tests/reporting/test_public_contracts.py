@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import invarlock.public_contracts as contracts
@@ -13,18 +14,46 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "bert-mlm-hf",
     }
 
+    family_catalog = contracts.load_model_family_catalog()
+    assert family_catalog["format_version"] == "model-family-catalog-v1"
+    assert family_catalog["as_of"] == "2026-03-25"
+    assert family_catalog["declared_support"][0]["display_name"] == "GPT-2 causal LM"
+    declared = {item["display_name"] for item in family_catalog["declared_support"]}
+    assert declared == {
+        "GPT-2 causal LM",
+        "BERT / RoBERTa MLM",
+        "Mistral 7B causal LM",
+        "Qwen2 7B causal LM",
+        "Qwen2.5 14B causal LM",
+        "Qwen3 causal LM",
+        "DeepSeek-R1-Distill-Qwen causal LM",
+        "Phi-4 causal LM (text-only eval)",
+        "TinyLlama 1.1B causal LM",
+        "OLMo 2 causal LM",
+        "Qwen3.5 causal LM",
+        "Seq2Seq / local pairs",
+    }
+    usage_only = {item["display_name"] for item in family_catalog["usage_only"]}
+    assert "QwQ 32B reasoning" not in usage_only
+    recommended = {
+        item["display_name"] for item in family_catalog["recommended_additions"]
+    }
+    assert recommended == {"Full multimodal evaluation pipeline"}
+
     gpt2_lane = contracts.support_lane_by_id("gpt2-causal-hf")
     assert gpt2_lane is not None
     assert gpt2_lane["support_tier"] == "published_basis"
 
-    onnx_capability = contracts.adapter_capability("hf_causal_onnx")
-    assert onnx_capability is not None
-    assert onnx_capability["guard_coverage"] == "eval_only"
-
     catalog = contracts.contract_catalog()
     assert catalog["support_matrix"]["format_version"] == "support-matrix-v1"
+    assert (
+        catalog["model_family_catalog"]["format_version"] == "model-family-catalog-v1"
+    )
     assert catalog["plugin_compatibility"]["core_abi"] == "0.1"
     assert catalog["plugin_compatibility"]["match_policy"] == "exact_match"
+    assert (
+        catalog["runtime_manifest"]["path"] == "contracts/runtime_manifest.schema.json"
+    )
     assert catalog["policy_pack"]["path"] == "contracts/policy_pack.schema.json"
 
     schema = contracts.load_policy_pack_schema()
@@ -32,6 +61,10 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     assert (
         contracts.load_proof_pack_manifest_schema()["title"]
         == "InvarLock Proof Pack Manifest"
+    )
+    assert (
+        contracts.load_runtime_manifest_schema()["title"]
+        == "InvarLock Runtime Manifest"
     )
 
 
@@ -46,6 +79,28 @@ def test_public_contract_paths_are_repo_relative() -> None:
     assert Path(
         contracts.contract_reference("support_matrix.json")["path"]
     ).as_posix() == ("contracts/support_matrix.json")
+
+
+def test_public_contract_loader_falls_back_to_packaged_contracts(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(contracts, "CONTRACTS_ROOT", tmp_path / "missing")
+
+    payload = contracts.load_support_matrix()
+    assert payload["format_version"] == "support-matrix-v1"
+    assert payload["lanes"]
+
+
+def test_packaged_contract_copies_match_repo_contracts() -> None:
+    repo_contracts = sorted(contracts.CONTRACTS_ROOT.glob("*.json"))
+    assert repo_contracts
+
+    for repo_path in repo_contracts:
+        packaged = contracts.PACKAGE_CONTRACTS_ROOT.joinpath(repo_path.name)
+        assert packaged.is_file(), repo_path.name
+        assert json.loads(packaged.read_text(encoding="utf-8")) == json.loads(
+            repo_path.read_text(encoding="utf-8")
+        )
 
 
 def test_public_contract_helpers_fall_back_when_contracts_are_unavailable(
@@ -65,11 +120,19 @@ def test_public_contract_helpers_fall_back_when_contracts_are_unavailable(
         "format_version": "adapter-capabilities-v1",
         "adapters": [],
     }
+    assert contracts.load_model_family_catalog() == {
+        "format_version": "model-family-catalog-v1",
+        "declared_support": [],
+        "implemented_coverage": [],
+        "usage_only": [],
+        "recommended_additions": [],
+    }
     assert contracts.load_plugin_compatibility() == {
         "format_version": "plugin-compatibility-v1"
     }
     assert contracts.load_policy_pack_schema() == {}
     assert contracts.load_proof_pack_manifest_schema() == {}
+    assert contracts.load_runtime_manifest_schema() == {}
     assert contracts.support_lane_by_id("missing") is None
     assert contracts.adapter_capability("missing") is None
     assert contracts.contract_reference("support_matrix.json") == {
@@ -80,8 +143,10 @@ def test_public_contract_helpers_fall_back_when_contracts_are_unavailable(
 def test_public_contract_helpers_reject_non_mapping_payloads(monkeypatch) -> None:
     payloads = {
         "support_matrix.json": ["unexpected"],
+        "model_family_catalog.json": "unexpected",
         "adapter_capabilities.json": "unexpected",
         "plugin_compatibility.json": ["unexpected"],
+        "runtime_manifest.schema.json": ["unexpected"],
         "policy_pack.schema.json": ["unexpected"],
         "proof_pack_manifest.schema.json": ["unexpected"],
     }
@@ -99,11 +164,19 @@ def test_public_contract_helpers_reject_non_mapping_payloads(monkeypatch) -> Non
         "format_version": "adapter-capabilities-v1",
         "adapters": [],
     }
+    assert contracts.load_model_family_catalog() == {
+        "format_version": "model-family-catalog-v1",
+        "declared_support": [],
+        "implemented_coverage": [],
+        "usage_only": [],
+        "recommended_additions": [],
+    }
     assert contracts.load_plugin_compatibility() == {
         "format_version": "plugin-compatibility-v1"
     }
     assert contracts.load_policy_pack_schema() == {}
     assert contracts.load_proof_pack_manifest_schema() == {}
+    assert contracts.load_runtime_manifest_schema() == {}
 
 
 def test_public_contract_lane_and_adapter_helpers_cover_non_matching_entries(
@@ -129,6 +202,16 @@ def test_public_contract_lane_and_adapter_helpers_cover_non_matching_entries(
                     "bad",
                 ],
             },
+            "model_family_catalog.json": {
+                "format_version": "model-family-catalog-v1",
+                "declared_support": [
+                    {"family_id": "gpt2-causal-lm", "display_name": "GPT-2 causal LM"},
+                    "bad",
+                ],
+                "implemented_coverage": [],
+                "usage_only": [],
+                "recommended_additions": [],
+            },
             "plugin_compatibility.json": {
                 "format_version": "plugin-compatibility-v1",
                 "format": "compatibility-doc",
@@ -145,6 +228,10 @@ def test_public_contract_lane_and_adapter_helpers_cover_non_matching_entries(
     }
     assert contracts.adapter_capability_map() == {
         "good": {"adapter": "good", "guard_coverage": "full"}
+    }
+    assert contracts.load_model_family_catalog()["declared_support"][0] == {
+        "family_id": "gpt2-causal-lm",
+        "display_name": "GPT-2 causal LM",
     }
     assert contracts.contract_reference("plugin_compatibility.json") == {
         "path": "contracts/plugin_compatibility.json",

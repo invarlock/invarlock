@@ -135,7 +135,7 @@ def _render_executive_dashboard(cert: dict[str, Any]) -> str:
 def _append_safety_dashboard_section(
     lines: list[str], evaluation_report: dict[str, Any]
 ) -> None:
-    """Append a concise, first-screen dashboard for the evaluation report."""
+    """Append a concise, first-screen summary table for the evaluation report."""
     block = compute_console_validation_block(evaluation_report)
     overall_pass = bool(block.get("overall_pass"))
     overall_status = (
@@ -263,8 +263,6 @@ def _append_safety_dashboard_section(
             threshold_str,
         )
 
-    lines.append("## Evaluation Dashboard")
-    lines.append("")
     lines.append("| Check | Status | Quick Summary |")
     lines.append("|-------|--------|---------------|")
     lines.append(f"| Overall | {overall_status} | Canonical gate outcomes |")
@@ -732,6 +730,92 @@ def build_console_summary_pack(evaluation_report: dict[str, Any]) -> dict[str, A
     }
 
 
+def _get_generated_at(evaluation_report: dict[str, Any]) -> str:
+    artifacts = evaluation_report.get("artifacts")
+    if isinstance(artifacts, dict):
+        generated_at = artifacts.get("generated_at")
+        if generated_at:
+            return str(generated_at)
+    policy_provenance = evaluation_report.get("policy_provenance")
+    if isinstance(policy_provenance, dict):
+        resolved_at = policy_provenance.get("resolved_at")
+        if resolved_at:
+            return str(resolved_at)
+    return "(not recorded)"
+
+
+def _get_window_plan_summary(evaluation_report: dict[str, Any]) -> str | None:
+    try:
+        plan_ctx = (
+            evaluation_report.get("window_plan")
+            or evaluation_report.get("dataset", {}).get("windows", {})
+            or evaluation_report.get("ppl", {}).get("window_plan")
+        )
+        if not isinstance(plan_ctx, dict):
+            return None
+        profile = plan_ctx.get("profile")
+        preview_n = (
+            plan_ctx.get("preview_n")
+            if plan_ctx.get("preview_n") is not None
+            else plan_ctx.get("actual_preview")
+        )
+        final_n = (
+            plan_ctx.get("final_n")
+            if plan_ctx.get("final_n") is not None
+            else plan_ctx.get("actual_final")
+        )
+        if profile is None and preview_n is None and final_n is None:
+            return None
+        seq_len = evaluation_report.get("dataset", {}).get(
+            "seq_len"
+        ) or evaluation_report.get("dataset", {}).get("sequence_length")
+        seq_len_suffix = f", seq_len={seq_len}" if seq_len else ""
+        return f"Window Plan: {profile}, {preview_n}/{final_n}{seq_len_suffix}"
+    except Exception:
+        return None
+
+
+def _append_report_header(lines: list[str], evaluation_report: dict[str, Any]) -> None:
+    lines.append("# InvarLock Evaluation Report")
+    lines.append("")
+    lines.append(
+        "> *Basis: “point” gates check the point estimate; “upper” gates check the CI "
+        "upper bound; “point & upper” requires both to pass.*"
+    )
+    lines.append("")
+    lines.append(f"**Schema Version:** {evaluation_report['schema_version']}")
+    lines.append(f"**Run ID:** `{evaluation_report['run_id']}`")
+    lines.append(f"**Generated:** {_get_generated_at(evaluation_report)}")
+    lines.append(f"**Edit Type:** {evaluation_report.get('edit_name', 'Unknown')}")
+    lines.append("")
+    lines.append(
+        "> Full evidence: see [`evaluation.report.json`](evaluation.report.json) for complete provenance, digests, and raw measurements."
+    )
+    lines.append("")
+
+
+def _append_executive_summary_section(
+    lines: list[str], evaluation_report: dict[str, Any]
+) -> None:
+    lines.append("## Executive Summary")
+    lines.append("")
+    block = compute_console_validation_block(evaluation_report)
+    overall_pass = bool(block.get("overall_pass"))
+    status_emoji = "✅" if overall_pass else "❌"
+    lines.append(
+        f"**Overall Status:** {status_emoji} {'PASS' if overall_pass else 'FAIL'}"
+    )
+    window_plan_summary = _get_window_plan_summary(evaluation_report)
+    if window_plan_summary:
+        lines.append(f"- {window_plan_summary}")
+    lines.append("")
+
+    dashboard = _render_executive_dashboard(evaluation_report)
+    if dashboard:
+        lines.extend(dashboard.splitlines())
+        lines.append("")
+
+
 def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
     """
     Render an evaluation report as a formatted Markdown report with pretty tables.
@@ -745,23 +829,7 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
     appendix_lines: list[str] = []
     edit_name = str(evaluation_report.get("edit_name") or "").lower()
 
-    # Header
-    lines.append("# InvarLock Evaluation Report")
-    lines.append("")
-    lines.append(
-        "> *Basis: “point” gates check the point estimate; “upper” gates check the CI "
-        "upper bound; “point & upper” requires both to pass.*"
-    )
-    lines.append("")
-    lines.append(f"**Schema Version:** {evaluation_report['schema_version']}")
-    lines.append(f"**Run ID:** `{evaluation_report['run_id']}`")
-    lines.append(f"**Generated:** {evaluation_report['artifacts']['generated_at']}")
-    lines.append(f"**Edit Type:** {evaluation_report.get('edit_name', 'Unknown')}")
-    lines.append("")
-    lines.append(
-        "> Full evidence: see [`evaluation.report.json`](evaluation.report.json) for complete provenance, digests, and raw measurements."
-    )
-    lines.append("")
+    _append_report_header(lines, evaluation_report)
 
     plugins = evaluation_report.get("plugins", {})
     if isinstance(plugins, dict) and plugins:
@@ -787,62 +855,7 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
                 lines.append("- Guards:\n  - " + "\n  - ".join(guard_entries))
     lines.append("")
 
-    # Executive Summary with validation status (canonical, from console block)
-    lines.append("## Executive Summary")
-    lines.append("")
-    _block = compute_console_validation_block(evaluation_report)
-    overall_pass = bool(_block.get("overall_pass"))
-    status_emoji = "✅" if overall_pass else "❌"
-    lines.append(
-        f"**Overall Status:** {status_emoji} {'PASS' if overall_pass else 'FAIL'}"
-    )
-    # Window Plan one-liner for quick audit
-    try:
-        plan_ctx = (
-            evaluation_report.get("window_plan")
-            or evaluation_report.get("dataset", {}).get("windows", {})
-            or evaluation_report.get("ppl", {}).get("window_plan")
-        )
-        seq_len = evaluation_report.get("dataset", {}).get(
-            "seq_len"
-        ) or evaluation_report.get("dataset", {}).get("sequence_length")
-        if isinstance(plan_ctx, dict):
-            profile = plan_ctx.get("profile")
-            preview_n = (
-                plan_ctx.get("preview_n")
-                if plan_ctx.get("preview_n") is not None
-                else plan_ctx.get("actual_preview")
-            )
-            final_n = (
-                plan_ctx.get("final_n")
-                if plan_ctx.get("final_n") is not None
-                else plan_ctx.get("actual_final")
-            )
-            lines.append(
-                f"- Window Plan: {profile}, {preview_n}/{final_n}{', seq_len=' + str(seq_len) if seq_len else ''}"
-            )
-    except Exception:
-        pass
-    lines.append("")
-
-    dashboard = _render_executive_dashboard(evaluation_report)
-    if dashboard:
-        lines.extend(dashboard.splitlines())
-        lines.append("")
-
-    lines.append("## Contents")
-    lines.append("")
-    lines.append("- [Evaluation Dashboard](#evaluation-dashboard)")
-    lines.append("- [Quality Gates](#quality-gates)")
-    lines.append("- [Guard Check Details](#guard-check-details)")
-    lines.append("- [Primary Metric](#primary-metric)")
-    lines.append("- [Guard Observability](#guard-observability)")
-    lines.append("- [Model Information](#model-information)")
-    lines.append("- [Dataset and Provenance](#dataset-and-provenance)")
-    lines.append("- [Policy Configuration](#policy-configuration)")
-    lines.append("- [Appendix](#appendix)")
-    lines.append("- [Evaluation Report Integrity](#evaluation-report-integrity)")
-    lines.append("")
+    _append_executive_summary_section(lines, evaluation_report)
 
     # Validation table with canonical gates (mirrors console allow-list)
     lines.append("## Quality Gates")
@@ -1065,11 +1078,17 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
     lines.append("| Guard Check | Status | Measured | Threshold | Description |")
     lines.append("|--------------|--------|----------|-----------|-------------|")
 
-    inv_summary = evaluation_report["invariants"]
+    inv_summary = evaluation_report.get("invariants", {}) or {}
     validation = evaluation_report.get("validation", {})
     inv_status = "✅ PASS" if validation.get("invariants_pass", False) else "❌ FAIL"
-    inv_counts = inv_summary.get("summary", {}) or {}
-    inv_measure = inv_summary.get("status", "pass").upper()
+    inv_counts = inv_summary.get("summary", {}) if isinstance(inv_summary, dict) else {}
+    if not isinstance(inv_counts, dict):
+        inv_counts = {}
+    inv_measure = (
+        str(inv_summary.get("status", "not recorded")).upper()
+        if isinstance(inv_summary, dict)
+        else "NOT RECORDED"
+    )
     fatal_violations = inv_counts.get("fatal_violations") or 0
     warning_violations = (
         inv_counts.get("warning_violations") or inv_counts.get("violations_found") or 0
@@ -1084,7 +1103,9 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
     lines.append(
         f"| Invariants | {inv_status} | {inv_measure} | pass | Model integrity checks |"
     )
-    invariants_failures = inv_summary.get("failures") or []
+    invariants_failures = (
+        inv_summary.get("failures") if isinstance(inv_summary, dict) else []
+    ) or []
     if warning_violations and not fatal_violations:
         non_fatal_message = None
         for failure in invariants_failures:
@@ -1098,9 +1119,21 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
         lines.append(f"- Non-fatal: {non_fatal_message}")
 
     spec_status = "✅ PASS" if validation.get("spectral_stable", False) else "❌ FAIL"
-    caps_applied = evaluation_report["spectral"]["caps_applied"]
+    spectral_summary = evaluation_report.get("spectral", {}) or {}
+    caps_applied = (
+        spectral_summary.get("caps_applied")
+        if isinstance(spectral_summary, dict)
+        else None
+    )
+    caps_measure = f"{caps_applied} violations" if caps_applied is not None else "N/A"
+    spectral_threshold = (
+        f"< {spectral_summary.get('max_caps')}"
+        if isinstance(spectral_summary, dict)
+        and spectral_summary.get("max_caps") is not None
+        else "< 5"
+    )
     lines.append(
-        f"| Spectral Stability | {spec_status} | {caps_applied} violations | < 5 | Weight matrix spectral norms |"
+        f"| Spectral Stability | {spec_status} | {caps_measure} | {spectral_threshold} | Weight matrix spectral norms |"
     )
 
     # Catastrophic spike safety stop row is now driven by primary metric flags
@@ -1552,7 +1585,7 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
     # Model and Configuration
     lines.append("## Model Information")
     lines.append("")
-    meta = evaluation_report["meta"]
+    meta = evaluation_report.get("meta", {}) or {}
     lines.append(f"- **Model ID:** {meta.get('model_id')}")
     lines.append(f"- **Adapter:** {meta.get('adapter')}")
     lines.append(f"- **Device:** {meta.get('device')}")
@@ -1623,12 +1656,13 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
     # Edit Configuration (removed duplicate Edit Information section)
 
     # Auto-tuning Configuration
-    auto = evaluation_report["auto"]
-    if auto["tier"] != "none":
+    auto = evaluation_report.get("auto", {}) or {}
+    auto_tier = auto.get("tier")
+    if auto_tier and auto_tier != "none":
         lines.append("## Auto-Tuning Configuration")
         lines.append("")
-        lines.append(f"- **Tier:** {auto['tier']}")
-        lines.append(f"- **Probes Used:** {auto['probes_used']}")
+        lines.append(f"- **Tier:** {auto_tier}")
+        lines.append(f"- **Probes Used:** {auto.get('probes_used', 0)}")
     if auto.get("target_pm_ratio"):
         lines.append(
             f"- **Auto Policy Target Ratio (informational):** {auto['target_pm_ratio']:.3f}"
@@ -1802,14 +1836,17 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
             lines.append("")
 
     # Variance Guard (Spectral/RMT summaries are already provided above)
-    variance = evaluation_report["variance"]
+    variance = evaluation_report.get("variance", {}) or {}
+    if not isinstance(variance, dict):
+        variance = {}
     appendix_lines.append("### Variance Guard")
     appendix_lines.append("")
 
     # Display whether VE was enabled after A/B test
-    appendix_lines.append(f"- **Enabled:** {'Yes' if variance['enabled'] else 'No'}")
+    variance_enabled = bool(variance.get("enabled"))
+    appendix_lines.append(f"- **Enabled:** {'Yes' if variance_enabled else 'No'}")
 
-    if variance["enabled"]:
+    if variance_enabled:
         # VE was enabled - show the gain
         gain_value = variance.get("gain", "N/A")
         if isinstance(gain_value, int | float):
@@ -1908,7 +1945,9 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
         appendix_lines.append(f"- **Events Log:** `{artifacts['events_path']}`")
     if artifacts.get("report_path"):
         appendix_lines.append(f"- **Full Report:** `{artifacts['report_path']}`")
-    appendix_lines.append(f"- **Report Generated:** {artifacts['generated_at']}")
+    appendix_lines.append(
+        f"- **Report Generated:** {_get_generated_at(evaluation_report)}"
+    )
     appendix_lines.append("")
 
     if appendix_lines:

@@ -30,6 +30,54 @@ test_runtime_python_wrapper_invokes_repo_helper() {
     assert_eq "ok" "${RUN_OUT}" "forwards helper stdout"
 }
 
+test_pack_run_from_config_invokes_repo_python_entrypoint() {
+    mock_reset
+    # shellcheck source=../runtime.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/runtime.sh"
+
+    local calls="${TEST_TMPDIR}/python.calls"
+    : >"${calls}"
+    _cmd_python() {
+        printf '%s\n' "$*" > "${calls}"
+        return 0
+    }
+
+    run _pack_run_from_config --config demo.yaml --out runs/demo
+    assert_rc "0" "${RUN_RC}" "_pack_run_from_config returns success"
+    assert_match "proof_packs/.*/python/run_from_config\\.py" "$(cat "${calls}")" "invokes repo-only config runner"
+    assert_match "--config demo\\.yaml --out runs/demo" "$(cat "${calls}")" "forwards config-run arguments"
+}
+
+test_cmd_python_honors_python_bin_override() {
+    mock_reset
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/python-override" <<'EOF'
+#!/usr/bin/env bash
+printf 'override %s\n' "$*"
+EOF
+    chmod +x "${bin_dir}/python-override"
+    local had_python_bin="0"
+    local previous_python_bin="${PYTHON_BIN:-}"
+    if [[ -v PYTHON_BIN ]]; then
+        had_python_bin="1"
+    fi
+    export PYTHON_BIN="${bin_dir}/python-override"
+
+    # shellcheck source=../runtime.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/runtime.sh"
+
+    run _cmd_python --version
+    assert_rc "0" "${RUN_RC}" "_cmd_python uses PYTHON_BIN"
+    assert_eq "override --version" "${RUN_OUT}" "PYTHON_BIN command receives arguments"
+
+    if [[ "${had_python_bin}" == "1" ]]; then
+        export PYTHON_BIN="${previous_python_bin}"
+    else
+        unset PYTHON_BIN
+    fi
+}
+
 test_rand_jitter_ms_positive_returns_value_in_range() {
     mock_reset
     # shellcheck source=../runtime.sh
@@ -86,8 +134,14 @@ test_pid_is_alive_proc_checks_proc_pid_dir() {
     # shellcheck source=../runtime.sh
     source "${TEST_ROOT}/scripts/proof_packs/lib/runtime.sh"
 
-    run _pid_is_alive_proc "123"
-    assert_rc "1" "${RUN_RC}" "macOS has no /proc, so pid is not alive via proc backend"
+    local pid="$$"
+    local expected_rc="1"
+    if [[ -d "/proc/${pid}" ]]; then
+        expected_rc="0"
+    fi
+
+    run _pid_is_alive_proc "${pid}"
+    assert_rc "${expected_rc}" "${RUN_RC}" "proc backend follows /proc/<pid> directory presence"
 }
 
 test_pid_is_alive_ps_calls_ps_for_valid_pid() {

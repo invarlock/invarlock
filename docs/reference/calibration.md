@@ -1,6 +1,6 @@
 # Tier Policy Tuning CLI (Calibration)
 
-> Scope note: this page covers **Tier Policy Tuning** via `invarlock calibrate ...`.
+> Scope note: this page covers **Tier Policy Tuning** via `invarlock advanced calibrate ...`.
 > It outputs `tiers_patch_*.yaml` recommendations for `runtime/tiers.yaml`.
 > For proof-pack run-scoped preset derivation (`CALIBRATION_RUN -> GENERATE_PRESET`),
 > see [Proof Pack Internals](../user-guide/proof-packs-internals.md).
@@ -11,23 +11,27 @@
 | --- | --- |
 | **Purpose** | Run policy-tuning sweeps to empirically derive guard thresholds and tier policy recommendations. |
 | **Audience** | Operators recalibrating tier policies for new model families or updated guard contracts. |
-| **Primary commands** | `invarlock calibrate null-sweep`, `invarlock calibrate ve-sweep`. |
+| **Primary commands** | `invarlock advanced calibrate null-sweep`, `invarlock advanced calibrate ve-sweep`. |
 | **Requires** | `invarlock[hf]` for HF workflows; base config YAML for each sweep type. |
 | **Network** | Offline by default; enable per command with `INVARLOCK_ALLOW_NETWORK=1`. |
 | **Source of truth** | `src/invarlock/cli/commands/calibrate.py`, `src/invarlock/calibration/`. |
 
 ## Quick Start
 
+The commands below use the secure-default runtime container. Add
+`--allow-host-execution` only for trusted local calibration workflows that
+intentionally bypass that boundary.
+
 ```bash
 # Run spectral null-sweep (noop edit) to calibrate κ/alpha
-invarlock calibrate null-sweep \
+invarlock advanced calibrate null-sweep \
   --config configs/calibration/null_sweep_ci.yaml \
   --out reports/calibration/null_sweep \
   --tier balanced --tier conservative \
   --n-seeds 10
 
 # Run VE sweep (quant_rtn edit) to calibrate min_effect_lognll
-invarlock calibrate ve-sweep \
+invarlock advanced calibrate ve-sweep \
   --config configs/calibration/rmt_ve_sweep_ci.yaml \
   --out reports/calibration/ve_sweep \
   --tier balanced --tier conservative \
@@ -51,9 +55,10 @@ invarlock calibrate ve-sweep \
 ## Published Basis vs Shipped Configs
 
 Published assurance basis currently covers GPT-2 and BERT profiles. The repo
-also ships pilot calibration configs for additional families such as Mistral 7B
-and Qwen2 7B under `configs/calibration/`, but those configs are not part of
-the published assurance basis until supporting artifacts are attached.
+also ships pilot calibration configs for additional families such as Mistral 7B,
+Qwen2 7B, and Qwen2.5 14B under `configs/calibration/`, but those configs are
+not part of the published assurance basis until supporting artifacts are
+attached.
 
 ### Policy-Tuning Sweep → Tier Policy Flow
 
@@ -87,14 +92,14 @@ the published assurance basis until supporting artifacts are attached.
 
 | Command | Purpose | Key outputs |
 | --- | --- | --- |
-| `invarlock calibrate null-sweep` | Calibrate spectral κ/alpha from null (noop) runs. | `null_sweep_report.json`, `tiers_patch_spectral_null.yaml` |
-| `invarlock calibrate ve-sweep` | Calibrate VE min_effect_lognll from real edit runs. | `ve_sweep_report.json`, `tiers_patch_variance_ve.yaml` |
+| `invarlock advanced calibrate null-sweep` | Calibrate spectral κ/alpha from null (noop) runs. | `null_sweep_report.json`, `tiers_patch_spectral_null.yaml` |
+| `invarlock advanced calibrate ve-sweep` | Calibrate VE min_effect_lognll from real edit runs. | `ve_sweep_report.json`, `tiers_patch_variance_ve.yaml` |
 
 ### null-sweep
 
 Runs a null (no-op edit) sweep and calibrates spectral κ/alpha empirically.
 
-**Usage:** `invarlock calibrate null-sweep --config <CONFIG> --out <OUT> [options]`
+**Usage:** `invarlock advanced calibrate null-sweep --config <CONFIG> --out <OUT> [options]`
 
 | Option | Default | Description |
 | --- | --- | --- |
@@ -120,7 +125,7 @@ Runs a null (no-op edit) sweep and calibrates spectral κ/alpha empirically.
 
 Runs VE predictive-gate sweeps and recommends `min_effect_lognll` per tier.
 
-**Usage:** `invarlock calibrate ve-sweep --config <CONFIG> --out <OUT> [options]`
+**Usage:** `invarlock advanced calibrate ve-sweep --config <CONFIG> --out <OUT> [options]`
 
 | Option | Default | Description |
 | --- | --- | --- |

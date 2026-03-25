@@ -3,9 +3,13 @@
 
 _PACK_CONFIG_GENERATOR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _PACK_CONFIG_GENERATOR_PY_DIR="${_PACK_CONFIG_GENERATOR_DIR}/../python"
+PACK_REPO_ROOT="${PACK_REPO_ROOT:-$(cd "${_PACK_CONFIG_GENERATOR_DIR}/../../.." && pwd)}"
+PACK_REPO_PYTHONPATH="${PACK_REPO_ROOT}/src"
 
 # shellcheck source=dataset_provider_config.sh
 source "${_PACK_CONFIG_GENERATOR_DIR}/dataset_provider_config.sh"
+# shellcheck source=runtime.sh
+source "${_PACK_CONFIG_GENERATOR_DIR}/runtime.sh"
 
 # ============ INVARLOCK CONFIG FOR PROOF PACKS ============
 generate_invarlock_config() {
@@ -76,7 +80,7 @@ model:
   device: "auto"
   device_map: "auto"
   dtype: "bfloat16"
-  trust_remote_code: true
+$(pack_model_trust_remote_code_yaml "  ")
   low_cpu_mem_usage: true
   ${attn_impl_yaml}
 
@@ -179,20 +183,31 @@ run_single_calibration() {
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Large model (${model_size}): using INVARLOCK_SKIP_OVERHEAD_CHECK=1 for calibration" >> "${log_file}"
     fi
 
-    INVARLOCK_WINDOW_OVERLAP_FRACTION=0.0 \
-    INVARLOCK_SKIP_OVERHEAD_CHECK=1 \
-    CUDA_VISIBLE_DEVICES="${cuda_devices}" invarlock run \
-        --config "${config_yaml}" \
-        --profile ci \
-        --out "${run_dir}" \
-        >> "${log_file}" 2>&1 || exit_code=$?
+    local -a run_env=(
+        INVARLOCK_WINDOW_OVERLAP_FRACTION=0.0
+        INVARLOCK_SKIP_OVERHEAD_CHECK=1
+        PYTHONPATH="${PACK_REPO_PYTHONPATH}"
+        CUDA_VISIBLE_DEVICES="${cuda_devices}"
+    )
+    if pack_remote_code_allowed; then
+        run_env+=(INVARLOCK_ALLOW_REMOTE_CODE=1)
+    fi
+
+    (
+        export "${run_env[@]}"
+        _pack_run_from_config \
+            --config "${config_yaml}" \
+            --profile ci \
+            --out "${run_dir}" \
+            >> "${log_file}" 2>&1
+    ) || exit_code=$?
 
     # Generate report from report
     local report_file
     report_file=$(find "${run_dir}" -name "report*.json" -type f 2>/dev/null | head -1)
     if [[ -n "${report_file}" ]]; then
         cp "${report_file}" "${run_dir}/baseline_report.json" 2>/dev/null || true
-        python3 "${_PACK_CONFIG_GENERATOR_PY_DIR}/evaluation_report_from_report.py" \
+        _cmd_python "${_PACK_CONFIG_GENERATOR_PY_DIR}/evaluation_report_from_report.py" \
             --report "${report_file}" \
             --out "${run_dir}/evaluation.report.json" >> "${log_file}" 2>&1 || true
     fi

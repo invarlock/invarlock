@@ -13,7 +13,7 @@ def test_adapter_capabilities_contract_is_exposed_through_plugins_json() -> None
     expected = {item["adapter"]: item for item in contract["adapters"]}
 
     res = CliRunner().invoke(
-        app, ["plugins", "adapters", "--json", "--show-unsupported"]
+        app, ["advanced", "plugins", "adapters", "--json", "--show-unsupported"]
     )
     assert res.exit_code == 0, res.output
     payload = json.loads(res.stdout.strip().splitlines()[-1])
@@ -28,7 +28,6 @@ def test_adapter_capabilities_contract_is_exposed_through_plugins_json() -> None
         "hf_causal",
         "hf_mlm",
         "hf_seq2seq",
-        "hf_causal_onnx",
         "hf_bnb",
         "hf_awq",
         "hf_gptq",

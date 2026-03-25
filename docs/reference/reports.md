@@ -16,7 +16,7 @@ telemetry fields, and HTML export.
 
 - [Quick Start](#quick-start)
 - [report Layout](#report-layout)
-  - [Evaluation Dashboard Interpretation](#evaluation-dashboard-interpretation)
+  - [Executive Summary Interpretation](#executive-summary-interpretation)
 - [Schema](#schema)
   - [Minimal v1 report Example](#minimal-v1-report-example)
   - [Schema Summary](#schema-summary-validator-view)
@@ -35,8 +35,9 @@ telemetry fields, and HTML export.
 # Generate a report from a run report
 invarlock report --run runs/subject/report.json --baseline runs/baseline/report.json --format report
 
-# Validate report structure
+# Validate an attested report bundle
 invarlock verify reports/eval/evaluation.report.json
+# expects reports/eval/runtime.manifest.json next to the report
 
 # Inspect telemetry fields
 jq '.telemetry' reports/eval/evaluation.report.json
@@ -49,7 +50,10 @@ invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/eva
 
 The markdown report is structured to highlight evaluation outcomes first:
 
-- **Evaluation Dashboard**: one-line PASS/FAIL + core gates (primary metric, drift, invariants, spectral, RMT, overhead).
+Attested evaluations also emit `runtime.manifest.json` next to
+`evaluation.report.json`. Archive and verify them together.
+
+- **Executive Summary**: one-line PASS/FAIL + compact gate table (primary metric, drift, invariants, spectral, RMT, overhead).
 - **Quality Gates**: table of canonical gating checks with measured values.
 - **Guard Check Details**: invariants, spectral stability, RMT health, and pairing snapshots.
 - **Primary Metric**: task-specific metric summary with CI + baseline comparison.
@@ -57,7 +61,7 @@ The markdown report is structured to highlight evaluation outcomes first:
 - **Policy Configuration**: tier + digest summary with resolved policy details in `<details>`.
 - **Appendix**: environment, inference diagnostics, and variance guard details.
 
-### Evaluation Dashboard Interpretation
+### Executive Summary Interpretation
 
 | Row | Meaning | Action |
 | --- | --- | --- |
@@ -109,7 +113,8 @@ The markdown report is structured to highlight evaluation outcomes first:
 │                                    ▼                                    │
 │   ┌────────────────────────────────────────────────────────────────┐    │
 │   │                    invarlock verify                            │    │
-│   │ schema + pairing + ratio math + measurement contracts          │    │
+│   │ schema + pairing + ratio math + measurement contracts +        │    │
+│   │ runtime-manifest attestation                                   │    │
 │   └────────────────────────────────────────────────────────────────┘    │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -438,7 +443,7 @@ html = render_report_html(report)
 - `primary_metric_tail` appears only for ppl-like metrics with paired windows.
 - The rendered HTML is derived from the Markdown report. If values look wrong,
   inspect the underlying `evaluation.report.json`.
-- The Markdown report is a human-readable view (starts with an Evaluation Dashboard + Contents); the JSON report is the canonical evidence artifact.
+- The Markdown report is a human-readable view that starts with the Executive Summary; the JSON report is the canonical evidence artifact.
 
 ---
 

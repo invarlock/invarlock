@@ -16,8 +16,9 @@
 # Allow model + dataset downloads for a single command
 INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --baseline gpt2 --subject gpt2
 
-# Force evaluation device for a one-off run
-INVARLOCK_EVAL_DEVICE=cpu invarlock run -c <config>.yaml --out runs/cpu_smoke
+# Force evaluation device for a one-off compare/evaluate run
+INVARLOCK_EVAL_DEVICE=cpu INVARLOCK_ALLOW_NETWORK=1 \
+  invarlock evaluate --baseline gpt2 --subject gpt2 --device cpu
 ```
 
 ## Concepts
@@ -62,9 +63,12 @@ INVARLOCK_EVAL_DEVICE=cpu invarlock run -c <config>.yaml --out runs/cpu_smoke
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `INVARLOCK_TRUST_REMOTE_CODE` | unset | Allow HF adapters to set `trust_remote_code=true`. |
+| `INVARLOCK_TRUST_REMOTE_CODE` | unset | Request `trust_remote_code=true` compatibility mode. |
+| `INVARLOCK_ALLOW_REMOTE_CODE` | unset | Explicitly allow remote model code execution. |
 
-HF adapters also honor `TRUST_REMOTE_CODE_BOOL` and `ALLOW_REMOTE_CODE` for compatibility.
+`INVARLOCK_TRUST_REMOTE_CODE`, `TRUST_REMOTE_CODE_BOOL`, and `ALLOW_REMOTE_CODE`
+only request remote code. The request still fails unless
+`INVARLOCK_ALLOW_REMOTE_CODE=1` is also present or `--allow-remote-code` is used.
 
 ### Evaluation & pairing
 
@@ -103,7 +107,7 @@ HF adapters also honor `TRUST_REMOTE_CODE_BOOL` and `ALLOW_REMOTE_CODE` for comp
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `INVARLOCK_EXPORT_MODEL` | unset | Enable HF export during `invarlock run`. |
+| `INVARLOCK_EXPORT_MODEL` | unset | Enable HF export during model-export capable CLI flows. |
 | `INVARLOCK_EXPORT_DIR` | unset | Target directory for model export. |
 
 ### Guarding & evidence
@@ -136,9 +140,18 @@ Strictness/tiny-relax/overhead-skip are also config/profile policy:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `INVARLOCK_DISABLE_PLUGIN_DISCOVERY` | unset | Disable plugin discovery in `plugins` and `doctor`. |
-| `INVARLOCK_MINIMAL` | unset | Show minimal plugin list in `invarlock plugins`. |
-| `INVARLOCK_PLUGINS_DRY_RUN` | unset | Force plugin install/uninstall dry run. |
+| `INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS` | unset | Enable third-party plugin discovery. |
+| `INVARLOCK_MINIMAL` | unset | Show minimal plugin list in `invarlock advanced plugins`. |
+
+### Runtime enforcement
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `INVARLOCK_ALLOW_HOST_EXECUTION` | unset | Advanced/internal host-execution override. Prefer `invarlock evaluate --mode local` for the public compare/evaluate path. |
+| `INVARLOCK_CONTAINER_EXECUTION` | unset | Internal recursion guard marking runtime-container execution. |
+| `INVARLOCK_RUNTIME_IMAGE` | unset | Override the OCI image used for containerized model execution. |
+| `INVARLOCK_RUNTIME_IMAGE_DIGEST` | unset | Supply the immutable digest recorded into `runtime.manifest.json`. |
+| `INVARLOCK_RUNTIME_VERIFIER` | unset | Override the `invarlock-runtime-verify` binary path. |
 
 ### Docs build
 
@@ -151,7 +164,7 @@ Strictness/tiny-relax/overhead-skip are also config/profile policy:
 
 - **Downloads blocked**: set `INVARLOCK_ALLOW_NETWORK=1` and retry.
 - **Calibration iterables fail**: use `INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE=1`.
-- **Plugin list empty**: unset `INVARLOCK_DISABLE_PLUGIN_DISCOVERY` or `INVARLOCK_MINIMAL`.
+- **Third-party plugins missing**: set `INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=1` or use `--allow-third-party-plugins`.
 
 ## Observability
 

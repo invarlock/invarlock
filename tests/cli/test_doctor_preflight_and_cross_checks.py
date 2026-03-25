@@ -234,7 +234,7 @@ def test_doctor_json_optional_deps_and_registry(monkeypatch, capsys):
         lambda: ["synthetic"],
         raising=False,
     )
-    monkeypatch.setenv("INVARLOCK_DISABLE_PLUGIN_DISCOVERY", "1")
+    monkeypatch.setenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "1")
     with pytest.raises(typer.Exit) as exc:
         doctor_mod.doctor_command(json_out=True)
     assert exc.value.exit_code == 0
@@ -243,7 +243,7 @@ def test_doctor_json_optional_deps_and_registry(monkeypatch, capsys):
     ]
     payload = json.loads(lines[-1])
     codes = {f["code"] for f in payload.get("findings", [])}
-    assert "D006" in codes  # plugin discovery disabled note
+    assert "D006" in codes  # third-party plugin discovery explicitly enabled note
 
 
 def test_doctor_config_preflight_findings(monkeypatch, tmp_path, capsys):
@@ -760,7 +760,7 @@ def test_doctor_non_json_device_and_optional_paths(monkeypatch):
     monkeypatch.setattr(
         doctor_mod.importlib.util, "find_spec", fake_find_spec, raising=False
     )
-    monkeypatch.delenv("INVARLOCK_DISABLE_PLUGIN_DISCOVERY", raising=False)
+    monkeypatch.delenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", raising=False)
     monkeypatch.setitem(
         sys.modules, "transformers", types.SimpleNamespace(__version__="1.0")
     )

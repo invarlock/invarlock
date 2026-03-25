@@ -59,6 +59,19 @@ def _find_step_by_uses_prefix(
     )
 
 
+def _iter_pip_install_commands(workflow: dict[str, Any]) -> list[str]:
+    commands: list[str] = []
+    for step in _iter_job_steps(workflow):
+        run = step.get("run")
+        if not isinstance(run, str):
+            continue
+        for line in run.splitlines():
+            stripped = line.strip()
+            if "pip install" in stripped:
+                commands.append(stripped)
+    return commands
+
+
 def test_supply_chain_job_configured():
     """Test supply-chain job includes core security checks.
 
@@ -91,6 +104,15 @@ def test_generate_sbom_script_exists():
     contents = script_path.read_text(encoding="utf-8")
     assert "cyclonedx-bom" in contents
     assert "SBOM written to" in contents
+
+
+def test_offline_bundle_script_exists():
+    script_path = Path("scripts/release/make_offline_bundle.sh")
+    assert script_path.exists(), "offline bundle generator script missing"
+
+    contents = script_path.read_text(encoding="utf-8")
+    assert "release-offline-bundle-v1" in contents
+    assert "Offline release bundle written to" in contents
 
 
 def test_workflows_pin_github_actions_to_full_shas():
@@ -132,6 +154,28 @@ def test_workflows_declare_explicit_permissions():
     assert not missing_job_level, "Missing job permissions:\n" + "\n".join(
         missing_job_level
     )
+
+
+def test_workflows_pin_pip_installs_by_hash() -> None:
+    offenders: list[str] = []
+    for workflow_path in _workflow_paths():
+        workflow = _load_workflow(workflow_path)
+        for command in _iter_pip_install_commands(workflow):
+            if "--require-hashes" not in command:
+                offenders.append(f"{workflow_path.name}: {command}")
+
+    assert not offenders, "Unhashed workflow pip installs:\n" + "\n".join(offenders)
+
+
+def test_scorecards_workflow_uses_least_privilege_top_level_permissions() -> None:
+    workflow = _load_workflow(Path(".github/workflows/scorecards.yml"))
+    assert workflow["permissions"] == {"contents": "read"}
+
+    analysis = workflow["jobs"]["analysis"]
+    assert analysis["permissions"] == {
+        "id-token": "write",
+        "security-events": "write",
+    }
 
 
 def test_release_workflow_uses_trusted_publishing():
@@ -180,7 +224,14 @@ def test_release_workflow_builds_and_bundles_release_assets():
     build_steps = build_check.get("steps", [])
 
     install_step = _find_step_by_name(build_steps, "Install build tooling")
-    assert ".[release-ci,security-ci]" in install_step["run"]
+    assert (
+        install_step["run"]
+        == "python -m pip install --require-hashes -r requirements/workflows/release-security-py313.txt"
+    )
+
+    smoke_step = _find_step_by_name(build_steps, "Install smoke from wheel")
+    assert "dist/smoke-requirements.txt" in smoke_step["run"]
+    assert "--require-hashes" in smoke_step["run"]
 
     assert _find_step_by_name(build_steps, "Generate release SBOM")
     sbom_upload = _find_step_by_name(build_steps, "Upload SBOM artifact")
@@ -199,17 +250,65 @@ def test_release_workflow_builds_and_bundles_release_assets():
     checkout_step = bundle_steps[0]
     assert checkout_step["uses"].startswith("actions/checkout@")
 
-    sigstore_step = _find_step_by_uses_prefix(
-        bundle_steps, "sigstore/gh-action-sigstore-python@"
+    sigstore_steps = [
+        step
+        for step in bundle_steps
+        if str(step.get("uses", "")).startswith("sigstore/gh-action-sigstore-python@")
+    ]
+    assert len(sigstore_steps) == 2
+    assert sigstore_steps[0]["name"] == "Sign release artifacts"
+    assert sigstore_steps[0]["with"]["inputs"] == "dist/*"
+    assert sigstore_steps[0]["with"]["upload-signing-artifacts"] is True
+
+    bundle_build_step = _find_step_by_name(
+        bundle_steps, "Create offline verification bundle"
     )
-    assert sigstore_step["with"]["inputs"] == "dist/*"
-    assert sigstore_step["with"]["upload-signing-artifacts"] is True
+    assert "scripts/release/make_offline_bundle.sh" in bundle_build_step["run"]
+    assert "--dist-dir dist" in bundle_build_step["run"]
+    assert "--sbom artifacts/supply-chain/sbom.json" in bundle_build_step["run"]
+    assert "--provenance-dir provenance" in bundle_build_step["run"]
+    assert "--output-dir release-assets" in bundle_build_step["run"]
+
+    assert sigstore_steps[1]["name"] == "Sign offline verification bundle"
+    assert (
+        sigstore_steps[1]["with"]["inputs"] == "release-assets/*-offline-bundle.tar.gz"
+    )
+    assert sigstore_steps[1]["with"]["upload-signing-artifacts"] is True
 
     release_step = _find_step_by_name(bundle_steps, "Create or update GitHub release")
+    assert bundle_steps.index(sigstore_steps[1]) < bundle_steps.index(release_step)
     assert "*.sigstore.json" in release_step["run"]
+    assert "cp dist/* release-assets/" in release_step["run"]
+    assert 'gh release upload "$tag" release-assets/* --clobber' in release_step["run"]
+    assert "release-assets/*-offline-bundle.tar.gz" not in release_step["run"]
     assert "gh release create" in release_step["run"]
     assert "gh release upload" in release_step["run"]
     assert "release-assets/*" in release_step["run"]
+
+    testpypi_smoke = workflow["jobs"]["testpypi_smoke"]
+    smoke_steps = testpypi_smoke.get("steps", [])
+    download_step = _find_step_by_name(smoke_steps, "Download published TestPyPI wheel")
+    assert "https://test.pypi.org/pypi/invarlock/" in download_step["run"]
+    assert "wheelhouse/requirements.txt" in download_step["run"]
+
+    install_published_step = _find_step_by_name(
+        smoke_steps, "Install published wheel and smoke test"
+    )
+    assert "--require-hashes" in install_published_step["run"]
+    assert "wheelhouse/requirements.txt" in install_published_step["run"]
+
+
+def test_ci_verify_full_pins_make_to_setup_python() -> None:
+    workflow = _load_workflow(Path(".github/workflows/ci.yml"))
+    verify_full = workflow["jobs"]["verify-full"]
+
+    env = verify_full.get("env", {})
+    assert env["PYTHON"] == "python"
+
+    steps = verify_full.get("steps", [])
+    verify_step = _find_step_by_name(steps, "Full verify")
+    assert "make verify" in verify_step["run"]
+    assert "mkdocs build --strict" in verify_step["run"]
 
 
 def test_scorecard_workflow_is_configured():
@@ -219,9 +318,10 @@ def test_scorecard_workflow_is_configured():
     workflow = _load_workflow(workflow_path)
     triggers = workflow["on"]
     assert triggers["push"]["branches"] == ["main"]
+    assert "branch_protection_rule" in triggers
     assert triggers["schedule"]
     assert "workflow_dispatch" in triggers
-    assert workflow["permissions"] == "read-all"
+    assert workflow["permissions"] == {"contents": "read"}
 
     analysis = workflow["jobs"]["analysis"]
     assert analysis["permissions"] == {
@@ -232,6 +332,7 @@ def test_scorecard_workflow_is_configured():
     steps = analysis.get("steps", [])
     scorecard_step = _find_step_by_uses_prefix(steps, "ossf/scorecard-action@")
     assert scorecard_step["with"] == {
+        "repo_token": "${{ secrets.SCORECARD_TOKEN || github.token }}",
         "publish_results": True,
         "results_file": "results.sarif",
         "results_format": "sarif",
@@ -249,7 +350,7 @@ def test_scorecard_workflow_is_configured():
     upload_artifact_step = _find_step_by_uses_prefix(steps, "actions/upload-artifact@")
     assert (
         upload_artifact_step["uses"]
-        == "actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f"
+        == "actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f"
     )
 
 
@@ -292,8 +393,20 @@ def test_readme_exposes_scorecard_badge():
 
 def test_codeql_workflow_uses_repo_config():
     workflow = _load_workflow(Path(".github/workflows/codeql.yml"))
+    assert workflow["permissions"] == {
+        "contents": "read",
+        "actions": "read",
+    }
+
+    analyze = workflow["jobs"]["analyze"]
+    assert analyze["permissions"] == {
+        "contents": "read",
+        "actions": "read",
+        "security-events": "write",
+    }
+
     init_step = _find_step_by_uses_prefix(
-        workflow["jobs"]["analyze"]["steps"], "github/codeql-action/init@"
+        analyze["steps"], "github/codeql-action/init@"
     )
     assert init_step["with"]["config-file"] == ".github/codeql/codeql-config.yml"
 
@@ -308,3 +421,39 @@ def test_codeql_config_scopes_analysis_to_shipped_python():
     excluded_ids = set(config["query-filters"][0]["exclude"]["id"])
     assert "py/empty-except" in excluded_ids
     assert "py/unused-local-variable" in excluded_ids
+
+
+def test_model_evidence_workflow_is_configured() -> None:
+    workflow = _load_workflow(Path(".github/workflows/model-evidence-sweep.yml"))
+
+    triggers = workflow["on"]
+    assert "workflow_dispatch" in triggers
+    assert triggers["schedule"] == [{"cron": "0 5 * * *"}]
+    assert workflow["permissions"] == {"contents": "read"}
+
+    job = workflow["jobs"]["model-evidence-sweep"]
+    assert job["runs-on"] == ["self-hosted", "linux", "gpu"]
+    assert job["timeout-minutes"] == 1440
+
+    env = job["env"]
+    assert env["PYTHONPATH"] == "${{ github.workspace }}/src"
+    assert env["INVARLOCK_ALLOW_NETWORK"] == "1"
+
+    steps = job["steps"]
+    checkout = _find_step_by_name(steps, "Checkout repository")
+    assert checkout["uses"].startswith("actions/checkout@")
+
+    install = _find_step_by_name(steps, "Install (core + hf)")
+    assert (
+        install["run"]
+        == "python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt"
+    )
+
+    sweep = _find_step_by_name(steps, "Run shipped-model evidence sweep")
+    assert "scripts/model_evidence_sweep.py" in sweep["run"]
+    assert "--profile ci" in sweep["run"]
+    assert "reports/model_evidence/${{ github.run_id }}" in sweep["run"]
+
+    upload = _find_step_by_uses_prefix(steps, "actions/upload-artifact@")
+    assert upload["with"]["name"] == "model-evidence-${{ github.run_id }}"
+    assert upload["with"]["path"] == "reports/model_evidence/${{ github.run_id }}/"

@@ -1,7 +1,7 @@
 # Example local preset (copy/rename before editing).
 #
 # This is a full run config for an edited (quant_rtn) run and is meant to be
-# paired against a baseline report via `invarlock run --baseline ...`.
+# paired against a baseline report via `invarlock evaluate --baseline-report ...`.
 
 model:
   id: "sshleifer/tiny-gpt2"

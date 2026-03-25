@@ -685,9 +685,13 @@ class TestPipelineErrorScenarios:
         try:
             # Attempt to write to read-only directory should fail
             test_file = os.path.join(readonly_dir, "test.json")
-            with pytest.raises(PermissionError):
+            if hasattr(os, "geteuid") and os.geteuid() == 0:
                 with open(test_file, "w") as f:
                     json.dump({"test": "data"}, f)
+            else:
+                with pytest.raises(PermissionError):
+                    with open(test_file, "w") as f:
+                        json.dump({"test": "data"}, f)
         finally:
             # Restore permissions for cleanup
             os.chmod(readonly_dir, 0o755)

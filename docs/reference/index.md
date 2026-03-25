@@ -12,6 +12,7 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 | [Configuration Schema](config-schema.md) | YAML config structure and precedence | CLI users |
 | [Guards](guards.md) | Safety check configuration and evidence | Users tuning guards |
 | [Model Adapters](model-adapters.md) | Adapter selection and capabilities | CLI and API users |
+| [Model Family Catalog](model-family-catalog.md) | Authoritative support inventory and backlog | Reviewers, tool authors |
 | [Public Contracts](contracts.md) | Stable public contracts for reports, verification, and policy artifacts | Tool authors, reviewers |
 | [Datasets](datasets.md) | Dataset providers and pairing | CLI users |
 | [reports](reports.md) | v1 schema, telemetry, and HTML export | Operators, tool authors |
@@ -25,11 +26,12 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 
 ### Running Evaluations
 
-1. [CLI Reference](cli.md) — `evaluate`, `verify`, `run` commands
+1. [CLI Reference](cli.md) — `evaluate`, `verify`, `report`, and `advanced`
 2. [Configuration Schema](config-schema.md) — YAML presets and profiles
 3. [Datasets](datasets.md) — Provider configuration
 4. [Model Adapters](model-adapters.md) — Adapter selection
-5. [Public Contracts](contracts.md) — Machine-readable trust contracts
+5. [Model Family Catalog](model-family-catalog.md) — Support inventory and backlog
+6. [Public Contracts](contracts.md) — Machine-readable trust contracts
 
 ### Understanding reports
 
@@ -48,14 +50,16 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 1. [API Guide](api-guide.md) — `CoreRunner.execute` and helpers
 2. [Programmatic Quickstart](programmatic-quickstart.md) — Minimal examples
 3. [Architecture](architecture.md) — System layers and data flow
-4. [Public Contracts](contracts.md) — Evidence and policy contract surfaces
-5. [Observability](observability.md) — Monitoring infrastructure
+4. [Model Family Catalog](model-family-catalog.md) — Support inventory and backlog
+5. [Public Contracts](contracts.md) — Evidence and policy contract surfaces
+6. [Observability](observability.md) — Monitoring infrastructure
 
 ### Operations
 
 1. [Environment Variables](env-vars.md) — Runtime configuration
 2. [Artifact Layout](artifacts.md) — Evidence retention
 3. [Observability](observability.md) — Health checking and telemetry
+4. [CLI Reference](cli.md) — Advanced namespaces such as `proof-pack`, `policy`, and `plugins`
 
 ## Related Documentation
 

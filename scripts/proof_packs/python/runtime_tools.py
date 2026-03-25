@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import os
 
 UTC = getattr(datetime, "UTC", datetime.timezone.utc)  # noqa: UP017
 
@@ -20,6 +21,22 @@ def iso_to_epoch(iso: str) -> int:
 def now_iso_plus_seconds(seconds: int) -> str:
     dt = datetime.datetime.now(UTC) + datetime.timedelta(seconds=seconds)
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def env_truthy(name: str) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return False
+    return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def require_remote_code_opt_in(context: str) -> bool:
+    if env_truthy("INVARLOCK_ALLOW_REMOTE_CODE"):
+        return True
+    raise RuntimeError(
+        f"{context} requires INVARLOCK_ALLOW_REMOTE_CODE=1 before using "
+        "trust_remote_code=True."
+    )
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:

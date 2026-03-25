@@ -29,6 +29,7 @@ nav:
       - Reports: reference/reports.md
       - Environment Variables: reference/env-vars.md
       - Model Adapters: reference/model-adapters.md
+      - Model Family Catalog: reference/model-family-catalog.md
       - Public Contracts: reference/contracts.md
       - Configuration Schema: reference/config-schema.md
       - Tier Policy Catalog: reference/tier-policy-catalog.md
@@ -54,6 +55,7 @@ nav:
       - GPU/MPS-First Guards: assurance/13-gpu-mps-first-guards.md
   - Security:
       - Best Practices: security/best-practices.md
+      - Release Verification: security/release-verification.md
       - Threat Model: security/threat-model.md
       - Architecture: security/architecture.md
       - Pip Audit Allowlist: security/pip-audit-allowlist.md

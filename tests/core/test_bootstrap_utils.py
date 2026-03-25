@@ -70,3 +70,83 @@ def test_compute_paired_delta_log_ci_uses_weights_for_resampling():
     expected = float(np.mean(delta[idx]))
     assert lo == pytest.approx(expected)
     assert hi == pytest.approx(expected)
+
+
+def test_weight_helpers_cover_invalid_inputs_and_zero_total_path():
+    assert B._normalize_weights(None, 3) is None
+    assert B._normalize_weights([1.0, 2.0], 3) is None
+    assert B._normalize_weights([1.0, float("nan"), 2.0], 3) is None
+    assert B._normalize_weights([1.0, -1.0, 2.0], 3) is None
+    assert B._normalize_weights([0.0, 0.0, 0.0], 3) is None
+    assert B._normalize_weights([2.0, 2.0, 2.0], 3) is None
+    weights = B._normalize_weights([1.0, 2.0, 3.0], 3)
+    assert weights is not None
+    assert float(weights.sum()) == pytest.approx(1.0)
+
+    mean = B._weighted_mean(
+        np.array([1.0, 3.0], dtype=float), np.array([0.0, 0.0], dtype=float)
+    )
+    assert mean == pytest.approx(2.0)
+
+
+def test_weighted_bootstrap_helpers_cover_small_n_and_validation_errors():
+    rng = np.random.default_rng(0)
+    lo, hi = B._bca_interval_weighted(
+        np.array([2.0], dtype=float),
+        weights=np.array([1.0], dtype=float),
+        replicates=10,
+        alpha=0.1,
+        rng=rng,
+    )
+    assert lo == hi == pytest.approx(2.0)
+
+    with pytest.raises(ValueError):
+        B._bootstrap_mean_ci_weighted(
+            np.array([1.0, 2.0], dtype=float),
+            np.array([0.2, 0.8], dtype=float),
+            method="percentile",
+            replicates=0,
+            alpha=0.1,
+            seed=0,
+        )
+    with pytest.raises(ValueError):
+        B._bootstrap_mean_ci_weighted(
+            np.array([1.0, 2.0], dtype=float),
+            np.array([0.2, 0.8], dtype=float),
+            method="percentile",
+            replicates=10,
+            alpha=1.5,
+            seed=0,
+        )
+    with pytest.raises(ValueError):
+        B._bootstrap_mean_ci_weighted(
+            np.array([1.0, 2.0], dtype=float),
+            np.array([0.2, 0.8], dtype=float),
+            method="unknown",
+            replicates=10,
+            alpha=0.1,
+            seed=0,
+        )
+
+
+def test_weighted_bootstrap_bca_handles_single_dominant_weight_and_short_weights():
+    lo, hi = B._bootstrap_mean_ci_weighted(
+        np.array([1.0, 3.0], dtype=float),
+        np.array([1.0, 0.0], dtype=float),
+        method="bca",
+        replicates=32,
+        alpha=0.1,
+        seed=0,
+    )
+    assert lo <= hi
+
+    lo2, hi2 = B.compute_paired_delta_log_ci(
+        [1.2, 1.3, 1.4],
+        [1.0, 1.1, 1.2],
+        weights=[10.0],
+        method="percentile",
+        replicates=10,
+        alpha=0.1,
+        seed=0,
+    )
+    assert lo2 <= hi2

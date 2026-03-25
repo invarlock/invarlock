@@ -14,6 +14,9 @@ security or alignment.
   as potentially untrusted artifacts.
 - Default runtime posture disables outbound network connections unless
   `INVARLOCK_ALLOW_NETWORK=1` is explicitly set.
+- Default runtime posture keeps model-loading commands inside the runtime
+  container unless a trusted public workflow uses `invarlock evaluate --mode local`
+  or an advanced/internal workflow explicitly sets `INVARLOCK_ALLOW_HOST_EXECUTION=1`.
 - Evaluation runs use the pairing, windowing, and bootstrap profiles
   described in the assurance docs and configs.
 
@@ -28,6 +31,13 @@ security or alignment.
 │  │ NETWORK LAYER                                                     │  │
 │  │ INVARLOCK_ALLOW_NETWORK=0 by default; outbound blocked unless     │  │
 │  │ explicitly enabled.                                               │  │
+│  └───────────────────────────────────────────────────────────────────┘  │
+│                               │                                         │
+│                               ▼                                         │
+│  ┌───────────────────────────────────────────────────────────────────┐  │
+│  │ RUNTIME LAYER                                                     │  │
+│  │ container execution by default; host execution only with          │  │
+│  │ `evaluate --mode local` (public) or advanced/internal host bypass │  │
 │  └───────────────────────────────────────────────────────────────────┘  │
 │                               │                                         │
 │                               ▼                                         │
@@ -48,7 +58,7 @@ security or alignment.
 │  ┌───────────────────────────────────────────────────────────────────┐  │
 │  │ EVIDENCE LAYER                                                    │  │
 │  │ evaluation.report.json with seeds, hashes, policy digest, and     │  │
-│  │ guard measurement contracts for audit.                            │  │
+│  │ guard measurement contracts plus runtime.manifest.json for audit. │  │
 │  └───────────────────────────────────────────────────────────────────┘  │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -75,9 +85,12 @@ security or alignment.
 
 - Network guard (`invarlock.security`) denies outbound sockets by default; network
   use must be opted into per command.
+- Runtime security defaults keep model-loading commands containerized, third-party
+  plugins disabled, and remote model code off unless explicitly allowed.
 - Supply-chain checks in CI (SBOM generation, `pip-audit`, secret scanning).
 - Strict configuration and report validation (`invarlock doctor`,
-  `invarlock verify`) to detect misconfiguration and schema drift.
+  `invarlock verify`) to detect misconfiguration, schema drift, and runtime
+  attestation mismatches.
 - report fields for seeds, windowing, dataset/tokenizer hashes, and guard
   telemetry so reviewers can audit the assurance evidence.
 
@@ -100,8 +113,9 @@ provenance checks (e.g., model cards, hash verification) before evaluation.
 
 **Threat:** Unsafe deserialization executes arbitrary code during model load.
 
-**Mitigation:** Use `weights_only=True` when available in PyTorch. Adapters
-using `from_pretrained` inherit HF's safetensors preference.
+**Mitigation:** InvarLock no longer uses pickle-capable adapter snapshot restore
+in the default path, and adapters using `from_pretrained` inherit HF's
+safetensors preference.
 
 **Detection:** Invariants guard checks for non-finite values post-load; does
 not catch code execution during load itself.

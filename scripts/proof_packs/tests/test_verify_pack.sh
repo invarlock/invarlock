@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 
-test_verify_pack_validates_checksums_and_certs() {
+test_verify_pack_validates_checksums_and_reports() {
     mock_reset
 
     source ./scripts/proof_packs/verify_pack.sh
 
     local pack_dir="${TEST_TMPDIR}/pack"
-    mkdir -p "${pack_dir}/certs"
-    echo "{}" > "${pack_dir}/certs/evaluation.report.json"
+    mkdir -p "${pack_dir}/reports"
+    echo "{}" > "${pack_dir}/reports/evaluation.report.json"
 
     local sha_cmd
     sha_cmd="$(pack_sha256_cmd)"
     (
         cd "${pack_dir}"
-        ${sha_cmd} certs/evaluation.report.json > checksums.sha256
+        ${sha_cmd} reports/evaluation.report.json > checksums.sha256
     )
 
     local checksums_digest
@@ -25,6 +25,9 @@ test_verify_pack_validates_checksums_and_certs() {
     cat > "${bin_dir}/invarlock" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
+for arg in "$@"; do
+    [[ "${arg}" != "--allow-unattested-artifacts" ]] || exit 97
+done
 echo '{"ok": true}'
 EOF
     chmod +x "${bin_dir}/invarlock"
@@ -61,14 +64,14 @@ test_verify_pack_rejects_json_output_inside_pack() {
     source ./scripts/proof_packs/verify_pack.sh
 
     local pack_dir="${TEST_TMPDIR}/pack"
-    mkdir -p "${pack_dir}/certs"
-    echo "{}" > "${pack_dir}/certs/evaluation.report.json"
+    mkdir -p "${pack_dir}/reports"
+    echo "{}" > "${pack_dir}/reports/evaluation.report.json"
 
     local sha_cmd
     sha_cmd="$(pack_sha256_cmd)"
     (
         cd "${pack_dir}"
-        ${sha_cmd} certs/evaluation.report.json > checksums.sha256
+        ${sha_cmd} reports/evaluation.report.json > checksums.sha256
     )
 
     local checksums_digest
@@ -76,7 +79,7 @@ test_verify_pack_rejects_json_output_inside_pack() {
     printf '%s\n' "{\"format\":\"proof-pack-v1\",\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
 
     run pack_verify_pack --pack "${pack_dir}" --json-out "${pack_dir}/verify.json"
-    assert_rc "1" "${RUN_RC}" "json output inside pack is rejected"
+    assert_rc "2" "${RUN_RC}" "json output inside pack is rejected"
     assert_match "--json-out must point outside the pack directory" "${RUN_ERR}" "error explains path constraint"
 }
 
@@ -99,15 +102,73 @@ test_verify_pack_double_dash_terminator() {
     assert_rc "2" "${RUN_RC}" "terminator stops parsing"
 }
 
-
-test_verify_pack_verify_certs_without_json_out() {
+test_verify_pack_manifest_digest_validation_reports_missing_and_empty_fields_directly() {
     mock_reset
 
     source ./scripts/proof_packs/verify_pack.sh
 
     local pack_dir="${TEST_TMPDIR}/pack"
-    mkdir -p "${pack_dir}/certs"
-    echo "{}" > "${pack_dir}/certs/evaluation.report.json"
+    mkdir -p "${pack_dir}"
+
+    printf '%s\n' '{"format":"proof-pack-v1","checksums_sha256":"checksums.sha256"}' > "${pack_dir}/manifest.json"
+    run pack_verify_manifest_binds_checksums "${pack_dir}" "false"
+    assert_rc "1" "${RUN_RC}" "missing digest field fails"
+    assert_match "missing checksums_sha256_digest" "${RUN_ERR}" "missing digest error is direct"
+
+    printf '%s\n' '{"format":"proof-pack-v1","checksums_sha256":"checksums.sha256","checksums_sha256_digest":""}' > "${pack_dir}/manifest.json"
+    run pack_verify_manifest_binds_checksums "${pack_dir}" "false"
+    assert_rc "1" "${RUN_RC}" "empty digest field fails"
+    assert_match "checksums_sha256_digest is empty" "${RUN_ERR}" "empty digest error is direct"
+}
+
+test_verify_pack_manifest_attestation_accepts_digest_backed_refs() {
+    mock_reset
+
+    source ./scripts/proof_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}/results/verdicts" "${pack_dir}/metadata"
+    echo '{"verdict":"PASS"}' > "${pack_dir}/results/verdicts/final_verdict.json"
+    echo '{"commit":"abc"}' > "${pack_dir}/metadata/source_repo.json"
+    echo '{"models":{"org/model":{"revision":"abc"}}}' > "${pack_dir}/metadata/model_revisions.json"
+
+    local subject_digest config_digest materials_digest
+    subject_digest="$(python3 -c 'import hashlib,sys; print("sha256:"+hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "${pack_dir}/results/verdicts/final_verdict.json")"
+    config_digest="$(python3 -c 'import hashlib,sys; print("sha256:"+hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "${pack_dir}/metadata/source_repo.json")"
+    materials_digest="$(python3 -c 'import hashlib,sys; print("sha256:"+hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "${pack_dir}/metadata/model_revisions.json")"
+
+    cat > "${pack_dir}/manifest.json" <<EOF
+{"format":"proof-pack-v1","checksums_sha256":"checksums.sha256","checksums_sha256_digest":"0000000000000000000000000000000000000000000000000000000000000000","subject":{"name":"final_verdict","path":"results/verdicts/final_verdict.json","digest":"${subject_digest}"},"invocation":{"config_source":{"path":"metadata/source_repo.json","digest":"${config_digest}"}},"materials":[{"name":"model_revisions","path":"metadata/model_revisions.json","digest":"${materials_digest}"}]}
+EOF
+
+    run pack_verify_manifest_attestation "${pack_dir}"
+    assert_rc "0" "${RUN_RC}" "digest-backed attestation references verify"
+}
+
+test_verify_pack_manifest_attestation_rejects_digest_mismatch() {
+    mock_reset
+
+    source ./scripts/proof_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}/results/verdicts"
+    echo '{"verdict":"PASS"}' > "${pack_dir}/results/verdicts/final_verdict.json"
+    printf '%s\n' '{"format":"proof-pack-v1","checksums_sha256":"checksums.sha256","checksums_sha256_digest":"0000000000000000000000000000000000000000000000000000000000000000","subject":{"name":"final_verdict","path":"results/verdicts/final_verdict.json","digest":"sha256:0000000000000000000000000000000000000000000000000000000000000000"}}' > "${pack_dir}/manifest.json"
+
+    run pack_verify_manifest_attestation "${pack_dir}"
+    assert_rc "1" "${RUN_RC}" "subject digest mismatch fails attestation verification"
+    assert_match "digest mismatch" "${RUN_ERR}" "digest mismatch error reported"
+}
+
+
+test_verify_pack_verify_reports_without_json_out() {
+    mock_reset
+
+    source ./scripts/proof_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}/reports"
+    echo "{}" > "${pack_dir}/reports/evaluation.report.json"
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
@@ -118,7 +179,7 @@ EOF
     chmod +x "${bin_dir}/invarlock"
     PATH="${bin_dir}:${PATH}"
 
-    run pack_verify_certs "${pack_dir}" ""
+    run pack_verify_reports "${pack_dir}" ""
     assert_rc "0" "${RUN_RC}" "verify without json_out succeeds"
 }
 
@@ -145,19 +206,19 @@ test_verify_pack_reports_missing_pack_dir_and_files() {
     source ./scripts/proof_packs/verify_pack.sh
 
     run pack_verify_pack --pack "${TEST_TMPDIR}/missing"
-    assert_rc "1" "${RUN_RC}" "missing pack dir fails"
+    assert_rc "3" "${RUN_RC}" "missing pack dir fails"
 
     local pack_dir="${TEST_TMPDIR}/pack"
     mkdir -p "${pack_dir}"
     run pack_verify_pack --pack "${pack_dir}"
-    assert_rc "1" "${RUN_RC}" "missing manifest fails"
+    assert_rc "3" "${RUN_RC}" "missing manifest fails"
 
     echo "{}" > "${pack_dir}/manifest.json"
     run pack_verify_pack --pack "${pack_dir}"
-    assert_rc "1" "${RUN_RC}" "missing checksums fails"
+    assert_rc "3" "${RUN_RC}" "missing checksums fails"
 }
 
-test_verify_pack_sha256_cmd_fallback_and_no_certs() {
+test_verify_pack_sha256_cmd_fallback_and_no_reports() {
     mock_reset
 
     source ./scripts/proof_packs/verify_pack.sh
@@ -195,7 +256,7 @@ EOF
     printf '%s\n' "{\"format\":\"proof-pack-v1\",\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
 
     run pack_verify_pack --pack "${pack_dir}"
-    assert_rc "1" "${RUN_RC}" "missing certs fails"
+    assert_rc "7" "${RUN_RC}" "missing reports fails"
 
     PATH="${original_path}"
 }
@@ -325,7 +386,7 @@ test_verify_pack_rejects_tampered_checksums_when_manifest_binds_digest() {
     )
 
     run pack_verify_pack --pack "${pack_dir}" --skip-verify
-    assert_rc "1" "${RUN_RC}" "tampered checksums must fail when digest is bound"
+    assert_rc "6" "${RUN_RC}" "tampered checksums must fail when digest is bound"
 }
 
 
@@ -350,7 +411,7 @@ test_verify_pack_strict_requires_manifest_signature() {
     printf '%s\n' "{\"format\":\"proof-pack-v1\",\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
 
     run pack_verify_pack --pack "${pack_dir}" --skip-verify --strict
-    assert_rc "1" "${RUN_RC}" "strict mode requires a manifest signature"
+    assert_rc "5" "${RUN_RC}" "strict mode requires a manifest signature"
 }
 
 
@@ -390,7 +451,7 @@ EOF
     PATH="${bin_dir}:${PATH}"
 
     run pack_verify_pack --pack "${pack_dir}" --skip-verify --strict
-    assert_rc "1" "${RUN_RC}" "strict mode rejects extra files"
+    assert_rc "6" "${RUN_RC}" "strict mode rejects extra files"
 
     PATH="${original_path}"
 }
@@ -441,8 +502,9 @@ test_verify_pack_rejects_manifest_missing_checksums_digest_field() {
     printf '%s\n' '{"format":"proof-pack-v1","checksums_sha256":"checksums.sha256"}' > "${pack_dir}/manifest.json"
 
     run pack_verify_pack --pack "${pack_dir}" --skip-verify
-    assert_rc "1" "${RUN_RC}" "missing digest must fail"
-    assert_match "manifest missing required field: checksums_sha256_digest" "${RUN_ERR}" "missing digest error"
+    assert_rc "4" "${RUN_RC}" "missing digest must fail schema validation"
+    assert_match "checksums_sha256_digest" "${RUN_ERR}" "missing digest error mentions field"
+    assert_match "required property" "${RUN_ERR}" "missing digest error comes from schema validation"
 }
 
 test_verify_pack_rejects_manifest_with_empty_checksums_digest_field() {
@@ -464,8 +526,9 @@ test_verify_pack_rejects_manifest_with_empty_checksums_digest_field() {
     printf '%s\n' '{"format":"proof-pack-v1","checksums_sha256":"checksums.sha256","checksums_sha256_digest":""}' > "${pack_dir}/manifest.json"
 
     run pack_verify_pack --pack "${pack_dir}" --skip-verify
-    assert_rc "1" "${RUN_RC}" "empty digest must fail"
-    assert_match "64-char sha256 hex" "${RUN_ERR}" "empty digest error"
+    assert_rc "4" "${RUN_RC}" "empty digest must fail schema validation"
+    assert_match "checksums_sha256_digest" "${RUN_ERR}" "empty digest error mentions field"
+    assert_match "too short" "${RUN_ERR}" "empty digest rejected by schema length validation"
 }
 
 test_verify_pack_rejects_manifest_with_wrong_format() {
@@ -489,7 +552,7 @@ test_verify_pack_rejects_manifest_with_wrong_format() {
     printf '%s\n' "{\"format\":\"proof-pack-v0\",\"generated_at\":\"2026-03-12T00:00:00Z\",\"suite\":\"subset\",\"network_mode\":\"offline\",\"determinism\":\"strict\",\"repeats\":0,\"run_dir\":\"runs/example\",\"artifacts\":[\"payload.txt\"],\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
 
     run pack_verify_pack --pack "${pack_dir}" --skip-verify
-    assert_rc "1" "${RUN_RC}" "bad manifest format fails"
+    assert_rc "4" "${RUN_RC}" "bad manifest format fails"
     assert_match "proof-pack-v1" "${RUN_ERR}" "error mentions required format"
 }
 
@@ -514,8 +577,9 @@ test_verify_pack_rejects_manifest_with_bad_checksums_pointer() {
     printf '%s\n' "{\"format\":\"proof-pack-v1\",\"checksums_sha256\":\"manifest.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
 
     run pack_verify_pack --pack "${pack_dir}" --skip-verify
-    assert_rc "1" "${RUN_RC}" "bad checksum pointer fails"
-    assert_match "checksums_sha256 must point to 'checksums.sha256'" "${RUN_ERR}" "error mentions checksums pointer"
+    assert_rc "4" "${RUN_RC}" "bad checksum pointer fails schema validation"
+    assert_match "checksums_sha256" "${RUN_ERR}" "error mentions checksums pointer field"
+    assert_match "checksums\\.sha256" "${RUN_ERR}" "error mentions required checksums pointer"
 }
 
 test_verify_pack_rejects_manifest_when_checksums_digest_computation_is_empty() {
@@ -527,7 +591,7 @@ test_verify_pack_rejects_manifest_when_checksums_digest_computation_is_empty() {
     mkdir -p "${pack_dir}"
     echo "payload" > "${pack_dir}/payload.txt"
     echo "junk" > "${pack_dir}/checksums.sha256"
-    echo '{"format":"proof-pack-v1","checksums_sha256":"checksums.sha256","checksums_sha256_digest":"deadbeef"}' > "${pack_dir}/manifest.json"
+    echo '{"format":"proof-pack-v1","checksums_sha256":"checksums.sha256","checksums_sha256_digest":"0000000000000000000000000000000000000000000000000000000000000000"}' > "${pack_dir}/manifest.json"
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
@@ -541,8 +605,8 @@ EOF
     PATH="${bin_dir}:${PATH}"
 
     run pack_verify_pack --pack "${pack_dir}" --skip-verify
-    assert_rc "1" "${RUN_RC}" "empty computed digest must fail"
-    assert_match "64-char sha256 hex" "${RUN_ERR}" "digest computation error"
+    assert_rc "6" "${RUN_RC}" "empty computed digest must fail"
+    assert_match "Failed to compute sha256 for checksums\\.sha256" "${RUN_ERR}" "digest computation error"
 
     PATH="${original_path}"
 }
@@ -567,7 +631,7 @@ test_verify_pack_strict_requires_gpg_when_signature_present() {
     }
 
     run pack_verify_pack --pack "${pack_dir}" --skip-verify --strict
-    assert_rc "1" "${RUN_RC}" "strict verification fails when gpg missing"
+    assert_rc "5" "${RUN_RC}" "strict verification fails when gpg missing"
     assert_match "gpg not found \\(strict mode requires signature verification\\)" "${RUN_ERR}" "strict gpg missing error"
 }
 
@@ -596,7 +660,7 @@ EOF
     PATH="${bin_dir}:${PATH}"
 
     run pack_verify_pack --pack "${pack_dir}" --skip-verify
-    assert_rc "1" "${RUN_RC}" "invalid signature must fail"
+    assert_rc "5" "${RUN_RC}" "invalid signature must fail"
     assert_match "manifest signature verification failed" "${RUN_ERR}" "signature failure surfaced"
 
     PATH="${original_path}"
@@ -612,7 +676,7 @@ test_verify_pack_rejects_signature_when_manifest_records_mismatched_fingerprint(
     echo "payload" > "${pack_dir}/payload.txt"
     echo "sig" > "${pack_dir}/manifest.json.asc"
     echo "{}" > "${pack_dir}/checksums.sha256"
-    printf '%s\n' '{"format":"proof-pack-v1","checksums_sha256":"checksums.sha256","checksums_sha256_digest":"0000000000000000000000000000000000000000000000000000000000000000","signing_key_fingerprint":"DEADBEEF"}' > "${pack_dir}/manifest.json"
+    printf '%s\n' '{"format":"proof-pack-v1","checksums_sha256":"checksums.sha256","checksums_sha256_digest":"0000000000000000000000000000000000000000000000000000000000000000","signing_key_fingerprint":"DEADBEEFDEADBEEF"}' > "${pack_dir}/manifest.json"
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
@@ -627,21 +691,21 @@ EOF
     PATH="${bin_dir}:${PATH}"
 
     run pack_verify_pack --pack "${pack_dir}" --skip-verify
-    assert_rc "1" "${RUN_RC}" "mismatched fingerprint must fail"
+    assert_rc "5" "${RUN_RC}" "mismatched fingerprint must fail"
     assert_match "does not match signature key" "${RUN_ERR}" "fingerprint mismatch surfaced"
 
     PATH="${original_path}"
 }
 
-test_verify_pack_verify_certs_attempts_error_injection_reports_best_effort() {
+test_verify_pack_verify_reports_attempts_error_injection_reports_best_effort() {
     mock_reset
 
     source ./scripts/proof_packs/verify_pack.sh
 
     local pack_dir="${TEST_TMPDIR}/pack"
-    mkdir -p "${pack_dir}/certs/modelA/edit/run_1" "${pack_dir}/certs/modelA/errors/nan_injection"
-    echo "{}" > "${pack_dir}/certs/modelA/edit/run_1/evaluation.report.json"
-    echo "{}" > "${pack_dir}/certs/modelA/errors/nan_injection/evaluation.report.json"
+    mkdir -p "${pack_dir}/reports/modelA/edit/run_1" "${pack_dir}/reports/modelA/errors/nan_injection"
+    echo "{}" > "${pack_dir}/reports/modelA/edit/run_1/evaluation.report.json"
+    echo "{}" > "${pack_dir}/reports/modelA/errors/nan_injection/evaluation.report.json"
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
@@ -661,23 +725,23 @@ EOF
     local original_path="${PATH}"
     PATH="${bin_dir}:${PATH}"
 
-    run pack_verify_certs "${pack_dir}" ""
-    assert_rc "0" "${RUN_RC}" "verify succeeds when error-injection certs fail"
+    run pack_verify_reports "${pack_dir}" ""
+    assert_rc "0" "${RUN_RC}" "verify succeeds when error-injection reports fail"
     assert_match "errors/nan_injection/evaluation\\.report\\.json" "$(cat "${TEST_TMPDIR}/invarlock.calls")" "attempts error-injection reports"
 
     PATH="${original_path}"
 }
 
-test_verify_pack_verify_certs_errors_when_only_error_injection_reports_present() {
+test_verify_pack_verify_reports_errors_when_only_error_injection_reports_present() {
     mock_reset
 
     source ./scripts/proof_packs/verify_pack.sh
 
     local pack_dir="${TEST_TMPDIR}/pack"
-    mkdir -p "${pack_dir}/certs/modelA/errors/nan_injection"
-    echo "{}" > "${pack_dir}/certs/modelA/errors/nan_injection/evaluation.report.json"
+    mkdir -p "${pack_dir}/reports/modelA/errors/nan_injection"
+    echo "{}" > "${pack_dir}/reports/modelA/errors/nan_injection/evaluation.report.json"
 
-    run pack_verify_certs "${pack_dir}" ""
+    run pack_verify_reports "${pack_dir}" ""
     assert_rc "1" "${RUN_RC}" "only error-injection reports must fail"
     assert_match "No clean reports found" "${RUN_ERR}" "clean report requirement surfaced"
 }
@@ -705,5 +769,5 @@ test_verify_pack_rejects_tampered_payload_when_checksums_bound() {
     echo "tampered" > "${pack_dir}/payload.txt"
 
     run pack_verify_pack --pack "${pack_dir}" --skip-verify
-    assert_rc "1" "${RUN_RC}" "tampered payload must fail checksum verification"
+    assert_rc "6" "${RUN_RC}" "tampered payload must fail checksum verification"
 }

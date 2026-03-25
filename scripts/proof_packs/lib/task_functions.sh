@@ -10,6 +10,8 @@
 
 # Source dependencies
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PACK_REPO_ROOT="${PACK_REPO_ROOT:-$(cd "${SCRIPT_DIR}/../../.." && pwd)}"
+PACK_REPO_PYTHONPATH="${PACK_REPO_ROOT}/src"
 # shellcheck source=runtime.sh
 source "${SCRIPT_DIR}/runtime.sh"
 # shellcheck source=dataset_provider_config.sh
@@ -62,7 +64,7 @@ _get_model_invarlock_config_fallback() {
             echo "512:512:192:192:96"
             ;;
         "13")
-            echo "1536:1536:192:192:64"
+            echo "512:512:192:192:64"
             ;;
         "30")
             echo "1024:1024:192:192:48"
@@ -127,6 +129,12 @@ _resolve_bootstrap_replicates() {
 
 _default_ci_min_windows() {
     local seq_len="${1:-}"
+    local tier="${2:-${INVARLOCK_TIER:-balanced}}"
+    local dataset_kind="${3:-}"
+
+    if [[ -z "${dataset_kind}" ]]; then
+        dataset_kind="$(pack_dataset_provider_kind "${INVARLOCK_DATASET:-}")"
+    fi
 
     if [[ -n "${INVARLOCK_CERT_MIN_WINDOWS:-}" ]]; then
         echo "${INVARLOCK_CERT_MIN_WINDOWS}"
@@ -134,13 +142,106 @@ _default_ci_min_windows() {
     fi
 
     local default_windows=256
-    # The balanced tier enforces a 50k token minimum; short seq_len on short-text
-    # datasets (e.g., WikiText-2) can fall below that floor due to padding.
-    if [[ "${seq_len}" =~ ^[0-9]+$ && "${seq_len}" -le 256 ]]; then
+    # The balanced tier enforces a 50k token minimum. On short-text datasets like
+    # WikiText-2, larger seq_len does not imply larger effective token counts
+    # because many windows are heavily padded. The Qwen2.5-14B clean controls only
+    # reached 45,723 total tokens at 352+352 windows, so keep a higher proof-pack
+    # floor for balanced WikiText-2 runs instead of weakening the public policy.
+    if [[ "${tier}" == "balanced" && "${dataset_kind}" == "wikitext2" && "${seq_len}" =~ ^[0-9]+$ && "${seq_len}" -ge 512 ]]; then
+        default_windows=400
+    elif [[ "${seq_len}" =~ ^[0-9]+$ && "${seq_len}" -le 256 ]]; then
         default_windows=352
     fi
 
     echo "${default_windows}"
+}
+
+_effective_ci_planning_target() {
+    local model_size="$1"
+    local tier="${2:-balanced}"
+    local dataset_kind="${3:-wikitext2}"
+    [[ "${model_size}" == "13" && "${tier}" == "balanced" && "${dataset_kind}" == "wikitext2" ]]
+}
+
+_plan_effective_ci_schedule() {
+    local model_ref="$1"
+    local model_size="$2"
+    local tier="$3"
+    local dataset_kind="$4"
+    local split="$5"
+    local seed="$6"
+
+    if ! _effective_ci_planning_target "${model_size}" "${tier}" "${dataset_kind}"; then
+        return 0
+    fi
+    if [[ -n "${INVARLOCK_CERT_MIN_WINDOWS:-}" ]]; then
+        jq -n --arg reason "manual_window_override" '{status:"skipped", reason:$reason}'
+        return 0
+    fi
+    if [[ -z "${model_ref}" || ! -e "${model_ref}" ]]; then
+        jq -n --arg reason "missing_model_ref" '{status:"skipped", reason:$reason}'
+        return 0
+    fi
+
+    local planner="${SCRIPT_DIR}/../python/plan_effective_windows.py"
+    local -a candidate_args=()
+    local seq_len=""
+    for seq_len in 512 768 1024 1536; do
+        local min_windows=""
+        min_windows="$(_default_ci_min_windows "${seq_len}" "${tier}" "${dataset_kind}")"
+        candidate_args+=(--candidate "${seq_len}:${min_windows}:${min_windows}")
+    done
+
+    PYTHONPATH="${PACK_REPO_PYTHONPATH}" \
+        INVARLOCK_ALLOW_REMOTE_CODE="${INVARLOCK_ALLOW_REMOTE_CODE:-}" \
+        _cmd_python "${planner}" \
+            --model-path "${model_ref}" \
+            --dataset-provider "${dataset_kind}" \
+            --split "${split}" \
+            --seed "${seed}" \
+            --tier "${tier}" \
+            --profile "ci" \
+            "${candidate_args[@]}"
+}
+
+_apply_effective_ci_schedule() {
+    local plan_json="$1"
+    local log_file="$2"
+
+    [[ -n "${plan_json}" ]] || return 0
+
+    local status=""
+    status="$(printf '%s' "${plan_json}" | jq -r '.status // "unknown"')"
+    if [[ "${status}" == "skipped" ]]; then
+        echo "  Effective CI planning skipped: $(printf '%s' "${plan_json}" | jq -r '.reason // "unknown"')" >> "${log_file}"
+        return 0
+    fi
+
+    local min_tokens_target=""
+    local effective_min_tokens=""
+    min_tokens_target="$(printf '%s' "${plan_json}" | jq -r '.min_tokens_target // 0')"
+    effective_min_tokens="$(printf '%s' "${plan_json}" | jq -r '.effective_min_tokens // 0')"
+    echo "  Effective CI planning target: min_tokens=${min_tokens_target}, with_headroom=${effective_min_tokens}" >> "${log_file}"
+    while IFS= read -r candidate; do
+        [[ -n "${candidate}" ]] || continue
+        echo "  Candidate: ${candidate}" >> "${log_file}"
+    done < <(
+        printf '%s' "${plan_json}" | jq -r '
+            .candidates[]? |
+            "seq=\(.seq_len) stride=\(.stride) requested=\(.requested_preview)+\(.requested_final) actual=\(.actual_preview)+\(.actual_final) tokens=\(.total_tokens) floor=\(.effective_min_tokens) floor_met=\(.tokens_floor_met) reason=\(.reason)"
+        '
+    )
+
+    if [[ "${status}" == "selected" ]]; then
+        local selected=""
+        selected="$(printf '%s' "${plan_json}" | jq -r '.selected | "\(.seq_len):\(.stride):\(.actual_preview):\(.actual_final)"')"
+        echo "  Selected effective CI schedule: ${selected}" >> "${log_file}"
+        printf '%s\n' "${selected}"
+        return 0
+    fi
+
+    echo "ERROR: Effective CI planning found no viable balanced WikiText-2 schedule. Switch dataset provider (for example hf_text/allenai-c4)." >> "${log_file}"
+    return 1
 }
 
 # Wrapper to get model size - tries main script function first, then fallback
@@ -233,18 +334,18 @@ _task_get_model_revision() {
 }
 
 # Check if model is large (30B+) and needs special handling.
-# Changed threshold from 70 to 30 to fix hang on 30-40B models:
-# - Skips overhead check (avoids loading model twice, which can exceed 180GB)
+# Changed threshold from 70 to 13 to cover 14B-class dense checkpoints:
+# - Skips overhead check (avoids loading the edited model twice in compare-mode runs)
 _is_large_model() {
     local model_size="$1"
     if [[ "${model_size}" == "moe" ]]; then
         return 0
     fi
     if [[ "${model_size}" =~ ^[0-9]+$ ]]; then
-        [[ ${model_size} -ge 30 ]]
+        [[ ${model_size} -ge 13 ]]
         return
     fi
-    [[ "${model_size}" =~ 30 || "${model_size}" =~ 32 || "${model_size}" =~ 34 || "${model_size}" =~ 40 || "${model_size}" =~ 70 || "${model_size}" =~ 72 || "${model_size}" =~ 65 || "${model_size}" =~ 80 || "${model_size}" =~ 90 ]]
+    [[ "${model_size}" =~ 13 || "${model_size}" =~ 14 || "${model_size}" =~ 30 || "${model_size}" =~ 32 || "${model_size}" =~ 34 || "${model_size}" =~ 40 || "${model_size}" =~ 70 || "${model_size}" =~ 72 || "${model_size}" =~ 65 || "${model_size}" =~ 80 || "${model_size}" =~ 90 ]]
 }
 
 # Resolve the concrete InvarLock adapter name for a model path/ID.
@@ -268,6 +369,92 @@ _validate_evaluate_baseline_report() {
 
     _cmd_python "${SCRIPT_DIR}/../python/validate_baseline_report.py" \
         "${report_path}" "${expected_adapter}" "${expected_profile}" "${expected_tier}"
+}
+
+_stage_runtime_input_for_eval() {
+    local source_file="$1"
+    local cert_dir="$2"
+    local log_file="$3"
+    local label="$4"
+
+    if [[ -z "${source_file}" || ! -f "${source_file}" ]]; then
+        return 1
+    fi
+
+    local staged_dir="${cert_dir}/runtime_inputs"
+    mkdir -p "${staged_dir}" || return 1
+
+    local staged_file="${staged_dir}/$(basename "${source_file}")"
+    cp -f "${source_file}" "${staged_file}" >> "${log_file}" 2>&1 || return 1
+    if [[ -n "${label}" ]]; then
+        echo "  Staged ${label} for evaluate runtime: ${staged_file}" >> "${log_file}"
+    fi
+    printf '%s\n' "$(cd "$(dirname "${staged_file}")" && pwd)/$(basename "${staged_file}")"
+}
+
+_stage_preset_for_eval() {
+    _stage_runtime_input_for_eval "$1" "$2" "$3" "preset"
+}
+
+_stage_baseline_report_for_eval() {
+    _stage_runtime_input_for_eval "$1" "$2" "$3" "baseline report"
+}
+
+_normalize_staged_preset_for_eval() {
+    local staged_preset="$1"
+    local seq_len="$2"
+    local stride="$3"
+    local preview_n="$4"
+    local final_n="$5"
+    local skip_overhead="$6"
+    local log_file="$7"
+
+    if [[ -z "${staged_preset}" || ! -f "${staged_preset}" ]]; then
+        return 1
+    fi
+
+    local normalize_args=(
+        "normalize_staged_preset.py"
+        --preset "${staged_preset}"
+        --seq-len "${seq_len}"
+        --stride "${stride}"
+        --preview-n "${preview_n}"
+        --final-n "${final_n}"
+    )
+    if [[ "${skip_overhead}" == "1" ]]; then
+        normalize_args+=(--skip-overhead-check)
+    fi
+
+    local previous_python_bin="${PYTHON_BIN:-}"
+    local had_python_bin="0"
+    if [[ -v PYTHON_BIN ]]; then
+        had_python_bin="1"
+    fi
+    if [[ "${had_python_bin}" != "1" ]]; then
+        local active_python=""
+        active_python="$(command -v python 2>/dev/null || true)"
+        if [[ -n "${active_python}" ]] && "${active_python}" -c "import yaml" >/dev/null 2>&1; then
+            export PYTHON_BIN="${active_python}"
+        fi
+    fi
+
+    _runtime_python "${normalize_args[@]}" >> "${log_file}" 2>&1 || {
+        if [[ "${had_python_bin}" == "1" ]]; then
+            export PYTHON_BIN="${previous_python_bin}"
+        else
+            unset PYTHON_BIN
+        fi
+        return 1
+    }
+    if [[ "${had_python_bin}" == "1" ]]; then
+        export PYTHON_BIN="${previous_python_bin}"
+    else
+        unset PYTHON_BIN
+    fi
+    echo "  Normalized staged preset dataset for evaluate runtime: seq=${seq_len}, stride=${stride}, preview=${preview_n}, final=${final_n}" >> "${log_file}"
+    if [[ "${skip_overhead}" == "1" ]]; then
+        echo "  Injected context.run.skip_overhead_check=true into staged preset" >> "${log_file}"
+    fi
 }
 
 _ensure_evaluate_baseline_report() {
@@ -326,7 +513,7 @@ _ensure_evaluate_baseline_report() {
 model:
   device_map: "auto"
   dtype: "bfloat16"
-  trust_remote_code: true
+$(pack_model_trust_remote_code_yaml "  ")
   low_cpu_mem_usage: true
 dataset:
   seq_len: ${seq_len}
@@ -370,7 +557,7 @@ model:
   device: "auto"
   device_map: "auto"
   dtype: "bfloat16"
-  trust_remote_code: true
+$(pack_model_trust_remote_code_yaml "  ")
   low_cpu_mem_usage: true
 
 dataset:
@@ -408,16 +595,23 @@ YAML
         if _is_large_model "${model_size}"; then
             extra_env+=(INVARLOCK_SKIP_OVERHEAD_CHECK=1)
         fi
+        extra_env+=("PYTHONPATH=${PACK_REPO_PYTHONPATH}")
         extra_env+=(INVARLOCK_STORE_EVAL_WINDOWS=1)
+        if pack_remote_code_allowed; then
+            extra_env+=(INVARLOCK_ALLOW_REMOTE_CODE=1)
+        fi
         extra_env+=("INVARLOCK_CONFIG_ROOT=${baseline_config_root}")
 
         local exit_code=0
-        env "${extra_env[@]}" invarlock run \
-            --config "${baseline_yaml}" \
-            --profile "${profile_flag}" \
-            --tier "${tier}" \
-            --out "${baseline_out}" \
-            --edit-label "noop" >> "${log_file}" 2>&1 || exit_code=$?
+        (
+            export "${extra_env[@]}"
+            _pack_run_from_config \
+                --config "${baseline_yaml}" \
+                --profile "${profile_flag}" \
+                --tier "${tier}" \
+                --out "${baseline_out}" \
+                --edit-label "noop" >> "${log_file}" 2>&1
+        ) || exit_code=$?
 
         if [[ ${exit_code} -eq 0 ]]; then
             local report_file
@@ -882,6 +1076,27 @@ task_calibration_run() {
             echo "  CI window override: preview=${preview_n}, final=${final_n}" >> "${log_file}"
         fi
     fi
+    local tier="${INVARLOCK_TIER:-balanced}"
+    local dataset_kind=""
+    dataset_kind="$(pack_dataset_provider_kind "${INVARLOCK_DATASET:-}")"
+    local effective_plan_json=""
+    effective_plan_json="$(
+        _plan_effective_ci_schedule \
+            "${baseline_path}" \
+            "${model_size}" \
+            "${tier}" \
+            "${dataset_kind}" \
+            "validation" \
+            "${seed}"
+    )" || {
+        echo "ERROR: Effective CI planning failed unexpectedly" >> "${log_file}"
+        return 1
+    }
+    local selected_schedule=""
+    selected_schedule="$(_apply_effective_ci_schedule "${effective_plan_json}" "${log_file}")" || return 1
+    if [[ -n "${selected_schedule}" ]]; then
+        IFS=':' read -r seq_len stride preview_n final_n <<< "${selected_schedule}"
+    fi
     local bootstrap_replicates=2000
 
 
@@ -906,7 +1121,7 @@ task_calibration_run() {
 model:
   device_map: "auto"
   dtype: "bfloat16"
-  trust_remote_code: true
+$(pack_model_trust_remote_code_yaml "  ")
   low_cpu_mem_usage: true
 dataset:
   preview_n: ${preview_n}
@@ -917,6 +1132,7 @@ eval:
     alpha: 0.05
 YAML
 
+    extra_env+=("PYTHONPATH=${PACK_REPO_PYTHONPATH}")
     extra_env+=("INVARLOCK_CONFIG_ROOT=${config_root}")
 
     # Generate config YAML
@@ -951,7 +1167,7 @@ model:
   device: "auto"
   device_map: "auto"
   dtype: "bfloat16"
-  trust_remote_code: true
+$(pack_model_trust_remote_code_yaml "  ")
   low_cpu_mem_usage: true
 
 dataset:
@@ -978,7 +1194,7 @@ eval:
 
 auto:
   enabled: true
-  tier: "${INVARLOCK_TIER:-balanced}"
+  tier: "${tier}"
   probes: 0
 YAML_EOF
 
@@ -986,11 +1202,14 @@ YAML_EOF
 
     # CUDA_VISIBLE_DEVICES is inherited from execute_task() for multi-GPU support
     local exit_code=0
-    env "${extra_env[@]}" invarlock run \
-        --config "${config_yaml}" \
-        --profile "${profile_flag}" \
-        --out "${run_dir}" \
-        >> "${log_file}" 2>&1 || exit_code=$?
+    (
+        export "${extra_env[@]}"
+        _pack_run_from_config \
+            --config "${config_yaml}" \
+            --profile "${profile_flag}" \
+            --out "${run_dir}" \
+            >> "${log_file}" 2>&1
+    ) || exit_code=$?
 
     # Copy report to standard location
     local report_file=$(find "${run_dir}" -name "report*.json" -type f 2>/dev/null | head -1)
@@ -1045,6 +1264,27 @@ task_generate_preset() {
     config=$(_get_invarlock_config "${model_size}")
 
     IFS=':' read -r seq_len stride preview_n final_n eval_batch <<< "${config}"
+    local tier="${INVARLOCK_TIER:-balanced}"
+    local dataset_kind=""
+    dataset_kind="$(pack_dataset_provider_kind "${INVARLOCK_DATASET:-}")"
+    local effective_plan_json=""
+    effective_plan_json="$(
+        _plan_effective_ci_schedule \
+            "${baseline_path}" \
+            "${model_size}" \
+            "${tier}" \
+            "${dataset_kind}" \
+            "validation" \
+            "42"
+    )" || {
+        echo "ERROR: Effective CI planning failed unexpectedly" >> "${log_file}"
+        return 1
+    }
+    local selected_schedule=""
+    selected_schedule="$(_apply_effective_ci_schedule "${effective_plan_json}" "${log_file}")" || return 1
+    if [[ -n "${selected_schedule}" ]]; then
+        IFS=':' read -r seq_len stride preview_n final_n <<< "${selected_schedule}"
+    fi
 
     # Export for use in Python script
     export PRESET_SEQ_LEN="${seq_len}"
@@ -1061,7 +1301,7 @@ task_generate_preset() {
         --preset-file "${preset_base}.yaml" \
         --model-name "${model_name}" \
         --model-path "${baseline_path}" \
-        --tier "${INVARLOCK_TIER:-balanced}" \
+        --tier "${tier}" \
         --dataset-provider "${INVARLOCK_DATASET:-wikitext2}" \
         --seq-len "${seq_len}" \
         --stride "${stride}" \
@@ -1305,6 +1545,26 @@ task_evaluate_edit() {
         fi
     fi
     local tier="${INVARLOCK_TIER:-balanced}"
+    local dataset_kind=""
+    dataset_kind="$(pack_dataset_provider_kind "${INVARLOCK_DATASET:-}")"
+    local effective_plan_json=""
+    effective_plan_json="$(
+        _plan_effective_ci_schedule \
+            "${abs_baseline_path}" \
+            "${model_size}" \
+            "${tier}" \
+            "${dataset_kind}" \
+            "validation" \
+            "42"
+    )" || {
+        echo "ERROR: Effective CI planning failed unexpectedly" >> "${log_file}"
+        return 1
+    }
+    local selected_schedule=""
+    selected_schedule="$(_apply_effective_ci_schedule "${effective_plan_json}" "${log_file}")" || return 1
+    if [[ -n "${selected_schedule}" ]]; then
+        IFS=':' read -r seq_len stride preview_n final_n <<< "${selected_schedule}"
+    fi
     local bootstrap_replicates
     bootstrap_replicates="$(_resolve_bootstrap_replicates "${model_size}" "${tier}")"
     local baseline_report_root="${model_output_dir}/baseline_reports/${profile_flag}_${tier}_seq${seq_len}_pv${preview_n}_fn${final_n}"
@@ -1327,18 +1587,30 @@ task_evaluate_edit() {
     )
     local -a baseline_report_args=()
     if [[ -n "${baseline_report_file}" && -f "${baseline_report_file}" ]]; then
-        baseline_report_args=(--baseline-report "${baseline_report_file}")
+        local abs_baseline_report_file
+        abs_baseline_report_file="$(_stage_baseline_report_for_eval "${baseline_report_file}" "${cert_dir}" "${log_file}")" || {
+            echo "ERROR: Failed to stage baseline report for evaluate runtime: ${baseline_report_file}" >> "${log_file}"
+            return 1
+        }
+        baseline_report_args=(--baseline-report "${abs_baseline_report_file}")
         echo "  Reusing baseline report: ${baseline_report_file}" >> "${log_file}"
     else
         echo "  WARNING: Baseline report unavailable; will run per-cert baseline evaluation" >> "${log_file}"
     fi
 
     local -a extra_env=()
+    extra_env+=("PYTHONPATH=${PACK_REPO_PYTHONPATH}")
+    local skip_overhead_config_yaml=""
+    local skip_overhead_in_preset="0"
     if _is_large_model "${model_size}"; then
-        extra_env+=(INVARLOCK_SKIP_OVERHEAD_CHECK=1)
-        echo "  Large model (${model_size}): SKIP_OVERHEAD_CHECK=1" >> "${log_file}"
+        skip_overhead_config_yaml=$'context:\n  run:\n    skip_overhead_check: true'
+        skip_overhead_in_preset="1"
+        echo "  Large model (${model_size}): context.run.skip_overhead_check=true" >> "${log_file}"
     fi
     extra_env+=(INVARLOCK_STORE_EVAL_WINDOWS=1)
+    if pack_remote_code_allowed; then
+        extra_env+=(INVARLOCK_ALLOW_REMOTE_CODE=1)
+    fi
 
     local config_root_base
     config_root_base="$(cd "${cert_dir}" && pwd)"
@@ -1348,7 +1620,7 @@ task_evaluate_edit() {
 model:
   device_map: "auto"
   dtype: "bfloat16"
-  trust_remote_code: true
+$(pack_model_trust_remote_code_yaml "  ")
   low_cpu_mem_usage: true
 dataset:
   seq_len: ${seq_len}
@@ -1359,6 +1631,7 @@ eval:
   bootstrap:
     replicates: ${bootstrap_replicates}
     alpha: 0.05
+${skip_overhead_config_yaml}
 YAML
 
     extra_env+=("INVARLOCK_CONFIG_ROOT=${config_root}")
@@ -1416,7 +1689,14 @@ PRESET_YAML
     local work_dir="${cert_dir}/.workdir"
     mkdir -p "${work_dir}"
     local abs_preset_file
-    abs_preset_file="$(cd "$(dirname "${preset_file}")" && pwd)/$(basename "${preset_file}")"
+    abs_preset_file="$(_stage_preset_for_eval "${preset_file}" "${cert_dir}" "${log_file}")" || {
+        echo "ERROR: Failed to stage preset for evaluate runtime: ${preset_file}" >> "${log_file}"
+        return 1
+    }
+    _normalize_staged_preset_for_eval "${abs_preset_file}" "${seq_len}" "${stride}" "${preview_n}" "${final_n}" "${skip_overhead_in_preset}" "${log_file}" || {
+        echo "ERROR: Failed to normalize staged preset for evaluate runtime: ${abs_preset_file}" >> "${log_file}"
+        return 1
+    }
     local edit_label
     edit_label="$(basename "${abs_edit_path}")"
     edit_label="${edit_label%_stress}"
@@ -1508,14 +1788,28 @@ task_cleanup_edit() {
     fi
 
     local models_root="${model_output_dir}/models"
-    local edit_path="${models_root}/${edit_dir_name}"
-    local baseline_path="${models_root}/baseline"
+    local models_root_abs
+    models_root_abs="$(cd "${models_root}" 2>/dev/null && pwd -P)" || {
+        echo "ERROR: Models root missing for cleanup: ${models_root}" >> "${log_file}"
+        return 1
+    }
+    local edit_parent_rel
+    edit_parent_rel="$(dirname "${edit_dir_name}")"
+    local edit_basename
+    edit_basename="$(basename "${edit_dir_name}")"
+    local edit_parent_abs
+    edit_parent_abs="$(cd "${models_root_abs}/${edit_parent_rel}" 2>/dev/null && pwd -P)" || {
+        echo "ERROR: Refusing to delete path outside models root: ${models_root}/${edit_dir_name}" >> "${log_file}"
+        return 1
+    }
+    local edit_path="${edit_parent_abs}/${edit_basename}"
+    local baseline_path="${models_root_abs}/baseline"
 
     if [[ "${edit_path}" == "${baseline_path}" ]]; then
         echo "ERROR: Refusing to delete baseline path: ${edit_path}" >> "${log_file}"
         return 1
     fi
-    if [[ "${edit_path}" != "${models_root}/"* ]]; then
+    if [[ "${edit_path}" != "${models_root_abs}/"* ]]; then
         echo "ERROR: Refusing to delete path outside models root: ${edit_path}" >> "${log_file}"
         return 1
     fi
@@ -1573,16 +1867,13 @@ task_create_error() {
     if [[ -n "${error_env_json}" && "${error_env_json}" != "null" ]]; then
         mapfile -t injector_env < <(
             printf '%s\n' "${error_env_json}" | jq -r '
-                if type=="object" then
-                    to_entries[]
-                    | select((.key | type) == "string")
-                    | select(.key | startswith("INVARLOCK_"))
-                    | select(.key | test("^[A-Z][A-Z0-9_]*$"))
-                    | select((.value | type) as $t | ($t == "string" or $t == "number" or $t == "boolean"))
-                    | "\(.key)=\(.value | tostring)"
-                else
-                    empty
-                end
+                objects
+                | to_entries[]
+                | select((.key | type) == "string")
+                | select(.key | startswith("INVARLOCK_"))
+                | select(.key | test("^[A-Z][A-Z0-9_]*$"))
+                | select((.value | type) as $t | ($t == "string" or $t == "number" or $t == "boolean"))
+                | "\(.key)=\(.value | tostring)"
             ' 2>/dev/null
         )
     fi
@@ -1593,12 +1884,30 @@ task_create_error() {
     local create_rc=0
     if type create_error_model &>/dev/null; then
         if [[ ${#injector_env[@]} -gt 0 ]]; then
-            (
-                for entry in "${injector_env[@]}"; do
-                    export "${entry}"
-                done
-                create_error_model "${baseline_path}" "${error_path}" "${error_type}" "${gpu_id}"
-            ) >> "${log_file}" 2>&1 || create_rc=$?
+            local -a injector_keys=()
+            local -a injector_prev_values=()
+            local -a injector_had_prev=()
+            local idx=0
+            for entry in "${injector_env[@]}"; do
+                local env_key="${entry%%=*}"
+                injector_keys+=("${env_key}")
+                if [[ ${!env_key+x} ]]; then
+                    injector_had_prev+=("1")
+                    injector_prev_values+=("${!env_key}")
+                else
+                    injector_had_prev+=("0")
+                    injector_prev_values+=("")
+                fi
+                export "${entry}"
+            done
+            create_error_model "${baseline_path}" "${error_path}" "${error_type}" "${gpu_id}" >> "${log_file}" 2>&1 || create_rc=$?
+            for idx in "${!injector_keys[@]}"; do
+                if [[ "${injector_had_prev[$idx]}" == "1" ]]; then
+                    export "${injector_keys[$idx]}=${injector_prev_values[$idx]}"
+                else
+                    unset "${injector_keys[$idx]}"
+                fi
+            done
         else
             create_error_model "${baseline_path}" "${error_path}" "${error_type}" "${gpu_id}" >> "${log_file}" 2>&1 || create_rc=$?
         fi
@@ -1733,6 +2042,26 @@ task_evaluate_error() {
         fi
     fi
     local tier="${INVARLOCK_TIER:-balanced}"
+    local dataset_kind=""
+    dataset_kind="$(pack_dataset_provider_kind "${INVARLOCK_DATASET:-}")"
+    local effective_plan_json=""
+    effective_plan_json="$(
+        _plan_effective_ci_schedule \
+            "${abs_baseline_path}" \
+            "${model_size}" \
+            "${tier}" \
+            "${dataset_kind}" \
+            "validation" \
+            "42"
+    )" || {
+        echo "ERROR: Effective CI planning failed unexpectedly" >> "${log_file}"
+        return 1
+    }
+    local selected_schedule=""
+    selected_schedule="$(_apply_effective_ci_schedule "${effective_plan_json}" "${log_file}")" || return 1
+    if [[ -n "${selected_schedule}" ]]; then
+        IFS=':' read -r seq_len stride preview_n final_n <<< "${selected_schedule}"
+    fi
     local bootstrap_replicates
     bootstrap_replicates="$(_resolve_bootstrap_replicates "${model_size}" "${tier}")"
     local baseline_report_root="${model_output_dir}/baseline_reports/${profile_flag}_${tier}_seq${seq_len}_pv${preview_n}_fn${final_n}"
@@ -1755,18 +2084,30 @@ task_evaluate_error() {
     )
     local -a baseline_report_args=()
     if [[ -n "${baseline_report_file}" && -f "${baseline_report_file}" ]]; then
-        baseline_report_args=(--baseline-report "${baseline_report_file}")
+        local abs_baseline_report_file
+        abs_baseline_report_file="$(_stage_baseline_report_for_eval "${baseline_report_file}" "${cert_dir}" "${log_file}")" || {
+            echo "ERROR: Failed to stage baseline report for evaluate runtime: ${baseline_report_file}" >> "${log_file}"
+            return 1
+        }
+        baseline_report_args=(--baseline-report "${abs_baseline_report_file}")
         echo "  Reusing baseline report: ${baseline_report_file}" >> "${log_file}"
     else
         echo "  WARNING: Baseline report unavailable; will run per-cert baseline evaluation" >> "${log_file}"
     fi
 
     local -a extra_env=()
+    extra_env+=("PYTHONPATH=${PACK_REPO_PYTHONPATH}")
+    local skip_overhead_config_yaml=""
+    local skip_overhead_in_preset="0"
     if _is_large_model "${model_size}"; then
-        extra_env+=(INVARLOCK_SKIP_OVERHEAD_CHECK=1)
-        echo "  Large model (${model_size}): SKIP_OVERHEAD_CHECK=1" >> "${log_file}"
+        skip_overhead_config_yaml=$'context:\n  run:\n    skip_overhead_check: true'
+        skip_overhead_in_preset="1"
+        echo "  Large model (${model_size}): context.run.skip_overhead_check=true" >> "${log_file}"
     fi
     extra_env+=(INVARLOCK_STORE_EVAL_WINDOWS=1)
+    if pack_remote_code_allowed; then
+        extra_env+=(INVARLOCK_ALLOW_REMOTE_CODE=1)
+    fi
 
     local config_root_base
     config_root_base="$(cd "${cert_dir}" && pwd)"
@@ -1776,7 +2117,7 @@ task_evaluate_error() {
 model:
   device_map: "auto"
   dtype: "bfloat16"
-  trust_remote_code: true
+$(pack_model_trust_remote_code_yaml "  ")
   low_cpu_mem_usage: true
 dataset:
   seq_len: ${seq_len}
@@ -1787,6 +2128,7 @@ eval:
   bootstrap:
     replicates: ${bootstrap_replicates}
     alpha: 0.05
+${skip_overhead_config_yaml}
 YAML
 
     extra_env+=("INVARLOCK_CONFIG_ROOT=${config_root}")
@@ -1829,7 +2171,14 @@ PRESET_YAML
     local work_dir="${cert_dir}/.workdir"
     mkdir -p "${work_dir}"
     local abs_preset_file
-    abs_preset_file="$(cd "$(dirname "${preset_file}")" && pwd)/$(basename "${preset_file}")"
+    abs_preset_file="$(_stage_preset_for_eval "${preset_file}" "${cert_dir}" "${log_file}")" || {
+        echo "ERROR: Failed to stage preset for evaluate runtime: ${preset_file}" >> "${log_file}"
+        return 1
+    }
+    _normalize_staged_preset_for_eval "${abs_preset_file}" "${seq_len}" "${stride}" "${preview_n}" "${final_n}" "${skip_overhead_in_preset}" "${log_file}" || {
+        echo "ERROR: Failed to normalize staged preset for evaluate runtime: ${abs_preset_file}" >> "${log_file}"
+        return 1
+    }
 
     # CUDA_VISIBLE_DEVICES is inherited from execute_task() for multi-GPU support
     local exit_code=0
@@ -1873,6 +2222,10 @@ PRESET_YAML
         local probe_out="${cert_dir}/rmt_probe.json"
         if [[ -f "${probe_script}" && -n "${baseline_report_file}" && -f "${baseline_report_file}" ]]; then
             local probe_rc=0
+            local probe_args=()
+            if pack_remote_code_allowed; then
+                probe_args+=(--trust-remote-code)
+            fi
             _cmd_python "${probe_script}" \
                 --baseline-model "${abs_baseline_path}" \
                 --subject-model "${abs_error_path}" \
@@ -1881,6 +2234,7 @@ PRESET_YAML
                 --tier "${tier}" \
                 --profile "${profile_flag}" \
                 --activation-windows "${PACK_RMT_PROBE_WINDOWS:-64}" \
+                "${probe_args[@]}" \
                 >> "${log_file}" 2>&1 || probe_rc=$?
             if [[ ${probe_rc} -ne 0 ]]; then
                 echo "  WARNING: RMT cross-model probe failed (exit=${probe_rc})" >> "${log_file}"
@@ -1898,6 +2252,10 @@ PRESET_YAML
         local ve_probe_out="${cert_dir}/ve_probe.json"
         if [[ -f "${ve_probe_script}" && -n "${baseline_report_file}" && -f "${baseline_report_file}" ]]; then
             local ve_probe_rc=0
+            local ve_probe_args=()
+            if pack_remote_code_allowed; then
+                ve_probe_args+=(--trust-remote-code)
+            fi
             _cmd_python "${ve_probe_script}" \
                 --baseline-model "${abs_baseline_path}" \
                 --subject-model "${abs_error_path}" \
@@ -1907,6 +2265,7 @@ PRESET_YAML
                 --profile "${profile_flag}" \
                 --calibration-windows "${PACK_VE_PROBE_WINDOWS:-12}" \
                 --min-coverage "${PACK_VE_PROBE_MIN_COVERAGE:-10}" \
+                "${ve_probe_args[@]}" \
                 >> "${log_file}" 2>&1 || ve_probe_rc=$?
             if [[ ${ve_probe_rc} -ne 0 ]]; then
                 echo "  WARNING: VE cross-model probe failed (exit=${ve_probe_rc})" >> "${log_file}"
@@ -1945,14 +2304,23 @@ task_cleanup_error() {
 
     local model_output_dir="${output_dir}/${model_name}"
     local models_root="${model_output_dir}/models"
-    local error_path="${models_root}/error_${error_type}"
-    local baseline_path="${models_root}/baseline"
-
-    if [[ "${error_path}" == "${baseline_path}" ]]; then
-        echo "ERROR: Refusing to delete baseline path: ${error_path}" >> "${log_file}"
+    local models_root_abs
+    models_root_abs="$(cd "${models_root}" 2>/dev/null && pwd -P)" || {
+        echo "ERROR: Models root missing for cleanup: ${models_root}" >> "${log_file}"
         return 1
-    fi
-    if [[ "${error_path}" != "${models_root}/"* ]]; then
+    }
+    local error_parent_rel
+    error_parent_rel="$(dirname "${error_type}")"
+    local error_basename
+    error_basename="error_$(basename "${error_type}")"
+    local error_parent_abs
+    error_parent_abs="$(cd "${models_root_abs}/${error_parent_rel}" 2>/dev/null && pwd -P)" || {
+        echo "ERROR: Refusing to delete path outside models root: ${models_root}/error_${error_type}" >> "${log_file}"
+        return 1
+    }
+    local error_path="${error_parent_abs}/${error_basename}"
+
+    if [[ "${error_path}" != "${models_root_abs}/"* ]]; then
         echo "ERROR: Refusing to delete path outside models root: ${error_path}" >> "${log_file}"
         return 1
     fi

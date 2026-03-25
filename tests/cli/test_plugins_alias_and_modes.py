@@ -8,8 +8,8 @@ from invarlock.cli.app import app
 
 
 def test_plugins_adapter_alias_json():
-    r1 = CliRunner().invoke(app, ["plugins", "adapters", "--json"])
-    r2 = CliRunner().invoke(app, ["plugins", "adapter", "--json"])
+    r1 = CliRunner().invoke(app, ["advanced", "plugins", "adapters", "--json"])
+    r2 = CliRunner().invoke(app, ["advanced", "plugins", "adapter", "--json"])
     assert r1.exit_code == 0 and r2.exit_code == 0
     p1 = json.loads(r1.stdout.strip().splitlines()[-1])
     p2 = json.loads(r2.stdout.strip().splitlines()[-1])
@@ -18,18 +18,20 @@ def test_plugins_adapter_alias_json():
 
 def test_plugins_guards_and_edits_text_and_json():
     # Compact text table
-    r = CliRunner().invoke(app, ["plugins", "guards"])
+    r = CliRunner().invoke(app, ["advanced", "plugins", "guards"])
     assert r.exit_code == 0 and "Guard Plugins" in r.stdout
     # Verbose table
-    rv = CliRunner().invoke(app, ["plugins", "edits", "--verbose"])
+    rv = CliRunner().invoke(app, ["advanced", "plugins", "edits", "--verbose"])
     assert rv.exit_code == 0 and "Edit Plugins" in rv.stdout
     # JSON shapes
-    rj = CliRunner().invoke(app, ["plugins", "guards", "--json"])
+    rj = CliRunner().invoke(app, ["advanced", "plugins", "guards", "--json"])
     assert rj.exit_code == 0
     pj = json.loads(rj.stdout.strip().splitlines()[-1])
     assert pj.get("format_version") == "plugins-v1" and pj.get("category") == "guards"
 
 
 def test_plugins_edits_explain_unknown():
-    r = CliRunner().invoke(app, ["plugins", "edits", "--explain", "__does_not_exist__"])
+    r = CliRunner().invoke(
+        app, ["advanced", "plugins", "edits", "--explain", "__does_not_exist__"]
+    )
     assert r.exit_code in (1, 2)

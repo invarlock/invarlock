@@ -243,6 +243,55 @@ is_queue_complete() {
     [[ $((pending + ready + running)) -eq 0 && ${failed} -eq 0 ]]
 }
 
+count_pending_tasks_blocked_by_failed_dependencies() {
+    local blocked=0
+    local task_file
+    local dep
+
+    for task_file in "${QUEUE_DIR}/pending"/*.task; do
+        [[ -f "${task_file}" ]] || continue
+
+        local blocked_by_failed_dep="false"
+        while IFS= read -r dep; do
+            [[ -n "${dep}" ]] || continue
+            if [[ -f "${QUEUE_DIR}/failed/${dep}.task" ]]; then
+                blocked_by_failed_dep="true"
+                break
+            fi
+        done < <(get_task_dependencies "${task_file}" 2>/dev/null || true)
+
+        if [[ "${blocked_by_failed_dep}" == "true" ]]; then
+            blocked=$((blocked + 1))
+        fi
+    done
+
+    echo "${blocked}"
+}
+
+queue_terminal_state() {
+    IFS=':' read -r pending ready running completed failed total <<< "$(get_queue_stats)"
+
+    if [[ $((pending + ready + running)) -eq 0 ]]; then
+        if [[ ${failed} -eq 0 ]]; then
+            echo "completed"
+        else
+            echo "completed_with_failures"
+        fi
+        return 0
+    fi
+
+    if [[ ${pending} -gt 0 && ${ready} -eq 0 && ${running} -eq 0 && ${failed} -gt 0 ]]; then
+        local blocked_pending=0
+        blocked_pending="$(count_pending_tasks_blocked_by_failed_dependencies)"
+        if [[ "${blocked_pending}" == "${pending}" ]]; then
+            echo "blocked_failed_dependencies"
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
 # ============ TASK STATE TRANSITIONS ============
 
 # Move task from pending to ready (when dependencies are satisfied)
@@ -414,19 +463,29 @@ reclaim_orphaned_tasks() {
     for task_file in "${running_dir}"/*.task; do
         [[ -f "${task_file}" ]] || continue
 
+        local task_id
+        task_id=$(get_task_id "${task_file}")
+
+        local pid_file="${running_dir}/${task_id}.pid"
+        local pid=""
+        if [[ -f "${pid_file}" ]]; then
+            pid=$(cat "${pid_file}" 2>/dev/null || true)
+        fi
+
         local assigned_gpus
         assigned_gpus=$(get_task_assigned_gpus "${task_file}")
         assigned_gpus="${assigned_gpus// /}"
+
+        local should_reclaim="false"
         if [[ -n "${assigned_gpus}" && "${assigned_gpus}" != "null" && "${assigned_gpus%%,*}" == "${gpu_id}" ]]; then
-            local task_id
-            task_id=$(get_task_id "${task_file}")
+            should_reclaim="true"
+        elif [[ -n "${pid}" && ( -z "${assigned_gpus}" || "${assigned_gpus}" == "null" ) ]]; then
+            # Older or partially-updated running tasks may still have a live PID file
+            # before assigned_gpus is recorded. Reclaim those inconsistent entries too.
+            should_reclaim="true"
+        fi
 
-            local pid_file="${running_dir}/${task_id}.pid"
-            local pid=""
-            if [[ -f "${pid_file}" ]]; then
-                pid=$(cat "${pid_file}" 2>/dev/null || true)
-            fi
-
+        if [[ "${should_reclaim}" == "true" ]]; then
             task_ids+=("${task_id}")
             task_assigned+=("${assigned_gpus}")
             task_pids+=("${pid}")
@@ -774,12 +833,10 @@ update_progress_state() {
     IFS=':' read -r pending ready running completed failed total <<< "$(get_queue_stats)"
 
     local status="running"
-    if [[ $((pending + ready + running)) -eq 0 ]]; then
-        if [[ ${failed} -eq 0 ]]; then
-            status="completed"
-        else
-            status="completed_with_failures"
-        fi
+    local terminal_state=""
+    terminal_state="$(queue_terminal_state 2>/dev/null || true)"
+    if [[ -n "${terminal_state}" ]]; then
+        status="${terminal_state}"
     fi
 
     local progress_pct=0
@@ -1065,6 +1122,7 @@ generate_model_tasks() {
     pack_root="$(cd "${SCRIPT_DIR}/.." && pwd)"
     local scenarios_file=""
     local suite_manifest=""
+    local using_state_manifest="false"
     # Prefer the run's state manifest (may be filtered by suite tags) when available.
     if [[ -n "${QUEUE_DIR:-}" ]]; then
         local run_root
@@ -1072,6 +1130,7 @@ generate_model_tasks() {
         suite_manifest="${run_root}/state/scenarios.json"
         if [[ -f "${suite_manifest}" ]]; then
             scenarios_file="${suite_manifest}"
+            using_state_manifest="true"
         fi
     fi
     if [[ -z "${scenarios_file}" ]]; then
@@ -1080,40 +1139,34 @@ generate_model_tasks() {
 
     local clean_edits=()
     local stress_edits=()
-    local all_edit_specs=""
+    local loaded_edit_manifest="false"
 
     if command -v jq >/dev/null 2>&1 && [[ -f "${scenarios_file}" ]]; then
+        local edit_specs_json=""
+        edit_specs_json="$(
+            jq -c '[.scenarios[]
+                | select(.generation.kind=="edit")
+                | {spec: .generation.edit_spec, version: .generation.version}]' "${scenarios_file}" 2>/dev/null
+        )"
+        if [[ -n "${edit_specs_json}" ]]; then
+            loaded_edit_manifest="true"
+        fi
         mapfile -t clean_edits < <(
             jq -r '.scenarios[]
                 | select(.generation.kind=="edit" and .generation.version=="clean")
-                | .generation.edit_spec' "${scenarios_file}"
+                | .generation.edit_spec' "${scenarios_file}" 2>/dev/null
         )
         mapfile -t stress_edits < <(
             jq -r '.scenarios[]
                 | select(.generation.kind=="edit" and .generation.version=="stress")
-                | .generation.edit_spec' "${scenarios_file}"
+                | .generation.edit_spec' "${scenarios_file}" 2>/dev/null
         )
-        all_edit_specs="$(
-            jq -c '[.scenarios[]
-                | select(.generation.kind=="edit")
-                | {spec: .generation.edit_spec, version: .generation.version}]' "${scenarios_file}"
-        )"
     fi
 
-    if [[ ${#clean_edits[@]} -eq 0 || ${#stress_edits[@]} -eq 0 || -z "${all_edit_specs}" ]]; then
+    if [[ "${loaded_edit_manifest}" != "true" ]]; then
         # Fallback defaults (kept for standalone script use).
         clean_edits=("quant_rtn:clean:ffn" "fp8_quant:clean:ffn" "magnitude_prune:clean:ffn" "lowrank_svd:clean:ffn")
         stress_edits=("quant_rtn:4:32:all" "fp8_quant:e5m2:all" "magnitude_prune:0.5:all" "lowrank_svd:32:all")
-        all_edit_specs='[
-            {"spec": "quant_rtn:clean:ffn", "version": "clean"},
-            {"spec": "fp8_quant:clean:ffn", "version": "clean"},
-            {"spec": "magnitude_prune:clean:ffn", "version": "clean"},
-            {"spec": "lowrank_svd:clean:ffn", "version": "clean"},
-            {"spec": "quant_rtn:4:32:all", "version": "stress"},
-            {"spec": "fp8_quant:e5m2:all", "version": "stress"},
-            {"spec": "magnitude_prune:0.5:all", "version": "stress"},
-            {"spec": "lowrank_svd:32:all", "version": "stress"}
-        ]'
     fi
 
     # Ensure use_batch is defined (defensive for set -u)
@@ -1294,7 +1347,7 @@ generate_model_tasks() {
                     | @tsv' "${scenarios_file}"
             )
         fi
-        if [[ ${#error_pairs[@]} -eq 0 ]]; then
+        if [[ ${#error_pairs[@]} -eq 0 && "${using_state_manifest}" != "true" ]]; then
             :
             error_pairs=(
                 $'nan_injection\t{}'
@@ -1320,8 +1373,9 @@ generate_model_tasks() {
 
             local params_json
             if [[ -n "${jq_bin}" ]]; then
+                local jq_params_builder="${jq_bin}"
                 params_json="$(
-                    "${jq_bin}" -cn \
+                    "${jq_params_builder}" -cn \
                         --arg error_type "${error_type}" \
                         --argjson error_env "${error_env_json}" \
                         '{error_type: $error_type, error_env: $error_env}'

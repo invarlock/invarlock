@@ -7,24 +7,20 @@ from typer.testing import CliRunner
 def _load_app(monkeypatch):
     # Ensure lightweight import path and skip heavy discovery
     monkeypatch.setenv("INVARLOCK_LIGHT_IMPORT", "1")
-    monkeypatch.setenv("INVARLOCK_DISABLE_PLUGIN_DISCOVERY", "1")
+    monkeypatch.setenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "0")
     from invarlock.cli.app import app
 
     return app
 
 
-def test_run_help_exposes_typed_options(monkeypatch):
+def test_run_command_reports_migration(monkeypatch):
     app = _load_app(monkeypatch)
     runner = CliRunner()
-    res = runner.invoke(app, ["run", "--help"])
-    assert res.exit_code == 0, res.output
-    out = strip_ansi(res.stdout)
-    # Regression guard: no raw ARGS/KWARGS placeholder
-    assert "ARGS KWARGS" not in out
-    # Must expose config and common options
-    assert "--config" in out or "-c" in out
-    assert "--profile" in out
-    assert "--out" in out
+    res = runner.invoke(app, ["run"])
+    assert res.exit_code == 2, res.output
+    out = strip_ansi(res.output)
+    assert "no longer a top-level command" in out
+    assert "invarlock evaluate" in out
 
 
 def test_evaluate_help_exposes_baseline_and_subject(monkeypatch):
@@ -54,10 +50,22 @@ def test_groups_help_list_subcommands(monkeypatch):
     runner = CliRunner()
     for cmd, expected in (
         ("report", ["verify", "explain", "html", "validate"]),
-        ("plugins", ["list", "guards", "edits", "install", "uninstall"]),
+        ("advanced", ["proof-pack", "policy", "plugins", "calibrate"]),
+        ("advanced plugins", ["list", "guards", "edits", "adapters"]),
     ):
-        res = runner.invoke(app, [cmd, "--help"])
+        res = runner.invoke(app, [*cmd.split(), "--help"])
         assert res.exit_code == 0, f"help failed for {cmd}: {res.output}"
         out = strip_ansi(res.stdout)
         for token in expected:
             assert token in out
+
+
+def test_plugin_management_subcommands_are_removed(monkeypatch):
+    app = _load_app(monkeypatch)
+    runner = CliRunner()
+    for args in (
+        ["advanced", "plugins", "install"],
+        ["advanced", "plugins", "uninstall"],
+    ):
+        res = runner.invoke(app, args)
+        assert res.exit_code == 2, res.output

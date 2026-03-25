@@ -4,6 +4,8 @@ import argparse
 import datetime as dt
 import hashlib
 import json
+import os
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -61,6 +63,10 @@ def _sha256_hex(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _sha256_prefixed(path: Path) -> str:
+    return f"sha256:{_sha256_hex(path)}"
+
+
 def _maybe_get_invarlock_version() -> str:
     try:
         import invarlock  # type: ignore[import-not-found]
@@ -71,11 +77,164 @@ def _maybe_get_invarlock_version() -> str:
         return ""
 
 
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[3]
+
+
+def _git_text(*args: str) -> str:
+    try:
+        proc = subprocess.run(
+            ["git", *args],
+            cwd=_repo_root(),
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except Exception:
+        return ""
+    if proc.returncode != 0:
+        return ""
+    return proc.stdout.strip()
+
+
 def _model_licenses_for(model_ids: set[str]) -> dict[str, str]:
     known_licenses = {
         "mistralai/Mistral-7B-v0.1": "Apache-2.0",
     }
     return {mid: lic for mid, lic in known_licenses.items() if mid in model_ids}
+
+
+def _first_file(pack_dir: Path, *candidates: str) -> Path | None:
+    for candidate in candidates:
+        path = pack_dir / candidate
+        if path.is_file():
+            return path
+    return None
+
+
+def _load_metadata_object(pack_dir: Path, rel_path: str) -> dict[str, Any]:
+    payload = _load_json(pack_dir / rel_path)
+    return payload if isinstance(payload, dict) else {}
+
+
+def _file_reference(
+    pack_dir: Path, rel_path: str, *, name: str | None = None
+) -> dict[str, Any] | None:
+    path = pack_dir / rel_path
+    if not path.is_file():
+        return None
+    payload: dict[str, Any] = {
+        "path": rel_path,
+        "digest": _sha256_prefixed(path),
+    }
+    if name:
+        payload["name"] = name
+    return payload
+
+
+def _subject(pack_dir: Path) -> dict[str, Any] | None:
+    path = _first_file(
+        pack_dir,
+        "results/verdicts/final_verdict.json",
+        "results/final_verdict.json",
+    )
+    if path is None:
+        return None
+    return {
+        "name": "final_verdict",
+        "path": str(path.relative_to(pack_dir)),
+        "digest": _sha256_prefixed(path),
+    }
+
+
+def _config_source(pack_dir: Path) -> dict[str, Any]:
+    payload = _load_metadata_object(pack_dir, "metadata/source_repo.json")
+    reference = _file_reference(pack_dir, "metadata/source_repo.json")
+    result: dict[str, Any] = {
+        "uri": payload.get("uri") or "",
+        "commit": payload.get("commit") or _git_text("rev-parse", "HEAD"),
+        "branch": payload.get("branch")
+        or _git_text("rev-parse", "--abbrev-ref", "HEAD"),
+        "describe": payload.get("describe")
+        or _git_text("describe", "--tags", "--always", "--dirty"),
+        "dirty": bool(payload.get("dirty"))
+        if payload
+        else bool(_git_text("status", "--porcelain")),
+    }
+    if reference is not None:
+        result.update(reference)
+    return result
+
+
+def _dataset_provider_parameters() -> dict[str, Any]:
+    kind = str(os.environ.get("INVARLOCK_DATASET", "")).strip() or "wikitext2"
+    payload: dict[str, Any] = {"kind": kind}
+    if kind == "hf_text":
+        dataset_name = (
+            os.environ.get("INVARLOCK_HF_DATASET_NAME")
+            or os.environ.get("INVARLOCK_HF_DATASET")
+            or "allenai/c4"
+        )
+        if dataset_name == "c4":
+            dataset_name = "allenai/c4"
+        payload["dataset_name"] = dataset_name
+        config_name = (
+            os.environ.get("INVARLOCK_HF_CONFIG_NAME")
+            or os.environ.get("INVARLOCK_HF_DATASET_CONFIG_NAME")
+            or ""
+        )
+        if config_name:
+            payload["config_name"] = config_name
+    elif kind == "local_jsonl":
+        for key in (
+            "INVARLOCK_LOCAL_JSONL_FILE",
+            "INVARLOCK_LOCAL_JSONL_PATH",
+            "INVARLOCK_LOCAL_JSONL_DATA_FILES",
+        ):
+            value = os.environ.get(key, "").strip()
+            if value:
+                payload[key.removeprefix("INVARLOCK_LOCAL_JSONL_").lower()] = value
+    return payload
+
+
+def _environment(pack_dir: Path) -> dict[str, Any] | None:
+    payload = _load_metadata_object(pack_dir, "metadata/environment.json")
+    reference = _file_reference(pack_dir, "metadata/environment.json")
+    if not payload and reference is None:
+        return None
+    result: dict[str, Any] = {}
+    if reference is not None:
+        result.update(reference)
+    for field in (
+        "recorded_at",
+        "platform",
+        "python_version",
+        "gpu_name",
+        "gpu_count",
+        "gpu_memory_gb",
+        "fp8_native_support",
+    ):
+        if field in payload:
+            result[field] = payload[field]
+    return result
+
+
+def _materials(pack_dir: Path) -> list[dict[str, Any]]:
+    materials: list[dict[str, Any]] = []
+    for rel_path, name in (
+        ("metadata/model_revisions.json", "model_revisions"),
+        ("metadata/scenarios.json", "scenarios"),
+        ("metadata/tuned_edit_params.json", "tuned_edit_params"),
+    ):
+        reference = _file_reference(pack_dir, rel_path, name=name)
+        if reference is not None:
+            materials.append(reference)
+    return materials
+
+
+def _scenario_ids() -> list[str]:
+    raw = str(os.environ.get("PACK_SCENARIO_IDS", ""))
+    return [item.strip() for item in raw.split(",") if item.strip()]
 
 
 def write_manifest(
@@ -133,7 +292,38 @@ def write_manifest(
         "artifacts": artifacts,
         "checksums_sha256": "checksums.sha256",
         "checksums_sha256_digest": checksums_digest,
+        "builder": {
+            "id": "invarlock/proof-pack@v1",
+            "name": "InvarLock Proof Pack Runner",
+        },
+        "invocation": {
+            "config_source": _config_source(pack_dir),
+            "parameters": {
+                "suite": suite,
+                "network_mode": "online"
+                if str(net) in {"1", "true", "yes", "on"}
+                else "offline",
+                "determinism": determinism,
+                "repeats": repeats,
+                "scenario_ids": _scenario_ids(),
+                "dataset_provider": _dataset_provider_parameters(),
+            },
+        },
+        "materials": _materials(pack_dir),
     }
+
+    if payload["builder"]["id"] and payload["builder"]["name"]:
+        version = payload.get("invarlock_version") or ""
+        if isinstance(version, str) and version:
+            payload["builder"]["version"] = version
+
+    subject = _subject(pack_dir)
+    if subject is not None:
+        payload["subject"] = subject
+
+    environment = _environment(pack_dir)
+    if environment is not None:
+        payload["environment"] = environment
 
     if model_licenses:
         payload["model_licenses"] = model_licenses

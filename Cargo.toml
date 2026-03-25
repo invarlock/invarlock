@@ -1,0 +1,3 @@
+[workspace]
+members = ["crates/invarlock-runtime-verify"]
+resolver = "2"

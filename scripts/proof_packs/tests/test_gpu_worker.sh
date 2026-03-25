@@ -27,7 +27,9 @@ test_gpu_worker_sets_waiting_deps_when_only_pending_tasks() {
     source "${TEST_ROOT}/scripts/proof_packs/lib/gpu_worker.sh"
 
     local out="${TEST_TMPDIR}/out"
+    rm -rf "${out}"
     mkdir -p "${out}/workers" "${out}/logs/tasks"
+    rm -f "${out}/workers/SHUTDOWN" "${out}/workers/gpu_0.shutdown"
 
     WORKER_DEP_RESOLVE_INTERVAL=0
 
@@ -52,6 +54,7 @@ test_gpu_worker_sets_waiting_deps_when_only_pending_tasks() {
             saw_waiting="true"
             break
         fi
+        sleep 0.01
     done
 
     touch "${out}/workers/SHUTDOWN"
@@ -412,6 +415,7 @@ test_gpu_worker_sanitizes_invalid_worker_config() {
 
     WORKER_HEARTBEAT_INTERVAL="nope"
     WORKER_IDLE_SLEEP="nope"
+    WORKER_DEP_RESOLVE_INTERVAL="bad"
     WORKER_MAX_FAILURES="nope"
     should_shutdown() { return 0; }
 

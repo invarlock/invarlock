@@ -97,6 +97,13 @@ def check_consistency() -> None:
             raise SystemExit(code)
 
 
+def check_live() -> None:
+    code, out = run([sys.executable, "scripts/verify_live_examples.py"])
+    print(out, end="")
+    if code != 0:
+        raise SystemExit(code)
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Consolidated docs checks")
     p.add_argument("--all", action="store_true", help="Run all checks")
@@ -115,13 +122,26 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Run version/CLI/schema/guards consistency checks",
     )
+    p.add_argument(
+        "--live",
+        action="store_true",
+        help="Live-run runnable markdown CLI examples and notebooks",
+    )
     return p.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     if not any(
-        [args.all, args.build, args.links, args.refs, args.examples, args.consistency]
+        [
+            args.all,
+            args.build,
+            args.links,
+            args.refs,
+            args.examples,
+            args.consistency,
+            args.live,
+        ]
     ):
         print("No checks selected. Use --all or individual flags.", file=sys.stderr)
         raise SystemExit(2)
@@ -132,6 +152,7 @@ def main() -> None:
         "refs": None,
         "examples": None,
         "consistency": None,
+        "live": None,
     }
 
     try:
@@ -150,6 +171,9 @@ def main() -> None:
         if args.all or args.consistency:
             check_consistency()
             summary["consistency"] = True
+        if args.live:
+            check_live()
+            summary["live"] = True
     except SystemExit as e:
         # On failure, print machine-readable summary and bubble up exit code
         print(

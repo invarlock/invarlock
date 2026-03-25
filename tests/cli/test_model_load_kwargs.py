@@ -26,7 +26,10 @@ class DummyNoKwAdapter:
 
 
 @pytest.mark.unit
-def test_extract_model_load_kwargs_excludes_core_fields():
+def test_extract_model_load_kwargs_excludes_core_fields(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("INVARLOCK_ALLOW_REMOTE_CODE", "1")
     cfg = InvarLockConfig(
         {
             "model": {
@@ -66,7 +69,10 @@ def test_extract_model_load_kwargs_rejects_removed_keys():
 
 
 @pytest.mark.unit
-def test_load_model_with_cfg_passes_all_kwargs_to_var_kw_adapter():
+def test_load_model_with_cfg_passes_all_kwargs_to_var_kw_adapter(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("INVARLOCK_ALLOW_REMOTE_CODE", "1")
     cfg = InvarLockConfig(
         {"model": {"id": "foo", "adapter": "dummy", "trust_remote_code": True}}
     )
@@ -78,7 +84,10 @@ def test_load_model_with_cfg_passes_all_kwargs_to_var_kw_adapter():
 
 
 @pytest.mark.unit
-def test_load_model_with_cfg_filters_unknown_kwargs_for_strict_adapter():
+def test_load_model_with_cfg_filters_unknown_kwargs_for_strict_adapter(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("INVARLOCK_ALLOW_REMOTE_CODE", "1")
     cfg = InvarLockConfig(
         {"model": {"id": "foo", "adapter": "dummy", "trust_remote_code": True}}
     )
@@ -87,3 +96,30 @@ def test_load_model_with_cfg_filters_unknown_kwargs_for_strict_adapter():
     _ = run_mod._load_model_with_cfg(adapter, cfg, "cpu")
 
     assert adapter.calls == [("foo", "cpu")]
+
+
+@pytest.mark.unit
+def test_extract_model_load_kwargs_rejects_remote_code_without_explicit_allow(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.delenv("INVARLOCK_ALLOW_REMOTE_CODE", raising=False)
+    cfg = InvarLockConfig(
+        {"model": {"id": "foo", "adapter": "dummy", "trust_remote_code": True}}
+    )
+
+    with pytest.raises(InvarlockError) as excinfo:
+        run_mod._extract_model_load_kwargs(cfg)
+
+    assert excinfo.value.code == "E008"
+
+
+@pytest.mark.unit
+def test_extract_model_load_kwargs_allows_remote_code_with_explicit_allow(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("INVARLOCK_ALLOW_REMOTE_CODE", "1")
+    cfg = InvarLockConfig(
+        {"model": {"id": "foo", "adapter": "dummy", "trust_remote_code": True}}
+    )
+
+    assert run_mod._extract_model_load_kwargs(cfg) == {"trust_remote_code": True}

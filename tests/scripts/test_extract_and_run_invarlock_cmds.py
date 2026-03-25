@@ -95,3 +95,29 @@ def test_run_commands_records_parse_errors(tmp_path: Path, monkeypatch) -> None:
     assert len(records) == 1
     assert records[0]["exit_code"] is None
     assert "invalid command syntax" in records[0]["error"]
+
+
+def test_iter_markdown_files_respects_requested_paths(tmp_path: Path) -> None:
+    module = _load_script_module()
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "guide.md").write_text("# guide\n", encoding="utf-8")
+    (tmp_path / "README.md").write_text("# root\n", encoding="utf-8")
+    (tmp_path / "notes.txt").write_text("skip\n", encoding="utf-8")
+
+    files = module.iter_markdown_files(tmp_path, paths=["README.md", "docs"])
+
+    assert files == [tmp_path / "README.md", tmp_path / "docs" / "guide.md"]
+
+
+def test_env_for_does_not_inject_execution_or_attestation_bypasses(
+    monkeypatch,
+) -> None:
+    module = _load_script_module()
+    monkeypatch.delenv("INVARLOCK_ALLOW_HOST_EXECUTION", raising=False)
+    monkeypatch.delenv("INVARLOCK_ALLOW_UNATTESTED_ARTIFACTS", raising=False)
+
+    env = module._env_for("invarlock verify reports/eval/evaluation.report.json")
+
+    assert env["INVARLOCK_ALLOW_NETWORK"] == "1"
+    assert "INVARLOCK_ALLOW_HOST_EXECUTION" not in env
+    assert "INVARLOCK_ALLOW_UNATTESTED_ARTIFACTS" not in env

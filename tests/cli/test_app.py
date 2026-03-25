@@ -1,11 +1,14 @@
 import os
+import re
 from unittest.mock import patch
 
+import click
+import typer
 from click.termui import strip_ansi
 from typer.testing import CliRunner
 
 os.environ["INVARLOCK_LIGHT_IMPORT"] = "1"
-from invarlock.cli.app import app, version
+from invarlock.cli.app import _load_lazy_subapp, app, version
 
 
 def test_app_initialization():
@@ -46,15 +49,32 @@ def test_cli_help_lists_core_commands():
     assert result.exit_code == 0
     output = strip_ansi(result.stdout)
     assert "evaluate model changes" in output.lower()
-    # Verify the new grouped layout mentions key groups
-    for command in ("evaluate", "report", "run", "plugins", "doctor", "version"):
-        assert command in output
+    for command in ("evaluate", "report", "verify", "doctor", "advanced", "version"):
+        assert re.search(rf"^\s*│\s+{re.escape(command)}\s", output, re.MULTILINE)
+    for removed in ("run", "proof-pack", "policy", "plugins", "calibrate"):
+        assert not re.search(rf"^\s*│\s+{re.escape(removed)}\s", output, re.MULTILINE)
 
 
-def test_run_help_mentions_profile_and_retry_options():
+def test_cli_version_flag_exits_through_root_callback():
     runner = CliRunner()
-    result = runner.invoke(app, ["run", "--help"])
+    with (
+        patch("invarlock.cli.app.network_policy_allows", return_value=False),
+        patch("invarlock.cli.app.enforce_default_security"),
+        patch("invarlock.cli.app.enforce_network_policy"),
+        patch("invarlock.cli.app._emit_version") as emit_version,
+    ):
+        result = runner.invoke(app, ["--version"])
     assert result.exit_code == 0
-    output = strip_ansi(result.stdout)
-    for option in ("--profile", "--until-pass", "--baseline"):
-        assert option in output
+    emit_version.assert_called_once_with()
+
+
+def test_ordered_group_handles_advanced_and_unknown_lazy_subapps():
+    command = typer.main.get_command(app)
+    assert isinstance(command, click.Group)
+    ctx = click.Context(command)
+
+    assert _load_lazy_subapp(command, "advanced") is True
+    assert command.get_command(ctx, "advanced") is not None
+    assert _load_lazy_subapp(command, "_run") is False
+    assert command.get_command(ctx, "_run") is None
+    assert command.get_command(ctx, "definitely-missing-command") is None

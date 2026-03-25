@@ -4,73 +4,76 @@
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Explain where run outputs and reports live. |
+| **Purpose** | Explain where evaluation outputs and reports live. |
 | **Audience** | Operators archiving evidence and CI outputs. |
 | **Scope** | `runs/` scratch outputs and `reports/` long-lived evidence. |
-| **Source of truth** | CLI run/report commands (`src/invarlock/cli/commands/run.py`). |
+| **Source of truth** | `src/invarlock/cli/commands/evaluate.py`, `src/invarlock/reporting/`. |
 
 ## Quick Start
 
 ```bash
-# Run baseline
-invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml --out runs/baseline
+# Compare baseline and subject on the secure-default runtime path
+INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate \
+  --baseline gpt2 \
+  --subject gpt2 \
+  --preset configs/presets/causal_lm/wikitext2_512.yaml \
+  --report-out reports/eval
 
-# Generate report
-invarlock report --run runs/baseline/report.json --format report --output reports/baseline
+# Render HTML from the emitted evaluation bundle
+invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 ```
+
+Model-loading commands use the secure-default runtime container unless a trusted
+`invarlock evaluate --mode local` workflow explicitly bypasses it.
 
 ## Concepts
 
-- `runs/` is scratch space: timestamped run directories with `report.json` + `events.jsonl`.
-- `reports/` is evidence: copy `report.json` and reports for audit.
-- reports reference baseline reports; keep them together to preserve pairing.
+- `runs/` is scratch space: evaluate emits baseline/subject working artifacts there.
+- `reports/` is evidence: archive `evaluation.report.json` and `runtime.manifest.json`
+  for audit, plus any HTML or proof-pack outputs you distribute.
+- evaluation bundles reference baseline/subject report artifacts; keep them
+  together to preserve pairing and make later review easier.
 
 ### Command outputs
 
 | Command | Writes | What to archive |
 | --- | --- | --- |
-| `invarlock run` | `runs/<name>/<timestamp>/report.json`, `events.jsonl` | Baseline + subject `report.json`. |
-| `invarlock report --format report` | `reports/<name>/evaluation.report.json` | report + baseline report. |
+| `invarlock evaluate` | `runs/`, `reports/<name>/evaluation.report.json`, `runtime.manifest.json` | Evaluation report bundle plus attestation for attested runs. |
 | `invarlock report html` | `reports/<name>/evaluation.html` | Optional (can be rebuilt). |
 
 ## Reference
 
-### Run outputs (`runs/`)
+### Evaluate scratch outputs (`runs/`)
 
 ```text
 runs/
   baseline/
-    20251010_182515/
-      report.json
-      events.jsonl
-  quant8/
-    20251010_151826/
-      report.json
-      events.jsonl
+    ...
+  subject/
+    ...
 ```
 
-### Reports and reports (`reports/`)
+### Evaluation reports (`reports/`)
 
 ```text
 reports/
-  baseline/
-    report.json
-  quant8_balanced/
+  eval/
     evaluation.report.json
-    report.json
+    runtime.manifest.json
+    evaluation.html
 ```
 
 ### Archive checklist
 
-- Move baseline + subject `report.json` into `reports/`.
-- Keep `evaluation.report.json` with the baseline report.
-- Retain `events.jsonl` only if debugging; HTML exports are optional.
+- Keep `evaluation.report.json` with `runtime.manifest.json`.
+- Retain HTML exports only when you need reviewer-friendly artifacts.
+- Retain scratch `runs/` only if debugging or rebuilding derived artifacts.
 - Prune timestamped `runs/` once evidence is archived.
 
 | Artifact | Why archive | Required for verify |
 | --- | --- | --- |
-| `report.json` (baseline + subject) | Metrics, windows, provenance | Yes |
 | `evaluation.report.json` | Evaluation report snapshot | Yes |
+| `runtime.manifest.json` | Runtime attestation for secure-default outputs | Yes |
 | `events.jsonl` | Debugging timeline | No |
 | `evaluation.html` | Human review | No |
 
@@ -82,20 +85,22 @@ reports/
 
 ### Cleanup checklist
 
-1. Copy `report.json` and `evaluation.report.json` into `reports/` for retention.
-2. Keep baseline reports alongside derived reports for pairing checks.
+1. Copy `evaluation.report.json` and `runtime.manifest.json` into `reports/`
+   for retention.
+2. Keep any referenced baseline/subject artifacts alongside derived reports for
+   pairing checks and `report explain`.
 3. Remove stale timestamped runs once evidence is archived.
 
 ## Troubleshooting
 
-- **Missing baseline report**: reports cannot be validated without the
-  baseline `report.json`; keep it alongside the report.
+- **Missing pairing artifacts**: `report explain` and some advanced workflows
+  need the baseline/subject artifacts referenced by the evaluation bundle.
 - **Large run dirs**: prune old timestamped runs after archiving reports.
 
 ## Observability
 
-- `report.json` is the canonical source for metrics/guards.
-- `events.jsonl` provides per-phase logs for debugging.
+- `evaluation.report.json` is the canonical distribution artifact.
+- scratch run artifacts still provide per-phase logs for debugging when needed.
 
 ## Related Documentation
 

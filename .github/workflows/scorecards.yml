@@ -2,13 +2,15 @@ name: OpenSSF Scorecard
 
 on:
   push:
+    # scorecard-action only supports push/schedule on the default branch.
     branches: [ main ]
+  branch_protection_rule:
   schedule:
     - cron: '18 4 * * 1'
   workflow_dispatch:
 
 permissions:
-  read-all
+  contents: read
 
 jobs:
   analysis:
@@ -25,11 +27,14 @@ jobs:
       - name: Run OpenSSF Scorecard analysis
         uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a
         with:
+          # Prefer a dedicated PAT when configured so classic branch protection
+          # remains visible to Scorecard; public repos fall back to github.token.
+          repo_token: ${{ secrets.SCORECARD_TOKEN || github.token }}
           publish_results: true
           results_file: results.sarif
           results_format: sarif
       - name: Upload Scorecard artifact
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: scorecard-results
           path: results.sarif

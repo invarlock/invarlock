@@ -35,10 +35,15 @@ def main() -> int:
     failures: list[str] = []
 
     required_by_file = {
-        "docs/user-guide/quickstart.md": ["machine-readable evaluation"],
+        "docs/user-guide/quickstart.md": [
+            "machine-readable evaluation report",
+            "invarlock verify",
+            "report html",
+        ],
         "docs/user-guide/getting-started.md": [
-            "make eval-loop",
-            "Understand the assurance scope",
+            "invarlock evaluate",
+            "invarlock verify",
+            "report html",
             "Assurance Case",
         ],
         "docs/user-guide/example-reports.md": [
@@ -55,15 +60,25 @@ def main() -> int:
             "Published assurance basis currently covers GPT-2 and BERT profiles.",
             "Mistral 7B",
             "Qwen2 7B",
+            "Qwen2.5 14B",
             "pilot calibration configs",
+            "Model Family Catalog",
         ],
         "mkdocs.yml": [
+            "Model Family Catalog: reference/model-family-catalog.md",
             "Assurance Case: assurance/00-assurance-case.md",
             "Evaluation Math Derivation: assurance/01-eval-math-derivation.md",
         ],
         "README.md": ["docs/assurance/00-assurance-case.md"],
         "docs/user-guide/reading-report.md": ["Assurance Case"],
         "docs/reference/index.md": ["Assurance claims and derivations"],
+        "docs/reference/contracts.md": ["Model family catalog"],
+        "docs/reference/model-family-catalog.md": [
+            "support tier",
+            "coverage state",
+            "Declared Support",
+            "Recommended Additions",
+        ],
         "docs/assurance/00-assurance-case.md": [
             "assurance case",
             "assurance claims",
@@ -73,18 +88,21 @@ def main() -> int:
             "Published assurance basis currently covers GPT-2 and BERT profiles.",
             "Mistral 7B",
             "Qwen2 7B",
+            "Qwen2.5 14B",
             "not part of the published",
         ],
         "docs/reference/calibration.md": [
             "Published assurance basis currently covers GPT-2 and BERT profiles.",
             "Mistral 7B",
             "Qwen2 7B",
+            "Qwen2.5 14B",
         ],
         "docs/reference/guards.md": [
             "GPT-2",
             "BERT profiles",
             "Mistral 7B",
             "Qwen2 7B",
+            "Qwen2.5 14B",
             "published assurance basis",
         ],
         "docs/reference/model-adapters.md": [
@@ -93,6 +111,7 @@ def main() -> int:
             "BERT",
             "Mistral 7B",
             "Qwen2 7B",
+            "Qwen2.5 14B",
         ],
         "docs/user-guide/proof-packs.md": [
             "signed manifest",

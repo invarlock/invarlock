@@ -1,4 +1,5 @@
 import os
+import re
 
 from click.termui import strip_ansi
 from typer.testing import CliRunner
@@ -15,8 +16,6 @@ def test_invarlock_help_layout_and_exit_codes():
 
     # Core copy
     assert "evaluate model changes" in out.lower()
-    # Updated help mentions built-in quant_rtn demo via --edit-config
-    assert "built-in quant_rtn" in out.lower()
     assert "invarlock evaluate --baseline" in out and "--subject" in out
 
     # Exit codes surfaced (normalize whitespace to avoid wrapping issues)
@@ -25,8 +24,10 @@ def test_invarlock_help_layout_and_exit_codes():
     assert "2=schema invalid" in normalized and "3=hard abort" in normalized
 
     # Command names presence (order may vary with Typer versions)
-    for name in ("evaluate", "report", "run", "plugins", "doctor", "version"):
-        assert name in out
+    for name in ("evaluate", "report", "verify", "doctor", "advanced", "version"):
+        assert re.search(rf"^\s*│\s+{re.escape(name)}\s", out, re.MULTILINE)
+    for removed in ("proof-pack", "run", "plugins", "policy", "calibrate"):
+        assert not re.search(rf"^\s*│\s+{re.escape(removed)}\s", out, re.MULTILINE)
 
 
 def test_invarlock_version_option():
@@ -45,27 +46,27 @@ def test_report_group_help_lists_subcommands():
         assert sub in out
 
 
-def test_plugins_group_help_lists_subcommands():
+def test_advanced_group_help_lists_subcommands():
     runner = CliRunner()
-    result = runner.invoke(app, ["plugins", "--help"])
+    result = runner.invoke(app, ["advanced", "--help"])
     assert result.exit_code == 0
     out = strip_ansi(result.stdout)
-    for sub in ("list", "guards", "edits", "install", "uninstall"):
+    for sub in ("proof-pack", "policy", "plugins", "calibrate"):
         assert sub in out
 
 
-def test_plugins_adapters_json_disabled_discovery():
+def test_advanced_plugins_adapters_json_disabled_discovery():
     runner = CliRunner()
-    # Disable plugin discovery to enforce lightweight path and stable JSON
+    # Keep third-party discovery off to enforce lightweight path and stable JSON
     import os as _os
 
-    _os.environ["INVARLOCK_DISABLE_PLUGIN_DISCOVERY"] = "1"
-    res = runner.invoke(app, ["plugins", "adapters", "--json"])
+    _os.environ["INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS"] = "0"
+    res = runner.invoke(app, ["advanced", "plugins", "adapters", "--json"])
     assert res.exit_code == 0, res.output
     import json as _json
 
     payload = _json.loads(res.output)
     assert payload.get("category") == "adapters"
     assert "kind" not in payload
-    assert payload.get("items") == []
-    assert payload.get("discovery") == "disabled"
+    names = {item.get("name") for item in payload.get("items", [])}
+    assert "hf_causal" in names

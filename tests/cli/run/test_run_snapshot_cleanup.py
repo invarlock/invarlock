@@ -3,11 +3,18 @@ from types import SimpleNamespace
 
 from typer.testing import CliRunner
 
-from invarlock.cli.app import app as cli
+from tests.cli.run._internal_cli import internal_run_app as cli
 
 
-def _cfg(tmp_path: Path) -> str:
+def _cfg(tmp_path: Path, *, skip_overhead: bool = False) -> str:
     p = tmp_path / "cfg.yaml"
+    context_yaml = ""
+    if skip_overhead:
+        context_yaml = """
+context:
+  run:
+    skip_overhead_check: true
+"""
     p.write_text(
         """
 model:
@@ -37,11 +44,18 @@ eval:
 output:
   dir: runs
 """
+        + context_yaml
     )
     return str(p)
 
 
-def _stub_env(monkeypatch, tmp_path: Path):
+def _stub_env(
+    monkeypatch,
+    tmp_path: Path,
+    *,
+    with_snapshot: bool = True,
+    broken_snapshot: bool = False,
+):
     monkeypatch.setenv("INVARLOCK_LIGHT_IMPORT", "1")
     # Device
     monkeypatch.setattr("invarlock.cli.device.resolve_device", lambda d: "cpu")
@@ -52,15 +66,27 @@ def _stub_env(monkeypatch, tmp_path: Path):
     # Registry and runner
     class DummyRegistry:
         def get_adapter(self, name):
-            # Provide snapshot capabilities so snapshot_mode line is printed deterministically
-            return SimpleNamespace(
+            adapter = SimpleNamespace(
                 name=name,
                 load_model=lambda *a, **k: object(),
-                snapshot=lambda _m=None: b"blob",
-                restore=lambda _m, _b=None: None,
-                snapshot_chunked=lambda _m=None: str(tmp_path / "snapdir"),
-                restore_chunked=lambda _m, _d=None: None,
             )
+            if with_snapshot:
+                if broken_snapshot:
+                    adapter.snapshot = lambda _m=None: (_ for _ in ()).throw(
+                        AssertionError("snapshot should not be called")
+                    )
+                    adapter.restore = lambda _m, _b=None: None
+                    adapter.snapshot_chunked = lambda _m=None: (_ for _ in ()).throw(
+                        AssertionError("snapshot_chunked should not be called")
+                    )
+                    adapter.restore_chunked = lambda _m, _d=None: None
+                else:
+                    # Provide snapshot capabilities so snapshot_mode line is printed deterministically
+                    adapter.snapshot = lambda _m=None: b"blob"
+                    adapter.restore = lambda _m, _b=None: None
+                    adapter.snapshot_chunked = lambda _m=None: str(tmp_path / "snapdir")
+                    adapter.restore_chunked = lambda _m, _d=None: None
+            return adapter
 
         def get_edit(self, name):
             return SimpleNamespace(name=name)
@@ -91,13 +117,26 @@ def _stub_env(monkeypatch, tmp_path: Path):
         "invarlock.eval.data.get_provider",
         lambda *a, **k: SimpleNamespace(
             windows=lambda **kw: (
-                SimpleNamespace(input_ids=[[1, 2]], attention_masks=[[1, 1]]),
-                SimpleNamespace(input_ids=[[3, 4]], attention_masks=[[1, 1]]),
+                SimpleNamespace(
+                    input_ids=[
+                        [idx + 1, idx + 2] for idx in range(int(kw.get("preview_n", 1)))
+                    ],
+                    attention_masks=[
+                        [1, 1] for _ in range(int(kw.get("preview_n", 1)))
+                    ],
+                ),
+                SimpleNamespace(
+                    input_ids=[
+                        [10_000 + idx + 1, 10_000 + idx + 2]
+                        for idx in range(int(kw.get("final_n", 1)))
+                    ],
+                    attention_masks=[[1, 1] for _ in range(int(kw.get("final_n", 1)))],
+                ),
             ),
             estimate_capacity=lambda **kw: {
-                "available_unique": 100,
-                "available_nonoverlap": 100,
-                "total_tokens": 1000,
+                "available_unique": 5000,
+                "available_nonoverlap": 5000,
+                "total_tokens": 50000,
                 "dedupe_rate": 0.0,
             },
         ),
@@ -137,3 +176,85 @@ def test_no_cleanup_flag_skips_deletion(tmp_path: Path, monkeypatch):
     r = CliRunner().invoke(cli, ["run", "-c", cfg, "--no-cleanup", "--profile", "dev"])
     s = r.stdout
     assert "Cleanup: skipped" in s
+
+
+def test_ci_skip_overhead_reuses_loaded_model_without_snapshot(
+    tmp_path: Path, monkeypatch
+):
+    _stub_env(monkeypatch, tmp_path, with_snapshot=False)
+    monkeypatch.setattr("invarlock.cli.commands.run.RELEASE_MIN_WINDOWS_PER_ARM", 1)
+
+    loaded_model = SimpleNamespace(name="loaded-model")
+    load_calls: list[dict[str, object] | None] = []
+
+    def _fake_load_model_with_cfg(*args, **kwargs):
+        load_calls.append(kwargs.get("warning_context"))
+        if len(load_calls) > 1:
+            raise AssertionError("unexpected second model load")
+        return loaded_model
+
+    def _exec(**kwargs):
+        assert kwargs["model"] is loaded_model
+        return SimpleNamespace(
+            edit={"deltas": {"params_changed": 0}},
+            metrics={"window_overlap_fraction": 0.0, "window_match_fraction": 1.0},
+            guards={},
+            context={"dataset_meta": {}},
+            evaluation_windows={},
+            status="success",
+        )
+
+    monkeypatch.setattr(
+        "invarlock.cli.commands.run._load_model_with_cfg", _fake_load_model_with_cfg
+    )
+    monkeypatch.setattr(
+        "invarlock.core.runner.CoreRunner", lambda: SimpleNamespace(execute=_exec)
+    )
+
+    cfg = _cfg(tmp_path, skip_overhead=True)
+    result = CliRunner().invoke(cli, ["run", "-c", cfg, "--profile", "ci"])
+
+    assert result.exit_code == 0, result.stdout
+    assert len(load_calls) == 1
+    assert "Reusing initially loaded model for guarded execution." in result.stdout
+
+
+def test_ci_skip_overhead_reuses_loaded_model_before_snapshot_setup(
+    tmp_path: Path, monkeypatch
+):
+    _stub_env(monkeypatch, tmp_path, with_snapshot=True, broken_snapshot=True)
+    monkeypatch.setattr("invarlock.cli.commands.run.RELEASE_MIN_WINDOWS_PER_ARM", 1)
+
+    loaded_model = SimpleNamespace(name="loaded-model")
+    load_calls: list[dict[str, object] | None] = []
+
+    def _fake_load_model_with_cfg(*args, **kwargs):
+        load_calls.append(kwargs.get("warning_context"))
+        if len(load_calls) > 1:
+            raise AssertionError("unexpected second model load")
+        return loaded_model
+
+    def _exec(**kwargs):
+        assert kwargs["model"] is loaded_model
+        return SimpleNamespace(
+            edit={"deltas": {"params_changed": 0}},
+            metrics={"window_overlap_fraction": 0.0, "window_match_fraction": 1.0},
+            guards={},
+            context={"dataset_meta": {}},
+            evaluation_windows={},
+            status="success",
+        )
+
+    monkeypatch.setattr(
+        "invarlock.cli.commands.run._load_model_with_cfg", _fake_load_model_with_cfg
+    )
+    monkeypatch.setattr(
+        "invarlock.core.runner.CoreRunner", lambda: SimpleNamespace(execute=_exec)
+    )
+
+    cfg = _cfg(tmp_path, skip_overhead=True)
+    result = CliRunner().invoke(cli, ["run", "-c", cfg, "--profile", "ci"])
+
+    assert result.exit_code == 0, result.stdout
+    assert len(load_calls) == 1
+    assert "Reusing initially loaded model for guarded execution." in result.stdout

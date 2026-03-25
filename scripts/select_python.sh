@@ -20,6 +20,10 @@ resolve_command() {
   command -v "$candidate" 2>/dev/null || return 1
 }
 
+prefer_active_python() {
+  [[ "${GITHUB_ACTIONS:-}" == "true" ]] || [[ -n "${VIRTUAL_ENV:-}" ]] || [[ -n "${CONDA_PREFIX:-}" ]]
+}
+
 print_if_version_matches() {
   local candidate resolved
   candidate="$1"
@@ -44,6 +48,10 @@ print_if_supported() {
 
 if command -v python >/dev/null 2>&1; then
   print_if_version_matches "python" || true
+fi
+
+if prefer_active_python && command -v python >/dev/null 2>&1; then
+  print_if_supported "python" || true
 fi
 
 print_if_version_matches "python3.12" || true

@@ -14,6 +14,7 @@ test_run_pack_build_pack_collects_artifacts() {
     echo "{}" > "${run_dir}/reports/guard_intervention_summary.json"
     echo '{"model_list": ["org/model"], "models": {"org/model": {"revision": "abc"}}}' > "${run_dir}/state/model_revisions.json"
     echo '{"schema":"proof_pack_scenarios_v1","schema_version":1,"scenarios":[]}' > "${run_dir}/state/scenarios.json"
+    echo '{"org/model":{"quant_rtn":{"bits":4}}}' > "${run_dir}/state/tuned_edit_params.json"
     echo "{}" > "${run_dir}/modelA/reports/edit/run_1/evaluation.report.json"
     echo '{"probe":"rmt_cross_model_v1","stable":false}' > "${run_dir}/modelA/reports/edit/run_1/rmt_probe.json"
     echo '{"probe":"ve_probe_v1","signal":true}' > "${run_dir}/modelA/reports/edit/run_1/ve_probe.json"
@@ -47,6 +48,9 @@ case "${cmd}" in
         fi
         ;;
     verify)
+        for arg in "$@"; do
+            [[ "${arg}" != "--allow-unattested-artifacts" ]] || exit 97
+        done
         echo '{"ok": true}'
         exit 0
         ;;
@@ -63,24 +67,31 @@ EOF
     export SCRIPT_DIR
 
     local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}"
     pack_build_pack "${run_dir}" "${pack_dir}"
 
     assert_file_exists "${pack_dir}/results/verdicts/final_verdict.txt" "verdict copied"
     assert_file_exists "${pack_dir}/metadata/model_revisions.json" "revisions copied"
     assert_file_exists "${pack_dir}/metadata/scenarios.json" "scenarios manifest copied"
-    assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/evaluation.report.json" "cert copied"
-    assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/rmt_probe.json" "probe sidecar copied"
-    assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/ve_probe.json" "ve probe sidecar copied"
-    assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/verify.json" "verify output captured"
+    assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/evaluation.report.json" "report copied"
+    assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/rmt_probe.json" "probe sidecar copied"
+    assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/ve_probe.json" "ve probe sidecar copied"
+    assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/verify.json" "verify output captured"
     assert_file_exists "${pack_dir}/results/verification_summary.json" "verification summary written"
     run python3 -c 'import json,sys; json.load(open(sys.argv[1], encoding="utf-8"))' "${pack_dir}/results/verification_summary.json"
     assert_rc "0" "${RUN_RC}" "verification summary is valid JSON"
     assert_file_exists "${pack_dir}/manifest.json" "manifest written"
     assert_file_exists "${pack_dir}/checksums.sha256" "checksums written"
-    assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/evaluation.html" "html rendered"
+    assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/evaluation.html" "html rendered"
     assert_file_exists "${pack_dir}/README.md" "readme written"
     assert_match "signed manifest, strict verification, and a PASS final verdict" "$(cat "${pack_dir}/README.md")" "README documents proof-grade triad"
+    assert_match "invarlock advanced proof-pack verify" "$(cat "${pack_dir}/README.md")" "README points to advanced proof-pack verify"
     assert_file_exists "${pack_dir}/results/analysis/guard_intervention_summary.json" "intervention summary copied"
+    assert_file_exists "${pack_dir}/metadata/source_repo.json" "source repo metadata written"
+    assert_file_exists "${pack_dir}/metadata/environment.json" "environment metadata written"
+    assert_file_exists "${pack_dir}/metadata/tuned_edit_params.json" "tuned edit params copied"
+    run python3 -c 'import json,sys; payload=json.load(open(sys.argv[1], encoding="utf-8")); assert payload["builder"]["id"]=="invarlock/proof-pack@v1"; assert payload["subject"]["path"]=="results/verdicts/final_verdict.json"; assert payload["invocation"]["config_source"]["path"]=="metadata/source_repo.json"; assert payload["environment"]["path"]=="metadata/environment.json"; assert any(item["path"]=="metadata/model_revisions.json" for item in payload["materials"]); assert any(item["path"]=="metadata/scenarios.json" for item in payload["materials"]); assert any(item["path"]=="metadata/tuned_edit_params.json" for item in payload["materials"])' "${pack_dir}/manifest.json"
+    assert_rc "0" "${RUN_RC}" "manifest carries attestation metadata"
 }
 
 test_run_pack_build_pack_rejects_failed_final_verdict() {
@@ -143,6 +154,9 @@ case "${cmd}" in
         fi
         ;;
     verify)
+        for arg in "$@"; do
+            [[ "${arg}" != "--allow-unattested-artifacts" ]] || exit 97
+        done
         echo '{"ok": true}'
         exit 0
         ;;
@@ -165,6 +179,8 @@ EOF
     assert_file_exists "${pack_dir}/results/verdicts/final_verdict.txt" "verdict nested"
     assert_file_exists "${pack_dir}/metadata/model_revisions.json" "revisions moved to metadata"
     assert_file_exists "${pack_dir}/metadata/scenarios.json" "scenarios manifest moved to metadata"
+    assert_file_exists "${pack_dir}/metadata/source_repo.json" "source repo metadata written"
+    assert_file_exists "${pack_dir}/metadata/environment.json" "environment metadata written"
     assert_file_exists "${pack_dir}/metadata/manifest.json" "manifest copied to metadata"
     assert_file_exists "${pack_dir}/metadata/manifest.json.asc" "manifest signature copied to metadata"
     assert_file_exists "${pack_dir}/metadata/checksums.sha256" "checksums copied to metadata"
@@ -267,9 +283,12 @@ case "${cmd}" in
         fi
         ;;
     verify)
-        cert="${@: -1}"
+        for arg in "$@"; do
+            [[ "${arg}" != "--allow-unattested-artifacts" ]] || exit 97
+        done
+        report="${@: -1}"
         echo '{"ok": false}'
-        if [[ "${cert}" == */errors/*/evaluation.report.json ]]; then
+        if [[ "${report}" == */errors/*/evaluation.report.json ]]; then
             exit 1
         fi
         exit 0
@@ -285,14 +304,14 @@ EOF
     local pack_dir="${TEST_TMPDIR}/pack"
     pack_build_pack "${run_dir}" "${pack_dir}"
 
-    assert_file_exists "${pack_dir}/certs/modelA/edit/run_1/verify.json" "clean verify output captured"
-    assert_file_exists "${pack_dir}/certs/modelA/errors/nan_injection/verify.json" "error injection verify output captured"
+    assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/verify.json" "clean verify output captured"
+    assert_file_exists "${pack_dir}/reports/modelA/errors/nan_injection/verify.json" "error injection verify output captured"
     assert_file_exists "${pack_dir}/results/verification_summary.json" "verification summary written"
     run python3 -c 'import json,sys; json.load(open(sys.argv[1], encoding="utf-8"))' "${pack_dir}/results/verification_summary.json"
     assert_rc "0" "${RUN_RC}" "verification summary is valid JSON"
-    assert_match "\"clean_certs\": 1" "$(cat "${pack_dir}/results/verification_summary.json")" "clean count recorded"
-    assert_match "\"error_injection_certs\": 1" "$(cat "${pack_dir}/results/verification_summary.json")" "error injection count recorded"
-    assert_match "\"failed_certs\": 0" "$(cat "${pack_dir}/results/verification_summary.json")" "failed count recorded"
+    assert_match "\"clean_reports\": 1" "$(cat "${pack_dir}/results/verification_summary.json")" "clean count recorded"
+    assert_match "\"error_injection_reports\": 1" "$(cat "${pack_dir}/results/verification_summary.json")" "error injection count recorded"
+    assert_match "\"failed_reports\": 0" "$(cat "${pack_dir}/results/verification_summary.json")" "failed count recorded"
 }
 
 test_run_pack_build_pack_continues_when_html_report_fails() {
@@ -325,6 +344,9 @@ case "${cmd}" in
         fi
         ;;
     verify)
+        for arg in "$@"; do
+            [[ "${arg}" != "--allow-unattested-artifacts" ]] || exit 97
+        done
         echo '{"ok": true}'
         exit 0
         ;;
@@ -387,6 +409,9 @@ case "${cmd}" in
         fi
         ;;
     verify)
+        for arg in "$@"; do
+            [[ "${arg}" != "--allow-unattested-artifacts" ]] || exit 97
+        done
         echo '{"ok": false}'
         exit 1
         ;;
@@ -401,10 +426,8 @@ EOF
     local pack_dir="${TEST_TMPDIR}/pack"
     run pack_build_pack "${run_dir}" "${pack_dir}"
     assert_rc "1" "${RUN_RC}" "unexpected verify failure returns non-zero"
-
-    assert_file_exists "${pack_dir}/manifest.json" "manifest written even on verify failure"
-    assert_file_exists "${pack_dir}/checksums.sha256" "checksums written even on verify failure"
-    assert_file_exists "${pack_dir}/results/verification_summary.json" "verification summary written on verify failure"
+    [[ ! -e "${pack_dir}" ]] || t_fail "failed pack build should not leave a final pack behind path='${pack_dir}'"
+    assert_eq "0" "$(find "${TEST_TMPDIR}" -maxdepth 1 -type d -name '.pack.tmp.*' | wc -l | tr -d ' ')" "failed pack build cleans staging directories"
 }
 
 
@@ -458,13 +481,13 @@ test_run_pack_helpers_cover_error_paths() {
     run pack_copy_file "${TEST_TMPDIR}/missing.txt" "${TEST_TMPDIR}/dest.txt"
     assert_rc "1" "${RUN_RC}" "missing artifact returns non-zero"
 
-    run pack_cert_rel_path "${TEST_TMPDIR}/run" "${TEST_TMPDIR}/nope"
-    assert_rc "1" "${RUN_RC}" "invalid cert path returns non-zero"
+    run pack_report_rel_path "${TEST_TMPDIR}/run" "${TEST_TMPDIR}/nope"
+    assert_rc "1" "${RUN_RC}" "invalid report path returns non-zero"
 
     local pack_dir="${TEST_TMPDIR}/pack"
-    mkdir -p "${pack_dir}/certs"
-    run pack_verify_certs "${pack_dir}"
-    assert_rc "1" "${RUN_RC}" "missing certs returns non-zero"
+    mkdir -p "${pack_dir}/reports"
+    run pack_verify_reports "${pack_dir}"
+    assert_rc "1" "${RUN_RC}" "missing reports returns non-zero"
 }
 
 test_run_pack_sha256_cmd_fallback_and_sign_warning() {
@@ -905,6 +928,37 @@ test_run_pack_build_pack_error_conditions() {
     echo "x" > "${pack_dir}/existing"
     run pack_build_pack "${run_dir}" "${pack_dir}"
     assert_rc "1" "${RUN_RC}" "non-empty pack dir returns non-zero"
+
+    local pack_file="${TEST_TMPDIR}/pack.file"
+    : > "${pack_file}"
+    run pack_build_pack "${run_dir}" "${pack_file}"
+    assert_rc "1" "${RUN_RC}" "non-directory pack target returns non-zero"
+}
+
+test_run_pack_atomic_helpers_cover_finalize_and_cleanup_paths() {
+    mock_reset
+
+    source ./scripts/proof_packs/run_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    local staging_dir
+    staging_dir="$(pack_prepare_staging_dir "${pack_dir}")"
+    assert_match "/\\.pack\\.tmp\\." "${staging_dir}" "staging dir uses hidden tmp naming"
+    echo "payload" > "${staging_dir}/payload.txt"
+
+    mkdir -p "${pack_dir}"
+    run pack_finalize_staging_dir "${staging_dir}" "${pack_dir}"
+    assert_rc "0" "${RUN_RC}" "finalize replaces empty target atomically"
+    assert_file_exists "${pack_dir}/payload.txt" "staged payload moved into final pack"
+
+    local file_target="${TEST_TMPDIR}/pack.file"
+    : > "${file_target}"
+    local staging_file
+    staging_file="$(pack_prepare_staging_dir "${file_target}")"
+    run pack_finalize_staging_dir "${staging_file}" "${file_target}"
+    assert_rc "1" "${RUN_RC}" "finalize rejects non-directory targets"
+    pack_cleanup_staging_dir "${staging_file}"
+    [[ ! -e "${staging_file}" ]] || t_fail "cleanup helper removes staging dir path='${staging_file}'"
 }
 
 test_run_pack_entrypoint_errors_on_invalid_args() {
@@ -1014,4 +1068,36 @@ test_run_pack_entrypoint_builds_run_args_for_modes() {
     pack_run_pack --resume --pack-dir "${TEST_TMPDIR}/pack3" --out "${TEST_TMPDIR}/out3"
     assert_match "--resume" "$(cat "${TEST_TMPDIR}/run.args")" "resume forwarded"
     assert_eq "${TEST_TMPDIR}/out3|${TEST_TMPDIR}/pack3" "$(cat "${TEST_TMPDIR}/pack.args")" "custom pack dir used"
+}
+
+test_run_pack_require_passing_run_verdict_falls_back_without_helper() {
+    mock_reset
+
+    source ./scripts/proof_packs/run_pack.sh
+
+    unset -f pack_read_final_verdict 2>/dev/null || true
+
+    local run_dir="${TEST_TMPDIR}/run"
+    mkdir -p "${run_dir}/reports"
+    printf '%s\n' '{"verdict":"PASS"}' > "${run_dir}/reports/final_verdict.json"
+
+    pack_require_passing_run_verdict "${run_dir}"
+
+    printf '%s\n' '{"verdict":"FAIL"}' > "${run_dir}/reports/final_verdict.json"
+    run pack_require_passing_run_verdict "${run_dir}"
+    assert_rc "1" "${RUN_RC}" "fallback parser rejects failed verdicts"
+    assert_match "refusing to build a distributable pack" "${RUN_ERR}" "fallback failure explains requirement"
+}
+
+test_run_pack_entrypoint_propagates_layout_normalization_failures() {
+    mock_reset
+
+    source ./scripts/proof_packs/run_pack.sh
+
+    pack_entrypoint() { :; }
+    pack_build_pack() { t_fail "pack_build_pack should not run when layout normalization fails"; }
+    pack_normalize_layout() { return 7; }
+
+    run pack_run_pack --out "${TEST_TMPDIR}/out"
+    assert_rc "7" "${RUN_RC}" "layout normalization failure propagates"
 }

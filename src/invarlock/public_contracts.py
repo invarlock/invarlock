@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import importlib.resources
 import json
 from pathlib import Path
 from typing import Any
 
 CONTRACTS_ROOT = Path(__file__).resolve().parents[2] / "contracts"
+PACKAGE_CONTRACTS_ROOT = importlib.resources.files("invarlock").joinpath(
+    "_data", "contracts"
+)
 
 
 def contract_path(filename: str) -> Path:
@@ -17,7 +21,11 @@ def contract_relpath(filename: str) -> str:
 
 def load_json_contract(filename: str) -> Any:
     path = contract_path(filename)
-    return json.loads(path.read_text(encoding="utf-8"))
+    if path.is_file():
+        return json.loads(path.read_text(encoding="utf-8"))
+    return json.loads(
+        PACKAGE_CONTRACTS_ROOT.joinpath(filename).read_text(encoding="utf-8")
+    )
 
 
 def _safe_load(filename: str, default: Any) -> Any:
@@ -45,6 +53,25 @@ def load_adapter_capabilities() -> dict[str, Any]:
     return {"format_version": "adapter-capabilities-v1", "adapters": []}
 
 
+def load_model_family_catalog() -> dict[str, Any]:
+    data = _safe_load(
+        "model_family_catalog.json", {"format_version": "model-family-catalog-v1"}
+    )
+    if isinstance(data, dict):
+        data.setdefault("declared_support", [])
+        data.setdefault("implemented_coverage", [])
+        data.setdefault("usage_only", [])
+        data.setdefault("recommended_additions", [])
+        return data
+    return {
+        "format_version": "model-family-catalog-v1",
+        "declared_support": [],
+        "implemented_coverage": [],
+        "usage_only": [],
+        "recommended_additions": [],
+    }
+
+
 def load_plugin_compatibility() -> dict[str, Any]:
     data = _safe_load(
         "plugin_compatibility.json", {"format_version": "plugin-compatibility-v1"}
@@ -61,6 +88,11 @@ def load_policy_pack_schema() -> dict[str, Any]:
 
 def load_proof_pack_manifest_schema() -> dict[str, Any]:
     data = _safe_load("proof_pack_manifest.schema.json", {})
+    return data if isinstance(data, dict) else {}
+
+
+def load_runtime_manifest_schema() -> dict[str, Any]:
+    data = _safe_load("runtime_manifest.schema.json", {})
     return data if isinstance(data, dict) else {}
 
 
@@ -118,8 +150,10 @@ def contract_reference(filename: str) -> dict[str, Any]:
 def contract_catalog() -> dict[str, Any]:
     return {
         "support_matrix": contract_reference("support_matrix.json"),
+        "model_family_catalog": contract_reference("model_family_catalog.json"),
         "adapter_capabilities": contract_reference("adapter_capabilities.json"),
         "plugin_compatibility": contract_reference("plugin_compatibility.json"),
+        "runtime_manifest": contract_reference("runtime_manifest.schema.json"),
         "proof_pack_manifest": contract_reference("proof_pack_manifest.schema.json"),
         "policy_pack": contract_reference("policy_pack.schema.json"),
     }
@@ -127,6 +161,7 @@ def contract_catalog() -> dict[str, Any]:
 
 __all__ = [
     "CONTRACTS_ROOT",
+    "PACKAGE_CONTRACTS_ROOT",
     "adapter_capability",
     "adapter_capability_map",
     "contract_catalog",
@@ -135,9 +170,11 @@ __all__ = [
     "contract_relpath",
     "load_adapter_capabilities",
     "load_json_contract",
+    "load_model_family_catalog",
     "load_plugin_compatibility",
     "load_policy_pack_schema",
     "load_proof_pack_manifest_schema",
+    "load_runtime_manifest_schema",
     "load_support_matrix",
     "published_basis_lanes",
     "support_lane_by_id",

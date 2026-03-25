@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from invarlock.cli import config as cfg_mod
 from invarlock.cli.config import (
     AutoConfig,
     DatasetConfig,
@@ -15,6 +16,7 @@ from invarlock.cli.config import (
     _deep_merge,
     apply_edit_override,
     apply_profile,
+    inspect_config_dependencies,
     load_config,
     resolve_edit_kind,
 )
@@ -172,7 +174,8 @@ def test_apply_profile_ci_and_release():
         edit={"name": "quant_rtn", "plan": {}},
     )
     ci = apply_profile(cfg, "ci")
-    assert ci.dataset.preview_n >= 200 and ci.eval.bootstrap.replicates >= 1200
+    assert ci.dataset.preview_n == 240 and ci.dataset.final_n == 240
+    assert ci.eval.bootstrap.replicates >= 1200
     assert ci.primary_metric.overhead_threshold == pytest.approx(0.01)
     rel = apply_profile(cfg, "release")
     assert rel.dataset.preview_n >= 240 and rel.eval.bootstrap.replicates >= 3200
@@ -221,6 +224,122 @@ def test_load_config_include_depth_guard(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match=r"Config !include depth exceeds"):
         load_config(main)
+
+
+def test_obj_mapping_scalar_and_non_mapping_paths() -> None:
+    obj = cfg_mod._Obj({"nested": {"value": 1}, "scalar": 7})
+
+    assert obj["scalar"] == 7
+    assert obj.scalar == 7
+    assert obj.nested.value == 1
+    assert cfg_mod._Obj("plain").get("missing", "fallback") == "fallback"
+
+
+def test_dataset_and_path_iteration_helper_edges(tmp_path: Path) -> None:
+    dataset = DatasetConfig(seq_len=8, stride=8)
+    absolute_a = tmp_path / "a.jsonl"
+    absolute_b = tmp_path / "b.jsonl"
+
+    found = cfg_mod._iter_absolute_path_strings(
+        [str(absolute_a), ("   ", {str(absolute_b)})]
+    )
+
+    assert dataset.seq_len == 8
+    assert found == {
+        cfg_mod._absolute_path_no_resolve(absolute_a),
+        cfg_mod._absolute_path_no_resolve(absolute_b),
+    }
+    assert cfg_mod._absolute_path_no_resolve("relative/config.yaml").is_absolute()
+
+
+def test_load_runtime_yaml_env_root_missing_file_falls_back_to_package(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("INVARLOCK_CONFIG_ROOT", str(tmp_path))
+
+    data = cfg_mod._load_runtime_yaml("profiles", "ci.yaml")
+
+    assert isinstance(data, dict)
+    assert data
+
+
+def test_inspect_config_dependencies_tracks_nested_includes_and_absolute_refs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    external_root = tmp_path / "external"
+    external_root.mkdir()
+    data_file = external_root / "dataset.jsonl"
+    data_file.write_text('{"text":"hello"}\n', encoding="utf-8")
+    nested = external_root / "nested.yaml"
+    nested.write_text(
+        textwrap.dedent(
+            f"""
+            dataset:
+              file: {data_file}
+            model:
+              id: gpt2
+              adapter: hf_causal
+            edit:
+              name: noop
+              plan: {{}}
+            """
+        ),
+        encoding="utf-8",
+    )
+    main = repo_root / "config.yaml"
+    main.write_text(
+        f"defaults: !include ../external/{nested.name}\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE", "1")
+
+    scan = inspect_config_dependencies(main)
+
+    assert scan.config_paths == tuple(
+        sorted((main.resolve(), nested.resolve()), key=str)
+    )
+    assert scan.referenced_paths == (data_file.resolve(),)
+
+
+def test_inspect_config_dependencies_rejects_outside_include_without_override(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    external_root = tmp_path / "external"
+    external_root.mkdir()
+    (external_root / "nested.yaml").write_text("model: {}\n", encoding="utf-8")
+    main = repo_root / "config.yaml"
+    main.write_text("defaults: !include ../external/nested.yaml\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE=1"):
+        inspect_config_dependencies(main)
+
+
+def test_inspect_config_dependencies_allows_outside_include_with_override(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    external_root = tmp_path / "external"
+    external_root.mkdir()
+    nested = external_root / "nested.yaml"
+    nested.write_text(
+        "model: {id: gpt2, adapter: hf_causal}\nedit: {name: noop, plan: {}}\n",
+        encoding="utf-8",
+    )
+    main = repo_root / "config.yaml"
+    main.write_text("defaults: !include ../external/nested.yaml\n", encoding="utf-8")
+    monkeypatch.setenv("INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE", "1")
+
+    scan = inspect_config_dependencies(main)
+
+    assert scan.config_paths == tuple(
+        sorted((main.resolve(), nested.resolve()), key=str)
+    )
 
 
 def test_load_config_none_and_nondict(tmp_path: Path):

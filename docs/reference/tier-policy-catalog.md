@@ -144,8 +144,8 @@ schedule). It is additive to the mean/CI primary-metric gate.
 - `mode` *(policy)* — `off|warn|fail`.
   - `warn` (default): violations are recorded in the report but do **not**
     fail validation (`validation.primary_metric_tail_acceptable` stays true).
-  - `fail`: violations fail validation and can trigger rollback in `invarlock run`
-    (`rollback_reason = primary_metric_tail_failed`).
+  - `fail`: violations fail validation and can trigger rollback in internal
+    run pipelines (`rollback_reason = primary_metric_tail_failed`).
 - `min_windows` *(policy)* — minimum paired windows required before evaluating
   thresholds. Underpowered runs set `primary_metric_tail.evaluated = false` and
   do not warn/fail.

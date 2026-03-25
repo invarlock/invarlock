@@ -30,9 +30,7 @@ jobs:
         with:
           python-version: '3.13'
       - name: Install build tooling
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e .[release-ci,security-ci]
+        run: python -m pip install --require-hashes -r requirements/workflows/release-security-py313.txt
       - name: Build wheel/sdist
         run: python -m build
       - name: Twine check
@@ -43,19 +41,30 @@ jobs:
         run: |
           python -m venv .venv
           . .venv/bin/activate
-          pip install dist/*.whl
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          wheel = next(Path("dist").glob("*.whl"))
+          digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
+          Path("dist/smoke-requirements.txt").write_text(
+              f"{wheel.resolve()} --hash=sha256:{digest}\n",
+              encoding="utf-8",
+          )
+          PY
+          python -m pip install --no-deps --require-hashes -r dist/smoke-requirements.txt
           python -c "import invarlock; import sys; print('invarlock version', getattr(invarlock, '__version__', 'n/a')); sys.exit(0)"
       - name: Generate release SBOM
         run: bash scripts/generate_sbom.sh artifacts/supply-chain/sbom.json
       - name: Upload dist artifacts
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: dist
           path: dist/*
           if-no-files-found: error
           retention-days: 3
       - name: Upload SBOM artifact
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: release-sbom
           path: artifacts/supply-chain/sbom.json
@@ -84,7 +93,7 @@ jobs:
         with:
           python-version: '3.13'
       - name: Download dist artifacts
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: dist
           path: dist
@@ -103,11 +112,11 @@ jobs:
           fi
       - name: Attest release artifacts
         id: attest_release
-        uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a
         with:
           subject-path: dist/*
       - name: Upload provenance bundle
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: release-provenance
           path: ${{ steps.attest_release.outputs.bundle-path }}
@@ -131,14 +140,47 @@ jobs:
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: '3.13'
-      - name: Install from TestPyPI and smoke test
+      - name: Download published TestPyPI wheel
+        env:
+          INVARLOCK_RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p wheelhouse
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import urllib.request
+          from pathlib import Path
+
+          version = os.environ["INVARLOCK_RELEASE_VERSION"].removeprefix("v")
+          metadata_url = f"https://test.pypi.org/pypi/invarlock/{version}/json"
+          with urllib.request.urlopen(metadata_url) as response:
+              payload = json.load(response)
+
+          wheel = next(item for item in payload["urls"] if item["filename"].endswith(".whl"))
+          destination = Path("wheelhouse") / wheel["filename"]
+          with urllib.request.urlopen(wheel["url"]) as response:
+              destination.write_bytes(response.read())
+
+          digest = hashlib.sha256(destination.read_bytes()).hexdigest()
+          if digest != wheel["digests"]["sha256"]:
+              raise SystemExit("TestPyPI wheel digest mismatch")
+
+          requirements = Path("wheelhouse/requirements.txt")
+          requirements.write_text(
+              f"{destination.resolve()} --hash=sha256:{digest}\n",
+              encoding="utf-8",
+          )
+          print(f"Downloaded {destination.name}")
+          PY
+      - name: Install published wheel and smoke test
         env:
           INVARLOCK_LIGHT_IMPORT: "1"
         run: |
           python -m venv .venv
           . .venv/bin/activate
-          python -m pip install --upgrade pip
-          pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple invarlock
+          python -m pip install --no-deps --require-hashes -r wheelhouse/requirements.txt
           invarlock --help || python -c "import invarlock; import sys; print('invarlock version', getattr(invarlock,'__version__','n/a')); sys.exit(0)"
 
   bundle_release:
@@ -159,17 +201,17 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
       - name: Download dist artifacts
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: dist
           path: dist
       - name: Download SBOM artifact
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: release-sbom
           path: artifacts/supply-chain
       - name: Download provenance artifact
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: release-provenance
           path: provenance
@@ -177,6 +219,27 @@ jobs:
         uses: sigstore/gh-action-sigstore-python@a5caf349bc536fbef3668a10ed7f5cd309a4b53d
         with:
           inputs: dist/*
+          upload-signing-artifacts: true
+      - name: Create offline verification bundle
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          bash scripts/release/make_offline_bundle.sh \
+            --version "${version}" \
+            --tag "${tag}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --dist-dir dist \
+            --sbom artifacts/supply-chain/sbom.json \
+            --provenance-dir provenance \
+            --output-dir release-assets
+      - name: Sign offline verification bundle
+        uses: sigstore/gh-action-sigstore-python@a5caf349bc536fbef3668a10ed7f5cd309a4b53d
+        with:
+          inputs: release-assets/*-offline-bundle.tar.gz
           upload-signing-artifacts: true
       - name: Create or update GitHub release
         env:

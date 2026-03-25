@@ -37,6 +37,8 @@ jobs:
     name: Docs Build & Validate
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      PYTHONPATH: ${{ github.workspace }}/src
 
     steps:
     - name: Checkout
@@ -55,7 +57,7 @@ jobs:
         node-version: '18'
 
     - name: Cache pip
-      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
+      uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
       # `act` can clobber PATH after setup-python on some hosts; cache is optional.
       if: ${{ !env.ACT }}
       with:
@@ -64,10 +66,7 @@ jobs:
         restore-keys: docs-pip-
 
     - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        # Install core package only (no [dev] which pulls torch/bitsandbytes ~3GB)
-        pip install -e .[ci,docs-ci]
+      run: python -m pip install --require-hashes -r requirements/workflows/docs-ci-py313.txt
 
     - name: Build docs (strict)
       run: mkdocs build --strict
@@ -107,7 +106,7 @@ jobs:
 
     - name: Upload build artifacts
       if: github.event_name == 'pull_request'
-      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
       with:
         name: docs-build
         path: site/
@@ -119,6 +118,8 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule'
     timeout-minutes: 15
+    env:
+      PYTHONPATH: ${{ github.workspace }}/src
 
     steps:
     - name: Checkout
@@ -130,7 +131,7 @@ jobs:
         python-version: '3.13'
 
     - name: Install link checker
-      run: pip install -e .[docs-ci]
+      run: python -m pip install --require-hashes -r requirements/workflows/docs-ci-py313.txt
 
     - name: Check external links
       run: linkchecker --check-extern docs/
@@ -146,6 +147,8 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+    env:
+      PYTHONPATH: ${{ github.workspace }}/src
 
     steps:
     - name: Checkout
@@ -157,14 +160,14 @@ jobs:
         python-version: '3.13'
 
     - name: Install dependencies
-      run: pip install -e .[ci]
+      run: python -m pip install --require-hashes -r requirements/workflows/docs-ci-py313.txt
 
     - name: Build documentation
       run: mkdocs build
 
     - name: Deploy to Netlify
       if: env.NETLIFY_AUTH_TOKEN != ''
-      uses: nwtgck/actions-netlify@dbedb29b68382c3d884447aa3968acec7af4fe73
+      uses: nwtgck/actions-netlify@4cbaf4c08f1a7bfa537d6113472ef4424e4eb654
       with:
         publish-dir: './site'
         production-branch: main

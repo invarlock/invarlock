@@ -19,6 +19,12 @@ def test_doctor_json_mode_outputs_findings_and_exitcode(monkeypatch):
     payload = json.loads(r.stdout.strip().splitlines()[-1])
     assert payload.get("format_version") == "doctor-v1"
     assert isinstance(payload.get("findings"), list)
+    assert payload["contracts"]["model_family_catalog"]["format_version"] == (
+        "model-family-catalog-v1"
+    )
+    assert payload["model_family_catalog"]["format_version"] == (
+        "model-family-catalog-v1"
+    )
     # Should include at least one note when INVARLOCK_TINY_RELAX is set
     # (ok if filtered out on some builds; ensure structure viable)
     assert "summary" in payload and "resolution" in payload

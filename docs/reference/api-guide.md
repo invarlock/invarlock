@@ -49,6 +49,9 @@ print("primary metric:", report.metrics.get("primary_metric"))
   `context.snapshot.*` when using YAML configs.
 - **reports**: generated from `RunReport` + baseline report via
   `invarlock.reporting.report_builder.make_report`.
+- **Verification**: CLI-side `invarlock verify` now enforces
+  `runtime.manifest.json` attestation for attested outputs in addition to schema
+  and pairing checks.
 
 ### Responsibility lanes
 

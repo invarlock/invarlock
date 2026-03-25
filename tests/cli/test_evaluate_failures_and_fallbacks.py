@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from contextlib import ExitStack
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
@@ -23,6 +23,77 @@ def _stub_run_dir(out_dir: Path, name: str = "report.json") -> Path:
         json.dumps({"meta": {}, "metrics": {}, "data": {}}), encoding="utf-8"
     )
     return report_path
+
+
+def _write_json(path: Path, payload: object) -> Path:
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def _valid_baseline_report_payload(
+    *,
+    adapter: str = "hf_causal",
+    profile: str = "dev",
+    tier: str = "balanced",
+    edit_name: str = "noop",
+    evaluation_windows: dict[str, object] | None = None,
+) -> dict[str, object]:
+    return {
+        "edit": {"name": edit_name},
+        "meta": {"adapter": adapter},
+        "context": {"profile": profile, "auto": {"tier": tier}},
+        "evaluation_windows": evaluation_windows
+        or {
+            "preview": {"window_ids": ["preview-0"], "input_ids": [[1, 2, 3]]},
+            "final": {"window_ids": ["final-0"], "input_ids": [[4, 5, 6]]},
+        },
+    }
+
+
+def _prepare_evaluate_paths(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> tuple[Path, Path]:
+    monkeypatch.chdir(tmp_path)
+    src = Path("src")
+    edt = Path("edt")
+    src.mkdir()
+    edt.mkdir()
+    return src, edt
+
+
+def _assert_baseline_report_validation_exit(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    payload: object | None = None,
+    raw_text: str | None = None,
+    profile: str = "dev",
+    tier: str = "balanced",
+) -> click.exceptions.Exit:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    baseline_path = Path("baseline.json")
+    if raw_text is not None:
+        baseline_path.write_text(raw_text, encoding="utf-8")
+    else:
+        assert payload is not None
+        baseline_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    monkeypatch.setattr(run_mod, "run_command", lambda **_: None, raising=False)
+    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+
+    with pytest.raises(click.exceptions.Exit) as exc:
+        mod.evaluate_command(
+            source=str(src),
+            edited=str(edt),
+            adapter="hf_causal",
+            baseline_report=str(baseline_path),
+            out=str(Path("runs")),
+            report_out=str(Path("reports")),
+            profile=profile,
+            tier=tier,
+        )
+
+    return exc.value
 
 
 def test_latest_run_report_variants(tmp_path: Path):
@@ -112,7 +183,9 @@ def test_evaluate_uses_inline_preset_when_repo_preset_missing(monkeypatch, tmp_p
         profile="dev",
     )
 
-    cfg_path = Path("tmp") / ".evaluate" / "baseline_noop.yaml"
+    cfg_candidates = list((Path("tmp") / ".evaluate").rglob("baseline_noop.yaml"))
+    assert len(cfg_candidates) == 1
+    cfg_path = cfg_candidates[0]
     cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     assert cfg["dataset"]["provider"] == "wikitext2"
     assert calls["runs"] == 2 and calls["reports"] == 1
@@ -164,9 +237,9 @@ def test_evaluate_edit_config_successfully_merges_subject(monkeypatch, tmp_path)
         profile="dev",
     )
 
-    merged = yaml.safe_load(
-        (Path("tmp") / ".evaluate" / "edited_merged.yaml").read_text(encoding="utf-8")
-    )
+    merged_candidates = list((Path("tmp") / ".evaluate").rglob("edited_merged.yaml"))
+    assert len(merged_candidates) == 1
+    merged = yaml.safe_load(merged_candidates[0].read_text(encoding="utf-8"))
     assert merged["model"]["id"] == str(edt)
     assert merged["model"]["adapter"] == "hf_causal"
     assert calls["runs"] == 2
@@ -479,6 +552,17 @@ def test_evaluate_yaml_tmp_dir_and_successful_quiet_summary(
     assert mod._resolve_evaluate_tmp_dir() == tmp_dir
     assert tmp_dir.exists()
 
+    monkeypatch.delenv("INVARLOCK_EVALUATE_TMP_DIR")
+    monkeypatch.chdir(tmp_path)
+    isolated_a = mod._resolve_evaluate_tmp_dir()
+    isolated_b = mod._resolve_evaluate_tmp_dir()
+    expected_parent = tmp_path / "tmp" / ".evaluate"
+    assert isolated_a != isolated_b
+    assert isolated_a.parent == expected_parent
+    assert isolated_b.parent == expected_parent
+    assert isolated_a.exists()
+    assert isolated_b.exists()
+
     assert mod._normalize_model_id("hf:demo/model", "hf_causal") == "demo/model"
 
     console = RecordingConsole()
@@ -506,3 +590,981 @@ def test_evaluate_yaml_tmp_dir_and_successful_quiet_summary(
     joined = console.joined()
     assert "Status: PASS · Gates: 1/2 passed" in joined
     assert "Primary metric ratio: 0.990" in joined
+
+
+def test_evaluate_rejects_invalid_execution_mode() -> None:
+    with pytest.raises(click.BadParameter, match="Execution mode must be one of"):
+        mod.evaluate_command(source="baseline", edited="subject", mode="invalid")
+
+
+def test_evaluate_quiet_mode_disables_progress_and_timing(
+    monkeypatch, tmp_path: Path
+) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    baseline_report = _write_json(tmp_path / "baseline.json", {})
+    edited_report = _write_json(tmp_path / "edited.json", {})
+    run_calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr(
+        run_mod,
+        "run_command",
+        lambda **kwargs: run_calls.append(kwargs),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        mod,
+        "_latest_run_report",
+        lambda run_root: (
+            baseline_report if Path(run_root).name == "source" else edited_report
+        ),
+    )
+    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+
+    mod.evaluate_command(
+        source=str(src),
+        edited=str(edt),
+        adapter="hf_causal",
+        out=str(Path("runs")),
+        report_out=str(Path("reports")),
+        profile="dev",
+        quiet=True,
+        timing=True,
+        progress=True,
+    )
+
+    assert len(run_calls) == 2
+    assert all(call["progress"] is False for call in run_calls)
+    assert all(call["timing"] is False for call in run_calls)
+
+
+def test_evaluate_uses_direct_report_json_from_baseline_report_directory(
+    monkeypatch, tmp_path: Path
+) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    baseline_dir = tmp_path / "baseline-run"
+    baseline_dir.mkdir()
+    direct_report = _write_json(
+        baseline_dir / "report.json",
+        _valid_baseline_report_payload(),
+    )
+    edited_report = _write_json(tmp_path / "edited.json", {})
+    run_calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr(
+        run_mod,
+        "run_command",
+        lambda **kwargs: run_calls.append(kwargs),
+        raising=False,
+    )
+    monkeypatch.setattr(mod, "_latest_run_report", lambda _run_root: edited_report)
+    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+
+    mod.evaluate_command(
+        source=str(src),
+        edited=str(edt),
+        adapter="hf_causal",
+        baseline_report=str(baseline_dir),
+        out=str(Path("runs")),
+        report_out=str(Path("reports")),
+        profile="dev",
+    )
+
+    assert len(run_calls) == 1
+    assert run_calls[0]["baseline"] == str(direct_report.resolve())
+
+
+def test_evaluate_uses_latest_report_when_baseline_report_directory_has_no_report_json(
+    monkeypatch, tmp_path: Path
+) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    baseline_dir = tmp_path / "baseline-run"
+    baseline_dir.mkdir()
+    fallback_report = _write_json(
+        baseline_dir / "20250101_000000.json",
+        _valid_baseline_report_payload(),
+    )
+    edited_report = _write_json(tmp_path / "edited.json", {})
+    run_calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr(
+        run_mod,
+        "run_command",
+        lambda **kwargs: run_calls.append(kwargs),
+        raising=False,
+    )
+
+    def fake_latest(run_root: Path):
+        return fallback_report if Path(run_root) == baseline_dir else edited_report
+
+    monkeypatch.setattr(mod, "_latest_run_report", fake_latest)
+    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+
+    mod.evaluate_command(
+        source=str(src),
+        edited=str(edt),
+        adapter="hf_causal",
+        baseline_report=str(baseline_dir),
+        out=str(Path("runs")),
+        report_out=str(Path("reports")),
+        profile="dev",
+    )
+
+    assert len(run_calls) == 1
+    assert run_calls[0]["baseline"] == str(fallback_report.resolve())
+
+
+def test_evaluate_baseline_report_invalid_json_exits(
+    monkeypatch, tmp_path: Path
+) -> None:
+    exc = _assert_baseline_report_validation_exit(
+        monkeypatch,
+        tmp_path,
+        raw_text="{not-json",
+    )
+
+    assert exc.exit_code == 2
+
+
+def test_evaluate_baseline_report_requires_json_object(
+    monkeypatch, tmp_path: Path
+) -> None:
+    exc = _assert_baseline_report_validation_exit(
+        monkeypatch,
+        tmp_path,
+        payload=["not-a-dict"],
+    )
+
+    assert exc.exit_code == 2
+
+
+def test_evaluate_baseline_report_requires_noop_edit(
+    monkeypatch, tmp_path: Path
+) -> None:
+    exc = _assert_baseline_report_validation_exit(
+        monkeypatch,
+        tmp_path,
+        payload=_valid_baseline_report_payload(edit_name="quant_rtn"),
+    )
+
+    assert exc.exit_code == 2
+
+
+def test_evaluate_baseline_report_rejects_adapter_mismatch(
+    monkeypatch, tmp_path: Path
+) -> None:
+    exc = _assert_baseline_report_validation_exit(
+        monkeypatch,
+        tmp_path,
+        payload=_valid_baseline_report_payload(adapter="hf_awq"),
+    )
+
+    assert exc.exit_code == 2
+
+
+def test_evaluate_baseline_report_rejects_profile_mismatch(
+    monkeypatch, tmp_path: Path
+) -> None:
+    exc = _assert_baseline_report_validation_exit(
+        monkeypatch,
+        tmp_path,
+        payload=_valid_baseline_report_payload(profile="release"),
+        profile="dev",
+    )
+
+    assert exc.exit_code == 2
+
+
+def test_evaluate_baseline_report_rejects_tier_mismatch(
+    monkeypatch, tmp_path: Path
+) -> None:
+    exc = _assert_baseline_report_validation_exit(
+        monkeypatch,
+        tmp_path,
+        payload=_valid_baseline_report_payload(tier="strict"),
+        tier="balanced",
+    )
+
+    assert exc.exit_code == 2
+
+
+def test_evaluate_baseline_report_requires_evaluation_windows_payload(
+    monkeypatch, tmp_path: Path
+) -> None:
+    exc = _assert_baseline_report_validation_exit(
+        monkeypatch,
+        tmp_path,
+        payload={
+            **_valid_baseline_report_payload(),
+            "evaluation_windows": None,
+        },
+    )
+
+    assert exc.exit_code == 2
+
+
+def test_evaluate_baseline_report_requires_preview_payload(
+    monkeypatch, tmp_path: Path
+) -> None:
+    exc = _assert_baseline_report_validation_exit(
+        monkeypatch,
+        tmp_path,
+        payload=_valid_baseline_report_payload(
+            evaluation_windows={
+                "preview": None,
+                "final": {"window_ids": ["final-0"], "input_ids": [[4, 5, 6]]},
+            }
+        ),
+    )
+
+    assert exc.exit_code == 2
+
+
+def test_evaluate_baseline_report_requires_matching_window_lengths(
+    monkeypatch, tmp_path: Path
+) -> None:
+    exc = _assert_baseline_report_validation_exit(
+        monkeypatch,
+        tmp_path,
+        payload=_valid_baseline_report_payload(
+            evaluation_windows={
+                "preview": {"window_ids": ["preview-0"], "input_ids": [[1, 2, 3]]},
+                "final": {
+                    "window_ids": ["final-0", "final-1"],
+                    "input_ids": [[4, 5, 6]],
+                },
+            }
+        ),
+    )
+
+    assert exc.exit_code == 2
+
+
+def test_evaluate_edit_config_preserves_explicit_adapter_and_guard_order(
+    monkeypatch, tmp_path: Path
+) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    preset = Path("preset.yaml")
+    preset.write_text("guards:\n  order:\n    - invariants\n", encoding="utf-8")
+    edit_cfg = Path("edit_config.yaml")
+    edit_cfg.write_text(
+        "model:\n"
+        "  id: hf:demo/model\n"
+        "  adapter: custom_adapter\n"
+        "guards:\n"
+        "  order:\n"
+        "    - custom_guard\n"
+        "edit:\n"
+        "  name: quant_rtn\n"
+        "  plan: {}\n",
+        encoding="utf-8",
+    )
+    baseline_report = _write_json(tmp_path / "baseline.json", {})
+    edited_report = _write_json(tmp_path / "edited.json", {})
+
+    monkeypatch.setattr(run_mod, "run_command", lambda **_: None, raising=False)
+    monkeypatch.setattr(
+        mod,
+        "_latest_run_report",
+        lambda run_root: (
+            baseline_report if Path(run_root).name == "source" else edited_report
+        ),
+    )
+    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+
+    mod.evaluate_command(
+        source=str(src),
+        edited=str(edt),
+        adapter="hf_causal",
+        preset=str(preset),
+        edit_config=str(edit_cfg),
+        out=str(Path("runs")),
+        report_out=str(Path("reports")),
+        profile="dev",
+    )
+
+    merged_candidates = list((Path("tmp") / ".evaluate").rglob("edited_merged.yaml"))
+    assert len(merged_candidates) == 1
+    merged = yaml.safe_load(merged_candidates[0].read_text(encoding="utf-8"))
+    assert merged["model"]["id"] == "demo/model"
+    assert merged["model"]["adapter"] == "custom_adapter"
+    assert merged["guards"]["order"] == ["custom_guard"]
+
+
+def test_evaluate_edit_label_is_forwarded_to_subject_run(
+    monkeypatch, tmp_path: Path
+) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    baseline_report = _write_json(tmp_path / "baseline.json", {})
+    edited_report = _write_json(tmp_path / "edited.json", {})
+    run_calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr(
+        run_mod,
+        "run_command",
+        lambda **kwargs: run_calls.append(kwargs),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        mod,
+        "_latest_run_report",
+        lambda run_root: (
+            baseline_report if Path(run_root).name == "source" else edited_report
+        ),
+    )
+    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+
+    mod.evaluate_command(
+        source=str(src),
+        edited=str(edt),
+        adapter="hf_causal",
+        out=str(Path("runs")),
+        report_out=str(Path("reports")),
+        profile="dev",
+        edit_label="quantized-subject",
+    )
+
+    assert len(run_calls) == 2
+    assert run_calls[1]["edit_label"] == "quantized-subject"
+
+
+def test_evaluate_filters_report_kwargs_to_supported_signature(
+    monkeypatch, tmp_path: Path
+) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    baseline_report = _write_json(tmp_path / "baseline.json", {})
+    edited_report = _write_json(tmp_path / "edited.json", {})
+    report_calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr(run_mod, "run_command", lambda **_: None, raising=False)
+    monkeypatch.setattr(
+        mod,
+        "_latest_run_report",
+        lambda run_root: (
+            baseline_report if Path(run_root).name == "source" else edited_report
+        ),
+    )
+
+    def limited_report(*, run, format, baseline, output):
+        report_calls.append(
+            {
+                "run": run,
+                "format": format,
+                "baseline": baseline,
+                "output": output,
+            }
+        )
+
+    monkeypatch.setattr(mod, "_report", limited_report, raising=False)
+
+    mod.evaluate_command(
+        source=str(src),
+        edited=str(edt),
+        adapter="hf_causal",
+        out=str(Path("runs")),
+        report_out=str(Path("reports")),
+        profile="dev",
+    )
+
+    assert report_calls == [
+        {
+            "run": str(edited_report),
+            "format": "report",
+            "baseline": str(baseline_report),
+            "output": str(Path("reports")),
+        }
+    ]
+
+
+def test_evaluate_uses_full_report_kwargs_when_signature_introspection_fails(
+    monkeypatch, tmp_path: Path
+) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    baseline_report = _write_json(tmp_path / "baseline.json", {})
+    edited_report = _write_json(tmp_path / "edited.json", {})
+    report_calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr(run_mod, "run_command", lambda **_: None, raising=False)
+    monkeypatch.setattr(
+        mod,
+        "_latest_run_report",
+        lambda run_root: (
+            baseline_report if Path(run_root).name == "source" else edited_report
+        ),
+    )
+    monkeypatch.setattr(
+        mod.inspect,
+        "signature",
+        lambda _fn: (_ for _ in ()).throw(TypeError("boom")),
+        raising=True,
+    )
+    monkeypatch.setattr(
+        mod,
+        "_report",
+        lambda **kwargs: report_calls.append(kwargs),
+        raising=False,
+    )
+
+    mod.evaluate_command(
+        source=str(src),
+        edited=str(edt),
+        adapter="hf_causal",
+        out=str(Path("runs")),
+        report_out=str(Path("reports")),
+        profile="dev",
+    )
+
+    assert len(report_calls) == 1
+    assert "summary_report_start" in report_calls[0]
+    assert report_calls[0]["output"] == str(Path("reports"))
+
+
+def test_evaluate_prints_timing_summary_when_requested(
+    monkeypatch, tmp_path: Path
+) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    baseline_report = _write_json(tmp_path / "baseline.json", {})
+    edited_report = _write_json(tmp_path / "edited.json", {})
+    summary_calls: list[tuple[dict[str, float], list[tuple[str, str]]]] = []
+    perf_values = iter([100.0, 104.0])
+
+    @contextmanager
+    def fake_timed_step(*, timings, key, **_kwargs):
+        yield
+        timings[key] = {
+            "baseline": 1.25,
+            "subject": 2.0,
+            "evaluation_report": 0.5,
+        }[key]
+
+    monkeypatch.setattr(run_mod, "run_command", lambda **_: None, raising=False)
+    monkeypatch.setattr(
+        mod,
+        "_latest_run_report",
+        lambda run_root: (
+            baseline_report if Path(run_root).name == "source" else edited_report
+        ),
+    )
+    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+    monkeypatch.setattr(
+        "invarlock.cli.output.timed_step",
+        fake_timed_step,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "invarlock.cli.output.perf_counter",
+        lambda: next(perf_values),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "invarlock.cli.output.print_timing_summary",
+        lambda _console, timings, *, order, **_kwargs: summary_calls.append(
+            (dict(timings), list(order))
+        ),
+        raising=False,
+    )
+
+    mod.evaluate_command(
+        source=str(src),
+        edited=str(edt),
+        adapter="hf_causal",
+        out=str(Path("runs")),
+        report_out=str(Path("reports")),
+        profile="dev",
+        timing=True,
+    )
+
+    assert len(summary_calls) == 1
+    timings, order = summary_calls[0]
+    assert timings["baseline"] == 1.25
+    assert timings["subject"] == 2.0
+    assert timings["evaluation_report"] == 0.5
+    assert timings["total"] == 4.0
+    assert order[-1] == ("Total", "total")
+
+
+def test_evaluate_degraded_primary_metric_emits_report_and_exits(
+    monkeypatch, tmp_path: Path
+) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    baseline_report = _write_json(tmp_path / "baseline.json", {})
+    edited_report = _write_json(
+        tmp_path / "edited.json",
+        {
+            "meta": {"device": "cpu", "adapter": "hf_causal"},
+            "edit": {"name": "quant_rtn"},
+            "metrics": {
+                "primary_metric": {
+                    "preview": 0.92,
+                    "final": 0.91,
+                    "ratio_vs_baseline": 1.01,
+                    "degraded": True,
+                    "degraded_reason": "guardrail_triggered",
+                }
+            },
+        },
+    )
+    report_calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr(run_mod, "run_command", lambda **_: None, raising=False)
+    monkeypatch.setattr(
+        mod,
+        "_latest_run_report",
+        lambda run_root: (
+            baseline_report if Path(run_root).name == "source" else edited_report
+        ),
+    )
+    monkeypatch.setattr(
+        mod,
+        "_report",
+        lambda **kwargs: report_calls.append(kwargs),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        mod, "_resolve_exit_code", lambda err, profile: 7, raising=False
+    )
+
+    with pytest.raises(click.exceptions.Exit) as exc:
+        mod.evaluate_command(
+            source=str(src),
+            edited=str(edt),
+            adapter="hf_causal",
+            out=str(Path("runs")),
+            report_out=str(Path("reports")),
+            profile="release",
+        )
+
+    assert exc.value.exit_code == 7
+    assert len(report_calls) == 1
+    assert report_calls[0]["run"] == str(edited_report)
+
+
+def test_evaluate_quiet_summary_skips_primary_metric_line_when_ratio_missing(
+    tmp_path: Path, monkeypatch
+) -> None:
+    console = RecordingConsole()
+    monkeypatch.setattr(mod, "console", console)
+    report_out = tmp_path / "reports"
+    report_out.mkdir()
+    _write_json(report_out / "evaluation.report.json", {"primary_metric": {}})
+
+    monkeypatch.setattr(
+        "invarlock.reporting.render.compute_console_validation_block",
+        lambda _report: {"rows": [], "overall_pass": False},
+        raising=False,
+    )
+
+    mod._print_quiet_summary(
+        report_out=report_out,
+        source="baseline",
+        edited="subject",
+        profile="dev",
+    )
+
+    assert "Primary metric ratio:" not in console.joined()
+
+
+def test_evaluate_verbose_mode_prints_debug_lines(monkeypatch, tmp_path: Path) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    baseline_report = _write_json(tmp_path / "baseline.json", {})
+    edited_report = _write_json(tmp_path / "edited.json", {})
+    console = RecordingConsole()
+
+    monkeypatch.setattr(
+        "invarlock.cli.output.make_console", lambda **_: console, raising=False
+    )
+    monkeypatch.setattr(
+        mod, "resolve_auto_adapter", lambda _src: "hf_causal", raising=True
+    )
+    monkeypatch.setattr(run_mod, "run_command", lambda **_: None, raising=False)
+    monkeypatch.setattr(
+        mod,
+        "_latest_run_report",
+        lambda run_root: (
+            baseline_report if Path(run_root).name == "source" else edited_report
+        ),
+    )
+    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+
+    mod.evaluate_command(
+        source=str(src),
+        edited=str(edt),
+        adapter="auto",
+        out=str(Path("runs")),
+        report_out=str(Path("reports")),
+        profile="dev",
+        verbose=True,
+        banner=False,
+    )
+
+    joined = console.joined()
+    assert "Adapter:auto -> hf_causal" in joined
+    assert "Baseline report:" in joined
+    assert "Edited report:" in joined
+
+
+def test_evaluate_invalid_preset_guard_order_falls_back_to_default(
+    monkeypatch, tmp_path: Path
+) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    preset = Path("preset.yaml")
+    preset.write_text(
+        "guards:\n  order:\n    - invariants\n    - 3\n",
+        encoding="utf-8",
+    )
+    baseline_report = _write_json(tmp_path / "baseline.json", {})
+    edited_report = _write_json(tmp_path / "edited.json", {})
+
+    monkeypatch.setattr(run_mod, "run_command", lambda **_: None, raising=False)
+    monkeypatch.setattr(
+        mod,
+        "_latest_run_report",
+        lambda run_root: (
+            baseline_report if Path(run_root).name == "source" else edited_report
+        ),
+    )
+    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+
+    mod.evaluate_command(
+        source=str(src),
+        edited=str(edt),
+        adapter="hf_causal",
+        preset=str(preset),
+        out=str(Path("runs")),
+        report_out=str(Path("reports")),
+        profile="dev",
+    )
+
+    baseline_candidates = list((Path("tmp") / ".evaluate").rglob("baseline_noop.yaml"))
+    assert len(baseline_candidates) == 1
+    baseline_cfg = yaml.safe_load(baseline_candidates[0].read_text(encoding="utf-8"))
+    assert baseline_cfg["guards"]["order"] == [
+        "invariants",
+        "spectral",
+        "rmt",
+        "variance",
+        "invariants",
+    ]
+
+
+def test_evaluate_supplied_baseline_report_path_must_exist(
+    monkeypatch, tmp_path: Path
+) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    monkeypatch.setattr(run_mod, "run_command", lambda **_: None, raising=False)
+    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+
+    with pytest.raises(click.exceptions.Exit) as exc:
+        mod.evaluate_command(
+            source=str(src),
+            edited=str(edt),
+            adapter="hf_causal",
+            baseline_report="missing.json",
+            out=str(Path("runs")),
+            report_out=str(Path("reports")),
+            profile="dev",
+        )
+
+    assert exc.value.exit_code == 2
+
+
+def test_evaluate_supplied_baseline_report_directory_requires_a_report_file(
+    monkeypatch, tmp_path: Path
+) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    baseline_dir = Path("baseline-dir")
+    baseline_dir.mkdir()
+    monkeypatch.setattr(run_mod, "run_command", lambda **_: None, raising=False)
+    monkeypatch.setattr(mod, "_latest_run_report", lambda _run_root: None)
+    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+
+    with pytest.raises(click.exceptions.Exit) as exc:
+        mod.evaluate_command(
+            source=str(src),
+            edited=str(edt),
+            adapter="hf_causal",
+            baseline_report=str(baseline_dir),
+            out=str(Path("runs")),
+            report_out=str(Path("reports")),
+            profile="dev",
+        )
+
+    assert exc.value.exit_code == 2
+
+
+def test_evaluate_baseline_report_accepts_non_mapping_meta_and_context(
+    monkeypatch, tmp_path: Path
+) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    baseline_payload = {
+        **_valid_baseline_report_payload(),
+        "meta": "bad-meta",
+        "context": "bad-context",
+    }
+    baseline_report = _write_json(tmp_path / "baseline.json", baseline_payload)
+    edited_report = _write_json(tmp_path / "edited.json", {})
+    run_calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr(
+        run_mod,
+        "run_command",
+        lambda **kwargs: run_calls.append(kwargs),
+        raising=False,
+    )
+    monkeypatch.setattr(mod, "_latest_run_report", lambda _run_root: edited_report)
+    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+
+    mod.evaluate_command(
+        source=str(src),
+        edited=str(edt),
+        adapter="hf_causal",
+        baseline_report=str(baseline_report),
+        out=str(Path("runs")),
+        report_out=str(Path("reports")),
+        profile="dev",
+    )
+
+    assert len(run_calls) == 1
+    assert run_calls[0]["baseline"] == str(baseline_report.resolve())
+
+
+def test_evaluate_baseline_report_requires_nonempty_preview_window_ids(
+    monkeypatch, tmp_path: Path
+) -> None:
+    exc = _assert_baseline_report_validation_exit(
+        monkeypatch,
+        tmp_path,
+        payload=_valid_baseline_report_payload(
+            evaluation_windows={
+                "preview": {"window_ids": [], "input_ids": [[1, 2, 3]]},
+                "final": {"window_ids": ["final-0"], "input_ids": [[4, 5, 6]]},
+            }
+        ),
+    )
+
+    assert exc.exit_code == 2
+
+
+def test_evaluate_baseline_report_requires_nonempty_preview_input_ids(
+    monkeypatch, tmp_path: Path
+) -> None:
+    exc = _assert_baseline_report_validation_exit(
+        monkeypatch,
+        tmp_path,
+        payload=_valid_baseline_report_payload(
+            evaluation_windows={
+                "preview": {"window_ids": ["preview-0"], "input_ids": []},
+                "final": {"window_ids": ["final-0"], "input_ids": [[4, 5, 6]]},
+            }
+        ),
+    )
+
+    assert exc.exit_code == 2
+
+
+def test_evaluate_quiet_mode_replays_baseline_child_output_on_failure(
+    monkeypatch, tmp_path: Path
+) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    console = RecordingConsole()
+
+    def failing_run(**kwargs):
+        if Path(kwargs["out"]).name == "source":
+            run_mod.console.print("baseline child output", markup=False)
+            raise RuntimeError("baseline boom")
+
+    monkeypatch.setattr(
+        "invarlock.cli.output.make_console", lambda **_: console, raising=False
+    )
+    monkeypatch.setattr(run_mod, "run_command", failing_run, raising=False)
+
+    with pytest.raises(RuntimeError, match="baseline boom"):
+        mod.evaluate_command(
+            source=str(src),
+            edited=str(edt),
+            adapter="hf_causal",
+            out=str(Path("runs")),
+            report_out=str(Path("reports")),
+            profile="dev",
+            quiet=True,
+        )
+
+    assert "baseline child output" in console.joined()
+
+
+def test_evaluate_quiet_mode_replays_edit_config_child_output_on_failure(
+    monkeypatch, tmp_path: Path
+) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    console = RecordingConsole()
+    baseline_report = _write_json(tmp_path / "baseline.json", {})
+    edit_cfg = Path("edit_config.yaml")
+    edit_cfg.write_text(
+        "model:\n  id: <MODEL_ID>\nedit:\n  name: quant_rtn\n  plan: {}\n",
+        encoding="utf-8",
+    )
+
+    def failing_run(**kwargs):
+        if Path(kwargs["out"]).name == "edited":
+            run_mod.console.print("edited child output", markup=False)
+            raise RuntimeError("edited boom")
+
+    monkeypatch.setattr(
+        "invarlock.cli.output.make_console", lambda **_: console, raising=False
+    )
+    monkeypatch.setattr(run_mod, "run_command", failing_run, raising=False)
+    monkeypatch.setattr(
+        mod,
+        "_latest_run_report",
+        lambda run_root: baseline_report if Path(run_root).name == "source" else None,
+    )
+
+    with pytest.raises(RuntimeError, match="edited boom"):
+        mod.evaluate_command(
+            source=str(src),
+            edited=str(edt),
+            adapter="hf_causal",
+            edit_config=str(edit_cfg),
+            out=str(Path("runs")),
+            report_out=str(Path("reports")),
+            profile="dev",
+            quiet=True,
+        )
+
+    assert "edited child output" in console.joined()
+
+
+def test_evaluate_quiet_mode_replays_noop_subject_output_on_failure(
+    monkeypatch, tmp_path: Path
+) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    console = RecordingConsole()
+    baseline_report = _write_json(tmp_path / "baseline.json", {})
+
+    def failing_run(**kwargs):
+        if Path(kwargs["out"]).name == "edited":
+            run_mod.console.print("noop subject output", markup=False)
+            raise RuntimeError("subject boom")
+
+    monkeypatch.setattr(
+        "invarlock.cli.output.make_console", lambda **_: console, raising=False
+    )
+    monkeypatch.setattr(run_mod, "run_command", failing_run, raising=False)
+    monkeypatch.setattr(
+        mod,
+        "_latest_run_report",
+        lambda run_root: baseline_report if Path(run_root).name == "source" else None,
+    )
+
+    with pytest.raises(RuntimeError, match="subject boom"):
+        mod.evaluate_command(
+            source=str(src),
+            edited=str(edt),
+            adapter="hf_causal",
+            out=str(Path("runs")),
+            report_out=str(Path("reports")),
+            profile="dev",
+            quiet=True,
+        )
+
+    assert "noop subject output" in console.joined()
+
+
+def test_evaluate_quiet_mode_replays_report_output_on_failure(
+    monkeypatch, tmp_path: Path
+) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    console = RecordingConsole()
+    baseline_report = _write_json(tmp_path / "baseline.json", {})
+    edited_report = _write_json(tmp_path / "edited.json", {})
+
+    def failing_report(**_kwargs):
+        from invarlock.cli.commands import report as report_mod
+
+        report_mod.console.print("report child output", markup=False)
+        raise RuntimeError("report boom")
+
+    monkeypatch.setattr(
+        "invarlock.cli.output.make_console", lambda **_: console, raising=False
+    )
+    monkeypatch.setattr(run_mod, "run_command", lambda **_: None, raising=False)
+    monkeypatch.setattr(
+        mod,
+        "_latest_run_report",
+        lambda run_root: (
+            baseline_report if Path(run_root).name == "source" else edited_report
+        ),
+    )
+    monkeypatch.setattr(mod, "_report", failing_report, raising=False)
+
+    with pytest.raises(RuntimeError, match="report boom"):
+        mod.evaluate_command(
+            source=str(src),
+            edited=str(edt),
+            adapter="hf_causal",
+            out=str(Path("runs")),
+            report_out=str(Path("reports")),
+            profile="dev",
+            quiet=True,
+        )
+
+    assert "report child output" in console.joined()
+
+
+def test_evaluate_timing_summary_uses_accumulated_total_when_style_disables_timing(
+    monkeypatch, tmp_path: Path
+) -> None:
+    from invarlock.cli.output import OutputStyle
+
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    baseline_report = _write_json(tmp_path / "baseline.json", {})
+    edited_report = _write_json(tmp_path / "edited.json", {})
+    summary_calls: list[dict[str, float]] = []
+
+    @contextmanager
+    def fake_timed_step(*, timings, key, **_kwargs):
+        yield
+        timings[key] = {
+            "baseline": 1.0,
+            "subject": 2.0,
+            "evaluation_report": 3.0,
+        }[key]
+
+    monkeypatch.setattr(run_mod, "run_command", lambda **_: None, raising=False)
+    monkeypatch.setattr(
+        mod,
+        "_latest_run_report",
+        lambda run_root: (
+            baseline_report if Path(run_root).name == "source" else edited_report
+        ),
+    )
+    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+    monkeypatch.setattr(
+        "invarlock.cli.output.resolve_output_style",
+        lambda **_kwargs: OutputStyle(
+            name="audit", progress=False, timing=False, color=False
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "invarlock.cli.output.timed_step",
+        fake_timed_step,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "invarlock.cli.output.print_timing_summary",
+        lambda _console, timings, **_kwargs: summary_calls.append(dict(timings)),
+        raising=False,
+    )
+
+    mod.evaluate_command(
+        source=str(src),
+        edited=str(edt),
+        adapter="hf_causal",
+        out=str(Path("runs")),
+        report_out=str(Path("reports")),
+        profile="dev",
+        timing=True,
+    )
+
+    assert len(summary_calls) == 1
+    assert summary_calls[0]["total"] == 6.0

@@ -8,6 +8,7 @@ __pycache__/
 .eggs/
 dist/
 build/
+target/
 pip-wheel-metadata/
 
 # Virtual environments
@@ -72,6 +73,7 @@ fullLisk.txt
 /demo_*/
 /mock_run/
 /artifacts/
+/guards_evidence.json
 /tmp/
 /tmp_*/
 /.certify_tmp/

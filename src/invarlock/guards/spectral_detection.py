@@ -86,12 +86,16 @@ def classify_model_families(
     scope: str = "all",
     existing: dict[str, str] | None = None,
     *,
+    modules: list[tuple[str, Any]] | tuple[tuple[str, Any], ...] | None = None,
     should_process_module_fn: Any = should_process_module,
     classify_module_family_fn: Any = classify_module_family,
 ) -> dict[str, str]:
     """Build or update a module→family map for the provided model."""
     family_map = dict(existing) if existing else {}
-    for name, module in model.named_modules():
+    module_iter = modules
+    if module_iter is None:
+        module_iter = tuple(model.named_modules())
+    for name, module in module_iter:
         if should_process_module_fn(name, module, scope):
             family_map[name] = classify_module_family_fn(name, module)
     return family_map
@@ -237,9 +241,7 @@ def detect_spectral_violations(
     violations: list[dict[str, Any]] = []
     latest_z: dict[str, float] = {}
 
-    for name, module in model.named_modules():
-        if not guard._should_check_module(name, module):
-            continue
+    for name, module in guard._get_scoped_modules(model):
         try:
             if hasattr(module, "weight") and module.weight.ndim == 2:
                 sigma_max = metrics.get(name)

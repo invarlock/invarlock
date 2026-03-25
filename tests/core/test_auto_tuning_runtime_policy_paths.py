@@ -141,3 +141,43 @@ guards:
         "balanced", edit_name="dummy_edit", config_root=str(tmp_path)
     )
     assert "missing_guard" not in policies2
+
+
+def test_get_tier_policies_uses_env_config_root(tmp_path, monkeypatch) -> None:
+    at.clear_tier_policies_cache()
+    runtime = tmp_path / "runtime"
+    runtime.mkdir(parents=True, exist_ok=True)
+    (runtime / "tiers.yaml").write_text(
+        "balanced:\n  spectral_guard:\n    deadband: 0.321\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("INVARLOCK_CONFIG_ROOT", str(tmp_path))
+
+    policies = at.get_tier_policies()
+
+    assert policies["balanced"]["spectral"]["deadband"] == pytest.approx(0.321)
+
+
+def test_load_profile_overrides_returns_empty_for_non_mapping(monkeypatch) -> None:
+    monkeypatch.setattr(at, "_load_runtime_yaml", lambda *_a, **_k: ["bad"])
+
+    assert at._load_profile_overrides("ci", config_root=None) == {}
+
+
+def test_tier_entry_to_policy_keeps_rmt_without_family_map() -> None:
+    out = at._tier_entry_to_policy(
+        {"rmt_guard": {"margin": 1.7, "epsilon_by_family": "bad"}}
+    )
+
+    assert out["rmt"]["margin"] == pytest.approx(1.7)
+    assert out["rmt"]["epsilon_by_family"] == "bad"
+
+
+def test_resolve_tier_policies_skips_non_mapping_explicit_overrides() -> None:
+    resolved = at.resolve_tier_policies(
+        "balanced",
+        explicit_overrides={"spectral": 7, "new_guard": 9},
+    )
+
+    assert isinstance(resolved["spectral"], dict)
+    assert "new_guard" not in resolved
