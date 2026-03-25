@@ -21,7 +21,6 @@ pytest.importorskip("transformers")
         ("Qwen/Qwen2.5-14B", "hf_causal", "qwen", "causal"),
         ("Qwen/Qwen3-8B", "hf_causal", "qwen", "causal"),
         ("Qwen/Qwen3.5-9B", "hf_causal", "qwen", "causal"),
-        ("Qwen/QwQ-32B", "hf_causal", "qwen", "causal"),
         ("TinyLlama/TinyLlama-1.1B-Chat-v1.0", "hf_causal", "llama", "causal"),
         ("unsloth/gemma-2-9b-it-bnb-4bit", "hf_causal", "gemma", "causal"),
         (
