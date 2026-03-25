@@ -123,6 +123,7 @@ if [[ ! -d "${PROVENANCE_DIR}" ]]; then
 fi
 
 mkdir -p "${OUTPUT_DIR}"
+OUTPUT_DIR="$(cd "${OUTPUT_DIR}" && pwd)"
 
 if [[ -z "${BUNDLE_NAME}" ]]; then
     BUNDLE_NAME="invarlock-${VERSION}-offline-bundle"
