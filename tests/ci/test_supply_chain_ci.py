@@ -274,10 +274,7 @@ def test_release_workflow_builds_and_bundles_release_assets():
     bundle_steps = bundle.get("steps", [])
     checkout_step = bundle_steps[0]
     assert checkout_step["uses"].startswith("actions/checkout@")
-    assert (
-        checkout_step["with"]["ref"]
-        == "${{ github.event_name == 'push' && github.ref || inputs.release_tag }}"
-    )
+    assert "with" not in checkout_step
 
     sigstore_steps = [
         step
