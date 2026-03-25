@@ -180,6 +180,12 @@ def test_scorecards_workflow_uses_least_privilege_top_level_permissions() -> Non
 
 def test_release_workflow_uses_trusted_publishing():
     workflow = _load_workflow(Path(".github/workflows/release.yml"))
+    triggers = workflow["on"]
+    dispatch_inputs = triggers["workflow_dispatch"]["inputs"]
+
+    assert dispatch_inputs["release_tag"]["type"] == "string"
+    assert dispatch_inputs["release_tag"]["default"] == ""
+
     publish = workflow["jobs"]["publish"]
     permissions = publish.get("permissions", {})
 
@@ -196,6 +202,14 @@ def test_release_workflow_uses_trusted_publishing():
     assert "startsWith(github.ref, 'refs/tags/v')" in publish["if"]
     assert "github.event_name == 'push'" in publish["if"]
     assert "inputs.publish == true" in publish["if"]
+    assert "inputs.release_tag != ''" in publish["if"]
+
+    checkout_step = steps[0]
+    assert checkout_step["uses"].startswith("actions/checkout@")
+    assert (
+        checkout_step["with"]["ref"]
+        == "${{ github.event_name == 'push' && github.ref || inputs.release_tag }}"
+    )
 
     attest_step = _find_step_by_uses_prefix(steps, "actions/attest-build-provenance@")
     assert attest_step["with"]["subject-path"] == "dist/*"
@@ -230,13 +244,23 @@ def test_release_workflow_builds_and_bundles_release_assets():
     )
 
     smoke_step = _find_step_by_name(build_steps, "Install smoke from wheel")
-    assert "dist/smoke-requirements.txt" in smoke_step["run"]
+    assert ".smoke/smoke-requirements.txt" in smoke_step["run"]
     assert "--require-hashes" in smoke_step["run"]
+
+    checkout_step = build_steps[0]
+    assert checkout_step["uses"].startswith("actions/checkout@")
+    assert (
+        checkout_step["with"]["ref"]
+        == "${{ github.event_name == 'push' && github.ref || inputs.release_tag }}"
+    )
 
     assert _find_step_by_name(build_steps, "Generate release SBOM")
     sbom_upload = _find_step_by_name(build_steps, "Upload SBOM artifact")
     assert sbom_upload["uses"].startswith("actions/upload-artifact@")
     assert sbom_upload["with"]["name"] == "release-sbom"
+
+    dist_upload = _find_step_by_name(build_steps, "Upload dist artifacts")
+    assert dist_upload["with"]["path"] == "dist/*.whl\ndist/*.tar.gz\n"
 
     bundle = workflow["jobs"]["bundle_release"]
     assert bundle["permissions"] == {
@@ -245,10 +269,15 @@ def test_release_workflow_builds_and_bundles_release_assets():
     }
     assert "startsWith(github.ref, 'refs/tags/v')" in bundle["if"]
     assert "inputs.target == 'pypi'" in bundle["if"]
+    assert "inputs.release_tag != ''" in bundle["if"]
 
     bundle_steps = bundle.get("steps", [])
     checkout_step = bundle_steps[0]
     assert checkout_step["uses"].startswith("actions/checkout@")
+    assert (
+        checkout_step["with"]["ref"]
+        == "${{ github.event_name == 'push' && github.ref || inputs.release_tag }}"
+    )
 
     sigstore_steps = [
         step
@@ -263,6 +292,7 @@ def test_release_workflow_builds_and_bundles_release_assets():
     bundle_build_step = _find_step_by_name(
         bundle_steps, "Create offline verification bundle"
     )
+    assert "INVARLOCK_RELEASE_TAG" in bundle_build_step["env"]
     assert "scripts/release/make_offline_bundle.sh" in bundle_build_step["run"]
     assert "--dist-dir dist" in bundle_build_step["run"]
     assert "--sbom artifacts/supply-chain/sbom.json" in bundle_build_step["run"]
@@ -286,10 +316,14 @@ def test_release_workflow_builds_and_bundles_release_assets():
     assert "release-assets/*" in release_step["run"]
 
     testpypi_smoke = workflow["jobs"]["testpypi_smoke"]
+    assert "inputs.release_tag != ''" in testpypi_smoke["if"]
     smoke_steps = testpypi_smoke.get("steps", [])
     download_step = _find_step_by_name(smoke_steps, "Download published TestPyPI wheel")
     assert "https://test.pypi.org/pypi/invarlock/" in download_step["run"]
     assert "wheelhouse/requirements.txt" in download_step["run"]
+    assert (
+        download_step["env"]["INVARLOCK_RELEASE_VERSION"] == "${{ inputs.release_tag }}"
+    )
 
     install_published_step = _find_step_by_name(
         smoke_steps, "Install published wheel and smoke test"
