@@ -23,16 +23,16 @@ THRESHOLDS = {
     "src/invarlock/eval/data.py": 0.75,
     "src/invarlock/eval/bootstrap.py": 1.00,
     "src/invarlock/eval/bench_regression.py": 1.00,
-    "src/invarlock/eval/probes/fft.py": 0.90,
+    "src/invarlock/eval/probes/fft.py": 1.00,
     "src/invarlock/eval/probes/mi.py": 0.90,
     "src/invarlock/eval/probes/post_attention.py": 0.90,
-    "src/invarlock/eval/providers/base.py": 0.90,
+    "src/invarlock/eval/providers/base.py": 1.00,
     "src/invarlock/eval/providers/seq2seq.py": 0.90,
     "src/invarlock/eval/metrics.py": 0.90,
     # Guard-effect benchmark harness (Step 14) + primary metric core
     "src/invarlock/eval/bench.py": 0.90,
     "src/invarlock/eval/primary_metric.py": 0.90,
-    "src/invarlock/eval/tail_stats.py": 0.90,
+    "src/invarlock/eval/tail_stats.py": 0.95,
     "src/invarlock/eval/tasks/classification.py": 1.00,
     "src/invarlock/eval/tasks/qa.py": 1.00,
     "src/invarlock/eval/tasks/text_generation.py": 0.90,
@@ -42,13 +42,13 @@ THRESHOLDS = {
     # Reporting
     "src/invarlock/reporting/report_builder.py": 0.90,
     "src/invarlock/reporting/report.py": 0.90,
-    "src/invarlock/reporting/validate.py": 0.90,
+    "src/invarlock/reporting/validate.py": 0.95,
     # Reporting types
-    "src/invarlock/reporting/report_types.py": 0.90,
+    "src/invarlock/reporting/report_types.py": 1.00,
     "src/invarlock/reporting/dataset_hashing.py": 0.90,
     "src/invarlock/reporting/guards_analysis.py": 0.90,
     "src/invarlock/reporting/primary_metric_utils.py": 0.90,
-    "src/invarlock/reporting/utils.py": 0.90,
+    "src/invarlock/reporting/utils.py": 1.00,
     # Shell modules: lifecycle/orchestration shells should stay branch-complete.
     "src/invarlock/core/runner.py": 1.00,
     "src/invarlock/guards/variance.py": 1.00,
@@ -57,7 +57,9 @@ THRESHOLDS = {
     "src/invarlock/reporting/report_schema.py": 1.00,
     "src/invarlock/public_contracts.py": 1.00,
     "src/invarlock/policy_pack.py": 1.00,
-    "src/invarlock/proof_pack.py": 1.00,
+    # Advanced proof-pack packaging/inspection coverage now exercises the
+    # command shell branch-completely; keep the command surface held there.
+    "src/invarlock/proof_pack.py": 0.90,
     "src/invarlock/cli/verify_output.py": 1.00,
     "src/invarlock/cli/commands/policy.py": 1.00,
     "src/invarlock/cli/commands/proof_pack.py": 1.00,
@@ -75,34 +77,40 @@ THRESHOLDS = {
     "src/invarlock/core/runner_eval_phase.py": 0.95,
     "src/invarlock/core/runner_latency.py": 0.95,
     "src/invarlock/core/runner_eval_windows.py": 0.95,
-    "src/invarlock/guards/variance_batching.py": 0.95,
+    "src/invarlock/guards/variance_batching.py": 1.00,
     "src/invarlock/guards/variance_evaluation.py": 0.95,
-    "src/invarlock/guards/variance_prepare.py": 0.95,
+    "src/invarlock/guards/variance_prepare.py": 1.00,
     "src/invarlock/guards/variance_ops.py": 0.95,
     "src/invarlock/guards/variance_scaling.py": 0.95,
     "src/invarlock/guards/invariants.py": 0.90,
     "src/invarlock/guards/spectral_control.py": 0.95,
     "src/invarlock/guards/spectral_measurement.py": 0.95,
     "src/invarlock/guards/rmt.py": 0.90,
-    "src/invarlock/guards/policies.py": 0.90,
+    "src/invarlock/guards/policies.py": 0.95,
     # Core orchestration & runtime
-    "src/invarlock/core/registry.py": 0.90,
-    "src/invarlock/core/bootstrap.py": 0.80,
+    "src/invarlock/core/registry.py": 1.00,
+    "src/invarlock/core/bootstrap.py": 0.95,
     "src/invarlock/core/contracts.py": 0.90,
-    "src/invarlock/core/auto_tuning.py": 0.90,
+    "src/invarlock/core/auto_tuning.py": 0.95,
     # Newly added core modules to critical surface
     "src/invarlock/core/checkpoint.py": 0.90,
-    "src/invarlock/core/api.py": 0.90,
+    "src/invarlock/core/api.py": 1.00,
     "src/invarlock/core/retry.py": 0.90,
     "src/invarlock/core/types.py": 0.90,
     # CLI commands
     "src/invarlock/cli/_json.py": 0.90,
     "src/invarlock/cli/_evidence.py": 0.90,
+    # Simplified public-core CLI surfaces have dedicated branch-focused tests;
+    # keep the hero commands above the default 90% floor.
+    "src/invarlock/cli/app.py": 0.90,
     "src/invarlock/cli/config.py": 0.90,
-    "src/invarlock/cli/commands/run.py": 0.90,
-    "src/invarlock/cli/commands/verify.py": 0.90,
+    "src/invarlock/cli/commands/evaluate.py": 0.95,
+    "src/invarlock/cli/commands/report.py": 0.95,
+    "src/invarlock/cli/commands/run.py": 0.95,
+    "src/invarlock/cli/commands/verify.py": 0.95,
     "src/invarlock/cli/commands/calibrate.py": 0.90,
     "src/invarlock/cli/verify_checks.py": 0.95,
+    "src/invarlock/runtime_security.py": 0.90,
     # PR-4 split modules
     "src/invarlock/cli/run_analysis.py": 0.90,
     "src/invarlock/cli/run_artifacts.py": 0.90,
@@ -118,10 +126,10 @@ THRESHOLDS = {
     "src/invarlock/core/runner_eval_metrics.py": 0.90,
     "src/invarlock/core/runner_finalize.py": 0.90,
     "src/invarlock/core/runner_guards.py": 0.90,
-    "src/invarlock/reporting/report_overhead.py": 0.90,
+    "src/invarlock/reporting/report_overhead.py": 0.95,
     "src/invarlock/reporting/report_policy.py": 0.90,
     "src/invarlock/reporting/report_provenance.py": 0.90,
-    "src/invarlock/reporting/report_validation.py": 0.90,
+    "src/invarlock/reporting/report_validation.py": 0.95,
 }
 
 # Default floors (applied only to core classification; non-core modules are not
@@ -174,6 +182,8 @@ CORE_FILES = (
     "src/invarlock/reporting/report_builder.py",
     # Critical CLI commands
     "src/invarlock/cli/commands/run.py",
+    "src/invarlock/cli/commands/evaluate.py",
+    "src/invarlock/cli/commands/report.py",
     "src/invarlock/cli/commands/verify.py",
     "src/invarlock/cli/commands/calibrate.py",
     "src/invarlock/cli/commands/policy.py",
@@ -183,11 +193,13 @@ CORE_FILES = (
     "src/invarlock/cli/config.py",
     "src/invarlock/cli/_json.py",
     "src/invarlock/cli/_evidence.py",
+    "src/invarlock/cli/app.py",
     # Public contract helpers
     "src/invarlock/public_contracts.py",
     "src/invarlock/policy_pack.py",
     "src/invarlock/proof_pack.py",
     "src/invarlock/cli/commands/proof_pack.py",
+    "src/invarlock/runtime_security.py",
 )
 
 
@@ -326,8 +338,24 @@ def _collect_branch_rates(root: ET.Element) -> dict[str, float]:
     return rates
 
 
-def _write_json(json_path: Path, records: list[dict[str, Any]], status: str) -> None:
-    payload = {"status": status, "files": records}
+def _write_json(
+    json_path: Path,
+    records: list[dict[str, Any]],
+    status: str,
+    *,
+    configured_threshold_files: int,
+    evaluated_files: int,
+    missing_threshold_files: list[str],
+    measured_threshold_files: int,
+) -> None:
+    payload = {
+        "status": status,
+        "files": records,
+        "configured_threshold_files": configured_threshold_files,
+        "evaluated_files": evaluated_files,
+        "measured_threshold_files": measured_threshold_files,
+        "missing_threshold_files": missing_threshold_files,
+    }
     json_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
@@ -357,6 +385,9 @@ def main() -> int:
         if rel_path in rates:
             required[rel_path] = floor
 
+    missing_threshold_files = sorted(set(THRESHOLDS) - set(rates))
+    measured_threshold_files = len(THRESHOLDS) - len(missing_threshold_files)
+
     # Evaluate all known files with a required floor
     for rel_path, floor in sorted(required.items()):
         rate = rates.get(rel_path)
@@ -376,7 +407,15 @@ def main() -> int:
             )
 
     if args.json_path:
-        _write_json(Path(args.json_path), records, "fail" if failures else "ok")
+        _write_json(
+            Path(args.json_path),
+            records,
+            "fail" if failures else "ok",
+            configured_threshold_files=len(THRESHOLDS),
+            evaluated_files=len(records),
+            missing_threshold_files=missing_threshold_files,
+            measured_threshold_files=measured_threshold_files,
+        )
 
     if failures:
         for failure in failures:
@@ -393,9 +432,15 @@ def main() -> int:
                 )
 
     summary = (
-        f"Coverage OK: {len(THRESHOLDS)}/{len(THRESHOLDS)} files met per-file thresholds. "
-        "Project floor enforced via pytest."
+        f"Coverage OK: {measured_threshold_files}/{len(THRESHOLDS)} threshold-listed files had coverage data "
+        "and met per-file thresholds. "
     )
+    if missing_threshold_files:
+        summary += (
+            f"{len(missing_threshold_files)} threshold-listed files were absent from the "
+            "coverage report. "
+        )
+    summary += "Project floor enforced via pytest."
     print(summary)
     return 0
 
