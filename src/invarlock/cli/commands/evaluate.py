@@ -284,7 +284,7 @@ def evaluate_command(
         "reports/eval", "--report-out", help="Evaluation report output directory"
     ),
     edit_config: str | None = typer.Option(
-        None, "--edit-config", help="Edit preset to apply a demo edit (quant_rtn)"
+        None, "--edit-config", help="Edit preset to apply a demo edit"
     ),
     edit_label: str | None = typer.Option(
         None,
@@ -307,6 +307,11 @@ def evaluate_command(
     timing: bool = typer.Option(False, "--timing", help="Show timing summary"),
     progress: bool = typer.Option(
         True, "--progress/--no-progress", help="Show progress done messages"
+    ),
+    mode: str = typer.Option(
+        "attested",
+        "--mode",
+        help="Execution mode for model-loading steps (attested|local).",
     ),
     allow_network: bool = typer.Option(
         False,
@@ -362,11 +367,19 @@ def evaluate_command(
     style = _coerce_option(style, "audit")
     timing = bool(_coerce_option(timing, False))
     progress = bool(_coerce_option(progress, True))
+    mode = str(_coerce_option(mode, "attested")).strip().lower()
     allow_network = bool(_coerce_option(allow_network, False))
     allow_host_execution = bool(_coerce_option(allow_host_execution, False))
     allow_third_party_plugins = bool(_coerce_option(allow_third_party_plugins, False))
     allow_remote_code = bool(_coerce_option(allow_remote_code, False))
     no_color = bool(_coerce_option(no_color, False))
+
+    if mode not in {"attested", "local"}:
+        raise typer.BadParameter(
+            "Execution mode must be one of: attested, local.",
+            param_hint="--mode",
+        )
+    allow_host_execution = allow_host_execution or mode == "local"
 
     configure_runtime_security(
         allow_network=allow_network,

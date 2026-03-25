@@ -22,4 +22,4 @@ def test_python_m_invarlock_shows_help(monkeypatch, capsys):
     out = capsys.readouterr().out
     # Smoke‑check: hero usage + grouped commands present
     assert "Usage:" in out
-    assert "evaluate" in out and "report" in out and "plugins" in out
+    assert "evaluate" in out and "report" in out and "advanced" in out

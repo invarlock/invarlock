@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import builtins
 import json
+import sys
+import types
 from pathlib import Path
 from unittest.mock import patch
 
@@ -168,6 +170,123 @@ def test_calibrate_commands_exit_on_missing_optional_deps(
         )
 
 
+def test_null_sweep_coerces_optioninfo_runtime_flags_before_dep_check(
+    tmp_path: Path,
+) -> None:
+    cfg = _write_base_config(tmp_path)
+    out = tmp_path / "out"
+    runtime_calls: list[dict[str, bool]] = []
+    real_import = builtins.__import__
+
+    def _missing_spectral(
+        name: str,
+        globals=None,
+        locals=None,
+        fromlist=(),
+        level: int = 0,
+    ):
+        if name == "invarlock.calibration.spectral_null":
+            exc = ModuleNotFoundError("missing torch")
+            exc.name = "torch"
+            raise exc
+        return real_import(name, globals, locals, fromlist, level)
+
+    with (
+        patch.object(
+            calibrate_mod,
+            "configure_runtime_security",
+            side_effect=lambda **kwargs: runtime_calls.append(kwargs),
+        ),
+        patch.object(calibrate_mod, "maybe_delegate_model_command"),
+        patch("builtins.__import__", _missing_spectral),
+        pytest.raises(typer.Exit),
+    ):
+        calibrate_mod.null_sweep(
+            config=cfg,
+            out=out,
+            tiers=["balanced"],
+            seed=[42],
+            n_seeds=1,
+            seed_start=42,
+            profile="ci",
+            device=None,
+            allow_network=typer.Option(True),
+            allow_host_execution=typer.Option(True),
+            allow_third_party_plugins=typer.Option(True),
+            allow_remote_code=typer.Option(True),
+            safety_margin=0.05,
+            target_any_warning_rate=0.01,
+        )
+
+    assert runtime_calls == [
+        {
+            "allow_network": False,
+            "allow_host_execution": False,
+            "allow_third_party_plugins": False,
+            "allow_remote_code": False,
+        }
+    ]
+
+
+def test_ve_sweep_coerces_optioninfo_runtime_flags_before_dep_check(
+    tmp_path: Path,
+) -> None:
+    cfg = _write_base_config(tmp_path)
+    out = tmp_path / "out"
+    runtime_calls: list[dict[str, bool]] = []
+    real_import = builtins.__import__
+
+    def _missing_variance(
+        name: str,
+        globals=None,
+        locals=None,
+        fromlist=(),
+        level: int = 0,
+    ):
+        if name == "invarlock.calibration.variance_ve":
+            exc = ModuleNotFoundError("missing transformers")
+            exc.name = "transformers"
+            raise exc
+        return real_import(name, globals, locals, fromlist, level)
+
+    with (
+        patch.object(
+            calibrate_mod,
+            "configure_runtime_security",
+            side_effect=lambda **kwargs: runtime_calls.append(kwargs),
+        ),
+        patch.object(calibrate_mod, "maybe_delegate_model_command"),
+        patch("builtins.__import__", _missing_variance),
+        pytest.raises(typer.Exit),
+    ):
+        calibrate_mod.ve_sweep(
+            config=cfg,
+            out=out,
+            tiers=["balanced"],
+            seed=[42],
+            n_seeds=1,
+            seed_start=42,
+            window=[6],
+            target_enable_rate=0.05,
+            profile="ci",
+            device=None,
+            allow_network=typer.Option(True),
+            allow_host_execution=typer.Option(True),
+            allow_third_party_plugins=typer.Option(True),
+            allow_remote_code=typer.Option(True),
+            safety_margin=0.0,
+        )
+
+    assert runtime_calls == [
+        {
+            "allow_network": False,
+            "allow_host_execution": False,
+            "allow_third_party_plugins": False,
+            "allow_remote_code": False,
+        }
+    ]
+
+
 def test_null_sweep_emits_json_csv_md_and_tier_patch(tmp_path: Path) -> None:
     cfg = _write_base_config(tmp_path)
     out = tmp_path / "out"
@@ -236,6 +355,60 @@ def test_null_sweep_emits_json_csv_md_and_tier_patch(tmp_path: Path) -> None:
     assert isinstance(tiers_patch, dict)
     assert "balanced" in tiers_patch
     assert "spectral_guard" in tiers_patch["balanced"]
+
+
+def test_ve_sweep_handles_reports_without_variance_guard(tmp_path: Path) -> None:
+    cfg = _write_base_config(tmp_path)
+    out = tmp_path / "out"
+    fake_module = types.SimpleNamespace(
+        summarize_ve_sweep_reports=lambda reports, **kwargs: {
+            "n_runs": len(reports),
+            "recommendations": {"min_effect_lognll": 0.12},
+        }
+    )
+
+    def _fake_run_command(*, out: str, tier: str, config: str, **_kwargs) -> str:  # noqa: ARG001
+        report_path = Path(out) / "report.json"
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(
+            json.dumps(
+                {
+                    "guards": [{"name": "other", "metrics": {}}],
+                    "meta": {"tier": tier, "config": config},
+                }
+            ),
+            encoding="utf-8",
+        )
+        return str(report_path)
+
+    with (
+        patch("invarlock.cli.commands.run.run_command", _fake_run_command),
+        patch.object(
+            calibrate_mod,
+            "get_tier_guard_config",
+            return_value={"predictive_one_sided": True},
+        ),
+        patch.dict(sys.modules, {"invarlock.calibration.variance_ve": fake_module}),
+    ):
+        calibrate_mod.ve_sweep(
+            config=cfg,
+            out=out,
+            tiers=["balanced"],
+            seed=[42],
+            n_seeds=1,
+            seed_start=42,
+            window=[6],
+            target_enable_rate=0.05,
+            profile="ci",
+            device=None,
+            safety_margin=0.0,
+        )
+
+    runs_csv = (out / "ve_sweep_runs.csv").read_text(encoding="utf-8")
+    power_csv = (out / "ve_power_curve.csv").read_text(encoding="utf-8")
+    assert "predictive_evaluated" in runs_csv
+    assert "False" in runs_csv
+    assert "mean_ci_width" in power_csv
 
 
 def test_null_sweep_handles_missing_spectral_and_bad_metrics(tmp_path: Path) -> None:

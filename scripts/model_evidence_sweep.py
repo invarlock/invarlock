@@ -102,13 +102,6 @@ CURRENT_SUPPORTED_EXPERIMENTAL_LANES: tuple[EvidenceLane, ...] = (
         preset_relpath="configs/presets/causal_lm/qwen3_8b_512.yaml",
     ),
     EvidenceLane(
-        slug="qwq_32b",
-        lane_id="qwq-32b-reasoning-causal-hf",
-        family="QwQ-32B reasoning causal LM",
-        model_id="Qwen/QwQ-32B",
-        preset_relpath="configs/presets/causal_lm/qwq_32b_512.yaml",
-    ),
-    EvidenceLane(
         slug="deepseek_r1_distill_qwen_7b",
         lane_id="deepseek-r1-distill-qwen-causal-hf",
         family="DeepSeek-R1-Distill-Qwen causal LM",
@@ -357,7 +350,7 @@ def build_evaluate_command(
         _command_path(lane_root / "report", execution_mode=execution_mode),
     ]
     if execution_mode == "host":
-        command.append("--allow-host-execution")
+        command.extend(["--mode", "local"])
     return command
 
 

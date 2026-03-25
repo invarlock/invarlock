@@ -1,7 +1,7 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
 
-.PHONY: help install dev-install test test-assurance lint format clean docsclean deepclean docs docs-ci verify verify-ruff coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync model-evidence-list model-evidence-sweep runtime-image runtime-smoke runtime-verify
+.PHONY: help install dev-install test test-assurance lint format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync model-evidence-list model-evidence-sweep runtime-image runtime-smoke runtime-verify
 
 PYTHON ?= $(shell bash scripts/select_python.sh)
 PIP := $(PYTHON) -m pip
@@ -57,12 +57,20 @@ COVERAGE_TESTS_EVAL_PROBES := \
 COVERAGE_TESTS_CLI_COMMANDS := \
 	tests/cli/test_doctor*.py tests/cli/test_plugins*.py tests/cli/test_evaluate*.py \
 	tests/cli/test_export_html*.py tests/cli/test_app*.py \
+	tests/cli/test_core_command_surface.py tests/cli/test_execution_mode.py \
+	tests/cli/test_removed_command_migrations.py tests/cli/test_python_m_invarlock.py \
 	tests/cli/test_explain_gates*.py tests/cli/test_report*.py \
 	tests/cli/test_calibrate_harness_artifacts.py tests/cli/test_determinism_preset.py
 
 COVERAGE_TESTS_CLI_HELPERS := \
 	tests/cli/test_adapter_auto*.py tests/cli/test_no_color.py \
 	tests/cli/test_json_helpers.py tests/unit/test_overhead_extraction.py
+
+COVERAGE_TESTS_RUNTIME := \
+	tests/cli/test_security_default_contract.py \
+	tests/cli/test_container_delegation.py \
+	tests/reporting/test_runtime_manifest_contract.py \
+	tests/unit/test_runtime_security_helpers.py
 
 COVERAGE_TESTS := \
 	$(COVERAGE_TESTS_CORE) \
@@ -80,10 +88,14 @@ COVERAGE_MODULES := \
 	--cov=invarlock.proof_pack
 
 COVERAGE_INCLUDE := \
-	src/invarlock/eval/*,src/invarlock/guards/*,src/invarlock/calibration/*,\
-	src/invarlock/cli/*,src/invarlock/core/*,src/invarlock/reporting/*,\
-	src/invarlock/public_contracts.py,src/invarlock/policy_pack.py,\
-	src/invarlock/proof_pack.py
+src/invarlock/eval/*,src/invarlock/guards/*,src/invarlock/calibration/*,\
+src/invarlock/cli/*,src/invarlock/cli/commands/*,src/invarlock/core/*,src/invarlock/reporting/*,\
+src/invarlock/public_contracts.py,src/invarlock/policy_pack.py,\
+src/invarlock/proof_pack.py,src/invarlock/runtime_security.py,\
+invarlock/eval/*,invarlock/guards/*,invarlock/calibration/*,\
+invarlock/cli/*,invarlock/cli/commands/*,invarlock/core/*,invarlock/reporting/*,\
+invarlock/public_contracts.py,invarlock/policy_pack.py,\
+invarlock/proof_pack.py,invarlock/runtime_security.py
 
 TEST_DIR_TARGETS := core cli eval guards edits adapters plugins scripts ci
 
@@ -114,6 +126,8 @@ coverage:  ## Run tests with coverage and generate XML
 		--cov-report=term --cov-report=xml:reports/cov.xml --cov-fail-under=90
 	PYTHONPATH=src $(COVERAGE) run --append -m pytest -q -p no:cov \
 		$(COVERAGE_TESTS_EVAL_PROBES)
+	PYTHONPATH=src $(COVERAGE) run --append -m pytest -q -p no:cov \
+		$(COVERAGE_TESTS_RUNTIME)
 	$(COVERAGE) report --include="$(COVERAGE_INCLUDE)" --fail-under=90
 	$(COVERAGE) xml --include="$(COVERAGE_INCLUDE)" -o reports/cov.xml
 
@@ -174,6 +188,8 @@ verify:  ## Run verification (pytest -q, runtime verifier, lint, format, markdow
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTEST) -q
 	OMP_NUM_THREADS=1 SKIP_RUFF=1 INVARLOCK_PYTHON="$(PYTHON)" bash scripts/run_smoke_regression.sh
+	$(MAKE) cli-smoke-core
+	$(MAKE) cli-smoke-advanced
 	$(MAKE) runtime-verify
 	$(MAKE) verify-ruff
 	$(MAKE) contracts-check
@@ -187,6 +203,22 @@ verify-ruff:  ## Run the Ruff checks used by make verify
 	$(MAKE) ensure-ruff
 	$(RUFF) check src/ tests/ scripts/
 	$(RUFF) format --check src/ tests/ scripts/
+
+cli-smoke-core:  ## Smoke the simplified core CLI surface
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTHON) -m invarlock --help >/dev/null
+	PYTHONPATH=src $(PYTHON) -m invarlock evaluate --help >/dev/null
+	PYTHONPATH=src $(PYTHON) -m invarlock verify --help >/dev/null
+	PYTHONPATH=src $(PYTHON) -m invarlock report html --help >/dev/null
+	PYTHONPATH=src $(PYTHON) -m invarlock doctor --json >/dev/null
+
+cli-smoke-advanced:  ## Smoke the advanced CLI namespace
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTHON) -m invarlock advanced --help >/dev/null
+	PYTHONPATH=src $(PYTHON) -m invarlock advanced proof-pack --help >/dev/null
+	PYTHONPATH=src $(PYTHON) -m invarlock advanced policy --help >/dev/null
+	PYTHONPATH=src $(PYTHON) -m invarlock advanced plugins --help >/dev/null
+	PYTHONPATH=src $(PYTHON) -m invarlock advanced calibrate --help >/dev/null
 
 model-evidence-list:  ## Print the maintained shipped-model evidence manifest
 	$(MAKE) ensure-python

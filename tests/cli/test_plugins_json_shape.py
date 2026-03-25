@@ -8,7 +8,7 @@ from invarlock.cli.app import app
 
 @pytest.mark.parametrize("cat", ["adapters", "guards", "edits", "plugins"])
 def test_plugins_json_shape_and_order(cat):
-    r = CliRunner().invoke(app, ["plugins", "list", cat, "--json"])
+    r = CliRunner().invoke(app, ["advanced", "plugins", "list", cat, "--json"])
     assert r.exit_code == 0, r.output
     payload = json.loads(r.stdout.strip().splitlines()[-1])
     assert payload["format_version"] == "plugins-v1"
@@ -24,13 +24,13 @@ def test_plugins_json_shape_and_order(cat):
 
 
 def test_plugins_unknown_category_exit_code():
-    r = CliRunner().invoke(app, ["plugins", "list", "unknown-category"])
+    r = CliRunner().invoke(app, ["advanced", "plugins", "list", "unknown-category"])
     assert r.exit_code == 2
 
 
 def test_plugins_json_sorting_tie_breakers():
     # Ensure deterministic sort by (name, kind, module, entry_point)
-    r = CliRunner().invoke(app, ["plugins", "list", "plugins", "--json"])
+    r = CliRunner().invoke(app, ["advanced", "plugins", "list", "plugins", "--json"])
     assert r.exit_code == 0
     payload = json.loads(r.stdout.strip().splitlines()[-1])
     items = payload.get("items", [])

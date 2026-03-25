@@ -293,6 +293,7 @@ def test_wheel_install_can_verify_proof_pack_outside_repo_tree(tmp_path: Path) -
     verify = _run(
         cli_exe,
         [
+            "advanced",
             "proof-pack",
             "verify",
             str(pack_dir),

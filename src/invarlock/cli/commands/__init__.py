@@ -37,7 +37,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "verify_command",
     ),
     "report_command": ("invarlock.cli.commands.report", "report_command"),
-    "run_command": ("invarlock.cli.commands.run", "run_command"),
     "verify_command": ("invarlock.cli.commands.verify", "verify_command"),
 }
 

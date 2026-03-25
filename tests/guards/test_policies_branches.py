@@ -223,6 +223,24 @@ def test_get_rmt_policy_overlay_and_fallback(monkeypatch: pytest.MonkeyPatch):
     assert fallback == baseline
 
 
+def test_falsey_yaml_overlays_keep_default_policies(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    baseline_spectral = get_spectral_policy("balanced", use_yaml=False)
+    baseline_rmt = get_rmt_policy("balanced", use_yaml=False)
+    baseline_variance = get_variance_policy("balanced", use_yaml=False)
+
+    monkeypatch.setattr(
+        "invarlock.guards.policies.get_tier_guard_config",
+        lambda *_a, **_k: {},
+        raising=True,
+    )
+
+    assert get_spectral_policy("balanced", use_yaml=True) == baseline_spectral
+    assert get_rmt_policy("balanced", use_yaml=True) == baseline_rmt
+    assert get_variance_policy("balanced", use_yaml=True) == baseline_variance
+
+
 def test_variance_policy_and_errors():
     # Model-size helper should route to different named policies
     small = get_variance_policy_for_model_size(50_000_000)
@@ -283,6 +301,22 @@ def test_enforce_validation_gate_no_violations():
         "branch_balance_ok": True,
     }
     enforce_validation_gate(metrics, gate)
+
+
+def test_enforce_validation_gate_ignores_malformed_primary_metric_ratio() -> None:
+    class Metrics:
+        def get(self, key, default=None):
+            if key == "caps_applied":
+                return 0
+            if key == "total_layers":
+                return 1
+            if key == "primary_metric_ratio":
+                raise RuntimeError("bad ratio")
+            return default
+
+    gate = get_validation_gate("standard")
+
+    enforce_validation_gate(Metrics(), gate)
 
     # total_layers == 0 exercises the false branch of the capping-rate check.
     enforce_validation_gate(

@@ -6,29 +6,31 @@ included in the wheel). Runtime policy is canonical and lives under
 
 ## Layout
 
-- `configs/presets/` — complete, runnable presets for `invarlock run`
+- `configs/presets/` — complete, runnable presets for `invarlock evaluate --preset ...`
 - `configs/overlays/` — partial overlays intended to be merged into presets
   - `overlays/edits/` (edit plans)
   - `overlays/models/` (model id/adapter overlays)
   - `overlays/datasets/` (dataset overlays)
-- `configs/calibration/` — calibration harness configs (used by `invarlock calibrate ...`)
+- `configs/calibration/` — calibration harness configs (used by `invarlock advanced calibrate ...`)
 - `configs/overrides/` — committed, copy-first examples for local guard overrides
 - `configs/local/` — ignored by git; for your working presets/overrides
 
 ## Examples
 
-These repo-only examples assume a trusted local checkout, so they opt into host
-execution explicitly. If you are running through the secure-default runtime
-container path, drop `INVARLOCK_ALLOW_HOST_EXECUTION=1`.
+These repo-only examples assume a trusted local checkout, so they use
+`invarlock evaluate --mode local`. If you are running through the secure-default
+runtime-container path, drop `--mode local`.
 
 ```bash
-# Baseline run (no-op edit)
-INVARLOCK_ALLOW_HOST_EXECUTION=1 INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock run \
-  -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --tier balanced \
-  --out runs/baseline
+# Baseline vs subject with the repo preset
+INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --mode local \
+  --baseline sshleifer/tiny-gpt2 --subject sshleifer/tiny-gpt2 --adapter auto \
+  --profile ci --tier balanced \
+  --preset configs/presets/causal_lm/wikitext2_512.yaml \
+  --out runs/baseline --report-out reports/baseline
 
 # Compare & Evaluate (preferred), using an edit overlay
-INVARLOCK_ALLOW_HOST_EXECUTION=1 INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
+INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --mode local \
   --baseline sshleifer/tiny-gpt2 --subject sshleifer/tiny-gpt2 --adapter auto \
   --profile ci --tier balanced \
   --preset configs/presets/causal_lm/wikitext2_512.yaml \

@@ -647,6 +647,42 @@ def test_container_launch_mounts_absolute_config_root_from_env(
     assert _path_is_mounted(command, config_root)
 
 
+def test_container_launch_path_env_mounts_skip_recursive_symlink_walk(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    monkeypatch.chdir(repo_dir)
+    _stub_container_launch(monkeypatch)
+    monkeypatch.delenv("PYTHONPATH", raising=False)
+
+    tmpdir_root = tmp_path / "runtime-tmp"
+    tmpdir_root.mkdir()
+    for name in runtime_security._PATH_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("TMPDIR", str(tmpdir_root))
+
+    recursive_flags: list[bool] = []
+    original = runtime_security._iter_external_symlink_target_mounts
+
+    def _spy(path: Path, *, cwd: Path, recursive: bool = True) -> list[Path]:
+        if path.resolve(strict=False) == tmpdir_root.resolve(strict=False):
+            recursive_flags.append(recursive)
+        return original(path, cwd=cwd, recursive=recursive)
+
+    monkeypatch.setattr(
+        runtime_security,
+        "_iter_external_symlink_target_mounts",
+        _spy,
+        raising=True,
+    )
+
+    command = runtime_security.build_container_command(["evaluate", "--help"])
+
+    assert recursive_flags == [False]
+    assert _path_is_mounted(command, tmpdir_root)
+
+
 def test_container_launch_mounts_external_symlink_targets_for_local_model_paths(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

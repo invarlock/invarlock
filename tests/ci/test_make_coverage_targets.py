@@ -53,3 +53,32 @@ def test_coverage_target_includes_probe_suite_for_plain_coverage_run() -> None:
     ):
         assert pattern in text
     assert "$(COVERAGE) run --append -m pytest -q -p no:cov" in text
+
+
+def test_coverage_target_includes_core_cli_surface_and_runtime_security_tests() -> None:
+    makefile = Path(__file__).resolve().parents[2] / "Makefile"
+    text = makefile.read_text(encoding="utf-8")
+
+    for pattern in (
+        "tests/cli/test_core_command_surface.py",
+        "tests/cli/test_execution_mode.py",
+        "tests/cli/test_removed_command_migrations.py",
+        "tests/cli/test_python_m_invarlock.py",
+        "tests/cli/test_security_default_contract.py",
+        "tests/cli/test_container_delegation.py",
+        "invarlock/runtime_security.py",
+    ):
+        assert pattern in text
+
+
+def test_coverage_include_does_not_embed_space_prefixed_cli_patterns() -> None:
+    makefile = Path(__file__).resolve().parents[2] / "Makefile"
+    text = makefile.read_text(encoding="utf-8")
+
+    assert "COVERAGE_INCLUDE := \\" in text
+    assert "COVERAGE_INCLUDE := $(strip \\" not in text
+    assert ", src/invarlock/cli/*" not in text
+    assert ", invarlock/cli/*" not in text
+    assert "src/invarlock/cli/*" in text
+    assert "src/invarlock/cli/commands/*" in text
+    assert "invarlock/cli/commands/*" in text

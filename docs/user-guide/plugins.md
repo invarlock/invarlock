@@ -26,15 +26,15 @@ not add additional edit algorithms beyond the built‑in RTN quantization.
 
 ```bash
 # List all plugins
-invarlock plugins list
+invarlock advanced plugins list
 
 # List by category
-invarlock plugins adapters
-invarlock plugins guards
-invarlock plugins edits
+invarlock advanced plugins adapters
+invarlock advanced plugins guards
+invarlock advanced plugins edits
 
 # JSON output for scripting
-invarlock plugins list --json
+invarlock advanced plugins list --json
 ```
 
 ## Your First Plugin
@@ -130,12 +130,12 @@ nan_check = "my_plugin.my_guard:NaNCheckGuard"
 pip install -e ./my_invarlock_plugin
 
 # Verify registration (third-party discovery is explicit opt-in)
-invarlock plugins guards --allow-third-party-plugins
+invarlock advanced plugins guards --allow-third-party-plugins
 # Should show: nan_check | Plugin | Guard | — | — | ✅ Ready
 
-# Use in a trusted local run
-INVARLOCK_ALLOW_HOST_EXECUTION=1 INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=1 \
-  invarlock run -c config.yaml
+# Use in a trusted local compare/evaluate run
+INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=1 \
+  invarlock evaluate --mode local --baseline gpt2 --subject gpt2 --preset config.yaml
 ```
 
 ### Step 5: Add to Config
@@ -487,19 +487,19 @@ custom_format = "my_plugin.custom_adapter:CustomFormatAdapter"
 
 ```bash
 # Verify plugin is discovered
-invarlock plugins list --verbose
+invarlock advanced plugins list --verbose
 
 # Get details for specific plugin
-invarlock plugins adapters --explain custom_format
+invarlock advanced plugins adapters --explain custom_format
 # For guards, use --verbose to show module and entry point details
-invarlock plugins guards --verbose
+invarlock advanced plugins guards --verbose
 ```
 
 ### Debug Loading Issues
 
 ```bash
 # Enable debug logging
-INVARLOCK_DEBUG_TRACE=1 invarlock plugins list
+INVARLOCK_DEBUG_TRACE=1 invarlock advanced plugins list
 
 # Check for import errors
 python -c "from my_plugin.my_guard import NaNCheckGuard; print('OK')"

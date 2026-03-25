@@ -7,7 +7,7 @@ Recommended practices for research and production deployments.
 - Keep the default network-off posture; opt in per command with
   `INVARLOCK_ALLOW_NETWORK=1` only when required.
 - Keep model-loading commands on the runtime container by default; use
-  `INVARLOCK_ALLOW_HOST_EXECUTION=1` only for trusted local workflows.
+  `invarlock evaluate --mode local` for trusted public local workflows.
 - Use isolated environments (pipx/virtualenv/conda) and lock dependencies.
 - Validate configuration inputs and paths; avoid user-controlled write
   locations and implicit directory creation.
@@ -49,7 +49,8 @@ Copy-paste checklist for production or CI deployments:
 ## Environment flags to know
 
 - `INVARLOCK_ALLOW_NETWORK=1` — enable downloads for a command.
-- `INVARLOCK_ALLOW_HOST_EXECUTION=1` — permit trusted host-side model loading.
+- `--mode local` — public evaluate opt-in for trusted host-side model loading.
+- `INVARLOCK_ALLOW_HOST_EXECUTION=1` — advanced/internal host-bypass opt-in.
 - `INVARLOCK_ALLOW_REMOTE_CODE=1` — permit trusted remote model code.
 - `INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=1` — permit trusted third-party plugin discovery.
 - `HF_DATASETS_OFFLINE=1` — force offline reads after warming caches.

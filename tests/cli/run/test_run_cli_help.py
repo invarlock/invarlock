@@ -4,13 +4,13 @@ from click.termui import strip_ansi
 from typer.testing import CliRunner
 
 os.environ["INVARLOCK_LIGHT_IMPORT"] = "1"
-from invarlock.cli.app import app
+from tests.cli.run._internal_cli import internal_run_app
 
 runner = CliRunner()
 
 
 def test_cli_run_help_includes_edit_label_and_metric_kind():
-    result = runner.invoke(app, ["run", "--help"])
+    result = runner.invoke(internal_run_app, ["run", "--help"])
     assert result.exit_code == 0
     stdout = strip_ansi(result.stdout)
     assert "--edit-label" in stdout
@@ -20,5 +20,5 @@ def test_cli_run_help_includes_edit_label_and_metric_kind():
 
 
 def test_cli_run_accepts_edit_label_flag():
-    result = runner.invoke(app, ["run", "--edit-label", "noop", "--help"])
+    result = runner.invoke(internal_run_app, ["run", "--edit-label", "noop", "--help"])
     assert result.exit_code == 0

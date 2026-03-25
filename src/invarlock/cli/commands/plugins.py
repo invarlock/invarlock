@@ -2,15 +2,13 @@
 InvarLock CLI Plugins Command
 =========================
 
-Handles the 'invarlock plugins' command for listing available plugins.
+Handles the 'invarlock advanced plugins' command for listing available plugins.
 Supports a minimal view via INVARLOCK_MINIMAL=1 to hide built‑in adapters.
 """
 
 import json
 import os
 import platform
-import subprocess
-import sys
 
 import typer
 from rich.console import Console
@@ -23,7 +21,6 @@ from invarlock.public_contracts import (
     load_model_family_catalog,
     load_support_matrix,
 )
-from invarlock.runtime_security import network_allowed, third_party_plugins_allowed
 
 from ..backend_runtime import bitsandbytes_runtime_available
 from ..constants import PLUGINS_FORMAT_VERSION
@@ -33,31 +30,8 @@ console = Console()
 
 # Group: plugins
 plugins_app = typer.Typer(
-    help="Manage optional backends; list adapters/guards/edits.",
+    help="Inspect available adapters, guards, edits, and datasets.",
 )
-
-PLUGIN_PIP_TIMEOUT_SECONDS = 300
-
-
-def _resolve_plugin_pip_timeout() -> int:
-    raw = os.environ.get("INVARLOCK_PLUGIN_PIP_TIMEOUT_SEC", "").strip()
-    if not raw:
-        return PLUGIN_PIP_TIMEOUT_SECONDS
-    try:
-        parsed = int(raw)
-    except ValueError:
-        return PLUGIN_PIP_TIMEOUT_SECONDS
-    return parsed if parsed > 0 else PLUGIN_PIP_TIMEOUT_SECONDS
-
-
-def _plugin_runtime_note(targets: list[str]) -> str:
-    normalized = {str(target).strip().lower() for target in targets}
-    if {"invarlock[gptq]", "auto-gptq", "auto_gptq"} & normalized:
-        return (
-            "auto-gptq packaging is upstream-dependent; current Python/CUDA "
-            "stacks may require a pinned or vendor wheel."
-        )
-    return ""
 
 
 def _sort_rows(rows):
@@ -122,11 +96,11 @@ def plugins_command(
     Shows plugin names, module paths, and availability status without instantiation.
 
     Examples:
-        invarlock plugins list         # List all plugins
-        invarlock plugins guards       # List built-in guard plugins
-        invarlock plugins edits        # List built-in edit plugins
-        invarlock plugins adapters     # List built-in adapter plugins
-        invarlock plugins adapters --allow-third-party-plugins
+        invarlock advanced plugins list         # List all plugins
+        invarlock advanced plugins guards       # List built-in guard plugins
+        invarlock advanced plugins edits        # List built-in edit plugins
+        invarlock advanced plugins adapters     # List built-in adapter plugins
+        invarlock advanced plugins adapters --allow-third-party-plugins
     """
     try:
         # Coerce Typer OptionInfo defaults when invoked programmatically
@@ -936,303 +910,6 @@ def list_guards_command():
     plugins_command("guards")
 
 
-def _resolve_uninstall_targets(target: str) -> list[str]:
-    """Map a user-provided plugin/extra name to underlying pip packages.
-
-    Supports aliases such as:
-    - gptq / hf_gptq / auto-gptq -> ["auto-gptq"]
-    - awq / hf_awq / autoawq     -> ["autoawq"]
-    - bnb / hf_bnb / gpu         -> ["bitsandbytes"]
-    - invarlock[awq] / invarlock[gptq] / invarlock[gpu] -> respective packages
-    """
-    name = (target or "").strip().lower()
-    if name.startswith("invarlock[") and name.endswith("]"):
-        name = name[len("invarlock[") : -1]
-    # Normalize separators
-    name = name.replace("-", "_")
-    mapping: dict[str, list[str]] = {
-        # GPTQ family
-        "gptq": ["auto-gptq"],
-        "hf_gptq": ["auto-gptq"],
-        "auto_gptq": ["auto-gptq"],
-        "auto-gptq": ["auto-gptq"],
-        # AWQ family
-        "awq": ["autoawq"],
-        "hf_awq": ["autoawq"],
-        "autoawq": ["autoawq"],
-        # bitsandbytes / GPU extra
-        "bnb": ["bitsandbytes"],
-        "hf_bnb": ["bitsandbytes"],
-        "gpu": ["bitsandbytes"],
-        "bitsandbytes": ["bitsandbytes"],
-    }
-    return mapping.get(name, [])
-
-
-def _resolve_install_targets(target: str) -> list[str]:
-    """Map a user-provided plugin/extra name to `pip install` targets.
-
-    Prefer installing via `invarlock[extra]` to keep pins/markers consistent.
-
-    Supported aliases:
-    - gptq / hf_gptq / auto-gptq -> ["invarlock[gptq]"]
-    - awq / hf_awq / autoawq     -> ["invarlock[awq]"]
-    - bnb / hf_bnb / gpu         -> ["invarlock[gpu]"]
-    - adapters / transformers    -> ["invarlock[adapters]"]
-    - direct package names pass through: auto-gptq, autoawq, bitsandbytes
-    """
-    name = (target or "").strip().lower()
-    if name.startswith("invarlock[") and name.endswith("]"):
-        return [name]
-    name = name.replace("-", "_")
-
-    mapping: dict[str, list[str]] = {
-        # Extras (preferred)
-        "gptq": ["invarlock[gptq]"],
-        "hf_gptq": ["invarlock[gptq]"],
-        "auto_gptq": ["invarlock[gptq]"],
-        "auto-gptq": ["invarlock[gptq]"],
-        "awq": ["invarlock[awq]"],
-        "hf_awq": ["invarlock[awq]"],
-        "autoawq": ["invarlock[awq]"],
-        "bnb": ["invarlock[gpu]"],
-        "hf_bnb": ["invarlock[gpu]"],
-        "gpu": ["invarlock[gpu]"],
-        "adapters": ["invarlock[adapters]"],
-        "transformers": ["invarlock[adapters]"],
-        # Direct packages passthrough
-        "bitsandbytes": ["bitsandbytes"],
-    }
-    return mapping.get(name, [])
-
-
-def plugins_uninstall_command(
-    names: list[str] = typer.Argument(
-        ...,
-        help="One or more plugin extras or adapter names (e.g., gptq awq gpu hf_bnb)",
-    ),
-    yes: bool = typer.Option(
-        False, "--yes", "-y", help="Proceed without interactive confirmation"
-    ),
-    dry_run: bool = typer.Option(
-        True, "--dry-run", help="Show what would be uninstalled without making changes"
-    ),
-    apply: bool = typer.Option(False, "--apply", help="Actually uninstall packages"),
-    allow_third_party_plugins: bool = False,
-):
-    """Uninstall optional plugin backends (mirror to extras install).
-
-    Examples:
-        invarlock plugins uninstall gptq --dry-run --allow-third-party-plugins
-        invarlock plugins uninstall awq --dry-run --allow-third-party-plugins
-        invarlock plugins uninstall hf_bnb -y --apply --allow-third-party-plugins
-        invarlock plugins uninstall 'invarlock[gpu]' --dry-run --allow-third-party-plugins
-    """
-    all_pkgs: list[str] = []
-    unknown: list[str] = []
-    for name in names:
-        pkgs = _resolve_uninstall_targets(name)
-        if not pkgs:
-            unknown.append(name)
-        else:
-            for p in pkgs:
-                if p not in all_pkgs:
-                    all_pkgs.append(p)
-
-    def _print_normalized(action: str, pkgs: list[str], mode: str, result: str) -> None:
-        console.print(f"Action: {action}")
-        console.print(f"Package: {_escape(' '.join(pkgs))}")
-        console.print(f"Mode: {mode}")
-        console.print(f"Result: {result}")
-
-    if unknown:
-        _print_normalized(
-            "uninstall",
-            [", ".join(unknown)],
-            "dry-run" if (not bool(apply)) or bool(dry_run) else "apply",
-            "not-found",
-        )
-        raise typer.Exit(1)
-
-    force_dry = str(
-        os.environ.get("INVARLOCK_PLUGINS_DRY_RUN", "")
-    ).strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
-    # Treat non-apply invocations as dry-run to avoid interactive prompts in tests/automation.
-    # This also honors explicit --dry-run or INVARLOCK_PLUGINS_DRY_RUN.
-    if (not bool(apply)) or bool(dry_run) or force_dry:
-        _print_normalized("uninstall", all_pkgs, "dry-run", "ok")
-        raise typer.Exit(0)
-
-    configure_runtime_security(
-        allow_third_party_plugins=bool(allow_third_party_plugins)
-    )
-    if not third_party_plugins_allowed():
-        console.print(
-            "[red]❌ Third-party plugin management is disabled by default. "
-            "Re-run with --allow-third-party-plugins or "
-            "INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=1.[/red]"
-        )
-        raise typer.Exit(1)
-
-    if not yes:
-        proceed = typer.confirm(
-            f"Uninstall the following packages from the current environment? {all_pkgs}"
-        )
-        if not proceed:
-            _print_normalized("uninstall", all_pkgs, "apply", "skipped")
-            raise typer.Exit(0)
-
-    try:
-        cmd = [sys.executable, "-m", "pip", "uninstall", "-y", *all_pkgs]
-        timeout_seconds = _resolve_plugin_pip_timeout()
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=timeout_seconds,
-        )
-    except subprocess.TimeoutExpired as exc:
-        _print_normalized("uninstall", all_pkgs, "apply", "timeout")
-        console.print(f"[red]❌ Uninstall timed out after {timeout_seconds}s[/red]")
-        raise typer.Exit(1) from exc
-    except OSError as exc:
-        _print_normalized("uninstall", all_pkgs, "apply", "failed")
-        console.print(f"[red]❌ Unable to invoke pip uninstall: {exc}[/red]")
-        raise typer.Exit(1) from exc
-    if result.returncode != 0:
-        _print_normalized("uninstall", all_pkgs, "apply", "skipped")
-        error_text = (result.stderr or result.stdout or "").strip()
-        if error_text:
-            console.print(
-                f"[red]❌ pip uninstall failed ({result.returncode}): "
-                f"{_escape(error_text.splitlines()[-1])}[/red]"
-            )
-        raise typer.Exit(1)
-    _print_normalized("uninstall", all_pkgs, "apply", "ok")
-
-
-def plugins_install_command(
-    names: list[str] = typer.Argument(
-        ...,
-        help="One or more plugin extras or adapter names (e.g., gptq awq gpu hf_bnb adapters)",
-    ),
-    upgrade: bool = typer.Option(
-        False, "--upgrade", "-U", help="Pass --upgrade to pip"
-    ),
-    dry_run: bool = typer.Option(
-        True, "--dry-run", help="Show what would be installed without making changes"
-    ),
-    apply: bool = typer.Option(False, "--apply", help="Actually install packages"),
-    allow_third_party_plugins: bool = False,
-    allow_network: bool = False,
-):
-    """Install optional plugin extras (mirror to extras install).
-
-    Examples:
-        invarlock plugins install gptq --dry-run --allow-third-party-plugins
-        invarlock plugins install awq gpu --upgrade --dry-run --allow-third-party-plugins
-        invarlock plugins install hf_bnb --dry-run --allow-third-party-plugins
-        invarlock plugins install adapters --dry-run --allow-third-party-plugins
-    """
-    all_targets: list[str] = []
-    unknown: list[str] = []
-    for name in names:
-        targets = _resolve_install_targets(name)
-        if not targets:
-            unknown.append(name)
-        else:
-            for t in targets:
-                if t not in all_targets:
-                    all_targets.append(t)
-
-    def _print_normalized(action: str, pkgs: list[str], mode: str, result: str) -> None:
-        console.print(f"Action: {action}")
-        console.print(f"Package: {_escape(' '.join(pkgs))}")
-        console.print(f"Mode: {mode}")
-        console.print(f"Result: {result}")
-        note = _plugin_runtime_note(pkgs)
-        if note:
-            console.print(f"Note: {_escape(note)}")
-
-    if unknown:
-        _print_normalized(
-            "install",
-            [", ".join(unknown)],
-            "dry-run" if dry_run and not apply else "apply",
-            "not-found",
-        )
-        raise typer.Exit(1)
-
-    force_dry = str(
-        os.environ.get("INVARLOCK_PLUGINS_DRY_RUN", "")
-    ).strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
-    # Treat any non-apply invocation as a dry-run to avoid accidental changes
-    # in CI/docs. This also honors explicit --dry-run or INVARLOCK_PLUGINS_DRY_RUN.
-    if (not bool(apply)) or bool(dry_run) or force_dry:
-        _print_normalized("install", all_targets, "dry-run", "ok")
-        raise typer.Exit(0)
-
-    configure_runtime_security(
-        allow_network=bool(allow_network),
-        allow_third_party_plugins=bool(allow_third_party_plugins),
-    )
-    if not third_party_plugins_allowed():
-        console.print(
-            "[red]❌ Third-party plugin management is disabled by default. "
-            "Re-run with --allow-third-party-plugins or "
-            "INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=1.[/red]"
-        )
-        raise typer.Exit(1)
-    if not network_allowed():
-        console.print(
-            "[red]❌ Network access is disabled by default. Re-run with "
-            "--allow-network or INVARLOCK_ALLOW_NETWORK=1 to install plugins.[/red]"
-        )
-        raise typer.Exit(1)
-
-    try:
-        cmd = [sys.executable, "-m", "pip", "install", *all_targets]
-        if upgrade:
-            cmd.insert(4, "--upgrade")
-        timeout_seconds = _resolve_plugin_pip_timeout()
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=timeout_seconds,
-        )
-    except subprocess.TimeoutExpired as exc:
-        _print_normalized("install", all_targets, "apply", "timeout")
-        console.print(f"[red]❌ Install timed out after {timeout_seconds}s[/red]")
-        raise typer.Exit(1) from exc
-    except OSError as exc:
-        _print_normalized("install", all_targets, "apply", "failed")
-        console.print(f"[red]❌ Unable to invoke pip install: {exc}[/red]")
-        raise typer.Exit(1) from exc
-    if result.returncode != 0:
-        _print_normalized("install", all_targets, "apply", "skipped")
-        error_text = (result.stderr or result.stdout or "").strip()
-        if error_text:
-            console.print(
-                f"[red]❌ pip install failed ({result.returncode}): "
-                f"{_escape(error_text.splitlines()[-1])}[/red]"
-            )
-        raise typer.Exit(1)
-    _print_normalized("install", all_targets, "apply", "ok")
-
-
 # Wire subcommands under group
 @plugins_app.command("list")
 def _plugins_list(
@@ -1380,97 +1057,9 @@ def _plugins_adapter_alias(
     )
 
 
-@plugins_app.command("install")
-def _plugins_install(
-    names: list[str] = typer.Argument(...),
-    upgrade: bool = typer.Option(False, "--upgrade", "-U"),
-    dry_run: bool = typer.Option(True, "--dry-run"),
-    apply: bool = typer.Option(False, "--apply"),
-    allow_network: bool = typer.Option(
-        False,
-        "--allow-network",
-        help="Allow network access for plugin installation.",
-    ),
-    allow_third_party_plugins: bool = typer.Option(
-        False,
-        "--allow-third-party-plugins",
-        help="Allow third-party plugin management for this command.",
-    ),
-):
-    """Install optional plugin backends via pip.
-
-    Examples:
-      invarlock plugins install invarlock[gptq] --dry-run --allow-third-party-plugins
-      invarlock plugins install invarlock[awq] --dry-run --allow-third-party-plugins
-      invarlock plugins install invarlock[gpu] --dry-run --allow-third-party-plugins
-
-    Use --dry-run (default) to preview the action; pass --apply to execute.
-    """
-    # Normalize semantics: when --dry-run is provided (default true), ensure apply stays False
-    eff_dry_run = bool(dry_run)
-    eff_apply = bool(apply) if not eff_dry_run else False
-    if eff_dry_run:
-        os.environ["INVARLOCK_PLUGINS_DRY_RUN"] = "1"
-    try:
-        return plugins_install_command(
-            names,
-            upgrade,
-            eff_dry_run,
-            eff_apply,
-            allow_third_party_plugins=allow_third_party_plugins,
-            allow_network=allow_network,
-        )
-    finally:
-        if os.environ.get("INVARLOCK_PLUGINS_DRY_RUN") == "1":
-            os.environ.pop("INVARLOCK_PLUGINS_DRY_RUN", None)
-
-
-@plugins_app.command("uninstall")
-def _plugins_uninstall(
-    names: list[str] = typer.Argument(...),
-    yes: bool = typer.Option(False, "--yes", "-y"),
-    dry_run: bool = typer.Option(True, "--dry-run"),
-    apply: bool = typer.Option(False, "--apply"),
-    allow_third_party_plugins: bool = typer.Option(
-        False,
-        "--allow-third-party-plugins",
-        help="Allow third-party plugin management for this command.",
-    ),
-):
-    """Uninstall optional plugin backends via pip.
-
-    Accepts either extras (invarlock[gptq], invarlock[awq], invarlock[gpu])
-    or direct package names (auto-gptq, autoawq, bitsandbytes).
-
-    Examples:
-      invarlock plugins uninstall invarlock[gptq] --dry-run --allow-third-party-plugins
-      invarlock plugins uninstall autoawq --dry-run --allow-third-party-plugins
-      invarlock plugins uninstall bitsandbytes --yes --apply --allow-third-party-plugins
-
-    Use --dry-run (default) to preview; pass --apply to execute.
-    """
-    eff_dry_run = bool(dry_run)
-    eff_apply = bool(apply) if not eff_dry_run else False
-    if eff_dry_run:
-        os.environ["INVARLOCK_PLUGINS_DRY_RUN"] = "1"
-    try:
-        return plugins_uninstall_command(
-            names,
-            yes,
-            eff_dry_run,
-            eff_apply,
-            allow_third_party_plugins=allow_third_party_plugins,
-        )
-    finally:
-        if os.environ.get("INVARLOCK_PLUGINS_DRY_RUN") == "1":
-            os.environ.pop("INVARLOCK_PLUGINS_DRY_RUN", None)
-
-
 __all__ = [
     "plugins_app",
     "plugins_command",
-    "plugins_install_command",
-    "plugins_uninstall_command",
     "list_guards_command",
     "list_edits_command",
 ]

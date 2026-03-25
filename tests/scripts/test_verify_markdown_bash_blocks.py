@@ -85,7 +85,8 @@ def test_sanitize_script_host_mode_injects_host_bypass_and_verify_override() -> 
 
     rendered = module._sanitize_script(block, execution_mode="host")
 
-    assert "INVARLOCK_ALLOW_HOST_EXECUTION=1" in rendered
+    assert "--mode local" in rendered
+    assert "INVARLOCK_ALLOW_HOST_EXECUTION=1" not in rendered
     assert "--allow-unattested-artifacts" in rendered
 
 

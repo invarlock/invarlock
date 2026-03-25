@@ -25,11 +25,10 @@ smoke_timeout() {
   printf '%s' "${!var_name:-$default_value}"
 }
 
-RUN_TIMEOUT_SECONDS="$(smoke_timeout INVARLOCK_SMOKE_RUN_TIMEOUT 180)"
 EVALUATE_TIMEOUT_SECONDS="$(smoke_timeout INVARLOCK_SMOKE_EVALUATE_TIMEOUT 420)"
 CALIBRATE_NULL_TIMEOUT_SECONDS="$(smoke_timeout INVARLOCK_SMOKE_CALIBRATE_NULL_TIMEOUT 900)"
 CALIBRATE_VE_TIMEOUT_SECONDS="$(smoke_timeout INVARLOCK_SMOKE_CALIBRATE_VE_TIMEOUT 1200)"
-echo "[info] $(ts) Timeout budget: run=${RUN_TIMEOUT_SECONDS}s evaluate=${EVALUATE_TIMEOUT_SECONDS}s calibrate_null=${CALIBRATE_NULL_TIMEOUT_SECONDS}s calibrate_ve=${CALIBRATE_VE_TIMEOUT_SECONDS}s" | tee -a "$LOG_FILE"
+echo "[info] $(ts) Timeout budget: evaluate=${EVALUATE_TIMEOUT_SECONDS}s calibrate_null=${CALIBRATE_NULL_TIMEOUT_SECONDS}s calibrate_ve=${CALIBRATE_VE_TIMEOUT_SECONDS}s" | tee -a "$LOG_FILE"
 
 ensure_writable_hf_cache() {
   local candidate_root=""
@@ -126,7 +125,7 @@ PY
 
 # Conditionally run long commands (model/dataset) only when adapters stack exists
 have_adapters_stack() {
-  bash -lc "$CLI plugins adapters --json >/dev/null 2>&1" || return 1
+  bash -lc "$CLI advanced plugins adapters --json >/dev/null 2>&1" || return 1
   # Try importing torch+transformers for a hard check (quick)
   python - <<'PY'
 import sys
@@ -149,49 +148,39 @@ run_env() {
 # Top-level and core commands (help-only: safe)
 run "invarlock --help"                "$CLI --help"
 run "invarlock version"               "$CLI version"
-run "invarlock evaluate --help"        "$CLI evaluate --help"
+run "invarlock evaluate --help"       "$CLI evaluate --help"
 run "invarlock verify --help"         "$CLI verify --help"
-run "invarlock run --help"            "$CLI run --help"
-run "invarlock calibrate --help"      "$CLI calibrate --help"
-run "invarlock calibrate null-sweep --help" "$CLI calibrate null-sweep --help"
-run "invarlock calibrate ve-sweep --help" "$CLI calibrate ve-sweep --help"
-run "invarlock proof-pack --help"     "$CLI proof-pack --help"
-run "invarlock proof-pack build --help" "$CLI proof-pack build --help"
-run "invarlock proof-pack inspect --help" "$CLI proof-pack inspect --help"
-run "invarlock proof-pack verify --help" "$CLI proof-pack verify --help"
 run "invarlock report --help"         "$CLI report --help"
 run "invarlock report verify --help"  "$CLI report verify --help"
 run "invarlock report explain --help" "$CLI report explain --help"
 run "invarlock report html --help"    "$CLI report html --help"
 run "invarlock report validate --help" "$CLI report validate --help"
 run "invarlock doctor --help"         "$CLI doctor --help"
+run "invarlock advanced --help"       "$CLI advanced --help"
+run "invarlock advanced proof-pack --help" "$CLI advanced proof-pack --help"
+run "invarlock advanced proof-pack build --help" "$CLI advanced proof-pack build --help"
+run "invarlock advanced proof-pack inspect --help" "$CLI advanced proof-pack inspect --help"
+run "invarlock advanced proof-pack verify --help" "$CLI advanced proof-pack verify --help"
+run "invarlock advanced policy --help" "$CLI advanced policy --help"
+run "invarlock advanced policy build --help" "$CLI advanced policy build --help"
+run "invarlock advanced policy verify --help" "$CLI advanced policy verify --help"
+run "invarlock advanced calibrate --help" "$CLI advanced calibrate --help"
+run "invarlock advanced calibrate null-sweep --help" "$CLI advanced calibrate null-sweep --help"
+run "invarlock advanced calibrate ve-sweep --help" "$CLI advanced calibrate ve-sweep --help"
 
 # Plugins listings (safe; JSON and text variants)
-run "invarlock plugins --help"        "$CLI plugins --help"
-run "invarlock plugins list --help"   "$CLI plugins list --help"
-run "invarlock plugins list (text)"   "$CLI plugins list"
-run "invarlock plugins list --json"   "$CLI plugins list --json"
-run "invarlock plugins list adapters --json" "$CLI plugins list adapters --json"
-run "invarlock plugins list guards --json"   "$CLI plugins list guards --json"
-run "invarlock plugins list edits --json"    "$CLI plugins list edits --json"
-run "invarlock plugins list datasets --json" "$CLI plugins list datasets --json"
-run "invarlock plugins list plugins --json"  "$CLI plugins list plugins --json"
+run "invarlock advanced plugins --help"        "$CLI advanced plugins --help"
+run "invarlock advanced plugins list --help"   "$CLI advanced plugins list --help"
+run "invarlock advanced plugins list (text)"   "$CLI advanced plugins list"
+run "invarlock advanced plugins list --json"   "$CLI advanced plugins list --json"
 
 # Category-specific helpers
-run "invarlock plugins adapters --help" "$CLI plugins adapters --help"
-run "invarlock plugins adapters --json" "$CLI plugins adapters --json"
-run "invarlock plugins guards --help"   "$CLI plugins guards --help"
-run "invarlock plugins guards --json"   "$CLI plugins guards --json"
-run "invarlock plugins edits --help"    "$CLI plugins edits --help"
-run "invarlock plugins edits --json"    "$CLI plugins edits --json"
-
-# Install/uninstall dry runs (safe, no side effects without --apply)
-run "invarlock plugins install --dry-run gpu"  "$CLI plugins install --dry-run gpu"
-run "invarlock plugins install --dry-run gptq" "$CLI plugins install --dry-run gptq"
-run "invarlock plugins install --dry-run awq"  "$CLI plugins install --dry-run awq"
-run "invarlock plugins uninstall --dry-run gpu"  "$CLI plugins uninstall --dry-run gpu"
-run "invarlock plugins uninstall --dry-run gptq" "$CLI plugins uninstall --dry-run gptq"
-run "invarlock plugins uninstall --dry-run awq"  "$CLI plugins uninstall --dry-run awq"
+run "invarlock advanced plugins adapters --help" "$CLI advanced plugins adapters --help"
+run "invarlock advanced plugins adapters --json" "$CLI advanced plugins adapters --json"
+run "invarlock advanced plugins guards --help"   "$CLI advanced plugins guards --help"
+run "invarlock advanced plugins guards --json"   "$CLI advanced plugins guards --json"
+run "invarlock advanced plugins edits --help"    "$CLI advanced plugins edits --help"
+run "invarlock advanced plugins edits --json"    "$CLI advanced plugins edits --json"
 
 # Extended: verify, evaluate/run with and without network
 # Create a tiny invalid report to exercise verify paths
@@ -201,6 +190,9 @@ printf '%s\n' '{"verdict":"PASS","summary":{"status":"smoke"}}' >"$TMP_DIR/final
 printf '%s\n' '{"commit":"smoke","branch":"staging/next"}' >"$TMP_DIR/source_repo.json"
 printf '%s\n' '{"platform":"cli-smoke","mode":"attested-fixture"}' >"$TMP_DIR/environment.json"
 printf '%s\n' '{"models":{"sshleifer/tiny-gpt2":{"revision":"fixture"}}}' >"$TMP_DIR/model_revisions.json"
+printf '%s\n' '{"metrics":{"pm_ratio":{"ratio_limit_base":1.1}}}' >"$TMP_DIR/resolved_policy.json"
+printf '%s\n' '[{"path":"metrics.pm_ratio.ratio_limit_base","value":1.1}]' >"$TMP_DIR/policy_overrides.json"
+printf '%s\n' '{"support_tiers":["published_basis"]}' >"$TMP_DIR/policy_compatibility.json"
 PROOF_PACK_REPORT_DIR="$TMP_DIR/proof_pack_report"
 mkdir -p "$PROOF_PACK_REPORT_DIR"
 PROOF_PACK_REPORT_DIR="$PROOF_PACK_REPORT_DIR" python - <<'PY'
@@ -337,86 +329,68 @@ PY
 
 run "invarlock verify (human, invalid)" "$CLI verify \"$TMP_DIR/report_invalid.json\""
 run "invarlock verify --json (invalid)" "$CLI verify --json \"$TMP_DIR/report_invalid.json\""
-run "invarlock proof-pack build" "$CLI proof-pack build \"$TMP_DIR/proof_pack_cli\" --final-verdict \"$TMP_DIR/final_verdict.json\" --source-repo \"$TMP_DIR/source_repo.json\" --environment \"$TMP_DIR/environment.json\" --material model_revisions=\"$TMP_DIR/model_revisions.json\" --report \"$PROOF_PACK_REPORT_DIR/evaluation.report.json\" --profile ci --json"
-run "invarlock proof-pack inspect --json" "$CLI proof-pack inspect \"$TMP_DIR/proof_pack_cli\" --json"
-run "invarlock proof-pack verify --json" "$CLI proof-pack verify \"$TMP_DIR/proof_pack_cli\" --json"
+run "invarlock advanced proof-pack build" "$CLI advanced proof-pack build \"$TMP_DIR/proof_pack_cli\" --final-verdict \"$TMP_DIR/final_verdict.json\" --source-repo \"$TMP_DIR/source_repo.json\" --environment \"$TMP_DIR/environment.json\" --material model_revisions=\"$TMP_DIR/model_revisions.json\" --report \"$PROOF_PACK_REPORT_DIR/evaluation.report.json\" --profile ci --json"
+run "invarlock advanced proof-pack inspect --json" "$CLI advanced proof-pack inspect \"$TMP_DIR/proof_pack_cli\" --json"
+run "invarlock advanced proof-pack verify --json" "$CLI advanced proof-pack verify \"$TMP_DIR/proof_pack_cli\" --json"
+run "invarlock advanced policy build" "$CLI advanced policy build --resolved-policy \"$TMP_DIR/resolved_policy.json\" --overrides \"$TMP_DIR/policy_overrides.json\" --compatibility \"$TMP_DIR/policy_compatibility.json\" --out \"$TMP_DIR/policy-pack.json\" --owner smoke"
+run "invarlock advanced policy verify --json" "$CLI advanced policy verify \"$TMP_DIR/policy-pack.json\" --json"
 
 # Offline runs (force quick failure if uncached)
 OFFLINE_ENV="HF_DATASETS_OFFLINE=1 TRANSFORMERS_OFFLINE=1 TOKENIZERS_PARALLELISM=false"
 OFFLINE_EVAL_ENV="$OFFLINE_ENV INVARLOCK_DEDUP_TEXTS=1 INVARLOCK_TINY_RELAX=1"
-OFFLINE_HOST_ENV="$OFFLINE_ENV INVARLOCK_ALLOW_HOST_EXECUTION=1"
-OFFLINE_HOST_EVAL_ENV="$OFFLINE_EVAL_ENV INVARLOCK_ALLOW_HOST_EXECUTION=1"
 
 if have_adapters_stack; then
-  run_to "invarlock run (offline)" "$RUN_TIMEOUT_SECONDS" "$OFFLINE_ENV $CLI run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --device cpu --out \"$TMP_DIR/run_offline\""
   run_to "invarlock evaluate (offline)" "$EVALUATE_TIMEOUT_SECONDS" "$OFFLINE_EVAL_ENV $CLI evaluate --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --device cpu --out \"$TMP_DIR/report_offline\" --report-out \"$TMP_DIR/report_offline_out\""
-  run_to "invarlock run (offline, host)" "$RUN_TIMEOUT_SECONDS" "$OFFLINE_HOST_ENV $CLI run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --device cpu --out \"$TMP_DIR/run_offline_host\""
-  run_to "invarlock evaluate (offline, host)" "$EVALUATE_TIMEOUT_SECONDS" "$OFFLINE_HOST_EVAL_ENV $CLI evaluate --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --device cpu --out \"$TMP_DIR/report_offline_host\" --report-out \"$TMP_DIR/report_offline_host_out\""
-  run_to "invarlock calibrate null-sweep (network)" "$CALIBRATE_NULL_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI calibrate null-sweep --allow-network --config configs/calibration/null_sweep_ci.yaml --out \"$TMP_DIR/calibrate_null\" --profile ci --device cpu --tier balanced --n-seeds 1 --seed-start 42"
-  run_to "invarlock calibrate ve-sweep (network)" "$CALIBRATE_VE_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI calibrate ve-sweep --allow-network --config configs/calibration/rmt_ve_sweep_ci.yaml --out \"$TMP_DIR/calibrate_ve\" --profile ci --device cpu --tier balanced --window 6 --n-seeds 1 --seed-start 42"
-  run_to "invarlock calibrate null-sweep (network, host)" "$CALIBRATE_NULL_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI calibrate null-sweep --allow-network --allow-host-execution --config configs/calibration/null_sweep_ci.yaml --out \"$TMP_DIR/calibrate_null_host\" --profile ci --device cpu --tier balanced --n-seeds 1 --seed-start 42"
-  run_to "invarlock calibrate ve-sweep (network, host)" "$CALIBRATE_VE_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI calibrate ve-sweep --allow-network --allow-host-execution --config configs/calibration/rmt_ve_sweep_ci.yaml --out \"$TMP_DIR/calibrate_ve_host\" --profile ci --device cpu --tier balanced --window 6 --n-seeds 1 --seed-start 42"
+  run_to "invarlock evaluate (offline, local)" "$EVALUATE_TIMEOUT_SECONDS" "$OFFLINE_EVAL_ENV $CLI evaluate --mode local --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --device cpu --out \"$TMP_DIR/report_offline_local\" --report-out \"$TMP_DIR/report_offline_local_out\""
+  run_to "invarlock advanced calibrate null-sweep (network)" "$CALIBRATE_NULL_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI advanced calibrate null-sweep --allow-network --config configs/calibration/null_sweep_ci.yaml --out \"$TMP_DIR/calibrate_null\" --profile ci --device cpu --tier balanced --n-seeds 1 --seed-start 42"
+  run_to "invarlock advanced calibrate ve-sweep (network)" "$CALIBRATE_VE_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI advanced calibrate ve-sweep --allow-network --config configs/calibration/rmt_ve_sweep_ci.yaml --out \"$TMP_DIR/calibrate_ve\" --profile ci --device cpu --tier balanced --window 6 --n-seeds 1 --seed-start 42"
+  run_to "invarlock advanced calibrate null-sweep (network, host)" "$CALIBRATE_NULL_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI advanced calibrate null-sweep --allow-network --allow-host-execution --config configs/calibration/null_sweep_ci.yaml --out \"$TMP_DIR/calibrate_null_host\" --profile ci --device cpu --tier balanced --n-seeds 1 --seed-start 42"
+  run_to "invarlock advanced calibrate ve-sweep (network, host)" "$CALIBRATE_VE_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI advanced calibrate ve-sweep --allow-network --allow-host-execution --config configs/calibration/rmt_ve_sweep_ci.yaml --out \"$TMP_DIR/calibrate_ve_host\" --profile ci --device cpu --tier balanced --window 6 --n-seeds 1 --seed-start 42"
 else
   {
-    echo "\n==== BEGIN invarlock run (offline) ===="
-    echo "[skip] adapters stack (torch/transformers) not available"
-    echo "==== END invarlock run (offline) ====\n"
     echo "\n==== BEGIN invarlock evaluate (offline) ===="
     echo "[skip] adapters stack (torch/transformers) not available"
     echo "==== END invarlock evaluate (offline) ====\n"
-    echo "\n==== BEGIN invarlock run (offline, host) ===="
+    echo "\n==== BEGIN invarlock evaluate (offline, local) ===="
     echo "[skip] adapters stack (torch/transformers) not available"
-    echo "==== END invarlock run (offline, host) ====\n"
-    echo "\n==== BEGIN invarlock evaluate (offline, host) ===="
+    echo "==== END invarlock evaluate (offline, local) ====\n"
+    echo "\n==== BEGIN invarlock advanced calibrate null-sweep (network) ===="
     echo "[skip] adapters stack (torch/transformers) not available"
-    echo "==== END invarlock evaluate (offline, host) ====\n"
-    echo "\n==== BEGIN invarlock calibrate null-sweep (network) ===="
+    echo "==== END invarlock advanced calibrate null-sweep (network) ====\n"
+    echo "\n==== BEGIN invarlock advanced calibrate ve-sweep (network) ===="
     echo "[skip] adapters stack (torch/transformers) not available"
-    echo "==== END invarlock calibrate null-sweep (network) ====\n"
-    echo "\n==== BEGIN invarlock calibrate ve-sweep (network) ===="
+    echo "==== END invarlock advanced calibrate ve-sweep (network) ====\n"
+    echo "\n==== BEGIN invarlock advanced calibrate null-sweep (network, host) ===="
     echo "[skip] adapters stack (torch/transformers) not available"
-    echo "==== END invarlock calibrate ve-sweep (network) ====\n"
-    echo "\n==== BEGIN invarlock calibrate null-sweep (network, host) ===="
+    echo "==== END invarlock advanced calibrate null-sweep (network, host) ====\n"
+    echo "\n==== BEGIN invarlock advanced calibrate ve-sweep (network, host) ===="
     echo "[skip] adapters stack (torch/transformers) not available"
-    echo "==== END invarlock calibrate null-sweep (network, host) ====\n"
-    echo "\n==== BEGIN invarlock calibrate ve-sweep (network, host) ===="
-    echo "[skip] adapters stack (torch/transformers) not available"
-    echo "==== END invarlock calibrate ve-sweep (network, host) ====\n"
+    echo "==== END invarlock advanced calibrate ve-sweep (network, host) ====\n"
   } >>"$LOG_FILE"
 fi
 
 # With network allowed (may still fail fast if extras missing)
 NET_ENV="INVARLOCK_ALLOW_NETWORK=1 TOKENIZERS_PARALLELISM=false"
 NET_EVAL_ENV="$NET_ENV INVARLOCK_DEDUP_TEXTS=1 INVARLOCK_TINY_RELAX=1"
-NET_HOST_ENV="$NET_ENV INVARLOCK_ALLOW_HOST_EXECUTION=1"
-NET_HOST_EVAL_ENV="$NET_EVAL_ENV INVARLOCK_ALLOW_HOST_EXECUTION=1"
 if have_adapters_stack; then
-  run_to "invarlock run (network)" "$RUN_TIMEOUT_SECONDS" "$NET_ENV $CLI run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --device cpu --out \"$TMP_DIR/run_net\""
   run_to "invarlock evaluate (network)" "$EVALUATE_TIMEOUT_SECONDS" "$NET_EVAL_ENV $CLI evaluate --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --device cpu --out \"$TMP_DIR/report_net\" --report-out \"$TMP_DIR/report_net_out\""
   run "invarlock verify (network output)" "if [ -f \"$TMP_DIR/report_net_out/evaluation.report.json\" ]; then $CLI verify --json \"$TMP_DIR/report_net_out/evaluation.report.json\"; else echo '[skip] report missing'; fi"
-  run_to "invarlock run (network, host)" "$RUN_TIMEOUT_SECONDS" "$NET_HOST_ENV $CLI run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --device cpu --out \"$TMP_DIR/run_net_host\""
-  run_to "invarlock evaluate (network, host)" "$EVALUATE_TIMEOUT_SECONDS" "$NET_HOST_EVAL_ENV $CLI evaluate --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --device cpu --out \"$TMP_DIR/report_net_host\" --report-out \"$TMP_DIR/report_net_host_out\""
-  run "invarlock verify (network host output)" "if [ -f \"$TMP_DIR/report_net_host_out/evaluation.report.json\" ]; then $CLI verify --allow-unattested-artifacts --json \"$TMP_DIR/report_net_host_out/evaluation.report.json\"; else echo '[skip] report missing'; fi"
+  run_to "invarlock evaluate (network, local)" "$EVALUATE_TIMEOUT_SECONDS" "$NET_EVAL_ENV $CLI evaluate --mode local --source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto --profile ci --preset configs/presets/causal_lm/wikitext2_512.yaml --device cpu --out \"$TMP_DIR/report_net_local\" --report-out \"$TMP_DIR/report_net_local_out\""
+  run "invarlock verify (network local output)" "if [ -f \"$TMP_DIR/report_net_local_out/evaluation.report.json\" ]; then $CLI verify --allow-unattested-artifacts --json \"$TMP_DIR/report_net_local_out/evaluation.report.json\"; else echo '[skip] report missing'; fi"
 else
   {
-    echo "\n==== BEGIN invarlock run (network) ===="
-    echo "[skip] adapters stack (torch/transformers) not available"
-    echo "==== END invarlock run (network) ====\n"
     echo "\n==== BEGIN invarlock evaluate (network) ===="
     echo "[skip] adapters stack (torch/transformers) not available"
     echo "==== END invarlock evaluate (network) ====\n"
     echo "\n==== BEGIN invarlock verify (network output) ===="
     echo "[skip] adapters stack (torch/transformers) not available"
     echo "==== END invarlock verify (network output) ====\n"
-    echo "\n==== BEGIN invarlock run (network, host) ===="
+    echo "\n==== BEGIN invarlock evaluate (network, local) ===="
     echo "[skip] adapters stack (torch/transformers) not available"
-    echo "==== END invarlock run (network, host) ====\n"
-    echo "\n==== BEGIN invarlock evaluate (network, host) ===="
+    echo "==== END invarlock evaluate (network, local) ====\n"
+    echo "\n==== BEGIN invarlock verify (network local output) ===="
     echo "[skip] adapters stack (torch/transformers) not available"
-    echo "==== END invarlock evaluate (network, host) ====\n"
-    echo "\n==== BEGIN invarlock verify (network host output) ===="
-    echo "[skip] adapters stack (torch/transformers) not available"
-    echo "==== END invarlock verify (network host output) ====\n"
+    echo "==== END invarlock verify (network local output) ====\n"
   } >>"$LOG_FILE"
 fi
 

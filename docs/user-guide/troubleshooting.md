@@ -5,7 +5,7 @@
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Consolidated error code reference and troubleshooting guide. |
-| **Audience** | Users encountering errors during `evaluate`, `run`, or `verify` commands. |
+| **Audience** | Users encountering errors during `evaluate`, `verify`, or advanced workflows. |
 | **Exit codes** | `0=success`, `1=generic failure`, `2=schema/config invalid`, `3=hard abort (CI/Release)`. |
 | **Source of truth** | `src/invarlock/cli/commands/run.py`, `src/invarlock/cli/commands/verify.py`. |
 
@@ -19,7 +19,8 @@ invarlock doctor --config <config.yaml> --profile ci
 invarlock verify reports/eval/evaluation.report.json --profile ci
 
 # Enable debug output for detailed traces
-INVARLOCK_DEBUG_TRACE=1 INVARLOCK_ALLOW_HOST_EXECUTION=1 invarlock run -c <config.yaml>
+INVARLOCK_DEBUG_TRACE=1 INVARLOCK_ALLOW_NETWORK=1 \
+  invarlock evaluate --mode local --baseline gpt2 --subject gpt2 --preset <config.yaml>
 ```
 
 `verify` expects `runtime.manifest.json` next to evaluation outputs.
@@ -239,7 +240,7 @@ These errors relate to window pairing, tokenizer consistency, and evidence integ
 **Notes:**
 
 - `invarlock evaluate` always emits a report before exiting on E111
-- `invarlock run` logs a warning for non-finite PM but does not raise E111
+- legacy/internal `run` flows log a warning for non-finite PM but do not raise E111
 
 ---
 
@@ -268,7 +269,7 @@ These errors relate to window pairing, tokenizer consistency, and evidence integ
 
 **Fixes:**
 
-1. Regenerate report via `invarlock report --format report`
+1. Regenerate report via `invarlock evaluate`
 2. Ensure report is unmodified from generation
 3. Check `schema_version` is `"v1"`
 
@@ -320,7 +321,8 @@ pip install "invarlock[adapters]" # All adapters
 **Fix:**
 
 ```bash
-INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE=1 invarlock run -c <config.yaml>
+INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE=1 INVARLOCK_ALLOW_NETWORK=1 \
+  invarlock evaluate --baseline gpt2 --subject gpt2 --preset <config.yaml>
 ```
 
 ### Guard Prepare Failures
@@ -360,7 +362,8 @@ invarlock doctor --config <config.yaml> --profile ci --strict
 Enable detailed logging:
 
 ```bash
-INVARLOCK_DEBUG_TRACE=1 invarlock run -c <config.yaml>
+INVARLOCK_DEBUG_TRACE=1 INVARLOCK_ALLOW_NETWORK=1 \
+  invarlock evaluate --baseline gpt2 --subject gpt2 --preset <config.yaml>
 ```
 
 ### Plugins Inspection
@@ -368,8 +371,8 @@ INVARLOCK_DEBUG_TRACE=1 invarlock run -c <config.yaml>
 List available adapters/guards/edits:
 
 ```bash
-invarlock plugins list --verbose
-invarlock plugins adapters --explain hf_causal
+invarlock advanced plugins list --verbose
+invarlock advanced plugins adapters --explain hf_causal
 ```
 
 ## Related Documentation

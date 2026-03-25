@@ -13,13 +13,13 @@ Pointers to common presets in this repository you can start from. Presets are
 repo assets (not shipped in wheels). Use flag‑only `invarlock evaluate` when
 installing from PyPI, or clone this repo to reference these files.
 
-Note: Adapter‑based flows such as `invarlock evaluate` and `invarlock run` with
-HF models require extras like `invarlock[hf]` or `invarlock[adapters]`. The
-core install (`pip install invarlock`) remains torch‑free.
+Note: Adapter‑based flows such as `invarlock evaluate` with HF models require
+extras like `invarlock[hf]` or `invarlock[adapters]`. The core install
+(`pip install invarlock`) remains torch‑free.
 
 The `evaluate` examples below use the secure-default runtime container. Add
-`--allow-host-execution` only for trusted local workflows that intentionally
-bypass that boundary.
+`--mode local` only for trusted local workflows that intentionally bypass that
+boundary.
 
 ## Presets (Runnable)
 

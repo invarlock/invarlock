@@ -13,10 +13,11 @@ Overview of the core security-related components and defaults.
 
 ## Runtime boundary (default containerized execution)
 
-- `invarlock evaluate`, `run`, and `calibrate` delegate to the runtime container
-  by default.
-- Use `--allow-host-execution` or `INVARLOCK_ALLOW_HOST_EXECUTION=1` only for
-  trusted local workflows that intentionally bypass that boundary.
+- `invarlock evaluate`, `invarlock advanced calibrate`, and internal `run`
+  flows delegate to the runtime container by default.
+- Use `--mode local` on `invarlock evaluate` for trusted public local runs, or
+  `INVARLOCK_ALLOW_HOST_EXECUTION=1` / `--allow-host-execution` for advanced
+  and internal workflows that intentionally bypass that boundary.
 - Third-party plugin discovery and remote model code execution are separate
   explicit opt-ins (`INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=1`,
   `INVARLOCK_ALLOW_REMOTE_CODE=1`).

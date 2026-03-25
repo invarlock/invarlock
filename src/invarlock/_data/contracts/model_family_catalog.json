@@ -1,6 +1,6 @@
 {
   "format_version": "model-family-catalog-v1",
-  "as_of": "2026-03-23",
+  "as_of": "2026-03-24",
   "declared_support": [
     {
       "family_id": "gpt2-causal-lm",
@@ -85,20 +85,6 @@
         "configs/calibration/null_sweep_qwen3_8b.yaml"
       ],
       "notes": "Derived from support_matrix lane qwen3-causal-hf."
-    },
-    {
-      "family_id": "qwq-32b-reasoning-causal-lm",
-      "display_name": "QwQ-32B reasoning causal LM",
-      "modalities": ["text"],
-      "task_role": "causal_lm",
-      "state": "supported_experimental",
-      "representative_models": ["Qwen/QwQ-32B"],
-      "repo_evidence": [
-        "contracts/support_matrix.json",
-        "configs/presets/causal_lm/qwq_32b_512.yaml",
-        "configs/calibration/null_sweep_qwq_32b.yaml"
-      ],
-      "notes": "Derived from support_matrix lane qwq-32b-reasoning-causal-hf."
     },
     {
       "family_id": "deepseek-r1-distill-qwen-causal-lm",
@@ -230,15 +216,14 @@
       "state": "profile_first_class",
       "representative_models": [
         "Qwen/Qwen2.5-14B",
-        "Qwen/Qwen3.5-9B",
-        "Qwen/QwQ-32B"
+        "Qwen/Qwen3.5-9B"
       ],
       "repo_evidence": [
         "src/invarlock/model_profile.py",
         "src/invarlock/cli/adapter_auto.py",
         "docs/reference/model-adapters.md"
       ],
-      "notes": "Shared qwen-family heuristics still cover aliases beyond the declared Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 public lanes, including the ungated QwQ reasoning branch and larger usage-only Qwen2.5 checkpoints."
+      "notes": "Shared qwen-family heuristics still cover aliases beyond the declared Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 public lanes, including internal/manual QwQ reasoning checkpoints and larger usage-only Qwen2.5 checkpoints."
     },
     {
       "family_id": "yi",
@@ -356,6 +341,20 @@
     }
   ],
   "usage_only": [
+    {
+      "family_id": "qwq-32b-reasoning",
+      "display_name": "QwQ 32B reasoning",
+      "modalities": ["text"],
+      "task_role": "causal_lm",
+      "state": "usage_only",
+      "representative_models": ["Qwen/QwQ-32B"],
+      "repo_evidence": [
+        "configs/presets/causal_lm/qwq_32b_512.yaml",
+        "configs/calibration/null_sweep_qwq_32b.yaml",
+        "tests/core/test_model_profiles.py"
+      ],
+      "notes": "Retained for internal/manual profile and preset coverage after removal from the declared support matrix and maintained evidence sweep."
+    },
     {
       "family_id": "qwen2-5",
       "display_name": "Qwen2.5 family",

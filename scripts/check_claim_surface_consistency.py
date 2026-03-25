@@ -35,10 +35,15 @@ def main() -> int:
     failures: list[str] = []
 
     required_by_file = {
-        "docs/user-guide/quickstart.md": ["machine-readable evaluation"],
+        "docs/user-guide/quickstart.md": [
+            "machine-readable evaluation report",
+            "invarlock verify",
+            "report html",
+        ],
         "docs/user-guide/getting-started.md": [
-            "make eval-loop",
-            "Understand the assurance scope",
+            "invarlock evaluate",
+            "invarlock verify",
+            "report html",
             "Assurance Case",
         ],
         "docs/user-guide/example-reports.md": [

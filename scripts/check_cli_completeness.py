@@ -8,10 +8,11 @@ import sys
 from pathlib import Path
 
 COMMANDS = {
-    "invarlock run",
+    "invarlock evaluate",
     "invarlock report",
-    "invarlock plugins",
+    "invarlock verify",
     "invarlock doctor",
+    "invarlock advanced",
 }
 
 

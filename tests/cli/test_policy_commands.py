@@ -34,6 +34,7 @@ def test_policy_build_and_verify_cli(tmp_path: Path) -> None:
     build = runner.invoke(
         app,
         [
+            "advanced",
             "policy",
             "build",
             "--resolved-policy",
@@ -51,7 +52,7 @@ def test_policy_build_and_verify_cli(tmp_path: Path) -> None:
     assert build.exit_code == 0, build.output
     assert out.is_file()
 
-    verify = runner.invoke(app, ["policy", "verify", str(out), "--json"])
+    verify = runner.invoke(app, ["advanced", "policy", "verify", str(out), "--json"])
     assert verify.exit_code == 0, verify.output
     payload = json.loads(verify.stdout.strip().splitlines()[-1])
     assert payload["format_version"] == "policy-pack-verify-v1"
@@ -80,6 +81,7 @@ def test_policy_build_rejects_non_mapping_resolved_policy(tmp_path: Path) -> Non
     result = runner.invoke(
         app,
         [
+            "advanced",
             "policy",
             "build",
             "--resolved-policy",
@@ -116,6 +118,7 @@ def test_policy_build_records_optional_approval_metadata(tmp_path: Path) -> None
     build = runner.invoke(
         app,
         [
+            "advanced",
             "policy",
             "build",
             "--resolved-policy",
@@ -161,6 +164,7 @@ def test_policy_verify_reports_human_and_json_failures(tmp_path: Path) -> None:
     build = runner.invoke(
         app,
         [
+            "advanced",
             "policy",
             "build",
             "--resolved-policy",
@@ -171,7 +175,7 @@ def test_policy_verify_reports_human_and_json_failures(tmp_path: Path) -> None:
     )
     assert build.exit_code == 0, build.output
 
-    ok_result = runner.invoke(app, ["policy", "verify", str(out)])
+    ok_result = runner.invoke(app, ["advanced", "policy", "verify", str(out)])
     assert ok_result.exit_code == 0, ok_result.output
     assert "Policy pack verified" in ok_result.output
 
@@ -179,11 +183,11 @@ def test_policy_verify_reports_human_and_json_failures(tmp_path: Path) -> None:
     tampered["policy_digest"] = "0000000000000000"
     out.write_text(json.dumps(tampered), encoding="utf-8")
 
-    human_fail = runner.invoke(app, ["policy", "verify", str(out)])
+    human_fail = runner.invoke(app, ["advanced", "policy", "verify", str(out)])
     assert human_fail.exit_code == 2
     assert "policy digest mismatch" in human_fail.output
 
-    json_fail = runner.invoke(app, ["policy", "verify", str(out), "--json"])
+    json_fail = runner.invoke(app, ["advanced", "policy", "verify", str(out), "--json"])
     assert json_fail.exit_code == 2
     payload = json.loads(json_fail.stdout.strip().splitlines()[-1])
     assert payload["ok"] is False

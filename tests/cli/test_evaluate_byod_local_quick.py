@@ -6,7 +6,8 @@ from types import SimpleNamespace
 
 from typer.testing import CliRunner
 
-from invarlock.cli.app import app as cli
+from invarlock.cli.app import app as public_cli
+from tests.cli.run._internal_cli import internal_run_app
 
 
 def _write_jsonl(path: Path, texts: list[str]) -> None:
@@ -148,11 +149,13 @@ def test_evaluate_byod_local_quick(tmp_path: Path, monkeypatch) -> None:
 
     # Produce baseline and subject runs
     r1 = CliRunner().invoke(
-        cli, ["run", "-c", cfg, "--profile", "dev", "--out", str(tmp_path / "run_base")]
+        internal_run_app,
+        ["run", "-c", cfg, "--profile", "dev", "--out", str(tmp_path / "run_base")],
     )
     assert r1.exit_code == 0, r1.stdout
     r2 = CliRunner().invoke(
-        cli, ["run", "-c", cfg, "--profile", "dev", "--out", str(tmp_path / "run_subj")]
+        internal_run_app,
+        ["run", "-c", cfg, "--profile", "dev", "--out", str(tmp_path / "run_subj")],
     )
     assert r2.exit_code == 0, r2.stdout
 
@@ -168,7 +171,7 @@ def test_evaluate_byod_local_quick(tmp_path: Path, monkeypatch) -> None:
     rep_base = _pick_run_dir(tmp_path / "run_base")
     rep_subj = _pick_run_dir(tmp_path / "run_subj")
     rcert = CliRunner().invoke(
-        cli,
+        public_cli,
         [
             "report",
             "--run",

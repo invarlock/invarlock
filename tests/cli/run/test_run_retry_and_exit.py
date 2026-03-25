@@ -13,8 +13,8 @@ from unittest.mock import patch
 import pytest
 from typer.testing import CliRunner
 
-from invarlock.cli.app import app as cli
 from invarlock.cli.commands.run import run_command
+from tests.cli.run._internal_cli import internal_run_app as cli
 
 
 # --------------------

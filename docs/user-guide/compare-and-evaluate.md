@@ -26,9 +26,9 @@ existing tooling intact.
   present).
 - Run `invarlock evaluate --baseline <baseline> --subject <subject> --adapter auto`.
 
-By default, `evaluate` runs inside the runtime container. Use
-`--allow-host-execution` only for trusted local workflows that intentionally run
-model loading on the host.
+By default, `evaluate` runs inside the runtime container. Use `--mode local`
+only for trusted local workflows that intentionally run model loading on the
+host.
 
 Example (GPT‑2, CPU/MPS friendly; requires `invarlock[hf]` or equivalent HF extra):
 

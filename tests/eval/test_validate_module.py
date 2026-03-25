@@ -19,7 +19,9 @@ from invarlock.reporting.validate import (
     load_baseline,
     save_baseline,
     validate_against_baseline,
+    validate_drift_gate,
     validate_gpt2_small_wt2_baseline,
+    validate_guard_overhead,
 )
 
 
@@ -260,6 +262,244 @@ class TestValidateAgainstBaseline:
         assert len(result.errors) > 0
         assert "Cannot extract ratio_vs_baseline" in result.errors[0]
 
+    def test_against_baseline_accuracy_delta_bounds_success(self):
+        run_report = {
+            "metrics": {
+                "primary_metric": {"kind": "accuracy", "ratio_vs_baseline": -0.004}
+            },
+            "param_reduction_ratio": 0.02,
+        }
+        baseline = {"ratio_vs_baseline": 0.0, "param_reduction_ratio": 0.02}
+
+        result = validate_against_baseline(
+            run_report,
+            baseline,
+            delta_bounds_pp=(-1.0, 0.0),
+            structural_exact=False,
+        )
+
+        assert result.passed is True
+        assert result.checks["delta_bounds_pp"] is True
+        assert "Δpp -0.40 within acceptable bounds" in " ".join(result.messages)
+
+    def test_against_baseline_accuracy_without_delta_bounds_sets_false(self):
+        run_report = {
+            "metrics": {"primary_metric": {"kind": "accuracy"}},
+            "param_reduction_ratio": 0.02,
+        }
+        baseline = {"ratio_vs_baseline": 0.0, "param_reduction_ratio": 0.02}
+
+        result = validate_against_baseline(
+            run_report,
+            baseline,
+            delta_bounds_pp=None,
+            structural_exact=False,
+        )
+
+        assert result.passed is False
+        assert result.checks["delta_bounds_pp"] is False
+        assert "Cannot extract ratio_vs_baseline" in " ".join(result.errors)
+
+    def test_against_baseline_accuracy_with_invalid_delta_bounds_skips_check(self):
+        run_report = {
+            "metrics": {
+                "primary_metric": {"kind": "accuracy", "ratio_vs_baseline": -0.004}
+            },
+            "param_reduction_ratio": 0.02,
+        }
+        baseline = {"ratio_vs_baseline": 0.0, "param_reduction_ratio": 0.02}
+
+        result = validate_against_baseline(
+            run_report,
+            baseline,
+            delta_bounds_pp=(0.0,),
+            structural_exact=False,
+        )
+
+        assert result.passed is True
+        assert "delta_bounds_pp" not in result.checks
+
+    def test_against_baseline_accuracy_delta_bounds_failure_message(self):
+        run_report = {
+            "metrics": {
+                "primary_metric": {"kind": "accuracy", "ratio_vs_baseline": -0.02}
+            },
+            "param_reduction_ratio": 0.02,
+        }
+        baseline = {"ratio_vs_baseline": 0.0, "param_reduction_ratio": 0.02}
+
+        result = validate_against_baseline(
+            run_report,
+            baseline,
+            delta_bounds_pp=(-1.0, 0.0),
+            structural_exact=False,
+        )
+
+        assert result.passed is False
+        assert result.checks["delta_bounds_pp"] is False
+        assert "outside acceptable bounds" in " ".join(result.messages)
+
+    def test_against_baseline_invariants_failure_adds_error(self):
+        run_report = {
+            "metrics": {
+                "primary_metric": {"kind": "ppl_causal", "ratio_vs_baseline": 1.25}
+            },
+            "param_reduction_ratio": 0.02,
+            "guard_reports": {"invariants_guard": {"passed": False}},
+        }
+        baseline = {"ratio_vs_baseline": 1.25, "param_reduction_ratio": 0.02}
+
+        result = validate_against_baseline(
+            run_report,
+            baseline,
+            structural_exact=False,
+        )
+
+        assert result.passed is False
+        assert result.checks["invariants"] is False
+        assert "Model invariants validation failed" in result.errors
+
+    def test_against_baseline_pm_kind_lookup_failure_falls_back_to_none(self):
+        class KindBoomDict(dict):
+            def get(self, key, default=None):
+                if key == "kind":
+                    raise RuntimeError("boom")
+                return super().get(key, default)
+
+        run_report = {
+            "metrics": {
+                "primary_metric": KindBoomDict(
+                    {"ratio_vs_baseline": 1.25, "kind": "ppl_causal"}
+                )
+            },
+            "param_reduction_ratio": 0.02,
+        }
+        baseline = {"ratio_vs_baseline": 1.25, "param_reduction_ratio": 0.02}
+
+        result = validate_against_baseline(
+            run_report,
+            baseline,
+            structural_exact=False,
+        )
+
+        assert result.passed is True
+        assert result.checks["ratio_tolerance"] is True
+        assert result.metrics["current_ratio"] == 1.25
+
+    def test_against_baseline_unexpected_exception_returns_validation_error(self):
+        class ExplodingMetrics(dict):
+            def get(self, key, default=None):
+                if key == "primary_metric":
+                    raise RuntimeError("explode")
+                return super().get(key, default)
+
+        run_report = {"metrics": ExplodingMetrics({"sentinel": True})}
+        baseline = {"ratio_vs_baseline": 1.25, "param_reduction_ratio": 0.02}
+
+        result = validate_against_baseline(run_report, baseline)
+
+        assert result.passed is False
+        assert result.checks == {"validation_error": False}
+        assert "Validation failed with exception: explode" in result.errors
+
+
+class TestDriftAndOverheadValidation:
+    def test_validate_drift_gate_success(self):
+        result = validate_drift_gate(
+            {"metrics": {"primary_metric": {"preview": 10.0, "final": 10.2}}}
+        )
+
+        assert result.passed is True
+        assert result.checks["drift_gate"] is True
+        assert result.metrics["drift_ratio"] == pytest.approx(1.02)
+
+    def test_validate_drift_gate_failure(self):
+        result = validate_drift_gate(
+            {"metrics": {"primary_metric": {"preview": 10.0, "final": 11.0}}}
+        )
+
+        assert result.passed is False
+        assert result.checks["drift_gate"] is False
+        assert "Drift gate FAILED" in " ".join(result.errors)
+
+    def test_validate_drift_gate_missing_values(self):
+        result = validate_drift_gate({"metrics": {"primary_metric": {"preview": 0.0}}})
+
+        assert result.passed is False
+        assert result.checks["drift_gate"] is False
+        assert "Cannot calculate drift" in " ".join(result.errors)
+
+    def test_validate_drift_gate_exception_path(self):
+        class ExplodingMetrics(dict):
+            def get(self, key, default=None):
+                if key == "primary_metric":
+                    raise RuntimeError("drift boom")
+                return super().get(key, default)
+
+        result = validate_drift_gate({"metrics": ExplodingMetrics({"sentinel": True})})
+
+        assert result.passed is False
+        assert result.checks == {"drift_gate_error": False}
+        assert "Drift gate validation failed: drift boom" in result.errors
+
+    def test_validate_guard_overhead_success(self):
+        result = validate_guard_overhead(
+            {"metrics": {"primary_metric": {"final": 10.0}}},
+            {"metrics": {"primary_metric": {"final": 10.05}}},
+            overhead_threshold=0.01,
+        )
+
+        assert result.passed is True
+        assert result.checks["guard_overhead"] is True
+        assert result.metrics["overhead_percent"] == pytest.approx(0.5)
+
+    def test_validate_guard_overhead_failure(self):
+        result = validate_guard_overhead(
+            {"metrics": {"primary_metric": {"final": 10.0}}},
+            {"metrics": {"primary_metric": {"final": 10.3}}},
+            overhead_threshold=0.01,
+        )
+
+        assert result.passed is False
+        assert result.checks["guard_overhead"] is False
+        assert "Guard overhead FAILED" in " ".join(result.errors)
+
+    def test_validate_guard_overhead_missing_values(self):
+        result = validate_guard_overhead(
+            {"metrics": {"primary_metric": {"final": 0.0}}},
+            {"metrics": {"primary_metric": {"final": 10.3}}},
+        )
+
+        assert result.passed is False
+        assert result.checks["guard_overhead"] is False
+        assert "Cannot calculate guard overhead" in " ".join(result.errors)
+
+    def test_validate_guard_overhead_rejects_non_mapping_primary_metric(self):
+        result = validate_guard_overhead(
+            {"metrics": {"primary_metric": "bad"}},
+            {"metrics": {"primary_metric": "bad"}},
+        )
+
+        assert result.passed is False
+        assert result.checks["guard_overhead"] is False
+        assert "Cannot calculate guard overhead" in " ".join(result.errors)
+
+    def test_validate_guard_overhead_exception_path(self):
+        class ExplodingMetrics(dict):
+            def get(self, key, default=None):
+                if key == "primary_metric":
+                    raise RuntimeError("overhead boom")
+                return super().get(key, default)
+
+        result = validate_guard_overhead(
+            {"metrics": ExplodingMetrics({"sentinel": True})},
+            {"metrics": {"primary_metric": {"final": 10.0}}},
+        )
+
+        assert result.passed is False
+        assert result.checks == {"guard_overhead_error": False}
+        assert "Guard overhead validation failed: overhead boom" in result.errors
+
 
 class TestValidateStructuralCounts:
     """Test _validate_structural_counts function."""
@@ -389,6 +629,18 @@ class TestValidateFileIO:
         finally:
             baseline_path.unlink()
 
+    def test_fileio_load_baseline_rejects_non_object_json(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump([1, 2, 3], f)
+            baseline_path = Path(f.name)
+
+        try:
+            with pytest.raises(ValueError) as exc_info:
+                load_baseline(baseline_path)
+            assert "Baseline file must contain a JSON object" in str(exc_info.value)
+        finally:
+            baseline_path.unlink()
+
     def test_fileio_save_baseline(self):
         """Test saving baseline to file."""
         test_baseline = {"ppl_ratio": 1.25, "test": True}
@@ -475,6 +727,25 @@ class TestValidateCreateBaseline:
         # Should still have metadata
         assert baseline["baseline_created"] is True
         assert baseline["source"] == "run_report"
+
+    def test_create_baseline_ignores_unparseable_ratio(self):
+        run_report = {
+            "metrics": {
+                "layers_modified": 3,
+                "primary_metric": {
+                    "kind": "ppl_causal",
+                    "ratio_vs_baseline": object(),
+                },
+            },
+            "parameters_removed": 10,
+            "original_params": 100,
+        }
+
+        baseline = create_baseline_from_report(run_report)
+
+        assert "ratio_vs_baseline" not in baseline
+        assert baseline["param_reduction_ratio"] == 0.1
+        assert baseline["layers_modified"] == 3
 
 
 class TestValidateGpt2Baseline:

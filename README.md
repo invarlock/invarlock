@@ -84,11 +84,11 @@ The secure-default CLI path runs model-loading commands inside the runtime
 container and expects an OCI container engine such as `docker` or `podman`.
 In a repo checkout, build the local runtime image once with
 `make runtime-image`; InvarLock automatically prefers
-`invarlock-runtime:local` when it is present. Trusted notebook or local-shell
-workflows can opt into host execution explicitly with
-`INVARLOCK_ALLOW_HOST_EXECUTION=1`, but the attested verification step below
-expects container execution. The quickstart block below assumes a repo checkout;
-do not skip `make runtime-image` if you want the attested container path.
+`invarlock-runtime:local` when it is present. Trusted local workflows can opt
+into host execution explicitly with `--mode local` on `invarlock evaluate`, but
+the attested verification step below expects container execution. The
+quickstart block below assumes a repo checkout; do not skip
+`make runtime-image` if you want the attested container path.
 
 ```bash
 # Repo-checkout quickstart for the attested container path
@@ -106,7 +106,7 @@ invarlock --version
 # reports/eval/runtime.manifest.json next to evaluation.report.json.
 INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate \
   --baseline gpt2 \
-  --subject  gpt2 \
+  --subject  distilgpt2 \
   --adapter auto \
   --profile dev \
   --report-out reports/eval \
@@ -131,17 +131,27 @@ Output: reports/eval/evaluation.report.json
 Attestation: reports/eval/runtime.manifest.json
 ```
 
+## Breaking Surface Changes
+
+- Core workflow: `invarlock evaluate` → `invarlock verify` →
+  `invarlock report html`.
+- Advanced workflows now live under `invarlock advanced ...`.
+- Trusted host execution for the core evaluate path now uses `--mode local`.
+- Optional adapter/backend installs use normal Python extras such as
+  `pip install "invarlock[hf]"` rather than CLI install commands.
+
 ## Proof packs (portable evidence bundles)
 
 Proof packs bundle reports + verification metadata into a distributable artifact.
 
 - Guide: <https://github.com/invarlock/invarlock/blob/main/docs/user-guide/proof-packs.md>
-- Verify from an installed wheel: `invarlock proof-pack verify <dir> --strict`
+- Verify from an installed wheel:
+  `invarlock advanced proof-pack verify <dir> --strict`
 - Repo harness alternative: `scripts/proof_packs/verify_pack.sh --pack <dir> --strict`
 
 Note: `configs/` and most `scripts/` remain repo resources and are not shipped in
 wheels. Installed wheels now include the public contracts and the
-`invarlock proof-pack verify` verifier.
+`invarlock advanced proof-pack verify` verifier.
 
 ## Installation
 
