@@ -6,4 +6,3 @@ edition = "2021"
 [[bin]]
 name = "invarlock-runtime-verify"
 path = "src/main.rs"
-

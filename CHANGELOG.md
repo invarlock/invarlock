@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+### Removed
+
+### Dependencies
+
+### Documentation
+
+## [0.5.0] - 2026-03-25
+### Added
 - Added an offline release-verification bundle generator and reference docs for
   auditing release artifacts without network access.
 - Added public model-family and runtime-manifest contracts, packaged contract
