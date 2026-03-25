@@ -7,6 +7,16 @@ import pytest
 import invarlock.core.config_execution as config_execution
 
 
+def test_default_run_impl_and_deps_imports_run_symbols() -> None:
+    from invarlock.cli.commands.run import _build_run_command_deps
+    from invarlock.cli.run_command_impl import run_command_impl
+
+    run_impl, deps_builder = config_execution._default_run_impl_and_deps()
+
+    assert run_impl is run_command_impl
+    assert deps_builder is _build_run_command_deps
+
+
 def test_run_from_config_executes_without_delegation_and_writes_manifest(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -152,5 +162,109 @@ def test_run_from_config_wraps_runtime_delegation_failures(
         raising=True,
     )
 
-    with pytest.raises(config_execution.RuntimeDelegationError, match="no runtime image"):
+    with pytest.raises(
+        config_execution.RuntimeDelegationError, match="no runtime image"
+    ):
         config_execution.run_from_config(config="configs/demo.yaml")
+
+
+def test_run_from_config_uses_default_impls_and_skips_manifest_for_missing_report(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    seen: dict[str, object] = {}
+    missing_report = tmp_path / "missing.report.json"
+
+    monkeypatch.setattr(
+        config_execution,
+        "apply_runtime_allowances",
+        lambda **kwargs: seen.setdefault("allowances", kwargs),
+        raising=True,
+    )
+
+    def _default_impls() -> tuple[object, object]:
+        def _deps_builder() -> dict[str, str]:
+            seen["deps_called"] = True
+            return {"deps": "default"}
+
+        def _run_impl(**kwargs) -> str:
+            seen["run_kwargs"] = kwargs
+            return str(missing_report)
+
+        return _run_impl, _deps_builder
+
+    monkeypatch.setattr(
+        config_execution,
+        "_default_run_impl_and_deps",
+        _default_impls,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        config_execution,
+        "write_runtime_manifest",
+        lambda *args, **kwargs: pytest.fail("manifest should not be written"),
+        raising=True,
+    )
+
+    out = config_execution.run_from_config(
+        config="configs/demo.yaml",
+        profile="ci",
+        delegate=False,
+    )
+
+    assert out == str(missing_report)
+    assert seen["allowances"] == {
+        "allow_network": False,
+        "allow_host_execution": False,
+        "allow_third_party_plugins": False,
+        "allow_remote_code": False,
+    }
+    assert seen["deps_called"] is True
+    assert seen["run_kwargs"] == {
+        "config": "configs/demo.yaml",
+        "device": None,
+        "profile": "ci",
+        "out": None,
+        "edit": None,
+        "edit_label": None,
+        "tier": None,
+        "metric_kind": None,
+        "probes": None,
+        "until_pass": False,
+        "max_attempts": 3,
+        "timeout": None,
+        "baseline": None,
+        "no_cleanup": False,
+        "style": None,
+        "progress": False,
+        "timing": False,
+        "telemetry": False,
+        "no_color": False,
+        "deps": {"deps": "default"},
+    }
+
+
+def test_run_from_config_returns_none_when_run_impl_returns_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        config_execution,
+        "apply_runtime_allowances",
+        lambda **kwargs: None,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        config_execution,
+        "write_runtime_manifest",
+        lambda *args, **kwargs: pytest.fail("manifest should not be written"),
+        raising=True,
+    )
+
+    out = config_execution.run_from_config(
+        config="configs/demo.yaml",
+        delegate=False,
+        run_impl=lambda **kwargs: None,
+        deps_builder=lambda: {"deps": "ok"},
+    )
+
+    assert out is None

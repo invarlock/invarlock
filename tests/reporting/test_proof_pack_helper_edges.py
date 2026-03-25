@@ -138,6 +138,23 @@ def test_manual_validate_manifest_reports_structural_errors() -> None:
     assert any("manifest materials must be a list" in error for error in errors)
 
 
+def test_manual_validate_manifest_covers_empty_digest_refs_and_non_dict_materials() -> (
+    None
+):
+    errors = proof_pack_mod._manual_validate_manifest(
+        {
+            "format": proof_pack_mod.PROOF_PACK_FORMAT,
+            "checksums_sha256": "checksums.sha256",
+            "checksums_sha256_digest": "a" * 64,
+            "subject": {},
+            "environment": {},
+            "materials": ["not-a-dict"],
+        }
+    )
+
+    assert errors == ["manifest materials[0] must be an object"]
+
+
 def test_validate_manifest_and_load_json_object_cover_error_paths(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -388,6 +405,82 @@ def test_verify_gpg_covers_missing_binary_signature_failure_and_fingerprint_mism
     )
     errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=False)
     assert "signing_key_fingerprint (EXPECTED) does not match" in errors[0]
+    assert warnings == []
+    assert fingerprint == "ACTUAL"
+
+
+def test_verify_gpg_uses_default_failure_text_and_ignores_short_validsig_lines(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    pack_dir = tmp_path / "pack"
+    report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
+    _write_manifest_and_checksums(
+        pack_dir,
+        report_path=report_path,
+        final_verdict=final_verdict,
+        environment=environment,
+    )
+    (pack_dir / "manifest.json.asc").write_text("sig", encoding="utf-8")
+
+    monkeypatch.setattr(
+        proof_pack_mod.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(returncode=1, stdout="", stderr=""),
+        raising=True,
+    )
+    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=False)
+    assert errors == ["manifest signature verification failed."]
+    assert warnings == []
+    assert fingerprint is None
+
+    monkeypatch.setattr(
+        proof_pack_mod.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(
+            returncode=0,
+            stdout="[GNUPG:] VALIDSIG\n",
+            stderr="",
+        ),
+        raising=True,
+    )
+    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=False)
+    assert errors == []
+    assert warnings == []
+    assert fingerprint is None
+
+
+def test_verify_gpg_skips_short_validsig_before_later_fingerprint(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    pack_dir = tmp_path / "pack"
+    report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
+    _write_manifest_and_checksums(
+        pack_dir,
+        report_path=report_path,
+        final_verdict=final_verdict,
+        environment=environment,
+    )
+    manifest = json.loads((pack_dir / "manifest.json").read_text(encoding="utf-8"))
+    manifest["signing_key_fingerprint"] = "ACTUAL"
+    (pack_dir / "manifest.json").write_text(
+        json.dumps(manifest, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (pack_dir / "manifest.json.asc").write_text("sig", encoding="utf-8")
+
+    monkeypatch.setattr(
+        proof_pack_mod.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(
+            returncode=0,
+            stdout="[GNUPG:] VALIDSIG \n[GNUPG:] VALIDSIG ACTUAL EXTRA\n",
+            stderr="",
+        ),
+        raising=True,
+    )
+
+    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=False)
+    assert errors == []
     assert warnings == []
     assert fingerprint == "ACTUAL"
 
@@ -841,6 +934,43 @@ def test_build_proof_pack_copies_readme_and_environment_without_optional_refs(
     assert "materials" not in manifest
     assert manifest["environment"]["path"] == "metadata/environment.json"
     assert (tmp_path / "out-readme" / "README.md").is_file()
+
+
+def test_build_proof_pack_copies_source_repo_without_environment_or_materials(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    final_verdict = tmp_path / "final.json"
+    report_path = tmp_path / "report.json"
+    runtime_manifest = report_path.parent / RUNTIME_MANIFEST_FILENAME
+    source_repo = tmp_path / "source_repo.json"
+    _write_json(final_verdict, {"verdict": "PASS"})
+    _write_json(report_path, {"ok": True})
+    _write_json(runtime_manifest, {"ok": True})
+    _write_json(source_repo, {"commit": "abc123"})
+
+    monkeypatch.setattr(
+        proof_pack_mod,
+        "_run_verify_command",
+        lambda reports, profile: (0, {"ok": True}),
+        raising=True,
+    )
+
+    payload, exit_code = proof_pack_mod.build_proof_pack(
+        tmp_path / "out-source-only",
+        final_verdict_path=final_verdict,
+        report_paths=[report_path],
+        source_repo_path=source_repo,
+    )
+    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_OK
+    assert payload["ok"] is True
+    manifest = json.loads(
+        (tmp_path / "out-source-only" / "manifest.json").read_text(encoding="utf-8")
+    )
+    assert (
+        manifest["invocation"]["config_source"]["path"] == "metadata/source_repo.json"
+    )
+    assert "environment" not in manifest
+    assert "materials" not in manifest
 
 
 def test_verify_proof_pack_reports_missing_manifest_and_checksums(

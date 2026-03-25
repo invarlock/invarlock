@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from invarlock.cli import config as cfg_mod
 from invarlock.cli.config import (
     AutoConfig,
     DatasetConfig,
@@ -223,6 +224,44 @@ def test_load_config_include_depth_guard(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match=r"Config !include depth exceeds"):
         load_config(main)
+
+
+def test_obj_mapping_scalar_and_non_mapping_paths() -> None:
+    obj = cfg_mod._Obj({"nested": {"value": 1}, "scalar": 7})
+
+    assert obj["scalar"] == 7
+    assert obj.scalar == 7
+    assert obj.nested.value == 1
+    assert cfg_mod._Obj("plain").get("missing", "fallback") == "fallback"
+
+
+def test_dataset_and_path_iteration_helper_edges(tmp_path: Path) -> None:
+    dataset = DatasetConfig(seq_len=8, stride=8)
+    absolute_a = tmp_path / "a.jsonl"
+    absolute_b = tmp_path / "b.jsonl"
+
+    found = cfg_mod._iter_absolute_path_strings(
+        [str(absolute_a), ("   ", {str(absolute_b)})]
+    )
+
+    assert dataset.seq_len == 8
+    assert found == {
+        cfg_mod._absolute_path_no_resolve(absolute_a),
+        cfg_mod._absolute_path_no_resolve(absolute_b),
+    }
+    assert cfg_mod._absolute_path_no_resolve("relative/config.yaml").is_absolute()
+
+
+def test_load_runtime_yaml_env_root_missing_file_falls_back_to_package(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("INVARLOCK_CONFIG_ROOT", str(tmp_path))
+
+    data = cfg_mod._load_runtime_yaml("profiles", "ci.yaml")
+
+    assert isinstance(data, dict)
+    assert data
 
 
 def test_inspect_config_dependencies_tracks_nested_includes_and_absolute_refs(

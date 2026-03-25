@@ -75,10 +75,18 @@ def test_coverage_include_does_not_embed_space_prefixed_cli_patterns() -> None:
     makefile = Path(__file__).resolve().parents[2] / "Makefile"
     text = makefile.read_text(encoding="utf-8")
 
-    assert "COVERAGE_INCLUDE := \\" in text
-    assert "COVERAGE_INCLUDE := $(strip \\" not in text
-    assert ", src/invarlock/cli/*" not in text
-    assert ", invarlock/cli/*" not in text
-    assert "src/invarlock/cli/*" in text
-    assert "src/invarlock/cli/commands/*" in text
-    assert "invarlock/cli/commands/*" in text
+    line = next(
+        raw_line
+        for raw_line in text.splitlines()
+        if raw_line.startswith("COVERAGE_INCLUDE :=")
+    )
+
+    assert "\\" not in line
+    assert ", src/invarlock/cli/*" not in line
+    assert ", invarlock/cli/*" not in line
+    assert "src/invarlock/cli/*" in line
+    assert "src/invarlock/cli/commands/*" in line
+    assert "src/invarlock/public_contracts.py" in line
+    assert "src/invarlock/proof_pack.py" in line
+    assert "src/invarlock/runtime_security.py" in line
+    assert "invarlock/cli/commands/*" in line

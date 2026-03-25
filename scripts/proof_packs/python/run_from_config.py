@@ -14,9 +14,7 @@ from invarlock.runtime_security import (
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Repo-only proof-pack config runner."
-    )
+    parser = argparse.ArgumentParser(description="Repo-only proof-pack config runner.")
     parser.add_argument("--config", "-c", required=True)
     parser.add_argument("--device")
     parser.add_argument("--profile")

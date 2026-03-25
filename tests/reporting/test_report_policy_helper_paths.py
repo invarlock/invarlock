@@ -103,6 +103,21 @@ def test_resolve_pm_acceptance_range_from_report_exception_paths(monkeypatch) ->
     assert out_ctx_complete == {"min": 0.98, "max": 1.02}
 
 
+def test_resolve_pm_acceptance_range_from_alt_context_non_dict_and_nonpositive() -> (
+    None
+):
+    out = policy.resolve_pm_acceptance_range_from_report(
+        {
+            "context": {
+                "primary_metric": "not-a-dict",
+                "pm_acceptance_range": {"min": 0, "max": -2},
+            }
+        }
+    )
+
+    assert out == {"min": 0.95, "max": 1.1}
+
+
 def test_resolve_pm_drift_band_from_report_exception_paths(monkeypatch) -> None:
     out_alt = policy.resolve_pm_drift_band_from_report(
         {
@@ -149,6 +164,22 @@ def test_resolve_pm_drift_band_from_report_exception_paths(monkeypatch) -> None:
         {"context": {"primary_metric": {"drift_band": "unstructured"}}}
     )
     assert out_unstructured == {}
+
+
+def test_resolve_pm_drift_band_nonpositive_bounds_reset_to_defaults() -> None:
+    out = policy.resolve_pm_drift_band_from_report(
+        {"context": {"primary_metric": {"drift_band": {"min": 0, "max": -1}}}}
+    )
+
+    assert out == {"min": 0.95, "max": 1.05}
+
+
+def test_resolve_pm_drift_band_inverted_bounds_reset_to_defaults() -> None:
+    out = policy.resolve_pm_drift_band_from_report(
+        {"context": {"primary_metric": {"drift_band": {"min": 1.2, "max": 1.1}}}}
+    )
+
+    assert out == {"min": 0.95, "max": 1.05}
 
 
 def test_resolve_tiny_relax_from_report_edges() -> None:

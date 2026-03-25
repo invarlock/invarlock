@@ -59,7 +59,7 @@ THRESHOLDS = {
     "src/invarlock/policy_pack.py": 1.00,
     # Advanced proof-pack packaging/inspection coverage now exercises the
     # command shell branch-completely; keep the command surface held there.
-    "src/invarlock/proof_pack.py": 0.90,
+    "src/invarlock/proof_pack.py": 1.00,
     "src/invarlock/cli/verify_output.py": 1.00,
     "src/invarlock/cli/commands/policy.py": 1.00,
     "src/invarlock/cli/commands/proof_pack.py": 1.00,
@@ -90,36 +90,36 @@ THRESHOLDS = {
     # Core orchestration & runtime
     "src/invarlock/core/registry.py": 1.00,
     "src/invarlock/core/bootstrap.py": 0.95,
-    "src/invarlock/core/contracts.py": 0.90,
+    "src/invarlock/core/contracts.py": 0.95,
     "src/invarlock/core/auto_tuning.py": 0.95,
     # Newly added core modules to critical surface
     "src/invarlock/core/checkpoint.py": 0.90,
     "src/invarlock/core/api.py": 1.00,
-    "src/invarlock/core/retry.py": 0.90,
+    "src/invarlock/core/retry.py": 0.95,
     "src/invarlock/core/types.py": 0.90,
     # CLI commands
-    "src/invarlock/cli/_json.py": 0.90,
-    "src/invarlock/cli/_evidence.py": 0.90,
+    "src/invarlock/cli/_json.py": 1.00,
+    "src/invarlock/cli/_evidence.py": 1.00,
     # Simplified public-core CLI surfaces have dedicated branch-focused tests;
     # keep the hero commands above the default 90% floor.
-    "src/invarlock/cli/app.py": 0.90,
-    "src/invarlock/cli/config.py": 0.90,
+    "src/invarlock/cli/app.py": 1.00,
+    "src/invarlock/cli/config.py": 0.95,
     "src/invarlock/cli/commands/evaluate.py": 0.95,
     "src/invarlock/cli/commands/report.py": 0.95,
     "src/invarlock/cli/commands/run.py": 0.95,
     "src/invarlock/cli/commands/verify.py": 0.95,
     "src/invarlock/cli/commands/calibrate.py": 0.90,
     "src/invarlock/cli/verify_checks.py": 0.95,
-    "src/invarlock/runtime_security.py": 0.90,
+    "src/invarlock/runtime_security.py": 0.95,
     # PR-4 split modules
-    "src/invarlock/cli/run_analysis.py": 0.90,
-    "src/invarlock/cli/run_artifacts.py": 0.90,
-    "src/invarlock/cli/run_config.py": 0.90,
-    "src/invarlock/cli/run_overhead.py": 0.90,
+    "src/invarlock/cli/run_analysis.py": 1.00,
+    "src/invarlock/cli/run_artifacts.py": 1.00,
+    "src/invarlock/cli/run_config.py": 1.00,
+    "src/invarlock/cli/run_overhead.py": 1.00,
     "src/invarlock/cli/run_pairing.py": 0.90,
-    "src/invarlock/cli/run_policy.py": 0.90,
+    "src/invarlock/cli/run_policy.py": 1.00,
     # CLI determinism preset (CI/Release provenance)
-    "src/invarlock/cli/determinism.py": 0.90,
+    "src/invarlock/cli/determinism.py": 0.95,
     # Core events logger
     "src/invarlock/core/events.py": 0.90,
     # PR-5 split modules
@@ -127,8 +127,8 @@ THRESHOLDS = {
     "src/invarlock/core/runner_finalize.py": 0.90,
     "src/invarlock/core/runner_guards.py": 0.90,
     "src/invarlock/reporting/report_overhead.py": 0.95,
-    "src/invarlock/reporting/report_policy.py": 0.90,
-    "src/invarlock/reporting/report_provenance.py": 0.90,
+    "src/invarlock/reporting/report_policy.py": 0.95,
+    "src/invarlock/reporting/report_provenance.py": 0.95,
     "src/invarlock/reporting/report_validation.py": 0.95,
 }
 

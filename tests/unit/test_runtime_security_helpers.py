@@ -89,6 +89,25 @@ def test_resolve_runtime_image_digest_uses_inspection_when_needed(monkeypatch) -
     assert runtime_security.resolve_runtime_image_digest() == "sha256:inspected"
 
 
+def test_resolve_runtime_image_digest_returns_none_without_engine(monkeypatch) -> None:
+    monkeypatch.delenv(runtime_security.RUNTIME_IMAGE_DIGEST_ENV, raising=False)
+    monkeypatch.delenv(runtime_security.RUNTIME_IMAGE_ENV, raising=False)
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image",
+        lambda: "ghcr.io/invarlock/invarlock-runtime:test",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_container_engine",
+        lambda: None,
+        raising=True,
+    )
+
+    assert runtime_security.resolve_runtime_image_digest() is None
+
+
 def test_resolve_runtime_image_prefers_explicit_local_and_default(monkeypatch) -> None:
     monkeypatch.setenv(
         runtime_security.RUNTIME_IMAGE_ENV,
@@ -221,6 +240,27 @@ def test_container_engine_and_device_helpers(monkeypatch) -> None:
     )
 
 
+def test_runtime_security_device_helpers_cover_missing_tokens_and_devnode(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        runtime_security.shutil,
+        "which",
+        lambda name: None,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security.Path,
+        "exists",
+        lambda self: str(self) == "/dev/nvidiactl",
+        raising=False,
+    )
+
+    assert runtime_security.resolve_container_engine() is None
+    assert runtime_security._host_nvidia_visible() is True
+    assert runtime_security._requested_device(["--help"]) is None
+
+
 def test_container_image_available_locally_and_runtime_verifier_binary(
     monkeypatch, tmp_path: Path
 ) -> None:
@@ -332,11 +372,30 @@ def test_apply_runtime_allowances_and_delegate_current_process(monkeypatch) -> N
     assert runtime_security.delegate_current_process_to_container(["evaluate"]) == 7
 
 
+def test_apply_runtime_allowances_ignores_network_policy_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import invarlock.security as security_module
+
+    monkeypatch.setattr(
+        security_module,
+        "enforce_network_policy",
+        lambda enabled: (_ for _ in ()).throw(RuntimeError("network boom")),
+        raising=False,
+    )
+
+    runtime_security.apply_runtime_allowances(allow_network=True)
+
+    assert runtime_security.network_allowed() is True
+
+
 def test_build_container_python_command_uses_python_entrypoint_for_repo_script(
     monkeypatch, tmp_path: Path
 ) -> None:
     repo_root = tmp_path / "repo"
-    script_path = repo_root / "scripts" / "proof_packs" / "python" / "run_from_config.py"
+    script_path = (
+        repo_root / "scripts" / "proof_packs" / "python" / "run_from_config.py"
+    )
     script_path.parent.mkdir(parents=True, exist_ok=True)
     script_path.write_text("# stub\n", encoding="utf-8")
     config_path = repo_root / "configs" / "demo.yaml"
@@ -439,6 +498,129 @@ def test_delegate_python_script_to_container_uses_python_builder(monkeypatch) ->
         )
         == 9
     )
+
+
+def test_build_container_python_command_raises_for_missing_engine_or_image(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    script_path = tmp_path / "run_from_config.py"
+    script_path.write_text("# stub\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_container_engine",
+        lambda: None,
+        raising=True,
+    )
+    with pytest.raises(RuntimeError, match="no container engine"):
+        runtime_security.build_container_python_command(
+            script_path, ["--config", "cfg"]
+        )
+
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_container_engine",
+        lambda: "docker",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image",
+        lambda: "ghcr.io/invarlock/runtime:test",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image_digest",
+        lambda: None,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "network_allowed",
+        lambda: False,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "container_image_available_locally",
+        lambda image, engine=None: False,
+        raising=True,
+    )
+    with pytest.raises(RuntimeError, match="not available locally"):
+        runtime_security.build_container_python_command(
+            script_path, ["--config", "cfg"]
+        )
+
+
+def test_build_container_python_command_leaves_external_script_as_host_path(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    external_root = tmp_path / "external"
+    external_root.mkdir()
+    script_path = external_root / "run_from_config.py"
+    script_path.write_text("# stub\n", encoding="utf-8")
+
+    monkeypatch.chdir(repo_root)
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_container_engine",
+        lambda: "docker",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image",
+        lambda: "ghcr.io/invarlock/runtime:test",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image_digest",
+        lambda: None,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "container_image_available_locally",
+        lambda image, engine=None: True,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "network_allowed",
+        lambda: True,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "_container_pythonpath_entries",
+        lambda *, cwd: (["/workspace/src"], []),
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "_delegated_env_pairs",
+        lambda *, cwd: ({}, []),
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "_host_nvidia_visible",
+        lambda: False,
+        raising=True,
+    )
+
+    command = runtime_security.build_container_python_command(
+        script_path,
+        ["verify", "--help"],
+    )
+
+    assert "--network" not in command
+    assert str(script_path.resolve()) in command
+    assert "/workspace/scripts/proof_packs/python/run_from_config.py" not in command
 
 
 def test_write_runtime_manifest_records_runtime_context(
@@ -545,6 +727,16 @@ def test_config_digest_and_load_runtime_manifest(tmp_path: Path) -> None:
     assert payload == {"ok": True}
 
 
+def test_config_digest_falls_back_to_payload_when_path_is_missing() -> None:
+    digest, source = runtime_security._config_digest(
+        config_path="missing.yaml",
+        config_payload={"model": {"id": "demo"}},
+    )
+
+    assert digest is not None
+    assert source == "inline"
+
+
 def test_set_env_flag_only_writes_when_explicitly_enabled(monkeypatch) -> None:
     flag = "INVARLOCK_TEST_RUNTIME_FLAG"
     monkeypatch.delenv(flag, raising=False)
@@ -583,6 +775,28 @@ def test_iter_path_args_and_flag_occurrences_cover_split_and_inline_forms() -> N
         (1, "--out", "reports", 2),
         (3, "--baseline-report", "baseline.json", None),
         (4, "-c", "config.yaml", 5),
+    ]
+
+
+def test_runtime_security_helpers_cover_empty_and_deduplicated_path_sets(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.delenv("PYTHONPATH", raising=False)
+    assert runtime_security._coerce_bool(None) is None
+    assert runtime_security._iter_absolute_pythonpath_entries() == []
+
+    cwd = tmp_path / "repo"
+    parent_mount = tmp_path / "external"
+    child_mount = parent_mount / "nested"
+    cwd.mkdir()
+    child_mount.mkdir(parents=True)
+
+    assert runtime_security._container_pythonpath_entries(cwd=cwd) == (
+        ["/workspace/src"],
+        [],
+    )
+    assert runtime_security._minimize_mounts([child_mount, parent_mount]) == [
+        parent_mount
     ]
 
 
@@ -976,3 +1190,148 @@ def test_build_container_command_raises_when_no_engine_is_available(
 
     with pytest.raises(RuntimeError, match="no container engine"):
         runtime_security.build_container_command(["evaluate", "--help"])
+
+
+def test_build_container_command_uses_sys_argv_and_deduplicates_mounts(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    shared_mount = tmp_path / "shared"
+    shared_mount.mkdir()
+
+    monkeypatch.chdir(repo_root)
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_container_engine",
+        lambda: "docker",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image",
+        lambda: "ghcr.io/invarlock/runtime:test",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image_digest",
+        lambda: "sha256:attested",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "container_image_available_locally",
+        lambda image, engine=None: True,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "network_allowed",
+        lambda: False,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security.sys,
+        "argv",
+        ["invarlock", "evaluate", "--config", "cfg.yaml"],
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "_normalize_delegated_argv",
+        lambda argv, *, cwd: (list(argv), [shared_mount], True),
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "_container_pythonpath_entries",
+        lambda *, cwd: (["/workspace/src"], [shared_mount]),
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "_delegated_env_pairs",
+        lambda *, cwd: ({"EXTRA": "1"}, [shared_mount]),
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "_needs_gpu_passthrough",
+        lambda argv: True,
+        raising=True,
+    )
+
+    command = runtime_security.build_container_command()
+
+    assert command[:3] == ["docker", "run", "--rm"]
+    assert "--gpus" in command
+    assert "all" in command
+    assert "--network" in command
+    assert "none" in command
+    assert f"{repo_root}:/workspace" in command
+    assert f"{repo_root}:{repo_root}" in command
+    assert sum(token == f"{shared_mount}:{shared_mount}" for token in command) == 1
+    assert "PYTHONPATH=/workspace/src" in command
+    assert "EXTRA=1" in command
+    assert command[-4:] == [
+        "ghcr.io/invarlock/runtime:test",
+        "evaluate",
+        "--config",
+        "cfg.yaml",
+    ]
+
+
+def test_write_runtime_manifest_omits_context_for_empty_extra(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    report_path = tmp_path / "evaluation.report.json"
+    report_path.write_text('{"ok": true}\n', encoding="utf-8")
+
+    monkeypatch.setattr(
+        runtime_security,
+        "current_execution_mode",
+        lambda: "host",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image",
+        lambda: "ghcr.io/invarlock/invarlock-runtime:test",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image_digest",
+        lambda: None,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "running_inside_container",
+        lambda: False,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "network_allowed",
+        lambda: False,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "remote_code_allowed",
+        lambda: False,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "third_party_plugins_allowed",
+        lambda: False,
+        raising=True,
+    )
+
+    manifest_path = runtime_security.write_runtime_manifest(report_path, extra={})
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    assert "context" not in payload
