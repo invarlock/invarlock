@@ -118,7 +118,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bumped `actions/cache` from `5.0.3` to `5.0.4`.
 - Bumped `actions/download-artifact` from `7` to `8`.
 - Bumped `actions/upload-artifact` from `5` to `7`.
-- Bumped `katex` from `0.16.28` to `0.16.33`.
+- Bumped `katex` from `0.16.28` to `0.16.38`.
+- Bumped `flatted` from `3.4.1` to `3.4.2`.
 
 ### Documentation
 - Rewrote the public onboarding flow around `evaluate` → `verify` →
