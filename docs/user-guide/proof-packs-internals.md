@@ -33,7 +33,7 @@ task graph, scheduling, and artifact generation. It complements
 ./scripts/proof_packs/run_pack.sh --suite full --net 1
 
 # Verify an existing proof pack
-invarlock proof-pack verify ./proof_pack_runs/subset_20250101_000000/proof_pack --strict
+invarlock advanced proof-pack verify ./proof_pack_runs/subset_20250101_000000/proof_pack --strict
 ```
 
 ## Hardware Target
@@ -54,7 +54,7 @@ invarlock proof-pack verify ./proof_pack_runs/subset_20250101_000000/proof_pack 
 - `scripts/proof_packs/run_pack.sh` runs a suite, then packages artifacts into a
   portable proof pack (manifest + checksums + reports).
 - `scripts/proof_packs/verify_pack.sh` validates a proof pack in repo workflows.
-- `invarlock proof-pack verify` provides the package-native verifier path for
+- `invarlock advanced proof-pack verify` provides the package-native verifier path for
   installed wheels.
 - `scripts/proof_packs/suites.sh` defines the model suites and allows
   `MODEL_1`–`MODEL_8` overrides.
@@ -571,7 +571,7 @@ run_pack.sh
   └─ optional HTML + GPG signature
 ```
 
-`invarlock proof-pack verify` checks the pack:
+`invarlock advanced proof-pack verify` checks the pack:
 
 - Verifies `manifest.json` binds `checksums.sha256` via `checksums_sha256_digest`.
 - Verifies digest-backed manifest references (`subject`, `invocation.config_source`,

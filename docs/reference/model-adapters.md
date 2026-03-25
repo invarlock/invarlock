@@ -20,7 +20,7 @@
 pip install "invarlock[hf]"
 
 # Inspect adapter availability
-invarlock plugins adapters
+invarlock advanced plugins adapters
 
 # Compare & evaluate with adapter auto-selection
 INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate \
@@ -30,8 +30,8 @@ INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate \
 ```
 
 The CLI example above uses the secure-default runtime container. Add
-`--allow-host-execution` only for trusted local workflows that intentionally
-bypass that boundary.
+`--mode local` only for trusted local compare/evaluate workflows that
+intentionally bypass that boundary.
 
 ```python
 from invarlock.adapters import HF_Auto_Adapter
@@ -83,7 +83,7 @@ Capability matrix (at a glance)
 
 Machine-readable adapter capability metadata is published at
 `contracts/adapter_capabilities.json` and surfaced through
-`invarlock plugins adapters --json`.
+`invarlock advanced plugins adapters --json`.
 
 ## Reference
 
@@ -186,7 +186,7 @@ finally:
 
 ## Troubleshooting
 
-- **Adapter missing from `invarlock plugins adapters`**: install the required extra
+- **Adapter missing from `invarlock advanced plugins adapters`**: install the required extra
   (`invarlock[adapters]`, `invarlock[gpu]`, `invarlock[gptq]`, `invarlock[awq]`).
 - **Linux-only adapters not available**: `hf_awq` and `hf_gptq` depend on
   `triton` and remain Linux-only in `pyproject.toml`.
@@ -194,14 +194,14 @@ finally:
   upstream-dependent; current Python/CUDA combinations may require a pinned or
   vendor wheel beyond `pip install "invarlock[gptq]"`.
 - **Bitsandbytes not detected**: `hf_bnb` is platform-dependent. If the backend
-  imports cleanly, `invarlock plugins adapters` will report it as ready even on
+  imports cleanly, `invarlock advanced plugins adapters` will report it as ready even on
   non-CUDA hosts.
 - **Quantized model `.to()` errors**: avoid explicit `.to()`; load with the adapter
   and let it manage device placement.
 
 ## Observability
 
-- `invarlock plugins adapters --json` reports readiness and missing extras.
+- `invarlock advanced plugins adapters --json` reports readiness and missing extras.
 - `report.context["plugins"]` and report `plugins.adapters` record adapter
   discovery for audit trails.
 

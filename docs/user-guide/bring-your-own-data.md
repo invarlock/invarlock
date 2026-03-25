@@ -79,16 +79,20 @@ eval:
 printf '{"text":"hello world"}\n{"text":"custom data"}\n' > /tmp/byod.jsonl
 
 # 2) Write config (start from configs/presets/causal_lm/wikitext2_512.yaml and adjust dataset to your BYOD)
-# 3) Run baseline and subject
-invarlock run -c byod.yaml --profile dev --out runs/base
-invarlock run -c byod.yaml --profile dev --out runs/subj
+# 3) Compare baseline and subject directly
+INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate \
+  --baseline gpt2 \
+  --subject gpt2 \
+  --preset byod.yaml \
+  --profile dev \
+  --report-out report_bundle
 
-# 4) Generate report
-invarlock report --run runs/subj --format report --baseline runs/base -o report_bundle
+# 4) Optional: render HTML
+invarlock report html -i report_bundle/evaluation.report.json -o report_bundle/evaluation.html
 ```
 
-The `invarlock run` steps follow the secure-default runtime container path
-unless a trusted local workflow explicitly sets `--allow-host-execution`.
+The `invarlock evaluate` step follows the secure-default runtime container path
+unless a trusted local workflow explicitly sets `--mode local`.
 
 Common pitfalls:
 

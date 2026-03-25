@@ -4,41 +4,30 @@
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Install InvarLock and run your first evaluation. |
-| **Audience** | New users setting up their environment. |
+| **Purpose** | Install InvarLock and complete the core evaluate → verify → report flow. |
+| **Audience** | New users setting up their first local or CI evaluation. |
 | **Python** | 3.12+ recommended (CI uses 3.13). |
-| **Install** | `pip install "invarlock[hf]"` for HF adapter workflows. |
-| **Next step** | [Quickstart](quickstart.md) for hands-on commands. |
+| **Install** | `pip install "invarlock[hf]"` for Hugging Face-backed evaluation. |
+| **Next step** | [Quickstart](quickstart.md) for copy-paste commands. |
 
-This guide covers installation, environment setup, and your first evaluation run.
-
-## Learning Paths
-
-Choose your path based on your role:
-
-| Persona | Path |
-|---------|------|
-| **First-time user** | Getting Started → [Quickstart](quickstart.md) → [Compare & evaluate](compare-and-evaluate.md) |
-| **Python developer** | Getting Started → [Primary Metric Smoke](primary-metric-smoke.md) → [API Guide](../reference/api-guide.md) |
-| **Custom data user** | Getting Started → [Bring Your Own Data](bring-your-own-data.md) → [Config Gallery](config-gallery.md) |
-| **Plugin developer** | Getting Started → [Plugins](plugins.md) → [Guards Reference](../reference/guards.md) |
-| **Validation engineer** | Getting Started → [Proof Packs](proof-packs.md) → [Proof Packs Internals](proof-packs-internals.md) |
-| **Security auditor** | Getting Started → [Threat Model](../security/threat-model.md) → [Best Practices](../security/best-practices.md) |
+This guide covers installation, environment setup, and the smallest useful
+InvarLock workflow: compare a baseline against a subject, verify the attested
+report, and render HTML for review.
 
 ## Install InvarLock
 
 ```bash
-# Minimal core (no torch; CLI + config/schema tools)
+# Minimal core (no torch; CLI + schema/verification tools)
 pip install invarlock
 
-# Recommended (HF adapter + evaluation stack for evaluate/run)
+# Recommended for model-loading and evaluation workflows
 pip install "invarlock[hf]"
 
-# Full (all extras)
+# Full extras bundle
 pip install "invarlock[all]"
 ```
 
-### Install via pipx (recommended isolation)
+### Install via pipx
 
 ```bash
 pipx install --python python3.12 "invarlock[hf]"
@@ -49,7 +38,6 @@ pipx install --python python3.12 "invarlock[hf]"
 ```bash
 conda create -n invarlock python=3.12 -y
 conda activate invarlock
-# Core + HF stack in this env
 pip install "invarlock[hf]"
 ```
 
@@ -61,84 +49,99 @@ invarlock doctor
 
 ## Network Access
 
-InvarLock blocks outbound network by default. When you need to download models or
-datasets, opt in per run with `INVARLOCK_ALLOW_NETWORK=1`:
+InvarLock blocks outbound network by default. When you need to download models
+or datasets, opt in per command with `INVARLOCK_ALLOW_NETWORK=1`:
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 \
-  invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci
+INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate \
+  --baseline gpt2 \
+  --subject distilgpt2 \
+  --adapter auto \
+  --profile ci
 ```
 
-For offline use, pre‑download assets and enforce offline reads with
-`HF_DATASETS_OFFLINE=1`. You can also relocate your HF cache via
-`HF_HOME`/`HF_DATASETS_CACHE`.
+For offline use, pre-download assets and enforce offline reads with
+`HF_DATASETS_OFFLINE=1`. You can also relocate your Hugging Face cache via
+`HF_HOME` and `HF_DATASETS_CACHE`.
 
-## Run The Automation Loop
+## First Evaluation
 
-Use the prebuilt workflow to capture a baseline and execute the edit stack:
-
-```bash
-make eval-loop
-```
-
-For more hands-on examples, see the [Example Reports](example-reports.md).
-
-See also: [Compare & evaluate (BYOE)](compare-and-evaluate.md) for a universal
-baseline→subject→report workflow when you already have two checkpoints.
-
-## Fast Smoke Runs
-
-For quick local/CI checks, enable an approximate capacity pass to shorten
-dataset prep:
-
-```bash
-INVARLOCK_CAPACITY_FAST=1 \
-  invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci
-```
-
-Note: this skips full capacity/dedupe work; don’t use for release evidence.
-
-## Compare & evaluate First
+The default `evaluate` path is attested: model-loading steps run inside the
+runtime container and emit `runtime.manifest.json` beside the evaluation
+report.
 
 ```bash
 INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
-  --source gpt2 \
-  --edited /path/to/edited \
+  --baseline gpt2 \
+  --subject /path/to/edited \
   --adapter auto \
   --profile ci \
-  --preset configs/presets/causal_lm/wikitext2_512.yaml
+  --preset configs/presets/causal_lm/wikitext2_512.yaml \
+  --report-out reports/eval
 ```
 
-Notes
+## Verify And Render
 
-- Prefer Compare & evaluate (BYOE) for production. Use `--edit-config` overlays for quick smokes.
-- `evaluate` uses the runtime container by default; add `--allow-host-execution`
-  only for trusted local host workflows.
+```bash
+invarlock verify reports/eval/evaluation.report.json
+invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
+```
+
+These commands validate the paired math, schema, and runtime attestation, then
+render a shareable HTML artifact from the same report.
+
+## Execution Modes
+
+- `evaluate` defaults to the runtime container (`--mode attested`).
+- Use `--mode local` only for trusted host-side workflows that intentionally
+  bypass container execution.
+- `verify` expects `runtime.manifest.json` next to attested evaluation reports.
+
+## Learning Paths
+
+| Persona | Path |
+| --- | --- |
+| **First-time user** | Getting Started → [Quickstart](quickstart.md) → [Compare & evaluate](compare-and-evaluate.md) |
+| **Python developer** | Getting Started → [Primary Metric Smoke](primary-metric-smoke.md) → [API Guide](../reference/api-guide.md) |
+| **Custom data user** | Getting Started → [Bring Your Own Data](bring-your-own-data.md) → [Config Gallery](config-gallery.md) |
+| **Validation engineer** | Getting Started → [Proof Packs](proof-packs.md) → [Proof Packs Internals](proof-packs-internals.md) |
+| **Security auditor** | Getting Started → [Threat Model](../security/threat-model.md) → [Best Practices](../security/best-practices.md) |
+
+## Advanced Workflows
+
+The simplified public CLI keeps the core path at the top level. Non-core
+surfaces live under `invarlock advanced`:
+
+- `invarlock advanced proof-pack ...`
+- `invarlock advanced policy ...`
+- `invarlock advanced plugins ...`
+- `invarlock advanced calibrate ...`
+
+Optional adapter and backend installs use Python extras such as
+`pip install "invarlock[awq,gptq]"`; they are no longer managed through CLI
+install or uninstall commands.
 
 ## Device Support
 
-InvarLock defaults to `--device auto`, probing **CUDA → MPS → CPU** in that order.
-All guard calculations and reports are device-agnostic; we continuously
-exercise CPU paths on Linux and macOS runners, document MPS fallbacks for
-Apple Silicon, and treat CUDA as optional-but-recommended for release-tier
-baselines. Native Windows is not supported; use WSL2 or a Linux container
-if you need to run InvarLock from a Windows host. When in doubt:
+InvarLock defaults to `--device auto`, probing **CUDA → MPS → CPU** in that
+order. All guard calculations and reports are device-agnostic; CUDA is
+recommended for larger release-tier workloads, while CPU and MPS remain useful
+for local smoke and portability runs.
 
-- `invarlock doctor` reports the detected accelerators.
-- Use `--device cpu` to force portability runs, or `--profile ci_cpu` to exercise the reduced-window telemetry preset.
-- Keep `INVARLOCK_OMP_THREADS` >= 4 for long CPU jobs to avoid multi-hour baselines.
+- `invarlock doctor` reports detected accelerators.
+- Use `--device cpu` to force portability runs.
+- Use `--profile ci_cpu` for a reduced-window CPU preset when you need a fast
+  validation lane.
 
 ## Next Steps
 
-Choose your path based on your workflow:
-
 | I want to... | Start here |
-|--------------|------------|
+| --- | --- |
 | evaluate my own edited model (BYOE) | [Compare & evaluate (BYOE)](compare-and-evaluate.md) |
-| Understand the CLI commands | [Quickstart](quickstart.md) |
-| Bring my own evaluation dataset | [Bring Your Own Data](bring-your-own-data.md) |
-| See example outputs | [Example Reports](example-reports.md) |
-| Understand what's in a report | [Reading a report](reading-report.md) |
-| Use InvarLock programmatically | [API Guide](../reference/api-guide.md) |
-| Understand the assurance scope | [Assurance Case](../assurance/00-assurance-case.md) |
-| Set up secure production deployment | [Security Best Practices](../security/best-practices.md) |
+| understand the CLI commands | [Quickstart](quickstart.md) |
+| bring my own evaluation dataset | [Bring Your Own Data](bring-your-own-data.md) |
+| see example outputs | [Example Reports](example-reports.md) |
+| understand what's in a report | [Reading a report](reading-report.md) |
+| use InvarLock programmatically | [API Guide](../reference/api-guide.md) |
+| understand the assurance scope | [Assurance Case](../assurance/00-assurance-case.md) |
+| set up secure production deployment | [Security Best Practices](../security/best-practices.md) |

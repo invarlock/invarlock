@@ -247,7 +247,12 @@ def _timeout_for(cmd_str: str) -> int:
         or "python -m invarlock --help" in s
     ):
         return 60
-    if " invarlock calibrate" in s or s.strip().startswith("invarlock calibrate"):
+    if (
+        " invarlock advanced calibrate" in s
+        or s.strip().startswith("invarlock advanced calibrate")
+        or " invarlock calibrate" in s
+        or s.strip().startswith("invarlock calibrate")
+    ):
         return 900
     if " invarlock run" in s or " invarlock evaluate" in s:
         return 600

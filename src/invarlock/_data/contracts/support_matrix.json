@@ -75,16 +75,6 @@
       "provenance_source": "docs/README.md#support-matrix"
     },
     {
-      "lane_id": "qwq-32b-reasoning-causal-hf",
-      "family": "QwQ-32B reasoning causal LM",
-      "runtime": "huggingface-pytorch",
-      "adapter": "hf_causal",
-      "support_tier": "supported_experimental",
-      "evidence_status": "repo_shipped_pilot_config",
-      "docs_label": "No, repo-shipped pilot config only",
-      "provenance_source": "docs/README.md#support-matrix"
-    },
-    {
       "lane_id": "deepseek-r1-distill-qwen-causal-hf",
       "family": "DeepSeek-R1-Distill-Qwen causal LM",
       "runtime": "huggingface-pytorch",

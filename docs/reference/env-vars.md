@@ -16,8 +16,9 @@
 # Allow model + dataset downloads for a single command
 INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --baseline gpt2 --subject gpt2
 
-# Force evaluation device for a one-off run
-INVARLOCK_EVAL_DEVICE=cpu invarlock run -c <config>.yaml --out runs/cpu_smoke
+# Force evaluation device for a one-off compare/evaluate run
+INVARLOCK_EVAL_DEVICE=cpu INVARLOCK_ALLOW_NETWORK=1 \
+  invarlock evaluate --baseline gpt2 --subject gpt2 --device cpu
 ```
 
 ## Concepts
@@ -106,7 +107,7 @@ only request remote code. The request still fails unless
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `INVARLOCK_EXPORT_MODEL` | unset | Enable HF export during `invarlock run`. |
+| `INVARLOCK_EXPORT_MODEL` | unset | Enable HF export during model-export capable CLI flows. |
 | `INVARLOCK_EXPORT_DIR` | unset | Target directory for model export. |
 
 ### Guarding & evidence
@@ -139,19 +140,18 @@ Strictness/tiny-relax/overhead-skip are also config/profile policy:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS` | unset | Enable third-party plugin discovery and management. |
-| `INVARLOCK_MINIMAL` | unset | Show minimal plugin list in `invarlock plugins`. |
+| `INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS` | unset | Enable third-party plugin discovery. |
+| `INVARLOCK_MINIMAL` | unset | Show minimal plugin list in `invarlock advanced plugins`. |
 
 ### Runtime enforcement
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `INVARLOCK_ALLOW_HOST_EXECUTION` | unset | Run model-loading commands on the host instead of the runtime container. |
+| `INVARLOCK_ALLOW_HOST_EXECUTION` | unset | Advanced/internal host-execution override. Prefer `invarlock evaluate --mode local` for the public compare/evaluate path. |
 | `INVARLOCK_CONTAINER_EXECUTION` | unset | Internal recursion guard marking runtime-container execution. |
 | `INVARLOCK_RUNTIME_IMAGE` | unset | Override the OCI image used for containerized model execution. |
 | `INVARLOCK_RUNTIME_IMAGE_DIGEST` | unset | Supply the immutable digest recorded into `runtime.manifest.json`. |
 | `INVARLOCK_RUNTIME_VERIFIER` | unset | Override the `invarlock-runtime-verify` binary path. |
-| `INVARLOCK_PLUGINS_DRY_RUN` | unset | Force plugin install/uninstall dry run. |
 
 ### Docs build
 

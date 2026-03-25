@@ -114,6 +114,23 @@ gpu = [
   "safetensors>=0.4.0",
 ]
 
+# Convenience install for advanced proof-pack/policy/plugins/calibration workflows.
+advanced = [
+  "torch>=2.1.0",
+  "transformers>=5.0.0",
+  "datasets>=3.0",
+  "numpy>=1.24",
+  "huggingface_hub>=1.0.0",
+  "accelerate>=0.27",
+  "bitsandbytes>=0.41",
+  "auto-gptq>=0.7.0; platform_system == \"Linux\"",
+  "autoawq>=0.2.0; platform_system == \"Linux\"",
+  "triton>=2.3.0; platform_system == \"Linux\"",
+  "aiohttp>=3.12.14",
+  "h2>=4.3.0",
+  "pillow>=11.3.0",
+]
+
 
 # Complete installation with all features
 all = [

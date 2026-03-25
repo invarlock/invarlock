@@ -16,7 +16,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
 
     family_catalog = contracts.load_model_family_catalog()
     assert family_catalog["format_version"] == "model-family-catalog-v1"
-    assert family_catalog["as_of"] == "2026-03-23"
+    assert family_catalog["as_of"] == "2026-03-24"
     assert family_catalog["declared_support"][0]["display_name"] == "GPT-2 causal LM"
     declared = {item["display_name"] for item in family_catalog["declared_support"]}
     assert declared == {
@@ -26,7 +26,6 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "Qwen2 7B causal LM",
         "Qwen2.5 14B causal LM",
         "Qwen3 causal LM",
-        "QwQ-32B reasoning causal LM",
         "DeepSeek-R1-Distill-Qwen causal LM",
         "Phi-4 causal LM (text-only eval)",
         "TinyLlama 1.1B causal LM",
@@ -34,6 +33,8 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "Qwen3.5 causal LM",
         "Seq2Seq / local pairs",
     }
+    usage_only = {item["display_name"] for item in family_catalog["usage_only"]}
+    assert "QwQ 32B reasoning" in usage_only
     recommended = {
         item["display_name"] for item in family_catalog["recommended_additions"]
     }

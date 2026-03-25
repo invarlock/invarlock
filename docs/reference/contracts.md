@@ -43,16 +43,16 @@ repo checkout when present or from packaged wheel data otherwise.
 The CLI exposes these contracts directly:
 
 - `invarlock verify --json`
-- `invarlock plugins adapters --json`
+- `invarlock advanced plugins adapters --json`
 - `invarlock doctor --json`
-- `invarlock proof-pack verify --json`
-- `invarlock policy build`
-- `invarlock policy verify`
+- `invarlock advanced proof-pack verify --json`
+- `invarlock advanced policy build`
+- `invarlock advanced policy verify`
 - `scripts/proof_packs/verify_pack.sh --strict`
 
 The first six surfaces are available from installed packages. The repo shell
 verifier remains available for proof-pack workflow maintainers, but pure wheel
-installs can now verify packs with `invarlock proof-pack verify`.
+installs can now verify packs with `invarlock advanced proof-pack verify`.
 
 For support-related automation, `plugins adapters --json` and `doctor --json`
 now expose both the strict `support_matrix` contract and the broader
@@ -71,11 +71,11 @@ Policy packs are Git-native artifacts that bind:
 Build and verify them with:
 
 ```bash
-invarlock policy build \
+invarlock advanced policy build \
   --resolved-policy resolved_policy.json \
   --overrides overrides.json \
   --compatibility compatibility.json \
   --out policy-pack.json
 
-invarlock policy verify policy-pack.json --json
+invarlock advanced policy verify policy-pack.json --json
 ```

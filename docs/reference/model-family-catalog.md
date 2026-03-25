@@ -34,7 +34,6 @@ out of declared support lanes and shipped preset inventory.
 | Qwen2 7B causal LM | `supported_experimental` | `Qwen/Qwen2-7B` | Pilot preset and calibration config are shipped. |
 | Qwen2.5 14B causal LM | `supported_experimental` | `Qwen/Qwen2.5-14B` | Pilot preset and calibration config are shipped. |
 | Qwen3 causal LM | `supported_experimental` | `Qwen/Qwen3-8B` | Pilot preset and calibration config are shipped. |
-| QwQ-32B reasoning causal LM | `supported_experimental` | `Qwen/QwQ-32B` | Pilot preset and calibration config are shipped, and the current remote evaluate/verify lane closes cleanly on the dense checkpoint. |
 | DeepSeek-R1-Distill-Qwen causal LM | `supported_experimental` | `deepseek-ai/DeepSeek-R1-Distill-Qwen-7B` | Pilot preset and calibration config are shipped. |
 | Phi-4 causal LM (text-only eval) | `supported_experimental` | `microsoft/Phi-4-reasoning-plus` | Text-only pilot preset and calibration config are shipped, and the current remote evaluate/verify lane closes cleanly. |
 | TinyLlama 1.1B causal LM | `supported_experimental` | `TinyLlama/TinyLlama-1.1B-Chat-v1.0` | Ungated Llama-family pilot lane with shipped preset and calibration config. |
@@ -48,7 +47,7 @@ out of declared support lanes and shipped preset inventory.
 | --- | --- | --- | --- |
 | Mixtral | `profile_first_class` | `mistralai/Mixtral-8x7B-v0.1` | Profile and loader code recognize the family directly. |
 | Llama | `profile_first_class` | `openlm-research/open_llama_7b`, `TinyLlama/TinyLlama-1.1B-Chat-v1.0` | Generic Llama-family profile handling is first-class. TinyLlama now provides the ungated declared support lane, while access-gated vendor checkpoints remain omitted. |
-| Qwen family aliases (Qwen1.5/Qwen2.5/Qwen3 naming) | `profile_first_class` | `Qwen/Qwen2.5-14B`, `Qwen/Qwen3.5-9B`, `Qwen/QwQ-32B` | Shared qwen-family heuristics still cover aliases beyond the declared Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 lanes, including the ungated QwQ reasoning branch and larger usage-only Qwen2.5 checkpoints. |
+| Qwen family aliases (Qwen1.5/Qwen2.5/Qwen3 naming) | `profile_first_class` | `Qwen/Qwen2.5-14B`, `Qwen/Qwen3.5-9B` | Shared qwen-family heuristics still cover aliases beyond the declared Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 lanes, including internal/manual QwQ reasoning checkpoints and larger usage-only Qwen2.5 checkpoints. |
 | Yi | `profile_first_class` | `01-ai/Yi-34B` | Treated as a RoPE decoder family in profile logic. |
 | Phi family | `profile_first_class` | `microsoft/Phi-3-mini-4k-instruct`, `microsoft/Phi-4-reasoning-plus` | Dedicated phi-family selectors now exist. Phi-4 now has a declared text-only lane, while multimodal Phi-4 remains backlog-only. |
 | OPT / GPT-NeoX / GPT-J | `profile_shared_alias` | `facebook/opt-1.3b`, `EleutherAI/gpt-neox-20b` | Available through shared GPT-style paths. |
@@ -62,6 +61,7 @@ out of declared support lanes and shipped preset inventory.
 
 | Family | State | Representative models | Notes |
 | --- | --- | --- | --- |
+| QwQ 32B reasoning | `usage_only` | `Qwen/QwQ-32B` | Retained for internal/manual profile and preset coverage after removal from the declared support matrix and maintained evidence sweep. |
 | Qwen2.5 family | `usage_only` | `Qwen/Qwen2.5-7B`, `Qwen/Qwen2.5-32B` | Used in proof-pack suites and validation defaults outside the declared Qwen2.5 14B support lane. |
 | Qwen1.5 72B | `usage_only` | `Qwen/Qwen1.5-72B` | Used concretely in proof-pack suites. |
 | Yi 34B | `usage_only` | `01-ai/Yi-34B` | Used in workshop and full proof-pack suites. |

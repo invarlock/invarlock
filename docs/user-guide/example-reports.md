@@ -16,8 +16,7 @@ Use the steps below to reproduce representative artifacts from the current relea
 
 The command below shows the secure-default runtime-container path. It writes an
 attested `runtime.manifest.json` next to `evaluation.report.json`. Trusted
-host-side workflows must opt into `INVARLOCK_ALLOW_HOST_EXECUTION=1` and are
-verified differently.
+public host-side workflows use `--mode local` and are verified differently.
 
 ```bash
 INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \

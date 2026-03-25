@@ -26,7 +26,7 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 
 ### Running Evaluations
 
-1. [CLI Reference](cli.md) — `evaluate`, `verify`, `run` commands
+1. [CLI Reference](cli.md) — `evaluate`, `verify`, `report`, and `advanced`
 2. [Configuration Schema](config-schema.md) — YAML presets and profiles
 3. [Datasets](datasets.md) — Provider configuration
 4. [Model Adapters](model-adapters.md) — Adapter selection
@@ -59,6 +59,7 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 1. [Environment Variables](env-vars.md) — Runtime configuration
 2. [Artifact Layout](artifacts.md) — Evidence retention
 3. [Observability](observability.md) — Health checking and telemetry
+4. [CLI Reference](cli.md) — Advanced namespaces such as `proof-pack`, `policy`, and `plugins`
 
 ## Related Documentation
 

@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   evidence-sweep tooling/workflows for maintaining shipped support claims.
 
 ### Changed
+- Simplified the public CLI contract around `evaluate`, `verify`, `report`,
+  `doctor`, and `advanced`; proof-pack, policy, plugin, and calibration flows
+  now live under the `advanced` namespace, and core trusted-host evaluation now
+  uses `--mode local`.
 - Optimized evaluation data loading, Hugging Face adapter/model-loading paths,
   model-profile resolution, and CLI run/bootstrap startup flows to reduce local
   evaluation overhead.
@@ -106,6 +110,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bumped `katex` from `0.16.28` to `0.16.33`.
 
 ### Documentation
+- Rewrote the public onboarding flow around `evaluate` → `verify` →
+  `report html`, moved advanced command guidance behind the `advanced`
+  namespace, and added migration notes for the simplified CLI surface.
 - Added a release-verification guide covering the new offline bundle flow and
   refreshed related security best-practice references.
 - Clarified proof-pack wheel-boundary, scenario, and verification guidance, and

@@ -81,6 +81,8 @@ def test_markdown_surfaces_with_model_loading_examples_explain_execution_context
         if any(
             marker in text
             for marker in (
+                "--mode local",
+                "--mode attested",
                 "--allow-host-execution",
                 "INVARLOCK_ALLOW_HOST_EXECUTION=1",
                 "runtime container",
@@ -211,6 +213,8 @@ def test_notebooks_with_model_loading_examples_explain_execution_context() -> No
         if any(
             marker in text
             for marker in (
+                "--mode local",
+                "--mode attested",
                 "--allow-host-execution",
                 "INVARLOCK_ALLOW_HOST_EXECUTION=1",
                 "runtime container",

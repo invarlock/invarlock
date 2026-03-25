@@ -1,7 +1,7 @@
 # InvarLock Documentation
 
-InvarLock is edit‑agnostic (BYOE). A small built‑in quantization demo
-(`quant_rtn`, 8‑bit) exists for CI/quickstart. See
+InvarLock is edit-agnostic (BYOE). A small built-in quantization demo
+(`quant_rtn`, 8-bit) exists for advanced smoke and demo workflows. See
 [Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md).
 
 Welcome to the documentation hub for InvarLock (Edit‑agnostic robustness reports for weight edits).
@@ -12,7 +12,7 @@ find detailed reference, design rationales, and assurance notes.
 
 ## Start Here
 
-1. **[Getting Started](user-guide/getting-started.md)** – environment setup and the first evaluation loop.
+1. **[Getting Started](user-guide/getting-started.md)** – environment setup and the first `evaluate` → `verify` → `report html` loop.
 2. **[Quickstart](user-guide/quickstart.md)** – CLI highlights for common workflows.
 3. **[Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md)** – baseline ↔ subject with guardchain.
 4. **[Primary Metric Smoke](user-guide/primary-metric-smoke.md)** – tiny examples for ppl/accuracy kinds.
@@ -23,7 +23,7 @@ find detailed reference, design rationales, and assurance notes.
 # Core-only install (no torch/transformers): CLI + config tools
 pip install invarlock
 
-# HF/torch stack for adapter-based flows (evaluate/run)
+# HF/torch stack for adapter-based flows
 pip install "invarlock[hf]"
 
 # Compare & evaluate (BYOE checkpoints)
@@ -36,9 +36,9 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
 Tip: enable Hub downloads per command when fetching models/datasets:
 `INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate ...`
 
-Security-default note: `evaluate`, `run`, and `calibrate` use the runtime
-container by default. Use `--allow-host-execution` only for trusted local
-workflows that intentionally bypass that boundary.
+Security-default note: `evaluate` uses the runtime container by default. Use
+`--mode local` only for trusted local workflows that intentionally bypass that
+boundary. Advanced runtime-heavy workflows live under `invarlock advanced`.
 
 ---
 
@@ -63,7 +63,7 @@ workflows that intentionally bypass that boundary.
 
 - [Reference Index](reference/index.md)
 - [CLI Reference](reference/cli.md)
-- [Tier Policy Tuning CLI (Calibration)](reference/calibration.md) — `invarlock calibrate` for tier policy sweeps
+- [Tier Policy Tuning CLI (Calibration)](reference/calibration.md) — `invarlock advanced calibrate` for tier policy sweeps
 - [Configuration Schema](reference/config-schema.md)
 - [Guards](reference/guards.md)
 - [Model Adapters](reference/model-adapters.md)
@@ -126,9 +126,10 @@ to change proposals or releases when you update calibration.
 ## Core Concepts
 
 1. **Configure** – describe model, dataset, edit, and guard policies in YAML.
-2. **Execute** – run `invarlock run` or `evaluate` under a CI or release profile;
-   model-loading commands use the runtime container by default.
-3. **Validate** – generate reports via `invarlock report` and run `invarlock verify`;
+2. **Execute** – run `invarlock evaluate` under a CI or release profile;
+   model-loading commands use the runtime container by default unless you pass
+   `--mode local`.
+3. **Validate** – run `invarlock verify` and render HTML via `invarlock report html`;
    attested outputs include `runtime.manifest.json` next to
    `evaluation.report.json`.
 4. **Iterate** – compare runs, adjust edit plans, and reissue reports until gates pass.
@@ -182,7 +183,6 @@ Notes
 | Qwen2 7B causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
 | Qwen2.5 14B causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
 | Qwen3 causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
-| QwQ-32B reasoning causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
 | DeepSeek-R1-Distill-Qwen causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
 | Phi-4 causal LM (text-only eval) | Yes | Yes | Yes | No, repo-shipped pilot config only |
 | TinyLlama 1.1B causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
@@ -192,7 +192,7 @@ Notes
 
 Published assurance basis currently covers GPT-2 and BERT profiles. Repo-shipped
 presets and pilot calibration configs for additional experimental families,
-including Mistral 7B, Qwen2 7B, Qwen2.5 14B, Qwen3, QwQ-32B, DeepSeek-R1-Distill-Qwen,
+including Mistral 7B, Qwen2 7B, Qwen2.5 14B, Qwen3, DeepSeek-R1-Distill-Qwen,
 Phi-4 text-only, TinyLlama 1.1B, OLMo 2, and Qwen3.5, do not become part of the published
 assurance basis until supporting artifacts are attached. Access-gated vendor
 checkpoints are intentionally excluded from the shipped support matrix and
@@ -233,8 +233,8 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
 ### Development
 
 ```bash
-invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml --profile ci --tier balanced
-invarlock plugins adapters
+invarlock advanced plugins adapters
+invarlock advanced calibrate --help
 python scripts/verify_ci_matrix.sh
 ```
 

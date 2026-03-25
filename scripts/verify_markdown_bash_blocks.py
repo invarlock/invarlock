@@ -249,6 +249,18 @@ def _rewrite_invarlock_tokens(
 
     if execution_mode == "container":
         argv = [token for token in argv if token != "--allow-host-execution"]
+        if command_tokens[:1] == ["evaluate"]:
+            rewritten: list[str] = []
+            skip_next = False
+            for idx, token in enumerate(argv):
+                if skip_next:
+                    skip_next = False
+                    continue
+                if token == "--mode" and idx + 1 < len(argv):
+                    skip_next = True
+                    continue
+                rewritten.append(token)
+            argv = rewritten
         if command_tokens[:1] == ["verify"] or command_tokens[:2] == [
             "report",
             "verify",
@@ -256,7 +268,18 @@ def _rewrite_invarlock_tokens(
             argv = [token for token in argv if token != "--allow-unattested-artifacts"]
         return env_prefix, argv
 
-    if command_tokens[:1] and command_tokens[0] in MODEL_LOADING_COMMANDS:
+    if command_tokens[:1] == ["evaluate"]:
+        if "--mode" not in argv:
+            if argv[:1] == ["invarlock"]:
+                argv = [*argv[:2], "--mode", "local", *argv[2:]]
+            elif (
+                len(argv) >= 3
+                and argv[0] in {"python", "python3"}
+                and argv[1] == "-m"
+                and argv[2].startswith("invarlock")
+            ):
+                argv = [*argv[:4], "--mode", "local", *argv[4:]]
+    elif command_tokens[:1] and command_tokens[0] in MODEL_LOADING_COMMANDS:
         if "--allow-host-execution" not in argv:
             env_prefix.append(f"{HOST_EXECUTION_ENV}=1")
     if (

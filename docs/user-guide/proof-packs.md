@@ -28,7 +28,7 @@ verify reported outcomes, and provide structured outputs for downstream analysis
 > phase (`CALIBRATION_RUN -> GENERATE_PRESET`) that writes
 > `calibrated_preset_<model>.yaml/json` for that suite run. It does not directly
 > modify global `runtime/tiers.yaml`. For global tier policy tuning, use
-> `invarlock calibrate ...` (see [Tier Policy Tuning CLI](../reference/calibration.md)).
+> `invarlock advanced calibrate ...` (see [Tier Policy Tuning CLI](../reference/calibration.md)).
 > Calibration entrypoints still use the secure-default runtime container unless
 > a trusted local workflow opts into `--allow-host-execution`.
 
@@ -39,9 +39,9 @@ verify reported outcomes, and provide structured outputs for downstream analysis
 | `run_pack.sh` | Full proof pack: runs suite + packages artifacts | Proof pack directory with manifest + checksums | Default: distributable validation evidence |
 | `run_suite.sh` | Suite execution only | Reports under the run directory | Development/debugging, iterative runs |
 | `verify_pack.sh` | Validate an existing proof pack | Verification status | Validating received proof packs |
-| `invarlock proof-pack inspect` | Read-only proof-pack summary | Manifest/integrity/report inventory summary | Auditing a received pack without nested report verification |
-| `invarlock proof-pack build` | Assemble a proof pack from existing artifacts | Proof pack directory with manifest + checksums | Packaging already-produced verdicts, metadata, and reports |
-| `invarlock proof-pack verify` | Package-native proof-pack verification | Verification status + optional JSON | Validating received proof packs from a wheel install |
+| `invarlock advanced proof-pack inspect` | Read-only proof-pack summary | Manifest/integrity/report inventory summary | Auditing a received pack without nested report verification |
+| `invarlock advanced proof-pack build` | Assemble a proof pack from existing artifacts | Proof pack directory with manifest + checksums | Packaging already-produced verdicts, metadata, and reports |
+| `invarlock advanced proof-pack verify` | Package-native proof-pack verification | Verification status + optional JSON | Validating received proof packs from a wheel install |
 
 ## Quick Start
 
@@ -69,10 +69,10 @@ INVARLOCK_ALLOW_REMOTE_CODE=1 \
   ./scripts/proof_packs/run_suite.sh --suite subset --resume
 
 # Inspect a received proof pack without nested report verification
-invarlock proof-pack inspect ./proof_pack_runs/subset_20250101_000000/proof_pack --json
+invarlock advanced proof-pack inspect ./proof_pack_runs/subset_20250101_000000/proof_pack --json
 
 # Build a proof pack from existing artifacts
-invarlock proof-pack build ./tmp/proof_pack \
+invarlock advanced proof-pack build ./tmp/proof_pack \
   --final-verdict ./reports/final_verdict.json \
   --source-repo ./metadata/source_repo.json \
   --environment ./metadata/environment.json \
@@ -80,7 +80,7 @@ invarlock proof-pack build ./tmp/proof_pack \
   --report ./runs/model/evaluation.report.json
 
 # Verify an existing proof pack
-invarlock proof-pack verify ./proof_pack_runs/subset_20250101_000000/proof_pack --strict
+invarlock advanced proof-pack verify ./proof_pack_runs/subset_20250101_000000/proof_pack --strict
 ```
 
 Note: clean edits require tuned preset parameters. Either set
@@ -246,32 +246,32 @@ Newer packs also carry a repo-native attestation block in the same signed manife
 Signed packs also record `signing_key_fingerprint` for audit trails.
 
 The manifest contract is published at `contracts/proof_pack_manifest.schema.json`.
-`invarlock proof-pack verify` validates this schema before checksum and signature verification so
+`invarlock advanced proof-pack verify` validates this schema before checksum and signature verification so
 malformed proof packs fail deterministically.
 
 Installed wheels now ship the public contracts and support package-native
-inspection, assembly, and verification via `invarlock proof-pack inspect`,
-`invarlock proof-pack build`, and `invarlock proof-pack verify`. The repo shell verifier remains
+inspection, assembly, and verification via `invarlock advanced proof-pack inspect`,
+`invarlock advanced proof-pack build`, and `invarlock advanced proof-pack verify`. The repo shell verifier remains
 available for maintainers using the proof-pack harness directly.
 
 Use the package-native subcommands:
 
-- `invarlock proof-pack inspect <dir>`
+- `invarlock advanced proof-pack inspect <dir>`
   - Summarizes manifest validity, checksum coverage, attestation references, report inventory, and strict-readiness.
   - Does not run nested `invarlock verify`; use this for quick received-artifact triage.
-- `invarlock proof-pack build <out> --final-verdict <json> --report <report> [...more --report]`
+- `invarlock advanced proof-pack build <out> --final-verdict <json> --report <report> [...more --report]`
   - Packages existing JSON artifacts into a proof pack and pre-verifies the supplied clean reports with `invarlock verify`.
   - Intended for wheel users packaging already-produced evidence, not for running the full suite.
-- `invarlock proof-pack verify <dir>`
+- `invarlock advanced proof-pack verify <dir>`
 
-- Default: `invarlock proof-pack verify <dir>`
+- Default: `invarlock advanced proof-pack verify <dir>`
   - Verifies `checksums_sha256_digest`, validates digest-backed manifest references, validates `checksums.sha256`, and runs `invarlock verify`.
   - Warns (but does not fail) if the pack is unsigned; this is evidence-grade verification.
-- Strict (recommended for distributable evidence): `invarlock proof-pack verify <dir> --strict`
+- Strict (recommended for distributable evidence): `invarlock advanced proof-pack verify <dir> --strict`
   - Fails if `manifest.json.asc` is missing, `gpg` verification fails, or extra files exist outside `checksums.sha256`.
   - Repo-harness alternative: `PACK_STRICT_MODE=1 scripts/proof_packs/verify_pack.sh --pack <dir>`.
 
-`invarlock proof-pack verify` returns structured exit codes:
+`invarlock advanced proof-pack verify` returns structured exit codes:
 
 - `0`: verified successfully
 - `2`: invalid usage or unsupported flag combination
@@ -284,7 +284,7 @@ Use the package-native subcommands:
 
 Reviewer checklist:
 
-- `invarlock proof-pack verify <dir> --strict` returns `0`
+- `invarlock advanced proof-pack verify <dir> --strict` returns `0`
 - `jq -e . <dir>/manifest.json` succeeds
 - `sha256sum -c <dir>/checksums.sha256` succeeds
 - `gpg --verify <dir>/manifest.json.asc <dir>/manifest.json` succeeds when the
