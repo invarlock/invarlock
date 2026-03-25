@@ -248,7 +248,7 @@ jobs:
         uses: sigstore/gh-action-sigstore-python@a5caf349bc536fbef3668a10ed7f5cd309a4b53d
         with:
           inputs: release-assets/*-offline-bundle.tar.gz
-          upload-signing-artifacts: true
+          upload-signing-artifacts: false
       - name: Create or update GitHub release
         env:
           GITHUB_TOKEN: ${{ github.token }}

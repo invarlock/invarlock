@@ -300,7 +300,7 @@ def test_release_workflow_builds_and_bundles_release_assets():
     assert (
         sigstore_steps[1]["with"]["inputs"] == "release-assets/*-offline-bundle.tar.gz"
     )
-    assert sigstore_steps[1]["with"]["upload-signing-artifacts"] is True
+    assert sigstore_steps[1]["with"]["upload-signing-artifacts"] is False
 
     release_step = _find_step_by_name(bundle_steps, "Create or update GitHub release")
     assert bundle_steps.index(sigstore_steps[1]) < bundle_steps.index(release_step)
