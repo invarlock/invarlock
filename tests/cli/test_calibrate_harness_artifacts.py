@@ -371,7 +371,12 @@ def test_ve_sweep_handles_reports_without_variance_guard(tmp_path: Path) -> None
         report_path = Path(out) / "report.json"
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(
-            json.dumps({"guards": [{"name": "other", "metrics": {}}], "meta": {"tier": tier, "config": config}}),
+            json.dumps(
+                {
+                    "guards": [{"name": "other", "metrics": {}}],
+                    "meta": {"tier": tier, "config": config},
+                }
+            ),
             encoding="utf-8",
         )
         return str(report_path)

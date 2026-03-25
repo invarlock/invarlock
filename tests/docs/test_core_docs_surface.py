@@ -59,9 +59,9 @@ def test_support_surfaces_use_local_mode_for_public_evaluate_examples():
     for rel_path in surfaces:
         text = _read(rel_path)
         assert "--mode local" in text, f"--mode local missing from {rel_path}"
-        assert (
-            "INVARLOCK_ALLOW_HOST_EXECUTION=1" not in text
-        ), f"legacy host-execution env still promoted in {rel_path}"
+        assert "INVARLOCK_ALLOW_HOST_EXECUTION=1" not in text, (
+            f"legacy host-execution env still promoted in {rel_path}"
+        )
 
 
 def test_support_surfaces_do_not_teach_removed_public_top_level_commands():

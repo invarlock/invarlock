@@ -109,7 +109,8 @@ def test_resolve_runtime_image_prefers_explicit_local_and_default(monkeypatch) -
     monkeypatch.setattr(
         runtime_security,
         "container_image_available_locally",
-        lambda image, engine=None: image == runtime_security.RUNTIME_IMAGE_LOCAL_DEFAULT,
+        lambda image, engine=None: image
+        == runtime_security.RUNTIME_IMAGE_LOCAL_DEFAULT,
         raising=True,
     )
     assert (
@@ -123,7 +124,10 @@ def test_resolve_runtime_image_prefers_explicit_local_and_default(monkeypatch) -
         lambda image, engine=None: False,
         raising=True,
     )
-    assert runtime_security.resolve_runtime_image() == runtime_security.RUNTIME_IMAGE_DEFAULT
+    assert (
+        runtime_security.resolve_runtime_image()
+        == runtime_security.RUNTIME_IMAGE_DEFAULT
+    )
 
 
 def test_inspect_container_image_parses_repo_digest_and_image_id(monkeypatch) -> None:
@@ -188,7 +192,9 @@ def test_container_engine_and_device_helpers(monkeypatch) -> None:
     assert runtime_security._requested_device(["evaluate"]) == "auto"
     assert runtime_security._requested_device(["run"]) == "auto"
     assert runtime_security._requested_device(["verify"]) is None
-    assert runtime_security._requested_device(["evaluate", "--device", "CUDA"]) == "cuda"
+    assert (
+        runtime_security._requested_device(["evaluate", "--device", "CUDA"]) == "cuda"
+    )
     assert runtime_security._requested_device(["evaluate", "--device"]) is None
 
     monkeypatch.setattr(
@@ -198,7 +204,10 @@ def test_container_engine_and_device_helpers(monkeypatch) -> None:
         raising=True,
     )
     assert runtime_security._needs_gpu_passthrough(["evaluate"]) is True
-    assert runtime_security._needs_gpu_passthrough(["evaluate", "--device", "cpu"]) is False
+    assert (
+        runtime_security._needs_gpu_passthrough(["evaluate", "--device", "cpu"])
+        is False
+    )
 
     monkeypatch.setattr(
         runtime_security,
@@ -206,7 +215,10 @@ def test_container_engine_and_device_helpers(monkeypatch) -> None:
         lambda: False,
         raising=True,
     )
-    assert runtime_security._needs_gpu_passthrough(["evaluate", "--device", "cuda"]) is False
+    assert (
+        runtime_security._needs_gpu_passthrough(["evaluate", "--device", "cuda"])
+        is False
+    )
 
 
 def test_container_image_available_locally_and_runtime_verifier_binary(
@@ -248,7 +260,10 @@ def test_runtime_verifier_binary_finds_repo_and_script_dir_candidates(
     module_path.parent.mkdir(parents=True, exist_ok=True)
     module_path.write_text("# stub\n", encoding="utf-8")
     debug_binary = (
-        repo_root / "target" / "debug" / runtime_security.RUNTIME_VERIFIER_BINARY_DEFAULT
+        repo_root
+        / "target"
+        / "debug"
+        / runtime_security.RUNTIME_VERIFIER_BINARY_DEFAULT
     )
     debug_binary.parent.mkdir(parents=True, exist_ok=True)
     debug_binary.write_text("#!/bin/sh\n", encoding="utf-8")
@@ -267,16 +282,23 @@ def test_runtime_verifier_binary_finds_repo_and_script_dir_candidates(
     script_binary = script_dir / runtime_security.RUNTIME_VERIFIER_BINARY_DEFAULT
     script_binary.write_text("#!/bin/sh\n", encoding="utf-8")
     script_binary.chmod(0o755)
-    monkeypatch.setattr(runtime_security.sys, "executable", str(python_bin), raising=True)
-    monkeypatch.setattr(runtime_security.sys, "argv", [str(script_dir / "cli")], raising=True)
+    monkeypatch.setattr(
+        runtime_security.sys, "executable", str(python_bin), raising=True
+    )
+    monkeypatch.setattr(
+        runtime_security.sys, "argv", [str(script_dir / "cli")], raising=True
+    )
     assert runtime_security.runtime_verifier_binary() == str(script_binary)
 
 
 def test_apply_runtime_allowances_and_delegate_current_process(monkeypatch) -> None:
+    import invarlock.security as security_module
+
     seen: list[bool] = []
 
     monkeypatch.setattr(
-        "invarlock.security.enforce_network_policy",
+        security_module,
+        "enforce_network_policy",
         lambda enabled: seen.append(enabled),
         raising=False,
     )
@@ -486,7 +508,9 @@ def test_path_helpers_resolve_workspace_and_membership(tmp_path: Path) -> None:
     assert runtime_security._absolute_host_path(external, cwd=cwd) == external
     assert runtime_security._path_is_within(nested, cwd) is True
     assert runtime_security._path_is_within(external, cwd) is False
-    assert runtime_security._workspace_path(cwd / "nested", cwd=cwd) == "/workspace/nested"
+    assert (
+        runtime_security._workspace_path(cwd / "nested", cwd=cwd) == "/workspace/nested"
+    )
 
 
 def test_mount_root_helpers_cover_files_directories_and_resolved_targets(
@@ -515,7 +539,9 @@ def test_iter_external_symlink_target_mounts_ignores_in_workspace_targets(
     link_path = cwd / "baseline-link"
     link_path.symlink_to(inside_target)
 
-    assert runtime_security._iter_external_symlink_target_mounts(link_path, cwd=cwd) == []
+    assert (
+        runtime_security._iter_external_symlink_target_mounts(link_path, cwd=cwd) == []
+    )
 
 
 def test_iter_external_symlink_target_mounts_finds_external_targets_recursively(
@@ -530,18 +556,21 @@ def test_iter_external_symlink_target_mounts_finds_external_targets_recursively(
 
     direct_link = cwd / "artifact-link"
     direct_link.symlink_to(target)
-    assert runtime_security._iter_external_symlink_target_mounts(direct_link, cwd=cwd) == [
-        external_root
-    ]
+    assert runtime_security._iter_external_symlink_target_mounts(
+        direct_link, cwd=cwd
+    ) == [external_root]
 
     tree = cwd / "tree"
     nested = tree / "nested"
     nested.mkdir(parents=True)
     deep_link = nested / "deep-link"
     deep_link.symlink_to(target)
-    assert runtime_security._iter_external_symlink_target_mounts(
-        tree, cwd=cwd, recursive=False
-    ) == []
+    assert (
+        runtime_security._iter_external_symlink_target_mounts(
+            tree, cwd=cwd, recursive=False
+        )
+        == []
+    )
     assert runtime_security._iter_external_symlink_target_mounts(tree, cwd=cwd) == [
         external_root
     ]
@@ -604,9 +633,11 @@ def test_normalize_output_and_local_model_paths_cover_inside_outside_and_missing
     external_root.mkdir()
     missing = cwd / "missing-model"
 
-    normalized_output, output_mounts = runtime_security._normalize_output_path_for_container(
-        "reports",
-        cwd=cwd,
+    normalized_output, output_mounts = (
+        runtime_security._normalize_output_path_for_container(
+            "reports",
+            cwd=cwd,
+        )
     )
     assert normalized_output == "reports"
     assert output_mounts == set()
@@ -679,10 +710,12 @@ def test_normalize_config_path_for_container_scans_dependencies_and_wraps_errors
         raising=True,
     )
 
-    normalized, mounts, needs_mirror = runtime_security._normalize_config_path_for_container(
-        "config.yaml",
-        cwd=cwd,
-        scan_dependencies=True,
+    normalized, mounts, needs_mirror = (
+        runtime_security._normalize_config_path_for_container(
+            "config.yaml",
+            cwd=cwd,
+            scan_dependencies=True,
+        )
     )
     assert normalized == str(config_path.resolve())
     assert mounts == {external_root}
@@ -773,9 +806,11 @@ def test_path_env_value_and_delegated_env_pairs_translate_workspace_paths(
         str(inside_tmp),
         cwd=cwd,
     )
-    translated_external, external_mounts = runtime_security._path_env_value_for_container(
-        str(external_tmp),
-        cwd=cwd,
+    translated_external, external_mounts = (
+        runtime_security._path_env_value_for_container(
+            str(external_tmp),
+            cwd=cwd,
+        )
     )
     assert translated_inside == "/workspace/tmp-cache"
     assert inside_mounts == []
@@ -807,8 +842,12 @@ def test_runtime_verifier_binary_falls_back_to_default_when_no_candidates_exist(
 
     monkeypatch.delenv(runtime_security.RUNTIME_VERIFIER_BINARY_ENV, raising=False)
     monkeypatch.setattr(runtime_security, "__file__", str(module_path), raising=False)
-    monkeypatch.setattr(runtime_security.sys, "executable", str(python_bin), raising=True)
-    monkeypatch.setattr(runtime_security.sys, "argv", [str(script_dir / "cli")], raising=True)
+    monkeypatch.setattr(
+        runtime_security.sys, "executable", str(python_bin), raising=True
+    )
+    monkeypatch.setattr(
+        runtime_security.sys, "argv", [str(script_dir / "cli")], raising=True
+    )
 
     assert (
         runtime_security.runtime_verifier_binary()

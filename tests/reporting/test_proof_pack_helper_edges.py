@@ -24,7 +24,9 @@ def _digest(path: Path) -> str:
 
 
 def _write_pack_scaffold(pack_dir: Path) -> tuple[Path, Path, Path]:
-    report_path = pack_dir / "reports" / "model" / "clean" / "noop" / "evaluation.report.json"
+    report_path = (
+        pack_dir / "reports" / "model" / "clean" / "noop" / "evaluation.report.json"
+    )
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text("{}", encoding="utf-8")
     _write_json(report_path.parent / RUNTIME_MANIFEST_FILENAME, {"ok": True})
@@ -46,9 +48,9 @@ def _write_manifest_and_checksums(
     checksum_lines: list[str] | None = None,
 ) -> None:
     rel_report = str(report_path.relative_to(pack_dir)).replace("\\", "/")
-    rel_runtime = str((report_path.parent / RUNTIME_MANIFEST_FILENAME).relative_to(pack_dir)).replace(
-        "\\", "/"
-    )
+    rel_runtime = str(
+        (report_path.parent / RUNTIME_MANIFEST_FILENAME).relative_to(pack_dir)
+    ).replace("\\", "/")
     rel_verdict = str(final_verdict.relative_to(pack_dir)).replace("\\", "/")
     rel_environment = str(environment.relative_to(pack_dir)).replace("\\", "/")
     if checksum_lines is None:
@@ -107,11 +109,19 @@ def test_manual_validate_manifest_reports_structural_errors() -> None:
     assert any("builder.id must be a non-empty string" in error for error in errors)
     assert any("builder.name must be a non-empty string" in error for error in errors)
     assert any("subject.path must be a non-empty string" in error for error in errors)
-    assert any("subject.digest must be a sha256:... string" in error for error in errors)
-    assert any("invocation.config_source must be an object" in error for error in errors)
+    assert any(
+        "subject.digest must be a sha256:... string" in error for error in errors
+    )
+    assert any(
+        "invocation.config_source must be an object" in error for error in errors
+    )
     assert any("invocation.parameters must be an object" in error for error in errors)
-    assert any("environment.path must be a non-empty string" in error for error in errors)
-    assert any("materials[0].name must be a non-empty string" in error for error in errors)
+    assert any(
+        "environment.path must be a non-empty string" in error for error in errors
+    )
+    assert any(
+        "materials[0].name must be a non-empty string" in error for error in errors
+    )
 
     errors = proof_pack_mod._manual_validate_manifest(
         {
@@ -197,9 +207,12 @@ def test_material_and_reference_helpers_cover_invalid_paths(tmp_path: Path) -> N
     target = pack_dir / "file.json"
     target.write_text("{}", encoding="utf-8")
 
-    assert proof_pack_mod._validate_reference(
-        pack_dir=pack_dir, label="demo", payload="bad"
-    ) == []
+    assert (
+        proof_pack_mod._validate_reference(
+            pack_dir=pack_dir, label="demo", payload="bad"
+        )
+        == []
+    )
     assert proof_pack_mod._validate_reference(
         pack_dir=pack_dir,
         label="demo",
@@ -264,15 +277,18 @@ def test_checksum_and_extra_file_helpers_cover_error_paths(tmp_path: Path) -> No
 
     manifest["checksums_sha256_digest"] = "a" * 64
     _write_json(pack_dir / "manifest.json", manifest)
-    assert "checksums.sha256 digest mismatch" in proof_pack_mod._verify_manifest_binds_checksums(pack_dir)[0]
+    assert (
+        "checksums.sha256 digest mismatch"
+        in proof_pack_mod._verify_manifest_binds_checksums(pack_dir)[0]
+    )
 
     (pack_dir / "checksums.sha256").write_text(
         "\n".join(
             [
                 "not a checksum line",
-                f"{'a'*64}  ../escape.txt",
-                f"{'b'*64}  missing.txt",
-                f"{'c'*64}  {final_verdict.relative_to(pack_dir).as_posix()}",
+                f"{'a' * 64}  ../escape.txt",
+                f"{'b' * 64}  missing.txt",
+                f"{'c' * 64}  {final_verdict.relative_to(pack_dir).as_posix()}",
             ]
         )
         + "\n",
@@ -285,7 +301,10 @@ def test_checksum_and_extra_file_helpers_cover_error_paths(tmp_path: Path) -> No
     assert "../escape.txt" in covered
     assert any("escapes the pack root" in error for error in checksum_errors)
     assert any("missing from pack: missing.txt" in error for error in checksum_errors)
-    assert any("checksum mismatch for results/final_verdict.json" in error for error in checksum_errors)
+    assert any(
+        "checksum mismatch for results/final_verdict.json" in error
+        for error in checksum_errors
+    )
 
     (pack_dir / "extra.txt").write_text("extra", encoding="utf-8")
     extra_errors, extra_warnings = proof_pack_mod._verify_no_extra_files(
@@ -318,7 +337,9 @@ def test_verify_gpg_covers_missing_binary_signature_failure_and_fingerprint_mism
     assert fingerprint is None
 
     errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=True)
-    assert errors == ["manifest.json.asc missing (strict mode requires a signed manifest)."]
+    assert errors == [
+        "manifest.json.asc missing (strict mode requires a signed manifest)."
+    ]
     assert warnings == []
     assert fingerprint is None
 
@@ -384,7 +405,12 @@ def test_verify_reports_and_inspect_cover_error_paths(
 
     error_only_pack = tmp_path / "error-only"
     error_report = (
-        error_only_pack / "reports" / "model" / "errors" / "noop" / "evaluation.report.json"
+        error_only_pack
+        / "reports"
+        / "model"
+        / "errors"
+        / "noop"
+        / "evaluation.report.json"
     )
     error_report.parent.mkdir(parents=True, exist_ok=True)
     error_report.write_text("{}", encoding="utf-8")
@@ -404,8 +430,12 @@ def test_verify_reports_and_inspect_cover_error_paths(
         final_verdict=final_verdict,
         environment=environment,
     )
-    (pack_dir / "reports" / "model" / "errors" / "noop").mkdir(parents=True, exist_ok=True)
-    (pack_dir / "reports" / "model" / "errors" / "noop" / "evaluation.report.json").write_text(
+    (pack_dir / "reports" / "model" / "errors" / "noop").mkdir(
+        parents=True, exist_ok=True
+    )
+    (
+        pack_dir / "reports" / "model" / "errors" / "noop" / "evaluation.report.json"
+    ).write_text(
         "{}",
         encoding="utf-8",
     )
@@ -619,7 +649,9 @@ def test_validate_reference_allows_empty_path_and_digest_pair(tmp_path: Path) ->
     )
 
 
-def test_verify_manifest_attestation_rejects_non_object_manifest(tmp_path: Path) -> None:
+def test_verify_manifest_attestation_rejects_non_object_manifest(
+    tmp_path: Path,
+) -> None:
     pack_dir = tmp_path / "pack"
     pack_dir.mkdir()
     (pack_dir / "manifest.json").write_text("[1, 2, 3]", encoding="utf-8")
@@ -653,9 +685,7 @@ def test_parse_checksums_ignores_blank_lines(tmp_path: Path) -> None:
     pack_dir = tmp_path / "pack"
     pack_dir.mkdir()
     (pack_dir / "checksums.sha256").write_text(
-        "\n"
-        f"{'a' * 64}  results/final_verdict.json\n"
-        "\n",
+        f"\n{'a' * 64}  results/final_verdict.json\n\n",
         encoding="utf-8",
     )
 

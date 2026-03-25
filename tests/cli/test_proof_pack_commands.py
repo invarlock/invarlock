@@ -278,7 +278,12 @@ def test_proof_pack_verify_human_failure_renders_errors(
     monkeypatch.setattr(
         "invarlock.cli.commands.proof_pack.verify_proof_pack",
         lambda *args, **kwargs: (
-            {"pack": str(pack_dir), "ok": False, "warnings": [], "errors": ["bad pack"]},
+            {
+                "pack": str(pack_dir),
+                "ok": False,
+                "warnings": [],
+                "errors": ["bad pack"],
+            },
             6,
         ),
         raising=False,

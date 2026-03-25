@@ -737,7 +737,9 @@ def test_evaluate_baseline_report_requires_json_object(
     assert exc.exit_code == 2
 
 
-def test_evaluate_baseline_report_requires_noop_edit(monkeypatch, tmp_path: Path) -> None:
+def test_evaluate_baseline_report_requires_noop_edit(
+    monkeypatch, tmp_path: Path
+) -> None:
     exc = _assert_baseline_report_validation_exit(
         monkeypatch,
         tmp_path,
@@ -1117,7 +1119,9 @@ def test_evaluate_degraded_primary_metric_emits_report_and_exits(
         lambda **kwargs: report_calls.append(kwargs),
         raising=False,
     )
-    monkeypatch.setattr(mod, "_resolve_exit_code", lambda err, profile: 7, raising=False)
+    monkeypatch.setattr(
+        mod, "_resolve_exit_code", lambda err, profile: 7, raising=False
+    )
 
     with pytest.raises(click.exceptions.Exit) as exc:
         mod.evaluate_command(
@@ -1159,16 +1163,18 @@ def test_evaluate_quiet_summary_skips_primary_metric_line_when_ratio_missing(
     assert "Primary metric ratio:" not in console.joined()
 
 
-def test_evaluate_verbose_mode_prints_debug_lines(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_evaluate_verbose_mode_prints_debug_lines(monkeypatch, tmp_path: Path) -> None:
     src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
     baseline_report = _write_json(tmp_path / "baseline.json", {})
     edited_report = _write_json(tmp_path / "edited.json", {})
     console = RecordingConsole()
 
-    monkeypatch.setattr("invarlock.cli.output.make_console", lambda **_: console, raising=False)
-    monkeypatch.setattr(mod, "resolve_auto_adapter", lambda _src: "hf_causal", raising=True)
+    monkeypatch.setattr(
+        "invarlock.cli.output.make_console", lambda **_: console, raising=False
+    )
+    monkeypatch.setattr(
+        mod, "resolve_auto_adapter", lambda _src: "hf_causal", raising=True
+    )
     monkeypatch.setattr(run_mod, "run_command", lambda **_: None, raising=False)
     monkeypatch.setattr(
         mod,
@@ -1202,10 +1208,7 @@ def test_evaluate_invalid_preset_guard_order_falls_back_to_default(
     src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
     preset = Path("preset.yaml")
     preset.write_text(
-        "guards:\n"
-        "  order:\n"
-        "    - invariants\n"
-        "    - 3\n",
+        "guards:\n  order:\n    - invariants\n    - 3\n",
         encoding="utf-8",
     )
     baseline_report = _write_json(tmp_path / "baseline.json", {})
@@ -1369,7 +1372,9 @@ def test_evaluate_quiet_mode_replays_baseline_child_output_on_failure(
             run_mod.console.print("baseline child output", markup=False)
             raise RuntimeError("baseline boom")
 
-    monkeypatch.setattr("invarlock.cli.output.make_console", lambda **_: console, raising=False)
+    monkeypatch.setattr(
+        "invarlock.cli.output.make_console", lambda **_: console, raising=False
+    )
     monkeypatch.setattr(run_mod, "run_command", failing_run, raising=False)
 
     with pytest.raises(RuntimeError, match="baseline boom"):
@@ -1394,11 +1399,7 @@ def test_evaluate_quiet_mode_replays_edit_config_child_output_on_failure(
     baseline_report = _write_json(tmp_path / "baseline.json", {})
     edit_cfg = Path("edit_config.yaml")
     edit_cfg.write_text(
-        "model:\n"
-        "  id: <MODEL_ID>\n"
-        "edit:\n"
-        "  name: quant_rtn\n"
-        "  plan: {}\n",
+        "model:\n  id: <MODEL_ID>\nedit:\n  name: quant_rtn\n  plan: {}\n",
         encoding="utf-8",
     )
 
@@ -1407,7 +1408,9 @@ def test_evaluate_quiet_mode_replays_edit_config_child_output_on_failure(
             run_mod.console.print("edited child output", markup=False)
             raise RuntimeError("edited boom")
 
-    monkeypatch.setattr("invarlock.cli.output.make_console", lambda **_: console, raising=False)
+    monkeypatch.setattr(
+        "invarlock.cli.output.make_console", lambda **_: console, raising=False
+    )
     monkeypatch.setattr(run_mod, "run_command", failing_run, raising=False)
     monkeypatch.setattr(
         mod,
@@ -1442,7 +1445,9 @@ def test_evaluate_quiet_mode_replays_noop_subject_output_on_failure(
             run_mod.console.print("noop subject output", markup=False)
             raise RuntimeError("subject boom")
 
-    monkeypatch.setattr("invarlock.cli.output.make_console", lambda **_: console, raising=False)
+    monkeypatch.setattr(
+        "invarlock.cli.output.make_console", lambda **_: console, raising=False
+    )
     monkeypatch.setattr(run_mod, "run_command", failing_run, raising=False)
     monkeypatch.setattr(
         mod,
@@ -1478,7 +1483,9 @@ def test_evaluate_quiet_mode_replays_report_output_on_failure(
         report_mod.console.print("report child output", markup=False)
         raise RuntimeError("report boom")
 
-    monkeypatch.setattr("invarlock.cli.output.make_console", lambda **_: console, raising=False)
+    monkeypatch.setattr(
+        "invarlock.cli.output.make_console", lambda **_: console, raising=False
+    )
     monkeypatch.setattr(run_mod, "run_command", lambda **_: None, raising=False)
     monkeypatch.setattr(
         mod,
@@ -1533,7 +1540,9 @@ def test_evaluate_timing_summary_uses_accumulated_total_when_style_disables_timi
     monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
     monkeypatch.setattr(
         "invarlock.cli.output.resolve_output_style",
-        lambda **_kwargs: OutputStyle(name="audit", progress=False, timing=False, color=False),
+        lambda **_kwargs: OutputStyle(
+            name="audit", progress=False, timing=False, color=False
+        ),
         raising=False,
     )
     monkeypatch.setattr(
