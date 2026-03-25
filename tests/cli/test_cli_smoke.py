@@ -12,7 +12,7 @@ def test_cli_version_smoke():
 
 
 def test_cli_plugins_guards_smoke():
-    result = runner.invoke(app, ["plugins", "guards"])
+    result = runner.invoke(app, ["advanced", "plugins", "guards"])
     # Command may exit 0 or 1 depending on environment; ensure it runs
     assert result.exit_code in (0, 1)
     assert "plugins" in result.stdout.lower() or result.stdout
@@ -29,13 +29,13 @@ def test_cli_plugins_unknown_category_exits_error():
 
     # Ensure discovery gating is not the reason this path fails
     _os.environ["INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS"] = "0"
-    result = runner.invoke(app, ["plugins", "list", "unknown_cat"])
+    result = runner.invoke(app, ["advanced", "plugins", "list", "unknown_cat"])
     # Expect a non-zero exit in this path
     assert result.exit_code != 0
     assert "unknown category" in result.stdout.lower()
 
 
 def test_cli_plugins_help_shows_usage():
-    result = runner.invoke(app, ["plugins", "--help"])
+    result = runner.invoke(app, ["advanced", "plugins", "--help"])
     assert result.exit_code == 0
     assert "usage" in result.stdout.lower() or "show" in result.stdout.lower()

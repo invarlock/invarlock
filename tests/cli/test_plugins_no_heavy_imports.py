@@ -21,7 +21,7 @@ def test_plugins_json_does_not_import_heavy_libs(category):
     if preloaded:
         pytest.skip(f"heavy libs already loaded: {sorted(preloaded)[:3]}...")
 
-    res = CliRunner().invoke(app, ["plugins", "list", category, "--json"])
+    res = CliRunner().invoke(app, ["advanced", "plugins", "list", category, "--json"])
     assert res.exit_code == 0
     _ = json.loads(res.stdout.strip().splitlines()[-1])
 

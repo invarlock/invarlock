@@ -11,7 +11,7 @@ runner = CliRunner()
 
 def test_plugins_alias_adapter_singular():
     # Should accept 'adapter' as alias for 'adapters'
-    res = runner.invoke(app, ["plugins", "adapter", "--json"])
+    res = runner.invoke(app, ["advanced", "plugins", "adapter", "--json"])
     assert res.exit_code == 0, res.output
     payload = json.loads(res.output)
     assert payload.get("category") == "adapters"
@@ -22,12 +22,12 @@ def test_plugins_alias_adapter_singular():
 def test_plugins_hide_unsupported_filter():
     # Compare JSON with and without --hide-unsupported; the filtered set
     # should not contain any entries with status == 'unsupported'
-    res_all = runner.invoke(app, ["plugins", "adapters", "--json"])
+    res_all = runner.invoke(app, ["advanced", "plugins", "adapters", "--json"])
     assert res_all.exit_code == 0, res_all.output
     _ = json.loads(res_all.output)
 
     res_filtered = runner.invoke(
-        app, ["plugins", "adapters", "--json", "--hide-unsupported"]
+        app, ["advanced", "plugins", "adapters", "--json", "--hide-unsupported"]
     )
     assert res_filtered.exit_code == 0, res_filtered.output
     filt_payload = json.loads(res_filtered.output)

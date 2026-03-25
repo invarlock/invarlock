@@ -10,7 +10,7 @@ from invarlock.cli.app import app
 def test_plugins_discovery_disabled_minimal_json_adapters():
     r = CliRunner().invoke(
         app,
-        ["plugins", "adapters", "--json"],
+        ["advanced", "plugins", "adapters", "--json"],
         env={"INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS": "0"},
     )
     assert r.exit_code == 0
@@ -23,6 +23,6 @@ def test_plugins_discovery_disabled_minimal_json_adapters():
 
 def test_plugins_explain_unknown_adapter_exits():
     r = CliRunner().invoke(
-        app, ["plugins", "adapters", "--explain", "__unknown_adapter__"]
+        app, ["advanced", "plugins", "adapters", "--explain", "__unknown_adapter__"]
     )
     assert r.exit_code == 1

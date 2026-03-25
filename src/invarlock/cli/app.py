@@ -12,7 +12,9 @@ minimal environments.
 from __future__ import annotations
 
 import os
+from enum import Enum
 
+import click
 import typer
 from rich.console import Console
 from typer.core import TyperGroup
@@ -38,14 +40,10 @@ class OrderedGroup(TyperGroup):
     def list_commands(self, ctx):  # type: ignore[override]
         return [
             "evaluate",
-            "calibrate",
             "report",
             "verify",
-            "proof-pack",
-            "policy",
-            "run",
-            "plugins",
             "doctor",
+            "advanced",
             "version",
         ]
 
@@ -53,9 +51,17 @@ class OrderedGroup(TyperGroup):
         command = super().get_command(ctx, cmd_name)
         if command is not None:
             return command
+        removed = _removed_top_level_command(cmd_name)
+        if removed is not None:
+            return removed
         if _load_lazy_subapp(self, cmd_name):
             return super().get_command(ctx, cmd_name)
         return None
+
+
+class ExecutionMode(str, Enum):
+    ATTESTED = "attested"
+    LOCAL = "local"
 
 
 # Initialize CLI app
@@ -63,8 +69,9 @@ app = typer.Typer(
     name="invarlock",
     help=(
         "InvarLock — evaluate model changes with deterministic pairing and safety gates.\n"
-        "Quick path: invarlock evaluate --baseline <MODEL> --subject <MODEL>\n"
-        "Hint: use --edit-config to run the built-in quant_rtn demo.\n"
+        "Core path: invarlock evaluate --baseline <MODEL> --subject <MODEL>\n"
+        "Then: invarlock verify <REPORT> and invarlock report html -i <REPORT> -o <HTML>\n"
+        "Advanced workflows live under: invarlock advanced\n"
         "Tip: enable downloads with INVARLOCK_ALLOW_NETWORK=1 when fetching.\n"
         "Exit codes:\n"
         "  0=success\n"
@@ -134,9 +141,40 @@ def version():
     _emit_version()
 
 
+_REMOVED_TOP_LEVEL_COMMAND_HINTS = {
+    "run": "Use `invarlock evaluate --baseline <MODEL> --subject <MODEL>` for the core workflow.",
+    "proof-pack": "Use `invarlock advanced proof-pack ...` for proof-pack tooling.",
+    "policy": "Use `invarlock advanced policy ...` for policy-pack tooling.",
+    "plugins": "Use `invarlock advanced plugins ...` for plugin inspection.",
+    "calibrate": "Use `invarlock advanced calibrate ...` for calibration workflows.",
+}
+
+
+def _removed_top_level_command(name: str) -> click.Command | None:
+    hint = _REMOVED_TOP_LEVEL_COMMAND_HINTS.get(name)
+    if hint is None:
+        return None
+
+    def _removed_command(args: tuple[str, ...]) -> None:
+        click.echo(
+            f"`{name}` is no longer a top-level command. {hint}",
+            err=True,
+        )
+        raise click.exceptions.Exit(2)
+
+    return click.Command(
+        name=name,
+        callback=_removed_command,
+        hidden=True,
+        add_help_option=False,
+        params=[click.Argument(["args"], nargs=-1, type=click.UNPROCESSED)],
+        context_settings={"ignore_unknown_options": True, "allow_extra_args": True},
+    )
+
+
 """Register command modules and groups in the desired help order.
 
-Order: evaluate → report → run → plugins → doctor → version
+Order: evaluate → report → verify → doctor → advanced → version
 """
 
 
@@ -207,6 +245,12 @@ def _evaluate_lazy(
     progress: bool = typer.Option(
         True, "--progress/--no-progress", help="Show progress done messages"
     ),
+    mode: ExecutionMode = typer.Option(
+        ExecutionMode.ATTESTED,
+        "--mode",
+        help="Execution mode for model-loading steps.",
+        case_sensitive=False,
+    ),
     no_color: bool = typer.Option(
         False, "--no-color", help="Disable ANSI colors (respects NO_COLOR=1)"
     ),
@@ -214,21 +258,6 @@ def _evaluate_lazy(
         False,
         "--allow-network",
         help="Allow network access, including runtime-image pulls and model fetches.",
-    ),
-    allow_host_execution: bool = typer.Option(
-        False,
-        "--allow-host-execution",
-        help="Allow running directly on the host instead of the runtime container.",
-    ),
-    allow_third_party_plugins: bool = typer.Option(
-        False,
-        "--allow-third-party-plugins",
-        help="Allow third-party plugin discovery for this command.",
-    ),
-    allow_remote_code: bool = typer.Option(
-        False,
-        "--allow-remote-code",
-        help="Allow trust_remote_code-style model loading for this command.",
     ),
 ):
     from .commands.evaluate import evaluate_command as _eval
@@ -252,11 +281,9 @@ def _evaluate_lazy(
         style=style,
         timing=timing,
         progress=progress,
+        mode=mode.value,
         no_color=no_color,
         allow_network=allow_network,
-        allow_host_execution=allow_host_execution,
-        allow_third_party_plugins=allow_third_party_plugins,
-        allow_remote_code=allow_remote_code,
     )
 
 
@@ -279,27 +306,10 @@ def _load_lazy_subapp(group: TyperGroup, name: str) -> bool:
         from .commands.report import report_app as _report_app
 
         return _register_lazy(name, _report_app)
-    if name == "policy":
-        from .commands.policy import policy_app as _policy_app
+    if name == "advanced":
+        from .commands.advanced import advanced_app as _advanced_app
 
-        return _register_lazy(name, _policy_app)
-    if name == "proof-pack":
-        from .commands.proof_pack import proof_pack_app as _proof_pack_app
-
-        return _register_lazy(name, _proof_pack_app)
-    if name == "plugins":
-        from .commands.plugins import plugins_app as _plugins_app
-
-        return _register_lazy(name, _plugins_app)
-    if name == "calibrate":
-        try:
-            from .commands.calibrate import calibrate_app as _calibrate_app
-        except ModuleNotFoundError as exc:  # pragma: no cover - exercised in venv test
-            missing = getattr(exc, "name", "") or ""
-            if missing in {"torch", "transformers"}:
-                return False
-            raise
-        return _register_lazy(name, _calibrate_app)
+        return _register_lazy(name, _advanced_app)
     return False
 
 
@@ -351,128 +361,6 @@ def _verify_typed(
         profile=profile,
         json_out=json_out,
         allow_unattested_artifacts=allow_unattested_artifacts,
-    )
-
-
-@app.command(
-    name="run",
-    help=(
-        "Execute an end-to-end run from a YAML config (edit + guards + reports). "
-        "Writes run artifacts and optionally an evaluation report."
-    ),
-)
-def _run_typed(
-    config: str = typer.Option(
-        ..., "--config", "-c", help="Path to YAML configuration file"
-    ),
-    device: str | None = typer.Option(
-        None, "--device", help="Device override (auto|cuda|mps|cpu)"
-    ),
-    profile: str | None = typer.Option(
-        None, "--profile", help="Profile to apply (ci|release)"
-    ),
-    out: str | None = typer.Option(None, "--out", help="Output directory override"),
-    edit: str | None = typer.Option(
-        None,
-        "--edit",
-        help="Edit name override (canonical plugin name, e.g. quant_rtn)",
-    ),
-    edit_label: str | None = typer.Option(
-        None,
-        "--edit-label",
-        help=(
-            "Edit algorithm label for BYOE models. Use 'noop' for baseline, "
-            "'quant_rtn' etc. for built-in edits, 'custom' for pre-edited models."
-        ),
-    ),
-    tier: str | None = typer.Option(
-        None,
-        "--tier",
-        help="Auto-tuning tier override (conservative|balanced|aggressive)",
-    ),
-    metric_kind: str | None = typer.Option(
-        None,
-        "--metric-kind",
-        help="Primary metric kind override (ppl_causal|ppl_mlm|accuracy|etc.)",
-    ),
-    probes: int | None = typer.Option(
-        None, "--probes", help="Number of micro-probes (0=deterministic, >0=adaptive)"
-    ),
-    until_pass: bool = typer.Option(
-        False,
-        "--until-pass",
-        help="Retry until evaluation report passes gates (max 3 attempts)",
-    ),
-    max_attempts: int = typer.Option(
-        3, "--max-attempts", help="Maximum retry attempts for --until-pass mode"
-    ),
-    timeout: int | None = typer.Option(
-        None, "--timeout", help="Timeout in seconds for --until-pass mode"
-    ),
-    baseline: str | None = typer.Option(
-        None,
-        "--baseline",
-        help="Path to baseline report.json for evaluation report validation",
-    ),
-    no_cleanup: bool = typer.Option(
-        False, "--no-cleanup", help="Skip cleanup of temporary artifacts"
-    ),
-    style: str | None = typer.Option(
-        None, "--style", help="Output style (audit|friendly)"
-    ),
-    progress: bool = typer.Option(
-        False, "--progress", help="Show progress done messages"
-    ),
-    timing: bool = typer.Option(False, "--timing", help="Show timing summary"),
-    no_color: bool = typer.Option(
-        False, "--no-color", help="Disable ANSI colors (respects NO_COLOR=1)"
-    ),
-    allow_network: bool = typer.Option(
-        False,
-        "--allow-network",
-        help="Allow network access, including runtime-image pulls and model fetches.",
-    ),
-    allow_host_execution: bool = typer.Option(
-        False,
-        "--allow-host-execution",
-        help="Allow running directly on the host instead of the runtime container.",
-    ),
-    allow_third_party_plugins: bool = typer.Option(
-        False,
-        "--allow-third-party-plugins",
-        help="Allow third-party plugin discovery for this command.",
-    ),
-    allow_remote_code: bool = typer.Option(
-        False,
-        "--allow-remote-code",
-        help="Allow trust_remote_code-style model loading for this command.",
-    ),
-):
-    from .commands.run import run_command as _run
-
-    return _run(
-        config=config,
-        device=device,
-        profile=profile,
-        out=out,
-        edit=edit,
-        edit_label=edit_label,
-        tier=tier,
-        metric_kind=metric_kind,
-        probes=probes,
-        until_pass=until_pass,
-        max_attempts=max_attempts,
-        timeout=timeout,
-        baseline=baseline,
-        no_cleanup=no_cleanup,
-        style=style,
-        progress=progress,
-        timing=timing,
-        no_color=no_color,
-        allow_network=allow_network,
-        allow_host_execution=allow_host_execution,
-        allow_third_party_plugins=allow_third_party_plugins,
-        allow_remote_code=allow_remote_code,
     )
 
 

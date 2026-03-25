@@ -53,7 +53,9 @@ def test_plugins_adapters_json_backend_and_filters(monkeypatch):
     # Force Linux to avoid Linux-only gating → needs_extra instead of unsupported
     monkeypatch.setattr(plug_mod.platform, "system", lambda: "Linux")
 
-    r = CliRunner().invoke(app, ["plugins", "adapters", "--json", "--show-unsupported"])
+    r = CliRunner().invoke(
+        app, ["advanced", "plugins", "adapters", "--json", "--show-unsupported"]
+    )
     assert r.exit_code == 0, r.output
     payload = json.loads(r.stdout.strip().splitlines()[-1])
     items = payload.get("items", [])
@@ -71,7 +73,15 @@ def test_plugins_adapters_json_backend_and_filters(monkeypatch):
     # only=missing filter should return only needs_extra
     r2 = CliRunner().invoke(
         app,
-        ["plugins", "adapters", "--json", "--only", "missing", "--show-unsupported"],
+        [
+            "advanced",
+            "plugins",
+            "adapters",
+            "--json",
+            "--only",
+            "missing",
+            "--show-unsupported",
+        ],
     )
     assert r2.exit_code == 0
     payload2 = json.loads(r2.stdout.strip().splitlines()[-1])

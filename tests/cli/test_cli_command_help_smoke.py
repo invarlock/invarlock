@@ -13,15 +13,14 @@ def test_cli_top_level_help_smoke(monkeypatch):
     for args in (
         ["--help"],
         ["evaluate", "--help"],
-        ["calibrate", "--help"],
         ["report", "--help"],
-        ["proof-pack", "--help"],
-        ["run", "--help"],
-        ["policy", "--help"],
-        ["plugins", "--help"],
-        ["plugins", "install", "--help"],
-        ["plugins", "uninstall", "--help"],
+        ["verify", "--help"],
         ["doctor", "--help"],
+        ["advanced", "--help"],
+        ["advanced", "calibrate", "--help"],
+        ["advanced", "proof-pack", "--help"],
+        ["advanced", "policy", "--help"],
+        ["advanced", "plugins", "--help"],
     ):
         res = runner.invoke(app, args)
         assert res.exit_code == 0, f"help failed for: {' '.join(args)} -> {res.output}"
@@ -41,7 +40,6 @@ def test_command_wrappers_importable():
         proof_pack_inspect_command,
         proof_pack_verify_command,
         report_command,
-        run_command,
         verify_command,
     )
     from invarlock.cli.commands.calibrate import calibrate_app
@@ -59,7 +57,6 @@ def test_command_wrappers_importable():
         proof_pack_inspect_command,
         proof_pack_verify_command,
         plugins_command,
-        run_command,
         verify_command,
         report_command,
     ):

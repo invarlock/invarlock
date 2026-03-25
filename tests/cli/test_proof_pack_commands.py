@@ -207,7 +207,7 @@ def _build_pack(pack_dir: Path, *, report_rel_path: str) -> Path:
 
 
 def test_proof_pack_help_lists_verify() -> None:
-    result = CliRunner().invoke(app, ["proof-pack", "--help"])
+    result = CliRunner().invoke(app, ["advanced", "proof-pack", "--help"])
     assert result.exit_code == 0
     assert "verify" in result.output
     assert "inspect" in result.output
@@ -230,6 +230,7 @@ def test_proof_pack_verify_json_round_trip(monkeypatch, tmp_path: Path) -> None:
     result = CliRunner().invoke(
         app,
         [
+            "advanced",
             "proof-pack",
             "verify",
             str(pack_dir),
@@ -258,11 +259,38 @@ def test_proof_pack_verify_human_success(monkeypatch, tmp_path: Path) -> None:
         raising=False,
     )
 
-    result = CliRunner().invoke(app, ["proof-pack", "verify", str(pack_dir)])
+    result = CliRunner().invoke(
+        app, ["advanced", "proof-pack", "verify", str(pack_dir)]
+    )
 
     assert result.exit_code == 0, result.output
     assert "WARNING:" in result.output
     assert "Proof pack verified" in result.output
+
+
+def test_proof_pack_verify_human_failure_renders_errors(
+    monkeypatch, tmp_path: Path
+) -> None:
+    pack_dir = _build_pack(
+        tmp_path / "pack",
+        report_rel_path="reports/model/clean/noop/evaluation.report.json",
+    )
+    monkeypatch.setattr(
+        "invarlock.cli.commands.proof_pack.verify_proof_pack",
+        lambda *args, **kwargs: (
+            {"pack": str(pack_dir), "ok": False, "warnings": [], "errors": ["bad pack"]},
+            6,
+        ),
+        raising=False,
+    )
+
+    result = CliRunner().invoke(
+        app, ["advanced", "proof-pack", "verify", str(pack_dir)]
+    )
+
+    assert result.exit_code == 6, result.output
+    assert "ERROR:" in result.output
+    assert "bad pack" in result.output
 
 
 def test_proof_pack_verify_json_round_trip_with_verify_payload(
@@ -278,7 +306,9 @@ def test_proof_pack_verify_json_round_trip_with_verify_payload(
         raising=False,
     )
 
-    result = CliRunner().invoke(app, ["proof-pack", "verify", str(pack_dir), "--json"])
+    result = CliRunner().invoke(
+        app, ["advanced", "proof-pack", "verify", str(pack_dir), "--json"]
+    )
 
     assert result.exit_code == 0, result.output
     payload = json.loads(result.stdout.strip())
@@ -296,7 +326,9 @@ def test_proof_pack_verify_json_round_trip_with_real_nested_verify(
         report_rel_path="reports/model/clean/noop/evaluation.report.json",
     )
 
-    result = CliRunner().invoke(app, ["proof-pack", "verify", str(pack_dir), "--json"])
+    result = CliRunner().invoke(
+        app, ["advanced", "proof-pack", "verify", str(pack_dir), "--json"]
+    )
 
     assert result.exit_code == 0, result.output
     payload = json.loads(result.stdout.strip())
@@ -310,7 +342,7 @@ def test_proof_pack_verify_json_round_trip_with_real_nested_verify(
 def test_proof_pack_verify_rejects_missing_pack(tmp_path: Path) -> None:
     result = CliRunner().invoke(
         app,
-        ["proof-pack", "verify", str(tmp_path / "missing"), "--json"],
+        ["advanced", "proof-pack", "verify", str(tmp_path / "missing"), "--json"],
     )
 
     assert result.exit_code == 3
@@ -321,7 +353,7 @@ def test_proof_pack_verify_rejects_missing_pack(tmp_path: Path) -> None:
 
 def test_proof_pack_verify_human_failure(tmp_path: Path) -> None:
     result = CliRunner().invoke(
-        app, ["proof-pack", "verify", str(tmp_path / "missing")]
+        app, ["advanced", "proof-pack", "verify", str(tmp_path / "missing")]
     )
 
     assert result.exit_code == 3
@@ -335,7 +367,9 @@ def test_proof_pack_inspect_json_summary(tmp_path: Path) -> None:
         report_rel_path="reports/model/clean/noop/evaluation.report.json",
     )
 
-    result = CliRunner().invoke(app, ["proof-pack", "inspect", str(pack_dir), "--json"])
+    result = CliRunner().invoke(
+        app, ["advanced", "proof-pack", "inspect", str(pack_dir), "--json"]
+    )
 
     assert result.exit_code == 0, result.output
     payload = json.loads(result.stdout.strip())
@@ -349,6 +383,51 @@ def test_proof_pack_inspect_json_summary(tmp_path: Path) -> None:
     assert payload["integrity"]["manifest_attestation_ok"] is True
     assert payload["strict_ready"] is False
     assert any("manifest.json.asc missing" in issue for issue in payload["issues"])
+
+
+def test_proof_pack_inspect_human_success_and_failure(
+    monkeypatch, tmp_path: Path
+) -> None:
+    pack_dir = tmp_path / "pack"
+    pack_dir.mkdir()
+
+    monkeypatch.setattr(
+        "invarlock.cli.commands.proof_pack.inspect_proof_pack",
+        lambda path: (
+            {
+                "pack": str(path),
+                "ok": True,
+                "issues": ["unsigned"],
+            },
+            0,
+        ),
+        raising=False,
+    )
+    result = CliRunner().invoke(
+        app, ["advanced", "proof-pack", "inspect", str(pack_dir)]
+    )
+    assert result.exit_code == 0, result.output
+    assert "Proof pack inspected" in result.output
+    assert "ISSUE:" in result.output
+
+    monkeypatch.setattr(
+        "invarlock.cli.commands.proof_pack.inspect_proof_pack",
+        lambda path: (
+            {
+                "pack": str(path),
+                "ok": False,
+                "issues": ["missing manifest"],
+            },
+            4,
+        ),
+        raising=False,
+    )
+    result = CliRunner().invoke(
+        app, ["advanced", "proof-pack", "inspect", str(pack_dir)]
+    )
+    assert result.exit_code == 4, result.output
+    assert "ERROR:" in result.output
+    assert "missing manifest" in result.output
 
 
 def test_proof_pack_build_json_round_trip(monkeypatch, tmp_path: Path) -> None:
@@ -374,6 +453,7 @@ def test_proof_pack_build_json_round_trip(monkeypatch, tmp_path: Path) -> None:
     build = CliRunner().invoke(
         app,
         [
+            "advanced",
             "proof-pack",
             "build",
             str(out_dir),
@@ -405,7 +485,9 @@ def test_proof_pack_build_json_round_trip(monkeypatch, tmp_path: Path) -> None:
     assert (out_dir / "metadata" / "model_revisions.json").is_file()
     assert len(list(out_dir.glob("reports/**/evaluation.report.json"))) == 1
 
-    verify = CliRunner().invoke(app, ["proof-pack", "verify", str(out_dir), "--json"])
+    verify = CliRunner().invoke(
+        app, ["advanced", "proof-pack", "verify", str(out_dir), "--json"]
+    )
     assert verify.exit_code == 0, verify.output
     verify_payload = json.loads(verify.stdout.strip())
     assert verify_payload["ok"] is True
@@ -419,6 +501,7 @@ def test_proof_pack_build_requires_reports(tmp_path: Path) -> None:
     result = CliRunner().invoke(
         app,
         [
+            "advanced",
             "proof-pack",
             "build",
             str(tmp_path / "pack"),
@@ -433,3 +516,118 @@ def test_proof_pack_build_requires_reports(tmp_path: Path) -> None:
     assert payload["format_version"] == "proof-pack-build-v1"
     assert payload["ok"] is False
     assert any("at least one --report" in error for error in payload["errors"])
+
+
+def test_proof_pack_build_invalid_material_human_and_json(tmp_path: Path) -> None:
+    final_verdict = tmp_path / "final_verdict.json"
+    _write_json(final_verdict, {"verdict": "PASS"})
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "advanced",
+            "proof-pack",
+            "build",
+            str(tmp_path / "pack"),
+            "--final-verdict",
+            str(final_verdict),
+            "--material",
+            "bad-material",
+        ],
+    )
+    assert result.exit_code == 2, result.output
+    assert "Invalid --material value" in result.output
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "advanced",
+            "proof-pack",
+            "build",
+            str(tmp_path / "pack-json"),
+            "--final-verdict",
+            str(final_verdict),
+            "--material",
+            "bad-material",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 2, result.output
+    payload = json.loads(result.stdout.strip())
+    assert payload["ok"] is False
+    assert "Invalid --material value" in payload["errors"][0]
+
+
+def test_proof_pack_build_human_success_and_failure(
+    monkeypatch, tmp_path: Path
+) -> None:
+    final_verdict = tmp_path / "final_verdict.json"
+    report = tmp_path / "evaluation.report.json"
+    final_verdict.write_text('{"verdict":"PASS"}', encoding="utf-8")
+    report.write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr(
+        "invarlock.cli.commands.proof_pack.build_proof_pack",
+        lambda *args, **kwargs: (
+            {
+                "pack": str(tmp_path / "pack"),
+                "ok": True,
+                "warnings": ["unsigned"],
+                "errors": [],
+                "reports": {"total": 1},
+                "verify": {"ok": True},
+                "files": {"hashed": 2},
+            },
+            0,
+        ),
+        raising=False,
+    )
+    result = CliRunner().invoke(
+        app,
+        [
+            "advanced",
+            "proof-pack",
+            "build",
+            str(tmp_path / "pack"),
+            "--final-verdict",
+            str(final_verdict),
+            "--report",
+            str(report),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "WARNING:" in result.output
+    assert "Proof pack built" in result.output
+
+    monkeypatch.setattr(
+        "invarlock.cli.commands.proof_pack.build_proof_pack",
+        lambda *args, **kwargs: (
+            {
+                "pack": str(tmp_path / "pack"),
+                "ok": False,
+                "warnings": [],
+                "errors": ["build failed"],
+                "reports": {"total": 1},
+                "verify": None,
+                "files": None,
+            },
+            7,
+        ),
+        raising=False,
+    )
+    result = CliRunner().invoke(
+        app,
+        [
+            "advanced",
+            "proof-pack",
+            "build",
+            str(tmp_path / "pack"),
+            "--final-verdict",
+            str(final_verdict),
+            "--report",
+            str(report),
+        ],
+    )
+    assert result.exit_code == 7, result.output
+    assert "ERROR:" in result.output
+    assert "build failed" in result.output

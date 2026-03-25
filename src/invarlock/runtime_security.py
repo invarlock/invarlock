@@ -365,7 +365,9 @@ def _mount_is_already_covered(mount: Path, *, cwd: Path) -> bool:
     return mount == cwd or cwd in mount.parents
 
 
-def _iter_external_symlink_target_mounts(path: Path, *, cwd: Path) -> list[Path]:
+def _iter_external_symlink_target_mounts(
+    path: Path, *, cwd: Path, recursive: bool = True
+) -> list[Path]:
     expanded = path.expanduser()
     root_mount = _mount_root_for_path(expanded)
     mounts: set[Path] = set()
@@ -380,6 +382,9 @@ def _iter_external_symlink_target_mounts(path: Path, *, cwd: Path) -> list[Path]
 
     if expanded.is_symlink():
         _record_symlink_target(expanded)
+
+    if not recursive:
+        return sorted(mounts, key=lambda item: (len(item.parts), str(item)))
 
     walk_root = expanded.resolve(strict=False) if expanded.is_symlink() else expanded
     if not walk_root.exists() or not walk_root.is_dir():
@@ -436,8 +441,20 @@ def _container_pythonpath_entries(*, cwd: Path) -> tuple[list[str], list[Path]]:
     return container_entries, _minimize_mounts(mounts)
 
 
-def _record_path_dependencies(path: Path, mounts: set[Path], *, cwd: Path) -> bool:
-    mounts.update(_iter_external_symlink_target_mounts(path, cwd=cwd))
+def _record_path_dependencies(
+    path: Path,
+    mounts: set[Path],
+    *,
+    cwd: Path,
+    recursive_symlink_scan: bool = True,
+) -> bool:
+    mounts.update(
+        _iter_external_symlink_target_mounts(
+            path,
+            cwd=cwd,
+            recursive=recursive_symlink_scan,
+        )
+    )
     if _path_is_within(path, cwd):
         return True
     mount = _mount_root_for_path(path)
@@ -567,7 +584,15 @@ def _path_env_value_for_container(
 ) -> tuple[str, list[Path]]:
     host_path = _absolute_host_path(raw_value, cwd=cwd)
     mounts: set[Path] = set()
-    inside_cwd = _record_path_dependencies(host_path, mounts, cwd=cwd)
+    # Path-based env vars like TMPDIR and cache roots can point at very large
+    # trees. Mount the declared root and any direct symlink target, but avoid
+    # recursively scanning the full directory contents while building commands.
+    inside_cwd = _record_path_dependencies(
+        host_path,
+        mounts,
+        cwd=cwd,
+        recursive_symlink_scan=False,
+    )
     if inside_cwd:
         return _workspace_path(host_path, cwd=cwd), _minimize_mounts(mounts)
     return str(host_path), _minimize_mounts(mounts)

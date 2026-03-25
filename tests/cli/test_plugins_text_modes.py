@@ -14,13 +14,15 @@ def test_plugins_adapters_compact_and_verbose_tables(monkeypatch):
     )
     monkeypatch.setitem(__import__("sys").modules, "torch", fake_torch)
 
-    r = CliRunner().invoke(app, ["plugins", "adapters", "--show-unsupported"])
+    r = CliRunner().invoke(
+        app, ["advanced", "plugins", "adapters", "--show-unsupported"]
+    )
     assert r.exit_code == 0
     # Title of compact table should appear
     assert "Adapters  ready:" in r.stdout or "Adapters — ready:" in r.stdout
 
     rv = CliRunner().invoke(
-        app, ["plugins", "adapters", "--verbose", "--show-unsupported"]
+        app, ["advanced", "plugins", "adapters", "--verbose", "--show-unsupported"]
     )
     assert rv.exit_code == 0
     assert "Adapters (verbose)" in rv.stdout
@@ -28,6 +30,8 @@ def test_plugins_adapters_compact_and_verbose_tables(monkeypatch):
 
 def test_plugins_adapter_explain(monkeypatch):
     # Explain a core adapter
-    r = CliRunner().invoke(app, ["plugins", "adapters", "--explain", "hf_causal"])
+    r = CliRunner().invoke(
+        app, ["advanced", "plugins", "adapters", "--explain", "hf_causal"]
+    )
     assert r.exit_code == 0
     assert "Support" in r.stdout and "Module" in r.stdout
