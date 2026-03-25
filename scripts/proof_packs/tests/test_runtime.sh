@@ -30,6 +30,24 @@ test_runtime_python_wrapper_invokes_repo_helper() {
     assert_eq "ok" "${RUN_OUT}" "forwards helper stdout"
 }
 
+test_pack_run_from_config_invokes_repo_python_entrypoint() {
+    mock_reset
+    # shellcheck source=../runtime.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/runtime.sh"
+
+    local calls="${TEST_TMPDIR}/python.calls"
+    : >"${calls}"
+    _cmd_python() {
+        printf '%s\n' "$*" > "${calls}"
+        return 0
+    }
+
+    run _pack_run_from_config --config demo.yaml --out runs/demo
+    assert_rc "0" "${RUN_RC}" "_pack_run_from_config returns success"
+    assert_match "proof_packs/.*/python/run_from_config\\.py" "$(cat "${calls}")" "invokes repo-only config runner"
+    assert_match "--config demo\\.yaml --out runs/demo" "$(cat "${calls}")" "forwards config-run arguments"
+}
+
 test_cmd_python_honors_python_bin_override() {
     mock_reset
     local bin_dir="${TEST_TMPDIR}/bin"

@@ -12,24 +12,10 @@ test_config_generator_run_single_calibration_large_model_emits_log_and_captures_
     PACK_DETERMINISM="throughput"
     export INVARLOCK_DATASET INVARLOCK_TIER FLASH_ATTENTION_AVAILABLE PACK_DETERMINISM
 
-    local bin_dir="${TEST_TMPDIR}/bin"
-    mkdir -p "${bin_dir}"
-
-    cat > "${bin_dir}/python3" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-exit 0
-EOF
-    chmod +x "${bin_dir}/python3"
-
-    cat > "${bin_dir}/invarlock" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-cmd="${1:-}"
-shift || true
-case "${cmd}" in
-    run)
-        out=""
+    local run_calls="${TEST_TMPDIR}/config_runner.calls"
+    _pack_run_from_config() {
+        printf '%s\n' "$*" > "${run_calls}"
+        local out=""
         while [[ $# -gt 0 ]]; do
             case "${1}" in
                 --out)
@@ -43,32 +29,9 @@ case "${cmd}" in
         done
         mkdir -p "${out}"
         echo '{}' > "${out}/report.json"
-        exit 0
-        ;;
-    evaluate)
-        cert_out=""
-        while [[ $# -gt 0 ]]; do
-            case "${1}" in
-                --report-out)
-                    cert_out="${2:-}"
-                    shift 2
-                    ;;
-                *)
-                    shift
-                    ;;
-            esac
-        done
-        mkdir -p "${cert_out}"
-        echo '{}' > "${cert_out}/evaluation.report.json"
-        exit 0
-        ;;
-esac
-exit 0
-EOF
-    chmod +x "${bin_dir}/invarlock"
-
-    PATH="${bin_dir}:${PATH}"
-    export PATH
+        return 0
+    }
+    _cmd_python() { return 0; }
 
     estimate_model_params() { echo "70"; }
 
@@ -86,6 +49,8 @@ EOF
 
     assert_match "Large model \\(70\\)" "$(cat "${log_file}")" "large model branch logged"
     assert_file_exists "${run_dir}/baseline_report.json" "baseline report copied"
+    assert_match "--config" "$(cat "${run_calls}")" "calibration forwards config path through repo config runner"
+    assert_match "--out" "$(cat "${run_calls}")" "calibration forwards output path through repo config runner"
 }
 
 test_config_generator_run_invarlock_calibration_logs_moe_and_all_runs_failed() {

@@ -747,6 +747,73 @@ def delegate_current_process_to_container(argv: list[str] | None = None) -> int:
     return int(completed.returncode)
 
 
+def build_container_python_command(
+    script_path: str | os.PathLike[str],
+    argv: list[str] | None = None,
+) -> list[str]:
+    engine = resolve_container_engine()
+    if engine is None:
+        raise RuntimeError(
+            "Host execution is disabled by default and no container engine "
+            "(docker/podman) is available. Set "
+            f"{ALLOW_HOST_EXECUTION_ENV}=1 or install docker/podman."
+        )
+
+    cwd = Path.cwd().resolve()
+    image = resolve_runtime_image()
+    digest = resolve_runtime_image_digest() or ""
+    if not network_allowed() and not container_image_available_locally(
+        image, engine=engine
+    ):
+        raise RuntimeError(
+            "Host execution is disabled by default and runtime image "
+            f"{image!r} is not available locally. Build it with `make runtime-image` "
+            f"or set {ALLOW_NETWORK_ENV}=1 to allow pulling the image."
+        )
+    if argv is None:
+        argv = list(sys.argv[1:])
+    argv, argv_mounts, needs_cwd_host_mirror = _normalize_delegated_argv(argv, cwd=cwd)
+    pythonpath_entries, pythonpath_mounts = _container_pythonpath_entries(cwd=cwd)
+    env_pairs, env_mounts = _delegated_env_pairs(cwd=cwd)
+    env_pairs[RUNTIME_IMAGE_DIGEST_ENV] = digest
+    env_pairs["PYTHONPATH"] = os.pathsep.join(pythonpath_entries)
+
+    script_host_path = _absolute_host_path(script_path, cwd=cwd)
+    script_mounts: set[Path] = set()
+    if _record_path_dependencies(script_host_path, script_mounts, cwd=cwd):
+        container_script = _workspace_path(script_host_path, cwd=cwd)
+    else:
+        container_script = str(script_host_path)
+
+    command = [engine, "run", "--rm", "--entrypoint", "python"]
+    if _needs_gpu_passthrough(["run", *argv]):
+        command.extend(["--gpus", "all"])
+    if not network_allowed():
+        command.extend(["--network", "none"])
+    command.extend(["-v", f"{cwd}:/workspace", "-w", "/workspace"])
+    if needs_cwd_host_mirror:
+        command.extend(["-v", f"{cwd}:{cwd}"])
+    extra_mounts = list(argv_mounts)
+    extra_mounts.extend(env_mounts)
+    extra_mounts.extend(pythonpath_mounts)
+    extra_mounts.extend(script_mounts)
+    for mount in _minimize_mounts(extra_mounts):
+        command.extend(["-v", f"{mount}:{mount}"])
+    for key, value in env_pairs.items():
+        command.extend(["-e", f"{key}={value}"])
+    command.extend([image, container_script, *argv])
+    return command
+
+
+def delegate_python_script_to_container(
+    script_path: str | os.PathLike[str],
+    argv: list[str] | None = None,
+) -> int:
+    command = build_container_python_command(script_path, argv=argv)
+    completed = subprocess.run(command, check=False)
+    return int(completed.returncode)
+
+
 def _config_digest(
     *,
     config_path: str | os.PathLike[str] | None = None,

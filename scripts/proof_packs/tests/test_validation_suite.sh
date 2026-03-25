@@ -1338,7 +1338,7 @@ test_pack_validation_run_single_calibration_large_model_and_report_copy_branch()
     pack_setup_output_dirs
 
     fixture_write "python3.stub" ""
-    fixture_write "invarlock.create_report" ""
+    fixture_write "python3.create_report" ""
     estimate_model_params() { echo "${MODEL_SIZE_RETURN}"; }
 
     local run_dir="${TEST_TMPDIR}/cal/run1"

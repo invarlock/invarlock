@@ -3,9 +3,13 @@
 
 _PACK_CONFIG_GENERATOR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _PACK_CONFIG_GENERATOR_PY_DIR="${_PACK_CONFIG_GENERATOR_DIR}/../python"
+PACK_REPO_ROOT="${PACK_REPO_ROOT:-$(cd "${_PACK_CONFIG_GENERATOR_DIR}/../../.." && pwd)}"
+PACK_REPO_PYTHONPATH="${PACK_REPO_ROOT}/src"
 
 # shellcheck source=dataset_provider_config.sh
 source "${_PACK_CONFIG_GENERATOR_DIR}/dataset_provider_config.sh"
+# shellcheck source=runtime.sh
+source "${_PACK_CONFIG_GENERATOR_DIR}/runtime.sh"
 
 # ============ INVARLOCK CONFIG FOR PROOF PACKS ============
 generate_invarlock_config() {
@@ -182,24 +186,28 @@ run_single_calibration() {
     local -a run_env=(
         INVARLOCK_WINDOW_OVERLAP_FRACTION=0.0
         INVARLOCK_SKIP_OVERHEAD_CHECK=1
+        PYTHONPATH="${PACK_REPO_PYTHONPATH}"
         CUDA_VISIBLE_DEVICES="${cuda_devices}"
     )
     if pack_remote_code_allowed; then
         run_env+=(INVARLOCK_ALLOW_REMOTE_CODE=1)
     fi
 
-    env "${run_env[@]}" invarlock run \
-        --config "${config_yaml}" \
-        --profile ci \
-        --out "${run_dir}" \
-        >> "${log_file}" 2>&1 || exit_code=$?
+    (
+        export "${run_env[@]}"
+        _pack_run_from_config \
+            --config "${config_yaml}" \
+            --profile ci \
+            --out "${run_dir}" \
+            >> "${log_file}" 2>&1
+    ) || exit_code=$?
 
     # Generate report from report
     local report_file
     report_file=$(find "${run_dir}" -name "report*.json" -type f 2>/dev/null | head -1)
     if [[ -n "${report_file}" ]]; then
         cp "${report_file}" "${run_dir}/baseline_report.json" 2>/dev/null || true
-        python3 "${_PACK_CONFIG_GENERATOR_PY_DIR}/evaluation_report_from_report.py" \
+        _cmd_python "${_PACK_CONFIG_GENERATOR_PY_DIR}/evaluation_report_from_report.py" \
             --report "${report_file}" \
             --out "${run_dir}/evaluation.report.json" >> "${log_file}" 2>&1 || true
     fi

@@ -108,8 +108,17 @@ def test_proof_pack_shell_flows_keep_attestation_enforced() -> None:
     config_generator = (
         repo_root / "scripts/proof_packs/lib/config_generator.sh"
     ).read_text(encoding="utf-8")
+    runtime_sh = (repo_root / "scripts/proof_packs/lib/runtime.sh").read_text(
+        encoding="utf-8"
+    )
 
     assert "--allow-unattested-artifacts" not in run_pack
     assert "--allow-unattested-artifacts" not in verify_pack
     assert "INVARLOCK_ALLOW_HOST_EXECUTION=1" not in task_functions
     assert "INVARLOCK_ALLOW_HOST_EXECUTION=1" not in config_generator
+    assert "invarlock run" not in task_functions
+    assert "invarlock run" not in config_generator
+    assert "invarlock _run" not in runtime_sh
+    assert "run_from_config.py" in runtime_sh
+    assert "invarlock advanced proof-pack verify" in run_pack
+    assert "invarlock proof-pack verify" not in run_pack

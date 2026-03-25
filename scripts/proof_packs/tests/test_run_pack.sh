@@ -85,6 +85,7 @@ EOF
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/evaluation.html" "html rendered"
     assert_file_exists "${pack_dir}/README.md" "readme written"
     assert_match "signed manifest, strict verification, and a PASS final verdict" "$(cat "${pack_dir}/README.md")" "README documents proof-grade triad"
+    assert_match "invarlock advanced proof-pack verify" "$(cat "${pack_dir}/README.md")" "README points to advanced proof-pack verify"
     assert_file_exists "${pack_dir}/results/analysis/guard_intervention_summary.json" "intervention summary copied"
     assert_file_exists "${pack_dir}/metadata/source_repo.json" "source repo metadata written"
     assert_file_exists "${pack_dir}/metadata/environment.json" "environment metadata written"

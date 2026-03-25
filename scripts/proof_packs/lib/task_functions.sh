@@ -603,12 +603,15 @@ YAML
         extra_env+=("INVARLOCK_CONFIG_ROOT=${baseline_config_root}")
 
         local exit_code=0
-        env "${extra_env[@]}" invarlock run \
-            --config "${baseline_yaml}" \
-            --profile "${profile_flag}" \
-            --tier "${tier}" \
-            --out "${baseline_out}" \
-            --edit-label "noop" >> "${log_file}" 2>&1 || exit_code=$?
+        (
+            export "${extra_env[@]}"
+            _pack_run_from_config \
+                --config "${baseline_yaml}" \
+                --profile "${profile_flag}" \
+                --tier "${tier}" \
+                --out "${baseline_out}" \
+                --edit-label "noop" >> "${log_file}" 2>&1
+        ) || exit_code=$?
 
         if [[ ${exit_code} -eq 0 ]]; then
             local report_file
@@ -1199,11 +1202,14 @@ YAML_EOF
 
     # CUDA_VISIBLE_DEVICES is inherited from execute_task() for multi-GPU support
     local exit_code=0
-    env "${extra_env[@]}" invarlock run \
-        --config "${config_yaml}" \
-        --profile "${profile_flag}" \
-        --out "${run_dir}" \
-        >> "${log_file}" 2>&1 || exit_code=$?
+    (
+        export "${extra_env[@]}"
+        _pack_run_from_config \
+            --config "${config_yaml}" \
+            --profile "${profile_flag}" \
+            --out "${run_dir}" \
+            >> "${log_file}" 2>&1
+    ) || exit_code=$?
 
     # Copy report to standard location
     local report_file=$(find "${run_dir}" -name "report*.json" -type f 2>/dev/null | head -1)

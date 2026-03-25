@@ -63,6 +63,13 @@ if ! declare -F _runtime_python >/dev/null 2>&1; then
     }
 fi
 
+if ! declare -F _pack_run_from_config >/dev/null 2>&1; then
+    :
+    _pack_run_from_config() {
+        _runtime_python run_from_config.py "$@"
+    }
+fi
+
 if ! declare -F _cmd_stat >/dev/null 2>&1; then
     :
     _cmd_stat() { command stat "$@"; }

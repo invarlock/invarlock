@@ -97,3 +97,12 @@ def test_public_security_and_reference_docs_use_local_mode_for_public_host_runs(
     for rel_path in surfaces:
         text = _read(rel_path)
         assert "--mode local" in text, f"--mode local missing from {rel_path}"
+
+
+def test_proof_pack_docs_keep_repo_wrappers_advanced_and_use_current_verify_surface():
+    text = _read("docs/user-guide/proof-packs.md")
+    assert "repo-only" in text
+    assert "invarlock advanced proof-pack verify" in text
+    assert "invarlock proof-pack verify" not in text
+    assert "invarlock run" not in text
+    assert "--allow-host-execution" not in text

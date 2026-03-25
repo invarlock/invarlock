@@ -13,7 +13,9 @@
 #       text_field: text
 #       max_samples: 512
 #
-# The CLI (`invarlock run/evaluate`) supports both representations.
+# The proof-pack execution flows (repo-only `run_from_config.py` plus
+# `invarlock evaluate`)
+# support both representations.
 
 pack_dataset_provider_kind() {
     local kind="${1:-${INVARLOCK_DATASET:-}}"

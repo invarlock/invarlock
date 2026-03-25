@@ -30,15 +30,15 @@ verify reported outcomes, and provide structured outputs for downstream analysis
 > modify global `runtime/tiers.yaml`. For global tier policy tuning, use
 > `invarlock advanced calibrate ...` (see [Tier Policy Tuning CLI](../reference/calibration.md)).
 > Calibration entrypoints still use the secure-default runtime container unless
-> a trusted local workflow opts into `--allow-host-execution`.
+> a trusted repo-only workflow opts into local host execution.
 
 ## Entrypoint Guide
 
 | Script | Purpose | Output | Use When |
 | --- | --- | --- | --- |
-| `run_pack.sh` | Full proof pack: runs suite + packages artifacts | Proof pack directory with manifest + checksums | Default: distributable validation evidence |
-| `run_suite.sh` | Suite execution only | Reports under the run directory | Development/debugging, iterative runs |
-| `verify_pack.sh` | Validate an existing proof pack | Verification status | Validating received proof packs |
+| `run_pack.sh` | Repo-only full proof-pack harness: runs suite + packages artifacts | Proof pack directory with manifest + checksums | Maintainer/distributor workflow from a repo checkout |
+| `run_suite.sh` | Repo-only suite harness | Reports under the run directory | Development/debugging, iterative runs |
+| `verify_pack.sh` | Repo-only shell verifier | Verification status | Validating received proof packs from a repo checkout |
 | `invarlock advanced proof-pack inspect` | Read-only proof-pack summary | Manifest/integrity/report inventory summary | Auditing a received pack without nested report verification |
 | `invarlock advanced proof-pack build` | Assemble a proof pack from existing artifacts | Proof pack directory with manifest + checksums | Packaging already-produced verdicts, metadata, and reports |
 | `invarlock advanced proof-pack verify` | Package-native proof-pack verification | Verification status + optional JSON | Validating received proof packs from a wheel install |
@@ -49,7 +49,8 @@ verify reported outcomes, and provide structured outputs for downstream analysis
 # In a repo checkout, install the CLI into the active environment once.
 make dev-install
 
-# Secure-default proof-pack runs call `invarlock run` / `evaluate` under the
+# Proof-pack shell wrappers are advanced repo workflows. They call a repo-only
+# Python config runner plus `invarlock evaluate` under the secure-default
 # runtime container. Build it once per checkout.
 make runtime-image
 
@@ -58,7 +59,8 @@ INVARLOCK_ALLOW_REMOTE_CODE=1 \
 PACK_TUNED_EDIT_PARAMS_FILE=./scripts/proof_packs/tuned_edit_params.json \
   ./scripts/proof_packs/run_pack.sh --suite subset --net 1
 
-# Trusted local host workflow (skips the attested container path)
+# Trusted local host workflow for these repo-only wrappers (skips the attested
+# container path)
 INVARLOCK_ALLOW_REMOTE_CODE=1 \
 INVARLOCK_ALLOW_HOST_EXECUTION=1 \
 PACK_TUNED_EDIT_PARAMS_FILE=./scripts/proof_packs/tuned_edit_params.json \
@@ -87,18 +89,19 @@ Note: clean edits require tuned preset parameters. Either set
 `PACK_TUNED_EDIT_PARAMS_FILE` or place the file at
 `scripts/proof_packs/tuned_edit_params.json`.
 
-The proof-pack shell wrappers do not expose a top-level
-`--allow-host-execution` flag. For trusted local host execution, set
+The proof-pack shell wrappers do not expose the public core `--mode` flag
+directly. For trusted local host execution in these repo-only wrappers, set
 `INVARLOCK_ALLOW_HOST_EXECUTION=1` in the environment before calling
-`run_pack.sh` or `run_suite.sh`. Otherwise, the underlying model-loading
-commands use the secure-default runtime container path and expect `docker` or
-`podman`, plus a locally built `invarlock-runtime:local` image from
+`run_pack.sh` or `run_suite.sh`. Installed-wheel/public workflows should use
+`invarlock evaluate --mode local` instead. Otherwise, the underlying
+model-loading commands use the secure-default runtime container path and expect
+`docker` or `podman`, plus a locally built `invarlock-runtime:local` image from
 `make runtime-image`.
 
 Validated secure-default parity contract for proof-pack wrappers:
 
 - Wrapper-provided `INVARLOCK_CONFIG_ROOT` and `INVARLOCK_STORE_EVAL_WINDOWS`
-  now survive delegated `invarlock run` / `evaluate` calls.
+  now survive delegated repo-only config-runner / `evaluate` calls.
 - External cache and temp overrides such as `HF_HOME`, `HF_HUB_CACHE`,
   `HF_DATASETS_CACHE`, `TRANSFORMERS_CACHE`, `TMPDIR`, and `TMP` remain visible
   inside the runtime container.

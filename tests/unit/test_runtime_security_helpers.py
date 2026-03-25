@@ -332,6 +332,115 @@ def test_apply_runtime_allowances_and_delegate_current_process(monkeypatch) -> N
     assert runtime_security.delegate_current_process_to_container(["evaluate"]) == 7
 
 
+def test_build_container_python_command_uses_python_entrypoint_for_repo_script(
+    monkeypatch, tmp_path: Path
+) -> None:
+    repo_root = tmp_path / "repo"
+    script_path = repo_root / "scripts" / "proof_packs" / "python" / "run_from_config.py"
+    script_path.parent.mkdir(parents=True, exist_ok=True)
+    script_path.write_text("# stub\n", encoding="utf-8")
+    config_path = repo_root / "configs" / "demo.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text("demo: true\n", encoding="utf-8")
+    out_dir = repo_root / "runs"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.chdir(repo_root)
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_container_engine",
+        lambda: "docker",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image",
+        lambda: "ghcr.io/invarlock/runtime:test",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image_digest",
+        lambda: "sha256:abc",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "container_image_available_locally",
+        lambda image, engine=None: True,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "network_allowed",
+        lambda: False,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "_host_nvidia_visible",
+        lambda: True,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "_container_pythonpath_entries",
+        lambda *, cwd: (["/workspace/src"], []),
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "_delegated_env_pairs",
+        lambda *, cwd: ({"EXTRA": "1"}, []),
+        raising=True,
+    )
+
+    command = runtime_security.build_container_python_command(
+        script_path,
+        ["--config", "configs/demo.yaml", "--out", "runs"],
+    )
+
+    assert command[:6] == [
+        "docker",
+        "run",
+        "--rm",
+        "--entrypoint",
+        "python",
+        "--gpus",
+    ]
+    assert "all" in command
+    assert "--network" in command
+    assert "none" in command
+    assert "-e" in command
+    assert "PYTHONPATH=/workspace/src" in command
+    assert "EXTRA=1" in command
+    assert "ghcr.io/invarlock/runtime:test" in command
+    assert "/workspace/scripts/proof_packs/python/run_from_config.py" in command
+
+
+def test_delegate_python_script_to_container_uses_python_builder(monkeypatch) -> None:
+    monkeypatch.setattr(
+        runtime_security,
+        "build_container_python_command",
+        lambda script_path, argv=None: ["docker", "run", "python", str(script_path)],
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security.subprocess,
+        "run",
+        lambda command, check=False: SimpleNamespace(returncode=9),
+        raising=True,
+    )
+
+    assert (
+        runtime_security.delegate_python_script_to_container(
+            "scripts/proof_packs/python/run_from_config.py",
+            ["--config", "demo.yaml"],
+        )
+        == 9
+    )
+
+
 def test_write_runtime_manifest_records_runtime_context(
     monkeypatch, tmp_path: Path
 ) -> None:

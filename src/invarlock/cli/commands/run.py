@@ -125,6 +125,10 @@ from invarlock.cli.utils import (
 from invarlock.core.auto_tuning import (
     resolve_tier_policies as _resolve_tier_policies,
 )
+from invarlock.core.config_execution import (
+    RuntimeDelegationError,
+    run_from_config,
+)
 from invarlock.core.exceptions import (
     ConfigError as _CfgErr,
 )
@@ -146,11 +150,6 @@ from ..config import (
     InvarLockConfig,
 )
 from ..overhead_utils import _extract_pm_snapshot_for_overhead
-from ..security_helpers import (
-    configure_runtime_security,
-    emit_runtime_manifest,
-    maybe_delegate_model_command,
-)
 
 console = make_console()
 _IMPORT_UNSET = object()
@@ -1741,48 +1740,38 @@ def run_command(
     allow_host_execution = bool(_coerce_option(allow_host_execution, False))
     allow_third_party_plugins = bool(_coerce_option(allow_third_party_plugins, False))
     allow_remote_code = bool(_coerce_option(allow_remote_code, False))
-    configure_runtime_security(
-        allow_network=allow_network,
-        allow_host_execution=allow_host_execution,
-        allow_third_party_plugins=allow_third_party_plugins,
-        allow_remote_code=allow_remote_code,
-    )
-    maybe_delegate_model_command()
-
-    report_path = _run_command_impl(
-        config=config,
-        device=device,
-        profile=profile,
-        out=out,
-        edit=edit,
-        edit_label=edit_label,
-        tier=tier,
-        metric_kind=metric_kind,
-        probes=probes,
-        until_pass=until_pass,
-        max_attempts=max_attempts,
-        timeout=timeout,
-        baseline=baseline,
-        no_cleanup=no_cleanup,
-        style=style,
-        progress=progress,
-        timing=timing,
-        telemetry=telemetry,
-        no_color=no_color,
-        deps=_build_run_command_deps(),
-    )
-    emit_runtime_manifest(
-        report_path,
-        config_path=config,
-        extra={
-            "command": "run",
-            "profile": profile,
-            "allow_network": allow_network,
-            "allow_remote_code": allow_remote_code,
-            "allow_third_party_plugins": allow_third_party_plugins,
-        },
-    )
-    return report_path
+    try:
+        return run_from_config(
+            config=config,
+            device=device,
+            profile=profile,
+            out=out,
+            edit=edit,
+            edit_label=edit_label,
+            tier=tier,
+            metric_kind=metric_kind,
+            probes=probes,
+            until_pass=until_pass,
+            max_attempts=max_attempts,
+            timeout=timeout,
+            baseline=baseline,
+            no_cleanup=no_cleanup,
+            style=style,
+            progress=progress,
+            timing=timing,
+            telemetry=telemetry,
+            no_color=no_color,
+            allow_network=allow_network,
+            allow_host_execution=allow_host_execution,
+            allow_third_party_plugins=allow_third_party_plugins,
+            allow_remote_code=allow_remote_code,
+            command_name="run",
+            run_impl=_run_command_impl,
+            deps_builder=_build_run_command_deps,
+        )
+    except RuntimeDelegationError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
 
 
 def _merge_primary_metric_health(

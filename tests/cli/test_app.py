@@ -75,4 +75,6 @@ def test_ordered_group_handles_advanced_and_unknown_lazy_subapps():
 
     assert _load_lazy_subapp(command, "advanced") is True
     assert command.get_command(ctx, "advanced") is not None
+    assert _load_lazy_subapp(command, "_run") is False
+    assert command.get_command(ctx, "_run") is None
     assert command.get_command(ctx, "definitely-missing-command") is None
