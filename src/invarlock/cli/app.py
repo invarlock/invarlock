@@ -196,7 +196,7 @@ def _evaluate_lazy(
         None,
         "--baseline-report",
         help=(
-            "Reuse an existing baseline run report.json (skips baseline evaluation). "
+            "Reuse an existing baseline run report.json file (explicit path; skips baseline evaluation). "
             "Must include stored evaluation windows (e.g., set INVARLOCK_STORE_EVAL_WINDOWS=1)."
         ),
     ),

@@ -61,6 +61,10 @@ runtime manifest before you promote results.
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 ```
 
+Directory inputs to `invarlock report` are only accepted when they contain
+canonical `report.json` or `evaluation.report.json`; otherwise pass the exact
+file path.
+
 Optional: explain gate decisions directly from the evaluation artifacts.
 
 ```bash

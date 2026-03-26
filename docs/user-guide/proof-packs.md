@@ -85,6 +85,10 @@ invarlock advanced proof-pack build ./tmp/proof_pack \
 invarlock advanced proof-pack verify ./proof_pack_runs/subset_20250101_000000/proof_pack --strict
 ```
 
+Each `--report` must be an explicit `evaluation.report.json` file path. The
+builder also requires `runtime.manifest.json` next to each supplied report so
+packaged evidence preserves attestation provenance.
+
 Note: clean edits require tuned preset parameters. Either set
 `PACK_TUNED_EDIT_PARAMS_FILE` or place the file at
 `scripts/proof_packs/tuned_edit_params.json`.

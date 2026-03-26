@@ -132,6 +132,8 @@ to change proposals or releases when you update calibration.
 3. **Validate** – run `invarlock verify` and render HTML via `invarlock report html`;
    attested outputs include `runtime.manifest.json` next to
    `evaluation.report.json`.
+   Directory inputs to `invarlock report` are only accepted when they contain
+   canonical `report.json` or `evaluation.report.json`.
 4. **Iterate** – compare runs, adjust edit plans, and reissue reports until gates pass.
 
 The guard suite (invariants, spectral, variance, and RMT) keeps edits inside

@@ -46,6 +46,10 @@ jq '.telemetry' reports/eval/evaluation.report.json
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 ```
 
+When you pass a directory to `invarlock report`, it must contain a canonical
+`report.json` or `evaluation.report.json`. Other report-like filenames are not
+auto-selected; pass the explicit file path instead.
+
 ## report Layout
 
 The markdown report is structured to highlight evaluation outcomes first:

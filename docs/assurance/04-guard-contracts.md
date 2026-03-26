@@ -169,9 +169,9 @@ Baseline pairing schedules record the exact windows to preserve determinism.
 To reproduce a report:
 
 1. Persist the run config (`config.yaml`), `window_plan`, and `evaluation_windows`.
-2. Record dataset/hash/tokenizer metadata (`invarlock report --run <run_dir> --format json` already saves this).
+2. Record dataset/hash/tokenizer metadata (`invarlock report --run <run_report.json> --format json` already saves this).
 3. Capture the seed bundle (`meta.seeds`) and policy digests.
-4. Use `invarlock report --format report` with the saved baseline/report combination
+4. Use `invarlock report --run <subject_report.json> --baseline <baseline_report.json> --format report`
    to regenerate the report; when seeds, config, and backend match, the
    resulting report is bit-for-bit identical.
 

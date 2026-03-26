@@ -30,11 +30,11 @@ Bands were empirically derived on pilot models and are enforced in CI. Actual va
 ```bash
 # Baseline on CPU → report
 INVARLOCK_ALLOW_HOST_EXECUTION=1 invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml --device cpu --profile ci --out runs/baseline_cpu
-invarlock report --run runs/baseline_cpu --format report --output runs/baseline_cpu
+invarlock report --run runs/baseline_cpu/report.json --format report --output runs/baseline_cpu
 
 # Same schedule on MPS → report
 INVARLOCK_ALLOW_HOST_EXECUTION=1 invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml --device mps --profile ci --out runs/baseline_mps
-invarlock report --run runs/baseline_mps --format report --output runs/baseline_mps
+invarlock report --run runs/baseline_mps/report.json --format report --output runs/baseline_mps
 
 # Lint cross-device drift (absolute ratio tolerance)
 python scripts/check_device_drift.py \

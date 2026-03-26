@@ -120,6 +120,10 @@ invarlock verify --json reports/eval/evaluation.report.json
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 ```
 
+If you pass a directory to `invarlock report`, it must contain canonical
+`report.json` or `evaluation.report.json`; other report-like filenames are not
+auto-selected.
+
 Example output (abridged; counts vary by profile/config):
 
 ```text

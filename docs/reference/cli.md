@@ -97,8 +97,8 @@ Common options:
 
 - `--baseline` / `--source`: baseline checkpoint path or model ID
 - `--subject` / `--edited`: subject checkpoint path or model ID
-- `--baseline-report`: reuse a stored baseline report when you already captured
-  the baseline windows
+- `--baseline-report`: reuse a stored baseline report by passing the explicit
+  `report.json` file path that captured the baseline windows
 - `--adapter`: adapter name or `auto`
 - `--profile`: `ci`, `release`, or another shipped profile
 - `--tier`: tier label for policy context
@@ -157,6 +157,9 @@ Core subcommands:
   - Validate a report JSON against the current schema
 - `invarlock report verify`
   - Re-run verification through the report namespace when needed
+- Directory inputs to `report` commands are only accepted when they contain a
+  canonical `report.json` or `evaluation.report.json`; otherwise pass an
+  explicit file path.
 
 Example:
 
@@ -176,6 +179,8 @@ Common options:
 - `--baseline-report`
 - `--subject-report`
 - `--strict`
+- Report inputs accept an explicit JSON file path or a directory containing
+  canonical `report.json` or `evaluation.report.json`.
 
 Example:
 
