@@ -135,6 +135,24 @@ from invarlock.core.exceptions import (
 from invarlock.core.exit_codes import (
     resolve_command_exit_code as _resolve_command_exit_code,
 )
+from invarlock.core.run_retry_policy import (
+    apply_mask_only_head_autotune as _apply_mask_only_head_autotune_impl,
+)
+from invarlock.core.run_retry_policy import (
+    build_retry_result_summary as _build_retry_result_summary_impl,
+)
+from invarlock.core.run_snapshot_policy import (
+    choose_snapshot_mode as _choose_snapshot_mode_impl,
+)
+from invarlock.core.run_snapshot_policy import (
+    estimate_model_bytes as _estimate_model_bytes_impl,
+)
+from invarlock.core.run_snapshot_policy import (
+    resolve_snapshot_config as _resolve_snapshot_config_impl,
+)
+from invarlock.core.run_timing_policy import (
+    build_timing_summary_payload as _build_timing_summary_payload_impl,
+)
 from invarlock.eval.window_planning import (
     resolve_effective_windows as _resolve_effective_windows_impl,
 )
@@ -677,6 +695,42 @@ def _should_measure_overhead(
     )
 
 
+def _resolve_snapshot_config(context: object | None) -> dict[str, Any]:
+    return _resolve_snapshot_config_impl(
+        context,
+        to_serialisable_dict_fn=_to_serialisable_dict,
+    )
+
+
+def _estimate_model_bytes(model: object | None) -> int:
+    return _estimate_model_bytes_impl(model)
+
+
+def _choose_snapshot_mode(
+    *,
+    snapshot_config: Mapping[str, Any] | None,
+    env_mode: str | None,
+    supports_bytes: bool,
+    supports_chunked: bool,
+    estimated_model_mb: float,
+    available_ram_mb: float,
+    disk_free_mb: float,
+    env_ram_fraction: str | None = None,
+    env_threshold_mb: str | None = None,
+) -> str:
+    return _choose_snapshot_mode_impl(
+        snapshot_config=snapshot_config,
+        env_mode=env_mode,
+        supports_bytes=supports_bytes,
+        supports_chunked=supports_chunked,
+        estimated_model_mb=estimated_model_mb,
+        available_ram_mb=available_ram_mb,
+        disk_free_mb=disk_free_mb,
+        env_ram_fraction=env_ram_fraction,
+        env_threshold_mb=env_threshold_mb,
+    )
+
+
 def _choose_dataset_split(
     *, requested: str | None, available: list[str] | None
 ) -> tuple[str, bool]:
@@ -691,6 +745,32 @@ def _choose_dataset_split(
 def _persist_ref_masks(core_report: Any, run_dir: Path) -> Path | None:
     """Persist reference keep indices to artifact if present."""
     return _persist_ref_masks_impl(core_report, run_dir)
+
+
+def _build_retry_result_summary(
+    validation: Mapping[str, Any] | None,
+) -> dict[str, object]:
+    return _build_retry_result_summary_impl(validation)
+
+
+def _apply_mask_only_head_autotune(
+    edit_config: Mapping[str, Any] | None,
+    validation: Mapping[str, Any] | None,
+) -> tuple[dict[str, Any], dict[str, int] | None]:
+    return _apply_mask_only_head_autotune_impl(edit_config, validation)
+
+
+def _build_timing_summary_payload(
+    *,
+    timings: Mapping[str, Any] | None,
+    total_duration: float | None,
+    report: Mapping[str, Any] | None,
+) -> object | None:
+    return _build_timing_summary_payload_impl(
+        timings=timings,
+        total_duration=total_duration,
+        report=report,
+    )
 
 
 def _resolve_exit_code(exc: Exception, *, profile: str | None) -> int:
@@ -1577,6 +1657,11 @@ def _build_run_command_deps() -> dict[str, Any]:
         "_resolve_pm_min_tokens_target": _resolve_pm_min_tokens_target,
         "_merge_primary_metric_health": _merge_primary_metric_health,
         "_normalize_overhead_result": _normalize_overhead_result,
+        "_apply_mask_only_head_autotune": _apply_mask_only_head_autotune,
+        "_build_timing_summary_payload": _build_timing_summary_payload,
+        "_build_retry_result_summary": _build_retry_result_summary,
+        "_choose_snapshot_mode": _choose_snapshot_mode,
+        "_estimate_model_bytes": _estimate_model_bytes,
         "_persist_ref_masks": _persist_ref_masks,
         "_postprocess_and_summarize": _postprocess_and_summarize,
         "_prepare_config_for_run": _prepare_config_for_run,
@@ -1590,6 +1675,7 @@ def _build_run_command_deps() -> dict[str, Any]:
         "_resolve_pm_acceptance_range": _resolve_pm_acceptance_range,
         "_resolve_pm_drift_band": _resolve_pm_drift_band,
         "_resolve_provider_and_split": _resolve_provider_and_split,
+        "_resolve_snapshot_config": _resolve_snapshot_config,
         "_run_bare_control": _run_bare_control,
         "_safe_int": _safe_int,
         "_should_measure_overhead": _should_measure_overhead,

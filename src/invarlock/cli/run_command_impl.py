@@ -56,8 +56,12 @@ def run_command_impl(
     Path = _dep("Path")
     _SnapshotRestoreFailed = _dep("_SnapshotRestoreFailed")
     _apply_mlm_masks = _dep("_apply_mlm_masks")
+    _apply_mask_only_head_autotune = _dep("_apply_mask_only_head_autotune")
     _apply_warning_filters = _dep("_apply_warning_filters")
+    _build_timing_summary_payload = _dep("_build_timing_summary_payload")
+    _build_retry_result_summary = _dep("_build_retry_result_summary")
     _canonical_dataset_id = _dep("_canonical_dataset_id")
+    _choose_snapshot_mode = _dep("_choose_snapshot_mode")
     _coerce_float = _dep("_coerce_float")
     _coerce_int = _dep("_coerce_int")
     _coerce_option = _dep("_coerce_option")
@@ -77,6 +81,7 @@ def run_command_impl(
     _maybe_plan_release_windows = _dep("_maybe_plan_release_windows")
     _merge_primary_metric_health = _dep("_merge_primary_metric_health")
     _normalize_overhead_result = _dep("_normalize_overhead_result")
+    _estimate_model_bytes = _dep("_estimate_model_bytes")
     _persist_ref_masks = _dep("_persist_ref_masks")
     _postprocess_and_summarize = _dep("_postprocess_and_summarize")
     _prepare_config_for_run = _dep("_prepare_config_for_run")
@@ -92,6 +97,7 @@ def run_command_impl(
     _resolve_pm_acceptance_range = _dep("_resolve_pm_acceptance_range")
     _resolve_pm_drift_band = _dep("_resolve_pm_drift_band")
     _resolve_provider_and_split = _dep("_resolve_provider_and_split")
+    _resolve_snapshot_config = _dep("_resolve_snapshot_config")
     _run_bare_control = _dep("_run_bare_control")
     _safe_int = _dep("_safe_int")
     _should_measure_overhead = _dep("_should_measure_overhead")
@@ -1598,175 +1604,61 @@ def run_command_impl(
             else:
                 # No edit-specific bootstrap logic
 
-                def _estimate_model_bytes(m: Any) -> int:
-                    total = 0
-                    try:
-                        for _, p in getattr(m, "named_parameters", lambda: [])():
-                            try:
-                                total += int(p.element_size() * p.nelement())
-                            except (AttributeError, TypeError, ValueError):
-                                pass
-                        for _, b in getattr(m, "named_buffers", lambda: [])():
-                            try:
-                                total += int(b.element_size() * b.nelement())
-                            except (AttributeError, TypeError, ValueError):
-                                pass
-                    except (AttributeError, TypeError):
-                        return 0
-                    return total
-
                 # Load snapshot config from config.context.snapshot (highest precedence)
-                cfg_snapshot = {}
                 try:
-                    cfg_context = _to_serialisable_dict(getattr(cfg, "context", {}))
-                    if isinstance(cfg_context, dict):
-                        cfg_snapshot = _to_serialisable_dict(
-                            cfg_context.get("snapshot", {})
-                        )
-                        if not isinstance(cfg_snapshot, dict):
-                            cfg_snapshot = {}
+                    cfg_snapshot = _resolve_snapshot_config(getattr(cfg, "context", {}))
                 except NON_FATAL_RUNTIME_EXCEPTIONS:
                     cfg_snapshot = {}
 
-                def _choose_snapshot_mode() -> str:
-                    # Precedence: config > env > auto
-                    cfg_mode = (
-                        str(cfg_snapshot.get("mode", "")).lower()
-                        if isinstance(cfg_snapshot, dict)
-                        else ""
-                    )
-                    mode_env = str(
-                        os.environ.get("INVARLOCK_SNAPSHOT_MODE", "auto")
-                    ).lower()
-                    supports_chunked = hasattr(adapter, "snapshot_chunked") and hasattr(
-                        adapter, "restore_chunked"
-                    )
-                    supports_bytes = hasattr(adapter, "snapshot") and hasattr(
-                        adapter, "restore"
-                    )
-                    if cfg_mode in {"bytes", "chunked"}:
-                        if cfg_mode == "bytes" and supports_bytes:
-                            return "bytes"
-                        if cfg_mode == "chunked" and supports_chunked:
-                            return "chunked"
-                        # fallback preference
-                        if supports_bytes:
-                            return "bytes"
-                        if supports_chunked:
-                            return "chunked"
-                        return "reload"
-                    if mode_env in {"bytes", "chunked"}:
-                        if mode_env == "bytes" and supports_bytes:
-                            return "bytes"
-                        if mode_env == "chunked" and supports_chunked:
-                            return "chunked"
-                        # fallback preference
-                        if supports_bytes:
-                            return "bytes"
-                        if supports_chunked:
-                            return "chunked"
-                        return "reload"
-                    # auto
-                    est_mb = _estimate_model_bytes(model) / (1024.0 * 1024.0)
-                    # RAM-based heuristic
-                    try:
-                        psutil_mod = _optional_psutil()
-                        if psutil_mod is None:
-                            raise AttributeError("psutil unavailable")
-                        ram = psutil_mod.virtual_memory()
-                        avail_mb = float(getattr(ram, "available", 0)) / (
-                            1024.0 * 1024.0
+                supports_chunked = hasattr(adapter, "snapshot_chunked") and hasattr(
+                    adapter, "restore_chunked"
+                )
+                supports_bytes = hasattr(adapter, "snapshot") and hasattr(
+                    adapter, "restore"
+                )
+                est_mb = _estimate_model_bytes(model) / (1024.0 * 1024.0)
+                try:
+                    psutil_mod = _optional_psutil()
+                    if psutil_mod is None:
+                        raise AttributeError("psutil unavailable")
+                    ram = psutil_mod.virtual_memory()
+                    avail_mb = float(getattr(ram, "available", 0)) / (1024.0 * 1024.0)
+                except (
+                    AttributeError,
+                    RuntimeError,
+                    OSError,
+                    TypeError,
+                    ValueError,
+                ):
+                    avail_mb = 0.0
+                try:
+                    tmpdir = None
+                    if isinstance(cfg_snapshot, dict):
+                        tmpdir = cfg_snapshot.get("temp_dir") or None
+                    if not tmpdir:
+                        tmpdir = (
+                            os.environ.get("TMPDIR")
+                            or os.environ.get("TMP")
+                            or tempfile.gettempdir()
                         )
-                    except (
-                        AttributeError,
-                        RuntimeError,
-                        OSError,
-                        TypeError,
-                        ValueError,
-                    ):
-                        avail_mb = 0.0
-                    # fraction: config override > env > default 0.4
-                    frac = 0.4
-                    try:
-                        if (
-                            isinstance(cfg_snapshot, dict)
-                            and cfg_snapshot.get("ram_fraction") is not None
-                        ):
-                            frac = float(cfg_snapshot.get("ram_fraction"))
-                        else:
-                            frac = float(
-                                os.environ.get(
-                                    "INVARLOCK_SNAPSHOT_AUTO_RAM_FRACTION", frac
-                                )
-                            )
-                    except (TypeError, ValueError):
-                        pass
-                    # threshold mb: if no RAM info, use config threshold_mb or env fallback; else derive from avail*frac
-                    if avail_mb > 0:
-                        threshold_mb = avail_mb * max(0.0, min(frac, 1.0))
-                    else:
-                        try:
-                            if (
-                                isinstance(cfg_snapshot, dict)
-                                and cfg_snapshot.get("threshold_mb") is not None
-                            ):
-                                threshold_mb = float(cfg_snapshot.get("threshold_mb"))
-                            else:
-                                threshold_mb = float(
-                                    os.environ.get(
-                                        "INVARLOCK_SNAPSHOT_THRESHOLD_MB", "768"
-                                    )
-                                )
-                        except (TypeError, ValueError):
-                            threshold_mb = 768.0
-                    # Disk availability for chunked
-                    try:
-                        tmpdir = None
-                        if isinstance(cfg_snapshot, dict):
-                            tmpdir = cfg_snapshot.get("temp_dir") or None
-                        if not tmpdir:
-                            tmpdir = (
-                                os.environ.get("TMPDIR")
-                                or os.environ.get("TMP")
-                                or tempfile.gettempdir()
-                            )
-                        du = shutil.disk_usage(tmpdir)
-                        free_mb = float(du.free) / (1024.0 * 1024.0)
-                    except (OSError, TypeError, ValueError):
-                        free_mb = 0.0
-                    # Disk margin ratio: config > default 1.2
-                    margin = 1.2
-                    try:
-                        if (
-                            isinstance(cfg_snapshot, dict)
-                            and cfg_snapshot.get("disk_free_margin_ratio") is not None
-                        ):
-                            margin = float(cfg_snapshot.get("disk_free_margin_ratio"))
-                    except (TypeError, ValueError):
-                        pass
-                    # Choose chunked if model snapshot is a large fraction of available RAM and disk has room
-                    if (
-                        supports_chunked
-                        and est_mb >= threshold_mb
-                        and (free_mb <= 0.0 or est_mb * margin <= free_mb)
-                    ):
-                        return "chunked"
-                    # Otherwise prefer bytes when supported
-                    if supports_bytes:
-                        # If RAM is extremely low and even bytes snapshot likely risky, fallback to chunked when possible
-                        if (
-                            supports_chunked
-                            and avail_mb > 0
-                            and est_mb >= max(64.0, avail_mb * 0.8)
-                            and (free_mb <= 0.0 or est_mb * margin <= free_mb)
-                        ):
-                            return "chunked"
-                        return "bytes"
-                    if supports_chunked:
-                        return "chunked"
-                    return "reload"
+                    du = shutil.disk_usage(tmpdir)
+                    free_mb = float(du.free) / (1024.0 * 1024.0)
+                except (OSError, TypeError, ValueError):
+                    free_mb = 0.0
 
-                mode = _choose_snapshot_mode()
+                mode = _choose_snapshot_mode(
+                    snapshot_config=cfg_snapshot,
+                    env_mode=os.environ.get("INVARLOCK_SNAPSHOT_MODE", "auto"),
+                    supports_bytes=supports_bytes,
+                    supports_chunked=supports_chunked,
+                    estimated_model_mb=est_mb,
+                    available_ram_mb=avail_mb,
+                    disk_free_mb=free_mb,
+                    env_ram_fraction=os.environ.get(
+                        "INVARLOCK_SNAPSHOT_AUTO_RAM_FRACTION"
+                    ),
+                    env_threshold_mb=os.environ.get("INVARLOCK_SNAPSHOT_THRESHOLD_MB"),
+                )
                 enabled = mode in {"bytes", "chunked"}
                 _event(
                     console,
@@ -3197,14 +3089,9 @@ def run_command_impl(
                     evaluation_report = make_report(report, baseline_report)
 
                     validation = evaluation_report.get("validation", {})
-                    report_passed = all(validation.values())
-
-                    failed_gates = [k for k, v in validation.items() if not v]
-                    result_summary = {
-                        "passed": report_passed,
-                        "failures": failed_gates,
-                        "validation": validation,
-                    }
+                    result_summary = _build_retry_result_summary(validation)
+                    report_passed = bool(result_summary["passed"])
+                    failed_gates = list(result_summary["failures"])
                     retry_controller.record_attempt(
                         attempt, result_summary, edit_config
                     )
@@ -3227,57 +3114,19 @@ def run_command_impl(
                             profile=profile_normalized,
                         )
 
-                        # Auto-tune mask-only heads (binary search on keep count)
-                        try:
-                            head_section = None
-                            for k in ("heads", "head_budget", "head_budgets"):
-                                if isinstance(edit_config.get(k), dict):
-                                    head_section = edit_config[k]
-                                    break
-                            search = (
-                                head_section.get("_auto_search")
-                                if isinstance(head_section, dict)
-                                else None
+                        edit_config, head_adjustment = _apply_mask_only_head_autotune(
+                            edit_config, validation
+                        )
+                        if head_adjustment is not None:
+                            _event(
+                                console,
+                                "INIT",
+                                "Auto-tune adjust: global_k → "
+                                f"{head_adjustment['global_k']} "
+                                f"(bounds {head_adjustment['keep_low']}-{head_adjustment['keep_high']})",
+                                emoji="🔧",
+                                profile=profile_normalized,
                             )
-                            if isinstance(search, dict) and head_section.get(
-                                "mask_only"
-                            ):
-                                keep_low = int(search.get("keep_low", 0))
-                                keep_high = int(
-                                    search.get(
-                                        "keep_high", search.get("total_heads", 0)
-                                    )
-                                )
-                                keep_current = int(
-                                    search.get("keep_current", keep_high)
-                                )
-                                # If the quality gate (PM) is unacceptable, increase keep (less pruning); if only other gates failed, be conservative and increase keep slightly
-                                pm_ok = bool(
-                                    validation.get("primary_metric_acceptable", False)
-                                )
-                                if not pm_ok:
-                                    keep_low = max(keep_low, keep_current)
-                                else:
-                                    # drift/spectral/etc failed: ease pruning
-                                    keep_low = max(keep_low, keep_current)
-                                next_keep = int((keep_low + keep_high + 1) // 2)
-                                search.update(
-                                    {
-                                        "keep_low": keep_low,
-                                        "keep_high": keep_high,
-                                        "keep_current": next_keep,
-                                    }
-                                )
-                                head_section["global_k"] = next_keep
-                                _event(
-                                    console,
-                                    "INIT",
-                                    f"Auto-tune adjust: global_k → {next_keep} (bounds {keep_low}-{keep_high})",
-                                    emoji="🔧",
-                                    profile=profile_normalized,
-                                )
-                        except (AttributeError, KeyError, TypeError, ValueError):
-                            pass
 
                         if retry_controller.should_retry(report_passed):
                             attempt += 1
@@ -3329,63 +3178,18 @@ def run_command_impl(
                 if total_start is not None
                 else None
             )
-            timings_for_summary: dict[str, float] = {}
-            for key, value in timings.items():
-                if isinstance(value, (int | float)):
-                    timings_for_summary[key] = float(value)
-            if total_duration is not None:
-                timings_for_summary["total"] = total_duration
-
-            has_breakdown = any(
-                key in timings_for_summary
-                for key in (
-                    "prepare",
-                    "prepare_guards",
-                    "edit",
-                    "guards",
-                    "eval",
-                    "finalize",
-                )
+            summary_payload = _build_timing_summary_payload(
+                timings=timings,
+                total_duration=total_duration,
+                report=report if isinstance(report, dict) else None,
             )
-
-            order: list[tuple[str, str]] = []
-
-            def _add(label: str, key: str) -> None:
-                if key in timings_for_summary:
-                    order.append((label, key))
-
-            _add("Load model", "load_model")
-            _add("Load data", "load_dataset")
-            if has_breakdown:
-                _add("Prepare", "prepare")
-                _add("Prep guards", "prepare_guards")
-                _add("Edit", "edit")
-                _add("Guards", "guards")
-                _add("Eval", "eval")
-                _add("Finalize", "finalize")
-            else:
-                _add("Execute", "execute")
-            _add("Total", "total")
-
-            extra_lines: list[str] = []
-            metrics_section = (
-                report.get("metrics", {}) if isinstance(report, dict) else {}
-            )
-            if isinstance(metrics_section, dict):
-                mem_peak = metrics_section.get("memory_mb_peak")
-                gpu_peak = metrics_section.get("gpu_memory_mb_peak")
-                if isinstance(mem_peak, (int | float)):
-                    extra_lines.append(f"  Peak Memory : {float(mem_peak):.2f} MB")
-                if isinstance(gpu_peak, (int | float)):
-                    extra_lines.append(f"  Peak GPU Mem: {float(gpu_peak):.2f} MB")
-
-            if timings_for_summary and order:
+            if summary_payload is not None:
                 print_timing_summary(
                     console,
-                    timings_for_summary,
+                    summary_payload.timings,
                     style=output_style,
-                    order=order,
-                    extra_lines=extra_lines,
+                    order=list(summary_payload.order),
+                    extra_lines=list(summary_payload.extra_lines),
                 )
 
         # Normal path falls through; cleanup handled below in finally

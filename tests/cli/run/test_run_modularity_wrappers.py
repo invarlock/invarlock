@@ -68,6 +68,50 @@ def test_policy_wrappers_delegate(monkeypatch):
         "config:context.run.skip_overhead_check",
     )
 
+    monkeypatch.setattr(
+        run_mod,
+        "_resolve_snapshot_config_impl",
+        lambda context, to_serialisable_dict_fn: {"mode": "bytes"},
+    )
+    assert run_mod._resolve_snapshot_config({"snapshot": {"mode": "bytes"}}) == {
+        "mode": "bytes"
+    }
+
+    monkeypatch.setattr(run_mod, "_estimate_model_bytes_impl", lambda model: 123)
+    assert run_mod._estimate_model_bytes(object()) == 123
+
+    monkeypatch.setattr(
+        run_mod,
+        "_choose_snapshot_mode_impl",
+        lambda **kwargs: "chunked",
+    )
+    assert (
+        run_mod._choose_snapshot_mode(
+            snapshot_config={},
+            env_mode="auto",
+            supports_bytes=True,
+            supports_chunked=True,
+            estimated_model_mb=128.0,
+            available_ram_mb=256.0,
+            disk_free_mb=1024.0,
+        )
+        == "chunked"
+    )
+
+    monkeypatch.setattr(
+        run_mod,
+        "_build_timing_summary_payload_impl",
+        lambda **kwargs: "summary",
+    )
+    assert (
+        run_mod._build_timing_summary_payload(
+            timings={"load_model": 1.0},
+            total_duration=2.0,
+            report={"metrics": {}},
+        )
+        == "summary"
+    )
+
     split_seen: dict[str, object] = {}
 
     def _split_stub(*, requested, available, split_aliases):
@@ -101,6 +145,27 @@ def test_artifact_wrappers_delegate(monkeypatch, tmp_path):
     monkeypatch.setattr(run_mod, "_resolve_command_exit_code", _exit_stub)
     assert run_mod._resolve_exit_code(_DummyError("x"), profile="release") == 3
     assert seen["profile"] == "release"
+
+    monkeypatch.setattr(
+        run_mod,
+        "_build_retry_result_summary_impl",
+        lambda validation: {"passed": True, "failures": [], "validation": validation},
+    )
+    assert run_mod._build_retry_result_summary({"ok": True}) == {
+        "passed": True,
+        "failures": [],
+        "validation": {"ok": True},
+    }
+
+    monkeypatch.setattr(
+        run_mod,
+        "_apply_mask_only_head_autotune_impl",
+        lambda edit_config, validation: ({"heads": {"global_k": 6}}, {"global_k": 6}),
+    )
+    assert run_mod._apply_mask_only_head_autotune({}, {"ok": False}) == (
+        {"heads": {"global_k": 6}},
+        {"global_k": 6},
+    )
 
 
 def test_pairing_wrappers_delegate(monkeypatch):
@@ -275,6 +340,13 @@ def test_run_command_injects_explicit_deps(monkeypatch, tmp_path: Path):
     deps = captured.get("deps")
     assert isinstance(deps, dict)
     assert deps["_resolve_pm_acceptance_range"] is sentinel
+    assert deps["_choose_snapshot_mode"] is run_mod._choose_snapshot_mode
+    assert (
+        deps["_build_timing_summary_payload"] is run_mod._build_timing_summary_payload
+    )
+    assert (
+        deps["_apply_mask_only_head_autotune"] is run_mod._apply_mask_only_head_autotune
+    )
     assert deps["console"] is run_mod.console
     assert callable(deps["get_torch"])
     assert callable(deps["get_psutil"])
