@@ -6,19 +6,30 @@ Handles the 'invarlock doctor' command for health checks.
 """
 
 import importlib.util
-import json
 import logging
 import os as _os
 import platform as _platform
 import shutil as _shutil
 import sys
-from collections.abc import Callable
-from pathlib import Path
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
+from invarlock.core.doctor_findings import (
+    DATASET_SPLIT_FALLBACK_WARNING,
+    DoctorAccumulator,
+    DoctorFinding,
+    build_bootstrap_replicates_findings,
+    build_capacity_findings,
+    build_cross_check_findings,
+    build_doctor_result,
+    build_provider_kind_findings,
+    build_provider_schema_findings,
+    build_split_fallback_findings,
+    build_tiny_relax_finding,
+    load_explicit_report_input,
+)
 from invarlock.public_contracts import (
     contract_catalog,
     load_adapter_capabilities,
@@ -46,157 +57,6 @@ def _find_spec_safe(module_name: str) -> object | None:
         return None
 
 
-def _cross_check_reports(
-    baseline_report: str | None,
-    subject_report: str | None,
-    *,
-    cfg_metric_kind: str | None,
-    strict: bool,
-    profile: str | None,
-    json_out: bool,
-    console: Console,
-    add_fn: Callable[..., None],
-) -> bool:
-    """Perform baseline vs subject cross-checks and report findings."""
-
-    def _as_dict(value: object) -> dict:
-        return value if isinstance(value, dict) else {}
-
-    def _as_lower(value: object) -> str:
-        return value.strip().lower() if isinstance(value, str) else ""
-
-    def _load_report(path: Path) -> dict | None:
-        try:
-            raw = path.read_text(encoding="utf-8")
-        except OSError as exc:
-            LOGGER.debug(
-                "doctor cross-check failed to read report %s", path, exc_info=exc
-            )
-            return None
-        try:
-            payload = json.loads(raw)
-        except (json.JSONDecodeError, TypeError, ValueError) as exc:
-            LOGGER.debug(
-                "doctor cross-check failed to parse report %s", path, exc_info=exc
-            )
-            return None
-        return _as_dict(payload)
-
-    def _primary_metric_kind(report_data: dict) -> str:
-        metrics = _as_dict(report_data.get("metrics"))
-        primary_metric = _as_dict(metrics.get("primary_metric"))
-        return _as_lower(primary_metric.get("kind"))
-
-    had_error = False
-    if not (baseline_report and subject_report):
-        return had_error
-
-    bpath = Path(baseline_report)
-    spath = Path(subject_report)
-    if not (bpath.exists() and spath.exists()):
-        return had_error
-
-    bdata = _load_report(bpath)
-    sdata = _load_report(spath)
-    if bdata is None or sdata is None:
-        return had_error
-
-    bprov = _as_dict(bdata.get("provenance"))
-    sprov = _as_dict(sdata.get("provenance"))
-    bdig = _as_dict(bprov.get("provider_digest"))
-    sdig = _as_dict(sprov.get("provider_digest"))
-
-    # D009: tokenizer digest mismatch
-    btok = bdig.get("tokenizer_sha256")
-    stok = sdig.get("tokenizer_sha256")
-    if (
-        isinstance(btok, str)
-        and isinstance(stok, str)
-        and btok
-        and stok
-        and btok != stok
-    ):
-        add_fn(
-            "D009",
-            "warning",
-            "tokenizer digests differ between baseline and subject; run will abort in ci/release (E002).",
-            field="provenance.provider_digest.tokenizer_sha256",
-        )
-
-    # D010: MLM mask digest missing (only for ppl_mlm)
-    bmask = bdig.get("masking_sha256")
-    smask = sdig.get("masking_sha256")
-    is_mlm = "ppl_mlm" in {
-        _primary_metric_kind(bdata),
-        _primary_metric_kind(sdata),
-        _as_lower(cfg_metric_kind),
-    }
-    if (
-        is_mlm
-        and isinstance(btok, str)
-        and isinstance(stok, str)
-        and btok
-        and stok
-        and btok == stok
-        and (not bmask or not smask)
-    ):
-        add_fn(
-            "D010",
-            "warning",
-            "ppl_mlm with matching tokenizer but missing masking digests; ci/release may abort on mask parity.",
-            baseline_has_mask=bool(bmask),
-            subject_has_mask=bool(smask),
-        )
-
-    # D011: split mismatch
-    bsplit = bprov.get("dataset_split")
-    ssplit = sprov.get("dataset_split")
-    if (
-        isinstance(bsplit, str)
-        and isinstance(ssplit, str)
-        and bsplit
-        and ssplit
-        and bsplit != ssplit
-    ):
-        sev = "error" if bool(strict) else "warning"
-        add_fn(
-            "D011",
-            sev,
-            f"dataset split mismatch (baseline={bsplit}, subject={ssplit})",
-            field="provenance.dataset_split",
-            baseline=bsplit,
-            subject=ssplit,
-        )
-        if sev == "error":
-            had_error = True
-
-    # D012: Accuracy PM flagged as estimated/pseudo (warn in dev; error in ci/release)
-    s_metrics = _as_dict(sdata.get("metrics"))
-    spm = _as_dict(s_metrics.get("primary_metric"))
-    pm_kind = _as_lower(spm.get("kind"))
-    if pm_kind in {"accuracy", "vqa_accuracy"}:
-        estimated = bool(spm.get("estimated"))
-        counts_source = _as_lower(spm.get("counts_source"))
-        if estimated or counts_source == "pseudo_config":
-            report_profile = _as_lower(_as_dict(sdata.get("meta")).get("profile"))
-            profile_flag = _as_lower(profile)
-            effective_profile = profile_flag or report_profile or "dev"
-            sev = "warning" if effective_profile == "dev" else "error"
-            add_fn(
-                "D012",
-                sev,
-                "accuracy primary metric uses pseudo/estimated counts; use labeled preset for measured accuracy.",
-                field="metrics.primary_metric",
-            )
-            if sev == "error":
-                had_error = True
-
-    return had_error
-
-
-DATASET_SPLIT_FALLBACK_WARNING = "Dataset split was inferred via fallback; set dataset.split explicitly to avoid drift."
-
-
 def doctor_command(
     config: str | None = typer.Option(
         None, "--config", "-c", help="Path to YAML config for preflight lints"
@@ -207,7 +67,12 @@ def doctor_command(
         help="Profile to apply for preflight (e.g. ci, release, ci_cpu; dev is a no-op)",
     ),
     baseline: str | None = typer.Option(
-        None, "--baseline", help="Optional baseline report to check pairing readiness"
+        None,
+        "--baseline",
+        help=(
+            "Optional baseline report JSON file or directory containing canonical "
+            "report.json or evaluation.report.json to check pairing readiness"
+        ),
     ),
     json_out: bool = typer.Option(
         False,
@@ -220,10 +85,20 @@ def doctor_command(
         help="Policy tier for floors preview (conservative|balanced|aggressive)",
     ),
     baseline_report: str | None = typer.Option(
-        None, "--baseline-report", help="Optional baseline report for cross-checks"
+        None,
+        "--baseline-report",
+        help=(
+            "Optional baseline report JSON file or directory containing canonical "
+            "report.json or evaluation.report.json for cross-checks"
+        ),
     ),
     subject_report: str | None = typer.Option(
-        None, "--subject-report", help="Optional subject report for cross-checks"
+        None,
+        "--subject-report",
+        help=(
+            "Optional subject report JSON file or directory containing canonical "
+            "report.json or evaluation.report.json for cross-checks"
+        ),
     ),
     strict: bool = typer.Option(
         False,
@@ -276,14 +151,10 @@ def doctor_command(
     strict = bool(_coerce_opt(strict, bool_default=False))
     json_out = bool(_coerce_opt(json_out, bool_default=False))
 
-    # Findings accumulator for --json mode
-    findings: list[dict] = []
+    accumulator = DoctorAccumulator()
 
     def _add(code: str, severity: str, message: str, **extra: object) -> None:
-        item = {"code": code, "severity": severity, "message": message}
-        if extra:
-            item.update(extra)
-        findings.append(item)
+        accumulator.add(code, severity, message, **extra)
         if not json_out:
             prefix = (
                 "ERROR:"
@@ -292,19 +163,19 @@ def doctor_command(
             )
             typer.echo(f"{prefix} {message} [INVARLOCK:{code}]")
 
-    # Early: surface tiny relax as a note when active (env-based)
-    if str(_os.environ.get("INVARLOCK_TINY_RELAX", "")).strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }:
-        _add(
-            "D013",
-            "note",
-            "tiny relax (dev) active; gates widened and drift/overhead may be informational.",
-            field="auto.tiny_relax",
-        )
+    def _record_findings(
+        findings: list[DoctorFinding], *, mark_error: bool | None = None
+    ) -> None:
+        accumulator.extend(findings, mark_error=mark_error)
+        if json_out:
+            return
+        for finding in findings:
+            prefix = (
+                "ERROR:"
+                if finding.severity == "error"
+                else ("WARNING:" if finding.severity == "warning" else "NOTE:")
+            )
+            typer.echo(f"{prefix} {finding.message} [INVARLOCK:{finding.code}]")
 
     # Redirect rich Console output in JSON mode so no extra text is emitted
     if json_out:
@@ -517,9 +388,6 @@ def doctor_command(
     if config:
         console.print("\n🧪 Preflight Lints (config)")
         try:
-            import json as _json
-            from pathlib import Path
-
             from invarlock.eval.data import get_provider
             from invarlock.model_profile import detect_model_profile, resolve_tokenizer
 
@@ -536,118 +404,20 @@ def doctor_command(
 
             # Provider kind sanity (D001)
             try:
-                SUPPORTED_PROVIDERS = {
-                    "wikitext2",
-                    "hf_text",
-                    "synthetic",
-                    "local_jsonl",
-                }
                 provider_cfg = getattr(
                     getattr(cfg, "dataset", object()), "provider", None
                 )
-                bad_kind: str | None = None
+                provider_findings, provider_error = build_provider_kind_findings(
+                    provider_cfg
+                )
+                _record_findings(provider_findings, mark_error=provider_error)
+                had_error = had_error or provider_error
 
-                # Helper to read mapping-like config values
-                def _pget(obj, key: str) -> str | None:
-                    try:
-                        if isinstance(obj, dict):
-                            return obj.get(key)  # type: ignore[return-value]
-                        # support mapping-like config objects (_Obj)
-                        if hasattr(obj, key):
-                            return getattr(obj, key)  # type: ignore[return-value]
-                        get = getattr(obj, "get", None)
-                        if callable(get):  # type: ignore[call-arg]
-                            return get(key)  # type: ignore[return-value]
-                    except NON_FATAL_EXCEPTIONS:
-                        return None
-                    return None
-
-                if isinstance(provider_cfg, dict):
-                    k = str(provider_cfg.get("kind", "")).strip()
-                    if not k or k not in SUPPORTED_PROVIDERS:
-                        bad_kind = k or ""
-                elif isinstance(provider_cfg, str):
-                    if provider_cfg not in SUPPORTED_PROVIDERS:
-                        bad_kind = provider_cfg
-                else:
-                    k2 = str(_pget(provider_cfg, "kind") or "").strip()
-                    if not k2 or k2 not in SUPPORTED_PROVIDERS:
-                        bad_kind = k2 or ""
-                if bad_kind:
-                    _add(
-                        "D001",
-                        "error",
-                        f'dataset.provider.kind "{bad_kind}" is not supported. Use one of: wikitext2 | hf_text | synthetic | local_jsonl.',
-                        field="dataset.provider.kind",
-                        hint="Use one of: wikitext2 | hf_text | synthetic | local_jsonl",
-                    )
-                    had_error = True
-                # Schema-level validations per provider kind (support mapping-like)
-                kind_val = None
-                if isinstance(provider_cfg, dict):
-                    kind_val = provider_cfg.get("kind")
-                else:
-                    kind_val = _pget(provider_cfg, "kind")
-                kind = str(kind_val or "").strip()
-                if kind == "local_jsonl":
-                    p = None
-                    if isinstance(provider_cfg, dict):
-                        p = (
-                            provider_cfg.get("file")
-                            or provider_cfg.get("path")
-                            or provider_cfg.get("data_files")
-                        )
-                    else:
-                        p = (
-                            _pget(provider_cfg, "file")
-                            or _pget(provider_cfg, "path")
-                            or _pget(provider_cfg, "data_files")
-                        )
-                    try:
-                        from pathlib import Path as _P
-
-                        exists = bool(p) and _P(str(p)).exists()
-                    except NON_FATAL_EXCEPTIONS:
-                        exists = False
-                    if not exists:
-                        _add(
-                            "D011",
-                            "error",
-                            "local_jsonl: path does not exist",
-                            field="dataset.provider.file",
-                        )
-                        had_error = True
-                    tf = None
-                    if isinstance(provider_cfg, dict):
-                        tf = str(provider_cfg.get("text_field", "")).strip() or "text"
-                    else:
-                        tf = (
-                            str(_pget(provider_cfg, "text_field") or "").strip()
-                            or "text"
-                        )
-                    if not tf:
-                        _add(
-                            "D012",
-                            "warning",
-                            "local_jsonl: set dataset.field.text or map 'text' to your column",
-                            field="dataset.provider.text_field",
-                        )
-                if kind == "hf_text":
-                    tf2 = None
-                    if isinstance(provider_cfg, dict):
-                        tf2 = str(provider_cfg.get("text_field", "")).strip() or "text"
-                    else:
-                        tf2 = (
-                            str(_pget(provider_cfg, "text_field") or "").strip()
-                            or "text"
-                        )
-                    if not tf2:
-                        _add(
-                            "D012",
-                            "warning",
-                            "hf_text: set dataset.field.text or map 'text' to your column",
-                            field="dataset.provider.text_field",
-                        )
+                schema_findings, schema_error = build_provider_schema_findings(
+                    provider_cfg
+                )
+                _record_findings(schema_findings, mark_error=schema_error)
+                had_error = had_error or schema_error
             except NON_FATAL_EXCEPTIONS:
                 pass
 
@@ -766,13 +536,7 @@ def doctor_command(
                         reps_val = int(reps_val)
                     except NON_FATAL_EXCEPTIONS:
                         reps_val = None
-                if isinstance(reps_val, int) and reps_val < 200:
-                    _add(
-                        "D004",
-                        "warning",
-                        "bootstrap replicates (<200) may produce unstable CIs; increase reps or expect wider intervals.",
-                        field="eval.bootstrap.replicates",
-                    )
+                _record_findings(build_bootstrap_replicates_findings(reps_val))
             except NON_FATAL_EXCEPTIONS:
                 pass
 
@@ -812,94 +576,22 @@ def doctor_command(
                         )
                     # Floors preview and capacity insufficiency (D007, D008)
                     try:
-                        import math as _math
-
-                        from invarlock.core.auto_tuning import get_tier_policies
-
-                        use_tier = (tier or "balanced").lower()
-                        tier_policies = get_tier_policies()
-                        tier_defaults = tier_policies.get(
-                            use_tier, tier_policies.get("balanced", {})
-                        )
-                        metrics_policy = (
-                            tier_defaults.get("metrics", {})
-                            if isinstance(tier_defaults, dict)
-                            else {}
-                        )
-                        pm_policy = (
-                            metrics_policy.get("pm_ratio", {})
-                            if isinstance(metrics_policy, dict)
-                            else {}
-                        )
-                        acc_policy = (
-                            metrics_policy.get("accuracy", {})
-                            if isinstance(metrics_policy, dict)
-                            else {}
-                        )
-                        min_tokens = int(pm_policy.get("min_tokens", 0) or 0)
-                        token_frac = float(
-                            pm_policy.get("min_token_fraction", 0.0) or 0.0
-                        )
-                        min_examples = int(acc_policy.get("min_examples", 0) or 0)
-                        ex_frac = float(
-                            acc_policy.get("min_examples_fraction", 0.0) or 0.0
-                        )
                         global POLICY_META
-                        POLICY_META = {
-                            "tier": use_tier,
-                            "floors": {
-                                "pm_ratio": {
-                                    "min_tokens": min_tokens,
-                                    "min_token_fraction": token_frac,
-                                },
-                                "accuracy": {
-                                    "min_examples": min_examples,
-                                    "min_examples_fraction": ex_frac,
-                                },
-                            },
-                        }
-                        tokens_avail = cap.get("tokens_available")
-                        examples_avail = cap.get("examples_available")
-                        eff_tokens = int(min_tokens)
-                        eff_examples = int(min_examples)
-                        if isinstance(tokens_avail, (int, float)) and token_frac > 0:
-                            eff_tokens = max(
-                                eff_tokens,
-                                int(_math.ceil(float(tokens_avail) * token_frac)),
-                            )
-                        if isinstance(examples_avail, (int, float)) and ex_frac > 0:
-                            eff_examples = max(
-                                eff_examples,
-                                int(_math.ceil(float(examples_avail) * ex_frac)),
-                            )
-                        if eff_tokens > 0 or eff_examples > 0:
-                            _add(
-                                "D007",
-                                "note",
-                                f"Floors: tokens >= {eff_tokens} (effective), examples >= {eff_examples} (effective)",
-                                tokens_min=eff_tokens,
-                                examples_min=eff_examples,
-                            )
-                        insufficient = False
-                        if (
-                            isinstance(tokens_avail, int | float)
-                            and eff_tokens > 0
-                            and tokens_avail < eff_tokens
-                        ):
-                            insufficient = True
-                        if (
-                            isinstance(examples_avail, int | float)
-                            and eff_examples > 0
-                            and examples_avail < eff_examples
-                        ):
-                            insufficient = True
-                        if insufficient:
-                            _add(
-                                "D008",
-                                "error",
-                                f"Insufficient capacity: tokens_available={tokens_avail}, examples_available={examples_avail} below effective floors",
-                            )
-                            had_error = True
+                        (
+                            capacity_findings,
+                            insufficient_capacity,
+                            policy_meta,
+                        ) = build_capacity_findings(
+                            cap=cap,
+                            tier=str(tier or "balanced"),
+                        )
+                        if policy_meta is not None:
+                            POLICY_META = policy_meta
+                        _record_findings(
+                            capacity_findings,
+                            mark_error=insufficient_capacity,
+                        )
+                        had_error = had_error or insufficient_capacity
                     except NON_FATAL_EXCEPTIONS:
                         pass
                 except NON_FATAL_EXCEPTIONS as _e:
@@ -914,33 +606,26 @@ def doctor_command(
             # Baseline pairing sanity
             if baseline:
                 try:
-                    bpath = Path(baseline)
-                    if bpath.exists():
-                        bdata = _json.loads(bpath.read_text())
+                    _, bdata, baseline_findings, invalid_baseline = (
+                        load_explicit_report_input(
+                            baseline,
+                            label="Baseline",
+                            field="baseline",
+                        )
+                    )
+                    _record_findings(baseline_findings, mark_error=invalid_baseline)
+                    had_error = had_error or invalid_baseline
+                    if bdata is not None:
                         has_windows = isinstance(bdata.get("evaluation_windows"), dict)
                         console.print(
                             f"  Baseline windows: {'present' if has_windows else 'missing'}"
                         )
-                        try:
-                            prov = (
-                                bdata.get("provenance", {})
-                                if isinstance(bdata, dict)
-                                else {}
+                        split_findings = build_split_fallback_findings(bdata)
+                        _record_findings(split_findings)
+                        if split_findings and not json_out:
+                            console.print(
+                                f"  [yellow]⚠️  {DATASET_SPLIT_FALLBACK_WARNING}[/yellow]"
                             )
-                            if isinstance(prov, dict) and prov.get("split_fallback"):
-                                _add(
-                                    "D003",
-                                    "warning",
-                                    "dataset split fallback was used. Set dataset.provider.hf_dataset.split explicitly.",
-                                )
-                                if not json_out:
-                                    console.print(
-                                        f"  [yellow]⚠️  {DATASET_SPLIT_FALLBACK_WARNING}[/yellow]"
-                                    )
-                        except NON_FATAL_EXCEPTIONS:
-                            pass
-                    else:
-                        console.print("  [yellow]⚠️ Baseline not found[/yellow]")
                 except NON_FATAL_EXCEPTIONS as _e:
                     console.print(f"  [yellow]⚠️ Baseline check failed: {_e}[/yellow]")
         except NON_FATAL_EXCEPTIONS as e:
@@ -948,37 +633,37 @@ def doctor_command(
 
     # Baseline quick check for split fallback visibility (even without --config)
     try:
-        if (baseline or baseline_report) and not config:
-            from json import loads as _json_loads
-            from pathlib import Path as _Path
-
-            bpath = _Path(baseline or baseline_report)
-            if bpath.exists():
-                bdata = _json_loads(bpath.read_text())
-                prov = bdata.get("provenance", {}) if isinstance(bdata, dict) else {}
-                if isinstance(prov, dict) and prov.get("split_fallback"):
-                    _add(
-                        "D003",
-                        "warning",
-                        "dataset split fallback was used. Set dataset.provider.hf_dataset.split explicitly.",
+        if not config:
+            quick_check_path = baseline or baseline_report
+            if quick_check_path:
+                _, bdata, quick_check_findings, invalid_quick_check = (
+                    load_explicit_report_input(
+                        quick_check_path,
+                        label="Baseline",
+                        field="baseline" if baseline else "baseline_report",
                     )
-                    if not json_out:
+                )
+                _record_findings(quick_check_findings, mark_error=invalid_quick_check)
+                had_error = had_error or invalid_quick_check
+                if bdata is not None:
+                    split_findings = build_split_fallback_findings(bdata)
+                    _record_findings(split_findings)
+                    if split_findings and not json_out:
                         console.print(
                             f"  [yellow]⚠️  {DATASET_SPLIT_FALLBACK_WARNING}[/yellow]"
                         )
     except NON_FATAL_EXCEPTIONS:
         pass
 
-    had_error = had_error or _cross_check_reports(
+    cross_check_findings, cross_check_error = build_cross_check_findings(
         baseline_report,
         subject_report,
         cfg_metric_kind=cfg_metric_kind,
         strict=bool(strict),
         profile=profile,
-        json_out=json_out,
-        console=console,
-        add_fn=_add,
     )
+    _record_findings(cross_check_findings, mark_error=cross_check_error)
+    had_error = had_error or cross_check_error
 
     # D013: Tiny relax (dev) active — note only
     try:
@@ -990,33 +675,31 @@ def doctor_command(
         }
     except NON_FATAL_EXCEPTIONS:
         tiny_env = False
-    tiny_cert = False
-    try:
-        # Best-effort: detect from reports when provided
-        import json as _json_d13
-        from pathlib import Path as _Path_d13
 
-        def _readsafe(p):
-            try:
-                return _json_d13.loads(_Path_d13(p).read_text()) if p else None
-            except NON_FATAL_EXCEPTIONS:
-                return None
+    def _load_optional_report_payload(
+        path_value: str | None,
+    ) -> dict[str, object] | None:
+        if not path_value:
+            return None
+        try:
+            _, payload, _, invalid = load_explicit_report_input(
+                path_value,
+                label="Report",
+                field="report",
+            )
+        except NON_FATAL_EXCEPTIONS:
+            return None
+        if invalid:
+            return None
+        return payload
 
-        sb = _readsafe(subject_report) if subject_report else None
-        bb = _readsafe(baseline_report) if baseline_report else None
-        tiny_cert = bool(
-            ((sb or {}).get("auto", {}) or {}).get("tiny_relax")
-            or ((bb or {}).get("auto", {}) or {}).get("tiny_relax")
-        )
-    except NON_FATAL_EXCEPTIONS:
-        tiny_cert = False
-    if tiny_env or tiny_cert:
-        _add(
-            "D013",
-            "note",
-            "tiny relax (dev) active; gates widened and drift/overhead may be informational.",
-            field="auto.tiny_relax",
-        )
+    tiny_finding = build_tiny_relax_finding(
+        subject_report=_load_optional_report_payload(subject_report),
+        baseline_report=_load_optional_report_payload(baseline_report),
+        env_enabled=tiny_env,
+    )
+    if tiny_finding is not None:
+        _record_findings([tiny_finding])
 
     # Check registry status
     try:
@@ -1306,36 +989,24 @@ def doctor_command(
         health_status = False
 
     # Final status / JSON output
+    had_error = had_error or accumulator.had_error
     exit_code = 0 if (health_status and not had_error) else 1
     if json_out:
         import json as _json_out
 
-        # Sort findings deterministically by severity then code
-        _order = {"error": 0, "warning": 1, "note": 2}
-        try:
-            findings.sort(
-                key=lambda f: (_order.get(f.get("severity"), 9), f.get("code", "Z999"))
-            )
-        except NON_FATAL_EXCEPTIONS:
-            pass
-        result_obj = {
-            "format_version": DOCTOR_FORMAT_VERSION,
-            "summary": {
-                "errors": sum(1 for f in findings if f.get("severity") == "error"),
-                "warnings": sum(1 for f in findings if f.get("severity") == "warning"),
-                "notes": sum(1 for f in findings if f.get("severity") == "note"),
-            },
-            "contracts": contract_catalog(),
-            "support_matrix": load_support_matrix(),
-            "model_family_catalog": load_model_family_catalog(),
-            "adapter_capabilities": load_adapter_capabilities(),
-            "plugin_compatibility": load_plugin_compatibility(),
-            "policy": POLICY_META
+        result_obj = build_doctor_result(
+            format_version=DOCTOR_FORMAT_VERSION,
+            findings=accumulator.findings,
+            exit_code=exit_code,
+            contracts=contract_catalog(),
+            support_matrix=load_support_matrix(),
+            model_family_catalog=load_model_family_catalog(),
+            adapter_capabilities=load_adapter_capabilities(),
+            plugin_compatibility=load_plugin_compatibility(),
+            policy=POLICY_META
             if "POLICY_META" in globals()
             else {"tier": (tier or "balanced").lower()},
-            "findings": findings,
-            "resolution": {"exit_code": exit_code},
-        }
+        )
         typer.echo(_json_out.dumps(result_obj))
         raise typer.Exit(exit_code)
     else:

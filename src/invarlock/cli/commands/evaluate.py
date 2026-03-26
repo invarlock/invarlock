@@ -14,6 +14,7 @@ Steps:
 
 from __future__ import annotations
 
+import builtins as _builtins
 import inspect
 import io
 import json
@@ -30,9 +31,26 @@ from rich.console import Console
 
 from invarlock import __version__ as INVARLOCK_VERSION
 
-from ...core.exceptions import MetricsError
+from ...core.evaluate_contract import (
+    apply_edited_primary_metric_policy,
+    load_validated_baseline_report,
+    require_run_report_artifact,
+)
+from ...core.evaluate_plan import (
+    build_baseline_run_config,
+    build_evaluation_report_kwargs,
+    build_subject_edit_run_config,
+    build_subject_noop_run_config,
+    default_preset_data_for_adapter,
+    determine_subject_label,
+    resolve_guards_order,
+    sanitize_preset_data_for_evaluate,
+)
+from ...core.evaluate_plan import (
+    normalize_model_id as _normalize_model_id,
+)
+from ...core.exceptions import ConfigError, ValidationError
 from ..adapter_auto import resolve_auto_adapter
-from ..config import _deep_merge as _merge  # reuse helper
 from ..security_helpers import (
     configure_runtime_security,
     emit_runtime_manifest,
@@ -41,7 +59,6 @@ from ..security_helpers import (
 
 # Use the report group's programmatic entry for report generation
 from .report import report_command as _report
-from .run import _resolve_exit_code as _resolve_exit_code
 
 _LAZY_RUN_IMPORT = True
 
@@ -175,21 +192,6 @@ def _print_quiet_summary(
     console.print(f"Output: {report_path}")
 
 
-def _latest_run_report(run_root: Path) -> Path | None:
-    if not run_root.exists():
-        return None
-    candidates = sorted([p for p in run_root.iterdir() if p.is_dir()])
-    if not candidates:
-        return None
-    latest = candidates[-1]
-    for f in [latest / "report.json", latest / f"{latest.name}.json"]:
-        if f.exists():
-            return f
-    # Fallback: first JSON in the directory
-    jsons = list(latest.glob("*.json"))
-    return jsons[0] if jsons else None
-
-
 def _load_yaml(path: Path) -> dict[str, Any]:
     import yaml
 
@@ -228,21 +230,6 @@ def _resolve_evaluate_tmp_dir() -> Path:
     return tmp_dir
 
 
-def _normalize_model_id(model_id: str, adapter_name: str) -> str:
-    """Normalize model identifiers for adapters.
-
-    - Accepts optional "hf:" prefix for Hugging Face repo IDs and strips it
-      before passing to transformers APIs.
-    """
-    mid = str(model_id or "").strip()
-    try:
-        if str(adapter_name).startswith("hf_") and mid.startswith("hf:"):
-            return mid.split(":", 1)[1]
-    except Exception:
-        pass
-    return mid
-
-
 def evaluate_command(
     # Primary names for programmatic/test compatibility
     source: str = typer.Option(
@@ -255,7 +242,7 @@ def evaluate_command(
         None,
         "--baseline-report",
         help=(
-            "Reuse an existing baseline run report.json (skips baseline evaluation). "
+            "Reuse an existing baseline run report.json file (explicit path; skips baseline evaluation). "
             "Must include stored evaluation windows (e.g., set INVARLOCK_STORE_EVAL_WINDOWS=1)."
         ),
     ),
@@ -415,6 +402,14 @@ def evaluate_command(
     timings: dict[str, float] = {}
     total_start: float | None = perf_counter() if output_style.timing else None
 
+    def _stable_text(value: object, fallback: str = "") -> str:
+        if isinstance(value, _builtins.str):
+            return value
+        try:
+            return str(value)
+        except Exception:
+            return fallback
+
     def _info(message: str, *, tag: str = "INFO", emoji: str | None = None) -> None:
         if verbosity >= VERBOSITY_DEFAULT:
             print_event(console, tag, message, style=output_style, emoji=emoji)
@@ -434,6 +429,8 @@ def evaluate_command(
 
     src_id = str(source)
     edt_id = str(edited)
+    profile_name = _stable_text(profile, "dev")
+    tier_name = _stable_text(tier, "balanced")
 
     # Resolve adapter when requested
     eff_adapter = adapter
@@ -447,8 +444,8 @@ def evaluate_command(
         _print_header_banner(
             console,
             version=INVARLOCK_VERSION,
-            profile=profile,
-            tier=tier,
+            profile=profile_name,
+            tier=tier_name,
             adapter=str(eff_adapter),
         )
         console.print("")
@@ -469,17 +466,7 @@ def evaluate_command(
     preset_data: dict[str, Any]
     if preset is None and not preset_path.exists():
         # Inline minimal preset (wikitext2 universal) for pip installs
-        preset_data = {
-            "dataset": {
-                "provider": "wikitext2",
-                "split": "validation",
-                "seq_len": 512,
-                "stride": 512,
-                "preview_n": 64,
-                "final_n": 64,
-                "seed": 43,
-            }
-        }
+        preset_data = default_preset_data_for_adapter(str(eff_adapter))
     else:
         if not preset_path.exists():
             print_event(
@@ -490,157 +477,32 @@ def evaluate_command(
                 emoji="❌",
             )
             raise typer.Exit(1)
-        preset_data = _load_yaml(preset_path)
-        # Do not hard-code device from presets in auto-generated evaluate configs;
-        # allow device resolution to pick CUDA/MPS/CPU via 'auto' or CLI overrides.
-        model_block = preset_data.get("model")
-        if isinstance(model_block, dict) and "device" in model_block:
-            model_block = dict(model_block)
-            model_block.pop("device", None)
-            preset_data["model"] = model_block
+        preset_data = sanitize_preset_data_for_evaluate(_load_yaml(preset_path))
 
-    default_guards_order = ["invariants", "spectral", "rmt", "variance", "invariants"]
-    guards_order = None
-    preset_guards = preset_data.get("guards")
-    if isinstance(preset_guards, dict):
-        preset_order = preset_guards.get("order")
-        if (
-            isinstance(preset_order, list)
-            and preset_order
-            and all(isinstance(item, str) for item in preset_order)
-        ):
-            guards_order = list(preset_order)
-    if guards_order is None:
-        guards_order = list(default_guards_order)
-
-    def _load_and_validate_baseline_report(
-        report_path: Path,
-        *,
-        expected_profile: str,
-        expected_tier: str,
-        expected_adapter: str,
-    ) -> Path:
-        candidate = Path(report_path).expanduser()
-        if not candidate.exists():
-            _fail(f"Baseline report not found: {candidate}")
-        resolved_report: Path | None = None
-        if candidate.is_dir():
-            direct = candidate / "report.json"
-            if direct.is_file():
-                resolved_report = direct
-            else:
-                resolved_report = _latest_run_report(candidate)
-        elif candidate.is_file():
-            resolved_report = candidate
-        if resolved_report is None or not resolved_report.is_file():
-            _fail(f"Baseline report not found: {candidate}")
-        resolved_report = resolved_report.resolve()
-        try:
-            with resolved_report.open("r", encoding="utf-8") as fh:
-                payload = json.load(fh)
-        except Exception as exc:  # noqa: BLE001
-            _fail(f"Baseline report is not valid JSON: {resolved_report} ({exc})")
-        if not isinstance(payload, dict):
-            _fail(f"Baseline report must be a JSON object: {resolved_report}")
-
-        edit_block = payload.get("edit")
-        edit_name = edit_block.get("name") if isinstance(edit_block, dict) else None
-        if edit_name != "noop":
-            _fail(
-                "Baseline report must be a no-op run (edit.name == 'noop'). "
-                f"Got edit.name={edit_name!r} in {resolved_report}"
-            )
-
-        meta = payload.get("meta")
-        if isinstance(meta, dict):
-            baseline_adapter = meta.get("adapter")
-            if (
-                isinstance(baseline_adapter, str)
-                and baseline_adapter != expected_adapter
-            ):
-                _fail(
-                    "Baseline report adapter mismatch. "
-                    f"Expected {expected_adapter!r}, got {baseline_adapter!r} in {resolved_report}"
-                )
-
-        context = payload.get("context")
-        if isinstance(context, dict):
-            baseline_profile = context.get("profile")
-            if (
-                isinstance(baseline_profile, str)
-                and baseline_profile.strip().lower() != expected_profile.strip().lower()
-            ):
-                _fail(
-                    "Baseline report profile mismatch. "
-                    f"Expected {expected_profile!r}, got {baseline_profile!r} in {resolved_report}"
-                )
-            auto_ctx = context.get("auto")
-            if isinstance(auto_ctx, dict):
-                baseline_tier = auto_ctx.get("tier")
-                if isinstance(baseline_tier, str) and baseline_tier != expected_tier:
-                    _fail(
-                        "Baseline report tier mismatch. "
-                        f"Expected {expected_tier!r}, got {baseline_tier!r} in {resolved_report}"
-                    )
-
-        eval_windows = payload.get("evaluation_windows")
-        if not isinstance(eval_windows, dict):
-            _fail(
-                "Baseline report missing evaluation window payloads. "
-                "Re-run baseline with INVARLOCK_STORE_EVAL_WINDOWS=1."
-            )
-
-        for phase_name in ("preview", "final"):
-            phase = eval_windows.get(phase_name)
-            if not isinstance(phase, dict):
-                _fail(
-                    f"Baseline report missing evaluation_windows.{phase_name} payloads. "
-                    "Re-run baseline with INVARLOCK_STORE_EVAL_WINDOWS=1."
-                )
-            window_ids = phase.get("window_ids")
-            input_ids = phase.get("input_ids")
-            if not isinstance(window_ids, list) or not window_ids:
-                _fail(
-                    f"Baseline report missing evaluation_windows.{phase_name}.window_ids."
-                )
-            if not isinstance(input_ids, list) or not input_ids:
-                _fail(
-                    f"Baseline report missing evaluation_windows.{phase_name}.input_ids."
-                )
-            if len(input_ids) != len(window_ids):
-                _fail(
-                    "Baseline report has inconsistent evaluation window payloads "
-                    f"for {phase_name}: input_ids={len(input_ids)} window_ids={len(window_ids)}."
-                )
-
-        return resolved_report
+    guards_order = resolve_guards_order(preset_data)
 
     # Create temp baseline config (no-op edit)
     # Normalize possible "hf:" prefixes for HF adapters
     norm_src_id = _normalize_model_id(src_id, eff_adapter)
     norm_edt_id = _normalize_model_id(edt_id, eff_adapter)
 
-    baseline_cfg = _merge(
+    baseline_cfg = build_baseline_run_config(
         preset_data,
-        {
-            "model": {
-                "id": norm_src_id,
-                "adapter": eff_adapter,
-            },
-            "edit": {"name": "noop", "plan": {}},
-            "eval": {},
-            "guards": {"order": guards_order},
-            "output": {"dir": str(Path(out) / "source")},
-            "context": {"profile": profile, "tier": tier},
-        },
+        model_id=norm_src_id,
+        adapter_name=str(eff_adapter),
+        output_dir=str(Path(out) / "source"),
+        profile=profile_name,
+        tier=tier_name,
+        guards_order=guards_order,
     )
 
     baseline_label = "noop"
-    subject_label: str | None = None
-    if edit_label:
-        subject_label = edit_label
-    elif not edit_config:
-        subject_label = "custom" if norm_src_id != norm_edt_id else "noop"
+    subject_label = determine_subject_label(
+        edit_label=edit_label,
+        edit_config=edit_config,
+        source_model_id=norm_src_id,
+        subject_model_id=norm_edt_id,
+    )
 
     tmp_dir = _resolve_evaluate_tmp_dir()
 
@@ -651,12 +513,15 @@ def evaluate_command(
             tag="EXEC",
             emoji="♻️",
         )
-        baseline_report_path = _load_and_validate_baseline_report(
-            Path(baseline_report),
-            expected_profile=profile,
-            expected_tier=tier,
-            expected_adapter=str(eff_adapter),
-        )
+        try:
+            baseline_report_path, _ = load_validated_baseline_report(
+                Path(baseline_report),
+                expected_profile=profile_name,
+                expected_tier=tier_name,
+                expected_adapter=str(eff_adapter),
+            )
+        except ValidationError as exc:
+            _fail(str(getattr(exc, "message", exc)), exit_code=2)
         _debug(f"Baseline report: {baseline_report_path}")
     else:
         baseline_yaml = tmp_dir / "baseline_noop.yaml"
@@ -678,11 +543,11 @@ def evaluate_command(
                     message="Baseline",
                     emoji="🏁",
                 ):
-                    _run(
+                    baseline_run_result = _run(
                         config=str(baseline_yaml),
-                        profile=profile,
+                        profile=profile_name,
                         out=str(Path(out) / "source"),
-                        tier=tier,
+                        tier=tier_name,
                         device=device,
                         until_pass=False,
                         max_attempts=1,
@@ -702,10 +567,13 @@ def evaluate_command(
                     console.print(quiet_buffer.getvalue(), markup=False)
                 raise
 
-        baseline_report_path_candidate = _latest_run_report(Path(out) / "source")
-        if not baseline_report_path_candidate:
-            _fail("Could not locate baseline report after run", exit_code=1)
-        baseline_report_path = baseline_report_path_candidate
+        try:
+            baseline_report_path = require_run_report_artifact(
+                baseline_run_result,
+                stage="Baseline",
+            )
+        except ConfigError as exc:
+            _fail(str(getattr(exc, "message", exc)), exit_code=1)
         _debug(f"Baseline report: {baseline_report_path}")
 
     # Edited run: either no-op (Compare & Evaluate) or provided edit_config (demo edit)
@@ -735,46 +603,16 @@ def evaluate_command(
             )
             raise typer.Exit(1) from exc
 
-        # Ensure model.id/adapter point to the requested subject
-        model_block = dict(cfg_loaded.get("model") or {})
-        # Replace placeholder IDs like "<MODEL_ID>" or "<set-your-model-id>"
-        if not isinstance(model_block.get("id"), str) or model_block.get(
-            "id", ""
-        ).startswith("<"):
-            model_block["id"] = norm_edt_id
-        else:
-            # Always normalize when adapter is HF family
-            model_block["id"] = _normalize_model_id(str(model_block["id"]), eff_adapter)
-        # Respect explicit device from edit config; only set adapter if missing
-        if not isinstance(model_block.get("adapter"), str) or not model_block.get(
-            "adapter"
-        ):
-            model_block["adapter"] = eff_adapter
-        cfg_loaded["model"] = model_block
-
-        # Apply the same preset to the edited run to avoid duplicating dataset/task
-        # settings in edit configs; then overlay the edit, output, and context.
-        merged_edited_cfg = _merge(
-            _merge(preset_data, cfg_loaded),
-            {
-                "output": {"dir": str(Path(out) / "edited")},
-                "context": {"profile": profile, "tier": tier},
-            },
+        merged_edited_cfg = build_subject_edit_run_config(
+            preset_data,
+            cfg_loaded,
+            subject_model_id=norm_edt_id,
+            adapter_name=str(eff_adapter),
+            output_dir=str(Path(out) / "edited"),
+            profile=profile_name,
+            tier=tier_name,
+            guards_order=guards_order,
         )
-        # Ensure the edited run always has a guard chain. Presets/edit configs
-        # often omit it, but `invarlock run` expects guards.order.
-        guards_block = merged_edited_cfg.get("guards")
-        guards_order_cfg = (
-            guards_block.get("order") if isinstance(guards_block, dict) else None
-        )
-        if not (
-            isinstance(guards_order_cfg, list)
-            and guards_order_cfg
-            and all(isinstance(item, str) for item in guards_order_cfg)
-        ):
-            merged_edited_cfg = _merge(
-                merged_edited_cfg, {"guards": {"order": guards_order}}
-            )
 
         # Persist a temporary merged config for traceability
         edited_merged_yaml = tmp_dir / "edited_merged.yaml"
@@ -794,11 +632,11 @@ def evaluate_command(
                     message="Subject",
                     emoji="✂️",
                 ):
-                    _run(
+                    edited_run_result = _run(
                         config=str(edited_merged_yaml),
-                        profile=profile,
+                        profile=profile_name,
                         out=str(Path(out) / "edited"),
-                        tier=tier,
+                        tier=tier_name,
                         baseline=str(baseline_report_path),
                         device=device,
                         until_pass=False,
@@ -819,16 +657,14 @@ def evaluate_command(
                     console.print(quiet_buffer.getvalue(), markup=False)
                 raise
     else:
-        edited_cfg = _merge(
+        edited_cfg = build_subject_noop_run_config(
             preset_data,
-            {
-                "model": {"id": norm_edt_id, "adapter": eff_adapter},
-                "edit": {"name": "noop", "plan": {}},
-                "eval": {},
-                "guards": {"order": guards_order},
-                "output": {"dir": str(Path(out) / "edited")},
-                "context": {"profile": profile, "tier": tier},
-            },
+            model_id=norm_edt_id,
+            adapter_name=str(eff_adapter),
+            output_dir=str(Path(out) / "edited"),
+            profile=profile_name,
+            tier=tier_name,
+            guards_order=guards_order,
         )
         edited_yaml = tmp_dir / "edited_noop.yaml"
         _dump_yaml(edited_yaml, edited_cfg)
@@ -847,11 +683,11 @@ def evaluate_command(
                     message="Subject",
                     emoji="🧪",
                 ):
-                    _run(
+                    edited_run_result = _run(
                         config=str(edited_yaml),
-                        profile=profile,
+                        profile=profile_name,
                         out=str(Path(out) / "edited"),
-                        tier=tier,
+                        tier=tier_name,
                         baseline=str(baseline_report_path),
                         device=device,
                         until_pass=False,
@@ -872,16 +708,13 @@ def evaluate_command(
                     console.print(quiet_buffer.getvalue(), markup=False)
                 raise
 
-    edited_report = _latest_run_report(Path(out) / "edited")
-    if not edited_report:
-        print_event(
-            console,
-            "FAIL",
-            "Could not locate edited report after run",
-            style=output_style,
-            emoji="❌",
+    try:
+        edited_report = require_run_report_artifact(
+            edited_run_result,
+            stage="Edited",
         )
-        raise typer.Exit(1)
+    except ConfigError as exc:
+        _fail(str(getattr(exc, "message", exc)), exit_code=1)
     _debug(f"Edited report: {edited_report}")
 
     _phase(3, 3, "EVALUATION REPORT GENERATION")
@@ -904,17 +737,16 @@ def evaluate_command(
                     from time import perf_counter as _wall_perf_counter
 
                     report_start = _wall_perf_counter()
-                    report_kwargs = {
-                        "run": str(edited_report),
-                        "format": "report",
-                        "baseline": str(baseline_report_path),
-                        "output": report_out,
-                        "style": output_style.name,
-                        "no_color": no_color,
-                        "summary_baseline_seconds": float(timings.get("baseline", 0.0)),
-                        "summary_subject_seconds": float(timings.get("subject", 0.0)),
-                        "summary_report_start": float(report_start),
-                    }
+                    report_kwargs = build_evaluation_report_kwargs(
+                        edited_report=str(edited_report),
+                        baseline_report=str(baseline_report_path),
+                        report_out=str(report_out),
+                        style=output_style.name,
+                        no_color=bool(no_color),
+                        baseline_seconds=float(timings.get("baseline", 0.0)),
+                        subject_seconds=float(timings.get("subject", 0.0)),
+                        report_start=float(report_start),
+                    )
                     try:
                         sig = inspect.signature(_report)
                     except (TypeError, ValueError):
@@ -944,8 +776,8 @@ def evaluate_command(
                 "source": source,
                 "edited": edited,
                 "adapter": adapter,
-                "profile": profile,
-                "tier": tier,
+                "profile": profile_name,
+                "tier": tier_name,
                 "preset": preset,
                 "out": out,
                 "report_out": report_out,
@@ -957,8 +789,8 @@ def evaluate_command(
             },
             extra={
                 "command": "evaluate",
-                "profile": profile,
-                "tier": tier,
+                "profile": profile_name,
+                "tier": tier_name,
             },
         )
 
@@ -981,74 +813,20 @@ def evaluate_command(
             )
             raise typer.Exit(1) from exc
 
-        def _finite(x: Any) -> bool:
-            try:
-                return isinstance(x, (int | float)) and math.isfinite(float(x))
-            except Exception:
-                return False
-
-        meta = (
-            edited_payload.get("meta", {}) if isinstance(edited_payload, dict) else {}
+        outcome = apply_edited_primary_metric_policy(
+            edited_payload,
+            profile=profile,
         )
-        metrics = (
-            edited_payload.get("metrics", {})
-            if isinstance(edited_payload, dict)
-            else {}
-        )
-        pm = metrics.get("primary_metric", {}) if isinstance(metrics, dict) else {}
-        pm_prev = pm.get("preview") if isinstance(pm, dict) else None
-        pm_final = pm.get("final") if isinstance(pm, dict) else None
-        pm_ratio = pm.get("ratio_vs_baseline")
-        device = meta.get("device") or "unknown"
-        adapter_name = meta.get("adapter") or "unknown"
-        edit_name = (
-            (edited_payload.get("edit", {}) or {}).get("name")
-            if isinstance(edited_payload, dict)
-            else None
-        ) or "unknown"
-
-        # Enforce only when a primary_metric block is present; allow degraded-but-flagged metrics to emit evaluation reports, but fail the task.
-        has_metric_block = isinstance(pm, dict) and bool(pm)
-        if has_metric_block:
-            degraded = bool(pm.get("invalid") or pm.get("degraded"))
-            if degraded or not _finite(pm_final):
-                fallback = pm_prev if _finite(pm_prev) else pm_final
-                if not _finite(fallback) or fallback <= 0:
-                    fallback = 1.0
-                degraded_reason = pm.get("degraded_reason") or (
-                    "non_finite_pm"
-                    if (not _finite(pm_prev) or not _finite(pm_final))
-                    else "primary_metric_degraded"
-                )
-                print_event(
-                    console,
-                    "WARN",
-                    "Primary metric degraded or non-finite; emitting evaluation report and marking task degraded. Primary metric computation failed.",
-                    style=output_style,
-                    emoji="⚠️",
-                )
-                pm["degraded"] = True
-                pm["invalid"] = pm.get("invalid") or True
-                pm["preview"] = pm_prev if _finite(pm_prev) else fallback
-                pm["final"] = pm_final if _finite(pm_final) else fallback
-                pm["ratio_vs_baseline"] = pm_ratio if _finite(pm_ratio) else 1.0
-                pm["degraded_reason"] = degraded_reason
-                metrics["primary_metric"] = pm
-                edited_payload.setdefault("metrics", {}).update(metrics)
-
-                # Emit the evaluation report for inspection, then exit with a CI-visible error.
-                _emit_evaluation_report()
-                err = MetricsError(
-                    code="E111",
-                    message=f"Primary metric degraded or non-finite ({degraded_reason}).",
-                    details={
-                        "reason": degraded_reason,
-                        "adapter": adapter_name,
-                        "device": device,
-                        "edit": edit_name,
-                    },
-                )
-                raise typer.Exit(_resolve_exit_code(err, profile=profile))
+        if outcome.warning is not None and outcome.error is not None:
+            print_event(
+                console,
+                "WARN",
+                outcome.warning,
+                style=output_style,
+                emoji="⚠️",
+            )
+            _emit_evaluation_report()
+            raise typer.Exit(int(outcome.exit_code or 1))
 
     _emit_evaluation_report()
     if timing:
@@ -1076,5 +854,5 @@ def evaluate_command(
             report_out=Path(report_out),
             source=src_id,
             edited=edt_id,
-            profile=profile,
+            profile=profile_name,
         )

@@ -13,8 +13,6 @@ def test_evaluate_hf_id_normalization_and_preset_fallback(monkeypatch, tmp_path:
     import invarlock.cli.commands.evaluate as cert_mod
     import invarlock.cli.commands.run as run_mod
 
-    monkeypatch.setattr(run_mod, "run_command", lambda **kwargs: None)
-
     captured = []
 
     def _dump_yaml_capture(path: Path, data: dict):  # type: ignore[no-untyped-def]
@@ -23,7 +21,6 @@ def test_evaluate_hf_id_normalization_and_preset_fallback(monkeypatch, tmp_path:
     monkeypatch.setattr(cert_mod, "_dump_yaml", _dump_yaml_capture)
     monkeypatch.setattr(cert_mod, "resolve_auto_adapter", lambda src: "hf_causal")
 
-    # Provide fake latest report paths post-run
     baseline_rep = tmp_path / "baseline.json"
     baseline_rep.write_text(
         json.dumps(
@@ -37,10 +34,13 @@ def test_evaluate_hf_id_normalization_and_preset_fallback(monkeypatch, tmp_path:
         )
     )
 
-    def _fake_latest(run_root: Path) -> Path | None:  # type: ignore[override]
-        return baseline_rep if run_root.name.endswith("source") else edited_rep
-
-    monkeypatch.setattr(cert_mod, "_latest_run_report", _fake_latest)
+    monkeypatch.setattr(
+        run_mod,
+        "run_command",
+        lambda **kwargs: str(
+            baseline_rep if Path(kwargs["out"]).name.endswith("source") else edited_rep
+        ),
+    )
     # No-op report emitter
     monkeypatch.setattr(cert_mod, "_report", lambda **kwargs: None)
 
@@ -74,8 +74,6 @@ def test_evaluate_ci_aborts_on_nonfinite_pm(monkeypatch, tmp_path: Path):
     import invarlock.cli.commands.evaluate as cert_mod
     import invarlock.cli.commands.run as run_mod
 
-    monkeypatch.setattr(run_mod, "run_command", lambda **kwargs: None)
-    # Provide fake latest reports
     baseline_rep = tmp_path / "baseline.json"
     baseline_rep.write_text(
         json.dumps(
@@ -94,10 +92,13 @@ def test_evaluate_ci_aborts_on_nonfinite_pm(monkeypatch, tmp_path: Path):
         )
     )
 
-    def _fake_latest(run_root: Path) -> Path | None:  # type: ignore[override]
-        return baseline_rep if run_root.name.endswith("source") else edited_rep
-
-    monkeypatch.setattr(cert_mod, "_latest_run_report", _fake_latest)
+    monkeypatch.setattr(
+        run_mod,
+        "run_command",
+        lambda **kwargs: str(
+            baseline_rep if Path(kwargs["out"]).name.endswith("source") else edited_rep
+        ),
+    )
     # No-op report emitter
     monkeypatch.setattr(cert_mod, "_report", lambda **kwargs: None)
     monkeypatch.setattr(cert_mod, "resolve_auto_adapter", lambda src: "hf_causal")

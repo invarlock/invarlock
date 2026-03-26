@@ -95,25 +95,29 @@ def test_evaluate_local_paths_pm_and_digests(monkeypatch, tmp_path: Path):
         calls["runs"].append(kwargs)
         if Path(kwargs.get("baseline") or "").exists():
             # Edited run
-            _write_run_report(
-                out_dir,
-                pm_kind="ppl_causal",
-                pm_final=10.0,
-                pm_preview=10.0,
-                ratio_vs_baseline=1.0,
-                latency_ms_per_tok=0.80,
-                provider_ids_digest="edited1234",
+            return str(
+                _write_run_report(
+                    out_dir,
+                    pm_kind="ppl_causal",
+                    pm_final=10.0,
+                    pm_preview=10.0,
+                    ratio_vs_baseline=1.0,
+                    latency_ms_per_tok=0.80,
+                    provider_ids_digest="edited1234",
+                )
             )
         else:
             # Baseline run
-            _write_run_report(
-                out_dir,
-                pm_kind="ppl_causal",
-                pm_final=10.0,
-                pm_preview=10.0,
-                ratio_vs_baseline=1.0,
-                latency_ms_per_tok=0.80,
-                provider_ids_digest="baseline1234",
+            return str(
+                _write_run_report(
+                    out_dir,
+                    pm_kind="ppl_causal",
+                    pm_final=10.0,
+                    pm_preview=10.0,
+                    ratio_vs_baseline=1.0,
+                    latency_ms_per_tok=0.80,
+                    provider_ids_digest="baseline1234",
+                )
             )
 
     # Patch evaluate workflow to use our fake run via the run module; bind _report to the programmatic wrapper
@@ -133,7 +137,7 @@ def test_evaluate_local_paths_pm_and_digests(monkeypatch, tmp_path: Path):
         output: str,
         compare: str | None = None,
     ):
-        from invarlock.reporting.report import save_report as _save_report
+        from invarlock.reporting.report_files import save_report as _save_report
 
         with open(run, encoding="utf-8") as fh:
             primary = _json.load(fh)
@@ -231,6 +235,7 @@ def test_evaluate_local_paths_quantized_subject_overheads(monkeypatch, tmp_path:
             data = json.loads(path.read_text())
             data.setdefault("metrics", {})["latency_ms_p50"] = 0.90
             path.write_text(json.dumps(data), encoding="utf-8")
+            return str(path)
         else:
             # Baseline run
             path = _write_run_report(
@@ -245,6 +250,7 @@ def test_evaluate_local_paths_quantized_subject_overheads(monkeypatch, tmp_path:
             data = json.loads(path.read_text())
             data.setdefault("metrics", {})["latency_ms_p50"] = 0.80
             path.write_text(json.dumps(data), encoding="utf-8")
+            return str(path)
 
     import invarlock.cli.commands.run as run_mod
     from invarlock.cli.commands import evaluate as mod
@@ -262,7 +268,7 @@ def test_evaluate_local_paths_quantized_subject_overheads(monkeypatch, tmp_path:
         output: str,
         compare: str | None = None,
     ):
-        from invarlock.reporting.report import save_report as _save_report
+        from invarlock.reporting.report_files import save_report as _save_report
 
         with open(run, encoding="utf-8") as fh:
             primary = _json.load(fh)

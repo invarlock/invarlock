@@ -265,15 +265,9 @@ def test_null_sweep_emits_json_csv_md_and_tier_patch(tmp_path: Path) -> None:
     cfg = _write_base_config(tmp_path)
     out = tmp_path / "out"
 
-    def _fake_run_command(
-        *, out: Path, tier: str, config: Path, **_kwargs
-    ) -> str | None:  # noqa: ARG001
+    def _fake_run_command(*, out: Path, tier: str, config: Path, **_kwargs) -> str:  # noqa: ARG001
         loaded = yaml.safe_load(Path(config).read_text(encoding="utf-8"))
         assert loaded["context"]["run"]["skip_overhead_check"] is True
-        out_str = str(out)
-        # Exercise both branches: one run produces a report; one is skipped.
-        if "seed_43" in out_str:
-            return None
         report_path = Path(out) / "report.json"
         report_path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
@@ -543,11 +537,7 @@ def test_ve_sweep_covers_guard_search_and_ci_width_exceptions(tmp_path: Path) ->
     )
     out = tmp_path / "out"
 
-    def _fake_run_command(
-        *, out: Path, tier: str, config: Path, **_kwargs
-    ) -> str | None:  # noqa: ARG001
-        if "seed_43" in str(out):
-            return None
+    def _fake_run_command(*, out: Path, tier: str, config: Path, **_kwargs) -> str:  # noqa: ARG001
         report_path = Path(out) / "report.json"
         report_path.parent.mkdir(parents=True, exist_ok=True)
         payload = {

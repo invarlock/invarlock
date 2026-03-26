@@ -21,6 +21,8 @@ import typer
 import yaml
 from rich.console import Console
 
+from invarlock.cli.commands.run import _build_run_command_deps
+from invarlock.cli.run_command_impl import run_command_impl as _run_command_impl
 from invarlock.core.config_execution import RuntimeDelegationError, run_from_config
 
 console = Console()
@@ -94,7 +96,7 @@ def _run_calibration_config(
     allow_host_execution: bool,
     allow_third_party_plugins: bool,
     allow_remote_code: bool,
-) -> str | None:
+) -> Path:
     try:
         return run_from_config(
             config=str(config),
@@ -107,6 +109,8 @@ def _run_calibration_config(
             allow_third_party_plugins=allow_third_party_plugins,
             allow_remote_code=allow_remote_code,
             command_name="calibrate",
+            run_impl=_run_command_impl,
+            deps_builder=_build_run_command_deps,
         )
     except RuntimeDelegationError as exc:
         console.print(f"[red]{exc}[/red]")
@@ -305,8 +309,6 @@ def null_sweep(
             allow_third_party_plugins=allow_third_party_plugins,
             allow_remote_code=allow_remote_code,
         )
-        if not isinstance(report_path, str):
-            continue
         report = json.loads(Path(report_path).read_text(encoding="utf-8"))
         reports_by_tier[spec.tier].append(report)
 
@@ -599,8 +601,6 @@ def ve_sweep(
             allow_third_party_plugins=allow_third_party_plugins,
             allow_remote_code=allow_remote_code,
         )
-        if not isinstance(report_path, str):
-            continue
         report = json.loads(Path(report_path).read_text(encoding="utf-8"))
         reports_by_tier[spec.tier].append(report)
         reports_by_tier_window[(spec.tier, win)].append(report)

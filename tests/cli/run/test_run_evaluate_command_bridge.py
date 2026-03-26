@@ -6,7 +6,7 @@ from pathlib import Path
 from invarlock.cli.commands.evaluate import evaluate_command
 
 
-def _stub_run(out_dir: Path) -> None:
+def _stub_run(out_dir: Path) -> Path:
     ts_dir = out_dir / "20250101_000000"
     ts_dir.mkdir(parents=True, exist_ok=True)
     report = {
@@ -15,7 +15,9 @@ def _stub_run(out_dir: Path) -> None:
         "metrics": {"primary_metric": {"preview": 1.0, "final": 1.0}},
         "data": {"preview_n": 1, "final_n": 1},
     }
-    (ts_dir / "report.json").write_text(json.dumps(report), encoding="utf-8")
+    report_path = ts_dir / "report.json"
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+    return report_path
 
 
 def test_evaluate_command_smoke_for_bridge(monkeypatch, tmp_path) -> None:
@@ -36,7 +38,7 @@ def test_evaluate_command_smoke_for_bridge(monkeypatch, tmp_path) -> None:
 
     def fake_run(**kwargs):  # noqa: ANN001
         calls["runs"] += 1
-        _stub_run(Path(kwargs["out"]))
+        return str(_stub_run(Path(kwargs["out"])))
 
     def fake_report(**_kwargs):  # noqa: ANN001
         calls["reports"] += 1
@@ -106,7 +108,7 @@ def test_evaluate_command_reuses_baseline_report_for_bridge(monkeypatch, tmp_pat
 
     def fake_run(**kwargs):  # noqa: ANN001
         calls["runs"].append(kwargs)
-        _stub_run(Path(kwargs["out"]))
+        return str(_stub_run(Path(kwargs["out"])))
 
     def fake_report(**kwargs):  # noqa: ANN001
         calls["reports"].append(kwargs)
@@ -120,7 +122,7 @@ def test_evaluate_command_reuses_baseline_report_for_bridge(monkeypatch, tmp_pat
     evaluate_command(
         source=str(src),
         edited=str(edt),
-        baseline_report=str(baseline_dir),
+        baseline_report=str(baseline_report),
         adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
@@ -154,7 +156,7 @@ def test_evaluate_command_passes_concrete_run_defaults(monkeypatch, tmp_path) ->
 
     def fake_run(**kwargs):  # noqa: ANN001
         captured_runs.append(kwargs)
-        _stub_run(Path(kwargs["out"]))
+        return str(_stub_run(Path(kwargs["out"])))
 
     def fake_report(**_kwargs):  # noqa: ANN001
         return None

@@ -7,14 +7,20 @@ import pytest
 import invarlock.core.config_execution as config_execution
 
 
-def test_default_run_impl_and_deps_imports_run_symbols() -> None:
-    from invarlock.cli.commands.run import _build_run_command_deps
-    from invarlock.cli.run_command_impl import run_command_impl
-
-    run_impl, deps_builder = config_execution._default_run_impl_and_deps()
-
-    assert run_impl is run_command_impl
-    assert deps_builder is _build_run_command_deps
+def test_run_from_config_requires_explicit_impls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        config_execution,
+        "apply_runtime_allowances",
+        lambda **kwargs: None,
+        raising=True,
+    )
+    with pytest.raises(
+        RuntimeError,
+        match="requires explicit run_impl and deps_builder",
+    ):
+        config_execution.run_from_config(config="configs/demo.yaml", delegate=False)
 
 
 def test_run_from_config_executes_without_delegation_and_writes_manifest(
@@ -59,7 +65,7 @@ def test_run_from_config_executes_without_delegation_and_writes_manifest(
         deps_builder=lambda: {"deps": "ok"},
     )
 
-    assert out == str(report_path)
+    assert out == report_path.resolve()
     assert seen["allowances"] == {
         "allow_network": True,
         "allow_host_execution": False,
@@ -168,7 +174,7 @@ def test_run_from_config_wraps_runtime_delegation_failures(
         config_execution.run_from_config(config="configs/demo.yaml")
 
 
-def test_run_from_config_uses_default_impls_and_skips_manifest_for_missing_report(
+def test_run_from_config_skips_manifest_for_missing_report(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -182,23 +188,14 @@ def test_run_from_config_uses_default_impls_and_skips_manifest_for_missing_repor
         raising=True,
     )
 
-    def _default_impls() -> tuple[object, object]:
-        def _deps_builder() -> dict[str, str]:
-            seen["deps_called"] = True
-            return {"deps": "default"}
+    def _deps_builder() -> dict[str, str]:
+        seen["deps_called"] = True
+        return {"deps": "explicit"}
 
-        def _run_impl(**kwargs) -> str:
-            seen["run_kwargs"] = kwargs
-            return str(missing_report)
+    def _run_impl(**kwargs) -> str:
+        seen["run_kwargs"] = kwargs
+        return str(missing_report)
 
-        return _run_impl, _deps_builder
-
-    monkeypatch.setattr(
-        config_execution,
-        "_default_run_impl_and_deps",
-        _default_impls,
-        raising=True,
-    )
     monkeypatch.setattr(
         config_execution,
         "write_runtime_manifest",
@@ -210,9 +207,12 @@ def test_run_from_config_uses_default_impls_and_skips_manifest_for_missing_repor
         config="configs/demo.yaml",
         profile="ci",
         delegate=False,
+        run_impl=_run_impl,
+        deps_builder=_deps_builder,
     )
 
-    assert out == str(missing_report)
+    assert out == missing_report.resolve()
+
     assert seen["allowances"] == {
         "allow_network": False,
         "allow_host_execution": False,
@@ -240,11 +240,11 @@ def test_run_from_config_uses_default_impls_and_skips_manifest_for_missing_repor
         "timing": False,
         "telemetry": False,
         "no_color": False,
-        "deps": {"deps": "default"},
+        "deps": {"deps": "explicit"},
     }
 
 
-def test_run_from_config_returns_none_when_run_impl_returns_none(
+def test_run_from_config_raises_when_run_impl_returns_none(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
@@ -260,11 +260,10 @@ def test_run_from_config_returns_none_when_run_impl_returns_none(
         raising=True,
     )
 
-    out = config_execution.run_from_config(
-        config="configs/demo.yaml",
-        delegate=False,
-        run_impl=lambda **kwargs: None,
-        deps_builder=lambda: {"deps": "ok"},
-    )
-
-    assert out is None
+    with pytest.raises(RuntimeError, match="run_impl did not return a report path"):
+        config_execution.run_from_config(
+            config="configs/demo.yaml",
+            delegate=False,
+            run_impl=lambda **kwargs: None,
+            deps_builder=lambda: {"deps": "ok"},
+        )

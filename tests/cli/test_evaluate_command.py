@@ -12,7 +12,7 @@ class _StubCLIExit(Exception):
     pass
 
 
-def _stub_run(out_dir: Path, baseline: Path | None = None):
+def _stub_run(out_dir: Path, baseline: Path | None = None) -> Path:
     # Create a deterministic timestamp directory and write a minimal report.json
     ts_dir = out_dir / "20250101_000000"
     ts_dir.mkdir(parents=True, exist_ok=True)
@@ -22,7 +22,9 @@ def _stub_run(out_dir: Path, baseline: Path | None = None):
         "metrics": {"ppl_ratio": 1.0, "ppl_final": 10.0},
         "data": {"preview_n": 1, "final_n": 1},
     }
-    (ts_dir / "report.json").write_text(json.dumps(report), encoding="utf-8")
+    report_path = ts_dir / "report.json"
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+    return report_path
 
 
 def test_evaluate_orchestrates_runs_and_cert(monkeypatch, tmp_path):
@@ -47,7 +49,7 @@ def test_evaluate_orchestrates_runs_and_cert(monkeypatch, tmp_path):
         calls["runs"].append(
             {k: kwargs.get(k) for k in ["config", "profile", "out", "baseline"]}
         )
-        _stub_run(out)
+        return str(_stub_run(out))
 
     def fake_report(**kwargs):
         calls["reports"].append(kwargs)
@@ -135,7 +137,7 @@ def test_evaluate_reuses_baseline_report_skipping_baseline_run(monkeypatch, tmp_
         calls["runs"].append(
             {k: kwargs.get(k) for k in ["config", "profile", "out", "baseline"]}
         )
-        _stub_run(out)
+        return str(_stub_run(out))
 
     def fake_report(**kwargs):  # noqa: ANN001
         calls["reports"].append(kwargs)
@@ -233,7 +235,7 @@ def test_evaluate_autogen_uses_device_auto(monkeypatch, tmp_path):
             {k: kwargs.get(k) for k in ("config", "profile", "out", "tier", "device")}
         )
         out = Path(kwargs.get("out"))
-        _stub_run(out)
+        return str(_stub_run(out))
 
     def fake_report(**_kwargs):
         return None
@@ -288,7 +290,7 @@ def test_evaluate_quiet_summary_emits_status(monkeypatch, tmp_path, capsys):
 
     def fake_run(**kwargs):
         out = Path(kwargs.get("out"))
-        _stub_run(out)
+        return str(_stub_run(out))
 
     def fake_report(**kwargs):
         output_dir = Path(kwargs.get("output"))

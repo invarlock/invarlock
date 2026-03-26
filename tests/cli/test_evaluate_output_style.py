@@ -6,7 +6,7 @@ from pathlib import Path
 from invarlock.cli.commands.evaluate import evaluate_command
 
 
-def _stub_run(out_dir: Path) -> None:
+def _stub_run(out_dir: Path) -> Path:
     ts_dir = out_dir / "20250101_000000"
     ts_dir.mkdir(parents=True, exist_ok=True)
     report = {
@@ -17,7 +17,9 @@ def _stub_run(out_dir: Path) -> None:
         },
         "data": {"preview_n": 1, "final_n": 1},
     }
-    (ts_dir / "report.json").write_text(json.dumps(report), encoding="utf-8")
+    report_path = ts_dir / "report.json"
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+    return report_path
 
 
 def test_evaluate_timing_block_printed(monkeypatch, tmp_path, capsys) -> None:
@@ -40,7 +42,7 @@ def test_evaluate_timing_block_printed(monkeypatch, tmp_path, capsys) -> None:
     monkeypatch.setattr(
         run_mod,
         "run_command",
-        lambda **kwargs: _stub_run(Path(kwargs["out"])),
+        lambda **kwargs: str(_stub_run(Path(kwargs["out"]))),
         raising=False,
     )
     monkeypatch.setattr(cert_mod, "_report", lambda **_kwargs: None, raising=False)

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import builtins
 import importlib.machinery
-import io
 import json
 import sys
 import types
@@ -10,9 +9,9 @@ from types import SimpleNamespace
 
 import pytest
 import typer
-from rich.console import Console
 
 from invarlock.cli.commands import doctor as doctor_mod
+from invarlock.core.doctor_findings import build_cross_check_findings
 
 
 class DummyConsole:
@@ -577,7 +576,21 @@ def test_doctor_baseline_quick_check_missing_path(monkeypatch, tmp_path):
     missing = tmp_path / "missing.json"
     with pytest.raises((SystemExit, typer.Exit)) as exc:
         doctor_mod.doctor_command(json_out=True, baseline=str(missing))
-    assert getattr(exc.value, "exit_code", getattr(exc.value, "code", None)) == 0
+    assert getattr(exc.value, "exit_code", getattr(exc.value, "code", None)) == 1
+
+
+def test_doctor_baseline_quick_check_missing_path_emits_d014(
+    monkeypatch, tmp_path, capsys
+):
+    _install_fake_torch(monkeypatch, cuda_available=False)
+    _patch_minimal_doctor_env(monkeypatch)
+    missing = tmp_path / "missing.json"
+    with pytest.raises((SystemExit, typer.Exit)):
+        doctor_mod.doctor_command(json_out=True, baseline=str(missing))
+
+    payload = json.loads(capsys.readouterr().out.splitlines()[-1])
+    codes = {f["code"] for f in payload.get("findings", [])}
+    assert "D014" in codes
 
 
 def test_doctor_baseline_split_warning_console(monkeypatch, tmp_path):
@@ -1037,23 +1050,14 @@ def _run_cross_check(tmp_path, baseline_payload, subject_payload, **kwargs):
     subject = tmp_path / "subject_cc.json"
     baseline.write_text(json.dumps(baseline_payload), encoding="utf-8")
     subject.write_text(json.dumps(subject_payload), encoding="utf-8")
-    calls: list[tuple[str, str]] = []
-    console = Console(file=io.StringIO())
-
-    def _capture(code, severity, message, **extra):
-        calls.append((code, severity))
-
-    had_error = doctor_mod._cross_check_reports(
+    findings, had_error = build_cross_check_findings(
         str(baseline),
         str(subject),
         cfg_metric_kind=kwargs.get("cfg_metric_kind"),
         strict=kwargs.get("strict", False),
         profile=kwargs.get("profile"),
-        json_out=True,
-        console=console,
-        add_fn=_capture,
     )
-    return had_error, calls
+    return had_error, [(finding.code, finding.severity) for finding in findings]
 
 
 def test_cross_checks_d009_tokenizer(tmp_path):

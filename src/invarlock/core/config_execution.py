@@ -16,13 +16,6 @@ class RuntimeDelegationError(RuntimeError):
     """Raised when secure-default container delegation cannot start."""
 
 
-def _default_run_impl_and_deps() -> tuple[Any, Any]:
-    from invarlock.cli.commands.run import _build_run_command_deps
-    from invarlock.cli.run_command_impl import run_command_impl
-
-    return run_command_impl, _build_run_command_deps
-
-
 def run_from_config(
     *,
     config: str,
@@ -52,8 +45,8 @@ def run_from_config(
     delegate: bool = True,
     run_impl: Any | None = None,
     deps_builder: Any | None = None,
-) -> str | None:
-    """Run a config-driven job and persist runtime attestation metadata."""
+) -> Path:
+    """Run a config-driven job and return the emitted report path."""
 
     apply_runtime_allowances(
         allow_network=allow_network,
@@ -69,12 +62,12 @@ def run_from_config(
             raise RuntimeDelegationError(str(exc)) from exc
         raise SystemExit(exit_code)
 
-    resolved_run_impl = run_impl
-    resolved_deps_builder = deps_builder
-    if resolved_run_impl is None or resolved_deps_builder is None:
-        resolved_run_impl, resolved_deps_builder = _default_run_impl_and_deps()
+    if run_impl is None or deps_builder is None:
+        raise RuntimeError(
+            "run_from_config requires explicit run_impl and deps_builder callables"
+        )
 
-    report_path = resolved_run_impl(
+    report_path = run_impl(
         config=config,
         device=device,
         profile=profile,
@@ -94,22 +87,24 @@ def run_from_config(
         timing=timing,
         telemetry=telemetry,
         no_color=no_color,
-        deps=resolved_deps_builder(),
+        deps=deps_builder(),
     )
 
-    if report_path:
-        report = Path(report_path)
-        if report.exists():
-            write_runtime_manifest(
-                report,
-                config_path=config,
-                extra={
-                    "command": command_name,
-                    "profile": profile,
-                    "allow_network": allow_network,
-                    "allow_remote_code": allow_remote_code,
-                    "allow_third_party_plugins": allow_third_party_plugins,
-                },
-            )
+    if report_path is None:
+        raise RuntimeError("run_impl did not return a report path")
 
-    return str(report_path) if report_path is not None else None
+    report = Path(report_path).resolve()
+    if report.exists():
+        write_runtime_manifest(
+            report,
+            config_path=config,
+            extra={
+                "command": command_name,
+                "profile": profile,
+                "allow_network": allow_network,
+                "allow_remote_code": allow_remote_code,
+                "allow_third_party_plugins": allow_third_party_plugins,
+            },
+        )
+
+    return report
