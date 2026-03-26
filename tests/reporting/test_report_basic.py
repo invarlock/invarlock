@@ -3,12 +3,12 @@ from typing import Any
 
 from invarlock.reporting import report as rpt
 from invarlock.reporting.report import (
-    save_report,
     to_evaluation_report,
     to_html,
     to_json,
     to_markdown,
 )
+from invarlock.reporting.report_files import save_report
 
 
 def _minimal_report() -> dict[str, Any]:
@@ -100,3 +100,40 @@ def test_validate_baseline_or_report_helper():
         "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 100.0}},
     }
     assert rpt._validate_baseline_or_report(baseline) is True
+
+
+def test_single_markdown_handles_missing_primary_metric_and_sparse_guards():
+    rep = _minimal_report()
+    rep["metrics"]["primary_metric"] = {}
+    rep["edit"]["deltas"]["sparsity"] = 0.25
+    rep["guards"] = [
+        {"name": "variance", "metrics": {}, "actions": [], "violations": []}
+    ]
+    rep["flags"]["guard_recovered"] = True
+
+    md = "\n".join(rpt._generate_single_markdown(rep))
+
+    assert "Primary Metric**: unavailable" in md
+    assert "Overall Sparsity" in md
+    assert "Guard recovery was triggered" in md
+
+
+def test_comparison_markdown_coerces_invalid_delta_values():
+    rep1 = _minimal_report()
+    rep2 = _minimal_report()
+    rep1["metrics"]["primary_metric"] = {}
+    rep2["metrics"]["primary_metric"] = {}
+    rep1["edit"]["deltas"]["params_changed"] = "bad"
+    rep2["edit"]["deltas"]["layers_modified"] = "bad"
+    rep1["guards"] = [
+        {"name": "spectral", "violations": [], "metrics": {}, "actions": []}
+    ]
+    rep2["guards"] = [
+        {"name": "spectral", "violations": ["x"], "metrics": {}, "actions": []}
+    ]
+
+    md = "\n".join(rpt._generate_comparison_markdown(rep1, rep2))
+
+    assert "| Params Changed | 0 | 0 | +0 |" in md
+    assert "| Layers Modified | 0 | 0 | +0 |" in md
+    assert "Violations:" in md

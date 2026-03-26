@@ -144,7 +144,7 @@ def test_run_command_invalid_probes(mock_load):
 @patch("invarlock.cli.device.validate_device_for_config", return_value=(True, ""))
 @patch("invarlock.core.registry.get_registry")
 @patch("invarlock.core.runner.CoreRunner")
-@patch("invarlock.reporting.report.save_report")
+@patch("invarlock.reporting.report_files.save_report")
 @patch("invarlock.eval.data.get_provider")
 @patch("pathlib.Path.mkdir")
 def test_run_command_fails_when_guard_overhead_exceeds_budget(

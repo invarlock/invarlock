@@ -4,7 +4,7 @@ import json
 import os
 from pathlib import Path
 
-from invarlock.reporting.report import save_report
+from invarlock.reporting.report_files import save_report
 
 
 def _minimal_report() -> dict:

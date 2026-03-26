@@ -119,7 +119,7 @@ output:
         ),
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
-        patch("invarlock.reporting.report.save_report", capture_save_report),
+        patch("invarlock.reporting.report_files.save_report", capture_save_report),
     ):
         run_command(
             config=str(cfg),

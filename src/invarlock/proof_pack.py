@@ -1,16 +1,12 @@
 from __future__ import annotations
 
 import hashlib
-import io
 import json
 import re
 import shutil
 import subprocess
-from contextlib import redirect_stdout
 from pathlib import Path
 from typing import Any
-
-import typer
 
 from invarlock.public_contracts import load_proof_pack_manifest_schema
 from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
@@ -440,19 +436,9 @@ def _verify_gpg(
 def _run_verify_command(
     reports: list[Path], *, profile: str
 ) -> tuple[int, dict[str, Any] | None]:
-    from invarlock.cli.commands.verify import verify_command
+    from invarlock.reporting.verify_contract import verify_reports_contract
 
-    buffer = io.StringIO()
-    exit_code = 0
-    with redirect_stdout(buffer):
-        try:
-            verify_command(reports=reports, profile=profile, json_out=True)
-        except (SystemExit, typer.Exit) as exc:
-            raw_code = getattr(exc, "exit_code", getattr(exc, "code", 1))
-            exit_code = int(raw_code) if isinstance(raw_code, int) else 1
-    output = buffer.getvalue().strip()
-    payload = json.loads(output.splitlines()[-1]) if output else None
-    return exit_code, payload
+    return verify_reports_contract(reports, profile=profile, json_mode=True)
 
 
 def _verify_reports(

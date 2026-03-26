@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.cli.commands import verify as v
+from invarlock.reporting import verify_contract as v
 
 
 def test_validate_counts_skips_when_expected_preview_final_missing() -> None:

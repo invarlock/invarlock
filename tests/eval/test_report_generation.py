@@ -7,12 +7,12 @@ import pytest
 from invarlock.reporting.report import (
     _sanitize_for_json,
     _validate_baseline_or_report,
-    save_report,
     to_evaluation_report,
     to_html,
     to_json,
     to_markdown,
 )
+from invarlock.reporting.report_files import save_report
 from invarlock.reporting.report_types import create_empty_report
 
 

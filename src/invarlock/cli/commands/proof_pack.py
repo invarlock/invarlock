@@ -126,7 +126,10 @@ def build_command(
     reports: list[str] = typer.Option(
         [],
         "--report",
-        help="Path to an evaluation.report.json file to verify and package.",
+        help=(
+            "Path to an explicit evaluation.report.json file to verify and "
+            "package (requires adjacent runtime.manifest.json)."
+        ),
     ),
     source_repo: str | None = typer.Option(
         None,

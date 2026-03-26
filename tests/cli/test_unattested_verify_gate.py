@@ -7,7 +7,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from invarlock.cli.app import app
-from invarlock.cli.commands import verify as verify_mod
+from invarlock.reporting import verify_contract as verify_mod
 
 
 def _attestation_gate_cert() -> dict:

@@ -4,7 +4,7 @@ import copy
 import json
 from pathlib import Path
 
-from invarlock.cli.commands import verify as verify_mod
+from invarlock.reporting import verify_contract as verify_mod
 
 
 def _write_json(path: Path, payload: dict) -> Path:

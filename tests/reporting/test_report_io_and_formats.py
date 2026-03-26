@@ -4,12 +4,12 @@ import json
 from pathlib import Path
 
 from invarlock.reporting.report import (
-    save_report,
     to_evaluation_report,
     to_html,
     to_json,
     to_markdown,
 )
+from invarlock.reporting.report_files import save_report
 from invarlock.reporting.report_types import RunReport
 
 

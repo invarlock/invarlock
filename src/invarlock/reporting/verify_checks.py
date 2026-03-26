@@ -35,7 +35,6 @@ def _coerce_int(value: Any) -> int | None:
 
 
 def _load_evaluation_report(path: Path) -> dict[str, Any]:
-    """Load an evaluation report JSON from disk."""
     with path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
 
@@ -47,7 +46,6 @@ def _validate_report_schema_strict(
     report_json_schema: dict[str, Any] = REPORT_JSON_SCHEMA,
     report_builder_module: Any = _report_builder,
 ) -> bool:
-    """Fail-closed schema validation for verify-time checks."""
     if not isinstance(report, dict):
         return False
     if report.get("schema_version") != schema_version:
@@ -67,7 +65,6 @@ def _validate_report_schema_strict(
 def _validate_logspace_ci_identity(
     report: dict[str, Any], *, profile: str | None
 ) -> list[str]:
-    """Validate paired ppl CI identity: display_ci ~= exp(ci)."""
     errors: list[str] = []
     pm = report.get("primary_metric", {}) or {}
     if not isinstance(pm, dict):
@@ -103,16 +100,17 @@ def _validate_logspace_ci_identity(
     )
     baseline_final = baseline_pm.get("final") if isinstance(baseline_pm, dict) else None
     if not (
-        isinstance(baseline_final, int | float) and math.isfinite(float(baseline_final))
+        isinstance(baseline_final, (int, float))
+        and math.isfinite(float(baseline_final))
     ):
         return errors
 
     def _finite_bounds(bounds: Any) -> bool:
         return (
-            isinstance(bounds, tuple | list)
+            isinstance(bounds, (tuple, list))
             and len(bounds) == 2
             and all(
-                isinstance(v, int | float) and math.isfinite(float(v)) for v in bounds
+                isinstance(v, (int, float)) and math.isfinite(float(v)) for v in bounds
             )
         )
 
@@ -146,7 +144,6 @@ def _validate_logspace_ci_identity(
 
 
 def _validate_primary_metric(report: dict[str, Any]) -> list[str]:
-    """Validate primary metric ratio consistency with baseline reference."""
     errors: list[str] = []
     pm = report.get("primary_metric", {}) or {}
     if not isinstance(pm, dict) or not pm:
@@ -183,7 +180,7 @@ def _validate_primary_metric(report: dict[str, Any]) -> list[str]:
         baseline_final = None
         if isinstance(baseline_pm, dict):
             bv = baseline_pm.get("final")
-            if isinstance(bv, int | float):
+            if isinstance(bv, (int, float)):
                 baseline_final = float(bv)
         if _is_finite_number(final) and _is_finite_number(baseline_final):
             if float(baseline_final) <= 0.0:
@@ -207,7 +204,7 @@ def _validate_primary_metric(report: dict[str, Any]) -> list[str]:
                         f"recorded={float(ratio_vs_baseline):.12f}, expected={expected_ratio:.12f}"
                     )
         else:
-            if (isinstance(final, int | float) and not _is_finite_number(final)) and (
+            if (isinstance(final, (int, float)) and not _is_finite_number(final)) and (
                 not pm_invalid
             ):
                 errors.append(
@@ -216,7 +213,7 @@ def _validate_primary_metric(report: dict[str, Any]) -> list[str]:
     else:
         if pm_invalid:
             return errors
-        if ratio_vs_baseline is None or not isinstance(ratio_vs_baseline, int | float):
+        if ratio_vs_baseline is None or not isinstance(ratio_vs_baseline, (int, float)):
             errors.append(
                 "report missing primary_metric.ratio_vs_baseline for non-ppl metric."
             )
@@ -243,7 +240,6 @@ def _recompute_validation_flags(
     resolve_tiny_relax_from_report_fn: Callable[[dict[str, Any]], bool]
     | Callable[[dict[str, Any]], Any] = resolve_tiny_relax_from_report,
 ) -> dict[str, bool]:
-    """Recompute report gates from serialized evidence for verify-time parity."""
     pm = report.get("primary_metric") or {}
     if not isinstance(pm, dict):
         pm = {}
@@ -349,7 +345,6 @@ def _validate_primary_metric_policy(
         [dict[str, Any]], dict[str, bool]
     ] = _recompute_validation_flags,
 ) -> list[str]:
-    """Enforce the serialized PM policy gate in CI/release verification."""
     prof = str(profile or "dev").strip().lower()
     if prof not in {"ci", "release"}:
         return []
@@ -378,7 +373,6 @@ def _validate_primary_metric_policy(
 
 
 def _validate_release_gate_outcomes(report: dict[str, Any]) -> list[str]:
-    """Require release reports to preserve PASS on canonical gate outcomes."""
     errors: list[str] = []
     validation = report.get("validation")
     if not isinstance(validation, dict):
@@ -427,7 +421,6 @@ def _validate_release_gate_outcomes(report: dict[str, Any]) -> list[str]:
 
 
 def _validate_pairing(report: dict[str, Any]) -> list[str]:
-    """Validate window pairing metrics (PM-only location)."""
     errors: list[str] = []
     stats = report.get("dataset", {}).get("windows", {}).get("stats", {})
 
@@ -464,7 +457,6 @@ def _validate_pairing(report: dict[str, Any]) -> list[str]:
 
 
 def _validate_counts(report: dict[str, Any]) -> list[str]:
-    """Validate preview/final window counts align with dataset configuration."""
     errors: list[str] = []
     dataset = report.get("dataset", {})
     dataset_windows = dataset.get("windows", {})
@@ -507,7 +499,6 @@ def _validate_counts(report: dict[str, Any]) -> list[str]:
 
 
 def _validate_drift_band(report: dict[str, Any]) -> list[str]:
-    """Validate preview→final drift stays within the configured band."""
     errors: list[str] = []
     if resolve_tiny_relax_from_report(report):
         return errors
@@ -522,8 +513,8 @@ def _validate_drift_band(report: dict[str, Any]) -> list[str]:
         prev = pm.get("preview")
         fin = pm.get("final")
         if (
-            isinstance(prev, int | float)
-            and isinstance(fin, int | float)
+            isinstance(prev, (int, float))
+            and isinstance(fin, (int, float))
             and math.isfinite(float(prev))
             and math.isfinite(float(fin))
             and prev > 0
@@ -532,7 +523,7 @@ def _validate_drift_band(report: dict[str, Any]) -> list[str]:
     except Exception:
         drift_ratio = None
 
-    if not isinstance(drift_ratio, int | float):
+    if not isinstance(drift_ratio, (int, float)):
         errors.append("report missing preview/final to compute drift ratio.")
         return errors
 
@@ -543,15 +534,15 @@ def _validate_drift_band(report: dict[str, Any]) -> list[str]:
         if isinstance(band, dict):
             lo = band.get("min")
             hi = band.get("max")
-            if isinstance(lo, int | float) and isinstance(hi, int | float):
+            if isinstance(lo, (int, float)) and isinstance(hi, (int, float)):
                 lo_f = float(lo)
                 hi_f = float(hi)
                 if math.isfinite(lo_f) and math.isfinite(hi_f) and 0 < lo_f < hi_f:
                     drift_min = lo_f
                     drift_max = hi_f
-        elif isinstance(band, list | tuple) and len(band) == 2:
+        elif isinstance(band, (list, tuple)) and len(band) == 2:
             lo_raw, hi_raw = band[0], band[1]
-            if isinstance(lo_raw, int | float) and isinstance(hi_raw, int | float):
+            if isinstance(lo_raw, (int, float)) and isinstance(hi_raw, (int, float)):
                 lo_f = float(lo_raw)
                 hi_f = float(hi_raw)
                 if math.isfinite(lo_f) and math.isfinite(hi_f) and 0 < lo_f < hi_f:
@@ -569,7 +560,6 @@ def _validate_drift_band(report: dict[str, Any]) -> list[str]:
 
 
 def _validate_tokenizer_hash(report: dict[str, Any]) -> list[str]:
-    """Validate tokenizer hash consistency between baseline and edited runs."""
     errors: list[str] = []
     meta = report.get("meta", {}) or {}
     dataset = report.get("dataset", {}) or {}
@@ -593,7 +583,6 @@ def _validate_tokenizer_hash(report: dict[str, Any]) -> list[str]:
 
 
 def _resolve_path(payload: Any, path: str) -> Any:
-    """Resolve dotted paths within nested dictionaries."""
     current = payload
     for segment in path.split("."):
         if isinstance(current, dict):
@@ -616,7 +605,6 @@ def _measurement_contract_digest(contract: Any) -> str | None:
 def _validate_measurement_contracts(
     report: dict[str, Any], *, profile: str
 ) -> list[str]:
-    """Enforce measurement-contract presence and baseline pairing for guards."""
     errors: list[str] = []
     prof = (profile or "").strip().lower()
     resolved_policy = report.get("resolved_policy") or {}
@@ -672,7 +660,6 @@ def _validate_measurement_contracts(
 
 
 def _apply_profile_lints(report: dict[str, Any]) -> list[str]:
-    """Apply model-profile specific lint rules embedded in the report."""
     errors: list[str] = []
     meta = report.get("meta", {})
     profile = meta.get("model_profile") if isinstance(meta, dict) else None
@@ -762,7 +749,6 @@ def _validate_evaluation_report_payload(
         ..., list[str]
     ] = _validate_measurement_contracts,
 ) -> list[str]:
-    """Run all verification checks for a single evaluation report."""
     errors: list[str] = []
     report = load_evaluation_report_fn(path)
     try:
@@ -818,7 +804,6 @@ def _validate_evaluation_report_payload(
                     errors.append(
                         "Release verification requires guard_overhead.overhead_ratio (missing)."
                     )
-
     return errors
 
 
@@ -841,4 +826,8 @@ __all__ = [
     "_validate_release_gate_outcomes",
     "_validate_report_schema_strict",
     "_validate_tokenizer_hash",
+    "compute_validation_flags",
+    "resolve_tiny_relax_from_report",
+    "validate_report",
+    "_report_builder",
 ]

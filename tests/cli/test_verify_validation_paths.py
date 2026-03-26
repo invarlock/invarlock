@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-from invarlock.cli.commands import verify as V
+from invarlock.reporting import verify_contract as V
 
 
 def _base_cert() -> dict:
@@ -91,7 +91,7 @@ def test_apply_profile_lints_equals_mismatch_and_numeric_conversion_errors():
 def test_validate_evaluation_report_payload_schema_fail(tmp_path: Path):
     cert_path = tmp_path / "c.json"
     cert_path.write_text(json.dumps(_base_cert()))
-    with patch("invarlock.cli.commands.verify.validate_report", lambda c: False):
+    with patch("invarlock.reporting.verify_contract.validate_report", lambda c: False):
         errs = V._validate_evaluation_report_payload(cert_path)
         assert any("schema validation failed" in e for e in errs)
 
@@ -106,7 +106,7 @@ def test_verify_command_multiple_files_mixed_results(tmp_path: Path, capsys):
     p1.write_text(json.dumps(good))
     p2.write_text(json.dumps(bad))
 
-    with patch("invarlock.cli.commands.verify.validate_report", lambda c: True):
+    with patch("invarlock.reporting.verify_contract.validate_report", lambda c: True):
         errs1 = V._validate_evaluation_report_payload(p1)
         errs2 = V._validate_evaluation_report_payload(p2)
         assert errs1 == [] and errs2 != []

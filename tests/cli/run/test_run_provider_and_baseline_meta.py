@@ -187,7 +187,9 @@ def test_report_flags_guard_recovered(tmp_path: Path):
             )
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",
@@ -240,7 +242,9 @@ def test_metrics_optional_keys_propagated(tmp_path: Path):
             )
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",
@@ -307,7 +311,9 @@ def test_guard_overhead_payload_present_ci(tmp_path: Path):
                 ),
             )
         )
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",
@@ -374,7 +380,9 @@ def test_tokenizer_digest_non_string_keys_in_vocab(tmp_path: Path):
                 ),
             )
         )
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",
@@ -444,7 +452,9 @@ def test_tokenizer_digest_exception_unknown(tmp_path: Path):
                 ),
             )
         )
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",
@@ -784,7 +794,9 @@ def test_preview_final_tokens_computed_when_missing_in_baseline_meta(tmp_path: P
             return R()
 
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", runner_factory))
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",

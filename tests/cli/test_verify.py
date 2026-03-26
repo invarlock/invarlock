@@ -11,7 +11,7 @@ from typer.testing import CliRunner
 
 os.environ["INVARLOCK_LIGHT_IMPORT"] = "1"
 from invarlock.cli.app import app
-from invarlock.cli.commands import verify as verify_mod
+from invarlock.reporting import verify_contract as verify_mod
 
 runner = CliRunner()
 

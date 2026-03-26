@@ -5,7 +5,8 @@ from pathlib import Path
 import pytest
 from click.exceptions import Exit as ClickExit
 
-from invarlock.cli.commands import verify as v
+from invarlock.cli.commands.verify import verify_command
+from invarlock.reporting import verify_contract as v
 
 
 def _cert_with_provenance() -> dict:
@@ -99,9 +100,7 @@ def test_verify_command_happy_ci_profile(tmp_path: Path, monkeypatch):
 
     # Expect Typer Exit (JSON emit) with code 0
     with pytest.raises(ClickExit) as ei:
-        v.verify_command(
-            [cert_path], baseline=baseline_path, profile="ci", json_out=True
-        )
+        verify_command([cert_path], baseline=baseline_path, profile="ci", json_out=True)
     assert getattr(ei.value, "exit_code", None) == 0
 
 
@@ -114,5 +113,5 @@ def test_verify_command_missing_digest_raises_in_ci(tmp_path: Path, monkeypatch)
     cert_path.write_text(json.dumps(cert))
 
     with pytest.raises(ClickExit) as ei:
-        v.verify_command([cert_path], baseline=None, profile="ci", json_out=True)
+        verify_command([cert_path], baseline=None, profile="ci", json_out=True)
     assert getattr(ei.value, "exit_code", None) not in (None, 0)

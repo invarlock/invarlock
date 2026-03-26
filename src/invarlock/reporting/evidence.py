@@ -7,10 +7,8 @@ from typing import Any
 
 
 def maybe_dump_guard_evidence(target_dir: str | Path, payload: dict[str, Any]) -> None:
-    """Dump a small JSON blob of guard decision inputs when INVARLOCK_EVIDENCE_DEBUG=1.
+    """Dump a small JSON blob of guard decision inputs when enabled."""
 
-    Keeps payload tiny; callers should pre-filter arrays and redact large fields.
-    """
     if os.getenv("INVARLOCK_EVIDENCE_DEBUG", "0") != "1":
         return
     try:
@@ -21,5 +19,8 @@ def maybe_dump_guard_evidence(target_dir: str | Path, payload: dict[str, Any]) -
             json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
         )
     except Exception:
-        # Never raise in evidence hook
+        # Never raise in evidence hooks.
         pass
+
+
+__all__ = ["maybe_dump_guard_evidence"]

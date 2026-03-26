@@ -6,6 +6,8 @@ import sys
 import types
 from pathlib import Path
 
+from invarlock.reporting.report_schema import REPORT_SCHEMA_VERSION
+
 
 def _import_verify_module():
     # transformers stub so importing verify (which imports run) is safe
@@ -33,7 +35,7 @@ def _import_verify_module():
         sub = types.ModuleType("transformers.tokenization_utils_base")
         sub.PreTrainedTokenizerBase = object  # type: ignore[attr-defined]
         sys.modules["transformers.tokenization_utils_base"] = sub
-    return importlib.import_module("invarlock.cli.commands.verify")
+    return importlib.import_module("invarlock.reporting.verify_contract")
 
 
 def test_primary_metric_validation_ppl_and_non_ppl() -> None:
@@ -500,7 +502,7 @@ def test_validate_report_schema_strict_paths(monkeypatch) -> None:
         verify_mod._validate_report_schema_strict({"schema_version": "nope"}) is False
     )
 
-    report = {"schema_version": verify_mod.REPORT_SCHEMA_VERSION}
+    report = {"schema_version": REPORT_SCHEMA_VERSION}
 
     monkeypatch.setattr(verify_mod._report_builder, "jsonschema", None, raising=False)
     assert verify_mod._validate_report_schema_strict(report) is False

@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
 
-from invarlock.cli.commands import verify as v
+from invarlock.reporting import verify_contract as v
 
 
 def _cert_base(pm: dict[str, Any]) -> dict[str, Any]:

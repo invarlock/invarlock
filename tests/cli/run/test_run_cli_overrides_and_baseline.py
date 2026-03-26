@@ -179,7 +179,9 @@ def test_auto_tier_override_conservative(tmp_path: Path):
         stack.enter_context(
             patch("invarlock.core.runner.CoreRunner", _runner_echo_context)
         )
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",
@@ -209,7 +211,9 @@ def test_auto_tier_override_aggressive(tmp_path: Path):
         stack.enter_context(
             patch("invarlock.core.runner.CoreRunner", _runner_echo_context)
         )
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",
@@ -239,7 +243,9 @@ def test_auto_probes_override_zero(tmp_path: Path):
         stack.enter_context(
             patch("invarlock.core.runner.CoreRunner", _runner_echo_context)
         )
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",
@@ -269,7 +275,9 @@ def test_auto_probes_override_three(tmp_path: Path):
         stack.enter_context(
             patch("invarlock.core.runner.CoreRunner", _runner_echo_context)
         )
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",
@@ -324,7 +332,9 @@ def test_data_meta_has_tokenizer_name(tmp_path: Path):
         stack.enter_context(
             patch("invarlock.core.runner.CoreRunner", _runner_echo_context)
         )
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",
@@ -353,7 +363,9 @@ def test_data_meta_has_tokenizer_hash(tmp_path: Path):
         stack.enter_context(
             patch("invarlock.core.runner.CoreRunner", _runner_echo_context)
         )
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",
@@ -382,7 +394,9 @@ def test_data_meta_has_vocab_size_and_tokens(tmp_path: Path):
         stack.enter_context(
             patch("invarlock.core.runner.CoreRunner", _runner_echo_context)
         )
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",
@@ -414,7 +428,9 @@ def test_data_meta_add_prefix_space_key_present(tmp_path: Path):
         stack.enter_context(
             patch("invarlock.core.runner.CoreRunner", _runner_echo_context)
         )
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",
@@ -505,7 +521,9 @@ def test_preview_and_final_hash_and_dataset_hash_present(tmp_path: Path):
         stack.enter_context(
             patch("invarlock.core.runner.CoreRunner", lambda: runner_eval)
         )
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",
@@ -553,7 +571,9 @@ def test_window_plan_present_and_capacity_mirrored(tmp_path: Path):
         stack.enter_context(
             patch("invarlock.core.runner.CoreRunner", _runner_echo_context)
         )
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",
@@ -663,7 +683,9 @@ def test_baseline_masked_counts_propagated(tmp_path: Path):
         stack.enter_context(
             patch("invarlock.core.runner.CoreRunner", lambda: runner_eval)
         )
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",

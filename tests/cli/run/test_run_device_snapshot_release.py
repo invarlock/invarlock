@@ -70,7 +70,7 @@ def _common_ce():
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
-            "invarlock.reporting.report.save_report",
+            "invarlock.reporting.report_files.save_report",
             lambda report, run_dir, formats, filename_prefix: {
                 "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
             },
@@ -618,7 +618,9 @@ def test_guard_overhead_bare_missing_ppl_and_status_warn(tmp_path: Path):
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: _provider_min())
         )
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         # Ensure profile that measures overhead (ci)
         run_command(
             config=str(cfg),
@@ -719,7 +721,7 @@ def test_tokenizer_hash_populated_from_context_when_missing(tmp_path: Path):
         # Capture save but don't need to inspect
         stack.enter_context(
             patch(
-                "invarlock.reporting.report.save_report",
+                "invarlock.reporting.report_files.save_report",
                 lambda report, run_dir, formats, filename_prefix: {
                     "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
                 },

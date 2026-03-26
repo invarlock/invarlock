@@ -55,7 +55,7 @@ def _common_ce():
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
-            "invarlock.reporting.report.save_report",
+            "invarlock.reporting.report_files.save_report",
             lambda report, run_dir, formats, filename_prefix: {
                 "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
             },
@@ -775,7 +775,9 @@ def test_save_report_failure_bubbles_to_exit(tmp_path: Path):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(patch("invarlock.reporting.report.save_report", bad_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", bad_save)
+        )
         stack.enter_context(
             patch(
                 "invarlock.eval.data.get_provider", lambda *a, **k: _provider_simple()

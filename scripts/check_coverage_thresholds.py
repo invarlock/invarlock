@@ -60,7 +60,8 @@ THRESHOLDS = {
     # Advanced proof-pack packaging/inspection coverage now exercises the
     # command shell branch-completely; keep the command surface held there.
     "src/invarlock/proof_pack.py": 1.00,
-    "src/invarlock/cli/verify_output.py": 1.00,
+    "src/invarlock/reporting/evidence.py": 1.00,
+    "src/invarlock/reporting/verify_output.py": 1.00,
     "src/invarlock/cli/commands/policy.py": 1.00,
     "src/invarlock/cli/commands/proof_pack.py": 1.00,
     "src/invarlock/core/runner_lifecycle.py": 1.00,
@@ -97,9 +98,10 @@ THRESHOLDS = {
     "src/invarlock/core/api.py": 1.00,
     "src/invarlock/core/retry.py": 0.95,
     "src/invarlock/core/types.py": 0.90,
+    "src/invarlock/core/doctor_findings.py": 0.95,
+    "src/invarlock/core/evaluate_plan.py": 0.95,
     # CLI commands
     "src/invarlock/cli/_json.py": 1.00,
-    "src/invarlock/cli/_evidence.py": 1.00,
     # Simplified public-core CLI surfaces have dedicated branch-focused tests;
     # keep the hero commands above the default 90% floor.
     "src/invarlock/cli/app.py": 1.00,
@@ -109,7 +111,9 @@ THRESHOLDS = {
     "src/invarlock/cli/commands/run.py": 0.95,
     "src/invarlock/cli/commands/verify.py": 0.95,
     "src/invarlock/cli/commands/calibrate.py": 0.90,
-    "src/invarlock/cli/verify_checks.py": 0.95,
+    "src/invarlock/reporting/report_files.py": 0.95,
+    "src/invarlock/reporting/verify_checks.py": 0.95,
+    "src/invarlock/reporting/verify_contract.py": 0.95,
     "src/invarlock/runtime_security.py": 0.95,
     # PR-4 split modules
     "src/invarlock/cli/run_analysis.py": 1.00,
@@ -187,13 +191,17 @@ CORE_FILES = (
     "src/invarlock/cli/commands/verify.py",
     "src/invarlock/cli/commands/calibrate.py",
     "src/invarlock/cli/commands/policy.py",
-    "src/invarlock/cli/verify_checks.py",
-    "src/invarlock/cli/verify_output.py",
+    "src/invarlock/reporting/report_files.py",
+    "src/invarlock/reporting/verify_checks.py",
+    "src/invarlock/reporting/verify_contract.py",
+    "src/invarlock/reporting/verify_output.py",
+    "src/invarlock/reporting/evidence.py",
     "src/invarlock/cli/determinism.py",
     "src/invarlock/cli/config.py",
     "src/invarlock/cli/_json.py",
-    "src/invarlock/cli/_evidence.py",
     "src/invarlock/cli/app.py",
+    "src/invarlock/core/doctor_findings.py",
+    "src/invarlock/core/evaluate_plan.py",
     # Public contract helpers
     "src/invarlock/public_contracts.py",
     "src/invarlock/policy_pack.py",

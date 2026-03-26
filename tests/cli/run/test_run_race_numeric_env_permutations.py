@@ -125,7 +125,7 @@ def _common_ce_detect_ce():
             ),
         ),
         patch(
-            "invarlock.reporting.report.save_report",
+            "invarlock.reporting.report_files.save_report",
             lambda report, run_dir, formats, filename_prefix: {
                 "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
             },
@@ -153,7 +153,9 @@ def test_output_dir_deleted_before_save_report(tmp_path: Path):
     with ExitStack() as stack:
         for ctx in _common_ce_detect_ce():
             stack.enter_context(ctx)
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: _provider_min())
         )

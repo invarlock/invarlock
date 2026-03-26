@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from invarlock.reporting.report import save_report
+from invarlock.reporting.report_files import save_report
 
 
 def _report_and_base():

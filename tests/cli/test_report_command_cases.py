@@ -81,8 +81,8 @@ def test_generate_reports_normalizes_md_and_handles_sparse_primary_metric(
             ],
         ),
         patch.object(
-            report_mod.report_lib,
-            "save_report",
+            report_mod,
+            "_save_report",
             return_value={"report": str(tmp_path / "report.json")},
         ) as save_report,
         patch.object(

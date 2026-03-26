@@ -53,9 +53,6 @@ from invarlock.cli.run_analysis import (
 from invarlock.cli.run_artifacts import (
     persist_ref_masks as _persist_ref_masks_impl,
 )
-from invarlock.cli.run_artifacts import (
-    resolve_exit_code as _resolve_exit_code_impl,
-)
 from invarlock.cli.run_command_impl import (
     run_command_impl as _run_command_impl,
 )
@@ -133,13 +130,10 @@ from invarlock.core.exceptions import (
     ConfigError as _CfgErr,
 )
 from invarlock.core.exceptions import (
-    DataError as _DataErr,
-)
-from invarlock.core.exceptions import (
     InvarlockError,
 )
-from invarlock.core.exceptions import (
-    ValidationError as _ValErr,
+from invarlock.core.exit_codes import (
+    resolve_command_exit_code as _resolve_command_exit_code,
 )
 from invarlock.eval.window_planning import (
     resolve_effective_windows as _resolve_effective_windows_impl,
@@ -706,14 +700,7 @@ def _resolve_exit_code(exc: Exception, *, profile: str | None) -> int:
     - InvarlockError in CI/Release         → 3 (hard abort)
     - All other cases                  → 1 (generic failure)
     """
-    return _resolve_exit_code_impl(
-        exc,
-        profile=profile,
-        config_error_cls=_CfgErr,
-        validation_error_cls=_ValErr,
-        data_error_cls=_DataErr,
-        invarlock_error_cls=InvarlockError,
-    )
+    return _resolve_command_exit_code(exc, profile=profile)
 
 
 ## NOTE: Deprecated helper `_check_pairability_or_abort` was removed.
@@ -1097,7 +1084,7 @@ def _emit_run_artifacts(
     *, report: Any, out_dir: Path, filename_prefix: str, console: Console
 ) -> dict[str, str]:
     """Save run report and return emitted artifact paths."""
-    from invarlock.reporting.report import save_report as _save_report
+    from invarlock.reporting.report_files import save_report as _save_report
 
     _event(console, "DATA", "Saving run report...", emoji="💾")
     return _save_report(

@@ -191,7 +191,9 @@ def test_save_report_missing_json_key_exits(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
-        stack.enter_context(patch("invarlock.reporting.report.save_report", bad_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", bad_save)
+        )
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
 
 

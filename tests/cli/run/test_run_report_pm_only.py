@@ -144,7 +144,7 @@ output:
         patch(
             "invarlock.eval.primary_metric.compute_primary_metric_from_report", fake_pm
         ),
-        patch("invarlock.reporting.report.save_report", fake_save_report),
+        patch("invarlock.reporting.report_files.save_report", fake_save_report),
     ):
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
 

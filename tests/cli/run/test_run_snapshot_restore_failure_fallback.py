@@ -221,7 +221,7 @@ def test_until_pass_restore_failure_discards_model_and_reloads_next_attempt(
             )
         )
         stack.enter_context(
-            patch("invarlock.reporting.report.save_report", save_report)
+            patch("invarlock.reporting.report_files.save_report", save_report)
         )
 
         run_command(

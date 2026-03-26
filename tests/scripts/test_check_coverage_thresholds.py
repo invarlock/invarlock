@@ -106,7 +106,7 @@ def test_overrides_take_precedence(tmp_path: Path) -> None:
         abs(files["src/invarlock/reporting/report_builder.py"]["threshold"] - 0.90)
         < 1e-9
     )
-    assert payload["configured_threshold_files"] == 92
+    assert payload["configured_threshold_files"] == 96
     assert payload["evaluated_files"] == 1
     assert payload["measured_threshold_files"] == 1
     assert "src/invarlock/cli/app.py" in payload["missing_threshold_files"]
@@ -169,19 +169,19 @@ def test_summary_reports_measured_vs_configured_threshold_counts(
 
     assert proc.returncode == 0, proc.stderr
     assert (
-        "Coverage OK: 1/92 threshold-listed files had coverage data and met "
+        "Coverage OK: 1/96 threshold-listed files had coverage data and met "
         "per-file thresholds." in proc.stdout
     )
     assert (
-        "91 threshold-listed files were absent from the coverage report." in proc.stdout
+        "95 threshold-listed files were absent from the coverage report." in proc.stdout
     )
 
     payload = json.loads(json_out.read_text())
     assert payload["status"] == "ok"
-    assert payload["configured_threshold_files"] == 92
+    assert payload["configured_threshold_files"] == 96
     assert payload["evaluated_files"] == 1
     assert payload["measured_threshold_files"] == 1
-    assert len(payload["missing_threshold_files"]) == 91
+    assert len(payload["missing_threshold_files"]) == 95
 
 
 def test_ratchets_selected_files_to_ninety_five_percent(tmp_path: Path) -> None:
@@ -243,7 +243,7 @@ def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
     _write_cov_xml(
         xml,
         [
-            ("src/invarlock/cli/_evidence.py", 0.999, 1.0),
+            ("src/invarlock/reporting/evidence.py", 0.999, 1.0),
             ("src/invarlock/cli/_json.py", 0.999, 1.0),
             ("src/invarlock/cli/app.py", 0.999, 1.0),
             ("src/invarlock/cli/commands/proof_pack.py", 0.999, 1.0),
@@ -268,7 +268,7 @@ def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
 
     assert proc.returncode != 0
     for path in (
-        "src/invarlock/cli/_evidence.py",
+        "src/invarlock/reporting/evidence.py",
         "src/invarlock/cli/_json.py",
         "src/invarlock/cli/app.py",
         "src/invarlock/cli/commands/proof_pack.py",

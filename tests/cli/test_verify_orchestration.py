@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 import typer
 
-from invarlock.cli.commands import verify as verify_mod
 from invarlock.cli.commands.verify import verify_command
+from invarlock.reporting import verify_contract as verify_mod
 
 
 def _write(path: Path, payload: dict) -> Path:
@@ -214,3 +214,21 @@ def test_verify_human_generic_exception_prints_failure(
     out = capsys.readouterr().out
     assert "Verification failed: unexpected failure" in out
     assert getattr(exc.value, "exit_code", getattr(exc.value, "code", None)) == 1
+
+
+def test_verify_reports_contract_returns_structured_payload_without_stdout(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    cert_path = _write(tmp_path / "subject.json", _ppl_cert())
+
+    exit_code, payload = verify_mod.verify_reports_contract(
+        [cert_path],
+        baseline=None,
+        profile="dev",
+        json_mode=True,
+    )
+
+    assert exit_code == 0
+    assert payload["summary"] == {"ok": True, "reason": "ok"}
+    assert payload["resolution"] == {"exit_code": 0}
+    assert capsys.readouterr().out == ""

@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from invarlock.reporting.report import save_report
+from invarlock.reporting.report_files import save_report
 
 
 def _minimal_run_report() -> dict:

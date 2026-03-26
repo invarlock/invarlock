@@ -4,7 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from invarlock.reporting.report import save_report, to_evaluation_report
+from invarlock.reporting.report import to_evaluation_report
+from invarlock.reporting.report_files import save_report
 
 
 def _minimal_report() -> dict:

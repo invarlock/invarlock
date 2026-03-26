@@ -7,6 +7,7 @@ import pytest
 import typer
 
 from invarlock.cli import _json
+from invarlock.core import error_encoding
 
 
 @dataclass
@@ -64,7 +65,7 @@ def test_emit_passes_through_non_mapping_payload(monkeypatch, capsys) -> None:
 
 def test_encode_error_for_generic_exception() -> None:
     exc = RuntimeError("boom")
-    encoded = _json.encode_error(exc)
+    encoded = error_encoding.encode_error(exc)
     assert encoded["code"] == "E_GENERIC"
     assert encoded["category"] == "RuntimeError"
     assert encoded["recoverable"] is False
@@ -75,7 +76,7 @@ def test_encode_error_for_schema_like_errors() -> None:
     class ValidationError(Exception): ...
 
     err = ValidationError("bad schema")
-    encoded = _json.encode_error(err)
+    encoded = error_encoding.encode_error(err)
     assert encoded["code"] == "E_SCHEMA"
     assert encoded["category"] == "ValidationError"
 
@@ -87,10 +88,10 @@ def test_encode_error_handles_invarlock_error(monkeypatch) -> None:
             self.recoverable = True
             self.details = {"reason": "details"}
 
-    monkeypatch.setattr(_json, "InvarlockError", FakeInvarlockError)
+    monkeypatch.setattr(error_encoding, "InvarlockError", FakeInvarlockError)
 
     err = FakeInvarlockError()
-    encoded = _json.encode_error(err)
+    encoded = error_encoding.encode_error(err)
     assert encoded["code"] == "E_CUSTOM"
     assert encoded["recoverable"] is True
     assert encoded["context"] == {"reason": "details"}
@@ -103,10 +104,10 @@ def test_encode_error_invarlock_path_handles_non_dict_details(monkeypatch) -> No
             self.recoverable = False
             self.details = "not-a-dict"
 
-    monkeypatch.setattr(_json, "InvarlockError", FakeInvarlockError)
+    monkeypatch.setattr(error_encoding, "InvarlockError", FakeInvarlockError)
 
     err = FakeInvarlockError()
-    encoded = _json.encode_error(err)
+    encoded = error_encoding.encode_error(err)
     assert encoded["code"] == "E_CUSTOM"
     assert encoded["recoverable"] is False
     assert encoded["context"] == {}
@@ -121,7 +122,7 @@ def test_encode_error_handles_category_introspection_failure() -> None:
 
     class BrokenExc(Exception, metaclass=_Meta): ...
 
-    encoded = _json.encode_error(BrokenExc())
+    encoded = error_encoding.encode_error(BrokenExc())
     assert encoded["category"] == "Exception"
 
 
@@ -132,9 +133,9 @@ def test_encode_error_falls_back_when_invarlock_type_check_raises(monkeypatch) -
 
     class FakeInvarlockError(Exception, metaclass=_Meta): ...
 
-    monkeypatch.setattr(_json, "InvarlockError", FakeInvarlockError)
+    monkeypatch.setattr(error_encoding, "InvarlockError", FakeInvarlockError)
 
-    encoded = _json.encode_error(RuntimeError("boom"))
+    encoded = error_encoding.encode_error(RuntimeError("boom"))
     assert encoded["code"] == "E_GENERIC"
     assert encoded["category"] == "RuntimeError"
     assert encoded["context"] == {}

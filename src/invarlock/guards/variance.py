@@ -439,7 +439,7 @@ class VarianceGuard(Guard):
     def finalize(self, model: nn.Module) -> dict[str, Any]:
         result = _variance_runtime.finalize_guard(self, model)
         try:
-            from invarlock.cli._evidence import maybe_dump_guard_evidence
+            from invarlock.reporting.evidence import maybe_dump_guard_evidence
 
             maybe_dump_guard_evidence(
                 ".",

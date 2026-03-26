@@ -4,7 +4,7 @@ import math
 from pathlib import Path
 from typing import Any
 
-from invarlock.cli import verify_output as verify_output
+from invarlock.reporting import verify_output as verify_output
 
 
 class _BadFloat:

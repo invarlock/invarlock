@@ -478,7 +478,7 @@ def test_until_pass_retry_summary_printed(tmp_path: Path):
         )
         stack.enter_context(
             patch(
-                "invarlock.reporting.report.save_report",
+                "invarlock.reporting.report_files.save_report",
                 lambda report, run_dir, formats, filename_prefix: {
                     "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
                 },
@@ -651,14 +651,14 @@ def test_parity_error_ci_exit_3(tmp_path: Path, monkeypatch):
     _stub_minimal_environment(monkeypatch, tmp_path)
     cfg = Path(_cfg(tmp_path))
     from invarlock.cli.commands import run as runmod
+    from invarlock.core.exceptions import InvarlockError as CoreInvarlockError
 
-    monkeypatch.setattr(
-        runmod, "InvarlockError", type("InvarlockError", (Exception,), {})
-    )
     monkeypatch.setattr(
         runmod,
         "detect_model_profile",
-        lambda *a, **k: (_ for _ in ()).throw(runmod.InvarlockError()),
+        lambda *a, **k: (_ for _ in ()).throw(
+            CoreInvarlockError(code="E999", message="boom")
+        ),
     )
     r = CliRunner().invoke(cli, ["run", "-c", str(cfg), "--profile", "ci"])
     assert r.exit_code == 3

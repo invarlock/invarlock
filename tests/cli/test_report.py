@@ -9,7 +9,7 @@ import typer
 from invarlock.cli.commands.report import report_command
 
 
-@patch("invarlock.reporting.report.save_report")
+@patch("invarlock.cli.commands.report._save_report")
 @patch("invarlock.cli.commands.report._load_run_report")
 def test_report_command_basic(mock_load, mock_save):
     mock_report = {
@@ -53,7 +53,7 @@ def test_report_command_with_comparison(mock_load):
 
     mock_load.side_effect = mock_side
     with (
-        patch("invarlock.reporting.report.save_report") as mock_save,
+        patch("invarlock.cli.commands.report._save_report") as mock_save,
         patch("invarlock.cli.commands.report.console"),
     ):
         mock_save.return_value = {"json": "report.json"}
@@ -87,7 +87,7 @@ def test_report_command_evaluation_report_no_baseline(mock_load):
             )
 
 
-@patch("invarlock.reporting.report.save_report")
+@patch("invarlock.cli.commands.report._save_report")
 @patch("invarlock.cli.commands.report._load_run_report")
 @patch("invarlock.reporting.report_builder.make_report")
 @patch("invarlock.reporting.report_builder.validate_report")
@@ -142,8 +142,27 @@ def test_load_run_report_directory(tmp_path: Path):
     assert _load_run_report(str(tmp_path)) == {"x": 1}
 
 
+def test_load_run_report_directory_ambiguous(tmp_path: Path):
+    from invarlock.cli.commands.report import _load_run_report
+
+    (tmp_path / "report.json").write_text(json.dumps({"x": 1}))
+    (tmp_path / "evaluation.report.json").write_text(json.dumps({"x": 2}))
+
+    with pytest.raises(ValueError, match="Ambiguous report directory"):
+        _load_run_report(str(tmp_path))
+
+
+def test_load_run_report_directory_requires_canonical_filename(tmp_path: Path):
+    from invarlock.cli.commands.report import _load_run_report
+
+    (tmp_path / "subject_report.json").write_text(json.dumps({"x": 1}))
+
+    with pytest.raises(ValueError, match="does not contain a canonical report file"):
+        _load_run_report(str(tmp_path))
+
+
 def test_load_run_report_not_found():
     from invarlock.cli.commands.report import _load_run_report
 
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(ValueError, match="Path not found"):
         _load_run_report("nonexistent.json")

@@ -146,7 +146,7 @@ if __name__ == "__main__":
     )
     verifier_path.chmod(0o755)
     monkeypatch.setenv("INVARLOCK_RUNTIME_VERIFIER", str(verifier_path))
-    from invarlock.cli.commands import verify as verify_mod
+    from invarlock.reporting import verify_contract as verify_mod
 
     original_verify_runtime_attestation = verify_mod.verify_runtime_attestation
 

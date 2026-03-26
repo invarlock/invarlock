@@ -87,7 +87,7 @@ def _common_ce():
             ),
         ),
         patch(
-            "invarlock.reporting.report.save_report",
+            "invarlock.reporting.report_files.save_report",
             lambda report, run_dir, formats, filename_prefix: {
                 "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
             },
@@ -303,7 +303,9 @@ def test_dataset_meta_stratification_scorer_profile(tmp_path: Path):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: Provider())
         )
@@ -363,7 +365,9 @@ def test_metrics_window_plan_stats_map(tmp_path: Path):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         stack.enter_context(
             patch(
                 "invarlock.core.runner.CoreRunner",
@@ -417,7 +421,9 @@ def test_metrics_window_plan_capacity_map(tmp_path: Path):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         stack.enter_context(
             patch(
                 "invarlock.core.runner.CoreRunner",
@@ -468,7 +474,9 @@ def test_persist_ref_masks_artifact(tmp_path: Path):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         stack.enter_context(
             patch(
                 "invarlock.core.runner.CoreRunner",
@@ -536,7 +544,9 @@ def test_overhead_bare_warning_present(tmp_path: Path):
                     ),
                 )
             )
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         stack.enter_context(
             patch(
@@ -873,7 +883,9 @@ def test_metrics_optional_pairing_fields_passthrough(tmp_path: Path, key: str):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         stack.enter_context(
             patch(
                 "invarlock.core.runner.CoreRunner",
@@ -924,7 +936,9 @@ def test_edit_optional_fields_transfer(tmp_path: Path, opt_key: str):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         stack.enter_context(
             patch(
                 "invarlock.core.runner.CoreRunner",

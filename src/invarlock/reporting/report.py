@@ -11,10 +11,7 @@ from __future__ import annotations
 import html
 import json
 from datetime import datetime
-from pathlib import Path
 from typing import Any, cast
-
-from invarlock.cli._evidence import maybe_dump_guard_evidence
 
 from .normalizer import normalize_run_report
 from .render import render_report_markdown
@@ -186,174 +183,6 @@ def to_evaluation_report(
         return render_report_markdown(evaluation_report)
     else:
         raise ValueError(f"Unsupported evaluation report format: {format}")
-
-
-def save_report(
-    report: RunReport,
-    output_dir: str | Path,
-    formats: list[str] | None = None,
-    compare: RunReport | None = None,
-    baseline: RunReport | None = None,
-    filename_prefix: str = "report",
-) -> dict[str, Path]:
-    """
-    Save RunReport in multiple formats to a directory.
-
-    Args:
-        report: RunReport to save
-        output_dir: Directory to save reports in
-        formats: List of formats to generate ("json", "markdown", "html", "report")
-        compare: Optional comparison report
-        baseline: Optional baseline report for evaluation report generation
-        filename_prefix: Prefix for generated filenames
-
-    Returns:
-        Dictionary mapping format names to generated file paths
-    """
-    if formats is None:
-        formats = ["json", "markdown", "html"]
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-
-    saved_files = {}
-
-    suffix = "_comparison" if compare else ""
-
-    if "json" in formats:
-        json_path = output_path / f"{filename_prefix}{suffix}.json"
-        with open(json_path, "w", encoding="utf-8") as f:
-            f.write(to_json(report))
-        saved_files["json"] = json_path
-
-    if "markdown" in formats:
-        md_path = output_path / f"{filename_prefix}{suffix}.md"
-        with open(md_path, "w", encoding="utf-8") as f:
-            f.write(to_markdown(report, compare))
-        saved_files["markdown"] = md_path
-
-    if "html" in formats:
-        html_path = output_path / f"{filename_prefix}{suffix}.html"
-        with open(html_path, "w", encoding="utf-8") as f:
-            f.write(to_html(report, compare))
-        saved_files["html"] = html_path
-
-    if "report" in formats:
-        if baseline is None:
-            raise ValueError(
-                "Baseline report required for evaluation report generation"
-            )
-
-        report_json = to_evaluation_report(report, baseline, format="json")
-        report_json_path = output_path / "evaluation.report.json"
-        with open(report_json_path, "w", encoding="utf-8") as f:
-            f.write(report_json)
-        saved_files["report"] = report_json_path
-
-        # Also emit a markdown variant for human consumption
-        report_md = to_evaluation_report(report, baseline, format="markdown")
-        report_md_path = output_path / "evaluation_report.md"
-        with open(report_md_path, "w", encoding="utf-8") as f:
-            f.write(report_md)
-        saved_files["report_md"] = report_md_path
-
-        # Emit a lightweight manifest to serve as an evidence bundle index
-        try:
-            from datetime import datetime as _dt
-
-            meta_obj: object = report.get("meta")
-            meta_dict: dict[str, Any] = meta_obj if isinstance(meta_obj, dict) else {}
-            manifest: dict[str, Any] = {
-                "generated_at": _dt.now().isoformat(),
-                "files": {
-                    "evaluation_report_json": str(report_json_path),
-                    "evaluation_report_markdown": str(report_md_path),
-                },
-                "summary": {
-                    "run_model": meta_dict.get("model_id"),
-                    "device": meta_dict.get("device"),
-                    "seed": meta_dict.get("seed"),
-                },
-            }
-
-            # Surface quick triage fields without opening the evaluation report.
-            try:
-                from .render import compute_console_validation_block
-
-                evaluation_report_obj = json.loads(report_json)
-                if not isinstance(evaluation_report_obj, dict):
-                    raise TypeError("evaluation report JSON did not decode to a dict")
-
-                block = compute_console_validation_block(evaluation_report_obj)
-                rows = block.get("rows", []) or []
-                gates_total = len(rows)
-                gates_passed = sum(
-                    1 for r in rows if isinstance(r, dict) and bool(r.get("ok"))
-                )
-                overall_status = "PASS" if block.get("overall_pass") else "FAIL"
-
-                pm_ratio = None
-                pm = evaluation_report_obj.get("primary_metric", {}) or {}
-                if isinstance(pm, dict):
-                    ratio = pm.get("ratio_vs_baseline")
-                    if isinstance(ratio, int | float):
-                        pm_ratio = float(ratio)
-
-                manifest["summary"].update(
-                    {
-                        "overall_status": overall_status,
-                        "primary_metric_ratio": pm_ratio,
-                        "gates_passed": gates_passed,
-                        "gates_total": gates_total,
-                    }
-                )
-            except Exception:
-                pass
-            # Write debug evidence (tiny) when requested via env
-            guard_payload = {}
-            try:
-                guard_ctx = report.get("guards") or []
-            except Exception:
-                guard_ctx = []
-            if isinstance(guard_ctx, list) and guard_ctx:
-                tiny: list[dict] = []
-                for g in guard_ctx:
-                    if isinstance(g, dict):
-                        entry: dict[str, object] = {}
-                        pol = g.get("policy") or {}
-                        if isinstance(pol, dict):
-                            for k in (
-                                "deadband",
-                                "min_effect_lognll",
-                                "max_caps",
-                                "sigma_quantile",
-                            ):
-                                if k in pol:
-                                    entry[k] = pol[k]
-                        if g.get("name"):
-                            entry["name"] = g.get("name")
-                        if entry:
-                            tiny.append(entry)
-                if tiny:
-                    guard_payload = {"guards_decisions": tiny}
-            # The helper will no-op unless INVARLOCK_EVIDENCE_DEBUG=1
-            if guard_payload:
-                maybe_dump_guard_evidence(output_path, guard_payload)
-            else:
-                maybe_dump_guard_evidence(output_path, {"guards_decisions": []})
-
-            ev_file = Path(output_path) / "guards_evidence.json"
-            if ev_file.exists():
-                manifest["evidence"] = {"guards_evidence": str(ev_file)}
-
-            (output_path / "manifest.json").write_text(
-                json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
-            )
-            saved_files["manifest"] = output_path / "manifest.json"
-        except Exception:
-            # Non-fatal; manifest is best-effort
-            pass
-
-    return saved_files
 
 
 # ── Private helper functions ──────────────────────────────────────────────
@@ -943,5 +772,4 @@ __all__ = [
     "to_markdown",
     "to_html",
     "to_evaluation_report",
-    "save_report",
 ]

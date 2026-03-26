@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from invarlock.reporting.report import save_report
+from invarlock.reporting.report_files import save_report
 from invarlock.reporting.report_types import RunReport, create_empty_report
 
 

@@ -670,6 +670,43 @@ def test_build_and_verify_proof_pack_cover_usage_and_failure_paths(
     assert "--json-out must point outside the pack directory." in payload["errors"]
 
 
+def test_run_verify_command_delegates_to_verify_reports_contract(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    report = tmp_path / "evaluation.report.json"
+    report.write_text("{}", encoding="utf-8")
+    captured: dict[str, object] = {}
+
+    def _fake_verify_contract(
+        reports: list[Path],
+        *,
+        baseline=None,
+        tolerance=1e-9,
+        profile=None,
+        allow_unattested_artifacts=False,
+        json_mode=False,
+        console_obj=None,
+    ):
+        captured["reports"] = reports
+        captured["profile"] = profile
+        captured["json_mode"] = json_mode
+        return 0, {"ok": True}
+
+    monkeypatch.setattr(
+        "invarlock.reporting.verify_contract.verify_reports_contract",
+        _fake_verify_contract,
+        raising=False,
+    )
+
+    exit_code, payload = proof_pack_mod._run_verify_command([report], profile="release")
+
+    assert exit_code == 0
+    assert payload == {"ok": True}
+    assert captured["reports"] == [report]
+    assert captured["profile"] == "release"
+    assert captured["json_mode"] is True
+
+
 def test_manual_validate_manifest_accepts_valid_optional_sections() -> None:
     payload = {
         "format": proof_pack_mod.PROOF_PACK_FORMAT,

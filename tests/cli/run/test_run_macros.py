@@ -131,7 +131,7 @@ def _patch_common(monkeypatch, run_mod, provider):
     import invarlock.core.registry as reg_mod
     import invarlock.core.runner as runner_mod
     import invarlock.eval.data as data_mod
-    import invarlock.reporting.report as report_mod
+    import invarlock.reporting.report_files as report_files_mod
 
     monkeypatch.setattr(reg_mod, "get_registry", lambda: _Registry())
     monkeypatch.setattr(data_mod, "get_provider", lambda *a, **k: provider)
@@ -150,7 +150,7 @@ def _patch_common(monkeypatch, run_mod, provider):
     def _save_report_stub(*a, **k):
         raise typer.Exit(0)
 
-    monkeypatch.setattr(report_mod, "save_report", _save_report_stub)
+    monkeypatch.setattr(report_files_mod, "save_report", _save_report_stub)
 
 
 def _write_cfg(path: Path, content: dict) -> Path:

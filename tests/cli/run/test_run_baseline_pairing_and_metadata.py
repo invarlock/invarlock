@@ -90,7 +90,7 @@ def _common_patches_ce():
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
-            "invarlock.reporting.report.save_report",
+            "invarlock.reporting.report_files.save_report",
             lambda report, run_dir, formats, filename_prefix: {
                 "json": str(run_dir / (filename_prefix + ".json"))
             },
@@ -145,7 +145,7 @@ def _common_patches_mlm():
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
-            "invarlock.reporting.report.save_report",
+            "invarlock.reporting.report_files.save_report",
             lambda report, run_dir, formats, filename_prefix: {
                 "json": str(run_dir / (filename_prefix + ".json"))
             },
@@ -210,7 +210,7 @@ def _supp_common_patches_detect_ce():
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
-            "invarlock.reporting.report.save_report",
+            "invarlock.reporting.report_files.save_report",
             lambda report, run_dir, formats, filename_prefix=None: {
                 "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
             },
@@ -311,7 +311,9 @@ def test_baseline_pairing_computes_hashes_and_tokens_in_dataset_meta(tmp_path: P
             patch("invarlock.eval.data.get_provider", lambda *a, **k: Provider())
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner))
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",
@@ -455,7 +457,9 @@ def test_baseline_pairing_propagates_window_plan_capacity(tmp_path: Path):
             )
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner))
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",
@@ -984,7 +988,9 @@ def test_metrics_window_plan_stats_and_capacity_mapping(tmp_path: Path):
             )
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", runner_factory))
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",
@@ -1045,7 +1051,9 @@ def test_metrics_loss_type_fallback_from_dataset_meta_context(tmp_path: Path):
             )
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", runner_factory))
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",
@@ -1111,7 +1119,9 @@ def test_report_meta_includes_tokenizer_hash_on_provider_path(tmp_path: Path):
                 ),
             )
         )
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",
@@ -1285,7 +1295,9 @@ def test_baseline_pairing_respects_existing_hashes_in_meta(tmp_path: Path):
             )
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner))
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",
@@ -1347,7 +1359,9 @@ def test_metrics_inherits_masked_token_counts_from_dataset_meta_context(tmp_path
             )
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", runner_factory))
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",

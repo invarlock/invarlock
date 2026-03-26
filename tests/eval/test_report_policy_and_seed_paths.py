@@ -128,7 +128,7 @@ def test_to_html_with_compare():
 
 
 def test_save_report_cert_requires_baseline(tmp_path):
-    from invarlock.reporting.report import save_report
+    from invarlock.reporting.report_files import save_report
 
     r = _minimal_report()
     with pytest.raises(ValueError):

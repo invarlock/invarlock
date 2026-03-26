@@ -5,14 +5,14 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from .constants import VERIFY_FORMAT_VERSION as FORMAT_VERIFY
+FORMAT_VERIFY = "verify-v1"
 
 
 def _coerce_ci_output(ci: Any) -> list[float] | None:
-    if not (isinstance(ci, tuple | list) and len(ci) == 2):
+    if not (isinstance(ci, (tuple, list)) and len(ci) == 2):
         return None
     try:
-        return [float(ci[0]), float(ci[1])]  # type: ignore[index]
+        return [float(ci[0]), float(ci[1])]
     except Exception:
         return None
 
@@ -41,8 +41,8 @@ def _build_recompute_summary(
             n_correct = cls.get("n_correct") if isinstance(cls, dict) else None
             n_total = cls.get("n_total") if isinstance(cls, dict) else None
             if (
-                isinstance(n_correct, int | float)
-                and isinstance(n_total, int | float)
+                isinstance(n_correct, (int, float))
+                and isinstance(n_total, (int, float))
                 and n_total > 0
             ):
                 acc = float(n_correct) / float(n_total)
@@ -52,7 +52,7 @@ def _build_recompute_summary(
                     else None
                 )
                 ok = bool(
-                    isinstance(display_final, int | float)
+                    isinstance(display_final, (int, float))
                     and abs(float(display_final) - acc) <= max(1e-12, tolerance)
                 )
                 recompute = {
@@ -98,7 +98,7 @@ def _build_recompute_summary(
                                 else None
                             )
                             ok = bool(
-                                isinstance(display_final, int | float)
+                                isinstance(display_final, (int, float))
                                 and abs(float(display_final) - recomputed)
                                 <= max(1e-12, tolerance)
                             )
@@ -155,7 +155,7 @@ def build_verify_json_result_item(
         "ok": ok,
         "reason": reason,
         "ratio_vs_baseline": float(ratio)
-        if isinstance(ratio, int | float) and math.isfinite(float(ratio))
+        if isinstance(ratio, (int, float)) and math.isfinite(float(ratio))
         else None,
         "ci": ci_out,
         "recompute": recompute,
@@ -246,7 +246,7 @@ def build_verify_success_line(report: dict[str, Any]) -> str:
     ci = primary_metric.get("display_ci") if isinstance(primary_metric, dict) else None
     ci_text = None
     width = None
-    if isinstance(ci, tuple | list) and len(ci) == 2:
+    if isinstance(ci, (tuple, list)) and len(ci) == 2:
         try:
             ci_lo = float(ci[0])
             ci_hi = float(ci[1])
@@ -261,10 +261,19 @@ def build_verify_success_line(report: dict[str, Any]) -> str:
         parts.append(f"metric={kind}")
     if n_prev is not None and n_fin is not None:
         parts.append(f"n={n_prev}/{n_fin}")
-    if isinstance(ratio, int | float):
+    if isinstance(ratio, (int, float)):
         parts.append(f"point={float(ratio):.6f}")
     if ci_text is not None:
         parts.append(ci_text)
-    if isinstance(width, int | float):
+    if isinstance(width, (int, float)):
         parts.append(f"width={width:.6f}")
     return " ".join(parts)
+
+
+__all__ = [
+    "FORMAT_VERIFY",
+    "build_verify_error_payload",
+    "build_verify_json_payload",
+    "build_verify_json_result_item",
+    "build_verify_success_line",
+]

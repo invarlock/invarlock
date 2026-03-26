@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import invarlock.cli.commands.run as run_mod
@@ -93,23 +94,11 @@ def test_artifact_wrappers_delegate(monkeypatch, tmp_path):
 
     seen: dict[str, object] = {}
 
-    def _exit_stub(
-        exc,
-        *,
-        profile,
-        config_error_cls,
-        validation_error_cls,
-        data_error_cls,
-        invarlock_error_cls,
-    ):
+    def _exit_stub(exc, *, profile):
         seen["profile"] = profile
-        seen["config_error_cls"] = config_error_cls
-        seen["validation_error_cls"] = validation_error_cls
-        seen["data_error_cls"] = data_error_cls
-        seen["invarlock_error_cls"] = invarlock_error_cls
         return 3
 
-    monkeypatch.setattr(run_mod, "_resolve_exit_code_impl", _exit_stub)
+    monkeypatch.setattr(run_mod, "_resolve_command_exit_code", _exit_stub)
     assert run_mod._resolve_exit_code(_DummyError("x"), profile="release") == 3
     assert seen["profile"] == "release"
 
@@ -265,9 +254,11 @@ def test_analysis_and_overhead_wrappers_delegate(monkeypatch):
     }
 
 
-def test_run_command_injects_explicit_deps(monkeypatch):
+def test_run_command_injects_explicit_deps(monkeypatch, tmp_path: Path):
     sentinel = object()
     captured: dict[str, object] = {}
+    report_path = tmp_path / "report.json"
+    report_path.write_text("{}", encoding="utf-8")
 
     monkeypatch.setattr(
         run_mod, "_resolve_pm_acceptance_range", sentinel, raising=False
@@ -275,12 +266,12 @@ def test_run_command_injects_explicit_deps(monkeypatch):
 
     def _fake_run_command_impl(**kwargs):
         captured.update(kwargs)
-        return "ok"
+        return str(report_path)
 
     monkeypatch.setattr(run_mod, "_run_command_impl", _fake_run_command_impl)
     out = run_mod.run_command(config="configs/example.yml")
 
-    assert out == "ok"
+    assert out == report_path.resolve()
     deps = captured.get("deps")
     assert isinstance(deps, dict)
     assert deps["_resolve_pm_acceptance_range"] is sentinel

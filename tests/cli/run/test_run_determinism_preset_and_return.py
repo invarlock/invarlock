@@ -1,5 +1,6 @@
 # ruff: noqa: I001,E402,F811
 from __future__ import annotations
+import json
 from contextlib import ExitStack
 from pathlib import Path
 from types import SimpleNamespace
@@ -45,6 +46,20 @@ output:
     return p
 
 
+def _emit_stub(
+    captured: dict[str, object],
+    *,
+    report: dict[str, object],
+    out_dir: Path,
+    filename_prefix: str,
+) -> dict[str, str]:
+    captured["report"] = report
+    report_path = out_dir / f"{filename_prefix}.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+    return {"json": str(report_path)}
+
+
 def test_run_command_returns_report_path_and_emits_determinism_meta(
     tmp_path: Path,
 ) -> None:
@@ -83,8 +98,12 @@ def test_run_command_returns_report_path_and_emits_determinism_meta(
         )
 
     def _fake_emit(*, report, out_dir, filename_prefix, console):  # noqa: ARG001
-        captured["report"] = report
-        return {"json": str(out_dir / f"{filename_prefix}.json")}
+        return _emit_stub(
+            captured,
+            report=report,
+            out_dir=out_dir,
+            filename_prefix=filename_prefix,
+        )
 
     fake_pm = lambda *a, **k: {  # noqa: E731
         "kind": "ppl_causal",
@@ -165,7 +184,7 @@ def test_run_command_returns_report_path_and_emits_determinism_meta(
             out=str(tmp_path / "runs"),
         )
 
-    assert isinstance(report_path, str) and report_path.endswith(".json")
+    assert isinstance(report_path, Path) and report_path.suffix == ".json"
     report_obj = captured.get("report")
     assert isinstance(report_obj, dict)
     meta = report_obj.get("meta", {})
@@ -212,8 +231,12 @@ def test_run_command_persists_tiny_relax_context(tmp_path: Path, monkeypatch) ->
         )
 
     def _fake_emit(*, report, out_dir, filename_prefix, console):  # noqa: ARG001
-        captured["report"] = report
-        return {"json": str(out_dir / f"{filename_prefix}.json")}
+        return _emit_stub(
+            captured,
+            report=report,
+            out_dir=out_dir,
+            filename_prefix=filename_prefix,
+        )
 
     fake_pm = lambda *a, **k: {  # noqa: E731
         "kind": "ppl_causal",
@@ -341,8 +364,12 @@ def test_run_command_does_not_include_determinism_when_preset_empty(
         )
 
     def _fake_emit(*, report, out_dir, filename_prefix, console):  # noqa: ARG001
-        captured["report"] = report
-        return {"json": str(out_dir / f"{filename_prefix}.json")}
+        return _emit_stub(
+            captured,
+            report=report,
+            out_dir=out_dir,
+            filename_prefix=filename_prefix,
+        )
 
     fake_pm = lambda *a, **k: {  # noqa: E731
         "kind": "ppl_causal",
@@ -426,7 +453,7 @@ def test_run_command_does_not_include_determinism_when_preset_empty(
             out=str(tmp_path / "runs"),
         )
 
-    assert isinstance(report_path, str) and report_path.endswith(".json")
+    assert isinstance(report_path, Path) and report_path.suffix == ".json"
     report_obj = captured.get("report")
     assert isinstance(report_obj, dict)
     meta = report_obj.get("meta", {})
@@ -482,8 +509,12 @@ context:
         )
 
     def _fake_emit(*, report, out_dir, filename_prefix, console):  # noqa: ARG001
-        captured["report"] = report
-        return {"json": str(out_dir / f"{filename_prefix}.json")}
+        return _emit_stub(
+            captured,
+            report=report,
+            out_dir=out_dir,
+            filename_prefix=filename_prefix,
+        )
 
     fake_pm = lambda *a, **k: {  # noqa: E731
         "kind": "ppl_causal",
@@ -567,7 +598,7 @@ context:
             out=str(tmp_path / "runs"),
         )
 
-    assert isinstance(report_path, str) and report_path.endswith(".json")
+    assert isinstance(report_path, Path) and report_path.suffix == ".json"
     report_obj = captured.get("report")
     assert isinstance(report_obj, dict)
     overhead = report_obj.get("guard_overhead")
