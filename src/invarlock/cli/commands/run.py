@@ -190,10 +190,19 @@ from invarlock.core.run_report_payload_policy import (
     merge_core_timing_metrics as _merge_core_timing_metrics_impl,
 )
 from invarlock.core.run_retry_policy import (
-    apply_mask_only_head_autotune as _apply_mask_only_head_autotune_impl,
+    build_restore_failure_attempt_summary as _build_restore_failure_attempt_summary_impl,
 )
 from invarlock.core.run_retry_policy import (
     build_retry_result_summary as _build_retry_result_summary_impl,
+)
+from invarlock.core.run_retry_policy import (
+    decide_failed_retry_transition as _decide_failed_retry_transition_impl,
+)
+from invarlock.core.run_retry_policy import (
+    record_retry_attempt as _record_retry_attempt_impl,
+)
+from invarlock.core.run_retry_policy import (
+    resolve_retry_validation_transition as _resolve_retry_validation_transition_impl,
 )
 from invarlock.core.run_snapshot_policy import (
     choose_snapshot_mode as _choose_snapshot_mode_impl,
@@ -826,11 +835,55 @@ def _build_retry_result_summary(
     return _build_retry_result_summary_impl(validation)
 
 
-def _apply_mask_only_head_autotune(
+def _decide_failed_retry_transition(
+    retry_controller: Any,
+    *,
+    attempt: int,
+    attempt_summary: Mapping[str, Any] | None,
     edit_config: Mapping[str, Any] | None,
-    validation: Mapping[str, Any] | None,
-) -> tuple[dict[str, Any], dict[str, int] | None]:
-    return _apply_mask_only_head_autotune_impl(edit_config, validation)
+    passed: bool = False,
+) -> Any:
+    return _decide_failed_retry_transition_impl(
+        retry_controller,
+        attempt=attempt,
+        attempt_summary=attempt_summary,
+        edit_config=edit_config,
+        passed=passed,
+    )
+
+
+def _record_retry_attempt(
+    retry_controller: Any,
+    *,
+    attempt: int,
+    attempt_summary: Mapping[str, Any] | None,
+    edit_config: Mapping[str, Any] | None,
+) -> None:
+    _record_retry_attempt_impl(
+        retry_controller,
+        attempt=attempt,
+        attempt_summary=attempt_summary,
+        edit_config=edit_config,
+    )
+
+
+def _build_restore_failure_attempt_summary() -> dict[str, Any]:
+    return _build_restore_failure_attempt_summary_impl()
+
+
+def _resolve_retry_validation_transition(
+    retry_controller: Any,
+    *,
+    attempt: int,
+    validation_result: Any,
+    edit_config: Mapping[str, Any] | None,
+) -> Any:
+    return _resolve_retry_validation_transition_impl(
+        retry_controller,
+        attempt=attempt,
+        validation_result=validation_result,
+        edit_config=edit_config,
+    )
 
 
 def _build_timing_summary_payload(
@@ -1088,6 +1141,17 @@ def _validate_retry_evaluation_report(
         telemetry_output_enabled_fn=_telemetry_output_enabled,
         telemetry_summary_line_fn=_telemetry_summary_line,
     )
+
+
+def _adjust_edit_params(
+    edit_name: str,
+    edit_params: dict[str, Any],
+    attempt: int,
+    report_result: dict[str, Any] | None = None,
+) -> Any:
+    from invarlock.core.retry import adjust_edit_params
+
+    return adjust_edit_params(edit_name, edit_params, attempt, report_result)
 
 
 def _resolve_exit_code(exc: Exception, *, profile: str | None) -> int:
@@ -2046,9 +2110,12 @@ def _build_run_command_deps() -> dict[str, Any]:
         "_merge_primary_metric_health": _merge_primary_metric_health,
         "_merge_core_timing_metrics": _merge_core_timing_metrics_impl,
         "_normalize_overhead_result": _normalize_overhead_result,
-        "_apply_mask_only_head_autotune": _apply_mask_only_head_autotune,
         "_build_timing_summary_payload": _build_timing_summary_payload,
-        "_build_retry_result_summary": _build_retry_result_summary,
+        "_build_restore_failure_attempt_summary": _build_restore_failure_attempt_summary,
+        "_record_retry_attempt": _record_retry_attempt,
+        "_decide_failed_retry_transition": _decide_failed_retry_transition,
+        "_resolve_retry_validation_transition": _resolve_retry_validation_transition,
+        "_adjust_edit_params": _adjust_edit_params,
         "_build_fallback_evaluation_windows": _build_fallback_evaluation_windows,
         "_choose_snapshot_mode": _choose_snapshot_mode,
         "_estimate_model_bytes": _estimate_model_bytes,

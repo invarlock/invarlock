@@ -202,12 +202,29 @@ def test_artifact_wrappers_delegate(monkeypatch, tmp_path):
 
     monkeypatch.setattr(
         run_mod,
-        "_apply_mask_only_head_autotune_impl",
-        lambda edit_config, validation: ({"heads": {"global_k": 6}}, {"global_k": 6}),
+        "_build_restore_failure_attempt_summary_impl",
+        lambda: {"passed": False, "failures": ["restore_failed"], "validation": {}},
     )
-    assert run_mod._apply_mask_only_head_autotune({}, {"ok": False}) == (
-        {"heads": {"global_k": 6}},
-        {"global_k": 6},
+    assert run_mod._build_restore_failure_attempt_summary() == {
+        "passed": False,
+        "failures": ["restore_failed"],
+        "validation": {},
+    }
+
+    decision = object()
+    monkeypatch.setattr(
+        run_mod,
+        "_resolve_retry_validation_transition_impl",
+        lambda *args, **kwargs: decision,
+    )
+    assert (
+        run_mod._resolve_retry_validation_transition(
+            object(),
+            attempt=2,
+            validation_result=object(),
+            edit_config={"heads": {"global_k": 4}},
+        )
+        is decision
     )
 
 
@@ -455,6 +472,18 @@ def test_analysis_and_overhead_wrappers_delegate(monkeypatch):
 
     monkeypatch.setattr(
         run_mod,
+        "_resolve_retry_validation_transition_impl",
+        lambda *args, **kwargs: {"action": "passed"},
+    )
+    assert run_mod._resolve_retry_validation_transition(
+        object(),
+        attempt=1,
+        validation_result=object(),
+        edit_config={},
+    ) == {"action": "passed"}
+
+    monkeypatch.setattr(
+        run_mod,
         "_build_run_context_payload_impl",
         lambda **kwargs: {"profile": "ci", "run_id": "run-1"},
     )
@@ -551,6 +580,10 @@ def test_run_command_injects_explicit_deps(monkeypatch, tmp_path: Path):
         deps["_validate_retry_evaluation_report"]
         is run_mod._validate_retry_evaluation_report
     )
+    assert (
+        deps["_resolve_retry_validation_transition"]
+        is run_mod._resolve_retry_validation_transition
+    )
     assert deps["_finalize_run_provenance"] is run_mod._finalize_run_provenance
     assert deps["_choose_snapshot_mode"] is run_mod._choose_snapshot_mode
     assert (
@@ -560,7 +593,8 @@ def test_run_command_injects_explicit_deps(monkeypatch, tmp_path: Path):
         deps["_prepare_guard_overhead_report"] is run_mod._prepare_guard_overhead_report
     )
     assert (
-        deps["_apply_mask_only_head_autotune"] is run_mod._apply_mask_only_head_autotune
+        deps["_resolve_retry_validation_transition"]
+        is run_mod._resolve_retry_validation_transition
     )
     assert deps["console"] is run_mod.console
     assert callable(deps["get_torch"])

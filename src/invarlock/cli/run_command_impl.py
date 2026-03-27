@@ -56,7 +56,7 @@ def run_command_impl(
     Path = _dep("Path")
     _SnapshotRestoreFailed = _dep("_SnapshotRestoreFailed")
     _apply_mlm_masks = _dep("_apply_mlm_masks")
-    _apply_mask_only_head_autotune = _dep("_apply_mask_only_head_autotune")
+    _adjust_edit_params = _dep("_adjust_edit_params")
     _apply_warning_filters = _dep("_apply_warning_filters")
     _build_artifacts_payload = _dep("_build_artifacts_payload")
     _build_provider_dataset_plan = _dep("_build_provider_dataset_plan")
@@ -65,7 +65,10 @@ def run_command_impl(
     _enrich_run_report_metrics = _dep("_enrich_run_report_metrics")
     _build_edit_payload = _dep("_build_edit_payload")
     _build_timing_summary_payload = _dep("_build_timing_summary_payload")
-    _build_retry_result_summary = _dep("_build_retry_result_summary")
+    _build_restore_failure_attempt_summary = _dep(
+        "_build_restore_failure_attempt_summary"
+    )
+    _decide_failed_retry_transition = _dep("_decide_failed_retry_transition")
     _build_flags_payload = _dep("_build_flags_payload")
     _build_guard_entries = _dep("_build_guard_entries")
     _build_metrics_payload = _dep("_build_metrics_payload")
@@ -101,12 +104,14 @@ def run_command_impl(
     _print_guard_overhead_summary = _dep("_print_guard_overhead_summary")
     _print_pipeline_start = _dep("_print_pipeline_start")
     _print_retry_summary = _dep("_print_retry_summary")
+    _record_retry_attempt = _dep("_record_retry_attempt")
     _resolve_device_and_output = _dep("_resolve_device_and_output")
     _resolve_exit_code = _dep("_resolve_exit_code")
     _resolve_guard_overhead_threshold = _dep("_resolve_guard_overhead_threshold")
     _resolve_pm_min_tokens_target = _dep("_resolve_pm_min_tokens_target")
     _resolve_pm_acceptance_range = _dep("_resolve_pm_acceptance_range")
     _resolve_pm_drift_band = _dep("_resolve_pm_drift_band")
+    _resolve_retry_validation_transition = _dep("_resolve_retry_validation_transition")
     _resolve_snapshot_config = _dep("_resolve_snapshot_config")
     _run_bare_control = _dep("_run_bare_control")
     _safe_int = _dep("_safe_int")
@@ -1058,9 +1063,7 @@ def run_command_impl(
 
             # Adjust parameters for retry attempts
             if retry_controller and attempt > 1:
-                from invarlock.core.retry import adjust_edit_params
-
-                adjustment = adjust_edit_params(
+                adjustment = _adjust_edit_params(
                     edit_op.name, edit_config, attempt, None
                 )
                 edit_config = adjustment.params
@@ -1169,30 +1172,24 @@ def run_command_impl(
                     f"↳ {exc}",
                     profile=profile_normalized,
                 )
-                if retry_controller:
-                    retry_controller.record_attempt(
-                        attempt,
-                        {
-                            "passed": False,
-                            "failures": ["restore_failed"],
-                            "validation": {},
-                        },
-                        edit_config,
+                retry_transition = _decide_failed_retry_transition(
+                    retry_controller,
+                    attempt=attempt,
+                    attempt_summary=_build_restore_failure_attempt_summary(),
+                    edit_config=edit_config,
+                    passed=False,
+                )
+                for notice in retry_transition.notices:
+                    _event(
+                        console,
+                        "WARN",
+                        notice,
+                        emoji="⚠️",
+                        profile=profile_normalized,
                     )
-                    should_retry = retry_controller.should_retry(False)
-                    drain_notices = getattr(retry_controller, "drain_notices", None)
-                    notices = drain_notices() if callable(drain_notices) else ()
-                    for notice in notices:
-                        _event(
-                            console,
-                            "WARN",
-                            notice,
-                            emoji="⚠️",
-                            profile=profile_normalized,
-                        )
-                    if should_retry:
-                        attempt += 1
-                        continue
+                if retry_transition.should_retry:
+                    attempt = retry_transition.next_attempt
+                    continue
                 raise typer.Exit(1) from exc
 
             if not hasattr(core_report, "context") or core_report.context is None:
@@ -1704,11 +1701,14 @@ def run_command_impl(
                 if retry_validation.telemetry_summary:
                     console.print(retry_validation.telemetry_summary, markup=False)
 
-                retry_controller.record_attempt(
-                    attempt, retry_validation.attempt_summary, edit_config
+                retry_decision = _resolve_retry_validation_transition(
+                    retry_controller,
+                    attempt=attempt,
+                    validation_result=retry_validation,
+                    edit_config=edit_config,
                 )
 
-                if retry_validation.status == "passed":
+                if retry_decision.action == "passed":
                     _event(
                         console,
                         "PASS",
@@ -1718,19 +1718,18 @@ def run_command_impl(
                     )
                     break
 
-                if retry_validation.status == "failed":
+                if retry_decision.action in {"retry", "exhausted"}:
                     _event(
                         console,
                         "FAIL",
                         "Evaluation report FAILED gates: "
-                        f"{', '.join(retry_validation.failed_gates)}",
+                        f"{', '.join(retry_decision.failed_gates)}",
                         emoji="⚠️",
                         profile=profile_normalized,
                     )
 
-                    edit_config, head_adjustment = _apply_mask_only_head_autotune(
-                        edit_config, retry_validation.validation
-                    )
+                    edit_config = retry_decision.updated_edit_config
+                    head_adjustment = retry_decision.head_adjustment
                     if head_adjustment is not None:
                         _event(
                             console,
@@ -1742,12 +1741,7 @@ def run_command_impl(
                             profile=profile_normalized,
                         )
 
-                    should_retry = retry_controller.should_retry(
-                        retry_validation.passed
-                    )
-                    drain_notices = getattr(retry_controller, "drain_notices", None)
-                    notices = drain_notices() if callable(drain_notices) else ()
-                    for notice in notices:
+                    for notice in retry_decision.notices:
                         _event(
                             console,
                             "WARN",
@@ -1755,8 +1749,8 @@ def run_command_impl(
                             emoji="⚠️",
                             profile=profile_normalized,
                         )
-                    if should_retry:
-                        attempt += 1
+                    if retry_decision.action == "retry":
+                        attempt = retry_decision.next_attempt or (attempt + 1)
                         continue
                     _event(
                         console,
@@ -1767,21 +1761,37 @@ def run_command_impl(
                     )
                     break
 
+                if retry_decision.action == "error":
+                    _event(
+                        console,
+                        "WARN",
+                        "Evaluation report validation failed: "
+                        f"{retry_decision.error_message}",
+                        emoji="⚠️",
+                        profile=profile_normalized,
+                    )
+                    break
+
                 _event(
                     console,
                     "WARN",
                     "Evaluation report validation failed: "
-                    f"{retry_validation.error_message}",
+                    f"{retry_decision.error_message}",
                     emoji="⚠️",
                     profile=profile_normalized,
                 )
                 break
             else:
                 if retry_controller:
-                    retry_controller.record_attempt(
-                        attempt,
-                        {"passed": True, "failures": [], "validation": {}},
-                        edit_config,
+                    _record_retry_attempt(
+                        retry_controller,
+                        attempt=attempt,
+                        attempt_summary={
+                            "passed": True,
+                            "failures": [],
+                            "validation": {},
+                        },
+                        edit_config=edit_config,
                     )
                 # No retry mode - single run
                 break
