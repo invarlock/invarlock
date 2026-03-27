@@ -18,7 +18,7 @@ def test_run_from_config_requires_explicit_impls(
     )
     with pytest.raises(
         RuntimeError,
-        match="requires explicit run_impl and deps_builder",
+        match="requires an explicit executor callable",
     ):
         config_execution.run_from_config(config="configs/demo.yaml", delegate=False)
 
@@ -47,8 +47,8 @@ def test_run_from_config_executes_without_delegation_and_writes_manifest(
         raising=True,
     )
 
-    def _run_impl(**kwargs):
-        seen["run_kwargs"] = kwargs
+    def _executor(request: config_execution.ConfigExecutionRequest):
+        seen["request"] = request
         return str(report_path)
 
     out = config_execution.run_from_config(
@@ -61,8 +61,7 @@ def test_run_from_config_executes_without_delegation_and_writes_manifest(
         allow_third_party_plugins=True,
         command_name="proof-pack-run",
         delegate=False,
-        run_impl=_run_impl,
-        deps_builder=lambda: {"deps": "ok"},
+        executor=_executor,
     )
 
     assert out == report_path.resolve()
@@ -72,28 +71,12 @@ def test_run_from_config_executes_without_delegation_and_writes_manifest(
         "allow_third_party_plugins": True,
         "allow_remote_code": True,
     }
-    assert seen["run_kwargs"] == {
-        "config": "configs/demo.yaml",
-        "device": None,
-        "profile": "ci",
-        "out": "runs/demo",
-        "edit": None,
-        "edit_label": None,
-        "tier": "balanced",
-        "metric_kind": None,
-        "probes": None,
-        "until_pass": False,
-        "max_attempts": 3,
-        "timeout": None,
-        "baseline": None,
-        "no_cleanup": False,
-        "style": None,
-        "progress": False,
-        "timing": False,
-        "telemetry": False,
-        "no_color": False,
-        "deps": {"deps": "ok"},
-    }
+    assert seen["request"] == config_execution.ConfigExecutionRequest(
+        config="configs/demo.yaml",
+        profile="ci",
+        out="runs/demo",
+        tier="balanced",
+    )
     manifest_report, manifest_config, manifest_extra = seen["manifest"]
     assert manifest_report == report_path
     assert manifest_config == "configs/demo.yaml"
@@ -188,12 +171,8 @@ def test_run_from_config_skips_manifest_for_missing_report(
         raising=True,
     )
 
-    def _deps_builder() -> dict[str, str]:
-        seen["deps_called"] = True
-        return {"deps": "explicit"}
-
-    def _run_impl(**kwargs) -> str:
-        seen["run_kwargs"] = kwargs
+    def _executor(request: config_execution.ConfigExecutionRequest) -> str:
+        seen["request"] = request
         return str(missing_report)
 
     monkeypatch.setattr(
@@ -207,8 +186,7 @@ def test_run_from_config_skips_manifest_for_missing_report(
         config="configs/demo.yaml",
         profile="ci",
         delegate=False,
-        run_impl=_run_impl,
-        deps_builder=_deps_builder,
+        executor=_executor,
     )
 
     assert out == missing_report.resolve()
@@ -219,32 +197,13 @@ def test_run_from_config_skips_manifest_for_missing_report(
         "allow_third_party_plugins": False,
         "allow_remote_code": False,
     }
-    assert seen["deps_called"] is True
-    assert seen["run_kwargs"] == {
-        "config": "configs/demo.yaml",
-        "device": None,
-        "profile": "ci",
-        "out": None,
-        "edit": None,
-        "edit_label": None,
-        "tier": None,
-        "metric_kind": None,
-        "probes": None,
-        "until_pass": False,
-        "max_attempts": 3,
-        "timeout": None,
-        "baseline": None,
-        "no_cleanup": False,
-        "style": None,
-        "progress": False,
-        "timing": False,
-        "telemetry": False,
-        "no_color": False,
-        "deps": {"deps": "explicit"},
-    }
+    assert seen["request"] == config_execution.ConfigExecutionRequest(
+        config="configs/demo.yaml",
+        profile="ci",
+    )
 
 
-def test_run_from_config_raises_when_run_impl_returns_none(
+def test_run_from_config_raises_when_executor_returns_none(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
@@ -260,10 +219,9 @@ def test_run_from_config_raises_when_run_impl_returns_none(
         raising=True,
     )
 
-    with pytest.raises(RuntimeError, match="run_impl did not return a report path"):
+    with pytest.raises(RuntimeError, match="executor did not return a report path"):
         config_execution.run_from_config(
             config="configs/demo.yaml",
             delegate=False,
-            run_impl=lambda **kwargs: None,
-            deps_builder=lambda: {"deps": "ok"},
+            executor=lambda request: None,
         )

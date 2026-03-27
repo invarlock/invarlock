@@ -649,90 +649,53 @@ def test_analysis_and_overhead_wrappers_delegate(monkeypatch):
     assert persisted.report_path_out == "report.json"
 
 
-def test_run_command_injects_explicit_deps(monkeypatch, tmp_path: Path):
-    sentinel = object()
+def test_run_command_delegates_through_typed_executor(monkeypatch, tmp_path: Path):
+    sentinel_deps = {"deps": "ok"}
     captured: dict[str, object] = {}
     report_path = tmp_path / "report.json"
     report_path.write_text("{}", encoding="utf-8")
 
     monkeypatch.setattr(
-        run_mod, "_resolve_pm_acceptance_range", sentinel, raising=False
+        run_mod, "_build_run_execution_deps", lambda: sentinel_deps, raising=True
     )
 
-    def _fake_run_command_impl(**kwargs):
-        captured.update(kwargs)
+    def _fake_execute_run_request(request, *, deps):
+        captured["request"] = request
+        captured["deps"] = deps
         return str(report_path)
 
-    monkeypatch.setattr(run_mod, "_run_command_impl", _fake_run_command_impl)
+    monkeypatch.setattr(run_mod, "_execute_run_request", _fake_execute_run_request)
     out = run_mod.run_command(config="configs/example.yml")
 
     assert out == report_path.resolve()
-    deps = captured.get("deps")
-    assert isinstance(deps, dict)
-    assert deps["_resolve_pm_acceptance_range"] is sentinel
-    assert deps["_build_provider_dataset_plan"] is run_mod._build_provider_dataset_plan
-    assert (
-        deps["_materialize_baseline_pairing_schedule"]
-        is run_mod._materialize_baseline_pairing_schedule
+    assert captured["request"] == run_mod.ConfigExecutionRequest(
+        config="configs/example.yml"
     )
-    assert deps["_build_run_context_payload"] is run_mod._build_run_context_payload
-    assert (
-        deps["_build_run_execution_config_payloads"]
-        is run_mod._build_run_execution_config_payloads
-    )
-    assert deps["_enrich_run_report_metrics"] is run_mod._enrich_run_report_metrics
-    assert deps["_assemble_run_report"] is run_mod._assemble_run_report
-    assert (
-        deps["_validate_retry_evaluation_report"]
-        is run_mod._validate_retry_evaluation_report
-    )
-    assert (
-        deps["_resolve_retry_validation_transition"]
-        is run_mod._resolve_retry_validation_transition
-    )
-    assert (
-        deps["_build_snapshot_execution_plan"] is run_mod._build_snapshot_execution_plan
-    )
-    assert (
-        deps["_resolve_snapshot_retry_transition"]
-        is run_mod._resolve_snapshot_retry_transition
-    )
-    assert deps["_finalize_run_provenance"] is run_mod._finalize_run_provenance
-    assert (
-        deps["_build_timing_summary_payload"] is run_mod._build_timing_summary_payload
-    )
-    assert (
-        deps["_prepare_guard_overhead_report"] is run_mod._prepare_guard_overhead_report
-    )
-    assert deps["_persist_run_report_outputs"] is run_mod._persist_run_report_outputs
-    assert (
-        deps["_resolve_retry_validation_transition"]
-        is run_mod._resolve_retry_validation_transition
-    )
-    assert deps["console"] is run_mod.console
-    assert callable(deps["get_torch"])
-    assert callable(deps["get_psutil"])
+    assert captured["deps"] is sentinel_deps
 
 
-def test_build_run_command_deps_keeps_optional_modules_lazy(monkeypatch):
-    calls = {"torch": 0, "psutil": 0}
+def test_execute_cli_run_request_builds_deps_at_call_time(monkeypatch, tmp_path: Path):
+    calls = {"deps": 0}
+    report_path = tmp_path / "report.json"
+    report_path.write_text("{}", encoding="utf-8")
+    captured: dict[str, object] = {}
 
-    def _fake_get_torch():
-        calls["torch"] += 1
-        return object()
+    def _fake_build_deps():
+        calls["deps"] += 1
+        return {"deps": "current"}
 
-    def _fake_get_psutil():
-        calls["psutil"] += 1
-        return object()
+    def _fake_execute(request, *, deps):
+        captured["request"] = request
+        captured["deps"] = deps
+        return str(report_path)
 
-    monkeypatch.setattr(run_mod, "_get_torch", _fake_get_torch)
-    monkeypatch.setattr(run_mod, "_get_psutil", _fake_get_psutil)
+    monkeypatch.setattr(run_mod, "_build_run_execution_deps", _fake_build_deps)
+    monkeypatch.setattr(run_mod, "_execute_run_request", _fake_execute)
 
-    deps = run_mod._build_run_command_deps()
+    request = run_mod.ConfigExecutionRequest(config="configs/example.yml")
+    out = run_mod._execute_cli_run_request(request)
 
-    assert callable(deps["get_torch"])
-    assert callable(deps["get_psutil"])
-    assert calls == {"torch": 0, "psutil": 0}
-    assert deps["get_torch"]() is not None
-    assert deps["get_psutil"]() is not None
-    assert calls == {"torch": 1, "psutil": 1}
+    assert out == str(report_path)
+    assert captured["request"] == request
+    assert captured["deps"] == {"deps": "current"}
+    assert calls == {"deps": 1}

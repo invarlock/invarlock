@@ -1,37 +1,41 @@
 # mypy: ignore-errors
-"""Implementation body for cli.commands.run.run_command."""
+"""Typed run execution owner for config-driven run commands."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 from typing import Any
 
+from invarlock.core.config_execution import ConfigExecutionRequest
 
-def run_command_impl(
+
+def execute_run_request(
+    request: ConfigExecutionRequest,
     *,
-    config: Any,
-    device: Any = None,
-    profile: Any = None,
-    out: Any = None,
-    edit: Any = None,
-    edit_label: Any = None,
-    tier: Any = None,
-    metric_kind: Any = None,
-    probes: Any = None,
-    until_pass: Any = False,
-    max_attempts: Any = 3,
-    timeout: Any = None,
-    baseline: Any = None,
-    no_cleanup: Any = False,
-    style: Any = None,
-    progress: Any = False,
-    timing: Any = False,
-    telemetry: Any = False,
-    no_color: Any = False,
-    prefer_local_files_only: Any = False,
     deps: Mapping[str, Any],
 ) -> str | None:
-    """Run implementation moved out of run.py to keep command surface stable."""
+    """Execute a config-driven run using an explicit typed request."""
+
+    config = request.config
+    device = request.device
+    profile = request.profile
+    out = request.out
+    edit = request.edit
+    edit_label = request.edit_label
+    tier = request.tier
+    metric_kind = request.metric_kind
+    probes = request.probes
+    until_pass = request.until_pass
+    max_attempts = request.max_attempts
+    timeout = request.timeout
+    baseline = request.baseline
+    no_cleanup = request.no_cleanup
+    style = request.style
+    progress = request.progress
+    timing = request.timing
+    telemetry = request.telemetry
+    no_color = request.no_color
+    prefer_local_files_only = request.prefer_local_files_only
 
     COERCE_EXCEPTIONS = (AttributeError, TypeError, ValueError, Exception)
     NUMERIC_EXCEPTIONS = (TypeError, ValueError, OverflowError)
@@ -49,7 +53,7 @@ def run_command_impl(
         try:
             return deps[name]
         except KeyError as exc:
-            raise RuntimeError(f"run_command_impl missing dependency: {name}") from exc
+            raise RuntimeError(f"execute_run_request missing dependency: {name}") from exc
 
     InvarlockError = _dep("InvarlockError")
     ConfigError = _dep("ConfigError")

@@ -44,9 +44,6 @@ from invarlock.cli.output import (
 from invarlock.cli.run_artifacts import (
     persist_ref_masks as _persist_ref_masks_impl,
 )
-from invarlock.cli.run_command_impl import (
-    run_command_impl as _run_command_impl,
-)
 from invarlock.cli.run_config import (
     extract_model_load_kwargs as _extract_model_load_kwargs_impl,
 )
@@ -58,6 +55,9 @@ from invarlock.cli.run_config import (
 )
 from invarlock.cli.run_config import (
     resolve_provider_and_split as _resolve_provider_and_split_impl,
+)
+from invarlock.cli.run_execution import (
+    execute_run_request as _execute_run_request,
 )
 from invarlock.cli.run_overhead import (
     plan_release_windows as _plan_release_windows_impl,
@@ -87,6 +87,7 @@ from invarlock.core.auto_tuning import (
     resolve_tier_policies as _resolve_tier_policies,
 )
 from invarlock.core.config_execution import (
+    ConfigExecutionRequest,
     RuntimeDelegationError,
     run_from_config,
 )
@@ -2269,8 +2270,8 @@ except ImportError:
     HAS_CORE_COMPONENTS = False
 
 
-def _build_run_command_deps() -> dict[str, Any]:
-    """Build explicit dependencies for run_command_impl.
+def _build_run_execution_deps() -> dict[str, Any]:
+    """Build explicit dependencies for the run execution owner.
 
     Passing an explicit map avoids dynamic module globals mutation while keeping
     monkeypatch behavior stable (resolved at call time).
@@ -2386,6 +2387,12 @@ def _build_run_command_deps() -> dict[str, Any]:
     }
 
 
+def _execute_cli_run_request(request: ConfigExecutionRequest) -> str | None:
+    """Bridge the typed config-execution request into the run execution owner."""
+
+    return _execute_run_request(request, deps=_build_run_execution_deps())
+
+
 def run_command(
     config: str,
     device: str | None = None,
@@ -2453,8 +2460,7 @@ def run_command(
             allow_remote_code=allow_remote_code,
             prefer_local_files_only=prefer_local_files_only,
             command_name="run",
-            run_impl=_run_command_impl,
-            deps_builder=_build_run_command_deps,
+            executor=_execute_cli_run_request,
         )
     except RuntimeDelegationError as exc:
         typer.echo(str(exc), err=True)

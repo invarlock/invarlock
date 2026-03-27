@@ -21,8 +21,7 @@ import typer
 import yaml
 from rich.console import Console
 
-from invarlock.cli.commands.run import _build_run_command_deps
-from invarlock.cli.run_command_impl import run_command_impl as _run_command_impl
+from invarlock.cli.commands.run import _execute_cli_run_request
 from invarlock.core.config_execution import RuntimeDelegationError, run_from_config
 
 console = Console()
@@ -109,8 +108,7 @@ def _run_calibration_config(
             allow_third_party_plugins=allow_third_party_plugins,
             allow_remote_code=allow_remote_code,
             command_name="calibrate",
-            run_impl=_run_command_impl,
-            deps_builder=_build_run_command_deps,
+            executor=_execute_cli_run_request,
         )
     except RuntimeDelegationError as exc:
         console.print(f"[red]{exc}[/red]")

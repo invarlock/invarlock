@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Protocol
 
 from invarlock.runtime_security import (
     apply_runtime_allowances,
@@ -14,6 +15,34 @@ from invarlock.runtime_security import (
 
 class RuntimeDelegationError(RuntimeError):
     """Raised when secure-default container delegation cannot start."""
+
+
+@dataclass(frozen=True)
+class ConfigExecutionRequest:
+    config: str
+    device: str | None = None
+    profile: str | None = None
+    out: str | None = None
+    edit: str | None = None
+    edit_label: str | None = None
+    tier: str | None = None
+    metric_kind: str | None = None
+    probes: int | None = None
+    until_pass: bool = False
+    max_attempts: int = 3
+    timeout: int | None = None
+    baseline: str | None = None
+    no_cleanup: bool = False
+    style: str | None = None
+    progress: bool = False
+    timing: bool = False
+    telemetry: bool = False
+    no_color: bool = False
+    prefer_local_files_only: bool = False
+
+
+class ConfigExecutionExecutor(Protocol):
+    def __call__(self, request: ConfigExecutionRequest) -> str | Path | None: ...
 
 
 def run_from_config(
@@ -44,8 +73,7 @@ def run_from_config(
     prefer_local_files_only: bool = False,
     command_name: str = "run",
     delegate: bool = True,
-    run_impl: Any | None = None,
-    deps_builder: Any | None = None,
+    executor: ConfigExecutionExecutor | None = None,
 ) -> Path:
     """Run a config-driven job and return the emitted report path."""
 
@@ -63,40 +91,36 @@ def run_from_config(
             raise RuntimeDelegationError(str(exc)) from exc
         raise SystemExit(exit_code)
 
-    if run_impl is None or deps_builder is None:
-        raise RuntimeError(
-            "run_from_config requires explicit run_impl and deps_builder callables"
-        )
+    if executor is None:
+        raise RuntimeError("run_from_config requires an explicit executor callable")
 
-    run_kwargs: dict[str, Any] = {
-        "config": config,
-        "device": device,
-        "profile": profile,
-        "out": out,
-        "edit": edit,
-        "edit_label": edit_label,
-        "tier": tier,
-        "metric_kind": metric_kind,
-        "probes": probes,
-        "until_pass": until_pass,
-        "max_attempts": max_attempts,
-        "timeout": timeout,
-        "baseline": baseline,
-        "no_cleanup": no_cleanup,
-        "style": style,
-        "progress": progress,
-        "timing": timing,
-        "telemetry": telemetry,
-        "no_color": no_color,
-        "deps": deps_builder(),
-    }
-    if prefer_local_files_only:
-        run_kwargs["prefer_local_files_only"] = True
+    request = ConfigExecutionRequest(
+        config=config,
+        device=device,
+        profile=profile,
+        out=out,
+        edit=edit,
+        edit_label=edit_label,
+        tier=tier,
+        metric_kind=metric_kind,
+        probes=probes,
+        until_pass=until_pass,
+        max_attempts=max_attempts,
+        timeout=timeout,
+        baseline=baseline,
+        no_cleanup=no_cleanup,
+        style=style,
+        progress=progress,
+        timing=timing,
+        telemetry=telemetry,
+        no_color=no_color,
+        prefer_local_files_only=prefer_local_files_only,
+    )
 
-    report_path = run_impl(**run_kwargs)
+    report_path = executor(request)
 
     if report_path is None:
-        raise RuntimeError("run_impl did not return a report path")
+        raise RuntimeError("executor did not return a report path")
 
     report = Path(report_path).resolve()
     if report.exists():
