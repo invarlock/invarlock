@@ -123,6 +123,7 @@ by the CLI and non-CLI entrypoints.
 
 | Module | Responsibility |
 | --- | --- |
+| `evaluate_contract.py` | Baseline-report validation and emitted run-artifact contract enforcement for `evaluate` |
 | `evaluate_plan.py` | Evaluation result policy, degradation classification, and emitted outcome shaping |
 | `report_inputs.py` | Canonical report path resolution and JSON-object validation |
 | `doctor_findings.py` | Structured doctor findings and optional report cross-check analysis |
