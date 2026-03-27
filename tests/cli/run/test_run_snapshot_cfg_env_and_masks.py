@@ -232,7 +232,9 @@ def test_snapshot_cfg_threshold_and_tempdir(tmp_path: Path, monkeypatch):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(patch("invarlock.core.config_runtime.load_config", load_cfg))
+        stack.enter_context(
+            patch("invarlock.core.config_runtime.load_config", load_cfg)
+        )
         stack.enter_context(
             patch("invarlock.cli.commands.run.psutil.virtual_memory", vm)
         )

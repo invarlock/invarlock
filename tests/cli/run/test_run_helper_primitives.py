@@ -1813,7 +1813,9 @@ def test_prepare_config_for_run_invalid_tier_and_probes(monkeypatch):
         "invarlock.core.config_runtime.apply_profile", lambda cfg, p: cfg, raising=False
     )
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.apply_edit_override", lambda cfg, e: cfg, raising=False
+        "invarlock.core.config_runtime.apply_edit_override",
+        lambda cfg, e: cfg,
+        raising=False,
     )
     # Invalid tier triggers Exit(1)
     with pytest.raises(typer.Exit):

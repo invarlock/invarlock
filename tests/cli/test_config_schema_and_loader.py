@@ -4,6 +4,11 @@ from pathlib import Path
 import pytest
 
 from invarlock.core import config_runtime as cfg_mod
+from invarlock.core.config_dependencies import (
+    absolute_path_no_resolve,
+    inspect_config_dependencies,
+    iter_absolute_path_strings,
+)
 from invarlock.core.config_runtime import (
     AutoConfig,
     DatasetConfig,
@@ -18,11 +23,6 @@ from invarlock.core.config_runtime import (
     apply_profile,
     load_config,
     resolve_edit_kind,
-)
-from invarlock.core.config_dependencies import (
-    absolute_path_no_resolve,
-    inspect_config_dependencies,
-    iter_absolute_path_strings,
 )
 
 

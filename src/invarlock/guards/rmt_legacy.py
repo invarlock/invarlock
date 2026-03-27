@@ -579,7 +579,9 @@ def rmt_detect(
                         f"(σ_max={stats['sigma_max']:.2f}, norm={normalization})",
                     )
             elif verbose and skip_reason:
-                _emit_verbose(verbose, f"      Module {module_name}: SKIP: {skip_reason}")
+                _emit_verbose(
+                    verbose, f"      Module {module_name}: SKIP: {skip_reason}"
+                )
 
         # Apply correction if requested and not detect-only
         if not detect_only and current_outliers > 0 and correction_factor is not None:
@@ -641,7 +643,9 @@ def rmt_detect(
         n_detected = n_outliers
         n_will_be_capped = n_outliers if not detect_only else 0
 
-        _emit_verbose(verbose, f"    ⚠️ RMT outliers detected{baseline_note}{deadband_note}:")
+        _emit_verbose(
+            verbose, f"    ⚠️ RMT outliers detected{baseline_note}{deadband_note}:"
+        )
         _emit_verbose(
             verbose, f"      Detected: {n_detected}, will correct: {n_will_be_capped}"
         )
