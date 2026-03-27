@@ -64,6 +64,7 @@ hf = [
   "transformers>=5.0.0",
   "safetensors>=0.4.0",
   "datasets>=3.0",
+  "requests>=2.33.0",
   "numpy>=1.24",
   "huggingface_hub>=1.0.0",
   "aiohttp>=3.12.14",
@@ -86,6 +87,7 @@ edits = [
 eval = [
   "torch>=2.1.0",
   "datasets>=3.0",
+  "requests>=2.33.0",
 ]
 
 # External edit integrations
@@ -119,6 +121,7 @@ advanced = [
   "torch>=2.1.0",
   "transformers>=5.0.0",
   "datasets>=3.0",
+  "requests>=2.33.0",
   "numpy>=1.24",
   "huggingface_hub>=1.0.0",
   "accelerate>=0.27",
@@ -137,6 +140,7 @@ all = [
   "torch>=2.1.0",
   "transformers>=5.0.0",
   "datasets>=3.0",
+  "requests>=2.33.0",
   "numpy>=1.24",
   "huggingface_hub>=1.0.0",
   "accelerate>=0.27",
@@ -165,6 +169,7 @@ dev = [
   "matplotlib>=3.7",
   "bitsandbytes>=0.41",
   "build>=0.10.0",
+  "requests>=2.33.0",
   "twine>=4.0.0",
 ]
 
@@ -175,10 +180,12 @@ ci = [
   "mkdocs-material>=9.5",
   "mkdocs-mermaid2-plugin>=1.1",
   "build>=0.10.0",
+  "requests>=2.33.0",
 ]
 
 docs-ci = [
   "linkchecker>=10.5",
+  "requests>=2.33.0",
   "mypy>=1.0",
   "hypothesis>=6.98",
 ]
@@ -189,12 +196,14 @@ precommit-ci = [
 
 release-ci = [
   "build>=0.10.0",
+  "requests>=2.33.0",
   "twine>=4.0.0",
   "cyclonedx-bom>=4.1",
 ]
 
 security-ci = [
   "pip-audit>=2.8",
+  "requests>=2.33.0",
   "cyclonedx-bom>=4.1",
 ]
 
