@@ -4,6 +4,7 @@ from pathlib import Path
 from invarlock.core.config_runtime import load_config
 
 EXPECTED_CONFIGS = [
+    ("presets/causal_lm", "gpt2_smoke_128.yaml", None),
     ("presets/causal_lm", "wikitext2_512.yaml", None),
     ("overlays/edits/quant_rtn", "8bit_attn.yaml", None),
     ("overlays/edits/quant_rtn", "8bit_full.yaml", None),
@@ -41,3 +42,20 @@ def test_eval_script_is_executable() -> None:
     script_path = repo_root / "scripts" / "eval_once.sh"
     assert script_path.exists(), "Expected scripts/eval_once.sh to exist"
     assert os.access(script_path, os.X_OK), "eval_once.sh should be executable"
+
+
+def test_gpt2_smoke_campaign_script_is_executable() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script_path = repo_root / "scripts" / "run_gpt2_smoke_campaign.sh"
+    assert script_path.exists(), "Expected scripts/run_gpt2_smoke_campaign.sh to exist"
+    assert os.access(script_path, os.X_OK), (
+        "run_gpt2_smoke_campaign.sh should be executable"
+    )
+    contents = script_path.read_text(encoding="utf-8")
+    assert "ensure_writable_hf_cache" in contents
+    assert "INVARLOCK_SMOKE_HOST_HF_CACHE_ROOT" in contents
+    assert 'CLI=("$PYTHON_BIN" -m invarlock)' in contents
+    assert "command -v invarlock" not in contents
+    assert "INVARLOCK_SMOKE_CACHE_COMPLETE" in contents
+    assert "evaluation report verification failed" in contents
+    assert "proof-pack verification failed" in contents

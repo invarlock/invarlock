@@ -40,6 +40,13 @@ Security-default note: `evaluate` uses the runtime container by default. Use
 `--mode local` only for trusted local workflows that intentionally bypass that
 boundary. Advanced runtime-heavy workflows live under `invarlock advanced`.
 
+Smoke asset note: `configs/presets/causal_lm/gpt2_smoke_128.yaml` ships the
+small GPT-2 smoke preset used by `scripts/run_gpt2_smoke_campaign.sh` and the
+repository smoke workflow. The smoke campaign runs under the shipped `dev`
+profile so it can complete the full `evaluate` → `verify` → `report` →
+`proof-pack` path on the cached GPT-2 assets without relying on the heavier
+release profile floors.
+
 ---
 
 ## Documentation Map

@@ -38,6 +38,7 @@ invarlock verify reports/eval/evaluation.report.json
 
 # Render shareable HTML
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
+invarlock report explain --report runs/subject/report.json --baseline runs/source/report.json
 ```
 
 ## Security Defaults
@@ -57,7 +58,7 @@ invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/eva
 | Compare baseline vs subject | `invarlock evaluate` | `reports/eval/evaluation.report.json` plus `runtime.manifest.json` for attested runs |
 | Validate an evaluation report | `invarlock verify` | Exit code plus human or JSON verification output |
 | Render HTML from an evaluation report | `invarlock report html` | HTML file |
-| Explain gate decisions | `invarlock report explain` | Human-readable explanation |
+| Explain gate decisions from run reports | `invarlock report explain` | Human-readable explanation |
 | Inspect environment health | `invarlock doctor` | Human or JSON diagnostics |
 | Proof-pack, policy, plugin, or calibration workflows | `invarlock advanced ...` | Advanced artifacts and diagnostics |
 
@@ -68,7 +69,7 @@ invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/eva
 | `invarlock evaluate` | Yes (`--out`, default `runs/`) | Yes (`--report-out`, default `reports/eval`) | Produces the paired evaluation report bundle |
 | `invarlock verify` | No | No | Reads existing evaluation report JSON |
 | `invarlock report html` | No | Yes (`--output`) | Renders HTML from an existing report |
-| `invarlock report explain` | No | No | Reads existing baseline and subject report artifacts |
+| `invarlock report explain` | No | No | Reads existing baseline and subject run report JSON files (not evaluation.report.json) |
 | `invarlock doctor` | No | No | Diagnostics only |
 | `invarlock advanced proof-pack` | Depends on subcommand | Depends on subcommand | Advanced evidence packaging |
 | `invarlock advanced policy` | Depends on subcommand | No | Advanced policy-pack tooling |
@@ -151,6 +152,7 @@ Core subcommands:
   - Render an evaluation report to HTML
   - Options: `-i/--input`, `-o/--output`, `--embed-css`, `--force`
 - `invarlock report explain`
+  - Explain gate decisions from run reports, not the generated evaluation bundle
   - Explain gates and primary-metric behavior for a subject report versus a
     baseline report
 - `invarlock report validate`
@@ -165,6 +167,7 @@ Example:
 
 ```bash
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
+invarlock report explain --report runs/subject/report.json --baseline runs/source/report.json
 ```
 
 ## `invarlock doctor`
