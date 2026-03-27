@@ -84,14 +84,14 @@ class _RemovedComponent:
 HF_Pythia_Adapter = _RemovedComponent("HF_Pythia_Adapter")
 auto_tune_pruning_budget = _RemovedComponent("auto_tune_pruning_budget")
 run_auto_invarlock = _RemovedComponent("run_auto_invarlock")
-InvarLockPipeline = _RemovedComponent("InvarLockPipeline", "invarlock.cli.app:main")
+InvarLockPipeline = _RemovedComponent("InvarLockPipeline", "invarlock.__main__:main")
 InvarLockConfig = _RemovedComponent(
     "InvarLockConfig", "invarlock.core.config_runtime:InvarLockConfig"
 )
 run_invarlock_pipeline = _RemovedComponent(
-    "run_invarlock_pipeline", "invarlock.cli.run"
+    "run_invarlock_pipeline", "invarlock.__main__:main"
 )
-run_invarlock = _RemovedComponent("run_invarlock", "invarlock.cli.run")
+run_invarlock = _RemovedComponent("run_invarlock", "invarlock.__main__:main")
 quick_prune_gpt2 = _RemovedComponent("quick_prune_gpt2")
 
 __all__ = [
