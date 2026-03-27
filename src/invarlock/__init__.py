@@ -18,16 +18,3 @@ __version__ = "0.5.0"
 from .config import CFG, Defaults, get_default_config
 
 __all__ = ["__version__", "get_default_config", "Defaults", "CFG"]
-
-
-def __getattr__(name: str):  # pragma: no cover - thin lazy loader
-    """Lazily expose selected subpackages without importing heavy deps at init.
-
-    This keeps `import invarlock` torch-free while allowing patterns like
-    monkeypatching `invarlock.eval.*` in tests.
-    """
-    if name == "eval":
-        import importlib
-
-        return importlib.import_module(".eval", __name__)
-    raise AttributeError(name)

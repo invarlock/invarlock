@@ -1131,58 +1131,35 @@ class TestInitModule:
         assert invarlock.adapters.quality_label(1.40) == "Fair"
 
     def test_placeholder_adapters(self):
-        """Test placeholder adapter classes."""
-        # Test that placeholders raise NotImplementedError
-        with pytest.raises(NotImplementedError):
-            invarlock.adapters.HF_Pythia_Adapter()
+        """Removed compatibility placeholders are absent from the namespace."""
+        assert not hasattr(invarlock.adapters, "HF_Pythia_Adapter")
+        assert not hasattr(invarlock.adapters, "auto_tune_pruning_budget")
+        assert not hasattr(invarlock.adapters, "run_auto_invarlock")
+        assert not hasattr(invarlock.adapters, "InvarLockPipeline")
+        assert not hasattr(invarlock.adapters, "InvarLockConfig")
+        assert not hasattr(invarlock.adapters, "run_invarlock_pipeline")
+        assert not hasattr(invarlock.adapters, "run_invarlock")
+        assert not hasattr(invarlock.adapters, "quick_prune_gpt2")
 
         # Note: HF_Causal_Adapter is now implemented, not a placeholder
         # Test that it can be instantiated without error
         adapter = invarlock.adapters.HF_Causal_Adapter()
         assert adapter is not None
 
-        # Test auto-tuning placeholders
-        with pytest.raises(NotImplementedError):
-            invarlock.adapters.auto_tune_pruning_budget()
-
-        with pytest.raises(NotImplementedError):
-            invarlock.adapters.run_auto_invarlock()
-
-        # Baseline-specific placeholders are not present
-
-        # Placeholder previously referenced here is no longer present
-
     def test_removed_component_stubs(self):
-        """Test removed component stubs."""
-        # Test removed components
-        with pytest.raises(NotImplementedError, match="InvarLock 1.0"):
-            invarlock.adapters.InvarLockPipeline()
-
-        with pytest.raises(NotImplementedError):
-            invarlock.adapters.InvarLockConfig()
-
-        with pytest.raises(NotImplementedError):
-            invarlock.adapters.run_invarlock_pipeline()
-
-        with pytest.raises(NotImplementedError):
-            invarlock.adapters.run_invarlock()
-
-        with pytest.raises(NotImplementedError):
-            invarlock.adapters.quick_prune_gpt2()
+        """Removed compatibility components stay absent."""
+        for name in (
+            "InvarLockPipeline",
+            "InvarLockConfig",
+            "run_invarlock_pipeline",
+            "run_invarlock",
+            "quick_prune_gpt2",
+        ):
+            assert not hasattr(invarlock.adapters, name)
 
     def test_removed_component_behavior(self):
-        """Test _RemovedComponent behavior."""
-        stub = invarlock.adapters._RemovedComponent("TestComponent", "new.component")
-
-        # Test calling the stub
-        with pytest.raises(
-            NotImplementedError, match="is not available in InvarLock 1.0"
-        ):
-            stub()
-
-        # Test attribute access
-        attr = stub.some_attribute
-        assert isinstance(attr, invarlock.adapters._RemovedComponent)
+        """Removed-component shim type is gone."""
+        assert not hasattr(invarlock.adapters, "_RemovedComponent")
 
 
 class TestIntegration:
