@@ -4,7 +4,9 @@ import argparse
 import json
 from pathlib import Path
 
-from invarlock.core.runtime_manifest_verify import verify_report_manifest
+from invarlock.core.runtime_manifest_verify import (
+    verify_report_manifest as _verify_report_manifest,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -22,7 +24,7 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     report_path = Path(args.report)
     manifest_path = Path(args.manifest)
-    errors = verify_report_manifest(report_path, manifest_path)
+    errors = _verify_report_manifest(report_path, manifest_path)
     ok = not errors
 
     if args.json:
