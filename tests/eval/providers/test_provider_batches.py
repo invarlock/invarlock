@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.cli.commands.run import _compute_mask_positions_digest
+from invarlock.cli.run_pairing_helpers import _compute_mask_positions_digest
 from invarlock.eval.providers.seq2seq import Seq2SeqProvider
 from invarlock.eval.providers.text_lm import TextLMProvider
 

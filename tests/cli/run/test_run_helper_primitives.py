@@ -11,6 +11,8 @@ import pytest
 import typer
 from rich.console import Console
 
+from invarlock.cli import run_masking as masking_mod
+from invarlock.cli import run_pairing_helpers as pairing_mod
 from invarlock.cli.commands import run as run_mod
 
 
@@ -141,16 +143,16 @@ def test_extract_model_load_kwargs_rejects_removed_keys():
 
 
 def test_hash_and_mask_digests():
-    digest = run_mod._hash_sequences([[1, 2, 3], [4, 5]])
+    digest = pairing_mod._hash_sequences([[1, 2, 3], [4, 5]])
     assert digest == "e08215eb1a73f6d493dfb9f17c0de613"
     windows = {
         "preview": {"labels": [[-100, 42, -100], [3, -100]]},
         "final": {"labels": [[-100, -100]]},
     }
-    mask_digest = run_mod._compute_mask_positions_digest(windows)
+    mask_digest = pairing_mod._compute_mask_positions_digest(windows)
     assert mask_digest == "bb77b7fbd60b8716abfbcec6f3e2e822"
     assert (
-        run_mod._compute_mask_positions_digest({"preview": {"labels": [[-100]]}})
+        pairing_mod._compute_mask_positions_digest({"preview": {"labels": [[-100]]}})
         is None
     )
     # Rows with no tokens should be ignored without tripping the digest logic
@@ -158,25 +160,25 @@ def test_hash_and_mask_digests():
         "preview": {"labels": [[], [-100, -100]]},
         "final": {"labels": [[-100]]},
     }
-    assert run_mod._compute_mask_positions_digest(empty_row) is None
+    assert pairing_mod._compute_mask_positions_digest(empty_row) is None
 
 
 def test_tensor_or_list_to_ints_variants(monkeypatch):
     fake_tensor = SimpleNamespace(tolist=lambda: [1, 2, 3])
-    monkeypatch.setattr(run_mod, "torch", SimpleNamespace(), raising=False)
-    assert run_mod._tensor_or_list_to_ints(fake_tensor) == [1, 2, 3]
-    monkeypatch.setattr(run_mod, "torch", None, raising=False)
+    monkeypatch.setattr(pairing_mod, "torch", SimpleNamespace(), raising=False)
+    assert pairing_mod._tensor_or_list_to_ints(fake_tensor) == [1, 2, 3]
+    monkeypatch.setattr(pairing_mod, "torch", None, raising=False)
     arr = np.array([4, 5])
-    assert run_mod._tensor_or_list_to_ints(arr) == [4, 5]
+    assert pairing_mod._tensor_or_list_to_ints(arr) == [4, 5]
     gen = (v for v in [6, 7])
-    assert run_mod._tensor_or_list_to_ints(gen) == [6, 7]
-    assert run_mod._tensor_or_list_to_ints(object()) == []
+    assert pairing_mod._tensor_or_list_to_ints(gen) == [6, 7]
+    assert pairing_mod._tensor_or_list_to_ints(object()) == []
 
 
 def test_apply_mlm_masks_zero_path_and_missing_tokenizer():
     records = [{"input_ids": [10, 11], "attention_mask": [1, 1]}]
     tokenizer = SimpleNamespace(mask_token_id=0)
-    masked, counts = run_mod._apply_mlm_masks(
+    masked, counts = masking_mod._apply_mlm_masks(
         records,
         tokenizer=tokenizer,
         mask_prob=0.0,
@@ -191,7 +193,7 @@ def test_apply_mlm_masks_zero_path_and_missing_tokenizer():
 
     missing_mask_tokenizer = SimpleNamespace(mask_token_id=None)
     with pytest.raises(RuntimeError):
-        run_mod._apply_mlm_masks(
+        masking_mod._apply_mlm_masks(
             [{"input_ids": [1], "attention_mask": [1]}],
             tokenizer=missing_mask_tokenizer,
             mask_prob=0.5,
@@ -214,7 +216,7 @@ def test_apply_mlm_masks_masks_tokens():
     records = [
         {"input_ids": [5, 6, 7, 8], "attention_mask": [1, 1, 1, 1]},
     ]
-    masked_total, counts = run_mod._apply_mlm_masks(
+    masked_total, counts = masking_mod._apply_mlm_masks(
         records,
         tokenizer=tokenizer,
         mask_prob=1.0,
@@ -241,7 +243,7 @@ def test_apply_mlm_masks_skips_attention_gaps_and_specials():
             "attention_mask": [1, 0, 1],
         }
     ]
-    masked_total, counts = run_mod._apply_mlm_masks(
+    masked_total, counts = masking_mod._apply_mlm_masks(
         records,
         tokenizer=tokenizer,
         mask_prob=1.0,
@@ -272,8 +274,8 @@ def test_apply_mlm_masks_no_candidates_skips_fallback(monkeypatch):
         }
     ]
     # Force the stochastic mask sampling to skip masking entirely
-    monkeypatch.setattr(run_mod.random, "random", lambda: 1.0)
-    masked_total, counts = run_mod._apply_mlm_masks(
+    monkeypatch.setattr(masking_mod.random, "random", lambda: 1.0)
+    masked_total, counts = masking_mod._apply_mlm_masks(
         records,
         tokenizer=tokenizer,
         mask_prob=0.5,
@@ -300,8 +302,8 @@ def test_apply_mlm_masks_fallback_random_replacement(monkeypatch):
         }
     ]
     # Ensure the primary sampling path never masks tokens so fallback triggers
-    monkeypatch.setattr(run_mod.random, "random", lambda: 1.0)
-    masked_total, counts = run_mod._apply_mlm_masks(
+    monkeypatch.setattr(masking_mod.random, "random", lambda: 1.0)
+    masked_total, counts = masking_mod._apply_mlm_masks(
         records,
         tokenizer=tokenizer,
         mask_prob=0.5,
@@ -323,8 +325,8 @@ def test_apply_mlm_masks_fallback_masks_token_alt(monkeypatch):
         {"input_ids": [11, 13], "attention_mask": [1, 1], "window_id": "fb"},
     ]
     # Ensure the primary sampling skips masking entirely
-    monkeypatch.setattr(run_mod.random, "random", lambda: 1.0)
-    masked_total, counts = run_mod._apply_mlm_masks(
+    monkeypatch.setattr(masking_mod.random, "random", lambda: 1.0)
+    masked_total, counts = masking_mod._apply_mlm_masks(
         records,
         tokenizer=tokenizer,
         mask_prob=0.5,
@@ -345,7 +347,7 @@ def test_apply_mlm_masks_fallback_keep_original(monkeypatch):
         {"input_ids": [11, 13], "attention_mask": [1, 1], "window_id": "fb2"},
     ]
     # Primary path never masks
-    monkeypatch.setattr(run_mod.random, "random", lambda: 1.0)
+    monkeypatch.setattr(masking_mod.random, "random", lambda: 1.0)
 
     class FixedRNG:
         def __init__(self, *_a, **_k):  # noqa: D401
@@ -355,9 +357,9 @@ def test_apply_mlm_masks_fallback_keep_original(monkeypatch):
             return 0.99  # ensure else branch in fallback → keep original token
 
     # Make Random() produce a generator with fixed random()
-    monkeypatch.setattr(run_mod.random, "Random", FixedRNG)
+    monkeypatch.setattr(masking_mod.random, "Random", FixedRNG)
 
-    masked_total, counts = run_mod._apply_mlm_masks(
+    masked_total, counts = masking_mod._apply_mlm_masks(
         records,
         tokenizer=tokenizer,
         mask_prob=0.5,
@@ -401,8 +403,8 @@ def test_apply_mlm_masks_original_token_path(monkeypatch):
         calls["n"] += 1
         return 0.0 if calls["n"] == 1 else 1.0
 
-    monkeypatch.setattr(run_mod.random, "random", fake_random)
-    masked_total, counts = run_mod._apply_mlm_masks(
+    monkeypatch.setattr(masking_mod.random, "random", fake_random)
+    masked_total, counts = masking_mod._apply_mlm_masks(
         records,
         tokenizer=tokenizer,
         mask_prob=1.0,
@@ -425,8 +427,8 @@ def test_apply_mlm_masks_fallback_masks_token(monkeypatch):
     records = [
         {"input_ids": [7, 8], "attention_mask": [1, 1]},
     ]
-    monkeypatch.setattr(run_mod.random, "random", lambda: 1.0)
-    masked, counts = run_mod._apply_mlm_masks(
+    monkeypatch.setattr(masking_mod.random, "random", lambda: 1.0)
+    masked, counts = masking_mod._apply_mlm_masks(
         records,
         tokenizer=tokenizer,
         mask_prob=0.2,
@@ -456,9 +458,9 @@ def test_apply_mlm_masks_fallback_random_path(monkeypatch):
         def randrange(self, limit):
             return min(5, max(0, limit - 1))
 
-    monkeypatch.setattr(run_mod.random, "random", lambda: 1.0)
-    monkeypatch.setattr(run_mod.random, "Random", FakeRandom)
-    masked, counts = run_mod._apply_mlm_masks(
+    monkeypatch.setattr(masking_mod.random, "random", lambda: 1.0)
+    monkeypatch.setattr(masking_mod.random, "Random", FakeRandom)
+    masked, counts = masking_mod._apply_mlm_masks(
         records,
         tokenizer=tokenizer,
         mask_prob=0.5,
@@ -489,9 +491,9 @@ def test_apply_mlm_masks_fallback_keeps_original(monkeypatch):
         def randrange(self, limit):
             raise AssertionError("should not be called")
 
-    monkeypatch.setattr(run_mod.random, "random", lambda: 1.0)
-    monkeypatch.setattr(run_mod.random, "Random", FakeRandom)
-    masked, counts = run_mod._apply_mlm_masks(
+    monkeypatch.setattr(masking_mod.random, "random", lambda: 1.0)
+    monkeypatch.setattr(masking_mod.random, "Random", FakeRandom)
+    masked, counts = masking_mod._apply_mlm_masks(
         records,
         tokenizer=tokenizer,
         mask_prob=0.5,
@@ -513,7 +515,7 @@ def test_tokenizer_digest_prefers_get_vocab():
         def get_vocab(self):
             return FakeMap()
 
-    digest = run_mod._tokenizer_digest(FakeTokenizer())
+    digest = masking_mod._tokenizer_digest(FakeTokenizer())
     expected_pairs = [("a", 1), ("b", 2)]
     import hashlib
 
@@ -525,7 +527,7 @@ def test_tokenizer_digest_fallbacks():
     class VocabListTokenizer:
         vocab = [("c", 3), ("d", 4)]
 
-    digest_list = run_mod._tokenizer_digest(VocabListTokenizer())
+    digest_list = masking_mod._tokenizer_digest(VocabListTokenizer())
     payload = json.dumps([("c", 3), ("d", 4)], separators=(",", ":")).encode()
     import hashlib
 
@@ -537,7 +539,7 @@ def test_tokenizer_digest_fallbacks():
         pad_token = "<pad>"
         vocab_size = 321
 
-    digest_attr = run_mod._tokenizer_digest(AttrTokenizer())
+    digest_attr = masking_mod._tokenizer_digest(AttrTokenizer())
     assert digest_attr != "unknown-tokenizer"
 
 
@@ -546,7 +548,7 @@ def test_tokenizer_digest_unknown_path():
         def __getattr__(self, item):
             raise RuntimeError("boom")
 
-    digest = run_mod._tokenizer_digest(Explode())
+    digest = masking_mod._tokenizer_digest(Explode())
     assert digest == "unknown-tokenizer"
 
 
@@ -564,7 +566,7 @@ def test_tokenizer_digest_get_vocab_items_not_callable():
             return WeirdMap()
 
     # Should skip the get_vocab branch and fall back to attrs digest path
-    digest = run_mod._tokenizer_digest(Tok())
+    digest = masking_mod._tokenizer_digest(Tok())
     assert isinstance(digest, str) and len(digest) == 64
 
 
@@ -575,7 +577,7 @@ def test_tokenizer_digest_get_vocab_missing_items():
 
         vocab = [("x", 1)]
 
-    digest = run_mod._tokenizer_digest(Tok())
+    digest = masking_mod._tokenizer_digest(Tok())
     payload = json.dumps([("x", 1)], separators=(",", ":")).encode()
     import hashlib
 
@@ -716,7 +718,7 @@ def test_tokenizer_digest_filters_non_string_keys():
 
             return Map()
 
-    digest = run_mod._tokenizer_digest(WeirdTokenizer())
+    digest = masking_mod._tokenizer_digest(WeirdTokenizer())
     expected = sorted([("1", 5), ("b", 3)])
     payload = json.dumps(expected, separators=(",", ":")).encode()
     import hashlib
@@ -729,7 +731,7 @@ def test_tokenizer_digest_unknown_fallback():
         def __getattr__(self, item):
             raise RuntimeError("boom")
 
-    assert run_mod._tokenizer_digest(ErrorTokenizer()) == "unknown-tokenizer"
+    assert masking_mod._tokenizer_digest(ErrorTokenizer()) == "unknown-tokenizer"
 
 
 def test_extract_pairing_schedule_success():

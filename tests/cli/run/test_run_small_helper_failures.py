@@ -5,13 +5,14 @@ from types import SimpleNamespace
 import click
 from rich.console import Console
 
+from invarlock.cli import run_pairing_helpers as pairing_mod
 from invarlock.cli.commands import run as run_mod
 
 
 def test_hash_sequences_falls_back_when_len_unavailable():
     # Inner generator sequences do not support len(), exercising the fallback path.
     seqs = ((i for i in [1, 2, 3]), (i for i in [4, 5]))
-    assert run_mod._hash_sequences(seqs) == "e08215eb1a73f6d493dfb9f17c0de613"
+    assert pairing_mod._hash_sequences(seqs) == "e08215eb1a73f6d493dfb9f17c0de613"
 
 
 def test_tensor_or_list_to_ints_reraises_click_exit(monkeypatch):
@@ -20,9 +21,9 @@ def test_tensor_or_list_to_ints_reraises_click_exit(monkeypatch):
             raise click.exceptions.Exit(2)
 
     fake_tensor = SimpleNamespace(tolist=lambda: ExplodingIter())
-    monkeypatch.setattr(run_mod, "torch", SimpleNamespace(), raising=False)
+    monkeypatch.setattr(pairing_mod, "torch", SimpleNamespace(), raising=False)
     # Best-effort helper should swallow exceptions and return empty list.
-    assert run_mod._tensor_or_list_to_ints(fake_tensor) == []
+    assert pairing_mod._tensor_or_list_to_ints(fake_tensor) == []
 
 
 def test_resolve_provider_and_split_provider_and_split_access_errors():

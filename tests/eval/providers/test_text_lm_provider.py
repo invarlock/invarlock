@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import copy
 
-from invarlock.cli.commands.run import (
-    _compute_mask_positions_digest,
-    _compute_provider_digest,
-)
+from invarlock.cli.commands.run import _compute_provider_digest
+from invarlock.cli.run_pairing_helpers import _compute_mask_positions_digest
 
 
 def _mk_windows(

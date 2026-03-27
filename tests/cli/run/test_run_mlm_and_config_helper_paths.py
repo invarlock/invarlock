@@ -6,6 +6,8 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+from invarlock.cli import run_masking as masking_mod
+from invarlock.cli import run_pairing_helpers as pairing_mod
 from invarlock.cli.commands import run as run_mod
 
 
@@ -158,7 +160,7 @@ def test_choose_dataset_split_covers_fallback_and_exception_path() -> None:
 
 def test_compute_mask_positions_digest_covers_none_digest_and_exception() -> None:
     assert (
-        run_mod._compute_mask_positions_digest(
+        pairing_mod._compute_mask_positions_digest(
             {
                 "preview": {"labels": [[-100, -100]]},
                 "final": {"labels": [[-100]]},
@@ -167,7 +169,7 @@ def test_compute_mask_positions_digest_covers_none_digest_and_exception() -> Non
         is None
     )
 
-    digest = run_mod._compute_mask_positions_digest(
+    digest = pairing_mod._compute_mask_positions_digest(
         {
             "preview": {"labels": [[-100, 5]]},
             "final": {"labels": [[-100]]},
@@ -179,7 +181,7 @@ def test_compute_mask_positions_digest_covers_none_digest_and_exception() -> Non
         def get(self, *_a, **_k):  # noqa: ANN001
             raise RuntimeError("boom")
 
-    assert run_mod._compute_mask_positions_digest(_BadDict()) is None
+    assert pairing_mod._compute_mask_positions_digest(_BadDict()) is None
 
 
 def test_tensor_or_list_to_ints_covers_tolist_numpy_iterable_and_exceptions(
@@ -189,14 +191,14 @@ def test_tensor_or_list_to_ints_covers_tolist_numpy_iterable_and_exceptions(
         def tolist(self):  # noqa: ANN001
             return [1, 2]
 
-    monkeypatch.setattr(run_mod, "torch", object())
-    assert run_mod._tensor_or_list_to_ints(_WithList()) == [1, 2]
+    monkeypatch.setattr(pairing_mod, "torch", object())
+    assert pairing_mod._tensor_or_list_to_ints(_WithList()) == [1, 2]
 
     class _WithIterable:
         def tolist(self):  # noqa: ANN001
             return (1, 2)
 
-    assert run_mod._tensor_or_list_to_ints(_WithIterable()) == [1, 2]
+    assert pairing_mod._tensor_or_list_to_ints(_WithIterable()) == [1, 2]
 
     class _BadRaw:
         def __iter__(self):  # noqa: ANN001
@@ -206,22 +208,22 @@ def test_tensor_or_list_to_ints_covers_tolist_numpy_iterable_and_exceptions(
         def tolist(self):  # noqa: ANN001
             return _BadRaw()
 
-    assert run_mod._tensor_or_list_to_ints(_WithBad()) == []
+    assert pairing_mod._tensor_or_list_to_ints(_WithBad()) == []
 
-    monkeypatch.setattr(run_mod, "torch", None)
-    assert run_mod._tensor_or_list_to_ints(np.array([1, 2])) == [1, 2]
-    assert run_mod._tensor_or_list_to_ints(range(3)) == [0, 1, 2]
+    monkeypatch.setattr(pairing_mod, "torch", None)
+    assert pairing_mod._tensor_or_list_to_ints(np.array([1, 2])) == [1, 2]
+    assert pairing_mod._tensor_or_list_to_ints(range(3)) == [0, 1, 2]
 
     class _BadIter:
         def __iter__(self):  # noqa: ANN001
             raise RuntimeError("boom")
 
-    assert run_mod._tensor_or_list_to_ints(_BadIter()) == []
+    assert pairing_mod._tensor_or_list_to_ints(_BadIter()) == []
 
 
 def test_apply_mlm_masks_zero_prob_sets_labels_and_counts() -> None:
     records = [{"input_ids": [1, 2, 3], "attention_mask": [1, 1, 1]}]
-    total, counts = run_mod._apply_mlm_masks(
+    total, counts = masking_mod._apply_mlm_masks(
         records,
         tokenizer=object(),
         mask_prob=0.0,
@@ -243,7 +245,7 @@ def test_apply_mlm_masks_requires_mask_token_id() -> None:
 
     records = [{"input_ids": [1, 2], "attention_mask": [1, 1]}]
     with pytest.raises(RuntimeError):
-        run_mod._apply_mlm_masks(
+        masking_mod._apply_mlm_masks(
             records,
             tokenizer=_Tok(),
             mask_prob=0.5,
@@ -271,7 +273,7 @@ def test_apply_mlm_masks_forces_one_mask_and_handles_special_id_exceptions(
         cls_token_id = _IntRaises()
         all_special_ids = _AllSpecialRaises()
 
-    monkeypatch.setattr(run_mod.random, "random", lambda: 1.0)
+    monkeypatch.setattr(masking_mod.random, "random", lambda: 1.0)
 
     records = [
         {
@@ -280,7 +282,7 @@ def test_apply_mlm_masks_forces_one_mask_and_handles_special_id_exceptions(
             "attention_mask": [1, 1],
         }
     ]
-    total, counts = run_mod._apply_mlm_masks(
+    total, counts = masking_mod._apply_mlm_masks(
         records,
         tokenizer=_Tok(),
         mask_prob=0.5,
@@ -301,7 +303,7 @@ def test_tokenizer_digest_covers_get_vocab_vocab_fallback_and_unknown() -> None:
         def get_vocab(self):  # noqa: ANN001
             return {"a": 1, 2: 3, None: 4}
 
-    digest = run_mod._tokenizer_digest(_TokGetVocab())
+    digest = masking_mod._tokenizer_digest(_TokGetVocab())
     assert isinstance(digest, str) and len(digest) == 64
 
     class _TokVocabList:
@@ -311,7 +313,7 @@ def test_tokenizer_digest_covers_get_vocab_vocab_fallback_and_unknown() -> None:
         pad_token = "</s>"
         vocab_size = 2
 
-    digest2 = run_mod._tokenizer_digest(_TokVocabList())
+    digest2 = masking_mod._tokenizer_digest(_TokVocabList())
     assert isinstance(digest2, str) and len(digest2) == 64
 
     class _TokBad:
@@ -324,10 +326,10 @@ def test_tokenizer_digest_covers_get_vocab_vocab_fallback_and_unknown() -> None:
         pad_token = "</s>"
         vocab_size = "2"
 
-    digest3 = run_mod._tokenizer_digest(_TokBad())
+    digest3 = masking_mod._tokenizer_digest(_TokBad())
     assert isinstance(digest3, str) and len(digest3) == 64
 
     class _TokUnserializable:
         name_or_path = object()
 
-    assert run_mod._tokenizer_digest(_TokUnserializable()) == "unknown-tokenizer"
+    assert masking_mod._tokenizer_digest(_TokUnserializable()) == "unknown-tokenizer"

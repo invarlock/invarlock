@@ -14,13 +14,11 @@ import json
 import logging
 import math
 import os
-import random
 import re
 import shutil
 import sys as _sys
 import warnings
-from array import array
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -32,6 +30,8 @@ import numpy as np
 import typer
 from rich.console import Console
 
+from invarlock.cli import run_masking as _run_masking
+from invarlock.cli import run_pairing_helpers as _run_pairing_helpers
 from invarlock.cli.output import (
     OutputStyle,
     make_console,
@@ -1000,12 +1000,12 @@ def _build_provider_dataset_plan(
         resolve_tokenizer_fn=resolve_tokenizer,
         maybe_plan_release_windows_fn=_maybe_plan_release_windows,
         resolve_effective_windows_fn=_resolve_effective_windows,
-        apply_mlm_masks_fn=_apply_mlm_masks,
+        apply_mlm_masks_fn=_run_masking._apply_mlm_masks,
         resolve_pm_min_tokens_target_fn=_resolve_pm_min_tokens_target,
-        hash_sequences_fn=_hash_sequences,
-        tokenizer_digest_fn=_tokenizer_digest,
-        safe_int_fn=_safe_int,
-        tensor_or_list_to_ints_fn=_tensor_or_list_to_ints,
+        hash_sequences_fn=_run_pairing_helpers._hash_sequences,
+        tokenizer_digest_fn=_run_masking._tokenizer_digest,
+        safe_int_fn=_run_pairing_helpers._safe_int,
+        tensor_or_list_to_ints_fn=_run_pairing_helpers._tensor_or_list_to_ints,
     )
 
 
@@ -1199,7 +1199,7 @@ def _assemble_run_report(
         build_run_report_context_fn=_build_run_report_context_impl,
         build_run_report_meta_fn=_build_run_report_meta_impl,
         canonical_dataset_id_fn=_canonical_dataset_id,
-        safe_int_fn=_safe_int,
+        safe_int_fn=_run_pairing_helpers._safe_int,
         build_run_report_data_fn=_build_run_report_data_impl,
         build_snapshot_provenance_fn=_build_snapshot_provenance_impl,
         build_edit_payload_fn=_build_edit_payload_impl,
@@ -1360,262 +1360,10 @@ def _resolve_exit_code(exc: Exception, *, profile: str | None) -> int:
     return _resolve_command_exit_code(exc, profile=profile)
 
 
-## NOTE: Deprecated helper `_check_pairability_or_abort` was removed.
-## Provider parity and pairing guarantees are enforced via guard digests and
-## invariant checks during run execution.
-
-
-def _hash_sequences(seqs: Sequence[Sequence[int]] | Iterable[Sequence[int]]) -> str:
-    """Compute a stable digest for a sequence of integer token sequences."""
-    hasher = hashlib.blake2s(digest_size=16)
-    for seq in seqs:
-        try:
-            seq_len = len(seq)
-        except TypeError:
-            seq = list(seq)
-            seq_len = len(seq)
-        hasher.update(seq_len.to_bytes(4, "little", signed=False))
-        arr = array("I", (int(token) & 0xFFFFFFFF for token in seq))
-        hasher.update(arr.tobytes())
-    return hasher.hexdigest()
-
-
-def _compute_mask_positions_digest(windows: dict[str, Any]) -> str | None:
-    """Compute a rolled hash of MLM mask positions across windows.
-
-    Expects windows of the shape { 'preview': {...}, 'final': {...} } with
-    'labels' and optional 'window_ids' in each section. Positions where
-    labels != -100 are treated as masked.
-    """
-    try:
-        # Simple, dependency-light digest of positions where labels != -100
-        hasher = hashlib.blake2s(digest_size=16)
-        any_masked = False
-        for arm in ("preview", "final"):
-            sec = windows.get(arm)
-            if not isinstance(sec, dict):
-                continue
-            labels = sec.get("labels")
-            if not isinstance(labels, list) or not labels:
-                continue
-            hasher.update(arm.encode("utf-8"))
-            for row in labels:
-                row_list = _tensor_or_list_to_ints(row)
-                if not row_list:
-                    continue
-                found = False
-                for idx, v in enumerate(row_list):
-                    if int(v) != -100:
-                        hasher.update(b"1")
-                        hasher.update(idx.to_bytes(4, "little", signed=False))
-                        found = True
-                if found:
-                    any_masked = True
-                hasher.update(b"|")
-        if not any_masked:
-            return None
-        digest = hasher.hexdigest()
-        return digest if digest else None
-    except Exception:
-        return None
-
-
-def _to_int_list(values: Sequence[int] | Iterable[int]) -> list[int]:
-    return [int(v) for v in values]
-
-
-def _tensor_or_list_to_ints(values: Any) -> list[int]:
-    """Coerce possible tensor/list-like inputs to a list[int]."""
-    try:
-        # Torch tensors: `.tolist()` path
-        torch_mod = _get_torch()
-        if torch_mod is not None and hasattr(values, "tolist"):
-            raw = values.tolist()
-            if isinstance(raw, list):
-                return _to_int_list(raw)
-            try:
-                return _to_int_list(list(raw))
-            except (typer.Exit, SystemExit, click.exceptions.Exit):
-                raise
-            except Exception:
-                pass
-        # Numpy arrays: treat as list-like
-        if isinstance(values, np.ndarray | list | tuple):
-            return _to_int_list(list(values))
-        # Iterables of ints
-        if isinstance(values, Iterable):
-            return _to_int_list(values)
-    except Exception:
-        pass
-    return []
-
-
-def _safe_int(value: Any, default: int = 0) -> int:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return default
-
-
-def _derive_mlm_seed(base_seed: int, window_id: str | int, position: int) -> int:
-    payload = f"{base_seed}:{window_id}:{position}".encode()
-    digest = hashlib.blake2s(payload, digest_size=8).digest()
-    return int.from_bytes(digest, "little", signed=False)
-
-
-def _apply_mlm_masks(
-    records: list[dict[str, Any]],
-    *,
-    tokenizer: Any,
-    mask_prob: float,
-    seed: int,
-    random_token_prob: float,
-    original_token_prob: float,
-    prefix: str,
-) -> tuple[int, list[int]]:
-    """Apply basic BERT-style MLM masking to tokenized records in-place."""
-    if mask_prob <= 0.0:
-        zeroed = []
-        for record in records:
-            length = len(record["input_ids"])
-            record["labels"] = [-100] * length
-            record["mlm_masked"] = 0
-            zeroed.append(0)
-        return 0, zeroed
-
-    vocab_size = _safe_int(getattr(tokenizer, "vocab_size", 0))
-    # Require an explicit mask token id for MLM
-    mask_token_id = getattr(tokenizer, "mask_token_id", None)
-    if mask_token_id is None:
-        raise RuntimeError(
-            "Tokenizer does not define mask_token_id; required for MLM evaluation."
-        )
-    try:
-        mask_token_id = int(mask_token_id)
-    except (TypeError, ValueError, OverflowError):
-        mask_token_id = _safe_int(mask_token_id, 0)
-
-    # Build special token id set to avoid masking them
-    special_ids = set()
-    for attr in (
-        "cls_token_id",
-        "sep_token_id",
-        "bos_token_id",
-        "eos_token_id",
-        "pad_token_id",
-    ):
-        val = getattr(tokenizer, attr, None)
-        if val is not None:
-            try:
-                special_ids.add(int(val))
-            except Exception:
-                pass
-    try:
-        special_ids.update(
-            int(t) for t in getattr(tokenizer, "all_special_ids", []) or []
-        )
-    except Exception:
-        pass
-
-    masked_total = 0
-    masked_counts: list[int] = []
-    for idx_record, record in enumerate(records):
-        window_id = record.get("window_id", f"{prefix}:{idx_record}")
-        input_ids = _tensor_or_list_to_ints(record.get("input_ids", []))
-        attention = _tensor_or_list_to_ints(record.get("attention_mask", []))
-        labels = [-100] * len(input_ids)
-
-        masked = 0
-        for pos, (tok, att) in enumerate(zip(input_ids, attention, strict=False)):
-            if not att:
-                continue
-            if int(tok) in special_ids:
-                continue
-            if random.random() < mask_prob:
-                rng = random.Random(_derive_mlm_seed(seed, window_id, pos))
-                labels[pos] = int(tok)
-                r = rng.random()
-                if r < 1.0 - (random_token_prob + original_token_prob):
-                    input_ids[pos] = mask_token_id
-                elif r < 1.0 - original_token_prob and vocab_size > 0:
-                    rng2 = random.Random(_derive_mlm_seed(seed + 17, window_id, pos))
-                    input_ids[pos] = rng2.randint(0, max(1, vocab_size - 1))
-                masked += 1
-
-        # Ensure at least one masked token for stability
-        if masked == 0:
-            candidate_positions = [
-                p
-                for p, (tok, att) in enumerate(zip(input_ids, attention, strict=False))
-                if att and int(tok) not in special_ids
-            ]
-            if candidate_positions:
-                pos = candidate_positions[len(candidate_positions) // 2]
-                rng = random.Random(_derive_mlm_seed(seed + 17, window_id, pos))
-                labels[pos] = int(input_ids[pos])
-                masked = 1
-                r = rng.random()
-                if r < 1.0 - (random_token_prob + original_token_prob):
-                    input_ids[pos] = mask_token_id
-                elif r < 1.0 - original_token_prob and vocab_size > 0:
-                    input_ids[pos] = rng.randrange(vocab_size)
-
-        record["input_ids"] = _to_int_list(input_ids)
-        record["attention_mask"] = _to_int_list(attention)
-        record["labels"] = _to_int_list(labels)
-        record["mlm_masked"] = masked
-        masked_total += masked
-        masked_counts.append(masked)
-
-    return masked_total, masked_counts
-
-
-def _tokenizer_digest(tokenizer: Any) -> str:
-    """Compute a stable digest for a tokenizer config.
-
-    Tries, in order: get_vocab().items(), `vocab` attribute if list-like, else
-    hashes a small set of informative attributes.
-    """
-    try:
-        if hasattr(tokenizer, "get_vocab"):
-            try:
-                items = getattr(tokenizer.get_vocab(), "items", None)
-                if callable(items):
-                    pairs = list(items())
-                    # Filter non-string keys for stability
-                    pairs = [
-                        (str(k), int(v)) for k, v in pairs if isinstance(k, str | int)
-                    ]
-                    payload = json.dumps(sorted(pairs), separators=(",", ":")).encode()
-                    return hashlib.sha256(payload).hexdigest()
-            except Exception:
-                pass
-        # Fallback to `vocab` attribute (e.g., list of pairs)
-        vocab = getattr(tokenizer, "vocab", None)
-        if isinstance(vocab, list):
-            try:
-                payload = json.dumps(
-                    [(str(k), int(v)) for k, v in vocab], separators=(",", ":")
-                ).encode()
-                return hashlib.sha256(payload).hexdigest()
-            except Exception:
-                pass
-        # Last resort: small attribute set
-        attrs = {
-            "name": getattr(tokenizer, "name_or_path", None),
-            "eos": getattr(tokenizer, "eos_token", None),
-            "pad": getattr(tokenizer, "pad_token", None),
-            "size": _safe_int(getattr(tokenizer, "vocab_size", 0)),
-        }
-        return hashlib.sha256(json.dumps(attrs, sort_keys=True).encode()).hexdigest()
-    except Exception:
-        return "unknown-tokenizer"
-
-
 def _extract_pairing_schedule(report: dict[str, Any] | None) -> dict[str, Any] | None:
     return _extract_pairing_schedule_impl(
         report,
-        tensor_or_list_to_ints_fn=_tensor_or_list_to_ints,
+        tensor_or_list_to_ints_fn=_run_pairing_helpers._tensor_or_list_to_ints,
     )
 
 
@@ -1659,10 +1407,10 @@ def _materialize_baseline_pairing_schedule(
         original_token_prob=original_token_prob,
         resolved_tier=resolved_tier,
         profile=profile,
-        apply_mlm_masks_fn=_apply_mlm_masks,
+        apply_mlm_masks_fn=_run_masking._apply_mlm_masks,
         resolve_pm_min_tokens_target_fn=_resolve_pm_min_tokens_target,
-        hash_sequences_fn=_hash_sequences,
-        tensor_or_list_to_ints_fn=_tensor_or_list_to_ints,
+        hash_sequences_fn=_run_pairing_helpers._hash_sequences,
+        tensor_or_list_to_ints_fn=_run_pairing_helpers._tensor_or_list_to_ints,
     )
 
 
@@ -2149,7 +1897,7 @@ def _postprocess_and_summarize(
 def _compute_provider_digest(report: dict[str, Any]) -> dict[str, str] | None:
     return _compute_provider_digest_impl(
         report,
-        compute_mask_positions_digest_fn=_compute_mask_positions_digest,
+        compute_mask_positions_digest_fn=_run_pairing_helpers._compute_mask_positions_digest,
     )
 
 
@@ -2210,8 +1958,8 @@ def _validate_and_harvest_baseline_schedule(
         console=console,
         event_fn=_event,
         canonical_dataset_id_fn=_canonical_dataset_id,
-        tensor_or_list_to_ints_fn=_tensor_or_list_to_ints,
-        hash_sequences_fn=_hash_sequences,
+        tensor_or_list_to_ints_fn=_run_pairing_helpers._tensor_or_list_to_ints,
+        hash_sequences_fn=_run_pairing_helpers._hash_sequences,
         invarlock_error_cls=InvarlockError,
     )
 
@@ -2286,7 +2034,7 @@ def _build_run_execution_deps() -> SimpleNamespace:
         "Path": Path,
         "RELEASE_MIN_WINDOWS_PER_ARM": RELEASE_MIN_WINDOWS_PER_ARM,
         "_SnapshotRestoreFailed": _SnapshotRestoreFailed,
-        "_apply_mlm_masks": _apply_mlm_masks,
+            "_apply_mlm_masks": _run_masking._apply_mlm_masks,
         "_apply_warning_filters": _apply_warning_filters,
         "_assemble_run_report": _assemble_run_report,
         "_build_artifacts_payload": _build_artifacts_payload_impl,
@@ -2314,7 +2062,7 @@ def _build_run_execution_deps() -> SimpleNamespace:
         "_format_guard_chain": _format_guard_chain,
         "_format_kv_line": _format_kv_line,
         "_free_model_memory": _free_model_memory,
-        "_hash_sequences": _hash_sequences,
+            "_hash_sequences": _run_pairing_helpers._hash_sequences,
         "_init_retry_controller": _init_retry_controller,
         "_load_model_with_cfg": _load_model_with_cfg,
         "_maybe_plan_release_windows": _maybe_plan_release_windows,
@@ -2356,13 +2104,13 @@ def _build_run_execution_deps() -> SimpleNamespace:
         "_resolve_snapshot_config": _resolve_snapshot_config,
         "_resolve_snapshot_retry_transition": _resolve_snapshot_retry_transition,
         "_run_bare_control": _run_bare_control,
-        "_safe_int": _safe_int,
+            "_safe_int": _run_pairing_helpers._safe_int,
         "_serialize_evaluation_windows": _serialize_evaluation_windows,
         "_should_measure_overhead": _should_measure_overhead,
         "_style_from_console": _style_from_console,
-        "_tensor_or_list_to_ints": _tensor_or_list_to_ints,
+            "_tensor_or_list_to_ints": _run_pairing_helpers._tensor_or_list_to_ints,
         "_to_serialisable_dict": _to_serialisable_dict,
-        "_tokenizer_digest": _tokenizer_digest,
+            "_tokenizer_digest": _run_masking._tokenizer_digest,
         "_build_snapshot_provenance": _build_snapshot_provenance_impl,
         "_validate_pairing_report_metrics": _validate_pairing_report_metrics,
         "_validate_and_harvest_baseline_schedule": _validate_and_harvest_baseline_schedule,

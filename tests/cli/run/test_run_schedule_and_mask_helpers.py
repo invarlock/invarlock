@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from invarlock.cli import run_masking as masking_mod
 from invarlock.cli.commands import run as run_mod
 from invarlock.core.exceptions import (
     ConfigError,
@@ -131,7 +132,7 @@ def test_extract_pairing_schedule_rejects_non_int_window_ids() -> None:
 
 def test_apply_mlm_masks_handles_mask_random_and_original_modes(monkeypatch) -> None:
     # Force masking decision for each position.
-    monkeypatch.setattr(run_mod.random, "random", lambda: 0.0)
+    monkeypatch.setattr(masking_mod.random, "random", lambda: 0.0)
 
     r_values = iter([0.0, 0.85, 0.95])
 
@@ -145,14 +146,14 @@ def test_apply_mlm_masks_handles_mask_random_and_original_modes(monkeypatch) -> 
         def randint(self, a: int, b: int) -> int:  # noqa: ARG002
             return 7
 
-    monkeypatch.setattr(run_mod.random, "Random", _FakeRandom)
+    monkeypatch.setattr(masking_mod.random, "Random", _FakeRandom)
 
     class _Tok:
         vocab_size = 100
         mask_token_id = 999
 
     records = [{"window_id": "w0", "input_ids": [1, 2, 3], "attention_mask": [1, 1, 1]}]
-    total, counts = run_mod._apply_mlm_masks(
+    total, counts = masking_mod._apply_mlm_masks(
         records,
         tokenizer=_Tok(),
         mask_prob=1.0,
@@ -175,7 +176,7 @@ def test_apply_mlm_masks_candidate_positions_empty_leaves_all_unmasked() -> None
         mask_token_id = 999
 
     records = [{"input_ids": [1, 2], "attention_mask": [0, 0]}]
-    total, counts = run_mod._apply_mlm_masks(
+    total, counts = masking_mod._apply_mlm_masks(
         records,
         tokenizer=_Tok(),
         mask_prob=1.0,
