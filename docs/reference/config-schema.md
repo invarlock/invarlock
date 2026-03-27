@@ -42,6 +42,9 @@ output:
   resolves guard thresholds from `tiers.yaml`.
 - **Defaults merging**: the optional top-level `defaults` mapping is merged into
   the config before execution.
+- **Programmatic access**: `load_config()` returns an explicit mapping-backed
+  `InvarLockConfig`. Use `cfg["model"]["id"]` or
+  `cfg.require_section("model")["id"]`; attribute-style access is unsupported.
 - **Unsupported keys**: `edit.kind`, `edit.parameters`, `assurance.*`, and
   `guards.{spectral,rmt}.mode` are rejected to keep the config surface explicit.
 
@@ -93,7 +96,7 @@ model:
   # Optional: v5-native HF quantization config (e.g., bitsandbytes)
   # quantization_config:
   #   quant_method: bitsandbytes
-  #   bits: 8
+  #   bitwidth: 8
 ```
 
 ### Dataset

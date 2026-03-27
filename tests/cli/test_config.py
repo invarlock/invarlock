@@ -11,35 +11,30 @@ from invarlock.core.config_runtime import (
     OutputConfig,
     SpectralGuardConfig,
     VarianceGuardConfig,
-    _Obj,
     apply_profile,
     resolve_edit_kind,
 )
 
 
-def test__obj_attribute_access_and_get():
-    o = _Obj({"a": {"b": 1}, "c": 2})
-    assert o.c == 2
-    assert isinstance(o.a, _Obj)
-    with pytest.raises(AttributeError):
-        _ = o.missing  # noqa: F841
-    assert o.get("missing", 7) == 7
-
-
-def test__obj_non_mapping_paths() -> None:
-    o = _Obj(123)
-    with pytest.raises(TypeError):
-        _ = o["x"]  # noqa: F841
-    assert o.get("anything", 9) == 9
-
-
-def test_invarlock_config_merges_data_and_sections() -> None:
+def test_invarlock_config_is_explicit_mutable_mapping() -> None:
     base = {"model": {"id": "gpt2"}, "extra": 1}
     cfg = InvarLockConfig(data=base, edit={"name": "noop"})
-    assert cfg.model.id == "gpt2"
-    assert cfg.edit.name == "noop"
-    with pytest.raises(AttributeError):
-        _ = cfg.missing  # noqa: F841
+    assert cfg["model"]["id"] == "gpt2"
+    assert cfg.require_section("edit")["name"] == "noop"
+    assert cfg.get("missing") is None
+    cfg.setdefault("context", {})
+    cfg["context"]["mode"] = "local"
+    assert cfg.section("context") == {"mode": "local"}
+
+
+def test_invarlock_config_section_accessors_fail_closed() -> None:
+    cfg = InvarLockConfig(model={"id": "gpt2"}, extra=7)
+    assert cfg.section("missing") is None
+    assert cfg.section("model") == {"id": "gpt2"}
+    with pytest.raises(KeyError, match="required"):
+        cfg.require_section("dataset")
+    with pytest.raises(TypeError, match="must be a mapping"):
+        cfg.section("extra")
 
 
 def test_guard_configs_family_caps_and_sigma_quantile():

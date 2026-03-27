@@ -629,9 +629,7 @@ def calculate_lens_metrics_for_model(
     model: nn.Module,
     dataloader,
     *,
-    config: MetricsConfig | None = None,
-    oracle_windows: int | None = None,  # Backward compatibility
-    device: torch.device | None = None,  # Backward compatibility
+    config: MetricsConfig,
 ) -> dict[str, float]:
     """
     Calculate comprehensive lens metrics for a model with enhanced robustness.
@@ -639,9 +637,7 @@ def calculate_lens_metrics_for_model(
     Args:
         model: The neural network model to analyze
         dataloader: DataLoader providing input data
-        config: MetricsConfig object with all parameters
-        oracle_windows: (deprecated) Number of windows to process
-        device: (deprecated) Device to use for computation
+        config: Required MetricsConfig object with all parameters
 
     Returns:
         Dictionary containing calculated metrics
@@ -649,14 +645,6 @@ def calculate_lens_metrics_for_model(
     Raises:
         MetricsError: If calculation fails due to various reasons
     """
-    # Handle backward compatibility
-    if config is None:
-        config = MetricsConfig()
-        if oracle_windows is not None:
-            config.oracle_windows = oracle_windows
-        if device is not None:
-            config.device = device
-
     # Initialize managers
     dep_manager = DependencyManager()
     resource_manager = ResourceManager(config)

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from invarlock.guards import variance_batching as variance_batching_mod
+import invarlock.guards.variance_batching as variance_batching_mod
 from invarlock.guards.variance import VarianceGuard
 
 

@@ -18,10 +18,10 @@ import pytest
 import torch
 import torch.nn as nn
 
-import invarlock
+import invarlock.adapters as invarlock_adapters
+from invarlock.adapters.auto import HF_Auto_Adapter
 
 # Import invarlock adapters namespace
-import invarlock.adapters as invarlock_adapters
 from invarlock.adapters.base import (
     AdapterCache,
     AdapterConfig,
@@ -1120,30 +1120,31 @@ class TestInitModule:
     def test_quality_label_function(self):
         """Test quality label function."""
         # Test different quality tiers
-        assert invarlock.adapters.quality_label(1.05) == "Excellent"
-        assert invarlock.adapters.quality_label(1.15) == "Good"
-        assert invarlock.adapters.quality_label(1.30) == "Fair"
-        assert invarlock.adapters.quality_label(1.50) == "Degraded"
+        assert invarlock_adapters.quality_label(1.05) == "Excellent"
+        assert invarlock_adapters.quality_label(1.15) == "Good"
+        assert invarlock_adapters.quality_label(1.30) == "Fair"
+        assert invarlock_adapters.quality_label(1.50) == "Degraded"
 
         # Test boundary conditions
-        assert invarlock.adapters.quality_label(1.10) == "Excellent"
-        assert invarlock.adapters.quality_label(1.25) == "Good"
-        assert invarlock.adapters.quality_label(1.40) == "Fair"
+        assert invarlock_adapters.quality_label(1.10) == "Excellent"
+        assert invarlock_adapters.quality_label(1.25) == "Good"
+        assert invarlock_adapters.quality_label(1.40) == "Fair"
 
     def test_placeholder_adapters(self):
         """Removed compatibility placeholders are absent from the namespace."""
-        assert not hasattr(invarlock.adapters, "HF_Pythia_Adapter")
-        assert not hasattr(invarlock.adapters, "auto_tune_pruning_budget")
-        assert not hasattr(invarlock.adapters, "run_auto_invarlock")
-        assert not hasattr(invarlock.adapters, "InvarLockPipeline")
-        assert not hasattr(invarlock.adapters, "InvarLockConfig")
-        assert not hasattr(invarlock.adapters, "run_invarlock_pipeline")
-        assert not hasattr(invarlock.adapters, "run_invarlock")
-        assert not hasattr(invarlock.adapters, "quick_prune_gpt2")
+        assert not hasattr(invarlock_adapters, "HF_Pythia_Adapter")
+        assert not hasattr(invarlock_adapters, "auto_tune_pruning_budget")
+        assert not hasattr(invarlock_adapters, "run_auto_invarlock")
+        assert not hasattr(invarlock_adapters, "InvarLockPipeline")
+        assert not hasattr(invarlock_adapters, "InvarLockConfig")
+        assert not hasattr(invarlock_adapters, "run_invarlock_pipeline")
+        assert not hasattr(invarlock_adapters, "run_invarlock")
+        assert not hasattr(invarlock_adapters, "quick_prune_gpt2")
 
-        # Note: HF_Causal_Adapter is now implemented, not a placeholder
-        # Test that it can be instantiated without error
-        adapter = invarlock.adapters.HF_Causal_Adapter()
+        assert not hasattr(invarlock_adapters, "HF_Causal_Adapter")
+        assert not hasattr(invarlock_adapters, "HF_Auto_Adapter")
+
+        adapter = HF_Auto_Adapter()
         assert adapter is not None
 
     def test_removed_component_stubs(self):
@@ -1155,11 +1156,11 @@ class TestInitModule:
             "run_invarlock",
             "quick_prune_gpt2",
         ):
-            assert not hasattr(invarlock.adapters, name)
+            assert not hasattr(invarlock_adapters, name)
 
     def test_removed_component_behavior(self):
         """Removed-component shim type is gone."""
-        assert not hasattr(invarlock.adapters, "_RemovedComponent")
+        assert not hasattr(invarlock_adapters, "_RemovedComponent")
 
 
 class TestIntegration:
@@ -1167,14 +1168,13 @@ class TestIntegration:
 
     def test_module_imports(self):
         """Test that main module imports work."""
-        # Test adapter classes
-        assert hasattr(invarlock_adapters, "HF_Causal_Adapter")
+        assert not hasattr(invarlock_adapters, "HF_Causal_Adapter")
         assert hasattr(invarlock_adapters, "BaseAdapter")
         assert hasattr(invarlock_adapters, "AdapterConfig")
 
         # Test utility functions
         assert hasattr(invarlock_adapters, "quality_label")
-        assert callable(invarlock.adapters.quality_label)
+        assert callable(invarlock_adapters.quality_label)
 
     def test_end_to_end_adapter_workflow(self):
         """Test end-to-end adapter workflow."""

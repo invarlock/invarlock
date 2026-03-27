@@ -4,7 +4,7 @@ import math
 
 import torch
 
-from invarlock.guards import _estimators as E
+import invarlock.guards._estimators as E
 
 
 def test_power_iter_sigma_max_edge_cases() -> None:

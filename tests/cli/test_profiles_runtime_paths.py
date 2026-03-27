@@ -44,7 +44,8 @@ def test_apply_profile_uses_packaged_runtime_when_configs_absent(
         ),
         profile="release",
     )
-    assert rel.dataset.preview_n >= 400 and rel.eval.bootstrap.replicates >= 3200
+    assert rel.require_section("dataset")["preview_n"] >= 400
+    assert rel.require_section("eval")["bootstrap"]["replicates"] >= 3200
 
     # And CI CPU profile forces CPU device and stride
     ci_cpu = apply_profile(
@@ -54,4 +55,5 @@ def test_apply_profile_uses_packaged_runtime_when_configs_absent(
         ),
         profile="ci_cpu",
     )
-    assert ci_cpu.model.device == "cpu" and ci_cpu.dataset.stride > 0
+    assert ci_cpu.require_section("model")["device"] == "cpu"
+    assert ci_cpu.require_section("dataset")["stride"] > 0

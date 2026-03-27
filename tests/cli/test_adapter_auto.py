@@ -1,11 +1,11 @@
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 from invarlock.core.adapter_auto import (
     apply_auto_adapter_if_needed,
     resolve_auto_adapter,
 )
-from invarlock.core.config_runtime import InvarLockConfig
 
 
 def _write_cfg(tmp_path: Path, model_type: str, arch: str) -> Path:
@@ -55,14 +55,28 @@ def test_resolve_auto_adapter_gpt_fallback(tmp_path):
 
 def test_apply_auto_adapter_if_needed_updates_cfg(tmp_path):
     model_dir = _write_cfg(tmp_path, "mistral", "MistralForCausalLM")
-    cfg = InvarLockConfig(
+
+    class _Cfg:
+        def __init__(self, data: dict):
+            self._data = data
+            model_data = data.get("model", {})
+            self.model = SimpleNamespace(
+                id=model_data.get("id"),
+                adapter=model_data.get("adapter"),
+                device=model_data.get("device"),
+            )
+
+        def model_dump(self) -> dict:
+            return json.loads(json.dumps(self._data))
+
+    cfg = _Cfg(
         {
             "model": {"id": str(model_dir), "adapter": "auto", "device": "cpu"},
             "dataset": {"provider": "synthetic", "seq_len": 32, "stride": 32},
             "eval": {},
             "guards": {"order": ["invariants"]},
             "output": {"dir": str(tmp_path / "runs")},
-            "edit": {"name": "quant_rtn", "plan": {"bits": 8}},
+            "edit": {"name": "quant_rtn", "plan": {"bitwidth": 8}},
         }
     )
     new_cfg = apply_auto_adapter_if_needed(cfg)

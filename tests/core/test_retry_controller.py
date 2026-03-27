@@ -80,7 +80,7 @@ class TestRetryController:
 
 class TestAdjustEditParams:
     def test_adjust_quant_adds_clamp_ratio(self) -> None:
-        params = {"bits": 8}
+        params = {"bitwidth": 8}
         adjusted = adjust_edit_params("quant_rtn", params, attempt=1)
         assert adjusted.params["clamp_ratio"] == 0.01
         assert adjusted.notices == ("Quant retry adjustment: added clamp_ratio=0.01",)
@@ -92,7 +92,7 @@ class TestAdjustEditParams:
         assert adjusted.notices == ()
 
     def test_adjust_preserves_other_fields(self) -> None:
-        params = {"bits": 8, "scope": "ffn", "seed": 42}
+        params = {"bitwidth": 8, "scope": "ffn", "seed": 42}
         adjusted = adjust_edit_params("quant_rtn", params, attempt=1)
         assert adjusted.params["scope"] == "ffn"
         assert adjusted.params["seed"] == 42

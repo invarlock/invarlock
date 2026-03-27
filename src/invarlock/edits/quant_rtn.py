@@ -12,7 +12,7 @@ Features:
 - Deterministic behavior with seed control
 - GuardChain integration with quantization-aware policies
 
-Follows the ModelEdit protocol with preview() and apply() methods.
+Follows the ModelEdit protocol through the RTNQuantEdit class only.
 """
 
 from __future__ import annotations
@@ -43,6 +43,24 @@ class RTNQuantEdit(ModelEdit):
 
     name = "quant_rtn"
 
+    @staticmethod
+    def _validate_options(
+        *,
+        bitwidth: int,
+        clamp_ratio: float,
+        scope: str,
+    ) -> None:
+        if bitwidth != 8:
+            raise ValueError(
+                f"RTNQuantEdit only supports 8-bit quantization (got bitwidth={bitwidth})"
+            )
+        if not (0.0 <= clamp_ratio <= 0.5):
+            raise ValueError(
+                f"Clamp ratio must be between 0.0 and 0.5, got {clamp_ratio}"
+            )
+        if scope not in ["ffn", "attn", "all"]:
+            raise ValueError(f"Scope must be 'ffn', 'attn', or 'all', got {scope}")
+
     def __init__(
         self,
         bitwidth: int = 8,
@@ -66,17 +84,11 @@ class RTNQuantEdit(ModelEdit):
             seed: Random seed for deterministic behavior
             guard_chain: Optional GuardChain for safety checks
         """
-        # Validate configuration – built-in edit is INT8-only
-        if bitwidth != 8:
-            raise ValueError(
-                f"RTNQuantEdit only supports 8-bit quantization (got bitwidth={bitwidth})"
-            )
-        if not (0.0 <= clamp_ratio <= 0.5):
-            raise ValueError(
-                f"Clamp ratio must be between 0.0 and 0.5, got {clamp_ratio}"
-            )
-        if scope not in ["ffn", "attn", "all"]:
-            raise ValueError(f"Scope must be 'ffn', 'attn', or 'all', got {scope}")
+        self._validate_options(
+            bitwidth=bitwidth,
+            clamp_ratio=clamp_ratio,
+            scope=scope,
+        )
 
         self.bitwidth = bitwidth
         self.per_channel = per_channel  # Always True
@@ -254,12 +266,23 @@ class RTNQuantEdit(ModelEdit):
             Dictionary with application results
         """
         try:
-            # Extract configuration from kwargs - handle both 'bits' and 'bitwidth' for compatibility
-            bitwidth = kwargs.get("bitwidth", kwargs.get("bits", self.bitwidth))
+            if "bits" in kwargs:
+                raise ValueError(
+                    "RTNQuantEdit uses the canonical 'bitwidth' field; 'bits' is not supported."
+                )
+
+            raw_bitwidth = kwargs.get("bitwidth", self.bitwidth)
+            bitwidth = int(raw_bitwidth)
             group_size = kwargs.get("group_size", self.group_size)
-            clamp_ratio = kwargs.get("clamp_ratio", self.clamp_ratio)
-            scope = kwargs.get("scope", self.scope)
-            seed = kwargs.get("seed", self.seed)
+            clamp_ratio = float(kwargs.get("clamp_ratio", self.clamp_ratio))
+            scope = str(kwargs.get("scope", self.scope))
+            seed = int(kwargs.get("seed", self.seed))
+
+            self._validate_options(
+                bitwidth=bitwidth,
+                clamp_ratio=clamp_ratio,
+                scope=scope,
+            )
 
             self._configure_output(**kwargs)
 
@@ -267,7 +290,7 @@ class RTNQuantEdit(ModelEdit):
             self._emit("RTN Quantization Configuration:")
             self._emit(
                 "Bitwidth: "
-                f"{bitwidth} (from config: {kwargs.get('bitwidth', kwargs.get('bits', 'default'))})"
+                f"{bitwidth} (from config: {kwargs.get('bitwidth', 'default')})"
             )
             self._emit(f"Scope: {scope}")
             self._emit(f"Group size: {group_size}")
@@ -800,37 +823,3 @@ class RTNQuantEdit(ModelEdit):
         }
 
         return weight_dequantized, scales.view(-1), scale_stats
-
-
-# For backward compatibility, provide a functional interface
-def apply(
-    model: nn.Module,
-    adapter: ModelAdapter,
-    plan: dict[Any, Any] | None = None,
-    **kwargs,
-) -> dict:
-    """
-    Apply RTN quantization using the RTNQuantEdit API.
-
-    This is the recommended interface that follows the ModelEdit protocol.
-    """
-    if plan is None:
-        # Create plan from kwargs
-        edit = RTNQuantEdit(
-            bitwidth=kwargs.get("bitwidth", 8),
-            per_channel=kwargs.get("per_channel", True),
-            group_size=kwargs.get("group_size"),
-            clamp_ratio=kwargs.get("clamp_ratio", 0.0),
-            scope=kwargs.get("scope", "ffn"),
-            seed=kwargs.get("seed", 42),
-            max_modules=kwargs.get("max_modules"),
-        )
-
-        # Need calibration data for preview (though RTN doesn't use it)
-        calib = kwargs.get("calib")
-        preview_result = edit.preview(model, adapter, calib)
-        plan = preview_result["plan"]
-
-    # Apply the plan
-    edit = RTNQuantEdit()
-    return edit.apply(model, adapter, plan)

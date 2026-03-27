@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import torch.nn as nn
 
-from invarlock.guards import rmt as R
+import invarlock.guards.rmt as R
 
 
 class _TinyBlock(nn.Module):

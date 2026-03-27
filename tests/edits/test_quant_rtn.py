@@ -4,6 +4,7 @@ import pytest
 import torch
 from rich.console import Console
 
+import invarlock.edits.quant_rtn as quant_rtn_mod
 from invarlock.edits.quant_rtn import RTNQuantEdit
 
 
@@ -53,6 +54,10 @@ def test_quant_rtn_rejects_non_int8_bitwidth() -> None:
     """quant_rtn is a minimal INT8 demo edit; 4-bit is not supported."""
     with pytest.raises(ValueError):
         RTNQuantEdit(bitwidth=4)
+
+
+def test_quant_rtn_module_has_no_functional_apply_shim() -> None:
+    assert "apply" not in quant_rtn_mod.__dict__
 
 
 def test_quant_rtn_output_format() -> None:
@@ -112,3 +117,25 @@ def test_quant_rtn_logs_when_console_missing(caplog: pytest.LogCaptureFixture) -
 
     assert caplog.records
     assert any(record.message.startswith("[EDIT]") for record in caplog.records)
+
+
+def test_quant_rtn_apply_rejects_bits_alias() -> None:
+    model = torch.nn.Linear(2, 2, bias=False)
+    adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
+    edit = RTNQuantEdit(scope="all", max_modules=1)
+
+    result = edit.apply(model, adapter, bits=8)
+
+    assert result["error"] == (
+        "RTNQuantEdit uses the canonical 'bitwidth' field; 'bits' is not supported."
+    )
+
+
+def test_quant_rtn_apply_rejects_non_int8_bitwidth_override() -> None:
+    model = torch.nn.Linear(2, 2, bias=False)
+    adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
+    edit = RTNQuantEdit(scope="all", max_modules=1)
+
+    result = edit.apply(model, adapter, bitwidth=4)
+
+    assert "only supports 8-bit quantization" in result["error"]

@@ -16,7 +16,7 @@ class _DummyReport:
 def test_variance_guard_handles_non_dict_base_calibration(monkeypatch):
     # Some probe/fixture environments may supply a malformed tier policy; the guard
     # should still be robust and merge caller calibration overrides.
-    from invarlock.guards import policies as policies_mod
+    import invarlock.guards.policies as policies_mod
 
     real = policies_mod.get_variance_policy
 

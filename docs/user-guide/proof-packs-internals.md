@@ -174,7 +174,7 @@ parameters at runtime.
 
 | Edit Type | Parameters | Scope |
 | --- | --- | --- |
-| Quantization RTN | tuned (`bits`, `group_size`) from tuned params file | FFN only |
+| Quantization RTN | tuned (`bitwidth`, `group_size`) from tuned params file | FFN only |
 | FP8 Quantization | tuned (`format`) from tuned params file | FFN only |
 | Magnitude Pruning | tuned (`prune_level`) from tuned params file | FFN only |
 | Low-Rank SVD | tuned (`rank`) from tuned params file | FFN only |
@@ -193,7 +193,7 @@ without manufacturing clean false positives.
 
 | Edit Type | Parameters | Scope |
 | --- | --- | --- |
-| Quantization RTN | `quant_rtn:4:32:all` (4-bit, group size 32) | All layers |
+| Quantization RTN | `quant_rtn:8:all` (8-bit) | All layers |
 | FP8 Quantization | `fp8_quant:e5m2:all` | All layers |
 | Magnitude Pruning | `magnitude_prune:0.5:all` (50% sparsity) | All layers |
 | Low-Rank SVD | `lowrank_svd:32:all` (rank 32) | All layers |

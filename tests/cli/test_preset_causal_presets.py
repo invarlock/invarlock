@@ -42,8 +42,8 @@ def test_causal_lm_family_presets_load() -> None:
     }
     for name, model_id in presets.items():
         cfg = load_config(root / "configs/presets/causal_lm" / name)
-        assert cfg.model.id == model_id
-        assert cfg.model.adapter == "hf_causal"
+        assert cfg.require_section("model")["id"] == model_id
+        assert cfg.require_section("model")["adapter"] == "hf_causal"
         provider = cfg.data["dataset"]["provider"]
         if name in expected_provider_kinds:
             assert provider["kind"] == expected_provider_kinds[name]

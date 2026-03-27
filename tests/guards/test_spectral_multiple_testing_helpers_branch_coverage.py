@@ -1,4 +1,4 @@
-from invarlock.guards import spectral_selection as sp
+import invarlock.guards.spectral_selection as sp
 from invarlock.guards.spectral import SpectralGuard
 
 

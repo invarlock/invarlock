@@ -68,7 +68,7 @@ def test_coerce_interval_from_string_and_list() -> None:
 
 
 def test_compute_edit_digest_quant_and_default() -> None:
-    d = C._compute_edit_digest({"edit": {"name": "quant_rtn", "config": {"bits": 8}}})
+    d = C._compute_edit_digest({"edit": {"name": "quant_rtn", "config": {"bitwidth": 8}}})
     assert d["family"] == "quantization" and isinstance(d["impl_hash"], str)
     d2 = C._compute_edit_digest({"edit": {"name": "noop"}})
     assert d2["family"] == "cert_only"

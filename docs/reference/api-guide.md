@@ -16,11 +16,12 @@
 ## Quick Start
 
 ```python
-from invarlock.adapters import HF_Auto_Adapter
+from invarlock.adapters.auto import HF_Auto_Adapter
 from invarlock.core.api import RunConfig
 from invarlock.core.runner import CoreRunner
 from invarlock.edits import RTNQuantEdit
-from invarlock.guards import InvariantsGuard, SpectralGuard
+from invarlock.guards.invariants import InvariantsGuard
+from invarlock.guards.spectral import SpectralGuard
 
 adapter = HF_Auto_Adapter()
 model = adapter.load_model("gpt2", device="auto")

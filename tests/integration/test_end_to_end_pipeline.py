@@ -266,7 +266,7 @@ class TestEndToEndPipeline:
         valid_config = {
             "model_path": "test_model",
             "edit_type": "quantization",
-            "edit_config": {"bits": 8},
+            "edit_config": {"bitwidth": 8},
             "output_dir": self.temp_dir,
         }
 
@@ -447,7 +447,7 @@ class TestEndToEndPipeline:
             "model_path": "test_model",
             "edit_type": "quantization",
             "edit_config": {
-                "bits": 8,
+                "bitwidth": 8,
                 "group_size": 128,
                 "target_modules": ["attn", "mlp"],
             },
@@ -580,14 +580,14 @@ class TestPipelineErrorScenarios:
     def test_invalid_edit_configuration(self):
         """Test handling of invalid edit configurations."""
         invalid_configs = [
-            {"bits": 3},  # Invalid bits for quantization
+            {"bitwidth": 3},  # Invalid bitwidth for quantization
             {},  # Empty config
         ]
 
         # Define validation function for testing purposes
         def validate_edit_config(config):
-            if "bits" in config and config["bits"] not in [4, 8, 16]:
-                raise ValueError("Invalid bits value")
+            if "bitwidth" in config and config["bitwidth"] not in [4, 8, 16]:
+                raise ValueError("Invalid bitwidth value")
             if not config:  # Empty config
                 raise ValueError("Configuration cannot be empty")
 

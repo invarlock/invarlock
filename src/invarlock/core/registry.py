@@ -144,13 +144,29 @@ class CoreRegistry:
 
         # Register built-in adapters
         _fallback(
-            self._adapters, "hf_causal", "invarlock.adapters", "HF_Causal_Adapter"
+            self._adapters,
+            "hf_causal",
+            "invarlock.adapters.hf_causal",
+            "HF_Causal_Adapter",
         )
-        _fallback(self._adapters, "hf_mlm", "invarlock.adapters", "HF_MLM_Adapter")
         _fallback(
-            self._adapters, "hf_seq2seq", "invarlock.adapters", "HF_Seq2Seq_Adapter"
+            self._adapters,
+            "hf_mlm",
+            "invarlock.adapters.hf_mlm",
+            "HF_MLM_Adapter",
         )
-        _fallback(self._adapters, "hf_auto", "invarlock.adapters", "HF_Auto_Adapter")
+        _fallback(
+            self._adapters,
+            "hf_seq2seq",
+            "invarlock.adapters.hf_seq2seq",
+            "HF_Seq2Seq_Adapter",
+        )
+        _fallback(
+            self._adapters,
+            "hf_auto",
+            "invarlock.adapters.auto",
+            "HF_Auto_Adapter",
+        )
         # Optional plugin adapters (verify runtime dependencies)
         _fallback(
             self._adapters,
@@ -183,10 +199,25 @@ class CoreRegistry:
         _fallback(self._edits, "noop", "invarlock.edits.noop", "NoopEdit")
 
         # Register built-in guards
-        _fallback(self._guards, "invariants", "invarlock.guards", "InvariantsGuard")
-        _fallback(self._guards, "spectral", "invarlock.guards", "SpectralGuard")
-        _fallback(self._guards, "variance", "invarlock.guards", "VarianceGuard")
-        _fallback(self._guards, "rmt", "invarlock.guards", "RMTGuard")
+        _fallback(
+            self._guards,
+            "invariants",
+            "invarlock.guards.invariants",
+            "InvariantsGuard",
+        )
+        _fallback(
+            self._guards,
+            "spectral",
+            "invarlock.guards.spectral",
+            "SpectralGuard",
+        )
+        _fallback(
+            self._guards,
+            "variance",
+            "invarlock.guards.variance",
+            "VarianceGuard",
+        )
+        _fallback(self._guards, "rmt", "invarlock.guards.rmt", "RMTGuard")
         _fallback(self._guards, "hello_guard", "invarlock.plugins", "HelloGuard")
 
     def _check_runtime_dependencies(self, deps: list[str]) -> list[str]:

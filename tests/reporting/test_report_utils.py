@@ -12,7 +12,7 @@ def test_is_ppl_kind_and_get_ppl_final() -> None:
 
 
 def test_compute_edit_digest_quant_and_default() -> None:
-    rep_quant = {"edit": {"name": "quant_rtn", "config": {"bits": 4}}}
+    rep_quant = {"edit": {"name": "quant_rtn", "config": {"bitwidth": 4}}}
     d1 = cert._compute_edit_digest(rep_quant)
     assert d1["family"] == "quantization"
     rep_none = {"edit": {"name": "noop"}}

@@ -34,7 +34,7 @@ The CLI example above uses the secure-default runtime container. Add
 intentionally bypass that boundary.
 
 ```python
-from invarlock.adapters import HF_Auto_Adapter
+from invarlock.adapters.auto import HF_Auto_Adapter
 
 adapter = HF_Auto_Adapter()
 model = adapter.load_model("gpt2", device="auto")

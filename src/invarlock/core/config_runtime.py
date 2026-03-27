@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import copy
 import os
-from dataclasses import dataclass, field
+from collections.abc import Iterator, MutableMapping
+from dataclasses import asdict, dataclass, field, fields, is_dataclass
 from importlib import resources as _ires
 from pathlib import Path
 from typing import Any
@@ -28,46 +29,166 @@ def _deep_merge(a: dict, b: dict) -> dict:
     return out
 
 
-class _Obj:
-    def __init__(self, data: Any):
-        self._data = data
+def _section_dataclass_payload(instance: Any) -> dict[str, Any]:
+    if not is_dataclass(instance):
+        raise TypeError(f"Expected dataclass instance, got {type(instance).__name__}")
+    payload = asdict(instance)
+    extra = payload.pop("_extra", None)
+    if isinstance(extra, dict):
+        payload.update(extra)
+    payload = {k: v for k, v in payload.items() if v is not None}
+    return payload
 
-    def __getattr__(self, item):
-        # Only return values for existing keys; otherwise raise AttributeError
-        # so hasattr/getattr(..., default) behave correctly.
-        if item in self._data:
-            v = self._data[item]
-            if isinstance(v, dict):
-                return _Obj(v)
-            return v
-        raise AttributeError(item)
 
-    def __getitem__(self, key):  # enable dict-like access in tests
-        if isinstance(self._data, dict):
-            return self._data[key]
-        raise TypeError("Object is not subscriptable")
+def _split_known_fields(
+    cls: type[Any], value: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    known_names = {f.name for f in fields(cls) if f.init and f.name != "_extra"}
+    known: dict[str, Any] = {}
+    extra: dict[str, Any] = {}
+    for key, item in value.items():
+        if key in known_names:
+            known[key] = item
+        else:
+            extra[key] = item
+    return known, extra
 
-    # Provide dict-like helpers where tests use mapping semantics
+
+class SectionMixin:
+    def __getitem__(self, key: str) -> Any:
+        payload = _section_dataclass_payload(self)
+        if key in payload and hasattr(self, key):
+            return getattr(self, key)
+        if key in payload:
+            return payload[key]
+        raise KeyError(key)
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        if hasattr(self, key):
+            setattr(self, key, value)
+            return
+        extra = getattr(self, "_extra", None)
+        if isinstance(extra, dict):
+            extra[key] = value
+            return
+        raise KeyError(key)
+
+    def __contains__(self, key: object) -> bool:
+        if not isinstance(key, str):
+            return False
+        return key in _section_dataclass_payload(self)
+
     def get(self, key: str, default: Any = None) -> Any:
-        if isinstance(self._data, dict):
-            return self._data.get(key, default)
-        return default
+        try:
+            return self[key]
+        except KeyError:
+            return default
 
-    def items(self):  # pragma: no cover - convenience for debug/tests
-        if isinstance(self._data, dict):
-            return self._data.items()
-        return []
+    def items(self):  # pragma: no cover - debug/test helper
+        return _section_dataclass_payload(self).items()
 
 
 @dataclass
-class InvarLockConfig:
-    """Lightweight, dict-backed config with ergonomic attribute access.
+class ModelConfig(SectionMixin):
+    id: str | None = None
+    adapter: str | None = None
+    device: str | None = None
+    _extra: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class EditConfig(SectionMixin):
+    name: str | None = None
+    plan: dict[str, Any] = field(default_factory=dict)
+    parameters: Any = None
+    kind: str | None = None
+    _extra: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class OutputConfig(SectionMixin):
+    dir: Path | str = Path(".")
+    model_dir: str | Path | None = None
+    model_subdir: str | None = None
+    _extra: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if isinstance(self.dir, str):
+            self.dir = Path(self.dir)
+        if isinstance(self.model_dir, str):
+            self.model_dir = Path(self.model_dir)
+
+
+@dataclass
+class GuardsConfig(SectionMixin):
+    order: list[str] = field(default_factory=list)
+    variance: VarianceGuardConfig | dict[str, Any] | None = None
+    _extra: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class EvalConfig(SectionMixin):
+    metric: dict[str, Any] | None = None
+    bootstrap: EvalBootstrapConfig | dict[str, Any] = field(default_factory=dict)
+    _extra: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.bootstrap:
+            self.bootstrap = EvalBootstrapConfig()
+        elif isinstance(self.bootstrap, dict):
+            known, extra = _split_known_fields(EvalBootstrapConfig, self.bootstrap)
+            self.bootstrap = EvalBootstrapConfig(_extra=extra, **known)
+
+
+def _normalize_top_level_section(name: str, value: Any) -> Any:
+    if not isinstance(value, dict):
+        return value
+
+    if name == "model":
+        known, extra = _split_known_fields(ModelConfig, value)
+        return ModelConfig(_extra=extra, **known)
+    if name == "edit":
+        known, extra = _split_known_fields(EditConfig, value)
+        plan = known.get("plan")
+        if not isinstance(plan, dict):
+            known["plan"] = {}
+        return EditConfig(_extra=extra, **known)
+    if name == "dataset":
+        known, extra = _split_known_fields(DatasetConfig, value)
+        cfg = DatasetConfig(**known)
+        if extra:
+            cfg._extra = extra
+        return cfg
+    if name == "output":
+        known, extra = _split_known_fields(OutputConfig, value)
+        return OutputConfig(_extra=extra, **known)
+    if name == "auto":
+        known, extra = _split_known_fields(AutoConfig, value)
+        return AutoConfig(_extra=extra, **known)
+    if name == "guards":
+        variance = value.get("variance")
+        if isinstance(variance, dict):
+            known, extra = _split_known_fields(VarianceGuardConfig, variance)
+            variance = VarianceGuardConfig(_extra=extra, **known)
+        guard_value = {k: v for k, v in value.items() if k != "variance"}
+        known, extra = _split_known_fields(GuardsConfig, guard_value)
+        return GuardsConfig(variance=variance, _extra=extra, **known)
+    if name == "eval":
+        known, extra = _split_known_fields(EvalConfig, value)
+        return EvalConfig(_extra=extra, **known)
+    return value
+
+
+class InvarLockConfig(MutableMapping[str, Any]):
+    """Explicit mutable mapping for runtime configuration.
 
     Accepts either a single `data` mapping or keyword sections like `model=`,
-    `edit=`, `dataset=`, etc., and stores them internally as a dict.
+    `edit=`, `dataset=`, etc., and stores them internally as a plain nested
+    mapping. Nested sections are accessed deliberately via mapping operations or
+    `section()` / `require_section()`.
     """
 
-    data: dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any]
 
     def __init__(self, data: dict[str, Any] | None = None, **sections: Any) -> None:
         if data is not None and sections:
@@ -77,33 +198,118 @@ class InvarLockConfig:
             self.data = copy.deepcopy(data)
         else:
             self.data = copy.deepcopy(sections)
+        for key, value in list(self.data.items()):
+            self.data[key] = _normalize_top_level_section(key, value)
 
-        # Basic validation hooks for well-known edits (none required here)
+    def __getitem__(self, key: str) -> Any:
+        return self.data[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        self.data[key] = _normalize_top_level_section(key, value)
+
+    def __delitem__(self, key: str) -> None:
+        del self.data[key]
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self.data)
+
+    def __len__(self) -> int:
+        return len(self.data)
 
     def model_dump(self) -> dict[str, Any]:
-        return copy.deepcopy(self.data)
+        dumped: dict[str, Any] = {}
+        for key, value in self.data.items():
+            if is_dataclass(value):
+                dumped[key] = _section_dataclass_payload(value)
+            else:
+                dumped[key] = copy.deepcopy(value)
+        return dumped
 
-    def __getattr__(self, item):
-        if item in self.data:
-            v = self.data[item]
-            if isinstance(v, dict):
-                return _Obj(v)
-            return v
-        raise AttributeError(item)
+    def section(self, name: str) -> dict[str, Any] | None:
+        value = self.data.get(name)
+        if value is None:
+            return None
+        if is_dataclass(value):
+            return _section_dataclass_payload(value)
+        if isinstance(value, dict):
+            return copy.deepcopy(value)
+        raise TypeError(
+            f"Config section '{name}' must be a mapping, got "
+            f"{type(value).__name__}."
+        )
+
+    def require_section(self, name: str) -> dict[str, Any]:
+        value = self.section(name)
+        if value is None:
+            raise KeyError(f"Config section '{name}' is required.")
+        return value
+
+    @property
+    def model(self) -> ModelConfig:
+        value = self.data.get("model")
+        if not isinstance(value, ModelConfig):
+            raise KeyError("Config section 'model' is required.")
+        return value
+
+    @property
+    def edit(self) -> EditConfig:
+        value = self.data.get("edit")
+        if not isinstance(value, EditConfig):
+            raise KeyError("Config section 'edit' is required.")
+        return value
+
+    @property
+    def dataset(self) -> DatasetConfig:
+        value = self.data.get("dataset")
+        if not isinstance(value, DatasetConfig):
+            raise KeyError("Config section 'dataset' is required.")
+        return value
+
+    @property
+    def output(self) -> OutputConfig:
+        value = self.data.get("output")
+        if not isinstance(value, OutputConfig):
+            raise KeyError("Config section 'output' is required.")
+        return value
+
+    @property
+    def auto(self) -> AutoConfig:
+        value = self.data.get("auto")
+        if not isinstance(value, AutoConfig):
+            value = AutoConfig()
+            self.data["auto"] = value
+        return value
+
+    @property
+    def guards(self) -> GuardsConfig:
+        value = self.data.get("guards")
+        if not isinstance(value, GuardsConfig):
+            value = GuardsConfig()
+            self.data["guards"] = value
+        return value
+
+    @property
+    def eval(self) -> EvalConfig:
+        value = self.data.get("eval")
+        if not isinstance(value, EvalConfig):
+            value = EvalConfig()
+            self.data["eval"] = value
+        return value
+
+    @property
+    def context(self) -> dict[str, Any]:
+        value = self.data.get("context")
+        if value is None:
+            value = {}
+            self.data["context"] = value
+        if not isinstance(value, dict):
+            raise TypeError("Config section 'context' must be a mapping.")
+        return value
 
 
-# Typed sub-configs used by tests (minimal validation only)
 @dataclass
-class OutputConfig:
-    dir: Path | str
-
-    def __post_init__(self) -> None:
-        if isinstance(self.dir, str):
-            self.dir = Path(self.dir)
-
-
-@dataclass
-class DatasetConfig:
+class DatasetConfig(SectionMixin):
+    id: str | None = None
     seq_len: int = 512
     stride: int = 512
     provider: str | None = None
@@ -111,6 +317,7 @@ class DatasetConfig:
     preview_n: int | None = None
     final_n: int | None = None
     seed: int | None = None
+    _extra: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.stride > self.seq_len:
@@ -122,6 +329,8 @@ class EvalBootstrapConfig:
     replicates: int = 1000
     alpha: float = 0.05
     ci_band: float = 0.10
+    method: str | None = None
+    _extra: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.replicates <= 0:
@@ -131,7 +340,7 @@ class EvalBootstrapConfig:
 
 
 @dataclass
-class SpectralGuardConfig:
+class SpectralGuardConfig(SectionMixin):
     sigma_quantile: float | None = None
     family_caps: dict[str, Any] = field(default_factory=dict)
 
@@ -147,12 +356,12 @@ class SpectralGuardConfig:
 
 
 @dataclass
-class RMTGuardConfig:
+class RMTGuardConfig(SectionMixin):
     epsilon: dict[str, float] | float | None = None
 
 
 @dataclass
-class VarianceGuardConfig:
+class VarianceGuardConfig(SectionMixin):
     clamp: list[float] | None = None
     mode: str | None = None
     deadband: float | None = None
@@ -168,7 +377,9 @@ class VarianceGuardConfig:
     target_modules: list[str] | None = None
     scope: str | None = None
     calibration: dict[str, Any] = field(default_factory=dict)
+    max_calib: int | None = None
     absolute_floor_ppl: float | None = None
+    _extra: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.clamp is not None:
@@ -184,8 +395,11 @@ class VarianceGuardConfig:
 
 @dataclass
 class AutoConfig:
+    enabled: bool = True
+    tier: str = "balanced"
     probes: int = 0
     target_pm_ratio: float = 1.0
+    _extra: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not (0 <= int(self.probes) <= 10):

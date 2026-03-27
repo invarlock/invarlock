@@ -1963,14 +1963,9 @@ def _extract_compression_diagnostics(
         if bitwidth_map:
             # Get bitwidth from first module in bitwidth_map
             first_module: dict[str, Any] = next(iter(bitwidth_map.values()), {})
-            actual_bitwidth = first_module.get(
-                "bitwidth",
-                edit_config.get("bitwidth", edit_config.get("bits", "unknown")),
-            )
+            actual_bitwidth = first_module.get("bitwidth", edit_config.get("bitwidth", "unknown"))
         else:
-            actual_bitwidth = edit_config.get(
-                "bitwidth", edit_config.get("bits", "unknown")
-            )
+            actual_bitwidth = edit_config.get("bitwidth", "unknown")
 
         param_analysis["bitwidth"] = {
             "value": actual_bitwidth,

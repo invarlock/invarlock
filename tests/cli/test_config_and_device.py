@@ -66,7 +66,7 @@ dataset: !include inc.yaml
     )
     cfg = load_config(main)
     assert isinstance(cfg, InvarLockConfig)
-    assert cfg.edit.name == "quant_rtn"
+    assert cfg.require_section("edit")["name"] == "quant_rtn"
     # apply_profile(ci) requires a packaged/runtime profile file.
     monkeypatch.setattr(config_mod, "_load_runtime_yaml", lambda *_a, **_k: None)
     monkeypatch.delenv("INVARLOCK_CONFIG_ROOT", raising=False)
@@ -78,7 +78,7 @@ dataset: !include inc.yaml
     with pytest.raises(ValueError):
         resolve_edit_kind("unknown")
     cfg3 = apply_edit_override(cfg2, "quant_rtn")
-    assert cfg3.edit.name == "quant_rtn"
+    assert cfg3.require_section("edit")["name"] == "quant_rtn"
     assert "kind" not in cfg3.data["edit"]
 
 
