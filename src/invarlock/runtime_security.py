@@ -91,8 +91,6 @@ def _json_safe(value: Any) -> Any:
         return {str(key): _json_safe(item) for key, item in value.items()}
     if isinstance(value, (list, tuple, set)):
         return [_json_safe(item) for item in value]
-    if value.__class__.__name__ == "OptionInfo":
-        return _json_safe(getattr(value, "default", None))
     return str(value)
 
 
@@ -232,7 +230,7 @@ _CONFIG_SCAN_ARG_FLAGS = {"--config", "-c", "--preset", "--edit-config"}
 _CONFIG_PATH_ARG_FLAGS = _CONFIG_SCAN_ARG_FLAGS | {"--baseline-report"}
 _OUTPUT_PATH_ARG_FLAGS = {"--out", "--report-out"}
 _PATH_ARG_FLAGS = _OUTPUT_PATH_ARG_FLAGS | _CONFIG_PATH_ARG_FLAGS
-_LOCAL_MODEL_ARG_FLAGS = {"--baseline", "--subject", "--source", "--edited"}
+_LOCAL_MODEL_ARG_FLAGS = {"--baseline", "--subject"}
 _PATH_ENV_VARS = {
     "INVARLOCK_CONFIG_ROOT",
     "INVARLOCK_EVALUATE_TMP_DIR",

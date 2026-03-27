@@ -16,19 +16,29 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+import invarlock.core.doctor_preflight as _doctor_preflight
 from invarlock.core.doctor_findings import (
-    DATASET_SPLIT_FALLBACK_WARNING,
+    DATASET_SPLIT_FALLBACK_WARNING as DATASET_SPLIT_FALLBACK_WARNING,  # re-exported for CLI/tests
+)
+from invarlock.core.doctor_findings import (
     DoctorAccumulator,
     DoctorFinding,
-    build_bootstrap_replicates_findings,
-    build_capacity_findings,
     build_cross_check_findings,
     build_doctor_result,
-    build_provider_kind_findings,
-    build_provider_schema_findings,
     build_split_fallback_findings,
     build_tiny_relax_finding,
     load_explicit_report_input,
+)
+from invarlock.core.doctor_inventory import (
+    build_adapter_inventory_rows,
+    build_dataset_inventory_rows,
+    build_generic_inventory_rows,
+    summarize_inventory_rows,
+)
+from invarlock.core.doctor_runtime import (
+    collect_optional_dependency_facts,
+    collect_torch_runtime_facts,
+    find_spec_safe,
 )
 from invarlock.public_contracts import (
     contract_catalog,
@@ -41,115 +51,41 @@ from invarlock.public_contracts import (
 from ..backend_runtime import bitsandbytes_runtime_available
 from ..constants import DOCTOR_FORMAT_VERSION
 
-# Exact wording constant for determinism warning (kept in one place)
-DETERMINISM_SHARDS_WARNING = "Provider workers > 0 without deterministic_shards=True; enable deterministic_shards or set workers=0 for determinism."
+DETERMINISM_SHARDS_WARNING = _doctor_preflight.DETERMINISM_SHARDS_WARNING
+NON_FATAL_EXCEPTIONS = (
+    AttributeError,
+    TypeError,
+    ValueError,
+    KeyError,
+    RuntimeError,
+    OSError,
+    ImportError,
+    ModuleNotFoundError,
+)
 
 console = Console()
 LOGGER = logging.getLogger(__name__)
 
 
 def _find_spec_safe(module_name: str) -> object | None:
-    """Best-effort spec lookup that tolerates broken import hooks."""
-
-    try:
-        return importlib.util.find_spec(module_name)
-    except Exception:
-        return None
+    return find_spec_safe(module_name, find_spec_fn=importlib.util.find_spec)
 
 
 def doctor_command(
-    config: str | None = typer.Option(
-        None, "--config", "-c", help="Path to YAML config for preflight lints"
-    ),
-    profile: str | None = typer.Option(
-        None,
-        "--profile",
-        help="Profile to apply for preflight (e.g. ci, release, ci_cpu; dev is a no-op)",
-    ),
-    baseline: str | None = typer.Option(
-        None,
-        "--baseline",
-        help=(
-            "Optional baseline report JSON file or directory containing canonical "
-            "report.json or evaluation.report.json to check pairing readiness"
-        ),
-    ),
-    json_out: bool = typer.Option(
-        False,
-        "--json",
-        help="Emit machine-readable JSON (suppresses human-readable output)",
-    ),
-    tier: str | None = typer.Option(
-        None,
-        "--tier",
-        help="Policy tier for floors preview (conservative|balanced|aggressive)",
-    ),
-    baseline_report: str | None = typer.Option(
-        None,
-        "--baseline-report",
-        help=(
-            "Optional baseline report JSON file or directory containing canonical "
-            "report.json or evaluation.report.json for cross-checks"
-        ),
-    ),
-    subject_report: str | None = typer.Option(
-        None,
-        "--subject-report",
-        help=(
-            "Optional subject report JSON file or directory containing canonical "
-            "report.json or evaluation.report.json for cross-checks"
-        ),
-    ),
-    strict: bool = typer.Option(
-        False,
-        "--strict",
-        help="Escalate certain warnings (e.g., split mismatch) to errors",
-    ),
+    config: str | None = None,
+    profile: str | None = None,
+    baseline: str | None = None,
+    json_out: bool = False,
+    tier: str | None = None,
+    baseline_report: str | None = None,
+    subject_report: str | None = None,
+    strict: bool = False,
 ):
     """
     Perform health checks on InvarLock installation.
 
     Checks PyTorch, device availability, memory, and optional extras.
     """
-
-    NON_FATAL_EXCEPTIONS = (
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-    )
-
-    # Normalize Typer OptionInfo placeholders when invoked directly in tests
-    def _is_optioninfo_like(obj: object) -> bool:
-        try:
-            # True for Typer's OptionInfo; robust to import shims/mocks
-            cname = getattr(obj, "__class__", type(None)).__name__
-            if cname == "OptionInfo":
-                return True
-            # Heuristic: has typical Typer OptionInfo attributes
-            return hasattr(obj, "param_decls") and hasattr(obj, "default")
-        except NON_FATAL_EXCEPTIONS:
-            return False
-
-    def _coerce_opt(val: object, *, bool_default: bool | None = None):
-        if _is_optioninfo_like(val):
-            if isinstance(bool_default, bool):
-                return bool_default
-            return None
-        return val
-
-    config = _coerce_opt(config)
-    profile = _coerce_opt(profile)
-    baseline = _coerce_opt(baseline)
-    tier = _coerce_opt(tier)
-    baseline_report = _coerce_opt(baseline_report)
-    subject_report = _coerce_opt(subject_report)
-    strict = bool(_coerce_opt(strict, bool_default=False))
-    json_out = bool(_coerce_opt(json_out, bool_default=False))
 
     accumulator = DoctorAccumulator()
 
@@ -217,9 +153,15 @@ def doctor_command(
 
     # Check PyTorch
     try:
-        import torch
+        from ..device import get_device_info
 
-        torch_version = getattr(torch, "__version__", None)
+        runtime_facts = collect_torch_runtime_facts(
+            import_torch_fn=lambda: __import__("torch"),
+            get_device_info_fn=get_device_info,
+            which_fn=_shutil.which,
+        )
+
+        torch_version = runtime_facts.version
         if not json_out:
             if torch_version:
                 console.print(f"[green]✅ PyTorch {torch_version}[/green]")
@@ -228,10 +170,7 @@ def doctor_command(
                     "[yellow]⚠️  PyTorch present but version unavailable[/yellow]"
                 )
 
-        # Device information
-        from ..device import get_device_info
-
-        device_info = get_device_info()
+        device_info = runtime_facts.device_info
         if not json_out:
             console.print("\nDevice Information")
 
@@ -263,36 +202,28 @@ def doctor_command(
                     )
 
         # CUDA triage details
-        try:
-            cuda_toolkit_found = bool(
-                _shutil.which("nvcc") or _shutil.which("nvidia-smi")
+        if (
+            runtime_facts.cuda_toolkit_found is not None
+            and runtime_facts.torch_cuda_build is not None
+            and runtime_facts.cuda_available is not None
+            and not json_out
+        ):
+            console.print(
+                f"  [dim]• CUDA toolkit: {'found' if runtime_facts.cuda_toolkit_found else 'not found'} · "
+                f"torch CUDA build: {'yes' if runtime_facts.torch_cuda_build else 'no'} · "
+                f"cuda.is_available(): {'true' if runtime_facts.cuda_available else 'false'}[/dim]"
             )
-            torch_cuda_build = bool(getattr(torch.version, "cuda", None))
-            cuda_available = bool(
-                getattr(torch, "cuda", None) and torch.cuda.is_available()
-            )
-            if not json_out:
-                console.print(
-                    f"  [dim]• CUDA toolkit: {'found' if cuda_toolkit_found else 'not found'} · "
-                    f"torch CUDA build: {'yes' if torch_cuda_build else 'no'} · "
-                    f"cuda.is_available(): {'true' if cuda_available else 'false'}[/dim]"
-                )
-        except NON_FATAL_EXCEPTIONS:
-            pass
 
         # Memory check
-        try:
-            if torch.cuda.is_available():
-                free_memory = torch.cuda.get_device_properties(0).total_memory / 1e9
-                if not json_out:
-                    console.print(f"\nGPU Memory: {free_memory:.1f} GB total")
-                if free_memory < 4.0:
-                    if not json_out:
-                        console.print(
-                            "[yellow]⚠️  Warning: Less than 4GB GPU memory available[/yellow]"
-                        )
-        except NON_FATAL_EXCEPTIONS:
-            pass
+        if runtime_facts.gpu_memory_gb is not None:
+            if not json_out:
+                console.print(
+                    f"\nGPU Memory: {runtime_facts.gpu_memory_gb:.1f} GB total"
+                )
+            if runtime_facts.gpu_memory_low and not json_out:
+                console.print(
+                    "[yellow]⚠️  Warning: Less than 4GB GPU memory available[/yellow]"
+                )
 
     except ImportError:
         if not json_out:
@@ -304,14 +235,6 @@ def doctor_command(
     if not json_out:
         console.print("\nOptional Dependencies")
 
-    optional_deps = [
-        ("datasets", "Dataset loading (WikiText-2, etc.)"),
-        ("transformers", "Hugging Face model support"),
-        ("auto_gptq", "GPTQ quantization (Linux/CUDA only)"),
-        ("autoawq", "AWQ quantization (Linux/CUDA only)"),
-        ("bitsandbytes", "8/4-bit loading (GPU)"),
-    ]
-
     # Query CUDA availability once
     try:
         import torch as _torch
@@ -320,19 +243,15 @@ def doctor_command(
     except NON_FATAL_EXCEPTIONS:
         has_cuda = False
 
-    for dep, description in optional_deps:
-        spec = _find_spec_safe(dep)
-        present = spec is not None
-        extra_hint = {
-            "datasets": "eval",
-            "transformers": "adapters",
-            "auto_gptq": "gptq",
-            "autoawq": "awq",
-            "bitsandbytes": "gpu",
-        }.get(dep, dep)
+    optional_deps = collect_optional_dependency_facts(
+        has_cuda=has_cuda,
+        bitsandbytes_runtime_available_fn=bitsandbytes_runtime_available,
+        find_spec_fn=importlib.util.find_spec,
+    )
 
-        if dep == "bitsandbytes":
-            runtime_available = present and bitsandbytes_runtime_available()
+    for dep in optional_deps:
+        if dep.name == "bitsandbytes":
+            runtime_available = bool(dep.runtime_available)
             if runtime_available:
                 if not json_out:
                     if has_cuda:
@@ -344,7 +263,7 @@ def doctor_command(
                             "  [green]✅ bitsandbytes — runtime available on this host[/green]"
                         )
             elif not has_cuda:
-                if present:
+                if dep.present:
                     if not json_out:
                         console.print(
                             "  [yellow]⚠️  bitsandbytes — GPU not detected and runtime unavailable on this host[/yellow]"
@@ -368,292 +287,64 @@ def doctor_command(
             continue
 
         if not json_out:
-            if present:
-                console.print(f"  [green]✅ {dep} — {description}[/green]")
+            if dep.present:
+                console.print(f"  [green]✅ {dep.name} — {dep.description}[/green]")
             else:
-                console.print(f"  [yellow]⚠️  {dep} — {description}[/yellow]")
+                console.print(f"  [yellow]⚠️  {dep.name} — {dep.description}[/yellow]")
                 # Remediation for platform-gated stacks
-                if dep in {"auto_gptq", "autoawq"}:
+                if dep.name in {"auto_gptq", "autoawq"}:
                     console.print(
-                        f"     → Install: pip install 'invarlock[{extra_hint}]'  # Linux + CUDA only",
+                        f"     → Install: pip install 'invarlock[{dep.extra_hint}]'  # Linux + CUDA only",
                         markup=False,
                     )
                 else:
                     console.print(
-                        f"     → Install: pip install 'invarlock[{extra_hint}]'",
+                        f"     → Install: pip install 'invarlock[{dep.extra_hint}]'",
                         markup=False,
                     )
 
     # Optional: Config preflight (determinism & provider)
     if config:
         console.print("\n🧪 Preflight Lints (config)")
-        try:
-            from invarlock.eval.data import get_provider
-            from invarlock.model_profile import detect_model_profile, resolve_tokenizer
-
-            from ...core.config_runtime import apply_profile, load_config
-            from ..commands.run import _resolve_metric_and_provider
-
-            cfg = load_config(config)
-            if profile:
-                try:
-                    cfg = apply_profile(cfg, profile)
-                    console.print(f"  ▶ Profile applied: {profile}")
-                except NON_FATAL_EXCEPTIONS as _e:
-                    console.print(f"  [yellow]⚠️ Profile apply failed: {_e}[/yellow]")
-
-            # Provider kind sanity (D001)
-            try:
-                provider_cfg = getattr(
-                    getattr(cfg, "dataset", object()), "provider", None
-                )
-                provider_findings, provider_error = build_provider_kind_findings(
-                    provider_cfg
-                )
-                _record_findings(provider_findings, mark_error=provider_error)
-                had_error = had_error or provider_error
-
-                schema_findings, schema_error = build_provider_schema_findings(
-                    provider_cfg
-                )
-                _record_findings(schema_findings, mark_error=schema_error)
-                had_error = had_error or schema_error
-            except NON_FATAL_EXCEPTIONS:
-                pass
-
-            # Resolve adapter & provider
-            adapter_name = (
-                str(getattr(cfg.model, "adapter", "")).lower()
-                if hasattr(cfg, "model")
-                else ""
-            )
-            model_id_raw = (
-                str(getattr(cfg.model, "id", "")) if hasattr(cfg, "model") else ""
-            )
-            model_profile = detect_model_profile(
-                model_id=model_id_raw, adapter=adapter_name
-            )
-            metric_kind_resolved, provider_kind, _metric_opts = (
-                _resolve_metric_and_provider(
-                    cfg, model_profile, resolved_loss_type=None
-                )
-            )
-            cfg_metric_kind = str(metric_kind_resolved)
-            try:
-                cfg_metric_kind = str(metric_kind_resolved)
-            except NON_FATAL_EXCEPTIONS:
-                pass
+        preflight = _doctor_preflight.run_doctor_config_preflight(
+            config_path=str(config),
+            profile=str(profile) if profile else None,
+            tier=str(tier) if tier else None,
+            baseline=str(baseline) if baseline else None,
+        )
+        for line in preflight.lines:
             if not json_out:
-                console.print(
-                    f"  Metric: {metric_kind_resolved} · Provider: {provider_kind}"
-                )
-
-            # Resolve provider and tokenizer
-            provider = get_provider(provider_kind)
-            tokenizer, tok_hash = resolve_tokenizer(model_profile)
-            if not json_out:
-                console.print(
-                    f"  Tokenizer: {tokenizer.__class__.__name__} · hash={tok_hash}"
-                )
-
-            # CUDA preflight (D002)
-            try:
-                import torch as _torch
-
-                requested_device = None
-                try:
-                    requested_device = getattr(
-                        getattr(cfg, "runner", object()), "device", None
-                    )
-                except NON_FATAL_EXCEPTIONS:
-                    requested_device = None
-                if requested_device is None:
-                    try:
-                        requested_device = getattr(
-                            getattr(cfg, "model", object()), "device", None
-                        )
-                    except NON_FATAL_EXCEPTIONS:
-                        requested_device = None
-                req = str(requested_device or "").lower()
-                if req.startswith("cuda") and not (
-                    getattr(_torch, "cuda", None) and _torch.cuda.is_available()
-                ):
-                    _add(
-                        "D002",
-                        "error",
-                        "CUDA requested but not available (runner.device=cuda). Resolve drivers / install CUDA PyTorch.",
-                        field="runner.device",
-                    )
-                    had_error = True
-            except NON_FATAL_EXCEPTIONS:
-                pass
-
-            # Determinism guard rails: warn when provider.workers>0 without deterministic_shards
-            try:
-                provider_cfg = None
-                if hasattr(cfg.dataset, "provider"):
-                    provider_cfg = cfg.dataset.provider
-                # Accept mapping-shaped provider configs
-                workers = None
-                det = None
-                if isinstance(provider_cfg, dict):
-                    workers = provider_cfg.get("workers")
-                    det = provider_cfg.get("deterministic_shards")
-                else:
-                    # Support InvarLockConfig's _Obj wrapper with dict-like get()
-                    try:
-                        workers = provider_cfg.get("workers", None)  # type: ignore[attr-defined]
-                        det = provider_cfg.get("deterministic_shards", None)  # type: ignore[attr-defined]
-                    except NON_FATAL_EXCEPTIONS:
-                        pass
-                # Legacy style might place workers directly under dataset
-                if workers is None and hasattr(cfg.dataset, "workers"):
-                    workers = cfg.dataset.workers
-                if det is None and hasattr(cfg.dataset, "deterministic_shards"):
-                    det = cfg.dataset.deterministic_shards
-                workers_val = int(workers) if workers is not None else 0
-                det_flag = bool(det) if det is not None else False
-                if workers_val > 0 and not det_flag:
-                    # Print the canonical message and include a human-readable hint token
-                    if not json_out:
-                        console.print(
-                            f"  [yellow]⚠️  {DETERMINISM_SHARDS_WARNING} (deterministic shards)[/yellow]"
-                        )
-            except NON_FATAL_EXCEPTIONS:
-                # Best-effort linting only
-                pass
-
-            # Determinism hints (D004: low bootstrap reps)
-            try:
-                reps_val = None
-                if hasattr(cfg, "eval") and hasattr(cfg.eval, "bootstrap"):
-                    try:
-                        reps_val = getattr(cfg.eval.bootstrap, "replicates", None)
-                    except NON_FATAL_EXCEPTIONS:
-                        reps_val = None
-                if reps_val is not None:
-                    try:
-                        reps_val = int(reps_val)
-                    except NON_FATAL_EXCEPTIONS:
-                        reps_val = None
-                _record_findings(build_bootstrap_replicates_findings(reps_val))
-            except NON_FATAL_EXCEPTIONS:
-                pass
-
-            # Capacity estimation if available
-            est = getattr(provider, "estimate_capacity", None)
-            if callable(est):
-                try:
-                    seq_len = (
-                        int(getattr(cfg.dataset, "seq_len", 512))
-                        if hasattr(cfg, "dataset")
-                        else 512
-                    )
-                    stride = (
-                        int(getattr(cfg.dataset, "stride", seq_len // 2))
-                        if hasattr(cfg, "dataset")
-                        else seq_len // 2
-                    )
-                    preview_n = int(getattr(cfg.dataset, "preview_n", 0) or 0)
-                    final_n = int(getattr(cfg.dataset, "final_n", 0) or 0)
-                    cap = est(
-                        tokenizer=tokenizer,
-                        seq_len=seq_len,
-                        stride=stride,
-                        split=getattr(cfg.dataset, "split", "validation"),
-                        target_total=preview_n + final_n,
-                        fast_mode=True,
-                    )
-                    avail = cap.get("available_nonoverlap") or cap.get(
-                        "candidate_limit"
-                    )
-                    console.print(
-                        f"  Capacity: available={avail} · seq_len={seq_len} · stride={stride}"
-                    )
-                    if isinstance(avail, int) and (preview_n + final_n) > avail:
-                        console.print(
-                            "  [yellow]⚠️ Requested windows exceed provider capacity[/yellow]"
-                        )
-                    # Floors preview and capacity insufficiency (D007, D008)
-                    try:
-                        global POLICY_META
-                        (
-                            capacity_findings,
-                            insufficient_capacity,
-                            policy_meta,
-                        ) = build_capacity_findings(
-                            cap=cap,
-                            tier=str(tier or "balanced"),
-                        )
-                        if policy_meta is not None:
-                            POLICY_META = policy_meta
-                        _record_findings(
-                            capacity_findings,
-                            mark_error=insufficient_capacity,
-                        )
-                        had_error = had_error or insufficient_capacity
-                    except NON_FATAL_EXCEPTIONS:
-                        pass
-                except NON_FATAL_EXCEPTIONS as _e:
-                    console.print(
-                        f"  [yellow]⚠️ Capacity estimation failed: {_e}[/yellow]"
-                    )
-            else:
-                console.print(
-                    "  [dim]Provider does not expose estimate_capacity()[/dim]"
-                )
-
-            # Baseline pairing sanity
-            if baseline:
-                try:
-                    _, bdata, baseline_findings, invalid_baseline = (
-                        load_explicit_report_input(
-                            baseline,
-                            label="Baseline",
-                            field="baseline",
-                        )
-                    )
-                    _record_findings(baseline_findings, mark_error=invalid_baseline)
-                    had_error = had_error or invalid_baseline
-                    if bdata is not None:
-                        has_windows = isinstance(bdata.get("evaluation_windows"), dict)
-                        console.print(
-                            f"  Baseline windows: {'present' if has_windows else 'missing'}"
-                        )
-                        split_findings = build_split_fallback_findings(bdata)
-                        _record_findings(split_findings)
-                        if split_findings and not json_out:
-                            console.print(
-                                f"  [yellow]⚠️  {DATASET_SPLIT_FALLBACK_WARNING}[/yellow]"
-                            )
-                except NON_FATAL_EXCEPTIONS as _e:
-                    console.print(f"  [yellow]⚠️ Baseline check failed: {_e}[/yellow]")
-        except NON_FATAL_EXCEPTIONS as e:
-            console.print(f"  [yellow]⚠️ Preflight failed: {e}[/yellow]")
+                console.print(line)
+        _record_findings(list(preflight.findings), mark_error=preflight.had_error)
+        had_error = had_error or preflight.had_error
+        cfg_metric_kind = preflight.metric_kind or cfg_metric_kind
+        if preflight.policy_meta is not None:
+            global POLICY_META
+            POLICY_META = preflight.policy_meta
 
     # Baseline quick check for split fallback visibility (even without --config)
-    try:
-        if not config:
-            quick_check_path = baseline or baseline_report
-            if quick_check_path:
-                _, bdata, quick_check_findings, invalid_quick_check = (
-                    load_explicit_report_input(
-                        quick_check_path,
-                        label="Baseline",
-                        field="baseline" if baseline else "baseline_report",
-                    )
+    if not config:
+        quick_check_path = baseline or baseline_report
+        if quick_check_path:
+            _, baseline_payload, baseline_findings, invalid_baseline = (
+                load_explicit_report_input(
+                    quick_check_path,
+                    label="Baseline",
+                    field="baseline" if baseline else "baseline_report",
                 )
-                _record_findings(quick_check_findings, mark_error=invalid_quick_check)
-                had_error = had_error or invalid_quick_check
-                if bdata is not None:
-                    split_findings = build_split_fallback_findings(bdata)
-                    _record_findings(split_findings)
-                    if split_findings and not json_out:
-                        console.print(
-                            f"  [yellow]⚠️  {DATASET_SPLIT_FALLBACK_WARNING}[/yellow]"
-                        )
-    except NON_FATAL_EXCEPTIONS:
-        pass
+            )
+            split_findings = (
+                build_split_fallback_findings(baseline_payload)
+                if baseline_payload is not None
+                else []
+            )
+            _record_findings(
+                list(baseline_findings) + list(split_findings),
+                mark_error=invalid_baseline,
+            )
+            had_error = had_error or invalid_baseline
+            if split_findings and not json_out:
+                console.print(f"  [yellow]⚠️  {DATASET_SPLIT_FALLBACK_WARNING}[/yellow]")
 
     cross_check_findings, cross_check_error = build_cross_check_findings(
         baseline_report,
@@ -723,103 +414,6 @@ def doctor_command(
                 "doctor will include optional third-party adapters in registry checks.",
             )
 
-        # Detail adapters with Origin/Mode/Backend/Version table
-        def _gather_adapter_rows() -> list[dict]:
-            names = registry.list_adapters()
-            try:
-                import torch as _t
-
-                has_cuda = bool(getattr(_t, "cuda", None) and _t.cuda.is_available())
-            except NON_FATAL_EXCEPTIONS:
-                has_cuda = False
-            is_linux = _platform.system().lower() == "linux"
-
-            rows: list[dict] = []
-            for n in names:
-                info = registry.get_plugin_info(n, "adapters")
-                module = str(info.get("module") or "")
-                support = (
-                    "auto"
-                    if module.startswith("invarlock.adapters") and n in {"hf_auto"}
-                    else (
-                        "core"
-                        if module.startswith("invarlock.adapters")
-                        else "optional"
-                    )
-                )
-                origin = "core" if support in {"core", "auto"} else "plugin"
-                mode = "auto-matcher" if support == "auto" else "adapter"
-
-                backend, version = None, None
-                status, enable = "ready", ""
-
-                # Heuristic backend mapping without heavy imports
-                if n in {
-                    "hf_causal",
-                    "hf_mlm",
-                    "hf_seq2seq",
-                    "hf_auto",
-                }:
-                    # Transformers-based
-                    backend = "transformers"
-                    try:
-                        import transformers as _tf  # type: ignore
-
-                        version = getattr(_tf, "__version__", None)
-                    except NON_FATAL_EXCEPTIONS:
-                        version = None
-                elif n == "hf_gptq":
-                    backend = "auto-gptq"
-                elif n == "hf_awq":
-                    backend = "autoawq"
-                elif n == "hf_bnb":
-                    backend = "bitsandbytes"
-
-                # Presence and platform gating
-                if support == "optional":
-                    # Check install presence
-                    present = (
-                        _find_spec_safe((backend or "").replace("-", "_")) is not None
-                        if backend
-                        else False
-                    )
-                    if not present:
-                        status = "needs_extra"
-                        hint = {
-                            "hf_gptq": "invarlock[gptq]",
-                            "hf_awq": "invarlock[awq]",
-                            "hf_bnb": "invarlock[gpu]",
-                        }.get(n)
-                        if hint:
-                            enable = f"pip install '{hint}'"
-                # Platform checks
-                if backend in {"auto-gptq", "autoawq"} and not is_linux:
-                    status = "unsupported"
-                    enable = "Linux-only"
-                if (
-                    backend == "bitsandbytes"
-                    and _find_spec_safe("bitsandbytes") is not None
-                    and not bitsandbytes_runtime_available()
-                ):
-                    status = "unsupported"
-                    if has_cuda:
-                        enable = "bitsandbytes unavailable on this host"
-                    else:
-                        enable = "Requires CUDA or a compatible bitsandbytes runtime"
-
-                rows.append(
-                    {
-                        "name": n,
-                        "origin": origin,
-                        "mode": mode,
-                        "backend": backend,
-                        "version": version,
-                        "status": status,
-                        "enable": enable,
-                    }
-                )
-            return rows
-
         def _fmt_backend_ver(
             backend: str | None, version: str | None
         ) -> tuple[str, str]:
@@ -827,16 +421,28 @@ def doctor_command(
             v = f"=={version}" if backend and version else "—"
             return b, v
 
-        all_rows = _gather_adapter_rows()
-        if all_rows:
+        try:
+            bnb_runtime_ready = bitsandbytes_runtime_available()
+        except NON_FATAL_EXCEPTIONS:
+            bnb_runtime_ready = False
+
+        adapter_rows = build_adapter_inventory_rows(
+            registry,
+            has_cuda=bool(has_cuda),
+            is_linux=_platform.system().lower() == "linux",
+            find_spec_safe=_find_spec_safe,
+            bitsandbytes_runtime_ready=bnb_runtime_ready,
+        )
+        if adapter_rows:
+            adapter_summary = summarize_inventory_rows(adapter_rows)
             # Counts over full set
-            total = len(all_rows)
-            ready = sum(1 for r in all_rows if r["status"] == "ready")
-            need = sum(1 for r in all_rows if r["status"] == "needs_extra")
-            unsupported = sum(1 for r in all_rows if r["status"] == "unsupported")
-            auto = sum(1 for r in all_rows if r["mode"] == "auto-matcher")
+            total = adapter_summary["total"]
+            ready = adapter_summary["ready"]
+            need = adapter_summary["needs_extra"]
+            unsupported = adapter_summary["unsupported"]
+            auto = adapter_summary["auto"]
             # Hide unsupported rows in the display
-            rows = [r for r in all_rows if r["status"] != "unsupported"]
+            rows = [row for row in adapter_rows if row.status != "unsupported"]
             table = Table(
                 title=f"Adapters — total: {total} · ready: {ready} · auto: {auto} · missing-extras: {need} · unsupported: {unsupported}"
             )
@@ -846,74 +452,39 @@ def doctor_command(
             table.add_column("Backend", style="magenta")
             table.add_column("Version", style="magenta")
             table.add_column("Status / Action", style="green")
-            for r in rows:
-                backend_disp, ver_disp = _fmt_backend_ver(r["backend"], r["version"])
-                if r["mode"] == "auto-matcher":
+            for row in rows:
+                backend_disp, ver_disp = _fmt_backend_ver(row.backend, row.version)
+                if row.mode == "auto-matcher":
                     status_disp = "Ready"
-                elif r["status"] == "ready":
+                elif row.status == "ready":
                     status_disp = "Ready"
-                elif r["status"] == "needs_extra":
+                elif row.status == "needs_extra":
                     status_disp = (
-                        f"Needs extra: {r['enable']}" if r["enable"] else "Needs extra"
+                        f"Needs extra: {row.enable}" if row.enable else "Needs extra"
                     )
                 else:
-                    status_disp = r["status"]
+                    status_disp = row.status
                 table.add_row(
-                    r["name"],
-                    r["origin"].capitalize(),
-                    "Auto‑matcher" if r["mode"] == "auto-matcher" else "Adapter",
+                    row.name,
+                    row.origin.capitalize(),
+                    "Auto‑matcher" if row.mode == "auto-matcher" else "Adapter",
                     backend_disp,
                     ver_disp,
                     status_disp,
                 )
             console.print(table)
 
-        # Guards table
-        def _gather_generic_rows(kind: str) -> list[dict]:
-            names = (
-                registry.list_guards() if kind == "guards" else registry.list_edits()
-            )
-            rows: list[dict] = []
-            for n in names:
-                info = registry.get_plugin_info(n, kind)
-                module = str(info.get("module") or "")
-                origin = "core" if module.startswith(f"invarlock.{kind}") else "plugin"
-                mode = "guard" if kind == "guards" else "edit"
-                # Extras
-                status = "ready"
-                enable = ""
-                try:
-                    extras = _check_plugin_extras(n, kind)
-                except NON_FATAL_EXCEPTIONS:
-                    extras = ""
-                if (
-                    isinstance(extras, str)
-                    and extras.startswith("⚠️")
-                    and "missing" in extras
-                ):
-                    status = "needs_extra"
-                    hint = extras.split("missing", 1)[-1].strip()
-                    if hint:
-                        enable = f"pip install '{hint}'"
-                rows.append(
-                    {
-                        "name": n,
-                        "origin": origin,
-                        "mode": mode,
-                        "backend": None,
-                        "version": None,
-                        "status": status,
-                        "enable": enable,
-                    }
-                )
-            return rows
-
         for kind, title in (("guards", "Guards"), ("edits", "Edits")):
-            grows = _gather_generic_rows(kind)
+            grows = build_generic_inventory_rows(
+                registry,
+                kind=kind,
+                check_plugin_extras=_check_plugin_extras,
+            )
             if grows:
-                total = len(grows)
-                ready = sum(1 for r in grows if r["status"] == "ready")
-                need = sum(1 for r in grows if r["status"] == "needs_extra")
+                summary = summarize_inventory_rows(grows)
+                total = summary["total"]
+                ready = summary["ready"]
+                need = summary["needs_extra"]
                 table = Table(
                     title=f"{title} — total: {total} · ready: {ready} · missing-extras: {need}"
                 )
@@ -923,22 +494,22 @@ def doctor_command(
                 table.add_column("Backend", style="magenta")
                 table.add_column("Version", style="magenta")
                 table.add_column("Status / Action", style="green")
-                for r in grows:
-                    b, v = _fmt_backend_ver(r["backend"], r["version"])
+                for row in grows:
+                    b, v = _fmt_backend_ver(row.backend, row.version)
 
                     status_disp = (
                         "Ready"
-                        if r["status"] == "ready"
+                        if row.status == "ready"
                         else (
-                            f"Needs extra: {r['enable']}"
-                            if r["enable"]
+                            f"Needs extra: {row.enable}"
+                            if row.enable
                             else "Needs extra"
                         )
                     )
                     table.add_row(
-                        r["name"],
-                        r["origin"].capitalize(),
-                        ("Guard" if r["mode"] == "guard" else "Edit"),
+                        row.name,
+                        row.origin.capitalize(),
+                        ("Guard" if row.mode == "guard" else "Edit"),
                         b,
                         v,
                         status_disp,
@@ -963,22 +534,16 @@ def doctor_command(
                     PROVIDER_PARAMS as provider_params,
                 )
 
-                def _net_label(name: str) -> str:
-                    val = (provider_network.get(name, "") or "").lower()
-                    if val == "cache":
-                        return "Cache/Net"
-                    if val == "yes":
-                        return "Yes"
-                    if val == "no":
-                        return "No"
-                    return "Unknown"
-
-                for pname in providers:
+                for row in build_dataset_inventory_rows(
+                    providers,
+                    provider_network=provider_network,
+                    provider_params=provider_params,
+                ):
                     dtable.add_row(
-                        pname,
-                        _net_label(pname),
-                        "✓ Available",
-                        provider_params.get(pname, "-"),
+                        row.provider,
+                        row.network,
+                        row.status,
+                        row.params,
                     )
                 console.print(dtable)
         except NON_FATAL_EXCEPTIONS:
