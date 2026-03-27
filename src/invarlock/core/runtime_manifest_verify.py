@@ -72,4 +72,3 @@ def verify_report_manifest(report_path: Path, manifest_path: Path) -> list[str]:
         errors.append("report file is empty")
 
     return errors
-

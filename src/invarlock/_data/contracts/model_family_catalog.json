@@ -204,7 +204,7 @@
       "repo_evidence": [
         "src/invarlock/model_profile.py",
         "src/invarlock/adapters/hf_loading.py",
-        "src/invarlock/core/adapter_auto.py"
+        "src/invarlock/cli/adapter_auto.py"
       ],
       "notes": "Generic Llama-family profile handling is first-class. TinyLlama now provides the ungated declared support lane, while access-gated vendor checkpoints remain omitted."
     },
@@ -220,7 +220,7 @@
       ],
       "repo_evidence": [
         "src/invarlock/model_profile.py",
-        "src/invarlock/core/adapter_auto.py",
+        "src/invarlock/cli/adapter_auto.py",
         "docs/reference/model-adapters.md"
       ],
       "notes": "Shared qwen-family heuristics still cover aliases beyond the declared Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 public lanes, including larger usage-only Qwen2.5 checkpoints."
@@ -234,7 +234,7 @@
       "representative_models": ["01-ai/Yi-34B"],
       "repo_evidence": [
         "src/invarlock/model_profile.py",
-        "src/invarlock/core/adapter_auto.py",
+        "src/invarlock/cli/adapter_auto.py",
         "docs/reference/model-adapters.md"
       ],
       "notes": "Yi is treated as a RoPE decoder family in profile and adapter-auto logic."
@@ -252,7 +252,7 @@
       "repo_evidence": [
         "src/invarlock/model_profile.py",
         "src/invarlock/adapters/hf_loading.py",
-        "src/invarlock/core/adapter_auto.py"
+        "src/invarlock/cli/adapter_auto.py"
       ],
       "notes": "Phi-family selectors are first-class. Phi-4 now has a declared text-only lane via the reasoning-plus pilot, while multimodal Phi-4 remains backlog-only."
     },
@@ -266,7 +266,7 @@
       "repo_evidence": [
         "src/invarlock/model_profile.py",
         "src/invarlock/adapters/hf_loading.py",
-        "src/invarlock/core/adapter_auto.py"
+        "src/invarlock/cli/adapter_auto.py"
       ],
       "notes": "These families are available through shared GPT-style loader and profile paths rather than dedicated public support lanes."
     },
@@ -278,7 +278,7 @@
       "state": "auto_or_loader_only",
       "representative_models": ["tiiuae/falcon-7b"],
       "repo_evidence": [
-        "src/invarlock/core/adapter_auto.py"
+        "src/invarlock/cli/adapter_auto.py"
       ],
       "notes": "Family visibility currently comes from adapter-auto heuristics only."
     },
@@ -290,7 +290,7 @@
       "state": "auto_or_loader_only",
       "representative_models": ["THUDM/glm-4-9b-chat"],
       "repo_evidence": [
-        "src/invarlock/core/adapter_auto.py"
+        "src/invarlock/cli/adapter_auto.py"
       ],
       "notes": "Family visibility currently comes from adapter-auto heuristics only."
     },
@@ -304,7 +304,7 @@
       "repo_evidence": [
         "src/invarlock/model_profile.py",
         "src/invarlock/adapters/hf_loading.py",
-        "src/invarlock/core/adapter_auto.py"
+        "src/invarlock/cli/adapter_auto.py"
       ],
       "notes": "DeepSeek distill checkpoints continue to share the qwen-family route. Oversized FP8 checkpoint-specific repo hooks and shipped configs were removed after bring-up showed that they do not fit the supported hardware/runtime path."
     },
@@ -320,7 +320,7 @@
       ],
       "repo_evidence": [
         "src/invarlock/adapters/hf_loading.py",
-        "src/invarlock/core/adapter_auto.py",
+        "src/invarlock/cli/adapter_auto.py",
         "docs/reference/model-adapters.md"
       ],
       "notes": "Loader and adapter-auto support exceeds the public BERT / RoBERTa support lane."
@@ -334,7 +334,7 @@
       "representative_models": ["facebook/mbart-large-50", "Helsinki-NLP/opus-mt-en-de"],
       "repo_evidence": [
         "src/invarlock/adapters/hf_loading.py",
-        "src/invarlock/core/adapter_auto.py",
+        "src/invarlock/cli/adapter_auto.py",
         "docs/reference/model-adapters.md"
       ],
       "notes": "Concrete loader families exist even though the public support matrix keeps seq2seq at a generic local-pairs lane."
@@ -415,7 +415,7 @@
       ],
       "repo_evidence": [
         "docs/reference/model-adapters.md",
-        "src/invarlock/core/adapter_auto.py"
+        "src/invarlock/cli/adapter_auto.py"
       ],
       "repo_gaps": [
         "No processor-aware multimodal dataset/evaluation pipeline exists today"

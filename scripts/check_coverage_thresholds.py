@@ -31,6 +31,8 @@ THRESHOLDS = {
     "src/invarlock/eval/metrics.py": 0.90,
     # Guard-effect benchmark harness (Step 14) + primary metric core
     "src/invarlock/eval/bench.py": 0.90,
+    "src/invarlock/eval/bench_policy.py": 0.95,
+    "src/invarlock/eval/bench_runner.py": 0.75,
     "src/invarlock/eval/primary_metric.py": 0.90,
     "src/invarlock/eval/tail_stats.py": 0.95,
     "src/invarlock/eval/tasks/classification.py": 1.00,
@@ -100,6 +102,7 @@ THRESHOLDS = {
     "src/invarlock/core/types.py": 0.90,
     "src/invarlock/core/doctor_findings.py": 0.95,
     "src/invarlock/core/evaluate_plan.py": 0.95,
+    "src/invarlock/core/runtime_manifest_verify.py": 0.90,
     # CLI commands
     "src/invarlock/cli/_json.py": 1.00,
     # Simplified public-core CLI surfaces have dedicated branch-focused tests;
@@ -114,6 +117,7 @@ THRESHOLDS = {
     "src/invarlock/reporting/report_files.py": 0.95,
     "src/invarlock/reporting/verify_checks.py": 0.95,
     "src/invarlock/reporting/verify_contract.py": 0.95,
+    "src/invarlock/runtime_verify.py": 1.00,
     "src/invarlock/runtime_security.py": 0.95,
     # PR-4 split modules
     "src/invarlock/cli/run_analysis.py": 1.00,
@@ -166,6 +170,8 @@ CORE_FILES = (
     "src/invarlock/eval/providers/seq2seq.py",
     "src/invarlock/eval/metrics.py",
     "src/invarlock/eval/bench.py",
+    "src/invarlock/eval/bench_policy.py",
+    "src/invarlock/eval/bench_runner.py",
     "src/invarlock/eval/primary_metric.py",
     "src/invarlock/eval/tail_stats.py",
     "src/invarlock/eval/tasks/classification.py",
@@ -206,6 +212,7 @@ CORE_FILES = (
     "src/invarlock/public_contracts.py",
     "src/invarlock/policy_pack.py",
     "src/invarlock/proof_pack.py",
+    "src/invarlock/runtime_verify.py",
     "src/invarlock/cli/commands/proof_pack.py",
     "src/invarlock/runtime_security.py",
 )

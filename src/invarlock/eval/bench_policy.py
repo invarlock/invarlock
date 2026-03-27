@@ -284,7 +284,9 @@ class MetricsAggregator:
         guarded_guards = cls.extract_guard_metrics(guarded_result.report)
 
         comparison = {
-            "primary_metric_bare": bare_metrics.get("primary_metric_final", float("nan")),
+            "primary_metric_bare": bare_metrics.get(
+                "primary_metric_final", float("nan")
+            ),
             "primary_metric_guarded": guarded_metrics.get(
                 "primary_metric_final", float("nan")
             ),
@@ -471,9 +473,7 @@ def summary_to_step14_json(summary: BenchmarkSummary) -> dict[str, Any]:
                     "mem_guarded": result.metrics.get("mem_guarded"),
                     "guard_overhead_mem": result.metrics.get("guard_overhead_mem"),
                     "rmt_outliers_bare": result.metrics.get("rmt_outliers_bare"),
-                    "rmt_outliers_guarded": result.metrics.get(
-                        "rmt_outliers_guarded"
-                    ),
+                    "rmt_outliers_guarded": result.metrics.get("rmt_outliers_guarded"),
                     "tying_violations_post": result.metrics.get(
                         "tying_violations_post"
                     ),
@@ -548,7 +548,9 @@ def generate_step14_markdown(summary: BenchmarkSummary) -> str:
             pm_overhead = result.metrics.get("primary_metric_overhead")
             if pm_overhead is not None and not math.isnan(pm_overhead):
                 ppl_delta = f"{pm_overhead:+.1%}"
-                ppl_delta = f"🔴 {ppl_delta}" if pm_overhead > 0.01 else f"🟢 {ppl_delta}"
+                ppl_delta = (
+                    f"🔴 {ppl_delta}" if pm_overhead > 0.01 else f"🟢 {ppl_delta}"
+                )
             else:
                 ppl_delta = "-"
             time_overhead = result.metrics.get("guard_overhead_time")

@@ -291,7 +291,9 @@ def test_vars_failure_in_to_serialisable_dict(tmp_path: Path):
     with ExitStack() as stack:
         for ctx in _common_ce_detect_ce():
             stack.enter_context(ctx)
-        stack.enter_context(patch("invarlock.core.config_runtime.load_config", lambda p: Cfg()))
+        stack.enter_context(
+            patch("invarlock.core.config_runtime.load_config", lambda p: Cfg())
+        )
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: _provider_min())
         )
@@ -612,7 +614,9 @@ def test_mlm_probability_inversion(tmp_path: Path):
                 "invarlock.cli.device.validate_device_for_config", lambda d: (True, "")
             )
         )
-        stack.enter_context(patch("invarlock.core.config_runtime.load_config", lambda p: Cfg()))
+        stack.enter_context(
+            patch("invarlock.core.config_runtime.load_config", lambda p: Cfg())
+        )
         stack.enter_context(
             patch("invarlock.cli.commands.run.detect_model_profile", detect_mlm)
         )
@@ -721,7 +725,9 @@ def test_baseline_mlm_no_masked_tokens_exit(tmp_path: Path):
                 "invarlock.cli.device.validate_device_for_config", lambda d: (True, "")
             )
         )
-        stack.enter_context(patch("invarlock.core.config_runtime.load_config", lambda p: Cfg()))
+        stack.enter_context(
+            patch("invarlock.core.config_runtime.load_config", lambda p: Cfg())
+        )
         stack.enter_context(
             patch("invarlock.cli.commands.run.detect_model_profile", detect_mlm)
         )

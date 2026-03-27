@@ -106,7 +106,7 @@ def test_overrides_take_precedence(tmp_path: Path) -> None:
         abs(files["src/invarlock/reporting/report_builder.py"]["threshold"] - 0.90)
         < 1e-9
     )
-    assert payload["configured_threshold_files"] == 96
+    assert payload["configured_threshold_files"] == 100
     assert payload["evaluated_files"] == 1
     assert payload["measured_threshold_files"] == 1
     assert "src/invarlock/cli/app.py" in payload["missing_threshold_files"]
@@ -123,6 +123,7 @@ def test_new_core_cli_and_runtime_surface_thresholds_are_enforced(
             ("invarlock/cli/app.py", 0.79, 0.95),
             ("invarlock/cli/commands/evaluate.py", 0.71, 0.95),
             ("invarlock/cli/commands/report.py", 0.81, 0.95),
+            ("invarlock/core/runtime_manifest_verify.py", 0.89, 0.95),
             ("invarlock/runtime_security.py", 0.71, 0.95),
         ],
     )
@@ -133,6 +134,7 @@ def test_new_core_cli_and_runtime_surface_thresholds_are_enforced(
     assert "src/invarlock/cli/app.py" in proc.stderr
     assert "src/invarlock/cli/commands/evaluate.py" in proc.stderr
     assert "src/invarlock/cli/commands/report.py" in proc.stderr
+    assert "src/invarlock/core/runtime_manifest_verify.py" in proc.stderr
     assert "src/invarlock/runtime_security.py" in proc.stderr
 
 
@@ -169,19 +171,19 @@ def test_summary_reports_measured_vs_configured_threshold_counts(
 
     assert proc.returncode == 0, proc.stderr
     assert (
-        "Coverage OK: 1/96 threshold-listed files had coverage data and met "
+        "Coverage OK: 1/100 threshold-listed files had coverage data and met "
         "per-file thresholds." in proc.stdout
     )
     assert (
-        "95 threshold-listed files were absent from the coverage report." in proc.stdout
+        "99 threshold-listed files were absent from the coverage report." in proc.stdout
     )
 
     payload = json.loads(json_out.read_text())
     assert payload["status"] == "ok"
-    assert payload["configured_threshold_files"] == 96
+    assert payload["configured_threshold_files"] == 100
     assert payload["evaluated_files"] == 1
     assert payload["measured_threshold_files"] == 1
-    assert len(payload["missing_threshold_files"]) == 95
+    assert len(payload["missing_threshold_files"]) == 99
 
 
 def test_ratchets_selected_files_to_ninety_five_percent(tmp_path: Path) -> None:
@@ -208,6 +210,7 @@ def test_ratchets_selected_files_to_ninety_five_percent(tmp_path: Path) -> None:
             ("src/invarlock/reporting/validate.py", 0.949, 1.0),
             ("src/invarlock/guards/policies.py", 0.949, 1.0),
             ("src/invarlock/runtime_security.py", 0.949, 1.0),
+            ("src/invarlock/eval/bench_policy.py", 0.949, 1.0),
         ],
     )
 
@@ -233,8 +236,20 @@ def test_ratchets_selected_files_to_ninety_five_percent(tmp_path: Path) -> None:
         "src/invarlock/reporting/validate.py",
         "src/invarlock/guards/policies.py",
         "src/invarlock/runtime_security.py",
+        "src/invarlock/eval/bench_policy.py",
     ):
         assert path in proc.stderr
+
+
+def test_calibrated_bench_runner_threshold_is_explicit(tmp_path: Path) -> None:
+    xml = tmp_path / "cov.xml"
+    json_out = tmp_path / "out.json"
+    _write_cov_xml(xml, [("src/invarlock/eval/bench_runner.py", 0.74, 1.0)])
+
+    proc = _run_checker(xml, json_out)
+
+    assert proc.returncode != 0
+    assert "src/invarlock/eval/bench_runner.py" in proc.stderr
 
 
 def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
@@ -261,6 +276,7 @@ def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
             ("src/invarlock/proof_pack.py", 0.999, 1.0),
             ("src/invarlock/reporting/report_types.py", 0.999, 1.0),
             ("src/invarlock/reporting/utils.py", 0.999, 1.0),
+            ("src/invarlock/runtime_verify.py", 0.999, 1.0),
         ],
     )
 
@@ -286,5 +302,6 @@ def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
         "src/invarlock/proof_pack.py",
         "src/invarlock/reporting/report_types.py",
         "src/invarlock/reporting/utils.py",
+        "src/invarlock/runtime_verify.py",
     ):
         assert path in proc.stderr

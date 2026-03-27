@@ -3,6 +3,12 @@ from __future__ import annotations
 import pytest
 
 import invarlock.core.config_runtime as config_mod
+from invarlock.cli.device import (
+    get_device_info,
+    is_device_available,
+    resolve_device,
+    validate_device_for_config,
+)
 from invarlock.core.config_runtime import (
     DatasetConfig,
     EvalBootstrapConfig,
@@ -13,12 +19,6 @@ from invarlock.core.config_runtime import (
     apply_profile,
     load_config,
     resolve_edit_kind,
-)
-from invarlock.cli.device import (
-    get_device_info,
-    is_device_available,
-    resolve_device,
-    validate_device_for_config,
 )
 
 

@@ -131,7 +131,9 @@ def test_cleanup_rmtree_exception_is_swallowed(tmp_path: Path, monkeypatch):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(patch("invarlock.core.config_runtime.load_config", load_cfg))
+        stack.enter_context(
+            patch("invarlock.core.config_runtime.load_config", load_cfg)
+        )
         stack.enter_context(
             patch(
                 "invarlock.core.registry.get_registry",
@@ -445,7 +447,9 @@ def test_restore_chunked_missing_dir_causes_exit(tmp_path: Path):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(patch("invarlock.core.config_runtime.load_config", load_cfg))
+        stack.enter_context(
+            patch("invarlock.core.config_runtime.load_config", load_cfg)
+        )
         stack.enter_context(
             patch(
                 "invarlock.core.registry.get_registry",

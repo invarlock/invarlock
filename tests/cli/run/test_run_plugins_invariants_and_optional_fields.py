@@ -434,7 +434,9 @@ def test_mlm_mask_prob_zero_sets_labels_and_zero_counts(tmp_path: Path):
             def model_dump(self):
                 return {}
 
-        stack.enter_context(patch("invarlock.core.config_runtime.load_config", lambda p: Cfg()))
+        stack.enter_context(
+            patch("invarlock.core.config_runtime.load_config", lambda p: Cfg())
+        )
 
         def runner_exec6(**kwargs):
             cfg_ctx = getattr(kwargs.get("config"), "context", {})

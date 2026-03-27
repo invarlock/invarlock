@@ -150,7 +150,9 @@ def test_bench_policy_regression_against_golden(tmp_path: Path, monkeypatch) -> 
         report["flags"].update({"guard_recovered": False, "rollback_reason": None})
         return bench.RunResult(run_type=run_type, report=report, success=True)
 
-    monkeypatch.setattr("invarlock.eval.bench_runner.execute_single_run", stub_execute_single_run)
+    monkeypatch.setattr(
+        "invarlock.eval.bench_runner.execute_single_run", stub_execute_single_run
+    )
 
     bench.run_guard_effect_benchmark(
         edits=["quant_rtn"],

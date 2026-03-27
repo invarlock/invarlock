@@ -544,7 +544,9 @@ def run_guard_effect_benchmark(
     logger.info(f"Output directory: {config.output_dir}")
 
     scenarios = generate_scenarios(config)
-    scenario_results = [execute_scenario(scenario, config, config.output_dir) for scenario in scenarios]
+    scenario_results = [
+        execute_scenario(scenario, config, config.output_dir) for scenario in scenarios
+    ]
 
     end_time = datetime.now()
     execution_time = (end_time - start_time).total_seconds()
