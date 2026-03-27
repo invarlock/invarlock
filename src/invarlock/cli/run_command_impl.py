@@ -58,9 +58,17 @@ def run_command_impl(
     _apply_mlm_masks = _dep("_apply_mlm_masks")
     _apply_mask_only_head_autotune = _dep("_apply_mask_only_head_autotune")
     _apply_warning_filters = _dep("_apply_warning_filters")
+    _build_artifacts_payload = _dep("_build_artifacts_payload")
+    _build_edit_payload = _dep("_build_edit_payload")
     _build_timing_summary_payload = _dep("_build_timing_summary_payload")
     _build_retry_result_summary = _dep("_build_retry_result_summary")
     _build_fallback_evaluation_windows = _dep("_build_fallback_evaluation_windows")
+    _build_flags_payload = _dep("_build_flags_payload")
+    _build_guard_entries = _dep("_build_guard_entries")
+    _build_metrics_payload = _dep("_build_metrics_payload")
+    _build_run_report_context = _dep("_build_run_report_context")
+    _build_run_report_data = _dep("_build_run_report_data")
+    _build_run_report_meta = _dep("_build_run_report_meta")
     _canonical_dataset_id = _dep("_canonical_dataset_id")
     _choose_snapshot_mode = _dep("_choose_snapshot_mode")
     _coerce_float = _dep("_coerce_float")
@@ -71,6 +79,7 @@ def run_command_impl(
     _event = _dep("_event")
     _execute_guarded_run = _dep("_execute_guarded_run")
     _extract_pairing_schedule = _dep("_extract_pairing_schedule")
+    _load_baseline_pairing_evidence = _dep("_load_baseline_pairing_evidence")
     _extract_pm_snapshot_for_overhead = _dep("_extract_pm_snapshot_for_overhead")
     _format_debug_metric_diffs = _dep("_format_debug_metric_diffs")
     _format_guard_chain = _dep("_format_guard_chain")
@@ -81,6 +90,7 @@ def run_command_impl(
     _load_model_with_cfg = _dep("_load_model_with_cfg")
     _maybe_plan_release_windows = _dep("_maybe_plan_release_windows")
     _merge_primary_metric_health = _dep("_merge_primary_metric_health")
+    _merge_core_timing_metrics = _dep("_merge_core_timing_metrics")
     _normalize_overhead_result = _dep("_normalize_overhead_result")
     _estimate_model_bytes = _dep("_estimate_model_bytes")
     _finalize_guard_overhead_payload = _dep("_finalize_guard_overhead_payload")
@@ -108,12 +118,12 @@ def run_command_impl(
     _tensor_or_list_to_ints = _dep("_tensor_or_list_to_ints")
     _to_serialisable_dict = _dep("_to_serialisable_dict")
     _tokenizer_digest = _dep("_tokenizer_digest")
+    _build_snapshot_provenance = _dep("_build_snapshot_provenance")
     _validate_and_harvest_baseline_schedule = _dep(
         "_validate_and_harvest_baseline_schedule"
     )
     click = _dep("click")
     console = _dep("console")
-    copy = _dep("copy")
     datetime = _dep("datetime")
     detect_model_profile = _dep("detect_model_profile")
     hashlib = _dep("hashlib")
@@ -483,114 +493,31 @@ def run_command_impl(
         if baseline:
             baseline_path = Path(baseline)
             strict_baseline = profile_normalized in {"ci", "release"}
-            if not baseline_path.exists():
-                msg = (
-                    "PAIRING-EVIDENCE-MISSING: baseline report path does not exist "
-                    f"({baseline})"
+            baseline_evidence = _load_baseline_pairing_evidence(
+                baseline_path=baseline_path,
+                tokenizer_hash=tokenizer_hash,
+            )
+            baseline_report_data = baseline_evidence.report_data
+            pairing_schedule = baseline_evidence.pairing_schedule
+            tokenizer_hash = baseline_evidence.tokenizer_hash
+            if baseline_evidence.status == "loaded":
+                _event(
+                    console,
+                    "DATA",
+                    "Loaded baseline evaluation schedule for pairing",
+                    emoji="🧬",
+                    profile=profile_normalized,
                 )
+            elif baseline_evidence.message:
                 if strict_baseline:
-                    raise InvarlockError(code="E001", message=msg)
+                    raise InvarlockError(code="E001", message=baseline_evidence.message)
                 _event(
                     console,
                     "WARN",
-                    f"{msg}. Falling back to dataset schedule.",
+                    f"{baseline_evidence.message}. Falling back to dataset schedule.",
                     emoji="⚠️",
                     profile=profile_normalized,
                 )
-            else:
-                try:
-                    with baseline_path.open(encoding="utf-8") as f:
-                        baseline_report_data = json.load(f)
-                except (OSError, TypeError, ValueError) as exc:
-                    msg = f"PAIRING-EVIDENCE-MISSING: baseline report JSON parse failed ({exc})"
-                    if strict_baseline:
-                        raise InvarlockError(code="E001", message=msg) from exc
-                    _event(
-                        console,
-                        "WARN",
-                        f"{msg}. Falling back to dataset schedule.",
-                        emoji="⚠️",
-                        profile=profile_normalized,
-                    )
-                    baseline_report_data = None
-                if isinstance(baseline_report_data, dict):
-                    pairing_schedule = _extract_pairing_schedule(baseline_report_data)
-                    if pairing_schedule:
-                        # Normalize baseline report in-memory so downstream digest/parity
-                        # computations see a consistent window_id + mask shape even for
-                        # baselines missing some fields.
-                        try:
-                            ew = baseline_report_data.get("evaluation_windows")
-                            if not isinstance(ew, dict):
-                                ew = {}
-                                baseline_report_data["evaluation_windows"] = ew
-                            # Merge the sanitized pairing schedule into existing
-                            # evaluation_windows without discarding logloss/token_counts.
-                            for arm in ("preview", "final"):
-                                src = (
-                                    pairing_schedule.get(arm)
-                                    if isinstance(pairing_schedule, dict)
-                                    else None
-                                )
-                                if not isinstance(src, dict):
-                                    continue
-                                dst = ew.get(arm)
-                                if not isinstance(dst, dict):
-                                    ew[arm] = dict(src)
-                                    continue
-                                for key, value in src.items():
-                                    dst[key] = value
-                        except NON_FATAL_RUNTIME_EXCEPTIONS:
-                            pass
-                        # Harvest tokenizer hash provenance from baseline when present.
-                        try:
-                            if not tokenizer_hash:
-                                tok = None
-                                meta = (
-                                    baseline_report_data.get("meta")
-                                    if isinstance(
-                                        baseline_report_data.get("meta"), dict
-                                    )
-                                    else {}
-                                )
-                                data = (
-                                    baseline_report_data.get("data")
-                                    if isinstance(
-                                        baseline_report_data.get("data"), dict
-                                    )
-                                    else {}
-                                )
-                                if isinstance(meta, dict):
-                                    tok = meta.get("tokenizer_hash")
-                                if not tok and isinstance(data, dict):
-                                    tok = data.get("tokenizer_hash")
-                                if isinstance(tok, str) and tok:
-                                    tokenizer_hash = tok
-                        except NON_FATAL_RUNTIME_EXCEPTIONS:
-                            pass
-                        _event(
-                            console,
-                            "DATA",
-                            "Loaded baseline evaluation schedule for pairing",
-                            emoji="🧬",
-                            profile=profile_normalized,
-                        )
-                    else:
-                        msg = (
-                            "PAIRING-EVIDENCE-MISSING: baseline report missing or invalid "
-                            f"evaluation_windows ({baseline})"
-                        )
-                        if strict_baseline:
-                            raise InvarlockError(code="E001", message=msg)
-                        _event(
-                            console,
-                            "WARN",
-                            f"{msg}. Falling back to dataset schedule.",
-                            emoji="⚠️",
-                            profile=profile_normalized,
-                        )
-                        baseline_report_data = None
-                        pairing_schedule = None
 
         requested_preview = int(getattr(cfg.dataset, "preview_n", 0))
         requested_final = int(getattr(cfg.dataset, "final_n", 0))
@@ -1917,23 +1844,11 @@ def run_command_impl(
 
             # Persist minimal run context for evaluation report provenance.
             try:
-                run_policy_context = (
-                    dict(run_context.get("run"))
-                    if isinstance(run_context.get("run"), dict)
-                    else {}
+                report["context"] = _build_run_report_context(
+                    profile_normalized=profile_normalized,
+                    auto_config=auto_config,
+                    run_context=run_context,
                 )
-                eval_policy_context = (
-                    dict(run_context.get("eval"))
-                    if isinstance(run_context.get("eval"), dict)
-                    else {}
-                )
-                report["context"] = {
-                    "profile": profile_normalized,
-                    "auto": dict(auto_config),
-                    "assurance": dict(run_context.get("assurance") or {}),
-                    "run": run_policy_context,
-                    "eval": eval_policy_context,
-                }
             except (TypeError, ValueError, KeyError):
                 pass
 
@@ -2024,60 +1939,40 @@ def run_command_impl(
             except (AttributeError, RuntimeError, TypeError, ValueError, OSError):
                 env_flags = {}
 
-            meta_payload = {
-                "model_id": cfg.model.id,
-                "adapter": cfg.model.adapter,
-                "device": str(resolved_device),
-                "commit": commit_value,
-                "seed": seed_bundle["python"],
-                "seeds": seed_bundle,
-                "ts": datetime.now().isoformat(),
-                "auto": auto_config,
-            }
-            if invarlock_version:
-                meta_payload["invarlock_version"] = invarlock_version
-            if env_flags:
-                meta_payload["env_flags"] = env_flags
-            if determinism_meta:
-                meta_payload["determinism"] = determinism_meta
-            report["meta"].update(meta_payload)
-            if pm_acceptance_range:
-                report["meta"]["pm_acceptance_range"] = pm_acceptance_range
-            if pm_drift_band:
-                report["meta"]["pm_drift_band"] = pm_drift_band
-            report["meta"]["guard_overhead_threshold"] = guard_overhead_threshold
-            report["meta"]["model_profile"] = {
-                "family": model_profile.family,
-                "default_loss": model_profile.default_loss,
-                "module_selectors": model_profile.module_selectors,
-                "invariants": list(model_profile.invariants),
-                "cert_lints": [dict(lint) for lint in model_profile.cert_lints],
-            }
+            report["meta"].update(
+                _build_run_report_meta(
+                    model_id=cfg.model.id,
+                    adapter=cfg.model.adapter,
+                    resolved_device=resolved_device,
+                    commit_value=commit_value,
+                    seed_bundle=seed_bundle,
+                    auto_config=auto_config,
+                    guard_overhead_threshold=guard_overhead_threshold,
+                    model_profile=model_profile,
+                    timestamp=datetime.now().isoformat(),
+                    invarlock_version=invarlock_version,
+                    env_flags=env_flags,
+                    determinism_meta=determinism_meta,
+                    pm_acceptance_range=pm_acceptance_range,
+                    pm_drift_band=pm_drift_band,
+                )
+            )
 
             dataset_provider = getattr(cfg.dataset, "provider", None)
             if dataset_provider is None:
                 dataset_provider = getattr(cfg.dataset, "dataset", None)
-            report["data"].update(
-                {
-                    "dataset": _canonical_dataset_id(dataset_provider),
-                    # Resolved split (explicit or inferred)
-                    "split": resolved_split,
-                    "seq_len": cfg.dataset.seq_len,
-                    "stride": getattr(cfg.dataset, "stride", cfg.dataset.seq_len // 2),
-                    "preview_n": _safe_int(preview_count),
-                    "final_n": _safe_int(final_count),
-                }
-            )
             dataset_meta_context = core_report.context.get("dataset_meta", {})
-            if isinstance(dataset_meta_context, dict):
-                report["data"].update(dataset_meta_context)
-                dataset_tokenizer_hash = dataset_meta_context.get("tokenizer_hash")
-                if (
-                    not tokenizer_hash
-                    and isinstance(dataset_tokenizer_hash, str)
-                    and dataset_tokenizer_hash
-                ):
-                    tokenizer_hash = dataset_tokenizer_hash
+            data_payload, tokenizer_hash = _build_run_report_data(
+                canonical_dataset_id=_canonical_dataset_id(dataset_provider),
+                resolved_split=resolved_split,
+                seq_len=cfg.dataset.seq_len,
+                stride=getattr(cfg.dataset, "stride", cfg.dataset.seq_len // 2),
+                preview_count=_safe_int(preview_count),
+                final_count=_safe_int(final_count),
+                dataset_meta_context=dataset_meta_context,
+                tokenizer_hash=tokenizer_hash,
+            )
+            report["data"].update(data_payload)
 
             if tokenizer_hash:
                 report["meta"]["tokenizer_hash"] = tokenizer_hash
@@ -2085,178 +1980,44 @@ def run_command_impl(
             # Snapshot/restore provenance (survives retries).
             try:
                 prov = report.setdefault("provenance", {})
-                prov["restore_failed"] = bool(snapshot_provenance.get("restore_failed"))
-                prov["reload_path_used"] = bool(
-                    snapshot_provenance.get("reload_path_used")
-                )
+                prov.update(_build_snapshot_provenance(snapshot_provenance))
             except (TypeError, KeyError):
                 pass
 
             # Transfer edit information
-            if hasattr(core_report, "edit") and core_report.edit:
-                edit_deltas = core_report.edit.get("deltas", {})
-                report["edit"].update(
-                    {
-                        "name": edit_op.name,
-                        "plan_digest": core_report.edit.get(
-                            "plan_digest", str(hash(str(core_report.edit)))
-                        ),
-                        "deltas": {
-                            "params_changed": edit_deltas.get("params_changed", 0),
-                            "sparsity": edit_deltas.get("sparsity", None),
-                            "bitwidth_map": edit_deltas.get("bitwidth_map", None),
-                            "layers_modified": edit_deltas.get("layers_modified", 0),
-                        },
-                    }
-                )
-                for key in (
-                    "algorithm",
-                    "algorithm_version",
-                    "implementation",
-                    "scope",
-                    "ranking",
-                    "grouping",
-                    "budgets",
-                    "seed",
-                    "mask_digest",
-                ):
-                    if key in core_report.edit:
-                        report["edit"][key] = copy.deepcopy(core_report.edit[key])
-                if isinstance(core_report.context, dict):
-                    core_report.context.setdefault("edit", {})
-                    core_report.context["edit"].update(
-                        {
-                            "name": edit_op.name,
-                            "params_changed": edit_deltas.get("params_changed", 0),
-                            "layers_modified": edit_deltas.get("layers_modified", 0),
-                        }
-                    )
-
-            if edit_label:
-                report.setdefault("edit", {})
-                report["edit"]["name"] = edit_label
-                report["edit"]["algorithm"] = edit_label
-                if isinstance(core_report.context, dict):
-                    core_report.context.setdefault("edit", {})
-                    core_report.context["edit"]["name"] = edit_label
+            edit_payload, context_edit = _build_edit_payload(
+                core_edit=(
+                    core_report.edit
+                    if hasattr(core_report, "edit")
+                    and isinstance(core_report.edit, dict)
+                    else None
+                ),
+                edit_name=edit_op.name,
+                edit_label=edit_label,
+            )
+            if edit_payload:
+                report["edit"].update(edit_payload)
+            if context_edit and isinstance(core_report.context, dict):
+                core_report.context.setdefault("edit", {})
+                core_report.context["edit"].update(context_edit)
 
             mask_artifact_path = _persist_ref_masks(core_report, run_dir)
-            if mask_artifact_path:
-                report.setdefault("artifacts", {})
-                report["artifacts"]["masks_path"] = str(mask_artifact_path)
+            report["artifacts"].update(
+                _build_artifacts_payload(
+                    event_path=run_config.event_path,
+                    mask_artifact_path=mask_artifact_path,
+                )
+            )
 
             # Transfer metrics (PM-only: do not write ppl_* fields)
             if hasattr(core_report, "metrics") and core_report.metrics:
-                if isinstance(core_report.metrics, dict):
-                    core_timings = core_report.metrics.get("timings")
-                    if isinstance(core_timings, dict):
-                        for key in (
-                            "prepare",
-                            "prepare_guards",
-                            "edit",
-                            "guards",
-                            "eval",
-                            "finalize",
-                        ):
-                            if key in core_timings:
-                                try:
-                                    timings[key] = float(core_timings[key])
-                                except NUMERIC_EXCEPTIONS:
-                                    timings[key] = core_timings[key]
-                metrics_payload = {
-                    "latency_ms_per_tok": core_report.metrics.get(
-                        "latency_ms_per_tok", 0.0
-                    ),
-                    "memory_mb_peak": core_report.metrics.get("memory_mb_peak", 0.0),
-                    "spectral": {},
-                    "rmt": {},
-                    "invariants": {},
-                }
-                window_plan_ctx = core_report.context.get("window_plan")
-                if isinstance(window_plan_ctx, dict):
-                    metrics_payload["window_plan"] = window_plan_ctx
-                    capacity_meta = window_plan_ctx.get("capacity")
-                    if isinstance(capacity_meta, dict):
-                        metrics_payload["window_capacity"] = capacity_meta
-                    stats_section = metrics_payload.setdefault("stats", {})
-                    if isinstance(stats_section, dict):
-                        stats_section.update(
-                            {
-                                "requested_preview": window_plan_ctx.get(
-                                    "requested_preview"
-                                ),
-                                "requested_final": window_plan_ctx.get(
-                                    "requested_final"
-                                ),
-                                "actual_preview": window_plan_ctx.get("actual_preview"),
-                                "actual_final": window_plan_ctx.get("actual_final"),
-                                "coverage_ok": window_plan_ctx.get("coverage_ok"),
-                                "preview_total_tokens": window_plan_ctx.get(
-                                    "preview_total_tokens"
-                                ),
-                                "final_total_tokens": window_plan_ctx.get(
-                                    "final_total_tokens"
-                                ),
-                                "min_tokens_target": window_plan_ctx.get(
-                                    "min_tokens_target"
-                                ),
-                                "tokens_floor_met": window_plan_ctx.get(
-                                    "tokens_floor_met"
-                                ),
-                                "dedupe_adjustments": window_plan_ctx.get(
-                                    "dedupe_adjustments"
-                                ),
-                            }
-                        )
-                optional_keys = [
-                    "logloss_preview",
-                    "logloss_final",
-                    "logloss_delta",
-                    "logloss_preview_ci",
-                    "logloss_final_ci",
-                    "logloss_delta_ci",
-                    "bootstrap",
-                    "window_overlap_fraction",
-                    "window_match_fraction",
-                    "window_pairing_reason",
-                    "window_pairing_preview",
-                    "window_pairing_final",
-                    "paired_windows",
-                    "paired_delta_summary",
-                    "primary_metric_tail",
-                    "preview_total_tokens",
-                    "final_total_tokens",
-                    "masked_tokens_total",
-                    "masked_tokens_preview",
-                    "masked_tokens_final",
-                    "timings",
-                    "guard_timings",
-                    "memory_snapshots",
-                    "gpu_memory_mb_peak",
-                    "gpu_memory_reserved_mb_peak",
-                    "reduction",
-                ]
-                for key in optional_keys:
-                    if key in core_report.metrics:
-                        metrics_payload[key] = core_report.metrics[key]
-                metrics_payload["loss_type"] = resolved_loss_type
-                if metrics_payload.get("loss_type") is None and isinstance(
-                    dataset_meta_context, dict
-                ):
-                    metrics_payload["loss_type"] = dataset_meta_context.get(
-                        "loss_type", resolved_loss_type
-                    )
-                if isinstance(dataset_meta_context, dict):
-                    for meta_key in (
-                        "masked_tokens_total",
-                        "masked_tokens_preview",
-                        "masked_tokens_final",
-                    ):
-                        if (
-                            meta_key not in metrics_payload
-                            and dataset_meta_context.get(meta_key) is not None
-                        ):
-                            metrics_payload[meta_key] = dataset_meta_context[meta_key]
+                timings = _merge_core_timing_metrics(timings, core_report.metrics)
+                metrics_payload = _build_metrics_payload(
+                    core_metrics=core_report.metrics,
+                    window_plan_context=core_report.context.get("window_plan"),
+                    dataset_meta_context=dataset_meta_context,
+                    resolved_loss_type=resolved_loss_type,
+                )
                 report["metrics"].update(metrics_payload)
 
             if guard_overhead_payload is not None:
@@ -2385,35 +2146,13 @@ def run_command_impl(
             except NON_FATAL_RUNTIME_EXCEPTIONS:
                 pass
 
-            # Transfer guard results
-            if hasattr(core_report, "guards") and core_report.guards:
-                for guard_name, guard_result in core_report.guards.items():
-                    guard_entry = {
-                        "name": guard_name,
-                        "passed": guard_result.get("passed"),
-                        "action": guard_result.get("action"),
-                        "policy": guard_result.get("policy", {}),
-                        "metrics": guard_result.get("metrics", {}),
-                        "actions": guard_result.get("actions", []),
-                        "violations": guard_result.get("violations", []),
-                        "warnings": guard_result.get("warnings", []),
-                        "errors": guard_result.get("errors", []),
-                        "details": guard_result.get("details", {}),
-                    }
-                    for extra_key in ("final_z_scores", "module_family_map"):
-                        if extra_key in guard_result:
-                            guard_entry[extra_key] = guard_result[extra_key]
-                    report["guards"].append(guard_entry)
-
-            # Set artifacts
-            report["artifacts"].update(
-                {
-                    "events_path": str(run_config.event_path)
-                    if run_config.event_path
-                    else "",
-                    "logs_path": "",
-                    "checkpoint_path": None,
-                }
+            report["guards"].extend(
+                _build_guard_entries(
+                    core_report.guards
+                    if hasattr(core_report, "guards")
+                    and isinstance(core_report.guards, dict)
+                    else None
+                )
             )
 
             # Optional: export HF-loadable model snapshot when requested
@@ -2506,16 +2245,13 @@ def run_command_impl(
                         profile=profile_normalized,
                     )
 
-            # Set flags
             report["flags"].update(
-                {
-                    "guard_recovered": any(
-                        not g.get("passed", True)
-                        for g in core_report.guards.values()
-                        if hasattr(core_report, "guards") and core_report.guards
-                    ),
-                    "rollback_reason": None,
-                }
+                _build_flags_payload(
+                    core_report.guards
+                    if hasattr(core_report, "guards")
+                    and isinstance(core_report.guards, dict)
+                    else None
+                )
             )
 
             metrics_section = report.get("metrics", {}) or {}
