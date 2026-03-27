@@ -59,6 +59,7 @@ def run_command_impl(
     _apply_mask_only_head_autotune = _dep("_apply_mask_only_head_autotune")
     _apply_warning_filters = _dep("_apply_warning_filters")
     _build_artifacts_payload = _dep("_build_artifacts_payload")
+    _build_provider_dataset_plan = _dep("_build_provider_dataset_plan")
     _build_edit_payload = _dep("_build_edit_payload")
     _build_timing_summary_payload = _dep("_build_timing_summary_payload")
     _build_retry_result_summary = _dep("_build_retry_result_summary")
@@ -88,7 +89,6 @@ def run_command_impl(
     _hash_sequences = _dep("_hash_sequences")
     _init_retry_controller = _dep("_init_retry_controller")
     _load_model_with_cfg = _dep("_load_model_with_cfg")
-    _maybe_plan_release_windows = _dep("_maybe_plan_release_windows")
     _merge_primary_metric_health = _dep("_merge_primary_metric_health")
     _merge_core_timing_metrics = _dep("_merge_core_timing_metrics")
     _normalize_overhead_result = _dep("_normalize_overhead_result")
@@ -101,14 +101,12 @@ def run_command_impl(
     _print_pipeline_start = _dep("_print_pipeline_start")
     _print_retry_summary = _dep("_print_retry_summary")
     _resolve_device_and_output = _dep("_resolve_device_and_output")
-    _resolve_effective_windows = _dep("_resolve_effective_windows")
     _resolve_exit_code = _dep("_resolve_exit_code")
     _resolve_guard_overhead_threshold = _dep("_resolve_guard_overhead_threshold")
     _resolve_metric_and_provider = _dep("_resolve_metric_and_provider")
     _resolve_pm_min_tokens_target = _dep("_resolve_pm_min_tokens_target")
     _resolve_pm_acceptance_range = _dep("_resolve_pm_acceptance_range")
     _resolve_pm_drift_band = _dep("_resolve_pm_drift_band")
-    _resolve_provider_and_split = _dep("_resolve_provider_and_split")
     _resolve_snapshot_config = _dep("_resolve_snapshot_config")
     _run_bare_control = _dep("_run_bare_control")
     _safe_int = _dep("_safe_int")
@@ -724,6 +722,10 @@ def run_command_impl(
         dataset_meta: dict[str, Any] = {}
         baseline_meta: dict[str, Any] = {}
         window_plan: dict[str, Any] | None = None
+        preview_records: list[dict[str, Any]] = []
+        final_records: list[dict[str, Any]] = []
+        preview_mask_counts: list[int] = []
+        final_mask_counts: list[int] = []
         dataset_timing_start: float | None = perf_counter() if collect_timings else None
         if pairing_schedule:
             harvested = _validate_and_harvest_baseline_schedule(
@@ -1005,373 +1007,64 @@ def run_command_impl(
                 emoji="📊",
                 profile=profile_normalized,
             )
-            # Pass through provider-specific kwargs when available
-            provider_kwargs = {}
-            for key in (
-                "dataset_name",
-                "config_name",
-                "text_field",
-                "src_field",
-                "tgt_field",
-                "cache_dir",
-                "max_samples",
-                # Local providers (e.g., local_jsonl)
-                "file",
-                "path",
-                "data_files",
-            ):
-                try:
-                    val = getattr(cfg.dataset, key)
-                except (AttributeError, TypeError):
-                    val = None
-                if val is not None and val != "":
-                    provider_kwargs[key] = val
-            # Resolve provider kind from config (supports string or mapping with kind)
-            provider_val = getattr(cfg.dataset, "provider", None)
-            provider_name = None
-            if isinstance(provider_val, dict):
-                provider_name = provider_val.get("kind")
-                # Include nested provider-specific kwargs
-                for k, v in provider_val.items():
-                    if k != "kind" and v is not None and v != "":
-                        provider_kwargs[k] = v
-            elif isinstance(provider_val, str):
-                provider_name = provider_val  # noqa: F841
-            else:
-                # Support mapping-like provider configs (e.g., _Obj with .get)
-                try:
-                    _ = provider_val.get("kind")  # type: ignore[attr-defined]
-                    # Try to expose nested entries
-                    try:
-                        for k, v in provider_val._data.items():  # type: ignore[attr-defined]
-                            if k != "kind" and v is not None and v != "":
-                                provider_kwargs[k] = v
-                    except (AttributeError, TypeError):
-                        # Fallback: if items() exists
-                        try:
-                            for k, v in provider_val.items():  # type: ignore[attr-defined]
-                                if k != "kind" and v is not None and v != "":
-                                    provider_kwargs[k] = v
-                        except (AttributeError, TypeError):
-                            pass
-                except (AttributeError, TypeError):
-                    _ = None
-            data_provider, resolved_split, used_fallback_split = (
-                _resolve_provider_and_split(
-                    cfg,
-                    model_profile,
-                    get_provider_fn=get_provider,
-                    provider_kwargs=provider_kwargs,
+            try:
+                dataset_plan = _build_provider_dataset_plan(
+                    cfg=cfg,
+                    model_profile=model_profile,
                     console=console,
                     resolved_device=resolved_device,
-                    emit=_provider_event,
+                    profile=profile,
+                    profile_normalized=profile_normalized,
+                    requested_preview=requested_preview,
+                    requested_final=requested_final,
+                    effective_preview=effective_preview,
+                    effective_final=effective_final,
+                    pairing_schedule_present=bool(pairing_schedule),
+                    use_mlm=use_mlm,
+                    mask_prob=mask_prob,
+                    mask_seed=mask_seed,
+                    random_token_prob=random_token_prob,
+                    original_token_prob=original_token_prob,
+                    resolved_loss_type=resolved_loss_type,
+                    tier=tier,
+                    get_provider_fn=get_provider,
                 )
-            )
-
-            # Load tokenizer for dataset processing
-            try:
-                tokenizer, tokenizer_hash = resolve_tokenizer(model_profile)
+            except RuntimeError as err:
+                _fail_run(str(err))
             except (
                 ImportError,
                 ModuleNotFoundError,
                 AttributeError,
-                RuntimeError,
                 TypeError,
                 ValueError,
             ) as exc:
                 _event(console, "FAIL", str(exc), emoji="❌", profile=profile)
                 raise typer.Exit(1) from exc
 
-            dataset_stride = getattr(
-                cfg.dataset, "stride", getattr(cfg.dataset, "seq_len", 0) // 2
-            )
-            release_profile = (profile or "").lower() == "release"
-            if release_profile and not pairing_schedule:
-                estimate_fn = getattr(data_provider, "estimate_capacity", None)
-                if callable(estimate_fn):
-                    capacity_fast = bool(getattr(cfg.eval, "capacity_fast", False))
-                    capacity_meta = estimate_fn(
-                        tokenizer=tokenizer,
-                        seq_len=cfg.dataset.seq_len,
-                        stride=dataset_stride,
-                        split=resolved_split,
-                        target_total=requested_preview + requested_final,
-                        fast_mode=capacity_fast,
-                    )
-                    variance_policy = getattr(cfg.guards, "variance", None)
-                    max_calibration = (
-                        getattr(variance_policy, "max_calib", 0)
-                        if variance_policy is not None
-                        else 0
-                    )
-                    try:
-                        window_plan = _maybe_plan_release_windows(
-                            capacity_meta,
-                            requested_preview=requested_preview,
-                            requested_final=requested_final,
-                            max_calibration=max_calibration,
-                            console=console,
-                        )
-                    except RuntimeError as err:
-                        _event(console, "FAIL", str(err), emoji="❌", profile=profile)
-                        raise typer.Exit(1) from err
-
-                    actual_per_arm = int(window_plan["actual_preview"])
-                    effective_preview = actual_per_arm
-                    effective_final = actual_per_arm
-                    dataset_stride = getattr(
-                        cfg.dataset, "stride", getattr(cfg.dataset, "seq_len", 0)
-                    )
-                else:
-                    _event(
-                        console,
-                        "WARN",
-                        "Release profile requested but dataset provider does not expose capacity estimation; using configured window counts.",
-                        emoji="⚠️",
-                        profile=profile_normalized,
-                    )
-
-            preview_records: list[dict[str, Any]] = []
-            final_records: list[dict[str, Any]] = []
-
-            signature_transform = None
-            if use_mlm:
-
-                def _signature_transform(
-                    preview_records_in: list[dict[str, Any]],
-                    final_records_in: list[dict[str, Any]],
-                ) -> list[dict[str, Any]]:
-                    temp_preview_records = [
-                        {
-                            "input_ids": list(rec["input_ids"]),
-                            "attention_mask": list(rec["attention_mask"]),
-                            "dataset_index": rec.get("dataset_index"),
-                            "window_id": rec.get("window_id"),
-                        }
-                        for rec in preview_records_in
-                    ]
-                    temp_final_records = [
-                        {
-                            "input_ids": list(rec["input_ids"]),
-                            "attention_mask": list(rec["attention_mask"]),
-                            "dataset_index": rec.get("dataset_index"),
-                            "window_id": rec.get("window_id"),
-                        }
-                        for rec in final_records_in
-                    ]
-                    _apply_mlm_masks(
-                        temp_preview_records,
-                        tokenizer=tokenizer,
-                        mask_prob=mask_prob,
-                        seed=mask_seed,
-                        random_token_prob=random_token_prob,
-                        original_token_prob=original_token_prob,
-                        prefix="preview",
-                    )
-                    _apply_mlm_masks(
-                        temp_final_records,
-                        tokenizer=tokenizer,
-                        mask_prob=mask_prob,
-                        seed=mask_seed,
-                        random_token_prob=random_token_prob,
-                        original_token_prob=original_token_prob,
-                        prefix="final",
-                    )
-                    return temp_preview_records + temp_final_records
-
-                signature_transform = _signature_transform
-
-            try:
-                effective_windows = _resolve_effective_windows(
-                    data_provider=data_provider,
-                    tokenizer=tokenizer,
-                    seq_len=cfg.dataset.seq_len,
-                    stride=getattr(cfg.dataset, "stride", cfg.dataset.seq_len // 2),
-                    preview_n=effective_preview,
-                    final_n=effective_final,
-                    seed=getattr(cfg.dataset, "seed", 42),
-                    split=resolved_split,
-                    requested_preview=requested_preview,
-                    requested_final=requested_final,
+            for notice in dataset_plan.notices:
+                _event(
+                    console,
+                    notice.tag,
+                    notice.message,
+                    emoji=notice.emoji,
                     profile=profile_normalized,
-                    signature_transform=signature_transform,
-                    event_fn=lambda message: _event(
-                        console,
-                        "WARN",
-                        message,
-                        emoji="⚠️",
-                        profile=profile_normalized,
-                    ),
-                )
-            except RuntimeError as err:
-                _fail_run(str(err))
-
-            preview_records = effective_windows["preview_records"]
-            final_records = effective_windows["final_records"]
-            preview_count = int(effective_windows["actual_preview"])
-            final_count = int(effective_windows["actual_final"])
-            effective_preview = preview_count
-            effective_final = final_count
-
-            # Optional: provider-supplied labels for seq2seq
-            provider_labels_prev = None
-            provider_labels_fin = None
-            try:
-                provider_labels_prev = getattr(
-                    data_provider, "last_preview_labels", None
-                )
-                provider_labels_fin = getattr(data_provider, "last_final_labels", None)
-            except (AttributeError, TypeError):
-                provider_labels_prev = None
-                provider_labels_fin = None
-
-            for idx_local, rec in enumerate(preview_records):
-                if provider_labels_prev is not None and idx_local < len(
-                    provider_labels_prev
-                ):
-                    rec["labels"] = _tensor_or_list_to_ints(
-                        provider_labels_prev[idx_local]
-                    )
-
-            min_tokens_target = _resolve_pm_min_tokens_target(
-                tier=tier
-                or getattr(
-                    getattr(cfg, "auto", None),
-                    "tier",
-                    None,
-                ),
-                profile=profile,
-            )
-            tokens_floor_met = (
-                int(effective_windows["preview_total_tokens"])
-                + int(effective_windows["final_total_tokens"])
-            ) >= int(min_tokens_target)
-
-            if window_plan is None:
-                window_plan = {
-                    "profile": (profile or "").lower() or "default",
-                    "requested_preview": int(requested_preview),
-                    "requested_final": int(requested_final),
-                    "capacity": {},
-                }
-
-            window_plan["actual_preview"] = int(preview_count)
-            window_plan["actual_final"] = int(final_count)
-            window_plan["coverage_ok"] = (
-                window_plan.get("coverage_ok", True) and preview_count == final_count
-            )
-            window_plan["preview_total_tokens"] = int(
-                effective_windows["preview_total_tokens"]
-            )
-            window_plan["final_total_tokens"] = int(
-                effective_windows["final_total_tokens"]
-            )
-            window_plan["min_tokens_target"] = int(min_tokens_target)
-            window_plan["tokens_floor_met"] = bool(tokens_floor_met)
-            if effective_windows["dedupe_adjustments"]:
-                window_plan["dedupe_adjustments"] = list(
-                    effective_windows["dedupe_adjustments"]
                 )
 
-            calibration_data: list[dict[str, Any]] = []
-            preview_mask_total = 0
-            final_mask_total = 0
-            preview_mask_counts: list[int] = []
-            final_mask_counts: list[int] = []
-            if use_mlm:
-                preview_mask_total, preview_mask_counts = _apply_mlm_masks(
-                    preview_records,
-                    tokenizer=tokenizer,
-                    mask_prob=mask_prob,
-                    seed=mask_seed,
-                    random_token_prob=random_token_prob,
-                    original_token_prob=original_token_prob,
-                    prefix="preview",
-                )
-                final_mask_total, final_mask_counts = _apply_mlm_masks(
-                    final_records,
-                    tokenizer=tokenizer,
-                    mask_prob=mask_prob,
-                    seed=mask_seed,
-                    random_token_prob=random_token_prob,
-                    original_token_prob=original_token_prob,
-                    prefix="final",
-                )
-            else:
-                preview_mask_counts = [0] * len(preview_records)
-                final_mask_counts = [0] * len(final_records)
-
-            preview_sequences = [record["input_ids"] for record in preview_records]
-            for idx, record in enumerate(preview_records):
-                entry = {
-                    "input_ids": record["input_ids"],
-                    "attention_mask": record["attention_mask"],
-                    "window_id": f"preview::{idx}",
-                    "dataset_index": record.get("dataset_index"),
-                    "mlm_masked": record.get("mlm_masked", 0),
-                }
-                if use_mlm:
-                    entry["labels"] = record.get(
-                        "labels", [-100] * len(record["input_ids"])
-                    )
-                calibration_data.append(entry)
-
-            final_sequences = [record["input_ids"] for record in final_records]
-            for idx, record in enumerate(final_records):
-                entry = {
-                    "input_ids": record["input_ids"],
-                    "attention_mask": record["attention_mask"],
-                    "window_id": f"final::{idx}",
-                    "dataset_index": record.get("dataset_index"),
-                    "mlm_masked": record.get("mlm_masked", 0),
-                }
-                if use_mlm:
-                    entry["labels"] = record.get(
-                        "labels", [-100] * len(record["input_ids"])
-                    )
-                elif provider_labels_fin is not None and idx < len(provider_labels_fin):
-                    entry["labels"] = _tensor_or_list_to_ints(provider_labels_fin[idx])
-                calibration_data.append(entry)
-
-            masked_tokens_total = preview_mask_total + final_mask_total
-            preview_hash = _hash_sequences(preview_sequences)
-            final_hash = _hash_sequences(final_sequences)
-            dataset_meta = {
-                "tokenizer_name": getattr(tokenizer, "name_or_path", "unknown"),
-                "tokenizer_hash": tokenizer_hash
-                if tokenizer_hash is not None
-                else _tokenizer_digest(tokenizer),
-                "vocab_size": _safe_int(getattr(tokenizer, "vocab_size", 0)),
-                "bos_token": getattr(tokenizer, "bos_token", None),
-                "eos_token": getattr(tokenizer, "eos_token", None),
-                "pad_token": getattr(tokenizer, "pad_token", None),
-                "add_prefix_space": getattr(tokenizer, "add_prefix_space", None),
-                "dataset_hash": hashlib.blake2s(
-                    (preview_hash + final_hash).encode("utf-8"), digest_size=16
-                ).hexdigest(),
-                "preview_hash": preview_hash,
-                "final_hash": final_hash,
-                "preview_total_tokens": int(effective_windows["preview_total_tokens"]),
-                "final_total_tokens": int(effective_windows["final_total_tokens"]),
-                "min_tokens_target": int(min_tokens_target),
-                "tokens_floor_met": bool(tokens_floor_met),
-            }
-            dataset_meta["loss_type"] = resolved_loss_type
-            if use_mlm:
-                dataset_meta["masked_tokens_preview"] = int(preview_mask_total)
-                dataset_meta["masked_tokens_final"] = int(final_mask_total)
-                dataset_meta["masked_tokens_total"] = int(masked_tokens_total)
-            if window_plan:
-                dataset_meta["window_plan"] = window_plan
-                capacity_meta = window_plan.get("capacity")
-                if capacity_meta:
-                    dataset_meta["window_capacity"] = capacity_meta
-            strat_stats = getattr(data_provider, "stratification_stats", None)
-            if strat_stats:
-                dataset_meta["stratification"] = strat_stats
-            scorer_profile = getattr(data_provider, "scorer_profile", None)
-            if scorer_profile:
-                dataset_meta["scorer_profile"] = scorer_profile
+            resolved_split = dataset_plan.resolved_split
+            used_fallback_split = dataset_plan.used_fallback_split
+            tokenizer = dataset_plan.tokenizer
+            tokenizer_hash = dataset_plan.tokenizer_hash
+            calibration_data = dataset_plan.calibration_data
+            dataset_meta = dataset_plan.dataset_meta
+            window_plan = dataset_plan.window_plan
+            preview_count = dataset_plan.preview_count
+            final_count = dataset_plan.final_count
+            effective_preview = dataset_plan.effective_preview
+            effective_final = dataset_plan.effective_final
+            preview_mask_counts = dataset_plan.preview_mask_counts
+            final_mask_counts = dataset_plan.final_mask_counts
+            preview_records = dataset_plan.preview_records
+            final_records = dataset_plan.final_records
 
         try:
             run_context["dataset"]["preview_n"] = preview_count

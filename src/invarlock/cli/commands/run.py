@@ -150,6 +150,9 @@ from invarlock.core.run_guard_overhead_policy import (
 from invarlock.core.run_guard_overhead_policy import (
     finalize_guard_overhead_payload as _finalize_guard_overhead_payload_impl,
 )
+from invarlock.core.run_provider_dataset_plan import (
+    build_provider_dataset_plan as _build_provider_dataset_plan_impl,
+)
 from invarlock.core.run_report_payload_policy import (
     build_artifacts_payload as _build_artifacts_payload_impl,
 )
@@ -887,6 +890,61 @@ def _build_dataset_window_stats(
         match_fraction=match_fraction,
         overlap_fraction=overlap_fraction,
         window_plan=window_plan,
+    )
+
+
+def _build_provider_dataset_plan(
+    *,
+    cfg: Any,
+    model_profile: Any,
+    console: Console,
+    resolved_device: str | None,
+    profile: str | None,
+    profile_normalized: str | None,
+    requested_preview: int,
+    requested_final: int,
+    effective_preview: int,
+    effective_final: int,
+    pairing_schedule_present: bool,
+    use_mlm: bool,
+    mask_prob: float,
+    mask_seed: int,
+    random_token_prob: float,
+    original_token_prob: float,
+    resolved_loss_type: str,
+    tier: str | None,
+    get_provider_fn: Any,
+) -> Any:
+    return _build_provider_dataset_plan_impl(
+        cfg=cfg,
+        model_profile=model_profile,
+        console=console,
+        resolved_device=resolved_device,
+        profile=profile,
+        profile_normalized=profile_normalized,
+        requested_preview=requested_preview,
+        requested_final=requested_final,
+        effective_preview=effective_preview,
+        effective_final=effective_final,
+        pairing_schedule_present=pairing_schedule_present,
+        use_mlm=use_mlm,
+        mask_prob=mask_prob,
+        mask_seed=mask_seed,
+        random_token_prob=random_token_prob,
+        original_token_prob=original_token_prob,
+        resolved_loss_type=resolved_loss_type,
+        tier=tier,
+        get_provider_fn=get_provider_fn,
+        resolve_provider_and_split_fn=_resolve_provider_and_split,
+        resolve_tokenizer_fn=resolve_tokenizer,
+        maybe_plan_release_windows_fn=_maybe_plan_release_windows,
+        resolve_effective_windows_fn=_resolve_effective_windows,
+        apply_mlm_masks_fn=_apply_mlm_masks,
+        resolve_pm_min_tokens_target_fn=_resolve_pm_min_tokens_target,
+        hash_sequences_fn=_hash_sequences,
+        tokenizer_digest_fn=_tokenizer_digest,
+        safe_int_fn=_safe_int,
+        tensor_or_list_to_ints_fn=_tensor_or_list_to_ints,
     )
 
 
@@ -1757,6 +1815,7 @@ def _build_run_command_deps() -> dict[str, Any]:
         "_apply_mlm_masks": _apply_mlm_masks,
         "_apply_warning_filters": _apply_warning_filters,
         "_build_artifacts_payload": _build_artifacts_payload_impl,
+        "_build_provider_dataset_plan": _build_provider_dataset_plan,
         "_build_dataset_window_stats": _build_dataset_window_stats,
         "_canonical_dataset_id": _canonical_dataset_id,
         "_coerce_float": _coerce_float,

@@ -358,6 +358,33 @@ def test_analysis_and_overhead_wrappers_delegate(monkeypatch):
         "passed": True,
     }
 
+    monkeypatch.setattr(
+        run_mod,
+        "_build_provider_dataset_plan_impl",
+        lambda **kwargs: {"resolved_split": "validation", "preview_count": 2},
+    )
+    assert run_mod._build_provider_dataset_plan(
+        cfg={},
+        model_profile=SimpleNamespace(),
+        console=run_mod.console,
+        resolved_device="cpu",
+        profile="dev",
+        profile_normalized="dev",
+        requested_preview=2,
+        requested_final=2,
+        effective_preview=2,
+        effective_final=2,
+        pairing_schedule_present=False,
+        use_mlm=False,
+        mask_prob=0.15,
+        mask_seed=43,
+        random_token_prob=0.1,
+        original_token_prob=0.1,
+        resolved_loss_type="ppl_causal",
+        tier="balanced",
+        get_provider_fn=lambda *args, **kwargs: None,
+    ) == {"resolved_split": "validation", "preview_count": 2}
+
 
 def test_run_command_injects_explicit_deps(monkeypatch, tmp_path: Path):
     sentinel = object()
@@ -380,6 +407,7 @@ def test_run_command_injects_explicit_deps(monkeypatch, tmp_path: Path):
     deps = captured.get("deps")
     assert isinstance(deps, dict)
     assert deps["_resolve_pm_acceptance_range"] is sentinel
+    assert deps["_build_provider_dataset_plan"] is run_mod._build_provider_dataset_plan
     assert deps["_choose_snapshot_mode"] is run_mod._choose_snapshot_mode
     assert (
         deps["_build_timing_summary_payload"] is run_mod._build_timing_summary_payload
