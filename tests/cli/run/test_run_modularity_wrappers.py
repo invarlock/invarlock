@@ -218,6 +218,26 @@ def test_pairing_wrappers_delegate(monkeypatch):
 
     monkeypatch.setattr(
         run_mod,
+        "_materialize_baseline_pairing_schedule_impl",
+        lambda **kwargs: {"preview_count": 1, "final_count": 1},
+    )
+    assert run_mod._materialize_baseline_pairing_schedule(
+        pairing_schedule={"preview": {}, "final": {}},
+        calibration_data=[],
+        dataset_meta={},
+        window_plan=None,
+        tokenizer=None,
+        use_mlm=False,
+        mask_prob=0.15,
+        mask_seed=43,
+        random_token_prob=0.1,
+        original_token_prob=0.1,
+        resolved_tier="balanced",
+        profile="dev",
+    ) == {"preview_count": 1, "final_count": 1}
+
+    monkeypatch.setattr(
+        run_mod,
         "_compute_provider_digest_impl",
         lambda report, compute_mask_positions_digest_fn: {"ids_sha256": "abc"},
     )
@@ -451,6 +471,10 @@ def test_run_command_injects_explicit_deps(monkeypatch, tmp_path: Path):
     assert isinstance(deps, dict)
     assert deps["_resolve_pm_acceptance_range"] is sentinel
     assert deps["_build_provider_dataset_plan"] is run_mod._build_provider_dataset_plan
+    assert (
+        deps["_materialize_baseline_pairing_schedule"]
+        is run_mod._materialize_baseline_pairing_schedule
+    )
     assert deps["_build_run_context_payload"] is run_mod._build_run_context_payload
     assert (
         deps["_build_run_execution_config_payloads"]

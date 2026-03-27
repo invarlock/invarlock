@@ -86,6 +86,9 @@ def run_command_impl(
     _execute_guarded_run = _dep("_execute_guarded_run")
     _extract_pairing_schedule = _dep("_extract_pairing_schedule")
     _load_baseline_pairing_evidence = _dep("_load_baseline_pairing_evidence")
+    _materialize_baseline_pairing_schedule = _dep(
+        "_materialize_baseline_pairing_schedule"
+    )
     _extract_pm_snapshot_for_overhead = _dep("_extract_pm_snapshot_for_overhead")
     _format_debug_metric_diffs = _dep("_format_debug_metric_diffs")
     _format_guard_chain = _dep("_format_guard_chain")
@@ -131,7 +134,6 @@ def run_command_impl(
     console = _dep("console")
     datetime = _dep("datetime")
     detect_model_profile = _dep("detect_model_profile")
-    hashlib = _dep("hashlib")
     math = _dep("math")
     np = _dep("np")
     os = _dep("os")
@@ -654,7 +656,6 @@ def run_command_impl(
         # Load calibration data if dataset is configured
         calibration_data = None
         dataset_meta: dict[str, Any] = {}
-        baseline_meta: dict[str, Any] = {}
         window_plan: dict[str, Any] | None = None
         preview_records: list[dict[str, Any]] = []
         final_records: list[dict[str, Any]] = []
@@ -688,251 +689,40 @@ def run_command_impl(
                 ) as exc:
                     _event(console, "FAIL", str(exc), emoji="❌", profile=profile)
                     raise typer.Exit(1) from exc
-            preview_window_ids = pairing_schedule["preview"].get("window_ids")
-            preview_labels = pairing_schedule["preview"].get("labels")
-            for idx, (input_ids, attention_mask) in enumerate(
-                zip(
-                    pairing_schedule["preview"]["input_ids"],
-                    pairing_schedule["preview"]["attention_masks"],
-                    strict=False,
-                )
-            ):
-                window_id = (
-                    preview_window_ids[idx]
-                    if preview_window_ids and idx < len(preview_window_ids)
-                    else idx
-                )
-                entry = {
-                    "input_ids": input_ids,
-                    "attention_mask": attention_mask,
-                    "window_id": f"preview::{window_id}",
-                }
-                if use_mlm:
-                    labels_list: list[int] = []
-                    if isinstance(preview_labels, list) and idx < len(preview_labels):
-                        labels_list = _tensor_or_list_to_ints(preview_labels[idx])
-                    if labels_list and any(token != -100 for token in labels_list):
-                        entry["labels"] = labels_list
-                        entry["mlm_masked"] = sum(
-                            1 for token in labels_list if token != -100
-                        )
-                    else:
-                        entry["labels"] = []
-                        entry["mlm_masked"] = 0
-                    # Prefer masked_token_counts if present in schedule
-                    mtc = pairing_schedule["preview"].get("masked_token_counts")
-                    if isinstance(mtc, list) and idx < len(mtc):
-                        try:
-                            entry["mlm_masked"] = int(mtc[idx])
-                        except NUMERIC_EXCEPTIONS:
-                            pass
-                calibration_data.append(entry)
-            final_window_ids = pairing_schedule["final"].get("window_ids")
-            final_labels = pairing_schedule["final"].get("labels")
-            for idx, (input_ids, attention_mask) in enumerate(
-                zip(
-                    pairing_schedule["final"]["input_ids"],
-                    pairing_schedule["final"]["attention_masks"],
-                    strict=False,
-                )
-            ):
-                window_id = (
-                    final_window_ids[idx]
-                    if final_window_ids and idx < len(final_window_ids)
-                    else idx
-                )
-                entry = {
-                    "input_ids": input_ids,
-                    "attention_mask": attention_mask,
-                    "window_id": f"final::{window_id}",
-                }
-                if use_mlm:
-                    labels_list: list[int] = []
-                    if isinstance(final_labels, list) and idx < len(final_labels):
-                        labels_list = _tensor_or_list_to_ints(final_labels[idx])
-                    if labels_list and any(token != -100 for token in labels_list):
-                        entry["labels"] = labels_list
-                        entry["mlm_masked"] = sum(
-                            1 for token in labels_list if token != -100
-                        )
-                    else:
-                        entry["labels"] = []
-                        entry["mlm_masked"] = 0
-                    # Prefer masked_token_counts if present in schedule
-                    mtc = pairing_schedule["final"].get("masked_token_counts")
-                    if isinstance(mtc, list) and idx < len(mtc):
-                        try:
-                            entry["mlm_masked"] = int(mtc[idx])
-                        except NUMERIC_EXCEPTIONS:
-                            pass
-                calibration_data.append(entry)
-            preview_count = len(pairing_schedule["preview"]["input_ids"])
-            final_count = len(pairing_schedule["final"]["input_ids"])
-            effective_preview = int(preview_count)
-            effective_final = int(final_count)
-            preview_mask_total = 0
-            final_mask_total = 0
-            preview_mask_counts: list[int] = []
-            final_mask_counts: list[int] = []
-            if use_mlm:
-                preview_entries = calibration_data[:preview_count]
-                final_entries = calibration_data[preview_count:]
-
-                def _needs_masks(entries):
-                    missing_any = False
-                    counts = []
-                    for entry in entries:
-                        labels_val = entry.get("labels")
-                        has_label_masks = bool(
-                            isinstance(labels_val, list)
-                            and any(token != -100 for token in labels_val)
-                        )
-                        existing_count = int(entry.get("mlm_masked", 0))
-                        if not has_label_masks and existing_count <= 0:
-                            missing_any = True
-                        counts.append(int(entry.get("mlm_masked", 0)))
-                    return missing_any, counts
-
-                preview_missing, preview_counts_existing = _needs_masks(preview_entries)
-                final_missing, final_counts_existing = _needs_masks(final_entries)
-
-                if preview_missing:
-                    preview_mask_total, preview_mask_counts = _apply_mlm_masks(
-                        preview_entries,
-                        tokenizer=tokenizer,
-                        mask_prob=mask_prob,
-                        seed=mask_seed,
-                        random_token_prob=random_token_prob,
-                        original_token_prob=original_token_prob,
-                        prefix="preview",
-                    )
-                else:
-                    preview_mask_counts = preview_counts_existing
-                    preview_mask_total = sum(preview_mask_counts)
-
-                if final_missing:
-                    final_mask_total, final_mask_counts = _apply_mlm_masks(
-                        final_entries,
-                        tokenizer=tokenizer,
-                        mask_prob=mask_prob,
-                        seed=mask_seed,
-                        random_token_prob=random_token_prob,
-                        original_token_prob=original_token_prob,
-                        prefix="final",
-                    )
-                else:
-                    final_mask_counts = final_counts_existing
-                    final_mask_total = sum(final_mask_counts)
-
-                # Ensure counts and labels set on entries
-                if preview_mask_counts:
-                    for entry, count in zip(
-                        preview_entries, preview_mask_counts, strict=False
-                    ):
-                        entry["mlm_masked"] = int(count)
-                if final_mask_counts:
-                    for entry, count in zip(
-                        final_entries, final_mask_counts, strict=False
-                    ):
-                        entry["mlm_masked"] = int(count)
-
-                if preview_count > 0 and preview_mask_total <= 0:
-                    _fail_run(
-                        "Baseline pairing schedule provided no masked tokens for preview windows; "
-                        "ensure MLM labels are present in the baseline report."
-                    )
-                if final_count > 0 and final_mask_total <= 0:
-                    _fail_run(
-                        "Baseline pairing schedule provided no masked tokens for final windows; "
-                        "ensure MLM labels are present in the baseline report."
-                    )
-
-                dataset_meta["masked_tokens_preview"] = int(preview_mask_total)
-                dataset_meta["masked_tokens_final"] = int(final_mask_total)
-                dataset_meta["masked_tokens_total"] = int(
-                    preview_mask_total + final_mask_total
-                )
-                if os.environ.get("INVARLOCK_DEBUG_TRACE"):
-                    console.print(
-                        f"[debug] MLM pairing masks → preview={preview_mask_total}, final={final_mask_total}"
-                    )
-            if "preview_total_tokens" not in dataset_meta:
-                dataset_meta["preview_total_tokens"] = sum(
-                    len(_tensor_or_list_to_ints(seq))
-                    for seq in pairing_schedule["preview"]["input_ids"]
-                )
-            if "final_total_tokens" not in dataset_meta:
-                dataset_meta["final_total_tokens"] = sum(
-                    len(_tensor_or_list_to_ints(seq))
-                    for seq in pairing_schedule["final"]["input_ids"]
-                )
-            if "preview_hash" not in dataset_meta:
-                preview_hash = _hash_sequences(
-                    _tensor_or_list_to_ints(seq)
-                    for seq in pairing_schedule["preview"]["input_ids"]
-                )
-                dataset_meta["preview_hash"] = preview_hash
-            else:
-                preview_hash = dataset_meta["preview_hash"]
-            if "final_hash" not in dataset_meta:
-                final_hash = _hash_sequences(
-                    _tensor_or_list_to_ints(seq)
-                    for seq in pairing_schedule["final"]["input_ids"]
-                )
-                dataset_meta["final_hash"] = final_hash
-            else:
-                final_hash = dataset_meta["final_hash"]
-            if "dataset_hash" not in dataset_meta:
-                dataset_meta["dataset_hash"] = hashlib.blake2s(
-                    (str(preview_hash) + str(final_hash)).encode("utf-8"),
-                    digest_size=16,
-                ).hexdigest()
-            if not window_plan:
-                window_capacity = (
-                    baseline_meta.get("window_capacity")
-                    if isinstance(baseline_meta, dict)
-                    else {}
-                )
-                window_plan = {
-                    "profile": (profile or "").lower() or "baseline",
-                    "requested_preview": int(preview_count),
-                    "requested_final": int(final_count),
-                    "actual_preview": int(preview_count),
-                    "actual_final": int(final_count),
-                    "coverage_ok": True,
-                    "capacity": window_capacity or {},
-                }
-            if isinstance(window_plan, dict):
-                preview_masks = pairing_schedule["preview"].get("attention_masks") or []
-                final_masks = pairing_schedule["final"].get("attention_masks") or []
-                preview_total_tokens = sum(
-                    sum(_tensor_or_list_to_ints(mask)) for mask in preview_masks
-                ) or int(dataset_meta.get("preview_total_tokens", 0) or 0)
-                final_total_tokens = sum(
-                    sum(_tensor_or_list_to_ints(mask)) for mask in final_masks
-                ) or int(dataset_meta.get("final_total_tokens", 0) or 0)
-                min_tokens_target = _resolve_pm_min_tokens_target(
-                    tier=tier
-                    or getattr(
-                        getattr(cfg, "auto", None),
-                        "tier",
-                        None,
-                    ),
+            try:
+                materialized_baseline = _materialize_baseline_pairing_schedule(
+                    pairing_schedule=pairing_schedule,
+                    calibration_data=calibration_data,
+                    dataset_meta=dataset_meta,
+                    window_plan=window_plan,
+                    tokenizer=tokenizer,
+                    use_mlm=use_mlm,
+                    mask_prob=mask_prob,
+                    mask_seed=mask_seed,
+                    random_token_prob=random_token_prob,
+                    original_token_prob=original_token_prob,
+                    resolved_tier=tier
+                    or getattr(getattr(cfg, "auto", None), "tier", None),
                     profile=profile,
                 )
-                window_plan["preview_total_tokens"] = int(preview_total_tokens)
-                window_plan["final_total_tokens"] = int(final_total_tokens)
-                window_plan["min_tokens_target"] = int(min_tokens_target)
-                window_plan["tokens_floor_met"] = (
-                    int(preview_total_tokens) + int(final_total_tokens)
-                ) >= int(min_tokens_target)
-                dataset_meta["min_tokens_target"] = int(min_tokens_target)
-                dataset_meta["tokens_floor_met"] = bool(window_plan["tokens_floor_met"])
-            if isinstance(window_plan, dict):
-                dataset_meta.setdefault("window_plan", window_plan)
-                capacity_meta = window_plan.get("capacity")
-                if capacity_meta and "window_capacity" not in dataset_meta:
-                    dataset_meta["window_capacity"] = capacity_meta
+            except ValueError as exc:
+                _fail_run(str(exc))
+
+            calibration_data = materialized_baseline.calibration_data
+            dataset_meta = materialized_baseline.dataset_meta
+            window_plan = materialized_baseline.window_plan
+            preview_count = materialized_baseline.preview_count
+            final_count = materialized_baseline.final_count
+            effective_preview = materialized_baseline.effective_preview
+            effective_final = materialized_baseline.effective_final
+            preview_mask_counts = materialized_baseline.preview_mask_counts
+            final_mask_counts = materialized_baseline.final_mask_counts
+            if use_mlm and os.environ.get("INVARLOCK_DEBUG_TRACE"):
+                console.print(
+                    "[debug] MLM pairing masks → preview="
+                    f"{materialized_baseline.preview_mask_total}, "
+                    f"final={materialized_baseline.final_mask_total}"
+                )
         elif cfg.dataset.provider:
             _event(
                 console,

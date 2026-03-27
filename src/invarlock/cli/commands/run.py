@@ -138,6 +138,9 @@ from invarlock.core.exit_codes import (
 from invarlock.core.run_baseline_evidence import (
     load_baseline_pairing_evidence as _load_baseline_pairing_evidence_impl,
 )
+from invarlock.core.run_baseline_evidence import (
+    materialize_baseline_pairing_schedule as _materialize_baseline_pairing_schedule_impl,
+)
 from invarlock.core.run_evaluation_windows_policy import (
     build_fallback_evaluation_windows as _build_fallback_evaluation_windows_impl,
 )
@@ -1308,6 +1311,41 @@ def _load_baseline_pairing_evidence(
     )
 
 
+def _materialize_baseline_pairing_schedule(
+    *,
+    pairing_schedule: dict[str, Any],
+    calibration_data: list[dict[str, Any]] | None,
+    dataset_meta: dict[str, Any],
+    window_plan: dict[str, Any] | None,
+    tokenizer: Any,
+    use_mlm: bool,
+    mask_prob: float,
+    mask_seed: int,
+    random_token_prob: float,
+    original_token_prob: float,
+    resolved_tier: str | None,
+    profile: str | None,
+) -> Any:
+    return _materialize_baseline_pairing_schedule_impl(
+        pairing_schedule=pairing_schedule,
+        calibration_data=calibration_data,
+        dataset_meta=dataset_meta,
+        window_plan=window_plan,
+        tokenizer=tokenizer,
+        use_mlm=use_mlm,
+        mask_prob=mask_prob,
+        mask_seed=mask_seed,
+        random_token_prob=random_token_prob,
+        original_token_prob=original_token_prob,
+        resolved_tier=resolved_tier,
+        profile=profile,
+        apply_mlm_masks_fn=_apply_mlm_masks,
+        resolve_pm_min_tokens_target_fn=_resolve_pm_min_tokens_target,
+        hash_sequences_fn=_hash_sequences,
+        tensor_or_list_to_ints_fn=_tensor_or_list_to_ints,
+    )
+
+
 def _prepare_config_for_run(
     *,
     config_path: str,
@@ -1910,6 +1948,7 @@ def _build_run_command_deps() -> dict[str, Any]:
         "_execute_guarded_run": _execute_guarded_run,
         "_extract_pairing_schedule": _extract_pairing_schedule,
         "_load_baseline_pairing_evidence": _load_baseline_pairing_evidence,
+        "_materialize_baseline_pairing_schedule": _materialize_baseline_pairing_schedule,
         "_extract_pm_snapshot_for_overhead": _extract_pm_snapshot_for_overhead,
         "_format_debug_metric_diffs": _format_debug_metric_diffs,
         "_format_guard_chain": _format_guard_chain,
