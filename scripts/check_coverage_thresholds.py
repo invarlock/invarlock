@@ -124,7 +124,7 @@ THRESHOLDS = {
     "src/invarlock/cli/run_config.py": 1.00,
     "src/invarlock/cli/run_overhead.py": 1.00,
     "src/invarlock/cli/run_pairing.py": 0.90,
-    "src/invarlock/cli/run_policy.py": 1.00,
+    "src/invarlock/core/run_policy.py": 1.00,
     "src/invarlock/reporting/run_metric_utils.py": 1.00,
     # CLI determinism preset (CI/Release provenance)
     "src/invarlock/cli/determinism.py": 0.95,

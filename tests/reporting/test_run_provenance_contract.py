@@ -71,10 +71,7 @@ def test_finalize_run_provenance_returns_missing_windows_for_release_baseline() 
         used_fallback_split=False,
         baseline_report_data=None,
         serialize_evaluation_windows_fn=lambda windows: None,
-        build_fallback_evaluation_windows_fn=lambda *args, **kwargs: {
-            "preview": {"window_ids": [0]},
-            "final": {"window_ids": [1]},
-        },
+        build_fallback_evaluation_windows_fn=lambda *args, **kwargs: {},
         compute_provider_digest_fn=lambda payload: {"ids_sha256": "subject"},
         enforce_provider_parity_fn=lambda *args, **kwargs: None,
     )
