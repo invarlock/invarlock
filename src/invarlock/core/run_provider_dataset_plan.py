@@ -274,7 +274,9 @@ def build_provider_dataset_plan(
 
     for idx_local, record in enumerate(preview_records):
         if provider_labels_prev is not None and idx_local < len(provider_labels_prev):
-            record["labels"] = tensor_or_list_to_ints_fn(provider_labels_prev[idx_local])
+            record["labels"] = tensor_or_list_to_ints_fn(
+                provider_labels_prev[idx_local]
+            )
 
     min_tokens_target = resolve_pm_min_tokens_target_fn(
         tier=tier or getattr(getattr(cfg, "auto", None), "tier", None),
@@ -303,7 +305,9 @@ def build_provider_dataset_plan(
     window_plan["min_tokens_target"] = int(min_tokens_target)
     window_plan["tokens_floor_met"] = bool(tokens_floor_met)
     if effective_windows["dedupe_adjustments"]:
-        window_plan["dedupe_adjustments"] = list(effective_windows["dedupe_adjustments"])
+        window_plan["dedupe_adjustments"] = list(
+            effective_windows["dedupe_adjustments"]
+        )
 
     calibration_data: list[dict[str, Any]] = []
     preview_mask_total = 0
@@ -367,7 +371,9 @@ def build_provider_dataset_plan(
     dataset_meta = {
         "tokenizer_name": getattr(tokenizer, "name_or_path", "unknown"),
         "tokenizer_hash": (
-            tokenizer_hash if tokenizer_hash is not None else tokenizer_digest_fn(tokenizer)
+            tokenizer_hash
+            if tokenizer_hash is not None
+            else tokenizer_digest_fn(tokenizer)
         ),
         "vocab_size": safe_int_fn(getattr(tokenizer, "vocab_size", 0), 0),
         "bos_token": getattr(tokenizer, "bos_token", None),

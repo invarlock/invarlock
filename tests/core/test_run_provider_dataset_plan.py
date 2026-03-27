@@ -50,7 +50,7 @@ def _cfg(*, provider: object, release: bool = False) -> SimpleNamespace:
 
 def test_build_provider_dataset_plan_collects_notices_and_provider_kwargs() -> None:
     captured: dict[str, object] = {}
-    provider = SimpleNamespace()
+    provider = _Seq2SeqProvider()
 
     def _resolve_provider_and_split(
         cfg: object,

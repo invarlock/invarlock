@@ -79,8 +79,7 @@ def load_baseline_pairing_evidence(
 ) -> BaselineEvidenceLoadResult:
     path_str = str(baseline_path)
     missing_path_message = (
-        "PAIRING-EVIDENCE-MISSING: baseline report path does not exist "
-        f"({path_str})"
+        f"PAIRING-EVIDENCE-MISSING: baseline report path does not exist ({path_str})"
     )
     if not baseline_path.exists():
         return BaselineEvidenceLoadResult(
@@ -314,9 +313,7 @@ def materialize_baseline_pairing_schedule(
 
         dataset_meta["masked_tokens_preview"] = int(preview_mask_total)
         dataset_meta["masked_tokens_final"] = int(final_mask_total)
-        dataset_meta["masked_tokens_total"] = int(
-            preview_mask_total + final_mask_total
-        )
+        dataset_meta["masked_tokens_total"] = int(preview_mask_total + final_mask_total)
 
     if "preview_total_tokens" not in dataset_meta:
         dataset_meta["preview_total_tokens"] = sum(

@@ -480,7 +480,10 @@ def test_run_command_injects_explicit_deps(monkeypatch, tmp_path: Path):
         deps["_build_run_execution_config_payloads"]
         is run_mod._build_run_execution_config_payloads
     )
-    assert deps["_validate_retry_evaluation_report"] is run_mod._validate_retry_evaluation_report
+    assert (
+        deps["_validate_retry_evaluation_report"]
+        is run_mod._validate_retry_evaluation_report
+    )
     assert deps["_choose_snapshot_mode"] is run_mod._choose_snapshot_mode
     assert (
         deps["_build_timing_summary_payload"] is run_mod._build_timing_summary_payload

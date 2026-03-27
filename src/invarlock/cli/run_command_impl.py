@@ -62,9 +62,7 @@ def run_command_impl(
     _build_provider_dataset_plan = _dep("_build_provider_dataset_plan")
     _build_dataset_window_stats = _dep("_build_dataset_window_stats")
     _build_run_context_payload = _dep("_build_run_context_payload")
-    _build_run_execution_config_payloads = _dep(
-        "_build_run_execution_config_payloads"
-    )
+    _build_run_execution_config_payloads = _dep("_build_run_execution_config_payloads")
     _build_edit_payload = _dep("_build_edit_payload")
     _build_timing_summary_payload = _dep("_build_timing_summary_payload")
     _build_retry_result_summary = _dep("_build_retry_result_summary")
@@ -2028,7 +2026,9 @@ def run_command_impl(
                             profile=profile_normalized,
                         )
 
-                    should_retry = retry_controller.should_retry(retry_validation.passed)
+                    should_retry = retry_controller.should_retry(
+                        retry_validation.passed
+                    )
                     drain_notices = getattr(retry_controller, "drain_notices", None)
                     notices = drain_notices() if callable(drain_notices) else ()
                     for notice in notices:

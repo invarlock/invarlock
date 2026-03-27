@@ -122,9 +122,9 @@ def build_run_context_payload(
     if isinstance(extra_context, dict):
         run_context.update(extra_context)
     try:
-        run_context.setdefault("eval", {}).setdefault("loss", {})[
-            "resolved_type"
-        ] = resolved_loss_type
+        run_context.setdefault("eval", {}).setdefault("loss", {})["resolved_type"] = (
+            resolved_loss_type
+        )
     except (AttributeError, TypeError):
         pass
 
