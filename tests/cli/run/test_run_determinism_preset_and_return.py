@@ -443,7 +443,10 @@ def test_run_command_does_not_include_determinism_when_preset_empty(
             patch("invarlock.cli.commands.run._emit_run_artifacts", _fake_emit)
         )
         stack.enter_context(
-            patch("invarlock.cli.determinism.apply_determinism_preset", lambda **_k: {})
+            patch(
+                "invarlock.core.determinism_policy.apply_determinism_preset",
+                lambda **_k: {},
+            )
         )
 
         report_path = run_command(
@@ -588,7 +591,10 @@ context:
             patch("invarlock.cli.commands.run._emit_run_artifacts", _fake_emit)
         )
         stack.enter_context(
-            patch("invarlock.cli.determinism.apply_determinism_preset", lambda **_k: {})
+            patch(
+                "invarlock.core.determinism_policy.apply_determinism_preset",
+                lambda **_k: {},
+            )
         )
 
         report_path = run_command(

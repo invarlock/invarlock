@@ -1,4 +1,4 @@
-"""Determinism presets for CI/release runs.
+"""Determinism policy helpers for CI/release runs.
 
 Centralizes:
 - Seeds (python/numpy/torch)

@@ -60,7 +60,7 @@ def _base_report_and_baseline():
 def test_render_markdown_plugins_overhead_and_rmt_variants():
     report, baseline = _base_report_and_baseline()
     with patch(
-        "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
+        "invarlock.core.bootstrap.compute_paired_delta_log_ci",
         return_value=(-0.1, 0.1),
     ):
         cert = make_report(report, baseline)

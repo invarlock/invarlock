@@ -42,16 +42,16 @@ def test_evaluate_hf_id_normalization_and_preset_fallback(monkeypatch, tmp_path:
         ),
     )
     # No-op report emitter
-    monkeypatch.setattr(cert_mod, "_report", lambda **kwargs: None)
+    monkeypatch.setattr(cert_mod, "generate_reports", lambda **kwargs: None)
 
     # Run with hf: prefix to exercise normalization; preset path is default fallback when missing
     r = CliRunner().invoke(
         app,
         [
             "evaluate",
-            "--source",
+            "--baseline",
             "hf:org/modelA",
-            "--edited",
+            "--subject",
             "hf:org/modelB",
             "--adapter",
             "auto",
@@ -100,16 +100,16 @@ def test_evaluate_ci_aborts_on_nonfinite_pm(monkeypatch, tmp_path: Path):
         ),
     )
     # No-op report emitter
-    monkeypatch.setattr(cert_mod, "_report", lambda **kwargs: None)
+    monkeypatch.setattr(cert_mod, "generate_reports", lambda **kwargs: None)
     monkeypatch.setattr(cert_mod, "resolve_auto_adapter", lambda src: "hf_causal")
 
     r = CliRunner().invoke(
         app,
         [
             "evaluate",
-            "--source",
+            "--baseline",
             "hf:org/modelA",
-            "--edited",
+            "--subject",
             "hf:org/modelB",
             "--adapter",
             "auto",

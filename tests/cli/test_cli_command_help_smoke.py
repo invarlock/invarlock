@@ -27,24 +27,20 @@ def test_cli_top_level_help_smoke(monkeypatch):
 
 
 def test_command_wrappers_importable():
-    # Ensure import surface remains stable
-    from invarlock.cli.commands import (
-        doctor_command,
-        evaluate_command,
-        explain_gates_command,
-        export_html_command,
-        plugins_command,
-        policy_build_command,
-        policy_verify_command,
-        proof_pack_build_command,
-        proof_pack_inspect_command,
-        proof_pack_verify_command,
-        report_command,
-        verify_command,
-    )
+    from invarlock.cli.commands.doctor import doctor_command
+    from invarlock.cli.commands.evaluate import evaluate_command
+    from invarlock.cli.commands.explain_gates import explain_gates_command
+    from invarlock.cli.commands.export_html import export_html_command
+    from invarlock.cli.commands.plugins import plugins_command
+    from invarlock.cli.commands.policy import build_command as policy_build_command
+    from invarlock.cli.commands.policy import verify_command as policy_verify_command
+    from invarlock.cli.commands.proof_pack import build_command as proof_pack_build_command
+    from invarlock.cli.commands.proof_pack import inspect_command as proof_pack_inspect_command
+    from invarlock.cli.commands.proof_pack import verify_command as proof_pack_verify_command
+    from invarlock.cli.commands.verify import verify_command
     from invarlock.cli.commands.calibrate import calibrate_app
+    from invarlock.reporting.report_contract import generate_reports
 
-    # Basic type checks – they should be callables or Typer callbacks
     for obj in (
         evaluate_command,
         calibrate_app,
@@ -58,6 +54,6 @@ def test_command_wrappers_importable():
         proof_pack_verify_command,
         plugins_command,
         verify_command,
-        report_command,
+        generate_reports,
     ):
         assert callable(obj)

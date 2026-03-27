@@ -14,13 +14,11 @@ from __future__ import annotations
 # mypy: ignore-errors
 import copy
 import hashlib
-import inspect
 import json
 import math
 import os
 import platform
 from collections.abc import Iterable
-from datetime import datetime
 from typing import Any
 
 # Optional JSON Schema validation support
@@ -30,28 +28,11 @@ except ImportError:  # pragma: no cover
     jsonschema = None  # type: ignore
 
 from invarlock.core.auto_tuning import get_tier_policies
-from invarlock.core.bootstrap import (
-    compute_paired_delta_log_ci,
-    logspace_to_ratio_ci,
-)
 from invarlock.eval.primary_metric import compute_primary_metric_from_report, get_metric
-from invarlock.eval.tail_stats import evaluate_metric_tail
 from invarlock.public_contracts import load_json_contract
 from invarlock.utils.digest import hash_json
 
 from . import report_schema as _report_schema
-from .dataset_hashing import (
-    _extract_dataset_info,
-)
-from .guards_analysis import (
-    _extract_invariants,
-    _extract_rmt_analysis,
-    _extract_spectral_analysis,
-    _extract_variance_analysis,
-)
-from .report_make_impl import (
-    make_report_impl as _make_report_impl,
-)
 from .report_overhead import (
     compute_quality_overhead_from_guard as _compute_quality_overhead_from_guard_impl,
 )
@@ -85,10 +66,8 @@ from .report_validation import (
 # dataset_hashing.compute_window_hash directly, so this import is no longer needed.
 from .utils import (
     _coerce_int,
-    _coerce_interval,
     _get_mapping,
     _infer_scope_from_modules,
-    _pair_logloss_windows,
     _sanitize_seed_bundle,
 )
 from .validate import validate_guard_overhead
@@ -106,23 +85,6 @@ TIER_RATIO_LIMITS: dict[str, float] = {
 
 # Canonical preview→final drift band used when not explicitly configured.
 PM_DRIFT_BAND_DEFAULT: tuple[float, float] = (0.95, 1.05)
-
-# Keep make_report dependencies available on this module for delegated
-# report_make_impl runtime lookup and test monkeypatch compatibility.
-_MAKE_REPORT_IMPL_EXPORTS = (
-    inspect,
-    datetime,
-    compute_paired_delta_log_ci,
-    logspace_to_ratio_ci,
-    evaluate_metric_tail,
-    _extract_dataset_info,
-    _extract_invariants,
-    _extract_rmt_analysis,
-    _extract_spectral_analysis,
-    _extract_variance_analysis,
-    _coerce_interval,
-    _pair_logloss_windows,
-)
 
 
 def _is_ppl_kind(name: Any) -> bool:
@@ -808,8 +770,9 @@ def make_report(
     baseline: RunReport | dict[str, Any],
 ) -> dict[str, Any]:
     """Generate an evaluation report from a RunReport and baseline comparison."""
+    from .report_make_impl import make_report_impl
 
-    return _make_report_impl(report, baseline)
+    return make_report_impl(report, baseline)
 
 
 # Console Validation Block helpers have moved to invarlock.reporting.render.

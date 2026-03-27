@@ -5,10 +5,11 @@ from pathlib import Path
 
 import pytest
 import typer
-from typer.models import OptionInfo
 
 import invarlock.cli.commands.report as report_mod
+import invarlock.reporting.report_contract as report_contract_mod
 import invarlock.reporting.report_builder as cert_mod
+from invarlock.reporting.report_contract import ReportGenerationResult, generate_reports
 
 
 def _make_primary_report():
@@ -26,10 +27,29 @@ def _make_primary_report():
     }
 
 
-def test_generate_reports_coerces_optioninfo_and_all_formats(monkeypatch):
-    monkeypatch.setattr(
-        report_mod, "_load_run_report", lambda path: _make_primary_report()
+def _make_generation_result(
+    *,
+    primary: dict | None = None,
+    baseline: dict | None = None,
+    output_dir: str = "out",
+    saved_files: dict[str, str] | None = None,
+    evaluation_report: dict | None = None,
+    validation_block: dict | None = None,
+    formats: list[str] | None = None,
+) -> ReportGenerationResult:
+    return ReportGenerationResult(
+        output_dir=output_dir,
+        formats=formats or ["report"],
+        saved_files=saved_files or {"report": "evaluation.report.json"},
+        primary_report=primary or _make_primary_report(),
+        compare_report=None,
+        baseline_report=baseline or _make_primary_report(),
+        evaluation_report=evaluation_report,
+        validation_block=validation_block,
     )
+
+
+def test_generate_reports_normalizes_all_formats(monkeypatch):
     saved = {}
 
     def fake_save(primary, out_dir, *, formats, **kwargs):
@@ -37,43 +57,17 @@ def test_generate_reports_coerces_optioninfo_and_all_formats(monkeypatch):
         return {fmt: f"{fmt}.json" for fmt in formats}
 
     monkeypatch.setattr(
-        report_mod, "console", type("C", (), {"print": lambda *_: None})()
+        report_contract_mod, "load_report_payload", lambda _path: _make_primary_report()
     )
-    monkeypatch.setattr(report_mod, "_save_report", fake_save, raising=False)
+    monkeypatch.setattr(report_contract_mod, "save_report", fake_save, raising=False)
 
-    run_opt = OptionInfo()
-    run_opt.default = "run.json"
-    format_opt = OptionInfo()
-    format_opt.default = "all"
-    report_mod._generate_reports(
-        run=run_opt,
-        format=format_opt,
-        compare=None,
-        baseline=None,
-        output=None,
-    )
+    generate_reports(run="run.json", format="all")
     assert saved["formats"] == ["json", "markdown", "html"]
 
 
-def test_generate_reports_evaluation_report_validation_block(monkeypatch):
-    primary = _make_primary_report()
-    baseline = _make_primary_report()
-
-    def fake_load(path):
-        return baseline if "baseline" in path else primary
-
-    monkeypatch.setattr(report_mod, "_load_run_report", fake_load, raising=False)
-
-    monkeypatch.setattr(
-        report_mod,
-        "_save_report",
-        lambda *_, **__: {"report": "evaluation.report.json"},
-        raising=False,
-    )
-    monkeypatch.setattr(
-        cert_mod,
-        "make_report",
-        lambda *_, **__: {
+def test_report_command_evaluation_report_validation_block(monkeypatch):
+    result = _make_generation_result(
+        evaluation_report={
             "validation": {"overall": True},
             "primary_metric": {
                 "kind": "ppl_causal",
@@ -83,21 +77,10 @@ def test_generate_reports_evaluation_report_validation_block(monkeypatch):
                 "display_ci": [0.9981, 1.0019],
             },
         },
-        raising=False,
-    )
-    monkeypatch.setattr(cert_mod, "validate_report", lambda cert: True, raising=False)
-
-    block = {
-        "overall_pass": True,
-        "rows": [{"label": "primary_metric", "status": "PASS"}],
-    }
-
-    def fake_console_block(cert):
-        return block
-
-    monkeypatch.setattr(
-        "invarlock.reporting.render.compute_console_validation_block",
-        fake_console_block,
+        validation_block={
+            "overall_pass": True,
+            "rows": [{"label": "primary_metric", "status": "PASS"}],
+        },
     )
     captured: list[str] = []
 
@@ -107,12 +90,10 @@ def test_generate_reports_evaluation_report_validation_block(monkeypatch):
 
     monkeypatch.setattr(report_mod, "console", _CaptureConsole())
 
-    report_mod.report_command(
-        run="run.json",
-        format="report",
-        compare=None,
-        baseline="baseline.json",
-        output="out",
+    report_mod._render_generation_result(
+        result=result,
+        style="audit",
+        no_color=False,
     )
     out = "\n".join(captured)
     assert "PRIMARY METRIC" in out
@@ -120,30 +101,10 @@ def test_generate_reports_evaluation_report_validation_block(monkeypatch):
     assert "[0.998, 1.002]" in out
 
 
-def test_generate_reports_summary_includes_total_time_suffix(monkeypatch):
-    primary = _make_primary_report()
-    baseline = _make_primary_report()
-
-    def fake_load(path):
-        return baseline if "baseline" in path else primary
-
-    monkeypatch.setattr(report_mod, "_load_run_report", fake_load, raising=False)
-    monkeypatch.setattr(
-        report_mod,
-        "_save_report",
-        lambda *_, **__: {"report": "evaluation.report.json"},
-        raising=False,
-    )
-    monkeypatch.setattr(
-        cert_mod,
-        "make_report",
-        lambda *_, **__: {"validation": {"overall": True}, "primary_metric": {}},
-        raising=False,
-    )
-    monkeypatch.setattr(cert_mod, "validate_report", lambda cert: True, raising=False)
-    monkeypatch.setattr(
-        "invarlock.reporting.render.compute_console_validation_block",
-        lambda cert: {"overall_pass": True, "rows": []},
+def test_report_command_summary_includes_total_time_suffix(monkeypatch):
+    result = _make_generation_result(
+        evaluation_report={"validation": {"overall": True}, "primary_metric": {}},
+        validation_block={"overall_pass": True, "rows": []},
     )
     monkeypatch.setattr(report_mod, "perf_counter", lambda: 126.0)
 
@@ -155,12 +116,10 @@ def test_generate_reports_summary_includes_total_time_suffix(monkeypatch):
 
     monkeypatch.setattr(report_mod, "console", _CaptureConsole())
 
-    report_mod.report_command(
-        run="run.json",
-        format="report",
-        compare=None,
-        baseline="baseline.json",
-        output="out",
+    report_mod._render_generation_result(
+        result=result,
+        style="audit",
+        no_color=False,
         summary_baseline_seconds=1.0,
         summary_subject_seconds=2.0,
         summary_report_start=120.0,
@@ -170,37 +129,81 @@ def test_generate_reports_summary_includes_total_time_suffix(monkeypatch):
     assert "[9.00s]" in out
 
 
-def test_generate_reports_evaluation_report_validation_error(monkeypatch):
-    monkeypatch.setattr(
-        report_mod, "_load_run_report", lambda path: _make_primary_report()
+def test_report_command_summary_handles_suffix_formatting_failures(monkeypatch):
+    result = _make_generation_result(
+        evaluation_report={"validation": {"overall": True}, "primary_metric": {}},
+        validation_block={"overall_pass": True, "rows": []},
     )
+    monkeypatch.setattr(report_mod, "perf_counter", lambda: 126.0)
+
+    captured: list[str] = []
+
+    class _CaptureConsole:
+        def print(self, *args: object, **kwargs: object) -> None:
+            captured.append(" ".join(str(a) for a in args))
+
+    monkeypatch.setattr(report_mod, "console", _CaptureConsole())
+
+    report_mod._render_generation_result(
+        result=result,
+        style="audit",
+        no_color=False,
+        summary_baseline_seconds=1.0,
+        summary_subject_seconds=2.0,
+        summary_report_start="bad",
+    )
+    out = "\n".join(captured)
+    assert "EVALUATION REPORT SUMMARY" in out
+    assert "[9.00s]" not in out
+
+
+def test_report_command_prints_telemetry_summary_line(monkeypatch):
+    result = _make_generation_result(
+        evaluation_report={"validation": {"overall": True}, "primary_metric": {}},
+        validation_block={"overall_pass": True, "rows": []},
+    )
+    monkeypatch.setattr(report_mod, "telemetry_output_enabled", lambda: True)
+    monkeypatch.setattr(
+        report_mod, "telemetry_summary_line", lambda _report: "telemetry"
+    )
+
+    captured: list[str] = []
+
+    class _CaptureConsole:
+        def print(self, *args: object, **kwargs: object) -> None:
+            captured.append(" ".join(str(a) for a in args))
+
+    monkeypatch.setattr(report_mod, "console", _CaptureConsole())
+
+    report_mod._render_generation_result(result=result, style="audit", no_color=False)
+    assert "telemetry" in "\n".join(captured)
+
+
+def test_report_command_evaluation_report_validation_error(monkeypatch):
     monkeypatch.setattr(
         report_mod,
-        "_save_report",
-        lambda *_, **__: {"report": "evaluation.report.json"},
-        raising=False,
+        "generate_reports",
+        lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("bad report")),
     )
-
-    def _boom(*_args, **_kwargs):
-        raise RuntimeError("bad report")
-
-    monkeypatch.setattr(cert_mod, "make_report", _boom, raising=False)
     monkeypatch.setattr(
         report_mod, "console", type("C", (), {"print": lambda *_: None})()
     )
 
     with pytest.raises(typer.Exit) as exc:
-        report_mod.report_command(
+        report_mod.report_callback(
+            type("Ctx", (), {"resilient_parsing": False, "invoked_subcommand": None})(),
             run="run.json",
             format="report",
             compare=None,
             baseline="baseline.json",
             output=None,
+            style="audit",
+            no_color=False,
         )
     assert exc.value.exit_code == 1
 
 
-def test_generate_reports_rejects_noncanonical_run_directory(monkeypatch, tmp_path):
+def test_report_command_rejects_noncanonical_run_directory(monkeypatch, tmp_path):
     report_dir = tmp_path / "report-dir"
     report_dir.mkdir()
     (report_dir / "my_report.json").write_text(
@@ -212,15 +215,77 @@ def test_generate_reports_rejects_noncanonical_run_directory(monkeypatch, tmp_pa
     )
 
     with pytest.raises(typer.Exit) as exc:
-        report_mod.report_command(
+        report_mod.report_callback(
+            type("Ctx", (), {"resilient_parsing": False, "invoked_subcommand": None})(),
             run=str(report_dir),
             format="json",
             compare=None,
             baseline=None,
             output=None,
+            style="audit",
+            no_color=False,
         )
 
     assert exc.value.exit_code == 2
+
+
+def test_artifact_entries_includes_unordered_extra_saved_files() -> None:
+    entries = report_mod._artifact_entries(
+        {"json": "a.json", "telemetry": "telemetry.json"},
+        "out",
+    )
+
+    assert ("Output", "out") in entries
+    assert ("JSON", "a.json") in entries
+    assert ("TELEMETRY", "telemetry.json") in entries
+
+
+def test_report_callback_skips_subcommand_and_delegates_success(monkeypatch) -> None:
+    delegated: list[dict[str, object]] = []
+
+    def fake_generate(**kwargs: object) -> ReportGenerationResult:
+        delegated.append(kwargs)
+        return _make_generation_result(formats=["json"], saved_files={"json": "a.json"})
+
+    monkeypatch.setattr(report_mod, "generate_reports", fake_generate)
+
+    ctx_skip = type(
+        "Ctx", (), {"resilient_parsing": False, "invoked_subcommand": "verify"}
+    )()
+    report_mod.report_callback(
+        ctx_skip,
+        run="run.json",
+        format="json",
+        compare=None,
+        baseline=None,
+        output=None,
+        style="audit",
+        no_color=False,
+    )
+    assert delegated == []
+
+    ctx_run = type(
+        "Ctx", (), {"resilient_parsing": False, "invoked_subcommand": None}
+    )()
+    report_mod.report_callback(
+        ctx_run,
+        run="run.json",
+        format="json",
+        compare="compare.json",
+        baseline="baseline.json",
+        output="out",
+        style="friendly",
+        no_color=True,
+    )
+    assert delegated == [
+        {
+            "run": "run.json",
+            "format": "json",
+            "compare": "compare.json",
+            "baseline": "baseline.json",
+            "output": "out",
+        }
+    ]
 
 
 def test_report_validate_success(monkeypatch, tmp_path):

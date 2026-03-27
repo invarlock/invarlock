@@ -62,13 +62,12 @@ def test_evaluate_orchestrates_runs_and_cert(monkeypatch, tmp_path):
     monkeypatch.setattr(
         run_mod, "run_command", lambda **kwargs: fake_run(**kwargs), raising=False
     )
-    # Patch the report entry already imported as _report in evaluate module
-    monkeypatch.setattr(mod, "_report", fake_report, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", fake_report, raising=False)
 
     # Act
     evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
@@ -146,11 +145,11 @@ def test_evaluate_reuses_baseline_report_skipping_baseline_run(monkeypatch, tmp_
     from invarlock.cli.commands import evaluate as mod
 
     monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
-    monkeypatch.setattr(mod, "_report", fake_report, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", fake_report, raising=False)
 
     evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         baseline_report=str(baseline_report),
         adapter="auto",
         profile="ci",
@@ -200,8 +199,8 @@ def test_evaluate_baseline_report_requires_windows(monkeypatch, tmp_path):
 
     with pytest.raises(click.exceptions.Exit):
         evaluate_command(
-            source=str(src),
-            edited=str(edt),
+            baseline=str(src),
+            subject=str(edt),
             baseline_report=str(baseline_report),
             adapter="auto",
             profile="ci",
@@ -246,13 +245,13 @@ def test_evaluate_autogen_uses_device_auto(monkeypatch, tmp_path):
     monkeypatch.setattr(
         run_mod, "run_command", lambda **kwargs: fake_run(**kwargs), raising=False
     )
-    monkeypatch.setattr(mod, "_report", fake_report, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", fake_report, raising=False)
 
     # Act
     repo_root = Path(__file__).resolve().parents[2]
     evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         adapter="auto",
         profile="ci",
         preset=str(
@@ -315,11 +314,11 @@ def test_evaluate_quiet_summary_emits_status(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(
         run_mod, "run_command", lambda **kwargs: fake_run(**kwargs), raising=False
     )
-    monkeypatch.setattr(mod, "_report", fake_report, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", fake_report, raising=False)
 
     evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),

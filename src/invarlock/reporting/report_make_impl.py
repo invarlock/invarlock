@@ -4,9 +4,26 @@
 
 from __future__ import annotations
 
+import copy
+import inspect
+import math
+import os
+from datetime import datetime
 from typing import Any
 
+import invarlock.core.bootstrap as bootstrap_mod
+import invarlock.eval.tail_stats as tail_stats_mod
 from invarlock.reporting.report_types import RunReport
+
+from . import report_builder as _builder
+from .dataset_hashing import _extract_dataset_info
+from .guards_analysis import (
+    _extract_invariants,
+    _extract_rmt_analysis,
+    _extract_spectral_analysis,
+    _extract_variance_analysis,
+)
+from .utils import _coerce_interval, _pair_logloss_windows
 
 
 def make_report_impl(
@@ -14,11 +31,6 @@ def make_report_impl(
     baseline: RunReport | dict[str, Any],
 ) -> dict[str, Any]:
     """Delegated implementation of report_builder.make_report."""
-    from invarlock.reporting import report_builder as builder_mod
-
-    # Keep runtime lookup dynamic so report_builder monkeypatches in tests continue to apply.
-    globals().update(builder_mod.__dict__)
-
     NON_FATAL_EXCEPTIONS = (
         AttributeError,
         TypeError,
@@ -30,6 +42,48 @@ def make_report_impl(
         ModuleNotFoundError,
     )
     NUMERIC_EXCEPTIONS = (TypeError, ValueError, OverflowError)
+
+    POLICY_VERSION = _builder.POLICY_VERSION
+    REPORT_SCHEMA_VERSION = _builder.REPORT_SCHEMA_VERSION
+    VARIANCE_CANONICAL_KEYS = _builder.VARIANCE_CANONICAL_KEYS
+    _VALIDATION_ALLOWLIST_SOURCE = _builder._VALIDATION_ALLOWLIST_SOURCE
+    _build_provenance_block = _builder._build_provenance_block
+    _build_resolved_policies = _builder._build_resolved_policies
+    _coerce_int = _builder._coerce_int
+    _compute_confidence_label = _builder._compute_confidence_label
+    _compute_policy_digest = _builder._compute_policy_digest
+    _compute_quality_overhead_from_guard = _builder._compute_quality_overhead_from_guard
+    _compute_thresholds_hash = _builder._compute_thresholds_hash
+    _compute_thresholds_payload = _builder._compute_thresholds_payload
+    _compute_validation_flags = _builder._compute_validation_flags
+    _compute_variance_policy_digest = _builder._compute_variance_policy_digest
+    _enforce_display_ci_alignment = _builder._enforce_display_ci_alignment
+    _enforce_drift_ratio_identity = _builder._enforce_drift_ratio_identity
+    _enforce_pairing_and_coverage = _builder._enforce_pairing_and_coverage
+    _enforce_ratio_ci_alignment = _builder._enforce_ratio_ci_alignment
+    _extract_edit_metadata = _builder._extract_edit_metadata
+    _extract_effective_policies = _builder._extract_effective_policies
+    _extract_policy_overrides = _builder._extract_policy_overrides
+    _extract_report_meta = _builder._extract_report_meta
+    _extract_structural_deltas = _builder._extract_structural_deltas
+    _fallback_paired_windows = _builder._fallback_paired_windows
+    _generate_run_id = _builder._generate_run_id
+    _is_ppl_kind = _builder._is_ppl_kind
+    _load_validation_allowlist = _builder._load_validation_allowlist
+    _normalize_and_validate_report = _builder._normalize_and_validate_report
+    _normalize_baseline = _builder._normalize_baseline
+    _prepare_guard_overhead_section = _builder._prepare_guard_overhead_section
+    _propagate_pairing_stats = _builder._propagate_pairing_stats
+    _resolve_pm_acceptance_range_from_report = (
+        _builder._resolve_pm_acceptance_range_from_report
+    )
+    _resolve_pm_drift_band_from_report = _builder._resolve_pm_drift_band_from_report
+    _resolve_tiny_relax_from_report = _builder._resolve_tiny_relax_from_report
+    compute_primary_metric_from_report = _builder.compute_primary_metric_from_report
+    get_tier_policies = _builder.get_tier_policies
+    compute_paired_delta_log_ci = bootstrap_mod.compute_paired_delta_log_ci
+    logspace_to_ratio_ci = bootstrap_mod.logspace_to_ratio_ci
+    evaluate_metric_tail = tail_stats_mod.evaluate_metric_tail
 
     report = _normalize_and_validate_report(report)
 

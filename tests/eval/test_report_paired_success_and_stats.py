@@ -99,7 +99,7 @@ def test_evaluation_report_paired_ci_success_and_stats_passthrough():
 
     # Return a tight ΔlogNLL CI around the mean so ratio_ci == exp(bounds)
     with patch(
-        "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
+        "invarlock.core.bootstrap.compute_paired_delta_log_ci",
         return_value=(-0.08, -0.06),
     ):
         with patch(

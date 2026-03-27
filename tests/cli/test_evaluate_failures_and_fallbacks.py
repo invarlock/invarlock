@@ -103,12 +103,12 @@ def _assert_baseline_report_validation_exit(
         baseline_path.write_text(json.dumps(payload), encoding="utf-8")
 
     monkeypatch.setattr(run_mod, "run_command", lambda **_: None, raising=False)
-    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", lambda **_: None, raising=False)
 
     with pytest.raises(click.exceptions.Exit) as exc:
         mod.evaluate_command(
-            source=str(src),
-            edited=str(edt),
+            baseline=str(src),
+            subject=str(edt),
             adapter="hf_causal",
             baseline_report=str(baseline_path),
             out=str(Path("runs")),
@@ -131,8 +131,8 @@ def test_evaluate_requires_explicit_runner_report_path(monkeypatch, tmp_path: Pa
 
     with pytest.raises(click.exceptions.Exit) as exc:
         mod.evaluate_command(
-            source=str(src),
-            edited=str(edt),
+            baseline=str(src),
+            subject=str(edt),
             adapter="hf_causal",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
@@ -157,8 +157,8 @@ def test_evaluate_requires_existing_runner_report_path(monkeypatch, tmp_path: Pa
 
     with pytest.raises(click.exceptions.Exit) as exc:
         mod.evaluate_command(
-            source=str(src),
-            edited=str(edt),
+            baseline=str(src),
+            subject=str(edt),
             adapter="hf_causal",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
@@ -182,8 +182,8 @@ def test_evaluate_requires_file_runner_report_path(monkeypatch, tmp_path: Path):
 
     with pytest.raises(click.exceptions.Exit) as exc:
         mod.evaluate_command(
-            source=str(src),
-            edited=str(edt),
+            baseline=str(src),
+            subject=str(edt),
             adapter="hf_causal",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
@@ -218,8 +218,8 @@ def test_evaluate_missing_preset_exits(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(run_mod, "run_command", lambda **k: None, raising=False)
     with pytest.raises(click.exceptions.Exit):
         mod.evaluate_command(
-            source=str(src),
-            edited=str(edt),
+            baseline=str(src),
+            subject=str(edt),
             preset=str(tmp_path / "no_such_preset.yaml"),
             out=str(tmp_path / "runs"),
         )
@@ -251,14 +251,14 @@ def test_evaluate_uses_inline_preset_when_repo_preset_missing(monkeypatch, tmp_p
     )
     monkeypatch.setattr(
         mod,
-        "_report",
+        "generate_reports",
         lambda **kwargs: report_calls.append(kwargs),
         raising=False,
     )
 
     mod.evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         adapter="hf_causal",
         out=str(runs),
         report_out=str(Path("certs")),
@@ -311,11 +311,11 @@ def test_evaluate_edit_config_successfully_merges_subject(monkeypatch, tmp_path)
         ),
         raising=False,
     )
-    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", lambda **_: None, raising=False)
 
     mod.evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         adapter="hf_causal",
         preset=str(preset),
         edit_config=str(edit_cfg),
@@ -350,14 +350,14 @@ def test_evaluate_uses_returned_run_report_path_over_directory_scan(
     monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
     monkeypatch.setattr(
         mod,
-        "_report",
+        "generate_reports",
         lambda **kwargs: report_calls.append(kwargs),
         raising=False,
     )
 
     mod.evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         adapter="hf_causal",
         out=str(Path("runs")),
         report_out=str(Path("reports")),
@@ -393,8 +393,8 @@ def test_evaluate_edit_config_invalid_yaml_exits(monkeypatch, tmp_path):
 
     with pytest.raises(click.exceptions.Exit):
         mod.evaluate_command(
-            source=str(src),
-            edited=str(edt),
+            baseline=str(src),
+            subject=str(edt),
             adapter="hf_causal",
             edit_config=str(edit_cfg),
             out=str(Path("runs")),
@@ -419,12 +419,12 @@ def test_evaluate_ci_profile_invalid_json_exits(monkeypatch, tmp_path):
         _fake_run_command_with_paths({"source": baseline_report, "edited": bad_report}),
         raising=False,
     )
-    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", lambda **_: None, raising=False)
 
     with pytest.raises(click.exceptions.Exit):
         mod.evaluate_command(
-            source=str(src),
-            edited=str(edt),
+            baseline=str(src),
+            subject=str(edt),
             adapter="hf_causal",
             out=str(Path("runs")),
             profile="ci",
@@ -460,7 +460,7 @@ def test_evaluate_ci_nonfinite_primary_metric_exits(monkeypatch, tmp_path):
         ),
         raising=False,
     )
-    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", lambda **_: None, raising=False)
     monkeypatch.setattr(
         evaluate_contract_mod,
         "resolve_command_exit_code",
@@ -470,8 +470,8 @@ def test_evaluate_ci_nonfinite_primary_metric_exits(monkeypatch, tmp_path):
 
     with pytest.raises(click.exceptions.Exit) as exc:
         mod.evaluate_command(
-            source=str(src),
-            edited=str(edt),
+            baseline=str(src),
+            subject=str(edt),
             adapter="hf_causal",
             out=str(Path("runs")),
             profile="ci",
@@ -500,7 +500,7 @@ def test_evaluate_ci_nonfinite_primary_metric_handles_float_cast_failure(
         ),
         raising=False,
     )
-    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", lambda **_: None, raising=False)
     monkeypatch.setattr(
         mod.json,
         "load",
@@ -525,8 +525,8 @@ def test_evaluate_ci_nonfinite_primary_metric_handles_float_cast_failure(
 
     with pytest.raises(click.exceptions.Exit) as exc:
         mod.evaluate_command(
-            source=str(src),
-            edited=str(edt),
+            baseline=str(src),
+            subject=str(edt),
             adapter="hf_causal",
             out=str(Path("runs")),
             profile="ci",
@@ -544,8 +544,8 @@ def test_evaluate_missing_baseline_report_exits(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(run_mod, "run_command", lambda **k: None, raising=False)
     with pytest.raises(click.exceptions.Exit):
         mod.evaluate_command(
-            source=str(src),
-            edited=str(edt),
+            baseline=str(src),
+            subject=str(edt),
             adapter="hf_causal",
             out=str(tmp_path / "runs"),
         )
@@ -568,8 +568,8 @@ def test_evaluate_missing_edited_report_exits(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
     with pytest.raises(click.exceptions.Exit):
         mod.evaluate_command(
-            source=str(src),
-            edited=str(edt),
+            baseline=str(src),
+            subject=str(edt),
             adapter="hf_causal",
             out=str(runs),
         )
@@ -591,8 +591,8 @@ def test_evaluate_edit_config_missing_exits(monkeypatch, tmp_path: Path):
     )
     with pytest.raises(click.exceptions.Exit):
         mod.evaluate_command(
-            source=str(src),
-            edited=str(edt),
+            baseline=str(src),
+            subject=str(edt),
             adapter="hf_causal",
             edit_config=str(tmp_path / "missing_edit.yaml"),
             out=str(tmp_path / "runs"),
@@ -629,10 +629,10 @@ def test_evaluate_happy_path_with_preset_and_auto_adapter(monkeypatch, tmp_path:
 
     with ExitStack() as stack:
         stack.enter_context(patch.object(run_mod, "run_command", run_stub))
-        stack.enter_context(patch.object(mod, "_report", report_stub))
+        stack.enter_context(patch.object(mod, "generate_reports", report_stub))
         mod.evaluate_command(
-            source=str(src),
-            edited=str(edt),
+            baseline=str(src),
+            subject=str(edt),
             adapter="auto",
             preset=str(preset),
             out=str(runs),
@@ -685,8 +685,8 @@ def test_evaluate_quiet_summary_variants(tmp_path: Path, monkeypatch) -> None:
 
     mod._print_quiet_summary(
         report_out=report_out,
-        source="baseline",
-        edited="subject",
+        baseline="baseline",
+        subject="subject",
         profile="ci",
     )
     assert any(f"Output: {report_out}" in line for line in console.lines)
@@ -696,8 +696,8 @@ def test_evaluate_quiet_summary_variants(tmp_path: Path, monkeypatch) -> None:
     console.calls.clear()
     mod._print_quiet_summary(
         report_out=report_out,
-        source="baseline",
-        edited="subject",
+        baseline="baseline",
+        subject="subject",
         profile="ci",
     )
     assert any(f"Output: {report_path}" in line for line in console.lines)
@@ -706,8 +706,8 @@ def test_evaluate_quiet_summary_variants(tmp_path: Path, monkeypatch) -> None:
     console.calls.clear()
     mod._print_quiet_summary(
         report_out=report_out,
-        source="baseline",
-        edited="subject",
+        baseline="baseline",
+        subject="subject",
         profile="ci",
     )
     assert any(f"Output: {report_path}" in line for line in console.lines)
@@ -724,8 +724,8 @@ def test_evaluate_quiet_summary_variants(tmp_path: Path, monkeypatch) -> None:
     )
     mod._print_quiet_summary(
         report_out=report_out,
-        source="baseline",
-        edited="subject",
+        baseline="baseline",
+        subject="subject",
         profile="ci",
     )
     joined = console.joined()
@@ -777,8 +777,8 @@ def test_evaluate_yaml_tmp_dir_and_successful_quiet_summary(
     )
     mod._print_quiet_summary(
         report_out=report_out,
-        source="baseline",
-        edited="subject",
+        baseline="baseline",
+        subject="subject",
         profile="release",
     )
     joined = console.joined()
@@ -788,7 +788,7 @@ def test_evaluate_yaml_tmp_dir_and_successful_quiet_summary(
 
 def test_evaluate_rejects_invalid_execution_mode() -> None:
     with pytest.raises(click.BadParameter, match="Execution mode must be one of"):
-        mod.evaluate_command(source="baseline", edited="subject", mode="invalid")
+        mod.evaluate_command(baseline="baseline", subject="subject", mode="invalid")
 
 
 def test_evaluate_quiet_mode_disables_progress_and_timing(
@@ -808,11 +808,11 @@ def test_evaluate_quiet_mode_disables_progress_and_timing(
         ),
         raising=False,
     )
-    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", lambda **_: None, raising=False)
 
     mod.evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         adapter="hf_causal",
         out=str(Path("runs")),
         report_out=str(Path("reports")),
@@ -845,12 +845,12 @@ def test_evaluate_rejects_baseline_report_directory_even_with_report_json(
         lambda **kwargs: run_calls.append(kwargs),
         raising=False,
     )
-    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", lambda **_: None, raising=False)
 
     with pytest.raises(click.exceptions.Exit) as exc:
         mod.evaluate_command(
-            source=str(src),
-            edited=str(edt),
+            baseline=str(src),
+            subject=str(edt),
             adapter="hf_causal",
             baseline_report=str(baseline_dir),
             out=str(Path("runs")),
@@ -880,12 +880,12 @@ def test_evaluate_rejects_baseline_report_directory_without_report_json(
         lambda **kwargs: run_calls.append(kwargs),
         raising=False,
     )
-    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", lambda **_: None, raising=False)
 
     with pytest.raises(click.exceptions.Exit) as exc:
         mod.evaluate_command(
-            source=str(src),
-            edited=str(edt),
+            baseline=str(src),
+            subject=str(edt),
             adapter="hf_causal",
             baseline_report=str(baseline_dir),
             out=str(Path("runs")),
@@ -997,12 +997,12 @@ def test_evaluate_baseline_report_rejects_non_regular_file(
     os.mkfifo(baseline_fifo)
 
     monkeypatch.setattr(run_mod, "run_command", lambda **_: None, raising=False)
-    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", lambda **_: None, raising=False)
 
     with pytest.raises(click.exceptions.Exit) as exc:
         mod.evaluate_command(
-            source=str(src),
-            edited=str(edt),
+            baseline=str(src),
+            subject=str(edt),
             adapter="hf_causal",
             baseline_report=str(baseline_fifo),
             out=str(Path("runs")),
@@ -1080,11 +1080,11 @@ def test_evaluate_edit_config_preserves_explicit_adapter_and_guard_order(
         ),
         raising=False,
     )
-    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", lambda **_: None, raising=False)
 
     mod.evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         adapter="hf_causal",
         preset=str(preset),
         edit_config=str(edit_cfg),
@@ -1118,11 +1118,11 @@ def test_evaluate_edit_label_is_forwarded_to_subject_run(
         ),
         raising=False,
     )
-    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", lambda **_: None, raising=False)
 
     mod.evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         adapter="hf_causal",
         out=str(Path("runs")),
         report_out=str(Path("reports")),
@@ -1161,11 +1161,11 @@ def test_evaluate_filters_report_kwargs_to_supported_signature(
             }
         )
 
-    monkeypatch.setattr(mod, "_report", limited_report, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", limited_report, raising=False)
 
     mod.evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         adapter="hf_causal",
         out=str(Path("runs")),
         report_out=str(Path("reports")),
@@ -1180,49 +1180,6 @@ def test_evaluate_filters_report_kwargs_to_supported_signature(
             "output": str(Path("reports")),
         }
     ]
-
-
-def test_evaluate_uses_full_report_kwargs_when_signature_introspection_fails(
-    monkeypatch, tmp_path: Path
-) -> None:
-    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
-    baseline_report = _write_json(tmp_path / "baseline.json", {})
-    edited_report = _write_json(tmp_path / "edited.json", {})
-    report_calls: list[dict[str, object]] = []
-
-    monkeypatch.setattr(
-        run_mod,
-        "run_command",
-        _fake_run_command_with_paths(
-            {"source": baseline_report, "edited": edited_report}
-        ),
-        raising=False,
-    )
-    monkeypatch.setattr(
-        mod.inspect,
-        "signature",
-        lambda _fn: (_ for _ in ()).throw(TypeError("boom")),
-        raising=True,
-    )
-    monkeypatch.setattr(
-        mod,
-        "_report",
-        lambda **kwargs: report_calls.append(kwargs),
-        raising=False,
-    )
-
-    mod.evaluate_command(
-        source=str(src),
-        edited=str(edt),
-        adapter="hf_causal",
-        out=str(Path("runs")),
-        report_out=str(Path("reports")),
-        profile="dev",
-    )
-
-    assert len(report_calls) == 1
-    assert "summary_report_start" in report_calls[0]
-    assert report_calls[0]["output"] == str(Path("reports"))
 
 
 def test_evaluate_prints_timing_summary_when_requested(
@@ -1251,7 +1208,7 @@ def test_evaluate_prints_timing_summary_when_requested(
         ),
         raising=False,
     )
-    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", lambda **_: None, raising=False)
     monkeypatch.setattr(
         "invarlock.cli.output.timed_step",
         fake_timed_step,
@@ -1271,8 +1228,8 @@ def test_evaluate_prints_timing_summary_when_requested(
     )
 
     mod.evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         adapter="hf_causal",
         out=str(Path("runs")),
         report_out=str(Path("reports")),
@@ -1322,7 +1279,7 @@ def test_evaluate_degraded_primary_metric_emits_report_and_exits(
     )
     monkeypatch.setattr(
         mod,
-        "_report",
+        "generate_reports",
         lambda **kwargs: report_calls.append(kwargs),
         raising=False,
     )
@@ -1335,8 +1292,8 @@ def test_evaluate_degraded_primary_metric_emits_report_and_exits(
 
     with pytest.raises(click.exceptions.Exit) as exc:
         mod.evaluate_command(
-            source=str(src),
-            edited=str(edt),
+            baseline=str(src),
+            subject=str(edt),
             adapter="hf_causal",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
@@ -1365,8 +1322,8 @@ def test_evaluate_quiet_summary_skips_primary_metric_line_when_ratio_missing(
 
     mod._print_quiet_summary(
         report_out=report_out,
-        source="baseline",
-        edited="subject",
+        baseline="baseline",
+        subject="subject",
         profile="dev",
     )
 
@@ -1393,11 +1350,11 @@ def test_evaluate_verbose_mode_prints_debug_lines(monkeypatch, tmp_path: Path) -
         ),
         raising=False,
     )
-    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", lambda **_: None, raising=False)
 
     mod.evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         adapter="auto",
         out=str(Path("runs")),
         report_out=str(Path("reports")),
@@ -1432,11 +1389,11 @@ def test_evaluate_invalid_preset_guard_order_falls_back_to_default(
         ),
         raising=False,
     )
-    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", lambda **_: None, raising=False)
 
     mod.evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         adapter="hf_causal",
         preset=str(preset),
         out=str(Path("runs")),
@@ -1461,12 +1418,12 @@ def test_evaluate_supplied_baseline_report_path_must_exist(
 ) -> None:
     src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
     monkeypatch.setattr(run_mod, "run_command", lambda **_: None, raising=False)
-    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", lambda **_: None, raising=False)
 
     with pytest.raises(click.exceptions.Exit) as exc:
         mod.evaluate_command(
-            source=str(src),
-            edited=str(edt),
+            baseline=str(src),
+            subject=str(edt),
             adapter="hf_causal",
             baseline_report="missing.json",
             out=str(Path("runs")),
@@ -1484,12 +1441,12 @@ def test_evaluate_supplied_baseline_report_directory_requires_a_report_file(
     baseline_dir = Path("baseline-dir")
     baseline_dir.mkdir()
     monkeypatch.setattr(run_mod, "run_command", lambda **_: None, raising=False)
-    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", lambda **_: None, raising=False)
 
     with pytest.raises(click.exceptions.Exit) as exc:
         mod.evaluate_command(
-            source=str(src),
-            edited=str(edt),
+            baseline=str(src),
+            subject=str(edt),
             adapter="hf_causal",
             baseline_report=str(baseline_dir),
             out=str(Path("runs")),
@@ -1522,11 +1479,11 @@ def test_evaluate_baseline_report_accepts_non_mapping_meta_and_context(
         ),
         raising=False,
     )
-    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", lambda **_: None, raising=False)
 
     mod.evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         adapter="hf_causal",
         baseline_report=str(baseline_report),
         out=str(Path("runs")),
@@ -1590,8 +1547,8 @@ def test_evaluate_quiet_mode_replays_baseline_child_output_on_failure(
 
     with pytest.raises(RuntimeError, match="baseline boom"):
         mod.evaluate_command(
-            source=str(src),
-            edited=str(edt),
+            baseline=str(src),
+            subject=str(edt),
             adapter="hf_causal",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
@@ -1628,8 +1585,8 @@ def test_evaluate_quiet_mode_replays_edit_config_child_output_on_failure(
 
     with pytest.raises(RuntimeError, match="edited boom"):
         mod.evaluate_command(
-            source=str(src),
-            edited=str(edt),
+            baseline=str(src),
+            subject=str(edt),
             adapter="hf_causal",
             edit_config=str(edit_cfg),
             out=str(Path("runs")),
@@ -1662,8 +1619,8 @@ def test_evaluate_quiet_mode_replays_noop_subject_output_on_failure(
 
     with pytest.raises(RuntimeError, match="subject boom"):
         mod.evaluate_command(
-            source=str(src),
-            edited=str(edt),
+            baseline=str(src),
+            subject=str(edt),
             adapter="hf_causal",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
@@ -1674,7 +1631,7 @@ def test_evaluate_quiet_mode_replays_noop_subject_output_on_failure(
     assert "noop subject output" in console.joined()
 
 
-def test_evaluate_quiet_mode_replays_report_output_on_failure(
+def test_evaluate_quiet_mode_report_failure_bubbles_without_child_replay(
     monkeypatch, tmp_path: Path
 ) -> None:
     src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
@@ -1683,9 +1640,6 @@ def test_evaluate_quiet_mode_replays_report_output_on_failure(
     edited_report = _write_json(tmp_path / "edited.json", {})
 
     def failing_report(**_kwargs):
-        from invarlock.cli.commands import report as report_mod
-
-        report_mod.console.print("report child output", markup=False)
         raise RuntimeError("report boom")
 
     monkeypatch.setattr(
@@ -1699,12 +1653,12 @@ def test_evaluate_quiet_mode_replays_report_output_on_failure(
         ),
         raising=False,
     )
-    monkeypatch.setattr(mod, "_report", failing_report, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", failing_report, raising=False)
 
     with pytest.raises(RuntimeError, match="report boom"):
         mod.evaluate_command(
-            source=str(src),
-            edited=str(edt),
+            baseline=str(src),
+            subject=str(edt),
             adapter="hf_causal",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
@@ -1712,7 +1666,7 @@ def test_evaluate_quiet_mode_replays_report_output_on_failure(
             quiet=True,
         )
 
-    assert "report child output" in console.joined()
+    assert "report child output" not in console.joined()
 
 
 def test_evaluate_profile_str_failure_falls_back_to_non_ci(
@@ -1748,7 +1702,7 @@ def test_evaluate_profile_str_failure_falls_back_to_non_ci(
     )
     monkeypatch.setattr(
         mod,
-        "_report",
+        "generate_reports",
         lambda **kwargs: report_calls.append(kwargs),
         raising=False,
     )
@@ -1758,8 +1712,8 @@ def test_evaluate_profile_str_failure_falls_back_to_non_ci(
     monkeypatch.setattr(mod, "str", fake_str, raising=False)
 
     mod.evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         adapter="hf_causal",
         out=str(Path("runs")),
         report_out=str(Path("reports")),
@@ -1800,15 +1754,15 @@ def test_evaluate_stable_text_uses_fallback_when_stringification_raises(
         ),
         raising=False,
     )
-    monkeypatch.setattr(mod, "_report", lambda **_kwargs: None, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", lambda **_kwargs: None, raising=False)
     monkeypatch.setattr(
         mod, "_dump_yaml", lambda *_args, **_kwargs: None, raising=False
     )
     monkeypatch.setattr(mod, "str", fake_str, raising=False)
 
     mod.evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         adapter="hf_causal",
         out=str(Path("runs")),
         report_out=str(Path("reports")),
@@ -1841,8 +1795,8 @@ def test_evaluate_non_quiet_edit_config_failure_does_not_replay_buffer(
 
     with pytest.raises(RuntimeError, match="edited boom"):
         mod.evaluate_command(
-            source=str(src),
-            edited=str(edt),
+            baseline=str(src),
+            subject=str(edt),
             adapter="hf_causal",
             edit_config=str(edit_cfg),
             out=str(Path("runs")),
@@ -1854,7 +1808,7 @@ def test_evaluate_non_quiet_edit_config_failure_does_not_replay_buffer(
     assert "edited child output" not in console.joined()
 
 
-def test_evaluate_non_quiet_report_failure_does_not_replay_buffer(
+def test_evaluate_non_quiet_report_failure_bubbles_without_child_replay(
     monkeypatch, tmp_path: Path
 ) -> None:
     src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
@@ -1863,9 +1817,6 @@ def test_evaluate_non_quiet_report_failure_does_not_replay_buffer(
     edited_report = _write_json(tmp_path / "edited.json", {})
 
     def failing_report(**_kwargs):
-        from invarlock.cli.commands import report as report_mod
-
-        report_mod.console.print("report child output", markup=False)
         raise RuntimeError("report boom")
 
     monkeypatch.setattr(
@@ -1879,12 +1830,12 @@ def test_evaluate_non_quiet_report_failure_does_not_replay_buffer(
         ),
         raising=False,
     )
-    monkeypatch.setattr(mod, "_report", failing_report, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", failing_report, raising=False)
 
     with pytest.raises(RuntimeError, match="report boom"):
         mod.evaluate_command(
-            source=str(src),
-            edited=str(edt),
+            baseline=str(src),
+            subject=str(edt),
             adapter="hf_causal",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
@@ -1922,7 +1873,7 @@ def test_evaluate_timing_summary_uses_accumulated_total_when_style_disables_timi
         ),
         raising=False,
     )
-    monkeypatch.setattr(mod, "_report", lambda **_: None, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", lambda **_: None, raising=False)
     monkeypatch.setattr(
         "invarlock.cli.output.resolve_output_style",
         lambda **_kwargs: OutputStyle(
@@ -1942,8 +1893,8 @@ def test_evaluate_timing_summary_uses_accumulated_total_when_style_disables_timi
     )
 
     mod.evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         adapter="hf_causal",
         out=str(Path("runs")),
         report_out=str(Path("reports")),

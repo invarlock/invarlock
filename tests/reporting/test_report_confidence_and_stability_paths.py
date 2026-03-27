@@ -109,7 +109,7 @@ def test_make_evaluation_report_replicates_zero_keeps_run_metrics_pairing_and_fi
     report["metrics"]["stats"] = {"requested_preview": 1.2, "requested_final": -1}
 
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
+        "invarlock.core.bootstrap.compute_paired_delta_log_ci",
         lambda *_a, **_k: (_a, _k),  # should not be called when replicates=0
     )
     cert = make_report(report, baseline)
@@ -131,7 +131,7 @@ def test_make_evaluation_report_uses_bca_when_method_explicit(monkeypatch) -> No
         return (-0.01, 0.01)
 
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.compute_paired_delta_log_ci", _fake_ci
+        "invarlock.core.bootstrap.compute_paired_delta_log_ci", _fake_ci
     )
     cert = make_report(report, baseline)
     assert validate_report(cert)
@@ -152,7 +152,7 @@ def test_make_evaluation_report_env_bca_flag_ignored_when_windows_small(
         return (-0.01, 0.01)
 
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.compute_paired_delta_log_ci", _fake_ci
+        "invarlock.core.bootstrap.compute_paired_delta_log_ci", _fake_ci
     )
     cert = make_report(report, baseline)
     assert validate_report(cert)
@@ -172,7 +172,7 @@ def test_make_evaluation_report_marks_unstable_when_token_floor_violated(
         lambda: {"balanced": {"metrics": {"pm_ratio": {"min_tokens": 100}}}},
     )
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
+        "invarlock.core.bootstrap.compute_paired_delta_log_ci",
         lambda *_a, **_k: (-0.01, 0.01),
     )
     cert = make_report(report, baseline)

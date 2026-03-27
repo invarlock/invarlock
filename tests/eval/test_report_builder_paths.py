@@ -159,7 +159,7 @@ def test_make_evaluation_report_raises_on_drift_vs_delta_mismatch(monkeypatch):
         "invarlock.reporting.report_builder.validate_run_report", lambda _: True
     )
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
+        "invarlock.core.bootstrap.compute_paired_delta_log_ci",
         lambda *_a, **_k: (-0.01, 0.01),
     )
 

@@ -68,12 +68,12 @@ def test_evaluate_edit_config_includes_guard_order(tmp_path: Path, monkeypatch):
     from invarlock.cli.commands import run as run_mod
 
     monkeypatch.setattr(run_mod, "run_command", _fake_run_command)
-    monkeypatch.setattr(evaluate_mod, "_report", lambda **_: None)
+    monkeypatch.setattr(evaluate_mod, "generate_reports", lambda **_: None)
 
     # Should not raise; the edited merged config must include guards.order.
     evaluate_mod.evaluate_command(
-        source="gpt2",
-        edited="gpt2",
+        baseline="gpt2",
+        subject="gpt2",
         adapter="hf_causal",
         profile="dev",
         tier="balanced",

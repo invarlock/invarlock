@@ -77,26 +77,57 @@ def test_policy_wrappers_delegate(monkeypatch):
         "mode": "bytes"
     }
 
-    monkeypatch.setattr(run_mod, "_estimate_model_bytes_impl", lambda model: 123)
-    assert run_mod._estimate_model_bytes(object()) == 123
+    snapshot_seen: dict[str, object] = {}
+
+    def _snapshot_plan_stub(**kwargs):
+        snapshot_seen.update(kwargs)
+        return "snapshot-plan"
 
     monkeypatch.setattr(
-        run_mod,
-        "_choose_snapshot_mode_impl",
-        lambda **kwargs: "chunked",
+        run_mod, "_build_snapshot_execution_plan_impl", _snapshot_plan_stub
     )
     assert (
-        run_mod._choose_snapshot_mode(
-            snapshot_config={},
-            env_mode="auto",
-            supports_bytes=True,
-            supports_chunked=True,
-            estimated_model_mb=128.0,
-            available_ram_mb=256.0,
-            disk_free_mb=1024.0,
+        run_mod._build_snapshot_execution_plan(
+            adapter=object(),
+            model=object(),
+            cfg_snapshot={},
+            direct_reuse_loaded_model=False,
+            skip_overhead_source=None,
         )
-        == "chunked"
+        == "snapshot-plan"
     )
+    assert (
+        snapshot_seen["choose_snapshot_mode_fn"] is run_mod._choose_snapshot_mode_impl
+    )
+    assert (
+        snapshot_seen["estimate_model_bytes_fn"] is run_mod._estimate_model_bytes_impl
+    )
+    assert snapshot_seen["disk_usage_fn"] is run_mod.shutil.disk_usage
+    assert snapshot_seen["free_model_memory_fn"] is run_mod._free_model_memory
+
+    retry_seen: dict[str, object] = {}
+
+    def _snapshot_retry_stub(**kwargs):
+        retry_seen.update(kwargs)
+        return "retry-plan"
+
+    monkeypatch.setattr(
+        run_mod, "_resolve_snapshot_retry_transition_impl", _snapshot_retry_stub
+    )
+    assert (
+        run_mod._resolve_snapshot_retry_transition(
+            skip_overhead=True,
+            profile_normalized="release",
+            emitted_skip_overhead_warning=False,
+            skip_overhead_source="config:context.run.skip_overhead_check",
+            retry_controller=None,
+            model=object(),
+            restore_fn=None,
+            skip_model_load=False,
+        )
+        == "retry-plan"
+    )
+    assert retry_seen["profile_normalized"] == "release"
 
     monkeypatch.setattr(
         run_mod,
@@ -456,7 +487,6 @@ def test_analysis_and_overhead_wrappers_delegate(monkeypatch):
         original_token_prob=0.1,
         resolved_loss_type="ppl_causal",
         tier="balanced",
-        get_provider_fn=lambda *args, **kwargs: None,
     ) == {"resolved_split": "validation", "preview_count": 2}
 
     monkeypatch.setattr(
@@ -660,8 +690,14 @@ def test_run_command_injects_explicit_deps(monkeypatch, tmp_path: Path):
         deps["_resolve_retry_validation_transition"]
         is run_mod._resolve_retry_validation_transition
     )
+    assert (
+        deps["_build_snapshot_execution_plan"] is run_mod._build_snapshot_execution_plan
+    )
+    assert (
+        deps["_resolve_snapshot_retry_transition"]
+        is run_mod._resolve_snapshot_retry_transition
+    )
     assert deps["_finalize_run_provenance"] is run_mod._finalize_run_provenance
-    assert deps["_choose_snapshot_mode"] is run_mod._choose_snapshot_mode
     assert (
         deps["_build_timing_summary_payload"] is run_mod._build_timing_summary_payload
     )

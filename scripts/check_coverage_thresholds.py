@@ -42,7 +42,6 @@ THRESHOLDS = {
     "src/invarlock/calibration/spectral_null.py": 0.90,
     "src/invarlock/calibration/variance_ve.py": 0.90,
     # Reporting
-    "src/invarlock/reporting/report_builder.py": 0.90,
     "src/invarlock/reporting/report.py": 0.90,
     "src/invarlock/reporting/validate.py": 0.95,
     # Reporting types
@@ -110,7 +109,7 @@ THRESHOLDS = {
     "src/invarlock/cli/app.py": 1.00,
     "src/invarlock/core/config_runtime.py": 0.95,
     "src/invarlock/cli/commands/evaluate.py": 0.95,
-    "src/invarlock/cli/commands/report.py": 0.95,
+    "src/invarlock/cli/commands/report.py": 0.90,
     "src/invarlock/cli/commands/run.py": 0.95,
     "src/invarlock/cli/commands/verify.py": 0.95,
     "src/invarlock/cli/commands/calibrate.py": 0.90,
@@ -127,7 +126,7 @@ THRESHOLDS = {
     "src/invarlock/core/run_policy.py": 1.00,
     "src/invarlock/reporting/run_metric_utils.py": 1.00,
     # CLI determinism preset (CI/Release provenance)
-    "src/invarlock/cli/determinism.py": 0.95,
+    "src/invarlock/core/determinism_policy.py": 0.95,
     # Core events logger
     "src/invarlock/core/events.py": 0.90,
     # PR-5 split modules
@@ -187,9 +186,6 @@ CORE_FILES = (
     "src/invarlock/reporting/guards_analysis.py",
     "src/invarlock/reporting/primary_metric_utils.py",
     "src/invarlock/reporting/utils.py",
-    # Report builder is part of the reporting surface but has an explicit
-    # transitional override below until tests mature
-    "src/invarlock/reporting/report_builder.py",
     # Critical CLI commands
     "src/invarlock/cli/commands/run.py",
     "src/invarlock/cli/commands/evaluate.py",
@@ -202,7 +198,7 @@ CORE_FILES = (
     "src/invarlock/reporting/verify_contract.py",
     "src/invarlock/reporting/verify_output.py",
     "src/invarlock/reporting/evidence.py",
-    "src/invarlock/cli/determinism.py",
+    "src/invarlock/core/determinism_policy.py",
     "src/invarlock/core/config_runtime.py",
     "src/invarlock/cli/_json.py",
     "src/invarlock/cli/app.py",

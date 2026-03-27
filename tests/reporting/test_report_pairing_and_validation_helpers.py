@@ -60,7 +60,7 @@ def test_make_evaluation_report_covers_baseline_ratio_identity_paths(
 ) -> None:
     # Avoid heavy bootstrap compute while still exercising the paired-window CI path.
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
+        "invarlock.core.bootstrap.compute_paired_delta_log_ci",
         lambda *_a, **_k: (-0.01, 0.01),
     )
 
@@ -421,7 +421,7 @@ def test_make_evaluation_report_ratio_ci_fallback_skips_non_interval(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
+        "invarlock.core.bootstrap.compute_paired_delta_log_ci",
         lambda *_a, **_k: (-0.01, 0.01),
     )
     monkeypatch.setattr(cert_mod, "_coerce_interval", lambda _v: (0.0,))  # type: ignore[assignment]

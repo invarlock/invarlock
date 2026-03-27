@@ -20,18 +20,10 @@ console = Console()
 
 
 def export_html_command(
-    input: str = typer.Option(
-        ..., "--input", "-i", help="Path to evaluation report JSON"
-    ),
-    output: str = typer.Option(..., "--output", "-o", help="Path to output HTML file"),
-    embed_css: bool = typer.Option(
-        True,
-        "--embed-css/--no-embed-css",
-        help="Inline a minimal static stylesheet (on by default)",
-    ),
-    force: bool = typer.Option(
-        False, "--force", help="Overwrite output file if it already exists"
-    ),
+    input: str,
+    output: str,
+    embed_css: bool = True,
+    force: bool = False,
 ) -> None:
     """Render an evaluation report JSON to HTML.
 
@@ -40,22 +32,6 @@ def export_html_command(
     - 1: generic failure (IO or overwrite refusal)
     - 2: validation failure (invalid evaluation report schema)
     """
-    # When called programmatically, Typer's Option defaults can be OptionInfo
-    try:  # pragma: no cover - defensive, matches other commands' pattern
-        from typer.models import OptionInfo as _TyperOptionInfo
-    except Exception:  # pragma: no cover
-        _TyperOptionInfo = ()  # type: ignore[assignment]
-
-    def _coerce(value: Any) -> Any:
-        if isinstance(value, _TyperOptionInfo):
-            return value.default
-        return value
-
-    input = _coerce(input)
-    output = _coerce(output)
-    embed_css = bool(_coerce(embed_css))
-    force = bool(_coerce(force))
-
     in_path = Path(str(input))
     out_path = Path(str(output))
 

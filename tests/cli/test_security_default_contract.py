@@ -532,9 +532,9 @@ def test_container_launch_mounts_absolute_source_and_edited_paths(
     command = runtime_security.build_container_command(
         [
             "evaluate",
-            "--source",
+            "--baseline",
             str(source_dir),
-            "--edited",
+            "--subject",
             str(edited_dir),
         ]
     )

@@ -9,6 +9,9 @@ from typing import Any
 import typer
 from rich.console import Console
 
+from invarlock.core.metric_provider_resolution import (
+    resolve_metric_and_provider as _resolve_metric_and_provider_core,
+)
 from invarlock.core.provider_parity import (
     enforce_provider_parity as _enforce_provider_parity_core,
 )
@@ -571,98 +574,10 @@ def resolve_metric_and_provider(
     resolved_loss_type: str | None = None,
     metric_kind_override: str | None = None,
 ) -> tuple[str, str, dict[str, float]]:
-    """Resolve metric kind, provider kind, and metric options from config."""
-    provider_val = None
-    try:
-        provider_val = cfg.dataset.provider
-    except Exception:
-        provider_val = None
-
-    provider_kind = None
-    if isinstance(provider_val, str) and provider_val:
-        provider_kind = provider_val
-    else:
-        try:
-            provider_kind = provider_val.kind
-        except Exception:
-            try:
-                provider_kind = provider_val.get("kind")  # type: ignore[attr-defined]
-            except Exception:
-                provider_kind = None
-
-    if not provider_kind and hasattr(model_profile, "default_provider"):
-        provider_kind = model_profile.default_provider
-    if not provider_kind:
-        provider_kind = "wikitext2"
-
-    metric_cfg = None
-    try:
-        eval_section = cfg.eval
-        metric_cfg = getattr(eval_section, "metric", None)
-    except Exception:
-        metric_cfg = None
-
-    metric_kind = None
-    if isinstance(metric_kind_override, str) and metric_kind_override.strip():
-        metric_override = metric_kind_override.strip().lower()
-        if metric_override != "auto":
-            metric_kind = metric_override
-
-    reps = None
-    ci_level = None
-    if metric_kind is None and metric_cfg is not None:
-        try:
-            metric_kind = (
-                metric_cfg.get("kind")
-                if isinstance(metric_cfg, dict)
-                else metric_cfg.kind
-            )
-        except Exception:
-            metric_kind = None
-        try:
-            reps = (
-                metric_cfg.get("reps")
-                if isinstance(metric_cfg, dict)
-                else metric_cfg.reps
-            )
-        except Exception:
-            reps = None
-        try:
-            ci_level = (
-                metric_cfg.get("ci_level")
-                if isinstance(metric_cfg, dict)
-                else metric_cfg.ci_level
-            )
-        except Exception:
-            ci_level = None
-
-    if isinstance(metric_kind, str) and metric_kind:
-        normalized_kind = metric_kind.strip().lower()
-        metric_kind = None if normalized_kind == "auto" else normalized_kind
-    else:
-        metric_kind = None
-
-    if not metric_kind and hasattr(model_profile, "default_metric"):
-        metric_kind = model_profile.default_metric
-    if not metric_kind:
-        loss_kind = (resolved_loss_type or "causal").lower()
-        if loss_kind == "mlm":
-            metric_kind = "ppl_mlm"
-        elif loss_kind in {"seq2seq", "s2s", "t5"}:
-            metric_kind = "ppl_seq2seq"
-        else:
-            metric_kind = "ppl_causal"
-
-    opts: dict[str, float] = {}
-    if reps is not None:
-        try:
-            opts["reps"] = float(int(reps))
-        except Exception:
-            pass
-    if ci_level is not None:
-        try:
-            opts["ci_level"] = float(ci_level)
-        except Exception:
-            pass
-
-    return str(metric_kind), str(provider_kind), opts
+    """Resolve metric/provider policy via the core owner."""
+    return _resolve_metric_and_provider_core(
+        cfg,
+        model_profile,
+        resolved_loss_type=resolved_loss_type,
+        metric_kind_override=metric_kind_override,
+    )

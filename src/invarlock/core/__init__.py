@@ -42,27 +42,7 @@ __all__ = [
     "ModelInfo",
     "EditInfo",
     "GuardResult",
-    # Registry and discovery
-    "get_registry",
-    "PluginInfo",
     # Supporting services
     "EventLogger",
     "CheckpointManager",
 ]
-
-
-# Lazy imports avoid pulling in registry/runtime surfaces during lightweight
-# CLI startup and helper imports.
-def __getattr__(name: str):  # pragma: no cover - simple lazy import shim
-    if name == "CoreRunner":
-        from .runner import CoreRunner as _CoreRunner
-
-        return _CoreRunner
-    if name in {"PluginInfo", "get_registry"}:
-        from .registry import PluginInfo as _PluginInfo
-        from .registry import get_registry as _get_registry
-
-        if name == "PluginInfo":
-            return _PluginInfo
-        return _get_registry
-    raise AttributeError(name)
