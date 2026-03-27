@@ -31,6 +31,7 @@ from rich.console import Console
 
 from invarlock import __version__ as INVARLOCK_VERSION
 
+from ...core.adapter_auto import resolve_auto_adapter
 from ...core.evaluate_contract import (
     apply_edited_primary_metric_policy,
     load_validated_baseline_report,
@@ -50,7 +51,6 @@ from ...core.evaluate_plan import (
     normalize_model_id as _normalize_model_id,
 )
 from ...core.exceptions import ConfigError, ValidationError
-from ..adapter_auto import resolve_auto_adapter
 from ..security_helpers import (
     configure_runtime_security,
     emit_runtime_manifest,

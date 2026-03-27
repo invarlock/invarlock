@@ -1102,7 +1102,7 @@ def _prepare_config_for_run(
     from ...core.config_runtime import resolve_edit_kind as _resolve_edit_kind
 
     try:
-        from ..adapter_auto import apply_auto_adapter_if_needed as _apply_auto
+        from ...core.adapter_auto import apply_auto_adapter_if_needed as _apply_auto
     except Exception:  # pragma: no cover - optional adapter path
         _apply_auto = None
 

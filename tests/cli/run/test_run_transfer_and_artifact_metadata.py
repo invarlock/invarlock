@@ -676,7 +676,7 @@ def test_auto_adapter_apply_ignored_on_error(monkeypatch, tmp_path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.adapter_auto.apply_auto_adapter_if_needed",
+        "invarlock.core.adapter_auto.apply_auto_adapter_if_needed",
         lambda cfg: (_ for _ in ()).throw(RuntimeError("auto-err")),
     )
     run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"), profile=None)

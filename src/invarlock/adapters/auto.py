@@ -7,7 +7,7 @@ from typing import Any
 
 from invarlock.core.api import ModelAdapter
 
-from ..cli.adapter_auto import resolve_auto_adapter
+from ..core.adapter_auto import resolve_auto_adapter
 
 
 def _detect_quantization_from_path(model_id: str) -> str | None:

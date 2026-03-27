@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import invarlock.cli.adapter_auto as mod
-from invarlock.cli.adapter_auto import (
+import invarlock.core.adapter_auto as mod
+from invarlock.core.adapter_auto import (
     _read_local_hf_config,
     apply_auto_adapter_if_needed,
     resolve_auto_adapter,
