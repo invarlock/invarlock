@@ -6,12 +6,15 @@ part of the public runtime guard contract in `invarlock.guards.rmt`.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import numpy as np
 import torch
 import torch.linalg as tla
 import torch.nn as nn
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "mp_bulk_edges",
@@ -59,6 +62,11 @@ def mp_bulk_edges(m: int, n: int, whitened: bool = True) -> tuple[float, float]:
         sigma_min = np.sqrt(m) * abs(1.0 - np.sqrt(q)) if q <= 1 else 0.0
 
     return sigma_min, sigma_max
+
+
+def _emit_verbose(verbose: bool, message: str) -> None:
+    if verbose:
+        logger.info(message)
 
 
 def mp_bulk_edge(m: int, n: int, whitened: bool = False) -> float:
@@ -565,19 +573,21 @@ def rmt_detect(
                     normalization = stats.get("worst_details", {}).get(
                         "normalization", "unknown"
                     )
-                    print(
+                    _emit_verbose(
+                        verbose,
                         f"      Module {module_name}: ratio={stats['worst_ratio']:.2f} "
-                        f"(σ_max={stats['sigma_max']:.2f}, norm={normalization})"
+                        f"(σ_max={stats['sigma_max']:.2f}, norm={normalization})",
                     )
             elif verbose and skip_reason:
-                print(f"      Module {module_name}: SKIP: {skip_reason}")
+                _emit_verbose(verbose, f"      Module {module_name}: SKIP: {skip_reason}")
 
         # Apply correction if requested and not detect-only
         if not detect_only and current_outliers > 0 and correction_factor is not None:
             if correction_iterations == 0:
                 if verbose:
-                    print(
-                        f"    Applying RMT correction (iteration {correction_iterations + 1})..."
+                    _emit_verbose(
+                        verbose,
+                        f"    Applying RMT correction (iteration {correction_iterations + 1})...",
                     )
                 # Apply correction to flagged modules
                 for idx in flagged_layers:
@@ -596,14 +606,16 @@ def rmt_detect(
                 # Check if improvement occurred
                 if current_outliers >= prev_outlier_count:
                     if verbose:
-                        print(
+                        _emit_verbose(
+                            verbose,
                             f"    RMT correction stalled ({current_outliers} outliers unchanged), "
-                            f"downgrading to warning"
+                            f"downgrading to warning",
                         )
                     break
                 elif verbose:
-                    print(
-                        f"    RMT correction improving ({prev_outlier_count} → {current_outliers} outliers)"
+                    _emit_verbose(
+                        verbose,
+                        f"    RMT correction improving ({prev_outlier_count} → {current_outliers} outliers)",
                     )
         else:
             # No correction requested, exit after first iteration
@@ -629,10 +641,12 @@ def rmt_detect(
         n_detected = n_outliers
         n_will_be_capped = n_outliers if not detect_only else 0
 
-        print(f"    ⚠️ RMT outliers detected{baseline_note}{deadband_note}:")
-        print(f"      Detected: {n_detected}, will correct: {n_will_be_capped}")
-        print(f"      Max ratio: {max_ratio:.2f}")
-        print("      Top offenders (σ_post / σ_ref):")
+        _emit_verbose(verbose, f"    ⚠️ RMT outliers detected{baseline_note}{deadband_note}:")
+        _emit_verbose(
+            verbose, f"      Detected: {n_detected}, will correct: {n_will_be_capped}"
+        )
+        _emit_verbose(verbose, f"      Max ratio: {max_ratio:.2f}")
+        _emit_verbose(verbose, "      Top offenders (σ_post / σ_ref):")
 
         # Show top 3 offenders with detailed information
         top_offenders = sorted(
@@ -647,13 +661,15 @@ def rmt_detect(
         for ratio, module_name, details in top_offenders:
             sigma_max = details.get("s_max", 0.0)
             ref_type = "mp_bulk_edge" if not baseline_sigmas else "baseline-aware"
-            print(
-                f"        - {module_name}: {ratio:.2f} (σ_post={sigma_max:.2f}, ref={ref_type})"
+            _emit_verbose(
+                verbose,
+                f"        - {module_name}: {ratio:.2f} (σ_post={sigma_max:.2f}, ref={ref_type})",
             )
 
         if len(top_offenders) < n_outliers:
-            print(
-                f"      ... and {n_outliers - len(top_offenders)} more layers flagged"
+            _emit_verbose(
+                verbose,
+                f"      ... and {n_outliers - len(top_offenders)} more layers flagged",
             )
 
     return {
@@ -788,18 +804,21 @@ def rmt_detect_with_names(
     has_outliers = n_outliers > 0
 
     if verbose and has_outliers:
-        print("    ⚠️ RMT outliers detected:")
-        print(f"      Layers flagged: {n_outliers}")
-        print(f"      Max ratio: {max_ratio:.2f}")
-        print(f"      Threshold: {threshold:.2f}")
-        print("      Top offenders (σ_post / σ_ref):")
+        _emit_verbose(verbose, "    ⚠️ RMT outliers detected:")
+        _emit_verbose(verbose, f"      Layers flagged: {n_outliers}")
+        _emit_verbose(verbose, f"      Max ratio: {max_ratio:.2f}")
+        _emit_verbose(verbose, f"      Threshold: {threshold:.2f}")
+        _emit_verbose(verbose, "      Top offenders (σ_post / σ_ref):")
         # Show top offenders with full module names and consistent formatting
         for outlier in outliers[:3]:
-            print(
-                f"        - {outlier['module_name']}: {outlier['ratio']:.2f} (σ_post={outlier['sigma_max']:.2f}, ref=mp_bulk_edge)"
+            _emit_verbose(
+                verbose,
+                f"        - {outlier['module_name']}: {outlier['ratio']:.2f} (σ_post={outlier['sigma_max']:.2f}, ref=mp_bulk_edge)",
             )
         if len(outliers) > 3:
-            print(f"      ... and {len(outliers) - 3} more layers flagged")
+            _emit_verbose(
+                verbose, f"      ... and {len(outliers) - 3} more layers flagged"
+            )
 
     return {
         "has_outliers": has_outliers,
@@ -928,23 +947,26 @@ def _apply_rmt_correction(
                                 if tied_params
                                 else ""
                             )
-                            print(
+                            _emit_verbose(
+                                verbose,
                                 f"      {layer_name}.{name}: σ={sigma_pre:.2f}→{sigma_post:.2f} "
-                                f"(scale={scale:.3f}, target={target_sigma:.2f}{tied_info})"
+                                f"(scale={scale:.3f}, target={target_sigma:.2f}{tied_info})",
                             )
                     else:
                         # No correction needed - log skip reason
                         if verbose:
-                            print(
-                                f"      {layer_name}.{name}: SKIP: ≤ target (σ={sigma_pre:.2f} ≤ {target_sigma:.2f})"
+                            _emit_verbose(
+                                verbose,
+                                f"      {layer_name}.{name}: SKIP: ≤ target (σ={sigma_pre:.2f} ≤ {target_sigma:.2f})",
                             )
 
                 except (RuntimeError, torch.linalg.LinAlgError):
                     # CRITICAL: Even fallback must use in-place scaling
                     param.mul_(factor)
                     if verbose:
-                        print(
-                            f"      {layer_name}.{name}: fallback scaling (SVD failed)"
+                        _emit_verbose(
+                            verbose,
+                            f"      {layer_name}.{name}: fallback scaling (SVD failed)",
                         )
 
 
