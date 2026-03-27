@@ -8,7 +8,7 @@
 | **Audience** | CI operators producing validation evidence across GPU topologies. |
 | **Requires** | Active repo environment, GPU capable of fitting selected models, and HF cache or network for model download. Secure-default runs also require an OCI container engine. |
 | **Outputs** | Proof pack directory with reports, checksums, and optional GPG signature. |
-| **Source of truth** | `scripts/proof_packs/run_suite.sh`, `scripts/proof_packs/run_pack.sh`. |
+| **Source of truth** | `scripts/proof_packs/run_suite.sh`, `scripts/proof_packs/run_pack.sh`, `src/invarlock/proof_pack.py`, `src/invarlock/cli/commands/proof_pack.py`, `src/invarlock/reporting/verify_contract.py`. |
 
 Proof packs are hardware-agnostic validation runs that bundle InvarLock reports,
 summary reports, and verification metadata into a portable evidence artifact. They replace the

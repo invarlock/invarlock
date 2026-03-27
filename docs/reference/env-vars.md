@@ -8,7 +8,7 @@
 | **Audience** | CLI users and operators tuning runtime behavior. |
 | **Scope** | CLI commands and programmatic runs; config values override env when both are set. |
 | **Network** | Offline by default; network must be explicitly enabled. |
-| **Source of truth** | `docs/reference/env-vars.md`, `src/invarlock/cli/commands/*`, `src/invarlock/core/runner.py`. |
+| **Source of truth** | `docs/reference/env-vars.md`, `src/invarlock/cli/commands/*`, `src/invarlock/cli/backend_runtime.py`, `src/invarlock/runtime_security.py`, `src/invarlock/core/runner.py`. |
 
 ## Quick Start
 

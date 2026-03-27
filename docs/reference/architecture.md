@@ -6,9 +6,9 @@
 | --- | --- |
 | **Purpose** | Edit-agnostic safety evaluation framework for ML model weight modifications. |
 | **Audience** | Developers extending InvarLock, operators debugging pipelines, security reviewers. |
-| **Core components** | CLI layer, Core runtime, Guard chain, Reporting/report subsystem. |
-| **Design goals** | Torch-independent core, edit-agnostic guards, deterministic evaluation, full provenance. |
-| **Source of truth** | `src/invarlock/core/runner.py`, `src/invarlock/cli/commands/*.py`, `src/invarlock/guards/*.py`. |
+| **Core components** | CLI shells, Core/runtime policy layer, Guard chain, Reporting/artifact subsystem. |
+| **Design goals** | Torch-independent core, edit-agnostic guards, deterministic evaluation, explicit artifact contracts, full provenance. |
+| **Source of truth** | `src/invarlock/core/*.py`, `src/invarlock/reporting/*.py`, `src/invarlock/cli/commands/*.py`, `src/invarlock/guards/*.py`. |
 
 See the [Glossary](../assurance/glossary.md) for definitions of terms such as
 the canonical guard chain, policy digest, and measurement contract.
@@ -60,15 +60,22 @@ InvarLock follows a layered architecture with clear separation of concerns:
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              CLI LAYER                                      │
+│                            CLI SHELL LAYER                                  │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐           │
 │  │ evaluate │ │   run    │ │  verify  │ │  report  │ │  doctor  │           │
 │  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘           │
 │       │            │            │            │            │                 │
 ├───────┴────────────┴────────────┴────────────┴────────────┴─────────────────┤
-│                            CORE RUNTIME                                     │
+│                     CORE POLICY / CONTRACT LAYER                            │
 │  ┌─────────────────────────────────────────────────────────────────┐        │
-│  │                        runner.py                                │        │
+│  │ evaluate_plan · report_inputs · doctor_findings                │        │
+│  │ verify_contract · run_*_policy                                 │        │
+│  └─────────────────────────────────────────────────────────────────┘        │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                       CORE RUNTIME / SERVICES                               │
+│  ┌─────────────────────────────────────────────────────────────────┐        │
+│  │ runner.py + runner_* + config_execution.py                     │        │
 │  │  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐     │        │
 │  │  │prepare │─▶│ guards │─▶│  edit  │─▶│ guards │─▶│  eval  │     │        │
 │  │  │ model  │  │(before)│  │ apply  │  │(after) │  │ final  │     │        │
@@ -76,18 +83,18 @@ InvarLock follows a layered architecture with clear separation of concerns:
 │  └─────────────────────────────────────────────────────────────────┘        │
 │                                                                             │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│                            GUARD LAYER                                      │
+│                            GUARD / MODEL LAYER                              │
 │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐             │
 │  │ invariants │  │  spectral  │  │    rmt     │  │  variance  │             │
 │  │ (integrity)│  │  (weights) │  │(activation)│  │   (A/B)    │             │
 │  └────────────┘  └────────────┘  └────────────┘  └────────────┘             │
 │                                                                             │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│                          REPORTING LAYER                                    │
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐             │
-│  │   report   │  │   report   │  │   render   │  │  manifest  │             │
-│  │   (JSON)   │  │   (JSON)   │  │  (MD/HTML) │  │   (JSON)   │             │
-│  └────────────┘  └────────────┘  └────────────┘  └────────────┘             │
+│                          REPORTING / FILES LAYER                            │
+│  ┌──────────────┐ ┌──────────────┐ ┌────────────┐ ┌────────────┐            │
+│  │ report_build │ │ report_files │ │   render   │ │  manifest  │            │
+│  │ + policy     │ │ + evidence   │ │  (MD/HTML) │ │   (JSON)   │            │
+│  └──────────────┘ └──────────────┘ └────────────┘ └────────────┘            │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -96,7 +103,9 @@ InvarLock follows a layered architecture with clear separation of concerns:
 
 ### CLI Layer (`src/invarlock/cli/`)
 
-Typer-based command-line interface providing user-facing entry points.
+Typer-based command shells providing user-facing entry points. The command
+modules should stay thin: parse arguments, call core/reporting owners, render
+output, and map failures to exit codes.
 
 | Command | Purpose | Primary Output |
 | --- | --- | --- |
@@ -107,16 +116,30 @@ Typer-based command-line interface providing user-facing entry points.
 | `doctor` | Environment diagnostics | Health check output |
 | `plugins` | List adapters, guards, edits | Plugin inventory |
 
+### Core Policy / Contracts (`src/invarlock/core/`, `src/invarlock/reporting/`)
+
+Deterministic policy, artifact-contract, and report-verification owners shared
+by the CLI and non-CLI entrypoints.
+
+| Module | Responsibility |
+| --- | --- |
+| `evaluate_plan.py` | Evaluation result policy, degradation classification, and emitted outcome shaping |
+| `report_inputs.py` | Canonical report path resolution and JSON-object validation |
+| `doctor_findings.py` | Structured doctor findings and optional report cross-check analysis |
+| `verify_contract.py` | Structured report-verification service used by `verify` and proof-pack flows |
+| `run_*_policy.py` | Snapshot, retry, and timing-policy helpers injected into `run` |
+
 ### Core Runtime (`src/invarlock/core/`)
 
 Pipeline orchestration without direct torch imports (torch-independent coordination).
 
 | Module | Responsibility |
 | --- | --- |
-| `runner.py` | Pipeline phases: prepare → guards → edit → eval → finalize |
+| `runner.py` + `runner_*.py` | Pipeline phases: prepare → guards → edit → eval → finalize |
 | `api.py` | Protocol definitions for ModelAdapter, ModelEdit, Guard |
 | `bootstrap.py` | BCa bootstrap CI computation for paired metrics |
-| `checkpoint.py` | Snapshot/restore for retry loops |
+| `checkpoint.py` | Snapshot/restore primitives for retry loops |
+| `config_execution.py` | Explicit run-from-config execution contract |
 | `registry.py` | Plugin discovery and registration |
 
 ### Guard Layer (`src/invarlock/guards/`)
@@ -132,14 +155,16 @@ Four-guard pipeline for edit safety validation.
 
 ### Reporting Layer (`src/invarlock/reporting/`)
 
-report generation, validation, and rendering.
+Report generation, validation, persistence, and rendering.
 
 | Module | Responsibility |
 | --- | --- |
-| `report.py` | report schema and validation |
+| `report_builder.py` | Evaluation report assembly from paired baseline/subject runs |
+| `report_validation.py` | Schema and semantic validation |
 | `render.py` | Markdown report rendering |
 | `html.py` | HTML export with styling |
-| `report.py` | Report generation and manifest |
+| `report_files.py` | Report/manifest persistence and artifact writing |
+| `evidence.py` | Evidence file normalization and attachment helpers |
 | `telemetry.py` | Performance metrics collection |
 
 ## Pipeline Flow
@@ -165,10 +190,10 @@ report generation, validation, and rendering.
 │                                                                             │
 │   PHASE 3: EVALUATION REPORT GENERATION                                     │
 │   ──────────────────────────────────────                                    │
-│   ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐              │
-│   │  Pair    │───▶│ Compute  │───▶│  Apply   │───▶│  Render  │              │
-│   │  Windows │    │  Ratios  │    │  Gates   │    │  Report  │              │
-│   └──────────┘    └──────────┘    └──────────┘    └──────────┘              │
+│   ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐            │
+│   │ Normalize  │─▶│  Compare   │─▶│  Apply     │─▶│ Persist +  │            │
+│   │ inputs     │  │  metrics   │  │  policy    │  │ render     │            │
+│   └────────────┘  └────────────┘  └────────────┘  └────────────┘            │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -278,6 +303,7 @@ report generation, validation, and rendering.
 | **Edit-agnostic guards** | Guards work with any weight modification (quantization, pruning, LoRA merge). | Guard protocol validates model state, not edit type |
 | **Tier-based policies** | Calibrated thresholds in `tiers.yaml` for balanced/conservative/aggressive safety profiles. | Policy resolution in `guards/policies.py` |
 | **Deterministic evaluation** | Seed bundle + window pairing schedules ensure reproducible metrics. | `meta.seeds`, `dataset.windows.stats` tracking |
+| **Functional-core / imperative-shell split** | Keep policy, artifact contracts, and verdict computation reusable outside the CLI while CLI modules stay thin. | `core/*.py` + `reporting/*.py` owners called from `cli/commands/*.py` |
 | **Plugin architecture** | Entry points for guards, adapters, edits enable extension without core changes. | `importlib.metadata` discovery in `core/registry.py` |
 | **Log-space primary metrics** | Paired ΔlogNLL with BCa bootstrap avoids ratio math bias. | `core/bootstrap.py` implementation |
 
@@ -293,25 +319,34 @@ report generation, validation, and rendering.
 │                           │  commands/* │                                   │
 │                           └──────┬──────┘                                   │
 │                                  │                                          │
-│              ┌───────────────────┼───────────────────┐                      │
-│              │                   │                   │                      │
-│              ▼                   ▼                   ▼                      │
-│       ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                 │
-│       │    core/    │    │   guards/   │    │ reporting/  │                 │
-│       │  runner.py  │───▶│  *.py       │───▶│ *.py        │                 │
-│       └──────┬──────┘    └──────┬──────┘    └─────────────┘                 │
-│              │                  │                                           │
-│              ▼                  ▼                                           │
-│       ┌─────────────┐    ┌─────────────┐                                    │
-│       │  adapters/  │    │   edits/    │                                    │
-│       │   hf_*.py   │    │ quant_rtn.py│                                    │
-│       └──────┬──────┘    └─────────────┘                                    │
-│              │                                                              │
-│              ▼                                                              │
-│       ┌─────────────┐                                                       │
-│       │    eval/    │  (metrics, datasets, tasks)                           │
-│       │  *.py       │                                                       │
-│       └─────────────┘                                                       │
+│                                  ▼                                          │
+│                     ┌───────────────────────────┐                            │
+│                     │ core/reporting contracts  │                            │
+│                     │ evaluate_plan,            │                            │
+│                     │ report_inputs,            │                            │
+│                     │ doctor_findings,          │                            │
+│                     │ verify_contract, run_*    │                            │
+│                     └─────────────┬─────────────┘                            │
+│                                   │                                          │
+│              ┌────────────────────┼────────────────────┐                     │
+│              │                    │                    │                     │
+│              ▼                    ▼                    ▼                     │
+│       ┌─────────────┐     ┌─────────────┐     ┌─────────────┐                │
+│       │ core/runner │────▶│  guards/*   │────▶│ reporting/* │                │
+│       │  + services │     │             │     │ build/files │                │
+│       └──────┬──────┘     └──────┬──────┘     └─────────────┘                │
+│              │                   │                                           │
+│              ▼                   ▼                                           │
+│       ┌─────────────┐     ┌─────────────┐                                    │
+│       │  adapters/  │     │   edits/    │                                    │
+│       │   hf_*.py   │     │ quant_rtn.py│                                    │
+│       └──────┬──────┘     └─────────────┘                                    │
+│              │                                                               │
+│              ▼                                                               │
+│       ┌─────────────┐                                                        │
+│       │    eval/    │  (metrics, datasets, tasks)                            │
+│       │  *.py       │                                                        │
+│       └─────────────┘                                                        │
 │                                                                             │
 │   KEY: ───▶ imports/depends on                                              │
 │                                                                             │

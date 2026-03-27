@@ -7,7 +7,7 @@
 | **Purpose** | Explain where evaluation outputs and reports live. |
 | **Audience** | Operators archiving evidence and CI outputs. |
 | **Scope** | `runs/` scratch outputs and `reports/` long-lived evidence. |
-| **Source of truth** | `src/invarlock/cli/commands/evaluate.py`, `src/invarlock/reporting/`. |
+| **Source of truth** | `src/invarlock/core/evaluate_plan.py`, `src/invarlock/reporting/report_builder.py`, `src/invarlock/reporting/report_files.py`, `src/invarlock/cli/commands/evaluate.py`. |
 
 ## Quick Start
 

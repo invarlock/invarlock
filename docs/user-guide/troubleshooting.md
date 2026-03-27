@@ -7,7 +7,7 @@
 | **Purpose** | Consolidated error code reference and troubleshooting guide. |
 | **Audience** | Users encountering errors during `evaluate`, `verify`, or advanced workflows. |
 | **Exit codes** | `0=success`, `1=generic failure`, `2=schema/config invalid`, `3=hard abort (CI/Release)`. |
-| **Source of truth** | `src/invarlock/cli/commands/run.py`, `src/invarlock/cli/commands/verify.py`. |
+| **Source of truth** | `src/invarlock/cli/commands/run.py`, `src/invarlock/reporting/verify_contract.py`, `src/invarlock/core/doctor_findings.py`. |
 
 ## Quick Start
 

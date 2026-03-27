@@ -123,13 +123,14 @@ unmodified baseline.
 
 #### Evidence Bundle
 
-Set of files produced for audit: reports, reports, manifests, and events.
+Set of files produced for audit: reports, attestation sidecars, and supporting
+events or derived renderings.
 
 | Aspect | Details |
 | --- | --- |
 | **Context** | Output directory from `invarlock evaluate` or `report --format report` |
-| **Related terms** | Report, report, Manifest |
-| **Typical contents** | `evaluation.report.json`, `evaluation_report.md`, `manifest.json` |
+| **Related terms** | Run report, evaluation report, Runtime manifest |
+| **Typical contents** | `evaluation.report.json`, `evaluation_report.md`, `runtime.manifest.json` |
 | **See also** | [Artifact Layout](../reference/artifacts.md) |
 
 ---

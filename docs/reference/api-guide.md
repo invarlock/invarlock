@@ -10,8 +10,8 @@
 | **Requires** | `invarlock[adapters]` for HF adapters, `invarlock[edits]` for built-in edits, `invarlock[guards]` for guard math, `invarlock[eval]` for dataset providers. |
 | **Network** | Offline by default; set `INVARLOCK_ALLOW_NETWORK=1` to download models or datasets. |
 | **Inputs** | Model instance, adapter, edit, guard list, `RunConfig`, optional calibration data. |
-| **Outputs / Artifacts** | `RunReport` object; optional event logs/checkpoints; reports via `make_report`. |
-| **Source of truth** | `src/invarlock/core/runner.py`, `src/invarlock/core/api.py`, `src/invarlock/reporting/report_builder.py`, `src/invarlock/reporting/render.py`, `src/invarlock/reporting/report_schema.py`. |
+| **Outputs / Artifacts** | `RunReport` object; optional event logs/checkpoints; evaluation bundles via `report_builder.make_report(...)` and `report_files.save_report(...)`. |
+| **Source of truth** | `src/invarlock/core/runner.py`, `src/invarlock/core/api.py`, `src/invarlock/core/config_execution.py`, `src/invarlock/reporting/report_builder.py`, `src/invarlock/reporting/report_files.py`, `src/invarlock/reporting/report_schema.py`. |
 
 ## Quick Start
 
@@ -48,7 +48,8 @@ print("primary metric:", report.metrics.get("primary_metric"))
 - **Snapshots**: retries use snapshot/restore; configure via
   `context.snapshot.*` when using YAML configs.
 - **reports**: generated from `RunReport` + baseline report via
-  `invarlock.reporting.report_builder.make_report`.
+  `invarlock.reporting.report_builder.make_report`, then persisted with
+  `invarlock.reporting.report_files.save_report`.
 - **Verification**: CLI-side `invarlock verify` now enforces
   `runtime.manifest.json` attestation for attested outputs in addition to schema
   and pairing checks.
@@ -62,7 +63,7 @@ print("primary metric:", report.metrics.get("primary_metric"))
 | Adapter | Load/describe model, snapshot/restore. |
 | Guards | `prepare`/`validate`, return action (warn/rollback/abort). |
 | Eval | Build windows, compute primary metric + tail metrics. |
-| report | `make_report(report, baseline)` for verification. |
+| report | `make_report(report, baseline)` + `save_report(...)` for bundle generation. |
 
 Note: CoreRunner coordinates each lane.
 

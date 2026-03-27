@@ -106,7 +106,7 @@ in `mode: warn` (staged rollout) where it emits a warning but keeps
 `validation.primary_metric_tail_acceptable = true`. Catastrophic spikes are
 handled during the run: the `spike_threshold` (default 2.0× PPL) triggers
 immediate rollback regardless of other gates. See also
-`src/invarlock/core/runner.py:1816`.
+`src/invarlock/core/runner_finalize.py`.
 
 **Sigma quantile (qσ)** controls the target sigma used for spectral monitoring.
 Balanced uses `sigma_quantile = 0.95`, Conservative `0.90` (see
@@ -158,7 +158,9 @@ An evaluation schedule is accepted when:
 - Masked-token counts are non-zero for masked-LM baselines (see
   `tests/eval/test_metrics_masked_lm.py`).
 - Window overlap = 0 and coverage ≥ requested counts; CI/Release profiles treat
-  violations as hard errors during the run (see `src/invarlock/core/runner.py`).
+  violations as hard errors during report assembly and verification (see
+  `src/invarlock/reporting/report_builder.py` and
+  `src/invarlock/reporting/report_validation.py`).
 - Predictive VE calibration windows are drawn from the same schedule; provenance
   appears under `variance.ab_test.provenance.window_ids`.
 

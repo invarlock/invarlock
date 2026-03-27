@@ -22,6 +22,7 @@ task graph, scheduling, and artifact generation. It complements
 | Scheduling | Dynamic work-stealing, `small_first` priority strategy |
 | Multi-GPU | Profile-based; `required_gpus` grows only when memory requires it |
 | Output | Proof pack with `manifest.json`, `checksums.sha256`, and report bundles (`--layout v2` nests results + metadata) |
+| Source of truth | `scripts/proof_packs/run_suite.sh`, `scripts/proof_packs/run_pack.sh`, `src/invarlock/proof_pack.py`, `src/invarlock/cli/commands/proof_pack.py` |
 
 ## Quick Start (Context)
 
