@@ -112,6 +112,36 @@ def test_policy_wrappers_delegate(monkeypatch):
         == "summary"
     )
 
+    monkeypatch.setattr(
+        run_mod,
+        "_serialize_evaluation_windows_impl",
+        lambda evaluation_windows: {"preview": {}, "final": {}},
+    )
+    assert run_mod._serialize_evaluation_windows({"preview": {}}) == {
+        "preview": {},
+        "final": {},
+    }
+
+    monkeypatch.setattr(
+        run_mod,
+        "_build_fallback_evaluation_windows_impl",
+        lambda preview_records, final_records, **kwargs: {
+            "preview": {"window_ids": [0]},
+            "final": {"window_ids": [1]},
+        },
+    )
+    assert run_mod._build_fallback_evaluation_windows([], [], use_mlm=False) == {
+        "preview": {"window_ids": [0]},
+        "final": {"window_ids": [1]},
+    }
+
+    monkeypatch.setattr(
+        run_mod,
+        "_finalize_guard_overhead_payload_impl",
+        lambda payload, result, normalize_overhead_result_fn: {"passed": True},
+    )
+    assert run_mod._finalize_guard_overhead_payload({}, object()) == {"passed": True}
+
     split_seen: dict[str, object] = {}
 
     def _split_stub(*, requested, available, split_aliases):

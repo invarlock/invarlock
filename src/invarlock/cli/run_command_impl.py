@@ -60,6 +60,7 @@ def run_command_impl(
     _apply_warning_filters = _dep("_apply_warning_filters")
     _build_timing_summary_payload = _dep("_build_timing_summary_payload")
     _build_retry_result_summary = _dep("_build_retry_result_summary")
+    _build_fallback_evaluation_windows = _dep("_build_fallback_evaluation_windows")
     _canonical_dataset_id = _dep("_canonical_dataset_id")
     _choose_snapshot_mode = _dep("_choose_snapshot_mode")
     _coerce_float = _dep("_coerce_float")
@@ -82,6 +83,7 @@ def run_command_impl(
     _merge_primary_metric_health = _dep("_merge_primary_metric_health")
     _normalize_overhead_result = _dep("_normalize_overhead_result")
     _estimate_model_bytes = _dep("_estimate_model_bytes")
+    _finalize_guard_overhead_payload = _dep("_finalize_guard_overhead_payload")
     _persist_ref_masks = _dep("_persist_ref_masks")
     _postprocess_and_summarize = _dep("_postprocess_and_summarize")
     _prepare_config_for_run = _dep("_prepare_config_for_run")
@@ -100,6 +102,7 @@ def run_command_impl(
     _resolve_snapshot_config = _dep("_resolve_snapshot_config")
     _run_bare_control = _dep("_run_bare_control")
     _safe_int = _dep("_safe_int")
+    _serialize_evaluation_windows = _dep("_serialize_evaluation_windows")
     _should_measure_overhead = _dep("_should_measure_overhead")
     _style_from_console = _dep("_style_from_console")
     _tensor_or_list_to_ints = _dep("_tensor_or_list_to_ints")
@@ -2277,102 +2280,18 @@ def run_command_impl(
                             "overhead_threshold", guard_overhead_threshold
                         ),
                     )
-                    try:
-                        messages = list(getattr(result, "messages", []))
-                    except TypeError:  # pragma: no cover - defensive
-                        messages = []
-                    try:
-                        warnings = list(getattr(result, "warnings", []))
-                    except TypeError:  # pragma: no cover - defensive
-                        warnings = []
-                    try:
-                        errors = list(getattr(result, "errors", []))
-                    except TypeError:  # pragma: no cover - defensive
-                        errors = []
-                    try:
-                        checks = dict(getattr(result, "checks", {}))
-                    except (TypeError, ValueError):  # pragma: no cover - defensive
-                        checks = {}
-                    metrics_obj = getattr(result, "metrics", {})
-                    if not isinstance(metrics_obj, dict):
-                        metrics_obj = {}
-                    overhead_ratio = metrics_obj.get("overhead_ratio")
-                    if overhead_ratio is None:
-                        overhead_ratio = getattr(result, "overhead_ratio", None)
-                    overhead_percent = metrics_obj.get("overhead_percent")
-                    if overhead_percent is None:
-                        overhead_percent = getattr(result, "overhead_percent", None)
-                    passed_flag = bool(getattr(result, "passed", False))
-
-                    guard_overhead_payload.update(
-                        {
-                            "messages": messages,
-                            "warnings": warnings,
-                            "errors": errors,
-                            "checks": checks,
-                            "overhead_ratio": overhead_ratio,
-                            "overhead_percent": overhead_percent,
-                            "passed": passed_flag,
-                            "evaluated": True,
-                        }
-                    )
-                    # Normalize for non-finite/degenerate cases
-                    guard_overhead_payload = _normalize_overhead_result(
-                        guard_overhead_payload, profile=profile_normalized
+                    guard_overhead_payload = _finalize_guard_overhead_payload(
+                        guard_overhead_payload,
+                        result,
                     )
                     report["guard_overhead"] = guard_overhead_payload
 
             had_baseline = bool(baseline and Path(baseline).exists())
-            if (
-                hasattr(core_report, "evaluation_windows")
-                and core_report.evaluation_windows
-            ):
-                preview_windows = core_report.evaluation_windows.get("preview", {})
-                final_windows = core_report.evaluation_windows.get("final", {})
-                report["evaluation_windows"] = {
-                    "preview": {
-                        "window_ids": list(preview_windows.get("window_ids", [])),
-                        "logloss": list(preview_windows.get("logloss", [])),
-                        "input_ids": [
-                            list(seq) for seq in preview_windows.get("input_ids", [])
-                        ],
-                        "attention_masks": [
-                            list(mask)
-                            for mask in preview_windows.get("attention_masks", [])
-                        ],
-                        "token_counts": list(preview_windows.get("token_counts", [])),
-                        "masked_token_counts": list(
-                            preview_windows.get("masked_token_counts", [])
-                        ),
-                        "actual_token_counts": list(
-                            preview_windows.get("actual_token_counts", [])
-                        ),
-                        "labels": [
-                            list(seq) for seq in preview_windows.get("labels", [])
-                        ],
-                    },
-                    "final": {
-                        "window_ids": list(final_windows.get("window_ids", [])),
-                        "logloss": list(final_windows.get("logloss", [])),
-                        "input_ids": [
-                            list(seq) for seq in final_windows.get("input_ids", [])
-                        ],
-                        "attention_masks": [
-                            list(mask)
-                            for mask in final_windows.get("attention_masks", [])
-                        ],
-                        "token_counts": list(final_windows.get("token_counts", [])),
-                        "masked_token_counts": list(
-                            final_windows.get("masked_token_counts", [])
-                        ),
-                        "actual_token_counts": list(
-                            final_windows.get("actual_token_counts", [])
-                        ),
-                        "labels": [
-                            list(seq) for seq in final_windows.get("labels", [])
-                        ],
-                    },
-                }
+            serialized_evaluation_windows = _serialize_evaluation_windows(
+                getattr(core_report, "evaluation_windows", None)
+            )
+            if serialized_evaluation_windows:
+                report["evaluation_windows"] = serialized_evaluation_windows
             elif had_baseline and (profile or "").lower() in {"ci", "release"}:
                 _event(
                     console,
@@ -2388,63 +2307,13 @@ def run_command_impl(
                 # provenance (provider_digest) can be computed even in lightweight/dev
                 # runs and unit tests that stub the runner.
                 try:
-
-                    def _tokens(rec: dict[str, Any]) -> int:
-                        try:
-                            return int(len(rec.get("input_ids", []) or []))
-                        except NUMERIC_EXCEPTIONS:
-                            return 0
-
-                    preview_window_count = len(preview_records)
-                    final_window_count = len(final_records)
-
-                    report["evaluation_windows"] = {
-                        "preview": {
-                            "window_ids": list(range(preview_window_count)),
-                            "input_ids": [
-                                list(r["input_ids"]) for r in preview_records
-                            ],
-                            "attention_masks": [
-                                list(r["attention_mask"]) for r in preview_records
-                            ],
-                            "token_counts": [_tokens(r) for r in preview_records],
-                            **(
-                                {
-                                    "masked_token_counts": list(preview_mask_counts),
-                                    "labels": [
-                                        r.get("labels", [-100] * len(r["input_ids"]))
-                                        for r in preview_records
-                                    ],
-                                }
-                                if use_mlm
-                                else {}
-                            ),
-                        },
-                        "final": {
-                            "window_ids": list(
-                                range(
-                                    preview_window_count,
-                                    preview_window_count + final_window_count,
-                                )
-                            ),
-                            "input_ids": [list(r["input_ids"]) for r in final_records],
-                            "attention_masks": [
-                                list(r["attention_mask"]) for r in final_records
-                            ],
-                            "token_counts": [_tokens(r) for r in final_records],
-                            **(
-                                {
-                                    "masked_token_counts": list(final_mask_counts),
-                                    "labels": [
-                                        r.get("labels", [-100] * len(r["input_ids"]))
-                                        for r in final_records
-                                    ],
-                                }
-                                if use_mlm
-                                else {}
-                            ),
-                        },
-                    }
+                    report["evaluation_windows"] = _build_fallback_evaluation_windows(
+                        preview_records,
+                        final_records,
+                        use_mlm=use_mlm,
+                        preview_mask_counts=preview_mask_counts,
+                        final_mask_counts=final_mask_counts,
+                    )
                 except NON_FATAL_RUNTIME_EXCEPTIONS:
                     # Best-effort: provenance digest will be skipped if windows cannot be built
                     pass

@@ -1,0 +1,120 @@
+from __future__ import annotations
+
+import math
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
+from typing import Any
+
+NormalizeOverheadResultFn = Callable[[dict[str, object] | None], dict[str, object]]
+
+
+@dataclass(frozen=True)
+class GuardOverheadSummary:
+    evaluated: bool
+    passed: bool
+    status: str
+    overhead_display: str
+    threshold_fraction: float
+    threshold_display: str
+
+
+def finalize_guard_overhead_payload(
+    payload: Mapping[str, Any] | None,
+    result: Any,
+    *,
+    normalize_overhead_result_fn: NormalizeOverheadResultFn,
+) -> dict[str, Any]:
+    """Normalize validator output into the persisted guard-overhead payload."""
+    resolved = dict(payload or {})
+    try:
+        messages = list(getattr(result, "messages", []))
+    except TypeError:  # pragma: no cover - defensive
+        messages = []
+    try:
+        warnings = list(getattr(result, "warnings", []))
+    except TypeError:  # pragma: no cover - defensive
+        warnings = []
+    try:
+        errors = list(getattr(result, "errors", []))
+    except TypeError:  # pragma: no cover - defensive
+        errors = []
+    try:
+        checks = dict(getattr(result, "checks", {}))
+    except (TypeError, ValueError):  # pragma: no cover - defensive
+        checks = {}
+
+    metrics_obj = getattr(result, "metrics", {})
+    if not isinstance(metrics_obj, dict):
+        metrics_obj = {}
+
+    overhead_ratio = metrics_obj.get("overhead_ratio")
+    if overhead_ratio is None:
+        overhead_ratio = getattr(result, "overhead_ratio", None)
+    overhead_percent = metrics_obj.get("overhead_percent")
+    if overhead_percent is None:
+        overhead_percent = getattr(result, "overhead_percent", None)
+
+    resolved.update(
+        {
+            "messages": messages,
+            "warnings": warnings,
+            "errors": errors,
+            "checks": checks,
+            "overhead_ratio": overhead_ratio,
+            "overhead_percent": overhead_percent,
+            "passed": bool(getattr(result, "passed", False)),
+            "evaluated": True,
+        }
+    )
+    normalized = normalize_overhead_result_fn(resolved)
+    return dict(normalized)
+
+
+def build_guard_overhead_summary(
+    guard_overhead_info: Mapping[str, Any] | None,
+    *,
+    default_threshold: float,
+) -> GuardOverheadSummary:
+    """Build a stable human-display summary for guard-overhead results."""
+    info = dict(guard_overhead_info or {})
+    try:
+        fallback_threshold = float(default_threshold)
+        if fallback_threshold < 0.0 or not math.isfinite(fallback_threshold):
+            fallback_threshold = 0.01
+    except Exception:
+        fallback_threshold = 0.01
+
+    evaluated = bool(info.get("evaluated", True))
+    passed = bool(info.get("passed", True))
+    status = "PASS" if passed else "FAIL"
+
+    overhead_percent = info.get("overhead_percent")
+    if isinstance(overhead_percent, (int, float)) and math.isfinite(
+        float(overhead_percent)
+    ):
+        overhead_display = f"{float(overhead_percent):+.2f}%"
+    else:
+        ratio_value = info.get("overhead_ratio")
+        if isinstance(ratio_value, (int, float)) and math.isfinite(float(ratio_value)):
+            overhead_display = f"{float(ratio_value):.3f}x"
+        else:
+            overhead_display = "not evaluated"
+
+    threshold_value = info.get("overhead_threshold", fallback_threshold)
+    try:
+        threshold_fraction = float(threshold_value)
+    except (TypeError, ValueError):
+        threshold_fraction = fallback_threshold
+    threshold_display = f"≤ +{threshold_fraction * 100:.1f}%"
+
+    if not evaluated:
+        overhead_display = "not evaluated"
+
+    return GuardOverheadSummary(
+        evaluated=evaluated,
+        passed=passed,
+        status=status,
+        overhead_display=overhead_display,
+        threshold_fraction=threshold_fraction,
+        threshold_display=threshold_display,
+    )

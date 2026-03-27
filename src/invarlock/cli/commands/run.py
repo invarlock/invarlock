@@ -135,6 +135,18 @@ from invarlock.core.exceptions import (
 from invarlock.core.exit_codes import (
     resolve_command_exit_code as _resolve_command_exit_code,
 )
+from invarlock.core.run_evaluation_windows_policy import (
+    build_fallback_evaluation_windows as _build_fallback_evaluation_windows_impl,
+)
+from invarlock.core.run_evaluation_windows_policy import (
+    serialize_evaluation_windows as _serialize_evaluation_windows_impl,
+)
+from invarlock.core.run_guard_overhead_policy import (
+    build_guard_overhead_summary as _build_guard_overhead_summary_impl,
+)
+from invarlock.core.run_guard_overhead_policy import (
+    finalize_guard_overhead_payload as _finalize_guard_overhead_payload_impl,
+)
 from invarlock.core.run_retry_policy import (
     apply_mask_only_head_autotune as _apply_mask_only_head_autotune_impl,
 )
@@ -770,6 +782,40 @@ def _build_timing_summary_payload(
         timings=timings,
         total_duration=total_duration,
         report=report,
+    )
+
+
+def _serialize_evaluation_windows(
+    evaluation_windows: Mapping[str, Any] | None,
+) -> dict[str, dict[str, Any]] | None:
+    return _serialize_evaluation_windows_impl(evaluation_windows)
+
+
+def _build_fallback_evaluation_windows(
+    preview_records: Sequence[Mapping[str, Any]],
+    final_records: Sequence[Mapping[str, Any]],
+    *,
+    use_mlm: bool,
+    preview_mask_counts: Sequence[int] | None = None,
+    final_mask_counts: Sequence[int] | None = None,
+) -> dict[str, dict[str, Any]]:
+    return _build_fallback_evaluation_windows_impl(
+        preview_records,
+        final_records,
+        use_mlm=use_mlm,
+        preview_mask_counts=preview_mask_counts,
+        final_mask_counts=final_mask_counts,
+    )
+
+
+def _finalize_guard_overhead_payload(
+    payload: Mapping[str, Any] | None,
+    result: Any,
+) -> dict[str, Any]:
+    return _finalize_guard_overhead_payload_impl(
+        payload,
+        result,
+        normalize_overhead_result_fn=_normalize_overhead_result,
     )
 
 
@@ -1660,8 +1706,10 @@ def _build_run_command_deps() -> dict[str, Any]:
         "_apply_mask_only_head_autotune": _apply_mask_only_head_autotune,
         "_build_timing_summary_payload": _build_timing_summary_payload,
         "_build_retry_result_summary": _build_retry_result_summary,
+        "_build_fallback_evaluation_windows": _build_fallback_evaluation_windows,
         "_choose_snapshot_mode": _choose_snapshot_mode,
         "_estimate_model_bytes": _estimate_model_bytes,
+        "_finalize_guard_overhead_payload": _finalize_guard_overhead_payload,
         "_persist_ref_masks": _persist_ref_masks,
         "_postprocess_and_summarize": _postprocess_and_summarize,
         "_prepare_config_for_run": _prepare_config_for_run,
@@ -1678,6 +1726,7 @@ def _build_run_command_deps() -> dict[str, Any]:
         "_resolve_snapshot_config": _resolve_snapshot_config,
         "_run_bare_control": _run_bare_control,
         "_safe_int": _safe_int,
+        "_serialize_evaluation_windows": _serialize_evaluation_windows,
         "_should_measure_overhead": _should_measure_overhead,
         "_style_from_console": _style_from_console,
         "_tensor_or_list_to_ints": _tensor_or_list_to_ints,
@@ -1880,44 +1929,20 @@ def _print_guard_overhead_summary(
     default_threshold: float = GUARD_OVERHEAD_THRESHOLD,
 ) -> float:
     """Print a concise guard-overhead console summary. Returns threshold fraction used."""
-    evaluated = bool(guard_overhead_info.get("evaluated", True))
-    try:
-        fallback_threshold = float(default_threshold)
-        if fallback_threshold < 0.0 or not math.isfinite(fallback_threshold):
-            fallback_threshold = GUARD_OVERHEAD_THRESHOLD
-    except Exception:
-        fallback_threshold = GUARD_OVERHEAD_THRESHOLD
-    if not evaluated:
-        _event(console, "METRIC", "Guard Overhead: not evaluated", emoji="🛡️")
-        return fallback_threshold
-    overhead_status = "PASS" if guard_overhead_info.get("passed", True) else "FAIL"
-    overhead_percent = guard_overhead_info.get("overhead_percent")
-    if isinstance(overhead_percent, (int | float)) and math.isfinite(
-        float(overhead_percent)
-    ):
-        overhead_display = f"{float(overhead_percent):+.2f}%"
-    else:
-        ratio_value = guard_overhead_info.get("overhead_ratio")
-        if isinstance(ratio_value, (int | float)) and math.isfinite(float(ratio_value)):
-            overhead_display = f"{float(ratio_value):.3f}x"
-        else:
-            # Avoid any 'nanx' or ambiguous output
-            overhead_display = "not evaluated"
-    threshold_percent = guard_overhead_info.get(
-        "overhead_threshold", fallback_threshold
+    summary = _build_guard_overhead_summary_impl(
+        guard_overhead_info,
+        default_threshold=default_threshold,
     )
-    try:
-        threshold_fraction = float(threshold_percent)
-    except (TypeError, ValueError):
-        threshold_fraction = fallback_threshold
-    threshold_display = f"≤ +{threshold_fraction * 100:.1f}%"
+    if not summary.evaluated:
+        _event(console, "METRIC", "Guard Overhead: not evaluated", emoji="🛡️")
+        return summary.threshold_fraction
     _event(
         console,
         "METRIC",
-        f"Guard Overhead: {overhead_status} {overhead_display} ({threshold_display})",
+        f"Guard Overhead: {summary.status} {summary.overhead_display} ({summary.threshold_display})",
         emoji="🛡️",
     )
-    return threshold_fraction
+    return summary.threshold_fraction
 
 
 def _print_retry_summary(console: Console, retry_controller: Any | None) -> None:
