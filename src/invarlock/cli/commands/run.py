@@ -77,30 +77,6 @@ from invarlock.cli.run_pairing import (
 from invarlock.cli.run_pairing import (
     validate_and_harvest_baseline_schedule as _validate_and_harvest_baseline_schedule_impl,
 )
-from invarlock.cli.run_policy import (
-    choose_dataset_split as _choose_dataset_split_impl,
-)
-from invarlock.cli.run_policy import (
-    coerce_bool_like as _coerce_bool_like_impl,
-)
-from invarlock.cli.run_policy import (
-    coerce_mapping as _coerce_mapping_impl,
-)
-from invarlock.cli.run_policy import (
-    resolve_guard_overhead_threshold as _resolve_guard_overhead_threshold_impl,
-)
-from invarlock.cli.run_policy import (
-    resolve_pm_acceptance_range as _resolve_pm_acceptance_range_impl,
-)
-from invarlock.cli.run_policy import (
-    resolve_pm_drift_band as _resolve_pm_drift_band_impl,
-)
-from invarlock.cli.run_policy import (
-    resolve_skip_overhead_policy as _resolve_skip_overhead_policy_impl,
-)
-from invarlock.cli.run_policy import (
-    should_measure_overhead as _should_measure_overhead_impl,
-)
 from invarlock.cli.utils import (
     coerce_float as _coerce_float,
 )
@@ -152,6 +128,30 @@ from invarlock.core.run_guard_overhead_policy import (
 )
 from invarlock.core.run_guard_overhead_policy import (
     normalize_guard_overhead_result as _normalize_overhead_result_impl,
+)
+from invarlock.core.run_policy import (
+    choose_dataset_split as _choose_dataset_split_impl,
+)
+from invarlock.core.run_policy import (
+    coerce_bool_like as _coerce_bool_like_impl,
+)
+from invarlock.core.run_policy import (
+    coerce_mapping as _coerce_mapping_impl,
+)
+from invarlock.core.run_policy import (
+    resolve_guard_overhead_threshold as _resolve_guard_overhead_threshold_impl,
+)
+from invarlock.core.run_policy import (
+    resolve_pm_acceptance_range as _resolve_pm_acceptance_range_impl,
+)
+from invarlock.core.run_policy import (
+    resolve_pm_drift_band as _resolve_pm_drift_band_impl,
+)
+from invarlock.core.run_policy import (
+    resolve_skip_overhead_policy as _resolve_skip_overhead_policy_impl,
+)
+from invarlock.core.run_policy import (
+    should_measure_overhead as _should_measure_overhead_impl,
 )
 from invarlock.core.run_provider_dataset_plan import (
     build_provider_dataset_plan as _build_provider_dataset_plan_impl,

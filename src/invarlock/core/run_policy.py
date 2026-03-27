@@ -1,8 +1,4 @@
-"""Run-command policy and config-resolution helpers.
-
-This module holds pure(ish) helper functions used by `cli.commands.run`.
-Keeping them here reduces `run.py` size and isolates policy resolution logic.
-"""
+"""Deterministic run-policy and config-resolution helpers."""
 
 from __future__ import annotations
 
