@@ -157,9 +157,6 @@ from invarlock.core.run_report_payload_policy import (
     build_artifacts_payload as _build_artifacts_payload_impl,
 )
 from invarlock.core.run_report_payload_policy import (
-    build_dataset_window_stats as _build_dataset_window_stats_impl,
-)
-from invarlock.core.run_report_payload_policy import (
     build_edit_payload as _build_edit_payload_impl,
 )
 from invarlock.core.run_report_payload_policy import (
@@ -186,9 +183,6 @@ from invarlock.core.run_report_payload_policy import (
 from invarlock.core.run_report_payload_policy import (
     merge_core_timing_metrics as _merge_core_timing_metrics_impl,
 )
-from invarlock.core.run_report_payload_policy import (
-    validate_pairing_report_metrics as _validate_pairing_report_metrics_impl,
-)
 from invarlock.core.run_retry_policy import (
     apply_mask_only_head_autotune as _apply_mask_only_head_autotune_impl,
 )
@@ -211,6 +205,12 @@ from invarlock.eval.window_planning import (
     resolve_effective_windows as _resolve_effective_windows_impl,
 )
 from invarlock.model_utils import set_seed
+from invarlock.reporting.run_pairing_contract import (
+    build_dataset_window_stats as _build_dataset_window_stats_impl,
+)
+from invarlock.reporting.run_pairing_contract import (
+    validate_pairing_report_metrics as _validate_pairing_report_metrics_impl,
+)
 from invarlock.reporting.run_retry_validation import (
     validate_retry_evaluation_report as _validate_retry_evaluation_report_impl,
 )

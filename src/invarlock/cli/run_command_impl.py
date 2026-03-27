@@ -60,6 +60,7 @@ def run_command_impl(
     _apply_warning_filters = _dep("_apply_warning_filters")
     _build_artifacts_payload = _dep("_build_artifacts_payload")
     _build_provider_dataset_plan = _dep("_build_provider_dataset_plan")
+    _build_dataset_window_stats = _dep("_build_dataset_window_stats")
     _build_edit_payload = _dep("_build_edit_payload")
     _build_timing_summary_payload = _dep("_build_timing_summary_payload")
     _build_retry_result_summary = _dep("_build_retry_result_summary")
@@ -117,6 +118,7 @@ def run_command_impl(
     _to_serialisable_dict = _dep("_to_serialisable_dict")
     _tokenizer_digest = _dep("_tokenizer_digest")
     _validate_retry_evaluation_report = _dep("_validate_retry_evaluation_report")
+    _validate_pairing_report_metrics = _dep("_validate_pairing_report_metrics")
     _build_snapshot_provenance = _dep("_build_snapshot_provenance")
     _validate_and_harvest_baseline_schedule = _dep(
         "_validate_and_harvest_baseline_schedule"
@@ -2057,100 +2059,28 @@ def run_command_impl(
                     pass
 
             match_fraction = metrics_section.get("window_match_fraction")
-            if match_fraction is not None and not math.isclose(
-                match_fraction, 1.0, rel_tol=0.0, abs_tol=1e-9
-            ):
-                err = InvarlockError(
-                    code="E001",
-                    message=(
-                        f"PAIRING-SCHEDULE-MISMATCH: window_match_fraction={match_fraction:.3f}"
-                    ),
-                    details={"window_match_fraction": float(match_fraction)},
-                )
-                code = _resolve_exit_code(err, profile=profile_normalized)
-                console.print(f"[red]{err}[/red]")
-                raise typer.Exit(code)
-
             overlap_fraction = metrics_section.get("window_overlap_fraction")
-            if overlap_fraction is not None and overlap_fraction > 1e-9:
-                err = InvarlockError(
-                    code="E001",
-                    message=(
-                        f"PAIRING-SCHEDULE-MISMATCH: window_overlap_fraction={overlap_fraction:.3f}"
-                    ),
-                    details={"window_overlap_fraction": float(overlap_fraction)},
-                )
-                code = _resolve_exit_code(err, profile=profile_normalized)
-                console.print(f"[red]{err}[/red]")
-                raise typer.Exit(code)
-
-            # Paired-run enforcement: baseline provided must be truly paired in CI/Release.
-            if baseline and profile_normalized in {"ci", "release"}:
-                pairing_reason = metrics_section.get("window_pairing_reason")
-                if pairing_reason is not None:
-                    err = InvarlockError(
-                        code="E001",
-                        message=(
-                            "PAIRING-SCHEDULE-MISMATCH: baseline pairing requested but run was not paired "
-                            f"(window_pairing_reason={pairing_reason})"
-                        ),
-                        details={"window_pairing_reason": pairing_reason},
-                    )
-                    code = _resolve_exit_code(err, profile=profile_normalized)
-                    console.print(f"[red]{err}[/red]")
-                    raise typer.Exit(code)
-
-                paired_windows_val = metrics_section.get("paired_windows")
-                paired_windows_int = None
-                try:
-                    if paired_windows_val is not None and not isinstance(
-                        paired_windows_val, bool
-                    ):
-                        paired_windows_int = int(paired_windows_val)
-                except NUMERIC_EXCEPTIONS:
-                    paired_windows_int = None
-                if paired_windows_int is None or paired_windows_int <= 0:
-                    err = InvarlockError(
-                        code="E001",
-                        message=(
-                            "PAIRED-WINDOWS-COLLAPSED: paired_windows<=0 under paired baseline. "
-                            "Check device stability, dataset windows, or edit scope."
-                        ),
-                        details={
-                            "paired_windows": paired_windows_val,
-                            "profile": profile_normalized,
-                        },
-                    )
-                    code = _resolve_exit_code(err, profile=profile_normalized)
-                    console.print(f"[red]{err}[/red]")
-                    raise typer.Exit(code)
-
             expected_preview = effective_preview or getattr(
                 cfg.dataset, "preview_n", preview_count_report
             )
             expected_final = effective_final or getattr(
                 cfg.dataset, "final_n", final_count_report
             )
-            if (
-                preview_count_report is not None
-                and expected_preview is not None
-                and int(preview_count_report) != int(expected_preview)
-            ) or (
-                final_count_report is not None
-                and expected_final is not None
-                and int(final_count_report) != int(expected_final)
-            ):
+            pairing_violations = _validate_pairing_report_metrics(
+                metrics_section,
+                baseline_requested=bool(baseline),
+                profile=profile_normalized,
+                preview_count_report=preview_count_report,
+                final_count_report=final_count_report,
+                expected_preview=expected_preview,
+                expected_final=expected_final,
+            )
+            if pairing_violations:
+                violation = pairing_violations[0]
                 err = InvarlockError(
-                    code="E001",
-                    message=(
-                        "PAIRING-SCHEDULE-MISMATCH: counts do not match configuration after stratification"
-                    ),
-                    details={
-                        "preview_used": int(preview_count_report or -1),
-                        "preview_expected": int(expected_preview or -1),
-                        "final_used": int(final_count_report or -1),
-                        "final_expected": int(expected_final or -1),
-                    },
+                    code=violation.code,
+                    message=violation.message,
+                    details=violation.details,
                 )
                 code = _resolve_exit_code(err, profile=profile_normalized)
                 console.print(f"[red]{err}[/red]")
@@ -2236,26 +2166,11 @@ def run_command_impl(
             # Derive dataset.windows.stats (PM-only surface)
             try:
                 ds = report.setdefault("dataset", {}).setdefault("windows", {})
-                stats = ds.setdefault("stats", {})
-                if match_fraction is not None:
-                    stats["window_match_fraction"] = float(match_fraction)
-                if overlap_fraction is not None:
-                    stats["window_overlap_fraction"] = float(overlap_fraction)
-                try:
-                    if isinstance(window_plan, dict) and "coverage_ok" in window_plan:
-                        stats["coverage"] = bool(window_plan.get("coverage_ok"))
-                        stats["preview_total_tokens"] = window_plan.get(
-                            "preview_total_tokens"
-                        )
-                        stats["final_total_tokens"] = window_plan.get(
-                            "final_total_tokens"
-                        )
-                        stats["min_tokens_target"] = window_plan.get(
-                            "min_tokens_target"
-                        )
-                        stats["tokens_floor_met"] = window_plan.get("tokens_floor_met")
-                except (AttributeError, KeyError, TypeError):
-                    pass
+                ds["stats"] = _build_dataset_window_stats(
+                    match_fraction=match_fraction,
+                    overlap_fraction=overlap_fraction,
+                    window_plan=window_plan,
+                )
             except (AttributeError, KeyError, TypeError):
                 pass
 
