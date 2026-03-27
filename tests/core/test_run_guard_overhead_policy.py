@@ -5,6 +5,8 @@ from types import SimpleNamespace
 from invarlock.core.run_guard_overhead_policy import (
     build_guard_overhead_summary,
     finalize_guard_overhead_payload,
+    normalize_guard_overhead_result,
+    prepare_guard_overhead_report,
 )
 
 
@@ -20,7 +22,6 @@ def test_finalize_guard_overhead_payload_collects_validator_fields() -> None:
     payload = finalize_guard_overhead_payload(
         {"overhead_threshold": 0.01},
         result,
-        normalize_overhead_result_fn=lambda data: dict(data or {}),
     )
     assert payload["messages"] == ["ok"]
     assert payload["warnings"] == ["warn"]
@@ -42,7 +43,6 @@ def test_finalize_guard_overhead_payload_uses_fallback_metric_attrs() -> None:
     payload = finalize_guard_overhead_payload(
         {},
         result,
-        normalize_overhead_result_fn=lambda data: dict(data or {}),
     )
     assert payload["overhead_ratio"] == 1.005
     assert payload["overhead_percent"] == 0.5
@@ -77,3 +77,58 @@ def test_build_guard_overhead_summary_marks_not_evaluated() -> None:
     )
     assert summary.evaluated is False
     assert summary.overhead_display == "not evaluated"
+
+
+def test_normalize_guard_overhead_result_marks_missing_ratio_as_not_evaluated() -> None:
+    out = normalize_guard_overhead_result(None)
+    assert out["evaluated"] is False
+    assert out["passed"] is True
+
+
+def test_normalize_guard_overhead_result_handles_float_coercion_failure() -> None:
+    class BadInt(int):
+        def __float__(self) -> float:
+            raise TypeError("boom")
+
+    out = normalize_guard_overhead_result({"overhead_ratio": BadInt(1)})
+    assert out["evaluated"] is False
+    assert out["passed"] is True
+
+
+def test_prepare_guard_overhead_report_returns_skipped_payload() -> None:
+    payload = prepare_guard_overhead_report(
+        {"skipped": True, "reason": "config"},
+        resolved_loss_type="ppl_causal",
+        core_report={},
+        report={},
+        default_threshold=0.01,
+        extract_pm_snapshot_for_overhead_fn=lambda *_args, **_kwargs: {"final": 1.0},
+        validate_guard_overhead_fn=lambda *_args, **_kwargs: object(),
+    )
+    assert payload == {"skipped": True, "reason": "config"}
+
+
+def test_prepare_guard_overhead_report_validates_and_finalizes() -> None:
+    class Result:
+        messages = ["ok"]
+        warnings = []
+        errors = []
+        checks = {"guard_overhead": True}
+        metrics = {"overhead_ratio": 1.005, "overhead_percent": 0.5}
+        passed = True
+
+    payload = prepare_guard_overhead_report(
+        {
+            "bare_report": {"metrics": {"primary_metric": {"final": 10.0}}},
+            "overhead_threshold": 0.02,
+        },
+        resolved_loss_type="causal",
+        core_report={"metrics": {}},
+        report={"metrics": {}},
+        default_threshold=0.01,
+        extract_pm_snapshot_for_overhead_fn=lambda *_args, **_kwargs: {"final": 10.1},
+        validate_guard_overhead_fn=lambda bare, guarded, overhead_threshold: Result(),
+    )
+    assert payload["guarded_report"] == {"metrics": {"primary_metric": {"final": 10.1}}}
+    assert payload["passed"] is True
+    assert payload["evaluated"] is True

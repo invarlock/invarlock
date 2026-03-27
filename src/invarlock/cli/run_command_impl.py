@@ -58,66 +58,72 @@ def run_command_impl(
     _apply_mlm_masks = _dep("_apply_mlm_masks")
     _apply_mask_only_head_autotune = _dep("_apply_mask_only_head_autotune")
     _apply_warning_filters = _dep("_apply_warning_filters")
+    _build_artifacts_payload = _dep("_build_artifacts_payload")
+    _build_provider_dataset_plan = _dep("_build_provider_dataset_plan")
+    _build_run_context_payload = _dep("_build_run_context_payload")
+    _build_run_execution_config_payloads = _dep("_build_run_execution_config_payloads")
+    _enrich_run_report_metrics = _dep("_enrich_run_report_metrics")
+    _build_edit_payload = _dep("_build_edit_payload")
     _build_timing_summary_payload = _dep("_build_timing_summary_payload")
     _build_retry_result_summary = _dep("_build_retry_result_summary")
-    _build_fallback_evaluation_windows = _dep("_build_fallback_evaluation_windows")
+    _build_flags_payload = _dep("_build_flags_payload")
+    _build_guard_entries = _dep("_build_guard_entries")
+    _build_metrics_payload = _dep("_build_metrics_payload")
+    _build_run_report_context = _dep("_build_run_report_context")
+    _build_run_report_data = _dep("_build_run_report_data")
+    _build_run_report_meta = _dep("_build_run_report_meta")
     _canonical_dataset_id = _dep("_canonical_dataset_id")
     _choose_snapshot_mode = _dep("_choose_snapshot_mode")
     _coerce_float = _dep("_coerce_float")
     _coerce_int = _dep("_coerce_int")
     _coerce_option = _dep("_coerce_option")
-    _compute_provider_digest = _dep("_compute_provider_digest")
-    _enforce_provider_parity = _dep("_enforce_provider_parity")
     _event = _dep("_event")
     _execute_guarded_run = _dep("_execute_guarded_run")
     _extract_pairing_schedule = _dep("_extract_pairing_schedule")
-    _extract_pm_snapshot_for_overhead = _dep("_extract_pm_snapshot_for_overhead")
-    _format_debug_metric_diffs = _dep("_format_debug_metric_diffs")
+    _load_baseline_pairing_evidence = _dep("_load_baseline_pairing_evidence")
+    _materialize_baseline_pairing_schedule = _dep(
+        "_materialize_baseline_pairing_schedule"
+    )
     _format_guard_chain = _dep("_format_guard_chain")
     _format_kv_line = _dep("_format_kv_line")
     _free_model_memory = _dep("_free_model_memory")
+    _finalize_run_provenance = _dep("_finalize_run_provenance")
     _hash_sequences = _dep("_hash_sequences")
     _init_retry_controller = _dep("_init_retry_controller")
     _load_model_with_cfg = _dep("_load_model_with_cfg")
-    _maybe_plan_release_windows = _dep("_maybe_plan_release_windows")
-    _merge_primary_metric_health = _dep("_merge_primary_metric_health")
+    _merge_core_timing_metrics = _dep("_merge_core_timing_metrics")
     _normalize_overhead_result = _dep("_normalize_overhead_result")
     _estimate_model_bytes = _dep("_estimate_model_bytes")
-    _finalize_guard_overhead_payload = _dep("_finalize_guard_overhead_payload")
     _persist_ref_masks = _dep("_persist_ref_masks")
     _postprocess_and_summarize = _dep("_postprocess_and_summarize")
+    _prepare_guard_overhead_report = _dep("_prepare_guard_overhead_report")
     _prepare_config_for_run = _dep("_prepare_config_for_run")
     _print_guard_overhead_summary = _dep("_print_guard_overhead_summary")
     _print_pipeline_start = _dep("_print_pipeline_start")
     _print_retry_summary = _dep("_print_retry_summary")
     _resolve_device_and_output = _dep("_resolve_device_and_output")
-    _resolve_effective_windows = _dep("_resolve_effective_windows")
     _resolve_exit_code = _dep("_resolve_exit_code")
     _resolve_guard_overhead_threshold = _dep("_resolve_guard_overhead_threshold")
-    _resolve_metric_and_provider = _dep("_resolve_metric_and_provider")
     _resolve_pm_min_tokens_target = _dep("_resolve_pm_min_tokens_target")
     _resolve_pm_acceptance_range = _dep("_resolve_pm_acceptance_range")
     _resolve_pm_drift_band = _dep("_resolve_pm_drift_band")
-    _resolve_provider_and_split = _dep("_resolve_provider_and_split")
     _resolve_snapshot_config = _dep("_resolve_snapshot_config")
     _run_bare_control = _dep("_run_bare_control")
     _safe_int = _dep("_safe_int")
-    _serialize_evaluation_windows = _dep("_serialize_evaluation_windows")
     _should_measure_overhead = _dep("_should_measure_overhead")
     _style_from_console = _dep("_style_from_console")
     _tensor_or_list_to_ints = _dep("_tensor_or_list_to_ints")
     _to_serialisable_dict = _dep("_to_serialisable_dict")
     _tokenizer_digest = _dep("_tokenizer_digest")
+    _validate_retry_evaluation_report = _dep("_validate_retry_evaluation_report")
+    _build_snapshot_provenance = _dep("_build_snapshot_provenance")
     _validate_and_harvest_baseline_schedule = _dep(
         "_validate_and_harvest_baseline_schedule"
     )
     click = _dep("click")
     console = _dep("console")
-    copy = _dep("copy")
     datetime = _dep("datetime")
     detect_model_profile = _dep("detect_model_profile")
-    hashlib = _dep("hashlib")
-    json = _dep("json")
     math = _dep("math")
     np = _dep("np")
     os = _dep("os")
@@ -131,7 +137,6 @@ def run_command_impl(
     timed_step = _dep("timed_step")
     get_torch = _dep("get_torch")
     typer = _dep("typer")
-    validate_guard_overhead = _dep("validate_guard_overhead")
 
     """
     Run InvarLock pipeline with the given configuration.
@@ -483,114 +488,31 @@ def run_command_impl(
         if baseline:
             baseline_path = Path(baseline)
             strict_baseline = profile_normalized in {"ci", "release"}
-            if not baseline_path.exists():
-                msg = (
-                    "PAIRING-EVIDENCE-MISSING: baseline report path does not exist "
-                    f"({baseline})"
+            baseline_evidence = _load_baseline_pairing_evidence(
+                baseline_path=baseline_path,
+                tokenizer_hash=tokenizer_hash,
+            )
+            baseline_report_data = baseline_evidence.report_data
+            pairing_schedule = baseline_evidence.pairing_schedule
+            tokenizer_hash = baseline_evidence.tokenizer_hash
+            if baseline_evidence.status == "loaded":
+                _event(
+                    console,
+                    "DATA",
+                    "Loaded baseline evaluation schedule for pairing",
+                    emoji="🧬",
+                    profile=profile_normalized,
                 )
+            elif baseline_evidence.message:
                 if strict_baseline:
-                    raise InvarlockError(code="E001", message=msg)
+                    raise InvarlockError(code="E001", message=baseline_evidence.message)
                 _event(
                     console,
                     "WARN",
-                    f"{msg}. Falling back to dataset schedule.",
+                    f"{baseline_evidence.message}. Falling back to dataset schedule.",
                     emoji="⚠️",
                     profile=profile_normalized,
                 )
-            else:
-                try:
-                    with baseline_path.open(encoding="utf-8") as f:
-                        baseline_report_data = json.load(f)
-                except (OSError, TypeError, ValueError) as exc:
-                    msg = f"PAIRING-EVIDENCE-MISSING: baseline report JSON parse failed ({exc})"
-                    if strict_baseline:
-                        raise InvarlockError(code="E001", message=msg) from exc
-                    _event(
-                        console,
-                        "WARN",
-                        f"{msg}. Falling back to dataset schedule.",
-                        emoji="⚠️",
-                        profile=profile_normalized,
-                    )
-                    baseline_report_data = None
-                if isinstance(baseline_report_data, dict):
-                    pairing_schedule = _extract_pairing_schedule(baseline_report_data)
-                    if pairing_schedule:
-                        # Normalize baseline report in-memory so downstream digest/parity
-                        # computations see a consistent window_id + mask shape even for
-                        # baselines missing some fields.
-                        try:
-                            ew = baseline_report_data.get("evaluation_windows")
-                            if not isinstance(ew, dict):
-                                ew = {}
-                                baseline_report_data["evaluation_windows"] = ew
-                            # Merge the sanitized pairing schedule into existing
-                            # evaluation_windows without discarding logloss/token_counts.
-                            for arm in ("preview", "final"):
-                                src = (
-                                    pairing_schedule.get(arm)
-                                    if isinstance(pairing_schedule, dict)
-                                    else None
-                                )
-                                if not isinstance(src, dict):
-                                    continue
-                                dst = ew.get(arm)
-                                if not isinstance(dst, dict):
-                                    ew[arm] = dict(src)
-                                    continue
-                                for key, value in src.items():
-                                    dst[key] = value
-                        except NON_FATAL_RUNTIME_EXCEPTIONS:
-                            pass
-                        # Harvest tokenizer hash provenance from baseline when present.
-                        try:
-                            if not tokenizer_hash:
-                                tok = None
-                                meta = (
-                                    baseline_report_data.get("meta")
-                                    if isinstance(
-                                        baseline_report_data.get("meta"), dict
-                                    )
-                                    else {}
-                                )
-                                data = (
-                                    baseline_report_data.get("data")
-                                    if isinstance(
-                                        baseline_report_data.get("data"), dict
-                                    )
-                                    else {}
-                                )
-                                if isinstance(meta, dict):
-                                    tok = meta.get("tokenizer_hash")
-                                if not tok and isinstance(data, dict):
-                                    tok = data.get("tokenizer_hash")
-                                if isinstance(tok, str) and tok:
-                                    tokenizer_hash = tok
-                        except NON_FATAL_RUNTIME_EXCEPTIONS:
-                            pass
-                        _event(
-                            console,
-                            "DATA",
-                            "Loaded baseline evaluation schedule for pairing",
-                            emoji="🧬",
-                            profile=profile_normalized,
-                        )
-                    else:
-                        msg = (
-                            "PAIRING-EVIDENCE-MISSING: baseline report missing or invalid "
-                            f"evaluation_windows ({baseline})"
-                        )
-                        if strict_baseline:
-                            raise InvarlockError(code="E001", message=msg)
-                        _event(
-                            console,
-                            "WARN",
-                            f"{msg}. Falling back to dataset schedule.",
-                            emoji="⚠️",
-                            profile=profile_normalized,
-                        )
-                        baseline_report_data = None
-                        pairing_schedule = None
 
         requested_preview = int(getattr(cfg.dataset, "preview_n", 0))
         requested_final = int(getattr(cfg.dataset, "final_n", 0))
@@ -695,94 +617,22 @@ def run_command_impl(
             profile=profile_normalized,
         )
 
-        # Create run configuration
-        guard_overrides = {
-            "spectral": _to_serialisable_dict(getattr(cfg.guards, "spectral", {})),
-            "rmt": _to_serialisable_dict(getattr(cfg.guards, "rmt", {})),
-            "variance": _to_serialisable_dict(getattr(cfg.guards, "variance", {})),
-            "invariants": _to_serialisable_dict(getattr(cfg.guards, "invariants", {})),
-        }
-
-        if model_profile.invariants:
-            invariants_policy = guard_overrides.setdefault("invariants", {})
-            existing_checks = invariants_policy.get("profile_checks", [])
-            if isinstance(existing_checks, list | tuple | set):
-                checks_list = [str(item) for item in existing_checks]
-            elif existing_checks:
-                checks_list = [str(existing_checks)]
-            else:
-                checks_list = []
-            for invariant in model_profile.invariants:
-                invariant_name = str(invariant)
-                if invariant_name not in checks_list:
-                    checks_list.append(invariant_name)
-            invariants_policy["profile_checks"] = checks_list
-
-        run_context = {
-            "eval": _to_serialisable_dict(cfg.eval),
-            "dataset": _to_serialisable_dict(cfg.dataset),
-            "guards": guard_overrides,
-            "profile": profile if profile else "",
-            "pairing_baseline": pairing_schedule,
-            "seeds": seed_bundle,
-            "plugins": plugin_provenance,
-            "run_id": run_id,
-        }
         tiny_relax_env = str(os.environ.get("INVARLOCK_TINY_RELAX", "")).strip().lower()
-        if tiny_relax_env in {"1", "true", "yes", "on"}:
-            run_context.setdefault("run", {})["tiny_relax"] = True
-        # Provide baseline per-window logloss to the CoreRunner for paired tail
-        # evidence and (optionally) fail/rollback enforcement.
-        try:
-            if isinstance(baseline_report_data, dict):
-                ew = baseline_report_data.get("evaluation_windows")
-                if isinstance(ew, dict):
-                    final = ew.get("final")
-                    if (
-                        isinstance(final, dict)
-                        and isinstance(final.get("window_ids"), list)
-                        and isinstance(final.get("logloss"), list)
-                    ):
-                        base_eval: dict[str, Any] = {
-                            "final": {
-                                "window_ids": list(final.get("window_ids") or []),
-                                "logloss": list(final.get("logloss") or []),
-                            }
-                        }
-                        if isinstance(final.get("token_counts"), list):
-                            base_eval["final"]["token_counts"] = list(
-                                final.get("token_counts") or []
-                            )
-                        run_context["baseline_eval_windows"] = base_eval
-        except NON_FATAL_RUNTIME_EXCEPTIONS:
-            pass
-        run_context.setdefault("primary_metric", {})["acceptance_range"] = (
-            pm_acceptance_range
+        run_context = _build_run_context_payload(
+            cfg=cfg,
+            profile=profile,
+            pairing_schedule=pairing_schedule,
+            seed_bundle=seed_bundle,
+            plugin_provenance=plugin_provenance,
+            run_id=run_id,
+            baseline_report_data=baseline_report_data,
+            pm_acceptance_range=pm_acceptance_range,
+            pm_drift_band=pm_drift_band,
+            guard_overhead_threshold=guard_overhead_threshold,
+            model_profile=model_profile,
+            resolved_loss_type=resolved_loss_type,
+            tiny_relax_enabled=tiny_relax_env in {"1", "true", "yes", "on"},
         )
-        run_context["pm_acceptance_range"] = pm_acceptance_range
-        if pm_drift_band:
-            run_context.setdefault("primary_metric", {})["drift_band"] = pm_drift_band
-            run_context["pm_drift_band"] = pm_drift_band
-        run_context.setdefault("primary_metric", {})["overhead_threshold"] = (
-            guard_overhead_threshold
-        )
-        run_context["guard_overhead_threshold"] = guard_overhead_threshold
-        run_context["model_profile"] = {
-            "family": model_profile.family,
-            "default_loss": model_profile.default_loss,
-            "module_selectors": model_profile.module_selectors,
-            "invariants": model_profile.invariants,
-            "cert_lints": model_profile.cert_lints,
-        }
-        extra_context = _to_serialisable_dict(getattr(cfg, "context", {}))
-        if isinstance(extra_context, dict):
-            run_context.update(extra_context)
-        try:
-            run_context.setdefault("eval", {}).setdefault("loss", {})[
-                "resolved_type"
-            ] = resolved_loss_type
-        except (AttributeError, TypeError):
-            pass
         run_config = RunConfig(
             device=resolved_device,
             max_pm_ratio=getattr(cfg.eval, "max_pm_ratio", 1.5),
@@ -795,8 +645,11 @@ def run_command_impl(
         # Load calibration data if dataset is configured
         calibration_data = None
         dataset_meta: dict[str, Any] = {}
-        baseline_meta: dict[str, Any] = {}
         window_plan: dict[str, Any] | None = None
+        preview_records: list[dict[str, Any]] = []
+        final_records: list[dict[str, Any]] = []
+        preview_mask_counts: list[int] = []
+        final_mask_counts: list[int] = []
         dataset_timing_start: float | None = perf_counter() if collect_timings else None
         if pairing_schedule:
             harvested = _validate_and_harvest_baseline_schedule(
@@ -825,251 +678,40 @@ def run_command_impl(
                 ) as exc:
                     _event(console, "FAIL", str(exc), emoji="❌", profile=profile)
                     raise typer.Exit(1) from exc
-            preview_window_ids = pairing_schedule["preview"].get("window_ids")
-            preview_labels = pairing_schedule["preview"].get("labels")
-            for idx, (input_ids, attention_mask) in enumerate(
-                zip(
-                    pairing_schedule["preview"]["input_ids"],
-                    pairing_schedule["preview"]["attention_masks"],
-                    strict=False,
-                )
-            ):
-                window_id = (
-                    preview_window_ids[idx]
-                    if preview_window_ids and idx < len(preview_window_ids)
-                    else idx
-                )
-                entry = {
-                    "input_ids": input_ids,
-                    "attention_mask": attention_mask,
-                    "window_id": f"preview::{window_id}",
-                }
-                if use_mlm:
-                    labels_list: list[int] = []
-                    if isinstance(preview_labels, list) and idx < len(preview_labels):
-                        labels_list = _tensor_or_list_to_ints(preview_labels[idx])
-                    if labels_list and any(token != -100 for token in labels_list):
-                        entry["labels"] = labels_list
-                        entry["mlm_masked"] = sum(
-                            1 for token in labels_list if token != -100
-                        )
-                    else:
-                        entry["labels"] = []
-                        entry["mlm_masked"] = 0
-                    # Prefer masked_token_counts if present in schedule
-                    mtc = pairing_schedule["preview"].get("masked_token_counts")
-                    if isinstance(mtc, list) and idx < len(mtc):
-                        try:
-                            entry["mlm_masked"] = int(mtc[idx])
-                        except NUMERIC_EXCEPTIONS:
-                            pass
-                calibration_data.append(entry)
-            final_window_ids = pairing_schedule["final"].get("window_ids")
-            final_labels = pairing_schedule["final"].get("labels")
-            for idx, (input_ids, attention_mask) in enumerate(
-                zip(
-                    pairing_schedule["final"]["input_ids"],
-                    pairing_schedule["final"]["attention_masks"],
-                    strict=False,
-                )
-            ):
-                window_id = (
-                    final_window_ids[idx]
-                    if final_window_ids and idx < len(final_window_ids)
-                    else idx
-                )
-                entry = {
-                    "input_ids": input_ids,
-                    "attention_mask": attention_mask,
-                    "window_id": f"final::{window_id}",
-                }
-                if use_mlm:
-                    labels_list: list[int] = []
-                    if isinstance(final_labels, list) and idx < len(final_labels):
-                        labels_list = _tensor_or_list_to_ints(final_labels[idx])
-                    if labels_list and any(token != -100 for token in labels_list):
-                        entry["labels"] = labels_list
-                        entry["mlm_masked"] = sum(
-                            1 for token in labels_list if token != -100
-                        )
-                    else:
-                        entry["labels"] = []
-                        entry["mlm_masked"] = 0
-                    # Prefer masked_token_counts if present in schedule
-                    mtc = pairing_schedule["final"].get("masked_token_counts")
-                    if isinstance(mtc, list) and idx < len(mtc):
-                        try:
-                            entry["mlm_masked"] = int(mtc[idx])
-                        except NUMERIC_EXCEPTIONS:
-                            pass
-                calibration_data.append(entry)
-            preview_count = len(pairing_schedule["preview"]["input_ids"])
-            final_count = len(pairing_schedule["final"]["input_ids"])
-            effective_preview = int(preview_count)
-            effective_final = int(final_count)
-            preview_mask_total = 0
-            final_mask_total = 0
-            preview_mask_counts: list[int] = []
-            final_mask_counts: list[int] = []
-            if use_mlm:
-                preview_entries = calibration_data[:preview_count]
-                final_entries = calibration_data[preview_count:]
-
-                def _needs_masks(entries):
-                    missing_any = False
-                    counts = []
-                    for entry in entries:
-                        labels_val = entry.get("labels")
-                        has_label_masks = bool(
-                            isinstance(labels_val, list)
-                            and any(token != -100 for token in labels_val)
-                        )
-                        existing_count = int(entry.get("mlm_masked", 0))
-                        if not has_label_masks and existing_count <= 0:
-                            missing_any = True
-                        counts.append(int(entry.get("mlm_masked", 0)))
-                    return missing_any, counts
-
-                preview_missing, preview_counts_existing = _needs_masks(preview_entries)
-                final_missing, final_counts_existing = _needs_masks(final_entries)
-
-                if preview_missing:
-                    preview_mask_total, preview_mask_counts = _apply_mlm_masks(
-                        preview_entries,
-                        tokenizer=tokenizer,
-                        mask_prob=mask_prob,
-                        seed=mask_seed,
-                        random_token_prob=random_token_prob,
-                        original_token_prob=original_token_prob,
-                        prefix="preview",
-                    )
-                else:
-                    preview_mask_counts = preview_counts_existing
-                    preview_mask_total = sum(preview_mask_counts)
-
-                if final_missing:
-                    final_mask_total, final_mask_counts = _apply_mlm_masks(
-                        final_entries,
-                        tokenizer=tokenizer,
-                        mask_prob=mask_prob,
-                        seed=mask_seed,
-                        random_token_prob=random_token_prob,
-                        original_token_prob=original_token_prob,
-                        prefix="final",
-                    )
-                else:
-                    final_mask_counts = final_counts_existing
-                    final_mask_total = sum(final_mask_counts)
-
-                # Ensure counts and labels set on entries
-                if preview_mask_counts:
-                    for entry, count in zip(
-                        preview_entries, preview_mask_counts, strict=False
-                    ):
-                        entry["mlm_masked"] = int(count)
-                if final_mask_counts:
-                    for entry, count in zip(
-                        final_entries, final_mask_counts, strict=False
-                    ):
-                        entry["mlm_masked"] = int(count)
-
-                if preview_count > 0 and preview_mask_total <= 0:
-                    _fail_run(
-                        "Baseline pairing schedule provided no masked tokens for preview windows; "
-                        "ensure MLM labels are present in the baseline report."
-                    )
-                if final_count > 0 and final_mask_total <= 0:
-                    _fail_run(
-                        "Baseline pairing schedule provided no masked tokens for final windows; "
-                        "ensure MLM labels are present in the baseline report."
-                    )
-
-                dataset_meta["masked_tokens_preview"] = int(preview_mask_total)
-                dataset_meta["masked_tokens_final"] = int(final_mask_total)
-                dataset_meta["masked_tokens_total"] = int(
-                    preview_mask_total + final_mask_total
-                )
-                if os.environ.get("INVARLOCK_DEBUG_TRACE"):
-                    console.print(
-                        f"[debug] MLM pairing masks → preview={preview_mask_total}, final={final_mask_total}"
-                    )
-            if "preview_total_tokens" not in dataset_meta:
-                dataset_meta["preview_total_tokens"] = sum(
-                    len(_tensor_or_list_to_ints(seq))
-                    for seq in pairing_schedule["preview"]["input_ids"]
-                )
-            if "final_total_tokens" not in dataset_meta:
-                dataset_meta["final_total_tokens"] = sum(
-                    len(_tensor_or_list_to_ints(seq))
-                    for seq in pairing_schedule["final"]["input_ids"]
-                )
-            if "preview_hash" not in dataset_meta:
-                preview_hash = _hash_sequences(
-                    _tensor_or_list_to_ints(seq)
-                    for seq in pairing_schedule["preview"]["input_ids"]
-                )
-                dataset_meta["preview_hash"] = preview_hash
-            else:
-                preview_hash = dataset_meta["preview_hash"]
-            if "final_hash" not in dataset_meta:
-                final_hash = _hash_sequences(
-                    _tensor_or_list_to_ints(seq)
-                    for seq in pairing_schedule["final"]["input_ids"]
-                )
-                dataset_meta["final_hash"] = final_hash
-            else:
-                final_hash = dataset_meta["final_hash"]
-            if "dataset_hash" not in dataset_meta:
-                dataset_meta["dataset_hash"] = hashlib.blake2s(
-                    (str(preview_hash) + str(final_hash)).encode("utf-8"),
-                    digest_size=16,
-                ).hexdigest()
-            if not window_plan:
-                window_capacity = (
-                    baseline_meta.get("window_capacity")
-                    if isinstance(baseline_meta, dict)
-                    else {}
-                )
-                window_plan = {
-                    "profile": (profile or "").lower() or "baseline",
-                    "requested_preview": int(preview_count),
-                    "requested_final": int(final_count),
-                    "actual_preview": int(preview_count),
-                    "actual_final": int(final_count),
-                    "coverage_ok": True,
-                    "capacity": window_capacity or {},
-                }
-            if isinstance(window_plan, dict):
-                preview_masks = pairing_schedule["preview"].get("attention_masks") or []
-                final_masks = pairing_schedule["final"].get("attention_masks") or []
-                preview_total_tokens = sum(
-                    sum(_tensor_or_list_to_ints(mask)) for mask in preview_masks
-                ) or int(dataset_meta.get("preview_total_tokens", 0) or 0)
-                final_total_tokens = sum(
-                    sum(_tensor_or_list_to_ints(mask)) for mask in final_masks
-                ) or int(dataset_meta.get("final_total_tokens", 0) or 0)
-                min_tokens_target = _resolve_pm_min_tokens_target(
-                    tier=tier
-                    or getattr(
-                        getattr(cfg, "auto", None),
-                        "tier",
-                        None,
-                    ),
+            try:
+                materialized_baseline = _materialize_baseline_pairing_schedule(
+                    pairing_schedule=pairing_schedule,
+                    calibration_data=calibration_data,
+                    dataset_meta=dataset_meta,
+                    window_plan=window_plan,
+                    tokenizer=tokenizer,
+                    use_mlm=use_mlm,
+                    mask_prob=mask_prob,
+                    mask_seed=mask_seed,
+                    random_token_prob=random_token_prob,
+                    original_token_prob=original_token_prob,
+                    resolved_tier=tier
+                    or getattr(getattr(cfg, "auto", None), "tier", None),
                     profile=profile,
                 )
-                window_plan["preview_total_tokens"] = int(preview_total_tokens)
-                window_plan["final_total_tokens"] = int(final_total_tokens)
-                window_plan["min_tokens_target"] = int(min_tokens_target)
-                window_plan["tokens_floor_met"] = (
-                    int(preview_total_tokens) + int(final_total_tokens)
-                ) >= int(min_tokens_target)
-                dataset_meta["min_tokens_target"] = int(min_tokens_target)
-                dataset_meta["tokens_floor_met"] = bool(window_plan["tokens_floor_met"])
-            if isinstance(window_plan, dict):
-                dataset_meta.setdefault("window_plan", window_plan)
-                capacity_meta = window_plan.get("capacity")
-                if capacity_meta and "window_capacity" not in dataset_meta:
-                    dataset_meta["window_capacity"] = capacity_meta
+            except ValueError as exc:
+                _fail_run(str(exc))
+
+            calibration_data = materialized_baseline.calibration_data
+            dataset_meta = materialized_baseline.dataset_meta
+            window_plan = materialized_baseline.window_plan
+            preview_count = materialized_baseline.preview_count
+            final_count = materialized_baseline.final_count
+            effective_preview = materialized_baseline.effective_preview
+            effective_final = materialized_baseline.effective_final
+            preview_mask_counts = materialized_baseline.preview_mask_counts
+            final_mask_counts = materialized_baseline.final_mask_counts
+            if use_mlm and os.environ.get("INVARLOCK_DEBUG_TRACE"):
+                console.print(
+                    "[debug] MLM pairing masks → preview="
+                    f"{materialized_baseline.preview_mask_total}, "
+                    f"final={materialized_baseline.final_mask_total}"
+                )
         elif cfg.dataset.provider:
             _event(
                 console,
@@ -1078,373 +720,64 @@ def run_command_impl(
                 emoji="📊",
                 profile=profile_normalized,
             )
-            # Pass through provider-specific kwargs when available
-            provider_kwargs = {}
-            for key in (
-                "dataset_name",
-                "config_name",
-                "text_field",
-                "src_field",
-                "tgt_field",
-                "cache_dir",
-                "max_samples",
-                # Local providers (e.g., local_jsonl)
-                "file",
-                "path",
-                "data_files",
-            ):
-                try:
-                    val = getattr(cfg.dataset, key)
-                except (AttributeError, TypeError):
-                    val = None
-                if val is not None and val != "":
-                    provider_kwargs[key] = val
-            # Resolve provider kind from config (supports string or mapping with kind)
-            provider_val = getattr(cfg.dataset, "provider", None)
-            provider_name = None
-            if isinstance(provider_val, dict):
-                provider_name = provider_val.get("kind")
-                # Include nested provider-specific kwargs
-                for k, v in provider_val.items():
-                    if k != "kind" and v is not None and v != "":
-                        provider_kwargs[k] = v
-            elif isinstance(provider_val, str):
-                provider_name = provider_val  # noqa: F841
-            else:
-                # Support mapping-like provider configs (e.g., _Obj with .get)
-                try:
-                    _ = provider_val.get("kind")  # type: ignore[attr-defined]
-                    # Try to expose nested entries
-                    try:
-                        for k, v in provider_val._data.items():  # type: ignore[attr-defined]
-                            if k != "kind" and v is not None and v != "":
-                                provider_kwargs[k] = v
-                    except (AttributeError, TypeError):
-                        # Fallback: if items() exists
-                        try:
-                            for k, v in provider_val.items():  # type: ignore[attr-defined]
-                                if k != "kind" and v is not None and v != "":
-                                    provider_kwargs[k] = v
-                        except (AttributeError, TypeError):
-                            pass
-                except (AttributeError, TypeError):
-                    _ = None
-            data_provider, resolved_split, used_fallback_split = (
-                _resolve_provider_and_split(
-                    cfg,
-                    model_profile,
-                    get_provider_fn=get_provider,
-                    provider_kwargs=provider_kwargs,
+            try:
+                dataset_plan = _build_provider_dataset_plan(
+                    cfg=cfg,
+                    model_profile=model_profile,
                     console=console,
                     resolved_device=resolved_device,
-                    emit=_provider_event,
+                    profile=profile,
+                    profile_normalized=profile_normalized,
+                    requested_preview=requested_preview,
+                    requested_final=requested_final,
+                    effective_preview=effective_preview,
+                    effective_final=effective_final,
+                    pairing_schedule_present=bool(pairing_schedule),
+                    use_mlm=use_mlm,
+                    mask_prob=mask_prob,
+                    mask_seed=mask_seed,
+                    random_token_prob=random_token_prob,
+                    original_token_prob=original_token_prob,
+                    resolved_loss_type=resolved_loss_type,
+                    tier=tier,
+                    get_provider_fn=get_provider,
                 )
-            )
-
-            # Load tokenizer for dataset processing
-            try:
-                tokenizer, tokenizer_hash = resolve_tokenizer(model_profile)
+            except RuntimeError as err:
+                _fail_run(str(err))
             except (
                 ImportError,
                 ModuleNotFoundError,
                 AttributeError,
-                RuntimeError,
                 TypeError,
                 ValueError,
             ) as exc:
                 _event(console, "FAIL", str(exc), emoji="❌", profile=profile)
                 raise typer.Exit(1) from exc
 
-            dataset_stride = getattr(
-                cfg.dataset, "stride", getattr(cfg.dataset, "seq_len", 0) // 2
-            )
-            release_profile = (profile or "").lower() == "release"
-            if release_profile and not pairing_schedule:
-                estimate_fn = getattr(data_provider, "estimate_capacity", None)
-                if callable(estimate_fn):
-                    capacity_fast = bool(getattr(cfg.eval, "capacity_fast", False))
-                    capacity_meta = estimate_fn(
-                        tokenizer=tokenizer,
-                        seq_len=cfg.dataset.seq_len,
-                        stride=dataset_stride,
-                        split=resolved_split,
-                        target_total=requested_preview + requested_final,
-                        fast_mode=capacity_fast,
-                    )
-                    variance_policy = getattr(cfg.guards, "variance", None)
-                    max_calibration = (
-                        getattr(variance_policy, "max_calib", 0)
-                        if variance_policy is not None
-                        else 0
-                    )
-                    try:
-                        window_plan = _maybe_plan_release_windows(
-                            capacity_meta,
-                            requested_preview=requested_preview,
-                            requested_final=requested_final,
-                            max_calibration=max_calibration,
-                            console=console,
-                        )
-                    except RuntimeError as err:
-                        _event(console, "FAIL", str(err), emoji="❌", profile=profile)
-                        raise typer.Exit(1) from err
-
-                    actual_per_arm = int(window_plan["actual_preview"])
-                    effective_preview = actual_per_arm
-                    effective_final = actual_per_arm
-                    dataset_stride = getattr(
-                        cfg.dataset, "stride", getattr(cfg.dataset, "seq_len", 0)
-                    )
-                else:
-                    _event(
-                        console,
-                        "WARN",
-                        "Release profile requested but dataset provider does not expose capacity estimation; using configured window counts.",
-                        emoji="⚠️",
-                        profile=profile_normalized,
-                    )
-
-            preview_records: list[dict[str, Any]] = []
-            final_records: list[dict[str, Any]] = []
-
-            signature_transform = None
-            if use_mlm:
-
-                def _signature_transform(
-                    preview_records_in: list[dict[str, Any]],
-                    final_records_in: list[dict[str, Any]],
-                ) -> list[dict[str, Any]]:
-                    temp_preview_records = [
-                        {
-                            "input_ids": list(rec["input_ids"]),
-                            "attention_mask": list(rec["attention_mask"]),
-                            "dataset_index": rec.get("dataset_index"),
-                            "window_id": rec.get("window_id"),
-                        }
-                        for rec in preview_records_in
-                    ]
-                    temp_final_records = [
-                        {
-                            "input_ids": list(rec["input_ids"]),
-                            "attention_mask": list(rec["attention_mask"]),
-                            "dataset_index": rec.get("dataset_index"),
-                            "window_id": rec.get("window_id"),
-                        }
-                        for rec in final_records_in
-                    ]
-                    _apply_mlm_masks(
-                        temp_preview_records,
-                        tokenizer=tokenizer,
-                        mask_prob=mask_prob,
-                        seed=mask_seed,
-                        random_token_prob=random_token_prob,
-                        original_token_prob=original_token_prob,
-                        prefix="preview",
-                    )
-                    _apply_mlm_masks(
-                        temp_final_records,
-                        tokenizer=tokenizer,
-                        mask_prob=mask_prob,
-                        seed=mask_seed,
-                        random_token_prob=random_token_prob,
-                        original_token_prob=original_token_prob,
-                        prefix="final",
-                    )
-                    return temp_preview_records + temp_final_records
-
-                signature_transform = _signature_transform
-
-            try:
-                effective_windows = _resolve_effective_windows(
-                    data_provider=data_provider,
-                    tokenizer=tokenizer,
-                    seq_len=cfg.dataset.seq_len,
-                    stride=getattr(cfg.dataset, "stride", cfg.dataset.seq_len // 2),
-                    preview_n=effective_preview,
-                    final_n=effective_final,
-                    seed=getattr(cfg.dataset, "seed", 42),
-                    split=resolved_split,
-                    requested_preview=requested_preview,
-                    requested_final=requested_final,
+            for notice in dataset_plan.notices:
+                _event(
+                    console,
+                    notice.tag,
+                    notice.message,
+                    emoji=notice.emoji,
                     profile=profile_normalized,
-                    signature_transform=signature_transform,
-                    event_fn=lambda message: _event(
-                        console,
-                        "WARN",
-                        message,
-                        emoji="⚠️",
-                        profile=profile_normalized,
-                    ),
-                )
-            except RuntimeError as err:
-                _fail_run(str(err))
-
-            preview_records = effective_windows["preview_records"]
-            final_records = effective_windows["final_records"]
-            preview_count = int(effective_windows["actual_preview"])
-            final_count = int(effective_windows["actual_final"])
-            effective_preview = preview_count
-            effective_final = final_count
-
-            # Optional: provider-supplied labels for seq2seq
-            provider_labels_prev = None
-            provider_labels_fin = None
-            try:
-                provider_labels_prev = getattr(
-                    data_provider, "last_preview_labels", None
-                )
-                provider_labels_fin = getattr(data_provider, "last_final_labels", None)
-            except (AttributeError, TypeError):
-                provider_labels_prev = None
-                provider_labels_fin = None
-
-            for idx_local, rec in enumerate(preview_records):
-                if provider_labels_prev is not None and idx_local < len(
-                    provider_labels_prev
-                ):
-                    rec["labels"] = _tensor_or_list_to_ints(
-                        provider_labels_prev[idx_local]
-                    )
-
-            min_tokens_target = _resolve_pm_min_tokens_target(
-                tier=tier
-                or getattr(
-                    getattr(cfg, "auto", None),
-                    "tier",
-                    None,
-                ),
-                profile=profile,
-            )
-            tokens_floor_met = (
-                int(effective_windows["preview_total_tokens"])
-                + int(effective_windows["final_total_tokens"])
-            ) >= int(min_tokens_target)
-
-            if window_plan is None:
-                window_plan = {
-                    "profile": (profile or "").lower() or "default",
-                    "requested_preview": int(requested_preview),
-                    "requested_final": int(requested_final),
-                    "capacity": {},
-                }
-
-            window_plan["actual_preview"] = int(preview_count)
-            window_plan["actual_final"] = int(final_count)
-            window_plan["coverage_ok"] = (
-                window_plan.get("coverage_ok", True) and preview_count == final_count
-            )
-            window_plan["preview_total_tokens"] = int(
-                effective_windows["preview_total_tokens"]
-            )
-            window_plan["final_total_tokens"] = int(
-                effective_windows["final_total_tokens"]
-            )
-            window_plan["min_tokens_target"] = int(min_tokens_target)
-            window_plan["tokens_floor_met"] = bool(tokens_floor_met)
-            if effective_windows["dedupe_adjustments"]:
-                window_plan["dedupe_adjustments"] = list(
-                    effective_windows["dedupe_adjustments"]
                 )
 
-            calibration_data: list[dict[str, Any]] = []
-            preview_mask_total = 0
-            final_mask_total = 0
-            preview_mask_counts: list[int] = []
-            final_mask_counts: list[int] = []
-            if use_mlm:
-                preview_mask_total, preview_mask_counts = _apply_mlm_masks(
-                    preview_records,
-                    tokenizer=tokenizer,
-                    mask_prob=mask_prob,
-                    seed=mask_seed,
-                    random_token_prob=random_token_prob,
-                    original_token_prob=original_token_prob,
-                    prefix="preview",
-                )
-                final_mask_total, final_mask_counts = _apply_mlm_masks(
-                    final_records,
-                    tokenizer=tokenizer,
-                    mask_prob=mask_prob,
-                    seed=mask_seed,
-                    random_token_prob=random_token_prob,
-                    original_token_prob=original_token_prob,
-                    prefix="final",
-                )
-            else:
-                preview_mask_counts = [0] * len(preview_records)
-                final_mask_counts = [0] * len(final_records)
-
-            preview_sequences = [record["input_ids"] for record in preview_records]
-            for idx, record in enumerate(preview_records):
-                entry = {
-                    "input_ids": record["input_ids"],
-                    "attention_mask": record["attention_mask"],
-                    "window_id": f"preview::{idx}",
-                    "dataset_index": record.get("dataset_index"),
-                    "mlm_masked": record.get("mlm_masked", 0),
-                }
-                if use_mlm:
-                    entry["labels"] = record.get(
-                        "labels", [-100] * len(record["input_ids"])
-                    )
-                calibration_data.append(entry)
-
-            final_sequences = [record["input_ids"] for record in final_records]
-            for idx, record in enumerate(final_records):
-                entry = {
-                    "input_ids": record["input_ids"],
-                    "attention_mask": record["attention_mask"],
-                    "window_id": f"final::{idx}",
-                    "dataset_index": record.get("dataset_index"),
-                    "mlm_masked": record.get("mlm_masked", 0),
-                }
-                if use_mlm:
-                    entry["labels"] = record.get(
-                        "labels", [-100] * len(record["input_ids"])
-                    )
-                elif provider_labels_fin is not None and idx < len(provider_labels_fin):
-                    entry["labels"] = _tensor_or_list_to_ints(provider_labels_fin[idx])
-                calibration_data.append(entry)
-
-            masked_tokens_total = preview_mask_total + final_mask_total
-            preview_hash = _hash_sequences(preview_sequences)
-            final_hash = _hash_sequences(final_sequences)
-            dataset_meta = {
-                "tokenizer_name": getattr(tokenizer, "name_or_path", "unknown"),
-                "tokenizer_hash": tokenizer_hash
-                if tokenizer_hash is not None
-                else _tokenizer_digest(tokenizer),
-                "vocab_size": _safe_int(getattr(tokenizer, "vocab_size", 0)),
-                "bos_token": getattr(tokenizer, "bos_token", None),
-                "eos_token": getattr(tokenizer, "eos_token", None),
-                "pad_token": getattr(tokenizer, "pad_token", None),
-                "add_prefix_space": getattr(tokenizer, "add_prefix_space", None),
-                "dataset_hash": hashlib.blake2s(
-                    (preview_hash + final_hash).encode("utf-8"), digest_size=16
-                ).hexdigest(),
-                "preview_hash": preview_hash,
-                "final_hash": final_hash,
-                "preview_total_tokens": int(effective_windows["preview_total_tokens"]),
-                "final_total_tokens": int(effective_windows["final_total_tokens"]),
-                "min_tokens_target": int(min_tokens_target),
-                "tokens_floor_met": bool(tokens_floor_met),
-            }
-            dataset_meta["loss_type"] = resolved_loss_type
-            if use_mlm:
-                dataset_meta["masked_tokens_preview"] = int(preview_mask_total)
-                dataset_meta["masked_tokens_final"] = int(final_mask_total)
-                dataset_meta["masked_tokens_total"] = int(masked_tokens_total)
-            if window_plan:
-                dataset_meta["window_plan"] = window_plan
-                capacity_meta = window_plan.get("capacity")
-                if capacity_meta:
-                    dataset_meta["window_capacity"] = capacity_meta
-            strat_stats = getattr(data_provider, "stratification_stats", None)
-            if strat_stats:
-                dataset_meta["stratification"] = strat_stats
-            scorer_profile = getattr(data_provider, "scorer_profile", None)
-            if scorer_profile:
-                dataset_meta["scorer_profile"] = scorer_profile
+            resolved_split = dataset_plan.resolved_split
+            used_fallback_split = dataset_plan.used_fallback_split
+            tokenizer = dataset_plan.tokenizer
+            tokenizer_hash = dataset_plan.tokenizer_hash
+            calibration_data = dataset_plan.calibration_data
+            dataset_meta = dataset_plan.dataset_meta
+            window_plan = dataset_plan.window_plan
+            preview_count = dataset_plan.preview_count
+            final_count = dataset_plan.final_count
+            effective_preview = dataset_plan.effective_preview
+            effective_final = dataset_plan.effective_final
+            preview_mask_counts = dataset_plan.preview_mask_counts
+            final_mask_counts = dataset_plan.final_mask_counts
+            preview_records = dataset_plan.preview_records
+            final_records = dataset_plan.final_records
 
         try:
             run_context["dataset"]["preview_n"] = preview_count
@@ -1490,59 +823,12 @@ def run_command_impl(
         )
         runner = CoreRunner()
 
-        # Prepare auto configuration for tier resolution
-        # Build auto configuration with safe fallbacks when section/keys are absent
-        try:
-            auto_enabled = bool(cfg.auto.enabled)
-        except NON_FATAL_RUNTIME_EXCEPTIONS:
-            auto_enabled = False
-        try:
-            auto_tier = cfg.auto.tier
-        except NON_FATAL_RUNTIME_EXCEPTIONS:
-            auto_tier = "balanced"
-        try:
-            auto_probes = int(cfg.auto.probes)
-        except NON_FATAL_RUNTIME_EXCEPTIONS:
-            auto_probes = 0
-        try:
-            auto_target_ratio = float(cfg.auto.target_pm_ratio)
-        except NON_FATAL_RUNTIME_EXCEPTIONS:
-            auto_target_ratio = 2.0
-
-        auto_config = {
-            "enabled": auto_enabled,
-            "tier": auto_tier,
-            "probes": auto_probes,
-            "target_pm_ratio": auto_target_ratio,
-        }
-
-        # Extract edit configuration parameters
-        edit_config = {}
-        if hasattr(cfg.edit, "plan") and cfg.edit.plan:
-            try:
-                # Accept plain dicts, dict-like wrappers, or nested objects
-                plan_obj = getattr(cfg.edit, "plan", {})
-                if isinstance(plan_obj, dict):
-                    edit_config = dict(plan_obj)
-                else:
-                    # Best-effort unwrap for InvarLockConfig _Obj wrapper
-                    plan_data = getattr(plan_obj, "_data", None)
-                    if isinstance(plan_data, dict):
-                        edit_config = dict(plan_data)
-                    elif hasattr(plan_obj, "items"):
-                        edit_config = dict(plan_obj)  # type: ignore[arg-type]
-            except (TypeError, AttributeError):
-                pass
-
-        if (
-            model_profile.module_selectors
-            and "module_selectors" not in edit_config
-            and isinstance(model_profile.module_selectors, dict)
-        ):
-            edit_config["module_selectors"] = {
-                key: list(values)
-                for key, values in model_profile.module_selectors.items()
-            }
+        execution_payloads = _build_run_execution_config_payloads(
+            cfg=cfg,
+            model_profile=model_profile,
+        )
+        auto_config = execution_payloads.auto_config
+        edit_config = execution_payloads.edit_config
 
         console.print(_format_kv_line("Edit", str(edit_op.name)))
         console.print(_format_kv_line("Guards", _format_guard_chain(guards)))
@@ -1917,23 +1203,11 @@ def run_command_impl(
 
             # Persist minimal run context for evaluation report provenance.
             try:
-                run_policy_context = (
-                    dict(run_context.get("run"))
-                    if isinstance(run_context.get("run"), dict)
-                    else {}
+                report["context"] = _build_run_report_context(
+                    profile_normalized=profile_normalized,
+                    auto_config=auto_config,
+                    run_context=run_context,
                 )
-                eval_policy_context = (
-                    dict(run_context.get("eval"))
-                    if isinstance(run_context.get("eval"), dict)
-                    else {}
-                )
-                report["context"] = {
-                    "profile": profile_normalized,
-                    "auto": dict(auto_config),
-                    "assurance": dict(run_context.get("assurance") or {}),
-                    "run": run_policy_context,
-                    "eval": eval_policy_context,
-                }
             except (TypeError, ValueError, KeyError):
                 pass
 
@@ -2024,60 +1298,40 @@ def run_command_impl(
             except (AttributeError, RuntimeError, TypeError, ValueError, OSError):
                 env_flags = {}
 
-            meta_payload = {
-                "model_id": cfg.model.id,
-                "adapter": cfg.model.adapter,
-                "device": str(resolved_device),
-                "commit": commit_value,
-                "seed": seed_bundle["python"],
-                "seeds": seed_bundle,
-                "ts": datetime.now().isoformat(),
-                "auto": auto_config,
-            }
-            if invarlock_version:
-                meta_payload["invarlock_version"] = invarlock_version
-            if env_flags:
-                meta_payload["env_flags"] = env_flags
-            if determinism_meta:
-                meta_payload["determinism"] = determinism_meta
-            report["meta"].update(meta_payload)
-            if pm_acceptance_range:
-                report["meta"]["pm_acceptance_range"] = pm_acceptance_range
-            if pm_drift_band:
-                report["meta"]["pm_drift_band"] = pm_drift_band
-            report["meta"]["guard_overhead_threshold"] = guard_overhead_threshold
-            report["meta"]["model_profile"] = {
-                "family": model_profile.family,
-                "default_loss": model_profile.default_loss,
-                "module_selectors": model_profile.module_selectors,
-                "invariants": list(model_profile.invariants),
-                "cert_lints": [dict(lint) for lint in model_profile.cert_lints],
-            }
+            report["meta"].update(
+                _build_run_report_meta(
+                    model_id=cfg.model.id,
+                    adapter=cfg.model.adapter,
+                    resolved_device=resolved_device,
+                    commit_value=commit_value,
+                    seed_bundle=seed_bundle,
+                    auto_config=auto_config,
+                    guard_overhead_threshold=guard_overhead_threshold,
+                    model_profile=model_profile,
+                    timestamp=datetime.now().isoformat(),
+                    invarlock_version=invarlock_version,
+                    env_flags=env_flags,
+                    determinism_meta=determinism_meta,
+                    pm_acceptance_range=pm_acceptance_range,
+                    pm_drift_band=pm_drift_band,
+                )
+            )
 
             dataset_provider = getattr(cfg.dataset, "provider", None)
             if dataset_provider is None:
                 dataset_provider = getattr(cfg.dataset, "dataset", None)
-            report["data"].update(
-                {
-                    "dataset": _canonical_dataset_id(dataset_provider),
-                    # Resolved split (explicit or inferred)
-                    "split": resolved_split,
-                    "seq_len": cfg.dataset.seq_len,
-                    "stride": getattr(cfg.dataset, "stride", cfg.dataset.seq_len // 2),
-                    "preview_n": _safe_int(preview_count),
-                    "final_n": _safe_int(final_count),
-                }
-            )
             dataset_meta_context = core_report.context.get("dataset_meta", {})
-            if isinstance(dataset_meta_context, dict):
-                report["data"].update(dataset_meta_context)
-                dataset_tokenizer_hash = dataset_meta_context.get("tokenizer_hash")
-                if (
-                    not tokenizer_hash
-                    and isinstance(dataset_tokenizer_hash, str)
-                    and dataset_tokenizer_hash
-                ):
-                    tokenizer_hash = dataset_tokenizer_hash
+            data_payload, tokenizer_hash = _build_run_report_data(
+                canonical_dataset_id=_canonical_dataset_id(dataset_provider),
+                resolved_split=resolved_split,
+                seq_len=cfg.dataset.seq_len,
+                stride=getattr(cfg.dataset, "stride", cfg.dataset.seq_len // 2),
+                preview_count=_safe_int(preview_count),
+                final_count=_safe_int(final_count),
+                dataset_meta_context=dataset_meta_context,
+                tokenizer_hash=tokenizer_hash,
+            )
+            report["data"].update(data_payload)
 
             if tokenizer_hash:
                 report["meta"]["tokenizer_hash"] = tokenizer_hash
@@ -2085,335 +1339,96 @@ def run_command_impl(
             # Snapshot/restore provenance (survives retries).
             try:
                 prov = report.setdefault("provenance", {})
-                prov["restore_failed"] = bool(snapshot_provenance.get("restore_failed"))
-                prov["reload_path_used"] = bool(
-                    snapshot_provenance.get("reload_path_used")
-                )
+                prov.update(_build_snapshot_provenance(snapshot_provenance))
             except (TypeError, KeyError):
                 pass
 
             # Transfer edit information
-            if hasattr(core_report, "edit") and core_report.edit:
-                edit_deltas = core_report.edit.get("deltas", {})
-                report["edit"].update(
-                    {
-                        "name": edit_op.name,
-                        "plan_digest": core_report.edit.get(
-                            "plan_digest", str(hash(str(core_report.edit)))
-                        ),
-                        "deltas": {
-                            "params_changed": edit_deltas.get("params_changed", 0),
-                            "sparsity": edit_deltas.get("sparsity", None),
-                            "bitwidth_map": edit_deltas.get("bitwidth_map", None),
-                            "layers_modified": edit_deltas.get("layers_modified", 0),
-                        },
-                    }
-                )
-                for key in (
-                    "algorithm",
-                    "algorithm_version",
-                    "implementation",
-                    "scope",
-                    "ranking",
-                    "grouping",
-                    "budgets",
-                    "seed",
-                    "mask_digest",
-                ):
-                    if key in core_report.edit:
-                        report["edit"][key] = copy.deepcopy(core_report.edit[key])
-                if isinstance(core_report.context, dict):
-                    core_report.context.setdefault("edit", {})
-                    core_report.context["edit"].update(
-                        {
-                            "name": edit_op.name,
-                            "params_changed": edit_deltas.get("params_changed", 0),
-                            "layers_modified": edit_deltas.get("layers_modified", 0),
-                        }
-                    )
-
-            if edit_label:
-                report.setdefault("edit", {})
-                report["edit"]["name"] = edit_label
-                report["edit"]["algorithm"] = edit_label
-                if isinstance(core_report.context, dict):
-                    core_report.context.setdefault("edit", {})
-                    core_report.context["edit"]["name"] = edit_label
+            edit_payload, context_edit = _build_edit_payload(
+                core_edit=(
+                    core_report.edit
+                    if hasattr(core_report, "edit")
+                    and isinstance(core_report.edit, dict)
+                    else None
+                ),
+                edit_name=edit_op.name,
+                edit_label=edit_label,
+            )
+            if edit_payload:
+                report["edit"].update(edit_payload)
+            if context_edit and isinstance(core_report.context, dict):
+                core_report.context.setdefault("edit", {})
+                core_report.context["edit"].update(context_edit)
 
             mask_artifact_path = _persist_ref_masks(core_report, run_dir)
-            if mask_artifact_path:
-                report.setdefault("artifacts", {})
-                report["artifacts"]["masks_path"] = str(mask_artifact_path)
+            report["artifacts"].update(
+                _build_artifacts_payload(
+                    event_path=run_config.event_path,
+                    mask_artifact_path=mask_artifact_path,
+                )
+            )
 
             # Transfer metrics (PM-only: do not write ppl_* fields)
             if hasattr(core_report, "metrics") and core_report.metrics:
-                if isinstance(core_report.metrics, dict):
-                    core_timings = core_report.metrics.get("timings")
-                    if isinstance(core_timings, dict):
-                        for key in (
-                            "prepare",
-                            "prepare_guards",
-                            "edit",
-                            "guards",
-                            "eval",
-                            "finalize",
-                        ):
-                            if key in core_timings:
-                                try:
-                                    timings[key] = float(core_timings[key])
-                                except NUMERIC_EXCEPTIONS:
-                                    timings[key] = core_timings[key]
-                metrics_payload = {
-                    "latency_ms_per_tok": core_report.metrics.get(
-                        "latency_ms_per_tok", 0.0
-                    ),
-                    "memory_mb_peak": core_report.metrics.get("memory_mb_peak", 0.0),
-                    "spectral": {},
-                    "rmt": {},
-                    "invariants": {},
-                }
-                window_plan_ctx = core_report.context.get("window_plan")
-                if isinstance(window_plan_ctx, dict):
-                    metrics_payload["window_plan"] = window_plan_ctx
-                    capacity_meta = window_plan_ctx.get("capacity")
-                    if isinstance(capacity_meta, dict):
-                        metrics_payload["window_capacity"] = capacity_meta
-                    stats_section = metrics_payload.setdefault("stats", {})
-                    if isinstance(stats_section, dict):
-                        stats_section.update(
-                            {
-                                "requested_preview": window_plan_ctx.get(
-                                    "requested_preview"
-                                ),
-                                "requested_final": window_plan_ctx.get(
-                                    "requested_final"
-                                ),
-                                "actual_preview": window_plan_ctx.get("actual_preview"),
-                                "actual_final": window_plan_ctx.get("actual_final"),
-                                "coverage_ok": window_plan_ctx.get("coverage_ok"),
-                                "preview_total_tokens": window_plan_ctx.get(
-                                    "preview_total_tokens"
-                                ),
-                                "final_total_tokens": window_plan_ctx.get(
-                                    "final_total_tokens"
-                                ),
-                                "min_tokens_target": window_plan_ctx.get(
-                                    "min_tokens_target"
-                                ),
-                                "tokens_floor_met": window_plan_ctx.get(
-                                    "tokens_floor_met"
-                                ),
-                                "dedupe_adjustments": window_plan_ctx.get(
-                                    "dedupe_adjustments"
-                                ),
-                            }
-                        )
-                optional_keys = [
-                    "logloss_preview",
-                    "logloss_final",
-                    "logloss_delta",
-                    "logloss_preview_ci",
-                    "logloss_final_ci",
-                    "logloss_delta_ci",
-                    "bootstrap",
-                    "window_overlap_fraction",
-                    "window_match_fraction",
-                    "window_pairing_reason",
-                    "window_pairing_preview",
-                    "window_pairing_final",
-                    "paired_windows",
-                    "paired_delta_summary",
-                    "primary_metric_tail",
-                    "preview_total_tokens",
-                    "final_total_tokens",
-                    "masked_tokens_total",
-                    "masked_tokens_preview",
-                    "masked_tokens_final",
-                    "timings",
-                    "guard_timings",
-                    "memory_snapshots",
-                    "gpu_memory_mb_peak",
-                    "gpu_memory_reserved_mb_peak",
-                    "reduction",
-                ]
-                for key in optional_keys:
-                    if key in core_report.metrics:
-                        metrics_payload[key] = core_report.metrics[key]
-                metrics_payload["loss_type"] = resolved_loss_type
-                if metrics_payload.get("loss_type") is None and isinstance(
-                    dataset_meta_context, dict
-                ):
-                    metrics_payload["loss_type"] = dataset_meta_context.get(
-                        "loss_type", resolved_loss_type
-                    )
-                if isinstance(dataset_meta_context, dict):
-                    for meta_key in (
-                        "masked_tokens_total",
-                        "masked_tokens_preview",
-                        "masked_tokens_final",
-                    ):
-                        if (
-                            meta_key not in metrics_payload
-                            and dataset_meta_context.get(meta_key) is not None
-                        ):
-                            metrics_payload[meta_key] = dataset_meta_context[meta_key]
+                timings = _merge_core_timing_metrics(timings, core_report.metrics)
+                metrics_payload = _build_metrics_payload(
+                    core_metrics=core_report.metrics,
+                    window_plan_context=core_report.context.get("window_plan"),
+                    dataset_meta_context=dataset_meta_context,
+                    resolved_loss_type=resolved_loss_type,
+                )
                 report["metrics"].update(metrics_payload)
 
             if guard_overhead_payload is not None:
-                if bool(guard_overhead_payload.get("skipped", False)):
-                    report["guard_overhead"] = guard_overhead_payload
-                else:
-                    # Compute guarded primary-metric snapshot; pass structured reports into validator
-                    try:
-                        # Map loss type to ppl family kind
-                        lk = str(resolved_loss_type or "causal").lower()
-                        if lk == "mlm":
-                            pm_kind_for_overhead = "ppl_mlm"
-                        elif lk in {"seq2seq", "s2s", "t5"}:
-                            pm_kind_for_overhead = "ppl_seq2seq"
-                        else:
-                            pm_kind_for_overhead = "ppl_causal"
-
-                        # Prefer computing from the in-memory core_report windows to avoid ordering issues
-                        pm_guarded = _extract_pm_snapshot_for_overhead(
-                            core_report, kind=pm_kind_for_overhead
-                        )
-                        if not isinstance(pm_guarded, dict) or not pm_guarded:
-                            pm_guarded = _extract_pm_snapshot_for_overhead(
-                                report, kind=pm_kind_for_overhead
-                            )
-
-                        guard_overhead_payload["guarded_report"] = (
-                            {"metrics": {"primary_metric": pm_guarded}}
-                            if isinstance(pm_guarded, dict) and pm_guarded
-                            else None
-                        )
-                    except (AttributeError, TypeError, ValueError):
-                        guard_overhead_payload["guarded_report"] = None
-                    bare_struct = guard_overhead_payload.get("bare_report") or {}
-                    guarded_struct = guard_overhead_payload.get("guarded_report") or {}
-                    # Be robust to mocks or minimal objects returned by validators
-                    result = validate_guard_overhead(
-                        bare_struct,
-                        guarded_struct,
-                        overhead_threshold=guard_overhead_payload.get(
-                            "overhead_threshold", guard_overhead_threshold
-                        ),
-                    )
-                    guard_overhead_payload = _finalize_guard_overhead_payload(
-                        guard_overhead_payload,
-                        result,
-                    )
-                    report["guard_overhead"] = guard_overhead_payload
+                report["guard_overhead"] = _prepare_guard_overhead_report(
+                    guard_overhead_payload,
+                    resolved_loss_type=resolved_loss_type,
+                    core_report=core_report,
+                    report=report,
+                    default_threshold=guard_overhead_threshold,
+                )
 
             had_baseline = bool(baseline and Path(baseline).exists())
-            serialized_evaluation_windows = _serialize_evaluation_windows(
-                getattr(core_report, "evaluation_windows", None)
-            )
-            if serialized_evaluation_windows:
-                report["evaluation_windows"] = serialized_evaluation_windows
-            elif had_baseline and (profile or "").lower() in {"ci", "release"}:
-                _event(
-                    console,
-                    "FAIL",
-                    "[INVARLOCK:E001] PAIRING-SCHEDULE-MISMATCH: baseline pairing requested but evaluation windows were not produced. Check capacity/pairing config.",
-                    emoji="❌",
-                    profile=profile_normalized,
-                )
-                raise typer.Exit(3)
-            else:
-                # Populate evaluation_windows directly from assembled records when the
-                # runner did not provide a structured window payload. This ensures
-                # provenance (provider_digest) can be computed even in lightweight/dev
-                # runs and unit tests that stub the runner.
-                try:
-                    report["evaluation_windows"] = _build_fallback_evaluation_windows(
-                        preview_records,
-                        final_records,
-                        use_mlm=use_mlm,
-                        preview_mask_counts=preview_mask_counts,
-                        final_mask_counts=final_mask_counts,
-                    )
-                except NON_FATAL_RUNTIME_EXCEPTIONS:
-                    # Best-effort: provenance digest will be skipped if windows cannot be built
-                    pass
-
-            # Attach provider digest and dataset split provenance when available
             try:
-                prov = report.setdefault("provenance", {})
-                # Always record dataset split provenance for visibility
-                try:
-                    prov["dataset_split"] = str(resolved_split)
-                    prov["split_fallback"] = bool(used_fallback_split)
-                except (TypeError, ValueError):
-                    pass
-                provider_digest = _compute_provider_digest(report)
-                if provider_digest:
-                    prov["provider_digest"] = provider_digest
-                    # Attach digest version for future evolution
-                    prov["digest_version"] = 1
-                    # Strict parity checks in CI/Release when baseline present
-                    try:
-                        if isinstance(baseline_report_data, dict):
-                            base_digest = None
-                            base_prov = baseline_report_data.get("provenance")
-                            if isinstance(base_prov, dict):
-                                base_pd = base_prov.get("provider_digest")
-                                if isinstance(base_pd, dict):
-                                    base_digest = base_pd
-                            if base_digest is None:
-                                base_digest = _compute_provider_digest(
-                                    baseline_report_data
-                                )
-                            _enforce_provider_parity(
-                                provider_digest,
-                                base_digest,
-                                profile=(str(profile).lower() if profile else None),
-                            )
-                    except InvarlockError as ce:
-                        console.print(str(ce))
-                        # Map to profile-aware exit code: dev→1, ci/release→3
-                        raise typer.Exit(
-                            _resolve_exit_code(ce, profile=profile)
-                        ) from None
-                    except RuntimeError as _e:
-                        _fail_run(str(_e))
-                    except NON_FATAL_RUNTIME_EXCEPTIONS:
-                        pass
+                provenance_result = _finalize_run_provenance(
+                    report=report,
+                    core_report=core_report,
+                    preview_records=preview_records,
+                    final_records=final_records,
+                    use_mlm=use_mlm,
+                    preview_mask_counts=preview_mask_counts,
+                    final_mask_counts=final_mask_counts,
+                    had_baseline=had_baseline,
+                    profile=profile,
+                    resolved_split=resolved_split,
+                    used_fallback_split=used_fallback_split,
+                    baseline_report_data=baseline_report_data,
+                )
+                if provenance_result.missing_evaluation_windows_for_baseline:
+                    _event(
+                        console,
+                        "FAIL",
+                        provenance_result.missing_evaluation_windows_message
+                        or "[INVARLOCK:E001] PAIRING-SCHEDULE-MISMATCH: baseline pairing requested but evaluation windows were not produced. Check capacity/pairing config.",
+                        emoji="❌",
+                        profile=profile_normalized,
+                    )
+                    raise typer.Exit(3)
+            except InvarlockError as ce:
+                console.print(str(ce))
+                raise typer.Exit(_resolve_exit_code(ce, profile=profile)) from None
+            except RuntimeError as _e:
+                _fail_run(str(_e))
             except (typer.Exit, SystemExit, click.exceptions.Exit):
                 raise
-            except NON_FATAL_RUNTIME_EXCEPTIONS:
-                pass
 
-            # Transfer guard results
-            if hasattr(core_report, "guards") and core_report.guards:
-                for guard_name, guard_result in core_report.guards.items():
-                    guard_entry = {
-                        "name": guard_name,
-                        "passed": guard_result.get("passed"),
-                        "action": guard_result.get("action"),
-                        "policy": guard_result.get("policy", {}),
-                        "metrics": guard_result.get("metrics", {}),
-                        "actions": guard_result.get("actions", []),
-                        "violations": guard_result.get("violations", []),
-                        "warnings": guard_result.get("warnings", []),
-                        "errors": guard_result.get("errors", []),
-                        "details": guard_result.get("details", {}),
-                    }
-                    for extra_key in ("final_z_scores", "module_family_map"):
-                        if extra_key in guard_result:
-                            guard_entry[extra_key] = guard_result[extra_key]
-                    report["guards"].append(guard_entry)
-
-            # Set artifacts
-            report["artifacts"].update(
-                {
-                    "events_path": str(run_config.event_path)
-                    if run_config.event_path
-                    else "",
-                    "logs_path": "",
-                    "checkpoint_path": None,
-                }
+            report["guards"].extend(
+                _build_guard_entries(
+                    core_report.guards
+                    if hasattr(core_report, "guards")
+                    and isinstance(core_report.guards, dict)
+                    else None
+                )
             )
 
             # Optional: export HF-loadable model snapshot when requested
@@ -2506,329 +1521,51 @@ def run_command_impl(
                         profile=profile_normalized,
                     )
 
-            # Set flags
             report["flags"].update(
-                {
-                    "guard_recovered": any(
-                        not g.get("passed", True)
-                        for g in core_report.guards.values()
-                        if hasattr(core_report, "guards") and core_report.guards
-                    ),
-                    "rollback_reason": None,
-                }
+                _build_flags_payload(
+                    core_report.guards
+                    if hasattr(core_report, "guards")
+                    and isinstance(core_report.guards, dict)
+                    else None
+                )
             )
 
-            metrics_section = report.get("metrics", {}) or {}
-            data_section = report.get("data", {}) or {}
-            preview_count_report = data_section.get("preview_n")
-            final_count_report = data_section.get("final_n")
-
-            # Classification metric (accuracy) — deterministic smoke path
-            # If loss type is explicitly 'classification', derive accuracy
-            # counts from evaluation windows using a deterministic label rule.
-            try:
-                loss_type_ctx = (
-                    run_config.context.get("eval", {})
-                    .get("loss", {})
-                    .get("resolved_type")
-                )
-            except (AttributeError, TypeError, KeyError):
-                loss_type_ctx = None
-            if str(loss_type_ctx).lower() == "classification":
-                try:
-                    from invarlock.eval.primary_metric import compute_accuracy_counts
-
-                    # Prefer in-memory core_report.evaluation_windows (includes input_ids)
-                    ew = {}
-                    try:
-                        if hasattr(core_report, "evaluation_windows") and isinstance(
-                            core_report.evaluation_windows, dict
-                        ):
-                            ew = core_report.evaluation_windows  # type: ignore[assignment]
-                    except (AttributeError, TypeError):
-                        ew = {}
-                    if not ew:
-                        # Fallback to the soon-to-be persisted report windows (may lack input_ids)
-                        ew = (
-                            report.get("evaluation_windows", {})
-                            if isinstance(report.get("evaluation_windows"), dict)
-                            else {}
-                        )
-                    prev_rec = []
-                    fin_rec = []
-                    if isinstance(ew, dict):
-                        prev = ew.get("preview", {})
-                        fin = ew.get("final", {})
-                        if isinstance(prev, dict):
-                            prev_rec = [
-                                {"input_ids": seq}
-                                for seq in prev.get("input_ids", []) or []
-                                if isinstance(seq, list)
-                            ]
-                        if isinstance(fin, dict):
-                            fin_rec = [
-                                {"input_ids": seq}
-                                for seq in fin.get("input_ids", []) or []
-                                if isinstance(seq, list)
-                            ]
-                    c_prev, n_prev = compute_accuracy_counts(prev_rec)
-                    c_fin, n_fin = compute_accuracy_counts(fin_rec)
-                    # If we could not derive counts (no windows persisted), fall back to
-                    # deterministic pseudo-accuracy based on configured window counts.
-                    used_pseudo_counts = False
-                    if n_prev == 0 and n_fin == 0:
-                        try:
-                            prev_n_cfg = getattr(cfg.dataset, "preview_n", None)
-                            fin_n_cfg = getattr(cfg.dataset, "final_n", None)
-                        except (AttributeError, TypeError):
-                            prev_n_cfg = None
-                            fin_n_cfg = None
-                        try:
-                            prev_n = int(preview_count_report or prev_n_cfg or 0)
-                            fin_n = int(final_count_report or fin_n_cfg or 0)
-                        except NUMERIC_EXCEPTIONS:
-                            prev_n = 0
-                            fin_n = 0
-                        c_prev, n_prev = (prev_n, prev_n) if prev_n > 0 else (0, 0)
-                        c_fin, n_fin = (fin_n, fin_n) if fin_n > 0 else (0, 0)
-                        used_pseudo_counts = prev_n > 0 or fin_n > 0
-                    classification_metrics = {
-                        "preview": {"correct_total": int(c_prev), "total": int(n_prev)},
-                        "final": {"correct_total": int(c_fin), "total": int(n_fin)},
-                    }
-                    # Tag source of counts for downstream rendering/doctor
-                    if used_pseudo_counts:
-                        classification_metrics["counts_source"] = "pseudo_config"
-                        # Add a provenance crumb for transparency
-                        try:
-                            prov = report.setdefault("provenance", {})
-                            notes = prov.setdefault("metric_notes", [])
-                            if isinstance(notes, list):
-                                notes.append(
-                                    "accuracy: pseudo counts from preview_n/final_n"
-                                )
-                        except (TypeError, KeyError, AttributeError):
-                            pass
-                    else:
-                        classification_metrics["counts_source"] = "measured"
-                    report.setdefault("metrics", {})["classification"] = (
-                        classification_metrics
-                    )
-                    # Convenience: top-level accuracy (final)
-                    if n_fin > 0:
-                        report["metrics"]["accuracy"] = float(c_fin / n_fin)
-                except (
-                    ImportError,
-                    ModuleNotFoundError,
-                    AttributeError,
-                    TypeError,
-                    ValueError,
-                    RuntimeError,
-                ):
-                    pass
-
-            match_fraction = metrics_section.get("window_match_fraction")
-            if match_fraction is not None and not math.isclose(
-                match_fraction, 1.0, rel_tol=0.0, abs_tol=1e-9
-            ):
+            debug_metric_diffs_enabled = str(
+                os.environ.get("DEBUG_METRIC_DIFFS", "")
+            ).strip().lower() in {"1", "true", "yes", "on"}
+            metrics_enrichment = _enrich_run_report_metrics(
+                report=report,
+                core_report=core_report,
+                run_config=run_config,
+                cfg=cfg,
+                model_profile=model_profile,
+                baseline_requested=bool(baseline),
+                baseline_report_data=baseline_report_data,
+                metric_kind=metric_kind,
+                resolved_loss_type=resolved_loss_type,
+                effective_preview=effective_preview,
+                effective_final=effective_final,
+                profile_normalized=profile_normalized,
+                window_plan=window_plan,
+                debug_metric_diffs_enabled=debug_metric_diffs_enabled,
+            )
+            pairing_violations = metrics_enrichment.pairing_violations
+            if pairing_violations:
+                violation = pairing_violations[0]
                 err = InvarlockError(
-                    code="E001",
-                    message=(
-                        f"PAIRING-SCHEDULE-MISMATCH: window_match_fraction={match_fraction:.3f}"
-                    ),
-                    details={"window_match_fraction": float(match_fraction)},
+                    code=violation.code,
+                    message=violation.message,
+                    details=violation.details,
                 )
                 code = _resolve_exit_code(err, profile=profile_normalized)
                 console.print(f"[red]{err}[/red]")
                 raise typer.Exit(code)
-
-            overlap_fraction = metrics_section.get("window_overlap_fraction")
-            if overlap_fraction is not None and overlap_fraction > 1e-9:
-                err = InvarlockError(
-                    code="E001",
-                    message=(
-                        f"PAIRING-SCHEDULE-MISMATCH: window_overlap_fraction={overlap_fraction:.3f}"
-                    ),
-                    details={"window_overlap_fraction": float(overlap_fraction)},
+            if metrics_enrichment.debug_diffs_line:
+                console.print(
+                    "[dim]DEBUG_METRIC_DIFFS: "
+                    + metrics_enrichment.debug_diffs_line
+                    + "[/dim]"
                 )
-                code = _resolve_exit_code(err, profile=profile_normalized)
-                console.print(f"[red]{err}[/red]")
-                raise typer.Exit(code)
-
-            # Paired-run enforcement: baseline provided must be truly paired in CI/Release.
-            if baseline and profile_normalized in {"ci", "release"}:
-                pairing_reason = metrics_section.get("window_pairing_reason")
-                if pairing_reason is not None:
-                    err = InvarlockError(
-                        code="E001",
-                        message=(
-                            "PAIRING-SCHEDULE-MISMATCH: baseline pairing requested but run was not paired "
-                            f"(window_pairing_reason={pairing_reason})"
-                        ),
-                        details={"window_pairing_reason": pairing_reason},
-                    )
-                    code = _resolve_exit_code(err, profile=profile_normalized)
-                    console.print(f"[red]{err}[/red]")
-                    raise typer.Exit(code)
-
-                paired_windows_val = metrics_section.get("paired_windows")
-                paired_windows_int = None
-                try:
-                    if paired_windows_val is not None and not isinstance(
-                        paired_windows_val, bool
-                    ):
-                        paired_windows_int = int(paired_windows_val)
-                except NUMERIC_EXCEPTIONS:
-                    paired_windows_int = None
-                if paired_windows_int is None or paired_windows_int <= 0:
-                    err = InvarlockError(
-                        code="E001",
-                        message=(
-                            "PAIRED-WINDOWS-COLLAPSED: paired_windows<=0 under paired baseline. "
-                            "Check device stability, dataset windows, or edit scope."
-                        ),
-                        details={
-                            "paired_windows": paired_windows_val,
-                            "profile": profile_normalized,
-                        },
-                    )
-                    code = _resolve_exit_code(err, profile=profile_normalized)
-                    console.print(f"[red]{err}[/red]")
-                    raise typer.Exit(code)
-
-            expected_preview = effective_preview or getattr(
-                cfg.dataset, "preview_n", preview_count_report
-            )
-            expected_final = effective_final or getattr(
-                cfg.dataset, "final_n", final_count_report
-            )
-            if (
-                preview_count_report is not None
-                and expected_preview is not None
-                and int(preview_count_report) != int(expected_preview)
-            ) or (
-                final_count_report is not None
-                and expected_final is not None
-                and int(final_count_report) != int(expected_final)
-            ):
-                err = InvarlockError(
-                    code="E001",
-                    message=(
-                        "PAIRING-SCHEDULE-MISMATCH: counts do not match configuration after stratification"
-                    ),
-                    details={
-                        "preview_used": int(preview_count_report or -1),
-                        "preview_expected": int(expected_preview or -1),
-                        "final_used": int(final_count_report or -1),
-                        "final_expected": int(expected_final or -1),
-                    },
-                )
-                code = _resolve_exit_code(err, profile=profile_normalized)
-                console.print(f"[red]{err}[/red]")
-                raise typer.Exit(code)
-
-            # Compute metric-v1 snapshot (primary_metric) — canonical path
-            try:
-                metric_kind_resolved, _provider_kind, metric_opts = (
-                    _resolve_metric_and_provider(
-                        cfg,
-                        model_profile,
-                        resolved_loss_type=resolved_loss_type,
-                        metric_kind_override=metric_kind,
-                    )
-                )
-                if metric_kind_resolved:
-                    from invarlock.eval.primary_metric import (
-                        compute_primary_metric_from_report,
-                    )
-
-                    pm = compute_primary_metric_from_report(
-                        report, kind=metric_kind_resolved, baseline=baseline_report_data
-                    )
-                    core_primary_metric = None
-                    if hasattr(core_report, "metrics") and isinstance(
-                        core_report.metrics, dict
-                    ):
-                        core_primary_metric = core_report.metrics.get("primary_metric")
-                    pm = _merge_primary_metric_health(pm, core_primary_metric)
-                    report.setdefault("metrics", {})["primary_metric"] = pm
-                    # Attach configured reps/ci_level when provided
-                    if metric_opts:
-                        try:
-                            if "reps" in metric_opts:
-                                report["metrics"]["primary_metric"]["reps"] = int(
-                                    metric_opts["reps"]
-                                )  # type: ignore[index]
-                            if "ci_level" in metric_opts:
-                                report["metrics"]["primary_metric"]["ci_level"] = float(
-                                    metric_opts["ci_level"]
-                                )  # type: ignore[index]
-                        except (TypeError, ValueError, KeyError):
-                            pass
-                # Shadow parity check against ppl_* fields (best-effort)
-                try:
-                    pm_blk = report.get("metrics", {}).get("primary_metric", {})
-                    ppl_final_v1 = float(pm_blk.get("final"))
-                    ppl_final_v2 = float(pm.get("final", float("nan")))
-                    if math.isfinite(ppl_final_v1) and math.isfinite(ppl_final_v2):
-                        if not math.isclose(
-                            ppl_final_v1, ppl_final_v2, rel_tol=1e-9, abs_tol=1e-9
-                        ):
-                            report.setdefault("metrics", {}).setdefault(
-                                "_metric_v1_mismatch", {}
-                            )["ppl_final_diff"] = ppl_final_v2 - ppl_final_v1
-                    # Optional: dual-write diffs logging for ppl_* metrics
-                    debug_diffs = str(
-                        os.environ.get("DEBUG_METRIC_DIFFS", "")
-                    ).strip().lower() in {"1", "true", "yes", "on"}
-                    if debug_diffs and str(pm.get("kind", "")).startswith("ppl"):
-                        diffs_line = _format_debug_metric_diffs(
-                            pm, report.get("metrics", {}), baseline_report_data
-                        )
-                        if diffs_line:
-                            console.print(
-                                "[dim]DEBUG_METRIC_DIFFS: " + diffs_line + "[/dim]"
-                            )
-                except NON_FATAL_RUNTIME_EXCEPTIONS:
-                    pass
-            except (
-                ImportError,
-                ModuleNotFoundError,
-                AttributeError,
-                TypeError,
-                ValueError,
-                RuntimeError,
-            ):
-                # Non-fatal: metric-v1 snapshot should not break runs
-                pass
-
-            # No deprecation notices in dev-phase: primary_metric is canonical.
-
-            # Derive dataset.windows.stats (PM-only surface)
-            try:
-                ds = report.setdefault("dataset", {}).setdefault("windows", {})
-                stats = ds.setdefault("stats", {})
-                if match_fraction is not None:
-                    stats["window_match_fraction"] = float(match_fraction)
-                if overlap_fraction is not None:
-                    stats["window_overlap_fraction"] = float(overlap_fraction)
-                try:
-                    if isinstance(window_plan, dict) and "coverage_ok" in window_plan:
-                        stats["coverage"] = bool(window_plan.get("coverage_ok"))
-                        stats["preview_total_tokens"] = window_plan.get(
-                            "preview_total_tokens"
-                        )
-                        stats["final_total_tokens"] = window_plan.get(
-                            "final_total_tokens"
-                        )
-                        stats["min_tokens_target"] = window_plan.get(
-                            "min_tokens_target"
-                        )
-                        stats["tokens_floor_met"] = window_plan.get("tokens_floor_met")
-                except (AttributeError, KeyError, TypeError):
-                    pass
-            except (AttributeError, KeyError, TypeError):
-                pass
 
             telemetry_path: Path | None = None
             if telemetry:
@@ -2841,10 +1578,6 @@ def run_command_impl(
                 report=report,
                 run_dir=run_dir,
                 run_config=run_config,
-                window_plan=window_plan,
-                dataset_meta=dataset_meta,
-                match_fraction=match_fraction,
-                overlap_fraction=overlap_fraction,
                 console=console,
             )
             try:
@@ -2956,118 +1689,93 @@ def run_command_impl(
 
             # Evaluation report validation for --until-pass mode
             if retry_controller and baseline:
-                from invarlock.reporting.report_builder import make_report
-                from invarlock.reporting.report_telemetry import (
-                    telemetry_output_enabled,
-                    telemetry_summary_line,
+                _event(
+                    console,
+                    "EXEC",
+                    "Generating evaluation report...",
+                    emoji="📜",
+                    profile=profile_normalized,
+                )
+                retry_validation = _validate_retry_evaluation_report(
+                    report=report,
+                    baseline_report_data=baseline_report_data,
+                    baseline_path=Path(baseline) if baseline else None,
+                )
+                if retry_validation.telemetry_summary:
+                    console.print(retry_validation.telemetry_summary, markup=False)
+
+                retry_controller.record_attempt(
+                    attempt, retry_validation.attempt_summary, edit_config
                 )
 
-                try:
-                    baseline_report = baseline_report_data
-                    if baseline_report is None and baseline:
-                        baseline_path = Path(baseline)
-                        with baseline_path.open(encoding="utf-8") as f:
-                            baseline_report = json.load(f)
-
-                    if baseline_report is None:
-                        raise FileNotFoundError("Baseline report unavailable")
-
+                if retry_validation.status == "passed":
                     _event(
                         console,
-                        "EXEC",
-                        "Generating evaluation report...",
-                        emoji="📜",
+                        "PASS",
+                        "Evaluation report PASSED all gates!",
+                        emoji="✅",
                         profile=profile_normalized,
                     )
-                    evaluation_report = make_report(report, baseline_report)
-                    if telemetry_output_enabled():
-                        summary_line = telemetry_summary_line(evaluation_report)
-                        if summary_line:
-                            console.print(summary_line, markup=False)
+                    break
 
-                    validation = evaluation_report.get("validation", {})
-                    result_summary = _build_retry_result_summary(validation)
-                    report_passed = bool(result_summary["passed"])
-                    failed_gates = list(result_summary["failures"])
-                    retry_controller.record_attempt(
-                        attempt, result_summary, edit_config
-                    )
-
-                    if report_passed:
-                        _event(
-                            console,
-                            "PASS",
-                            "Evaluation report PASSED all gates!",
-                            emoji="✅",
-                            profile=profile_normalized,
-                        )
-                        break
-                    else:
-                        _event(
-                            console,
-                            "FAIL",
-                            f"Evaluation report FAILED gates: {', '.join(failed_gates)}",
-                            emoji="⚠️",
-                            profile=profile_normalized,
-                        )
-
-                        edit_config, head_adjustment = _apply_mask_only_head_autotune(
-                            edit_config, validation
-                        )
-                        if head_adjustment is not None:
-                            _event(
-                                console,
-                                "INIT",
-                                "Auto-tune adjust: global_k → "
-                                f"{head_adjustment['global_k']} "
-                                f"(bounds {head_adjustment['keep_low']}-{head_adjustment['keep_high']})",
-                                emoji="🔧",
-                                profile=profile_normalized,
-                            )
-
-                        should_retry = retry_controller.should_retry(report_passed)
-                        drain_notices = getattr(retry_controller, "drain_notices", None)
-                        notices = drain_notices() if callable(drain_notices) else ()
-                        for notice in notices:
-                            _event(
-                                console,
-                                "WARN",
-                                notice,
-                                emoji="⚠️",
-                                profile=profile_normalized,
-                            )
-                        if should_retry:
-                            attempt += 1
-                            continue
-                        else:
-                            _event(
-                                console,
-                                "FAIL",
-                                f"Exhausted retry budget after {attempt} attempts",
-                                emoji="❌",
-                                profile=profile_normalized,
-                            )
-                            break
-
-                except Exception as report_error:
+                if retry_validation.status == "failed":
                     _event(
                         console,
-                        "WARN",
-                        f"Evaluation report validation failed: {report_error}",
+                        "FAIL",
+                        "Evaluation report FAILED gates: "
+                        f"{', '.join(retry_validation.failed_gates)}",
                         emoji="⚠️",
                         profile=profile_normalized,
                     )
-                    if retry_controller:
-                        retry_controller.record_attempt(
-                            attempt,
-                            {
-                                "passed": False,
-                                "failures": ["report_error"],
-                                "validation": {},
-                            },
-                            edit_config,
+
+                    edit_config, head_adjustment = _apply_mask_only_head_autotune(
+                        edit_config, retry_validation.validation
+                    )
+                    if head_adjustment is not None:
+                        _event(
+                            console,
+                            "INIT",
+                            "Auto-tune adjust: global_k → "
+                            f"{head_adjustment['global_k']} "
+                            f"(bounds {head_adjustment['keep_low']}-{head_adjustment['keep_high']})",
+                            emoji="🔧",
+                            profile=profile_normalized,
                         )
+
+                    should_retry = retry_controller.should_retry(
+                        retry_validation.passed
+                    )
+                    drain_notices = getattr(retry_controller, "drain_notices", None)
+                    notices = drain_notices() if callable(drain_notices) else ()
+                    for notice in notices:
+                        _event(
+                            console,
+                            "WARN",
+                            notice,
+                            emoji="⚠️",
+                            profile=profile_normalized,
+                        )
+                    if should_retry:
+                        attempt += 1
+                        continue
+                    _event(
+                        console,
+                        "FAIL",
+                        f"Exhausted retry budget after {attempt} attempts",
+                        emoji="❌",
+                        profile=profile_normalized,
+                    )
                     break
+
+                _event(
+                    console,
+                    "WARN",
+                    "Evaluation report validation failed: "
+                    f"{retry_validation.error_message}",
+                    emoji="⚠️",
+                    profile=profile_normalized,
+                )
+                break
             else:
                 if retry_controller:
                     retry_controller.record_attempt(

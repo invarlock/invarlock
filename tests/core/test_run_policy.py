@@ -3,7 +3,7 @@ from __future__ import annotations
 import builtins
 from typing import Any
 
-from invarlock.cli import run_policy as policy
+from invarlock.core import run_policy as policy
 
 
 class _BadFloat:
@@ -121,7 +121,6 @@ def test_skip_policy_and_bool_coercion_edges() -> None:
     assert policy.coerce_bool_like("off") is False
     assert policy.coerce_bool_like("unknown") is None
 
-    # Non-dict config maps should fail closed.
     assert policy.resolve_skip_overhead_policy(
         {}, coerce_mapping_fn=lambda _obj: []
     ) == (

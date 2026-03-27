@@ -41,15 +41,6 @@ from invarlock.cli.output import (
     resolve_output_style,
     timed_step,
 )
-from invarlock.cli.run_analysis import (
-    format_debug_metric_diffs as _format_debug_metric_diffs_impl,
-)
-from invarlock.cli.run_analysis import (
-    merge_primary_metric_health as _merge_primary_metric_health_impl,
-)
-from invarlock.cli.run_analysis import (
-    normalize_overhead_result as _normalize_overhead_result_impl,
-)
 from invarlock.cli.run_artifacts import (
     persist_ref_masks as _persist_ref_masks_impl,
 )
@@ -86,30 +77,6 @@ from invarlock.cli.run_pairing import (
 from invarlock.cli.run_pairing import (
     validate_and_harvest_baseline_schedule as _validate_and_harvest_baseline_schedule_impl,
 )
-from invarlock.cli.run_policy import (
-    choose_dataset_split as _choose_dataset_split_impl,
-)
-from invarlock.cli.run_policy import (
-    coerce_bool_like as _coerce_bool_like_impl,
-)
-from invarlock.cli.run_policy import (
-    coerce_mapping as _coerce_mapping_impl,
-)
-from invarlock.cli.run_policy import (
-    resolve_guard_overhead_threshold as _resolve_guard_overhead_threshold_impl,
-)
-from invarlock.cli.run_policy import (
-    resolve_pm_acceptance_range as _resolve_pm_acceptance_range_impl,
-)
-from invarlock.cli.run_policy import (
-    resolve_pm_drift_band as _resolve_pm_drift_band_impl,
-)
-from invarlock.cli.run_policy import (
-    resolve_skip_overhead_policy as _resolve_skip_overhead_policy_impl,
-)
-from invarlock.cli.run_policy import (
-    should_measure_overhead as _should_measure_overhead_impl,
-)
 from invarlock.cli.utils import (
     coerce_float as _coerce_float,
 )
@@ -135,17 +102,92 @@ from invarlock.core.exceptions import (
 from invarlock.core.exit_codes import (
     resolve_command_exit_code as _resolve_command_exit_code,
 )
+from invarlock.core.run_baseline_evidence import (
+    load_baseline_pairing_evidence as _load_baseline_pairing_evidence_impl,
+)
+from invarlock.core.run_baseline_evidence import (
+    materialize_baseline_pairing_schedule as _materialize_baseline_pairing_schedule_impl,
+)
 from invarlock.core.run_evaluation_windows_policy import (
     build_fallback_evaluation_windows as _build_fallback_evaluation_windows_impl,
 )
 from invarlock.core.run_evaluation_windows_policy import (
     serialize_evaluation_windows as _serialize_evaluation_windows_impl,
 )
+from invarlock.core.run_execution_context_policy import (
+    build_run_context_payload as _build_run_context_payload_impl,
+)
+from invarlock.core.run_execution_context_policy import (
+    build_run_execution_config_payloads as _build_run_execution_config_payloads_impl,
+)
 from invarlock.core.run_guard_overhead_policy import (
     build_guard_overhead_summary as _build_guard_overhead_summary_impl,
 )
 from invarlock.core.run_guard_overhead_policy import (
     finalize_guard_overhead_payload as _finalize_guard_overhead_payload_impl,
+)
+from invarlock.core.run_guard_overhead_policy import (
+    normalize_guard_overhead_result as _normalize_overhead_result_impl,
+)
+from invarlock.core.run_guard_overhead_policy import (
+    prepare_guard_overhead_report as _prepare_guard_overhead_report_impl,
+)
+from invarlock.core.run_policy import (
+    choose_dataset_split as _choose_dataset_split_impl,
+)
+from invarlock.core.run_policy import (
+    coerce_bool_like as _coerce_bool_like_impl,
+)
+from invarlock.core.run_policy import (
+    coerce_mapping as _coerce_mapping_impl,
+)
+from invarlock.core.run_policy import (
+    resolve_guard_overhead_threshold as _resolve_guard_overhead_threshold_impl,
+)
+from invarlock.core.run_policy import (
+    resolve_pm_acceptance_range as _resolve_pm_acceptance_range_impl,
+)
+from invarlock.core.run_policy import (
+    resolve_pm_drift_band as _resolve_pm_drift_band_impl,
+)
+from invarlock.core.run_policy import (
+    resolve_skip_overhead_policy as _resolve_skip_overhead_policy_impl,
+)
+from invarlock.core.run_policy import (
+    should_measure_overhead as _should_measure_overhead_impl,
+)
+from invarlock.core.run_provider_dataset_plan import (
+    build_provider_dataset_plan as _build_provider_dataset_plan_impl,
+)
+from invarlock.core.run_report_payload_policy import (
+    build_artifacts_payload as _build_artifacts_payload_impl,
+)
+from invarlock.core.run_report_payload_policy import (
+    build_edit_payload as _build_edit_payload_impl,
+)
+from invarlock.core.run_report_payload_policy import (
+    build_flags_payload as _build_flags_payload_impl,
+)
+from invarlock.core.run_report_payload_policy import (
+    build_guard_entries as _build_guard_entries_impl,
+)
+from invarlock.core.run_report_payload_policy import (
+    build_metrics_payload as _build_metrics_payload_impl,
+)
+from invarlock.core.run_report_payload_policy import (
+    build_run_report_context as _build_run_report_context_impl,
+)
+from invarlock.core.run_report_payload_policy import (
+    build_run_report_data as _build_run_report_data_impl,
+)
+from invarlock.core.run_report_payload_policy import (
+    build_run_report_meta as _build_run_report_meta_impl,
+)
+from invarlock.core.run_report_payload_policy import (
+    build_snapshot_provenance as _build_snapshot_provenance_impl,
+)
+from invarlock.core.run_report_payload_policy import (
+    merge_core_timing_metrics as _merge_core_timing_metrics_impl,
 )
 from invarlock.core.run_retry_policy import (
     apply_mask_only_head_autotune as _apply_mask_only_head_autotune_impl,
@@ -169,6 +211,27 @@ from invarlock.eval.window_planning import (
     resolve_effective_windows as _resolve_effective_windows_impl,
 )
 from invarlock.model_utils import set_seed
+from invarlock.reporting.run_metric_utils import (
+    format_debug_metric_diffs as _format_debug_metric_diffs_impl,
+)
+from invarlock.reporting.run_metric_utils import (
+    merge_primary_metric_health as _merge_primary_metric_health_impl,
+)
+from invarlock.reporting.run_pairing_contract import (
+    build_dataset_window_stats as _build_dataset_window_stats_impl,
+)
+from invarlock.reporting.run_pairing_contract import (
+    validate_pairing_report_metrics as _validate_pairing_report_metrics_impl,
+)
+from invarlock.reporting.run_provenance_contract import (
+    finalize_run_provenance as _finalize_run_provenance_impl,
+)
+from invarlock.reporting.run_report_metrics_contract import (
+    enrich_run_report_metrics as _enrich_run_report_metrics_impl,
+)
+from invarlock.reporting.run_retry_validation import (
+    validate_retry_evaluation_report as _validate_retry_evaluation_report_impl,
+)
 
 from ...core.config_runtime import InvarLockConfig
 from ..overhead_utils import _extract_pm_snapshot_for_overhead
@@ -810,10 +873,220 @@ def _finalize_guard_overhead_payload(
     payload: Mapping[str, Any] | None,
     result: Any,
 ) -> dict[str, Any]:
-    return _finalize_guard_overhead_payload_impl(
-        payload,
-        result,
-        normalize_overhead_result_fn=_normalize_overhead_result,
+    return _finalize_guard_overhead_payload_impl(payload, result)
+
+
+def _prepare_guard_overhead_report(
+    guard_overhead_payload: Mapping[str, Any] | None,
+    *,
+    resolved_loss_type: str | None,
+    core_report: Any,
+    report: Mapping[str, Any] | None,
+    default_threshold: float,
+) -> dict[str, Any]:
+    return _prepare_guard_overhead_report_impl(
+        guard_overhead_payload,
+        resolved_loss_type=resolved_loss_type,
+        core_report=core_report,
+        report=report,
+        default_threshold=default_threshold,
+        extract_pm_snapshot_for_overhead_fn=_extract_pm_snapshot_for_overhead,
+        validate_guard_overhead_fn=validate_guard_overhead,
+    )
+
+
+def _validate_pairing_report_metrics(
+    metrics_section: Mapping[str, Any] | None,
+    *,
+    baseline_requested: bool,
+    profile: str | None,
+    preview_count_report: Any,
+    final_count_report: Any,
+    expected_preview: Any,
+    expected_final: Any,
+) -> list[Any]:
+    return _validate_pairing_report_metrics_impl(
+        metrics_section,
+        baseline_requested=baseline_requested,
+        profile=profile,
+        preview_count_report=preview_count_report,
+        final_count_report=final_count_report,
+        expected_preview=expected_preview,
+        expected_final=expected_final,
+    )
+
+
+def _build_dataset_window_stats(
+    *,
+    match_fraction: Any,
+    overlap_fraction: Any,
+    window_plan: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    return _build_dataset_window_stats_impl(
+        match_fraction=match_fraction,
+        overlap_fraction=overlap_fraction,
+        window_plan=window_plan,
+    )
+
+
+def _build_provider_dataset_plan(
+    *,
+    cfg: Any,
+    model_profile: Any,
+    console: Console,
+    resolved_device: str | None,
+    profile: str | None,
+    profile_normalized: str | None,
+    requested_preview: int,
+    requested_final: int,
+    effective_preview: int,
+    effective_final: int,
+    pairing_schedule_present: bool,
+    use_mlm: bool,
+    mask_prob: float,
+    mask_seed: int,
+    random_token_prob: float,
+    original_token_prob: float,
+    resolved_loss_type: str,
+    tier: str | None,
+    get_provider_fn: Any,
+) -> Any:
+    return _build_provider_dataset_plan_impl(
+        cfg=cfg,
+        model_profile=model_profile,
+        console=console,
+        resolved_device=resolved_device,
+        profile=profile,
+        profile_normalized=profile_normalized,
+        requested_preview=requested_preview,
+        requested_final=requested_final,
+        effective_preview=effective_preview,
+        effective_final=effective_final,
+        pairing_schedule_present=pairing_schedule_present,
+        use_mlm=use_mlm,
+        mask_prob=mask_prob,
+        mask_seed=mask_seed,
+        random_token_prob=random_token_prob,
+        original_token_prob=original_token_prob,
+        resolved_loss_type=resolved_loss_type,
+        tier=tier,
+        get_provider_fn=get_provider_fn,
+        resolve_provider_and_split_fn=_resolve_provider_and_split,
+        resolve_tokenizer_fn=resolve_tokenizer,
+        maybe_plan_release_windows_fn=_maybe_plan_release_windows,
+        resolve_effective_windows_fn=_resolve_effective_windows,
+        apply_mlm_masks_fn=_apply_mlm_masks,
+        resolve_pm_min_tokens_target_fn=_resolve_pm_min_tokens_target,
+        hash_sequences_fn=_hash_sequences,
+        tokenizer_digest_fn=_tokenizer_digest,
+        safe_int_fn=_safe_int,
+        tensor_or_list_to_ints_fn=_tensor_or_list_to_ints,
+    )
+
+
+def _build_run_context_payload(
+    *,
+    cfg: Any,
+    profile: str | None,
+    pairing_schedule: dict[str, Any] | None,
+    seed_bundle: Mapping[str, Any],
+    plugin_provenance: Mapping[str, Any],
+    run_id: str,
+    baseline_report_data: Mapping[str, Any] | None,
+    pm_acceptance_range: tuple[float, float] | None,
+    pm_drift_band: tuple[float, float] | None,
+    guard_overhead_threshold: float,
+    model_profile: Any,
+    resolved_loss_type: str,
+    tiny_relax_enabled: bool,
+) -> dict[str, Any]:
+    return _build_run_context_payload_impl(
+        cfg=cfg,
+        profile=profile,
+        pairing_schedule=pairing_schedule,
+        seed_bundle=seed_bundle,
+        plugin_provenance=plugin_provenance,
+        run_id=run_id,
+        baseline_report_data=baseline_report_data,
+        pm_acceptance_range=pm_acceptance_range,
+        pm_drift_band=pm_drift_band,
+        guard_overhead_threshold=guard_overhead_threshold,
+        model_profile=model_profile,
+        resolved_loss_type=resolved_loss_type,
+        tiny_relax_enabled=tiny_relax_enabled,
+        to_serialisable_dict_fn=_to_serialisable_dict,
+    )
+
+
+def _build_run_execution_config_payloads(
+    *,
+    cfg: Any,
+    model_profile: Any,
+) -> Any:
+    return _build_run_execution_config_payloads_impl(
+        cfg=cfg,
+        model_profile=model_profile,
+    )
+
+
+def _enrich_run_report_metrics(
+    *,
+    report: dict[str, Any],
+    core_report: Any,
+    run_config: Any,
+    cfg: Any,
+    model_profile: Any,
+    baseline_requested: bool,
+    baseline_report_data: Mapping[str, Any] | None,
+    metric_kind: str | None,
+    resolved_loss_type: str,
+    effective_preview: Any,
+    effective_final: Any,
+    profile_normalized: str | None,
+    window_plan: Mapping[str, Any] | None,
+    debug_metric_diffs_enabled: bool,
+) -> Any:
+    return _enrich_run_report_metrics_impl(
+        report=report,
+        core_report=core_report,
+        run_config=run_config,
+        cfg=cfg,
+        model_profile=model_profile,
+        baseline_requested=baseline_requested,
+        baseline_report_data=baseline_report_data,
+        metric_kind=metric_kind,
+        resolved_loss_type=resolved_loss_type,
+        effective_preview=effective_preview,
+        effective_final=effective_final,
+        profile_normalized=profile_normalized,
+        window_plan=window_plan,
+        debug_metric_diffs_enabled=debug_metric_diffs_enabled,
+        resolve_metric_and_provider_fn=_resolve_metric_and_provider,
+    )
+
+
+def _validate_retry_evaluation_report(
+    *,
+    report: dict[str, Any],
+    baseline_report_data: dict[str, Any] | None,
+    baseline_path: Path | None,
+) -> Any:
+    from invarlock.reporting.report_builder import make_report as _make_report
+    from invarlock.reporting.report_telemetry import (
+        telemetry_output_enabled as _telemetry_output_enabled,
+    )
+    from invarlock.reporting.report_telemetry import (
+        telemetry_summary_line as _telemetry_summary_line,
+    )
+
+    return _validate_retry_evaluation_report_impl(
+        report=report,
+        baseline_report_data=baseline_report_data,
+        baseline_path=baseline_path,
+        build_retry_result_summary_fn=_build_retry_result_summary,
+        make_report_fn=_make_report,
+        telemetry_output_enabled_fn=_telemetry_output_enabled,
+        telemetry_summary_line_fn=_telemetry_summary_line,
     )
 
 
@@ -1082,6 +1355,53 @@ def _tokenizer_digest(tokenizer: Any) -> str:
 def _extract_pairing_schedule(report: dict[str, Any] | None) -> dict[str, Any] | None:
     return _extract_pairing_schedule_impl(
         report,
+        tensor_or_list_to_ints_fn=_tensor_or_list_to_ints,
+    )
+
+
+def _load_baseline_pairing_evidence(
+    *,
+    baseline_path: Path,
+    tokenizer_hash: str | None,
+):
+    return _load_baseline_pairing_evidence_impl(
+        baseline_path=baseline_path,
+        tokenizer_hash=tokenizer_hash,
+        extract_pairing_schedule_fn=_extract_pairing_schedule,
+    )
+
+
+def _materialize_baseline_pairing_schedule(
+    *,
+    pairing_schedule: dict[str, Any],
+    calibration_data: list[dict[str, Any]] | None,
+    dataset_meta: dict[str, Any],
+    window_plan: dict[str, Any] | None,
+    tokenizer: Any,
+    use_mlm: bool,
+    mask_prob: float,
+    mask_seed: int,
+    random_token_prob: float,
+    original_token_prob: float,
+    resolved_tier: str | None,
+    profile: str | None,
+) -> Any:
+    return _materialize_baseline_pairing_schedule_impl(
+        pairing_schedule=pairing_schedule,
+        calibration_data=calibration_data,
+        dataset_meta=dataset_meta,
+        window_plan=window_plan,
+        tokenizer=tokenizer,
+        use_mlm=use_mlm,
+        mask_prob=mask_prob,
+        mask_seed=mask_seed,
+        random_token_prob=random_token_prob,
+        original_token_prob=original_token_prob,
+        resolved_tier=resolved_tier,
+        profile=profile,
+        apply_mlm_masks_fn=_apply_mlm_masks,
+        resolve_pm_min_tokens_target_fn=_resolve_pm_min_tokens_target,
+        hash_sequences_fn=_hash_sequences,
         tensor_or_list_to_ints_fn=_tensor_or_list_to_ints,
     )
 
@@ -1533,28 +1853,8 @@ def _postprocess_and_summarize(
     report: dict[str, Any],
     run_dir: Path,
     run_config: Any,
-    window_plan: dict[str, Any] | None,
-    dataset_meta: dict[str, Any],
-    match_fraction: float | None,
-    overlap_fraction: float | None,
     console: Console,
 ) -> dict[str, str]:
-    """Finalize report windows stats and print/save summary artifacts."""
-    try:
-        ds = report.setdefault("dataset", {}).setdefault("windows", {})
-        stats = ds.setdefault("stats", {})
-        if match_fraction is not None:
-            stats["window_match_fraction"] = float(match_fraction)
-        if overlap_fraction is not None:
-            stats["window_overlap_fraction"] = float(overlap_fraction)
-        try:
-            if isinstance(window_plan, dict) and "coverage_ok" in window_plan:
-                stats["coverage"] = bool(window_plan.get("coverage_ok"))
-        except Exception:
-            pass
-    except Exception:
-        pass
-
     saved_files = _emit_run_artifacts(
         report=report, out_dir=run_dir, filename_prefix="report", console=console
     )
@@ -1569,6 +1869,41 @@ def _compute_provider_digest(report: dict[str, Any]) -> dict[str, str] | None:
     return _compute_provider_digest_impl(
         report,
         compute_mask_positions_digest_fn=_compute_mask_positions_digest,
+    )
+
+
+def _finalize_run_provenance(
+    *,
+    report: dict[str, Any],
+    core_report: Any,
+    preview_records: list[dict[str, Any]],
+    final_records: list[dict[str, Any]],
+    use_mlm: bool,
+    preview_mask_counts: list[int] | None,
+    final_mask_counts: list[int] | None,
+    had_baseline: bool,
+    profile: str | None,
+    resolved_split: str | None,
+    used_fallback_split: bool,
+    baseline_report_data: dict[str, Any] | None,
+) -> Any:
+    return _finalize_run_provenance_impl(
+        report=report,
+        core_report=core_report,
+        preview_records=preview_records,
+        final_records=final_records,
+        use_mlm=use_mlm,
+        preview_mask_counts=preview_mask_counts,
+        final_mask_counts=final_mask_counts,
+        had_baseline=had_baseline,
+        profile=profile,
+        resolved_split=resolved_split,
+        used_fallback_split=used_fallback_split,
+        baseline_report_data=baseline_report_data,
+        serialize_evaluation_windows_fn=_serialize_evaluation_windows,
+        build_fallback_evaluation_windows_fn=_build_fallback_evaluation_windows,
+        compute_provider_digest_fn=_compute_provider_digest,
+        enforce_provider_parity_fn=_enforce_provider_parity,
     )
 
 
@@ -1671,15 +2006,26 @@ def _build_run_command_deps() -> dict[str, Any]:
         "_SnapshotRestoreFailed": _SnapshotRestoreFailed,
         "_apply_mlm_masks": _apply_mlm_masks,
         "_apply_warning_filters": _apply_warning_filters,
+        "_build_artifacts_payload": _build_artifacts_payload_impl,
+        "_build_provider_dataset_plan": _build_provider_dataset_plan,
+        "_build_run_context_payload": _build_run_context_payload,
+        "_build_run_execution_config_payloads": _build_run_execution_config_payloads,
+        "_enrich_run_report_metrics": _enrich_run_report_metrics,
+        "_validate_retry_evaluation_report": _validate_retry_evaluation_report,
+        "_build_dataset_window_stats": _build_dataset_window_stats,
         "_canonical_dataset_id": _canonical_dataset_id,
         "_coerce_float": _coerce_float,
         "_coerce_int": _coerce_int,
         "_coerce_option": _coerce_option,
         "_compute_provider_digest": _compute_provider_digest,
+        "_finalize_run_provenance": _finalize_run_provenance,
+        "_build_edit_payload": _build_edit_payload_impl,
         "_enforce_provider_parity": _enforce_provider_parity,
         "_event": _event,
         "_execute_guarded_run": _execute_guarded_run,
         "_extract_pairing_schedule": _extract_pairing_schedule,
+        "_load_baseline_pairing_evidence": _load_baseline_pairing_evidence,
+        "_materialize_baseline_pairing_schedule": _materialize_baseline_pairing_schedule,
         "_extract_pm_snapshot_for_overhead": _extract_pm_snapshot_for_overhead,
         "_format_debug_metric_diffs": _format_debug_metric_diffs,
         "_format_guard_chain": _format_guard_chain,
@@ -1689,9 +2035,16 @@ def _build_run_command_deps() -> dict[str, Any]:
         "_init_retry_controller": _init_retry_controller,
         "_load_model_with_cfg": _load_model_with_cfg,
         "_maybe_plan_release_windows": _maybe_plan_release_windows,
+        "_build_flags_payload": _build_flags_payload_impl,
+        "_build_guard_entries": _build_guard_entries_impl,
+        "_build_metrics_payload": _build_metrics_payload_impl,
+        "_build_run_report_context": _build_run_report_context_impl,
+        "_build_run_report_data": _build_run_report_data_impl,
+        "_build_run_report_meta": _build_run_report_meta_impl,
         "_resolve_effective_windows": _resolve_effective_windows,
         "_resolve_pm_min_tokens_target": _resolve_pm_min_tokens_target,
         "_merge_primary_metric_health": _merge_primary_metric_health,
+        "_merge_core_timing_metrics": _merge_core_timing_metrics_impl,
         "_normalize_overhead_result": _normalize_overhead_result,
         "_apply_mask_only_head_autotune": _apply_mask_only_head_autotune,
         "_build_timing_summary_payload": _build_timing_summary_payload,
@@ -1702,6 +2055,7 @@ def _build_run_command_deps() -> dict[str, Any]:
         "_finalize_guard_overhead_payload": _finalize_guard_overhead_payload,
         "_persist_ref_masks": _persist_ref_masks,
         "_postprocess_and_summarize": _postprocess_and_summarize,
+        "_prepare_guard_overhead_report": _prepare_guard_overhead_report,
         "_prepare_config_for_run": _prepare_config_for_run,
         "_print_guard_overhead_summary": _print_guard_overhead_summary,
         "_print_pipeline_start": _print_pipeline_start,
@@ -1722,6 +2076,8 @@ def _build_run_command_deps() -> dict[str, Any]:
         "_tensor_or_list_to_ints": _tensor_or_list_to_ints,
         "_to_serialisable_dict": _to_serialisable_dict,
         "_tokenizer_digest": _tokenizer_digest,
+        "_build_snapshot_provenance": _build_snapshot_provenance_impl,
+        "_validate_pairing_report_metrics": _validate_pairing_report_metrics,
         "_validate_and_harvest_baseline_schedule": _validate_and_harvest_baseline_schedule,
         "click": click,
         "console": console,

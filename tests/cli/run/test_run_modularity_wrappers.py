@@ -138,9 +138,22 @@ def test_policy_wrappers_delegate(monkeypatch):
     monkeypatch.setattr(
         run_mod,
         "_finalize_guard_overhead_payload_impl",
-        lambda payload, result, normalize_overhead_result_fn: {"passed": True},
+        lambda payload, result: {"passed": True},
     )
     assert run_mod._finalize_guard_overhead_payload({}, object()) == {"passed": True}
+
+    monkeypatch.setattr(
+        run_mod,
+        "_prepare_guard_overhead_report_impl",
+        lambda *args, **kwargs: {"prepared": True},
+    )
+    assert run_mod._prepare_guard_overhead_report(
+        {},
+        resolved_loss_type="ppl_causal",
+        core_report={},
+        report={},
+        default_threshold=0.01,
+    ) == {"prepared": True}
 
     split_seen: dict[str, object] = {}
 
@@ -208,6 +221,36 @@ def test_pairing_wrappers_delegate(monkeypatch):
 
     monkeypatch.setattr(
         run_mod,
+        "_load_baseline_pairing_evidence_impl",
+        lambda **kwargs: {"status": "loaded"},
+    )
+    assert run_mod._load_baseline_pairing_evidence(
+        baseline_path=Path("baseline.json"),
+        tokenizer_hash="tok",
+    ) == {"status": "loaded"}
+
+    monkeypatch.setattr(
+        run_mod,
+        "_materialize_baseline_pairing_schedule_impl",
+        lambda **kwargs: {"preview_count": 1, "final_count": 1},
+    )
+    assert run_mod._materialize_baseline_pairing_schedule(
+        pairing_schedule={"preview": {}, "final": {}},
+        calibration_data=[],
+        dataset_meta={},
+        window_plan=None,
+        tokenizer=None,
+        use_mlm=False,
+        mask_prob=0.15,
+        mask_seed=43,
+        random_token_prob=0.1,
+        original_token_prob=0.1,
+        resolved_tier="balanced",
+        profile="dev",
+    ) == {"preview_count": 1, "final_count": 1}
+
+    monkeypatch.setattr(
+        run_mod,
         "_compute_provider_digest_impl",
         lambda report, compute_mask_positions_digest_fn: {"ids_sha256": "abc"},
     )
@@ -237,6 +280,30 @@ def test_pairing_wrappers_delegate(monkeypatch):
         {"ids_sha256": "a"}, {"ids_sha256": "a"}, profile="ci"
     )
     assert seen["profile"] == "ci"
+
+    monkeypatch.setattr(
+        run_mod,
+        "_finalize_run_provenance_impl",
+        lambda **kwargs: SimpleNamespace(
+            missing_evaluation_windows_for_baseline=False,
+            missing_evaluation_windows_message=None,
+        ),
+    )
+    out = run_mod._finalize_run_provenance(
+        report={},
+        core_report=SimpleNamespace(evaluation_windows={}),
+        preview_records=[],
+        final_records=[],
+        use_mlm=False,
+        preview_mask_counts=None,
+        final_mask_counts=None,
+        had_baseline=False,
+        profile="dev",
+        resolved_split="validation",
+        used_fallback_split=False,
+        baseline_report_data=None,
+    )
+    assert out.missing_evaluation_windows_for_baseline is False
 
     monkeypatch.setattr(
         run_mod,
@@ -348,6 +415,105 @@ def test_analysis_and_overhead_wrappers_delegate(monkeypatch):
         "passed": True,
     }
 
+    monkeypatch.setattr(
+        run_mod,
+        "_build_provider_dataset_plan_impl",
+        lambda **kwargs: {"resolved_split": "validation", "preview_count": 2},
+    )
+    assert run_mod._build_provider_dataset_plan(
+        cfg={},
+        model_profile=SimpleNamespace(),
+        console=run_mod.console,
+        resolved_device="cpu",
+        profile="dev",
+        profile_normalized="dev",
+        requested_preview=2,
+        requested_final=2,
+        effective_preview=2,
+        effective_final=2,
+        pairing_schedule_present=False,
+        use_mlm=False,
+        mask_prob=0.15,
+        mask_seed=43,
+        random_token_prob=0.1,
+        original_token_prob=0.1,
+        resolved_loss_type="ppl_causal",
+        tier="balanced",
+        get_provider_fn=lambda *args, **kwargs: None,
+    ) == {"resolved_split": "validation", "preview_count": 2}
+
+    monkeypatch.setattr(
+        run_mod,
+        "_validate_retry_evaluation_report_impl",
+        lambda **kwargs: {"status": "passed"},
+    )
+    assert run_mod._validate_retry_evaluation_report(
+        report={},
+        baseline_report_data=None,
+        baseline_path=Path("baseline.json"),
+    ) == {"status": "passed"}
+
+    monkeypatch.setattr(
+        run_mod,
+        "_build_run_context_payload_impl",
+        lambda **kwargs: {"profile": "ci", "run_id": "run-1"},
+    )
+    assert run_mod._build_run_context_payload(
+        cfg={},
+        profile="ci",
+        pairing_schedule=None,
+        seed_bundle={"python": 43},
+        plugin_provenance={},
+        run_id="run-1",
+        baseline_report_data=None,
+        pm_acceptance_range=(0.9, 1.1),
+        pm_drift_band=None,
+        guard_overhead_threshold=0.02,
+        model_profile=SimpleNamespace(),
+        resolved_loss_type="ppl_causal",
+        tiny_relax_enabled=False,
+    ) == {"profile": "ci", "run_id": "run-1"}
+
+    monkeypatch.setattr(
+        run_mod,
+        "_build_run_execution_config_payloads_impl",
+        lambda **kwargs: SimpleNamespace(auto_config={"enabled": True}, edit_config={}),
+    )
+    payloads = run_mod._build_run_execution_config_payloads(
+        cfg={},
+        model_profile=SimpleNamespace(),
+    )
+    assert payloads.auto_config == {"enabled": True}
+
+    monkeypatch.setattr(
+        run_mod,
+        "_enrich_run_report_metrics_impl",
+        lambda **kwargs: SimpleNamespace(
+            report=kwargs["report"],
+            pairing_violations=(),
+            debug_diffs_line="diffs",
+            match_fraction=1.0,
+            overlap_fraction=0.0,
+        ),
+    )
+    enriched = run_mod._enrich_run_report_metrics(
+        report={"metrics": {}},
+        core_report=SimpleNamespace(),
+        run_config=SimpleNamespace(context={}),
+        cfg=SimpleNamespace(dataset=SimpleNamespace()),
+        model_profile=SimpleNamespace(),
+        baseline_requested=False,
+        baseline_report_data=None,
+        metric_kind="ppl_causal",
+        resolved_loss_type="ppl_causal",
+        effective_preview=1,
+        effective_final=1,
+        profile_normalized="dev",
+        window_plan=None,
+        debug_metric_diffs_enabled=True,
+    )
+    assert enriched.debug_diffs_line == "diffs"
+
 
 def test_run_command_injects_explicit_deps(monkeypatch, tmp_path: Path):
     sentinel = object()
@@ -370,9 +536,28 @@ def test_run_command_injects_explicit_deps(monkeypatch, tmp_path: Path):
     deps = captured.get("deps")
     assert isinstance(deps, dict)
     assert deps["_resolve_pm_acceptance_range"] is sentinel
+    assert deps["_build_provider_dataset_plan"] is run_mod._build_provider_dataset_plan
+    assert (
+        deps["_materialize_baseline_pairing_schedule"]
+        is run_mod._materialize_baseline_pairing_schedule
+    )
+    assert deps["_build_run_context_payload"] is run_mod._build_run_context_payload
+    assert (
+        deps["_build_run_execution_config_payloads"]
+        is run_mod._build_run_execution_config_payloads
+    )
+    assert deps["_enrich_run_report_metrics"] is run_mod._enrich_run_report_metrics
+    assert (
+        deps["_validate_retry_evaluation_report"]
+        is run_mod._validate_retry_evaluation_report
+    )
+    assert deps["_finalize_run_provenance"] is run_mod._finalize_run_provenance
     assert deps["_choose_snapshot_mode"] is run_mod._choose_snapshot_mode
     assert (
         deps["_build_timing_summary_payload"] is run_mod._build_timing_summary_payload
+    )
+    assert (
+        deps["_prepare_guard_overhead_report"] is run_mod._prepare_guard_overhead_report
     )
     assert (
         deps["_apply_mask_only_head_autotune"] is run_mod._apply_mask_only_head_autotune

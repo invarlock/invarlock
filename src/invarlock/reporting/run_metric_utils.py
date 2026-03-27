@@ -1,5 +1,3 @@
-"""Analysis and normalization helpers for the run command."""
-
 from __future__ import annotations
 
 import math
@@ -34,8 +32,6 @@ def format_debug_metric_diffs(
     baseline_report_data: dict | None,
 ) -> str:
     """Build a compact debug line comparing current snapshot vs ppl_* values."""
-    import math as _m
-
     if not isinstance(pm, dict) or not isinstance(metrics, dict):
         return ""
     diffs: list[str] = []
@@ -57,54 +53,44 @@ def format_debug_metric_diffs(
     except Exception:
         ppl_prev_v2 = float("nan")
 
-    if _m.isfinite(ppl_final_v1) and _m.isfinite(ppl_final_v2):
+    if math.isfinite(ppl_final_v1) and math.isfinite(ppl_final_v2):
         diffs.append(f"final: v1-v1 = {ppl_final_v2 - ppl_final_v1:+.9f}")
         try:
             diffs.append(
-                f"Δlog(final): {_m.log(ppl_final_v2) - _m.log(ppl_final_v1):+.9f}"
+                f"Δlog(final): {math.log(ppl_final_v2) - math.log(ppl_final_v1):+.9f}"
             )
         except Exception:
             pass
-    if _m.isfinite(ppl_prev_v1) and _m.isfinite(ppl_prev_v2):
+    if math.isfinite(ppl_prev_v1) and math.isfinite(ppl_prev_v2):
         diffs.append(f"preview: v1-v1 = {ppl_prev_v2 - ppl_prev_v1:+.9f}")
         try:
             diffs.append(
-                f"Δlog(preview): {_m.log(ppl_prev_v2) - _m.log(ppl_prev_v1):+.9f}"
+                f"Δlog(preview): {math.log(ppl_prev_v2) - math.log(ppl_prev_v1):+.9f}"
             )
         except Exception:
             pass
 
     try:
-        r_v2 = float(pm.get("ratio_vs_baseline", float("nan")))
+        ratio_v2 = float(pm.get("ratio_vs_baseline", float("nan")))
     except Exception:
-        r_v2 = float("nan")
-    r_v1 = float(pm_blk.get("ratio_vs_baseline", float("nan")))
-    if (not _m.isfinite(r_v1)) and isinstance(baseline_report_data, dict):
+        ratio_v2 = float("nan")
+    ratio_v1 = float(pm_blk.get("ratio_vs_baseline", float("nan")))
+    if (not math.isfinite(ratio_v1)) and isinstance(baseline_report_data, dict):
         try:
-            base_fin = float(
+            base_final = float(
                 (
                     (baseline_report_data.get("metrics") or {}).get("primary_metric")
                     or {}
                 ).get("final")
             )
-            if _m.isfinite(base_fin) and base_fin > 0 and _m.isfinite(ppl_final_v1):
-                r_v1 = ppl_final_v1 / base_fin
+            if (
+                math.isfinite(base_final)
+                and base_final > 0
+                and math.isfinite(ppl_final_v1)
+            ):
+                ratio_v1 = ppl_final_v1 / base_final
         except Exception:
             pass
-    if _m.isfinite(r_v1) and _m.isfinite(r_v2):
-        diffs.append(f"ratio_vs_baseline: v1-v1 = {r_v2 - r_v1:+.9f}")
+    if math.isfinite(ratio_v1) and math.isfinite(ratio_v2):
+        diffs.append(f"ratio_vs_baseline: v1-v1 = {ratio_v2 - ratio_v1:+.9f}")
     return "; ".join(diffs)
-
-
-def normalize_overhead_result(payload: dict[str, object] | None) -> dict[str, object]:
-    """Normalize guard-overhead payload for tiny/degenerate runs."""
-    payload = dict(payload or {})
-    try:
-        ratio = payload.get("overhead_ratio")
-        val = float(ratio) if isinstance(ratio, int | float) else float("nan")
-    except Exception:
-        val = float("nan")
-    if not (isinstance(val, float) and math.isfinite(val)):
-        payload["evaluated"] = False
-        payload["passed"] = True
-    return payload

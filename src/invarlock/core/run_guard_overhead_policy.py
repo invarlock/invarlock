@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
-
-NormalizeOverheadResultFn = Callable[[dict[str, object] | None], dict[str, object]]
 
 
 @dataclass(frozen=True)
@@ -18,11 +16,25 @@ class GuardOverheadSummary:
     threshold_display: str
 
 
+def normalize_guard_overhead_result(
+    payload: dict[str, object] | None,
+) -> dict[str, object]:
+    """Normalize guard-overhead payload for tiny or degenerate runs."""
+    payload = dict(payload or {})
+    try:
+        ratio = payload.get("overhead_ratio")
+        value = float(ratio) if isinstance(ratio, int | float) else float("nan")
+    except Exception:
+        value = float("nan")
+    if not (isinstance(value, float) and math.isfinite(value)):
+        payload["evaluated"] = False
+        payload["passed"] = True
+    return payload
+
+
 def finalize_guard_overhead_payload(
     payload: Mapping[str, Any] | None,
     result: Any,
-    *,
-    normalize_overhead_result_fn: NormalizeOverheadResultFn,
 ) -> dict[str, Any]:
     """Normalize validator output into the persisted guard-overhead payload."""
     resolved = dict(payload or {})
@@ -66,8 +78,58 @@ def finalize_guard_overhead_payload(
             "evaluated": True,
         }
     )
-    normalized = normalize_overhead_result_fn(resolved)
+    normalized = normalize_guard_overhead_result(resolved)
     return dict(normalized)
+
+
+def prepare_guard_overhead_report(
+    guard_overhead_payload: Mapping[str, Any] | None,
+    *,
+    resolved_loss_type: str | None,
+    core_report: Any,
+    report: Mapping[str, Any] | None,
+    default_threshold: float,
+    extract_pm_snapshot_for_overhead_fn: Any,
+    validate_guard_overhead_fn: Any,
+) -> dict[str, Any]:
+    """Build the persisted guard-overhead report payload."""
+    payload = dict(guard_overhead_payload or {})
+    if bool(payload.get("skipped", False)):
+        return payload
+
+    try:
+        loss_kind = str(resolved_loss_type or "causal").lower()
+        if loss_kind == "mlm":
+            pm_kind_for_overhead = "ppl_mlm"
+        elif loss_kind in {"seq2seq", "s2s", "t5"}:
+            pm_kind_for_overhead = "ppl_seq2seq"
+        else:
+            pm_kind_for_overhead = "ppl_causal"
+
+        pm_guarded = extract_pm_snapshot_for_overhead_fn(
+            core_report, kind=pm_kind_for_overhead
+        )
+        if not isinstance(pm_guarded, dict) or not pm_guarded:
+            pm_guarded = extract_pm_snapshot_for_overhead_fn(
+                report, kind=pm_kind_for_overhead
+            )
+
+        payload["guarded_report"] = (
+            {"metrics": {"primary_metric": pm_guarded}}
+            if isinstance(pm_guarded, dict) and pm_guarded
+            else None
+        )
+    except (AttributeError, TypeError, ValueError):
+        payload["guarded_report"] = None
+
+    bare_struct = payload.get("bare_report") or {}
+    guarded_struct = payload.get("guarded_report") or {}
+    result = validate_guard_overhead_fn(
+        bare_struct,
+        guarded_struct,
+        overhead_threshold=payload.get("overhead_threshold", default_threshold),
+    )
+    return finalize_guard_overhead_payload(payload, result)
 
 
 def build_guard_overhead_summary(
