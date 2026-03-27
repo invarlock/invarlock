@@ -1530,7 +1530,7 @@ def make_report_impl(
     except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         pass
 
-    # Emit optional one-line telemetry summary (opt-in via INVARLOCK_TELEMETRY=1).
+    # Attach a one-line telemetry summary for shells/services that choose to emit it.
     # This runs after primary_metric attachment so the summary can include display_ci/width.
     try:
         kind = None
@@ -1608,13 +1608,6 @@ def make_report_impl(
             parts.append(f"gate={'pass' if gate_ok else 'fail'}")
         summary_line = "INVARLOCK_TELEMETRY " + " ".join(parts)
         evaluation_report.setdefault("telemetry", {})["summary_line"] = summary_line
-        if str(os.environ.get("INVARLOCK_TELEMETRY", "")).strip().lower() in {
-            "1",
-            "true",
-            "yes",
-            "on",
-        }:
-            print(summary_line)
     except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         pass
 

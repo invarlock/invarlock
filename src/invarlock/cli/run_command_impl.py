@@ -1774,9 +1774,18 @@ def run_command_impl(
             if retry_controller and attempt > 1:
                 from invarlock.core.retry import adjust_edit_params
 
-                edit_config = adjust_edit_params(
+                adjustment = adjust_edit_params(
                     edit_op.name, edit_config, attempt, None
                 )
+                edit_config = adjustment.params
+                for notice in adjustment.notices:
+                    _event(
+                        console,
+                        "INIT",
+                        notice,
+                        emoji="🔧",
+                        profile=profile_normalized,
+                    )
 
             guard_overhead_payload: dict[str, Any] | None = None
             try:
@@ -1884,7 +1893,18 @@ def run_command_impl(
                         },
                         edit_config,
                     )
-                    if retry_controller.should_retry(False):
+                    should_retry = retry_controller.should_retry(False)
+                    drain_notices = getattr(retry_controller, "drain_notices", None)
+                    notices = drain_notices() if callable(drain_notices) else ()
+                    for notice in notices:
+                        _event(
+                            console,
+                            "WARN",
+                            notice,
+                            emoji="⚠️",
+                            profile=profile_normalized,
+                        )
+                    if should_retry:
                         attempt += 1
                         continue
                 raise typer.Exit(1) from exc
@@ -2937,6 +2957,10 @@ def run_command_impl(
             # Evaluation report validation for --until-pass mode
             if retry_controller and baseline:
                 from invarlock.reporting.report_builder import make_report
+                from invarlock.reporting.report_telemetry import (
+                    telemetry_output_enabled,
+                    telemetry_summary_line,
+                )
 
                 try:
                     baseline_report = baseline_report_data
@@ -2956,6 +2980,10 @@ def run_command_impl(
                         profile=profile_normalized,
                     )
                     evaluation_report = make_report(report, baseline_report)
+                    if telemetry_output_enabled():
+                        summary_line = telemetry_summary_line(evaluation_report)
+                        if summary_line:
+                            console.print(summary_line, markup=False)
 
                     validation = evaluation_report.get("validation", {})
                     result_summary = _build_retry_result_summary(validation)
@@ -2997,7 +3025,18 @@ def run_command_impl(
                                 profile=profile_normalized,
                             )
 
-                        if retry_controller.should_retry(report_passed):
+                        should_retry = retry_controller.should_retry(report_passed)
+                        drain_notices = getattr(retry_controller, "drain_notices", None)
+                        notices = drain_notices() if callable(drain_notices) else ()
+                        for notice in notices:
+                            _event(
+                                console,
+                                "WARN",
+                                notice,
+                                emoji="⚠️",
+                                profile=profile_normalized,
+                            )
+                        if should_retry:
                             attempt += 1
                             continue
                         else:

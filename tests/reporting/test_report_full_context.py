@@ -362,7 +362,7 @@ def test_make_evaluation_report_provenance_and_guard_schedule_fallback(monkeypat
     )
 
 
-def test_make_evaluation_report_emits_telemetry_summary(monkeypatch, capsys):
+def test_make_evaluation_report_embeds_telemetry_summary(monkeypatch):
     monkeypatch.setattr(
         cert, "_normalize_and_validate_report", lambda value: value, raising=False
     )
@@ -372,6 +372,7 @@ def test_make_evaluation_report_emits_telemetry_summary(monkeypatch, capsys):
     report = deepcopy(report)
     baseline = deepcopy(baseline)
 
-    cert.make_report(report, baseline)
-    out = capsys.readouterr().out
-    assert "INVARLOCK_TELEMETRY" in out
+    evaluation_report = cert.make_report(report, baseline)
+    assert evaluation_report["telemetry"]["summary_line"].startswith(
+        "INVARLOCK_TELEMETRY"
+    )

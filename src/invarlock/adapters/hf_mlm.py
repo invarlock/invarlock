@@ -5,6 +5,7 @@ HuggingFace masked LM adapter.
 ModelAdapter implementation for HuggingFace masked language models.
 """
 
+import warnings
 from typing import Any
 
 import torch
@@ -744,8 +745,12 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
             source_param: Name of the source parameter to tie to
         """
         # This is a placeholder for weight tying restoration logic
-        print(
-            f"Warning: Weight tying relationship {tied_param} -> {source_param} may have been broken during restore"
+        warnings.warn(
+            (
+                "Weight tying relationship "
+                f"{tied_param} -> {source_param} may have been broken during restore"
+            ),
+            stacklevel=2,
         )
 
     def get_layer_modules(

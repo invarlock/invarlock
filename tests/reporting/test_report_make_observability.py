@@ -20,14 +20,12 @@ def test_make_evaluation_report_marks_tiny_relax() -> None:
         assert qo["basis"] in {"ratio", "delta_pp"}
 
 
-def test_make_evaluation_report_emits_telemetry_summary(monkeypatch, capsys):
+def test_make_evaluation_report_embeds_telemetry_summary(monkeypatch):
     report, baseline = _rich_run_report()
     report = deepcopy(report)
     baseline = deepcopy(baseline)
     monkeypatch.setenv("INVARLOCK_TELEMETRY", "1")
     evaluation_report = cert.make_report(report, baseline)
-    out = capsys.readouterr().out
-    assert "INVARLOCK_TELEMETRY run_id" in out
     assert evaluation_report["telemetry"]["summary_line"].startswith(
         "INVARLOCK_TELEMETRY"
     )

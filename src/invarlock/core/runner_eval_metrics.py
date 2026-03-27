@@ -42,8 +42,19 @@ def compute_real_metrics(
     model.eval()
 
     if os.environ.get("INVARLOCK_DEBUG_TRACE"):
-        print(
-            f"[debug] compute_real_metrics preview_n={preview_n} final_n={final_n} calibration_len={len(calibration_data) if hasattr(calibration_data, '__len__') else 'n/a'}"
+        runner._log_event(
+            "eval",
+            "real_metrics_snapshot",
+            LogLevel.DEBUG,
+            {
+                "preview_n": preview_n,
+                "final_n": final_n,
+                "calibration_len": (
+                    len(calibration_data)
+                    if hasattr(calibration_data, "__len__")
+                    else "n/a"
+                ),
+            },
         )
     device = next(model.parameters()).device
 

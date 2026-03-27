@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from invarlock.cli.config import inspect_config_dependencies
+from invarlock.core.config_dependencies import inspect_config_dependencies
 
 ALLOW_HOST_EXECUTION_ENV = "INVARLOCK_ALLOW_HOST_EXECUTION"
 ALLOW_NETWORK_ENV = "INVARLOCK_ALLOW_NETWORK"

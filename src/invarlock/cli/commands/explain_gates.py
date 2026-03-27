@@ -12,6 +12,10 @@ from invarlock.reporting.report_builder import (
     PM_DRIFT_BAND_DEFAULT,
     make_report,
 )
+from invarlock.reporting.report_telemetry import (
+    telemetry_output_enabled,
+    telemetry_summary_line,
+)
 
 console = Console()
 
@@ -41,6 +45,10 @@ def explain_gates_command(
         raise typer.Exit(1) from exc
 
     evaluation_report = make_report(report_data, baseline_data)
+    if telemetry_output_enabled():
+        summary_line = telemetry_summary_line(evaluation_report)
+        if summary_line:
+            console.print(summary_line, markup=False)
     validation = (
         evaluation_report.get("validation", {})
         if isinstance(evaluation_report.get("validation"), dict)

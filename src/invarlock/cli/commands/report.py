@@ -23,6 +23,10 @@ from invarlock.core.report_inputs import (
 )
 from invarlock.reporting import report_builder as report_builder
 from invarlock.reporting.report_files import save_report as _save_report
+from invarlock.reporting.report_telemetry import (
+    telemetry_output_enabled,
+    telemetry_summary_line,
+)
 
 console = Console()
 
@@ -253,6 +257,10 @@ def _generate_reports(
                 evaluation_report = report_builder.make_report(
                     primary_report, baseline_report
                 )
+                if telemetry_output_enabled():
+                    summary_line = telemetry_summary_line(evaluation_report)
+                    if summary_line:
+                        console.print(summary_line, markup=False)
                 report_builder.validate_report(evaluation_report)
                 from invarlock.reporting.render import (
                     compute_console_validation_block as _console_block,

@@ -18,6 +18,7 @@ class TestRetryController:
         controller = RetryController(max_attempts=3)
         assert controller.should_retry(report_passed=True) is False
         assert controller.attempt_history == []
+        assert controller.drain_notices() == ()
 
     def test_attempt_budget_enforced(self) -> None:
         controller = RetryController(max_attempts=3)
@@ -69,27 +70,29 @@ class TestRetryController:
         controller.record_attempt(1, {"passed": False}, {})
         assert controller.should_retry(False) is False
 
-    def test_verbose_timeout_budget_prints_stop_message(self, capsys) -> None:
+    def test_verbose_timeout_budget_collects_stop_notice(self) -> None:
         controller = RetryController(max_attempts=3, timeout=0, verbose=True)
         controller.start_time = time.time() - 1
 
         assert controller.should_retry(False) is False
-        assert "Timeout 0s exceeded" in capsys.readouterr().out
+        assert "Timeout 0s exceeded" in controller.drain_notices()[0]
 
 
 class TestAdjustEditParams:
     def test_adjust_quant_adds_clamp_ratio(self) -> None:
         params = {"bits": 8}
         adjusted = adjust_edit_params("quant_rtn", params, attempt=1)
-        assert adjusted["clamp_ratio"] == 0.01
+        assert adjusted.params["clamp_ratio"] == 0.01
+        assert adjusted.notices == ("Quant retry adjustment: added clamp_ratio=0.01",)
 
     def test_adjust_unknown_edit_noop(self) -> None:
         params = {"some_param": "value"}
         adjusted = adjust_edit_params("unknown_edit", params, attempt=1)
-        assert adjusted == params
+        assert adjusted.params == params
+        assert adjusted.notices == ()
 
     def test_adjust_preserves_other_fields(self) -> None:
         params = {"bits": 8, "scope": "ffn", "seed": 42}
         adjusted = adjust_edit_params("quant_rtn", params, attempt=1)
-        assert adjusted["scope"] == "ffn"
-        assert adjusted["seed"] == 42
+        assert adjusted.params["scope"] == "ffn"
+        assert adjusted.params["seed"] == 42

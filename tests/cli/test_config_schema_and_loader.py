@@ -16,9 +16,13 @@ from invarlock.cli.config import (
     _deep_merge,
     apply_edit_override,
     apply_profile,
-    inspect_config_dependencies,
     load_config,
     resolve_edit_kind,
+)
+from invarlock.core.config_dependencies import (
+    absolute_path_no_resolve,
+    inspect_config_dependencies,
+    iter_absolute_path_strings,
 )
 
 
@@ -240,16 +244,14 @@ def test_dataset_and_path_iteration_helper_edges(tmp_path: Path) -> None:
     absolute_a = tmp_path / "a.jsonl"
     absolute_b = tmp_path / "b.jsonl"
 
-    found = cfg_mod._iter_absolute_path_strings(
-        [str(absolute_a), ("   ", {str(absolute_b)})]
-    )
+    found = iter_absolute_path_strings([str(absolute_a), ("   ", {str(absolute_b)})])
 
     assert dataset.seq_len == 8
     assert found == {
-        cfg_mod._absolute_path_no_resolve(absolute_a),
-        cfg_mod._absolute_path_no_resolve(absolute_b),
+        absolute_path_no_resolve(absolute_a),
+        absolute_path_no_resolve(absolute_b),
     }
-    assert cfg_mod._absolute_path_no_resolve("relative/config.yaml").is_absolute()
+    assert absolute_path_no_resolve("relative/config.yaml").is_absolute()
 
 
 def test_load_runtime_yaml_env_root_missing_file_falls_back_to_package(

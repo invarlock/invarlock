@@ -12,9 +12,16 @@ Manages retry logic for automated evaluation workflows with:
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from typing import Any
 
-__all__ = ["RetryController", "adjust_edit_params"]
+__all__ = ["EditAdjustmentResult", "RetryController", "adjust_edit_params"]
+
+
+@dataclass(frozen=True)
+class EditAdjustmentResult:
+    params: dict[str, Any]
+    notices: tuple[str, ...] = ()
 
 
 class RetryController:
@@ -44,6 +51,7 @@ class RetryController:
         self.verbose = verbose
         self.start_time = time.time()
         self.attempt_history: list[dict[str, Any]] = []
+        self._pending_notices: list[str] = []
 
     def should_retry(self, report_passed: bool) -> bool:
         """
@@ -62,7 +70,9 @@ class RetryController:
         # Check attempt budget (attempt count equals history length)
         if len(self.attempt_history) >= self.max_attempts:
             if self.verbose:
-                print(f"Exhausted {self.max_attempts} attempts, stopping retry")
+                self._pending_notices.append(
+                    f"Exhausted {self.max_attempts} attempts, stopping retry"
+                )
             return False
 
         # Check timeout budget
@@ -70,7 +80,7 @@ class RetryController:
             elapsed = time.time() - self.start_time
             if elapsed > self.timeout:
                 if self.verbose:
-                    print(
+                    self._pending_notices.append(
                         f"Timeout {self.timeout}s exceeded ({elapsed:.1f}s), stopping retry"
                     )
                 return False
@@ -99,6 +109,11 @@ class RetryController:
             }
         )
 
+    def drain_notices(self) -> tuple[str, ...]:
+        notices = tuple(self._pending_notices)
+        self._pending_notices.clear()
+        return notices
+
     def get_attempt_summary(self) -> dict[str, Any]:
         """Get summary of all retry attempts."""
         return {
@@ -115,7 +130,7 @@ def adjust_edit_params(
     edit_params: dict[str, Any],
     attempt: int,
     report_result: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+) -> EditAdjustmentResult:
     """
     Adjust edit parameters for retry attempt based on edit type and failure mode.
 
@@ -129,18 +144,19 @@ def adjust_edit_params(
         report_result: Optional evaluation report result for failure analysis
 
     Returns:
-        Adjusted parameters for next attempt
+        Adjusted parameters plus caller-rendered notices for the next attempt
     """
     adjusted = edit_params.copy()
+    notices: list[str] = []
 
     # Quantization adjustments
     if "quant" in edit_name.lower():
         # Add clamp_ratio for stability
         if "clamp_ratio" not in adjusted:
             adjusted["clamp_ratio"] = 0.01
-            print("  Quant retry adjustment: added clamp_ratio=0.01")
+            notices.append("Quant retry adjustment: added clamp_ratio=0.01")
         else:
             # Could increase existing clamp_ratio if needed
             pass
 
-    return adjusted
+    return EditAdjustmentResult(params=adjusted, notices=tuple(notices))

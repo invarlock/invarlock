@@ -982,8 +982,16 @@ def execute_scenario(
     try:
         if bare_result.success and guarded_result.success:
             from invarlock.reporting.report_builder import make_report
+            from invarlock.reporting.report_telemetry import (
+                telemetry_output_enabled,
+                telemetry_summary_line,
+            )
 
             evaluation_report = make_report(guarded_result.report, bare_result.report)
+            if telemetry_output_enabled():
+                summary_line = telemetry_summary_line(evaluation_report)
+                if summary_line:
+                    print(summary_line)
             report_path = scenario_dir / "evaluation.report.json"
             report_path.write_text(
                 json.dumps(evaluation_report, indent=2), encoding="utf-8"
