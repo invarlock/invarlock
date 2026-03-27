@@ -270,6 +270,30 @@ def test_pairing_wrappers_delegate(monkeypatch):
 
     monkeypatch.setattr(
         run_mod,
+        "_finalize_run_provenance_impl",
+        lambda **kwargs: SimpleNamespace(
+            missing_evaluation_windows_for_baseline=False,
+            missing_evaluation_windows_message=None,
+        ),
+    )
+    out = run_mod._finalize_run_provenance(
+        report={},
+        core_report=SimpleNamespace(evaluation_windows={}),
+        preview_records=[],
+        final_records=[],
+        use_mlm=False,
+        preview_mask_counts=None,
+        final_mask_counts=None,
+        had_baseline=False,
+        profile="dev",
+        resolved_split="validation",
+        used_fallback_split=False,
+        baseline_report_data=None,
+    )
+    assert out.missing_evaluation_windows_for_baseline is False
+
+    monkeypatch.setattr(
+        run_mod,
         "_resolve_metric_and_provider_impl",
         lambda cfg, model_profile, resolved_loss_type, metric_kind_override: (
             "ppl_causal",
@@ -514,6 +538,7 @@ def test_run_command_injects_explicit_deps(monkeypatch, tmp_path: Path):
         deps["_validate_retry_evaluation_report"]
         is run_mod._validate_retry_evaluation_report
     )
+    assert deps["_finalize_run_provenance"] is run_mod._finalize_run_provenance
     assert deps["_choose_snapshot_mode"] is run_mod._choose_snapshot_mode
     assert (
         deps["_build_timing_summary_payload"] is run_mod._build_timing_summary_payload

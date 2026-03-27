@@ -66,7 +66,6 @@ def run_command_impl(
     _build_edit_payload = _dep("_build_edit_payload")
     _build_timing_summary_payload = _dep("_build_timing_summary_payload")
     _build_retry_result_summary = _dep("_build_retry_result_summary")
-    _build_fallback_evaluation_windows = _dep("_build_fallback_evaluation_windows")
     _build_flags_payload = _dep("_build_flags_payload")
     _build_guard_entries = _dep("_build_guard_entries")
     _build_metrics_payload = _dep("_build_metrics_payload")
@@ -78,8 +77,6 @@ def run_command_impl(
     _coerce_float = _dep("_coerce_float")
     _coerce_int = _dep("_coerce_int")
     _coerce_option = _dep("_coerce_option")
-    _compute_provider_digest = _dep("_compute_provider_digest")
-    _enforce_provider_parity = _dep("_enforce_provider_parity")
     _event = _dep("_event")
     _execute_guarded_run = _dep("_execute_guarded_run")
     _extract_pairing_schedule = _dep("_extract_pairing_schedule")
@@ -91,6 +88,7 @@ def run_command_impl(
     _format_guard_chain = _dep("_format_guard_chain")
     _format_kv_line = _dep("_format_kv_line")
     _free_model_memory = _dep("_free_model_memory")
+    _finalize_run_provenance = _dep("_finalize_run_provenance")
     _hash_sequences = _dep("_hash_sequences")
     _init_retry_controller = _dep("_init_retry_controller")
     _load_model_with_cfg = _dep("_load_model_with_cfg")
@@ -113,7 +111,6 @@ def run_command_impl(
     _resolve_snapshot_config = _dep("_resolve_snapshot_config")
     _run_bare_control = _dep("_run_bare_control")
     _safe_int = _dep("_safe_int")
-    _serialize_evaluation_windows = _dep("_serialize_evaluation_windows")
     _should_measure_overhead = _dep("_should_measure_overhead")
     _style_from_console = _dep("_style_from_console")
     _tensor_or_list_to_ints = _dep("_tensor_or_list_to_ints")
@@ -1432,83 +1429,38 @@ def run_command_impl(
                     report["guard_overhead"] = guard_overhead_payload
 
             had_baseline = bool(baseline and Path(baseline).exists())
-            serialized_evaluation_windows = _serialize_evaluation_windows(
-                getattr(core_report, "evaluation_windows", None)
-            )
-            if serialized_evaluation_windows:
-                report["evaluation_windows"] = serialized_evaluation_windows
-            elif had_baseline and (profile or "").lower() in {"ci", "release"}:
-                _event(
-                    console,
-                    "FAIL",
-                    "[INVARLOCK:E001] PAIRING-SCHEDULE-MISMATCH: baseline pairing requested but evaluation windows were not produced. Check capacity/pairing config.",
-                    emoji="❌",
-                    profile=profile_normalized,
-                )
-                raise typer.Exit(3)
-            else:
-                # Populate evaluation_windows directly from assembled records when the
-                # runner did not provide a structured window payload. This ensures
-                # provenance (provider_digest) can be computed even in lightweight/dev
-                # runs and unit tests that stub the runner.
-                try:
-                    report["evaluation_windows"] = _build_fallback_evaluation_windows(
-                        preview_records,
-                        final_records,
-                        use_mlm=use_mlm,
-                        preview_mask_counts=preview_mask_counts,
-                        final_mask_counts=final_mask_counts,
-                    )
-                except NON_FATAL_RUNTIME_EXCEPTIONS:
-                    # Best-effort: provenance digest will be skipped if windows cannot be built
-                    pass
-
-            # Attach provider digest and dataset split provenance when available
             try:
-                prov = report.setdefault("provenance", {})
-                # Always record dataset split provenance for visibility
-                try:
-                    prov["dataset_split"] = str(resolved_split)
-                    prov["split_fallback"] = bool(used_fallback_split)
-                except (TypeError, ValueError):
-                    pass
-                provider_digest = _compute_provider_digest(report)
-                if provider_digest:
-                    prov["provider_digest"] = provider_digest
-                    # Attach digest version for future evolution
-                    prov["digest_version"] = 1
-                    # Strict parity checks in CI/Release when baseline present
-                    try:
-                        if isinstance(baseline_report_data, dict):
-                            base_digest = None
-                            base_prov = baseline_report_data.get("provenance")
-                            if isinstance(base_prov, dict):
-                                base_pd = base_prov.get("provider_digest")
-                                if isinstance(base_pd, dict):
-                                    base_digest = base_pd
-                            if base_digest is None:
-                                base_digest = _compute_provider_digest(
-                                    baseline_report_data
-                                )
-                            _enforce_provider_parity(
-                                provider_digest,
-                                base_digest,
-                                profile=(str(profile).lower() if profile else None),
-                            )
-                    except InvarlockError as ce:
-                        console.print(str(ce))
-                        # Map to profile-aware exit code: dev→1, ci/release→3
-                        raise typer.Exit(
-                            _resolve_exit_code(ce, profile=profile)
-                        ) from None
-                    except RuntimeError as _e:
-                        _fail_run(str(_e))
-                    except NON_FATAL_RUNTIME_EXCEPTIONS:
-                        pass
+                provenance_result = _finalize_run_provenance(
+                    report=report,
+                    core_report=core_report,
+                    preview_records=preview_records,
+                    final_records=final_records,
+                    use_mlm=use_mlm,
+                    preview_mask_counts=preview_mask_counts,
+                    final_mask_counts=final_mask_counts,
+                    had_baseline=had_baseline,
+                    profile=profile,
+                    resolved_split=resolved_split,
+                    used_fallback_split=used_fallback_split,
+                    baseline_report_data=baseline_report_data,
+                )
+                if provenance_result.missing_evaluation_windows_for_baseline:
+                    _event(
+                        console,
+                        "FAIL",
+                        provenance_result.missing_evaluation_windows_message
+                        or "[INVARLOCK:E001] PAIRING-SCHEDULE-MISMATCH: baseline pairing requested but evaluation windows were not produced. Check capacity/pairing config.",
+                        emoji="❌",
+                        profile=profile_normalized,
+                    )
+                    raise typer.Exit(3)
+            except InvarlockError as ce:
+                console.print(str(ce))
+                raise typer.Exit(_resolve_exit_code(ce, profile=profile)) from None
+            except RuntimeError as _e:
+                _fail_run(str(_e))
             except (typer.Exit, SystemExit, click.exceptions.Exit):
                 raise
-            except NON_FATAL_RUNTIME_EXCEPTIONS:
-                pass
 
             report["guards"].extend(
                 _build_guard_entries(

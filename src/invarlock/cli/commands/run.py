@@ -220,6 +220,9 @@ from invarlock.reporting.run_pairing_contract import (
 from invarlock.reporting.run_pairing_contract import (
     validate_pairing_report_metrics as _validate_pairing_report_metrics_impl,
 )
+from invarlock.reporting.run_provenance_contract import (
+    finalize_run_provenance as _finalize_run_provenance_impl,
+)
 from invarlock.reporting.run_report_metrics_contract import (
     enrich_run_report_metrics as _enrich_run_report_metrics_impl,
 )
@@ -1847,6 +1850,41 @@ def _compute_provider_digest(report: dict[str, Any]) -> dict[str, str] | None:
     )
 
 
+def _finalize_run_provenance(
+    *,
+    report: dict[str, Any],
+    core_report: Any,
+    preview_records: list[dict[str, Any]],
+    final_records: list[dict[str, Any]],
+    use_mlm: bool,
+    preview_mask_counts: list[int] | None,
+    final_mask_counts: list[int] | None,
+    had_baseline: bool,
+    profile: str | None,
+    resolved_split: str | None,
+    used_fallback_split: bool,
+    baseline_report_data: dict[str, Any] | None,
+) -> Any:
+    return _finalize_run_provenance_impl(
+        report=report,
+        core_report=core_report,
+        preview_records=preview_records,
+        final_records=final_records,
+        use_mlm=use_mlm,
+        preview_mask_counts=preview_mask_counts,
+        final_mask_counts=final_mask_counts,
+        had_baseline=had_baseline,
+        profile=profile,
+        resolved_split=resolved_split,
+        used_fallback_split=used_fallback_split,
+        baseline_report_data=baseline_report_data,
+        serialize_evaluation_windows_fn=_serialize_evaluation_windows,
+        build_fallback_evaluation_windows_fn=_build_fallback_evaluation_windows,
+        compute_provider_digest_fn=_compute_provider_digest,
+        enforce_provider_parity_fn=_enforce_provider_parity,
+    )
+
+
 def _validate_and_harvest_baseline_schedule(
     cfg: Any,
     pairing_schedule: dict[str, Any],
@@ -1958,6 +1996,7 @@ def _build_run_command_deps() -> dict[str, Any]:
         "_coerce_int": _coerce_int,
         "_coerce_option": _coerce_option,
         "_compute_provider_digest": _compute_provider_digest,
+        "_finalize_run_provenance": _finalize_run_provenance,
         "_build_edit_payload": _build_edit_payload_impl,
         "_enforce_provider_parity": _enforce_provider_parity,
         "_event": _event,
