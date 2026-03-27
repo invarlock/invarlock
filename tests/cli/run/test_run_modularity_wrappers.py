@@ -448,6 +448,35 @@ def test_analysis_and_overhead_wrappers_delegate(monkeypatch):
     )
     assert payloads.auto_config == {"enabled": True}
 
+    monkeypatch.setattr(
+        run_mod,
+        "_enrich_run_report_metrics_impl",
+        lambda **kwargs: SimpleNamespace(
+            report=kwargs["report"],
+            pairing_violations=(),
+            debug_diffs_line="diffs",
+            match_fraction=1.0,
+            overlap_fraction=0.0,
+        ),
+    )
+    enriched = run_mod._enrich_run_report_metrics(
+        report={"metrics": {}},
+        core_report=SimpleNamespace(),
+        run_config=SimpleNamespace(context={}),
+        cfg=SimpleNamespace(dataset=SimpleNamespace()),
+        model_profile=SimpleNamespace(),
+        baseline_requested=False,
+        baseline_report_data=None,
+        metric_kind="ppl_causal",
+        resolved_loss_type="ppl_causal",
+        effective_preview=1,
+        effective_final=1,
+        profile_normalized="dev",
+        window_plan=None,
+        debug_metric_diffs_enabled=True,
+    )
+    assert enriched.debug_diffs_line == "diffs"
+
 
 def test_run_command_injects_explicit_deps(monkeypatch, tmp_path: Path):
     sentinel = object()
@@ -480,6 +509,7 @@ def test_run_command_injects_explicit_deps(monkeypatch, tmp_path: Path):
         deps["_build_run_execution_config_payloads"]
         is run_mod._build_run_execution_config_payloads
     )
+    assert deps["_enrich_run_report_metrics"] is run_mod._enrich_run_report_metrics
     assert (
         deps["_validate_retry_evaluation_report"]
         is run_mod._validate_retry_evaluation_report

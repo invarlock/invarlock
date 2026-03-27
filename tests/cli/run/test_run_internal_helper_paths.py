@@ -504,10 +504,6 @@ def test_postprocess_and_summarize_includes_event_path(
         report={},
         run_dir=tmp_path,
         run_config=run_config,
-        window_plan=None,
-        dataset_meta={},
-        match_fraction=None,
-        overlap_fraction=None,
         console=console,
     )
     assert saved["json"].endswith("report.json")
@@ -531,10 +527,6 @@ def test_postprocess_and_summarize_omits_event_path_when_missing(
         report={},
         run_dir=tmp_path,
         run_config=run_config,
-        window_plan=None,
-        dataset_meta={},
-        match_fraction=None,
-        overlap_fraction=None,
         console=console,
     )
     assert saved["json"].endswith("report.json")

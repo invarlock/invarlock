@@ -220,6 +220,9 @@ from invarlock.reporting.run_pairing_contract import (
 from invarlock.reporting.run_pairing_contract import (
     validate_pairing_report_metrics as _validate_pairing_report_metrics_impl,
 )
+from invarlock.reporting.run_report_metrics_contract import (
+    enrich_run_report_metrics as _enrich_run_report_metrics_impl,
+)
 from invarlock.reporting.run_retry_validation import (
     validate_retry_evaluation_report as _validate_retry_evaluation_report_impl,
 )
@@ -1002,6 +1005,44 @@ def _build_run_execution_config_payloads(
     return _build_run_execution_config_payloads_impl(
         cfg=cfg,
         model_profile=model_profile,
+    )
+
+
+def _enrich_run_report_metrics(
+    *,
+    report: dict[str, Any],
+    core_report: Any,
+    run_config: Any,
+    cfg: Any,
+    model_profile: Any,
+    baseline_requested: bool,
+    baseline_report_data: Mapping[str, Any] | None,
+    metric_kind: str | None,
+    resolved_loss_type: str,
+    effective_preview: Any,
+    effective_final: Any,
+    profile_normalized: str | None,
+    window_plan: Mapping[str, Any] | None,
+    debug_metric_diffs_enabled: bool,
+) -> Any:
+    return _enrich_run_report_metrics_impl(
+        report=report,
+        core_report=core_report,
+        run_config=run_config,
+        cfg=cfg,
+        model_profile=model_profile,
+        baseline_requested=baseline_requested,
+        baseline_report_data=baseline_report_data,
+        metric_kind=metric_kind,
+        resolved_loss_type=resolved_loss_type,
+        effective_preview=effective_preview,
+        effective_final=effective_final,
+        profile_normalized=profile_normalized,
+        window_plan=window_plan,
+        debug_metric_diffs_enabled=debug_metric_diffs_enabled,
+        resolve_metric_and_provider_fn=_resolve_metric_and_provider,
+        merge_primary_metric_health_fn=_merge_primary_metric_health,
+        format_debug_metric_diffs_fn=_format_debug_metric_diffs,
     )
 
 
@@ -1793,28 +1834,8 @@ def _postprocess_and_summarize(
     report: dict[str, Any],
     run_dir: Path,
     run_config: Any,
-    window_plan: dict[str, Any] | None,
-    dataset_meta: dict[str, Any],
-    match_fraction: float | None,
-    overlap_fraction: float | None,
     console: Console,
 ) -> dict[str, str]:
-    """Finalize report windows stats and print/save summary artifacts."""
-    try:
-        ds = report.setdefault("dataset", {}).setdefault("windows", {})
-        stats = ds.setdefault("stats", {})
-        if match_fraction is not None:
-            stats["window_match_fraction"] = float(match_fraction)
-        if overlap_fraction is not None:
-            stats["window_overlap_fraction"] = float(overlap_fraction)
-        try:
-            if isinstance(window_plan, dict) and "coverage_ok" in window_plan:
-                stats["coverage"] = bool(window_plan.get("coverage_ok"))
-        except Exception:
-            pass
-    except Exception:
-        pass
-
     saved_files = _emit_run_artifacts(
         report=report, out_dir=run_dir, filename_prefix="report", console=console
     )
@@ -1935,6 +1956,7 @@ def _build_run_command_deps() -> dict[str, Any]:
         "_build_provider_dataset_plan": _build_provider_dataset_plan,
         "_build_run_context_payload": _build_run_context_payload,
         "_build_run_execution_config_payloads": _build_run_execution_config_payloads,
+        "_enrich_run_report_metrics": _enrich_run_report_metrics,
         "_validate_retry_evaluation_report": _validate_retry_evaluation_report,
         "_build_dataset_window_stats": _build_dataset_window_stats,
         "_canonical_dataset_id": _canonical_dataset_id,

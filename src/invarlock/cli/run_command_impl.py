@@ -60,9 +60,9 @@ def run_command_impl(
     _apply_warning_filters = _dep("_apply_warning_filters")
     _build_artifacts_payload = _dep("_build_artifacts_payload")
     _build_provider_dataset_plan = _dep("_build_provider_dataset_plan")
-    _build_dataset_window_stats = _dep("_build_dataset_window_stats")
     _build_run_context_payload = _dep("_build_run_context_payload")
     _build_run_execution_config_payloads = _dep("_build_run_execution_config_payloads")
+    _enrich_run_report_metrics = _dep("_enrich_run_report_metrics")
     _build_edit_payload = _dep("_build_edit_payload")
     _build_timing_summary_payload = _dep("_build_timing_summary_payload")
     _build_retry_result_summary = _dep("_build_retry_result_summary")
@@ -88,14 +88,12 @@ def run_command_impl(
         "_materialize_baseline_pairing_schedule"
     )
     _extract_pm_snapshot_for_overhead = _dep("_extract_pm_snapshot_for_overhead")
-    _format_debug_metric_diffs = _dep("_format_debug_metric_diffs")
     _format_guard_chain = _dep("_format_guard_chain")
     _format_kv_line = _dep("_format_kv_line")
     _free_model_memory = _dep("_free_model_memory")
     _hash_sequences = _dep("_hash_sequences")
     _init_retry_controller = _dep("_init_retry_controller")
     _load_model_with_cfg = _dep("_load_model_with_cfg")
-    _merge_primary_metric_health = _dep("_merge_primary_metric_health")
     _merge_core_timing_metrics = _dep("_merge_core_timing_metrics")
     _normalize_overhead_result = _dep("_normalize_overhead_result")
     _estimate_model_bytes = _dep("_estimate_model_bytes")
@@ -109,7 +107,6 @@ def run_command_impl(
     _resolve_device_and_output = _dep("_resolve_device_and_output")
     _resolve_exit_code = _dep("_resolve_exit_code")
     _resolve_guard_overhead_threshold = _dep("_resolve_guard_overhead_threshold")
-    _resolve_metric_and_provider = _dep("_resolve_metric_and_provider")
     _resolve_pm_min_tokens_target = _dep("_resolve_pm_min_tokens_target")
     _resolve_pm_acceptance_range = _dep("_resolve_pm_acceptance_range")
     _resolve_pm_drift_band = _dep("_resolve_pm_drift_band")
@@ -123,7 +120,6 @@ def run_command_impl(
     _to_serialisable_dict = _dep("_to_serialisable_dict")
     _tokenizer_digest = _dep("_tokenizer_digest")
     _validate_retry_evaluation_report = _dep("_validate_retry_evaluation_report")
-    _validate_pairing_report_metrics = _dep("_validate_pairing_report_metrics")
     _build_snapshot_provenance = _dep("_build_snapshot_provenance")
     _validate_and_harvest_baseline_schedule = _dep(
         "_validate_and_harvest_baseline_schedule"
@@ -1622,132 +1618,26 @@ def run_command_impl(
                 )
             )
 
-            metrics_section = report.get("metrics", {}) or {}
-            data_section = report.get("data", {}) or {}
-            preview_count_report = data_section.get("preview_n")
-            final_count_report = data_section.get("final_n")
-
-            # Classification metric (accuracy) — deterministic smoke path
-            # If loss type is explicitly 'classification', derive accuracy
-            # counts from evaluation windows using a deterministic label rule.
-            try:
-                loss_type_ctx = (
-                    run_config.context.get("eval", {})
-                    .get("loss", {})
-                    .get("resolved_type")
-                )
-            except (AttributeError, TypeError, KeyError):
-                loss_type_ctx = None
-            if str(loss_type_ctx).lower() == "classification":
-                try:
-                    from invarlock.eval.primary_metric import compute_accuracy_counts
-
-                    # Prefer in-memory core_report.evaluation_windows (includes input_ids)
-                    ew = {}
-                    try:
-                        if hasattr(core_report, "evaluation_windows") and isinstance(
-                            core_report.evaluation_windows, dict
-                        ):
-                            ew = core_report.evaluation_windows  # type: ignore[assignment]
-                    except (AttributeError, TypeError):
-                        ew = {}
-                    if not ew:
-                        # Fallback to the soon-to-be persisted report windows (may lack input_ids)
-                        ew = (
-                            report.get("evaluation_windows", {})
-                            if isinstance(report.get("evaluation_windows"), dict)
-                            else {}
-                        )
-                    prev_rec = []
-                    fin_rec = []
-                    if isinstance(ew, dict):
-                        prev = ew.get("preview", {})
-                        fin = ew.get("final", {})
-                        if isinstance(prev, dict):
-                            prev_rec = [
-                                {"input_ids": seq}
-                                for seq in prev.get("input_ids", []) or []
-                                if isinstance(seq, list)
-                            ]
-                        if isinstance(fin, dict):
-                            fin_rec = [
-                                {"input_ids": seq}
-                                for seq in fin.get("input_ids", []) or []
-                                if isinstance(seq, list)
-                            ]
-                    c_prev, n_prev = compute_accuracy_counts(prev_rec)
-                    c_fin, n_fin = compute_accuracy_counts(fin_rec)
-                    # If we could not derive counts (no windows persisted), fall back to
-                    # deterministic pseudo-accuracy based on configured window counts.
-                    used_pseudo_counts = False
-                    if n_prev == 0 and n_fin == 0:
-                        try:
-                            prev_n_cfg = getattr(cfg.dataset, "preview_n", None)
-                            fin_n_cfg = getattr(cfg.dataset, "final_n", None)
-                        except (AttributeError, TypeError):
-                            prev_n_cfg = None
-                            fin_n_cfg = None
-                        try:
-                            prev_n = int(preview_count_report or prev_n_cfg or 0)
-                            fin_n = int(final_count_report or fin_n_cfg or 0)
-                        except NUMERIC_EXCEPTIONS:
-                            prev_n = 0
-                            fin_n = 0
-                        c_prev, n_prev = (prev_n, prev_n) if prev_n > 0 else (0, 0)
-                        c_fin, n_fin = (fin_n, fin_n) if fin_n > 0 else (0, 0)
-                        used_pseudo_counts = prev_n > 0 or fin_n > 0
-                    classification_metrics = {
-                        "preview": {"correct_total": int(c_prev), "total": int(n_prev)},
-                        "final": {"correct_total": int(c_fin), "total": int(n_fin)},
-                    }
-                    # Tag source of counts for downstream rendering/doctor
-                    if used_pseudo_counts:
-                        classification_metrics["counts_source"] = "pseudo_config"
-                        # Add a provenance crumb for transparency
-                        try:
-                            prov = report.setdefault("provenance", {})
-                            notes = prov.setdefault("metric_notes", [])
-                            if isinstance(notes, list):
-                                notes.append(
-                                    "accuracy: pseudo counts from preview_n/final_n"
-                                )
-                        except (TypeError, KeyError, AttributeError):
-                            pass
-                    else:
-                        classification_metrics["counts_source"] = "measured"
-                    report.setdefault("metrics", {})["classification"] = (
-                        classification_metrics
-                    )
-                    # Convenience: top-level accuracy (final)
-                    if n_fin > 0:
-                        report["metrics"]["accuracy"] = float(c_fin / n_fin)
-                except (
-                    ImportError,
-                    ModuleNotFoundError,
-                    AttributeError,
-                    TypeError,
-                    ValueError,
-                    RuntimeError,
-                ):
-                    pass
-
-            match_fraction = metrics_section.get("window_match_fraction")
-            overlap_fraction = metrics_section.get("window_overlap_fraction")
-            expected_preview = effective_preview or getattr(
-                cfg.dataset, "preview_n", preview_count_report
-            )
-            expected_final = effective_final or getattr(
-                cfg.dataset, "final_n", final_count_report
-            )
-            pairing_violations = _validate_pairing_report_metrics(
-                metrics_section,
+            debug_metric_diffs_enabled = str(
+                os.environ.get("DEBUG_METRIC_DIFFS", "")
+            ).strip().lower() in {"1", "true", "yes", "on"}
+            metrics_enrichment = _enrich_run_report_metrics(
+                report=report,
+                core_report=core_report,
+                run_config=run_config,
+                cfg=cfg,
+                model_profile=model_profile,
                 baseline_requested=bool(baseline),
-                profile=profile_normalized,
-                preview_count_report=preview_count_report,
-                final_count_report=final_count_report,
-                expected_preview=expected_preview,
-                expected_final=expected_final,
+                baseline_report_data=baseline_report_data,
+                metric_kind=metric_kind,
+                resolved_loss_type=resolved_loss_type,
+                effective_preview=effective_preview,
+                effective_final=effective_final,
+                profile_normalized=profile_normalized,
+                window_plan=window_plan,
+                debug_metric_diffs_enabled=debug_metric_diffs_enabled,
             )
+            pairing_violations = metrics_enrichment.pairing_violations
             if pairing_violations:
                 violation = pairing_violations[0]
                 err = InvarlockError(
@@ -1758,94 +1648,12 @@ def run_command_impl(
                 code = _resolve_exit_code(err, profile=profile_normalized)
                 console.print(f"[red]{err}[/red]")
                 raise typer.Exit(code)
-
-            # Compute metric-v1 snapshot (primary_metric) — canonical path
-            try:
-                metric_kind_resolved, _provider_kind, metric_opts = (
-                    _resolve_metric_and_provider(
-                        cfg,
-                        model_profile,
-                        resolved_loss_type=resolved_loss_type,
-                        metric_kind_override=metric_kind,
-                    )
+            if metrics_enrichment.debug_diffs_line:
+                console.print(
+                    "[dim]DEBUG_METRIC_DIFFS: "
+                    + metrics_enrichment.debug_diffs_line
+                    + "[/dim]"
                 )
-                if metric_kind_resolved:
-                    from invarlock.eval.primary_metric import (
-                        compute_primary_metric_from_report,
-                    )
-
-                    pm = compute_primary_metric_from_report(
-                        report, kind=metric_kind_resolved, baseline=baseline_report_data
-                    )
-                    core_primary_metric = None
-                    if hasattr(core_report, "metrics") and isinstance(
-                        core_report.metrics, dict
-                    ):
-                        core_primary_metric = core_report.metrics.get("primary_metric")
-                    pm = _merge_primary_metric_health(pm, core_primary_metric)
-                    report.setdefault("metrics", {})["primary_metric"] = pm
-                    # Attach configured reps/ci_level when provided
-                    if metric_opts:
-                        try:
-                            if "reps" in metric_opts:
-                                report["metrics"]["primary_metric"]["reps"] = int(
-                                    metric_opts["reps"]
-                                )  # type: ignore[index]
-                            if "ci_level" in metric_opts:
-                                report["metrics"]["primary_metric"]["ci_level"] = float(
-                                    metric_opts["ci_level"]
-                                )  # type: ignore[index]
-                        except (TypeError, ValueError, KeyError):
-                            pass
-                # Shadow parity check against ppl_* fields (best-effort)
-                try:
-                    pm_blk = report.get("metrics", {}).get("primary_metric", {})
-                    ppl_final_v1 = float(pm_blk.get("final"))
-                    ppl_final_v2 = float(pm.get("final", float("nan")))
-                    if math.isfinite(ppl_final_v1) and math.isfinite(ppl_final_v2):
-                        if not math.isclose(
-                            ppl_final_v1, ppl_final_v2, rel_tol=1e-9, abs_tol=1e-9
-                        ):
-                            report.setdefault("metrics", {}).setdefault(
-                                "_metric_v1_mismatch", {}
-                            )["ppl_final_diff"] = ppl_final_v2 - ppl_final_v1
-                    # Optional: dual-write diffs logging for ppl_* metrics
-                    debug_diffs = str(
-                        os.environ.get("DEBUG_METRIC_DIFFS", "")
-                    ).strip().lower() in {"1", "true", "yes", "on"}
-                    if debug_diffs and str(pm.get("kind", "")).startswith("ppl"):
-                        diffs_line = _format_debug_metric_diffs(
-                            pm, report.get("metrics", {}), baseline_report_data
-                        )
-                        if diffs_line:
-                            console.print(
-                                "[dim]DEBUG_METRIC_DIFFS: " + diffs_line + "[/dim]"
-                            )
-                except NON_FATAL_RUNTIME_EXCEPTIONS:
-                    pass
-            except (
-                ImportError,
-                ModuleNotFoundError,
-                AttributeError,
-                TypeError,
-                ValueError,
-                RuntimeError,
-            ):
-                # Non-fatal: metric-v1 snapshot should not break runs
-                pass
-
-            # No deprecation notices in dev-phase: primary_metric is canonical.
-
-            # Derive dataset.windows.stats (PM-only surface)
-            try:
-                ds = report.setdefault("dataset", {}).setdefault("windows", {})
-                ds["stats"] = _build_dataset_window_stats(
-                    match_fraction=match_fraction,
-                    overlap_fraction=overlap_fraction,
-                    window_plan=window_plan,
-                )
-            except (AttributeError, KeyError, TypeError):
-                pass
 
             telemetry_path: Path | None = None
             if telemetry:
@@ -1858,10 +1666,6 @@ def run_command_impl(
                 report=report,
                 run_dir=run_dir,
                 run_config=run_config,
-                window_plan=window_plan,
-                dataset_meta=dataset_meta,
-                match_fraction=match_fraction,
-                overlap_fraction=overlap_fraction,
                 console=console,
             )
             try:
