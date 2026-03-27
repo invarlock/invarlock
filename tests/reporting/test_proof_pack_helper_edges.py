@@ -685,7 +685,6 @@ def test_run_verify_command_delegates_to_verify_reports_contract(
         profile=None,
         allow_unattested_artifacts=False,
         json_mode=False,
-        console_obj=None,
     ):
         captured["reports"] = reports
         captured["profile"] = profile

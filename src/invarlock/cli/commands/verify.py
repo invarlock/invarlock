@@ -15,7 +15,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from ...reporting.verify_contract import verify_reports_contract
+from ...reporting.verify_contract import run_verify_reports
 from .._json import emit as _emit_json
 
 console = Console()
@@ -72,16 +72,18 @@ def verify_command(
 
     if isinstance(allow_unattested_artifacts, _OptionInfo):
         allow_unattested_artifacts = False
-    exit_code, payload = verify_reports_contract(
+    result = run_verify_reports(
         reports,
         baseline=baseline,
         tolerance=tolerance,
         profile=profile,
         allow_unattested_artifacts=bool(allow_unattested_artifacts),
         json_mode=bool(json_out),
-        console_obj=console,
     )
+    if not json_out:
+        for line in result.human_lines:
+            console.print(line)
     if json_out:
-        _emit_json(payload, exit_code)
-    if exit_code != 0:
-        raise SystemExit(exit_code)
+        _emit_json(result.payload, result.exit_code)
+    if result.exit_code != 0:
+        raise SystemExit(result.exit_code)

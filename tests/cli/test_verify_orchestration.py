@@ -232,3 +232,21 @@ def test_verify_reports_contract_returns_structured_payload_without_stdout(
     assert payload["summary"] == {"ok": True, "reason": "ok"}
     assert payload["resolution"] == {"exit_code": 0}
     assert capsys.readouterr().out == ""
+
+
+def test_run_verify_reports_collects_human_lines_without_stdout(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    cert_path = _write(tmp_path / "subject.json", _ppl_cert())
+
+    result = verify_mod.run_verify_reports(
+        [cert_path],
+        baseline=None,
+        profile="dev",
+        json_mode=False,
+    )
+
+    assert result.exit_code == 0
+    assert any("PASS" in line for line in result.human_lines)
+    assert any("VERIFY OK" in line for line in result.human_lines)
+    assert capsys.readouterr().out == ""

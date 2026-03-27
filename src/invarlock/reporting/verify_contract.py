@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import json
 import math
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-
-from rich.console import Console
 
 from invarlock.core.error_encoding import encode_error as _encode_error
 from invarlock.core.exceptions import InvarlockError
@@ -20,8 +19,6 @@ from invarlock.core.runtime_attestation import (
 
 from . import verify_checks as _verify_checks
 from . import verify_output as _verify_output
-
-console = Console()
 
 _coerce_float = _verify_checks._coerce_float
 _coerce_int = _verify_checks._coerce_int
@@ -40,6 +37,13 @@ _report_builder = _verify_checks._report_builder
 validate_report = _verify_checks.validate_report
 compute_validation_flags = _verify_checks.compute_validation_flags
 resolve_tiny_relax_from_report = _verify_checks.resolve_tiny_relax_from_report
+
+
+@dataclass(frozen=True)
+class VerifyExecutionResult:
+    exit_code: int
+    payload: dict[str, Any]
+    human_lines: tuple[str, ...]
 
 
 def _validate_report_schema_strict(report: dict[str, Any]) -> bool:
@@ -91,13 +95,10 @@ def _validate_evaluation_report_payload(
 def _warn_adapter_family_mismatch(
     cert_path: Path,
     report: dict[str, Any],
-    *,
-    console_obj: Console | None = None,
-) -> None:
-    """Emit a soft warning if adapter families differ between baseline and edited."""
+) -> tuple[str, ...]:
+    """Build a soft warning if adapter families differ between baseline and edited."""
 
     try:
-        active_console = console_obj or console
         plugins = report.get("plugins") or {}
         adapter_meta = plugins.get("adapter") if isinstance(plugins, dict) else None
         edited_family = None
@@ -150,23 +151,18 @@ def _warn_adapter_family_mismatch(
             base_version = f"=={base_ver}" if base_lib and base_ver else "—"
             edited_backend = edited_lib or "—"
             edited_version = f"=={edited_ver}" if edited_lib and edited_ver else "—"
-            active_console.print(
-                "[yellow]⚠️  Adapter family differs between baseline and edited runs:[/yellow]"
-            )
-            active_console.print(
-                f"[yellow]   • baseline: family={baseline_family}, backend={base_backend} {base_version}[/yellow]"
-            )
-            active_console.print(
-                f"[yellow]   • edited  : family={edited_family}, backend={edited_backend} {edited_version}[/yellow]"
-            )
-            active_console.print(
-                "[yellow]   Ensure this cross-family comparison is intentional (Compare & Evaluate flows should normally match families).[/yellow]"
+            return (
+                "[yellow]⚠️  Adapter family differs between baseline and edited runs:[/yellow]",
+                f"[yellow]   • baseline: family={baseline_family}, backend={base_backend} {base_version}[/yellow]",
+                f"[yellow]   • edited  : family={edited_family}, backend={edited_backend} {edited_version}[/yellow]",
+                "[yellow]   Ensure this cross-family comparison is intentional (Compare & Evaluate flows should normally match families).[/yellow]",
             )
     except Exception:
-        return
+        return ()
+    return ()
 
 
-def verify_reports_contract(
+def run_verify_reports(
     reports: list[Path],
     *,
     baseline: Path | None = None,
@@ -174,12 +170,11 @@ def verify_reports_contract(
     profile: str | None = "dev",
     allow_unattested_artifacts: bool = False,
     json_mode: bool = False,
-    console_obj: Console | None = None,
-) -> tuple[int, dict[str, Any]]:
-    """Verify reports and return a structured result without relying on CLI output."""
+) -> VerifyExecutionResult:
+    """Verify reports and return structured machine + human output."""
 
-    active_console = console_obj or console
     overall_ok = True
+    human_lines: list[str] = []
     configure_runtime_security(
         allow_unattested_artifacts=bool(allow_unattested_artifacts)
     )
@@ -298,7 +293,7 @@ def verify_reports_contract(
                             ),
                         )
                     if not json_mode:
-                        active_console.print(
+                        human_lines.append(
                             "[yellow]⚠️  Cannot recompute accuracy: missing aggregates (dev mode).[/yellow]"
                         )
             else:
@@ -347,7 +342,7 @@ def verify_reports_contract(
                                 ),
                             )
                         if not json_mode:
-                            active_console.print(
+                            human_lines.append(
                                 "[yellow]⚠️  Cannot recompute basis: evaluation_windows.final missing or incomplete (dev mode).[/yellow]"
                             )
 
@@ -368,17 +363,18 @@ def verify_reports_contract(
             if errors:
                 overall_ok = False
                 if not json_mode:
-                    active_console.print(f"[red]FAIL[/red] {cert_path}")
+                    human_lines.append(f"[red]FAIL[/red] {cert_path}")
                     for err in errors:
-                        active_console.print(f"  ↳ {err}")
+                        human_lines.append(f"  ↳ {err}")
             else:
                 if not json_mode:
-                    active_console.print(f"[green]PASS[/green] {cert_path}")
+                    human_lines.append(f"[green]PASS[/green] {cert_path}")
                     try:
-                        _warn_adapter_family_mismatch(
-                            cert_path,
-                            cert_obj,
-                            console_obj=active_console,
+                        human_lines.extend(
+                            _warn_adapter_family_mismatch(
+                                cert_path,
+                                cert_obj,
+                            )
                         )
                     except Exception:
                         pass
@@ -393,7 +389,11 @@ def verify_reports_contract(
                 tolerance=tol,
                 load_report_fn=_load_evaluation_report,
             )
-            return code, payload
+            return VerifyExecutionResult(
+                exit_code=code,
+                payload=payload,
+                human_lines=tuple(human_lines),
+            )
 
         payload = _verify_output.build_verify_json_payload(
             reports,
@@ -406,10 +406,14 @@ def verify_reports_contract(
         if not json_mode:
             try:
                 last = _load_evaluation_report(reports[-1]) if reports else {}
-                active_console.print(_verify_output.build_verify_success_line(last))
+                human_lines.append(_verify_output.build_verify_success_line(last))
             except Exception:
                 pass
-        return 0, payload
+        return VerifyExecutionResult(
+            exit_code=0,
+            payload=payload,
+            human_lines=tuple(human_lines),
+        )
 
     except InvarlockError as ce:
         code = resolve_command_exit_code(ce, profile=profile)
@@ -420,8 +424,12 @@ def verify_reports_contract(
             encoded_error=_encode_error(ce),
         )
         if not json_mode:
-            active_console.print(str(ce))
-        return code, payload
+            human_lines.append(str(ce))
+        return VerifyExecutionResult(
+            exit_code=code,
+            payload=payload,
+            human_lines=tuple(human_lines),
+        )
     except Exception as e:
         code = resolve_command_exit_code(e, profile=profile)
         payload = _verify_output.build_verify_error_payload(
@@ -433,8 +441,33 @@ def verify_reports_contract(
             encoded_error=_encode_error(e),
         )
         if not json_mode:
-            active_console.print(f"[red]❌ Verification failed: {e}[/red]")
-        return code, payload
+            human_lines.append(f"[red]❌ Verification failed: {e}[/red]")
+        return VerifyExecutionResult(
+            exit_code=code,
+            payload=payload,
+            human_lines=tuple(human_lines),
+        )
 
 
-__all__ = ["verify_reports_contract"]
+def verify_reports_contract(
+    reports: list[Path],
+    *,
+    baseline: Path | None = None,
+    tolerance: float = 1e-9,
+    profile: str | None = "dev",
+    allow_unattested_artifacts: bool = False,
+    json_mode: bool = False,
+) -> tuple[int, dict[str, Any]]:
+    """Verify reports and return a structured result without relying on CLI output."""
+    result = run_verify_reports(
+        reports,
+        baseline=baseline,
+        tolerance=tolerance,
+        profile=profile,
+        allow_unattested_artifacts=allow_unattested_artifacts,
+        json_mode=json_mode,
+    )
+    return result.exit_code, result.payload
+
+
+__all__ = ["run_verify_reports", "verify_reports_contract"]
