@@ -59,24 +59,15 @@ def run_command_impl(
     _apply_mlm_masks = _dep("_apply_mlm_masks")
     _adjust_edit_params = _dep("_adjust_edit_params")
     _apply_warning_filters = _dep("_apply_warning_filters")
-    _build_artifacts_payload = _dep("_build_artifacts_payload")
+    _assemble_run_report = _dep("_assemble_run_report")
     _build_provider_dataset_plan = _dep("_build_provider_dataset_plan")
     _build_run_context_payload = _dep("_build_run_context_payload")
     _build_run_execution_config_payloads = _dep("_build_run_execution_config_payloads")
-    _enrich_run_report_metrics = _dep("_enrich_run_report_metrics")
-    _build_edit_payload = _dep("_build_edit_payload")
     _build_timing_summary_payload = _dep("_build_timing_summary_payload")
     _build_restore_failure_attempt_summary = _dep(
         "_build_restore_failure_attempt_summary"
     )
     _decide_failed_retry_transition = _dep("_decide_failed_retry_transition")
-    _build_flags_payload = _dep("_build_flags_payload")
-    _build_guard_entries = _dep("_build_guard_entries")
-    _build_metrics_payload = _dep("_build_metrics_payload")
-    _build_run_report_context = _dep("_build_run_report_context")
-    _build_run_report_data = _dep("_build_run_report_data")
-    _build_run_report_meta = _dep("_build_run_report_meta")
-    _canonical_dataset_id = _dep("_canonical_dataset_id")
     _choose_snapshot_mode = _dep("_choose_snapshot_mode")
     _coerce_float = _dep("_coerce_float")
     _coerce_int = _dep("_coerce_int")
@@ -91,16 +82,12 @@ def run_command_impl(
     _format_guard_chain = _dep("_format_guard_chain")
     _format_kv_line = _dep("_format_kv_line")
     _free_model_memory = _dep("_free_model_memory")
-    _finalize_run_provenance = _dep("_finalize_run_provenance")
     _hash_sequences = _dep("_hash_sequences")
     _init_retry_controller = _dep("_init_retry_controller")
     _load_model_with_cfg = _dep("_load_model_with_cfg")
-    _merge_core_timing_metrics = _dep("_merge_core_timing_metrics")
     _normalize_overhead_result = _dep("_normalize_overhead_result")
     _estimate_model_bytes = _dep("_estimate_model_bytes")
-    _persist_ref_masks = _dep("_persist_ref_masks")
-    _postprocess_and_summarize = _dep("_postprocess_and_summarize")
-    _prepare_guard_overhead_report = _dep("_prepare_guard_overhead_report")
+    _persist_run_report_outputs = _dep("_persist_run_report_outputs")
     _prepare_config_for_run = _dep("_prepare_config_for_run")
     _print_guard_overhead_summary = _dep("_print_guard_overhead_summary")
     _print_pipeline_start = _dep("_print_pipeline_start")
@@ -122,7 +109,6 @@ def run_command_impl(
     _to_serialisable_dict = _dep("_to_serialisable_dict")
     _tokenizer_digest = _dep("_tokenizer_digest")
     _validate_retry_evaluation_report = _dep("_validate_retry_evaluation_report")
-    _build_snapshot_provenance = _dep("_build_snapshot_provenance")
     _validate_and_harvest_baseline_schedule = _dep(
         "_validate_and_harvest_baseline_schedule"
     )
@@ -267,7 +253,6 @@ def run_command_impl(
         from invarlock.core.registry import get_registry
         from invarlock.core.runner import CoreRunner
         from invarlock.eval.data import get_provider
-        from invarlock.reporting.report_types import create_empty_report
 
         # Load and validate configuration via helper (preserves console prints)
         cfg = _prepare_config_for_run(
@@ -1196,215 +1181,56 @@ def run_command_impl(
                     continue
                 raise typer.Exit(1) from exc
 
-            if not hasattr(core_report, "context") or core_report.context is None:
-                core_report.context = {}
+            debug_metric_diffs_enabled = str(
+                os.environ.get("DEBUG_METRIC_DIFFS", "")
+            ).strip().lower() in {"1", "true", "yes", "on"}
 
-            # Convert CoreRunner report to evaluation report
-            report = create_empty_report()
-
-            # Persist minimal run context for evaluation report provenance.
-            try:
-                report["context"] = _build_run_report_context(
-                    profile_normalized=profile_normalized,
-                    auto_config=auto_config,
-                    run_context=run_context,
-                )
-            except (TypeError, ValueError, KeyError):
-                pass
-
-            # Code provenance: commit hash and InvarLock version
-            commit_value = (
-                getattr(cfg.meta, "commit", "") if hasattr(cfg, "meta") else ""
-            )
-            if not commit_value:
-                try:
-                    import subprocess
-
-                    git_path = shutil.which("git")
-                    if git_path:
-                        commit_value = (
-                            subprocess.check_output(
-                                [git_path, "rev-parse", "HEAD"],
-                                stderr=subprocess.DEVNULL,
-                            )
-                            .decode("utf-8", "ignore")
-                            .strip()
-                        )
-                except (OSError, subprocess.SubprocessError):
-                    commit_value = ""
-            invarlock_version = None
-            try:
-                from invarlock import __version__ as _invarlock_version
-
-                invarlock_version = _invarlock_version
-            except ImportError:
-                invarlock_version = None
-
-            # Collect determinism/env flags
-            env_flags: dict[str, object] = {}
-            try:
-                import os as _os
-
-                torch_mod = _optional_torch()
-                if torch_mod is not None:
-                    try:
-                        det_enabled = getattr(
-                            torch_mod, "are_deterministic_algorithms_enabled", None
-                        )
-                        if callable(det_enabled):
-                            env_flags["torch_deterministic_algorithms"] = bool(
-                                det_enabled()
-                            )
-                    except (AttributeError, RuntimeError, TypeError):
-                        pass
-                    try:
-                        tf32_matmul = getattr(
-                            getattr(torch_mod.backends, "cuda", object()),
-                            "matmul",
-                            None,
-                        )
-                        if tf32_matmul is not None and hasattr(
-                            tf32_matmul, "allow_tf32"
-                        ):
-                            env_flags["cuda_matmul_allow_tf32"] = bool(
-                                tf32_matmul.allow_tf32
-                            )
-                    except (AttributeError, RuntimeError, TypeError):
-                        pass
-                    try:
-                        cudnn_mod = getattr(torch_mod.backends, "cudnn", None)
-                        if cudnn_mod is not None:
-                            env_flags["cudnn_allow_tf32"] = bool(
-                                getattr(cudnn_mod, "allow_tf32", None)
-                            )
-                            env_flags["cudnn_deterministic"] = bool(
-                                getattr(cudnn_mod, "deterministic", None)
-                            )
-                            env_flags["cudnn_benchmark"] = bool(
-                                getattr(cudnn_mod, "benchmark", None)
-                            )
-                    except (AttributeError, RuntimeError, TypeError):
-                        pass
-                    try:
-                        env_flags["mps_available"] = bool(
-                            getattr(torch_mod.backends, "mps", None)
-                            and torch_mod.backends.mps.is_available()
-                        )
-                    except (AttributeError, RuntimeError, TypeError):
-                        pass
-                # Common environment variables for determinism
-                env_flags["CUBLAS_WORKSPACE_CONFIG"] = _os.environ.get(
-                    "CUBLAS_WORKSPACE_CONFIG"
-                )
-            except (AttributeError, RuntimeError, TypeError, ValueError, OSError):
-                env_flags = {}
-
-            report["meta"].update(
-                _build_run_report_meta(
-                    model_id=cfg.model.id,
-                    adapter=cfg.model.adapter,
-                    resolved_device=resolved_device,
-                    commit_value=commit_value,
-                    seed_bundle=seed_bundle,
-                    auto_config=auto_config,
-                    guard_overhead_threshold=guard_overhead_threshold,
-                    model_profile=model_profile,
-                    timestamp=datetime.now().isoformat(),
-                    invarlock_version=invarlock_version,
-                    env_flags=env_flags,
-                    determinism_meta=determinism_meta,
-                    pm_acceptance_range=pm_acceptance_range,
-                    pm_drift_band=pm_drift_band,
-                )
-            )
-
-            dataset_provider = getattr(cfg.dataset, "provider", None)
-            if dataset_provider is None:
-                dataset_provider = getattr(cfg.dataset, "dataset", None)
-            dataset_meta_context = core_report.context.get("dataset_meta", {})
-            data_payload, tokenizer_hash = _build_run_report_data(
-                canonical_dataset_id=_canonical_dataset_id(dataset_provider),
-                resolved_split=resolved_split,
-                seq_len=cfg.dataset.seq_len,
-                stride=getattr(cfg.dataset, "stride", cfg.dataset.seq_len // 2),
-                preview_count=_safe_int(preview_count),
-                final_count=_safe_int(final_count),
-                dataset_meta_context=dataset_meta_context,
+            assembly_result = _assemble_run_report(
+                core_report=core_report,
+                cfg=cfg,
+                run_context=run_context,
+                profile_normalized=profile_normalized,
+                auto_config=auto_config,
+                resolved_device=resolved_device,
+                seed_bundle=seed_bundle,
+                guard_overhead_threshold=guard_overhead_threshold,
+                model_profile=model_profile,
+                determinism_meta=determinism_meta,
+                pm_acceptance_range=pm_acceptance_range,
+                pm_drift_band=pm_drift_band,
                 tokenizer_hash=tokenizer_hash,
-            )
-            report["data"].update(data_payload)
-
-            if tokenizer_hash:
-                report["meta"]["tokenizer_hash"] = tokenizer_hash
-
-            # Snapshot/restore provenance (survives retries).
-            try:
-                prov = report.setdefault("provenance", {})
-                prov.update(_build_snapshot_provenance(snapshot_provenance))
-            except (TypeError, KeyError):
-                pass
-
-            # Transfer edit information
-            edit_payload, context_edit = _build_edit_payload(
-                core_edit=(
-                    core_report.edit
-                    if hasattr(core_report, "edit")
-                    and isinstance(core_report.edit, dict)
-                    else None
-                ),
-                edit_name=edit_op.name,
+                resolved_split=resolved_split,
+                preview_count=preview_count,
+                final_count=final_count,
+                snapshot_provenance=snapshot_provenance,
+                edit_op=edit_op,
                 edit_label=edit_label,
+                run_dir=run_dir,
+                run_config=run_config,
+                resolved_loss_type=resolved_loss_type,
+                timings=timings,
+                guard_overhead_payload=guard_overhead_payload,
+                baseline=baseline,
+                preview_records=preview_records,
+                final_records=final_records,
+                use_mlm=use_mlm,
+                preview_mask_counts=preview_mask_counts,
+                final_mask_counts=final_mask_counts,
+                profile=profile,
+                used_fallback_split=used_fallback_split,
+                baseline_report_data=baseline_report_data,
+                effective_preview=effective_preview,
+                effective_final=effective_final,
+                metric_kind=metric_kind,
+                window_plan=window_plan,
+                debug_metric_diffs_enabled=debug_metric_diffs_enabled,
             )
-            if edit_payload:
-                report["edit"].update(edit_payload)
-            if context_edit and isinstance(core_report.context, dict):
-                core_report.context.setdefault("edit", {})
-                core_report.context["edit"].update(context_edit)
+            report = assembly_result.report
+            timings = assembly_result.timings
+            provenance_result = assembly_result.provenance_result
+            metrics_enrichment = assembly_result.metrics_enrichment
 
-            mask_artifact_path = _persist_ref_masks(core_report, run_dir)
-            report["artifacts"].update(
-                _build_artifacts_payload(
-                    event_path=run_config.event_path,
-                    mask_artifact_path=mask_artifact_path,
-                )
-            )
-
-            # Transfer metrics (PM-only: do not write ppl_* fields)
-            if hasattr(core_report, "metrics") and core_report.metrics:
-                timings = _merge_core_timing_metrics(timings, core_report.metrics)
-                metrics_payload = _build_metrics_payload(
-                    core_metrics=core_report.metrics,
-                    window_plan_context=core_report.context.get("window_plan"),
-                    dataset_meta_context=dataset_meta_context,
-                    resolved_loss_type=resolved_loss_type,
-                )
-                report["metrics"].update(metrics_payload)
-
-            if guard_overhead_payload is not None:
-                report["guard_overhead"] = _prepare_guard_overhead_report(
-                    guard_overhead_payload,
-                    resolved_loss_type=resolved_loss_type,
-                    core_report=core_report,
-                    report=report,
-                    default_threshold=guard_overhead_threshold,
-                )
-
-            had_baseline = bool(baseline and Path(baseline).exists())
             try:
-                provenance_result = _finalize_run_provenance(
-                    report=report,
-                    core_report=core_report,
-                    preview_records=preview_records,
-                    final_records=final_records,
-                    use_mlm=use_mlm,
-                    preview_mask_counts=preview_mask_counts,
-                    final_mask_counts=final_mask_counts,
-                    had_baseline=had_baseline,
-                    profile=profile,
-                    resolved_split=resolved_split,
-                    used_fallback_split=used_fallback_split,
-                    baseline_report_data=baseline_report_data,
-                )
                 if provenance_result.missing_evaluation_windows_for_baseline:
                     _event(
                         console,
@@ -1422,15 +1248,6 @@ def run_command_impl(
                 _fail_run(str(_e))
             except (typer.Exit, SystemExit, click.exceptions.Exit):
                 raise
-
-            report["guards"].extend(
-                _build_guard_entries(
-                    core_report.guards
-                    if hasattr(core_report, "guards")
-                    and isinstance(core_report.guards, dict)
-                    else None
-                )
-            )
 
             # Optional: export HF-loadable model snapshot when requested
             export_env = str(
@@ -1522,34 +1339,6 @@ def run_command_impl(
                         profile=profile_normalized,
                     )
 
-            report["flags"].update(
-                _build_flags_payload(
-                    core_report.guards
-                    if hasattr(core_report, "guards")
-                    and isinstance(core_report.guards, dict)
-                    else None
-                )
-            )
-
-            debug_metric_diffs_enabled = str(
-                os.environ.get("DEBUG_METRIC_DIFFS", "")
-            ).strip().lower() in {"1", "true", "yes", "on"}
-            metrics_enrichment = _enrich_run_report_metrics(
-                report=report,
-                core_report=core_report,
-                run_config=run_config,
-                cfg=cfg,
-                model_profile=model_profile,
-                baseline_requested=bool(baseline),
-                baseline_report_data=baseline_report_data,
-                metric_kind=metric_kind,
-                resolved_loss_type=resolved_loss_type,
-                effective_preview=effective_preview,
-                effective_final=effective_final,
-                profile_normalized=profile_normalized,
-                window_plan=window_plan,
-                debug_metric_diffs_enabled=debug_metric_diffs_enabled,
-            )
             pairing_violations = metrics_enrichment.pairing_violations
             if pairing_violations:
                 violation = pairing_violations[0]
@@ -1568,49 +1357,30 @@ def run_command_impl(
                     + "[/dim]"
                 )
 
-            telemetry_path: Path | None = None
-            if telemetry:
-                telemetry_path = run_dir / "telemetry.json"
-                report.setdefault("artifacts", {})["telemetry_path"] = str(
-                    telemetry_path
-                )
-
-            saved_files = _postprocess_and_summarize(
+            persistence_result = _persist_run_report_outputs(
                 report=report,
                 run_dir=run_dir,
                 run_config=run_config,
                 console=console,
+                telemetry=telemetry,
             )
-            try:
-                if isinstance(saved_files, dict) and saved_files.get("json"):
-                    report_path_out = str(saved_files["json"])
-            except (TypeError, KeyError):
-                pass
-
-            if telemetry and telemetry_path is not None:
-                try:
-                    from invarlock.reporting.telemetry import save_telemetry_report
-
-                    saved_path = save_telemetry_report(
-                        report, run_dir, filename=telemetry_path.name
-                    )
-                    if isinstance(saved_files, dict):
-                        saved_files["telemetry"] = str(saved_path)
-                    _event(
-                        console,
-                        "DATA",
-                        f"Telemetry: {saved_path}",
-                        emoji="📈",
-                        profile=profile_normalized,
-                    )
-                except Exception as exc:  # pragma: no cover - best-effort
-                    _event(
-                        console,
-                        "WARN",
-                        f"Telemetry export failed: {exc}",
-                        emoji="⚠️",
-                        profile=profile_normalized,
-                    )
+            report_path_out = persistence_result.report_path_out or report_path_out
+            if persistence_result.telemetry_saved_path:
+                _event(
+                    console,
+                    "DATA",
+                    f"Telemetry: {persistence_result.telemetry_saved_path}",
+                    emoji="📈",
+                    profile=profile_normalized,
+                )
+            elif persistence_result.telemetry_error:
+                _event(
+                    console,
+                    "WARN",
+                    f"Telemetry export failed: {persistence_result.telemetry_error}",
+                    emoji="⚠️",
+                    profile=profile_normalized,
+                )
 
             # Metrics display
             pm_obj = None

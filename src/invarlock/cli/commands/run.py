@@ -220,6 +220,9 @@ from invarlock.eval.window_planning import (
     resolve_effective_windows as _resolve_effective_windows_impl,
 )
 from invarlock.model_utils import set_seed
+from invarlock.reporting.report_types import (
+    create_empty_report as _create_empty_report_impl,
+)
 from invarlock.reporting.run_metric_utils import (
     format_debug_metric_diffs as _format_debug_metric_diffs_impl,
 )
@@ -234,6 +237,12 @@ from invarlock.reporting.run_pairing_contract import (
 )
 from invarlock.reporting.run_provenance_contract import (
     finalize_run_provenance as _finalize_run_provenance_impl,
+)
+from invarlock.reporting.run_report_contract import (
+    assemble_run_report as _assemble_run_report_impl,
+)
+from invarlock.reporting.run_report_contract import (
+    persist_run_report_outputs as _persist_run_report_outputs_impl,
 )
 from invarlock.reporting.run_report_metrics_contract import (
     enrich_run_report_metrics as _enrich_run_report_metrics_impl,
@@ -1140,6 +1149,129 @@ def _validate_retry_evaluation_report(
         make_report_fn=_make_report,
         telemetry_output_enabled_fn=_telemetry_output_enabled,
         telemetry_summary_line_fn=_telemetry_summary_line,
+    )
+
+
+def _assemble_run_report(
+    *,
+    core_report: Any,
+    cfg: Any,
+    run_context: dict[str, Any] | None,
+    profile_normalized: str | None,
+    auto_config: dict[str, Any] | None,
+    resolved_device: str,
+    seed_bundle: dict[str, Any],
+    guard_overhead_threshold: float,
+    model_profile: Any,
+    determinism_meta: dict[str, Any],
+    pm_acceptance_range: tuple[float, float] | None,
+    pm_drift_band: tuple[float, float] | None,
+    tokenizer_hash: str | None,
+    resolved_split: str | None,
+    preview_count: Any,
+    final_count: Any,
+    snapshot_provenance: dict[str, bool],
+    edit_op: Any,
+    edit_label: str | None,
+    run_dir: Path,
+    run_config: Any,
+    resolved_loss_type: str,
+    timings: dict[str, float],
+    guard_overhead_payload: dict[str, Any] | None,
+    baseline: str | None,
+    preview_records: list[dict[str, Any]],
+    final_records: list[dict[str, Any]],
+    use_mlm: bool,
+    preview_mask_counts: list[int] | None,
+    final_mask_counts: list[int] | None,
+    profile: str | None,
+    used_fallback_split: bool,
+    baseline_report_data: dict[str, Any] | None,
+    effective_preview: Any,
+    effective_final: Any,
+    metric_kind: str | None,
+    window_plan: dict[str, Any] | None,
+    debug_metric_diffs_enabled: bool,
+) -> Any:
+    return _assemble_run_report_impl(
+        core_report=core_report,
+        cfg=cfg,
+        run_context=run_context,
+        profile_normalized=profile_normalized,
+        auto_config=auto_config,
+        resolved_device=resolved_device,
+        seed_bundle=seed_bundle,
+        guard_overhead_threshold=guard_overhead_threshold,
+        model_profile=model_profile,
+        determinism_meta=determinism_meta,
+        pm_acceptance_range=pm_acceptance_range,
+        pm_drift_band=pm_drift_band,
+        tokenizer_hash=tokenizer_hash,
+        resolved_split=resolved_split,
+        preview_count=preview_count,
+        final_count=final_count,
+        snapshot_provenance=snapshot_provenance,
+        edit_op=edit_op,
+        edit_label=edit_label,
+        run_dir=run_dir,
+        run_config=run_config,
+        resolved_loss_type=resolved_loss_type,
+        timings=timings,
+        guard_overhead_payload=guard_overhead_payload,
+        baseline=baseline,
+        preview_records=preview_records,
+        final_records=final_records,
+        use_mlm=use_mlm,
+        preview_mask_counts=preview_mask_counts,
+        final_mask_counts=final_mask_counts,
+        profile=profile,
+        used_fallback_split=used_fallback_split,
+        baseline_report_data=baseline_report_data,
+        effective_preview=effective_preview,
+        effective_final=effective_final,
+        metric_kind=metric_kind,
+        window_plan=window_plan,
+        debug_metric_diffs_enabled=debug_metric_diffs_enabled,
+        create_empty_report_fn=_create_empty_report_impl,
+        build_run_report_context_fn=_build_run_report_context_impl,
+        build_run_report_meta_fn=_build_run_report_meta_impl,
+        canonical_dataset_id_fn=_canonical_dataset_id,
+        safe_int_fn=_safe_int,
+        build_run_report_data_fn=_build_run_report_data_impl,
+        build_snapshot_provenance_fn=_build_snapshot_provenance_impl,
+        build_edit_payload_fn=_build_edit_payload_impl,
+        persist_ref_masks_fn=_persist_ref_masks,
+        build_artifacts_payload_fn=_build_artifacts_payload_impl,
+        merge_core_timing_metrics_fn=_merge_core_timing_metrics_impl,
+        build_metrics_payload_fn=_build_metrics_payload_impl,
+        prepare_guard_overhead_report_fn=_prepare_guard_overhead_report,
+        finalize_run_provenance_fn=_finalize_run_provenance,
+        build_guard_entries_fn=_build_guard_entries_impl,
+        build_flags_payload_fn=_build_flags_payload_impl,
+        enrich_run_report_metrics_fn=_enrich_run_report_metrics,
+        optional_torch_fn=_get_torch,
+        environ=os.environ,
+    )
+
+
+def _persist_run_report_outputs(
+    *,
+    report: dict[str, Any],
+    run_dir: Path,
+    run_config: Any,
+    console: Console,
+    telemetry: bool,
+) -> Any:
+    from invarlock.reporting.telemetry import save_telemetry_report
+
+    return _persist_run_report_outputs_impl(
+        report=report,
+        run_dir=run_dir,
+        run_config=run_config,
+        console=console,
+        telemetry=telemetry,
+        postprocess_and_summarize_fn=_postprocess_and_summarize,
+        save_telemetry_report_fn=save_telemetry_report,
     )
 
 
@@ -2091,6 +2223,7 @@ def _build_run_command_deps() -> dict[str, Any]:
         "_SnapshotRestoreFailed": _SnapshotRestoreFailed,
         "_apply_mlm_masks": _apply_mlm_masks,
         "_apply_warning_filters": _apply_warning_filters,
+        "_assemble_run_report": _assemble_run_report,
         "_build_artifacts_payload": _build_artifacts_payload_impl,
         "_build_provider_dataset_plan": _build_provider_dataset_plan,
         "_build_run_context_payload": _build_run_context_payload,
@@ -2142,6 +2275,7 @@ def _build_run_command_deps() -> dict[str, Any]:
         "_estimate_model_bytes": _estimate_model_bytes,
         "_finalize_guard_overhead_payload": _finalize_guard_overhead_payload,
         "_persist_ref_masks": _persist_ref_masks,
+        "_persist_run_report_outputs": _persist_run_report_outputs,
         "_postprocess_and_summarize": _postprocess_and_summarize,
         "_prepare_guard_overhead_report": _prepare_guard_overhead_report,
         "_prepare_config_for_run": _prepare_config_for_run,

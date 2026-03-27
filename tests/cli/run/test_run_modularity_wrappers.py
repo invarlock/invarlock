@@ -543,6 +543,81 @@ def test_analysis_and_overhead_wrappers_delegate(monkeypatch):
     )
     assert enriched.debug_diffs_line == "diffs"
 
+    monkeypatch.setattr(
+        run_mod,
+        "_assemble_run_report_impl",
+        lambda **kwargs: SimpleNamespace(
+            report={"meta": {}},
+            timings={},
+            provenance_result=None,
+            metrics_enrichment=None,
+        ),
+    )
+    assembled = run_mod._assemble_run_report(
+        core_report=SimpleNamespace(context={}),
+        cfg=SimpleNamespace(
+            model=SimpleNamespace(id="gpt2", adapter="hf_causal"),
+            dataset=SimpleNamespace(provider="wikitext2", seq_len=128, stride=64),
+            meta=SimpleNamespace(commit="abc123"),
+        ),
+        run_context={},
+        profile_normalized="dev",
+        auto_config={},
+        resolved_device="cpu",
+        seed_bundle={"python": 43},
+        guard_overhead_threshold=0.01,
+        model_profile=SimpleNamespace(),
+        determinism_meta={},
+        pm_acceptance_range=None,
+        pm_drift_band=None,
+        tokenizer_hash=None,
+        resolved_split="validation",
+        preview_count=1,
+        final_count=1,
+        snapshot_provenance={},
+        edit_op=SimpleNamespace(name="noop"),
+        edit_label=None,
+        run_dir=Path("."),
+        run_config=SimpleNamespace(event_path=None),
+        resolved_loss_type="causal",
+        timings={},
+        guard_overhead_payload=None,
+        baseline=None,
+        preview_records=[],
+        final_records=[],
+        use_mlm=False,
+        preview_mask_counts=None,
+        final_mask_counts=None,
+        profile="dev",
+        used_fallback_split=False,
+        baseline_report_data=None,
+        effective_preview=1,
+        effective_final=1,
+        metric_kind="ppl_causal",
+        window_plan=None,
+        debug_metric_diffs_enabled=False,
+    )
+    assert assembled.report == {"meta": {}}
+
+    monkeypatch.setattr(
+        run_mod,
+        "_persist_run_report_outputs_impl",
+        lambda **kwargs: SimpleNamespace(
+            saved_files={"json": "report.json"},
+            report_path_out="report.json",
+            telemetry_saved_path=None,
+            telemetry_error=None,
+        ),
+    )
+    persisted = run_mod._persist_run_report_outputs(
+        report={},
+        run_dir=Path("."),
+        run_config=SimpleNamespace(event_path=None),
+        console=run_mod.console,
+        telemetry=False,
+    )
+    assert persisted.report_path_out == "report.json"
+
 
 def test_run_command_injects_explicit_deps(monkeypatch, tmp_path: Path):
     sentinel = object()
@@ -576,6 +651,7 @@ def test_run_command_injects_explicit_deps(monkeypatch, tmp_path: Path):
         is run_mod._build_run_execution_config_payloads
     )
     assert deps["_enrich_run_report_metrics"] is run_mod._enrich_run_report_metrics
+    assert deps["_assemble_run_report"] is run_mod._assemble_run_report
     assert (
         deps["_validate_retry_evaluation_report"]
         is run_mod._validate_retry_evaluation_report
@@ -592,6 +668,7 @@ def test_run_command_injects_explicit_deps(monkeypatch, tmp_path: Path):
     assert (
         deps["_prepare_guard_overhead_report"] is run_mod._prepare_guard_overhead_report
     )
+    assert deps["_persist_run_report_outputs"] is run_mod._persist_run_report_outputs
     assert (
         deps["_resolve_retry_validation_transition"]
         is run_mod._resolve_retry_validation_transition
