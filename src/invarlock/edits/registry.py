@@ -156,11 +156,3 @@ def check_edit_dependencies(edit_name: str) -> dict[str, bool]:
             result[dep] = False
 
     return result
-
-
-def print_edit_status() -> None:
-    """Print status of all registered edits."""
-    registry = get_registry()
-    for name, plugin in registry._plugins.items():
-        status = "✓" if plugin.is_available else "✗"
-        print(f"{status} {name}: {plugin.description}")

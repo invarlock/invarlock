@@ -94,3 +94,21 @@ def test_quant_rtn_emit_flag_suppresses_output() -> None:
     )
 
     assert out.getvalue() == ""
+
+
+def test_quant_rtn_logs_when_console_missing(caplog: pytest.LogCaptureFixture) -> None:
+    model = torch.nn.Linear(2, 2, bias=False)
+    adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
+    edit = RTNQuantEdit(scope="all", max_modules=1)
+
+    with caplog.at_level("INFO", logger="invarlock.edits.quant_rtn"):
+        edit.apply(
+            model,
+            adapter,
+            scope="all",
+            max_modules=1,
+            emit=True,
+        )
+
+    assert caplog.records
+    assert any(record.message.startswith("[EDIT]") for record in caplog.records)

@@ -17,6 +17,7 @@ Follows the ModelEdit protocol with preview() and apply() methods.
 
 from __future__ import annotations
 
+import logging
 import random
 from typing import Any
 
@@ -27,6 +28,8 @@ import torch.nn as nn
 from invarlock.core.api import CalibrationData, GuardChain, ModelAdapter, ModelEdit
 
 __all__ = ["RTNQuantEdit"]
+
+logger = logging.getLogger(__name__)
 
 
 class RTNQuantEdit(ModelEdit):
@@ -110,7 +113,7 @@ class RTNQuantEdit(ModelEdit):
             except TypeError:
                 self._emit_console.print(line)
         else:
-            print(line)
+            logger.info(line)
 
     def can_edit(self, model_desc: dict[str, Any]) -> bool:
         """Check if RTN quantization can be applied to this model."""
