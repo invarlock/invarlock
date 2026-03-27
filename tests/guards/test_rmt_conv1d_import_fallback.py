@@ -4,8 +4,8 @@ import builtins
 
 import torch.nn as nn
 
-from invarlock.guards.rmt_analysis import capture_baseline_mp_stats
 import invarlock.guards.rmt as runtime_rmt
+from invarlock.guards.rmt_analysis import capture_baseline_mp_stats
 
 
 class _TinyModel(nn.Module):

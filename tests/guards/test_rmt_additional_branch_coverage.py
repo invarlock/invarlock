@@ -31,6 +31,8 @@ def test_capture_baseline_mp_stats_allowed_module_names_filters() -> None:
 def test_runtime_detection_reports_supported_modules() -> None:
     model = _TinyModel()
     guard = runtime_rmt.RMTGuard(correct=False)
+    guard.baseline_mp_stats = {}
+    guard.baseline_sigmas = {}
     out = guard._apply_rmt_detection_and_correction(model)
     per_layer = out.get("per_layer", [])
     assert isinstance(per_layer, list)

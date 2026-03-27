@@ -76,7 +76,21 @@ def test_rmt_detect_with_names_fallback_path():
     guard = runtime_rmt.RMTGuard(margin=0.9, correct=False)
     guard.baseline_mp_stats = {}
     guard.baseline_sigmas = {}
-    report = guard._apply_rmt_detection_and_correction(model)
+    original = runtime_rmt.rmt_analysis.layer_svd_stats
+
+    def _fake_layer_svd_stats(_module, *_args, **_kwargs):
+        return {
+            "sigma_min": 1.0,
+            "sigma_max": 2.0,
+            "worst_ratio": 2.0,
+            "worst_details": {"name": "attn.c_attn", "s_max": 2.0},
+        }
+
+    runtime_rmt.rmt_analysis.layer_svd_stats = _fake_layer_svd_stats
+    try:
+        report = guard._apply_rmt_detection_and_correction(model)
+    finally:
+        runtime_rmt.rmt_analysis.layer_svd_stats = original
 
     assert report["has_outliers"] is True
     assert report["flagged_layers"]
