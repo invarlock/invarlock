@@ -1164,7 +1164,7 @@ class TestExecuteSingleRun:
 class TestExecuteScenario:
     """Test execute_scenario function."""
 
-    @patch("invarlock.eval.bench.DependencyChecker.check_edit_dependencies")
+    @patch("invarlock.eval.bench_runner.DependencyChecker.check_edit_dependencies")
     def test_execute_scenario_dependency_failure(self, mock_check_deps):
         """Test scenario execution with dependency failure."""
         mock_check_deps.return_value = (False, "missing dependency")
@@ -1178,9 +1178,9 @@ class TestExecuteScenario:
         assert result.skipped is True
         assert result.skip_reason == "missing dependency"
 
-    @patch("invarlock.eval.bench.resolve_epsilon_from_runtime")
-    @patch("invarlock.eval.bench.execute_single_run")
-    @patch("invarlock.eval.bench.DependencyChecker.check_edit_dependencies")
+    @patch("invarlock.eval.bench_runner.resolve_epsilon_from_runtime")
+    @patch("invarlock.eval.bench_runner.execute_single_run")
+    @patch("invarlock.eval.bench_runner.DependencyChecker.check_edit_dependencies")
     def test_execute_scenario_epsilon_fallback_when_guarded_fails(
         self,
         mock_check_deps,
@@ -1213,9 +1213,9 @@ class TestExecuteScenario:
         assert pytest.approx(result.epsilon_used, rel=1e-9) == 0.10
         mock_resolve_epsilon.assert_not_called()
 
-    @patch("invarlock.eval.bench.ValidationGates.validate_all_gates")
-    @patch("invarlock.eval.bench.execute_single_run")
-    @patch("invarlock.eval.bench.DependencyChecker.check_edit_dependencies")
+    @patch("invarlock.eval.bench_runner.ValidationGates.validate_all_gates")
+    @patch("invarlock.eval.bench_runner.execute_single_run")
+    @patch("invarlock.eval.bench_runner.DependencyChecker.check_edit_dependencies")
     def test_execute_scenario_success_uses_validation_gates(
         self,
         mock_check_deps,
@@ -1264,7 +1264,7 @@ class TestRunGuardEffectBenchmark:
     def test_run_guard_effect_benchmark_basic(self, monkeypatch):
         """Test basic benchmark execution."""
         monkeypatch.setattr(
-            "invarlock.eval.bench.execute_scenario",
+            "invarlock.eval.bench_runner.execute_scenario",
             lambda scenario, cfg, output_dir: ScenarioResult(
                 config=scenario,
                 metrics={"primary_metric_overhead": 0.0, "guard_overhead_time": 0.0},
@@ -1297,7 +1297,7 @@ class TestRunGuardEffectBenchmark:
     def test_run_guard_effect_benchmark_multiple_scenarios(self, monkeypatch):
         """Test benchmark with multiple scenarios."""
         monkeypatch.setattr(
-            "invarlock.eval.bench.execute_scenario",
+            "invarlock.eval.bench_runner.execute_scenario",
             lambda scenario, cfg, output_dir: ScenarioResult(
                 config=scenario,
                 metrics={"primary_metric_overhead": 0.0, "guard_overhead_time": 0.0},
@@ -1335,10 +1335,10 @@ class TestRunGuardEffectBenchmark:
             epsilon_used=0.05,
         )
         monkeypatch.setattr(
-            "invarlock.eval.bench.generate_scenarios", lambda cfg: [scenario_cfg]
+            "invarlock.eval.bench_runner.generate_scenarios", lambda cfg: [scenario_cfg]
         )
         monkeypatch.setattr(
-            "invarlock.eval.bench.execute_scenario",
+            "invarlock.eval.bench_runner.execute_scenario",
             lambda scenario, cfg, output_dir: fail_result,
         )
 
