@@ -5,7 +5,7 @@ from invarlock.cli.adapter_auto import (
     apply_auto_adapter_if_needed,
     resolve_auto_adapter,
 )
-from invarlock.cli.config import InvarLockConfig
+from invarlock.core.config_runtime import InvarLockConfig
 
 
 def _write_cfg(tmp_path: Path, model_type: str, arch: str) -> Path:

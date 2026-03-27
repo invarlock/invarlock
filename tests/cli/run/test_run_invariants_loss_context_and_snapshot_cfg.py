@@ -158,7 +158,7 @@ def test_invariants_existing_checks_as_scalar_becomes_list(tmp_path: Path):
             patch("invarlock.cli.commands.run.detect_model_profile", detect_profile)
         )
         stack.enter_context(
-            patch("invarlock.cli.config.load_config", lambda p: DummyCfg())
+            patch("invarlock.core.config_runtime.load_config", lambda p: DummyCfg())
         )
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: _provider())
@@ -236,7 +236,7 @@ def test_invariants_existing_checks_set_becomes_list(tmp_path: Path):
             patch("invarlock.cli.commands.run.detect_model_profile", detect_profile)
         )
         stack.enter_context(
-            patch("invarlock.cli.config.load_config", lambda p: DummyCfg())
+            patch("invarlock.core.config_runtime.load_config", lambda p: DummyCfg())
         )
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: _provider())
@@ -317,7 +317,7 @@ def test_invariants_existing_checks_tuple_becomes_list(tmp_path: Path):
             patch("invarlock.cli.commands.run.detect_model_profile", detect_profile)
         )
         stack.enter_context(
-            patch("invarlock.cli.config.load_config", lambda p: DummyCfg())
+            patch("invarlock.core.config_runtime.load_config", lambda p: DummyCfg())
         )
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: _provider())
@@ -372,7 +372,7 @@ def test_loss_cfg_nan_values_coerced(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.cli.config.load_config", lambda p: DummyCfg())
+            patch("invarlock.core.config_runtime.load_config", lambda p: DummyCfg())
         )
         stack.enter_context(
             patch(
@@ -566,7 +566,7 @@ def test_snapshot_cfg_threshold_and_tempdir(tmp_path: Path, monkeypatch):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(patch("invarlock.cli.config.load_config", load_cfg))
+        stack.enter_context(patch("invarlock.core.config_runtime.load_config", load_cfg))
         stack.enter_context(
             patch(
                 "invarlock.core.registry.get_registry",

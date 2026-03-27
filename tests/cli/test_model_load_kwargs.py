@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from invarlock.cli.commands import run as run_mod
-from invarlock.cli.config import InvarLockConfig
+from invarlock.core.config_runtime import InvarLockConfig
 from invarlock.core.exceptions import InvarlockError
 
 

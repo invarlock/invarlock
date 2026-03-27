@@ -162,11 +162,11 @@ def test_edit_override_invalid_raises(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.cli.config.resolve_edit_kind", lambda name: name)
+            patch("invarlock.core.config_runtime.resolve_edit_kind", lambda name: name)
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.config.apply_edit_override",
+                "invarlock.core.config_runtime.apply_edit_override",
                 side_effect=ValueError("bad edit"),
             )
         )
@@ -261,7 +261,7 @@ def test_unknown_guards_skipped_and_known_kept(tmp_path: Path):
             patch("invarlock.core.registry.get_registry", lambda: Reg())
         )
         stack.enter_context(
-            patch("invarlock.cli.config.load_config", lambda p: DummyCfg())
+            patch("invarlock.core.config_runtime.load_config", lambda p: DummyCfg())
         )
         stack.enter_context(
             patch(
@@ -674,7 +674,7 @@ def test_plugin_provenance_counts_present(tmp_path: Path):
             patch("invarlock.core.registry.get_registry", lambda: Reg())
         )
         stack.enter_context(
-            patch("invarlock.cli.config.load_config", lambda p: DummyCfg())
+            patch("invarlock.core.config_runtime.load_config", lambda p: DummyCfg())
         )
         stack.enter_context(
             patch(

@@ -236,7 +236,7 @@ def test_snapshot_cfg_mode_overrides_env(tmp_path: Path, monkeypatch):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         monkeypatch.setenv("INVARLOCK_SNAPSHOT_MODE", "chunked")  # env says chunked
-        stack.enter_context(patch("invarlock.cli.config.load_config", load_cfg))
+        stack.enter_context(patch("invarlock.core.config_runtime.load_config", load_cfg))
         stack.enter_context(
             patch(
                 "invarlock.core.registry.get_registry",

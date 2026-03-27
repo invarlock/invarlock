@@ -6,7 +6,7 @@
 | --- | --- |
 | **Purpose** | YAML configuration structure for `invarlock evaluate --preset` and advanced/internal preset-driven flows. |
 | **Audience** | CLI users authoring presets or overrides. |
-| **Source of truth** | `src/invarlock/cli/config.py`, `src/invarlock/core/config_dependencies.py`, runtime profiles under `invarlock/_data/runtime`. |
+| **Source of truth** | `src/invarlock/core/config_runtime.py`, `src/invarlock/core/config_dependencies.py`, runtime profiles under `invarlock/_data/runtime`. |
 | **Network** | Offline by default; enable downloads via `INVARLOCK_ALLOW_NETWORK=1`. |
 | **Execution** | Model-loading commands run in the runtime container by default; trusted local `invarlock evaluate` runs use `--mode local`, while advanced/internal flows may still use `INVARLOCK_ALLOW_HOST_EXECUTION=1` or `--allow-host-execution`. |
 

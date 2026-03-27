@@ -170,9 +170,7 @@ from invarlock.eval.window_planning import (
 )
 from invarlock.model_utils import set_seed
 
-from ..config import (
-    InvarLockConfig,
-)
+from ...core.config_runtime import InvarLockConfig
 from ..overhead_utils import _extract_pm_snapshot_for_overhead
 
 console = make_console()
@@ -1098,18 +1096,10 @@ def _prepare_config_for_run(
     console: Console,
 ) -> InvarLockConfig:
     """Load InvarLock config and apply CLI/profile overrides deterministically."""
-    from ..config import (
-        apply_edit_override as _apply_edit_override,
-    )
-    from ..config import (
-        apply_profile as _apply_profile,
-    )
-    from ..config import (
-        load_config as _load_config,
-    )
-    from ..config import (
-        resolve_edit_kind as _resolve_edit_kind,
-    )
+    from ...core.config_runtime import apply_edit_override as _apply_edit_override
+    from ...core.config_runtime import apply_profile as _apply_profile
+    from ...core.config_runtime import load_config as _load_config
+    from ...core.config_runtime import resolve_edit_kind as _resolve_edit_kind
 
     try:
         from ..adapter_auto import apply_auto_adapter_if_needed as _apply_auto

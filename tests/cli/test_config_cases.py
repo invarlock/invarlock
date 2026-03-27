@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from invarlock.cli.config import (
+from invarlock.core.config_runtime import (
     AutoConfig,
     DatasetConfig,
     EvalBootstrapConfig,
 )
-from invarlock.cli.config import (
+from invarlock.core.config_runtime import (
     _deep_merge as deep_merge,
 )
 

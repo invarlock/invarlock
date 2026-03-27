@@ -1,5 +1,5 @@
 from invarlock.cli.commands import run
-from invarlock.cli.config import InvarLockConfig
+from invarlock.core.config_runtime import InvarLockConfig
 from invarlock.reporting import report_builder as cert
 
 

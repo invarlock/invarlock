@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.cli.commands import run
-from invarlock.cli.config import load_config
+from invarlock.core.config_runtime import load_config
 
 
 def test_run_config_guard_overrides_prune_none(tmp_path):

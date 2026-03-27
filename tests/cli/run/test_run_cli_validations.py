@@ -33,8 +33,8 @@ def test_run_command_file_not_found():
 
 
 @patch("invarlock.cli.commands.run.HAS_CORE_COMPONENTS", True)
-@patch("invarlock.cli.config.load_config")
-@patch("invarlock.cli.config.resolve_edit_kind")
+@patch("invarlock.core.config_runtime.load_config")
+@patch("invarlock.core.config_runtime.resolve_edit_kind")
 def test_run_command_invalid_edit_kind(mock_resolve_edit, mock_load):
     mock_config = Mock()
     mock_config.model.device = "auto"
@@ -61,7 +61,7 @@ def test_run_command_invalid_edit_kind(mock_resolve_edit, mock_load):
 
 
 @patch("invarlock.cli.commands.run.HAS_CORE_COMPONENTS", True)
-@patch("invarlock.cli.config.load_config")
+@patch("invarlock.core.config_runtime.load_config")
 def test_run_command_invalid_config_key_exits_2(mock_load):
     mock_load.side_effect = ValueError(
         "edit.parameters is not supported; use edit.plan."
@@ -85,7 +85,7 @@ def test_run_command_invalid_config_key_exits_2(mock_load):
 
 
 @patch("invarlock.cli.commands.run.HAS_CORE_COMPONENTS", True)
-@patch("invarlock.cli.config.load_config")
+@patch("invarlock.core.config_runtime.load_config")
 def test_run_command_invalid_tier(mock_load):
     mock_config = Mock()
     mock_config.model.device = "auto"
@@ -111,7 +111,7 @@ def test_run_command_invalid_tier(mock_load):
 
 
 @patch("invarlock.cli.commands.run.HAS_CORE_COMPONENTS", True)
-@patch("invarlock.cli.config.load_config")
+@patch("invarlock.core.config_runtime.load_config")
 def test_run_command_invalid_probes(mock_load):
     mock_config = Mock()
     mock_config.model.device = "auto"
@@ -138,8 +138,8 @@ def test_run_command_invalid_probes(mock_load):
 
 @patch("invarlock.cli.commands.run.HAS_CORE_COMPONENTS", True)
 @patch("invarlock.cli.commands.run.validate_guard_overhead")
-@patch("invarlock.cli.config.load_config")
-@patch("invarlock.cli.config.apply_profile")
+@patch("invarlock.core.config_runtime.load_config")
+@patch("invarlock.core.config_runtime.apply_profile")
 @patch("invarlock.cli.device.resolve_device", return_value="cpu")
 @patch("invarlock.cli.device.validate_device_for_config", return_value=(True, ""))
 @patch("invarlock.core.registry.get_registry")

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.cli.commands.run import _resolve_metric_and_provider
-from invarlock.cli.config import InvarLockConfig
+from invarlock.core.config_runtime import InvarLockConfig
 from invarlock.model_profile import detect_model_profile
 
 

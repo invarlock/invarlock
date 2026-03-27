@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-import invarlock.cli.config as config_mod
-from invarlock.cli.config import (
+import invarlock.core.config_runtime as config_mod
+from invarlock.core.config_runtime import (
     DatasetConfig,
     EvalBootstrapConfig,
     InvarLockConfig,

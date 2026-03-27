@@ -102,7 +102,7 @@ def test_edit_cli_override_invalid_exits(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.cli.config.resolve_edit_kind",
+                "invarlock.core.config_runtime.resolve_edit_kind",
                 side_effect=ValueError("bad edit"),
             )
         )
@@ -303,7 +303,7 @@ def test_edit_name_invalid_exits(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.cli.config.resolve_edit_kind",
+                "invarlock.core.config_runtime.resolve_edit_kind",
                 side_effect=ValueError("bad edit"),
             )
         )

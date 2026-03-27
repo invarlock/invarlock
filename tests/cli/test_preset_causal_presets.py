@@ -4,7 +4,7 @@ from pathlib import Path
 
 import yaml
 
-from invarlock.cli.config import load_config
+from invarlock.core.config_runtime import load_config
 
 
 def _repo_root() -> Path:

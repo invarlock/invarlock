@@ -86,7 +86,7 @@ auto_tune_pruning_budget = _RemovedComponent("auto_tune_pruning_budget")
 run_auto_invarlock = _RemovedComponent("run_auto_invarlock")
 InvarLockPipeline = _RemovedComponent("InvarLockPipeline", "invarlock.cli.app:main")
 InvarLockConfig = _RemovedComponent(
-    "InvarLockConfig", "invarlock.cli.config:InvarLockConfig"
+    "InvarLockConfig", "invarlock.core.config_runtime:InvarLockConfig"
 )
 run_invarlock_pipeline = _RemovedComponent(
     "run_invarlock_pipeline", "invarlock.cli.run"

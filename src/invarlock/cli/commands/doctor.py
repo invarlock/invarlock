@@ -391,8 +391,8 @@ def doctor_command(
             from invarlock.eval.data import get_provider
             from invarlock.model_profile import detect_model_profile, resolve_tokenizer
 
+            from ...core.config_runtime import apply_profile, load_config
             from ..commands.run import _resolve_metric_and_provider
-            from ..config import apply_profile, load_config
 
             cfg = load_config(config)
             if profile:

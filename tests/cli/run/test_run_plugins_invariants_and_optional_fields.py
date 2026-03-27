@@ -131,7 +131,7 @@ def test_profile_apply_failure_exit(tmp_path: Path):
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.config.apply_profile",
+                "invarlock.core.config_runtime.apply_profile",
                 side_effect=RuntimeError("bad profile"),
             )
         )
@@ -151,10 +151,10 @@ def test_edit_override_ok(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.cli.config.resolve_edit_kind", lambda name: name)
+            patch("invarlock.core.config_runtime.resolve_edit_kind", lambda name: name)
         )
         stack.enter_context(
-            patch("invarlock.cli.config.apply_edit_override", lambda c, e: c)
+            patch("invarlock.core.config_runtime.apply_edit_override", lambda c, e: c)
         )
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: _provider_min())
@@ -434,7 +434,7 @@ def test_mlm_mask_prob_zero_sets_labels_and_zero_counts(tmp_path: Path):
             def model_dump(self):
                 return {}
 
-        stack.enter_context(patch("invarlock.cli.config.load_config", lambda p: Cfg()))
+        stack.enter_context(patch("invarlock.core.config_runtime.load_config", lambda p: Cfg()))
 
         def runner_exec6(**kwargs):
             cfg_ctx = getattr(kwargs.get("config"), "context", {})

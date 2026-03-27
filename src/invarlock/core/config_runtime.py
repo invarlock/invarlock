@@ -1,7 +1,7 @@
-"""Minimal CLI config implementation for invarlock.cli.
+"""Runtime config ownership for InvarLock.
 
-Provides a lightweight, dict-backed configuration object plus helpers used by
-the CLI commands (load_config, apply_profile, apply_edit_override, resolve_edit_kind).
+Provides the lightweight, dict-backed config model plus runtime config loading,
+profile application, and edit override helpers used by shells and services.
 """
 
 from __future__ import annotations
@@ -15,9 +15,7 @@ from typing import Any
 
 import yaml
 
-from invarlock.core.config_dependencies import (
-    load_raw_config_payload as _load_raw_config_payload,
-)
+from .config_dependencies import load_raw_config_payload as _load_raw_config_payload
 
 
 def _deep_merge(a: dict, b: dict) -> dict:

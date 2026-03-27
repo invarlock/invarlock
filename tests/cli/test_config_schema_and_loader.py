@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from invarlock.cli import config as cfg_mod
-from invarlock.cli.config import (
+from invarlock.core import config_runtime as cfg_mod
+from invarlock.core.config_runtime import (
     AutoConfig,
     DatasetConfig,
     EvalBootstrapConfig,

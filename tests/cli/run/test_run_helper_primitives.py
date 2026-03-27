@@ -120,7 +120,7 @@ def test_resolve_exit_code_cases():
 
 
 def test_extract_model_load_kwargs_rejects_removed_keys():
-    from invarlock.cli.config import InvarLockConfig
+    from invarlock.core.config_runtime import InvarLockConfig
 
     cfg = InvarLockConfig(
         {
@@ -1804,16 +1804,16 @@ def test_prepare_config_for_run_invalid_tier_and_probes(monkeypatch):
             return dict(self._data)
 
     monkeypatch.setattr(
-        "invarlock.cli.config.load_config",
+        "invarlock.core.config_runtime.load_config",
         lambda path: DummyCfg({"auto": {}}),
         raising=False,
     )
     # Pass-through apply_profile and apply_edit_override
     monkeypatch.setattr(
-        "invarlock.cli.config.apply_profile", lambda cfg, p: cfg, raising=False
+        "invarlock.core.config_runtime.apply_profile", lambda cfg, p: cfg, raising=False
     )
     monkeypatch.setattr(
-        "invarlock.cli.config.apply_edit_override", lambda cfg, e: cfg, raising=False
+        "invarlock.core.config_runtime.apply_edit_override", lambda cfg, e: cfg, raising=False
     )
     # Invalid tier triggers Exit(1)
     with pytest.raises(typer.Exit):

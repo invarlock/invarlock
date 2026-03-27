@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from invarlock.cli.config import load_config
+from invarlock.core.config_runtime import load_config
 
 EXPECTED_CONFIGS = [
     ("presets/causal_lm", "wikitext2_512.yaml", None),

@@ -602,7 +602,7 @@ def test_provider_kwargs_propagated(tmp_path: Path):
 
         stack.enter_context(
             patch(
-                "invarlock.cli.config.load_config",
+                "invarlock.core.config_runtime.load_config",
                 lambda p: DummyCfg(tmp_path / "runs"),
             )
         )
@@ -842,7 +842,7 @@ def test_skip_missing_guard_path(tmp_path: Path):
 
         stack.enter_context(
             patch(
-                "invarlock.cli.config.load_config",
+                "invarlock.core.config_runtime.load_config",
                 lambda p: DummyCfg(tmp_path / "runs"),
             )
         )

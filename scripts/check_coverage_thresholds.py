@@ -105,7 +105,7 @@ THRESHOLDS = {
     # Simplified public-core CLI surfaces have dedicated branch-focused tests;
     # keep the hero commands above the default 90% floor.
     "src/invarlock/cli/app.py": 1.00,
-    "src/invarlock/cli/config.py": 0.95,
+    "src/invarlock/core/config_runtime.py": 0.95,
     "src/invarlock/cli/commands/evaluate.py": 0.95,
     "src/invarlock/cli/commands/report.py": 0.95,
     "src/invarlock/cli/commands/run.py": 0.95,
@@ -197,7 +197,7 @@ CORE_FILES = (
     "src/invarlock/reporting/verify_output.py",
     "src/invarlock/reporting/evidence.py",
     "src/invarlock/cli/determinism.py",
-    "src/invarlock/cli/config.py",
+    "src/invarlock/core/config_runtime.py",
     "src/invarlock/cli/_json.py",
     "src/invarlock/cli/app.py",
     "src/invarlock/core/doctor_findings.py",
