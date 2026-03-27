@@ -153,12 +153,12 @@ def test_evaluate_local_paths_pm_and_digests(monkeypatch, tmp_path: Path):
             filename_prefix="evaluation",
         )
 
-    monkeypatch.setattr(mod, "_report", _report_wrapper, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", _report_wrapper, raising=False)
 
     report_dir = tmp_path / "reports"
     evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
@@ -284,12 +284,12 @@ def test_evaluate_local_paths_quantized_subject_overheads(monkeypatch, tmp_path:
             filename_prefix="evaluation",
         )
 
-    monkeypatch.setattr(mod, "_report", _report_wrapper, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", _report_wrapper, raising=False)
 
     report_dir = tmp_path / "reports"
     evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),

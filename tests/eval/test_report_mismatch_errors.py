@@ -87,7 +87,7 @@ def test_evaluation_report_raises_on_drift_ratio_inconsistency():
         {"profile": "ci", "preview_n": 180, "final_n": 180}
     )
     with patch(
-        "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
+        "invarlock.core.bootstrap.compute_paired_delta_log_ci",
         return_value=(-0.01, 0.01),
     ):
         cert = make_report(report, baseline)

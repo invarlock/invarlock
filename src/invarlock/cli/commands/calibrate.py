@@ -242,22 +242,6 @@ def null_sweep(
         help="Target run-level spectral warning rate under the null.",
     ),
 ) -> None:
-    try:
-        from typer.models import OptionInfo as _OptionInfo  # type: ignore
-    except Exception:  # pragma: no cover
-
-        class _OptionInfo:  # type: ignore
-            pass
-
-    if isinstance(allow_network, _OptionInfo):
-        allow_network = False
-    if isinstance(allow_host_execution, _OptionInfo):
-        allow_host_execution = False
-    if isinstance(allow_third_party_plugins, _OptionInfo):
-        allow_third_party_plugins = False
-    if isinstance(allow_remote_code, _OptionInfo):
-        allow_remote_code = False
-
     # Optional deps: calibration sweeps require torch/guards, but docs/tests may
     # import this module without heavy deps. Import lazily so CLI example
     # validation can parse `invarlock calibrate ...` without installing torch.
@@ -511,22 +495,6 @@ def ve_sweep(
         help="Safety margin applied to min_effect recommendations.",
     ),
 ) -> None:
-    try:
-        from typer.models import OptionInfo as _OptionInfo  # type: ignore
-    except Exception:  # pragma: no cover
-
-        class _OptionInfo:  # type: ignore
-            pass
-
-    if isinstance(allow_network, _OptionInfo):
-        allow_network = False
-    if isinstance(allow_host_execution, _OptionInfo):
-        allow_host_execution = False
-    if isinstance(allow_third_party_plugins, _OptionInfo):
-        allow_third_party_plugins = False
-    if isinstance(allow_remote_code, _OptionInfo):
-        allow_remote_code = False
-
     # Optional deps: see null_sweep() note.
     try:
         from invarlock.calibration.variance_ve import summarize_ve_sweep_reports

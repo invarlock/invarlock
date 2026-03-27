@@ -47,11 +47,11 @@ def test_evaluate_command_smoke_for_bridge(monkeypatch, tmp_path) -> None:
     from invarlock.cli.commands import evaluate as cert_mod
 
     monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
-    monkeypatch.setattr(cert_mod, "_report", fake_report, raising=False)
+    monkeypatch.setattr(cert_mod, "generate_reports", fake_report, raising=False)
 
     evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
@@ -117,11 +117,11 @@ def test_evaluate_command_reuses_baseline_report_for_bridge(monkeypatch, tmp_pat
     from invarlock.cli.commands import evaluate as cert_mod
 
     monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
-    monkeypatch.setattr(cert_mod, "_report", fake_report, raising=False)
+    monkeypatch.setattr(cert_mod, "generate_reports", fake_report, raising=False)
 
     evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         baseline_report=str(baseline_report),
         adapter="auto",
         profile="ci",
@@ -165,11 +165,11 @@ def test_evaluate_command_local_mode_prefers_local_files_only(monkeypatch, tmp_p
     from invarlock.cli.commands import evaluate as cert_mod
 
     monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
-    monkeypatch.setattr(cert_mod, "_report", fake_report, raising=False)
+    monkeypatch.setattr(cert_mod, "generate_reports", fake_report, raising=False)
 
     evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         adapter="auto",
         profile="ci",
         mode="local",
@@ -211,11 +211,11 @@ def test_evaluate_command_passes_concrete_run_defaults(monkeypatch, tmp_path) ->
     from invarlock.cli.commands import evaluate as cert_mod
 
     monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
-    monkeypatch.setattr(cert_mod, "_report", fake_report, raising=False)
+    monkeypatch.setattr(cert_mod, "generate_reports", fake_report, raising=False)
 
     evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),

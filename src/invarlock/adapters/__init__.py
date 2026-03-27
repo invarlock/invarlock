@@ -1,8 +1,4 @@
-"""Adapter namespace (`invarlock.adapters`) exposing built-in adapters.
-
-Provides lazy import of heavy submodules to avoid importing Transformers
-stacks unless needed. Accessing adapter classes triggers on-demand import.
-"""
+"""Adapter namespace (`invarlock.adapters`) exposing built-in adapters."""
 
 from __future__ import annotations
 
@@ -65,35 +61,6 @@ def quality_label(ratio: float) -> str:
     return "Degraded"
 
 
-class _RemovedComponent:
-    def __init__(self, name: str, replacement: str | None = None):
-        self._name = name
-        self._replacement = replacement
-
-    def __call__(self, *args, **kwargs):
-        raise NotImplementedError(
-            f"{self._name} is not available in InvarLock 1.0."
-            + (f" Use: {self._replacement}" if self._replacement else "")
-        )
-
-    def __getattr__(self, _):  # pragma: no cover - simple passthrough
-        return _RemovedComponent(self._name, self._replacement)
-
-
-# Placeholders for removed utilities referenced in tests
-HF_Pythia_Adapter = _RemovedComponent("HF_Pythia_Adapter")
-auto_tune_pruning_budget = _RemovedComponent("auto_tune_pruning_budget")
-run_auto_invarlock = _RemovedComponent("run_auto_invarlock")
-InvarLockPipeline = _RemovedComponent("InvarLockPipeline", "invarlock.__main__:main")
-InvarLockConfig = _RemovedComponent(
-    "InvarLockConfig", "invarlock.core.config_runtime:InvarLockConfig"
-)
-run_invarlock_pipeline = _RemovedComponent(
-    "run_invarlock_pipeline", "invarlock.__main__:main"
-)
-run_invarlock = _RemovedComponent("run_invarlock", "invarlock.__main__:main")
-quick_prune_gpt2 = _RemovedComponent("quick_prune_gpt2")
-
 __all__ = [
     "HF_Causal_Adapter",
     "HF_MLM_Adapter",
@@ -105,7 +72,6 @@ __all__ = [
     "DeviceManager",
     "BasePerformanceMetrics",
     "quality_label",
-    "_RemovedComponent",
     "INVARLOCK_CORE_ABI",
     # Capabilities
     "ModelCapabilities",

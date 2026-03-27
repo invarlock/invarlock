@@ -57,7 +57,7 @@ def test_evaluation_report_ratio_ci_source_run_metrics_on_compute_failure():
     }
 
     with patch(
-        "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
+        "invarlock.core.bootstrap.compute_paired_delta_log_ci",
         side_effect=RuntimeError("fail"),
     ):
         cert = make_report(report, baseline)

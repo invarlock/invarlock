@@ -62,7 +62,7 @@ def test_meta_tokenizer_hash_propagates_and_ratio_ci_non_numeric_continues():
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ),
         patch(
-            "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
+            "invarlock.core.bootstrap.compute_paired_delta_log_ci",
             return_value=(-0.1, 0.05),
         ),
     ):

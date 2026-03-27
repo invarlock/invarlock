@@ -83,9 +83,6 @@ from invarlock.cli.utils import (
 from invarlock.cli.utils import (
     coerce_int as _coerce_int,
 )
-from invarlock.cli.utils import (
-    coerce_option as _coerce_option,
-)
 from invarlock.core.auto_tuning import (
     resolve_tier_policies as _resolve_tier_policies,
 )
@@ -107,6 +104,9 @@ from invarlock.core.run_baseline_evidence import (
 )
 from invarlock.core.run_baseline_evidence import (
     materialize_baseline_pairing_schedule as _materialize_baseline_pairing_schedule_impl,
+)
+from invarlock.core.run_dataset_contract import (
+    materialize_run_dataset as _materialize_run_dataset_impl,
 )
 from invarlock.core.run_evaluation_windows_policy import (
     build_fallback_evaluation_windows as _build_fallback_evaluation_windows_impl,
@@ -204,6 +204,12 @@ from invarlock.core.run_retry_policy import (
 from invarlock.core.run_retry_policy import (
     resolve_retry_validation_transition as _resolve_retry_validation_transition_impl,
 )
+from invarlock.core.run_snapshot_contract import (
+    build_snapshot_execution_plan as _build_snapshot_execution_plan_impl,
+)
+from invarlock.core.run_snapshot_contract import (
+    resolve_snapshot_retry_transition as _resolve_snapshot_retry_transition_impl,
+)
 from invarlock.core.run_snapshot_policy import (
     choose_snapshot_mode as _choose_snapshot_mode_impl,
 )
@@ -220,6 +226,9 @@ from invarlock.eval.window_planning import (
     resolve_effective_windows as _resolve_effective_windows_impl,
 )
 from invarlock.model_utils import set_seed
+from invarlock.reporting.report_types import (
+    create_empty_report as _create_empty_report_impl,
+)
 from invarlock.reporting.run_metric_utils import (
     format_debug_metric_diffs as _format_debug_metric_diffs_impl,
 )
@@ -234,6 +243,12 @@ from invarlock.reporting.run_pairing_contract import (
 )
 from invarlock.reporting.run_provenance_contract import (
     finalize_run_provenance as _finalize_run_provenance_impl,
+)
+from invarlock.reporting.run_report_contract import (
+    assemble_run_report as _assemble_run_report_impl,
+)
+from invarlock.reporting.run_report_contract import (
+    persist_run_report_outputs as _persist_run_report_outputs_impl,
 )
 from invarlock.reporting.run_report_metrics_contract import (
     enrich_run_report_metrics as _enrich_run_report_metrics_impl,
@@ -338,22 +353,6 @@ def validate_guard_overhead(*args: Any, **kwargs: Any) -> Any:
     )
 
     return _validate_guard_overhead(*args, **kwargs)
-
-
-# Keep these names available on this module for delegated run_command_impl
-# runtime lookup and test monkeypatch compatibility.
-_RUN_COMMAND_IMPL_EXPORTS = (
-    psutil,
-    perf_counter,
-    print_timing_summary,
-    timed_step,
-    _coerce_float,
-    _coerce_int,
-    _coerce_option,
-    detect_model_profile,
-    resolve_tokenizer,
-    validate_guard_overhead,
-)
 
 
 def _style_from_console(console: Console, profile: str | None = None) -> OutputStyle:
@@ -784,35 +783,6 @@ def _resolve_snapshot_config(context: object | None) -> dict[str, Any]:
     )
 
 
-def _estimate_model_bytes(model: object | None) -> int:
-    return _estimate_model_bytes_impl(model)
-
-
-def _choose_snapshot_mode(
-    *,
-    snapshot_config: Mapping[str, Any] | None,
-    env_mode: str | None,
-    supports_bytes: bool,
-    supports_chunked: bool,
-    estimated_model_mb: float,
-    available_ram_mb: float,
-    disk_free_mb: float,
-    env_ram_fraction: str | None = None,
-    env_threshold_mb: str | None = None,
-) -> str:
-    return _choose_snapshot_mode_impl(
-        snapshot_config=snapshot_config,
-        env_mode=env_mode,
-        supports_bytes=supports_bytes,
-        supports_chunked=supports_chunked,
-        estimated_model_mb=estimated_model_mb,
-        available_ram_mb=available_ram_mb,
-        disk_free_mb=disk_free_mb,
-        env_ram_fraction=env_ram_fraction,
-        env_threshold_mb=env_threshold_mb,
-    )
-
-
 def _choose_dataset_split(
     *, requested: str | None, available: list[str] | None
 ) -> tuple[str, bool]:
@@ -1002,8 +972,9 @@ def _build_provider_dataset_plan(
     original_token_prob: float,
     resolved_loss_type: str,
     tier: str | None,
-    get_provider_fn: Any,
 ) -> Any:
+    from invarlock.eval.data import get_provider
+
     return _build_provider_dataset_plan_impl(
         cfg=cfg,
         model_profile=model_profile,
@@ -1023,7 +994,7 @@ def _build_provider_dataset_plan(
         original_token_prob=original_token_prob,
         resolved_loss_type=resolved_loss_type,
         tier=tier,
-        get_provider_fn=get_provider_fn,
+        get_provider_fn=get_provider,
         resolve_provider_and_split_fn=_resolve_provider_and_split,
         resolve_tokenizer_fn=resolve_tokenizer,
         maybe_plan_release_windows_fn=_maybe_plan_release_windows,
@@ -1140,6 +1111,230 @@ def _validate_retry_evaluation_report(
         make_report_fn=_make_report,
         telemetry_output_enabled_fn=_telemetry_output_enabled,
         telemetry_summary_line_fn=_telemetry_summary_line,
+    )
+
+
+def _assemble_run_report(
+    *,
+    core_report: Any,
+    cfg: Any,
+    run_context: dict[str, Any] | None,
+    profile_normalized: str | None,
+    auto_config: dict[str, Any] | None,
+    resolved_device: str,
+    seed_bundle: dict[str, Any],
+    guard_overhead_threshold: float,
+    model_profile: Any,
+    determinism_meta: dict[str, Any],
+    pm_acceptance_range: tuple[float, float] | None,
+    pm_drift_band: tuple[float, float] | None,
+    tokenizer_hash: str | None,
+    resolved_split: str | None,
+    preview_count: Any,
+    final_count: Any,
+    snapshot_provenance: dict[str, bool],
+    edit_op: Any,
+    edit_label: str | None,
+    run_dir: Path,
+    run_config: Any,
+    resolved_loss_type: str,
+    timings: dict[str, float],
+    guard_overhead_payload: dict[str, Any] | None,
+    baseline: str | None,
+    preview_records: list[dict[str, Any]],
+    final_records: list[dict[str, Any]],
+    use_mlm: bool,
+    preview_mask_counts: list[int] | None,
+    final_mask_counts: list[int] | None,
+    profile: str | None,
+    used_fallback_split: bool,
+    baseline_report_data: dict[str, Any] | None,
+    effective_preview: Any,
+    effective_final: Any,
+    metric_kind: str | None,
+    window_plan: dict[str, Any] | None,
+    debug_metric_diffs_enabled: bool,
+) -> Any:
+    return _assemble_run_report_impl(
+        core_report=core_report,
+        cfg=cfg,
+        run_context=run_context,
+        profile_normalized=profile_normalized,
+        auto_config=auto_config,
+        resolved_device=resolved_device,
+        seed_bundle=seed_bundle,
+        guard_overhead_threshold=guard_overhead_threshold,
+        model_profile=model_profile,
+        determinism_meta=determinism_meta,
+        pm_acceptance_range=pm_acceptance_range,
+        pm_drift_band=pm_drift_band,
+        tokenizer_hash=tokenizer_hash,
+        resolved_split=resolved_split,
+        preview_count=preview_count,
+        final_count=final_count,
+        snapshot_provenance=snapshot_provenance,
+        edit_op=edit_op,
+        edit_label=edit_label,
+        run_dir=run_dir,
+        run_config=run_config,
+        resolved_loss_type=resolved_loss_type,
+        timings=timings,
+        guard_overhead_payload=guard_overhead_payload,
+        baseline=baseline,
+        preview_records=preview_records,
+        final_records=final_records,
+        use_mlm=use_mlm,
+        preview_mask_counts=preview_mask_counts,
+        final_mask_counts=final_mask_counts,
+        profile=profile,
+        used_fallback_split=used_fallback_split,
+        baseline_report_data=baseline_report_data,
+        effective_preview=effective_preview,
+        effective_final=effective_final,
+        metric_kind=metric_kind,
+        window_plan=window_plan,
+        debug_metric_diffs_enabled=debug_metric_diffs_enabled,
+        create_empty_report_fn=_create_empty_report_impl,
+        build_run_report_context_fn=_build_run_report_context_impl,
+        build_run_report_meta_fn=_build_run_report_meta_impl,
+        canonical_dataset_id_fn=_canonical_dataset_id,
+        safe_int_fn=_safe_int,
+        build_run_report_data_fn=_build_run_report_data_impl,
+        build_snapshot_provenance_fn=_build_snapshot_provenance_impl,
+        build_edit_payload_fn=_build_edit_payload_impl,
+        persist_ref_masks_fn=_persist_ref_masks,
+        build_artifacts_payload_fn=_build_artifacts_payload_impl,
+        merge_core_timing_metrics_fn=_merge_core_timing_metrics_impl,
+        build_metrics_payload_fn=_build_metrics_payload_impl,
+        prepare_guard_overhead_report_fn=_prepare_guard_overhead_report,
+        finalize_run_provenance_fn=_finalize_run_provenance,
+        build_guard_entries_fn=_build_guard_entries_impl,
+        build_flags_payload_fn=_build_flags_payload_impl,
+        enrich_run_report_metrics_fn=_enrich_run_report_metrics,
+        optional_torch_fn=_get_torch,
+        environ=os.environ,
+    )
+
+
+def _persist_run_report_outputs(
+    *,
+    report: dict[str, Any],
+    run_dir: Path,
+    run_config: Any,
+    console: Console,
+    telemetry: bool,
+) -> Any:
+    from invarlock.reporting.telemetry import save_telemetry_report
+
+    return _persist_run_report_outputs_impl(
+        report=report,
+        run_dir=run_dir,
+        run_config=run_config,
+        console=console,
+        telemetry=telemetry,
+        postprocess_and_summarize_fn=_postprocess_and_summarize,
+        save_telemetry_report_fn=save_telemetry_report,
+    )
+
+
+def _build_snapshot_execution_plan(
+    *,
+    adapter: Any,
+    model: Any,
+    cfg_snapshot: dict[str, Any] | None,
+    direct_reuse_loaded_model: bool,
+    skip_overhead_source: str | None,
+) -> Any:
+    return _build_snapshot_execution_plan_impl(
+        adapter=adapter,
+        model=model,
+        cfg_snapshot=cfg_snapshot,
+        direct_reuse_loaded_model=direct_reuse_loaded_model,
+        skip_overhead_source=skip_overhead_source,
+        choose_snapshot_mode_fn=_choose_snapshot_mode_impl,
+        estimate_model_bytes_fn=_estimate_model_bytes_impl,
+        psutil_module=_get_psutil(),
+        environ=os.environ,
+        disk_usage_fn=shutil.disk_usage,
+        free_model_memory_fn=_free_model_memory,
+    )
+
+
+def _resolve_snapshot_retry_transition(
+    *,
+    skip_overhead: bool,
+    profile_normalized: str | None,
+    emitted_skip_overhead_warning: bool,
+    skip_overhead_source: str | None,
+    retry_controller: Any,
+    model: Any,
+    restore_fn: Any | None,
+    skip_model_load: bool,
+) -> Any:
+    return _resolve_snapshot_retry_transition_impl(
+        skip_overhead=skip_overhead,
+        profile_normalized=profile_normalized,
+        emitted_skip_overhead_warning=emitted_skip_overhead_warning,
+        skip_overhead_source=skip_overhead_source,
+        retry_controller=retry_controller,
+        model=model,
+        restore_fn=restore_fn,
+        skip_model_load=skip_model_load,
+    )
+
+
+def _materialize_run_dataset(
+    *,
+    pairing_schedule: dict[str, Any] | None,
+    cfg: Any,
+    model_profile: Any,
+    console: Console,
+    resolved_device: str | None,
+    profile: str | None,
+    profile_normalized: str | None,
+    requested_preview: int,
+    requested_final: int,
+    effective_preview: int,
+    effective_final: int,
+    use_mlm: bool,
+    mask_prob: float,
+    mask_seed: int,
+    random_token_prob: float,
+    original_token_prob: float,
+    resolved_loss_type: str,
+    tier: str | None,
+    baseline_report_data: dict[str, Any] | None,
+    tokenizer: Any,
+    tokenizer_hash: str | None,
+    resolved_split: str | None,
+) -> Any:
+    return _materialize_run_dataset_impl(
+        pairing_schedule=pairing_schedule,
+        cfg=cfg,
+        model_profile=model_profile,
+        console=console,
+        resolved_device=resolved_device,
+        profile=profile,
+        profile_normalized=profile_normalized,
+        requested_preview=requested_preview,
+        requested_final=requested_final,
+        effective_preview=effective_preview,
+        effective_final=effective_final,
+        use_mlm=use_mlm,
+        mask_prob=mask_prob,
+        mask_seed=mask_seed,
+        random_token_prob=random_token_prob,
+        original_token_prob=original_token_prob,
+        resolved_loss_type=resolved_loss_type,
+        tier=tier,
+        baseline_report_data=baseline_report_data,
+        tokenizer=tokenizer,
+        tokenizer_hash=tokenizer_hash,
+        resolved_split=resolved_split,
+        validate_and_harvest_baseline_schedule_fn=_validate_and_harvest_baseline_schedule,
+        materialize_baseline_pairing_schedule_fn=_materialize_baseline_pairing_schedule,
+        build_provider_dataset_plan_fn=_build_provider_dataset_plan,
+        resolve_tokenizer_fn=resolve_tokenizer,
     )
 
 
@@ -2091,6 +2286,7 @@ def _build_run_command_deps() -> dict[str, Any]:
         "_SnapshotRestoreFailed": _SnapshotRestoreFailed,
         "_apply_mlm_masks": _apply_mlm_masks,
         "_apply_warning_filters": _apply_warning_filters,
+        "_assemble_run_report": _assemble_run_report,
         "_build_artifacts_payload": _build_artifacts_payload_impl,
         "_build_provider_dataset_plan": _build_provider_dataset_plan,
         "_build_run_context_payload": _build_run_context_payload,
@@ -2101,7 +2297,6 @@ def _build_run_command_deps() -> dict[str, Any]:
         "_canonical_dataset_id": _canonical_dataset_id,
         "_coerce_float": _coerce_float,
         "_coerce_int": _coerce_int,
-        "_coerce_option": _coerce_option,
         "_compute_provider_digest": _compute_provider_digest,
         "_finalize_run_provenance": _finalize_run_provenance,
         "_build_edit_payload": _build_edit_payload_impl,
@@ -2110,6 +2305,7 @@ def _build_run_command_deps() -> dict[str, Any]:
         "_execute_guarded_run": _execute_guarded_run,
         "_extract_pairing_schedule": _extract_pairing_schedule,
         "_load_baseline_pairing_evidence": _load_baseline_pairing_evidence,
+        "_materialize_run_dataset": _materialize_run_dataset,
         "_materialize_baseline_pairing_schedule": _materialize_baseline_pairing_schedule,
         "_extract_pm_snapshot_for_overhead": _extract_pm_snapshot_for_overhead,
         "_format_debug_metric_diffs": _format_debug_metric_diffs,
@@ -2138,10 +2334,10 @@ def _build_run_command_deps() -> dict[str, Any]:
         "_resolve_retry_validation_transition": _resolve_retry_validation_transition,
         "_adjust_edit_params": _adjust_edit_params,
         "_build_fallback_evaluation_windows": _build_fallback_evaluation_windows,
-        "_choose_snapshot_mode": _choose_snapshot_mode,
-        "_estimate_model_bytes": _estimate_model_bytes,
+        "_build_snapshot_execution_plan": _build_snapshot_execution_plan,
         "_finalize_guard_overhead_payload": _finalize_guard_overhead_payload,
         "_persist_ref_masks": _persist_ref_masks,
+        "_persist_run_report_outputs": _persist_run_report_outputs,
         "_postprocess_and_summarize": _postprocess_and_summarize,
         "_prepare_guard_overhead_report": _prepare_guard_overhead_report,
         "_prepare_config_for_run": _prepare_config_for_run,
@@ -2156,6 +2352,7 @@ def _build_run_command_deps() -> dict[str, Any]:
         "_resolve_pm_drift_band": _resolve_pm_drift_band,
         "_resolve_provider_and_split": _resolve_provider_and_split,
         "_resolve_snapshot_config": _resolve_snapshot_config,
+        "_resolve_snapshot_retry_transition": _resolve_snapshot_retry_transition,
         "_run_bare_control": _run_bare_control,
         "_safe_int": _safe_int,
         "_serialize_evaluation_windows": _serialize_evaluation_windows,
@@ -2181,9 +2378,7 @@ def _build_run_command_deps() -> dict[str, Any]:
         "print_timing_summary": print_timing_summary,
         "get_psutil": _get_psutil,
         "resolve_output_style": resolve_output_style,
-        "resolve_tokenizer": resolve_tokenizer,
         "set_seed": set_seed,
-        "shutil": shutil,
         "timed_step": timed_step,
         "get_torch": _get_torch,
         "typer": typer,
@@ -2192,100 +2387,30 @@ def _build_run_command_deps() -> dict[str, Any]:
 
 
 def run_command(
-    config: str = typer.Option(
-        ..., "--config", "-c", help="Path to YAML configuration file"
-    ),
-    device: str | None = typer.Option(
-        None, "--device", help="Device override (auto|cuda|mps|cpu)"
-    ),
-    profile: str | None = typer.Option(
-        None,
-        "--profile",
-        help="Profile to apply (e.g. ci, release, ci_cpu; dev is a no-op)",
-    ),
-    out: str | None = typer.Option(None, "--out", help="Output directory override"),
-    edit: str | None = typer.Option(
-        None,
-        "--edit",
-        help="Edit name override (canonical plugin name, e.g. quant_rtn)",
-    ),
-    edit_label: str | None = typer.Option(
-        None,
-        "--edit-label",
-        help=(
-            "Edit algorithm label for BYOE models. Use 'noop' for baseline, "
-            "'quant_rtn' etc. for built-in edits, 'custom' for pre-edited models."
-        ),
-    ),
-    tier: str | None = typer.Option(
-        None,
-        "--tier",
-        help="Auto-tuning tier override (conservative|balanced|aggressive)",
-    ),
-    metric_kind: str | None = typer.Option(
-        None,
-        "--metric-kind",
-        help="Primary metric kind override (ppl_causal|ppl_mlm|accuracy|etc.)",
-    ),
-    probes: int | None = typer.Option(
-        None, "--probes", help="Number of micro-probes (0=deterministic, >0=adaptive)"
-    ),
-    until_pass: bool = typer.Option(
-        False,
-        "--until-pass",
-        help="Retry until evaluation report passes gates (max 3 attempts)",
-    ),
-    max_attempts: int = typer.Option(
-        3, "--max-attempts", help="Maximum retry attempts for --until-pass mode"
-    ),
-    timeout: int | None = typer.Option(
-        None, "--timeout", help="Timeout in seconds for --until-pass mode"
-    ),
-    baseline: str | None = typer.Option(
-        None,
-        "--baseline",
-        help="Path to baseline report.json for evaluation report validation",
-    ),
-    no_cleanup: bool = typer.Option(
-        False, "--no-cleanup", help="Skip cleanup of temporary artifacts"
-    ),
-    style: str | None = typer.Option(
-        None, "--style", help="Output style (audit|friendly)"
-    ),
-    progress: bool = typer.Option(
-        False, "--progress", help="Show progress done messages"
-    ),
-    timing: bool = typer.Option(False, "--timing", help="Show timing summary"),
-    telemetry: bool = typer.Option(
-        False, "--telemetry", help="Write telemetry JSON alongside the report"
-    ),
-    allow_network: bool = typer.Option(
-        False,
-        "--allow-network",
-        help="Explicitly allow outbound network access for this command.",
-    ),
-    allow_host_execution: bool = typer.Option(
-        False,
-        "--allow-host-execution",
-        help="Run on the host instead of auto-delegating to the runtime container.",
-    ),
-    allow_third_party_plugins: bool = typer.Option(
-        False,
-        "--allow-third-party-plugins",
-        help="Enable third-party entry-point plugin discovery for this command.",
-    ),
-    allow_remote_code: bool = typer.Option(
-        False,
-        "--allow-remote-code",
-        help="Allow trust_remote_code-style model loading for this command.",
-    ),
-    prefer_local_files_only: bool = typer.Option(
-        False,
-        hidden=True,
-    ),
-    no_color: bool = typer.Option(
-        False, "--no-color", help="Disable ANSI colors (respects NO_COLOR=1)"
-    ),
+    config: str,
+    device: str | None = None,
+    profile: str | None = None,
+    out: str | None = None,
+    edit: str | None = None,
+    edit_label: str | None = None,
+    tier: str | None = None,
+    metric_kind: str | None = None,
+    probes: int | None = None,
+    until_pass: bool = False,
+    max_attempts: int = 3,
+    timeout: int | None = None,
+    baseline: str | None = None,
+    no_cleanup: bool = False,
+    style: str | None = None,
+    progress: bool = False,
+    timing: bool = False,
+    telemetry: bool = False,
+    allow_network: bool = False,
+    allow_host_execution: bool = False,
+    allow_third_party_plugins: bool = False,
+    allow_remote_code: bool = False,
+    prefer_local_files_only: bool = False,
+    no_color: bool = False,
 ):
     """
     Run InvarLock pipeline with the given configuration.
@@ -2296,11 +2421,11 @@ def run_command(
     and emits a run report plus JSONL
     events suitable for evaluation report generation.
     """
-    allow_network = bool(_coerce_option(allow_network, False))
-    allow_host_execution = bool(_coerce_option(allow_host_execution, False))
-    allow_third_party_plugins = bool(_coerce_option(allow_third_party_plugins, False))
-    allow_remote_code = bool(_coerce_option(allow_remote_code, False))
-    prefer_local_files_only = bool(_coerce_option(prefer_local_files_only, False))
+    allow_network = bool(allow_network)
+    allow_host_execution = bool(allow_host_execution)
+    allow_third_party_plugins = bool(allow_third_party_plugins)
+    allow_remote_code = bool(allow_remote_code)
+    prefer_local_files_only = bool(prefer_local_files_only)
     try:
         return run_from_config(
             config=config,

@@ -69,7 +69,7 @@ def test_evaluation_report_ratio_ci_mismatch_raises(monkeypatch):
     )
     # Force mismatch by overriding the ratio_ci computation from delta_ci
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.logspace_to_ratio_ci",
+        "invarlock.core.bootstrap.logspace_to_ratio_ci",
         lambda _: (1.05, 1.06),
     )
 

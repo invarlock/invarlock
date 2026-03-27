@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from invarlock.cli.commands import report as R
+from invarlock.reporting.report_contract import generate_reports
 from invarlock.reporting.report_types import create_empty_report
 
 
@@ -32,7 +32,7 @@ def test_report_command_programmatic_json_only(tmp_path: Path):
     report_path.write_text(json.dumps(report), encoding="utf-8")
 
     # Should generate plain JSON report bundle without baseline
-    R.report_command(
+    generate_reports(
         run=str(run_dir),
         format="json",
         baseline=None,

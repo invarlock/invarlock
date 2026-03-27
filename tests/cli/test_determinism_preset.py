@@ -3,11 +3,13 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from invarlock.cli.determinism import apply_determinism_preset
+from invarlock.core.determinism_policy import apply_determinism_preset
 
 
 def test_determinism_preset_coercion_failure_paths(monkeypatch) -> None:
-    monkeypatch.setattr("invarlock.cli.determinism.set_seed", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        "invarlock.core.determinism_policy.set_seed", lambda *_a, **_k: None
+    )
 
     payload = apply_determinism_preset(
         profile=object(),  # type: ignore[arg-type]
@@ -21,7 +23,9 @@ def test_determinism_preset_coercion_failure_paths(monkeypatch) -> None:
 
 
 def test_determinism_preset_off_in_dev_profile(monkeypatch) -> None:
-    monkeypatch.setattr("invarlock.cli.determinism.set_seed", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        "invarlock.core.determinism_policy.set_seed", lambda *_a, **_k: None
+    )
     payload = apply_determinism_preset(profile="dev", device="cpu", seed=123, threads=2)
     assert payload["requested"] == "off"
     assert payload["level"] == "off"
@@ -29,8 +33,10 @@ def test_determinism_preset_off_in_dev_profile(monkeypatch) -> None:
 
 
 def test_determinism_preset_downgrades_when_torch_unavailable(monkeypatch) -> None:
-    monkeypatch.setattr("invarlock.cli.determinism.torch", None)
-    monkeypatch.setattr("invarlock.cli.determinism.set_seed", lambda *_a, **_k: None)
+    monkeypatch.setattr("invarlock.core.determinism_policy.torch", None)
+    monkeypatch.setattr(
+        "invarlock.core.determinism_policy.set_seed", lambda *_a, **_k: None
+    )
 
     payload = apply_determinism_preset(
         profile="release", device="cuda:0", seed=7, threads=2
@@ -78,8 +84,10 @@ def test_determinism_preset_marks_tolerance_when_deterministic_algos_fail(
         are_deterministic_algorithms_enabled=lambda: False,
     )
 
-    monkeypatch.setattr("invarlock.cli.determinism.torch", fake_torch)
-    monkeypatch.setattr("invarlock.cli.determinism.set_seed", lambda *_a, **_k: None)
+    monkeypatch.setattr("invarlock.core.determinism_policy.torch", fake_torch)
+    monkeypatch.setattr(
+        "invarlock.core.determinism_policy.set_seed", lambda *_a, **_k: None
+    )
 
     payload = apply_determinism_preset(profile="ci", device="cuda:0", seed=7, threads=1)
     assert payload["requested"] == "strict"
@@ -92,9 +100,11 @@ def test_determinism_preset_seed_bundle_fallbacks(monkeypatch) -> None:
         raise RuntimeError("boom")
 
     fake_torch = SimpleNamespace(initial_seed=_boom)
-    monkeypatch.setattr("invarlock.cli.determinism.torch", fake_torch)
-    monkeypatch.setattr("invarlock.cli.determinism.set_seed", lambda *_a, **_k: None)
-    monkeypatch.setattr("invarlock.cli.determinism.np.random.get_state", _boom)
+    monkeypatch.setattr("invarlock.core.determinism_policy.torch", fake_torch)
+    monkeypatch.setattr(
+        "invarlock.core.determinism_policy.set_seed", lambda *_a, **_k: None
+    )
+    monkeypatch.setattr("invarlock.core.determinism_policy.np.random.get_state", _boom)
 
     payload = apply_determinism_preset(profile="dev", device="cpu", seed=3, threads=1)
     assert payload["seeds"]["numpy"] == 3
@@ -116,8 +126,10 @@ def test_determinism_preset_marks_tolerance_when_backend_access_raises(
         initial_seed=lambda: 7,
         are_deterministic_algorithms_enabled=lambda: True,
     )
-    monkeypatch.setattr("invarlock.cli.determinism.torch", fake_torch)
-    monkeypatch.setattr("invarlock.cli.determinism.set_seed", lambda *_a, **_k: None)
+    monkeypatch.setattr("invarlock.core.determinism_policy.torch", fake_torch)
+    monkeypatch.setattr(
+        "invarlock.core.determinism_policy.set_seed", lambda *_a, **_k: None
+    )
 
     payload = apply_determinism_preset(profile="ci", device="cuda:0", seed=7, threads=1)
     assert payload["level"] == "tolerance"
@@ -132,8 +144,10 @@ def test_determinism_preset_strict_with_minimal_torch_stub_hits_false_paths(
         cudnn = None
 
     fake_torch = SimpleNamespace(backends=_Backends(), initial_seed=lambda: 7)
-    monkeypatch.setattr("invarlock.cli.determinism.torch", fake_torch)
-    monkeypatch.setattr("invarlock.cli.determinism.set_seed", lambda *_a, **_k: None)
+    monkeypatch.setattr("invarlock.core.determinism_policy.torch", fake_torch)
+    monkeypatch.setattr(
+        "invarlock.core.determinism_policy.set_seed", lambda *_a, **_k: None
+    )
 
     payload = apply_determinism_preset(profile="ci", device="cuda:0", seed=7, threads=1)
     assert payload["level"] == "strict"
@@ -166,8 +180,10 @@ def test_determinism_preset_warn_only_fallback_failure(monkeypatch) -> None:
         initial_seed=lambda: 7,
     )
 
-    monkeypatch.setattr("invarlock.cli.determinism.torch", fake_torch)
-    monkeypatch.setattr("invarlock.cli.determinism.set_seed", lambda *_a, **_k: None)
+    monkeypatch.setattr("invarlock.core.determinism_policy.torch", fake_torch)
+    monkeypatch.setattr(
+        "invarlock.core.determinism_policy.set_seed", lambda *_a, **_k: None
+    )
 
     payload = apply_determinism_preset(profile="ci", device="cuda:0", seed=7, threads=1)
     assert payload["level"] == "tolerance"
@@ -204,8 +220,10 @@ def test_determinism_preset_cuda_low_memory_selects_cublas_fallback(
     )
 
     monkeypatch.delenv("CUBLAS_WORKSPACE_CONFIG", raising=False)
-    monkeypatch.setattr("invarlock.cli.determinism.torch", fake_torch)
-    monkeypatch.setattr("invarlock.cli.determinism.set_seed", lambda *_a, **_k: None)
+    monkeypatch.setattr("invarlock.core.determinism_policy.torch", fake_torch)
+    monkeypatch.setattr(
+        "invarlock.core.determinism_policy.set_seed", lambda *_a, **_k: None
+    )
 
     payload = apply_determinism_preset(profile="ci", device="cuda:0", seed=7, threads=2)
     assert payload["requested"] == "strict"
@@ -215,8 +233,12 @@ def test_determinism_preset_cuda_low_memory_selects_cublas_fallback(
 def test_determinism_preset_prunes_empty_torch_payload_when_random_fails(
     monkeypatch,
 ) -> None:
-    monkeypatch.setattr("invarlock.cli.determinism.random.random", lambda: 1 / 0)
-    monkeypatch.setattr("invarlock.cli.determinism.set_seed", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        "invarlock.core.determinism_policy.random.random", lambda: 1 / 0
+    )
+    monkeypatch.setattr(
+        "invarlock.core.determinism_policy.set_seed", lambda *_a, **_k: None
+    )
 
     payload = apply_determinism_preset(profile="dev", device="cpu", seed=1, threads=1)
     assert "torch" not in payload

@@ -8,17 +8,9 @@ from invarlock.cli.app import app
 
 
 def test_removed_commands_fail_with_migration_guidance():
-    expected = {
-        "run": "invarlock evaluate",
-        "proof-pack": "advanced proof-pack",
-        "policy": "advanced policy",
-        "plugins": "advanced plugins",
-        "calibrate": "advanced calibrate",
-    }
-
     runner = CliRunner()
-    for command, hint in expected.items():
+    for command in ("run", "proof-pack", "policy", "plugins", "calibrate"):
         result = runner.invoke(app, [command])
         assert result.exit_code == 2
         out = strip_ansi(result.output)
-        assert hint in out
+        assert f"No such command '{command}'" in out

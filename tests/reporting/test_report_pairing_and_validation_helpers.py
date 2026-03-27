@@ -8,6 +8,7 @@ import pytest
 
 from invarlock.reporting import primary_metric_utils
 from invarlock.reporting import report_builder as cert_mod
+from invarlock.reporting import report_make_impl as report_make_impl_mod
 from invarlock.reporting import report_schema as cert_schema_mod
 from invarlock.reporting.report_builder import make_report, validate_report
 from invarlock.reporting.report_types import create_empty_report
@@ -60,7 +61,7 @@ def test_make_evaluation_report_covers_baseline_ratio_identity_paths(
 ) -> None:
     # Avoid heavy bootstrap compute while still exercising the paired-window CI path.
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
+        "invarlock.core.bootstrap.compute_paired_delta_log_ci",
         lambda *_a, **_k: (-0.01, 0.01),
     )
 
@@ -421,10 +422,10 @@ def test_make_evaluation_report_ratio_ci_fallback_skips_non_interval(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
+        "invarlock.core.bootstrap.compute_paired_delta_log_ci",
         lambda *_a, **_k: (-0.01, 0.01),
     )
-    monkeypatch.setattr(cert_mod, "_coerce_interval", lambda _v: (0.0,))  # type: ignore[assignment]
+    monkeypatch.setattr(report_make_impl_mod, "_coerce_interval", lambda _v: (0.0,))  # type: ignore[assignment]
 
     baseline = _mk_baseline()
     report = create_empty_report()

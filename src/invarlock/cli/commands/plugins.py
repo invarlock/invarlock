@@ -62,33 +62,13 @@ def _emit_plugins_json(category: str, rows, extra: dict | None = None) -> None:
 
 
 def plugins_command(
-    category: str | None = typer.Argument(
-        None, help="Plugin category (guards|edits|adapters|datasets)"
-    ),
-    only: str | None = typer.Option(
-        None,
-        "--only",
-        help="Filter adapters (adapters only): missing|ready|core|optional",
-    ),
-    verbose: bool = typer.Option(
-        False, "--verbose", help="Show detailed columns for adapters"
-    ),
-    json_out: bool = typer.Option(
-        False, "--json", help="Emit JSON instead of a table (adapters only)"
-    ),
-    explain: str | None = typer.Option(
-        None, "--explain", help="Explain a specific adapter (adapters only)"
-    ),
-    hide_unsupported: bool = typer.Option(
-        True,
-        "--hide-unsupported/--show-unsupported",
-        help="Hide adapters unsupported on this platform (default: hide)",
-    ),
-    allow_third_party_plugins: bool = typer.Option(
-        False,
-        "--allow-third-party-plugins",
-        help="Allow third-party plugin discovery for this command.",
-    ),
+    category: str | None = None,
+    only: str | None = None,
+    verbose: bool = False,
+    json_out: bool = False,
+    explain: str | None = None,
+    hide_unsupported: bool = True,
+    allow_third_party_plugins: bool = False,
 ):
     """
     List available plugins with entry point information.
@@ -103,27 +83,6 @@ def plugins_command(
         invarlock advanced plugins adapters --allow-third-party-plugins
     """
     try:
-        # Coerce Typer OptionInfo defaults when invoked programmatically
-        try:
-            from typer.models import OptionInfo as _OptionInfo  # type: ignore
-        except Exception:  # pragma: no cover
-
-            class _OptionInfo:  # type: ignore
-                pass
-
-        if isinstance(only, _OptionInfo):
-            only = None
-        if isinstance(verbose, _OptionInfo):
-            verbose = False
-        if isinstance(json_out, _OptionInfo):
-            json_out = False
-        if isinstance(explain, _OptionInfo):
-            explain = None
-        if isinstance(hide_unsupported, _OptionInfo):
-            hide_unsupported = True
-        if isinstance(allow_third_party_plugins, _OptionInfo):
-            allow_third_party_plugins = False
-
         configure_runtime_security(
             allow_third_party_plugins=bool(allow_third_party_plugins)
         )
@@ -180,7 +139,9 @@ def plugins_command(
                 present = False
                 backend_present = False
                 try:
-                    from invarlock.cli.provenance import extract_adapter_provenance
+                    from invarlock.core.adapter_provenance import (
+                        extract_adapter_provenance,
+                    )
 
                     prov = extract_adapter_provenance(n)
                     backend_name = prov.library or ""
@@ -703,10 +664,6 @@ def plugins_command(
             _render_dataset_table(title, plugin_list, verbose=verbose)
 
         # Show specific category or all
-        # Accept singular alias
-        if category == "adapter":
-            category = "adapters"
-
         if category == "guards":
             show_plugins("Guard Plugins", registry.list_guards(), "guards")
         elif category == "edits":
@@ -900,16 +857,6 @@ def _check_plugin_extras(plugin_name: str, plugin_type: str) -> str:
             return f"⚠️ missing {', '.join(missing_packages)}"
 
 
-def list_edits_command():
-    """List available edit plugins."""
-    plugins_command("edits")
-
-
-def list_guards_command():
-    """List available guard plugins."""
-    plugins_command("guards")
-
-
 # Wire subcommands under group
 @plugins_app.command("list")
 def _plugins_list(
@@ -1024,42 +971,7 @@ def _plugins_adapters(
     )
 
 
-# Back-compat singular alias (hidden)
-@plugins_app.command(name="adapter", hidden=True, help="Alias for 'adapters' (hidden).")
-def _plugins_adapter_alias(
-    only: str | None = typer.Option(
-        None, "--only", help="Filter: missing|ready|core|optional"
-    ),
-    verbose: bool = typer.Option(False, "--verbose", help="Verbose table output"),
-    json_out: bool = typer.Option(False, "--json", help="Emit JSON output"),
-    explain: str | None = typer.Option(
-        None, "--explain", help="Explain a specific adapter"
-    ),
-    hide_unsupported: bool = typer.Option(
-        True,
-        "--hide-unsupported/--show-unsupported",
-        help="Hide adapters unsupported on this platform (default: hide)",
-    ),
-    allow_third_party_plugins: bool = typer.Option(
-        False,
-        "--allow-third-party-plugins",
-        help="Allow third-party plugin discovery for this command.",
-    ),
-):
-    return plugins_command(
-        "adapters",
-        only=only,
-        verbose=verbose,
-        json_out=json_out,
-        explain=explain,
-        hide_unsupported=hide_unsupported,
-        allow_third_party_plugins=allow_third_party_plugins,
-    )
-
-
 __all__ = [
     "plugins_app",
     "plugins_command",
-    "list_guards_command",
-    "list_edits_command",
 ]

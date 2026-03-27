@@ -153,10 +153,10 @@ def test_evaluation_report_uses_bca_when_env_enabled_and_many_paired_windows(
         return (0.0, 0.0)
 
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.compute_paired_delta_log_ci", _fake_ci
+        "invarlock.core.bootstrap.compute_paired_delta_log_ci", _fake_ci
     )
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.logspace_to_ratio_ci",
+        "invarlock.core.bootstrap.logspace_to_ratio_ci",
         lambda _ci: (1.0, 1.0),
     )
     monkeypatch.setattr(

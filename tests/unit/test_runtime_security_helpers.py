@@ -30,14 +30,14 @@ def test_runtime_bool_helpers_and_execution_mode(monkeypatch) -> None:
 
 
 def test_serialize_canonical_json_normalizes_supported_types() -> None:
-    OptionInfo = type("OptionInfo", (), {})
-    option = OptionInfo()
-    option.default = Path("payload.json")
-
     payload = {
         "path": Path("artifact.txt"),
         "values": {3, 1},
-        "nested": [Path("nested.txt"), option, SimpleNamespace(answer=42)],
+        "nested": [
+            Path("nested.txt"),
+            {"report": Path("payload.json")},
+            SimpleNamespace(answer=42),
+        ],
     }
 
     encoded = runtime_security.serialize_canonical_json(payload)
@@ -46,7 +46,7 @@ def test_serialize_canonical_json_normalizes_supported_types() -> None:
     assert decoded["path"] == "artifact.txt"
     assert sorted(decoded["values"]) == [1, 3]
     assert decoded["nested"][0] == "nested.txt"
-    assert decoded["nested"][1] == "payload.json"
+    assert decoded["nested"][1] == {"report": "payload.json"}
     assert decoded["nested"][2].startswith("namespace(")
 
 
@@ -1086,7 +1086,7 @@ def test_normalize_delegated_argv_rewrites_paths_and_collects_mounts(
             "reports",
             "--baseline",
             str(external_root),
-            "--edited",
+            "--subject",
             str(inside_model),
         ],
         cwd=cwd,
@@ -1100,7 +1100,7 @@ def test_normalize_delegated_argv_rewrites_paths_and_collects_mounts(
         "reports",
         "--baseline",
         str(external_root.resolve()),
-        "--edited",
+        "--subject",
         "/workspace/subject",
     ]
     assert mounts == [external_root]

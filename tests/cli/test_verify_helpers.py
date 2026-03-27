@@ -258,7 +258,7 @@ def test_validate_drift_band_skips_tiny_relax_reports() -> None:
     verify_mod = _import_verify_module()
 
     cert_tiny_relax = {
-        "auto": {"tiny_relax": True},
+        "context": {"run": {"tiny_relax": True}},
         "primary_metric": {"preview": 10.0, "final": 20.0},
     }
 
@@ -685,11 +685,13 @@ def test_recompute_validation_flags_and_policy_gate_paths(monkeypatch) -> None:
             }
         },
         "auto": {"tier": "Conservative", "target_pm_ratio": "1.1"},
-        "resolved_policy": {"metrics": {"pm_ratio": {"min_tokens": 1}}},
-        "meta": {
-            "pm_acceptance_range": {"min": 0.95, "max": 1.15},
-            "pm_drift_band": {"min": 0.9, "max": 1.3},
+        "context": {
+            "primary_metric": {
+                "acceptance_range": {"min": 0.95, "max": 1.15},
+                "drift_band": {"min": 0.9, "max": 1.3},
+            }
         },
+        "resolved_policy": {"metrics": {"pm_ratio": {"min_tokens": 1}}},
         "spectral": {},
         "rmt": {},
         "invariants": {},
@@ -746,7 +748,7 @@ def test_primary_metric_policy_uses_serialized_acceptance_range() -> None:
             "ratio_vs_baseline": 1.12,
         },
         "baseline_ref": {"primary_metric": {"final": 10.0}},
-        "meta": {"pm_acceptance_range": {"min": 0.95, "max": 1.15}},
+        "context": {"primary_metric": {"acceptance_range": {"min": 0.95, "max": 1.15}}},
     }
     assert verify_mod._validate_primary_metric_policy(relaxed, profile="release") == []
 
@@ -758,7 +760,7 @@ def test_primary_metric_policy_uses_serialized_acceptance_range() -> None:
             "ratio_vs_baseline": 1.08,
         },
         "baseline_ref": {"primary_metric": {"final": 10.0}},
-        "meta": {"pm_acceptance_range": {"min": 0.95, "max": 1.05}},
+        "context": {"primary_metric": {"acceptance_range": {"min": 0.95, "max": 1.05}}},
     }
     errs = verify_mod._validate_primary_metric_policy(strict, profile="release")
     assert errs == ["Primary metric policy gate failed (tier=balanced)."]

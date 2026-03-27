@@ -89,12 +89,7 @@ def test_plugins_discovery_disabled_json(monkeypatch, capsys):
     )
 
 
-def test_plugins_adapters_json_with_optioninfo(monkeypatch, capsys):
-    """Test that OptionInfo parameters are correctly coerced.
-
-    When called programmatically with typer.Option() values, the coercion
-    logic should handle them gracefully (OptionInfo -> default value).
-    """
+def test_plugins_adapters_json_with_explicit_filters(monkeypatch, capsys):
     adapters = {
         "hf_bnb": {"module": "invarlock.plugins.bitsandbytes", "entry_point": "ep"},
         "hf_auto": {"module": "invarlock.adapters.hf", "entry_point": "auto"},
@@ -108,7 +103,7 @@ def test_plugins_adapters_json_with_optioninfo(monkeypatch, capsys):
 
     # Patch at the provenance module level so the import inside the function gets it
     monkeypatch.setattr(
-        "invarlock.cli.provenance.extract_adapter_provenance",
+        "invarlock.core.adapter_provenance.extract_adapter_provenance",
         fake_extract,
         raising=False,
     )
@@ -123,24 +118,19 @@ def test_plugins_adapters_json_with_optioninfo(monkeypatch, capsys):
     monkeypatch.setattr(
         plugins_mod, "console", Console(file=io.StringIO()), raising=False
     )
-    # Test with OptionInfo values - they should be coerced
     plugins_command(
         category="adapters",
         only="missing",
-        verbose=typer.Option(True),  # OptionInfo gets coerced to False
+        verbose=False,
         json_out=True,
     )
     payload = json.loads(capsys.readouterr().out)
     assert payload["category"] == "adapters"
     assert "kind" not in payload
-    # With proper patching, hf_bnb should have needs_extra status
-    # The test validates that OptionInfo coercion doesn't break JSON output
     needs_extra_items = [
         i for i in payload["items"] if i.get("status") == "needs_extra"
     ]
-    assert (
-        len(needs_extra_items) >= 1 or len(payload["items"]) >= 0
-    )  # Flexible assertion
+    assert len(needs_extra_items) >= 1 or len(payload["items"]) >= 0
 
 
 def test_plugins_adapters_json_statuses(monkeypatch, capsys):
@@ -157,7 +147,7 @@ def test_plugins_adapters_json_statuses(monkeypatch, capsys):
         return SimpleNamespace(library="transformers", version="1.0")
 
     monkeypatch.setattr(
-        "invarlock.cli.provenance.extract_adapter_provenance",
+        "invarlock.core.adapter_provenance.extract_adapter_provenance",
         fake_extract,
         raising=False,
     )
@@ -200,7 +190,7 @@ def test_plugins_adapters_json_bnb_ready_without_cuda_when_runtime_is_available(
         plugins_mod, "bitsandbytes_runtime_available", lambda: True, raising=False
     )
     monkeypatch.setattr(
-        "invarlock.cli.provenance.extract_adapter_provenance",
+        "invarlock.core.adapter_provenance.extract_adapter_provenance",
         lambda name: SimpleNamespace(library="bitsandbytes", version="0.49.2"),
         raising=False,
     )
@@ -229,7 +219,7 @@ def test_plugins_adapters_json_marks_missing_backends_not_present(monkeypatch, c
         return SimpleNamespace(library=lib, version=None)
 
     monkeypatch.setattr(
-        "invarlock.cli.provenance.extract_adapter_provenance",
+        "invarlock.core.adapter_provenance.extract_adapter_provenance",
         fake_extract,
         raising=False,
     )
@@ -249,7 +239,7 @@ def test_plugins_adapters_minimal_only_ready(monkeypatch, capsys):
     _patch_registry(monkeypatch, adapters)
     monkeypatch.setenv("INVARLOCK_MINIMAL", "1")
     monkeypatch.setattr(
-        "invarlock.cli.provenance.extract_adapter_provenance",
+        "invarlock.core.adapter_provenance.extract_adapter_provenance",
         lambda name: SimpleNamespace(library="transformers", version="1.0"),
         raising=False,
     )
@@ -358,7 +348,7 @@ def test_plugins_adapters_handle_torch_and_extra_errors(monkeypatch, capsys):
         raise RuntimeError("no provenance")
 
     monkeypatch.setattr(
-        "invarlock.cli.provenance.extract_adapter_provenance",
+        "invarlock.core.adapter_provenance.extract_adapter_provenance",
         fake_extract,
         raising=False,
     )
@@ -458,7 +448,7 @@ def test_plugins_explain_unknown_adapter(monkeypatch):
     }
     _patch_registry(monkeypatch, adapters)
     monkeypatch.setattr(
-        "invarlock.cli.provenance.extract_adapter_provenance",
+        "invarlock.core.adapter_provenance.extract_adapter_provenance",
         lambda name: SimpleNamespace(library="bitsandbytes", version=None),
         raising=False,
     )
@@ -492,7 +482,7 @@ def test_plugins_adapters_verbose_console(monkeypatch):
     }
     _patch_registry(monkeypatch, adapters)
     monkeypatch.setattr(
-        "invarlock.cli.provenance.extract_adapter_provenance",
+        "invarlock.core.adapter_provenance.extract_adapter_provenance",
         lambda name: SimpleNamespace(library="transformers", version="1.0"),
         raising=False,
     )
@@ -547,7 +537,7 @@ def test_plugins_adapters_only_unknown_keeps_all(monkeypatch, capsys):
     }
     _patch_registry(monkeypatch, adapters)
     monkeypatch.setattr(
-        "invarlock.cli.provenance.extract_adapter_provenance",
+        "invarlock.core.adapter_provenance.extract_adapter_provenance",
         lambda name: SimpleNamespace(library="transformers", version="1.0"),
         raising=False,
     )
@@ -563,7 +553,7 @@ def test_plugins_adapters_only_core_and_optional(monkeypatch, capsys):
     }
     _patch_registry(monkeypatch, adapters)
     monkeypatch.setattr(
-        "invarlock.cli.provenance.extract_adapter_provenance",
+        "invarlock.core.adapter_provenance.extract_adapter_provenance",
         lambda name: SimpleNamespace(library="transformers", version="1.0"),
         raising=False,
     )
@@ -585,7 +575,7 @@ def test_plugins_adapters_show_unsupported_backend_present(monkeypatch, capsys):
     adapters = {"hf_gptq": {"module": "invarlock.plugins.gptq", "entry_point": "gptq"}}
     _patch_registry(monkeypatch, adapters)
     monkeypatch.setattr(
-        "invarlock.cli.provenance.extract_adapter_provenance",
+        "invarlock.core.adapter_provenance.extract_adapter_provenance",
         lambda name: SimpleNamespace(library="auto-gptq", version=None),
         raising=False,
     )
@@ -596,7 +586,7 @@ def test_plugins_adapters_show_unsupported_backend_present(monkeypatch, capsys):
     )
     monkeypatch.setattr(plugins_mod.platform, "system", lambda: "Darwin", raising=False)
     plugins_command(
-        category="adapter",
+        category="adapters",
         json_out=True,
         hide_unsupported=False,
     )
@@ -611,7 +601,7 @@ def test_plugins_adapters_explain_enable_hint(monkeypatch):
     }
     _patch_registry(monkeypatch, adapters)
     monkeypatch.setattr(
-        "invarlock.cli.provenance.extract_adapter_provenance",
+        "invarlock.core.adapter_provenance.extract_adapter_provenance",
         lambda name: SimpleNamespace(library="transformers", version="1.0"),
         raising=False,
     )
@@ -636,7 +626,7 @@ def test_plugins_adapters_explain_special_notes(monkeypatch):
     }
     _patch_registry(monkeypatch, adapters)
     monkeypatch.setattr(
-        "invarlock.cli.provenance.extract_adapter_provenance",
+        "invarlock.core.adapter_provenance.extract_adapter_provenance",
         lambda name: SimpleNamespace(
             library=name.replace("hf_", "").replace("_", "-"), version="1.0"
         ),
@@ -663,7 +653,7 @@ def test_plugins_adapters_provenance_failure_graceful(monkeypatch, capsys):
     }
     _patch_registry(monkeypatch, adapters)
     monkeypatch.setattr(
-        "invarlock.cli.provenance.extract_adapter_provenance",
+        "invarlock.core.adapter_provenance.extract_adapter_provenance",
         lambda name: (_ for _ in ()).throw(RuntimeError("boom")),
         raising=False,
     )
@@ -793,7 +783,7 @@ def test_plugins_adapters_explain_variants(monkeypatch):
 
     # Patch at the provenance module level so the import inside the function gets it
     monkeypatch.setattr(
-        "invarlock.cli.provenance.extract_adapter_provenance",
+        "invarlock.core.adapter_provenance.extract_adapter_provenance",
         fake_extract,
         raising=False,
     )
@@ -830,7 +820,7 @@ def test_plugins_plugins_category_json(monkeypatch, capsys):
     edits = {"quant_rtn": {"module": "invarlock.edits.quant", "entry_point": "edit"}}
     _patch_registry(monkeypatch, adapters, guards=guards, edits=edits)
     monkeypatch.setattr(
-        "invarlock.cli.provenance.extract_adapter_provenance",
+        "invarlock.core.adapter_provenance.extract_adapter_provenance",
         lambda name: SimpleNamespace(library="transformers", version="1.0"),
         raising=False,
     )
@@ -848,7 +838,7 @@ def test_plugins_category_none_lists_all(monkeypatch):
     edits = {"quant_rtn": {"module": "invarlock.edits.quant", "entry_point": "edit"}}
     _patch_registry(monkeypatch, adapters, guards=guards, edits=edits)
     monkeypatch.setattr(
-        "invarlock.cli.provenance.extract_adapter_provenance",
+        "invarlock.core.adapter_provenance.extract_adapter_provenance",
         lambda name: SimpleNamespace(library="transformers", version="1.0"),
         raising=False,
     )
@@ -918,7 +908,7 @@ def test_plugins_plugins_category_tables(monkeypatch):
     edits = {"quant_rtn": {"module": "invarlock.edits.quant", "entry_point": "edit"}}
     _patch_registry(monkeypatch, adapters, guards=guards, edits=edits)
     monkeypatch.setattr(
-        "invarlock.cli.provenance.extract_adapter_provenance",
+        "invarlock.core.adapter_provenance.extract_adapter_provenance",
         lambda name: SimpleNamespace(library="transformers", version="1.0"),
         raising=False,
     )

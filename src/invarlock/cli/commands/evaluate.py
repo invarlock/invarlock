@@ -15,7 +15,6 @@ Steps:
 from __future__ import annotations
 
 import builtins as _builtins
-import inspect
 import io
 import json
 import math
@@ -39,7 +38,6 @@ from ...core.evaluate_contract import (
 )
 from ...core.evaluate_plan import (
     build_baseline_run_config,
-    build_evaluation_report_kwargs,
     build_subject_edit_run_config,
     build_subject_noop_run_config,
     default_preset_data_for_adapter,
@@ -51,14 +49,14 @@ from ...core.evaluate_plan import (
     normalize_model_id as _normalize_model_id,
 )
 from ...core.exceptions import ConfigError, ValidationError
+
+# Use the report group's programmatic entry for report generation
+from ...reporting.report_contract import generate_reports
 from ..security_helpers import (
     configure_runtime_security,
     emit_runtime_manifest,
     maybe_delegate_model_command,
 )
-
-# Use the report group's programmatic entry for report generation
-from .report import report_command as _report
 
 _LAZY_RUN_IMPORT = True
 
@@ -147,13 +145,13 @@ def _suppress_child_output(enabled: bool) -> Iterator[io.StringIO | None]:
 def _print_quiet_summary(
     *,
     report_out: Path,
-    source: str,
-    edited: str,
+    baseline: str,
+    subject: str,
     profile: str,
 ) -> None:
     report_path = report_out / "evaluation.report.json"
     console.print(f"INVARLOCK v{INVARLOCK_VERSION} · EVALUATE")
-    console.print(f"Baseline: {source} -> Subject: {edited} · Profile: {profile}")
+    console.print(f"Baseline: {baseline} -> Subject: {subject} · Profile: {profile}")
     if not report_path.exists():
         console.print(f"Output: {report_out}")
         return
@@ -231,135 +229,33 @@ def _resolve_evaluate_tmp_dir() -> Path:
 
 
 def evaluate_command(
-    # Primary names for programmatic/test compatibility
-    source: str = typer.Option(
-        ..., "--source", "--baseline", help="Baseline model dir or Hub ID"
-    ),
-    edited: str = typer.Option(
-        ..., "--edited", "--subject", help="Subject model dir or Hub ID"
-    ),
-    baseline_report: str | None = typer.Option(
-        None,
-        "--baseline-report",
-        help=(
-            "Reuse an existing baseline run report.json file (explicit path; skips baseline evaluation). "
-            "Must include stored evaluation windows (e.g., set INVARLOCK_STORE_EVAL_WINDOWS=1)."
-        ),
-    ),
-    adapter: str = typer.Option(
-        "auto", "--adapter", help="Adapter name or 'auto' to resolve"
-    ),
-    device: str | None = typer.Option(
-        None,
-        "--device",
-        help="Device override for runs (auto|cuda|mps|cpu)",
-    ),
-    profile: str = typer.Option(
-        "ci", "--profile", help="Profile (ci|release|ci_cpu|dev)"
-    ),
-    tier: str = typer.Option("balanced", "--tier", help="Tier label for context"),
-    preset: str | None = typer.Option(
-        None,
-        "--preset",
-        help=(
-            "Universal preset path to use (defaults to causal or masked preset"
-            " based on adapter)"
-        ),
-    ),
-    out: str = typer.Option("runs", "--out", help="Base output directory"),
-    report_out: str = typer.Option(
-        "reports/eval", "--report-out", help="Evaluation report output directory"
-    ),
-    edit_config: str | None = typer.Option(
-        None, "--edit-config", help="Edit preset to apply a demo edit"
-    ),
-    edit_label: str | None = typer.Option(
-        None,
-        "--edit-label",
-        help=(
-            "Edit algorithm label for BYOE models. Use 'noop' for baseline, "
-            "'quant_rtn' etc. for built-in edits, 'custom' for pre-edited models."
-        ),
-    ),
-    quiet: bool = typer.Option(
-        False, "--quiet", "-q", help="Minimal output (suppress run/report detail)"
-    ),
-    verbose: bool = typer.Option(
-        False, "--verbose", "-v", help="Verbose output (include debug details)"
-    ),
-    banner: bool = typer.Option(
-        True, "--banner/--no-banner", help="Show header banner"
-    ),
-    style: str = typer.Option("audit", "--style", help="Output style (audit|friendly)"),
-    timing: bool = typer.Option(False, "--timing", help="Show timing summary"),
-    progress: bool = typer.Option(
-        True, "--progress/--no-progress", help="Show progress done messages"
-    ),
-    mode: str = typer.Option(
-        "attested",
-        "--mode",
-        help="Execution mode for model-loading steps (attested|local).",
-    ),
-    allow_network: bool = typer.Option(
-        False,
-        "--allow-network",
-        help="Explicitly allow outbound network access for this command.",
-    ),
-    allow_host_execution: bool = typer.Option(
-        False,
-        "--allow-host-execution",
-        help="Run on the host instead of auto-delegating to the runtime container.",
-    ),
-    allow_third_party_plugins: bool = typer.Option(
-        False,
-        "--allow-third-party-plugins",
-        help="Enable third-party entry-point plugin discovery for this command.",
-    ),
-    allow_remote_code: bool = typer.Option(
-        False,
-        "--allow-remote-code",
-        help="Allow trust_remote_code-style model loading for this command.",
-    ),
-    no_color: bool = typer.Option(
-        False, "--no-color", help="Disable ANSI colors (respects NO_COLOR=1)"
-    ),
+    baseline: str,
+    subject: str,
+    baseline_report: str | None = None,
+    adapter: str = "auto",
+    device: str | None = None,
+    profile: str = "ci",
+    tier: str = "balanced",
+    preset: str | None = None,
+    out: str = "runs",
+    report_out: str = "reports/eval",
+    edit_config: str | None = None,
+    edit_label: str | None = None,
+    quiet: bool = False,
+    verbose: bool = False,
+    banner: bool = True,
+    style: str = "audit",
+    timing: bool = False,
+    progress: bool = True,
+    mode: str = "attested",
+    allow_network: bool = False,
+    allow_host_execution: bool = False,
+    allow_third_party_plugins: bool = False,
+    allow_remote_code: bool = False,
+    no_color: bool = False,
 ):
     """Evaluate two checkpoints (baseline vs subject) with pinned windows."""
-    # Support programmatic calls and Typer-invoked calls uniformly
-    try:
-        from typer.models import OptionInfo as _TyperOptionInfo
-    except Exception:  # pragma: no cover - typer internals may change
-        _TyperOptionInfo = ()  # type: ignore[assignment]
-
-    def _coerce_option(value, fallback=None):
-        if isinstance(value, _TyperOptionInfo):
-            return getattr(value, "default", fallback)
-        return value if value is not None else fallback
-
-    source = _coerce_option(source)
-    edited = _coerce_option(edited)
-    baseline_report = _coerce_option(baseline_report)
-    adapter = _coerce_option(adapter, "auto")
-    device = _coerce_option(device)
-    profile = _coerce_option(profile, "ci")
-    tier = _coerce_option(tier, "balanced")
-    preset = _coerce_option(preset)
-    out = _coerce_option(out, "runs")
-    report_out = _coerce_option(report_out, "reports/eval")
-    edit_config = _coerce_option(edit_config)
-    edit_label = _coerce_option(edit_label)
-    quiet = _coerce_option(quiet, False)
-    verbose = _coerce_option(verbose, False)
-    banner = _coerce_option(banner, True)
-    style = _coerce_option(style, "audit")
-    timing = bool(_coerce_option(timing, False))
-    progress = bool(_coerce_option(progress, True))
-    mode = str(_coerce_option(mode, "attested")).strip().lower()
-    allow_network = bool(_coerce_option(allow_network, False))
-    allow_host_execution = bool(_coerce_option(allow_host_execution, False))
-    allow_third_party_plugins = bool(_coerce_option(allow_third_party_plugins, False))
-    allow_remote_code = bool(_coerce_option(allow_remote_code, False))
-    no_color = bool(_coerce_option(no_color, False))
+    mode = str(mode).strip().lower()
 
     if mode not in {"attested", "local"}:
         raise typer.BadParameter(
@@ -428,8 +324,8 @@ def evaluate_command(
             console.print("")
             _print_phase_header(console, _phase_title(index, total, title))
 
-    src_id = str(source)
-    edt_id = str(edited)
+    src_id = str(baseline)
+    edt_id = str(subject)
     profile_name = _stable_text(profile, "dev")
     tier_name = _stable_text(tier, "balanced")
 
@@ -725,60 +621,27 @@ def evaluate_command(
 
     def _emit_evaluation_report() -> None:
         _info("Emitting evaluation report", tag="EXEC", emoji="📜")
-        with _suppress_child_output(verbosity == VERBOSITY_QUIET) as quiet_buffer:
-            try:
-                with timed_step(
-                    console=console,
-                    style=output_style,
-                    timings=timings,
-                    key="evaluation_report",
-                    tag="EXEC",
-                    message="Evaluation Report",
-                    emoji="📜",
-                ):
-                    # Use a wall-clock perf counter here (not the output module's
-                    # test-patched counter) so timing tests remain deterministic.
-                    from time import perf_counter as _wall_perf_counter
-
-                    report_start = _wall_perf_counter()
-                    report_kwargs = build_evaluation_report_kwargs(
-                        edited_report=str(edited_report),
-                        baseline_report=str(baseline_report_path),
-                        report_out=str(report_out),
-                        style=output_style.name,
-                        no_color=bool(no_color),
-                        baseline_seconds=float(timings.get("baseline", 0.0)),
-                        subject_seconds=float(timings.get("subject", 0.0)),
-                        report_start=float(report_start),
-                    )
-                    try:
-                        sig = inspect.signature(_report)
-                    except (TypeError, ValueError):
-                        _report(**report_kwargs)
-                    else:
-                        if any(
-                            param.kind == inspect.Parameter.VAR_KEYWORD
-                            for param in sig.parameters.values()
-                        ):
-                            _report(**report_kwargs)
-                        else:
-                            _report(
-                                **{
-                                    key: value
-                                    for key, value in report_kwargs.items()
-                                    if key in sig.parameters
-                                }
-                            )
-            except Exception:
-                if quiet_buffer is not None:
-                    console.print(quiet_buffer.getvalue(), markup=False)
-                raise
+        with timed_step(
+            console=console,
+            style=output_style,
+            timings=timings,
+            key="evaluation_report",
+            tag="EXEC",
+            message="Evaluation Report",
+            emoji="📜",
+        ):
+            generate_reports(
+                run=str(edited_report),
+                format="report",
+                baseline=str(baseline_report_path),
+                output=str(report_out),
+            )
         emit_runtime_manifest(
             Path(report_out) / "evaluation.report.json",
             config_payload={
                 "command": "evaluate",
-                "source": source,
-                "edited": edited,
+                "baseline": baseline,
+                "subject": subject,
                 "adapter": adapter,
                 "profile": profile_name,
                 "tier": tier_name,
@@ -856,7 +719,7 @@ def evaluate_command(
     if verbosity == VERBOSITY_QUIET:
         _print_quiet_summary(
             report_out=Path(report_out),
-            source=src_id,
-            edited=edt_id,
+            baseline=src_id,
+            subject=edt_id,
             profile=profile_name,
         )

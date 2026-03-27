@@ -96,8 +96,8 @@ Purpose: compare a baseline against a subject and emit an evaluation report.
 
 Common options:
 
-- `--baseline` / `--source`: baseline checkpoint path or model ID
-- `--subject` / `--edited`: subject checkpoint path or model ID
+- `--baseline`: baseline checkpoint path or model ID
+- `--subject`: subject checkpoint path or model ID
 - `--baseline-report`: reuse a stored baseline report by passing the explicit
   `report.json` file path that captured the baseline windows
 - `--adapter`: adapter name or `auto`

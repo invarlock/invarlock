@@ -19,8 +19,7 @@ def test_run_command_reports_migration(monkeypatch):
     res = runner.invoke(app, ["run"])
     assert res.exit_code == 2, res.output
     out = strip_ansi(res.output)
-    assert "no longer a top-level command" in out
-    assert "invarlock evaluate" in out
+    assert "No such command 'run'" in out
 
 
 def test_evaluate_help_exposes_baseline_and_subject(monkeypatch):
@@ -29,8 +28,8 @@ def test_evaluate_help_exposes_baseline_and_subject(monkeypatch):
     res = runner.invoke(app, ["evaluate", "--help"])
     assert res.exit_code == 0, res.output
     out = strip_ansi(res.stdout)
-    assert "--baseline" in out or "--source" in out
-    assert "--subject" in out or "--edited" in out
+    assert "--baseline" in out or "--baseline" in out
+    assert "--subject" in out or "--subject" in out
     assert "--preset" in out
 
 

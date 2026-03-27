@@ -1398,7 +1398,7 @@ class TestMakeEvaluationReport:
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
             with patch(
-                "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
+                "invarlock.core.bootstrap.compute_paired_delta_log_ci",
                 return_value=(-0.01, 0.02),
             ):
                 # Enforce CI profile hard-fail for mismatch
@@ -1450,7 +1450,7 @@ class TestMakeEvaluationReport:
             "invarlock.reporting.report_builder.validate_run_report", return_value=True
         ):
             with patch(
-                "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
+                "invarlock.core.bootstrap.compute_paired_delta_log_ci",
                 return_value=(-0.005, 0.010),
             ):
                 evaluation_report = make_report(report, baseline)

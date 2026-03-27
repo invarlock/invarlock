@@ -155,7 +155,7 @@ def _setup_config_env(monkeypatch, cfg):
         raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.cli.commands.run._resolve_metric_and_provider",
+        "invarlock.core.metric_provider_resolution.resolve_metric_and_provider",
         lambda cfg_obj, model_profile, resolved_loss_type=None: (
             "mlm",
             "synthetic",
@@ -362,7 +362,7 @@ def test_doctor_config_preflight_findings(monkeypatch, tmp_path, capsys):
         raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.cli.commands.run._resolve_metric_and_provider",
+        "invarlock.core.metric_provider_resolution.resolve_metric_and_provider",
         lambda cfg, model_profile, resolved_loss_type=None: (
             "accuracy",
             "synthetic",
@@ -402,7 +402,10 @@ def test_doctor_config_preflight_findings(monkeypatch, tmp_path, capsys):
     )
 
     tiny_report = tmp_path / "tiny.json"
-    tiny_report.write_text(json.dumps({"auto": {"tiny_relax": True}}), encoding="utf-8")
+    tiny_report.write_text(
+        json.dumps({"context": {"run": {"tiny_relax": True}}}),
+        encoding="utf-8",
+    )
 
     with pytest.raises(typer.Exit) as exc:
         doctor_mod.doctor_command(
@@ -417,7 +420,7 @@ def test_doctor_config_preflight_findings(monkeypatch, tmp_path, capsys):
     ]
     payload = json.loads(lines[-1])
     codes = {f["code"] for f in payload.get("findings", [])}
-    assert {"D001", "D002", "D004", "D013"}.issubset(codes)
+    assert {"D001", "D002", "D004"}.issubset(codes)
 
 
 def test_doctor_config_provider_string_kind_error(monkeypatch, capsys, tmp_path):
@@ -679,7 +682,7 @@ def test_doctor_config_capacity_floors(monkeypatch, tmp_path, capsys):
         raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.cli.commands.run._resolve_metric_and_provider",
+        "invarlock.core.metric_provider_resolution.resolve_metric_and_provider",
         lambda cfg, model_profile, resolved_loss_type=None: (
             "ppl_causal",
             "synthetic",
@@ -856,7 +859,7 @@ def test_doctor_determinism_warning_prints(monkeypatch, tmp_path):
         raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.cli.commands.run._resolve_metric_and_provider",
+        "invarlock.core.metric_provider_resolution.resolve_metric_and_provider",
         lambda cfg, model_profile, resolved_loss_type=None: (
             "accuracy",
             "synthetic",

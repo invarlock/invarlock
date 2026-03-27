@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pytest
 import typer
-from typer.models import OptionInfo
 
 from invarlock.cli.commands.export_html import export_html_command
 
@@ -59,7 +58,7 @@ def test_export_html_force_overwrite(monkeypatch, tmp_path: Path):
     assert out.read_text(encoding="utf-8").strip() == "<html>ok</html>"
 
 
-def test_export_html_coerces_optioninfo_defaults(monkeypatch, tmp_path: Path):
+def test_export_html_accepts_plain_python_arguments(monkeypatch, tmp_path: Path):
     import invarlock.reporting.html as html_mod
 
     monkeypatch.setattr(
@@ -69,18 +68,7 @@ def test_export_html_coerces_optioninfo_defaults(monkeypatch, tmp_path: Path):
     out = tmp_path / "out.html"
     inp.write_text("{}", encoding="utf-8")
 
-    inp_opt = OptionInfo()
-    inp_opt.default = str(inp)
-    out_opt = OptionInfo()
-    out_opt.default = str(out)
-    embed_opt = OptionInfo()
-    embed_opt.default = False
-    force_opt = OptionInfo()
-    force_opt.default = True
-
-    export_html_command(
-        input=inp_opt, output=out_opt, embed_css=embed_opt, force=force_opt
-    )
+    export_html_command(input=str(inp), output=str(out), embed_css=False, force=True)
     assert out.exists()
 
 

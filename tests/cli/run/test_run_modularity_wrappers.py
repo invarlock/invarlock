@@ -77,26 +77,57 @@ def test_policy_wrappers_delegate(monkeypatch):
         "mode": "bytes"
     }
 
-    monkeypatch.setattr(run_mod, "_estimate_model_bytes_impl", lambda model: 123)
-    assert run_mod._estimate_model_bytes(object()) == 123
+    snapshot_seen: dict[str, object] = {}
+
+    def _snapshot_plan_stub(**kwargs):
+        snapshot_seen.update(kwargs)
+        return "snapshot-plan"
 
     monkeypatch.setattr(
-        run_mod,
-        "_choose_snapshot_mode_impl",
-        lambda **kwargs: "chunked",
+        run_mod, "_build_snapshot_execution_plan_impl", _snapshot_plan_stub
     )
     assert (
-        run_mod._choose_snapshot_mode(
-            snapshot_config={},
-            env_mode="auto",
-            supports_bytes=True,
-            supports_chunked=True,
-            estimated_model_mb=128.0,
-            available_ram_mb=256.0,
-            disk_free_mb=1024.0,
+        run_mod._build_snapshot_execution_plan(
+            adapter=object(),
+            model=object(),
+            cfg_snapshot={},
+            direct_reuse_loaded_model=False,
+            skip_overhead_source=None,
         )
-        == "chunked"
+        == "snapshot-plan"
     )
+    assert (
+        snapshot_seen["choose_snapshot_mode_fn"] is run_mod._choose_snapshot_mode_impl
+    )
+    assert (
+        snapshot_seen["estimate_model_bytes_fn"] is run_mod._estimate_model_bytes_impl
+    )
+    assert snapshot_seen["disk_usage_fn"] is run_mod.shutil.disk_usage
+    assert snapshot_seen["free_model_memory_fn"] is run_mod._free_model_memory
+
+    retry_seen: dict[str, object] = {}
+
+    def _snapshot_retry_stub(**kwargs):
+        retry_seen.update(kwargs)
+        return "retry-plan"
+
+    monkeypatch.setattr(
+        run_mod, "_resolve_snapshot_retry_transition_impl", _snapshot_retry_stub
+    )
+    assert (
+        run_mod._resolve_snapshot_retry_transition(
+            skip_overhead=True,
+            profile_normalized="release",
+            emitted_skip_overhead_warning=False,
+            skip_overhead_source="config:context.run.skip_overhead_check",
+            retry_controller=None,
+            model=object(),
+            restore_fn=None,
+            skip_model_load=False,
+        )
+        == "retry-plan"
+    )
+    assert retry_seen["profile_normalized"] == "release"
 
     monkeypatch.setattr(
         run_mod,
@@ -456,7 +487,6 @@ def test_analysis_and_overhead_wrappers_delegate(monkeypatch):
         original_token_prob=0.1,
         resolved_loss_type="ppl_causal",
         tier="balanced",
-        get_provider_fn=lambda *args, **kwargs: None,
     ) == {"resolved_split": "validation", "preview_count": 2}
 
     monkeypatch.setattr(
@@ -543,6 +573,81 @@ def test_analysis_and_overhead_wrappers_delegate(monkeypatch):
     )
     assert enriched.debug_diffs_line == "diffs"
 
+    monkeypatch.setattr(
+        run_mod,
+        "_assemble_run_report_impl",
+        lambda **kwargs: SimpleNamespace(
+            report={"meta": {}},
+            timings={},
+            provenance_result=None,
+            metrics_enrichment=None,
+        ),
+    )
+    assembled = run_mod._assemble_run_report(
+        core_report=SimpleNamespace(context={}),
+        cfg=SimpleNamespace(
+            model=SimpleNamespace(id="gpt2", adapter="hf_causal"),
+            dataset=SimpleNamespace(provider="wikitext2", seq_len=128, stride=64),
+            meta=SimpleNamespace(commit="abc123"),
+        ),
+        run_context={},
+        profile_normalized="dev",
+        auto_config={},
+        resolved_device="cpu",
+        seed_bundle={"python": 43},
+        guard_overhead_threshold=0.01,
+        model_profile=SimpleNamespace(),
+        determinism_meta={},
+        pm_acceptance_range=None,
+        pm_drift_band=None,
+        tokenizer_hash=None,
+        resolved_split="validation",
+        preview_count=1,
+        final_count=1,
+        snapshot_provenance={},
+        edit_op=SimpleNamespace(name="noop"),
+        edit_label=None,
+        run_dir=Path("."),
+        run_config=SimpleNamespace(event_path=None),
+        resolved_loss_type="causal",
+        timings={},
+        guard_overhead_payload=None,
+        baseline=None,
+        preview_records=[],
+        final_records=[],
+        use_mlm=False,
+        preview_mask_counts=None,
+        final_mask_counts=None,
+        profile="dev",
+        used_fallback_split=False,
+        baseline_report_data=None,
+        effective_preview=1,
+        effective_final=1,
+        metric_kind="ppl_causal",
+        window_plan=None,
+        debug_metric_diffs_enabled=False,
+    )
+    assert assembled.report == {"meta": {}}
+
+    monkeypatch.setattr(
+        run_mod,
+        "_persist_run_report_outputs_impl",
+        lambda **kwargs: SimpleNamespace(
+            saved_files={"json": "report.json"},
+            report_path_out="report.json",
+            telemetry_saved_path=None,
+            telemetry_error=None,
+        ),
+    )
+    persisted = run_mod._persist_run_report_outputs(
+        report={},
+        run_dir=Path("."),
+        run_config=SimpleNamespace(event_path=None),
+        console=run_mod.console,
+        telemetry=False,
+    )
+    assert persisted.report_path_out == "report.json"
+
 
 def test_run_command_injects_explicit_deps(monkeypatch, tmp_path: Path):
     sentinel = object()
@@ -576,6 +681,7 @@ def test_run_command_injects_explicit_deps(monkeypatch, tmp_path: Path):
         is run_mod._build_run_execution_config_payloads
     )
     assert deps["_enrich_run_report_metrics"] is run_mod._enrich_run_report_metrics
+    assert deps["_assemble_run_report"] is run_mod._assemble_run_report
     assert (
         deps["_validate_retry_evaluation_report"]
         is run_mod._validate_retry_evaluation_report
@@ -584,14 +690,21 @@ def test_run_command_injects_explicit_deps(monkeypatch, tmp_path: Path):
         deps["_resolve_retry_validation_transition"]
         is run_mod._resolve_retry_validation_transition
     )
+    assert (
+        deps["_build_snapshot_execution_plan"] is run_mod._build_snapshot_execution_plan
+    )
+    assert (
+        deps["_resolve_snapshot_retry_transition"]
+        is run_mod._resolve_snapshot_retry_transition
+    )
     assert deps["_finalize_run_provenance"] is run_mod._finalize_run_provenance
-    assert deps["_choose_snapshot_mode"] is run_mod._choose_snapshot_mode
     assert (
         deps["_build_timing_summary_payload"] is run_mod._build_timing_summary_payload
     )
     assert (
         deps["_prepare_guard_overhead_report"] is run_mod._prepare_guard_overhead_report
     )
+    assert deps["_persist_run_report_outputs"] is run_mod._persist_run_report_outputs
     assert (
         deps["_resolve_retry_validation_transition"]
         is run_mod._resolve_retry_validation_transition
