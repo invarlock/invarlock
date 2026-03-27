@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 import invarlock.guards.rmt as runtime_rmt
-import invarlock.guards.rmt_legacy as legacy_rmt
+from invarlock.guards.rmt_analysis import capture_baseline_mp_stats, layer_svd_stats
 
 
 class _TinyBlock(nn.Module):
@@ -24,18 +24,14 @@ class _TinyModel(nn.Module):
 def test_capture_baseline_mp_stats_allowed_module_names_filters() -> None:
     model = _TinyModel()
     allowed = ["block.attn.c_attn"]
-    stats = legacy_rmt.capture_baseline_mp_stats(model, allowed_module_names=allowed)
+    stats = capture_baseline_mp_stats(model, allowed_module_names=allowed)
     assert list(stats.keys()) == allowed
 
 
-def test_rmt_detect_respects_allowed_module_names() -> None:
+def test_runtime_detection_reports_supported_modules() -> None:
     model = _TinyModel()
-    out = legacy_rmt.rmt_detect(
-        model,
-        threshold=10.0,
-        allowed_module_names=["block.attn.c_attn"],
-        verbose=False,
-    )
+    guard = runtime_rmt.RMTGuard(correct=False)
+    out = guard._apply_rmt_detection_and_correction(model)
     per_layer = out.get("per_layer", [])
     assert isinstance(per_layer, list)
     assert any(item.get("module_name") == "block.attn.c_attn" for item in per_layer)
@@ -47,7 +43,7 @@ def test_capture_baseline_mp_stats_svd_failure_is_skipped(monkeypatch) -> None:
         "svdvals",
         lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("boom")),
     )
-    stats = legacy_rmt.capture_baseline_mp_stats(_TinyModel())
+    stats = capture_baseline_mp_stats(_TinyModel())
     assert stats == {}
 
 
@@ -55,7 +51,7 @@ def test_layer_svd_stats_zero_matrix_quantile_branch_ratio_one() -> None:
     layer = nn.Linear(2, 2, bias=False)
     with torch.no_grad():
         layer.weight.zero_()
-    stats = legacy_rmt.layer_svd_stats(layer)
+    stats = layer_svd_stats(layer)
     assert stats["worst_ratio"] == 1.0
 
 

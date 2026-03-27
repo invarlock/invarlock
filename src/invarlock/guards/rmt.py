@@ -1,8 +1,8 @@
 """InvarLock RMT runtime guard contract.
 
 This module exposes the public activation edge-risk runtime guard and its
-policy helpers. Legacy weight/SVD/MP analysis utilities live in
-`invarlock.guards.rmt_legacy`.
+policy helpers. Weight-space math, analysis, and detection helpers live in
+their dedicated owner modules.
 """
 
 from __future__ import annotations
@@ -18,8 +18,8 @@ import torch.nn as nn
 
 from invarlock.core.api import Guard
 
+from . import rmt_analysis, rmt_detection, rmt_math
 from ._contracts import guard_assert
-from .rmt_legacy import _apply_rmt_correction, layer_svd_stats, mp_bulk_edge
 
 __all__ = [
     "RMTGuard",
@@ -160,6 +160,8 @@ class RMTGuard(Guard):
         self.edge_risk_by_family: dict[str, float] = {}
         self.edge_risk_by_module: dict[str, float] = {}
         self.epsilon_violations: list[dict[str, Any]] = []
+        self.baseline_sigmas: dict[str, float] = {}
+        self.baseline_mp_stats: dict[str, dict[str, float]] = {}
 
     def _log_event(
         self, operation: str, level: str = "INFO", message: str = "", **data
@@ -516,7 +518,7 @@ class RMTGuard(Guard):
             return None
 
         m, n = int(mat.shape[0]), int(mat.shape[1])
-        mp_edge_val = mp_bulk_edge(m, n, whitened=False)
+        mp_edge_val = rmt_math.mp_bulk_edge(m, n, whitened=False)
         if not (math.isfinite(mp_edge_val) and mp_edge_val > 0.0):
             return None
 
@@ -709,7 +711,7 @@ class RMTGuard(Guard):
 
         mat = mat / std
         m, n = mat.shape
-        mp_edge_val = mp_bulk_edge(m, n, whitened=False)
+        mp_edge_val = rmt_math.mp_bulk_edge(m, n, whitened=False)
         threshold = mp_edge_val * (1.0 + deadband) * margin
 
         try:
@@ -872,7 +874,7 @@ class RMTGuard(Guard):
 
         for idx, (module_name, module) in enumerate(modules_to_analyze):
             # Get current stats
-            stats = layer_svd_stats(
+            stats = rmt_analysis.layer_svd_stats(
                 module, self.baseline_sigmas, self.baseline_mp_stats, module_name
             )
 
@@ -896,7 +898,7 @@ class RMTGuard(Guard):
                     # Apply correction using enhanced logic with adapter support
                     if self.correct:
                         try:
-                            _apply_rmt_correction(
+                            rmt_detection._apply_rmt_correction(
                                 module,
                                 0.95,  # Conservative factor (not used in Step 5 logic)
                                 self.baseline_sigmas,
@@ -917,7 +919,7 @@ class RMTGuard(Guard):
                             )
 
                             # Re-compute stats after correction
-                            stats_post = layer_svd_stats(
+                            stats_post = rmt_analysis.layer_svd_stats(
                                 module,
                                 self.baseline_sigmas,
                                 self.baseline_mp_stats,

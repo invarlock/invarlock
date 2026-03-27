@@ -52,8 +52,10 @@ def test_rmt_apply_step5_detection_and_correction_branches(monkeypatch) -> None:
         # Fallback branch, no outlier
         return {"sigma_min": 0.0, "sigma_max": 1.0, "worst_ratio": 1.0}
 
-    monkeypatch.setattr(R, "layer_svd_stats", _fake_layer_svd_stats)
-    monkeypatch.setattr(R, "_apply_rmt_correction", lambda *_a, **_k: None)
+    monkeypatch.setattr(R.rmt_analysis, "layer_svd_stats", _fake_layer_svd_stats)
+    monkeypatch.setattr(
+        R.rmt_detection, "_apply_rmt_correction", lambda *_a, **_k: None
+    )
 
     out = guard._apply_rmt_detection_and_correction(model)
     assert out["corrected_layers"] == 1

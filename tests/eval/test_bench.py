@@ -440,7 +440,7 @@ def test_execute_single_run_skips_tokenizer_hash_and_duration_paths(
 
     import invarlock.core.registry as core_registry
     import invarlock.core.runner as core_runner
-    import invarlock.guards.rmt_legacy as rmt_mod
+    import invarlock.eval.bench_runner as bench_runner_mod
 
     class _Adapter:
         def restore(self, _model, _blob):  # noqa: ANN001
@@ -463,7 +463,9 @@ def test_execute_single_run_skips_tokenizer_hash_and_duration_paths(
 
     monkeypatch.setattr(core_registry, "get_registry", lambda: _Registry())
     monkeypatch.setattr(core_runner, "CoreRunner", _CoreRunner)
-    monkeypatch.setattr(rmt_mod, "rmt_detect", lambda **_k: {"n_layers_flagged": 0})
+    monkeypatch.setattr(
+        bench_runner_mod.rmt_detection, "rmt_detect", lambda **_k: {"n_layers_flagged": 0}
+    )
 
     scenario = ScenarioConfig(
         edit="quant_rtn", tier="balanced", probes=0, profile="ci", device="cpu"
@@ -989,11 +991,11 @@ class TestExecuteSingleRun:
         )
         monkeypatch.setattr("invarlock.core.runner.CoreRunner.execute", _fake_execute)
         monkeypatch.setattr(
-            "invarlock.guards.rmt_legacy.capture_baseline_mp_stats",
+            "invarlock.eval.bench_runner.rmt_analysis.capture_baseline_mp_stats",
             lambda *_a, **_k: {},
         )
         monkeypatch.setattr(
-            "invarlock.guards.rmt_legacy.rmt_detect",
+            "invarlock.eval.bench_runner.rmt_detection.rmt_detect",
             lambda *_a, **_k: {"n_layers_flagged": 0},
         )
 
@@ -1127,10 +1129,10 @@ class TestExecuteSingleRun:
         )
         monkeypatch.setattr("invarlock.core.runner.CoreRunner.execute", _fake_execute)
         monkeypatch.setattr(
-            "invarlock.guards.rmt_legacy.capture_baseline_mp_stats", _fake_capture
+            "invarlock.eval.bench_runner.rmt_analysis.capture_baseline_mp_stats", _fake_capture
         )
         monkeypatch.setattr(
-            "invarlock.guards.rmt_legacy.rmt_detect",
+            "invarlock.eval.bench_runner.rmt_detection.rmt_detect",
             lambda *_a, **_k: {"n_layers_flagged": 0},
         )
 

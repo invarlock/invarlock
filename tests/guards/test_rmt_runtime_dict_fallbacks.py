@@ -193,11 +193,13 @@ def test_runtime_activation_module_and_edge_risk_guardrails(monkeypatch) -> None
     assert guard._activation_edge_risk(torch.randn(3, 2)) is None
 
     monkeypatch.setattr(torch, "sqrt", original_sqrt)
-    original_mp_bulk_edge = runtime_rmt.mp_bulk_edge
-    monkeypatch.setattr(runtime_rmt, "mp_bulk_edge", lambda *_a, **_k: float("nan"))
+    original_mp_bulk_edge = runtime_rmt.rmt_math.mp_bulk_edge
+    monkeypatch.setattr(
+        runtime_rmt.rmt_math, "mp_bulk_edge", lambda *_a, **_k: float("nan")
+    )
     assert guard._activation_edge_risk(torch.randn(3, 2)) is None
 
-    monkeypatch.setattr(runtime_rmt, "mp_bulk_edge", original_mp_bulk_edge)
+    monkeypatch.setattr(runtime_rmt.rmt_math, "mp_bulk_edge", original_mp_bulk_edge)
     guard.estimator = {"iters": "bad", "init": "bogus"}
     assert guard._activation_edge_risk(torch.randn(3, 2)) is not None
 
@@ -264,7 +266,7 @@ def test_runtime_detection_logs_correction_failure(monkeypatch) -> None:
 
     monkeypatch.setattr(guard, "_get_linear_modules", lambda _model: [("layer", layer)])
     monkeypatch.setattr(
-        runtime_rmt,
+        runtime_rmt.rmt_analysis,
         "layer_svd_stats",
         lambda *_a, **_k: {
             "sigma_min": 0.0,
@@ -274,7 +276,7 @@ def test_runtime_detection_logs_correction_failure(monkeypatch) -> None:
         },
     )
     monkeypatch.setattr(
-        runtime_rmt,
+        runtime_rmt.rmt_detection,
         "_apply_rmt_correction",
         lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("boom")),
     )

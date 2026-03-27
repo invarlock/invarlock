@@ -6,6 +6,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import invarlock.guards.rmt_analysis as rmt_analysis
+import invarlock.guards.rmt_detection as rmt_detection
 from invarlock.reporting.report_types import create_empty_report
 
 from .bench_policy import (
@@ -60,10 +62,6 @@ def execute_single_run(
         from invarlock.core.registry import get_registry as _get_registry
         from invarlock.core.runner import CoreRunner as _CoreRunner
         from invarlock.eval.data import get_provider as _get_provider
-        from invarlock.guards.rmt_legacy import (
-            capture_baseline_mp_stats as _capture_mp_stats,
-        )
-        from invarlock.guards.rmt_legacy import rmt_detect as _rmt_detect
         from invarlock.model_profile import detect_model_profile as _detect_profile
 
         def _ensure_dir(path: Path) -> None:
@@ -172,7 +170,7 @@ def execute_single_run(
             rmt_baseline_sigmas, dict
         ):
             adapter.restore(model, baseline_snapshot)
-            rmt_baseline_mp_stats = _capture_mp_stats(model)
+            rmt_baseline_mp_stats = rmt_analysis.capture_baseline_mp_stats(model)
             rmt_baseline_sigmas = {
                 name: float(stats.get("sigma_base", 0.0) or 0.0)
                 for name, stats in rmt_baseline_mp_stats.items()
@@ -320,7 +318,7 @@ def execute_single_run(
                 )
 
         try:
-            detection = _rmt_detect(
+            detection = rmt_detection.rmt_detect(
                 model=model,
                 threshold=rmt_margin,
                 detect_only=True,
