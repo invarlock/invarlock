@@ -138,6 +138,52 @@ def test_evaluate_command_reuses_baseline_report_for_bridge(monkeypatch, tmp_pat
     )
 
 
+def test_evaluate_command_local_mode_prefers_local_files_only(monkeypatch, tmp_path):
+    src = tmp_path / "src_model"
+    edt = tmp_path / "edt_model"
+    src.mkdir()
+    edt.mkdir()
+    (src / "config.json").write_text(
+        json.dumps({"model_type": "gpt2", "architectures": ["GPT2LMHeadModel"]}),
+        encoding="utf-8",
+    )
+    (edt / "config.json").write_text(
+        json.dumps({"model_type": "gpt2", "architectures": ["GPT2LMHeadModel"]}),
+        encoding="utf-8",
+    )
+
+    captured_runs: list[dict[str, object]] = []
+
+    def fake_run(**kwargs):  # noqa: ANN001
+        captured_runs.append(kwargs)
+        return str(_stub_run(Path(kwargs["out"])))
+
+    def fake_report(**_kwargs):  # noqa: ANN001
+        return None
+
+    import invarlock.cli.commands.run as run_mod
+    from invarlock.cli.commands import evaluate as cert_mod
+
+    monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
+    monkeypatch.setattr(cert_mod, "_report", fake_report, raising=False)
+
+    evaluate_command(
+        source=str(src),
+        edited=str(edt),
+        adapter="auto",
+        profile="ci",
+        mode="local",
+        out=str(tmp_path / "runs"),
+        report_out=str(tmp_path / "reports"),
+        timing=False,
+        progress=False,
+    )
+
+    assert len(captured_runs) == 2
+    for call in captured_runs:
+        assert call["prefer_local_files_only"] is True
+
+
 def test_evaluate_command_passes_concrete_run_defaults(monkeypatch, tmp_path) -> None:
     src = tmp_path / "src_model"
     edt = tmp_path / "edt_model"

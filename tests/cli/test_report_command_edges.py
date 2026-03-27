@@ -414,14 +414,23 @@ def test_report_verify_command_rejects_noncanonical_baseline_directory(
 
 
 def test_report_explain_resolves_canonical_directories(monkeypatch, tmp_path):
+    run_report = {
+        "meta": {"seed": 1},
+        "data": {},
+        "edit": {},
+        "guards": [],
+        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 1.0}},
+        "artifacts": {},
+        "flags": {},
+    }
     report_dir = tmp_path / "report-dir"
     report_dir.mkdir()
-    report_json = report_dir / "evaluation.report.json"
-    report_json.write_text("{}", encoding="utf-8")
+    report_json = report_dir / "report.json"
+    report_json.write_text(json.dumps(run_report), encoding="utf-8")
     baseline_dir = tmp_path / "baseline-dir"
     baseline_dir.mkdir()
     baseline_json = baseline_dir / "report.json"
-    baseline_json.write_text("{}", encoding="utf-8")
+    baseline_json.write_text(json.dumps(run_report), encoding="utf-8")
     captured: dict[str, object] = {}
 
     monkeypatch.setattr(
@@ -434,6 +443,48 @@ def test_report_explain_resolves_canonical_directories(monkeypatch, tmp_path):
 
     assert captured["report"] == str(report_json.resolve())
     assert captured["baseline"] == str(baseline_json.resolve())
+
+
+@pytest.mark.parametrize("invalid_slot", ["report", "baseline"])
+def test_report_explain_rejects_evaluation_report_bundle(
+    monkeypatch, tmp_path, invalid_slot
+):
+    run_report = {
+        "meta": {"seed": 1},
+        "data": {},
+        "edit": {},
+        "guards": [],
+        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 1.0}},
+        "artifacts": {},
+        "flags": {},
+    }
+    report_json = tmp_path / "report.json"
+    report_json.write_text(json.dumps(run_report), encoding="utf-8")
+    baseline_json = tmp_path / "baseline-report.json"
+    baseline_json.write_text(json.dumps(run_report), encoding="utf-8")
+    evaluation_json = tmp_path / "evaluation.report.json"
+    evaluation_json.write_text(
+        json.dumps({"schema_version": "v1", "validation": {}}), encoding="utf-8"
+    )
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(
+        "invarlock.cli.commands.explain_gates.explain_gates_command",
+        lambda **kwargs: captured.update(kwargs),
+        raising=False,
+    )
+    if invalid_slot == "report":
+        report_json = evaluation_json
+    else:
+        baseline_json = evaluation_json
+    monkeypatch.setattr(
+        report_mod, "console", type("C", (), {"print": lambda *_: None})()
+    )
+
+    with pytest.raises(typer.Exit) as exc:
+        report_mod.report_explain(report=str(report_json), baseline=str(baseline_json))
+
+    assert exc.value.exit_code == 2
+    assert captured == {}
 
 
 @pytest.mark.parametrize("invalid_slot", ["report", "baseline"])

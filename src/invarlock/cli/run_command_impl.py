@@ -29,6 +29,7 @@ def run_command_impl(
     timing: Any = False,
     telemetry: Any = False,
     no_color: Any = False,
+    prefer_local_files_only: Any = False,
     deps: Mapping[str, Any],
 ) -> str | None:
     """Run implementation moved out of run.py to keep command surface stable."""
@@ -873,6 +874,7 @@ def run_command_impl(
                     profile=profile_normalized,
                     event_path=run_dir / "events.jsonl",
                     warning_context={"phase": "load_model", "run_id": run_id},
+                    prefer_local_files_only=prefer_local_files_only,
                 )
 
             if direct_reuse_loaded_model:
@@ -1122,6 +1124,7 @@ def run_command_impl(
                         profile_normalized=profile_normalized,
                         snapshot_provenance=snapshot_provenance,
                         skip_model_load=skip_model_load,
+                        prefer_local_files_only=prefer_local_files_only,
                     )
 
                 # Ensure clean state for guarded run
@@ -1153,6 +1156,7 @@ def run_command_impl(
                         console=console,
                         snapshot_provenance=snapshot_provenance,
                         skip_model_load=skip_model_load,
+                        prefer_local_files_only=prefer_local_files_only,
                     )
             except _SnapshotRestoreFailed as exc:
                 snapshot_provenance["restore_failed"] = True

@@ -325,3 +325,56 @@ class TestFilteredLoadingInfo:
         assert len(DummyLoader.calls) == 2
         assert DummyLoader.calls[0]["output_loading_info"] is True
         assert "output_loading_info" not in DummyLoader.calls[1]
+
+    def test_prefers_local_files_only_before_online_retry(self):
+        mixin = SimpleMixin()
+
+        class DummyModel:
+            pass
+
+        class DummyLoader:
+            calls: list[dict[str, object]] = []
+
+            @classmethod
+            def from_pretrained(cls, model_id: str, **kwargs: object):
+                cls.calls.append({"model_id": model_id, **kwargs})
+                if kwargs.get("local_files_only") is True:
+                    return DummyModel(), {"unexpected_keys": []}
+                return DummyModel()
+
+        model = mixin._load_pretrained_model(
+            DummyLoader,
+            "gpt2",
+            prefer_local_files_only=True,
+        )
+
+        assert isinstance(model, DummyModel)
+        assert len(DummyLoader.calls) == 1
+        assert DummyLoader.calls[0]["local_files_only"] is True
+
+    def test_falls_back_online_when_local_cache_missing(self):
+        mixin = SimpleMixin()
+
+        class DummyModel:
+            pass
+
+        class DummyLoader:
+            calls: list[dict[str, object]] = []
+
+            @classmethod
+            def from_pretrained(cls, model_id: str, **kwargs: object):
+                cls.calls.append({"model_id": model_id, **kwargs})
+                if kwargs.get("local_files_only") is True:
+                    raise OSError("missing cached files")
+                return DummyModel()
+
+        model = mixin._load_pretrained_model(
+            DummyLoader,
+            "gpt2",
+            prefer_local_files_only=True,
+        )
+
+        assert isinstance(model, DummyModel)
+        assert len(DummyLoader.calls) == 2
+        assert DummyLoader.calls[0]["local_files_only"] is True
+        assert "local_files_only" not in DummyLoader.calls[1]

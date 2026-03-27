@@ -567,34 +567,45 @@ def report_verify_command(
 
 
 @report_app.command(
-    name="explain", help="Explain evaluation report gates for report vs baseline."
+    name="explain",
+    help="Explain gate decisions for subject and baseline run reports.",
 )
 def report_explain(
     report: str = typer.Option(
         ...,
         "--report",
         help=(
-            "Path to primary report JSON file or directory containing "
-            "canonical report.json or evaluation.report.json"
+            "Path to primary run report JSON file or directory containing "
+            "canonical report.json"
         ),
     ),
     baseline: str = typer.Option(
         ...,
         "--baseline",
         help=(
-            "Path to baseline report JSON file or directory containing "
-            "canonical report.json or evaluation.report.json"
+            "Path to baseline run report JSON file or directory containing "
+            "canonical report.json"
         ),
     ),
 ):  # pragma: no cover - thin wrapper
-    """Explain evaluation report gates for a report vs baseline."""
+    """Explain gate decisions for a subject run report vs baseline run report."""
     from .explain_gates import explain_gates_command as _explain
 
     try:
-        report_path, _ = load_report_input_json(report)
-        baseline_path, _ = load_report_input_json(baseline)
+        report_path, report_payload = load_report_input_json(report)
+        baseline_path, baseline_payload = load_report_input_json(baseline)
     except ReportInputError as exc:
         _raise_report_input_failure(str(exc))
+    if isinstance(report_payload.get("validation"), dict):
+        _raise_report_input_failure(
+            "report explain expects a subject run report.json; pass the run "
+            "report emitted by invarlock evaluate/run, not an evaluation.report.json bundle."
+        )
+    if isinstance(baseline_payload.get("validation"), dict):
+        _raise_report_input_failure(
+            "report explain expects a baseline run report.json; pass the baseline "
+            "run report emitted by invarlock evaluate/run, not an evaluation.report.json bundle."
+        )
     return _explain(report=str(report_path), baseline=str(baseline_path))
 
 
