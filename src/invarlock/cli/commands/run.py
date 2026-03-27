@@ -135,14 +135,14 @@ from invarlock.core.exceptions import (
 from invarlock.core.exit_codes import (
     resolve_command_exit_code as _resolve_command_exit_code,
 )
+from invarlock.core.run_baseline_evidence import (
+    load_baseline_pairing_evidence as _load_baseline_pairing_evidence_impl,
+)
 from invarlock.core.run_evaluation_windows_policy import (
     build_fallback_evaluation_windows as _build_fallback_evaluation_windows_impl,
 )
 from invarlock.core.run_evaluation_windows_policy import (
     serialize_evaluation_windows as _serialize_evaluation_windows_impl,
-)
-from invarlock.core.run_baseline_evidence import (
-    load_baseline_pairing_evidence as _load_baseline_pairing_evidence_impl,
 )
 from invarlock.core.run_guard_overhead_policy import (
     build_guard_overhead_summary as _build_guard_overhead_summary_impl,
@@ -152,6 +152,9 @@ from invarlock.core.run_guard_overhead_policy import (
 )
 from invarlock.core.run_report_payload_policy import (
     build_artifacts_payload as _build_artifacts_payload_impl,
+)
+from invarlock.core.run_report_payload_policy import (
+    build_dataset_window_stats as _build_dataset_window_stats_impl,
 )
 from invarlock.core.run_report_payload_policy import (
     build_edit_payload as _build_edit_payload_impl,
@@ -179,6 +182,9 @@ from invarlock.core.run_report_payload_policy import (
 )
 from invarlock.core.run_report_payload_policy import (
     merge_core_timing_metrics as _merge_core_timing_metrics_impl,
+)
+from invarlock.core.run_report_payload_policy import (
+    validate_pairing_report_metrics as _validate_pairing_report_metrics_impl,
 )
 from invarlock.core.run_retry_policy import (
     apply_mask_only_head_autotune as _apply_mask_only_head_autotune_impl,
@@ -847,6 +853,40 @@ def _finalize_guard_overhead_payload(
         payload,
         result,
         normalize_overhead_result_fn=_normalize_overhead_result,
+    )
+
+
+def _validate_pairing_report_metrics(
+    metrics_section: Mapping[str, Any] | None,
+    *,
+    baseline_requested: bool,
+    profile: str | None,
+    preview_count_report: Any,
+    final_count_report: Any,
+    expected_preview: Any,
+    expected_final: Any,
+) -> list[Any]:
+    return _validate_pairing_report_metrics_impl(
+        metrics_section,
+        baseline_requested=baseline_requested,
+        profile=profile,
+        preview_count_report=preview_count_report,
+        final_count_report=final_count_report,
+        expected_preview=expected_preview,
+        expected_final=expected_final,
+    )
+
+
+def _build_dataset_window_stats(
+    *,
+    match_fraction: Any,
+    overlap_fraction: Any,
+    window_plan: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    return _build_dataset_window_stats_impl(
+        match_fraction=match_fraction,
+        overlap_fraction=overlap_fraction,
+        window_plan=window_plan,
     )
 
 
@@ -1717,6 +1757,7 @@ def _build_run_command_deps() -> dict[str, Any]:
         "_apply_mlm_masks": _apply_mlm_masks,
         "_apply_warning_filters": _apply_warning_filters,
         "_build_artifacts_payload": _build_artifacts_payload_impl,
+        "_build_dataset_window_stats": _build_dataset_window_stats,
         "_canonical_dataset_id": _canonical_dataset_id,
         "_coerce_float": _coerce_float,
         "_coerce_int": _coerce_int,
@@ -1778,6 +1819,7 @@ def _build_run_command_deps() -> dict[str, Any]:
         "_to_serialisable_dict": _to_serialisable_dict,
         "_tokenizer_digest": _tokenizer_digest,
         "_build_snapshot_provenance": _build_snapshot_provenance_impl,
+        "_validate_pairing_report_metrics": _validate_pairing_report_metrics,
         "_validate_and_harvest_baseline_schedule": _validate_and_harvest_baseline_schedule,
         "click": click,
         "console": console,

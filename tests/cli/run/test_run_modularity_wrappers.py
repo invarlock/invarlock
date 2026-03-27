@@ -208,6 +208,16 @@ def test_pairing_wrappers_delegate(monkeypatch):
 
     monkeypatch.setattr(
         run_mod,
+        "_load_baseline_pairing_evidence_impl",
+        lambda **kwargs: {"status": "loaded"},
+    )
+    assert run_mod._load_baseline_pairing_evidence(
+        baseline_path=Path("baseline.json"),
+        tokenizer_hash="tok",
+    ) == {"status": "loaded"}
+
+    monkeypatch.setattr(
+        run_mod,
         "_compute_provider_digest_impl",
         lambda report, compute_mask_positions_digest_fn: {"ids_sha256": "abc"},
     )
