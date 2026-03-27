@@ -538,16 +538,8 @@ class WikiText2Provider:
     def _event(self, tag: str, message: str, *, emoji: str | None = None) -> None:
         """Emit a dataset event via an optional CLI-provided sink."""
         if self._emit_event is None:
-            if emoji:
-                print(f"{emoji} {message}")
-            else:
-                print(message)
             return
-        try:
-            self._emit_event(tag, message, emoji)
-        except TypeError:
-            # Back-compat: tolerate sinks that only accept (tag, message).
-            self._emit_event(tag, message)  # type: ignore[misc]
+        self._emit_event(tag, message, emoji)
 
     def _validate_dependencies(self) -> None:
         """Check that required dependencies are available."""

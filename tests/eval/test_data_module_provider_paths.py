@@ -163,6 +163,23 @@ def test_wikitext2_windows_insufficient_and_nonpositive(monkeypatch):
         pt.windows(tokenizer=SimpleNamespace(), preview_n=4, final_n=4)
 
 
+def test_wikitext2_load_without_emit_sink_stays_off_stdout(
+    monkeypatch, capsys: pytest.CaptureFixture[str]
+):
+    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
+
+    def fake_load_dataset(*args, **kwargs):  # noqa: ARG001
+        return [{"text": "alpha sample with enough length"}]
+
+    monkeypatch.setattr(data_mod, "load_dataset", fake_load_dataset)
+    provider = WikiText2Provider()
+    texts = provider.load(max_samples=1)
+    captured = capsys.readouterr()
+    assert texts == ["alpha sample with enough length"]
+    assert captured.out == ""
+    assert captured.err == ""
+
+
 def test_wikitext2_windows_tokenization_failure(monkeypatch):
     monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
     pt = WikiText2Provider()
