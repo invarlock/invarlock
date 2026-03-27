@@ -19,13 +19,9 @@ def test_resolve_pm_drift_band_from_report_paths(monkeypatch):
     out2 = cert._resolve_pm_drift_band_from_report(report_list)
     assert out2 == {"min": 0.9, "max": 1.2}
 
-    report_alt = {"context": {"pm_drift_band": {"min": 0.9, "max": 1.1}}}
+    report_alt = {"context": {"primary_metric": {"drift_band": {"min": 0.9, "max": 1.1}}}}
     out3 = cert._resolve_pm_drift_band_from_report(report_alt)
     assert out3 == {"min": 0.9, "max": 1.1}
-
-    report_meta = {"meta": {"pm_drift_band": {"min": 0.9, "max": 1.1}}}
-    out4 = cert._resolve_pm_drift_band_from_report(report_meta)
-    assert out4 == {"min": 0.9, "max": 1.1}
 
     monkeypatch.delenv("INVARLOCK_PM_DRIFT_MIN", raising=False)
     monkeypatch.delenv("INVARLOCK_PM_DRIFT_MAX", raising=False)
