@@ -396,6 +396,38 @@ def test_analysis_and_overhead_wrappers_delegate(monkeypatch):
         baseline_path=Path("baseline.json"),
     ) == {"status": "passed"}
 
+    monkeypatch.setattr(
+        run_mod,
+        "_build_run_context_payload_impl",
+        lambda **kwargs: {"profile": "ci", "run_id": "run-1"},
+    )
+    assert run_mod._build_run_context_payload(
+        cfg={},
+        profile="ci",
+        pairing_schedule=None,
+        seed_bundle={"python": 43},
+        plugin_provenance={},
+        run_id="run-1",
+        baseline_report_data=None,
+        pm_acceptance_range=(0.9, 1.1),
+        pm_drift_band=None,
+        guard_overhead_threshold=0.02,
+        model_profile=SimpleNamespace(),
+        resolved_loss_type="ppl_causal",
+        tiny_relax_enabled=False,
+    ) == {"profile": "ci", "run_id": "run-1"}
+
+    monkeypatch.setattr(
+        run_mod,
+        "_build_run_execution_config_payloads_impl",
+        lambda **kwargs: SimpleNamespace(auto_config={"enabled": True}, edit_config={}),
+    )
+    payloads = run_mod._build_run_execution_config_payloads(
+        cfg={},
+        model_profile=SimpleNamespace(),
+    )
+    assert payloads.auto_config == {"enabled": True}
+
 
 def test_run_command_injects_explicit_deps(monkeypatch, tmp_path: Path):
     sentinel = object()
@@ -419,6 +451,11 @@ def test_run_command_injects_explicit_deps(monkeypatch, tmp_path: Path):
     assert isinstance(deps, dict)
     assert deps["_resolve_pm_acceptance_range"] is sentinel
     assert deps["_build_provider_dataset_plan"] is run_mod._build_provider_dataset_plan
+    assert deps["_build_run_context_payload"] is run_mod._build_run_context_payload
+    assert (
+        deps["_build_run_execution_config_payloads"]
+        is run_mod._build_run_execution_config_payloads
+    )
     assert deps["_validate_retry_evaluation_report"] is run_mod._validate_retry_evaluation_report
     assert deps["_choose_snapshot_mode"] is run_mod._choose_snapshot_mode
     assert (

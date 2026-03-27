@@ -61,6 +61,10 @@ def run_command_impl(
     _build_artifacts_payload = _dep("_build_artifacts_payload")
     _build_provider_dataset_plan = _dep("_build_provider_dataset_plan")
     _build_dataset_window_stats = _dep("_build_dataset_window_stats")
+    _build_run_context_payload = _dep("_build_run_context_payload")
+    _build_run_execution_config_payloads = _dep(
+        "_build_run_execution_config_payloads"
+    )
     _build_edit_payload = _dep("_build_edit_payload")
     _build_timing_summary_payload = _dep("_build_timing_summary_payload")
     _build_retry_result_summary = _dep("_build_retry_result_summary")
@@ -622,94 +626,22 @@ def run_command_impl(
             profile=profile_normalized,
         )
 
-        # Create run configuration
-        guard_overrides = {
-            "spectral": _to_serialisable_dict(getattr(cfg.guards, "spectral", {})),
-            "rmt": _to_serialisable_dict(getattr(cfg.guards, "rmt", {})),
-            "variance": _to_serialisable_dict(getattr(cfg.guards, "variance", {})),
-            "invariants": _to_serialisable_dict(getattr(cfg.guards, "invariants", {})),
-        }
-
-        if model_profile.invariants:
-            invariants_policy = guard_overrides.setdefault("invariants", {})
-            existing_checks = invariants_policy.get("profile_checks", [])
-            if isinstance(existing_checks, list | tuple | set):
-                checks_list = [str(item) for item in existing_checks]
-            elif existing_checks:
-                checks_list = [str(existing_checks)]
-            else:
-                checks_list = []
-            for invariant in model_profile.invariants:
-                invariant_name = str(invariant)
-                if invariant_name not in checks_list:
-                    checks_list.append(invariant_name)
-            invariants_policy["profile_checks"] = checks_list
-
-        run_context = {
-            "eval": _to_serialisable_dict(cfg.eval),
-            "dataset": _to_serialisable_dict(cfg.dataset),
-            "guards": guard_overrides,
-            "profile": profile if profile else "",
-            "pairing_baseline": pairing_schedule,
-            "seeds": seed_bundle,
-            "plugins": plugin_provenance,
-            "run_id": run_id,
-        }
         tiny_relax_env = str(os.environ.get("INVARLOCK_TINY_RELAX", "")).strip().lower()
-        if tiny_relax_env in {"1", "true", "yes", "on"}:
-            run_context.setdefault("run", {})["tiny_relax"] = True
-        # Provide baseline per-window logloss to the CoreRunner for paired tail
-        # evidence and (optionally) fail/rollback enforcement.
-        try:
-            if isinstance(baseline_report_data, dict):
-                ew = baseline_report_data.get("evaluation_windows")
-                if isinstance(ew, dict):
-                    final = ew.get("final")
-                    if (
-                        isinstance(final, dict)
-                        and isinstance(final.get("window_ids"), list)
-                        and isinstance(final.get("logloss"), list)
-                    ):
-                        base_eval: dict[str, Any] = {
-                            "final": {
-                                "window_ids": list(final.get("window_ids") or []),
-                                "logloss": list(final.get("logloss") or []),
-                            }
-                        }
-                        if isinstance(final.get("token_counts"), list):
-                            base_eval["final"]["token_counts"] = list(
-                                final.get("token_counts") or []
-                            )
-                        run_context["baseline_eval_windows"] = base_eval
-        except NON_FATAL_RUNTIME_EXCEPTIONS:
-            pass
-        run_context.setdefault("primary_metric", {})["acceptance_range"] = (
-            pm_acceptance_range
+        run_context = _build_run_context_payload(
+            cfg=cfg,
+            profile=profile,
+            pairing_schedule=pairing_schedule,
+            seed_bundle=seed_bundle,
+            plugin_provenance=plugin_provenance,
+            run_id=run_id,
+            baseline_report_data=baseline_report_data,
+            pm_acceptance_range=pm_acceptance_range,
+            pm_drift_band=pm_drift_band,
+            guard_overhead_threshold=guard_overhead_threshold,
+            model_profile=model_profile,
+            resolved_loss_type=resolved_loss_type,
+            tiny_relax_enabled=tiny_relax_env in {"1", "true", "yes", "on"},
         )
-        run_context["pm_acceptance_range"] = pm_acceptance_range
-        if pm_drift_band:
-            run_context.setdefault("primary_metric", {})["drift_band"] = pm_drift_band
-            run_context["pm_drift_band"] = pm_drift_band
-        run_context.setdefault("primary_metric", {})["overhead_threshold"] = (
-            guard_overhead_threshold
-        )
-        run_context["guard_overhead_threshold"] = guard_overhead_threshold
-        run_context["model_profile"] = {
-            "family": model_profile.family,
-            "default_loss": model_profile.default_loss,
-            "module_selectors": model_profile.module_selectors,
-            "invariants": model_profile.invariants,
-            "cert_lints": model_profile.cert_lints,
-        }
-        extra_context = _to_serialisable_dict(getattr(cfg, "context", {}))
-        if isinstance(extra_context, dict):
-            run_context.update(extra_context)
-        try:
-            run_context.setdefault("eval", {}).setdefault("loss", {})[
-                "resolved_type"
-            ] = resolved_loss_type
-        except (AttributeError, TypeError):
-            pass
         run_config = RunConfig(
             device=resolved_device,
             max_pm_ratio=getattr(cfg.eval, "max_pm_ratio", 1.5),
@@ -1112,59 +1044,12 @@ def run_command_impl(
         )
         runner = CoreRunner()
 
-        # Prepare auto configuration for tier resolution
-        # Build auto configuration with safe fallbacks when section/keys are absent
-        try:
-            auto_enabled = bool(cfg.auto.enabled)
-        except NON_FATAL_RUNTIME_EXCEPTIONS:
-            auto_enabled = False
-        try:
-            auto_tier = cfg.auto.tier
-        except NON_FATAL_RUNTIME_EXCEPTIONS:
-            auto_tier = "balanced"
-        try:
-            auto_probes = int(cfg.auto.probes)
-        except NON_FATAL_RUNTIME_EXCEPTIONS:
-            auto_probes = 0
-        try:
-            auto_target_ratio = float(cfg.auto.target_pm_ratio)
-        except NON_FATAL_RUNTIME_EXCEPTIONS:
-            auto_target_ratio = 2.0
-
-        auto_config = {
-            "enabled": auto_enabled,
-            "tier": auto_tier,
-            "probes": auto_probes,
-            "target_pm_ratio": auto_target_ratio,
-        }
-
-        # Extract edit configuration parameters
-        edit_config = {}
-        if hasattr(cfg.edit, "plan") and cfg.edit.plan:
-            try:
-                # Accept plain dicts, dict-like wrappers, or nested objects
-                plan_obj = getattr(cfg.edit, "plan", {})
-                if isinstance(plan_obj, dict):
-                    edit_config = dict(plan_obj)
-                else:
-                    # Best-effort unwrap for InvarLockConfig _Obj wrapper
-                    plan_data = getattr(plan_obj, "_data", None)
-                    if isinstance(plan_data, dict):
-                        edit_config = dict(plan_data)
-                    elif hasattr(plan_obj, "items"):
-                        edit_config = dict(plan_obj)  # type: ignore[arg-type]
-            except (TypeError, AttributeError):
-                pass
-
-        if (
-            model_profile.module_selectors
-            and "module_selectors" not in edit_config
-            and isinstance(model_profile.module_selectors, dict)
-        ):
-            edit_config["module_selectors"] = {
-                key: list(values)
-                for key, values in model_profile.module_selectors.items()
-            }
+        execution_payloads = _build_run_execution_config_payloads(
+            cfg=cfg,
+            model_profile=model_profile,
+        )
+        auto_config = execution_payloads.auto_config
+        edit_config = execution_payloads.edit_config
 
         console.print(_format_kv_line("Edit", str(edit_op.name)))
         console.print(_format_kv_line("Guards", _format_guard_chain(guards)))

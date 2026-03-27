@@ -144,6 +144,12 @@ from invarlock.core.run_evaluation_windows_policy import (
 from invarlock.core.run_evaluation_windows_policy import (
     serialize_evaluation_windows as _serialize_evaluation_windows_impl,
 )
+from invarlock.core.run_execution_context_policy import (
+    build_run_context_payload as _build_run_context_payload_impl,
+)
+from invarlock.core.run_execution_context_policy import (
+    build_run_execution_config_payloads as _build_run_execution_config_payloads_impl,
+)
 from invarlock.core.run_guard_overhead_policy import (
     build_guard_overhead_summary as _build_guard_overhead_summary_impl,
 )
@@ -948,6 +954,51 @@ def _build_provider_dataset_plan(
         tokenizer_digest_fn=_tokenizer_digest,
         safe_int_fn=_safe_int,
         tensor_or_list_to_ints_fn=_tensor_or_list_to_ints,
+    )
+
+
+def _build_run_context_payload(
+    *,
+    cfg: Any,
+    profile: str | None,
+    pairing_schedule: dict[str, Any] | None,
+    seed_bundle: Mapping[str, Any],
+    plugin_provenance: Mapping[str, Any],
+    run_id: str,
+    baseline_report_data: Mapping[str, Any] | None,
+    pm_acceptance_range: tuple[float, float] | None,
+    pm_drift_band: tuple[float, float] | None,
+    guard_overhead_threshold: float,
+    model_profile: Any,
+    resolved_loss_type: str,
+    tiny_relax_enabled: bool,
+) -> dict[str, Any]:
+    return _build_run_context_payload_impl(
+        cfg=cfg,
+        profile=profile,
+        pairing_schedule=pairing_schedule,
+        seed_bundle=seed_bundle,
+        plugin_provenance=plugin_provenance,
+        run_id=run_id,
+        baseline_report_data=baseline_report_data,
+        pm_acceptance_range=pm_acceptance_range,
+        pm_drift_band=pm_drift_band,
+        guard_overhead_threshold=guard_overhead_threshold,
+        model_profile=model_profile,
+        resolved_loss_type=resolved_loss_type,
+        tiny_relax_enabled=tiny_relax_enabled,
+        to_serialisable_dict_fn=_to_serialisable_dict,
+    )
+
+
+def _build_run_execution_config_payloads(
+    *,
+    cfg: Any,
+    model_profile: Any,
+) -> Any:
+    return _build_run_execution_config_payloads_impl(
+        cfg=cfg,
+        model_profile=model_profile,
     )
 
 
@@ -1844,6 +1895,8 @@ def _build_run_command_deps() -> dict[str, Any]:
         "_apply_warning_filters": _apply_warning_filters,
         "_build_artifacts_payload": _build_artifacts_payload_impl,
         "_build_provider_dataset_plan": _build_provider_dataset_plan,
+        "_build_run_context_payload": _build_run_context_payload,
+        "_build_run_execution_config_payloads": _build_run_execution_config_payloads,
         "_validate_retry_evaluation_report": _validate_retry_evaluation_report,
         "_build_dataset_window_stats": _build_dataset_window_stats,
         "_canonical_dataset_id": _canonical_dataset_id,
