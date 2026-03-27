@@ -5,6 +5,7 @@ from pathlib import Path
 
 import jsonschema
 
+from invarlock.core.runtime_manifest_verify import verify_report_manifest
 from invarlock.public_contracts import load_runtime_manifest_schema
 from invarlock.runtime_security import (
     CONTAINER_EXECUTION_ENV,
@@ -12,7 +13,6 @@ from invarlock.runtime_security import (
     RUNTIME_IMAGE_ENV,
     write_runtime_manifest,
 )
-from invarlock.runtime_verify import verify_report_manifest
 
 _VALID_TEST_IMAGE_DIGEST = "sha256:" + ("a" * 64)
 
