@@ -367,6 +367,7 @@ def evaluate_command(
             param_hint="--mode",
         )
     allow_host_execution = allow_host_execution or mode == "local"
+    prefer_local_files_only = mode == "local"
 
     configure_runtime_security(
         allow_network=allow_network,
@@ -560,6 +561,7 @@ def evaluate_command(
                         allow_host_execution=allow_host_execution,
                         allow_third_party_plugins=allow_third_party_plugins,
                         allow_remote_code=allow_remote_code,
+                        prefer_local_files_only=prefer_local_files_only,
                         no_color=no_color,
                     )
             except Exception:
@@ -650,6 +652,7 @@ def evaluate_command(
                         allow_host_execution=allow_host_execution,
                         allow_third_party_plugins=allow_third_party_plugins,
                         allow_remote_code=allow_remote_code,
+                        prefer_local_files_only=prefer_local_files_only,
                         no_color=no_color,
                     )
             except Exception:
@@ -701,6 +704,7 @@ def evaluate_command(
                         allow_host_execution=allow_host_execution,
                         allow_third_party_plugins=allow_third_party_plugins,
                         allow_remote_code=allow_remote_code,
+                        prefer_local_files_only=prefer_local_files_only,
                         no_color=no_color,
                     )
             except Exception:

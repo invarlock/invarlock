@@ -41,6 +41,7 @@ def run_from_config(
     allow_host_execution: bool = False,
     allow_third_party_plugins: bool = False,
     allow_remote_code: bool = False,
+    prefer_local_files_only: bool = False,
     command_name: str = "run",
     delegate: bool = True,
     run_impl: Any | None = None,
@@ -67,28 +68,32 @@ def run_from_config(
             "run_from_config requires explicit run_impl and deps_builder callables"
         )
 
-    report_path = run_impl(
-        config=config,
-        device=device,
-        profile=profile,
-        out=out,
-        edit=edit,
-        edit_label=edit_label,
-        tier=tier,
-        metric_kind=metric_kind,
-        probes=probes,
-        until_pass=until_pass,
-        max_attempts=max_attempts,
-        timeout=timeout,
-        baseline=baseline,
-        no_cleanup=no_cleanup,
-        style=style,
-        progress=progress,
-        timing=timing,
-        telemetry=telemetry,
-        no_color=no_color,
-        deps=deps_builder(),
-    )
+    run_kwargs: dict[str, Any] = {
+        "config": config,
+        "device": device,
+        "profile": profile,
+        "out": out,
+        "edit": edit,
+        "edit_label": edit_label,
+        "tier": tier,
+        "metric_kind": metric_kind,
+        "probes": probes,
+        "until_pass": until_pass,
+        "max_attempts": max_attempts,
+        "timeout": timeout,
+        "baseline": baseline,
+        "no_cleanup": no_cleanup,
+        "style": style,
+        "progress": progress,
+        "timing": timing,
+        "telemetry": telemetry,
+        "no_color": no_color,
+        "deps": deps_builder(),
+    }
+    if prefer_local_files_only:
+        run_kwargs["prefer_local_files_only"] = True
+
+    report_path = run_impl(**run_kwargs)
 
     if report_path is None:
         raise RuntimeError("run_impl did not return a report path")

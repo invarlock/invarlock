@@ -194,6 +194,7 @@ class HFAdapterMixin:
     def _load_pretrained_model(self, loader: Any, model_id: str, **kwargs: Any) -> Any:
         """Load a HF model while filtering known benign loading-info noise."""
 
+        prefer_local_files_only = bool(kwargs.pop("prefer_local_files_only", False))
         tf_logger = logging.getLogger("transformers")
         prev_tf_verbosity = os.environ.get("TRANSFORMERS_VERBOSITY")
         prev_tf_level = tf_logger.level
@@ -201,13 +202,37 @@ class HFAdapterMixin:
         tf_logger.setLevel(logging.ERROR)
         try:
             try:
-                loaded = loader.from_pretrained(
-                    model_id, output_loading_info=True, **kwargs
-                )
+                if prefer_local_files_only:
+                    loaded = loader.from_pretrained(
+                        model_id,
+                        output_loading_info=True,
+                        local_files_only=True,
+                        **kwargs,
+                    )
+                else:
+                    loaded = loader.from_pretrained(
+                        model_id, output_loading_info=True, **kwargs
+                    )
             except TypeError as exc:
                 if "output_loading_info" not in str(exc):
                     raise
-                loaded = loader.from_pretrained(model_id, **kwargs)
+                if prefer_local_files_only:
+                    loaded = loader.from_pretrained(
+                        model_id, local_files_only=True, **kwargs
+                    )
+                else:
+                    loaded = loader.from_pretrained(model_id, **kwargs)
+            except Exception:
+                if not prefer_local_files_only:
+                    raise
+                try:
+                    loaded = loader.from_pretrained(
+                        model_id, output_loading_info=True, **kwargs
+                    )
+                except TypeError as exc:
+                    if "output_loading_info" not in str(exc):
+                        raise
+                    loaded = loader.from_pretrained(model_id, **kwargs)
         finally:
             try:
                 tf_logger.setLevel(prev_tf_level)

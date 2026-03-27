@@ -84,6 +84,21 @@ def test_load_model_with_cfg_passes_all_kwargs_to_var_kw_adapter(
 
 
 @pytest.mark.unit
+def test_load_model_with_cfg_passes_local_files_only_to_var_kw_adapter():
+    cfg = InvarLockConfig({"model": {"id": "foo", "adapter": "dummy"}})
+    adapter = DummyKwAdapter()
+
+    _ = run_mod._load_model_with_cfg(
+        adapter,
+        cfg,
+        "cpu",
+        prefer_local_files_only=True,
+    )
+
+    assert adapter.calls == [("foo", "cpu", {"prefer_local_files_only": True})]
+
+
+@pytest.mark.unit
 def test_load_model_with_cfg_filters_unknown_kwargs_for_strict_adapter(
     monkeypatch: pytest.MonkeyPatch,
 ):
@@ -94,6 +109,21 @@ def test_load_model_with_cfg_filters_unknown_kwargs_for_strict_adapter(
     adapter = DummyNoKwAdapter()
 
     _ = run_mod._load_model_with_cfg(adapter, cfg, "cpu")
+
+    assert adapter.calls == [("foo", "cpu")]
+
+
+@pytest.mark.unit
+def test_load_model_with_cfg_omits_local_files_only_for_strict_adapter():
+    cfg = InvarLockConfig({"model": {"id": "foo", "adapter": "dummy"}})
+    adapter = DummyNoKwAdapter()
+
+    _ = run_mod._load_model_with_cfg(
+        adapter,
+        cfg,
+        "cpu",
+        prefer_local_files_only=True,
+    )
 
     assert adapter.calls == [("foo", "cpu")]
 

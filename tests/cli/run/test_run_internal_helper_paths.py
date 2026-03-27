@@ -487,6 +487,90 @@ def test_execute_guarded_run_loads_model_without_snapshot_provenance(
     assert runner.model is sentinel
 
 
+def test_execute_guarded_run_passes_local_files_only_hint(monkeypatch) -> None:
+    seen: dict[str, object] = {}
+
+    class DummyRunner:
+        def execute(self, **kwargs):  # noqa: D401, ARG002
+            seen["model"] = kwargs.get("model")
+            return {"status": "ok"}
+
+    def _load_model_with_cfg(adapter, cfg, device, **kwargs):  # noqa: ARG001
+        seen["kwargs"] = dict(kwargs)
+        return object()
+
+    monkeypatch.setattr(run_mod, "_load_model_with_cfg", _load_model_with_cfg)
+
+    runner = DummyRunner()
+    report, model = run_mod._execute_guarded_run(
+        runner=runner,
+        adapter=SimpleNamespace(),
+        model=None,
+        cfg=SimpleNamespace(model=SimpleNamespace(id="dummy")),
+        edit_op=SimpleNamespace(name="noop"),
+        run_config=SimpleNamespace(context={}, event_path=None),
+        guards=[],
+        calibration_data=[],
+        auto_config={},
+        edit_config={},
+        preview_count=1,
+        final_count=1,
+        restore_fn=None,
+        resolved_device="cpu",
+        console=Console(file=io.StringIO()),
+        prefer_local_files_only=True,
+    )
+    assert isinstance(report, dict)
+    assert model is not None
+    assert seen["kwargs"]["prefer_local_files_only"] is True
+
+
+def test_run_bare_control_passes_local_files_only_hint(monkeypatch) -> None:
+    seen: dict[str, object] = {}
+
+    class DummyRunner:
+        def execute(self, **kwargs):  # noqa: D401, ARG002
+            seen["model"] = kwargs.get("model")
+            return {
+                "status": "ok",
+                "metrics": {"primary_metric": {"preview": 1.0, "final": 1.0}},
+            }
+
+    def _load_model_with_cfg(adapter, cfg, device, **kwargs):  # noqa: ARG001
+        seen["kwargs"] = dict(kwargs)
+        return object()
+
+    monkeypatch.setattr(
+        "invarlock.core.runner.CoreRunner", lambda: DummyRunner(), raising=False
+    )
+    monkeypatch.setattr(run_mod, "_load_model_with_cfg", _load_model_with_cfg)
+    monkeypatch.setattr(
+        run_mod, "_extract_pm_snapshot_for_overhead", lambda *a, **k: {}
+    )
+
+    payload = run_mod._run_bare_control(
+        adapter=SimpleNamespace(),
+        edit_op=SimpleNamespace(name="noop"),
+        cfg=SimpleNamespace(model=SimpleNamespace(id="dummy")),
+        model=None,
+        run_config=SimpleNamespace(context={}, event_path=None),
+        calibration_data=[],
+        auto_config={},
+        edit_config={},
+        preview_count=1,
+        final_count=1,
+        seed_bundle={"python": 0, "numpy": 0, "torch": None},
+        resolved_device="cpu",
+        restore_fn=None,
+        console=Console(file=io.StringIO()),
+        resolved_loss_type="causal",
+        profile_normalized="dev",
+        prefer_local_files_only=True,
+    )
+    assert isinstance(payload, dict)
+    assert seen["kwargs"]["prefer_local_files_only"] is True
+
+
 def test_postprocess_and_summarize_includes_event_path(
     monkeypatch, tmp_path: Path
 ) -> None:

@@ -1651,6 +1651,7 @@ def _load_model_with_cfg(
     profile: str | None = None,
     event_path: Path | None = None,
     warning_context: dict[str, Any] | None = None,
+    prefer_local_files_only: bool = False,
 ) -> Any:
     """Load a model with config-provided kwargs, filtering for strict adapters."""
     try:
@@ -1669,19 +1670,32 @@ def _load_model_with_cfg(
         event_path=event_path,
         context=warning_context,
     ):
+        strict_accepts_local_files_only = False
         try:
             sig = inspect.signature(adapter.load_model)
             accepts_var_kw = any(
                 p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
             )
             if accepts_var_kw:
-                return adapter.load_model(model_id, device=device, **extra)
+                allowed = dict(extra)
+                if prefer_local_files_only:
+                    allowed["prefer_local_files_only"] = True
+                return adapter.load_model(model_id, device=device, **allowed)
             allowed = {k: v for k, v in extra.items() if k in sig.parameters}
+            strict_accepts_local_files_only = (
+                "prefer_local_files_only" in sig.parameters
+            )
+            if prefer_local_files_only and strict_accepts_local_files_only:
+                allowed["prefer_local_files_only"] = True
             if allowed:
                 return adapter.load_model(model_id, device=device, **allowed)
         except Exception:
             # Fall back to the strictest call shape.
             pass
+        if prefer_local_files_only and strict_accepts_local_files_only:
+            return adapter.load_model(
+                model_id, device=device, prefer_local_files_only=True
+            )
         return adapter.load_model(model_id, device=device)
 
 
@@ -1706,6 +1720,7 @@ def _run_bare_control(
     profile_normalized: str | None = None,
     snapshot_provenance: dict[str, bool] | None = None,
     skip_model_load: bool = False,
+    prefer_local_files_only: bool = False,
 ) -> dict[str, Any] | None:
     """Execute the bare-control run for overhead estimation and return payload."""
     from invarlock.core.runner import CoreRunner as _CoreRunner
@@ -1745,7 +1760,11 @@ def _run_bare_control(
             bare_target_model = model or SimpleNamespace(name="bare_stub_model")
         else:
             bare_target_model = _load_model_with_cfg(
-                adapter, cfg, resolved_device, profile=profile_normalized
+                adapter,
+                cfg,
+                resolved_device,
+                profile=profile_normalized,
+                prefer_local_files_only=prefer_local_files_only,
             )
             private_model_loaded = True
             if snapshot_provenance is not None:
@@ -1849,6 +1868,7 @@ def _execute_guarded_run(
     console: Console,
     snapshot_provenance: dict[str, bool] | None = None,
     skip_model_load: bool = False,
+    prefer_local_files_only: bool = False,
 ) -> tuple[Any, Any]:
     """Restore or load model and execute the guarded CoreRunner."""
     if restore_fn and model is not None:
@@ -1881,6 +1901,7 @@ def _execute_guarded_run(
             profile=profile_normalized,
             event_path=getattr(run_config, "event_path", None),
             warning_context=warning_context,
+            prefer_local_files_only=prefer_local_files_only,
         )
         if snapshot_provenance is not None:
             snapshot_provenance["reload_path_used"] = True
@@ -2258,6 +2279,10 @@ def run_command(
         "--allow-remote-code",
         help="Allow trust_remote_code-style model loading for this command.",
     ),
+    prefer_local_files_only: bool = typer.Option(
+        False,
+        hidden=True,
+    ),
     no_color: bool = typer.Option(
         False, "--no-color", help="Disable ANSI colors (respects NO_COLOR=1)"
     ),
@@ -2275,6 +2300,7 @@ def run_command(
     allow_host_execution = bool(_coerce_option(allow_host_execution, False))
     allow_third_party_plugins = bool(_coerce_option(allow_third_party_plugins, False))
     allow_remote_code = bool(_coerce_option(allow_remote_code, False))
+    prefer_local_files_only = bool(_coerce_option(prefer_local_files_only, False))
     try:
         return run_from_config(
             config=config,
@@ -2300,6 +2326,7 @@ def run_command(
             allow_host_execution=allow_host_execution,
             allow_third_party_plugins=allow_third_party_plugins,
             allow_remote_code=allow_remote_code,
+            prefer_local_files_only=prefer_local_files_only,
             command_name="run",
             run_impl=_run_command_impl,
             deps_builder=_build_run_command_deps,

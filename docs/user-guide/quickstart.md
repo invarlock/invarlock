@@ -65,11 +65,15 @@ Directory inputs to `invarlock report` are only accepted when they contain
 canonical `report.json` or `evaluation.report.json`; otherwise pass the exact
 file path.
 
-Optional: explain gate decisions directly from the evaluation artifacts.
+Optional: explain gate decisions directly from the run reports.
 
 ```bash
 invarlock report explain --report runs/subject/report.json --baseline runs/source/report.json
 ```
+
+`invarlock report explain` expects run reports (`report.json`), not the
+generated `evaluation.report.json` bundle. Use `invarlock verify` for the
+paired evaluation report.
 
 ## Execution Notes
 

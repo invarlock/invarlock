@@ -35,6 +35,12 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --mode loca
   --profile ci --tier balanced \
   --preset configs/presets/causal_lm/wikitext2_512.yaml \
   --edit-config configs/overlays/edits/quant_rtn/8bit_attn.yaml
+
+# First-class GPT-2 smoke preset used by the smoke campaign script/CI workflow
+INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --mode local \
+  --baseline gpt2 --subject gpt2 --adapter auto \
+  --profile dev \
+  --preset configs/presets/causal_lm/gpt2_smoke_128.yaml
 ```
 
 Runtime configs (canonical, in‑package) live under `src/invarlock/_data/runtime/`:
