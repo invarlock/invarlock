@@ -385,6 +385,17 @@ def test_analysis_and_overhead_wrappers_delegate(monkeypatch):
         get_provider_fn=lambda *args, **kwargs: None,
     ) == {"resolved_split": "validation", "preview_count": 2}
 
+    monkeypatch.setattr(
+        run_mod,
+        "_validate_retry_evaluation_report_impl",
+        lambda **kwargs: {"status": "passed"},
+    )
+    assert run_mod._validate_retry_evaluation_report(
+        report={},
+        baseline_report_data=None,
+        baseline_path=Path("baseline.json"),
+    ) == {"status": "passed"}
+
 
 def test_run_command_injects_explicit_deps(monkeypatch, tmp_path: Path):
     sentinel = object()
@@ -408,6 +419,7 @@ def test_run_command_injects_explicit_deps(monkeypatch, tmp_path: Path):
     assert isinstance(deps, dict)
     assert deps["_resolve_pm_acceptance_range"] is sentinel
     assert deps["_build_provider_dataset_plan"] is run_mod._build_provider_dataset_plan
+    assert deps["_validate_retry_evaluation_report"] is run_mod._validate_retry_evaluation_report
     assert deps["_choose_snapshot_mode"] is run_mod._choose_snapshot_mode
     assert (
         deps["_build_timing_summary_payload"] is run_mod._build_timing_summary_payload

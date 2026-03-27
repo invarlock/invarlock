@@ -116,6 +116,7 @@ def run_command_impl(
     _tensor_or_list_to_ints = _dep("_tensor_or_list_to_ints")
     _to_serialisable_dict = _dep("_to_serialisable_dict")
     _tokenizer_digest = _dep("_tokenizer_digest")
+    _validate_retry_evaluation_report = _dep("_validate_retry_evaluation_report")
     _build_snapshot_provenance = _dep("_build_snapshot_provenance")
     _validate_and_harvest_baseline_schedule = _dep(
         "_validate_and_harvest_baseline_schedule"
@@ -125,7 +126,6 @@ def run_command_impl(
     datetime = _dep("datetime")
     detect_model_profile = _dep("detect_model_profile")
     hashlib = _dep("hashlib")
-    json = _dep("json")
     math = _dep("math")
     np = _dep("np")
     os = _dep("os")
@@ -2385,118 +2385,91 @@ def run_command_impl(
 
             # Evaluation report validation for --until-pass mode
             if retry_controller and baseline:
-                from invarlock.reporting.report_builder import make_report
-                from invarlock.reporting.report_telemetry import (
-                    telemetry_output_enabled,
-                    telemetry_summary_line,
+                _event(
+                    console,
+                    "EXEC",
+                    "Generating evaluation report...",
+                    emoji="📜",
+                    profile=profile_normalized,
+                )
+                retry_validation = _validate_retry_evaluation_report(
+                    report=report,
+                    baseline_report_data=baseline_report_data,
+                    baseline_path=Path(baseline) if baseline else None,
+                )
+                if retry_validation.telemetry_summary:
+                    console.print(retry_validation.telemetry_summary, markup=False)
+
+                retry_controller.record_attempt(
+                    attempt, retry_validation.attempt_summary, edit_config
                 )
 
-                try:
-                    baseline_report = baseline_report_data
-                    if baseline_report is None and baseline:
-                        baseline_path = Path(baseline)
-                        with baseline_path.open(encoding="utf-8") as f:
-                            baseline_report = json.load(f)
-
-                    if baseline_report is None:
-                        raise FileNotFoundError("Baseline report unavailable")
-
+                if retry_validation.status == "passed":
                     _event(
                         console,
-                        "EXEC",
-                        "Generating evaluation report...",
-                        emoji="📜",
+                        "PASS",
+                        "Evaluation report PASSED all gates!",
+                        emoji="✅",
                         profile=profile_normalized,
                     )
-                    evaluation_report = make_report(report, baseline_report)
-                    if telemetry_output_enabled():
-                        summary_line = telemetry_summary_line(evaluation_report)
-                        if summary_line:
-                            console.print(summary_line, markup=False)
+                    break
 
-                    validation = evaluation_report.get("validation", {})
-                    result_summary = _build_retry_result_summary(validation)
-                    report_passed = bool(result_summary["passed"])
-                    failed_gates = list(result_summary["failures"])
-                    retry_controller.record_attempt(
-                        attempt, result_summary, edit_config
-                    )
-
-                    if report_passed:
-                        _event(
-                            console,
-                            "PASS",
-                            "Evaluation report PASSED all gates!",
-                            emoji="✅",
-                            profile=profile_normalized,
-                        )
-                        break
-                    else:
-                        _event(
-                            console,
-                            "FAIL",
-                            f"Evaluation report FAILED gates: {', '.join(failed_gates)}",
-                            emoji="⚠️",
-                            profile=profile_normalized,
-                        )
-
-                        edit_config, head_adjustment = _apply_mask_only_head_autotune(
-                            edit_config, validation
-                        )
-                        if head_adjustment is not None:
-                            _event(
-                                console,
-                                "INIT",
-                                "Auto-tune adjust: global_k → "
-                                f"{head_adjustment['global_k']} "
-                                f"(bounds {head_adjustment['keep_low']}-{head_adjustment['keep_high']})",
-                                emoji="🔧",
-                                profile=profile_normalized,
-                            )
-
-                        should_retry = retry_controller.should_retry(report_passed)
-                        drain_notices = getattr(retry_controller, "drain_notices", None)
-                        notices = drain_notices() if callable(drain_notices) else ()
-                        for notice in notices:
-                            _event(
-                                console,
-                                "WARN",
-                                notice,
-                                emoji="⚠️",
-                                profile=profile_normalized,
-                            )
-                        if should_retry:
-                            attempt += 1
-                            continue
-                        else:
-                            _event(
-                                console,
-                                "FAIL",
-                                f"Exhausted retry budget after {attempt} attempts",
-                                emoji="❌",
-                                profile=profile_normalized,
-                            )
-                            break
-
-                except Exception as report_error:
+                if retry_validation.status == "failed":
                     _event(
                         console,
-                        "WARN",
-                        f"Evaluation report validation failed: {report_error}",
+                        "FAIL",
+                        "Evaluation report FAILED gates: "
+                        f"{', '.join(retry_validation.failed_gates)}",
                         emoji="⚠️",
                         profile=profile_normalized,
                     )
-                    if retry_controller:
-                        retry_controller.record_attempt(
-                            attempt,
-                            {
-                                "passed": False,
-                                "failures": ["report_error"],
-                                "validation": {},
-                            },
-                            edit_config,
+
+                    edit_config, head_adjustment = _apply_mask_only_head_autotune(
+                        edit_config, retry_validation.validation
+                    )
+                    if head_adjustment is not None:
+                        _event(
+                            console,
+                            "INIT",
+                            "Auto-tune adjust: global_k → "
+                            f"{head_adjustment['global_k']} "
+                            f"(bounds {head_adjustment['keep_low']}-{head_adjustment['keep_high']})",
+                            emoji="🔧",
+                            profile=profile_normalized,
                         )
+
+                    should_retry = retry_controller.should_retry(retry_validation.passed)
+                    drain_notices = getattr(retry_controller, "drain_notices", None)
+                    notices = drain_notices() if callable(drain_notices) else ()
+                    for notice in notices:
+                        _event(
+                            console,
+                            "WARN",
+                            notice,
+                            emoji="⚠️",
+                            profile=profile_normalized,
+                        )
+                    if should_retry:
+                        attempt += 1
+                        continue
+                    _event(
+                        console,
+                        "FAIL",
+                        f"Exhausted retry budget after {attempt} attempts",
+                        emoji="❌",
+                        profile=profile_normalized,
+                    )
                     break
+
+                _event(
+                    console,
+                    "WARN",
+                    "Evaluation report validation failed: "
+                    f"{retry_validation.error_message}",
+                    emoji="⚠️",
+                    profile=profile_normalized,
+                )
+                break
             else:
                 if retry_controller:
                     retry_controller.record_attempt(

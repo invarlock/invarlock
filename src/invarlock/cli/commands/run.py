@@ -211,6 +211,9 @@ from invarlock.eval.window_planning import (
     resolve_effective_windows as _resolve_effective_windows_impl,
 )
 from invarlock.model_utils import set_seed
+from invarlock.reporting.run_retry_validation import (
+    validate_retry_evaluation_report as _validate_retry_evaluation_report_impl,
+)
 
 from ...core.config_runtime import InvarLockConfig
 from ..overhead_utils import _extract_pm_snapshot_for_overhead
@@ -945,6 +948,31 @@ def _build_provider_dataset_plan(
         tokenizer_digest_fn=_tokenizer_digest,
         safe_int_fn=_safe_int,
         tensor_or_list_to_ints_fn=_tensor_or_list_to_ints,
+    )
+
+
+def _validate_retry_evaluation_report(
+    *,
+    report: dict[str, Any],
+    baseline_report_data: dict[str, Any] | None,
+    baseline_path: Path | None,
+) -> Any:
+    from invarlock.reporting.report_builder import make_report as _make_report
+    from invarlock.reporting.report_telemetry import (
+        telemetry_output_enabled as _telemetry_output_enabled,
+    )
+    from invarlock.reporting.report_telemetry import (
+        telemetry_summary_line as _telemetry_summary_line,
+    )
+
+    return _validate_retry_evaluation_report_impl(
+        report=report,
+        baseline_report_data=baseline_report_data,
+        baseline_path=baseline_path,
+        build_retry_result_summary_fn=_build_retry_result_summary,
+        make_report_fn=_make_report,
+        telemetry_output_enabled_fn=_telemetry_output_enabled,
+        telemetry_summary_line_fn=_telemetry_summary_line,
     )
 
 
@@ -1816,6 +1844,7 @@ def _build_run_command_deps() -> dict[str, Any]:
         "_apply_warning_filters": _apply_warning_filters,
         "_build_artifacts_payload": _build_artifacts_payload_impl,
         "_build_provider_dataset_plan": _build_provider_dataset_plan,
+        "_validate_retry_evaluation_report": _validate_retry_evaluation_report,
         "_build_dataset_window_stats": _build_dataset_window_stats,
         "_canonical_dataset_id": _canonical_dataset_id,
         "_coerce_float": _coerce_float,
