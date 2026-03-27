@@ -138,7 +138,7 @@ def test_policy_wrappers_delegate(monkeypatch):
     monkeypatch.setattr(
         run_mod,
         "_finalize_guard_overhead_payload_impl",
-        lambda payload, result, normalize_overhead_result_fn: {"passed": True},
+        lambda payload, result: {"passed": True},
     )
     assert run_mod._finalize_guard_overhead_payload({}, object()) == {"passed": True}
 

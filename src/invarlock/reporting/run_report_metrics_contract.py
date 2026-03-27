@@ -1,21 +1,19 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from invarlock.reporting.run_metric_utils import (
+    format_debug_metric_diffs,
+    merge_primary_metric_health,
+)
 from invarlock.reporting.run_pairing_contract import (
     RunReportPolicyViolation,
     build_dataset_window_stats,
     validate_pairing_report_metrics,
 )
-
-ResolveMetricAndProviderFn = Callable[..., tuple[str | None, Any, dict[str, Any]]]
-MergePrimaryMetricHealthFn = Callable[[dict[str, Any], Any], dict[str, Any]]
-FormatDebugMetricDiffsFn = Callable[
-    [dict[str, Any], Mapping[str, Any] | None, Mapping[str, Any] | None], str
-]
 
 
 @dataclass(frozen=True)
@@ -62,9 +60,7 @@ def enrich_run_report_metrics(
     profile_normalized: str | None,
     window_plan: Mapping[str, Any] | None,
     debug_metric_diffs_enabled: bool,
-    resolve_metric_and_provider_fn: ResolveMetricAndProviderFn,
-    merge_primary_metric_health_fn: MergePrimaryMetricHealthFn,
-    format_debug_metric_diffs_fn: FormatDebugMetricDiffsFn,
+    resolve_metric_and_provider_fn: Any,
 ) -> RunReportMetricsEnrichmentResult:
     metrics_section = report.get("metrics", {}) or {}
     data_section = report.get("data", {}) or {}
@@ -189,7 +185,7 @@ def enrich_run_report_metrics(
                 core_report.metrics, dict
             ):
                 core_primary_metric = core_report.metrics.get("primary_metric")
-            primary_metric = merge_primary_metric_health_fn(
+            primary_metric = merge_primary_metric_health(
                 primary_metric, core_primary_metric
             )
             report.setdefault("metrics", {})["primary_metric"] = primary_metric
@@ -222,7 +218,7 @@ def enrich_run_report_metrics(
                 if debug_metric_diffs_enabled and str(
                     primary_metric.get("kind", "")
                 ).startswith("ppl"):
-                    debug_diffs_line = format_debug_metric_diffs_fn(
+                    debug_diffs_line = format_debug_metric_diffs(
                         primary_metric,
                         report.get("metrics", {}),
                         baseline_report_data,

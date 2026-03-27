@@ -41,15 +41,6 @@ from invarlock.cli.output import (
     resolve_output_style,
     timed_step,
 )
-from invarlock.cli.run_analysis import (
-    format_debug_metric_diffs as _format_debug_metric_diffs_impl,
-)
-from invarlock.cli.run_analysis import (
-    merge_primary_metric_health as _merge_primary_metric_health_impl,
-)
-from invarlock.cli.run_analysis import (
-    normalize_overhead_result as _normalize_overhead_result_impl,
-)
 from invarlock.cli.run_artifacts import (
     persist_ref_masks as _persist_ref_masks_impl,
 )
@@ -159,6 +150,9 @@ from invarlock.core.run_guard_overhead_policy import (
 from invarlock.core.run_guard_overhead_policy import (
     finalize_guard_overhead_payload as _finalize_guard_overhead_payload_impl,
 )
+from invarlock.core.run_guard_overhead_policy import (
+    normalize_guard_overhead_result as _normalize_overhead_result_impl,
+)
 from invarlock.core.run_provider_dataset_plan import (
     build_provider_dataset_plan as _build_provider_dataset_plan_impl,
 )
@@ -214,6 +208,12 @@ from invarlock.eval.window_planning import (
     resolve_effective_windows as _resolve_effective_windows_impl,
 )
 from invarlock.model_utils import set_seed
+from invarlock.reporting.run_metric_utils import (
+    format_debug_metric_diffs as _format_debug_metric_diffs_impl,
+)
+from invarlock.reporting.run_metric_utils import (
+    merge_primary_metric_health as _merge_primary_metric_health_impl,
+)
 from invarlock.reporting.run_pairing_contract import (
     build_dataset_window_stats as _build_dataset_window_stats_impl,
 )
@@ -867,11 +867,7 @@ def _finalize_guard_overhead_payload(
     payload: Mapping[str, Any] | None,
     result: Any,
 ) -> dict[str, Any]:
-    return _finalize_guard_overhead_payload_impl(
-        payload,
-        result,
-        normalize_overhead_result_fn=_normalize_overhead_result,
-    )
+    return _finalize_guard_overhead_payload_impl(payload, result)
 
 
 def _validate_pairing_report_metrics(
@@ -1041,8 +1037,6 @@ def _enrich_run_report_metrics(
         window_plan=window_plan,
         debug_metric_diffs_enabled=debug_metric_diffs_enabled,
         resolve_metric_and_provider_fn=_resolve_metric_and_provider,
-        merge_primary_metric_health_fn=_merge_primary_metric_health,
-        format_debug_metric_diffs_fn=_format_debug_metric_diffs,
     )
 
 

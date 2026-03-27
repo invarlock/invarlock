@@ -67,15 +67,10 @@ def test_enrich_run_report_metrics_adds_classification_primary_metric_and_stats(
             None,
             {"reps": 10, "ci_level": 0.95},
         ),
-        merge_primary_metric_health_fn=lambda pm, core_pm: {
-            **pm,
-            "degraded": bool(core_pm and core_pm.get("degraded")),
-        },
-        format_debug_metric_diffs_fn=lambda pm, metrics, baseline: "diffs",
     )
 
     assert result.pairing_violations == ()
-    assert result.debug_diffs_line == "diffs"
+    assert result.debug_diffs_line
     assert result.report["metrics"]["classification"]["counts_source"] == "measured"
     assert result.report["metrics"]["accuracy"] == 1.0
     assert result.report["metrics"]["primary_metric"]["reps"] == 10
@@ -115,8 +110,6 @@ def test_enrich_run_report_metrics_uses_pseudo_counts_and_returns_pairing_violat
         window_plan=None,
         debug_metric_diffs_enabled=False,
         resolve_metric_and_provider_fn=lambda *args, **kwargs: (None, None, {}),
-        merge_primary_metric_health_fn=lambda pm, core_pm: pm,
-        format_debug_metric_diffs_fn=lambda pm, metrics, baseline: "",
     )
 
     assert (
