@@ -170,7 +170,7 @@ def test_calibrate_commands_exit_on_missing_optional_deps(
         )
 
 
-def test_null_sweep_optioninfo_runtime_flags_do_not_block_missing_dep_error(
+def test_null_sweep_runtime_flags_do_not_block_missing_dep_error(
     tmp_path: Path,
 ) -> None:
     cfg = _write_base_config(tmp_path)
@@ -204,10 +204,10 @@ def test_null_sweep_optioninfo_runtime_flags_do_not_block_missing_dep_error(
             seed_start=42,
             profile="ci",
             device=None,
-            allow_network=typer.Option(True),
-            allow_host_execution=typer.Option(True),
-            allow_third_party_plugins=typer.Option(True),
-            allow_remote_code=typer.Option(True),
+            allow_network=True,
+            allow_host_execution=True,
+            allow_third_party_plugins=True,
+            allow_remote_code=True,
             safety_margin=0.05,
             target_any_warning_rate=0.01,
         )
@@ -215,7 +215,7 @@ def test_null_sweep_optioninfo_runtime_flags_do_not_block_missing_dep_error(
     run_calibration.assert_not_called()
 
 
-def test_ve_sweep_optioninfo_runtime_flags_do_not_block_missing_dep_error(
+def test_ve_sweep_runtime_flags_do_not_block_missing_dep_error(
     tmp_path: Path,
 ) -> None:
     cfg = _write_base_config(tmp_path)
@@ -251,10 +251,10 @@ def test_ve_sweep_optioninfo_runtime_flags_do_not_block_missing_dep_error(
             target_enable_rate=0.05,
             profile="ci",
             device=None,
-            allow_network=typer.Option(True),
-            allow_host_execution=typer.Option(True),
-            allow_third_party_plugins=typer.Option(True),
-            allow_remote_code=typer.Option(True),
+            allow_network=True,
+            allow_host_execution=True,
+            allow_third_party_plugins=True,
+            allow_remote_code=True,
             safety_margin=0.0,
         )
 
