@@ -1,22 +1,23 @@
 from __future__ import annotations
 
 from invarlock.reporting import report_builder as C
+from invarlock.reporting.utils import _pair_logloss_windows
 
 
 def test_pair_logloss_windows_invalid_and_small_samples():
     # Invalid inputs
-    assert C._pair_logloss_windows(None, None) is None  # type: ignore[arg-type]
-    assert C._pair_logloss_windows({"window_ids": [1]}, {"window_ids": [1]}) is None
+    assert _pair_logloss_windows(None, None) is None  # type: ignore[arg-type]
+    assert _pair_logloss_windows({"window_ids": [1]}, {"window_ids": [1]}) is None
     # Valid structure but <2 pairs → None
     run = {"window_ids": [1], "logloss": [1.0]}
     base = {"window_ids": [1], "logloss": [1.0]}
-    assert C._pair_logloss_windows(run, base) is None
+    assert _pair_logloss_windows(run, base) is None
 
 
 def test_pair_logloss_windows_happy_path_two_pairs():
     run = {"window_ids": [1, 2], "logloss": [1.0, 2.0]}
     base = {"window_ids": [1, 2], "logloss": [1.1, 1.9]}
-    out = C._pair_logloss_windows(run, base)
+    out = _pair_logloss_windows(run, base)
     assert isinstance(out, tuple) and len(out) == 2
     pr, pb = out
     assert pr == [1.0, 2.0] and pb == [1.1, 1.9]

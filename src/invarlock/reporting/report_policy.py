@@ -32,8 +32,10 @@ def resolve_pm_acceptance_range_from_report(
             else {}
         )
         if isinstance(pm_ctx, dict):
-            cfg_min = _safe_float(pm_ctx.get("acceptance_range", {}).get("min"))
-            cfg_max = _safe_float(pm_ctx.get("acceptance_range", {}).get("max"))
+            acceptance_range = pm_ctx.get("acceptance_range")
+            if isinstance(acceptance_range, dict):
+                cfg_min = _safe_float(acceptance_range.get("min"))
+                cfg_max = _safe_float(acceptance_range.get("max"))
     has_explicit = any(v is not None for v in (cfg_min, cfg_max))
     if not has_explicit:
         return {}

@@ -7,8 +7,8 @@ from typing import Any
 from invarlock.core.report_inputs import load_report_input_json
 
 from . import report_builder
-from .report_files import save_report
 from .render import compute_console_validation_block
+from .report_files import save_report
 
 
 @dataclass(frozen=True)

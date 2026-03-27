@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from ..eval.data import EvaluationWindow
 
 
@@ -148,6 +148,8 @@ def _extract_dataset_info(report: dict[str, Any]) -> dict[str, Any]:
     placeholder values for non-essential fields.
     """
     data_config = report.get("data", {}) if isinstance(report, dict) else {}
+    if not isinstance(data_config, dict):
+        data_config = {}
     eval_windows = (
         report.get("evaluation_windows", {}) if isinstance(report, dict) else {}
     )
@@ -183,9 +185,6 @@ def _extract_dataset_info(report: dict[str, Any]) -> dict[str, Any]:
             if isinstance(report.get("meta"), dict)
             else 0
         )
-        preview_n = int(data_config.get("preview_n", 0) or 0)
-        final_n = int(data_config.get("final_n", 0) or 0)
-        seq_len = int(data_config.get("seq_len", 0) or 0)
         config_str = f"{dataset}{split}{seq_len}{preview_n}{final_n}{seed}"
         digest = _hashlib.sha256(config_str.encode()).hexdigest()
         preview_tokens = preview_n * seq_len if preview_n and seq_len else 0

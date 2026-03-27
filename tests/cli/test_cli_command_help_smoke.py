@@ -27,6 +27,7 @@ def test_cli_top_level_help_smoke(monkeypatch):
 
 
 def test_command_wrappers_importable():
+    from invarlock.cli.commands.calibrate import calibrate_app
     from invarlock.cli.commands.doctor import doctor_command
     from invarlock.cli.commands.evaluate import evaluate_command
     from invarlock.cli.commands.explain_gates import explain_gates_command
@@ -34,11 +35,16 @@ def test_command_wrappers_importable():
     from invarlock.cli.commands.plugins import plugins_command
     from invarlock.cli.commands.policy import build_command as policy_build_command
     from invarlock.cli.commands.policy import verify_command as policy_verify_command
-    from invarlock.cli.commands.proof_pack import build_command as proof_pack_build_command
-    from invarlock.cli.commands.proof_pack import inspect_command as proof_pack_inspect_command
-    from invarlock.cli.commands.proof_pack import verify_command as proof_pack_verify_command
+    from invarlock.cli.commands.proof_pack import (
+        build_command as proof_pack_build_command,
+    )
+    from invarlock.cli.commands.proof_pack import (
+        inspect_command as proof_pack_inspect_command,
+    )
+    from invarlock.cli.commands.proof_pack import (
+        verify_command as proof_pack_verify_command,
+    )
     from invarlock.cli.commands.verify import verify_command
-    from invarlock.cli.commands.calibrate import calibrate_app
     from invarlock.reporting.report_contract import generate_reports
 
     for obj in (

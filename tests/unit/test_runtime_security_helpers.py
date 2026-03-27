@@ -33,7 +33,11 @@ def test_serialize_canonical_json_normalizes_supported_types() -> None:
     payload = {
         "path": Path("artifact.txt"),
         "values": {3, 1},
-        "nested": [Path("nested.txt"), {"report": Path("payload.json")}, SimpleNamespace(answer=42)],
+        "nested": [
+            Path("nested.txt"),
+            {"report": Path("payload.json")},
+            SimpleNamespace(answer=42),
+        ],
     }
 
     encoded = runtime_security.serialize_canonical_json(payload)

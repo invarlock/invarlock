@@ -291,9 +291,7 @@ def _doctor_typed(
     baseline: str | None = typer.Option(
         None, "--baseline", help="Optional baseline model path or id for quick checks."
     ),
-    json_out: bool = typer.Option(
-        False, "--json", help="Emit machine-readable JSON."
-    ),
+    json_out: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
     tier: str | None = typer.Option(
         None, "--tier", help="Optional tier context for config validation."
     ),

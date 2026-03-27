@@ -49,14 +49,14 @@ from ...core.evaluate_plan import (
     normalize_model_id as _normalize_model_id,
 )
 from ...core.exceptions import ConfigError, ValidationError
+
+# Use the report group's programmatic entry for report generation
+from ...reporting.report_contract import generate_reports
 from ..security_helpers import (
     configure_runtime_security,
     emit_runtime_manifest,
     maybe_delegate_model_command,
 )
-
-# Use the report group's programmatic entry for report generation
-from ...reporting.report_contract import generate_reports
 
 _LAZY_RUN_IMPORT = True
 

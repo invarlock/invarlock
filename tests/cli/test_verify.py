@@ -297,9 +297,8 @@ def test_verify_delta_basis_matches_pm_direction(tmp_path: Path):
 
 def test_verify_command_passes(tmp_path: Path):
     cert_path = _write_evaluation_report(tmp_path)
-    result = runner.invoke(app, ["report", "verify", str(cert_path)])
+    result = runner.invoke(app, ["verify", "--json", str(cert_path)])
     assert result.exit_code == 0
-    # report.verify emits JSON payload; verify success should have ok=true
     payload = json.loads(result.stdout)
     assert payload.get("format_version") == "verify-v1"
     assert payload.get("summary", {}).get("ok") is True
@@ -322,7 +321,7 @@ def test_verify_ci_rejects_below_token_floor(tmp_path: Path):
 def test_verify_ci_allows_below_token_floor_with_tiny_relax(tmp_path: Path):
     cert = _make_ci_ready(_build_sample_evaluation_report())
     cert["telemetry"] = {"preview_total_tokens": 20_000, "final_total_tokens": 20_000}
-    cert["auto"]["tiny_relax"] = True
+    cert.setdefault("context", {}).setdefault("run", {})["tiny_relax"] = True
     cert_path = tmp_path / "cert_ci_floor_tiny_relax.json"
     cert_path.write_text(json.dumps(cert))
 
@@ -338,7 +337,7 @@ def test_verify_command_detects_ratio_mismatch(tmp_path: Path):
     evaluation_report["primary_metric"]["ratio_vs_baseline"] = 2.0  # impossible ratio
     cert_path.write_text(json.dumps(evaluation_report))
 
-    result = runner.invoke(app, ["report", "verify", str(cert_path)])
+    result = runner.invoke(app, ["verify", "--json", str(cert_path)])
     assert result.exit_code == 1
     payload = json.loads(result.stdout)
     assert payload.get("format_version") == "verify-v1"
@@ -351,7 +350,7 @@ def test_verify_command_detects_pairing_failure(tmp_path: Path):
     evaluation_report["dataset"]["windows"]["stats"]["window_match_fraction"] = 0.95
     cert_path.write_text(json.dumps(evaluation_report))
 
-    result = runner.invoke(app, ["report", "verify", str(cert_path)])
+    result = runner.invoke(app, ["verify", "--json", str(cert_path)])
     assert result.exit_code == 1
     payload = json.loads(result.stdout)
     assert payload.get("format_version") == "verify-v1"
@@ -366,7 +365,7 @@ def test_verify_command_detects_count_mismatch(tmp_path: Path):
     )
     cert_path.write_text(json.dumps(evaluation_report))
 
-    result = runner.invoke(app, ["report", "verify", str(cert_path)])
+    result = runner.invoke(app, ["verify", "--json", str(cert_path)])
     assert result.exit_code == 1
     payload = json.loads(result.stdout)
     assert payload.get("format_version") == "verify-v1"
@@ -381,7 +380,7 @@ def test_verify_command_detects_drift_band_violation(tmp_path: Path):
     evaluation_report["primary_metric"]["final"] = 12.0
     cert_path.write_text(json.dumps(evaluation_report))
 
-    result = runner.invoke(app, ["report", "verify", str(cert_path)])
+    result = runner.invoke(app, ["verify", "--json", str(cert_path)])
     assert result.exit_code == 1
     payload = json.loads(result.stdout)
     assert payload.get("format_version") == "verify-v1"

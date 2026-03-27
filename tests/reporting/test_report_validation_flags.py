@@ -217,9 +217,18 @@ def test_compute_validation_flags_clamps_negative_min_tokens_tolerance(
 
 
 def test_resolve_tiny_relax_from_report_context_only() -> None:
-    assert C._resolve_tiny_relax_from_report({"context": {"run": {"tiny_relax": "on"}}}) is True
-    assert C._resolve_tiny_relax_from_report({"context": {"eval": {"tiny_relax": 1}}}) is True
-    assert C._resolve_tiny_relax_from_report({"meta": {"auto": {"tiny_relax": "maybe"}}}) is False
+    assert (
+        C._resolve_tiny_relax_from_report({"context": {"run": {"tiny_relax": "on"}}})
+        is True
+    )
+    assert (
+        C._resolve_tiny_relax_from_report({"context": {"eval": {"tiny_relax": 1}}})
+        is True
+    )
+    assert (
+        C._resolve_tiny_relax_from_report({"meta": {"auto": {"tiny_relax": "maybe"}}})
+        is False
+    )
 
 
 def test_prepare_guard_overhead_section_fallback_paths():

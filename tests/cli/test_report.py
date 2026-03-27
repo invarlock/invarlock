@@ -4,7 +4,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-import typer
 
 from invarlock.reporting.report_contract import generate_reports
 
@@ -80,6 +79,7 @@ def test_report_command_evaluation_report_no_baseline(mock_load):
             baseline=None,
             output=None,
         )
+
 
 @patch("invarlock.reporting.report_contract.save_report")
 @patch("invarlock.reporting.report_contract.load_report_payload")

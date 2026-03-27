@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from invarlock.reporting.report_types import create_empty_report
 from invarlock.reporting.report_contract import generate_reports
+from invarlock.reporting.report_types import create_empty_report
 
 
 def test_report_command_programmatic_json_only(tmp_path: Path):

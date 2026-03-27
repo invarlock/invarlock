@@ -7,8 +7,8 @@ import pytest
 import typer
 
 import invarlock.cli.commands.report as report_mod
-import invarlock.reporting.report_contract as report_contract_mod
 import invarlock.reporting.report_builder as cert_mod
+import invarlock.reporting.report_contract as report_contract_mod
 from invarlock.reporting.report_contract import ReportGenerationResult, generate_reports
 
 
@@ -179,6 +179,26 @@ def test_report_command_prints_telemetry_summary_line(monkeypatch):
     assert "telemetry" in "\n".join(captured)
 
 
+def test_report_command_skips_empty_telemetry_summary_line(monkeypatch):
+    result = _make_generation_result(
+        evaluation_report={"validation": {"overall": True}, "primary_metric": {}},
+        validation_block={"overall_pass": True, "rows": []},
+    )
+    monkeypatch.setattr(report_mod, "telemetry_output_enabled", lambda: True)
+    monkeypatch.setattr(report_mod, "telemetry_summary_line", lambda _report: "")
+
+    captured: list[str] = []
+
+    class _CaptureConsole:
+        def print(self, *args: object, **kwargs: object) -> None:
+            captured.append(" ".join(str(a) for a in args))
+
+    monkeypatch.setattr(report_mod, "console", _CaptureConsole())
+
+    report_mod._render_generation_result(result=result, style="audit", no_color=False)
+    assert "telemetry" not in "\n".join(captured)
+
+
 def test_report_command_evaluation_report_validation_error(monkeypatch):
     monkeypatch.setattr(
         report_mod,
@@ -186,7 +206,7 @@ def test_report_command_evaluation_report_validation_error(monkeypatch):
         lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("bad report")),
     )
     monkeypatch.setattr(
-        report_mod, "console", type("C", (), {"print": lambda *_: None})()
+        report_mod, "console", type("C", (), {"print": lambda *args, **kwargs: None})()
     )
 
     with pytest.raises(typer.Exit) as exc:
@@ -203,6 +223,29 @@ def test_report_command_evaluation_report_validation_error(monkeypatch):
     assert exc.value.exit_code == 1
 
 
+def test_report_command_renders_non_report_artifacts_without_summary(monkeypatch):
+    result = _make_generation_result(
+        formats=["json"],
+        saved_files={"json": "report.json", "html": "report.html"},
+        evaluation_report=None,
+        validation_block=None,
+    )
+    captured: list[str] = []
+
+    class _CaptureConsole:
+        def print(self, *args: object, **kwargs: object) -> None:
+            captured.append(" ".join(str(a) for a in args))
+
+    monkeypatch.setattr(report_mod, "console", _CaptureConsole())
+
+    report_mod._render_generation_result(result=result, style="audit", no_color=False)
+    rendered = "\n".join(captured)
+    assert "EVALUATION REPORT SUMMARY" not in rendered
+    assert "Output" in rendered
+    assert "report.json" in rendered
+    assert "report.html" in rendered
+
+
 def test_report_command_rejects_noncanonical_run_directory(monkeypatch, tmp_path):
     report_dir = tmp_path / "report-dir"
     report_dir.mkdir()
@@ -211,7 +254,7 @@ def test_report_command_rejects_noncanonical_run_directory(monkeypatch, tmp_path
         encoding="utf-8",
     )
     monkeypatch.setattr(
-        report_mod, "console", type("C", (), {"print": lambda *_: None})()
+        report_mod, "console", type("C", (), {"print": lambda *args, **kwargs: None})()
     )
 
     with pytest.raises(typer.Exit) as exc:
@@ -229,6 +272,64 @@ def test_report_command_rejects_noncanonical_run_directory(monkeypatch, tmp_path
     assert exc.value.exit_code == 2
 
 
+def test_report_command_maps_nonbaseline_value_error_to_exit_two(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        report_mod,
+        "generate_reports",
+        lambda **_kwargs: (_ for _ in ()).throw(ValueError("bad input path")),
+    )
+    monkeypatch.setattr(
+        report_mod,
+        "_raise_report_input_failure",
+        lambda message, *, no_color=False: (
+            captured.update({"message": message, "no_color": no_color}),
+            (_ for _ in ()).throw(typer.Exit(2)),
+        )[1],
+    )
+
+    with pytest.raises(typer.Exit) as exc:
+        report_mod.report_callback(
+            type("Ctx", (), {"resilient_parsing": False, "invoked_subcommand": None})(),
+            run="run.json",
+            format="json",
+            compare=None,
+            baseline=None,
+            output=None,
+            style="audit",
+            no_color=False,
+        )
+
+    assert exc.value.exit_code == 2
+    assert captured == {"message": "bad input path", "no_color": False}
+
+
+def test_report_callback_maps_generic_error_to_exit_one(monkeypatch) -> None:
+    monkeypatch.setattr(
+        report_mod,
+        "generate_reports",
+        lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+    monkeypatch.setattr(
+        report_mod, "console", type("C", (), {"print": lambda *_: None})()
+    )
+
+    with pytest.raises(typer.Exit) as exc:
+        report_mod.report_callback(
+            type("Ctx", (), {"resilient_parsing": False, "invoked_subcommand": None})(),
+            run="run.json",
+            format="json",
+            compare=None,
+            baseline=None,
+            output=None,
+            style="audit",
+            no_color=False,
+        )
+
+    assert exc.value.exit_code == 1
+
+
 def test_artifact_entries_includes_unordered_extra_saved_files() -> None:
     entries = report_mod._artifact_entries(
         {"json": "a.json", "telemetry": "telemetry.json"},
@@ -238,6 +339,195 @@ def test_artifact_entries_includes_unordered_extra_saved_files() -> None:
     assert ("Output", "out") in entries
     assert ("JSON", "a.json") in entries
     assert ("TELEMETRY", "telemetry.json") in entries
+
+
+def test_fmt_ci_95_rejects_non_pair_values() -> None:
+    assert report_mod._fmt_ci_95("not-a-pair") is None
+    assert report_mod._fmt_ci_95(None) is None
+
+
+def test_report_command_summary_skips_telemetry_when_disabled(monkeypatch) -> None:
+    result = _make_generation_result(
+        primary={"meta": {}, "edit": {}, "metrics": {}},
+        evaluation_report={"primary_metric": None},
+        validation_block={"overall_pass": False, "rows": []},
+    )
+    captured: list[str] = []
+
+    class _CaptureConsole:
+        def print(self, *args: object, **kwargs: object) -> None:
+            captured.append(" ".join(str(a) for a in args))
+
+    monkeypatch.setattr(report_mod, "console", _CaptureConsole())
+    monkeypatch.setattr(report_mod, "telemetry_output_enabled", lambda: False)
+    monkeypatch.setattr(
+        report_mod,
+        "telemetry_summary_line",
+        lambda _report: (_ for _ in ()).throw(RuntimeError("should not run")),
+    )
+
+    report_mod._render_generation_result(result=result, style="audit", no_color=False)
+    rendered = "\n".join(captured)
+    assert "No validation rows" in rendered
+    assert "Status         Unavailable" in rendered
+
+
+def test_fmt_ci_95_rejects_non_finite_and_non_numeric_bounds() -> None:
+    assert report_mod._fmt_ci_95(["bad", 1.0]) is None
+    assert report_mod._fmt_ci_95([1.0, float("inf")]) is None
+
+
+def test_report_command_summary_handles_missing_optional_fields(monkeypatch) -> None:
+    result = _make_generation_result(
+        primary={"meta": {}, "edit": {}, "metrics": {}, "_sentinel": True},
+        evaluation_report={"validation": {}},
+        validation_block={"overall_pass": False, "rows": "not-a-list"},
+    )
+    captured: list[str] = []
+
+    class _CaptureConsole:
+        def print(self, *args: object, **kwargs: object) -> None:
+            captured.append(" ".join(str(a) for a in args))
+
+    monkeypatch.setattr(report_mod, "console", _CaptureConsole())
+    monkeypatch.setattr(report_mod, "telemetry_output_enabled", lambda: True)
+    monkeypatch.setattr(report_mod, "telemetry_summary_line", lambda _report: None)
+
+    report_mod._render_generation_result(result=result, style="audit", no_color=False)
+    rendered = "\n".join(captured)
+    assert "No validation rows" in rendered
+    assert "Status         Unavailable" in rendered
+    assert "Run ID" not in rendered
+    assert "Model" not in rendered
+    assert "Edit" not in rendered
+
+
+def test_render_generation_result_maps_report_input_error_to_exit_two(monkeypatch):
+    result = _make_generation_result(
+        formats=["json"],
+        saved_files={"json": "report.json"},
+        evaluation_report=None,
+        validation_block=None,
+    )
+    captured: dict[str, object] = {}
+
+    def _raise_input(message: str, *, no_color: bool = False) -> None:
+        captured["message"] = message
+        captured["no_color"] = no_color
+        raise typer.Exit(2)
+
+    monkeypatch.setattr(
+        report_mod,
+        "print_event",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            report_mod.ReportInputError("invalid_report_input", Path("bad.json"))
+        ),
+    )
+    monkeypatch.setattr(report_mod, "_raise_report_input_failure", _raise_input)
+
+    with pytest.raises(typer.Exit) as exc:
+        report_mod._render_generation_result(
+            result=result, style="audit", no_color=True
+        )
+
+    assert exc.value.exit_code == 2
+    assert captured == {
+        "message": "Invalid report input: bad.json",
+        "no_color": True,
+    }
+
+
+def test_render_generation_result_maps_value_error_to_exit_two(monkeypatch):
+    result = _make_generation_result(
+        formats=["json"],
+        saved_files={"json": "report.json"},
+        evaluation_report=None,
+        validation_block=None,
+    )
+    monkeypatch.setattr(
+        report_mod,
+        "_artifact_entries",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("bad value")),
+    )
+    monkeypatch.setattr(
+        report_mod, "console", type("C", (), {"print": lambda *args, **kwargs: None})()
+    )
+
+    with pytest.raises(typer.Exit) as exc:
+        report_mod._render_generation_result(
+            result=result, style="audit", no_color=False
+        )
+    assert exc.value.exit_code == 2
+
+
+def test_render_generation_result_maps_unexpected_error_to_exit_one(monkeypatch):
+    result = _make_generation_result(
+        formats=["json"],
+        saved_files={"json": "report.json"},
+        evaluation_report=None,
+        validation_block=None,
+    )
+    monkeypatch.setattr(
+        report_mod,
+        "_artifact_entries",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+    monkeypatch.setattr(
+        report_mod, "console", type("C", (), {"print": lambda *args, **kwargs: None})()
+    )
+
+    with pytest.raises(typer.Exit) as exc:
+        report_mod._render_generation_result(
+            result=result, style="audit", no_color=False
+        )
+    assert exc.value.exit_code == 1
+
+
+def test_render_generation_result_maps_inner_report_error_to_exit_one(monkeypatch):
+    result = _make_generation_result(
+        evaluation_report={"primary_metric": {}},
+        validation_block={"overall_pass": True, "rows": []},
+    )
+    monkeypatch.setattr(report_mod, "telemetry_output_enabled", lambda: True)
+    monkeypatch.setattr(
+        report_mod,
+        "telemetry_summary_line",
+        lambda _report: (_ for _ in ()).throw(RuntimeError("bad telemetry")),
+    )
+    monkeypatch.setattr(
+        report_mod, "console", type("C", (), {"print": lambda *args, **kwargs: None})()
+    )
+
+    with pytest.raises(typer.Exit) as exc:
+        report_mod._render_generation_result(
+            result=result, style="audit", no_color=False
+        )
+    assert exc.value.exit_code == 1
+
+
+def test_render_generation_result_maps_console_failures_to_exit_one(monkeypatch):
+    result = _make_generation_result(
+        evaluation_report={"primary_metric": {}},
+        validation_block={"overall_pass": True, "rows": []},
+    )
+    monkeypatch.setattr(report_mod, "print_event", lambda *_args, **_kwargs: None)
+
+    class _ExplodingConsole:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def print(self, *_args: object, **_kwargs: object) -> None:
+            self.calls += 1
+            if self.calls >= 2:
+                raise RuntimeError("console boom")
+
+    monkeypatch.setattr(report_mod, "console", _ExplodingConsole())
+
+    with pytest.raises(typer.Exit) as exc:
+        report_mod._render_generation_result(
+            result=result, style="audit", no_color=False
+        )
+    assert exc.value.exit_code == 1
 
 
 def test_report_callback_skips_subcommand_and_delegates_success(monkeypatch) -> None:
@@ -286,6 +576,33 @@ def test_report_callback_skips_subcommand_and_delegates_success(monkeypatch) -> 
             "output": "out",
         }
     ]
+
+
+def test_report_command_maps_report_input_error_to_exit_two(monkeypatch) -> None:
+    monkeypatch.setattr(
+        report_mod,
+        "generate_reports",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            report_mod.ReportInputError("not_found", Path("run.json"))
+        ),
+    )
+    monkeypatch.setattr(
+        report_mod, "console", type("C", (), {"print": lambda *args, **kwargs: None})()
+    )
+
+    with pytest.raises(typer.Exit) as exc:
+        report_mod.report_callback(
+            type("Ctx", (), {"resilient_parsing": False, "invoked_subcommand": None})(),
+            run="run.json",
+            format="json",
+            compare=None,
+            baseline=None,
+            output=None,
+            style="audit",
+            no_color=False,
+        )
+
+    assert exc.value.exit_code == 2
 
 
 def test_report_validate_success(monkeypatch, tmp_path):

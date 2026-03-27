@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import venv
 from pathlib import Path
@@ -36,8 +37,27 @@ def test_import_and_cli_help_without_torch(tmp_path: Path):
     # Create an isolated virtual environment and install the project.
     env_dir, python_exe = _create_venv(tmp_path)
     project_root = Path(__file__).resolve().parents[2]
+    source_root = tmp_path / "src-copy"
+    shutil.copytree(
+        project_root,
+        source_root,
+        ignore=shutil.ignore_patterns(
+            ".git",
+            ".pytest_cache",
+            "__pycache__",
+            "build",
+            "dist",
+            "reports",
+            "runs",
+            "site",
+            "out",
+            "tmp",
+            "node_modules",
+            "target",
+        ),
+    )
 
-    install = _run(python_exe, ["-m", "pip", "install", str(project_root)])
+    install = _run(python_exe, ["-m", "pip", "install", str(source_root)])
     if install.returncode != 0:
         combined = f"{install.stdout}{install.stderr}"
         if "requires a different Python" in combined or "not in '>=3.12'" in combined:

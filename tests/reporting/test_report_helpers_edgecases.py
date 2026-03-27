@@ -5,6 +5,7 @@ import math
 import pytest
 
 from invarlock.reporting import report_builder as C
+from invarlock.reporting.utils import _coerce_interval
 
 
 class _RaisingStr:
@@ -58,11 +59,11 @@ def test_infer_scope_from_modules_variants() -> None:
 
 
 def test_coerce_interval_from_string_and_list() -> None:
-    lo, hi = C._coerce_interval("(1.5, 2.5)")
+    lo, hi = _coerce_interval("(1.5, 2.5)")
     assert math.isclose(lo, 1.5) and math.isclose(hi, 2.5)
-    lo2, hi2 = C._coerce_interval("not a tuple")
+    lo2, hi2 = _coerce_interval("not a tuple")
     assert math.isnan(lo2) and math.isnan(hi2)
-    lo3, hi3 = C._coerce_interval(["x", 2])
+    lo3, hi3 = _coerce_interval(["x", 2])
     assert math.isnan(lo3) and math.isnan(hi3)
 
 

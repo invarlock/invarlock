@@ -23,7 +23,11 @@ def test_resolve_pm_acceptance_range_paths(monkeypatch):
     monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MIN", raising=False)
     monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MAX", raising=False)
     passthrough = cert._resolve_pm_acceptance_range_from_report(
-        {"context": {"primary_metric": {"acceptance_range": {"min": 0.97, "max": 1.02}}}}
+        {
+            "context": {
+                "primary_metric": {"acceptance_range": {"min": 0.97, "max": 1.02}}
+            }
+        }
     )
     assert passthrough == {"min": 0.97, "max": 1.02}
 

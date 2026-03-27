@@ -6,6 +6,7 @@ from copy import deepcopy
 import pytest
 
 from invarlock.reporting import report_builder as cert
+from invarlock.reporting import report_make_impl as report_make_impl_mod
 
 
 def _base_report() -> dict:
@@ -113,7 +114,9 @@ def _stub_evaluation_report_extractors(
     resolved_policy = resolved_policy or {"spectral": {}, "variance": {}}
 
     monkeypatch.setattr(
-        cert, "_extract_dataset_info", lambda *_: deepcopy(dataset_info), raising=False
+        report_make_impl_mod,
+        "_extract_dataset_info",
+        lambda *_: deepcopy(dataset_info),
     )
     monkeypatch.setattr(
         cert, "_extract_invariants", lambda *args, **kwargs: invariants, raising=False
@@ -165,9 +168,10 @@ def test_make_evaluation_report_raises_on_drift_identity(monkeypatch):
     def fake_pair(_run, _base):
         return ([0.1, 0.2], [0.0, 0.0])
 
-    monkeypatch.setattr(cert, "_pair_logloss_windows", fake_pair, raising=False)
+    monkeypatch.setattr(report_make_impl_mod, "_pair_logloss_windows", fake_pair)
     monkeypatch.setattr(
-        cert, "compute_paired_delta_log_ci", lambda *args, **kwargs: (0.0, 0.0)
+        "invarlock.core.bootstrap.compute_paired_delta_log_ci",
+        lambda *args, **kwargs: (0.0, 0.0),
     )
     monkeypatch.setattr(
         cert,
@@ -193,9 +197,10 @@ def test_make_evaluation_report_raises_on_ratio_ci_mismatch(monkeypatch):
     def fake_pair(_run, _base):
         return ([0.1, 0.2], [0.1, 0.2])
 
-    monkeypatch.setattr(cert, "_pair_logloss_windows", fake_pair, raising=False)
+    monkeypatch.setattr(report_make_impl_mod, "_pair_logloss_windows", fake_pair)
     monkeypatch.setattr(
-        cert, "compute_paired_delta_log_ci", lambda *args, **kwargs: (0.0, 0.0)
+        "invarlock.core.bootstrap.compute_paired_delta_log_ci",
+        lambda *args, **kwargs: (0.0, 0.0),
     )
     monkeypatch.setattr(
         cert,
@@ -214,7 +219,7 @@ def test_make_evaluation_report_uses_coverage_fallback(monkeypatch):
     report["metrics"]["bootstrap"]["coverage"] = {"preview": {"used": 5}}
 
     _patch_common(monkeypatch, report, baseline)
-    monkeypatch.setattr(cert, "_pair_logloss_windows", lambda *_: None, raising=False)
+    monkeypatch.setattr(report_make_impl_mod, "_pair_logloss_windows", lambda *_: None)
 
     evaluation_report = cert.make_report(report, baseline)
     stats = evaluation_report["dataset"]["windows"]["stats"]
@@ -306,7 +311,9 @@ def test_make_evaluation_report_populates_optional_sections(monkeypatch):
 
     monkeypatch.setattr(cert, "_attach_pm", _attach_pm_stub, raising=False)
     monkeypatch.setattr(
-        cert, "_extract_dataset_info", lambda *_: deepcopy(dataset_info), raising=False
+        report_make_impl_mod,
+        "_extract_dataset_info",
+        lambda *_: deepcopy(dataset_info),
     )
     monkeypatch.setattr(
         cert, "_extract_invariants", lambda *args, **kwargs: invariants, raising=False
@@ -489,10 +496,9 @@ def test_make_evaluation_report_handles_missing_dataset_section(monkeypatch):
     )
     monkeypatch.setattr(cert, "_normalize_baseline", lambda value: value, raising=False)
     monkeypatch.setattr(
-        cert,
+        report_make_impl_mod,
         "_extract_dataset_info",
         lambda *_: {"hash": {}, "windows": {}},
-        raising=False,
     )
 
     evaluation_report = cert.make_report(report, baseline)

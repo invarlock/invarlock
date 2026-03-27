@@ -8,7 +8,6 @@ Provides the `invarlock report` group with:
 """
 
 import math
-from pathlib import Path
 from time import perf_counter
 from typing import Any, NoReturn
 
@@ -156,6 +155,7 @@ def _render_generation_result(
 
         def _event(tag: str, message: str, *, emoji: str | None = None) -> None:
             print_event(console, tag, message, style=output_style, emoji=emoji)
+
         output_dir = result.output_dir
         saved_files = result.saved_files
 
