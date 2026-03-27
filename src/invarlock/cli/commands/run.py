@@ -129,6 +129,9 @@ from invarlock.core.run_guard_overhead_policy import (
 from invarlock.core.run_guard_overhead_policy import (
     normalize_guard_overhead_result as _normalize_overhead_result_impl,
 )
+from invarlock.core.run_guard_overhead_policy import (
+    prepare_guard_overhead_report as _prepare_guard_overhead_report_impl,
+)
 from invarlock.core.run_policy import (
     choose_dataset_split as _choose_dataset_split_impl,
 )
@@ -871,6 +874,25 @@ def _finalize_guard_overhead_payload(
     result: Any,
 ) -> dict[str, Any]:
     return _finalize_guard_overhead_payload_impl(payload, result)
+
+
+def _prepare_guard_overhead_report(
+    guard_overhead_payload: Mapping[str, Any] | None,
+    *,
+    resolved_loss_type: str | None,
+    core_report: Any,
+    report: Mapping[str, Any] | None,
+    default_threshold: float,
+) -> dict[str, Any]:
+    return _prepare_guard_overhead_report_impl(
+        guard_overhead_payload,
+        resolved_loss_type=resolved_loss_type,
+        core_report=core_report,
+        report=report,
+        default_threshold=default_threshold,
+        extract_pm_snapshot_for_overhead_fn=_extract_pm_snapshot_for_overhead,
+        validate_guard_overhead_fn=validate_guard_overhead,
+    )
 
 
 def _validate_pairing_report_metrics(
@@ -2033,6 +2055,7 @@ def _build_run_command_deps() -> dict[str, Any]:
         "_finalize_guard_overhead_payload": _finalize_guard_overhead_payload,
         "_persist_ref_masks": _persist_ref_masks,
         "_postprocess_and_summarize": _postprocess_and_summarize,
+        "_prepare_guard_overhead_report": _prepare_guard_overhead_report,
         "_prepare_config_for_run": _prepare_config_for_run,
         "_print_guard_overhead_summary": _print_guard_overhead_summary,
         "_print_pipeline_start": _print_pipeline_start,

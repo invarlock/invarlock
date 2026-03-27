@@ -82,6 +82,56 @@ def finalize_guard_overhead_payload(
     return dict(normalized)
 
 
+def prepare_guard_overhead_report(
+    guard_overhead_payload: Mapping[str, Any] | None,
+    *,
+    resolved_loss_type: str | None,
+    core_report: Any,
+    report: Mapping[str, Any] | None,
+    default_threshold: float,
+    extract_pm_snapshot_for_overhead_fn: Any,
+    validate_guard_overhead_fn: Any,
+) -> dict[str, Any]:
+    """Build the persisted guard-overhead report payload."""
+    payload = dict(guard_overhead_payload or {})
+    if bool(payload.get("skipped", False)):
+        return payload
+
+    try:
+        loss_kind = str(resolved_loss_type or "causal").lower()
+        if loss_kind == "mlm":
+            pm_kind_for_overhead = "ppl_mlm"
+        elif loss_kind in {"seq2seq", "s2s", "t5"}:
+            pm_kind_for_overhead = "ppl_seq2seq"
+        else:
+            pm_kind_for_overhead = "ppl_causal"
+
+        pm_guarded = extract_pm_snapshot_for_overhead_fn(
+            core_report, kind=pm_kind_for_overhead
+        )
+        if not isinstance(pm_guarded, dict) or not pm_guarded:
+            pm_guarded = extract_pm_snapshot_for_overhead_fn(
+                report, kind=pm_kind_for_overhead
+            )
+
+        payload["guarded_report"] = (
+            {"metrics": {"primary_metric": pm_guarded}}
+            if isinstance(pm_guarded, dict) and pm_guarded
+            else None
+        )
+    except (AttributeError, TypeError, ValueError):
+        payload["guarded_report"] = None
+
+    bare_struct = payload.get("bare_report") or {}
+    guarded_struct = payload.get("guarded_report") or {}
+    result = validate_guard_overhead_fn(
+        bare_struct,
+        guarded_struct,
+        overhead_threshold=payload.get("overhead_threshold", default_threshold),
+    )
+    return finalize_guard_overhead_payload(payload, result)
+
+
 def build_guard_overhead_summary(
     guard_overhead_info: Mapping[str, Any] | None,
     *,

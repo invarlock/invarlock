@@ -142,6 +142,19 @@ def test_policy_wrappers_delegate(monkeypatch):
     )
     assert run_mod._finalize_guard_overhead_payload({}, object()) == {"passed": True}
 
+    monkeypatch.setattr(
+        run_mod,
+        "_prepare_guard_overhead_report_impl",
+        lambda *args, **kwargs: {"prepared": True},
+    )
+    assert run_mod._prepare_guard_overhead_report(
+        {},
+        resolved_loss_type="ppl_causal",
+        core_report={},
+        report={},
+        default_threshold=0.01,
+    ) == {"prepared": True}
+
     split_seen: dict[str, object] = {}
 
     def _split_stub(*, requested, available, split_aliases):
@@ -542,6 +555,9 @@ def test_run_command_injects_explicit_deps(monkeypatch, tmp_path: Path):
     assert deps["_choose_snapshot_mode"] is run_mod._choose_snapshot_mode
     assert (
         deps["_build_timing_summary_payload"] is run_mod._build_timing_summary_payload
+    )
+    assert (
+        deps["_prepare_guard_overhead_report"] is run_mod._prepare_guard_overhead_report
     )
     assert (
         deps["_apply_mask_only_head_autotune"] is run_mod._apply_mask_only_head_autotune

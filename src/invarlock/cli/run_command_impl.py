@@ -84,7 +84,6 @@ def run_command_impl(
     _materialize_baseline_pairing_schedule = _dep(
         "_materialize_baseline_pairing_schedule"
     )
-    _extract_pm_snapshot_for_overhead = _dep("_extract_pm_snapshot_for_overhead")
     _format_guard_chain = _dep("_format_guard_chain")
     _format_kv_line = _dep("_format_kv_line")
     _free_model_memory = _dep("_free_model_memory")
@@ -95,9 +94,9 @@ def run_command_impl(
     _merge_core_timing_metrics = _dep("_merge_core_timing_metrics")
     _normalize_overhead_result = _dep("_normalize_overhead_result")
     _estimate_model_bytes = _dep("_estimate_model_bytes")
-    _finalize_guard_overhead_payload = _dep("_finalize_guard_overhead_payload")
     _persist_ref_masks = _dep("_persist_ref_masks")
     _postprocess_and_summarize = _dep("_postprocess_and_summarize")
+    _prepare_guard_overhead_report = _dep("_prepare_guard_overhead_report")
     _prepare_config_for_run = _dep("_prepare_config_for_run")
     _print_guard_overhead_summary = _dep("_print_guard_overhead_summary")
     _print_pipeline_start = _dep("_print_pipeline_start")
@@ -138,7 +137,6 @@ def run_command_impl(
     timed_step = _dep("timed_step")
     get_torch = _dep("get_torch")
     typer = _dep("typer")
-    validate_guard_overhead = _dep("validate_guard_overhead")
 
     """
     Run InvarLock pipeline with the given configuration.
@@ -1382,51 +1380,13 @@ def run_command_impl(
                 report["metrics"].update(metrics_payload)
 
             if guard_overhead_payload is not None:
-                if bool(guard_overhead_payload.get("skipped", False)):
-                    report["guard_overhead"] = guard_overhead_payload
-                else:
-                    # Compute guarded primary-metric snapshot; pass structured reports into validator
-                    try:
-                        # Map loss type to ppl family kind
-                        lk = str(resolved_loss_type or "causal").lower()
-                        if lk == "mlm":
-                            pm_kind_for_overhead = "ppl_mlm"
-                        elif lk in {"seq2seq", "s2s", "t5"}:
-                            pm_kind_for_overhead = "ppl_seq2seq"
-                        else:
-                            pm_kind_for_overhead = "ppl_causal"
-
-                        # Prefer computing from the in-memory core_report windows to avoid ordering issues
-                        pm_guarded = _extract_pm_snapshot_for_overhead(
-                            core_report, kind=pm_kind_for_overhead
-                        )
-                        if not isinstance(pm_guarded, dict) or not pm_guarded:
-                            pm_guarded = _extract_pm_snapshot_for_overhead(
-                                report, kind=pm_kind_for_overhead
-                            )
-
-                        guard_overhead_payload["guarded_report"] = (
-                            {"metrics": {"primary_metric": pm_guarded}}
-                            if isinstance(pm_guarded, dict) and pm_guarded
-                            else None
-                        )
-                    except (AttributeError, TypeError, ValueError):
-                        guard_overhead_payload["guarded_report"] = None
-                    bare_struct = guard_overhead_payload.get("bare_report") or {}
-                    guarded_struct = guard_overhead_payload.get("guarded_report") or {}
-                    # Be robust to mocks or minimal objects returned by validators
-                    result = validate_guard_overhead(
-                        bare_struct,
-                        guarded_struct,
-                        overhead_threshold=guard_overhead_payload.get(
-                            "overhead_threshold", guard_overhead_threshold
-                        ),
-                    )
-                    guard_overhead_payload = _finalize_guard_overhead_payload(
-                        guard_overhead_payload,
-                        result,
-                    )
-                    report["guard_overhead"] = guard_overhead_payload
+                report["guard_overhead"] = _prepare_guard_overhead_report(
+                    guard_overhead_payload,
+                    resolved_loss_type=resolved_loss_type,
+                    core_report=core_report,
+                    report=report,
+                    default_threshold=guard_overhead_threshold,
+                )
 
             had_baseline = bool(baseline and Path(baseline).exists())
             try:
