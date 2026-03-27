@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from typing import Any
 
 from invarlock.core.config_execution import ConfigExecutionRequest
@@ -12,7 +11,7 @@ from invarlock.core.config_execution import ConfigExecutionRequest
 def execute_run_request(
     request: ConfigExecutionRequest,
     *,
-    deps: Mapping[str, Any],
+    deps: Any,
 ) -> str | None:
     """Execute a config-driven run using an explicit typed request."""
 
@@ -49,84 +48,74 @@ def execute_run_request(
         Exception,
     )
 
-    def _dep(name: str) -> Any:
-        try:
-            return deps[name]
-        except KeyError as exc:
-            raise RuntimeError(f"execute_run_request missing dependency: {name}") from exc
-
-    InvarlockError = _dep("InvarlockError")
-    ConfigError = _dep("ConfigError")
-    Path = _dep("Path")
-    _SnapshotRestoreFailed = _dep("_SnapshotRestoreFailed")
-    _apply_mlm_masks = _dep("_apply_mlm_masks")
-    _adjust_edit_params = _dep("_adjust_edit_params")
-    _apply_warning_filters = _dep("_apply_warning_filters")
-    _assemble_run_report = _dep("_assemble_run_report")
-    _build_snapshot_execution_plan = _dep("_build_snapshot_execution_plan")
-    _build_provider_dataset_plan = _dep("_build_provider_dataset_plan")
-    _build_run_context_payload = _dep("_build_run_context_payload")
-    _build_run_execution_config_payloads = _dep("_build_run_execution_config_payloads")
-    _build_timing_summary_payload = _dep("_build_timing_summary_payload")
-    _build_restore_failure_attempt_summary = _dep(
-        "_build_restore_failure_attempt_summary"
-    )
-    _decide_failed_retry_transition = _dep("_decide_failed_retry_transition")
-    _coerce_float = _dep("_coerce_float")
-    _coerce_int = _dep("_coerce_int")
-    _event = _dep("_event")
-    _execute_guarded_run = _dep("_execute_guarded_run")
-    _extract_pairing_schedule = _dep("_extract_pairing_schedule")
-    _load_baseline_pairing_evidence = _dep("_load_baseline_pairing_evidence")
-    _materialize_run_dataset = _dep("_materialize_run_dataset")
-    _format_guard_chain = _dep("_format_guard_chain")
-    _format_kv_line = _dep("_format_kv_line")
-    _free_model_memory = _dep("_free_model_memory")
-    _hash_sequences = _dep("_hash_sequences")
-    _init_retry_controller = _dep("_init_retry_controller")
-    _load_model_with_cfg = _dep("_load_model_with_cfg")
-    _normalize_overhead_result = _dep("_normalize_overhead_result")
-    _persist_run_report_outputs = _dep("_persist_run_report_outputs")
-    _prepare_config_for_run = _dep("_prepare_config_for_run")
-    _print_guard_overhead_summary = _dep("_print_guard_overhead_summary")
-    _print_pipeline_start = _dep("_print_pipeline_start")
-    _print_retry_summary = _dep("_print_retry_summary")
-    _record_retry_attempt = _dep("_record_retry_attempt")
-    _resolve_device_and_output = _dep("_resolve_device_and_output")
-    _resolve_exit_code = _dep("_resolve_exit_code")
-    _resolve_guard_overhead_threshold = _dep("_resolve_guard_overhead_threshold")
-    _resolve_pm_min_tokens_target = _dep("_resolve_pm_min_tokens_target")
-    _resolve_pm_acceptance_range = _dep("_resolve_pm_acceptance_range")
-    _resolve_pm_drift_band = _dep("_resolve_pm_drift_band")
-    _resolve_retry_validation_transition = _dep("_resolve_retry_validation_transition")
-    _resolve_snapshot_config = _dep("_resolve_snapshot_config")
-    _resolve_snapshot_retry_transition = _dep("_resolve_snapshot_retry_transition")
-    _run_bare_control = _dep("_run_bare_control")
-    _safe_int = _dep("_safe_int")
-    _should_measure_overhead = _dep("_should_measure_overhead")
-    _style_from_console = _dep("_style_from_console")
-    _tensor_or_list_to_ints = _dep("_tensor_or_list_to_ints")
-    _to_serialisable_dict = _dep("_to_serialisable_dict")
-    _tokenizer_digest = _dep("_tokenizer_digest")
-    _validate_retry_evaluation_report = _dep("_validate_retry_evaluation_report")
-    _validate_and_harvest_baseline_schedule = _dep(
-        "_validate_and_harvest_baseline_schedule"
-    )
-    click = _dep("click")
-    console = _dep("console")
-    datetime = _dep("datetime")
-    detect_model_profile = _dep("detect_model_profile")
-    math = _dep("math")
-    np = _dep("np")
-    os = _dep("os")
-    perf_counter = _dep("perf_counter")
-    get_psutil = _dep("get_psutil")
-    print_timing_summary = _dep("print_timing_summary")
-    resolve_output_style = _dep("resolve_output_style")
-    set_seed = _dep("set_seed")
-    timed_step = _dep("timed_step")
-    get_torch = _dep("get_torch")
-    typer = _dep("typer")
+    InvarlockError = deps.InvarlockError
+    ConfigError = deps.ConfigError
+    Path = deps.Path
+    _SnapshotRestoreFailed = deps._SnapshotRestoreFailed
+    _apply_mlm_masks = deps._apply_mlm_masks
+    _adjust_edit_params = deps._adjust_edit_params
+    _apply_warning_filters = deps._apply_warning_filters
+    _assemble_run_report = deps._assemble_run_report
+    _build_snapshot_execution_plan = deps._build_snapshot_execution_plan
+    _build_provider_dataset_plan = deps._build_provider_dataset_plan
+    _build_run_context_payload = deps._build_run_context_payload
+    _build_run_execution_config_payloads = deps._build_run_execution_config_payloads
+    _build_timing_summary_payload = deps._build_timing_summary_payload
+    _build_restore_failure_attempt_summary = deps._build_restore_failure_attempt_summary
+    _decide_failed_retry_transition = deps._decide_failed_retry_transition
+    _coerce_float = deps._coerce_float
+    _coerce_int = deps._coerce_int
+    _event = deps._event
+    _execute_guarded_run = deps._execute_guarded_run
+    _extract_pairing_schedule = deps._extract_pairing_schedule
+    _load_baseline_pairing_evidence = deps._load_baseline_pairing_evidence
+    _materialize_run_dataset = deps._materialize_run_dataset
+    _format_guard_chain = deps._format_guard_chain
+    _format_kv_line = deps._format_kv_line
+    _free_model_memory = deps._free_model_memory
+    _hash_sequences = deps._hash_sequences
+    _init_retry_controller = deps._init_retry_controller
+    _load_model_with_cfg = deps._load_model_with_cfg
+    _normalize_overhead_result = deps._normalize_overhead_result
+    _persist_run_report_outputs = deps._persist_run_report_outputs
+    _prepare_config_for_run = deps._prepare_config_for_run
+    _print_guard_overhead_summary = deps._print_guard_overhead_summary
+    _print_pipeline_start = deps._print_pipeline_start
+    _print_retry_summary = deps._print_retry_summary
+    _record_retry_attempt = deps._record_retry_attempt
+    _resolve_device_and_output = deps._resolve_device_and_output
+    _resolve_exit_code = deps._resolve_exit_code
+    _resolve_guard_overhead_threshold = deps._resolve_guard_overhead_threshold
+    _resolve_pm_min_tokens_target = deps._resolve_pm_min_tokens_target
+    _resolve_pm_acceptance_range = deps._resolve_pm_acceptance_range
+    _resolve_pm_drift_band = deps._resolve_pm_drift_band
+    _resolve_retry_validation_transition = deps._resolve_retry_validation_transition
+    _resolve_snapshot_config = deps._resolve_snapshot_config
+    _resolve_snapshot_retry_transition = deps._resolve_snapshot_retry_transition
+    _run_bare_control = deps._run_bare_control
+    _safe_int = deps._safe_int
+    _should_measure_overhead = deps._should_measure_overhead
+    _style_from_console = deps._style_from_console
+    _tensor_or_list_to_ints = deps._tensor_or_list_to_ints
+    _to_serialisable_dict = deps._to_serialisable_dict
+    _tokenizer_digest = deps._tokenizer_digest
+    _validate_retry_evaluation_report = deps._validate_retry_evaluation_report
+    _validate_and_harvest_baseline_schedule = deps._validate_and_harvest_baseline_schedule
+    click = deps.click
+    console = deps.console
+    datetime = deps.datetime
+    detect_model_profile = deps.detect_model_profile
+    math = deps.math
+    np = deps.np
+    os = deps.os
+    perf_counter = deps.perf_counter
+    get_psutil = deps.get_psutil
+    print_timing_summary = deps.print_timing_summary
+    resolve_output_style = deps.resolve_output_style
+    set_seed = deps.set_seed
+    timed_step = deps.timed_step
+    get_torch = deps.get_torch
+    typer = deps.typer
 
     """
     Run InvarLock pipeline with the given configuration.

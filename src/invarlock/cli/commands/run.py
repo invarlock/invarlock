@@ -2270,16 +2270,17 @@ except ImportError:
     HAS_CORE_COMPONENTS = False
 
 
-def _build_run_execution_deps() -> dict[str, Any]:
+def _build_run_execution_deps() -> SimpleNamespace:
     """Build explicit dependencies for the run execution owner.
 
-    Passing an explicit map avoids dynamic module globals mutation while keeping
+    Passing an explicit namespace avoids dynamic module globals mutation while keeping
     monkeypatch behavior stable (resolved at call time).
     """
 
     _reset_optional_runtime_caches()
 
-    return {
+    return SimpleNamespace(
+        **{
         "ConfigError": _CfgErr,
         "InvarlockError": InvarlockError,
         "Path": Path,
@@ -2383,8 +2384,9 @@ def _build_run_execution_deps() -> dict[str, Any]:
         "timed_step": timed_step,
         "get_torch": _get_torch,
         "typer": typer,
-        "validate_guard_overhead": validate_guard_overhead,
-    }
+            "validate_guard_overhead": validate_guard_overhead,
+        }
+    )
 
 
 def _execute_cli_run_request(request: ConfigExecutionRequest) -> str | None:
