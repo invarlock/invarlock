@@ -4,14 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-
-def _short_digest(value: str) -> str:
-    normalized = str(value)
-    return (
-        normalized
-        if len(normalized) <= 16
-        else (normalized[:8] + "…" + normalized[-8:])
-    )
+from .render_helpers import _short_digest
 
 
 def _dataset_hash_source_label(source: Any) -> str | None:
@@ -20,10 +13,7 @@ def _dataset_hash_source_label(source: Any) -> str | None:
         "explicit_token_ids": "content-derived token IDs",
         "config_fallback": "config-derived fallback",
     }
-    try:
-        key = str(source or "").strip()
-    except Exception:
-        return None
+    key = str(source or "").strip()
     return source_map.get(key)
 
 
@@ -45,14 +35,10 @@ def append_dataset_and_provenance_section(
     if has_dataset:
         provider = dataset.get("provider") or "unknown"
         lines.append(f"- **Provider:** {provider}")
-        try:
-            seq_len_val = (
-                int(dataset.get("seq_len"))
-                if isinstance(dataset.get("seq_len"), int | float)
-                else dataset.get("seq_len")
-            )
-        except Exception:  # pragma: no cover
-            seq_len_val = dataset.get("seq_len")
+        seq_len_raw = dataset.get("seq_len")
+        seq_len_val = (
+            int(seq_len_raw) if isinstance(seq_len_raw, int | float) else seq_len_raw
+        )
         if seq_len_val is not None:
             lines.append(f"- **Sequence Length:** {seq_len_val}")
         windows_blk = (
@@ -140,28 +126,22 @@ def append_dataset_and_provenance_section(
                     f"  - masking_sha256: `{_short_digest(mask_d)}` (full in JSON)"
                 )
 
-        try:
-            confidence = evaluation_report.get("confidence", {}) or {}
-            if isinstance(confidence, dict) and confidence.get("label"):
-                lines.append(f"- **Confidence:** {confidence.get('label')}")
-        except Exception:
-            pass
+        confidence = evaluation_report.get("confidence", {}) or {}
+        if isinstance(confidence, dict) and confidence.get("label"):
+            lines.append(f"- **Confidence:** {confidence.get('label')}")
 
-        try:
-            policy_digest = evaluation_report.get("policy_digest", {}) or {}
-            if isinstance(policy_digest, dict) and policy_digest:
-                policy_version = policy_digest.get("policy_version")
-                thresholds_hash = policy_digest.get("thresholds_hash")
-                if policy_version:
-                    lines.append(f"- **Policy Version:** {policy_version}")
-                if isinstance(thresholds_hash, str) and thresholds_hash:
-                    lines.append(
-                        f"- **Thresholds Digest:** `{_short_digest(thresholds_hash)}` (full in JSON)"
-                    )
-                if policy_digest.get("changed"):
-                    lines.append("- Note: policy changed")
-        except Exception:
-            pass
+        policy_digest = evaluation_report.get("policy_digest", {}) or {}
+        if isinstance(policy_digest, dict) and policy_digest:
+            policy_version = policy_digest.get("policy_version")
+            thresholds_hash = policy_digest.get("thresholds_hash")
+            if policy_version:
+                lines.append(f"- **Policy Version:** {policy_version}")
+            if isinstance(thresholds_hash, str) and thresholds_hash:
+                lines.append(
+                    f"- **Thresholds Digest:** `{_short_digest(thresholds_hash)}` (full in JSON)"
+                )
+            if policy_digest.get("changed"):
+                lines.append("- Note: policy changed")
 
     lines.append("")
 

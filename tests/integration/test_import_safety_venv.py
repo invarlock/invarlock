@@ -43,6 +43,8 @@ def test_import_and_cli_help_without_torch(tmp_path: Path):
         source_root,
         ignore=shutil.ignore_patterns(
             ".git",
+            ".coverage",
+            ".coverage.*",
             ".pytest_cache",
             "__pycache__",
             "build",
