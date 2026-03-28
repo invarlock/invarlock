@@ -2,13 +2,20 @@ from __future__ import annotations
 
 from typing import Any
 
-from invarlock.public_contracts import load_json_contract
+from . import report_validation_allowlist as allowlist_mod
 
 # Optional JSON Schema validation support (best-effort)
 try:  # pragma: no cover - exercised in integration
     import jsonschema
-except Exception:  # pragma: no cover
+except (ImportError, ModuleNotFoundError):  # pragma: no cover
     jsonschema = None
+    _JSONSCHEMA_FAILURES: tuple[type[BaseException], ...] = ()
+else:
+    _JSONSCHEMA_FAILURES = (
+        ValueError,
+        jsonschema.SchemaError,
+        jsonschema.ValidationError,
+    )
 
 
 # Evaluation report schema version (PM-first canonical)
@@ -204,34 +211,7 @@ REPORT_JSON_SCHEMA: dict[str, Any] = {
 }
 
 
-_VALIDATION_ALLOWLIST_DEFAULT = {
-    "primary_metric_acceptable",
-    "primary_metric_tail_acceptable",
-    "preview_final_drift_acceptable",
-    "guard_overhead_acceptable",
-    "invariants_pass",
-    "spectral_stable",
-    "rmt_stable",
-    # Compatibility keys were removed; PM-only surface
-    "hysteresis_applied",
-    "moe_observed",
-    "moe_identity_ok",
-}
-
-
-def _load_validation_allowlist() -> set[str]:
-    """Load validation key allow-list from contracts/validation_keys.json when available.
-
-    Falls back to a safe built-in default when the contracts directory is not present
-    (e.g., installed wheel) or when parsing fails.
-    """
-    try:
-        data = load_json_contract("validation_keys.json")
-        if isinstance(data, list):
-            return {str(k) for k in data}
-    except Exception:
-        pass
-    return set(_VALIDATION_ALLOWLIST_DEFAULT)
+_VALIDATION_ALLOWLIST_DEFAULT = allowlist_mod.DEFAULT_VALIDATION_ALLOWLIST
 
 
 def _validate_with_jsonschema(report: dict[str, Any]) -> bool:
@@ -241,7 +221,7 @@ def _validate_with_jsonschema(report: dict[str, Any]) -> bool:
     try:
         jsonschema.validate(instance=report, schema=REPORT_JSON_SCHEMA)
         return True
-    except Exception:
+    except _JSONSCHEMA_FAILURES:
         return False
 
 
@@ -256,13 +236,10 @@ def validate_report(report: dict[str, Any]) -> bool:
         # Tighten JSON Schema: populate validation.properties from allow-list and
         # disallow unknown validation keys at schema level.
         try:
-            vkeys = _load_validation_allowlist()
-            if isinstance(REPORT_JSON_SCHEMA.get("properties"), dict):
-                vspec = REPORT_JSON_SCHEMA["properties"].get("validation")
-                if isinstance(vspec, dict):
-                    vspec["properties"] = {k: {"type": "boolean"} for k in vkeys}
-                    vspec["additionalProperties"] = False
-        except Exception:
+            allowlist_mod.apply_validation_allowlist_schema(
+                REPORT_JSON_SCHEMA, allowlist_mod.load_validation_allowlist()
+            )
+        except (KeyError, RuntimeError, TypeError, ValueError):
             pass
 
         if not _validate_with_jsonschema(report):

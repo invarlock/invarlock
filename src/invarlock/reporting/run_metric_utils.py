@@ -3,6 +3,8 @@ from __future__ import annotations
 import math
 from typing import Any
 
+_PARSE_EXCEPTIONS = (AttributeError, KeyError, OverflowError, TypeError, ValueError)
+
 
 def merge_primary_metric_health(
     primary_metric: dict[str, Any] | None,
@@ -38,19 +40,19 @@ def format_debug_metric_diffs(
     try:
         pm_blk = metrics.get("primary_metric", {}) if isinstance(metrics, dict) else {}
         ppl_final_v1 = float(pm_blk.get("final", float("nan")))
-    except Exception:
+    except _PARSE_EXCEPTIONS:
         ppl_final_v1 = float("nan")
     try:
         ppl_prev_v1 = float(pm_blk.get("preview", float("nan")))
-    except Exception:
+    except _PARSE_EXCEPTIONS:
         ppl_prev_v1 = float("nan")
     try:
         ppl_final_v2 = float(pm.get("final", float("nan")))
-    except Exception:
+    except _PARSE_EXCEPTIONS:
         ppl_final_v2 = float("nan")
     try:
         ppl_prev_v2 = float(pm.get("preview", float("nan")))
-    except Exception:
+    except _PARSE_EXCEPTIONS:
         ppl_prev_v2 = float("nan")
 
     if math.isfinite(ppl_final_v1) and math.isfinite(ppl_final_v2):
@@ -59,7 +61,7 @@ def format_debug_metric_diffs(
             diffs.append(
                 f"Δlog(final): {math.log(ppl_final_v2) - math.log(ppl_final_v1):+.9f}"
             )
-        except Exception:
+        except _PARSE_EXCEPTIONS:
             pass
     if math.isfinite(ppl_prev_v1) and math.isfinite(ppl_prev_v2):
         diffs.append(f"preview: v1-v1 = {ppl_prev_v2 - ppl_prev_v1:+.9f}")
@@ -67,12 +69,12 @@ def format_debug_metric_diffs(
             diffs.append(
                 f"Δlog(preview): {math.log(ppl_prev_v2) - math.log(ppl_prev_v1):+.9f}"
             )
-        except Exception:
+        except _PARSE_EXCEPTIONS:
             pass
 
     try:
         ratio_v2 = float(pm.get("ratio_vs_baseline", float("nan")))
-    except Exception:
+    except _PARSE_EXCEPTIONS:
         ratio_v2 = float("nan")
     ratio_v1 = float(pm_blk.get("ratio_vs_baseline", float("nan")))
     if (not math.isfinite(ratio_v1)) and isinstance(baseline_report_data, dict):
@@ -89,7 +91,7 @@ def format_debug_metric_diffs(
                 and math.isfinite(ppl_final_v1)
             ):
                 ratio_v1 = ppl_final_v1 / base_final
-        except Exception:
+        except _PARSE_EXCEPTIONS:
             pass
     if math.isfinite(ratio_v1) and math.isfinite(ratio_v2):
         diffs.append(f"ratio_vs_baseline: v1-v1 = {ratio_v2 - ratio_v1:+.9f}")

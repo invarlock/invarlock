@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from .render_helpers import _fmt_by_kind, _fmtv, _p, _short_digest
 from .render_markdown import (
     _append_accuracy_subgroups,
     _append_executive_summary_section,
@@ -9,13 +10,9 @@ from .render_markdown import (
     _append_report_header,
     _append_safety_dashboard_section,
     _append_system_overhead_section,
-    _fmt_by_kind,
-    _fmtv,
     _format_plugin,
     _get_generated_at,
-    _p,
     _render_executive_dashboard,
-    _short_digest,
     render_report_markdown,
 )
 from .report_console import compute_report_hash as _compute_report_hash

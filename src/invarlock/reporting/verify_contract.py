@@ -20,6 +20,17 @@ from invarlock.core.runtime_attestation import (
 from . import verify_checks as _verify_checks
 from . import verify_output as _verify_output
 
+_VERIFY_RECOVERABLE_EXCEPTIONS = (
+    AttributeError,
+    FileNotFoundError,
+    json.JSONDecodeError,
+    KeyError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 _coerce_float = _verify_checks._coerce_float
 _coerce_int = _verify_checks._coerce_int
 _load_evaluation_report = _verify_checks._load_evaluation_report
@@ -157,7 +168,7 @@ def _warn_adapter_family_mismatch(
                 f"[yellow]   • edited  : family={edited_family}, backend={edited_backend} {edited_version}[/yellow]",
                 "[yellow]   Ensure this cross-family comparison is intentional (Compare & Evaluate flows should normally match families).[/yellow]",
             )
-    except Exception:
+    except _VERIFY_RECOVERABLE_EXCEPTIONS:
         return ()
     return ()
 
@@ -180,7 +191,7 @@ def run_verify_reports(
     )
     try:
         tol = float(tolerance)
-    except Exception:
+    except _VERIFY_RECOVERABLE_EXCEPTIONS:
         tol = 1e-9
 
     baseline_digest = None
@@ -192,7 +203,7 @@ def run_verify_reports(
                 pd = prov.get("provider_digest")
                 if isinstance(pd, dict):
                     baseline_digest = pd
-    except Exception:
+    except _VERIFY_RECOVERABLE_EXCEPTIONS:
         baseline_digest = None
 
     malformed_any = False
@@ -202,7 +213,7 @@ def run_verify_reports(
 
             try:
                 prof = (profile or "").strip().lower()
-            except Exception:
+            except _VERIFY_RECOVERABLE_EXCEPTIONS:
                 prof = "dev"
             prov = cert_obj.get("provenance") if isinstance(cert_obj, dict) else None
             subj_digest = None
@@ -331,7 +342,7 @@ def run_verify_reports(
                                             errors.append(
                                                 f"Display mismatch: final={float(disp_final):.12f} exp(basis)={math.exp(recomputed_mean):.12f}"
                                             )
-                        except Exception:
+                        except _VERIFY_RECOVERABLE_EXCEPTIONS:
                             pass
                     else:
                         if prof in {"ci", "release"}:
@@ -376,7 +387,7 @@ def run_verify_reports(
                                 cert_obj,
                             )
                         )
-                    except Exception:
+                    except _VERIFY_RECOVERABLE_EXCEPTIONS:
                         pass
 
         if not overall_ok:
@@ -407,7 +418,7 @@ def run_verify_reports(
             try:
                 last = _load_evaluation_report(reports[-1]) if reports else {}
                 human_lines.append(_verify_output.build_verify_success_line(last))
-            except Exception:
+            except _VERIFY_RECOVERABLE_EXCEPTIONS:
                 pass
         return VerifyExecutionResult(
             exit_code=0,
@@ -430,7 +441,7 @@ def run_verify_reports(
             payload=payload,
             human_lines=tuple(human_lines),
         )
-    except Exception as e:
+    except _VERIFY_RECOVERABLE_EXCEPTIONS as e:
         code = resolve_command_exit_code(e, profile=profile)
         payload = _verify_output.build_verify_error_payload(
             reports[0] if reports else None,

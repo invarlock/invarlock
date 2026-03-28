@@ -2,6 +2,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+_NON_FATAL_EXCEPTIONS = (
+    AttributeError,
+    KeyError,
+    OverflowError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 if TYPE_CHECKING:  # pragma: no cover
     from ..eval.data import EvaluationWindow
 
@@ -119,7 +128,7 @@ def _compute_actual_window_hashes(report: dict[str, Any]) -> dict[str, Any]:
             for seq in seqs:
                 try:
                     h.update(str(list(seq)).encode("utf-8"))
-                except Exception:
+                except _NON_FATAL_EXCEPTIONS:
                     continue
             return h.hexdigest()
 
@@ -136,7 +145,7 @@ def _compute_actual_window_hashes(report: dict[str, Any]) -> dict[str, Any]:
             "total_tokens": preview_tokens + final_tokens,
             "source": "explicit_token_ids",
         }
-    except Exception:
+    except _NON_FATAL_EXCEPTIONS:
         # Signal caller to use config-based fallback
         return {}
 

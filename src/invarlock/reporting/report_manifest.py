@@ -12,6 +12,8 @@ from .report_evidence import build_guard_evidence_payload
 from .report_summary import build_report_manifest_summary
 from .report_types import RunReport
 
+_NON_FATAL_EXCEPTIONS = (AttributeError, OSError, TypeError, ValueError)
+
 
 def write_report_manifest(
     *,
@@ -54,7 +56,7 @@ def write_report_manifest(
             json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
         )
         saved_files["manifest"] = manifest_path
-    except Exception:
+    except _NON_FATAL_EXCEPTIONS:
         # Manifest generation is best-effort.
         pass
 

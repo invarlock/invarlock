@@ -6,6 +6,8 @@ from typing import Any
 
 from .report_console import compute_console_validation_block
 
+_PARSE_EXCEPTIONS = (AttributeError, KeyError, OverflowError, TypeError, ValueError)
+
 
 @dataclass(frozen=True)
 class SafetyDashboardRow:
@@ -141,7 +143,7 @@ def build_safety_dashboard_summary(
         )
         if math.isfinite(drift):
             drift_val = f"{drift:.3f}×"
-    except Exception:
+    except _PARSE_EXCEPTIONS:
         drift_val = "N/A"
     if isinstance(drift_ok, bool):
         drift_status = f"{'✅' if drift_ok else '❌'} {drift_val}"
@@ -292,7 +294,7 @@ def build_quality_gates_summary(
                     if math.isfinite(lo_f) and math.isfinite(hi_f) and 0 < lo_f < hi_f:
                         drift_min = lo_f
                         drift_max = hi_f
-        except Exception:
+        except _PARSE_EXCEPTIONS:
             pass
         try:
             pv = (
@@ -310,7 +312,7 @@ def build_quality_gates_summary(
                 if (math.isfinite(pv) and pv > 0 and math.isfinite(fv))
                 else float("nan")
             )
-        except Exception:
+        except _PARSE_EXCEPTIONS:
             drift = float("nan")
         measured = f"{drift:.3f}x" if math.isfinite(drift) else "N/A"
         rows.append(
@@ -348,7 +350,7 @@ def build_quality_gates_summary(
                 threshold_val = guard_overhead.get("overhead_threshold", 0.01)
                 try:
                     threshold_pct = float(threshold_val) * 100.0
-                except Exception:
+                except _PARSE_EXCEPTIONS:
                     threshold_pct = 1.0
             rows.append(
                 QualityGateRow(
@@ -391,7 +393,7 @@ def build_quality_gates_summary(
             q = policy.get("quantile", 0.95)
             try:
                 qf = float(q)
-            except Exception:
+            except _PARSE_EXCEPTIONS:
                 qf = 0.95
             qf = max(0.0, min(1.0, qf))
             q_key = f"q{int(round(100.0 * qf))}"

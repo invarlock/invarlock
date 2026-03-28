@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+_NON_FATAL_EXCEPTIONS = (AttributeError, KeyError, OSError, TypeError, ValueError)
+
 
 @dataclass(frozen=True)
 class RunProvenanceResult:
@@ -49,7 +51,7 @@ def finalize_run_provenance(
             )
             if fallback_evaluation_windows:
                 report["evaluation_windows"] = fallback_evaluation_windows
-        except Exception:
+        except _NON_FATAL_EXCEPTIONS:
             pass
         if (
             "evaluation_windows" not in report
@@ -73,12 +75,12 @@ def finalize_run_provenance(
     try:
         provenance["dataset_split"] = str(resolved_split)
         provenance["split_fallback"] = bool(used_fallback_split)
-    except Exception:
+    except _NON_FATAL_EXCEPTIONS:
         pass
 
     try:
         provider_digest = compute_provider_digest_fn(report)
-    except Exception:
+    except _NON_FATAL_EXCEPTIONS:
         provider_digest = None
     if not provider_digest:
         return RunProvenanceResult()
@@ -98,7 +100,7 @@ def finalize_run_provenance(
     if base_digest is None:
         try:
             base_digest = compute_provider_digest_fn(baseline_report_data)
-        except Exception:
+        except _NON_FATAL_EXCEPTIONS:
             base_digest = None
 
     enforce_provider_parity_fn(

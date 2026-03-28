@@ -1,9 +1,22 @@
 from __future__ import annotations
 
+import json
 import math
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+
+_VERIFY_OUTPUT_EXCEPTIONS = (
+    AttributeError,
+    FileNotFoundError,
+    json.JSONDecodeError,
+    KeyError,
+    OSError,
+    OverflowError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 
 FORMAT_VERIFY = "verify-v1"
 
@@ -13,7 +26,7 @@ def _coerce_ci_output(ci: Any) -> list[float] | None:
         return None
     try:
         return [float(ci[0]), float(ci[1])]
-    except Exception:
+    except _VERIFY_OUTPUT_EXCEPTIONS:
         return None
 
 
@@ -107,7 +120,7 @@ def _build_recompute_summary(
                             "ok": ok,
                             "reason": None if ok else "mismatch",
                         }
-                    except Exception:
+                    except _VERIFY_OUTPUT_EXCEPTIONS:
                         recompute = {
                             "family": family,
                             "ok": True,
@@ -115,7 +128,7 @@ def _build_recompute_summary(
                         }
                 else:
                     recompute = {"family": family, "ok": True, "reason": "skipped"}
-    except Exception:
+    except _VERIFY_OUTPUT_EXCEPTIONS:
         recompute = None
 
     return recompute
@@ -175,7 +188,7 @@ def build_verify_json_payload(
     for cert_path in reports:
         try:
             cert_obj = load_report_fn(cert_path)
-        except Exception:
+        except _VERIFY_OUTPUT_EXCEPTIONS:
             cert_obj = {}
         results.append(
             build_verify_json_result_item(
@@ -250,7 +263,7 @@ def build_verify_success_line(report: dict[str, Any]) -> str:
         try:
             ci_lo = float(ci[0])
             ci_hi = float(ci[1])
-        except Exception:
+        except _VERIFY_OUTPUT_EXCEPTIONS:
             ci_text = None
             width = None
         else:

@@ -16,6 +16,8 @@ from typing import Any, cast
 from .normalizer import normalize_run_report
 from .report_types import RunReport, validate_report
 
+_PARSE_EXCEPTIONS = (AttributeError, KeyError, OverflowError, TypeError, ValueError)
+
 
 def to_json(report: RunReport, indent: int = 2) -> str:
     """
@@ -459,14 +461,14 @@ def _generate_comparison_markdown(report1: RunReport, report2: RunReport) -> lis
         if isinstance(val1_obj, int | float | str):
             try:
                 val1_i = int(val1_obj)
-            except Exception:
+            except _PARSE_EXCEPTIONS:
                 val1_i = 0
         else:
             val1_i = 0
         if isinstance(val2_obj, int | float | str):
             try:
                 val2_i = int(val2_obj)
-            except Exception:
+            except _PARSE_EXCEPTIONS:
                 val2_i = 0
         else:
             val2_i = 0
