@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from invarlock.reporting import render as render_mod
+from invarlock.reporting import render_markdown as render_markdown_mod
 from invarlock.reporting import report_summary as report_summary_mod
 from invarlock.reporting.render import (
     render_report_markdown,
@@ -96,7 +96,7 @@ def test_render_report_markdown_uses_precomputed_quality_gates_view_model(
         return summary
 
     monkeypatch.setattr(
-        render_mod,
+        render_markdown_mod,
         "build_quality_gates_summary",
         fake_build_quality_gates_summary,
     )

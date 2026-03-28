@@ -70,7 +70,10 @@ COVERAGE_TESTS_RUNTIME := \
 	tests/cli/test_security_default_contract.py \
 	tests/cli/test_container_delegation.py \
 	tests/reporting/test_runtime_manifest_contract.py \
-	tests/unit/test_runtime_security_helpers.py
+	tests/unit/test_runtime_security_container.py \
+	tests/unit/test_runtime_security_core.py \
+	tests/unit/test_runtime_security_manifest.py \
+	tests/unit/test_runtime_security_paths.py
 
 COVERAGE_TESTS := \
 	$(COVERAGE_TESTS_CORE) \
