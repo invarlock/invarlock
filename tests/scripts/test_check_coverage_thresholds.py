@@ -111,7 +111,7 @@ def test_overrides_take_precedence(tmp_path: Path) -> None:
         )
         < 1e-9
     )
-    assert payload["configured_threshold_files"] == 103
+    assert payload["configured_threshold_files"] == 105
     assert payload["evaluated_files"] == 1
     assert payload["measured_threshold_files"] == 1
     assert "src/invarlock/cli/app.py" in payload["missing_threshold_files"]
@@ -176,20 +176,20 @@ def test_summary_reports_measured_vs_configured_threshold_counts(
 
     assert proc.returncode == 0, proc.stderr
     assert (
-        "Coverage OK: 1/103 threshold-listed files had coverage data and met "
+        "Coverage OK: 1/105 threshold-listed files had coverage data and met "
         "per-file thresholds." in proc.stdout
     )
     assert (
-        "102 threshold-listed files were absent from the coverage report."
+        "104 threshold-listed files were absent from the coverage report."
         in proc.stdout
     )
 
     payload = json.loads(json_out.read_text())
     assert payload["status"] == "ok"
-    assert payload["configured_threshold_files"] == 103
+    assert payload["configured_threshold_files"] == 105
     assert payload["evaluated_files"] == 1
     assert payload["measured_threshold_files"] == 1
-    assert len(payload["missing_threshold_files"]) == 102
+    assert len(payload["missing_threshold_files"]) == 104
 
 
 def test_ratchets_selected_files_to_ninety_five_percent(tmp_path: Path) -> None:
@@ -317,6 +317,8 @@ def test_calibrated_split_owner_thresholds_are_explicit(tmp_path: Path) -> None:
             ("src/invarlock/core/metric_provider_resolution.py", 0.889, 1.0),
             ("src/invarlock/core/run_orchestrator.py", 0.849, 1.0),
             ("src/invarlock/core/run_provider_dataset_plan.py", 0.889, 1.0),
+            ("src/invarlock/cli/run_config.py", 0.939, 1.0),
+            ("src/invarlock/cli/run_pairing.py", 0.869, 1.0),
             ("src/invarlock/eval/metrics_aggregation.py", 0.869, 1.0),
             ("src/invarlock/eval/metrics_runtime.py", 0.849, 1.0),
         ],
@@ -330,6 +332,8 @@ def test_calibrated_split_owner_thresholds_are_explicit(tmp_path: Path) -> None:
         "src/invarlock/core/metric_provider_resolution.py",
         "src/invarlock/core/run_orchestrator.py",
         "src/invarlock/core/run_provider_dataset_plan.py",
+        "src/invarlock/cli/run_config.py",
+        "src/invarlock/cli/run_pairing.py",
         "src/invarlock/eval/metrics_aggregation.py",
         "src/invarlock/eval/metrics_runtime.py",
     ):
