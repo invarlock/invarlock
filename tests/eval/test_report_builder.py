@@ -3054,7 +3054,6 @@ class TestModuleExports:
         expected_exports = [
             "make_report",
             "validate_report",
-            "render_report_markdown",
             "REPORT_SCHEMA_VERSION",
         ]
 

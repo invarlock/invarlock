@@ -775,11 +775,8 @@ def make_report(
     return make_report_impl(report, baseline)
 
 
-# Console Validation Block helpers have moved to invarlock.reporting.render.
-
-
-## NOTE: render_report_markdown has been moved to invarlock.reporting.render.
-## It is re-exported at the bottom of this module to preserve the public API.
+# Console Validation Block helpers and render_report_markdown live in
+# invarlock.reporting.render. This module owns report construction helpers only.
 ## Private helper functions
 
 
@@ -2073,39 +2070,11 @@ def _extract_compression_diagnostics(
 
 ## Note: compute_window_hashes is available under invarlock.reporting.dataset_hashing.
 
-# Re-export rendering API from dedicated module to avoid bloat/cycles
-# Rendering helpers live in invarlock.reporting.render; internal code should import there directly.
-# Tests and public API expect render_report_markdown to be available from
-# invarlock.reporting.report_builder. Import lazily at module end to avoid cycles with
-# invarlock.reporting.render which imports this module as a namespace.
-try:  # pragma: no cover - simple re-export
-    from .render import (
-        compute_console_validation_block,  # type: ignore
-        render_report_markdown,  # type: ignore
-    )
-except Exception:  # pragma: no cover - defensive fallback
-
-    def render_report_markdown(evaluation_report: dict[str, Any]) -> str:  # type: ignore
-        raise ImportError(
-            "render_report_markdown is unavailable; rendering dependencies missing"
-        )
-
-    def compute_console_validation_block(
-        evaluation_report: dict[str, Any],
-    ) -> dict[str, Any]:  # type: ignore
-        raise ImportError(
-            "compute_console_validation_block is unavailable; rendering dependencies missing"
-        )
-
-
-# Export public API
 __all__ = [
     "make_report",
     "validate_report",
     "_validate_with_jsonschema",
     "jsonschema",
-    "render_report_markdown",
-    "compute_console_validation_block",
     "REPORT_SCHEMA_VERSION",
     "REPORT_JSON_SCHEMA",
 ]

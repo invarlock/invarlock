@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting import report_builder as C
+from invarlock.reporting.render import render_report_markdown
 
 
 def _mk_report() -> dict:
@@ -104,7 +105,7 @@ def test_render_report_markdown_general_sections() -> None:
     report = _mk_report()
     baseline = _mk_report()
     cert = C.make_report(report, baseline)
-    out = C.render_report_markdown(cert)
+    out = render_report_markdown(cert)
     assert "InvarLock Evaluation Report" in out
     assert "Executive Summary" in out
     assert "Primary Metric" in out

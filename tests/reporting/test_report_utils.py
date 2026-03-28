@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting import report_builder as cert
+from invarlock.reporting.render import compute_console_validation_block
 
 
 def test_is_ppl_kind_and_get_ppl_final() -> None:
@@ -102,13 +103,13 @@ def test_console_validation_block_guard_skipped_and_included() -> None:
         },
     }
     # Not evaluated: guard row omitted
-    block1 = cert.compute_console_validation_block(base)
+    block1 = compute_console_validation_block(base)
     labels1 = block1["labels"]
     assert all(label != "Guard Overhead Acceptable" for label in labels1)
 
     # Evaluated: include guard row
     base2 = dict(base)
     base2["guard_overhead"] = {"evaluated": True}
-    block2 = cert.compute_console_validation_block(base2)
+    block2 = compute_console_validation_block(base2)
     labels2 = block2["labels"]
     assert "Guard Overhead Acceptable" in labels2

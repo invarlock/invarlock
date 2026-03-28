@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import copy
-import inspect
 import math
 import os
 from datetime import datetime
@@ -1228,41 +1227,11 @@ def make_report_impl(
             "tokens_available": capacity_tokens,
             "examples_available": capacity_examples,
         },
+        "pm_acceptance_range": pm_acceptance_range,
+        "pm_drift_band": pm_drift_band,
+        "pm_tail": pm_tail_result,
+        "tiny_relax": tiny_relax,
     }
-    try:
-        if (
-            "pm_acceptance_range"
-            in inspect.signature(_compute_validation_flags).parameters
-        ):
-            validation_kwargs["pm_acceptance_range"] = pm_acceptance_range
-    except (
-        NON_FATAL_EXCEPTIONS
-    ):  # pragma: no cover - defensive against patched functions
-        validation_kwargs["pm_acceptance_range"] = pm_acceptance_range
-
-    try:
-        if "pm_drift_band" in inspect.signature(_compute_validation_flags).parameters:
-            validation_kwargs["pm_drift_band"] = pm_drift_band
-    except (
-        NON_FATAL_EXCEPTIONS
-    ):  # pragma: no cover - defensive against patched functions
-        validation_kwargs["pm_drift_band"] = pm_drift_band
-
-    try:
-        if "pm_tail" in inspect.signature(_compute_validation_flags).parameters:
-            validation_kwargs["pm_tail"] = pm_tail_result
-    except (
-        NON_FATAL_EXCEPTIONS
-    ):  # pragma: no cover - defensive against patched functions
-        validation_kwargs["pm_tail"] = pm_tail_result
-
-    try:
-        if "tiny_relax" in inspect.signature(_compute_validation_flags).parameters:
-            validation_kwargs["tiny_relax"] = tiny_relax
-    except (
-        NON_FATAL_EXCEPTIONS
-    ):  # pragma: no cover - defensive against patched functions
-        validation_kwargs["tiny_relax"] = tiny_relax
 
     validation_flags = _compute_validation_flags(**validation_kwargs)
 
