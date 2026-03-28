@@ -1,7 +1,7 @@
 import math
 from unittest.mock import patch
 
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 
 
 def test_evaluation_report_raises_on_drift_ratio_inconsistency():

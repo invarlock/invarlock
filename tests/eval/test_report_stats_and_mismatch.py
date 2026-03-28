@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 
 
 def _base_report():
@@ -65,7 +65,7 @@ def test_evaluation_report_ratio_ci_mismatch_raises(monkeypatch):
     report["metrics"]["stats"] = {"pairing": "paired_baseline"}
 
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.validate_run_report", lambda _: True
+        "invarlock.reporting.report_normalization.validate_report", lambda _: True
     )
     # Force mismatch by overriding the ratio_ci computation from delta_ci
     monkeypatch.setattr(
@@ -91,7 +91,7 @@ def test_evaluation_report_metrics_stats_passthrough(monkeypatch):
     }
 
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.validate_run_report", lambda _: True
+        "invarlock.reporting.report_normalization.validate_report", lambda _: True
     )
     cert = make_report(report, baseline)
     stats = cert.get("dataset", {}).get("windows", {}).get("stats", {})

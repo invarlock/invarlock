@@ -6,9 +6,11 @@ from typing import Any
 
 from invarlock.core.report_inputs import load_report_input_json
 
-from . import report_builder
-from .render import compute_console_validation_block
+from .report_bundle import save_evaluation_bundle
+from .report_console import compute_console_validation_block
 from .report_files import save_report
+from .report_make import make_report
+from .report_schema import validate_report
 
 
 @dataclass(frozen=True)
@@ -64,26 +66,38 @@ def generate_reports(
     if "report" in formats and baseline_report is None:
         raise ValueError("Evaluation report format requires --baseline")
 
-    saved_files = save_report(
-        primary_report,
-        output_dir,
-        formats=formats,
-        compare=compare_report,
-        baseline=baseline_report,
-        filename_prefix="evaluation",
-    )
-
     evaluation_report: dict[str, Any] | None = None
     validation_block: dict[str, Any] | None = None
     if "report" in formats and baseline_report is not None:
-        evaluation_report = report_builder.make_report(primary_report, baseline_report)
-        report_builder.validate_report(evaluation_report)
+        evaluation_report = make_report(primary_report, baseline_report)
+        validate_report(evaluation_report)
         validation_block = compute_console_validation_block(evaluation_report)
+
+    save_formats = [fmt for fmt in formats if fmt != "report"]
+    saved_files: dict[str, Path] = {}
+    if save_formats:
+        saved_files.update(
+            save_report(
+                primary_report,
+                output_dir,
+                formats=save_formats,
+                compare=compare_report,
+                filename_prefix="evaluation",
+            )
+        )
+    if evaluation_report is not None:
+        saved_files.update(
+            save_evaluation_bundle(
+                run_report=primary_report,
+                output_dir=output_dir,
+                evaluation_report=evaluation_report,
+            )
+        )
 
     return ReportGenerationResult(
         output_dir=output_dir,
         formats=formats,
-        saved_files=saved_files,
+        saved_files={key: str(path) for key, path in saved_files.items()},
         primary_report=primary_report,
         compare_report=compare_report,
         baseline_report=baseline_report,

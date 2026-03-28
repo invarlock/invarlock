@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
-from invarlock.reporting.report import to_evaluation_report
+from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import RunReport, create_empty_report
 
 
@@ -23,17 +26,22 @@ def _mk_report() -> RunReport:
     return r
 
 
-def test_to_evaluation_report_json_and_markdown(tmp_path) -> None:
+def test_make_report_json_and_markdown() -> None:
     rp = _mk_report()
     base = _mk_report()
-    js = to_evaluation_report(rp, base, format="json")
+    cert = make_report(rp, base)
+    js = json.dumps(cert, indent=2, ensure_ascii=False)
     assert "schema_version" in js
-    md = to_evaluation_report(rp, base, format="markdown")
+    md = render_report_markdown(cert)
     assert "Evaluation Report" in md
 
 
-def test_to_evaluation_report_unsupported_format(tmp_path) -> None:
+def test_make_report_rejects_unsupported_baseline_schema() -> None:
     rp = _mk_report()
-    base = _mk_report()
+    base = {
+        "schema_version": "baseline-v2",
+        "meta": {"model_id": "m"},
+        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
+    }
     with pytest.raises(ValueError):
-        to_evaluation_report(rp, base, format="txt")
+        make_report(rp, base)

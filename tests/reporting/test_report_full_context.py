@@ -6,7 +6,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from invarlock.reporting import report_builder as cert
+import invarlock.eval.primary_metric as primary_metric_mod
+from invarlock.reporting import report_make as cert
+from invarlock.reporting import report_normalization as report_normalization_mod
+from invarlock.reporting.report_make import make_report
 
 
 def _rich_run_report() -> tuple[dict, dict]:
@@ -148,13 +151,15 @@ def test_make_evaluation_report_rich_context_generates_diagnostics(monkeypatch):
         metrics = (report.get("metrics") or {}).get("primary_metric", {})
         return {"final": metrics.get("final", 1.0), "direction": "lower"}
 
-    monkeypatch.setattr(cert, "compute_primary_metric_from_report", fake_compute)
     monkeypatch.setattr(
-        cert, "get_metric", lambda *_: SimpleNamespace(direction="lower")
+        primary_metric_mod, "compute_primary_metric_from_report", fake_compute
+    )
+    monkeypatch.setattr(
+        primary_metric_mod, "get_metric", lambda *_: SimpleNamespace(direction="lower")
     )
 
     report, baseline = _rich_run_report()
-    cert_obj = cert.make_report(report, baseline)
+    cert_obj = make_report(report, baseline)
     assert cert_obj["quality_overhead"]["basis"] == "ratio"
     stats = cert_obj["dataset"]["windows"]["stats"]
     assert stats["paired_windows"] >= 1
@@ -165,7 +170,7 @@ def test_make_evaluation_report_rich_context_generates_diagnostics(monkeypatch):
 
 def test_make_evaluation_report_surfaces_pairing_and_policy_digest():
     report, baseline = _rich_run_report()
-    cert_obj = cert.make_report(report, baseline)
+    cert_obj = make_report(report, baseline)
     stats = cert_obj["dataset"]["windows"]["stats"]
     assert "pairing" in stats and stats["paired_windows"] >= 1
     assert "coverage" in stats and "window_match_fraction" in stats
@@ -178,9 +183,14 @@ def test_make_evaluation_report_end_to_end_populates_optional_sections_and_valid
     monkeypatch,
 ):
     monkeypatch.setattr(
-        cert, "_normalize_and_validate_report", lambda value: value, raising=False
+        report_normalization_mod,
+        "normalize_and_validate_run_report",
+        lambda value: value,
+        raising=False,
     )
-    monkeypatch.setattr(cert, "_normalize_baseline", lambda value: value, raising=False)
+    monkeypatch.setattr(
+        report_normalization_mod, "normalize_baseline", lambda value: value, raising=False
+    )
     report, baseline = _rich_run_report()
     report = deepcopy(report)
     baseline = deepcopy(baseline)
@@ -276,7 +286,7 @@ def test_make_evaluation_report_end_to_end_populates_optional_sections_and_valid
     report["metrics"]["spectral"]["caps_exceeded"] = True
     report["metrics"]["rmt"]["stable"] = False
 
-    evaluation_report = cert.make_report(report, baseline)
+    evaluation_report = make_report(report, baseline)
 
     stats = evaluation_report["dataset"]["windows"]["stats"]
     assert stats["pairing"]
@@ -321,9 +331,14 @@ def test_make_evaluation_report_policy_digest_changes_when_policy_override_diffe
     monkeypatch,
 ):
     monkeypatch.setattr(
-        cert, "_normalize_and_validate_report", lambda value: value, raising=False
+        report_normalization_mod,
+        "normalize_and_validate_run_report",
+        lambda value: value,
+        raising=False,
     )
-    monkeypatch.setattr(cert, "_normalize_baseline", lambda value: value, raising=False)
+    monkeypatch.setattr(
+        report_normalization_mod, "normalize_baseline", lambda value: value, raising=False
+    )
     report, baseline = _rich_run_report()
     report = deepcopy(report)
     baseline = deepcopy(baseline)
@@ -333,16 +348,21 @@ def test_make_evaluation_report_policy_digest_changes_when_policy_override_diffe
     baseline["guards"] = []
     baseline["meta"]["auto"]["tier"] = "conservative"
 
-    evaluation_report = cert.make_report(report, baseline)
+    evaluation_report = make_report(report, baseline)
 
     assert evaluation_report["policy_digest"]["changed"] is True
 
 
 def test_make_evaluation_report_provenance_and_guard_schedule_fallback(monkeypatch):
     monkeypatch.setattr(
-        cert, "_normalize_and_validate_report", lambda value: value, raising=False
+        report_normalization_mod,
+        "normalize_and_validate_run_report",
+        lambda value: value,
+        raising=False,
     )
-    monkeypatch.setattr(cert, "_normalize_baseline", lambda value: value, raising=False)
+    monkeypatch.setattr(
+        report_normalization_mod, "normalize_baseline", lambda value: value, raising=False
+    )
     report, baseline = _rich_run_report()
     report = deepcopy(report)
     baseline = deepcopy(baseline)
@@ -351,7 +371,7 @@ def test_make_evaluation_report_provenance_and_guard_schedule_fallback(monkeypat
     report["guard_overhead"] = {}
     report["metrics"]["window_plan"]["profile"] = "dev"
 
-    evaluation_report = cert.make_report(report, baseline)
+    evaluation_report = make_report(report, baseline)
 
     prov = evaluation_report["provenance"]
     assert "provider_digest" in prov
@@ -364,15 +384,20 @@ def test_make_evaluation_report_provenance_and_guard_schedule_fallback(monkeypat
 
 def test_make_evaluation_report_embeds_telemetry_summary(monkeypatch):
     monkeypatch.setattr(
-        cert, "_normalize_and_validate_report", lambda value: value, raising=False
+        report_normalization_mod,
+        "normalize_and_validate_run_report",
+        lambda value: value,
+        raising=False,
     )
-    monkeypatch.setattr(cert, "_normalize_baseline", lambda value: value, raising=False)
+    monkeypatch.setattr(
+        report_normalization_mod, "normalize_baseline", lambda value: value, raising=False
+    )
     monkeypatch.setenv("INVARLOCK_TELEMETRY", "1")
     report, baseline = _rich_run_report()
     report = deepcopy(report)
     baseline = deepcopy(baseline)
 
-    evaluation_report = cert.make_report(report, baseline)
+    evaluation_report = make_report(report, baseline)
     assert evaluation_report["telemetry"]["summary_line"].startswith(
         "INVARLOCK_TELEMETRY"
     )

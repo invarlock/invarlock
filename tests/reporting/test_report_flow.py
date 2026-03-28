@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from invarlock.reporting.report import to_evaluation_report
 from invarlock.reporting.report_files import save_report
+from invarlock.reporting.report_make import make_report
 
 
 def _minimal_report() -> dict:
@@ -53,15 +53,15 @@ def _minimal_report() -> dict:
     }
 
 
-def test_to_evaluation_report_unsupported_format_raises():
+def test_make_report_rejects_unsupported_baseline_schema():
     rep = _minimal_report()
     base = {
-        "schema_version": "baseline-v1",
+        "schema_version": "baseline-v2",
         "meta": {},
         "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 100.0}},
     }
     with pytest.raises(ValueError):
-        to_evaluation_report(rep, base, format="xml")
+        make_report(rep, base)
 
 
 def test_save_report_with_compare_suffix(tmp_path: Path):
@@ -80,7 +80,7 @@ def test_save_report_with_compare_suffix(tmp_path: Path):
 
 
 def test_generate_comparison_markdown_with_guard_violations():
-    from invarlock.reporting.report import to_markdown
+    from invarlock.reporting.run_report_formatters import to_markdown
 
     rep1 = _minimal_report()
     rep2 = _minimal_report()

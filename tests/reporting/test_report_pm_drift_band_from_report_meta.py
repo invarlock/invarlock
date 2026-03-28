@@ -1,4 +1,4 @@
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 
 
 def _report_with_meta_pm_drift_band():

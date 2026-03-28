@@ -20,7 +20,6 @@ from invarlock.core.report_inputs import (
     load_report_input_json,
     resolve_report_input_path,
 )
-from invarlock.reporting import report_builder as report_builder
 from invarlock.reporting.report_contract import (
     ReportGenerationResult,
     generate_reports,
@@ -602,7 +601,7 @@ def report_validate(
         raise typer.Exit(2) from exc
 
     try:
-        from invarlock.reporting.report_builder import validate_report
+        from invarlock.reporting.report_schema import validate_report
 
         ok = validate_report(payload)
         if not ok:

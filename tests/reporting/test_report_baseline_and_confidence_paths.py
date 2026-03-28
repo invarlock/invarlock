@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from invarlock.reporting import report_builder as C
+from invarlock.reporting import report_make as C
+from invarlock.reporting.report_make import make_report
 
 
 def test_confidence_label_variants():
@@ -122,7 +123,7 @@ def test_make_evaluation_report_uses_pairing_and_marks_unstable_with_low_replica
     base = _baseline_v1_windows_only()
     # Ensure BCa not forced (and sample count remains small); environment flag off
     monkeypatch.delenv("INVARLOCK_BOOTSTRAP_BCA", raising=False)
-    cert = C.make_report(rep, base)
+    cert = make_report(rep, base)
     pm = cert.get("primary_metric", {})
     assert isinstance(pm, dict)
     # Replicates=10 should set unstable hint True
@@ -132,7 +133,7 @@ def test_make_evaluation_report_uses_pairing_and_marks_unstable_with_low_replica
 def test_normalize_baseline_v1_path_is_exercised(tmp_path: Path):
     rep = _simple_report_with_windows()
     base = _baseline_v1_windows_only()
-    cert = C.make_report(rep, base)
+    cert = make_report(rep, base)
     # Baseline ref present with PM snapshot
     br = cert.get("baseline_ref", {})
     assert isinstance(br, dict) and isinstance(br.get("primary_metric", {}), dict)

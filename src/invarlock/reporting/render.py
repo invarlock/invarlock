@@ -8,91 +8,11 @@ from typing import Any
 
 import yaml
 
-from invarlock.public_contracts import load_json_contract
-
-from .report_schema import validate_report
-
-# Console Validation Block helpers (allow-list driven)
-_CONSOLE_LABELS_DEFAULT = [
-    "Primary Metric Acceptable",
-    "Preview Final Drift Acceptable",
-    "Guard Overhead Acceptable",
-    "Invariants Pass",
-    "Spectral Stable",
-    "Rmt Stable",
-]
-
-
-def _load_console_labels() -> list[str]:
-    """Load console labels allow-list from contracts with a safe fallback."""
-    try:
-        data = load_json_contract("console_labels.json")
-        if isinstance(data, list) and all(isinstance(x, str) for x in data):
-            return list(data)
-    except Exception:
-        pass
-    return list(_CONSOLE_LABELS_DEFAULT)
-
-
-def compute_console_validation_block(
-    evaluation_report: dict[str, Any],
-) -> dict[str, Any]:
-    """Produce a normalized console validation block from an evaluation report.
-
-    Returns a dict with keys:
-    - labels: the canonical label list
-    - rows: list of {label, status, evaluated, ok}
-    - overall_pass: boolean computed from canonical rows only. Guard Overhead is
-      counted only when evaluated.
-    """
-    labels = _load_console_labels()
-    validation = evaluation_report.get("validation", {}) or {}
-    guard_ctx = evaluation_report.get("guard_overhead", {}) or {}
-    guard_evaluated = (
-        bool(guard_ctx.get("evaluated")) if isinstance(guard_ctx, dict) else False
-    )
-
-    # Map label → validation key
-    def _to_key(label: str) -> str:
-        return label.strip().lower().replace(" ", "_")
-
-    rows: list[dict[str, Any]] = []
-    ok_map: dict[str, bool] = {}
-    effective_labels: list[str] = []
-    for label in labels:
-        key = _to_key(label)
-        ok = bool(validation.get(key, False))
-        status: str
-        evaluated = True
-        if key == "guard_overhead_acceptable":
-            evaluated = guard_evaluated
-            if not evaluated:
-                # Omit row entirely when not evaluated (policy/profile skipped)
-                continue
-            status = "✅ PASS" if ok else "❌ FAIL"
-        else:
-            status = "✅ PASS" if ok else "❌ FAIL"
-        rows.append(
-            {"label": label, "status": status, "evaluated": evaluated, "ok": ok}
-        )
-        effective_labels.append(label)
-        ok_map[key] = ok
-
-    # Overall policy from canonical rows only; exclude guard when not evaluated
-    keys_for_overall = [
-        "primary_metric_acceptable",
-        "preview_final_drift_acceptable",
-        "invariants_pass",
-        "spectral_stable",
-        "rmt_stable",
-    ]
-    # Include guard overhead only if evaluated
-    if guard_evaluated:
-        keys_for_overall.append("guard_overhead_acceptable")
-
-    overall_pass = all(ok_map.get(k, False) for k in keys_for_overall)
-
-    return {"labels": effective_labels, "rows": rows, "overall_pass": overall_pass}
+from .render_dataset_section import append_dataset_and_provenance_section
+from .report_console import (
+    compute_report_hash as _compute_report_hash,
+)
+from .report_summary import build_quality_gates_summary, build_safety_dashboard_summary
 
 
 def _format_plugin(plugin: dict[str, Any]) -> str:
@@ -112,19 +32,6 @@ def _short_digest(v: str) -> str:
     return v if len(v) <= 16 else (v[:8] + "…" + v[-8:])
 
 
-def _dataset_hash_source_label(source: Any) -> str | None:
-    source_map = {
-        "explicit_preview_final_hashes": "provider-derived explicit preview/final hashes",
-        "explicit_token_ids": "content-derived token IDs",
-        "config_fallback": "config-derived fallback",
-    }
-    try:
-        key = str(source or "").strip()
-    except Exception:
-        return None
-    return source_map.get(key)
-
-
 def _render_executive_dashboard(cert: dict[str, Any]) -> str:
     """Render executive summary dashboard table."""
     lines: list[str] = []
@@ -136,147 +43,13 @@ def _append_safety_dashboard_section(
     lines: list[str], evaluation_report: dict[str, Any]
 ) -> None:
     """Append a concise, first-screen summary table for the evaluation report."""
-    block = compute_console_validation_block(evaluation_report)
-    overall_pass = bool(block.get("overall_pass"))
-    overall_status = (
-        f"{'✅' if overall_pass else '❌'} {'PASS' if overall_pass else 'FAIL'}"
-    )
-
-    validation = evaluation_report.get("validation", {}) or {}
-    pm = evaluation_report.get("primary_metric", {}) or {}
-    auto = evaluation_report.get("auto", {}) or {}
-    tier = str(auto.get("tier") or "balanced").lower()
-
-    # Primary metric summary
-    pm_kind = str(pm.get("kind", "")).lower()
-    pm_basis = pm.get("gating_basis") or pm.get("basis") or "point"
-    pm_ok: bool | None
-    if isinstance(validation, dict) and "primary_metric_acceptable" in validation:
-        pm_ok = bool(validation.get("primary_metric_acceptable"))
-    else:
-        pm_ok = None
-    pm_value = pm.get("ratio_vs_baseline")
-
-    if pm_kind in {"accuracy", "vqa_accuracy"}:
-        measured = f"{pm_value:+.2f} pp" if isinstance(pm_value, int | float) else "N/A"
-        th_map = {
-            "conservative": -0.5,
-            "balanced": -1.0,
-            "aggressive": -2.0,
-            "none": -1.0,
-        }
-        th = th_map.get(tier, -1.0)
-        threshold = f"≥ {th:+.2f} pp ({pm_basis})"
-    else:
-        measured = f"{pm_value:.3f}×" if isinstance(pm_value, int | float) else "N/A"
-        tier_thresholds = {
-            "conservative": 1.05,
-            "balanced": 1.10,
-            "aggressive": 1.20,
-            "none": 1.10,
-        }
-        ratio_limit = tier_thresholds.get(tier, 1.10)
-        target_ratio = auto.get("target_pm_ratio")
-        if isinstance(target_ratio, int | float) and target_ratio > 0:
-            ratio_limit = min(ratio_limit, float(target_ratio))
-        threshold = f"≤ {ratio_limit:.2f}× ({pm_basis})"
-
-    pm_status = (
-        f"{'✅' if pm_ok else '❌'} {measured}"
-        if isinstance(pm_ok, bool)
-        else f"ℹ️ {measured}"
-    )
-
-    # Drift summary (final/preview ratio) when preview/final are numeric
-    drift_ok: bool | None
-    if isinstance(validation, dict) and "preview_final_drift_acceptable" in validation:
-        drift_ok = bool(validation.get("preview_final_drift_acceptable"))
-    else:
-        drift_ok = None
-    drift_val = "N/A"
-    try:
-        pv = (
-            float(pm.get("preview"))
-            if isinstance(pm.get("preview"), int | float)
-            else float("nan")
-        )
-        fv = (
-            float(pm.get("final"))
-            if isinstance(pm.get("final"), int | float)
-            else float("nan")
-        )
-        drift = (
-            fv / pv
-            if (math.isfinite(pv) and pv > 0 and math.isfinite(fv))
-            else float("nan")
-        )
-        if math.isfinite(drift):
-            drift_val = f"{drift:.3f}×"
-    except Exception:
-        drift_val = "N/A"
-    drift_status = (
-        f"{'✅' if drift_ok else '❌'} {drift_val}"
-        if isinstance(drift_ok, bool)
-        else f"ℹ️ {drift_val}"
-    )
-
-    def _gate_cell(key: str, ok_default: bool | None = None) -> str:
-        ok: bool | None
-        if not isinstance(validation, dict):
-            ok = ok_default
-        elif key not in validation:
-            ok = ok_default
-        else:
-            ok = bool(validation.get(key))
-        if ok is None:
-            return "ℹ️ N/A"
-        return "✅ PASS" if ok else "❌ FAIL"
-
-    overhead_ctx = evaluation_report.get("guard_overhead", {}) or {}
-    overhead_evaluated = (
-        bool(overhead_ctx.get("evaluated")) if isinstance(overhead_ctx, dict) else False
-    )
-    overhead_row: tuple[str, str, str] | None = None
-    if overhead_evaluated:
-        overhead_pct = overhead_ctx.get("overhead_percent")
-        overhead_ratio = overhead_ctx.get("overhead_ratio")
-        if isinstance(overhead_pct, int | float) and math.isfinite(float(overhead_pct)):
-            overhead_measured = f"{float(overhead_pct):+.2f}%"
-        elif isinstance(overhead_ratio, int | float) and math.isfinite(
-            float(overhead_ratio)
-        ):
-            overhead_measured = f"{float(overhead_ratio):.3f}×"
-        else:
-            overhead_measured = "N/A"
-        threshold_pct = overhead_ctx.get("threshold_percent")
-        if isinstance(threshold_pct, int | float) and math.isfinite(
-            float(threshold_pct)
-        ):
-            threshold_str = f"≤ +{float(threshold_pct):.1f}%"
-        else:
-            threshold_str = "≤ +1.0%"
-        overhead_row = (
-            "Overhead",
-            f"{'✅' if bool(validation.get('guard_overhead_acceptable', True)) else '❌'} {overhead_measured}"
-            if isinstance(validation, dict)
-            else f"ℹ️ {overhead_measured}",
-            threshold_str,
-        )
+    summary = build_safety_dashboard_summary(evaluation_report)
 
     lines.append("| Check | Status | Quick Summary |")
     lines.append("|-------|--------|---------------|")
-    lines.append(f"| Overall | {overall_status} | Canonical gate outcomes |")
-    lines.append(f"| Primary Metric | {pm_status} | {threshold} |")
-    lines.append(f"| Drift | {drift_status} | 0.95–1.05× band |")
-    lines.append(
-        f"| Invariants | {_gate_cell('invariants_pass')} | Model integrity checks |"
-    )
-    lines.append(
-        f"| Spectral | {_gate_cell('spectral_stable')} | Weight matrix spectral norms |"
-    )
-    lines.append(f"| RMT | {_gate_cell('rmt_stable')} | Random Matrix Theory guard |")
-    if overhead_row:
-        lines.append(f"| {overhead_row[0]} | {overhead_row[1]} | {overhead_row[2]} |")
+    lines.append(f"| Overall | {summary.overall_status} | Canonical gate outcomes |")
+    for row in summary.rows:
+        lines.append(f"| {row.label} | {row.status} | {row.summary} |")
     lines.append("")
 
 
@@ -445,143 +218,6 @@ def _append_policy_configuration_section(
     lines.append("")
 
 
-def _append_dataset_and_provenance_section(
-    lines: list[str], evaluation_report: dict[str, Any]
-) -> None:
-    dataset = evaluation_report.get("dataset", {}) or {}
-    provenance_info = evaluation_report.get("provenance", {}) or {}
-
-    has_dataset = isinstance(dataset, dict) and bool(dataset)
-    has_provenance = isinstance(provenance_info, dict) and bool(provenance_info)
-    if not (has_dataset or has_provenance):
-        return
-
-    lines.append("## Dataset and Provenance")
-    lines.append("")
-
-    if has_dataset:
-        prov = dataset.get("provider") or "unknown"
-        lines.append(f"- **Provider:** {prov}")
-        try:
-            seq_len_val = (
-                int(dataset.get("seq_len"))
-                if isinstance(dataset.get("seq_len"), int | float)
-                else dataset.get("seq_len")
-            )
-        except Exception:  # pragma: no cover - defensive
-            seq_len_val = dataset.get("seq_len")
-        if seq_len_val is not None:
-            lines.append(f"- **Sequence Length:** {seq_len_val}")
-        windows_blk = (
-            dataset.get("windows", {})
-            if isinstance(dataset.get("windows"), dict)
-            else {}
-        )
-        win_prev = windows_blk.get("preview")
-        win_final = windows_blk.get("final")
-        if win_prev is not None and win_final is not None:
-            lines.append(f"- **Windows:** {win_prev} preview + {win_final} final")
-        if windows_blk.get("seed") is not None:
-            lines.append(f"- **Seed:** {windows_blk.get('seed')}")
-        hash_blk = (
-            dataset.get("hash", {}) if isinstance(dataset.get("hash"), dict) else {}
-        )
-        if hash_blk.get("preview_tokens") is not None:
-            lines.append(f"- **Preview Tokens:** {hash_blk.get('preview_tokens'):,}")
-        if hash_blk.get("final_tokens") is not None:
-            lines.append(f"- **Final Tokens:** {hash_blk.get('final_tokens'):,}")
-        if hash_blk.get("total_tokens") is not None:
-            lines.append(f"- **Total Tokens:** {hash_blk.get('total_tokens'):,}")
-        if hash_blk.get("dataset"):
-            lines.append(f"- **Dataset Hash:** {hash_blk.get('dataset')}")
-        hash_source = _dataset_hash_source_label(hash_blk.get("source"))
-        if hash_source:
-            lines.append(f"- **Hash Source:** {hash_source}")
-        tokenizer = dataset.get("tokenizer", {})
-        if isinstance(tokenizer, dict) and (
-            tokenizer.get("name") or tokenizer.get("hash")
-        ):
-            vocab_size = tokenizer.get("vocab_size")
-            vocab_suffix = (
-                f" (vocab {vocab_size})" if isinstance(vocab_size, int) else ""
-            )
-            lines.append(
-                f"- **Tokenizer:** {tokenizer.get('name', 'unknown')}{vocab_suffix}"
-            )
-            if tokenizer.get("hash"):
-                lines.append(f"  - Hash: {tokenizer['hash']}")
-            lines.append(
-                f"  - BOS/EOS: {tokenizer.get('bos_token')} / {tokenizer.get('eos_token')}"
-            )
-            if tokenizer.get("pad_token") is not None:
-                lines.append(f"  - PAD: {tokenizer.get('pad_token')}")
-            if tokenizer.get("add_prefix_space") is not None:
-                lines.append(
-                    f"  - add_prefix_space: {tokenizer.get('add_prefix_space')}"
-                )
-
-    if has_provenance:
-        baseline_info = provenance_info.get("baseline", {}) or {}
-        edited_info = provenance_info.get("edited", {}) or {}
-
-        if baseline_info or edited_info:
-            lines.append("")
-        if baseline_info:
-            lines.append(f"- **Baseline Run ID:** {baseline_info.get('run_id')}")
-            if baseline_info.get("report_hash"):
-                lines.append(f"  - Report Hash: `{baseline_info.get('report_hash')}`")
-            if baseline_info.get("report_path"):
-                lines.append(f"  - Report Path: {baseline_info.get('report_path')}")
-        if edited_info:
-            lines.append(f"- **Edited Run ID:** {edited_info.get('run_id')}")
-            if edited_info.get("report_hash"):
-                lines.append(f"  - Report Hash: `{edited_info.get('report_hash')}`")
-            if edited_info.get("report_path"):
-                lines.append(f"  - Report Path: {edited_info.get('report_path')}")
-
-        provider_digest = provenance_info.get("provider_digest")
-        if isinstance(provider_digest, dict) and provider_digest:
-            ids_d = provider_digest.get("ids_sha256")
-            tok_d = provider_digest.get("tokenizer_sha256")
-            mask_d = provider_digest.get("masking_sha256")
-
-            lines.append("- **Provider Digest:**")
-            if tok_d:
-                lines.append(
-                    f"  - tokenizer_sha256: `{_short_digest(tok_d)}` (full in JSON)"
-                )
-            if ids_d:
-                lines.append(f"  - ids_sha256: `{_short_digest(ids_d)}` (full in JSON)")
-            if mask_d:
-                lines.append(
-                    f"  - masking_sha256: `{_short_digest(mask_d)}` (full in JSON)"
-                )
-
-        try:
-            conf = evaluation_report.get("confidence", {}) or {}
-            if isinstance(conf, dict) and conf.get("label"):
-                lines.append(f"- **Confidence:** {conf.get('label')}")
-        except Exception:
-            pass
-
-        try:
-            pd = evaluation_report.get("policy_digest", {}) or {}
-            if isinstance(pd, dict) and pd:
-                pv = pd.get("policy_version")
-                th = pd.get("thresholds_hash")
-                if pv:
-                    lines.append(f"- **Policy Version:** {pv}")
-                if isinstance(th, str) and th:
-                    short = th if len(th) <= 16 else (th[:8] + "…" + th[-8:])
-                    lines.append(f"- **Thresholds Digest:** `{short}` (full in JSON)")
-                if pd.get("changed"):
-                    lines.append("- Note: policy changed")
-        except Exception:
-            pass
-
-    lines.append("")
-
-
 def _fmt_by_kind(x: Any, k: str) -> str:
     try:
         xv = float(x)
@@ -684,52 +320,6 @@ def _append_accuracy_subgroups(lines: list[str], subgroups: dict[str, Any]) -> N
     lines.append("")
 
 
-def _compute_report_hash(evaluation_report: dict[str, Any]) -> str:
-    """Compute integrity hash for the evaluation_report.
-
-    Hash ignores the `artifacts` section for stability across saves.
-    """
-    # Create a copy without the artifacts section for stable hashing
-    cert_copy = dict(evaluation_report or {})
-    cert_copy.pop("artifacts", None)
-
-    # Sort keys for deterministic hashing
-    cert_str = json.dumps(cert_copy, sort_keys=True)
-    import hashlib as _hash
-
-    return _hash.sha256(cert_str.encode()).hexdigest()[:16]
-
-
-def build_console_summary_pack(evaluation_report: dict[str, Any]) -> dict[str, Any]:
-    """Build a small, reusable console summary pack from a evaluation_report.
-
-    Returns a dict with:
-    - overall_pass: bool
-    - overall_line: human-friendly overall status line
-    - gate_lines: list of "<Label>: <Status>" strings for each evaluated gate
-    - labels: the canonical label list used
-    """
-    block = compute_console_validation_block(evaluation_report)
-    overall_pass = bool(block.get("overall_pass"))
-    emoji = "✅" if overall_pass else "❌"
-    overall_line = f"Overall Status: {emoji} {'PASS' if overall_pass else 'FAIL'}"
-
-    gate_lines: list[str] = []
-    for row in block.get("rows", []) or []:
-        if not isinstance(row, dict):
-            continue
-        label = row.get("label", "Gate")
-        status = row.get("status", "")
-        gate_lines.append(f"{label}: {status}")
-
-    return {
-        "overall_pass": overall_pass,
-        "overall_line": overall_line,
-        "gate_lines": gate_lines,
-        "labels": block.get("labels", []),
-    }
-
-
 def _get_generated_at(evaluation_report: dict[str, Any]) -> str:
     artifacts = evaluation_report.get("artifacts")
     if isinstance(artifacts, dict):
@@ -799,12 +389,8 @@ def _append_executive_summary_section(
 ) -> None:
     lines.append("## Executive Summary")
     lines.append("")
-    block = compute_console_validation_block(evaluation_report)
-    overall_pass = bool(block.get("overall_pass"))
-    status_emoji = "✅" if overall_pass else "❌"
-    lines.append(
-        f"**Overall Status:** {status_emoji} {'PASS' if overall_pass else 'FAIL'}"
-    )
+    summary = build_safety_dashboard_summary(evaluation_report)
+    lines.append(f"**Overall Status:** {summary.overall_status}")
     window_plan_summary = _get_window_plan_summary(evaluation_report)
     if window_plan_summary:
         lines.append(f"- {window_plan_summary}")
@@ -816,15 +402,30 @@ def _append_executive_summary_section(
         lines.append("")
 
 
+def _append_quality_gates_section(
+    lines: list[str], evaluation_report: dict[str, Any]
+) -> None:
+    summary = build_quality_gates_summary(evaluation_report)
+
+    lines.append("## Quality Gates")
+    lines.append("")
+    lines.append("| Gate | Status | Measured | Threshold | Basis | Description |")
+    lines.append("|------|--------|----------|-----------|-------|-------------|")
+    for row in summary.rows:
+        lines.append(
+            f"| {row.label} | {row.status} | {row.measured} | {row.threshold} | {row.basis} | {row.description} |"
+        )
+    if summary.hysteresis_applied:
+        lines.append("- Note: hysteresis applied to gate boundary")
+    lines.append("")
+
+
 def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
     """
     Render an evaluation report as a formatted Markdown report with pretty tables.
 
-    This implementation is moved from report_builder.py to keep that module lean.
+    Render an already-normalized evaluation report into Markdown.
     """
-    if not validate_report(evaluation_report):
-        raise ValueError("Invalid evaluation report structure")
-
     lines: list[str] = []
     appendix_lines: list[str] = []
     edit_name = str(evaluation_report.get("edit_name") or "").lower()
@@ -857,222 +458,8 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
 
     _append_executive_summary_section(lines, evaluation_report)
 
-    # Validation table with canonical gates (mirrors console allow-list)
-    lines.append("## Quality Gates")
-    lines.append("")
-    lines.append("| Gate | Status | Measured | Threshold | Basis | Description |")
-    lines.append("|------|--------|----------|-----------|-------|-------------|")
+    _append_quality_gates_section(lines, evaluation_report)
 
-    pm_block = evaluation_report.get("primary_metric", {}) or {}
-    has_pm = isinstance(pm_block, dict) and bool(pm_block)
-    auto_info = evaluation_report.get("auto", {})
-    tier = (auto_info.get("tier") or "balanced").lower()
-
-    # Helper to emit Primary Metric Acceptable row
-    def _emit_pm_gate_row() -> None:
-        pm_kind = str(pm_block.get("kind", "")).lower()
-        value = pm_block.get("ratio_vs_baseline")
-        gating_basis = pm_block.get("gating_basis") or "point"
-        ok = bool(
-            evaluation_report.get("validation", {}).get(
-                "primary_metric_acceptable", True
-            )
-        )
-        status = "✅ PASS" if ok else "❌ FAIL"
-        if pm_kind in {"accuracy", "vqa_accuracy"}:
-            measured = f"{value:+.2f} pp" if isinstance(value, int | float) else "N/A"
-            th_map = {
-                "conservative": -0.5,
-                "balanced": -1.0,
-                "aggressive": -2.0,
-                "none": -1.0,
-            }
-            th = th_map.get(tier, -1.0)
-            lines.append(
-                f"| Primary Metric Acceptable | {status} | {measured} | ≥ {th:+.2f} pp | {gating_basis} | Δ accuracy vs baseline |"
-            )
-        else:
-            tier_thresholds = {
-                "conservative": 1.05,
-                "balanced": 1.10,
-                "aggressive": 1.20,
-                "none": 1.10,
-            }
-            ratio_limit = tier_thresholds.get(tier, 1.10)
-            target_ratio = auto_info.get("target_pm_ratio")
-            if isinstance(target_ratio, int | float) and target_ratio > 0:
-                ratio_limit = min(ratio_limit, float(target_ratio))
-            measured = f"{value:.3f}x" if isinstance(value, int | float) else "N/A"
-            lines.append(
-                f"| Primary Metric Acceptable | {status} | {measured} | ≤ {ratio_limit:.2f}x | {gating_basis} | Ratio vs baseline |"
-            )
-
-    # Helper to emit Preview Final Drift Acceptable row
-    def _emit_drift_gate_row() -> None:
-        ok = bool(
-            evaluation_report.get("validation", {}).get(
-                "preview_final_drift_acceptable", True
-            )
-        )
-        status = "✅ PASS" if ok else "❌ FAIL"
-        drift_min = 0.95
-        drift_max = 1.05
-        try:
-            drift_band = (
-                pm_block.get("drift_band") if isinstance(pm_block, dict) else None
-            )
-            if isinstance(drift_band, dict):
-                lo = drift_band.get("min")
-                hi = drift_band.get("max")
-                if isinstance(lo, int | float) and isinstance(hi, int | float):
-                    lo_f = float(lo)
-                    hi_f = float(hi)
-                    if math.isfinite(lo_f) and math.isfinite(hi_f) and 0 < lo_f < hi_f:
-                        drift_min = lo_f
-                        drift_max = hi_f
-            elif isinstance(drift_band, list | tuple) and len(drift_band) == 2:
-                lo_raw, hi_raw = drift_band[0], drift_band[1]
-                if isinstance(lo_raw, int | float) and isinstance(hi_raw, int | float):
-                    lo_f = float(lo_raw)
-                    hi_f = float(hi_raw)
-                    if math.isfinite(lo_f) and math.isfinite(hi_f) and 0 < lo_f < hi_f:
-                        drift_min = lo_f
-                        drift_max = hi_f
-        except Exception:
-            pass
-        # Compute drift from PM preview/final when available
-        try:
-            pv = (
-                float(pm_block.get("preview"))
-                if isinstance(pm_block.get("preview"), int | float)
-                else float("nan")
-            )
-            fv = (
-                float(pm_block.get("final"))
-                if isinstance(pm_block.get("final"), int | float)
-                else float("nan")
-            )
-            drift = (
-                fv / pv
-                if (math.isfinite(pv) and pv > 0 and math.isfinite(fv))
-                else float("nan")
-            )
-        except Exception:
-            drift = float("nan")
-        measured = f"{drift:.3f}x" if math.isfinite(drift) else "N/A"
-        band_label = f"{drift_min:.2f}–{drift_max:.2f}x"
-        lines.append(
-            f"| Preview Final Drift Acceptable | {status} | {measured} | {band_label} | point | Final/Preview ratio stability |"
-        )
-
-    # Helper to emit Guard Overhead Acceptable row (only when evaluated)
-    def _emit_overhead_gate_row() -> None:
-        guard_overhead = evaluation_report.get("guard_overhead", {}) or {}
-        evaluated = bool(guard_overhead.get("evaluated"))
-        if not evaluated:
-            return
-        ok = bool(
-            evaluation_report.get("validation", {}).get(
-                "guard_overhead_acceptable", True
-            )
-        )
-        status = "✅ PASS" if ok else "❌ FAIL"
-        overhead_pct = guard_overhead.get("overhead_percent")
-        overhead_ratio = guard_overhead.get("overhead_ratio")
-        if isinstance(overhead_pct, int | float) and math.isfinite(float(overhead_pct)):
-            measured = f"{float(overhead_pct):+.2f}%"
-        elif isinstance(overhead_ratio, int | float) and math.isfinite(
-            float(overhead_ratio)
-        ):
-            measured = f"{float(overhead_ratio):.3f}x"
-        else:
-            measured = "N/A"
-        threshold_pct = guard_overhead.get("threshold_percent")
-        if not (
-            isinstance(threshold_pct, int | float)
-            and math.isfinite(float(threshold_pct))
-        ):
-            threshold_val = guard_overhead.get("overhead_threshold", 0.01)
-            try:
-                threshold_pct = float(threshold_val) * 100.0
-            except Exception:
-                threshold_pct = 1.0
-        lines.append(
-            f"| Guard Overhead Acceptable | {status} | {measured} | ≤ +{threshold_pct:.1f}% | point | Guarded vs bare PM overhead |"
-        )
-
-    def _emit_pm_tail_gate_row() -> None:
-        pm_tail = evaluation_report.get("primary_metric_tail", {}) or {}
-        if not isinstance(pm_tail, dict) or not pm_tail:
-            return
-
-        evaluated = bool(pm_tail.get("evaluated", False))
-        mode = str(pm_tail.get("mode", "warn") or "warn").strip().lower()
-        passed = bool(pm_tail.get("passed", True))
-        warned = bool(pm_tail.get("warned", False))
-
-        if not evaluated:
-            status = "ℹ️ INFO"
-        elif passed:
-            status = "✅ PASS"
-        elif mode == "fail":
-            status = "❌ FAIL"
-        else:
-            status = "⚠️ WARN" if warned else "⚠️ WARN"
-
-        policy = (
-            pm_tail.get("policy", {}) if isinstance(pm_tail.get("policy"), dict) else {}
-        )
-        stats = (
-            pm_tail.get("stats", {}) if isinstance(pm_tail.get("stats"), dict) else {}
-        )
-
-        q = policy.get("quantile", 0.95)
-        try:
-            qf = float(q)
-        except Exception:
-            qf = 0.95
-        qf = max(0.0, min(1.0, qf))
-        q_key = f"q{int(round(100.0 * qf))}"
-        q_name = f"P{int(round(100.0 * qf))}"
-        q_val = stats.get(q_key)
-        mass_val = stats.get("tail_mass")
-        eps = policy.get("epsilon", stats.get("epsilon"))
-
-        measured_parts: list[str] = []
-        if isinstance(q_val, int | float) and math.isfinite(float(q_val)):
-            measured_parts.append(f"{q_name}={float(q_val):.3f}")
-        if isinstance(mass_val, int | float) and math.isfinite(float(mass_val)):
-            measured_parts.append(f"mass={float(mass_val):.3f}")
-        measured = ", ".join(measured_parts) if measured_parts else "N/A"
-
-        thr_parts: list[str] = []
-        qmax = policy.get("quantile_max")
-        if isinstance(qmax, int | float) and math.isfinite(float(qmax)):
-            thr_parts.append(f"{q_name}≤{float(qmax):.3f}")
-        mmax = policy.get("mass_max")
-        if isinstance(mmax, int | float) and math.isfinite(float(mmax)):
-            thr_parts.append(f"mass≤{float(mmax):.3f}")
-        if isinstance(eps, int | float) and math.isfinite(float(eps)):
-            thr_parts.append(f"ε={float(eps):.1e}")
-        threshold = "; ".join(thr_parts) if thr_parts else "policy"
-
-        lines.append(
-            f"| Primary Metric Tail | {status} | {measured} | {threshold} | {q_name.lower()} | Tail regression vs baseline (ΔlogNLL) |"
-        )
-
-    # Emit canonical gate rows
-    if has_pm:
-        _emit_pm_gate_row()
-        _emit_pm_tail_gate_row()
-        _emit_drift_gate_row()
-        _emit_overhead_gate_row()
-
-    # Annotate hysteresis usage if applied
-    if evaluation_report.get("validation", {}).get("hysteresis_applied"):
-        lines.append("- Note: hysteresis applied to gate boundary")
-
-    lines.append("")
     lines.append("## Guard Check Details")
     lines.append("")
     lines.append("| Guard Check | Status | Measured | Threshold | Description |")
@@ -1145,7 +532,7 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
                 f"| Catastrophic Spike Gate (hard stop) | {'✅ PASS' if pm_ok else '❌ FAIL'} | {pm_ratio:.3f}x | ≤ 2.0x | Hard stop @ 2.0× |"
             )
 
-    # Include RMT Health row for compatibility and clarity
+    # RMT Health remains a first-screen summary row alongside the other guard gates.
     rmt_status = "✅ PASS" if validation.get("rmt_stable", False) else "❌ FAIL"
     rmt_state = evaluation_report.get("rmt", {}).get("status", "unknown").title()
     lines.append(
@@ -1675,7 +1062,7 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
             pass
         lines.append("")
 
-    _append_dataset_and_provenance_section(lines, evaluation_report)
+    append_dataset_and_provenance_section(lines, evaluation_report)
 
     # Structural Changes heading is printed with content later; avoid empty header here
 

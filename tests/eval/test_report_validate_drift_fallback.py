@@ -1,4 +1,4 @@
-from invarlock.reporting.report_builder import (
+from invarlock.reporting.report_schema import (
     REPORT_SCHEMA_VERSION,
     validate_report,
 )

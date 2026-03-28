@@ -7,8 +7,8 @@ import pytest
 import typer
 
 import invarlock.cli.commands.report as report_mod
-import invarlock.reporting.report_builder as cert_mod
 import invarlock.reporting.report_contract as report_contract_mod
+import invarlock.reporting.report_schema as schema_mod
 from invarlock.reporting.report_contract import ReportGenerationResult, generate_reports
 
 
@@ -612,7 +612,7 @@ def test_report_validate_success(monkeypatch, tmp_path):
         report_mod, "console", type("C", (), {"print": lambda *_: None})()
     )
     monkeypatch.setattr(
-        cert_mod,
+        schema_mod,
         "validate_report",
         lambda payload: True,
         raising=False,
@@ -631,7 +631,7 @@ def test_report_validate_accepts_canonical_directory(monkeypatch, tmp_path):
         report_mod, "console", type("C", (), {"print": lambda *_: None})()
     )
     monkeypatch.setattr(
-        cert_mod,
+        schema_mod,
         "validate_report",
         lambda payload: True,
         raising=False,
@@ -664,7 +664,7 @@ def test_report_validate_schema_failure(monkeypatch, tmp_path):
         report_mod, "console", type("C", (), {"print": lambda *_: None})()
     )
     monkeypatch.setattr(
-        cert_mod,
+        schema_mod,
         "validate_report",
         lambda payload: False,
         raising=False,
@@ -684,7 +684,7 @@ def test_report_validate_value_error(monkeypatch, tmp_path):
     def _raise_val(payload):
         raise ValueError("bad schema")
 
-    monkeypatch.setattr(cert_mod, "validate_report", _raise_val, raising=False)
+    monkeypatch.setattr(schema_mod, "validate_report", _raise_val, raising=False)
     with pytest.raises(typer.Exit) as exc:
         report_mod.report_validate(report=str(report))
     assert exc.value.exit_code == 2
@@ -700,7 +700,7 @@ def test_report_validate_generic_error(monkeypatch, tmp_path):
     def _raise(payload):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(cert_mod, "validate_report", _raise, raising=False)
+    monkeypatch.setattr(schema_mod, "validate_report", _raise, raising=False)
     with pytest.raises(typer.Exit) as exc:
         report_mod.report_validate(report=str(report))
     assert exc.value.exit_code == 1

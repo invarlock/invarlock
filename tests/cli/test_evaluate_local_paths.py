@@ -137,7 +137,10 @@ def test_evaluate_local_paths_pm_and_digests(monkeypatch, tmp_path: Path):
         output: str,
         compare: str | None = None,
     ):
-        from invarlock.reporting.report_files import save_report as _save_report
+        from invarlock.reporting.report_bundle import (
+            save_evaluation_bundle as _save_evaluation_bundle,
+        )
+        from invarlock.reporting.report_make import make_report as _make_report
 
         with open(run, encoding="utf-8") as fh:
             primary = _json.load(fh)
@@ -145,12 +148,10 @@ def test_evaluate_local_paths_pm_and_digests(monkeypatch, tmp_path: Path):
         if baseline:
             with open(baseline, encoding="utf-8") as fh:
                 base = _json.load(fh)
-        return _save_report(
-            primary,
-            output,
-            formats=["report"],
-            baseline=base,
-            filename_prefix="evaluation",
+        return _save_evaluation_bundle(
+            run_report=primary,
+            output_dir=output,
+            evaluation_report=_make_report(primary, base) if base is not None else {},
         )
 
     monkeypatch.setattr(mod, "generate_reports", _report_wrapper, raising=False)
@@ -268,7 +269,10 @@ def test_evaluate_local_paths_quantized_subject_overheads(monkeypatch, tmp_path:
         output: str,
         compare: str | None = None,
     ):
-        from invarlock.reporting.report_files import save_report as _save_report
+        from invarlock.reporting.report_bundle import (
+            save_evaluation_bundle as _save_evaluation_bundle,
+        )
+        from invarlock.reporting.report_make import make_report as _make_report
 
         with open(run, encoding="utf-8") as fh:
             primary = _json.load(fh)
@@ -276,12 +280,10 @@ def test_evaluate_local_paths_quantized_subject_overheads(monkeypatch, tmp_path:
         if baseline:
             with open(baseline, encoding="utf-8") as fh:
                 base = _json.load(fh)
-        return _save_report(
-            primary,
-            output,
-            formats=["report"],
-            baseline=base,
-            filename_prefix="evaluation",
+        return _save_evaluation_bundle(
+            run_report=primary,
+            output_dir=output,
+            evaluation_report=_make_report(primary, base) if base is not None else {},
         )
 
     monkeypatch.setattr(mod, "generate_reports", _report_wrapper, raising=False)

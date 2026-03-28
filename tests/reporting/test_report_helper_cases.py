@@ -5,7 +5,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from invarlock.reporting import report_builder as cert
+from invarlock.reporting import report_edit_summary as report_edit_summary_mod
+from invarlock.reporting import report_make as cert
+from invarlock.reporting import report_overhead as report_overhead_mod
+from invarlock.reporting import report_validation as report_validation_mod
 
 
 def _basic_pm(final: float) -> dict[str, object]:
@@ -60,7 +63,7 @@ def test_compute_report_digest_changes_with_inputs():
 def test_prepare_guard_overhead_section_with_reports():
     bare = _basic_pm(10.0)
     guarded = _basic_pm(10.05)
-    payload, passed = cert._prepare_guard_overhead_section(
+    payload, passed = report_overhead_mod.prepare_guard_overhead_section(
         {"bare_report": bare, "guarded_report": guarded, "source": "unit"}
     )
     assert passed is True
@@ -69,7 +72,7 @@ def test_prepare_guard_overhead_section_with_reports():
 
 
 def test_prepare_guard_overhead_section_ratio_fallback():
-    payload, passed = cert._prepare_guard_overhead_section(
+    payload, passed = report_overhead_mod.prepare_guard_overhead_section(
         {"bare_ppl": 10.0, "guarded_ppl": 11.0, "messages": ["note"]}
     )
     assert passed is False
@@ -84,12 +87,11 @@ def test_compute_quality_overhead_from_guard_handles_ratio(monkeypatch):
     def fake_compute(report, *, kind, baseline=None):
         return {"final": report["value"], "direction": "lower"}
 
-    monkeypatch.setattr(cert, "compute_primary_metric_from_report", fake_compute)
-    monkeypatch.setattr(
-        cert, "get_metric", lambda *_: SimpleNamespace(direction="lower")
-    )
-    info = cert._compute_quality_overhead_from_guard(
-        {"bare_report": bare, "guarded_report": guarded}, pm_kind_hint="ppl_causal"
+    info = report_overhead_mod.compute_quality_overhead_from_guard(
+        {"bare_report": bare, "guarded_report": guarded},
+        pm_kind_hint="ppl_causal",
+        compute_primary_metric_from_report_fn=fake_compute,
+        get_metric_fn=lambda *_: SimpleNamespace(direction="lower"),
     )
     assert info == {"basis": "ratio", "value": pytest.approx(1.1), "kind": "ppl_causal"}
 
@@ -101,12 +103,11 @@ def test_compute_quality_overhead_from_guard_accuracy_delta(monkeypatch):
     def fake_compute(report, *, kind, baseline=None):
         return {"final": report["value"], "direction": "higher"}
 
-    monkeypatch.setattr(cert, "compute_primary_metric_from_report", fake_compute)
-    monkeypatch.setattr(
-        cert, "get_metric", lambda *_: SimpleNamespace(direction="higher")
-    )
-    info = cert._compute_quality_overhead_from_guard(
-        {"bare_report": bare, "guarded_report": guarded}, pm_kind_hint="accuracy"
+    info = report_overhead_mod.compute_quality_overhead_from_guard(
+        {"bare_report": bare, "guarded_report": guarded},
+        pm_kind_hint="accuracy",
+        compute_primary_metric_from_report_fn=fake_compute,
+        get_metric_fn=lambda *_: SimpleNamespace(direction="higher"),
     )
     assert info["basis"] == "delta_pp"
     assert math.isclose(info["value"], 5.0)
@@ -127,8 +128,8 @@ def test_generate_run_id_handles_non_dict_meta():
 
 
 def test_analyze_bitwidth_map_empty_and_missing():
-    assert cert._analyze_bitwidth_map({}) == {}
-    assert cert._analyze_bitwidth_map({"layer": {"params": 128}}) == {}
+    assert report_edit_summary_mod.analyze_bitwidth_map({}) == {}
+    assert report_edit_summary_mod.analyze_bitwidth_map({"layer": {"params": 128}}) == {}
 
 
 def test_analyze_bitwidth_map_and_rank_information():
@@ -136,7 +137,7 @@ def test_analyze_bitwidth_map_and_rank_information():
         "layer1": {"bitwidth": 4, "params": 128},
         "layer2": {"bitwidth": 8, "params": 256},
     }
-    stats = cert._analyze_bitwidth_map(bitwidth_map)
+    stats = report_edit_summary_mod.analyze_bitwidth_map(bitwidth_map)
     assert stats["total_modules"] == 2
     assert stats["min_bitwidth"] == 4
     deltas = {
@@ -156,9 +157,9 @@ def test_analyze_bitwidth_map_and_rank_information():
         "savings": {"deploy_mode": "recompose"},
     }
     edit_cfg = {"frac": 0.5, "rank_policy": "auto"}
-    rank_info = cert._extract_rank_information(edit_cfg, deltas)
+    rank_info = report_edit_summary_mod.extract_rank_information(edit_cfg, deltas)
     assert rank_info["rank_policy"] == "auto"
-    savings = cert._compute_savings_summary(deltas)
+    savings = report_edit_summary_mod.compute_savings_summary(deltas)
     assert savings["mode"] == "realized"
 
 
@@ -189,7 +190,7 @@ def test_extract_compression_diagnostics_quant(monkeypatch):
         },
     }
     edit_cfg = {"scope": "unknown", "clamp_ratio": 0.2}
-    diagnostics = cert._extract_compression_diagnostics(
+    diagnostics = report_edit_summary_mod.extract_compression_diagnostics(
         "quant_rtn_rank",
         edit_cfg,
         deltas,
@@ -203,14 +204,14 @@ def test_extract_compression_diagnostics_quant(monkeypatch):
 
 
 def test_prepare_guard_overhead_section_empty_returns_pass():
-    payload, passed = cert._prepare_guard_overhead_section({})
+    payload, passed = report_overhead_mod.prepare_guard_overhead_section({})
     assert payload == {}
     assert passed is True
 
 
 def test_compute_validation_flags_respects_token_floors(monkeypatch):
     monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
-    flags = cert._compute_validation_flags(
+    flags = report_validation_mod.compute_validation_flags(
         ppl={
             "preview_final_ratio": 1.02,
             "ratio_vs_baseline": 1.2,
@@ -235,7 +236,7 @@ def test_compute_validation_flags_respects_token_floors(monkeypatch):
 def test_compute_validation_flags_accuracy_sets_hysteresis(monkeypatch):
     monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
     pm = {"kind": "accuracy", "ratio_vs_baseline": -0.5, "n_final": 50}
-    flags = cert._compute_validation_flags(
+    flags = report_validation_mod.compute_validation_flags(
         ppl={"preview_final_ratio": 1.0, "ratio_vs_baseline": 0.98},
         spectral={"caps_applied": 1},
         rmt={"stable": True},

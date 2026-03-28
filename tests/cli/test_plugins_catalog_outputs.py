@@ -686,10 +686,9 @@ def test_plugins_datasets_import_failure_unknown_network(monkeypatch):
             self.get_provider = fake_get_provider
             self.list_providers = fake_list_providers
 
-        def __getattr__(self, item):
-            if item == "_PROVIDERS":
-                raise RuntimeError("boom")
-            raise AttributeError(item)
+        @property
+        def _PROVIDERS(self):
+            raise RuntimeError("boom")
 
     monkeypatch.setitem(sys.modules, "invarlock.eval.data", BrokenModule())
     buf = _set_console(monkeypatch)

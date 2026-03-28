@@ -11,6 +11,7 @@ from html import escape
 from typing import Any
 
 from .render import render_report_markdown
+from .report_schema import validate_report
 
 markdown_module: Any | None = None
 try:
@@ -43,6 +44,8 @@ def render_report_html(evaluation_report: dict[str, Any]) -> str:
     Uses the Markdown renderer and converts to HTML when available, falling back
     to a <pre> block when the markdown dependency is missing.
     """
+    if not validate_report(evaluation_report):
+        raise ValueError("Invalid evaluation report structure")
     md = render_report_markdown(evaluation_report)
     if markdown_module is None:
         body = f'<pre class="invarlock-md">{escape(md)}</pre>'

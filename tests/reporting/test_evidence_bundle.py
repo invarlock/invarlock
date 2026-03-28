@@ -3,7 +3,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from invarlock.reporting.report_files import save_report
+from invarlock.reporting.report_bundle import save_evaluation_bundle
+from invarlock.reporting.report_make import make_report
 
 
 def _minimal_run_report() -> dict:
@@ -57,12 +58,10 @@ def test_manifest_and_expected_files_present(tmp_path: Path) -> None:
     # Use save_report to emit evaluation report + manifest; enable evidence hook
     os.environ["INVARLOCK_EVIDENCE_DEBUG"] = "1"
     try:
-        _ = save_report(
-            primary,
-            out_dir,
-            formats=["report"],
-            baseline=baseline,
-            filename_prefix="evaluation",
+        _ = save_evaluation_bundle(
+            run_report=primary,
+            output_dir=out_dir,
+            evaluation_report=make_report(primary, baseline),
         )
     finally:
         os.environ.pop("INVARLOCK_EVIDENCE_DEBUG", None)

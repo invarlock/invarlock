@@ -4,7 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from invarlock.reporting.report_files import save_report
+from invarlock.reporting.report_bundle import save_evaluation_bundle
+from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import RunReport, create_empty_report
 
 
@@ -40,13 +41,10 @@ def test_save_report_outputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     base = _mk_simple_report()
     # Gate evidence emission on env
     monkeypatch.setenv("INVARLOCK_EVIDENCE_DEBUG", "1")
-    out = save_report(
-        rp,
-        tmp_path,
-        formats=["report"],
-        compare=None,
-        baseline=base,
-        filename_prefix="unit",
+    out = save_evaluation_bundle(
+        run_report=rp,
+        output_dir=tmp_path,
+        evaluation_report=make_report(rp, base),
     )
     # Ensure expected files are produced
     assert (tmp_path / "evaluation.report.json").exists()

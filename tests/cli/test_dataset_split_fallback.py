@@ -2,29 +2,46 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 
 
 def test_choose_dataset_split_logic():
-    # Import the helper directly for unit testing
-    from invarlock.cli.commands.run import SPLIT_ALIASES, _choose_dataset_split
+    from invarlock.core.run_policy import choose_dataset_split
+
+    split_aliases = ("validation", "val", "dev", "eval", "test")
 
     # When requested is provided, it should return verbatim and no fallback
-    s, fb = _choose_dataset_split(requested="train", available=["train", "validation"])
+    s, fb = choose_dataset_split(
+        requested="train",
+        available=["train", "validation"],
+        split_aliases=split_aliases,
+    )
     assert s == "train" and fb is False
 
     # When not requested, it should pick the first alias present
-    for cand in SPLIT_ALIASES:
-        s, fb = _choose_dataset_split(requested=None, available=[cand, "other"])
+    for cand in split_aliases:
+        s, fb = choose_dataset_split(
+            requested=None,
+            available=[cand, "other"],
+            split_aliases=split_aliases,
+        )
         assert s == cand and fb is True
         break
 
     # When no aliases present, it should pick the first sorted available
-    s, fb = _choose_dataset_split(requested=None, available=["zzz", "aaa"])
+    s, fb = choose_dataset_split(
+        requested=None,
+        available=["zzz", "aaa"],
+        split_aliases=split_aliases,
+    )
     assert s == "aaa" and fb is True
 
     # When available is None/empty, last-resort fallback to validation
-    s, fb = _choose_dataset_split(requested=None, available=None)
+    s, fb = choose_dataset_split(
+        requested=None,
+        available=None,
+        split_aliases=split_aliases,
+    )
     assert s == "validation" and fb is True
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from invarlock.reporting import report_builder as C
+from invarlock.reporting import report_schema as C
 
 
 def test_validate_evaluation_report_jsonschema_true(monkeypatch):

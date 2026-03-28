@@ -8,6 +8,7 @@ from typing import Any
 
 from invarlock.core.auto_tuning import get_tier_policies, resolve_tier_policies
 
+from .report_policy import TIER_RATIO_LIMITS
 from .report_types import RunReport
 
 
@@ -35,7 +36,6 @@ def _compute_thresholds_payload(
     tier: str, resolved_policy: dict[str, Any]
 ) -> dict[str, Any]:
     """Build canonical thresholds payload for digest stability."""
-    from .report_builder import TIER_RATIO_LIMITS  # local to avoid cycles
 
     tier_lc = (tier or "balanced").lower()
     metrics_policy = (

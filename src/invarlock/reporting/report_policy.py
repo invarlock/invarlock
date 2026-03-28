@@ -1,9 +1,18 @@
-"""Policy-resolution helpers extracted from report_builder."""
+"""Policy-resolution helpers for evaluation report assembly."""
 
 from __future__ import annotations
 
 import math
 from typing import Any
+
+TIER_RATIO_LIMITS: dict[str, float] = {
+    "conservative": 1.05,
+    "balanced": 1.10,
+    "aggressive": 1.20,
+    "none": 1.10,
+}
+
+PM_DRIFT_BAND_DEFAULT: tuple[float, float] = (0.95, 1.05)
 
 
 def resolve_pm_acceptance_range_from_report(

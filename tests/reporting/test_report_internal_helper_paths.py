@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import pytest
 
-from invarlock.reporting import report_builder as cert
+from invarlock.reporting import report_edit_summary as report_edit_summary_mod
+from invarlock.reporting import report_normalization as report_normalization_mod
+from invarlock.reporting import report_overhead as report_overhead_mod
+from invarlock.reporting import report_validation as report_validation_mod
 
 
 def test_normalize_and_validate_report_raises_on_invalid(monkeypatch):
-    monkeypatch.setattr(cert, "validate_report", lambda _: False, raising=False)
+    del monkeypatch
     with pytest.raises(ValueError, match="Invalid RunReport structure"):
-        cert._normalize_and_validate_report({"meta": {}})
+        report_normalization_mod.normalize_and_validate_run_report({"meta": {}})
 
 
 def test_normalize_baseline_v1_schema():
@@ -20,7 +23,7 @@ def test_normalize_baseline_v1_schema():
         "rmt_base": {"stable": True},
         "invariants": {"status": "pass"},
     }
-    normalized = cert._normalize_baseline(baseline)
+    normalized = report_normalization_mod.normalize_baseline(baseline)
     assert normalized["run_id"] == "abcdef1234567890"
     assert normalized["ppl_final"] == 42.0
 
@@ -49,17 +52,17 @@ def test_normalize_baseline_run_report_invalid_ppl():
         },
     }
     with pytest.raises(ValueError, match="Invalid baseline"):
-        cert._normalize_baseline(baseline)
+        report_normalization_mod.normalize_baseline(baseline)
 
 
 def test_normalize_baseline_dict_soft_fallback():
     with pytest.raises(ValueError, match="Invalid baseline"):
-        cert._normalize_baseline({"ppl_final": 0.0})
+        report_normalization_mod.normalize_baseline({"ppl_final": 0.0})
 
 
 def test_normalize_baseline_invalid_type():
     with pytest.raises(ValueError):
-        cert._normalize_baseline("not a baseline")  # type: ignore[arg-type]
+        report_normalization_mod.normalize_baseline("not a baseline")  # type: ignore[arg-type]
 
 
 def test_extract_structural_deltas_infers_scope_and_details():
@@ -93,14 +96,14 @@ def test_extract_structural_deltas_infers_scope_and_details():
             },
         }
     }
-    structure = cert._extract_structural_deltas(report)
+    structure = report_edit_summary_mod.extract_structural_deltas(report)
     diagnostics = structure["compression_diagnostics"]
     assert diagnostics["target_analysis"]["scope"] == "all"
     assert diagnostics["rank_summary"]["modules_modified"] == 1
 
 
 def test_compute_validation_flags_hysteresis_and_ci() -> None:
-    flags = cert._compute_validation_flags(
+    flags = report_validation_mod.compute_validation_flags(
         ppl={
             "preview_final_ratio": 1.0,
             "ratio_vs_baseline": 1.102,
@@ -121,7 +124,7 @@ def test_compute_validation_flags_hysteresis_and_ci() -> None:
 
 
 def test_compute_validation_flags_tiny_relax_mode() -> None:
-    flags = cert._compute_validation_flags(
+    flags = report_validation_mod.compute_validation_flags(
         ppl={"preview_final_ratio": 1.2, "ratio_vs_baseline": 1.5},
         spectral={"caps_applied": 10},
         rmt={"stable": False},
@@ -138,7 +141,7 @@ def test_compute_validation_flags_tiny_relax_mode() -> None:
 def test_prepare_guard_overhead_section_triggers_validation():
     bare = {"metrics": {"primary_metric": {"final": 10.0}}}
     guarded = {"metrics": {"primary_metric": {"final": 12.0}}}
-    payload, passed = cert._prepare_guard_overhead_section(
+    payload, passed = report_overhead_mod.prepare_guard_overhead_section(
         {"bare_report": bare, "guarded_report": guarded, "overhead_threshold": 0.01}
     )
     assert passed is False
@@ -147,7 +150,7 @@ def test_prepare_guard_overhead_section_triggers_validation():
 
 def test_compute_quality_overhead_from_guard_none_on_missing_data():
     assert (
-        cert._compute_quality_overhead_from_guard(
+        report_overhead_mod.compute_quality_overhead_from_guard(
             {"bare_report": {}, "guarded_report": {}}
         )
         is None

@@ -2,7 +2,8 @@ import math
 
 from invarlock.reporting.policy_utils import _compute_variance_policy_digest
 from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_builder import make_report, validate_report
+from invarlock.reporting.report_make import make_report
+from invarlock.reporting.report_schema import validate_report
 from invarlock.reporting.utils import (
     _coerce_interval,
     _pair_logloss_windows,

@@ -6,7 +6,7 @@ from invarlock.reporting.policy_utils import (
     _compute_thresholds_payload,
     _compute_variance_policy_digest,
 )
-from invarlock.reporting.report_builder import (
+from invarlock.reporting.report_make import (
     TIER_RATIO_LIMITS,
     _compute_confidence_label,
     _compute_edit_digest,

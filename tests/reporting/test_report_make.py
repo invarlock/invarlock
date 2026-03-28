@@ -1,4 +1,5 @@
-from invarlock.reporting.report_builder import make_report, validate_report
+from invarlock.reporting.report_make import make_report
+from invarlock.reporting.report_schema import validate_report
 from invarlock.reporting.report_types import create_empty_report
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from invarlock.reporting import report_builder as C
+from invarlock.reporting import report_make as C
+from invarlock.reporting.policy_utils import _compute_variance_policy_digest
 from invarlock.reporting.utils import _pair_logloss_windows
 
 
@@ -24,8 +25,8 @@ def test_pair_logloss_windows_happy_path_two_pairs():
 
 
 def test_compute_variance_policy_digest_variants():
-    assert C._compute_variance_policy_digest({}) == ""
-    h = C._compute_variance_policy_digest({"deadband": 0.02, "min_abs_adjust": 0.01})
+    assert _compute_variance_policy_digest({}) == ""
+    h = _compute_variance_policy_digest({"deadband": 0.02, "min_abs_adjust": 0.01})
     assert isinstance(h, str) and len(h) == 16
 
 

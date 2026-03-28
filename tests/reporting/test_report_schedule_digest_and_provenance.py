@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 
 
 def _mk_report_with_final_windows() -> dict[str, Any]:

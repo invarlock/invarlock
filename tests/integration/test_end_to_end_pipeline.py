@@ -383,7 +383,8 @@ class TestEndToEndPipeline:
 
         # Edit failure and rollback path (quant-only dummy)
         class _FailingQuant:
-            def apply(self, model, adapter, cfg):
+            def apply(self, model, adapter, plan=None, runtime=None):
+                _ = model, adapter, plan, runtime
                 return {
                     "success": False,
                     "error": "Edit failed",
@@ -518,7 +519,8 @@ class TestEndToEndPipeline:
 
         # Device handling path via a dummy quant edit
         class _DummyQuant:
-            def apply(self, model, adapter, cfg):
+            def apply(self, model, adapter, plan=None, runtime=None):
+                _ = model, adapter, plan, runtime
                 return {
                     "success": True,
                     "device_info": {"original_device": "cpu", "edit_device": "cpu"},

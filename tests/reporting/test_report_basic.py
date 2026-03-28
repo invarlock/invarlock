@@ -1,14 +1,16 @@
 from pathlib import Path
 from typing import Any
 
-from invarlock.reporting import report as rpt
-from invarlock.reporting.report import (
-    to_evaluation_report,
+from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.report_files import save_report
+from invarlock.reporting.report_make import make_report
+from invarlock.reporting.run_report_formatters import (
+    _generate_comparison_markdown,
+    _generate_single_markdown,
     to_html,
     to_json,
     to_markdown,
 )
-from invarlock.reporting.report_files import save_report
 
 
 def _minimal_report() -> dict[str, Any]:
@@ -79,27 +81,29 @@ def test_save_report_multiple_formats(tmp_path: Path):
     assert out["html"].exists()
 
 
-def test_to_evaluation_report_markdown_path():
+def test_make_report_markdown_path():
     rep = _minimal_report()
     baseline = {
         "schema_version": "baseline-v1",
         "meta": {},
         "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 100.0}},
     }
-    md = to_evaluation_report(rep, baseline, format="markdown")
+    md = render_report_markdown(make_report(rep, baseline))
     assert isinstance(md, str) and "InvarLock Evaluation Report" in md
 
 
-def test_validate_baseline_or_report_helper():
-    # Valid as RunReport
-    assert rpt._validate_baseline_or_report(_minimal_report()) is True
-    # Valid as baseline-v1 with primary_metric.final
+def test_make_report_accepts_run_report_and_baseline_v1():
+    rep = _minimal_report()
+    cert_from_run = make_report(rep, rep)
+    assert cert_from_run["schema_version"] == "v1"
+
     baseline = {
         "schema_version": "baseline-v1",
         "meta": {},
         "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 100.0}},
     }
-    assert rpt._validate_baseline_or_report(baseline) is True
+    cert_from_baseline = make_report(rep, baseline)
+    assert cert_from_baseline["schema_version"] == "v1"
 
 
 def test_single_markdown_handles_missing_primary_metric_and_sparse_guards():
@@ -111,7 +115,7 @@ def test_single_markdown_handles_missing_primary_metric_and_sparse_guards():
     ]
     rep["flags"]["guard_recovered"] = True
 
-    md = "\n".join(rpt._generate_single_markdown(rep))
+    md = "\n".join(_generate_single_markdown(rep))
 
     assert "Primary Metric**: unavailable" in md
     assert "Overall Sparsity" in md
@@ -132,7 +136,7 @@ def test_comparison_markdown_coerces_invalid_delta_values():
         {"name": "spectral", "violations": ["x"], "metrics": {}, "actions": []}
     ]
 
-    md = "\n".join(rpt._generate_comparison_markdown(rep1, rep2))
+    md = "\n".join(_generate_comparison_markdown(rep1, rep2))
 
     assert "| Params Changed | 0 | 0 | +0 |" in md
     assert "| Layers Modified | 0 | 0 | +0 |" in md

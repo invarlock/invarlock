@@ -5,8 +5,18 @@ from copy import deepcopy
 
 import pytest
 
-from invarlock.reporting import report_builder as cert
-from invarlock.reporting import report_make_impl as report_make_impl_mod
+import invarlock.eval.primary_metric as primary_metric_mod
+from invarlock.reporting import (
+    dataset_hashing,
+    guards_analysis,
+    policy_utils,
+    primary_metric_utils,
+    report_edit_summary,
+    report_normalization,
+)
+from invarlock.reporting import report_make as cert
+from invarlock.reporting import utils as report_utils
+from invarlock.reporting.report_make import make_report
 
 
 def _base_report() -> dict:
@@ -78,15 +88,24 @@ def _base_baseline() -> dict:
 
 def _patch_common(monkeypatch, report, baseline):
     monkeypatch.setattr(
-        cert, "_normalize_and_validate_report", lambda _r: report, raising=False
+        report_normalization,
+        "normalize_and_validate_run_report",
+        lambda _r: report,
+        raising=False,
     )
-    monkeypatch.setattr(cert, "_normalize_baseline", lambda _b: baseline, raising=False)
-    monkeypatch.setattr(cert, "_attach_pm", lambda *args, **kwargs: None, raising=False)
     monkeypatch.setattr(
-        cert,
+        report_normalization, "normalize_baseline", lambda _b: baseline, raising=False
+    )
+    monkeypatch.setattr(
+        primary_metric_utils,
+        "attach_primary_metric",
+        lambda *args, **kwargs: None,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        primary_metric_mod,
         "compute_primary_metric_from_report",
         lambda *args, **kwargs: {},
-        raising=False,
     )
 
 
@@ -114,43 +133,43 @@ def _stub_evaluation_report_extractors(
     resolved_policy = resolved_policy or {"spectral": {}, "variance": {}}
 
     monkeypatch.setattr(
-        report_make_impl_mod,
-        "_extract_dataset_info",
-        lambda *_: deepcopy(dataset_info),
+        dataset_hashing, "_extract_dataset_info", lambda *_: deepcopy(dataset_info)
     )
     monkeypatch.setattr(
-        cert, "_extract_invariants", lambda *args, **kwargs: invariants, raising=False
+        guards_analysis, "_extract_invariants", lambda *args, **kwargs: invariants, raising=False
     )
     monkeypatch.setattr(
-        cert, "_extract_spectral_analysis", lambda *_: spectral, raising=False
-    )
-    monkeypatch.setattr(cert, "_extract_rmt_analysis", lambda *_: rmt, raising=False)
-    monkeypatch.setattr(
-        cert, "_extract_variance_analysis", lambda *_: variance, raising=False
+        guards_analysis, "_extract_spectral_analysis", lambda *_: spectral, raising=False
     )
     monkeypatch.setattr(
-        cert,
-        "_extract_structural_deltas",
+        guards_analysis, "_extract_rmt_analysis", lambda *_: rmt, raising=False
+    )
+    monkeypatch.setattr(
+        guards_analysis, "_extract_variance_analysis", lambda *_: variance, raising=False
+    )
+    monkeypatch.setattr(
+        report_edit_summary,
+        "extract_structural_deltas",
         lambda *_: deepcopy(structure),
         raising=False,
     )
     monkeypatch.setattr(
-        cert,
+        policy_utils,
         "_extract_effective_policies",
         lambda *_: deepcopy(policies_payload),
         raising=False,
     )
     monkeypatch.setattr(
-        cert, "_extract_policy_overrides", lambda *_: ["manual"], raising=False
+        policy_utils, "_extract_policy_overrides", lambda *_: ["manual"], raising=False
     )
     monkeypatch.setattr(
-        cert,
+        policy_utils,
         "_build_resolved_policies",
         lambda *args, **kwargs: deepcopy(resolved_policy),
         raising=False,
     )
     monkeypatch.setattr(
-        cert, "_compute_policy_digest", lambda *_: "resolved-digest", raising=False
+        policy_utils, "_compute_policy_digest", lambda *_: "resolved-digest", raising=False
     )
 
 
@@ -168,7 +187,7 @@ def test_make_evaluation_report_raises_on_drift_identity(monkeypatch):
     def fake_pair(_run, _base):
         return ([0.1, 0.2], [0.0, 0.0])
 
-    monkeypatch.setattr(report_make_impl_mod, "_pair_logloss_windows", fake_pair)
+    monkeypatch.setattr(report_utils, "_pair_logloss_windows", fake_pair)
     monkeypatch.setattr(
         "invarlock.core.bootstrap.compute_paired_delta_log_ci",
         lambda *args, **kwargs: (0.0, 0.0),
@@ -183,7 +202,7 @@ def test_make_evaluation_report_raises_on_drift_identity(monkeypatch):
     )
 
     with pytest.raises(ValueError, match="drift ratio"):
-        cert.make_report({}, {})
+        make_report({}, {})
 
 
 def test_make_evaluation_report_raises_on_ratio_ci_mismatch(monkeypatch):
@@ -197,7 +216,7 @@ def test_make_evaluation_report_raises_on_ratio_ci_mismatch(monkeypatch):
     def fake_pair(_run, _base):
         return ([0.1, 0.2], [0.1, 0.2])
 
-    monkeypatch.setattr(report_make_impl_mod, "_pair_logloss_windows", fake_pair)
+    monkeypatch.setattr(report_utils, "_pair_logloss_windows", fake_pair)
     monkeypatch.setattr(
         "invarlock.core.bootstrap.compute_paired_delta_log_ci",
         lambda *args, **kwargs: (0.0, 0.0),
@@ -210,18 +229,18 @@ def test_make_evaluation_report_raises_on_ratio_ci_mismatch(monkeypatch):
     )
 
     with pytest.raises(ValueError, match="CI mismatch"):
-        cert.make_report({}, {})
+        make_report({}, {})
 
 
 def test_make_evaluation_report_uses_coverage_fallback(monkeypatch):
     report = _base_report()
     baseline = _base_baseline()
     report["metrics"]["bootstrap"]["coverage"] = {"preview": {"used": 5}}
+    report["evaluation_windows"] = {}
 
     _patch_common(monkeypatch, report, baseline)
-    monkeypatch.setattr(report_make_impl_mod, "_pair_logloss_windows", lambda *_: None)
 
-    evaluation_report = cert.make_report(report, baseline)
+    evaluation_report = make_report(report, baseline)
     stats = evaluation_report["dataset"]["windows"]["stats"]
     assert stats["paired_windows"] == 5
 
@@ -309,48 +328,50 @@ def test_make_evaluation_report_populates_optional_sections(monkeypatch):
         "variance": {"min_effect_lognll": 0.1},
     }
 
-    monkeypatch.setattr(cert, "_attach_pm", _attach_pm_stub, raising=False)
     monkeypatch.setattr(
-        report_make_impl_mod,
-        "_extract_dataset_info",
-        lambda *_: deepcopy(dataset_info),
+        primary_metric_utils, "attach_primary_metric", _attach_pm_stub, raising=False
     )
     monkeypatch.setattr(
-        cert, "_extract_invariants", lambda *args, **kwargs: invariants, raising=False
+        dataset_hashing, "_extract_dataset_info", lambda *_: deepcopy(dataset_info)
     )
     monkeypatch.setattr(
-        cert, "_extract_spectral_analysis", lambda *_: spectral, raising=False
-    )
-    monkeypatch.setattr(cert, "_extract_rmt_analysis", lambda *_: rmt, raising=False)
-    monkeypatch.setattr(
-        cert, "_extract_variance_analysis", lambda *_: variance, raising=False
+        guards_analysis, "_extract_invariants", lambda *args, **kwargs: invariants, raising=False
     )
     monkeypatch.setattr(
-        cert,
-        "_extract_structural_deltas",
+        guards_analysis, "_extract_spectral_analysis", lambda *_: spectral, raising=False
+    )
+    monkeypatch.setattr(
+        guards_analysis, "_extract_rmt_analysis", lambda *_: rmt, raising=False
+    )
+    monkeypatch.setattr(
+        guards_analysis, "_extract_variance_analysis", lambda *_: variance, raising=False
+    )
+    monkeypatch.setattr(
+        report_edit_summary,
+        "extract_structural_deltas",
         lambda *_: deepcopy(structure),
         raising=False,
     )
     monkeypatch.setattr(
-        cert,
+        policy_utils,
         "_extract_effective_policies",
         lambda *_: deepcopy(policies_payload),
         raising=False,
     )
     monkeypatch.setattr(
-        cert, "_extract_policy_overrides", lambda *_: ["manual-limit"], raising=False
+        policy_utils, "_extract_policy_overrides", lambda *_: ["manual-limit"], raising=False
     )
     monkeypatch.setattr(
-        cert,
+        policy_utils,
         "_build_resolved_policies",
         lambda *args, **kwargs: resolved_policy,
         raising=False,
     )
     monkeypatch.setattr(
-        cert, "_compute_policy_digest", lambda *_: "resolved-digest", raising=False
+        policy_utils, "_compute_policy_digest", lambda *_: "resolved-digest", raising=False
     )
 
-    evaluation_report = cert.make_report(report, baseline)
+    evaluation_report = make_report(report, baseline)
 
     assert evaluation_report["secondary_metrics"][0]["kind"] == "accuracy"
     subgroup = evaluation_report["classification"]["subgroups"]["alpha"]
@@ -378,7 +399,7 @@ def test_make_evaluation_report_populates_dataset_stats_when_absent(monkeypatch)
         resolved_policy={"spectral": {}, "variance": {}},
     )
 
-    evaluation_report = cert.make_report(report, baseline)
+    evaluation_report = make_report(report, baseline)
     stats = evaluation_report["dataset"]["windows"]["stats"]
     assert "pairing" in stats
     assert stats["paired_windows"] >= 1
@@ -397,7 +418,7 @@ def test_make_evaluation_report_policy_digest_marks_tier_change(monkeypatch):
         resolved_policy={"spectral": {}, "variance": {}},
     )
 
-    evaluation_report = cert.make_report(report, baseline)
+    evaluation_report = make_report(report, baseline)
     assert evaluation_report["policy_digest"]["changed"] is True
 
 
@@ -416,7 +437,7 @@ def test_make_evaluation_report_policy_digest_handles_missing_baseline_tier(
         resolved_policy={"spectral": {}, "variance": {}},
     )
 
-    evaluation_report = cert.make_report(report, baseline)
+    evaluation_report = make_report(report, baseline)
     assert evaluation_report["policy_digest"]["changed"] is False
 
 
@@ -442,11 +463,11 @@ def test_make_evaluation_report_policy_digest_detects_threshold_hash_change(
         return f"{payload['tier']}-{payload['call']}"
 
     monkeypatch.setattr(
-        cert, "_compute_thresholds_payload", fake_payload, raising=False
+        policy_utils, "_compute_thresholds_payload", fake_payload, raising=False
     )
-    monkeypatch.setattr(cert, "_compute_thresholds_hash", fake_hash, raising=False)
+    monkeypatch.setattr(policy_utils, "_compute_thresholds_hash", fake_hash, raising=False)
 
-    evaluation_report = cert.make_report(report, baseline)
+    evaluation_report = make_report(report, baseline)
     assert evaluation_report["policy_digest"]["changed"] is True
 
 
@@ -459,11 +480,14 @@ def test_make_evaluation_report_copies_meta_environment_flags(monkeypatch):
     report["meta"]["cuda_flags"] = {"tf32": True}
 
     monkeypatch.setattr(
-        cert, "_normalize_and_validate_report", lambda value: value, raising=False
+        report_normalization,
+        "normalize_and_validate_run_report",
+        lambda value: value,
+        raising=False,
     )
-    monkeypatch.setattr(cert, "_normalize_baseline", lambda value: value, raising=False)
+    monkeypatch.setattr(report_normalization, "normalize_baseline", lambda value: value, raising=False)
 
-    evaluation_report = cert.make_report(report, baseline)
+    evaluation_report = make_report(report, baseline)
     meta = evaluation_report["meta"]
     assert meta["env_flags"]["tf32"] is False
     assert meta["tokenizer_hash"] == "tok-data"
@@ -477,11 +501,14 @@ def test_make_evaluation_report_uses_meta_tokenizer_hash(monkeypatch):
     report["meta"]["tokenizer_hash"] = "tok-meta"
 
     monkeypatch.setattr(
-        cert, "_normalize_and_validate_report", lambda value: value, raising=False
+        report_normalization,
+        "normalize_and_validate_run_report",
+        lambda value: value,
+        raising=False,
     )
-    monkeypatch.setattr(cert, "_normalize_baseline", lambda value: value, raising=False)
+    monkeypatch.setattr(report_normalization, "normalize_baseline", lambda value: value, raising=False)
 
-    evaluation_report = cert.make_report(report, baseline)
+    evaluation_report = make_report(report, baseline)
     assert evaluation_report["meta"]["tokenizer_hash"] == "tok-meta"
 
 
@@ -492,14 +519,17 @@ def test_make_evaluation_report_handles_missing_dataset_section(monkeypatch):
     report["data"] = None
 
     monkeypatch.setattr(
-        cert, "_normalize_and_validate_report", lambda value: value, raising=False
+        report_normalization,
+        "normalize_and_validate_run_report",
+        lambda value: value,
+        raising=False,
     )
-    monkeypatch.setattr(cert, "_normalize_baseline", lambda value: value, raising=False)
+    monkeypatch.setattr(report_normalization, "normalize_baseline", lambda value: value, raising=False)
     monkeypatch.setattr(
-        report_make_impl_mod,
+        dataset_hashing,
         "_extract_dataset_info",
         lambda *_: {"hash": {}, "windows": {}},
     )
 
-    evaluation_report = cert.make_report(report, baseline)
+    evaluation_report = make_report(report, baseline)
     assert "tokenizer_hash" not in evaluation_report["meta"]

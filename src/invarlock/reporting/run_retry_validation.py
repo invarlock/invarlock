@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_telemetry import (
     telemetry_output_enabled,
     telemetry_summary_line,

@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 
 
 def test_evaluation_report_ratio_ci_source_run_metrics_on_wrong_type_return():

@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_builder import (
-    _is_ppl_kind,
-    make_report,
-    validate_report,
-)
+from invarlock.reporting.report_make import _is_ppl_kind, make_report
+from invarlock.reporting.report_schema import validate_report
 from invarlock.reporting.report_types import RunReport, create_empty_report
 
 
@@ -168,7 +165,7 @@ def test_make_evaluation_report_marks_unstable_when_token_floor_violated(
     report["metrics"]["final_total_tokens"] = 10
 
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.get_tier_policies",
+        "invarlock.reporting.report_make.get_tier_policies",
         lambda: {"balanced": {"metrics": {"pm_ratio": {"min_tokens": 100}}}},
     )
     monkeypatch.setattr(

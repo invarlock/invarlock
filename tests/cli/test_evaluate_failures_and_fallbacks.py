@@ -14,6 +14,7 @@ import typer
 import yaml
 
 import invarlock.cli.commands.run as run_mod
+import invarlock.cli.run_execution as run_exec_mod
 import invarlock.core.evaluate_contract as evaluate_contract_mod
 from invarlock.cli.commands import evaluate as mod
 from tests.cli.support import RecordingConsole
@@ -664,17 +665,17 @@ def test_evaluate_helper_formatting_and_console_contexts(monkeypatch) -> None:
     with mod._suppress_child_output(False) as buffer:
         assert buffer is None
 
+    from invarlock.cli import run_execution as run_exec_mod_local
     from invarlock.cli.commands import report as report_mod
-    from invarlock.cli.commands import run as run_mod_local
 
     original_report_console = report_mod.console
-    original_run_console = run_mod_local.console
+    original_run_console = run_exec_mod_local.console
     with mod._suppress_child_output(True) as buffer:
         assert buffer is not None
         assert report_mod.console is not original_report_console
-        assert run_mod_local.console is not original_run_console
+        assert run_exec_mod_local.console is not original_run_console
     assert report_mod.console is original_report_console
-    assert run_mod_local.console is original_run_console
+    assert run_exec_mod_local.console is original_run_console
 
 
 def test_evaluate_quiet_summary_variants(tmp_path: Path, monkeypatch) -> None:
@@ -718,7 +719,7 @@ def test_evaluate_quiet_summary_variants(tmp_path: Path, monkeypatch) -> None:
     )
     console.calls.clear()
     monkeypatch.setattr(
-        "invarlock.reporting.render.compute_console_validation_block",
+        "invarlock.reporting.report_console.compute_console_validation_block",
         lambda _report: (_ for _ in ()).throw(RuntimeError("boom")),
         raising=False,
     )
@@ -768,7 +769,7 @@ def test_evaluate_yaml_tmp_dir_and_successful_quiet_summary(
         json.dumps({"primary_metric": {"ratio_vs_baseline": 0.99}}), encoding="utf-8"
     )
     monkeypatch.setattr(
-        "invarlock.reporting.render.compute_console_validation_block",
+        "invarlock.reporting.report_console.compute_console_validation_block",
         lambda _report: {
             "rows": [{"ok": True}, {"ok": False}],
             "overall_pass": True,
@@ -1315,7 +1316,7 @@ def test_evaluate_quiet_summary_skips_primary_metric_line_when_ratio_missing(
     _write_json(report_out / "evaluation.report.json", {"primary_metric": {}})
 
     monkeypatch.setattr(
-        "invarlock.reporting.render.compute_console_validation_block",
+        "invarlock.reporting.report_console.compute_console_validation_block",
         lambda _report: {"rows": [], "overall_pass": False},
         raising=False,
     )
@@ -1537,7 +1538,7 @@ def test_evaluate_quiet_mode_replays_baseline_child_output_on_failure(
 
     def failing_run(**kwargs):
         if Path(kwargs["out"]).name == "source":
-            run_mod.console.print("baseline child output", markup=False)
+            run_exec_mod.console.print("baseline child output", markup=False)
             raise RuntimeError("baseline boom")
 
     monkeypatch.setattr(
@@ -1575,7 +1576,7 @@ def test_evaluate_quiet_mode_replays_edit_config_child_output_on_failure(
         if Path(kwargs["out"]).name == "source":
             return str(baseline_report)
         if Path(kwargs["out"]).name == "edited":
-            run_mod.console.print("edited child output", markup=False)
+            run_exec_mod.console.print("edited child output", markup=False)
             raise RuntimeError("edited boom")
 
     monkeypatch.setattr(
@@ -1609,7 +1610,7 @@ def test_evaluate_quiet_mode_replays_noop_subject_output_on_failure(
         if Path(kwargs["out"]).name == "source":
             return str(baseline_report)
         if Path(kwargs["out"]).name == "edited":
-            run_mod.console.print("noop subject output", markup=False)
+            run_exec_mod.console.print("noop subject output", markup=False)
             raise RuntimeError("subject boom")
 
     monkeypatch.setattr(
@@ -1785,7 +1786,7 @@ def test_evaluate_non_quiet_edit_config_failure_does_not_replay_buffer(
         out_name = Path(kwargs["out"]).name
         if out_name == "source":
             return str(baseline_report)
-        run_mod.console.print("edited child output", markup=False)
+        run_exec_mod.console.print("edited child output", markup=False)
         raise RuntimeError("edited boom")
 
     monkeypatch.setattr(

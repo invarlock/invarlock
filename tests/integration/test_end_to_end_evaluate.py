@@ -25,15 +25,13 @@ def test_small_workflow_configs_present() -> None:
         assert cfg_path.exists(), f"Expected config {primary} (or fallback) to exist"
 
         config = load_config(str(cfg_path))
-        model_section = getattr(config, "model", None)
-        if model_section is not None:
-            assert isinstance(model_section.id, str) and len(model_section.id) > 0
-        dataset_section = getattr(config, "dataset", None)
-        if dataset_section is not None:
-            assert dataset_section.provider == "wikitext2"
+        if "model" in config:
+            assert isinstance(config.model.id, str) and len(config.model.id) > 0
+        if "dataset" in config:
+            assert config.dataset.provider == "wikitext2"
         # For edit configs, verify an edit is specified; task presets may omit edit.
-        if subdir.startswith("edits"):
-            assert getattr(config.edit, "name", None)
+        if subdir.startswith("edits") and "edit" in config:
+            assert config.edit.name
         # Presets carry tier context via profile; auto tier may not be set at top-level
 
 

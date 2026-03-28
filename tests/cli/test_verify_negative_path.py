@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from invarlock.cli.commands.verify import verify_command
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 
 
 def _mk_basic_reports() -> tuple[dict, dict]:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting import report_builder as C
+from invarlock.reporting import report_make as C
 
 
 def test_confidence_label_accuracy_threshold_override():

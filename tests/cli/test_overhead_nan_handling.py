@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from invarlock.cli.commands.run import _normalize_overhead_result as _norm
+from invarlock.core.run_guard_overhead_policy import (
+    normalize_guard_overhead_result as _norm,
+)
 
 
 def test_overhead_nan_marks_not_evaluated_and_passes() -> None:

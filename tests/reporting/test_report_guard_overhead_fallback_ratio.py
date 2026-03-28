@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting import report_builder as C
+from invarlock.reporting import report_overhead as report_overhead_mod
 
 
 def test_prepare_guard_overhead_section_direct_ratio_and_lists() -> None:
@@ -12,7 +12,7 @@ def test_prepare_guard_overhead_section_direct_ratio_and_lists() -> None:
         "warnings": ["warn"],
         "errors": [],
     }
-    sanitized, passed = C._prepare_guard_overhead_section(raw)
+    sanitized, passed = report_overhead_mod.prepare_guard_overhead_section(raw)
     assert isinstance(sanitized, dict)
     assert 0.01 < sanitized["overhead_threshold"] < 0.03
     assert "overhead_ratio" in sanitized and "overhead_percent" in sanitized

@@ -6,11 +6,18 @@ from copy import deepcopy
 
 import pytest
 
-from invarlock.reporting import primary_metric_utils
-from invarlock.reporting import report_builder as cert_mod
-from invarlock.reporting import report_make_impl as report_make_impl_mod
+from invarlock.reporting import (
+    policy_utils,
+    primary_metric_utils,
+    report_normalization,
+    report_overhead,
+    report_validation,
+)
+from invarlock.reporting import report_make as cert_mod
 from invarlock.reporting import report_schema as cert_schema_mod
-from invarlock.reporting.report_builder import make_report, validate_report
+from invarlock.reporting import utils as report_utils
+from invarlock.reporting.report_make import make_report
+from invarlock.reporting.report_schema import validate_report
 from invarlock.reporting.report_types import create_empty_report
 
 
@@ -137,7 +144,10 @@ def test_make_evaluation_report_synthesizes_display_ci_from_ratio_or_defaults(
 
     # Ensure our test payload survives normalization and triggers the local fallback block.
     monkeypatch.setattr(
-        cert_mod, "_normalize_and_validate_report", lambda r: r, raising=False
+        report_normalization,
+        "normalize_and_validate_run_report",
+        lambda r: r,
+        raising=False,
     )
     monkeypatch.setattr(primary_metric_utils, "attach_primary_metric", attach_stub)
 
@@ -338,9 +348,9 @@ def test_propagate_pairing_stats_early_returns() -> None:
 
 
 def test_normalize_override_entry_variants() -> None:
-    assert cert_mod._normalize_override_entry(None) == []
-    assert cert_mod._normalize_override_entry("a.yaml") == ["a.yaml"]
-    assert cert_mod._normalize_override_entry(["a.yaml", None, 5]) == ["a.yaml", "5"]
+    assert policy_utils._normalize_override_entry(None) == []
+    assert policy_utils._normalize_override_entry("a.yaml") == ["a.yaml"]
+    assert policy_utils._normalize_override_entry(["a.yaml", None, 5]) == ["a.yaml", "5"]
 
 
 def test_normalize_baseline_derives_ppl_from_primary_metric() -> None:
@@ -356,21 +366,21 @@ def test_normalize_baseline_derives_ppl_from_primary_metric() -> None:
         },
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [1.0]}},
     }
-    out = cert_mod._normalize_baseline(baseline)
+    out = report_normalization.normalize_baseline(baseline)
     assert out.get("ppl_final") == 10.0
     assert out.get("ppl_preview") == 9.0
 
 
 def test_prepare_guard_overhead_section_keeps_skip_reason() -> None:
     payload = {"skipped": True, "skip_reason": " because ", "overhead_threshold": 0.01}
-    out, ok = cert_mod._prepare_guard_overhead_section(payload)
+    out, ok = report_overhead.prepare_guard_overhead_section(payload)
     assert ok is True
     assert out.get("skip_reason") == "because"
 
 
 def test_compute_validation_flags_acceptance_bounds_and_accuracy_tiny_relax() -> None:
     # Acceptance bounds (min/max) parsing and PM ratio fallback.
-    flags = cert_mod._compute_validation_flags(
+    flags = report_validation.compute_validation_flags(
         ppl={"preview_final_ratio": 1.0, "ratio_vs_baseline": float("nan")},
         spectral={},
         rmt={},
@@ -382,7 +392,7 @@ def test_compute_validation_flags_acceptance_bounds_and_accuracy_tiny_relax() ->
     assert flags.get("primary_metric_acceptable") in {True, False}
 
     # Tiny-relax accuracy branch: accept missing delta and small n.
-    flags2 = cert_mod._compute_validation_flags(
+    flags2 = report_validation.compute_validation_flags(
         ppl={"preview_final_ratio": 1.0, "ratio_vs_baseline": 0.0},
         spectral={},
         rmt={},
@@ -425,7 +435,9 @@ def test_make_evaluation_report_ratio_ci_fallback_skips_non_interval(
         "invarlock.core.bootstrap.compute_paired_delta_log_ci",
         lambda *_a, **_k: (-0.01, 0.01),
     )
-    monkeypatch.setattr(report_make_impl_mod, "_coerce_interval", lambda _v: (0.0,))  # type: ignore[assignment]
+    monkeypatch.setattr(
+        report_utils, "_coerce_interval", lambda _v: (0.0,)
+    )  # type: ignore[assignment]
 
     baseline = _mk_baseline()
     report = create_empty_report()

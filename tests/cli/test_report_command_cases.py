@@ -10,6 +10,7 @@ from typer.testing import CliRunner
 
 from invarlock.cli.app import app
 from invarlock.cli.commands import report as report_mod
+from invarlock.reporting import report_console as console_mod
 from invarlock.reporting.report_contract import ReportGenerationResult, generate_reports
 
 
@@ -83,11 +84,14 @@ def test_report_command_normalizes_md_and_handles_sparse_primary_metric(
         ),
         patch(
             "invarlock.reporting.report_contract.save_report",
-            return_value={"report": str(tmp_path / "report.json")},
+            return_value={"markdown": str(tmp_path / "report.md")},
         ) as save_report,
-        patch.object(
-            report_mod.report_builder,
-            "make_report",
+        patch(
+            "invarlock.reporting.report_contract.save_evaluation_bundle",
+            return_value={"report": tmp_path / "report.json"},
+        ) as save_bundle,
+        patch(
+            "invarlock.reporting.report_contract.make_report",
             return_value={
                 "schema_version": "1",
                 "primary_metric": {
@@ -99,7 +103,7 @@ def test_report_command_normalizes_md_and_handles_sparse_primary_metric(
                 },
             },
         ),
-        patch.object(report_mod.report_builder, "validate_report"),
+        patch("invarlock.reporting.report_contract.validate_report"),
         patch(
             "invarlock.reporting.report_contract.compute_console_validation_block",
             render_mod.compute_console_validation_block,
@@ -117,10 +121,8 @@ def test_report_command_normalizes_md_and_handles_sparse_primary_metric(
             output=str(tmp_path / "out-md"),
         )
 
-    first_formats = save_report.call_args_list[0].kwargs["formats"]
-    second_formats = save_report.call_args_list[1].kwargs["formats"]
-    assert first_formats == ["report"]
-    assert second_formats == ["markdown"]
+    assert save_bundle.call_count == 1
+    assert save_report.call_args_list[0].kwargs["formats"] == ["markdown"]
 
 
 def test_report_command_generic_failure_maps_to_exit_one(monkeypatch) -> None:
@@ -163,13 +165,6 @@ def test_report_command_summary_prints_metadata_and_primary_metric_fields(
         def print(self, *args: object, **kwargs: object) -> None:
             captured.append(" ".join(str(arg) for arg in args))
 
-    render_mod = types.SimpleNamespace(
-        compute_console_validation_block=lambda _report: {
-            "overall_pass": True,
-            "rows": [],
-        }
-    )
-
     result = ReportGenerationResult(
         output_dir=str(tmp_path / "out"),
         formats=["report"],
@@ -188,7 +183,7 @@ def test_report_command_summary_prints_metadata_and_primary_metric_fields(
                 "display_ci": [1.25, 1.75],
             },
         },
-        validation_block=render_mod.compute_console_validation_block({}),
+        validation_block=console_mod.compute_console_validation_block({}),
     )
     with patch.object(report_mod, "console", _CaptureConsole()):
         report_mod._render_generation_result(

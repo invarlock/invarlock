@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 
 
 def test_accuracy_hysteresis_applied_and_pm_ok() -> None:

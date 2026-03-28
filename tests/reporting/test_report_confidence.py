@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import invarlock.reporting.report_builder as cert
+import invarlock.reporting.report_make as cert
 from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 
 
 def _mk_report(ratio: float = 1.00, reps: int | None = None) -> dict:

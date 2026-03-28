@@ -1,4 +1,4 @@
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 
 
 def test_cert_provenance_records_tiny_relax():

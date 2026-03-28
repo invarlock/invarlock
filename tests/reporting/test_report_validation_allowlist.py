@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from invarlock.reporting import report_builder as cert
+from invarlock.reporting import report_make as cert
 
 
 def test_load_validation_allowlist_returns_default_when_missing(monkeypatch):

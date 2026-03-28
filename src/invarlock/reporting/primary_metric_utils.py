@@ -16,7 +16,7 @@ def attach_primary_metric(
 ) -> None:
     """Attach/normalize the primary_metric block on the evaluation report.
 
-    Behavior mirrors historical logic in report_builder.py and preserves structure:
+    Behavior matches the canonical evaluation-report assembly contract and preserves structure:
     - Prefer explicit metrics.primary_metric if present
     - Compute missing ratio_vs_baseline, degenerate display_ci
     - ppl window-based analysis info (mean logloss) added when available

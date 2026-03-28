@@ -130,6 +130,7 @@ def _suppress_child_output(enabled: bool) -> Iterator[io.StringIO | None]:
     if not enabled:
         yield None
         return
+    from .. import run_execution as run_exec_mod
     from . import report as report_mod
     from . import run as run_mod
 
@@ -137,6 +138,7 @@ def _suppress_child_output(enabled: bool) -> Iterator[io.StringIO | None]:
     quiet_console = Console(file=buffer, force_terminal=False, color_system=None)
     with (
         _override_console(run_mod, quiet_console),
+        _override_console(run_exec_mod, quiet_console),
         _override_console(report_mod, quiet_console),
     ):
         yield buffer
@@ -165,7 +167,7 @@ def _print_quiet_summary(
         console.print(f"Output: {report_path}")
         return
     try:
-        from invarlock.reporting.render import (
+        from invarlock.reporting.report_console import (
             compute_console_validation_block as _console_block,
         )
 

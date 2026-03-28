@@ -14,8 +14,6 @@ from datetime import datetime
 from typing import Any, cast
 
 from .normalizer import normalize_run_report
-from .render import render_report_markdown
-from .report_builder import make_report
 from .report_types import RunReport, validate_report
 
 
@@ -42,6 +40,22 @@ def to_json(report: RunReport, indent: int = 2) -> str:
     return json.dumps(json_data, indent=indent, ensure_ascii=False)
 
 
+def _coerce_run_reports(
+    report: RunReport | dict[str, Any],
+    compare: RunReport | dict[str, Any] | None = None,
+) -> tuple[RunReport, RunReport | None]:
+    # Normalize external dicts to canonical RunReport values before rendering.
+    rp: RunReport = normalize_run_report(report) if isinstance(report, dict) else report
+    cmp: RunReport | None = (
+        normalize_run_report(compare) if isinstance(compare, dict) else compare
+    )
+    if not validate_report(rp):
+        raise ValueError("Invalid primary RunReport structure")
+    if cmp and not validate_report(cmp):
+        raise ValueError("Invalid comparison RunReport structure")
+    return rp, cmp
+
+
 def to_markdown(
     report: RunReport | dict[str, Any],
     compare: RunReport | dict[str, Any] | None = None,
@@ -58,16 +72,7 @@ def to_markdown(
     Returns:
         Formatted Markdown string
     """
-    # Normalize external dicts to canonical RunReport
-    rp: RunReport = normalize_run_report(report) if isinstance(report, dict) else report
-    cmp: RunReport | None = (
-        normalize_run_report(compare) if isinstance(compare, dict) else compare
-    )
-
-    if not validate_report(rp):
-        raise ValueError("Invalid primary RunReport structure")
-    if cmp and not validate_report(cmp):
-        raise ValueError("Invalid comparison RunReport structure")
+    rp, cmp = _coerce_run_reports(report, compare)
 
     lines = []
 
@@ -109,14 +114,7 @@ def to_html(
     Returns:
         Formatted HTML string
     """
-    rp: RunReport = normalize_run_report(report) if isinstance(report, dict) else report
-    cmp: RunReport | None = (
-        normalize_run_report(compare) if isinstance(compare, dict) else compare
-    )
-    if not validate_report(rp):
-        raise ValueError("Invalid primary RunReport structure")
-    if cmp and not validate_report(cmp):
-        raise ValueError("Invalid comparison RunReport structure")
+    rp, cmp = _coerce_run_reports(report, compare)
 
     html_title = html.escape(
         title
@@ -153,76 +151,6 @@ def to_html(
     html_parts.extend(["    </div>", "</body>", "</html>"])
 
     return "\n".join(html_parts)
-
-
-def to_evaluation_report(
-    report: RunReport, baseline: RunReport, format: str = "json"
-) -> str:
-    """
-    Convert RunReport to evaluation report format.
-
-    Args:
-        report: Primary RunReport to evaluate
-        baseline: Baseline RunReport for comparison
-        format: Output format ("json" or "markdown")
-
-    Returns:
-        Formatted evaluation report string
-    """
-    if not validate_report(report):
-        raise ValueError("Invalid primary RunReport structure")
-
-    if not _validate_baseline_or_report(baseline):
-        raise ValueError("Invalid baseline RunReport structure")
-
-    evaluation_report = make_report(report, baseline)
-
-    if format == "json":
-        return json.dumps(evaluation_report, indent=2, ensure_ascii=False)
-    elif format == "markdown":
-        return render_report_markdown(evaluation_report)
-    else:
-        raise ValueError(f"Unsupported evaluation report format: {format}")
-
-
-# ── Private helper functions ──────────────────────────────────────────────
-
-
-def _validate_baseline_or_report(baseline: RunReport | dict[str, Any]) -> bool:
-    """
-    Validate that a baseline is either a valid RunReport or a valid baseline format.
-
-    Args:
-        baseline: Baseline data to validate
-
-    Returns:
-        True if valid, False otherwise
-    """
-    # First try to validate as a RunReport
-    if isinstance(baseline, dict) and validate_report(cast(RunReport, baseline)):
-        return True
-
-    # If not a RunReport, check if it's a valid baseline format
-    try:
-        # Check for baseline schema (v1 only)
-        if isinstance(baseline, dict):
-            schema_version = baseline.get("schema_version")
-            if schema_version in ["baseline-v1"]:
-                # Validate required baseline fields
-                required_keys = {"meta", "metrics"}
-                if all(key in baseline for key in required_keys):
-                    # Baseline must include primary_metric with at least a final value
-                    metrics = baseline.get("metrics", {})
-                    pm = (
-                        metrics.get("primary_metric")
-                        if isinstance(metrics, dict)
-                        else None
-                    )
-                    if isinstance(pm, dict) and (pm.get("final") is not None):
-                        return True
-        return False
-    except (KeyError, TypeError):
-        return False
 
 
 def _sanitize_for_json(obj: Any) -> Any:
@@ -771,5 +699,4 @@ __all__ = [
     "to_json",
     "to_markdown",
     "to_html",
-    "to_evaluation_report",
 ]

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from invarlock.reporting import report_builder as C
-from invarlock.reporting.render import compute_console_validation_block
+from invarlock.reporting import report_schema as schema_mod
+from invarlock.reporting.report_console import compute_console_validation_block
 
 
 def test_compute_console_validation_block_guard_omitted_and_included():
@@ -41,9 +41,9 @@ def test_compute_console_validation_block_guard_omitted_and_included():
 
 def test_validate_evaluation_report_fallback_and_flag_types(monkeypatch):
     # Force JSON schema validator to fail to exercise fallback path
-    monkeypatch.setattr(C, "_validate_with_jsonschema", lambda c: False)
+    monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda c: False)
     good = {
-        "schema_version": C.REPORT_SCHEMA_VERSION,
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
         "run_id": "r1",
         "primary_metric": {"kind": "ppl_causal", "final": 10.0},
         "validation": {
@@ -51,10 +51,10 @@ def test_validate_evaluation_report_fallback_and_flag_types(monkeypatch):
             "preview_final_drift_acceptable": True,
         },
     }
-    assert C.validate_report(good) is True
+    assert schema_mod.validate_report(good) is True
 
     bad = {
         **good,
         "validation": {"primary_metric_acceptable": "not-bool"},
     }
-    assert C.validate_report(bad) is False
+    assert schema_mod.validate_report(bad) is False

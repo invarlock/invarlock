@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from invarlock.reporting.report_files import save_report
+from invarlock.reporting.report_bundle import save_evaluation_bundle
+from invarlock.reporting.report_make import make_report
 
 
 def _report_and_base():
@@ -62,8 +63,10 @@ def _report_and_base():
 
 def test_save_report_without_evidence(tmp_path: Path):
     rep, base = _report_and_base()
-    out = save_report(
-        rep, tmp_path, formats=["report"], baseline=base, filename_prefix="r"
+    out = save_evaluation_bundle(
+        run_report=rep,
+        output_dir=tmp_path,
+        evaluation_report=make_report(rep, base),
     )
     assert out["report"].exists() and out["report_md"].exists()
     # No debug env flag → evidence file is optional and typically absent

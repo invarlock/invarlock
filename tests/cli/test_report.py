@@ -81,12 +81,12 @@ def test_report_command_evaluation_report_no_baseline(mock_load):
         )
 
 
-@patch("invarlock.reporting.report_contract.save_report")
+@patch("invarlock.reporting.report_contract.save_evaluation_bundle")
 @patch("invarlock.reporting.report_contract.load_report_payload")
-@patch("invarlock.reporting.report_builder.make_report")
-@patch("invarlock.reporting.report_builder.validate_report")
+@patch("invarlock.reporting.report_contract.make_report")
+@patch("invarlock.reporting.report_contract.validate_report")
 def test_report_command_evaluation_report_with_baseline(
-    mock_validate, mock_cert, mock_load, mock_save
+    mock_validate, mock_cert, mock_load, mock_save_bundle
 ):
     run = {
         "meta": {"model_id": "gpt2"},
@@ -103,7 +103,7 @@ def test_report_command_evaluation_report_with_baseline(
         return baseline if "baseline" in path else run
 
     mock_load.side_effect = side
-    mock_save.return_value = {"report": "evaluation.report.json"}
+    mock_save_bundle.return_value = {"report": "evaluation.report.json"}
     mock_cert.return_value = {"validation": {"safety_check": True}}
     mock_validate.return_value = True
 

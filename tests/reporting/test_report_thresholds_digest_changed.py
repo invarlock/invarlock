@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 
 
 def _mk_pm_report(*, ratio: float = 1.0, pm_final: float = 10.0) -> dict:

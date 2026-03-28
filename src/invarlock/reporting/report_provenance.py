@@ -1,4 +1,4 @@
-"""Provenance-assembly helpers extracted from report_builder."""
+"""Provenance assembly helpers for evaluation report generation."""
 
 from __future__ import annotations
 

@@ -6,7 +6,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from invarlock.reporting import report_builder as cert
+from invarlock.reporting import report_edit_summary as report_edit_summary_mod
+from invarlock.reporting import report_make as cert
+from invarlock.reporting import report_normalization as normalization_mod
+from invarlock.reporting import report_overhead as overhead_mod
+from invarlock.reporting import report_provenance as provenance_mod
+from invarlock.reporting import report_schema as schema_mod
+from invarlock.reporting import report_validation as validation_mod
 
 
 def test_enforce_drift_ratio_identity_raises_for_ci_profile():
@@ -245,7 +251,7 @@ def test_prepare_guard_overhead_section_ratio_threshold():
         "checks": {"ratio": True},
         "overhead_threshold": 0.01,
     }
-    sanitized, passed = cert._prepare_guard_overhead_section(payload)
+    sanitized, passed = overhead_mod.prepare_guard_overhead_section(payload)
     assert sanitized["evaluated"] is True
     assert sanitized["overhead_ratio"] == pytest.approx(1.05)
     assert passed is False  # ratio above 1% threshold should fail
@@ -254,7 +260,7 @@ def test_prepare_guard_overhead_section_ratio_threshold():
 
 
 def test_prepare_guard_overhead_section_soft_pass_when_ratio_missing():
-    sanitized, passed = cert._prepare_guard_overhead_section({"messages": ["x"]})
+    sanitized, passed = overhead_mod.prepare_guard_overhead_section({"messages": ["x"]})
     assert sanitized["evaluated"] is False
     assert sanitized["passed"] is True
     assert "Guard overhead ratio unavailable" in sanitized["errors"][0]
@@ -265,19 +271,14 @@ def test_compute_quality_overhead_ratio_basis(monkeypatch):
     guarded = {"metrics": {"primary_metric": {"final": 11.0}}}
     raw = {"bare_report": bare, "guarded_report": guarded}
 
-    monkeypatch.setattr(
-        cert,
-        "compute_primary_metric_from_report",
-        lambda report, kind=None: report["metrics"]["primary_metric"],
+    result = overhead_mod.compute_quality_overhead_from_guard(
+        raw,
+        "ppl_causal",
+        compute_primary_metric_from_report_fn=lambda report, kind=None: report[
+            "metrics"
+        ]["primary_metric"],
+        get_metric_fn=lambda kind: SimpleNamespace(direction="lower"),
     )
-    monkeypatch.setattr(
-        cert,
-        "get_metric",
-        lambda kind: SimpleNamespace(direction="lower"),
-        raising=False,
-    )
-
-    result = cert._compute_quality_overhead_from_guard(raw, "ppl_causal")
     assert result == {
         "basis": "ratio",
         "value": pytest.approx(1.1),
@@ -290,19 +291,14 @@ def test_compute_quality_overhead_accuracy_delta(monkeypatch):
     guarded = {"metrics": {"primary_metric": {"final": 0.8}}}
     raw = {"bare_report": bare, "guarded_report": guarded}
 
-    monkeypatch.setattr(
-        cert,
-        "compute_primary_metric_from_report",
-        lambda report, kind=None: report["metrics"]["primary_metric"],
+    result = overhead_mod.compute_quality_overhead_from_guard(
+        raw,
+        "accuracy",
+        compute_primary_metric_from_report_fn=lambda report, kind=None: report[
+            "metrics"
+        ]["primary_metric"],
+        get_metric_fn=lambda kind: SimpleNamespace(direction="higher"),
     )
-    monkeypatch.setattr(
-        cert,
-        "get_metric",
-        lambda kind: SimpleNamespace(direction="higher"),
-        raising=False,
-    )
-
-    result = cert._compute_quality_overhead_from_guard(raw, "accuracy")
     assert result["basis"] == "delta_pp"
     assert result["kind"] == "accuracy"
     assert result["value"] == pytest.approx(10.0)  # (0.8-0.7)*100
@@ -350,9 +346,6 @@ def test_compute_validation_flags_accuracy_hysteresis(monkeypatch):
             "spectral": {"max_caps": 3},
         }
     }
-    monkeypatch.setattr(
-        cert, "get_tier_policies", lambda *_a, **_k: dict(fake_policies)
-    )
     monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
 
     ppl = {
@@ -368,7 +361,7 @@ def test_compute_validation_flags_accuracy_hysteresis(monkeypatch):
     dataset_capacity = {"examples_available": 40}
     ppl_metrics = {"preview_total_tokens": 60, "final_total_tokens": 60}
 
-    flags = cert._compute_validation_flags(
+    flags = validation_mod.compute_validation_flags(
         ppl,
         spectral,
         rmt,
@@ -378,6 +371,7 @@ def test_compute_validation_flags_accuracy_hysteresis(monkeypatch):
         guard_overhead=guard_overhead,
         primary_metric=primary_metric,
         dataset_capacity=dataset_capacity,
+        get_tier_policies_fn=lambda: dict(fake_policies),
     )
 
     assert flags["preview_final_drift_acceptable"] is True
@@ -404,12 +398,9 @@ def test_compute_validation_flags_core_gates_ppl_and_tail_fail(monkeypatch):
             "spectral": {"max_caps": 1},
         }
     }
-    monkeypatch.setattr(
-        cert, "get_tier_policies", lambda *_a, **_k: dict(fake_policies)
-    )
     monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
 
-    flags = cert._compute_validation_flags(
+    flags = validation_mod.compute_validation_flags(
         {
             "preview_final_ratio": 1.20,  # out of [0.95, 1.05]
             "ratio_vs_baseline": 1.25,  # > ratio limit
@@ -421,6 +412,7 @@ def test_compute_validation_flags_core_gates_ppl_and_tail_fail(monkeypatch):
         tier="balanced",
         guard_overhead={"overhead_ratio": 1.20, "overhead_threshold": 0.0},
         pm_tail={"mode": "fail", "evaluated": True, "passed": False},
+        get_tier_policies_fn=lambda: dict(fake_policies),
     )
 
     assert flags["preview_final_drift_acceptable"] is False
@@ -451,12 +443,8 @@ def test_compute_validation_flags_tiny_relax_allows_unevaluated_overhead(monkeyp
             "spectral": {"max_caps": 5},
         }
     }
-    monkeypatch.setattr(
-        cert, "get_tier_policies", lambda *_a, **_k: dict(fake_policies)
-    )
-
     guard_overhead = {"passed": False, "evaluated": False, "errors": ["missing"]}
-    flags = cert._compute_validation_flags(
+    flags = validation_mod.compute_validation_flags(
         {"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.0},
         {"caps_applied": 0},
         {"stable": True},
@@ -467,6 +455,7 @@ def test_compute_validation_flags_tiny_relax_allows_unevaluated_overhead(monkeyp
         _ppl_metrics={"preview_total_tokens": 0, "final_total_tokens": 0},
         dataset_capacity={"tokens_available": 0},
         tiny_relax=True,
+        get_tier_policies_fn=lambda: dict(fake_policies),
     )
 
     assert flags["guard_overhead_acceptable"] is True
@@ -523,7 +512,7 @@ def test_normalize_baseline_handles_schema_v1():
         "rmt_base": {"stable": True},
         "invariants": {"status": "ok"},
     }
-    normalized = cert._normalize_baseline(baseline)
+    normalized = normalization_mod.normalize_baseline(baseline)
     assert normalized["run_id"] == "abcdef1234567890"
     assert normalized["ppl_final"] == 42.0
     assert normalized["spectral"] == {"caps": 1}
@@ -546,7 +535,7 @@ def test_normalize_baseline_infers_primary_metric():
         },
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.2]}},
     }
-    normalized = cert._normalize_baseline(baseline)
+    normalized = normalization_mod.normalize_baseline(baseline)
     assert normalized["ppl_final"] == 10.0
     assert normalized["ppl_preview"] == 9.0
     assert normalized["evaluation_windows"]["final"]["logloss"] == [0.2]
@@ -565,7 +554,7 @@ def test_normalize_baseline_raises_on_invalid():
         },
     }
     with pytest.raises(ValueError, match="Invalid baseline"):
-        cert._normalize_baseline(baseline)
+        normalization_mod.normalize_baseline(baseline)
 
 
 def test_compute_validation_flags_guard_overhead_ratio_failure(monkeypatch):
@@ -588,12 +577,8 @@ def test_compute_validation_flags_guard_overhead_ratio_failure(monkeypatch):
             "spectral": {"max_caps": 3},
         }
     }
-    monkeypatch.setattr(
-        cert, "get_tier_policies", lambda *_a, **_k: dict(fake_policies)
-    )
-
     guard_overhead = {"overhead_ratio": 1.05, "overhead_threshold": 0.01}
-    flags = cert._compute_validation_flags(
+    flags = validation_mod.compute_validation_flags(
         {"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.0},
         {"caps_applied": 0},
         {"stable": True},
@@ -603,6 +588,7 @@ def test_compute_validation_flags_guard_overhead_ratio_failure(monkeypatch):
         primary_metric={"kind": "ppl_causal", "ratio_vs_baseline": 1.0},
         _ppl_metrics={"preview_total_tokens": 10, "final_total_tokens": 10},
         dataset_capacity={"tokens_available": 20},
+        get_tier_policies_fn=lambda: dict(fake_policies),
     )
 
     assert flags["guard_overhead_acceptable"] is False
@@ -629,12 +615,8 @@ def test_compute_validation_flags_guard_overhead_ratio_passes_with_tiny_relax(
             "spectral": {"max_caps": 3},
         }
     }
-    monkeypatch.setattr(
-        cert, "get_tier_policies", lambda *_a, **_k: dict(fake_policies)
-    )
-
     guard_overhead = {"overhead_ratio": 1.05, "overhead_threshold": 0.01}
-    flags = cert._compute_validation_flags(
+    flags = validation_mod.compute_validation_flags(
         {"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.2},
         {"caps_applied": 0},
         {"stable": True},
@@ -645,6 +627,7 @@ def test_compute_validation_flags_guard_overhead_ratio_passes_with_tiny_relax(
         _ppl_metrics={"preview_total_tokens": 0, "final_total_tokens": 0},
         dataset_capacity={"tokens_available": 0},
         tiny_relax=True,
+        get_tier_policies_fn=lambda: dict(fake_policies),
     )
 
     assert flags["guard_overhead_acceptable"] is True
@@ -670,12 +653,8 @@ def test_compute_validation_flags_guard_overhead_passes_when_ratio_missing(monke
             "spectral": {"max_caps": 3},
         }
     }
-    monkeypatch.setattr(
-        cert, "get_tier_policies", lambda *_a, **_k: dict(fake_policies)
-    )
-
     guard_overhead = {"overhead_threshold": 0.01}
-    flags = cert._compute_validation_flags(
+    flags = validation_mod.compute_validation_flags(
         {"preview_final_ratio": 1.0, "ratio_vs_baseline": 0.9},
         {"caps_applied": 0},
         {"stable": True},
@@ -685,6 +664,7 @@ def test_compute_validation_flags_guard_overhead_passes_when_ratio_missing(monke
         primary_metric={"kind": "ppl_causal", "ratio_vs_baseline": 0.9},
         _ppl_metrics={"preview_total_tokens": 10, "final_total_tokens": 10},
         dataset_capacity={"tokens_available": 20},
+        get_tier_policies_fn=lambda: dict(fake_policies),
     )
 
     assert flags["guard_overhead_acceptable"] is True
@@ -709,13 +689,10 @@ def test_compute_validation_flags_accuracy_fails_low_examples(monkeypatch):
             "spectral": {"max_caps": 3},
         }
     }
-    monkeypatch.setattr(
-        cert, "get_tier_policies", lambda *_a, **_k: dict(fake_policies)
-    )
     monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
 
     primary_metric = {"kind": "accuracy", "ratio_vs_baseline": -0.1, "n_final": 50}
-    flags = cert._compute_validation_flags(
+    flags = validation_mod.compute_validation_flags(
         {"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.0},
         {"caps_applied": 0},
         {"stable": True},
@@ -725,6 +702,7 @@ def test_compute_validation_flags_accuracy_fails_low_examples(monkeypatch):
         primary_metric=primary_metric,
         _ppl_metrics={"preview_total_tokens": 10, "final_total_tokens": 10},
         dataset_capacity={"tokens_available": 20},
+        get_tier_policies_fn=lambda: dict(fake_policies),
     )
 
     assert flags["primary_metric_acceptable"] is False
@@ -749,14 +727,11 @@ def test_compute_validation_flags_accuracy_respects_dataset_fraction_floor(monke
             "spectral": {"max_caps": 3},
         }
     }
-    monkeypatch.setattr(
-        cert, "get_tier_policies", lambda *_a, **_k: dict(fake_policies)
-    )
     monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
 
     primary_metric = {"kind": "accuracy", "ratio_vs_baseline": -0.3, "n_final": 15}
     dataset_capacity = {"examples_available": 80}
-    flags = cert._compute_validation_flags(
+    flags = validation_mod.compute_validation_flags(
         {"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.0},
         {"caps_applied": 0},
         {"stable": True},
@@ -766,6 +741,7 @@ def test_compute_validation_flags_accuracy_respects_dataset_fraction_floor(monke
         primary_metric=primary_metric,
         _ppl_metrics={"preview_total_tokens": 10, "final_total_tokens": 10},
         dataset_capacity=dataset_capacity,
+        get_tier_policies_fn=lambda: dict(fake_policies),
     )
 
     assert flags["primary_metric_acceptable"] is False
@@ -790,13 +766,10 @@ def test_compute_validation_flags_accuracy_passes_with_hysteresis(monkeypatch):
             "spectral": {"max_caps": 3},
         }
     }
-    monkeypatch.setattr(
-        cert, "get_tier_policies", lambda *_a, **_k: dict(fake_policies)
-    )
     monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
 
     primary_metric = {"kind": "accuracy", "ratio_vs_baseline": -1.2, "n_final": 80}
-    flags = cert._compute_validation_flags(
+    flags = validation_mod.compute_validation_flags(
         {"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.0},
         {"caps_applied": 0},
         {"stable": True},
@@ -806,6 +779,7 @@ def test_compute_validation_flags_accuracy_passes_with_hysteresis(monkeypatch):
         primary_metric=primary_metric,
         _ppl_metrics={"preview_total_tokens": 10, "final_total_tokens": 10},
         dataset_capacity={"examples_available": 200},
+        get_tier_policies_fn=lambda: dict(fake_policies),
     )
 
     assert flags["primary_metric_acceptable"] is True
@@ -821,14 +795,14 @@ def test_validate_evaluation_report_uses_jsonschema(monkeypatch):
             self.calls += 1
 
     dummy = DummySchema()
-    monkeypatch.setattr(cert, "jsonschema", dummy, raising=False)
+    monkeypatch.setattr(schema_mod, "jsonschema", dummy, raising=False)
     evaluation_report = {
-        "schema_version": cert.REPORT_SCHEMA_VERSION,
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
         "run_id": "run-1",
         "primary_metric": {"kind": "ppl_causal"},
         "validation": {"primary_metric_acceptable": True},
     }
-    assert cert.validate_report(evaluation_report) is True
+    assert schema_mod.validate_report(evaluation_report) is True
     assert dummy.calls == 1
 
 
@@ -837,31 +811,31 @@ def test_validate_evaluation_report_falls_back_when_jsonschema_fails(monkeypatch
         def validate(self, instance, schema):
             raise ValueError("boom")
 
-    monkeypatch.setattr(cert, "jsonschema", FailingSchema(), raising=False)
+    monkeypatch.setattr(schema_mod, "jsonschema", FailingSchema(), raising=False)
     evaluation_report = {
-        "schema_version": cert.REPORT_SCHEMA_VERSION,
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
         "run_id": "run-2",
         "primary_metric": {"final": 1.0},
         "validation": {"primary_metric_acceptable": True},
     }
-    assert cert.validate_report(evaluation_report) is True
+    assert schema_mod.validate_report(evaluation_report) is True
 
 
 def test_validate_evaluation_report_rejects_invalid_flags(monkeypatch):
-    monkeypatch.setattr(cert, "jsonschema", None, raising=False)
+    monkeypatch.setattr(schema_mod, "jsonschema", None, raising=False)
     evaluation_report = {
-        "schema_version": cert.REPORT_SCHEMA_VERSION,
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
         "run_id": "run-3",
         "primary_metric": {"final": 1.0},
         "validation": {"primary_metric_acceptable": "yes"},
     }
-    assert cert.validate_report(evaluation_report) is False
+    assert schema_mod.validate_report(evaluation_report) is False
 
 
 def test_load_validation_allowlist_prefers_contracts_file(tmp_path, monkeypatch):
     keys = ["primary_metric_acceptable", "guard_overhead_acceptable", "custom_flag"]
-    monkeypatch.setattr(cert, "load_json_contract", lambda _filename: keys)
-    loaded = cert._load_validation_allowlist()
+    monkeypatch.setattr(schema_mod, "load_json_contract", lambda _filename: keys)
+    loaded = schema_mod._load_validation_allowlist()
     assert loaded == {str(k) for k in keys}
 
 
@@ -872,7 +846,7 @@ def test_validate_evaluation_report_handles_mapping_errors() -> None:
 
     evaluation_report = ExplodingMapping()
     # ValueError raised inside validate_report should be caught and return False.
-    assert cert.validate_report(evaluation_report) is False
+    assert schema_mod.validate_report(evaluation_report) is False
 
 
 def test_propagate_pairing_stats_adds_missing_fields():
@@ -914,7 +888,7 @@ def test_normalize_baseline_handles_v1_schema_structure():
         "rmt_base": {"stable": True},
         "invariants": {"status": "ok"},
     }
-    normalized = cert._normalize_baseline(baseline)
+    normalized = normalization_mod.normalize_baseline(baseline)
     assert normalized["run_id"] == "abcdef1234567890"
     assert normalized["model_id"] == "gpt2"
     assert normalized["ppl_final"] == 25.0
@@ -929,7 +903,7 @@ def test_normalize_baseline_raises_for_invalid_ppl():
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
     with pytest.raises(ValueError, match="Invalid baseline"):
-        cert._normalize_baseline(baseline)
+        normalization_mod.normalize_baseline(baseline)
 
 
 def test_normalize_baseline_extracts_runreport_payload():
@@ -954,7 +928,7 @@ def test_normalize_baseline_extracts_runreport_payload():
             "final": {"window_ids": [1, 2], "logloss": [0.1, 0.2]},
         },
     }
-    normalized = cert._normalize_baseline(baseline)
+    normalized = normalization_mod.normalize_baseline(baseline)
     assert normalized["run_id"] is not None
     assert normalized["spectral"]["caps_applied"] == 0
     assert normalized["evaluation_windows"]["final"]["logloss"] == [0.1, 0.2]
@@ -971,7 +945,7 @@ def test_extract_edit_metadata_infers_scope_from_budgets():
             "name": "quant_rtn",
         }
     }
-    metadata = cert._extract_edit_metadata(report, {})
+    metadata = report_edit_summary_mod.extract_edit_metadata(report, {})
     assert metadata["scope"] == "heads+ffn"
 
 
@@ -983,7 +957,7 @@ def test_extract_edit_metadata_uses_config_plan_fallback():
             "name": "quant_rtn",
         }
     }
-    metadata = cert._extract_edit_metadata(report, {})
+    metadata = report_edit_summary_mod.extract_edit_metadata(report, {})
     assert metadata["scope"] == "ffn"
     assert metadata["ranking"] == "l2"
 
@@ -1048,7 +1022,7 @@ def test_extract_structural_deltas_captures_bitwidth_and_ranks():
         },
         "meta": {"seed": 7},
     }
-    structure = cert._extract_structural_deltas(report)
+    structure = report_edit_summary_mod.extract_structural_deltas(report)
     assert "bitwidths" in structure
     assert "ranks" in structure
     diag = structure["compression_diagnostics"]
@@ -1065,7 +1039,7 @@ def test_build_provenance_block_uses_schedule_digest(monkeypatch):
     policy = {"source": "auto"}
     ppl = {"window_plan": {"profile": "dev"}}
 
-    provenance = cert._build_provenance_block(
+    provenance = provenance_mod.build_provenance_block(
         report,
         baseline_raw=None,
         baseline_ref=baseline_ref,
@@ -1074,6 +1048,11 @@ def test_build_provenance_block_uses_schedule_digest(monkeypatch):
         schedule_digest="abc123",
         ppl_analysis=ppl,
         current_run_id="edited-1",
+        compute_report_digest_fn=lambda payload: "digest"
+        if payload is not None
+        else None,
+        collect_backend_versions_fn=lambda: {"python": "x.y"},
+        compute_edit_digest_fn=lambda report: {"family": "cert_only"},
     )
 
     assert provenance["provider_digest"] == {"ids_sha256": "abc123"}
@@ -1082,7 +1061,7 @@ def test_build_provenance_block_uses_schedule_digest(monkeypatch):
 
 
 def test_compute_validation_flags_marks_moe_observed():
-    flags = cert._compute_validation_flags(
+    flags = validation_mod.compute_validation_flags(
         {"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.0},
         {"caps_applied": 0},
         {"stable": True},
@@ -1117,12 +1096,9 @@ def test_compute_validation_flags_reconciles_ppl_primary_metric_ratio(monkeypatc
             "spectral": {"max_caps": 3},
         }
     }
-    monkeypatch.setattr(
-        cert, "get_tier_policies", lambda *_a, **_k: dict(fake_policies)
-    )
     ppl = {"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.2}
     primary_metric = {"kind": "ppl_causal", "ratio_vs_baseline": 1.05}
-    flags = cert._compute_validation_flags(
+    flags = validation_mod.compute_validation_flags(
         ppl,
         {"caps_applied": 0},
         {"stable": True},
@@ -1132,6 +1108,7 @@ def test_compute_validation_flags_reconciles_ppl_primary_metric_ratio(monkeypatc
         primary_metric=primary_metric,
         _ppl_metrics={"preview_total_tokens": 10, "final_total_tokens": 10},
         dataset_capacity={"tokens_available": 20},
+        get_tier_policies_fn=lambda: dict(fake_policies),
     )
     assert flags["primary_metric_acceptable"] is True
 
@@ -1142,7 +1119,7 @@ def test_extract_compression_diagnostics_no_modifications():
         "sources": {},
         "log": [],
     }
-    diagnostics = cert._extract_compression_diagnostics(
+    diagnostics = report_edit_summary_mod.extract_compression_diagnostics(
         "quant_rtn",
         {"scope": "ffn", "clamp_ratio": 0.0},
         {"params_changed": 0},
@@ -1186,7 +1163,7 @@ def test_extract_compression_diagnostics_quant_success():
         "params_changed": 5,
         "bitwidth_map": {"layer1": {"bitwidth": 8, "group_size": 32, "params": 256}},
     }
-    diagnostics = cert._extract_compression_diagnostics(
+    diagnostics = report_edit_summary_mod.extract_compression_diagnostics(
         "quant_rtn",
         {"scope": "attn", "clamp_ratio": 0.5},
         deltas,
@@ -1231,7 +1208,7 @@ def test_extract_rank_information_tracks_skipped_modules():
         },
         "savings": {"deploy_mode": "recompose"},
     }
-    info = cert._extract_rank_information({"frac": 0.2}, deltas)
+    info = report_edit_summary_mod.extract_rank_information({"frac": 0.2}, deltas)
     assert "per_module" in info
     assert info["skipped_modules"] == ["layer.1"]
 
@@ -1241,7 +1218,7 @@ def test_build_provenance_block_respects_existing_provider_digest():
         "provenance": {"provider_digest": {"source": "pre"}},
         "artifacts": {},
     }
-    provenance = cert._build_provenance_block(
+    provenance = provenance_mod.build_provenance_block(
         report,
         {"artifacts": {"logs_path": "/logs/base.log"}},
         {"run_id": "base-1"},
@@ -1250,13 +1227,18 @@ def test_build_provenance_block_respects_existing_provider_digest():
         "abc123",
         {},
         "run-1",
+        compute_report_digest_fn=lambda payload: "digest"
+        if payload is not None
+        else None,
+        collect_backend_versions_fn=lambda: {"python": "x.y"},
+        compute_edit_digest_fn=lambda report: {"family": "cert_only"},
     )
     assert provenance["provider_digest"] == {"source": "pre"}
     assert provenance["baseline"]["report_path"] == "/logs/base.log"
 
 
 def test_build_provenance_block_fallbacks_to_schedule_digest():
-    provenance = cert._build_provenance_block(
+    provenance = provenance_mod.build_provenance_block(
         {},
         {},
         {"run_id": "base-1"},
@@ -1265,6 +1247,11 @@ def test_build_provenance_block_fallbacks_to_schedule_digest():
         "deadbeef",
         {},
         "run-2",
+        compute_report_digest_fn=lambda payload: "digest"
+        if payload is not None
+        else None,
+        collect_backend_versions_fn=lambda: {"python": "x.y"},
+        compute_edit_digest_fn=lambda report: {"family": "cert_only"},
     )
     assert provenance["provider_digest"] == {"ids_sha256": "deadbeef"}
 
@@ -1275,7 +1262,7 @@ def test_build_provenance_block_transfers_dataset_split_and_window_plan():
         "artifacts": {},
     }
     ppl_analysis = {"window_plan": {"profile": "ci"}}
-    provenance = cert._build_provenance_block(
+    provenance = provenance_mod.build_provenance_block(
         report,
         {},
         {"run_id": "base-2"},
@@ -1284,6 +1271,11 @@ def test_build_provenance_block_transfers_dataset_split_and_window_plan():
         "cafebabe",
         ppl_analysis,
         "run-3",
+        compute_report_digest_fn=lambda payload: "digest"
+        if payload is not None
+        else None,
+        collect_backend_versions_fn=lambda: {"python": "x.y"},
+        compute_edit_digest_fn=lambda report: {"family": "cert_only"},
     )
     assert provenance["dataset_split"] == "eval"
     assert provenance["split_fallback"] is True

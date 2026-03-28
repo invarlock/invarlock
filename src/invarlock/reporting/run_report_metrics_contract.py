@@ -69,7 +69,10 @@ def enrich_run_report_metrics(
     match_fraction = metrics_section.get("window_match_fraction")
     overlap_fraction = metrics_section.get("window_overlap_fraction")
 
-    if _loss_type_from_context(run_config) == "classification":
+    loss_type = (
+        _loss_type_from_context(run_config) or str(resolved_loss_type or "").lower()
+    )
+    if loss_type == "classification":
         try:
             from invarlock.eval.primary_metric import compute_accuracy_counts
 

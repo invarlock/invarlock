@@ -1,6 +1,6 @@
-from invarlock.cli.commands import run
 from invarlock.core.config_runtime import InvarLockConfig
-from invarlock.reporting import report_builder as cert
+from invarlock.core.run_policy import resolve_pm_acceptance_range
+from invarlock.reporting.report_validation import compute_validation_flags
 
 
 def test_pm_acceptance_range_ignores_env_override(monkeypatch):
@@ -9,7 +9,7 @@ def test_pm_acceptance_range_ignores_env_override(monkeypatch):
     cfg = InvarLockConfig(
         {"primary_metric": {"acceptance_range": {"min": 0.95, "max": 1.05}}}
     )
-    resolved = run._resolve_pm_acceptance_range(cfg)
+    resolved = resolve_pm_acceptance_range(cfg)
 
     assert resolved["min"] == 0.95
     assert resolved["max"] == 1.05
@@ -28,7 +28,7 @@ def test_evaluation_report_acceptance_range_applied():
         "dataset_capacity": {"tokens_available": 120000},
     }
 
-    relaxed_flags = cert._compute_validation_flags(
+    relaxed_flags = compute_validation_flags(
         **base_kwargs,
         tier="balanced",
         target_ratio=None,
@@ -36,7 +36,7 @@ def test_evaluation_report_acceptance_range_applied():
     )
     assert relaxed_flags["primary_metric_acceptable"] is True
 
-    strict_flags = cert._compute_validation_flags(
+    strict_flags = compute_validation_flags(
         **base_kwargs,
         tier="balanced",
         target_ratio=None,

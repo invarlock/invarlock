@@ -1,4 +1,4 @@
-from invarlock.reporting.report_builder import _compute_validation_flags
+from invarlock.reporting.report_validation import compute_validation_flags
 
 
 def test_tiny_relax_env_relaxes_gates(monkeypatch):
@@ -8,7 +8,7 @@ def test_tiny_relax_env_relaxes_gates(monkeypatch):
     rmt = {"stable": True}
     invariants = {"status": "pass"}
     guard_overhead = {"overhead_ratio": float("nan"), "overhead_threshold": 0.01}
-    flags = _compute_validation_flags(
+    flags = compute_validation_flags(
         ppl,
         spectral,
         rmt,

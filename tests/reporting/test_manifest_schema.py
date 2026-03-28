@@ -4,7 +4,8 @@ import json
 import os
 from pathlib import Path
 
-from invarlock.reporting.report_files import save_report
+from invarlock.reporting.report_bundle import save_evaluation_bundle
+from invarlock.reporting.report_make import make_report
 
 
 def _minimal_report() -> dict:
@@ -53,12 +54,10 @@ def test_manifest_matches_schema(tmp_path: Path):
     # Enable evidence pointer
     os.environ["INVARLOCK_EVIDENCE_DEBUG"] = "1"
     try:
-        save_report(
-            primary,
-            out_dir,
-            formats=["report"],
-            baseline=baseline,
-            filename_prefix="evaluation",
+        save_evaluation_bundle(
+            run_report=primary,
+            output_dir=out_dir,
+            evaluation_report=make_report(primary, baseline),
         )
     finally:
         os.environ.pop("INVARLOCK_EVIDENCE_DEBUG", None)

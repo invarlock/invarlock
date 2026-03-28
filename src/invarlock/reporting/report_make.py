@@ -1,20 +1,40 @@
-# mypy: ignore-errors
-# ruff: noqa: F821
-"""Implementation body for reporting.report_builder.make_report."""
+"""
+InvarLock Evaluation Report Generation
+=====================================
+
+Generate standardized evaluation reports from RunReport and baseline
+comparison.
+Evaluation reports are standalone, portable artifacts that record statistical
+gates and evidence for CI/CD checks and audits (not formal verification).
+"""
 
 from __future__ import annotations
 
+## Core evaluation report building and analysis orchestration lives here.
+# mypy: ignore-errors
 import copy
+import hashlib
+import json
 import math
 import os
+import platform
 from datetime import datetime
 from typing import Any
 
-import invarlock.core.bootstrap as bootstrap_mod
-import invarlock.eval.tail_stats as tail_stats_mod
-from invarlock.reporting.report_types import RunReport
+from invarlock.core import bootstrap as bootstrap_mod
+from invarlock.core.auto_tuning import get_tier_policies
+from invarlock.eval import tail_stats as tail_stats_mod
+from invarlock.eval.primary_metric import compute_primary_metric_from_report
+from invarlock.public_contracts import load_json_contract
+from invarlock.utils.digest import hash_json
 
-from . import report_builder as _builder
+from . import policy_utils as report_policy_utils_mod
+from . import report_edit_summary as report_edit_summary_mod
+from . import report_normalization as report_normalization_mod
+from . import report_overhead as report_overhead_mod
+from . import report_policy as report_policy_mod
+from . import report_provenance as report_provenance_mod
+from . import report_validation as report_validation_mod
 from .dataset_hashing import _extract_dataset_info
 from .guards_analysis import (
     _extract_invariants,
@@ -22,14 +42,776 @@ from .guards_analysis import (
     _extract_spectral_analysis,
     _extract_variance_analysis,
 )
-from .utils import _coerce_interval, _pair_logloss_windows
+from .report_schema import (
+    REPORT_JSON_SCHEMA,
+    REPORT_SCHEMA_VERSION,
+)
+from .report_types import RunReport
+from .utils import (
+    _coerce_int,
+    _coerce_interval,
+    _pair_logloss_windows,
+    _sanitize_seed_bundle,
+)
+
+# Expose compute_window_hash for tests that monkeypatch it
+# compute_window_hash used to be exposed via the evaluation report builder; tests now patch
+# dataset_hashing.compute_window_hash directly, so this import is no longer needed.
+# Policy digest semantic version (bumped when thresholds basis changes)
+POLICY_VERSION = "policy-v1"
+
+# Canonical base ratio limits per tier
+TIER_RATIO_LIMITS: dict[str, float] = {
+    "conservative": 1.05,
+    "balanced": 1.10,
+    "aggressive": 1.20,
+    "none": 1.10,
+}
+
+# Canonical preview→final drift band used when not explicitly configured.
+PM_DRIFT_BAND_DEFAULT: tuple[float, float] = (0.95, 1.05)
 
 
-def make_report_impl(
+def _is_ppl_kind(name: Any) -> bool:
+    """Return True if a primary_metric kind denotes a ppl-like metric.
+
+    Supports alternate names to stay resilient across schema variants.
+    """
+    try:
+        n = str(name or "").lower()
+    except Exception:  # pragma: no cover
+        n = ""
+    return n in {
+        "ppl",
+        "perplexity",
+        "ppl_causal",
+        "causal_ppl",
+        "ppl_mlm",
+        "mlm_ppl",
+        "ppl_masked",
+        "ppl_seq2seq",
+        "seq2seq_ppl",
+    }
+
+
+## NOTE: Deprecated helper `_get_ppl_final` was removed; callers should
+## use the normalized primary_metric block directly via make_report or
+## report processing utilities.
+
+
+def _compute_edit_digest(report: dict) -> dict:
+    """Compute a minimal, non-leaky edit breadcrumb for provenance.
+
+    If `quant_rtn` is detected as the edit name, tag as quantization and
+    hash the name+config. Otherwise, treat as cert_only with a stable hash.
+    """
+    try:
+        edits = report.get("edit")
+        if not isinstance(edits, dict):
+            provenance = report.get("provenance")
+            edits = provenance.get("edits") if isinstance(provenance, dict) else {}
+    except Exception:  # pragma: no cover
+        edits = {}
+    family = "cert_only"
+    impl_hash = hash_json({"family": "cert_only"})
+    try:
+        if isinstance(edits, dict) and str(edits.get("name", "")) == "quant_rtn":
+            family = "quantization"
+            cfg = (
+                edits.get("config", {}) if isinstance(edits.get("config"), dict) else {}
+            )
+            impl_hash = hash_json({"name": "quant_rtn", "config": cfg})
+    except Exception:  # pragma: no cover
+        pass
+    return {"family": family, "impl_hash": impl_hash, "version": 1}
+
+
+def _compute_confidence_label(evaluation_report: dict[str, Any]) -> dict[str, Any]:
+    """Compute evaluation report confidence label based on stability and CI width.
+
+    Heuristics:
+    - High: ppl_acceptable=True, unstable=False, width <= 0.03 (ratio) or <= 1.0 pp for accuracy
+    - Medium: floors met but unstable=True or width borderline (<= 2x threshold)
+    - Low: otherwise (floors unmet, failure, or missing bounds)
+    Returns a dict with label, basis, width and threshold for transparency.
+    """
+    validation = evaluation_report.get("validation", {}) or {}
+    pm_ok = bool(validation.get("primary_metric_acceptable", False))
+    # Basis label shown in confidence block:
+    #  - For ppl-like metrics, use 'ppl_ratio' to reflect ratio width threshold
+    #  - For accuracy-like metrics, use their kind ('accuracy' or 'vqa_accuracy')
+    #  - Fall back to 'primary_metric' when unknown
+    basis = "primary_metric"
+    lo = hi = float("nan")
+    try:
+        pm = evaluation_report.get("primary_metric", {}) or {}
+        kind = str(pm.get("kind", "") or "").lower()
+        if isinstance(pm, dict) and pm and pm.get("display_ci"):
+            dci = pm.get("display_ci")
+            if isinstance(dci, tuple | list) and len(dci) == 2:
+                lo, hi = float(dci[0]), float(dci[1])
+                # Map kind → confidence basis label
+                if kind.startswith("ppl"):
+                    basis = "ppl_ratio"
+                elif kind in {"accuracy", "vqa_accuracy"}:
+                    basis = kind
+                else:
+                    basis = basis if basis else (kind or "primary_metric")
+    except (TypeError, ValueError):  # pragma: no cover
+        pass
+
+    width = hi - lo if (math.isfinite(lo) and math.isfinite(hi)) else float("nan")
+    # Thresholds (policy-configurable; fallback to defaults)
+    thr_ratio = 0.03  # 3% width for ratio
+    thr_pp = 1.0  # 1.0 percentage point for accuracy kinds
+    try:
+        pol = evaluation_report.get("resolved_policy")
+        if isinstance(pol, dict):
+            conf_pol = pol.get("confidence")
+            if isinstance(conf_pol, dict):
+                rr = conf_pol.get("ppl_ratio_width_max")
+                if isinstance(rr, int | float):
+                    thr_ratio = float(rr)
+                ap = conf_pol.get("accuracy_delta_pp_width_max")
+                if isinstance(ap, int | float):
+                    thr_pp = float(ap)
+    except (TypeError, ValueError):  # pragma: no cover
+        pass
+    is_acc = basis in {"accuracy", "vqa_accuracy"}
+    thr = thr_pp if is_acc else thr_ratio
+
+    # Unstable hint from primary metric (if provided)
+    try:
+        unstable = bool((evaluation_report.get("primary_metric") or {}).get("unstable"))
+    except (AttributeError, TypeError, ValueError):  # pragma: no cover
+        unstable = False
+
+    label = "Low"
+    if pm_ok:
+        if (not unstable) and math.isfinite(width) and width <= thr:
+            label = "High"
+        else:
+            # Floors met, but unstable or borderline width
+            if math.isfinite(width) and width <= 2 * thr:
+                label = "Medium"
+            else:
+                label = "Medium" if unstable else "Low"
+    else:
+        label = "Low"
+
+    return {
+        "label": label,
+        "basis": basis,
+        "width": width,
+        "threshold": thr,
+        "unstable": unstable,
+    }
+
+
+# Minimal JSON Schema describing the canonical shape of an evaluation report.
+# This focuses on structural validity; numerical thresholds are validated
+# separately in metric-specific logic.
+# JSON Schema is provided by report_schema; no duplication here.
+
+
+VARIANCE_CANONICAL_KEYS = (
+    "deadband",
+    "min_abs_adjust",
+    "max_scale_step",
+    "min_effect_lognll",
+    "predictive_one_sided",
+    "topk_backstop",
+    "max_adjusted_modules",
+)
+
+
+## Helpers are imported from invarlock.reporting.utils
+
+
+def _collect_backend_versions() -> dict[str, Any]:
+    """Collect backend/library versions for provenance.env_flags.
+
+    Best-effort and resilient to missing libraries. Includes torch/cuda/cudnn/nccl
+    when available, as well as Python/platform basics.
+    """
+    info: dict[str, Any] = {}
+    # Python/platform
+    try:
+        info["python"] = platform.python_version()
+        info["platform"] = platform.platform()
+        info["machine"] = platform.machine()
+    except Exception:  # pragma: no cover
+        pass
+    # Torch + CUDA libs (best-effort)
+    try:  # pragma: no cover - depends on torch availability
+        import torch
+
+        info["torch"] = getattr(torch, "__version__", None)
+        tv = getattr(torch, "version", None)
+        if tv is not None:
+            info["torch_cuda"] = getattr(tv, "cuda", None)
+            info["torch_cudnn"] = getattr(tv, "cudnn", None)
+            info["torch_git"] = getattr(tv, "git_version", None)
+        # Device and driver meta
+        try:
+            if torch.cuda.is_available():
+                props = torch.cuda.get_device_properties(0)
+                info["device_name"] = getattr(props, "name", None)
+                try:
+                    maj = getattr(props, "major", None)
+                    minr = getattr(props, "minor", None)
+                    if maj is not None and minr is not None:
+                        info["sm_capability"] = f"{int(maj)}.{int(minr)}"
+                except Exception:  # pragma: no cover
+                    pass
+        except Exception:  # pragma: no cover
+            pass
+        # cuDNN runtime version
+        try:
+            if hasattr(torch.backends, "cudnn") and hasattr(
+                torch.backends.cudnn, "version"
+            ):
+                v = torch.backends.cudnn.version()
+                info["cudnn_runtime"] = int(v) if v is not None else None
+        except Exception:  # pragma: no cover
+            pass
+        # NCCL version
+        try:
+            nccl_mod = getattr(torch.cuda, "nccl", None)
+            if nccl_mod is not None and hasattr(nccl_mod, "version"):
+                info["nccl"] = str(nccl_mod.version())
+        except Exception:  # pragma: no cover
+            pass
+        # TF32 status (duplicated from meta.cuda_flags for convenience)
+        try:
+            tf32 = {}
+            if hasattr(torch.backends, "cudnn") and hasattr(
+                torch.backends.cudnn, "allow_tf32"
+            ):
+                tf32["cudnn_allow_tf32"] = bool(torch.backends.cudnn.allow_tf32)
+            if hasattr(torch.backends, "cuda") and hasattr(
+                torch.backends.cuda, "matmul"
+            ):
+                matmul = torch.backends.cuda.matmul
+                if hasattr(matmul, "allow_tf32"):
+                    tf32["cuda_matmul_allow_tf32"] = bool(matmul.allow_tf32)
+            if tf32:
+                info["tf32"] = tf32
+        except Exception:  # pragma: no cover
+            pass
+    except Exception:  # pragma: no cover
+        # torch not available
+        pass
+    # Environment variable hints
+    try:
+        if os.environ.get("CUBLAS_WORKSPACE_CONFIG"):
+            info["cublas_workspace_config"] = os.environ.get("CUBLAS_WORKSPACE_CONFIG")
+    except Exception:  # pragma: no cover
+        pass
+    return {k: v for k, v in info.items() if v is not None}
+
+
+## Pairing helper available from invarlock.reporting.utils
+
+
+def _compute_thresholds_payload(
+    tier: str, resolved_policy: dict[str, Any]
+) -> dict[str, Any]:
+    from .policy_utils import _compute_thresholds_payload as _impl
+
+    return _impl(tier, resolved_policy)
+
+
+def _compute_thresholds_hash(payload: dict[str, Any]) -> str:
+    from .policy_utils import _compute_thresholds_hash as _impl
+
+    return _impl(payload)
+
+
+# Allow-list loader with safe defaults for validation keys
+_VALIDATION_ALLOWLIST_DEFAULT = {
+    "primary_metric_acceptable",
+    "primary_metric_tail_acceptable",
+    "preview_final_drift_acceptable",
+    "guard_overhead_acceptable",
+    "invariants_pass",
+    "spectral_stable",
+    "rmt_stable",
+    # Compatibility keys were removed; PM-only surface
+    "hysteresis_applied",
+    "moe_observed",
+    "moe_identity_ok",
+}
+
+
+def _load_validation_allowlist_with_source() -> tuple[set[str], str]:
+    """Load validation key allow-list and report the source explicitly."""
+    try:
+        data = load_json_contract("validation_keys.json")
+        if isinstance(data, list):
+            return {str(k) for k in data}, "contracts"
+        return (
+            set(_VALIDATION_ALLOWLIST_DEFAULT),
+            "fallback:invalid-contract-validation-keys",
+        )
+    except Exception:  # pragma: no cover
+        return set(_VALIDATION_ALLOWLIST_DEFAULT), "fallback:load-error"
+
+
+def _load_validation_allowlist() -> set[str]:
+    """Load validation key allow-list from contracts with fail-closed fallback."""
+    keys, _ = _load_validation_allowlist_with_source()
+    return keys
+
+
+def _apply_validation_allowlist_schema(validation_keys: set[str]) -> None:
+    """Apply allow-list constraints to report schema (fail closed on shape drift)."""
+    schema_properties = REPORT_JSON_SCHEMA.get("properties")
+    if not isinstance(schema_properties, dict):
+        raise RuntimeError(
+            "REPORT_JSON_SCHEMA.properties must be a mapping to enforce validation "
+            "allow-list constraints."
+        )
+    validation_spec = schema_properties.get("validation")
+    if not isinstance(validation_spec, dict):
+        raise RuntimeError(
+            "REPORT_JSON_SCHEMA.properties.validation must be a mapping to enforce "
+            "validation allow-list constraints."
+        )
+    validation_spec["properties"] = {k: {"type": "boolean"} for k in validation_keys}
+    validation_spec["additionalProperties"] = False
+
+
+# Tighten JSON Schema: populate validation.properties from allow-list and
+# disallow unknown validation keys at schema level.
+_VALIDATION_ALLOWLIST_KEYS, _VALIDATION_ALLOWLIST_SOURCE = (
+    _load_validation_allowlist_with_source()
+)
+_apply_validation_allowlist_schema(_VALIDATION_ALLOWLIST_KEYS)
+
+
+## Note: helpers like _get_section/_get_mapping/_iter_guard_entries,
+## and policy helpers are provided by invarlock.reporting.utils and policy_utils.
+## Import those directly in callers/tests instead of through this module.
+
+
+def _extract_report_meta(report: RunReport) -> dict[str, Any]:
+    """Extract the evaluation report metadata block with a full seed bundle."""
+    meta_section = (
+        report.get("meta", {}) if isinstance(report.get("meta"), dict) else {}
+    )
+    seed_value = _coerce_int(meta_section.get("seed"))
+    seeds_bundle = _sanitize_seed_bundle(meta_section.get("seeds"), seed_value)
+    primary_seed = (
+        seeds_bundle.get("python") if isinstance(seeds_bundle, dict) else None
+    )
+    if primary_seed is None:
+        primary_seed = 0
+    return {
+        "model_id": meta_section.get("model_id", "unknown"),
+        "adapter": meta_section.get("adapter", "unknown"),
+        "device": meta_section.get("device", "unknown"),
+        "ts": meta_section.get("ts"),
+        "commit": meta_section.get("commit"),
+        "seed": primary_seed,
+        "seeds": seeds_bundle,
+    }
+
+
+def _enforce_drift_ratio_identity(
+    paired_windows: int,
+    delta_mean: Any,
+    drift_ratio: float,
+    window_plan_profile: str | None,
+) -> float | None:
+    """Ensure exp(delta_mean) aligns with observed drift ratio."""
+    if (
+        paired_windows > 0
+        and isinstance(delta_mean, (int | float))
+        and math.isfinite(delta_mean)
+        and isinstance(drift_ratio, (int | float))
+        and math.isfinite(drift_ratio)
+    ):
+        ratio_from_delta = math.exp(float(delta_mean))
+        tolerance = 1e-3 * max(1.0, abs(drift_ratio))
+        if abs(ratio_from_delta - drift_ratio) > tolerance:
+            profile = (window_plan_profile or "dev").lower()
+            if profile in {"ci", "release"}:
+                raise ValueError(
+                    "Paired ΔlogNLL mean is inconsistent with reported drift ratio."
+                )
+        return ratio_from_delta
+    return None
+
+
+def _enforce_ratio_ci_alignment(
+    ratio_ci_source: str,
+    ratio_ci: Any,
+    logloss_delta_ci: Any,
+) -> None:
+    """Validate that ratio_ci matches exp(logloss_delta_ci) when paired."""
+    if ratio_ci_source != "paired_baseline":
+        return
+    if not (
+        isinstance(logloss_delta_ci, tuple | list)
+        and len(logloss_delta_ci) == 2
+        and isinstance(ratio_ci, tuple | list)
+        and len(ratio_ci) == 2
+    ):
+        return
+    expected_bounds = tuple(math.exp(bound) for bound in logloss_delta_ci)
+    for observed, expected in zip(ratio_ci, expected_bounds, strict=False):
+        if not (
+            isinstance(observed, (int | float))
+            and math.isfinite(observed)
+            and isinstance(expected, (int | float))
+            and math.isfinite(expected)
+        ):
+            continue
+        tolerance = 5e-4 * max(1.0, abs(expected))
+        if abs(float(observed) - float(expected)) > tolerance:
+            raise ValueError(
+                "Paired ΔlogNLL CI mismatch: ratio bounds do not match exp(Δlog bounds)."
+            )
+
+
+def _enforce_display_ci_alignment(
+    ratio_ci_source: str,
+    primary_metric: Any,
+    logloss_delta_ci: Any,
+    window_plan_profile: str | None,
+) -> None:
+    """Ensure display_ci matches exp(ci) for ppl-like metrics when paired."""
+    if ratio_ci_source != "paired_baseline":
+        return
+    if not isinstance(primary_metric, dict) or not primary_metric:
+        return
+    try:
+        kind = str(primary_metric.get("kind", "")).lower()
+    except Exception:
+        return
+    if not kind.startswith("ppl"):
+        return
+
+    def _finite_bounds(bounds: Any) -> bool:
+        return (
+            isinstance(bounds, tuple | list)
+            and len(bounds) == 2
+            and all(isinstance(v, int | float) and math.isfinite(v) for v in bounds)
+        )
+
+    ci = primary_metric.get("ci")
+    if not _finite_bounds(ci):
+        if _finite_bounds(logloss_delta_ci):
+            primary_metric["ci"] = (
+                float(logloss_delta_ci[0]),
+                float(logloss_delta_ci[1]),
+            )
+            ci = primary_metric["ci"]
+        else:
+            profile = (window_plan_profile or "dev").lower()
+            if profile in {"ci", "release"}:
+                raise ValueError(
+                    "primary_metric.ci missing for ppl-like metric under paired baseline."
+                )
+            return
+
+    expected = tuple(math.exp(float(bound)) for bound in ci)
+    display_ci = primary_metric.get("display_ci")
+    if not _finite_bounds(display_ci):
+        profile = (window_plan_profile or "dev").lower()
+        if profile in {"ci", "release"}:
+            raise ValueError(
+                "primary_metric.display_ci missing for ppl-like metric under paired baseline."
+            )
+        primary_metric["display_ci"] = [expected[0], expected[1]]
+        return
+
+    for observed, exp_val in zip(display_ci, expected, strict=False):
+        tolerance = 5e-4 * max(1.0, abs(exp_val))
+        if abs(float(observed) - float(exp_val)) > tolerance:
+            profile = (window_plan_profile or "dev").lower()
+            if profile in {"ci", "release"}:
+                raise ValueError(
+                    "primary_metric.display_ci mismatch: bounds do not match exp(ci)."
+                )
+            primary_metric["display_ci"] = [expected[0], expected[1]]
+            break
+
+
+def _enforce_pairing_and_coverage(
+    stats: dict[str, Any] | None,
+    window_plan_profile: str | None,
+    tier: str | None,
+) -> None:
+    """Enforce pairing and coverage contracts for CI/Release profiles."""
+    profile = (window_plan_profile or "dev").lower()
+    if profile not in {"ci", "release"}:
+        return
+    if not isinstance(stats, dict):
+        raise ValueError("Missing dataset window stats for CI/Release enforcement.")
+
+    pairing_reason = stats.get("window_pairing_reason")
+    if pairing_reason is not None:
+        raise ValueError(
+            "CI/Release requires paired baseline evidence "
+            f"(window_pairing_reason={pairing_reason!r})."
+        )
+
+    match_fraction = stats.get("window_match_fraction")
+    overlap_fraction = stats.get("window_overlap_fraction")
+    if not (
+        isinstance(match_fraction, (int | float))
+        and math.isfinite(float(match_fraction))
+    ):
+        raise ValueError("CI/Release requires window_match_fraction.")
+    if float(match_fraction) < 0.999999:
+        raise ValueError(
+            f"CI/Release requires perfect pairing (window_match_fraction={float(match_fraction):.6f})."
+        )
+
+    if not (
+        isinstance(overlap_fraction, (int | float))
+        and math.isfinite(float(overlap_fraction))
+    ):
+        raise ValueError("CI/Release requires window_overlap_fraction.")
+    if float(overlap_fraction) > 1e-9:
+        raise ValueError(
+            f"CI/Release requires non-overlapping windows (window_overlap_fraction={float(overlap_fraction):.6f})."
+        )
+
+    def _coerce_count(value: Any) -> int | None:
+        if value is None or isinstance(value, bool):
+            return None
+        try:
+            val = float(value)
+        except (TypeError, ValueError):
+            return None
+        if not math.isfinite(val) or val < 0:
+            return None
+        if abs(val - round(val)) > 1e-9:
+            return None
+        return int(round(val))
+
+    paired_windows = _coerce_count(stats.get("paired_windows"))
+    if paired_windows is None:
+        raise ValueError("CI/Release requires paired_windows metric.")
+    if paired_windows == 0:
+        raise ValueError("CI/Release requires paired_windows > 0.")
+
+    actual_preview = _coerce_count(stats.get("actual_preview"))
+    actual_final = _coerce_count(stats.get("actual_final"))
+    if actual_preview is None or actual_final is None:
+        coverage = stats.get("coverage")
+        if isinstance(coverage, dict):
+            if actual_preview is None:
+                actual_preview = _coerce_count(coverage.get("preview", {}).get("used"))
+            if actual_final is None:
+                actual_final = _coerce_count(coverage.get("final", {}).get("used"))
+
+    if actual_preview is None or actual_final is None:
+        raise ValueError("CI/Release requires preview/final window counts.")
+    if actual_preview != actual_final:
+        raise ValueError(
+            f"CI/Release requires matching preview/final counts "
+            f"(preview={actual_preview}, final={actual_final})."
+        )
+
+    from invarlock.core.runner_pairing import BOOTSTRAP_COVERAGE_REQUIREMENTS
+
+    tier_key = str(tier or "balanced").lower()
+    floors = BOOTSTRAP_COVERAGE_REQUIREMENTS.get(
+        tier_key, BOOTSTRAP_COVERAGE_REQUIREMENTS["balanced"]
+    )
+    preview_floor = int(floors.get("preview", 0))
+    final_floor = int(floors.get("final", 0))
+    replicates_floor = int(floors.get("replicates", 0))
+
+    coverage = stats.get("coverage")
+    if not isinstance(coverage, dict):
+        raise ValueError("CI/Release requires bootstrap coverage stats.")
+
+    preview_used = _coerce_count(coverage.get("preview", {}).get("used"))
+    final_used = _coerce_count(coverage.get("final", {}).get("used"))
+    replicates_used = _coerce_count(coverage.get("replicates", {}).get("used"))
+
+    if replicates_used is None:
+        bootstrap = stats.get("bootstrap")
+        if isinstance(bootstrap, dict):
+            replicates_used = _coerce_count(
+                bootstrap.get("replicates", bootstrap.get("n"))
+            )
+
+    if preview_used is None or final_used is None or replicates_used is None:
+        raise ValueError("CI/Release requires preview/final/replicates coverage stats.")
+
+    if preview_used < preview_floor or final_used < final_floor:
+        raise ValueError(
+            "CI/Release requires preview/final coverage at or above tier floors "
+            f"(preview={preview_used}/{preview_floor}, final={final_used}/{final_floor})."
+        )
+    if replicates_used < replicates_floor:
+        raise ValueError(
+            "CI/Release requires bootstrap replicates at or above tier floors "
+            f"(replicates={replicates_used}/{replicates_floor})."
+        )
+
+
+def _fallback_paired_windows(
+    paired_windows: int, coverage_summary: dict[str, Any]
+) -> int:
+    """Use coverage preview counts when explicit pairing is unavailable."""
+    if paired_windows > 0 or not isinstance(coverage_summary, dict):
+        return paired_windows
+    try:
+        cprev = coverage_summary.get("preview")
+        used = cprev.get("used") if isinstance(cprev, dict) else None
+        if isinstance(used, int | float) and used >= 0:
+            return int(used)
+    except Exception:  # pragma: no cover
+        pass
+    return paired_windows
+
+
+# Console validation helpers live in `report_console`; Markdown rendering lives in
+# `render`. This module owns report-construction helpers only.
+## Private helper functions
+
+
+## Dataset hashing helpers live in invarlock.reporting.dataset_hashing
+
+
+## Guard extractors moved to invarlock.reporting.guards_analysis and imported above
+def _compute_report_digest(report: RunReport | dict[str, Any] | None) -> str | None:
+    if not isinstance(report, dict):
+        return None
+    meta = report.get("meta", {}) if isinstance(report.get("meta"), dict) else {}
+    edit = report.get("edit", {}) if isinstance(report.get("edit"), dict) else {}
+    metrics = (
+        report.get("metrics", {}) if isinstance(report.get("metrics"), dict) else {}
+    )
+    spectral_metrics = metrics.get("spectral", {})
+    rmt_metrics = metrics.get("rmt", {})
+    subset = {
+        "meta": {
+            "model_id": meta.get("model_id"),
+            "adapter": meta.get("adapter"),
+            "commit": meta.get("commit"),
+            "ts": meta.get("ts"),
+        },
+        "edit": {
+            "name": edit.get("name"),
+            "plan_digest": edit.get("plan_digest"),
+        },
+        "metrics": {
+            # Legacy PPL fields removed in PM-only surface
+            "spectral_caps": spectral_metrics.get("caps_applied")
+            if isinstance(spectral_metrics, dict)
+            else None,
+            "rmt_outliers": rmt_metrics.get("outliers")
+            if isinstance(rmt_metrics, dict)
+            else None,
+        },
+    }
+    canonical = json.dumps(subset, sort_keys=True, default=str)
+    return hashlib.sha256(canonical.encode()).hexdigest()[:16]
+
+
+def _propagate_pairing_stats(
+    evaluation_report: dict[str, Any], ppl_analysis: dict[str, Any] | None
+) -> None:
+    """Surface pairing statistics inside evaluation_report.dataset.windows.stats."""
+    if not isinstance(evaluation_report, dict):
+        return
+    ds = evaluation_report.get("dataset", {})
+    if not isinstance(ds, dict):
+        return
+    windows = ds.get("windows", {})
+    if not isinstance(windows, dict):
+        windows = {}
+    stats = windows.get("stats", {})
+    if not isinstance(stats, dict):
+        stats = {}
+    pairing = None
+    paired_windows_out = None
+    pa_stats = ppl_analysis.get("stats", {}) if isinstance(ppl_analysis, dict) else {}
+    try:
+        pairing = pa_stats.get("pairing")
+        paired_windows_out = pa_stats.get("paired_windows")
+        passthrough_keys = (
+            "requested_preview",
+            "requested_final",
+            "actual_preview",
+            "actual_final",
+            "coverage_ok",
+        )
+        for key in passthrough_keys:
+            if key in pa_stats:
+                stats[key] = pa_stats[key]
+        coverage = pa_stats.get("coverage")
+        if isinstance(coverage, dict) and coverage:
+            stats["coverage"] = coverage
+        bootstrap = pa_stats.get("bootstrap")
+        if isinstance(bootstrap, dict) and bootstrap:
+            stats["bootstrap"] = bootstrap
+        paired_delta_summary = pa_stats.get("paired_delta_summary")
+        if isinstance(paired_delta_summary, dict) and paired_delta_summary:
+            stats["paired_delta_summary"] = paired_delta_summary
+        wmf = pa_stats.get("window_match_fraction")
+        if wmf is not None:
+            stats["window_match_fraction"] = wmf
+        wof = pa_stats.get("window_overlap_fraction")
+        if wof is not None:
+            stats["window_overlap_fraction"] = wof
+        wpr = pa_stats.get("window_pairing_reason")
+        if wpr is not None:
+            stats["window_pairing_reason"] = wpr
+    except Exception:  # pragma: no cover
+        pairing = None
+        paired_windows_out = None
+    if pairing is not None:
+        stats["pairing"] = pairing
+    if paired_windows_out is not None:
+        stats.setdefault("paired_windows", paired_windows_out)
+    if stats is not windows.get("stats"):
+        windows["stats"] = stats
+    if windows is not ds.get("windows"):
+        ds["windows"] = windows
+    evaluation_report["dataset"] = ds
+
+
+def _generate_run_id(report: RunReport) -> str:
+    """Generate a unique run ID from report metadata."""
+    if isinstance(report, dict):
+        meta = report.get("meta", {})
+    else:
+        meta = getattr(report, "meta", {})
+
+    if isinstance(meta, dict):
+        existing = meta.get("run_id")
+        if isinstance(existing, str) and existing:
+            return existing
+        timestamp = str(meta.get("ts", meta.get("start_time", "")))
+        model_id = str(meta.get("model_id", "unknown"))
+        commit = str(meta.get("commit", meta.get("commit_sha", "")))[:16]
+        base_str = f"{timestamp}{model_id}{commit}"
+    else:
+        base_str = str(meta or report)
+
+    return hashlib.sha256(base_str.encode()).hexdigest()[:16]
+
+
+## NOTE: _compute_report_hash moved to invarlock.reporting.render and is re-exported below.
+
+
+## Note: compute_window_hashes is available under invarlock.reporting.dataset_hashing.
+
+
+def make_report(
     report: RunReport,
     baseline: RunReport | dict[str, Any],
 ) -> dict[str, Any]:
-    """Delegated implementation of report_builder.make_report."""
+    """Generate an evaluation report from a RunReport and baseline comparison."""
     NON_FATAL_EXCEPTIONS = (
         AttributeError,
         TypeError,
@@ -41,54 +823,15 @@ def make_report_impl(
         ModuleNotFoundError,
     )
     NUMERIC_EXCEPTIONS = (TypeError, ValueError, OverflowError)
-
-    POLICY_VERSION = _builder.POLICY_VERSION
-    REPORT_SCHEMA_VERSION = _builder.REPORT_SCHEMA_VERSION
-    VARIANCE_CANONICAL_KEYS = _builder.VARIANCE_CANONICAL_KEYS
-    _VALIDATION_ALLOWLIST_SOURCE = _builder._VALIDATION_ALLOWLIST_SOURCE
-    _build_provenance_block = _builder._build_provenance_block
-    _build_resolved_policies = _builder._build_resolved_policies
-    _coerce_int = _builder._coerce_int
-    _compute_confidence_label = _builder._compute_confidence_label
-    _compute_policy_digest = _builder._compute_policy_digest
-    _compute_quality_overhead_from_guard = _builder._compute_quality_overhead_from_guard
-    _compute_thresholds_hash = _builder._compute_thresholds_hash
-    _compute_thresholds_payload = _builder._compute_thresholds_payload
-    _compute_validation_flags = _builder._compute_validation_flags
-    _compute_variance_policy_digest = _builder._compute_variance_policy_digest
-    _enforce_display_ci_alignment = _builder._enforce_display_ci_alignment
-    _enforce_drift_ratio_identity = _builder._enforce_drift_ratio_identity
-    _enforce_pairing_and_coverage = _builder._enforce_pairing_and_coverage
-    _enforce_ratio_ci_alignment = _builder._enforce_ratio_ci_alignment
-    _extract_edit_metadata = _builder._extract_edit_metadata
-    _extract_effective_policies = _builder._extract_effective_policies
-    _extract_policy_overrides = _builder._extract_policy_overrides
-    _extract_report_meta = _builder._extract_report_meta
-    _extract_structural_deltas = _builder._extract_structural_deltas
-    _fallback_paired_windows = _builder._fallback_paired_windows
-    _generate_run_id = _builder._generate_run_id
-    _is_ppl_kind = _builder._is_ppl_kind
-    _load_validation_allowlist = _builder._load_validation_allowlist
-    _normalize_and_validate_report = _builder._normalize_and_validate_report
-    _normalize_baseline = _builder._normalize_baseline
-    _prepare_guard_overhead_section = _builder._prepare_guard_overhead_section
-    _propagate_pairing_stats = _builder._propagate_pairing_stats
-    _resolve_pm_acceptance_range_from_report = (
-        _builder._resolve_pm_acceptance_range_from_report
-    )
-    _resolve_pm_drift_band_from_report = _builder._resolve_pm_drift_band_from_report
-    _resolve_tiny_relax_from_report = _builder._resolve_tiny_relax_from_report
-    compute_primary_metric_from_report = _builder.compute_primary_metric_from_report
-    get_tier_policies = _builder.get_tier_policies
     compute_paired_delta_log_ci = bootstrap_mod.compute_paired_delta_log_ci
     logspace_to_ratio_ci = bootstrap_mod.logspace_to_ratio_ci
     evaluate_metric_tail = tail_stats_mod.evaluate_metric_tail
 
-    report = _normalize_and_validate_report(report)
+    report = report_normalization_mod.normalize_and_validate_run_report(report)
 
     # Normalize baseline input
     baseline_raw = baseline
-    baseline_normalized = _normalize_baseline(baseline_raw)
+    baseline_normalized = report_normalization_mod.normalize_baseline(baseline_raw)
     baseline_report: RunReport | None = None
     try:
         if (
@@ -97,7 +840,9 @@ def make_report_impl(
             and "metrics" in baseline_raw
             and "edit" in baseline_raw
         ):
-            baseline_report = _normalize_and_validate_report(baseline_raw)
+            baseline_report = report_normalization_mod.normalize_and_validate_run_report(
+                baseline_raw
+            )
     except NON_FATAL_EXCEPTIONS:  # pragma: no cover - baseline compare is best-effort
         baseline_report = None
 
@@ -788,12 +1533,12 @@ def make_report_impl(
     variance = _extract_variance_analysis(report)
 
     # Extract structural deltas
-    structure = _extract_structural_deltas(report)
+    structure = report_edit_summary_mod.extract_structural_deltas(report)
     compression_diag = structure.get("compression_diagnostics", {})
     structure["compression_diagnostics"] = compression_diag
 
     # Extract effective policies used
-    policies = _extract_effective_policies(report)
+    policies = report_policy_utils_mod._extract_effective_policies(report)
     variance_policy = policies.get("variance")
     guard_variance_policy = None
     for guard in report.get("guards", []):
@@ -805,10 +1550,14 @@ def make_report_impl(
 
     variance_policy_digest = ""
     if isinstance(variance_policy, dict):
-        variance_policy_digest = _compute_variance_policy_digest(variance_policy)
+        variance_policy_digest = report_policy_utils_mod._compute_variance_policy_digest(
+            variance_policy
+        )
         if not variance_policy_digest and isinstance(guard_variance_policy, dict):
-            variance_policy_digest = _compute_variance_policy_digest(
-                guard_variance_policy
+            variance_policy_digest = (
+                report_policy_utils_mod._compute_variance_policy_digest(
+                    guard_variance_policy
+                )
             )
             if variance_policy_digest:
                 for key in VARIANCE_CANONICAL_KEYS:
@@ -859,7 +1608,7 @@ def make_report_impl(
     except NON_FATAL_EXCEPTIONS:
         explicit_overrides = None
 
-    resolved_policy = _build_resolved_policies(
+    resolved_policy = report_policy_utils_mod._build_resolved_policies(
         auto.get("tier", "balanced"),
         spectral,
         rmt,
@@ -867,8 +1616,8 @@ def make_report_impl(
         profile=profile,
         explicit_overrides=explicit_overrides,
     )
-    overrides_list = _extract_policy_overrides(report)
-    resolved_digest = _compute_policy_digest(
+    overrides_list = report_policy_utils_mod._extract_policy_overrides(report)
+    resolved_digest = report_policy_utils_mod._compute_policy_digest(
         {
             "resolved_policy": resolved_policy,
             "overrides": overrides_list,
@@ -891,7 +1640,9 @@ def make_report_impl(
                 policies[guard_name]["policy_digest"] = variance_policy_digest
 
     plugin_provenance = report.get("meta", {}).get("plugins", {})
-    edit_metadata = _extract_edit_metadata(report, plugin_provenance)
+    edit_metadata = report_edit_summary_mod.extract_edit_metadata(
+        report, plugin_provenance
+    )
 
     # Extract telemetry (latency, memory, etc.)
     telemetry: dict[str, Any] = {}
@@ -956,7 +1707,9 @@ def make_report_impl(
         artifacts_payload["masks_path"] = masks_path
 
     raw_guard_ctx = report.get("guard_overhead")
-    guard_overhead_section, _ = _prepare_guard_overhead_section(raw_guard_ctx)
+    guard_overhead_section, _ = report_overhead_mod.prepare_guard_overhead_section(
+        raw_guard_ctx
+    )
 
     # Add schedule digest to provenance/overhead for auditability of schedule reuse
     try:
@@ -985,7 +1738,7 @@ def make_report_impl(
     policy_provenance["resolved_at"] = artifacts_payload["generated_at"]
 
     current_run_id = _generate_run_id(report)
-    provenance = _build_provenance_block(
+    provenance = report_provenance_mod.build_provenance_block(
         report,
         baseline_raw,
         baseline_ref,
@@ -994,6 +1747,9 @@ def make_report_impl(
         schedule_digest,
         ppl_analysis,
         current_run_id,
+        compute_report_digest_fn=_compute_report_digest,
+        collect_backend_versions_fn=_collect_backend_versions,
+        compute_edit_digest_fn=_compute_edit_digest,
     )
 
     # Prepare MoE section (observability; non-gating)
@@ -1099,9 +1855,13 @@ def make_report_impl(
         capacity_tokens = None
         capacity_examples = None
 
-    pm_acceptance_range = _resolve_pm_acceptance_range_from_report(report)
-    pm_drift_band = _resolve_pm_drift_band_from_report(report)
-    tiny_relax = _resolve_tiny_relax_from_report(report)
+    pm_acceptance_range = report_policy_mod.resolve_pm_acceptance_range_from_report(
+        report,
+    )
+    pm_drift_band = report_policy_mod.resolve_pm_drift_band_from_report(
+        report, drift_band_default=PM_DRIFT_BAND_DEFAULT
+    )
+    tiny_relax = report_policy_mod.resolve_tiny_relax_from_report(report)
     if not tiny_relax:
         tiny_relax = str(
             os.environ.get("INVARLOCK_TINY_RELAX", "")
@@ -1233,7 +1993,11 @@ def make_report_impl(
         "tiny_relax": tiny_relax,
     }
 
-    validation_flags = _compute_validation_flags(**validation_kwargs)
+    validation_flags = report_validation_mod.compute_validation_flags(
+        **validation_kwargs,
+        pm_drift_band_default=PM_DRIFT_BAND_DEFAULT,
+        get_tier_policies_fn=get_tier_policies,
+    )
 
     # Enforce validation key allow-list to prevent surface drift
     _allowed_validation = _load_validation_allowlist()
@@ -1293,7 +2057,9 @@ def make_report_impl(
                 pm_kind_hint = pm_try.get("kind")
         except NON_FATAL_EXCEPTIONS:  # pragma: no cover
             pm_kind_hint = None
-        qo = _compute_quality_overhead_from_guard(raw_guard_ctx, pm_kind_hint)
+        qo = report_overhead_mod.compute_quality_overhead_from_guard(
+            raw_guard_ctx, pm_kind_hint
+        )
         if (
             isinstance(qo, dict)
             and "value" in qo

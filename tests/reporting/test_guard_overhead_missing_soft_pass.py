@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_builder import _compute_validation_flags
+from invarlock.reporting.report_validation import compute_validation_flags
 
 
 def test_guard_overhead_missing_ratio_treated_as_pass() -> None:
@@ -13,7 +13,7 @@ def test_guard_overhead_missing_ratio_treated_as_pass() -> None:
     # Guard overhead payload missing ratio should be treated as pass
     guard_overhead = {"overhead_threshold": 0.01}
 
-    flags = _compute_validation_flags(
+    flags = compute_validation_flags(
         ppl,
         spectral,
         rmt,

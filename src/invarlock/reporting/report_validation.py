@@ -1,4 +1,4 @@
-"""Validation-flag computation extracted from report_builder."""
+"""Validation-flag computation for evaluation report generation."""
 
 from __future__ import annotations
 

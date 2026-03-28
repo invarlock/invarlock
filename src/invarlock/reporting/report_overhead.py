@@ -1,4 +1,4 @@
-"""Guard-overhead helpers extracted from report_builder."""
+"""Guard-overhead normalization helpers for evaluation report assembly."""
 
 from __future__ import annotations
 

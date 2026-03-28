@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from invarlock.reporting import report_builder as cert
-from invarlock.reporting.render import compute_console_validation_block
+from invarlock.reporting import report_make as cert
+from invarlock.reporting import report_schema as schema_mod
+from invarlock.reporting.report_console import compute_console_validation_block
 
 
 def test_is_ppl_kind_and_get_ppl_final() -> None:
@@ -49,7 +50,7 @@ def test_confidence_label_paths() -> None:
 
 def test_validate_evaluation_report_rejects_non_boolean_flags() -> None:
     bad = {
-        "schema_version": cert.REPORT_SCHEMA_VERSION,
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
         "run_id": "r",
         "artifacts": {"generated_at": "t"},
         "plugins": {},
@@ -62,23 +63,23 @@ def test_validate_evaluation_report_rejects_non_boolean_flags() -> None:
         "primary_metric": {"kind": "ppl_causal", "final": 10.0},
         "validation": {"primary_metric_acceptable": "yes"},  # invalid type
     }
-    assert cert.validate_report(bad) is False
+    assert schema_mod.validate_report(bad) is False
 
 
 def test_validate_evaluation_report_fallback_ok_and_schema_minimal() -> None:
     # Force minimal fallback path: missing many properties, but minimal fields present
     minimal = {
-        "schema_version": cert.REPORT_SCHEMA_VERSION,
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
         "run_id": "r",
         "primary_metric": {"kind": "ppl_causal"},
     }
     # JSONSchema may reject; fallback minimal check should pass
-    assert cert.validate_report(minimal) is True
+    assert schema_mod.validate_report(minimal) is True
 
 
 def test_console_validation_block_guard_skipped_and_included() -> None:
     base = {
-        "schema_version": cert.REPORT_SCHEMA_VERSION,
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
         "run_id": "x",
         "artifacts": {"generated_at": "t"},
         "plugins": {},

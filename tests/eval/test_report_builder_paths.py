@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 from invarlock.reporting.dataset_hashing import _extract_dataset_info
 from invarlock.reporting.policy_utils import _resolve_policy_tier
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 from invarlock.reporting.utils import (
     _coerce_int,
     _get_mapping,
@@ -156,7 +156,7 @@ def test_make_evaluation_report_raises_on_drift_vs_delta_mismatch(monkeypatch):
 
     # Bypass full schema validation to focus on drift consistency branch
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.validate_run_report", lambda _: True
+        "invarlock.reporting.report_normalization.validate_report", lambda _: True
     )
     monkeypatch.setattr(
         "invarlock.core.bootstrap.compute_paired_delta_log_ci",
@@ -207,7 +207,7 @@ def test_make_evaluation_report_primary_seed_defaulted_when_missing(monkeypatch)
         "metrics": {"ppl_final": 10.2, "ppl_preview": 10.1},
     }
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.validate_run_report", lambda _: True
+        "invarlock.reporting.report_normalization.validate_report", lambda _: True
     )
     # Ensure minimal acceptance criteria satisfied
     report.setdefault("metrics", {})["ppl_ratio"] = 1.01
@@ -253,7 +253,7 @@ def test_make_evaluation_report_uses_tokenizer_hash_from_data(monkeypatch):
         "metrics": {"ppl_final": 10.5, "ppl_preview": 10.1},
     }
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.validate_run_report", lambda _: True
+        "invarlock.reporting.report_normalization.validate_report", lambda _: True
     )
     cert = make_report(report, baseline)
     assert cert["meta"]["tokenizer_hash"] == "tok-abc"
@@ -294,7 +294,7 @@ def test_make_evaluation_report_includes_cuda_flags_and_model_profile(monkeypatc
         "metrics": {"ppl_final": 10.5, "ppl_preview": 10.1},
     }
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.validate_run_report", lambda _: True
+        "invarlock.reporting.report_normalization.validate_report", lambda _: True
     )
     cert = make_report(report, baseline)
     # Extended meta fields may be omitted after normalization
@@ -335,7 +335,7 @@ def test_make_evaluation_report_carries_window_plan(monkeypatch):
         "metrics": {"ppl_final": 10.5, "ppl_preview": 10.1},
     }
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.validate_run_report", lambda _: True
+        "invarlock.reporting.report_normalization.validate_report", lambda _: True
     )
     cert = make_report(report, baseline)
     # Window plan may be omitted; ensure dataset pairing stats are present

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting import render as render_mod
+from invarlock.reporting import report_console as console_mod
 
 
 def test_compute_console_validation_block_handles_guard(monkeypatch):
@@ -10,7 +11,7 @@ def test_compute_console_validation_block_handles_guard(monkeypatch):
         "Invariants Pass",
     ]
     monkeypatch.setattr(
-        render_mod, "_load_console_labels", lambda: labels, raising=False
+        console_mod, "load_console_labels", lambda: labels, raising=False
     )
 
     evaluation_report = {
@@ -21,12 +22,12 @@ def test_compute_console_validation_block_handles_guard(monkeypatch):
         },
         "guard_overhead": {"evaluated": False, "ok": True},
     }
-    block = render_mod.compute_console_validation_block(evaluation_report)
+    block = console_mod.compute_console_validation_block(evaluation_report)
     assert "Guard Overhead Acceptable" not in block["labels"]
     assert block["overall_pass"] is False
 
     evaluation_report["guard_overhead"]["evaluated"] = True
-    block2 = render_mod.compute_console_validation_block(evaluation_report)
+    block2 = console_mod.compute_console_validation_block(evaluation_report)
     guard_rows = [row for row in block2["rows"] if "Guard Overhead" in row["label"]]
     assert guard_rows and guard_rows[0]["ok"] is True
     assert block2["overall_pass"] is False

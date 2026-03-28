@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.render import compute_console_validation_block
+from invarlock.reporting.report_console import compute_console_validation_block
 
 
 def test_console_block_without_guard_overhead_is_pass():
