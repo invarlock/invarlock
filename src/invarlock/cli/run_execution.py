@@ -1,17 +1,92 @@
-# mypy: ignore-errors
 """Typed run execution owner for config-driven run commands."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 from invarlock.core.config_execution import ConfigExecutionRequest
+
+AnyCallable = Callable[..., Any]
+
+
+@dataclass(frozen=True)
+class RunExecutionDeps:
+    ConfigError: Any
+    InvarlockError: Any
+    Path: Any
+    _SnapshotRestoreFailed: Any
+    _adjust_edit_params: AnyCallable
+    _apply_mlm_masks: AnyCallable
+    _apply_warning_filters: AnyCallable
+    _assemble_run_report: AnyCallable
+    _build_provider_dataset_plan: AnyCallable
+    _build_restore_failure_attempt_summary: AnyCallable
+    _build_run_context_payload: AnyCallable
+    _build_run_execution_config_payloads: AnyCallable
+    _build_snapshot_execution_plan: AnyCallable
+    _build_timing_summary_payload: AnyCallable
+    _coerce_float: AnyCallable
+    _coerce_int: AnyCallable
+    _decide_failed_retry_transition: AnyCallable
+    _event: AnyCallable
+    _execute_guarded_run: AnyCallable
+    _extract_pairing_schedule: AnyCallable
+    _format_guard_chain: AnyCallable
+    _format_kv_line: AnyCallable
+    _free_model_memory: AnyCallable
+    _hash_sequences: AnyCallable
+    _init_retry_controller: AnyCallable
+    _load_baseline_pairing_evidence: AnyCallable
+    _load_model_with_cfg: AnyCallable
+    _materialize_run_dataset: AnyCallable
+    _normalize_overhead_result: AnyCallable
+    _persist_run_report_outputs: AnyCallable
+    _prepare_config_for_run: AnyCallable
+    _print_guard_overhead_summary: AnyCallable
+    _print_pipeline_start: AnyCallable
+    _print_retry_summary: AnyCallable
+    _record_retry_attempt: AnyCallable
+    _resolve_device_and_output: AnyCallable
+    _resolve_exit_code: AnyCallable
+    _resolve_guard_overhead_threshold: AnyCallable
+    _resolve_pm_acceptance_range: AnyCallable
+    _resolve_pm_drift_band: AnyCallable
+    _resolve_pm_min_tokens_target: AnyCallable
+    _resolve_retry_validation_transition: AnyCallable
+    _resolve_snapshot_config: AnyCallable
+    _resolve_snapshot_retry_transition: AnyCallable
+    _run_bare_control: AnyCallable
+    _safe_int: AnyCallable
+    _should_measure_overhead: AnyCallable
+    _style_from_console: AnyCallable
+    _tensor_or_list_to_ints: AnyCallable
+    _to_serialisable_dict: AnyCallable
+    _tokenizer_digest: AnyCallable
+    _validate_and_harvest_baseline_schedule: AnyCallable
+    _validate_retry_evaluation_report: AnyCallable
+    click: Any
+    console: Any
+    datetime: Any
+    detect_model_profile: AnyCallable
+    get_psutil: AnyCallable
+    get_torch: AnyCallable
+    math: Any
+    np: Any
+    os: Any
+    perf_counter: AnyCallable
+    print_timing_summary: AnyCallable
+    resolve_output_style: AnyCallable
+    set_seed: AnyCallable
+    timed_step: AnyCallable
+    typer: Any
 
 
 def execute_run_request(
     request: ConfigExecutionRequest,
     *,
-    deps: Any,
+    deps: RunExecutionDeps,
 ) -> str | None:
     """Execute a config-driven run using an explicit typed request."""
 
