@@ -502,9 +502,7 @@ def test_plan_release_windows_candidate_unique_zero_falls_back_to_available_uniq
         requested_final=500,
         max_calibration=100,
         console=Console(record=True),
-        event_fn=lambda console, tag, message, **kwargs: events.append(
-            (tag, message)
-        ),
+        event_fn=lambda console, tag, message, **kwargs: events.append((tag, message)),
     )
 
     assert plan["capacity"]["effective_unique"] == 2000

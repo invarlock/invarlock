@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from invarlock.cli.run_overhead import plan_release_windows
 from invarlock.cli import run_pairing_helpers as pairing_helpers_mod
+from invarlock.cli.run_overhead import plan_release_windows
 from invarlock.cli.run_pairing import (
     _canonical_dataset_id,
     compute_provider_digest,
