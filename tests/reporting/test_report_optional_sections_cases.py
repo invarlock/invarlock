@@ -114,7 +114,10 @@ def test_make_evaluation_report_populates_optional_sections(monkeypatch):
         raising=False,
     )
     monkeypatch.setattr(
-        report_normalization_mod, "normalize_baseline", lambda value: value, raising=False
+        report_normalization_mod,
+        "normalize_baseline",
+        lambda value: value,
+        raising=False,
     )
 
     evaluation_report = make_report(report, baseline)
@@ -146,7 +149,10 @@ def test_make_evaluation_report_policy_digest_marks_changed(monkeypatch):
         raising=False,
     )
     monkeypatch.setattr(
-        report_normalization_mod, "normalize_baseline", lambda value: value, raising=False
+        report_normalization_mod,
+        "normalize_baseline",
+        lambda value: value,
+        raising=False,
     )
 
     evaluation_report = make_report(report, baseline)

@@ -64,7 +64,9 @@ def normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
     """Normalize baseline payloads into a canonical comparison dictionary."""
 
     if not isinstance(baseline, dict):
-        raise ValueError("Baseline must be a RunReport dict or normalized baseline dict")
+        raise ValueError(
+            "Baseline must be a RunReport dict or normalized baseline dict"
+        )
 
     schema_version = baseline.get("schema_version")
     if (
@@ -152,27 +154,43 @@ def normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
 
     if baseline.get("schema_version") == "baseline-v1":
         metrics_blk = baseline.get("metrics", {}) or {}
-        pm = metrics_blk.get("primary_metric", {}) if isinstance(metrics_blk, dict) else {}
+        pm = (
+            metrics_blk.get("primary_metric", {})
+            if isinstance(metrics_blk, dict)
+            else {}
+        )
         pm_kind = _normalize_kind(pm.get("kind")) if isinstance(pm, dict) else ""
         pm_is_ppl = _is_ppl_kind(pm_kind)
-        ppl_final_raw = metrics_blk.get("ppl_final") if isinstance(metrics_blk, dict) else None
-        if not (
-            isinstance(ppl_final_raw, int | float) and math.isfinite(float(ppl_final_raw))
-        ) and pm_is_ppl and isinstance(pm, dict):
+        ppl_final_raw = (
+            metrics_blk.get("ppl_final") if isinstance(metrics_blk, dict) else None
+        )
+        if (
+            not (
+                isinstance(ppl_final_raw, int | float)
+                and math.isfinite(float(ppl_final_raw))
+            )
+            and pm_is_ppl
+            and isinstance(pm, dict)
+        ):
             final_value = pm.get("final")
             if isinstance(final_value, int | float):
                 ppl_final_raw = float(final_value)
         if not (
-            isinstance(ppl_final_raw, int | float) and math.isfinite(float(ppl_final_raw))
+            isinstance(ppl_final_raw, int | float)
+            and math.isfinite(float(ppl_final_raw))
         ):
             evaluation_windows = baseline.get("evaluation_windows")
             if isinstance(evaluation_windows, dict):
                 ppl_final_raw = _derive_ppl_from_logloss_block(
                     evaluation_windows.get("final")
                 )
-        if not (
-            isinstance(ppl_final_raw, int | float) and math.isfinite(float(ppl_final_raw))
-        ) and not pm_is_ppl:
+        if (
+            not (
+                isinstance(ppl_final_raw, int | float)
+                and math.isfinite(float(ppl_final_raw))
+            )
+            and not pm_is_ppl
+        ):
             evaluation_windows = baseline.get("evaluation_windows")
             has_window_payload = isinstance(evaluation_windows, dict) and bool(
                 evaluation_windows.get("final") or evaluation_windows.get("preview")
@@ -214,14 +232,19 @@ def normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
 
     if "meta" in baseline and "metrics" in baseline and "edit" in baseline:
         metrics_blk = baseline.get("metrics", {}) or {}
-        pm = metrics_blk.get("primary_metric", {}) if isinstance(metrics_blk, dict) else {}
+        pm = (
+            metrics_blk.get("primary_metric", {})
+            if isinstance(metrics_blk, dict)
+            else {}
+        )
         pm_kind = _normalize_kind(pm.get("kind")) if isinstance(pm, dict) else ""
         pm_is_ppl = _is_ppl_kind(pm_kind)
         ppl_final = metrics_blk.get("ppl_final")
         ppl_preview = metrics_blk.get("ppl_preview")
-        if not (
-            isinstance(ppl_final, int | float) and math.isfinite(float(ppl_final))
-        ) and pm_is_ppl:
+        if (
+            not (isinstance(ppl_final, int | float) and math.isfinite(float(ppl_final)))
+            and pm_is_ppl
+        ):
             try:
                 final_value = pm.get("final")
                 preview_value = pm.get("preview", final_value)
@@ -233,8 +256,16 @@ def normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
                 pass
 
         evaluation_windows = baseline.get("evaluation_windows", {})
-        final_windows = evaluation_windows.get("final", {}) if isinstance(evaluation_windows, dict) else {}
-        preview_windows = evaluation_windows.get("preview", {}) if isinstance(evaluation_windows, dict) else {}
+        final_windows = (
+            evaluation_windows.get("final", {})
+            if isinstance(evaluation_windows, dict)
+            else {}
+        )
+        preview_windows = (
+            evaluation_windows.get("preview", {})
+            if isinstance(evaluation_windows, dict)
+            else {}
+        )
         if ppl_final is None:
             ppl_final = _derive_ppl_from_logloss_block(final_windows)
         if ppl_preview is None:
@@ -242,9 +273,10 @@ def normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
         if ppl_preview is None:
             ppl_preview = ppl_final
 
-        non_ppl_without_ppl_metrics = not (
-            isinstance(ppl_final, int | float) and math.isfinite(float(ppl_final))
-        ) and not pm_is_ppl
+        non_ppl_without_ppl_metrics = (
+            not (isinstance(ppl_final, int | float) and math.isfinite(float(ppl_final)))
+            and not pm_is_ppl
+        )
 
         baseline_eval_windows = {
             "final": {
@@ -261,7 +293,9 @@ def normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
             if isinstance(baseline.get("metrics"), dict)
             else {}
         )
-        window_overlap = baseline["metrics"].get("window_overlap_fraction", float("nan"))
+        window_overlap = baseline["metrics"].get(
+            "window_overlap_fraction", float("nan")
+        )
         window_match = baseline["metrics"].get("window_match_fraction", float("nan"))
 
         baseline_tokenizer_hash = None
@@ -322,13 +356,21 @@ def normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
         if isinstance(metrics_blk, dict):
             direct_final = metrics_blk.get("ppl_final")
             direct_preview = metrics_blk.get("ppl_preview", direct_final)
-            if isinstance(direct_final, int | float) and math.isfinite(float(direct_final)):
+            if isinstance(direct_final, int | float) and math.isfinite(
+                float(direct_final)
+            ):
                 ppl_final = float(direct_final)
-            if isinstance(direct_preview, int | float) and math.isfinite(float(direct_preview)):
+            if isinstance(direct_preview, int | float) and math.isfinite(
+                float(direct_preview)
+            ):
                 ppl_preview = float(direct_preview)
-            if not (
-                isinstance(ppl_final, int | float) and math.isfinite(float(ppl_final))
-            ) and pm_is_ppl:
+            if (
+                not (
+                    isinstance(ppl_final, int | float)
+                    and math.isfinite(float(ppl_final))
+                )
+                and pm_is_ppl
+            ):
                 pm = metrics_blk.get("primary_metric", {})
                 if isinstance(pm, dict):
                     final_value = pm.get("final")
@@ -337,7 +379,10 @@ def normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
                         ppl_final = float(final_value)
                     if isinstance(preview_value, int | float):
                         ppl_preview = float(preview_value)
-        if not (isinstance(ppl_final, int | float) and math.isfinite(float(ppl_final))) and pm_is_ppl:
+        if (
+            not (isinstance(ppl_final, int | float) and math.isfinite(float(ppl_final)))
+            and pm_is_ppl
+        ):
             pm_top = baseline_out.get("primary_metric", {})
             if isinstance(pm_top, dict):
                 final_value = pm_top.get("final")
@@ -349,13 +394,18 @@ def normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
         if not (isinstance(ppl_final, int | float) and math.isfinite(float(ppl_final))):
             evaluation_windows = baseline_out.get("evaluation_windows")
             if isinstance(evaluation_windows, dict):
-                ppl_final = _derive_ppl_from_logloss_block(evaluation_windows.get("final"))
+                ppl_final = _derive_ppl_from_logloss_block(
+                    evaluation_windows.get("final")
+                )
                 if ppl_preview is None:
                     ppl_preview = _derive_ppl_from_logloss_block(
                         evaluation_windows.get("preview")
                     )
 
-    if not (isinstance(ppl_final, int | float) and math.isfinite(float(ppl_final))) and not pm_is_ppl:
+    if (
+        not (isinstance(ppl_final, int | float) and math.isfinite(float(ppl_final)))
+        and not pm_is_ppl
+    ):
         if "ppl_final" in baseline_out:
             try:
                 ppl_final_float = float(baseline_out.get("ppl_final"))

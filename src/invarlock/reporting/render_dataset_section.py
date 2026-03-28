@@ -134,9 +134,7 @@ def append_dataset_and_provenance_section(
                     f"  - tokenizer_sha256: `{_short_digest(tok_d)}` (full in JSON)"
                 )
             if ids_d:
-                lines.append(
-                    f"  - ids_sha256: `{_short_digest(ids_d)}` (full in JSON)"
-                )
+                lines.append(f"  - ids_sha256: `{_short_digest(ids_d)}` (full in JSON)")
             if mask_d:
                 lines.append(
                     f"  - masking_sha256: `{_short_digest(mask_d)}` (full in JSON)"

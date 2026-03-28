@@ -51,7 +51,10 @@ def _mk_cert(edit_name):
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [1.0]}},
     }
     with (
-        patch("invarlock.reporting.report_normalization.validate_report", return_value=True),
+        patch(
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
+        ),
         patch(
             "invarlock.core.bootstrap.compute_paired_delta_log_ci",
             return_value=(-0.1, 0.1),

@@ -107,7 +107,10 @@ def test_run_execution_owner_does_not_import_run_command_module() -> None:
     offenders = [snippet for snippet in banned_snippets if snippet in text]
     tree = ast.parse(text, filename=str(RUN_EXECUTION_PATH))
     for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module == "invarlock.cli.run_service":
+        if (
+            isinstance(node, ast.ImportFrom)
+            and node.module == "invarlock.cli.run_service"
+        ):
             offenders.append("invarlock.cli.run_service")
     assert not offenders, "\n".join(sorted(offenders))
 

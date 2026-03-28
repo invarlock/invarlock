@@ -189,7 +189,10 @@ def test_make_evaluation_report_end_to_end_populates_optional_sections_and_valid
         raising=False,
     )
     monkeypatch.setattr(
-        report_normalization_mod, "normalize_baseline", lambda value: value, raising=False
+        report_normalization_mod,
+        "normalize_baseline",
+        lambda value: value,
+        raising=False,
     )
     report, baseline = _rich_run_report()
     report = deepcopy(report)
@@ -337,7 +340,10 @@ def test_make_evaluation_report_policy_digest_changes_when_policy_override_diffe
         raising=False,
     )
     monkeypatch.setattr(
-        report_normalization_mod, "normalize_baseline", lambda value: value, raising=False
+        report_normalization_mod,
+        "normalize_baseline",
+        lambda value: value,
+        raising=False,
     )
     report, baseline = _rich_run_report()
     report = deepcopy(report)
@@ -361,7 +367,10 @@ def test_make_evaluation_report_provenance_and_guard_schedule_fallback(monkeypat
         raising=False,
     )
     monkeypatch.setattr(
-        report_normalization_mod, "normalize_baseline", lambda value: value, raising=False
+        report_normalization_mod,
+        "normalize_baseline",
+        lambda value: value,
+        raising=False,
     )
     report, baseline = _rich_run_report()
     report = deepcopy(report)
@@ -390,7 +399,10 @@ def test_make_evaluation_report_embeds_telemetry_summary(monkeypatch):
         raising=False,
     )
     monkeypatch.setattr(
-        report_normalization_mod, "normalize_baseline", lambda value: value, raising=False
+        report_normalization_mod,
+        "normalize_baseline",
+        lambda value: value,
+        raising=False,
     )
     monkeypatch.setenv("INVARLOCK_TELEMETRY", "1")
     report, baseline = _rich_run_report()

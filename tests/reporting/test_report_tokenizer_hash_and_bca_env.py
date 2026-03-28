@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import create_empty_report
 
@@ -162,10 +160,6 @@ def test_evaluation_report_uses_bca_when_env_enabled_and_many_paired_windows(
     monkeypatch.setattr(
         "invarlock.reporting.report_make.compute_primary_metric_from_report",
         lambda *_a, **_k: {"kind": "ppl_causal", "final": 10.0},
-    )
-    monkeypatch.setattr(
-        "invarlock.reporting.report_make.get_metric",
-        lambda *_a, **_k: SimpleNamespace(direction="lower"),
     )
 
     make_report(report, baseline)

@@ -129,7 +129,9 @@ def test_generate_run_id_handles_non_dict_meta():
 
 def test_analyze_bitwidth_map_empty_and_missing():
     assert report_edit_summary_mod.analyze_bitwidth_map({}) == {}
-    assert report_edit_summary_mod.analyze_bitwidth_map({"layer": {"params": 128}}) == {}
+    assert (
+        report_edit_summary_mod.analyze_bitwidth_map({"layer": {"params": 128}}) == {}
+    )
 
 
 def test_analyze_bitwidth_map_and_rank_information():

@@ -6,7 +6,7 @@ import pytest
 
 from invarlock.reporting import report_make as C
 from invarlock.reporting import report_normalization as normalization_mod
-from invarlock.reporting.utils import _coerce_interval
+from invarlock.reporting.utils import _coerce_interval, _infer_scope_from_modules
 
 
 class _RaisingStr:
@@ -51,11 +51,11 @@ def test_sanitize_seed_bundle_partial_and_fallback() -> None:
 
 
 def test_infer_scope_from_modules_variants() -> None:
-    assert C._infer_scope_from_modules([]) == "unknown"
-    assert C._infer_scope_from_modules(["model.attn.block"]) == "attn"
-    assert C._infer_scope_from_modules(["decoder.mlp.fc"]) == "ffn"
-    assert C._infer_scope_from_modules(["wte.embedding"]) == "embed"
-    mixed = C._infer_scope_from_modules(["layer.attention", "mlp.ffn", "tok.embed"])
+    assert _infer_scope_from_modules([]) == "unknown"
+    assert _infer_scope_from_modules(["model.attn.block"]) == "attn"
+    assert _infer_scope_from_modules(["decoder.mlp.fc"]) == "ffn"
+    assert _infer_scope_from_modules(["wte.embedding"]) == "embed"
+    mixed = _infer_scope_from_modules(["layer.attention", "mlp.ffn", "tok.embed"])
     assert mixed in {"attn+embed+ffn", "attn+ffn+embed"}
 
 

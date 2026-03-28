@@ -840,8 +840,8 @@ def make_report(
             and "metrics" in baseline_raw
             and "edit" in baseline_raw
         ):
-            baseline_report = report_normalization_mod.normalize_and_validate_run_report(
-                baseline_raw
+            baseline_report = (
+                report_normalization_mod.normalize_and_validate_run_report(baseline_raw)
             )
     except NON_FATAL_EXCEPTIONS:  # pragma: no cover - baseline compare is best-effort
         baseline_report = None
@@ -1550,8 +1550,8 @@ def make_report(
 
     variance_policy_digest = ""
     if isinstance(variance_policy, dict):
-        variance_policy_digest = report_policy_utils_mod._compute_variance_policy_digest(
-            variance_policy
+        variance_policy_digest = (
+            report_policy_utils_mod._compute_variance_policy_digest(variance_policy)
         )
         if not variance_policy_digest and isinstance(guard_variance_policy, dict):
             variance_policy_digest = (

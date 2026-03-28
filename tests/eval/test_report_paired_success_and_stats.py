@@ -103,7 +103,8 @@ def test_evaluation_report_paired_ci_success_and_stats_passthrough():
         return_value=(-0.08, -0.06),
     ):
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             cert = make_report(report, baseline)
 

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_validation import compute_validation_flags
 from invarlock.reporting.report_make import (
     REPORT_SCHEMA_VERSION,
 )
+from invarlock.reporting.report_validation import compute_validation_flags
 
 
 def test_primary_metric_accuracy_gating_balanced_passes():

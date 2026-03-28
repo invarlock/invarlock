@@ -1305,7 +1305,8 @@ class TestMakeEvaluationReport:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
 
@@ -1327,7 +1328,8 @@ class TestMakeEvaluationReport:
         report["data"]["final_n"] = 180
         baseline = create_mock_baseline()
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             # Enforce CI profile for hard-fail on invalid metrics
             report.setdefault("metrics", {}).setdefault("window_plan", {})[
@@ -1359,7 +1361,8 @@ class TestMakeEvaluationReport:
         report["metrics"]["ppl_final"] = 0.5
         baseline = create_mock_baseline(ppl_final=55.0)
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
         # Normalized path keeps PM snapshot as provided; fallback applies internally for gating
@@ -1374,7 +1377,8 @@ class TestMakeEvaluationReport:
         }
         baseline = create_mock_baseline()
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
         # Guard overhead is optional when not preserved by normalization
@@ -1385,7 +1389,8 @@ class TestMakeEvaluationReport:
         report = create_mock_run_report(include_evaluation_windows=True)
         baseline = create_mock_baseline()
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
         dataset_hash = evaluation_report["dataset"]["hash"]
@@ -1407,7 +1412,8 @@ class TestMakeEvaluationReport:
         report["metrics"]["paired_delta_summary"] = {"mean": math.log(1.2)}
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             with patch(
                 "invarlock.core.bootstrap.compute_paired_delta_log_ci",
@@ -1459,7 +1465,8 @@ class TestMakeEvaluationReport:
         report["metrics"]["logloss_delta_ci"] = (-0.005, 0.010)
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             with patch(
                 "invarlock.core.bootstrap.compute_paired_delta_log_ci",
@@ -1483,7 +1490,8 @@ class TestMakeEvaluationReport:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
 
@@ -1515,7 +1523,8 @@ class TestMakeEvaluationReport:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
 
@@ -1536,7 +1545,8 @@ class TestMakeEvaluationReport:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
 
@@ -1551,7 +1561,8 @@ class TestMakeEvaluationReport:
         baseline = create_mock_baseline(schema_type="baseline-v1")
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
 
@@ -1592,7 +1603,8 @@ class TestMakeEvaluationReport:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
 
@@ -1615,7 +1627,8 @@ class TestMakeEvaluationReport:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
 
@@ -1634,7 +1647,8 @@ class TestMakeEvaluationReport:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
 
@@ -1660,7 +1674,8 @@ class TestMakeEvaluationReport:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
         # Normalized evaluation_report may omit guard_overhead; validate the decision logic directly
@@ -1685,7 +1700,8 @@ class TestMakeEvaluationReport:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
 
@@ -1710,7 +1726,8 @@ class TestMakeEvaluationReport:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
 
@@ -1752,7 +1769,8 @@ class TestMakeEvaluationReport:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
 
@@ -1801,7 +1819,8 @@ class TestMakeEvaluationReport:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
 
@@ -1844,7 +1863,8 @@ class TestMakeEvaluationReport:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
 
@@ -1863,7 +1883,8 @@ class TestMakeEvaluationReport:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
 
@@ -1877,7 +1898,8 @@ class TestMakeEvaluationReport:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=False
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=False,
         ):
             with pytest.raises(ValueError, match="Invalid RunReport structure"):
                 make_report(report, baseline)
@@ -1888,7 +1910,8 @@ class TestMakeEvaluationReport:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
         from tests.utils.pm import pm as _pm
@@ -1910,7 +1933,8 @@ class TestMakeEvaluationReport:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
         assert isinstance(evaluation_report, dict)
@@ -2072,7 +2096,8 @@ class TestRenderEvaluationReportMarkdown:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
 
@@ -2091,7 +2116,8 @@ class TestRenderEvaluationReportMarkdown:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
 
@@ -2109,7 +2135,8 @@ class TestRenderEvaluationReportMarkdown:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
 
@@ -2123,7 +2150,8 @@ class TestRenderEvaluationReportMarkdown:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
 
@@ -2170,7 +2198,8 @@ class TestRenderEvaluationReportMarkdown:
         report = create_mock_run_report()
         baseline = create_mock_baseline()
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             cert = make_report(report, baseline)
         markdown = render_report_markdown(cert)
@@ -2189,7 +2218,8 @@ class TestRenderEvaluationReportMarkdown:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
 
@@ -2237,7 +2267,8 @@ class TestRenderEvaluationReportMarkdown:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
 
@@ -2424,7 +2455,8 @@ class TestRenderEvaluationReportMarkdown:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
 
@@ -2949,7 +2981,8 @@ class TestIntegrationAndEdgeCases:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             # Create evaluation_report
             evaluation_report = make_report(report, baseline)
@@ -2970,7 +3003,8 @@ class TestIntegrationAndEdgeCases:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
 
@@ -2988,7 +3022,8 @@ class TestIntegrationAndEdgeCases:
         baseline = create_mock_baseline()
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
 
@@ -3010,7 +3045,8 @@ class TestDriftValidationGates:
         baseline = create_mock_baseline(ppl_final=30.0, schema_type="baseline-v1")
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
 
@@ -3029,7 +3065,8 @@ class TestDriftValidationGates:
         baseline = create_mock_baseline(ppl_final=30.0, schema_type="baseline-v1")
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
 
@@ -3053,7 +3090,8 @@ class TestDriftValidationGates:
         baseline = create_mock_baseline(ppl_final=30.0, schema_type="baseline-v1")
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             # Current implementation normalizes invalid metrics; ensure it does not crash
             cert = make_report(report, baseline)
@@ -3070,7 +3108,8 @@ class TestDriftValidationGates:
         baseline = create_mock_baseline(ppl_final=40.0, schema_type="baseline-v1")
 
         with patch(
-            "invarlock.reporting.report_normalization.validate_report", return_value=True
+            "invarlock.reporting.report_normalization.validate_report",
+            return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
 

@@ -136,16 +136,25 @@ def _stub_evaluation_report_extractors(
         dataset_hashing, "_extract_dataset_info", lambda *_: deepcopy(dataset_info)
     )
     monkeypatch.setattr(
-        guards_analysis, "_extract_invariants", lambda *args, **kwargs: invariants, raising=False
+        guards_analysis,
+        "_extract_invariants",
+        lambda *args, **kwargs: invariants,
+        raising=False,
     )
     monkeypatch.setattr(
-        guards_analysis, "_extract_spectral_analysis", lambda *_: spectral, raising=False
+        guards_analysis,
+        "_extract_spectral_analysis",
+        lambda *_: spectral,
+        raising=False,
     )
     monkeypatch.setattr(
         guards_analysis, "_extract_rmt_analysis", lambda *_: rmt, raising=False
     )
     monkeypatch.setattr(
-        guards_analysis, "_extract_variance_analysis", lambda *_: variance, raising=False
+        guards_analysis,
+        "_extract_variance_analysis",
+        lambda *_: variance,
+        raising=False,
     )
     monkeypatch.setattr(
         report_edit_summary,
@@ -169,7 +178,10 @@ def _stub_evaluation_report_extractors(
         raising=False,
     )
     monkeypatch.setattr(
-        policy_utils, "_compute_policy_digest", lambda *_: "resolved-digest", raising=False
+        policy_utils,
+        "_compute_policy_digest",
+        lambda *_: "resolved-digest",
+        raising=False,
     )
 
 
@@ -335,16 +347,25 @@ def test_make_evaluation_report_populates_optional_sections(monkeypatch):
         dataset_hashing, "_extract_dataset_info", lambda *_: deepcopy(dataset_info)
     )
     monkeypatch.setattr(
-        guards_analysis, "_extract_invariants", lambda *args, **kwargs: invariants, raising=False
+        guards_analysis,
+        "_extract_invariants",
+        lambda *args, **kwargs: invariants,
+        raising=False,
     )
     monkeypatch.setattr(
-        guards_analysis, "_extract_spectral_analysis", lambda *_: spectral, raising=False
+        guards_analysis,
+        "_extract_spectral_analysis",
+        lambda *_: spectral,
+        raising=False,
     )
     monkeypatch.setattr(
         guards_analysis, "_extract_rmt_analysis", lambda *_: rmt, raising=False
     )
     monkeypatch.setattr(
-        guards_analysis, "_extract_variance_analysis", lambda *_: variance, raising=False
+        guards_analysis,
+        "_extract_variance_analysis",
+        lambda *_: variance,
+        raising=False,
     )
     monkeypatch.setattr(
         report_edit_summary,
@@ -359,7 +380,10 @@ def test_make_evaluation_report_populates_optional_sections(monkeypatch):
         raising=False,
     )
     monkeypatch.setattr(
-        policy_utils, "_extract_policy_overrides", lambda *_: ["manual-limit"], raising=False
+        policy_utils,
+        "_extract_policy_overrides",
+        lambda *_: ["manual-limit"],
+        raising=False,
     )
     monkeypatch.setattr(
         policy_utils,
@@ -368,7 +392,10 @@ def test_make_evaluation_report_populates_optional_sections(monkeypatch):
         raising=False,
     )
     monkeypatch.setattr(
-        policy_utils, "_compute_policy_digest", lambda *_: "resolved-digest", raising=False
+        policy_utils,
+        "_compute_policy_digest",
+        lambda *_: "resolved-digest",
+        raising=False,
     )
 
     evaluation_report = make_report(report, baseline)
@@ -465,7 +492,9 @@ def test_make_evaluation_report_policy_digest_detects_threshold_hash_change(
     monkeypatch.setattr(
         policy_utils, "_compute_thresholds_payload", fake_payload, raising=False
     )
-    monkeypatch.setattr(policy_utils, "_compute_thresholds_hash", fake_hash, raising=False)
+    monkeypatch.setattr(
+        policy_utils, "_compute_thresholds_hash", fake_hash, raising=False
+    )
 
     evaluation_report = make_report(report, baseline)
     assert evaluation_report["policy_digest"]["changed"] is True
@@ -485,7 +514,9 @@ def test_make_evaluation_report_copies_meta_environment_flags(monkeypatch):
         lambda value: value,
         raising=False,
     )
-    monkeypatch.setattr(report_normalization, "normalize_baseline", lambda value: value, raising=False)
+    monkeypatch.setattr(
+        report_normalization, "normalize_baseline", lambda value: value, raising=False
+    )
 
     evaluation_report = make_report(report, baseline)
     meta = evaluation_report["meta"]
@@ -506,7 +537,9 @@ def test_make_evaluation_report_uses_meta_tokenizer_hash(monkeypatch):
         lambda value: value,
         raising=False,
     )
-    monkeypatch.setattr(report_normalization, "normalize_baseline", lambda value: value, raising=False)
+    monkeypatch.setattr(
+        report_normalization, "normalize_baseline", lambda value: value, raising=False
+    )
 
     evaluation_report = make_report(report, baseline)
     assert evaluation_report["meta"]["tokenizer_hash"] == "tok-meta"
@@ -524,7 +557,9 @@ def test_make_evaluation_report_handles_missing_dataset_section(monkeypatch):
         lambda value: value,
         raising=False,
     )
-    monkeypatch.setattr(report_normalization, "normalize_baseline", lambda value: value, raising=False)
+    monkeypatch.setattr(
+        report_normalization, "normalize_baseline", lambda value: value, raising=False
+    )
     monkeypatch.setattr(
         dataset_hashing,
         "_extract_dataset_info",
