@@ -18,7 +18,7 @@ from invarlock.core.config_runtime import (
 
 def test_invarlock_config_is_explicit_mutable_mapping() -> None:
     base = {"model": {"id": "gpt2"}, "extra": 1}
-    cfg = InvarLockConfig(data=base, edit={"name": "noop"})
+    cfg = InvarLockConfig.from_sections(**base, edit={"name": "noop"})
     assert cfg["model"]["id"] == "gpt2"
     assert cfg.require_section("edit")["name"] == "noop"
     assert cfg.get("missing") is None
@@ -28,7 +28,7 @@ def test_invarlock_config_is_explicit_mutable_mapping() -> None:
 
 
 def test_invarlock_config_section_accessors_fail_closed() -> None:
-    cfg = InvarLockConfig(model={"id": "gpt2"}, extra=7)
+    cfg = InvarLockConfig.from_sections(model={"id": "gpt2"}, extra=7)
     assert cfg.section("missing") is None
     assert cfg.section("model") == {"id": "gpt2"}
     with pytest.raises(KeyError, match="required"):
@@ -38,7 +38,7 @@ def test_invarlock_config_section_accessors_fail_closed() -> None:
 
 
 def test_eval_section_preserves_loss_and_runtime_fields() -> None:
-    cfg = InvarLockConfig(
+    cfg = InvarLockConfig.from_sections(
         eval={
             "loss": {
                 "type": "mlm",
@@ -115,7 +115,7 @@ def test_resolve_edit_kind_unknown_raises():
 
 def test_apply_profile_ci_raises_when_runtime_profile_missing(monkeypatch):
     monkeypatch.setattr(config_mod, "_load_runtime_yaml", lambda *_a, **_k: None)
-    cfg = InvarLockConfig(dataset={"provider": "wikitext2"})
+    cfg = InvarLockConfig.from_sections(dataset={"provider": "wikitext2"})
     with pytest.raises(ValueError, match="Unknown profile"):
         apply_profile(cfg, "ci")
 
@@ -124,6 +124,6 @@ def test_apply_profile_ci_missing_runtime_profile_ignores_env(monkeypatch):
     monkeypatch.setattr(config_mod, "_load_runtime_yaml", lambda *_a, **_k: None)
     monkeypatch.setenv("INVARLOCK_CI_PREVIEW", "not-an-int")
     monkeypatch.setenv("INVARLOCK_CI_FINAL", "also-bad")
-    cfg = InvarLockConfig(dataset={"provider": "wikitext2"})
+    cfg = InvarLockConfig.from_sections(dataset={"provider": "wikitext2"})
     with pytest.raises(ValueError, match="Unknown profile"):
         apply_profile(cfg, "ci")

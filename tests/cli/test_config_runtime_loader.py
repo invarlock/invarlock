@@ -26,7 +26,10 @@ def test_load_tiers_from_runtime_override(tmp_path: Path, monkeypatch):
 
 def test_apply_profile_unknown_raises():
     with pytest.raises(ValueError):
-        apply_profile(InvarLockConfig(dataset={"provider": "wikitext2"}), "unknown")
+        apply_profile(
+            InvarLockConfig.from_sections(dataset={"provider": "wikitext2"}),
+            "unknown",
+        )
 
 
 def test_resolve_edit_kind_positive():
@@ -41,7 +44,7 @@ def test_apply_profile_runtime_profile_success(tmp_path: Path, monkeypatch):
     prof = rt / "dev.yaml"
     prof.write_text("dataset: {preview_n: 5, final_n: 7}", encoding="utf-8")
     monkeypatch.setenv("INVARLOCK_CONFIG_ROOT", str(tmp_path))
-    cfg = InvarLockConfig(dataset={"provider": "wikitext2"})
+    cfg = InvarLockConfig.from_sections(dataset={"provider": "wikitext2"})
     out = apply_profile(cfg, "dev")
     d = out.data.get("dataset", {})
     assert d.get("preview_n") == 5 and d.get("final_n") == 7

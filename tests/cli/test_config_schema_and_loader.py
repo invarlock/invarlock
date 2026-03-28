@@ -27,7 +27,7 @@ from invarlock.core.config_runtime import (
 
 
 def test_resolve_edit_kind_and_apply_override_roundtrip():
-    cfg = InvarLockConfig(
+    cfg = InvarLockConfig.from_sections(
         model={"id": "gpt2", "adapter": "hf_causal"},
         edit={"name": "quant_rtn", "plan": {}},
     )
@@ -161,7 +161,7 @@ def test_load_config_raises_on_bad_defaults_type(tmp_path: Path):
 
 
 def test_apply_profile_ci_cpu_and_unknown_profile():
-    cfg = InvarLockConfig(
+    cfg = InvarLockConfig.from_sections(
         model={"id": "gpt2", "adapter": "hf_causal"},
         edit={"name": "quant_rtn", "plan": {}},
     )
@@ -174,7 +174,7 @@ def test_apply_profile_ci_cpu_and_unknown_profile():
 
 
 def test_apply_profile_ci_and_release():
-    cfg = InvarLockConfig(
+    cfg = InvarLockConfig.from_sections(
         model={"id": "gpt2", "adapter": "hf_causal"},
         edit={"name": "quant_rtn", "plan": {}},
     )

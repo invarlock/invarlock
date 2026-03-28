@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import copy
 import os
-from collections.abc import Iterator, MutableMapping
+from collections.abc import Iterator, Mapping, MutableMapping
 from dataclasses import dataclass, field, fields, is_dataclass
 from importlib import resources as _ires
 from pathlib import Path
@@ -231,24 +231,21 @@ def _normalize_top_level_section(name: str, value: Any) -> Any:
 class InvarLockConfig(MutableMapping[str, Any]):
     """Explicit mutable mapping for runtime configuration.
 
-    Accepts either a single `data` mapping or keyword sections like `model=`,
-    `edit=`, `dataset=`, etc., and stores them internally as a plain nested
-    mapping. Nested sections are accessed deliberately via mapping operations or
-    `section()` / `require_section()`.
+    Stores runtime configuration as a plain nested mapping. Nested sections are
+    accessed deliberately via mapping operations or `section()` /
+    `require_section()`.
     """
 
     data: dict[str, Any]
 
-    def __init__(self, data: dict[str, Any] | None = None, **sections: Any) -> None:
-        if data is not None and sections:
-            merged = _deep_merge(data, sections)
-            self.data = merged
-        elif data is not None:
-            self.data = copy.deepcopy(data)
-        else:
-            self.data = copy.deepcopy(sections)
+    def __init__(self, data: Mapping[str, Any]) -> None:
+        self.data = copy.deepcopy(dict(data))
         for key, value in list(self.data.items()):
             self.data[key] = _normalize_top_level_section(key, value)
+
+    @classmethod
+    def from_sections(cls, **sections: Any) -> InvarLockConfig:
+        return cls(sections)
 
     def __getitem__(self, key: str) -> Any:
         return self.data[key]
