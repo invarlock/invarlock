@@ -11,6 +11,17 @@ from invarlock.reporting.report_telemetry import (
     telemetry_summary_line,
 )
 
+_VALIDATION_EXCEPTIONS = (
+    AttributeError,
+    FileNotFoundError,
+    json.JSONDecodeError,
+    KeyError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 @dataclass(frozen=True)
 class RetryReportValidationResult:
@@ -69,7 +80,7 @@ def validate_retry_evaluation_report(
             telemetry_summary=telemetry_summary,
             error_message=None,
         )
-    except Exception as exc:
+    except _VALIDATION_EXCEPTIONS as exc:
         return RetryReportValidationResult(
             status="error",
             passed=False,

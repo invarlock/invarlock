@@ -20,6 +20,16 @@ from invarlock.reporting.report_schema import (
 )
 from invarlock.reporting.report_validation import compute_validation_flags
 
+_VERIFY_PARSE_EXCEPTIONS = (
+    AttributeError,
+    json.JSONDecodeError,
+    KeyError,
+    OverflowError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 def _coerce_float(value: Any) -> float | None:
     try:
@@ -57,10 +67,22 @@ def _validate_report_schema_strict(
     schema_lib = getattr(report_schema_module, "jsonschema", None)
     if schema_lib is None:
         return False
+    schema_failures = getattr(report_schema_module, "_JSONSCHEMA_FAILURES", ())
+    schema_failures = tuple(
+        exc
+        for exc in schema_failures
+        if isinstance(exc, type) and issubclass(exc, BaseException)
+    )
+    schema_validation_exceptions = (
+        TypeError,
+        ValueError,
+        KeyError,
+        RuntimeError,
+    ) + schema_failures
 
     try:
         schema_lib.validate(instance=report, schema=report_json_schema)
-    except Exception:
+    except schema_validation_exceptions:
         return False
     return True
 
@@ -523,7 +545,7 @@ def _validate_drift_band(report: dict[str, Any]) -> list[str]:
             and prev > 0
         ):
             drift_ratio = float(fin) / float(prev)
-    except Exception:
+    except _VERIFY_PARSE_EXCEPTIONS:
         drift_ratio = None
 
     if not isinstance(drift_ratio, (int, float)):
@@ -551,7 +573,7 @@ def _validate_drift_band(report: dict[str, Any]) -> list[str]:
                 if math.isfinite(lo_f) and math.isfinite(hi_f) and 0 < lo_f < hi_f:
                     drift_min = lo_f
                     drift_max = hi_f
-    except Exception:
+    except _VERIFY_PARSE_EXCEPTIONS:
         pass
 
     if not drift_min <= float(drift_ratio) <= drift_max:
@@ -573,7 +595,7 @@ def _validate_tokenizer_hash(report: dict[str, Any]) -> list[str]:
             if isinstance(dataset.get("tokenizer"), dict)
             else None
         )
-    except Exception:
+    except _VERIFY_PARSE_EXCEPTIONS:
         edited_hash = None
 
     baseline_ref = report.get("baseline_ref", {}) or {}
@@ -600,7 +622,7 @@ def _measurement_contract_digest(contract: Any) -> str | None:
         return None
     try:
         canonical = json.dumps(contract, sort_keys=True, default=str)
-    except Exception:
+    except _VERIFY_PARSE_EXCEPTIONS:
         return None
     return hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
@@ -760,7 +782,7 @@ def _validate_evaluation_report_payload(
             if isinstance(profile, str | None)
             else "dev"
         )
-    except Exception:
+    except _VERIFY_PARSE_EXCEPTIONS:
         prof = "dev"
 
     if prof in {"ci", "release"} and not validate_report_schema_strict_fn(report):

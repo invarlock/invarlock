@@ -6,12 +6,20 @@ from typing import Any
 
 from .report_types import RunReport
 
+_NON_FATAL_EXCEPTIONS = (
+    AttributeError,
+    KeyError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 def build_guard_evidence_payload(report: RunReport) -> dict[str, Any]:
     """Build the compact guard evidence payload persisted with report bundles."""
     try:
         guard_ctx = report.get("guards") or []
-    except Exception:
+    except _NON_FATAL_EXCEPTIONS:
         guard_ctx = []
 
     if not isinstance(guard_ctx, list) or not guard_ctx:

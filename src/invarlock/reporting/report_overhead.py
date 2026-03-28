@@ -11,6 +11,15 @@ ValidateGuardOverheadFn = Callable[..., Any]
 ComputePrimaryMetricFn = Callable[..., dict[str, Any]]
 GetMetricFn = Callable[[str], Any]
 
+_NON_FATAL_EXCEPTIONS = (
+    AttributeError,
+    KeyError,
+    OverflowError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 def prepare_guard_overhead_section(
     raw: Any,
@@ -54,7 +63,7 @@ def prepare_guard_overhead_section(
             mode = payload.get("guard_overhead_mode")
         if isinstance(mode, str) and mode.strip():
             sanitized["mode"] = mode.strip()
-    except Exception:
+    except _NON_FATAL_EXCEPTIONS:
         pass
     try:
         skipped = bool(payload.get("skipped", False))
@@ -63,7 +72,7 @@ def prepare_guard_overhead_section(
             reason = payload.get("skip_reason")
             if isinstance(reason, str) and reason.strip():
                 sanitized["skip_reason"] = reason.strip()
-    except Exception:
+    except _NON_FATAL_EXCEPTIONS:
         pass
 
     # Prefer structured reports and reuse the validator when available
@@ -192,7 +201,7 @@ def compute_quality_overhead_from_guard(
         # Resolve direction from registry when possible
         try:
             direction = get_metric_impl(kind).direction
-        except Exception:  # pragma: no cover
+        except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
             direction = str(pm_g.get("direction", "")).lower()
         if direction == "lower":
             if float(b_point) <= 0:
@@ -203,5 +212,5 @@ def compute_quality_overhead_from_guard(
             value = 100.0 * (float(g_point) - float(b_point))
             basis = "delta_pp"
         return {"basis": basis, "value": value, "kind": kind}
-    except Exception:  # pragma: no cover
+    except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
         return None

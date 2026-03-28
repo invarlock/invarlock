@@ -3,32 +3,33 @@ from __future__ import annotations
 import copy
 
 import invarlock.reporting.report_schema as schema_mod
+import invarlock.reporting.report_validation_allowlist as allowlist_mod
 
 
 def test_load_validation_allowlist_default(monkeypatch):
     def _missing(_filename: str):
         raise FileNotFoundError
 
-    monkeypatch.setattr(schema_mod, "load_json_contract", _missing)
-    allowlist = schema_mod._load_validation_allowlist()
+    monkeypatch.setattr(allowlist_mod, "load_json_contract", _missing)
+    allowlist = allowlist_mod.load_validation_allowlist()
     assert allowlist == set(schema_mod._VALIDATION_ALLOWLIST_DEFAULT)
 
 
 def test_load_validation_allowlist_reads_file(monkeypatch):
     monkeypatch.setattr(
-        schema_mod,
+        allowlist_mod,
         "load_json_contract",
         lambda _filename: ["primary_metric_acceptable", "custom_flag"],
     )
-    allowlist = schema_mod._load_validation_allowlist()
+    allowlist = allowlist_mod.load_validation_allowlist()
     assert allowlist == {"primary_metric_acceptable", "custom_flag"}
 
 
 def test_load_validation_allowlist_non_list_payload(monkeypatch):
     monkeypatch.setattr(
-        schema_mod, "load_json_contract", lambda _filename: {"oops": True}
+        allowlist_mod, "load_json_contract", lambda _filename: {"oops": True}
     )
-    allowlist = schema_mod._load_validation_allowlist()
+    allowlist = allowlist_mod.load_validation_allowlist()
     assert allowlist == set(schema_mod._VALIDATION_ALLOWLIST_DEFAULT)
 
 
@@ -74,7 +75,7 @@ def test_validate_report_fallback_and_allowlist(monkeypatch):
     )
 
     monkeypatch.setattr(
-        schema_mod, "_load_validation_allowlist", lambda: {"custom_flag"}
+        allowlist_mod, "load_validation_allowlist", lambda: {"custom_flag"}
     )
     monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda _: False)
 
@@ -99,13 +100,11 @@ def test_validate_report_rejects_non_boolean_flags(monkeypatch):
 
 
 def test_load_validation_allowlist_handles_exception(monkeypatch):
-    from pathlib import Path
-
-    def boom(self):
+    def boom(_filename: str):
         raise RuntimeError("fail")
 
-    monkeypatch.setattr(Path, "resolve", boom, raising=False)
-    allowlist = schema_mod._load_validation_allowlist()
+    monkeypatch.setattr(allowlist_mod, "load_json_contract", boom)
+    allowlist = allowlist_mod.load_validation_allowlist()
     assert allowlist == set(schema_mod._VALIDATION_ALLOWLIST_DEFAULT)
 
 
@@ -116,8 +115,8 @@ def test_validate_report_allowlist_error(monkeypatch):
         "primary_metric": {"kind": "ppl_causal", "final": 1.0},
     }
     monkeypatch.setattr(
-        schema_mod,
-        "_load_validation_allowlist",
+        allowlist_mod,
+        "load_validation_allowlist",
         lambda: (_ for _ in ()).throw(RuntimeError("boom")),
     )
     monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda _: True)

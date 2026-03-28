@@ -10,13 +10,22 @@ from typing import Any
 from .normalizer import normalize_run_report
 from .report_types import RunReport, validate_report
 
+_PARSE_EXCEPTIONS = (
+    AttributeError,
+    KeyError,
+    OverflowError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 def _is_ppl_kind(name: Any) -> bool:
     """Return True when the metric kind is a ppl-like metric."""
 
     try:
         normalized = str(name or "").lower()
-    except Exception:  # pragma: no cover
+    except _PARSE_EXCEPTIONS:  # pragma: no cover
         normalized = ""
     return normalized in {
         "ppl",
@@ -108,7 +117,7 @@ def normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
     def _normalize_kind(value: Any) -> str:
         try:
             return str(value or "").strip().lower()
-        except Exception:
+        except _PARSE_EXCEPTIONS:
             return ""
 
     def _derive_ppl_from_logloss_block(block: Any) -> float | None:
@@ -143,7 +152,7 @@ def normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
                     if denominator > 0.0
                     else float(sum(values) / len(values))
                 )
-            except Exception:
+            except _PARSE_EXCEPTIONS:
                 mean_ll = float(sum(values) / len(values))
         else:
             mean_ll = float(sum(values) / len(values))
@@ -252,7 +261,7 @@ def normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
                     ppl_final = float(final_value)
                 if isinstance(preview_value, int | float):
                     ppl_preview = float(preview_value)
-            except Exception:  # pragma: no cover
+            except _PARSE_EXCEPTIONS:  # pragma: no cover
                 pass
 
         evaluation_windows = baseline.get("evaluation_windows", {})
@@ -303,7 +312,7 @@ def normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
             baseline_tokenizer_hash = baseline.get("meta", {}).get(
                 "tokenizer_hash"
             ) or baseline.get("data", {}).get("tokenizer_hash")
-        except Exception:  # pragma: no cover
+        except _PARSE_EXCEPTIONS:  # pragma: no cover
             baseline_tokenizer_hash = None
 
         baseline_out: dict[str, Any] = {
@@ -409,7 +418,7 @@ def normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
         if "ppl_final" in baseline_out:
             try:
                 ppl_final_float = float(baseline_out.get("ppl_final"))
-            except Exception:
+            except _PARSE_EXCEPTIONS:
                 baseline_out.pop("ppl_final", None)
             else:
                 if not math.isfinite(ppl_final_float) or ppl_final_float <= 0.0:
@@ -417,7 +426,7 @@ def normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
         if "ppl_preview" in baseline_out:
             try:
                 ppl_preview_float = float(baseline_out.get("ppl_preview"))
-            except Exception:
+            except _PARSE_EXCEPTIONS:
                 baseline_out.pop("ppl_preview", None)
             else:
                 if not math.isfinite(ppl_preview_float) or ppl_preview_float <= 0.0:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_make import _is_ppl_kind, make_report
+from invarlock.reporting.report_make import make_report
+from invarlock.reporting.report_primary_metric_policy import is_ppl_kind as _is_ppl_kind
 from invarlock.reporting.report_schema import validate_report
 from invarlock.reporting.report_types import RunReport, create_empty_report
 

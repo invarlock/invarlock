@@ -7,6 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+_NON_FATAL_EXCEPTIONS = (AttributeError, KeyError, OSError, TypeError, ValueError)
+
 
 @dataclass(frozen=True)
 class RunReportAssemblyResult:
@@ -363,7 +365,7 @@ def persist_run_report_outputs(
             telemetry_saved_path = str(saved_path)
             if isinstance(saved_files, dict):
                 saved_files["telemetry"] = telemetry_saved_path
-        except Exception as exc:  # pragma: no cover - best-effort
+        except _NON_FATAL_EXCEPTIONS as exc:  # pragma: no cover - best-effort
             telemetry_error = str(exc)
 
     return RunReportPersistenceResult(

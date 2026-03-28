@@ -8,6 +8,14 @@ from collections.abc import Callable
 from typing import Any
 
 GetTierPoliciesFn = Callable[[], dict[str, Any]]
+_NON_FATAL_EXCEPTIONS = (
+    AttributeError,
+    KeyError,
+    OverflowError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 
 
 def _coerce_finite_float(value: Any) -> float | None:
@@ -112,7 +120,7 @@ def compute_validation_flags(
                 ):
                     drift_min = cand_min_f
                     drift_max = cand_max_f
-        except Exception:  # pragma: no cover
+        except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
             pass
     preview_final_drift_acceptable = drift_min <= drift_ratio <= drift_max
     if tiny_relax:
@@ -132,7 +140,7 @@ def compute_validation_flags(
             )
             if isinstance(pm_ratio, int | float) and math.isfinite(pm_ratio):
                 ratio_vs_baseline = float(pm_ratio)
-        except Exception:  # pragma: no cover
+        except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
             pass
     # Hysteresis and sample-size floors from tier policies
     hysteresis_ratio = float(pm_policy.get("hysteresis_ratio", 0.0))
@@ -158,7 +166,7 @@ def compute_validation_flags(
                                 eff_min_tokens,
                                 int(math.ceil(float(avail_tokens) * frac)),
                             )
-                except Exception:  # pragma: no cover
+                except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
                     pass
                 tokens_ok = total_tokens >= eff_min_tokens
                 if not tokens_ok:
@@ -184,7 +192,7 @@ def compute_validation_flags(
                                     and float(fin_used) >= float(fin_req)
                                 )
                                 coverage_ok = prev_ok and fin_ok
-                    except Exception:  # pragma: no cover
+                    except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
                         coverage_ok = False
 
                     if coverage_ok:
@@ -192,7 +200,7 @@ def compute_validation_flags(
                             tolerance_ratio = float(
                                 pm_policy.get("min_tokens_tolerance", 0.02) or 0.0
                             )
-                        except Exception:
+                        except _NON_FATAL_EXCEPTIONS:
                             tolerance_ratio = 0.0
                         if tolerance_ratio < 0.0:
                             tolerance_ratio = 0.0
@@ -200,7 +208,7 @@ def compute_validation_flags(
                             math.floor(float(eff_min_tokens) * (1.0 - tolerance_ratio))
                         )
                         tokens_ok = total_tokens >= max(relaxed_floor, 0)
-            except Exception:  # pragma: no cover
+            except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
                 tokens_ok = True
     # Under tiny_relax, treat token floors as informational only
     tokens_ok_eff = tokens_ok or tiny_relax
@@ -212,7 +220,7 @@ def compute_validation_flags(
             lower_bound_ok = math.isfinite(float(ratio_vs_baseline)) and (
                 float(ratio_vs_baseline) >= float(ratio_min_bound)
             )
-        except Exception:
+        except _NON_FATAL_EXCEPTIONS:
             lower_bound_ok = True
     compression_acceptable = (
         isinstance(ratio_vs_baseline, int | float)
@@ -294,7 +302,7 @@ def compute_validation_flags(
         )
         if not base_ok and compression_acceptable:
             flags["hysteresis_applied"] = True
-    except Exception:  # pragma: no cover
+    except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
         pass
 
     # Optional primary metric gating (metric-v1)
@@ -346,7 +354,7 @@ def compute_validation_flags(
                                     eff_min_examples,
                                     int(math.ceil(float(avail_ex) * frac)),
                                 )
-                    except Exception:  # pragma: no cover
+                    except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
                         pass
                     meets_n = int(n_fin) >= eff_min_examples
                     if tiny_relax:
@@ -360,9 +368,9 @@ def compute_validation_flags(
                         and meets_delta
                     ):
                         flags["hysteresis_applied"] = True
-                except Exception:  # pragma: no cover
+                except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
                     pass
-    except Exception:  # pragma: no cover
+    except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
         # Fail-closed to False if something goes wrong
         flags["primary_metric_acceptable"] = False
 
@@ -380,7 +388,7 @@ def compute_validation_flags(
                     and bool(tokens_ok_eff)
                 ):
                     flags["primary_metric_acceptable"] = True
-    except Exception:  # pragma: no cover
+    except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
         pass
 
     # MoE observability flags (non-gating)
@@ -388,7 +396,7 @@ def compute_validation_flags(
         if isinstance(moe, dict) and moe:
             flags["moe_observed"] = True
             flags["moe_identity_ok"] = True
-    except Exception:  # pragma: no cover
+    except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
         pass
 
     # Primary metric tail gate (warn/fail; default non-blocking)
@@ -401,7 +409,7 @@ def compute_validation_flags(
             if mode == "fail" and evaluated and (not passed):
                 tail_ok = False
         flags["primary_metric_tail_acceptable"] = bool(tail_ok)
-    except Exception:  # pragma: no cover
+    except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
         flags["primary_metric_tail_acceptable"] = True
 
     return flags

@@ -9,6 +9,8 @@ from typing import Any
 from .report_types import RunReport
 from .utils import _coerce_int, _get_mapping, _infer_scope_from_modules
 
+_NON_FATAL_EXCEPTIONS = (AttributeError, TypeError, ValueError)
+
 
 def analyze_bitwidth_map(bitwidth_map: dict[str, Any]) -> dict[str, Any]:
     """Analyze bitwidth changes for compression diagnostics."""
@@ -377,7 +379,7 @@ def extract_structural_deltas(report: RunReport) -> dict[str, Any]:
                 _infer("scope", "embed", "plan_digest")
     try:
         edit_name = (report.get("edit", {}) or {}).get("name", "unknown")
-    except Exception:  # pragma: no cover
+    except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
         edit_name = "unknown"
 
     structure = {
@@ -466,7 +468,7 @@ def extract_edit_metadata(
         algorithm = edit_name or ""
     try:
         alg_lower = str(algorithm).strip().lower()
-    except Exception:  # pragma: no cover
+    except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
         alg_lower = ""
     allowed_algorithms = {"quant_rtn", "noop", "custom"}
     if alg_lower not in allowed_algorithms:

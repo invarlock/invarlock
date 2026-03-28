@@ -13,22 +13,21 @@ from __future__ import annotations
 # Core evaluation report building and analysis orchestration lives here.
 import copy
 import hashlib
-import math
 import os
-from datetime import datetime
 from typing import Any
 
-from invarlock.core import bootstrap as bootstrap_mod
 from invarlock.core.auto_tuning import get_tier_policies
 from invarlock.eval import tail_stats as tail_stats_mod
 from invarlock.eval.primary_metric import compute_primary_metric_from_report
 
 from . import policy_utils as report_policy_utils_mod
-from . import report_assembly_support as report_assembly_support_mod
+from . import report_build_context as report_build_context_mod
 from . import report_edit_summary as report_edit_summary_mod
+from . import report_enrichment as report_enrichment_mod
 from . import report_normalization as report_normalization_mod
 from . import report_overhead as report_overhead_mod
 from . import report_policy as report_policy_mod
+from . import report_primary_metric_analysis as report_primary_metric_analysis_mod
 from . import report_provenance as report_provenance_mod
 from . import report_schema as report_schema_mod
 from . import report_validation as report_validation_mod
@@ -39,27 +38,32 @@ from .guards_analysis import (
     _extract_spectral_analysis,
     _extract_variance_analysis,
 )
-from .report_types import RunReport
-from .utils import (
-    _coerce_int,
-    _coerce_interval,
-    _pair_logloss_windows,
-    _sanitize_seed_bundle,
+from .report_confidence import compute_confidence_label as _compute_confidence_label
+from .report_primary_metric_policy import (
+    enforce_display_ci_alignment as _enforce_display_ci_alignment,
 )
+from .report_primary_metric_policy import (
+    propagate_pairing_stats as _propagate_pairing_stats,
+)
+from .report_types import RunReport
+from .report_validation_allowlist import (
+    apply_validation_allowlist_schema as _apply_validation_allowlist_schema,
+)
+from .report_validation_allowlist import (
+    load_validation_allowlist as _load_validation_allowlist,
+)
+from .report_validation_allowlist import (
+    load_validation_allowlist_with_source as _load_validation_allowlist_with_source,
+)
+from .utils import _coerce_int, _sanitize_seed_bundle
 
-POLICY_VERSION = report_assembly_support_mod.POLICY_VERSION
+POLICY_VERSION = report_provenance_mod.POLICY_VERSION
 REPORT_SCHEMA_VERSION = report_schema_mod.REPORT_SCHEMA_VERSION
 REPORT_JSON_SCHEMA = report_schema_mod.REPORT_JSON_SCHEMA
 TIER_RATIO_LIMITS = report_policy_mod.TIER_RATIO_LIMITS
-_VALIDATION_ALLOWLIST_DEFAULT = (
-    report_assembly_support_mod._VALIDATION_ALLOWLIST_DEFAULT
-)
 
 # Canonical preview→final drift band used when not explicitly configured.
 PM_DRIFT_BAND_DEFAULT: tuple[float, float] = (0.95, 1.05)
-# Helpers are imported from `report_assembly_support`; keep this module focused on
-# orchestration and report assembly only.
-
 
 VARIANCE_CANONICAL_KEYS = (
     "deadband",
@@ -73,25 +77,9 @@ VARIANCE_CANONICAL_KEYS = (
 
 
 ## Helpers are imported from invarlock.reporting.utils
-
-
-def _collect_backend_versions() -> dict[str, Any]:
-    """Collect backend/library versions for provenance.env_flags."""
-    return report_assembly_support_mod.collect_backend_versions()
-
-
-def _compute_edit_digest(report: dict[str, Any]) -> dict[str, Any]:
-    return report_assembly_support_mod.compute_edit_digest(report)
-
-
-def _compute_confidence_label(
-    evaluation_report: dict[str, Any],
-) -> dict[str, Any]:
-    return report_assembly_support_mod.compute_confidence_label(evaluation_report)
-
-
-def _is_ppl_kind(name: Any) -> bool:
-    return report_assembly_support_mod.is_ppl_kind(name)
+_collect_backend_versions = report_provenance_mod.collect_backend_versions
+_compute_edit_digest = report_provenance_mod.compute_edit_digest
+_compute_report_digest = report_provenance_mod.compute_report_digest
 
 
 ## Pairing helper available from invarlock.reporting.utils
@@ -111,41 +99,12 @@ def _compute_thresholds_hash(payload: dict[str, Any]) -> str:
     return _impl(payload)
 
 
-def _load_validation_allowlist_with_source() -> tuple[set[str], str]:
-    """Load validation key allow-list and report the source explicitly."""
-    return report_assembly_support_mod.load_validation_allowlist_with_source()
-
-
-def _load_validation_allowlist() -> set[str]:
-    """Load validation key allow-list from contracts with fail-closed fallback."""
-    keys, _ = _load_validation_allowlist_with_source()
-    return keys
-
-
-def _apply_validation_allowlist_schema(validation_keys: set[str]) -> None:
-    """Apply allow-list constraints to report schema (fail closed on shape drift)."""
-    schema_properties = REPORT_JSON_SCHEMA.get("properties")
-    if not isinstance(schema_properties, dict):
-        raise RuntimeError(
-            "REPORT_JSON_SCHEMA.properties must be a mapping to enforce validation "
-            "allow-list constraints."
-        )
-    validation_spec = schema_properties.get("validation")
-    if not isinstance(validation_spec, dict):
-        raise RuntimeError(
-            "REPORT_JSON_SCHEMA.properties.validation must be a mapping to enforce "
-            "validation allow-list constraints."
-        )
-    validation_spec["properties"] = {k: {"type": "boolean"} for k in validation_keys}
-    validation_spec["additionalProperties"] = False
-
-
 # Tighten JSON Schema: populate validation.properties from allow-list and
 # disallow unknown validation keys at schema level.
 _VALIDATION_ALLOWLIST_KEYS, _VALIDATION_ALLOWLIST_SOURCE = (
     _load_validation_allowlist_with_source()
 )
-_apply_validation_allowlist_schema(_VALIDATION_ALLOWLIST_KEYS)
+_apply_validation_allowlist_schema(REPORT_JSON_SCHEMA, _VALIDATION_ALLOWLIST_KEYS)
 
 
 ## Note: helpers like _get_section/_get_mapping/_iter_guard_entries,
@@ -176,61 +135,6 @@ def _extract_report_meta(report: RunReport) -> dict[str, Any]:
     }
 
 
-def _enforce_drift_ratio_identity(
-    paired_windows: int,
-    delta_mean: Any,
-    drift_ratio: float,
-    window_plan_profile: str | None,
-) -> float | None:
-    """Ensure exp(delta_mean) aligns with observed drift ratio."""
-    return report_assembly_support_mod.enforce_drift_ratio_identity(
-        paired_windows, delta_mean, drift_ratio, window_plan_profile
-    )
-
-
-def _enforce_ratio_ci_alignment(
-    ratio_ci_source: str,
-    ratio_ci: Any,
-    logloss_delta_ci: Any,
-) -> None:
-    """Validate that ratio_ci matches exp(logloss_delta_ci) when paired."""
-    return report_assembly_support_mod.enforce_ratio_ci_alignment(
-        ratio_ci_source, ratio_ci, logloss_delta_ci
-    )
-
-
-def _enforce_display_ci_alignment(
-    ratio_ci_source: str,
-    primary_metric: Any,
-    logloss_delta_ci: Any,
-    window_plan_profile: str | None,
-) -> None:
-    """Ensure display_ci matches exp(ci) for ppl-like metrics when paired."""
-    return report_assembly_support_mod.enforce_display_ci_alignment(
-        ratio_ci_source, primary_metric, logloss_delta_ci, window_plan_profile
-    )
-
-
-def _enforce_pairing_and_coverage(
-    stats: dict[str, Any] | None,
-    window_plan_profile: str | None,
-    tier: str | None,
-) -> None:
-    """Enforce pairing and coverage contracts for CI/Release profiles."""
-    return report_assembly_support_mod.enforce_pairing_and_coverage(
-        stats, window_plan_profile, tier
-    )
-
-
-def _fallback_paired_windows(
-    paired_windows: int, coverage_summary: dict[str, Any]
-) -> int:
-    """Use coverage preview counts when explicit pairing is unavailable."""
-    return report_assembly_support_mod.fallback_paired_windows(
-        paired_windows, coverage_summary
-    )
-
-
 # Console validation helpers live in `report_console`; Markdown rendering lives in
 # `render`. This module owns report-construction helpers only.
 ## Private helper functions
@@ -240,19 +144,6 @@ def _fallback_paired_windows(
 
 
 ## Guard extractors moved to invarlock.reporting.guards_analysis and imported above
-def _compute_report_digest(report: RunReport | dict[str, Any] | None) -> str | None:
-    return report_assembly_support_mod.compute_report_digest(report)
-
-
-def _propagate_pairing_stats(
-    evaluation_report: dict[str, Any], ppl_analysis: dict[str, Any] | None
-) -> None:
-    """Surface pairing statistics inside evaluation_report.dataset.windows.stats."""
-    return report_assembly_support_mod.propagate_pairing_stats(
-        evaluation_report, ppl_analysis
-    )
-
-
 def _generate_run_id(report: RunReport) -> str:
     """Generate a unique run ID from report metadata."""
     meta = (
@@ -294,9 +185,6 @@ def make_report(
         ImportError,
         ModuleNotFoundError,
     )
-    NUMERIC_EXCEPTIONS = (TypeError, ValueError, OverflowError)
-    compute_paired_delta_log_ci = bootstrap_mod.compute_paired_delta_log_ci
-    logspace_to_ratio_ci = bootstrap_mod.logspace_to_ratio_ci
     evaluate_metric_tail = tail_stats_mod.evaluate_metric_tail
 
     report = report_normalization_mod.normalize_and_validate_run_report(report)
@@ -428,569 +316,15 @@ def make_report(
     if isinstance(baseline_tok_hash, str) and baseline_tok_hash:
         baseline_ref["tokenizer_hash"] = baseline_tok_hash
 
-    # Primary-metric analysis (PM-only)
+    ppl_analysis, window_plan_profile = (
+        report_primary_metric_analysis_mod.build_primary_metric_analysis(
+            report,
+            baseline_normalized,
+            baseline_ref,
+            dataset_info,
+        )
+    )
     ppl_metrics = report.get("metrics", {}) if isinstance(report, dict) else {}
-    edited_preview = float("nan")
-    edited_final = float("nan")
-    ratio_vs_baseline = float("nan")
-
-    metrics_bootstrap_obj = (
-        report["metrics"].get("bootstrap", {})
-        if isinstance(report.get("metrics"), dict)
-        else {}
-    )
-    metrics_bootstrap = (
-        dict(metrics_bootstrap_obj) if isinstance(metrics_bootstrap_obj, dict) else {}
-    )
-    raw_coverage = metrics_bootstrap.get("coverage") if metrics_bootstrap else None
-    coverage_summary = (
-        copy.deepcopy(raw_coverage) if isinstance(raw_coverage, dict) else {}
-    )
-    window_plan_ctx = (
-        report.get("metrics", {}).get("window_plan")
-        if isinstance(report.get("metrics"), dict)
-        else None
-    )
-    window_plan_profile = (
-        str(window_plan_ctx.get("profile"))
-        if isinstance(window_plan_ctx, dict) and window_plan_ctx.get("profile")
-        else None
-    )
-    preview_ci = None
-    final_ci = None
-    ratio_ci = None
-    ratio_ci_source = "run_metrics"
-    # PM-only fallback: derive ratio_ci from logloss_delta_ci when available
-    if ratio_ci is None:
-        try:
-            dlci = _coerce_interval(report["metrics"].get("logloss_delta_ci"))
-            if (
-                isinstance(dlci, tuple | list)
-                and len(dlci) == 2
-                and all(isinstance(x, (int | float)) for x in dlci)
-            ):
-                lo, hi = float(dlci[0]), float(dlci[1])
-                ratio_ci = (math.exp(lo), math.exp(hi))
-                ratio_ci_source = "run_metrics"
-        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-            pass
-    paired_windows = 0
-    # UX hint: mark CI as unstable for very low replicate counts or insufficient tokens
-    unstable_ci_flag = False
-    try:
-        rep_raw = metrics_bootstrap.get("replicates", metrics_bootstrap.get("n"))
-        if rep_raw is not None and int(rep_raw) < 200:
-            unstable_ci_flag = True
-    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        unstable_ci_flag = False
-    # Also consider token-count floor from tier policy when available
-    try:
-        tokens_prev = (
-            report.get("metrics", {}).get("preview_total_tokens")
-            if isinstance(report.get("metrics"), dict)
-            else None
-        )
-        tokens_fin = (
-            report.get("metrics", {}).get("final_total_tokens")
-            if isinstance(report.get("metrics"), dict)
-            else None
-        )
-        total_tokens = None
-        if isinstance(tokens_prev, int | float) and isinstance(tokens_fin, int | float):
-            total_tokens = int(tokens_prev) + int(tokens_fin)
-        # Resolve tier
-        tier = "balanced"
-        try:
-            auto_cfg = (
-                report.get("meta", {}).get("auto")
-                if isinstance(report.get("meta"), dict)
-                else None
-            )
-            if isinstance(auto_cfg, dict) and auto_cfg.get("tier"):
-                tier = str(auto_cfg.get("tier")).lower()
-        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-            pass
-        tier_policies = get_tier_policies()
-        tier_defaults = tier_policies.get(tier, tier_policies.get("balanced", {}))
-        metrics_policy = (
-            tier_defaults.get("metrics", {}) if isinstance(tier_defaults, dict) else {}
-        )
-        pm_policy = (
-            metrics_policy.get("pm_ratio", {})
-            if isinstance(metrics_policy, dict)
-            else {}
-        )
-        min_tokens = int(pm_policy.get("min_tokens", 0))
-        if (
-            isinstance(total_tokens, int)
-            and min_tokens > 0
-            and total_tokens < min_tokens
-        ):
-            unstable_ci_flag = True
-    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        pass
-    raw_logloss_delta = report["metrics"].get("logloss_delta")
-    logloss_delta = (
-        float(raw_logloss_delta)
-        if isinstance(raw_logloss_delta, int | float)
-        else float("nan")
-    )
-    logloss_delta_ci = _coerce_interval(report["metrics"].get("logloss_delta_ci"))
-    raw_delta_summary = report["metrics"].get("paired_delta_summary", {})
-    paired_delta_summary = (
-        dict(raw_delta_summary) if isinstance(raw_delta_summary, dict) else {}
-    )
-
-    run_windows = (
-        report.get("evaluation_windows", {}).get("final", {})
-        if isinstance(report.get("evaluation_windows"), dict)
-        else {}
-    )
-    baseline_windows = (
-        baseline_normalized.get("evaluation_windows", {}).get("final", {})
-        if isinstance(baseline_normalized.get("evaluation_windows"), dict)
-        else {}
-    )
-
-    paired = _pair_logloss_windows(run_windows, baseline_windows)
-    baseline_delta_mean = float("nan")
-    if paired:
-        paired_run, paired_base = paired
-        paired_windows = len(paired_run)
-        paired_weights: list[float] | None = None
-        try:
-            run_ids = (
-                run_windows.get("window_ids") if isinstance(run_windows, dict) else None
-            )
-            run_w = (
-                run_windows.get("token_counts")
-                if isinstance(run_windows, dict)
-                else None
-            )
-            base_ids = (
-                baseline_windows.get("window_ids")
-                if isinstance(baseline_windows, dict)
-                else None
-            )
-            if (
-                isinstance(run_ids, list)
-                and isinstance(run_w, list)
-                and isinstance(base_ids, list)
-            ):
-                base_set = {
-                    int(b_id) for b_id in base_ids if isinstance(b_id, int | float)
-                }
-                weights: list[float] = []
-                for r_id, w in zip(run_ids, run_w, strict=False):
-                    if not isinstance(r_id, int | float):
-                        continue
-                    key = int(r_id)
-                    if key not in base_set:
-                        continue
-                    try:
-                        wv = float(w)
-                    except NUMERIC_EXCEPTIONS:
-                        continue
-                    if not math.isfinite(wv):
-                        continue
-                    weights.append(float(max(wv, 0.0)))
-                if weights:
-                    paired_weights = weights
-        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-            paired_weights = None
-        method = str(metrics_bootstrap.get("method", "percentile")).lower()
-        replicates = int(
-            metrics_bootstrap.get(
-                "replicates", metrics_bootstrap.get("n", 1000) or 1000
-            )
-        )
-        alpha = float(metrics_bootstrap.get("alpha", 0.05) or 0.05)
-        seed = int(metrics_bootstrap.get("seed", 0) or 0)
-        # Default to percentile for deterministic behavior; enable BCa only when requested
-        ci_method = "percentile"
-        try:
-            if "bca" in method:
-                ci_method = "bca"
-            else:
-                # Opt-in via env flag and sufficiently large sample
-                use_bca_flag = str(
-                    os.environ.get("INVARLOCK_BOOTSTRAP_BCA", "")
-                ).strip().lower() in {"1", "true", "yes", "on"}
-                if use_bca_flag and paired_windows >= 200:
-                    ci_method = "bca"
-        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-            pass
-        if replicates > 0:
-            try:
-                delta_ci = compute_paired_delta_log_ci(
-                    paired_run,
-                    paired_base,
-                    weights=paired_weights,
-                    method=ci_method,
-                    replicates=replicates,
-                    alpha=alpha,
-                    seed=seed + 503,
-                )
-                if isinstance(delta_ci, tuple | list) and len(delta_ci) == 2:
-                    delta_ci = (float(delta_ci[0]), float(delta_ci[1]))
-                logloss_delta_ci = delta_ci
-                ratio_ci = logspace_to_ratio_ci(delta_ci)
-                ratio_ci_source = "paired_baseline"
-                # Compute token-weighted paired mean ΔlogNLL vs baseline for identity checks
-                try:
-                    run_ids = (
-                        run_windows.get("window_ids")
-                        if isinstance(run_windows, dict)
-                        else None
-                    )
-                    run_ll = (
-                        run_windows.get("logloss")
-                        if isinstance(run_windows, dict)
-                        else None
-                    )
-                    base_ids = (
-                        baseline_windows.get("window_ids")
-                        if isinstance(baseline_windows, dict)
-                        else None
-                    )
-                    base_ll = (
-                        baseline_windows.get("logloss")
-                        if isinstance(baseline_windows, dict)
-                        else None
-                    )
-                    run_w = (
-                        run_windows.get("token_counts")
-                        if isinstance(run_windows, dict)
-                        else None
-                    )
-                    if (
-                        isinstance(run_ids, list)
-                        and isinstance(run_ll, list)
-                        and isinstance(base_ids, list)
-                        and isinstance(base_ll, list)
-                        and isinstance(run_w, list)
-                    ):
-                        base_map: dict[int, float] = {}
-                        for b_id, b_val in zip(base_ids, base_ll, strict=False):
-                            if isinstance(b_id, int | float) and isinstance(
-                                b_val, int | float
-                            ):
-                                base_map[int(b_id)] = float(b_val)
-                        sum_w = 0.0
-                        sum_dw = 0.0
-                        for r_id, r_val, w in zip(run_ids, run_ll, run_w, strict=False):
-                            if not (
-                                isinstance(r_id, int | float)
-                                and isinstance(r_val, int | float)
-                            ):
-                                continue
-                            try:
-                                wv = float(w)
-                            except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-                                continue
-                            if not math.isfinite(wv) or wv <= 0:
-                                continue
-                            key = int(r_id)
-                            if key not in base_map:
-                                continue
-                            sum_w += wv
-                            sum_dw += wv * (float(r_val) - base_map[key])
-                        if sum_w > 0.0:
-                            baseline_delta_mean = float(sum_dw / sum_w)
-                except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-                    baseline_delta_mean = float("nan")
-            except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-                ratio_ci_source = "run_metrics"
-
-    def _finite_bounds(bounds: tuple[float, float]) -> bool:
-        return (
-            isinstance(bounds, tuple | list)
-            and len(bounds) == 2
-            and all(isinstance(v, int | float) and math.isfinite(v) for v in bounds)
-        )
-
-    drift_ci = (float("nan"), float("nan"))
-    if _finite_bounds(preview_ci) and _finite_bounds(final_ci):
-        lower_preview = max(preview_ci[0], 1e-12)
-        upper_preview = max(preview_ci[1], 1e-12)
-        drift_ci = (
-            final_ci[0] / upper_preview if upper_preview > 0 else float("nan"),
-            final_ci[1] / max(lower_preview, 1e-12),
-        )
-
-    def _is_number(value: Any) -> bool:
-        return isinstance(value, int | float) and math.isfinite(float(value))
-
-    delta_mean = paired_delta_summary.get("mean")
-    degenerate_delta = paired_delta_summary.get("degenerate", False)
-    drift_ratio = (
-        edited_final / edited_preview
-        if _is_number(edited_final)
-        and _is_number(edited_preview)
-        and edited_preview > 0
-        else float("nan")
-    )
-
-    ratio_from_delta = None
-    if _is_number(delta_mean) and not degenerate_delta:
-        ratio_from_delta = _enforce_drift_ratio_identity(
-            paired_windows, float(delta_mean), drift_ratio, window_plan_profile
-        )
-
-    if (
-        ratio_from_delta is not None
-        and _is_number(baseline_delta_mean)
-        and _is_number(ratio_vs_baseline)
-    ):
-        expected_ratio_baseline = math.exp(float(baseline_delta_mean))
-        tolerance = 5e-4 * max(1.0, abs(expected_ratio_baseline))
-        if abs(expected_ratio_baseline - ratio_vs_baseline) > tolerance:
-            pass
-
-    # Fallback: if we could not compute a finite ratio, but we did compute a paired
-    # baseline delta, use exp(delta) as an identity-consistent ratio. This covers
-    # tiny runs where ppl_* fields are absent and PM-only windows are identical.
-    if not (
-        isinstance(ratio_vs_baseline, int | float) and math.isfinite(ratio_vs_baseline)
-    ):
-        try:
-            if isinstance(baseline_delta_mean, int | float) and math.isfinite(
-                baseline_delta_mean
-            ):
-                ratio_vs_baseline = math.exp(float(baseline_delta_mean))
-                # Provide a degenerate CI if none was computed
-                if not (
-                    isinstance(ratio_ci, tuple | list) and len(ratio_ci) == 2
-                ) and isinstance(edited_final, int | float):
-                    ratio_ci = (float(edited_final), float(edited_final))
-        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-            pass
-
-    _enforce_ratio_ci_alignment(ratio_ci_source, ratio_ci, logloss_delta_ci)
-
-    paired_windows = _fallback_paired_windows(paired_windows, coverage_summary)
-    # Prefer runner-reported paired window count when available (signal used for
-    # CI/Release enforcement); fall back to evidence-based pairing or coverage
-    # heuristics when the metric is missing.
-    try:
-        paired_windows_signal = (
-            report.get("metrics", {}).get("paired_windows")
-            if isinstance(report.get("metrics"), dict)
-            else None
-        )
-    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        paired_windows_signal = None
-    paired_windows_signal_int = _coerce_int(paired_windows_signal)
-    if paired_windows_signal_int is not None and paired_windows_signal_int >= 0:
-        paired_windows = paired_windows_signal_int
-
-    # Primary-metric stats for gating/summary (PM-only)
-    try:
-        pm_blk = (
-            report.get("metrics", {}).get("primary_metric")
-            if isinstance(report.get("metrics"), dict)
-            else None
-        )
-    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        pm_blk = None
-    if not isinstance(pm_blk, dict) or not pm_blk:
-        try:
-            pm_blk = compute_primary_metric_from_report(report)
-        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-            pm_blk = {}
-    pm_prev = pm_blk.get("preview") if isinstance(pm_blk, dict) else float("nan")
-    pm_fin = pm_blk.get("final") if isinstance(pm_blk, dict) else float("nan")
-    pm_ratio = pm_blk.get("ratio_vs_baseline") if isinstance(pm_blk, dict) else None
-    if not isinstance(pm_ratio, (int | float)):
-        try:
-            base_final = baseline_ref.get("primary_metric", {}).get("final")
-            if (
-                isinstance(pm_fin, (int | float))
-                and isinstance(base_final, (int | float))
-                and base_final > 0
-            ):
-                pm_ratio = float(pm_fin) / float(base_final)
-        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-            pm_ratio = float("nan")
-    pm_preview_final_ratio = (
-        float(pm_fin) / float(pm_prev)
-        if isinstance(pm_fin, (int | float))
-        and isinstance(pm_prev, (int | float))
-        and pm_prev > 0
-        else float("nan")
-    )
-    ppl_analysis = {
-        "preview": pm_prev,
-        "final": pm_fin,
-        "ratio_vs_baseline": pm_ratio
-        if isinstance(pm_ratio, (int | float))
-        else float("nan"),
-        "preview_final_ratio": pm_preview_final_ratio,
-        "drift": pm_preview_final_ratio,
-        "preview_ci": None,
-        "final_ci": None,
-        "ratio_ci": ratio_ci,
-        "degenerate": bool(
-            isinstance(ratio_ci, list | tuple)
-            and len(ratio_ci) == 2
-            and all(isinstance(x, int | float) for x in ratio_ci)
-            and abs(ratio_ci[0] - 1.0) < 1e-12
-            and abs(ratio_ci[1] - 1.0) < 1e-12
-        ),
-        "unstable": bool(unstable_ci_flag),
-        "drift_ci": drift_ci,
-        "logloss_delta": logloss_delta,
-        "logloss_delta_ci": logloss_delta_ci,
-        "logloss_delta_paired_baseline": float(baseline_delta_mean)
-        if _is_number(baseline_delta_mean)
-        else None,
-        "reduction": report["metrics"].get("reduction")
-        if isinstance(report.get("metrics"), dict)
-        else None,
-        "stats": {
-            "metric_space": "log_nll",
-            "bootstrap": metrics_bootstrap,
-            "coverage": coverage_summary,
-            "pairing": ratio_ci_source,
-            "paired_windows": paired_windows,
-            "window_overlap_fraction": report["metrics"].get(
-                "window_overlap_fraction", float("nan")
-            ),
-            "window_match_fraction": report["metrics"].get(
-                "window_match_fraction", float("nan")
-            ),
-            "window_pairing_reason": report["metrics"].get(
-                "window_pairing_reason", None
-            ),
-            "paired_delta_summary": paired_delta_summary,
-        },
-    }
-
-    metrics_stats_source = {}
-    if isinstance(report.get("metrics"), dict):
-        metrics_stats_source = report["metrics"].get("stats", {}) or {}
-    if isinstance(metrics_stats_source, dict):
-        for key in (
-            "requested_preview",
-            "requested_final",
-            "actual_preview",
-            "actual_final",
-            "coverage_ok",
-        ):
-            if key in metrics_stats_source:
-                ppl_analysis["stats"][key] = metrics_stats_source[key]
-
-    # Derive requested/actual window counts for auditability when runners do not
-    # emit a metrics.stats block (normalization may also drop it).
-    try:
-        stats_obj = ppl_analysis.get("stats", {})
-        if isinstance(stats_obj, dict):
-
-            def _as_count(value: Any) -> int | None:
-                if value is None or isinstance(value, bool):
-                    return None
-                if isinstance(value, int):
-                    return int(value) if value >= 0 else None
-                if isinstance(value, float) and math.isfinite(value):
-                    if abs(value - round(value)) > 1e-9 or value < 0:
-                        return None
-                    return int(round(value))
-                return None
-
-            data_cfg = report.get("data", {}) if isinstance(report, dict) else {}
-            data_cfg = data_cfg if isinstance(data_cfg, dict) else {}
-            windows_cfg = (
-                dataset_info.get("windows", {})
-                if isinstance(dataset_info, dict)
-                else {}
-            )
-            windows_cfg = windows_cfg if isinstance(windows_cfg, dict) else {}
-
-            req_prev = _as_count(stats_obj.get("requested_preview"))
-            if req_prev is None:
-                req_prev = _as_count(data_cfg.get("preview_n"))
-            if req_prev is None:
-                req_prev = _as_count(windows_cfg.get("preview"))
-
-            req_fin = _as_count(stats_obj.get("requested_final"))
-            if req_fin is None:
-                req_fin = _as_count(data_cfg.get("final_n"))
-            if req_fin is None:
-                req_fin = _as_count(windows_cfg.get("final"))
-
-            eval_windows = (
-                report.get("evaluation_windows", {}) if isinstance(report, dict) else {}
-            )
-            eval_windows = eval_windows if isinstance(eval_windows, dict) else {}
-
-            def _len_ids(section: Any) -> int | None:
-                if not isinstance(section, dict):
-                    return None
-                ids = section.get("window_ids")
-                if isinstance(ids, list):
-                    return int(len(ids))
-                return None
-
-            act_prev = _as_count(stats_obj.get("actual_preview"))
-            if act_prev is None:
-                act_prev = _len_ids(eval_windows.get("preview"))
-            if act_prev is None:
-                cov_prev = (
-                    coverage_summary.get("preview")
-                    if isinstance(coverage_summary, dict)
-                    else None
-                )
-                if isinstance(cov_prev, dict):
-                    act_prev = _as_count(cov_prev.get("used"))
-            if act_prev is None:
-                act_prev = req_prev
-
-            act_fin = _as_count(stats_obj.get("actual_final"))
-            if act_fin is None:
-                act_fin = _len_ids(eval_windows.get("final"))
-            if act_fin is None:
-                cov_fin = (
-                    coverage_summary.get("final")
-                    if isinstance(coverage_summary, dict)
-                    else None
-                )
-                if isinstance(cov_fin, dict):
-                    act_fin = _as_count(cov_fin.get("used"))
-                elif isinstance(coverage_summary, dict):
-                    act_fin = _as_count(coverage_summary.get("used"))
-            if act_fin is None:
-                act_fin = req_fin
-
-            if req_prev is not None:
-                stats_obj["requested_preview"] = req_prev
-            if req_fin is not None:
-                stats_obj["requested_final"] = req_fin
-            if act_prev is not None:
-                stats_obj["actual_preview"] = act_prev
-            if act_fin is not None:
-                stats_obj["actual_final"] = act_fin
-
-            if "coverage_ok" not in stats_obj:
-                if (
-                    isinstance(req_prev, int)
-                    and isinstance(req_fin, int)
-                    and isinstance(act_prev, int)
-                    and isinstance(act_fin, int)
-                ):
-                    stats_obj["coverage_ok"] = (act_prev >= req_prev) and (
-                        act_fin >= req_fin
-                    )
-    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        pass
-
-    _enforce_pairing_and_coverage(
-        ppl_analysis.get("stats", {}),
-        window_plan_profile,
-        auto.get("tier", "balanced"),
-    )
-
-    if isinstance(window_plan_ctx, dict):
-        ppl_analysis["window_plan"] = window_plan_ctx
 
     # Extract invariant status
     invariants = _extract_invariants(report, baseline=baseline_report)
@@ -1116,41 +450,7 @@ def make_report(
         report, plugin_provenance
     )
 
-    # Extract telemetry (latency, memory, etc.)
-    telemetry: dict[str, Any] = {}
-    metrics_section = report.get("metrics", {})
-    if isinstance(metrics_section, dict):
-        for key in (
-            "latency_ms_per_tok",
-            "memory_mb_peak",
-            "gpu_memory_mb_peak",
-            "gpu_memory_reserved_mb_peak",
-            "throughput_tok_per_s",
-        ):
-            value = metrics_section.get(key)
-            if isinstance(value, int | float) and math.isfinite(value):
-                telemetry[key] = float(value)
-
-        for key in ("preview_total_tokens", "final_total_tokens"):
-            value = metrics_section.get(key)
-            if isinstance(value, int | float) and value >= 0:
-                telemetry[key] = float(value)
-        for key in (
-            "masked_tokens_total",
-            "masked_tokens_preview",
-            "masked_tokens_final",
-        ):
-            value = metrics_section.get(key)
-            if isinstance(value, int | float) and value >= 0:
-                telemetry[key] = float(value)
-
-        edge_ctx = metrics_section.get("edge_device")
-        if isinstance(edge_ctx, dict):
-            telemetry["edge_device"] = edge_ctx
-
-    device_name = meta.get("device")
-    if device_name:
-        telemetry.setdefault("device", device_name)
+    telemetry = report_build_context_mod.extract_telemetry(report, meta.get("device"))
 
     # Build the evaluation report
     window_capacity_ctx = (
@@ -1158,53 +458,17 @@ def make_report(
         if isinstance(report.get("metrics"), dict)
         else None
     )
-    window_plan_ctx = (
-        report.get("metrics", {}).get("window_plan")
-        if isinstance(report.get("metrics"), dict)
-        else None
-    )
 
-    report_artifacts = (
-        report.get("artifacts", {}) if isinstance(report.get("artifacts"), dict) else {}
-    )
-    artifacts_payload = {
-        "events_path": report_artifacts.get("events_path", ""),
-        "report_path": report_artifacts.get(
-            "report_path", report_artifacts.get("logs_path", "")
-        ),
-        "generated_at": datetime.now().isoformat(),
-    }
-    masks_path = report_artifacts.get("masks_path")
-    if isinstance(masks_path, str) and masks_path:
-        artifacts_payload["masks_path"] = masks_path
+    artifacts_payload = report_build_context_mod.build_artifacts_payload(report)
 
     raw_guard_ctx = report.get("guard_overhead")
     guard_overhead_section, _ = report_overhead_mod.prepare_guard_overhead_section(
         raw_guard_ctx
     )
 
-    # Add schedule digest to provenance/overhead for auditability of schedule reuse
-    schedule_digest = None
-    try:
-        final_windows_ctx = (
-            report.get("evaluation_windows", {}).get("final", {})
-            if isinstance(report.get("evaluation_windows"), dict)
-            else {}
-        )
-        window_ids = final_windows_ctx.get("window_ids")
-        if isinstance(window_ids, list) and window_ids:
-            import hashlib as _hashlib
-
-            h = _hashlib.blake2s(digest_size=16)
-            for wid in window_ids:
-                try:
-                    h.update(int(wid).to_bytes(8, "little", signed=True))
-                except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-                    h.update(str(wid).encode("utf-8", "ignore"))
-            schedule_digest = h.hexdigest()
-            guard_overhead_section["schedule_digest"] = schedule_digest
-    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        schedule_digest = None
+    schedule_digest = report_build_context_mod.attach_schedule_digest(
+        report, guard_overhead_section
+    )
 
     policy_provenance["resolved_at"] = artifacts_payload["generated_at"]
 
@@ -1220,111 +484,18 @@ def make_report(
         current_run_id,
         compute_report_digest_fn=_compute_report_digest,
         collect_backend_versions_fn=_collect_backend_versions,
-        compute_edit_digest_fn=report_assembly_support_mod.compute_edit_digest,
+        compute_edit_digest_fn=_compute_edit_digest,
     )
 
-    # Prepare MoE section (observability; non-gating)
-    moe_section: dict[str, Any] = {}
-    try:
-        run_moe = (
-            report.get("metrics", {}).get("moe")
-            if isinstance(report.get("metrics"), dict)
-            else None
-        )
-        base_moe = None
-        # Try raw baseline first (dict with optional 'moe')
-        if isinstance(baseline_raw, dict):
-            try:
-                base_moe = baseline_raw.get("moe")
-            except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-                base_moe = None
-        # Then normalized baseline variants
-        if (not isinstance(base_moe, dict) or not base_moe) and isinstance(
-            baseline_normalized, dict
-        ):
-            try:
-                bm = baseline_normalized.get("moe")
-                if isinstance(bm, dict) and bm:
-                    base_moe = bm
-                else:
-                    mx = (
-                        baseline_normalized.get("metrics")
-                        if isinstance(baseline_normalized.get("metrics"), dict)
-                        else None
-                    )
-                    if isinstance(mx, dict):
-                        base_moe = mx.get("moe")
-            except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-                pass
-        if isinstance(run_moe, dict) and run_moe:
-            # Copy selected fields
-            for key in (
-                "top_k",
-                "capacity_factor",
-                "expert_drop_rate",
-                "load_balance_loss",
-                "router_entropy",
-            ):
-                val = run_moe.get(key)
-                if isinstance(val, int | float):
-                    moe_section[key] = float(val)
-            # Utilization summary
-            util = run_moe.get("utilization")
-            if isinstance(util, list) and util:
-                try:
-                    util_vals = [float(x) for x in util]
-                    moe_section["utilization_mean"] = float(
-                        sum(util_vals) / max(1, len(util_vals))
-                    )
-                    moe_section["utilization_count"] = int(len(util_vals))
-                except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-                    pass
-            # Deltas vs baseline (if available)
-            if isinstance(base_moe, dict) and base_moe:
-                for key in ("load_balance_loss", "router_entropy"):
-                    rv = run_moe.get(key)
-                    bv = base_moe.get(key)
-                    if isinstance(rv, int | float) and isinstance(bv, int | float):
-                        moe_section[f"delta_{key}"] = float(rv) - float(bv)
-                bu = base_moe.get("utilization")
-                if isinstance(util, list) and isinstance(bu, list) and util and bu:
-                    try:
-                        util_vals = [float(x) for x in util]
-                        bu_vals = [float(x) for x in bu]
-                        mu = float(sum(util_vals) / len(util_vals))
-                        mb = float(sum(bu_vals) / len(bu_vals))
-                        moe_section["delta_utilization_mean"] = mu - mb
-                    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-                        pass
-    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        moe_section = {}
+    moe_section = report_build_context_mod.build_moe_section(
+        report, baseline_raw, baseline_normalized
+    )
 
-    # Build dataset capacity context for gating floors
-    capacity_tokens: int | None = None
-    capacity_examples: int | None = None
-    try:
-        if isinstance(window_capacity_ctx, dict):
-            tv = window_capacity_ctx.get("total_tokens")
-            if isinstance(tv, int | float):
-                capacity_tokens = int(tv)
-            ex = (
-                window_capacity_ctx.get("available_unique")
-                or window_capacity_ctx.get("available_nonoverlap")
-                or window_capacity_ctx.get("candidate_limit")
-            )
-            if isinstance(ex, int | float):
-                capacity_examples = int(ex)
-        # Fallback: sum of configured windows
-        if capacity_examples is None:
-            try:
-                capacity_examples = int(
-                    dataset_info.get("windows", {}).get("preview", 0)
-                ) + int(dataset_info.get("windows", {}).get("final", 0))
-            except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-                capacity_examples = None
-    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        capacity_tokens = None
-        capacity_examples = None
+    capacity_tokens, capacity_examples = (
+        report_build_context_mod.resolve_capacity_context(
+            window_capacity_ctx, dataset_info
+        )
+    )
 
     pm_acceptance_range = report_policy_mod.resolve_pm_acceptance_range_from_report(
         report,
@@ -1343,103 +514,12 @@ def make_report(
             "on",
         }
 
-    # Primary metric tail evidence and gate evaluation (ΔlogNLL vs baseline, per-window).
-    pm_tail_result: dict[str, Any] = {}
-    try:
-        pm_kind = None
-        try:
-            pm_block = (
-                report.get("metrics", {}).get("primary_metric")
-                if isinstance(report.get("metrics"), dict)
-                else None
-            )
-            if isinstance(pm_block, dict):
-                pm_kind = pm_block.get("kind")
-        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-            pm_kind = None
-
-        pm_tail_policy: dict[str, Any] = {}
-        try:
-            metrics_pol = (
-                resolved_policy.get("metrics", {})
-                if isinstance(resolved_policy, dict)
-                else {}
-            )
-            if isinstance(metrics_pol, dict) and isinstance(
-                metrics_pol.get("pm_tail"), dict
-            ):
-                pm_tail_policy = dict(metrics_pol.get("pm_tail") or {})
-        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-            pm_tail_policy = {}
-
-        deltas: list[float] = []
-        weights: list[float] = []
-        if report_assembly_support_mod.is_ppl_kind(pm_kind):
-            run_windows = (
-                report.get("evaluation_windows", {}).get("final", {})
-                if isinstance(report.get("evaluation_windows"), dict)
-                else {}
-            )
-            base_windows = (
-                baseline_normalized.get("evaluation_windows", {}).get("final", {})
-                if isinstance(baseline_normalized.get("evaluation_windows"), dict)
-                else {}
-            )
-            run_ids = (
-                run_windows.get("window_ids") if isinstance(run_windows, dict) else None
-            )
-            run_ll = (
-                run_windows.get("logloss") if isinstance(run_windows, dict) else None
-            )
-            run_tc = (
-                run_windows.get("token_counts")
-                if isinstance(run_windows, dict)
-                else None
-            )
-            base_ids = (
-                base_windows.get("window_ids")
-                if isinstance(base_windows, dict)
-                else None
-            )
-            base_ll = (
-                base_windows.get("logloss") if isinstance(base_windows, dict) else None
-            )
-            if (
-                isinstance(run_ids, list)
-                and isinstance(run_ll, list)
-                and isinstance(base_ids, list)
-                and isinstance(base_ll, list)
-            ):
-                base_map: dict[int, float] = {}
-                for b_id, b_val in zip(base_ids, base_ll, strict=False):
-                    if isinstance(b_id, int | float) and isinstance(b_val, int | float):
-                        base_map[int(b_id)] = float(b_val)
-                for idx, (r_id, r_val) in enumerate(zip(run_ids, run_ll, strict=False)):
-                    if not (
-                        isinstance(r_id, int | float) and isinstance(r_val, int | float)
-                    ):
-                        continue
-                    key = int(r_id)
-                    if key not in base_map:
-                        continue
-                    dv = float(r_val) - base_map[key]
-                    if math.isfinite(dv):
-                        deltas.append(float(dv))
-                        if isinstance(run_tc, list) and idx < len(run_tc):
-                            try:
-                                wv = float(run_tc[idx])
-                            except NUMERIC_EXCEPTIONS:
-                                wv = 0.0
-                            weights.append(float(max(wv, 0.0)))
-
-        pm_tail_result = evaluate_metric_tail(
-            deltas=deltas,
-            weights=weights if (weights and len(weights) == len(deltas)) else None,
-            policy=pm_tail_policy,
-        )
-        pm_tail_result["source"] = "paired_baseline.final"
-    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        pm_tail_result = {"mode": "warn", "evaluated": False, "passed": True}
+    pm_tail_result = report_build_context_mod.evaluate_primary_metric_tail(
+        report,
+        baseline_normalized,
+        resolved_policy,
+        evaluate_metric_tail,
+    )
 
     validation_kwargs = {
         "ppl": ppl_analysis,
@@ -1515,232 +595,36 @@ def make_report(
         except NON_FATAL_EXCEPTIONS:  # pragma: no cover
             pass
 
-    # Compute PM-aware quality overhead when both snapshots are present
-    try:
-        pm_kind_hint = None
-        try:
-            pm_try = (
-                report.get("metrics", {}).get("primary_metric")
-                if isinstance(report.get("metrics"), dict)
-                else None
-            )
-            if isinstance(pm_try, dict):
-                pm_kind_hint = pm_try.get("kind")
-        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-            pm_kind_hint = None
-        qo = report_overhead_mod.compute_quality_overhead_from_guard(
-            raw_guard_ctx, pm_kind_hint
-        )
-        if (
-            isinstance(qo, dict)
-            and "value" in qo
-            and math.isfinite(float(qo.get("value", float("nan"))))
-        ):
-            evaluation_report["quality_overhead"] = qo
-    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        pass
+    report_enrichment_mod.attach_quality_overhead(
+        evaluation_report,
+        raw_guard_ctx,
+        report,
+        report_overhead_mod.compute_quality_overhead_from_guard,
+    )
 
     try:
         _propagate_pairing_stats(evaluation_report, ppl_analysis)
     except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         pass
 
-    # Attach policy/version digest object (thresholds/floors + key knobs)
-    try:
-        cur_tier = str(auto.get("tier", "balanced")).lower()
-    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        cur_tier = "balanced"
-    thresholds_payload = _compute_thresholds_payload(cur_tier, resolved_policy)
-    thresholds_hash = _compute_thresholds_hash(thresholds_payload)
-    # Baseline tier for change note (best-effort)
-    base_tier = None
-    try:
-        # Prefer raw baseline RunReport (if provided)
-        if isinstance(baseline_raw, dict):
-            bm = baseline_raw.get("meta")
-            if isinstance(bm, dict):
-                ba = bm.get("auto")
-                if isinstance(ba, dict) and ba.get("tier"):
-                    base_tier = str(ba.get("tier")).lower()
-        # Fallback to normalized (usually lacks meta)
-        if base_tier is None and isinstance(baseline_normalized, dict):
-            base_meta = baseline_normalized.get("meta")
-            if isinstance(base_meta, dict):
-                base_auto = base_meta.get("auto")
-                if isinstance(base_auto, dict) and base_auto.get("tier"):
-                    base_tier = str(base_auto.get("tier")).lower()
-    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        base_tier = None
-    baseline_payload = _compute_thresholds_payload(
-        base_tier or cur_tier, resolved_policy
+    report_enrichment_mod.attach_policy_digest(
+        evaluation_report,
+        auto,
+        resolved_policy,
+        baseline_raw,
+        baseline_normalized,
+        _compute_thresholds_payload,
+        _compute_thresholds_hash,
+        POLICY_VERSION,
     )
-    baseline_hash = _compute_thresholds_hash(baseline_payload)
-    changed = bool(
-        (base_tier is not None and base_tier != cur_tier)
-        or (baseline_hash != thresholds_hash)
+    report_enrichment_mod.attach_secondary_metrics(evaluation_report, report)
+    report_enrichment_mod.attach_classification(evaluation_report, report)
+    report_enrichment_mod.attach_system_overhead(
+        evaluation_report,
+        report,
+        baseline_raw,
+        telemetry,
     )
-
-    # Hysteresis knobs snapshot (policy-resolved)
-    metrics_policy = (
-        resolved_policy.get("metrics", {}) if isinstance(resolved_policy, dict) else {}
-    )
-    if not isinstance(metrics_policy, dict):
-        metrics_policy = {}
-    ppl_hys = 0.0
-    acc_hys = 0.0
-    try:
-        ppl_hys = float(
-            (metrics_policy.get("pm_ratio") or {}).get("hysteresis_ratio", 0.0) or 0.0
-        )
-        acc_hys = float(
-            (metrics_policy.get("accuracy") or {}).get("hysteresis_delta_pp", 0.0)
-            or 0.0
-        )
-    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        pass
-    min_effective = float(
-        (resolved_policy.get("variance") or {}).get("min_effect_lognll", 0.0) or 0.0
-    )
-
-    evaluation_report["policy_digest"] = {
-        "policy_version": report_assembly_support_mod.POLICY_VERSION,
-        "tier_policy_name": cur_tier,
-        "thresholds_hash": thresholds_hash,
-        "hysteresis": {"ppl": ppl_hys, "accuracy_delta_pp": acc_hys},
-        "min_effective": min_effective,
-        "changed": changed,
-    }
-
-    # Optional: include secondary metrics (informational; non-gating)
-    try:
-        if isinstance(report.get("metrics"), dict):
-            sec = report["metrics"].get("secondary_metrics")
-            if isinstance(sec, list) and sec:
-                sanitized: list[dict[str, Any]] = []
-                for item in sec:
-                    if isinstance(item, dict) and item.get("kind"):
-                        payload: dict[str, Any] = {}
-                        for key in (
-                            "kind",
-                            "preview",
-                            "final",
-                            "ratio_vs_baseline",
-                            "unit",
-                            "display_ci",
-                            "ci",
-                        ):
-                            if key in item:
-                                payload[key] = item[key]
-                        sanitized.append(payload)
-                if sanitized:
-                    evaluation_report["secondary_metrics"] = sanitized
-    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        pass
-
-    # Optional: classification subgroup analysis (informational)
-    try:
-        cls = (
-            report.get("metrics", {}).get("classification")
-            if isinstance(report.get("metrics"), dict)
-            else None
-        )
-        if isinstance(cls, dict):
-            sub = cls.get("subgroups")
-            # Expect pre-aggregated subgroup counts
-            if isinstance(sub, dict) and all(k in sub for k in ("preview", "final")):
-                prev = sub.get("preview", {})
-                fin = sub.get("final", {})
-                pc = prev.get("group_counts", {}) if isinstance(prev, dict) else {}
-                pcc = prev.get("correct_counts", {}) if isinstance(prev, dict) else {}
-                fc = fin.get("group_counts", {}) if isinstance(fin, dict) else {}
-                fcc = fin.get("correct_counts", {}) if isinstance(fin, dict) else {}
-                out: dict[str, Any] = {}
-                labels = set(list(pc.keys()) + list(fc.keys()))
-                for g in labels:
-                    try:
-                        nprev = float(pc.get(g, 0))
-                        nfin = float(fc.get(g, 0))
-                        acc_prev = (
-                            float(pcc.get(g, 0)) / nprev if nprev > 0 else float("nan")
-                        )
-                        acc_fin = (
-                            float(fcc.get(g, 0)) / nfin if nfin > 0 else float("nan")
-                        )
-                        delta_pp = (
-                            (acc_fin - acc_prev) * 100.0
-                            if (math.isfinite(acc_prev) and math.isfinite(acc_fin))
-                            else float("nan")
-                        )
-                        out[str(g)] = {
-                            "preview": acc_prev,
-                            "final": acc_fin,
-                            "delta_pp": delta_pp,
-                            "n_preview": nprev,
-                            "n_final": nfin,
-                        }
-                    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-                        continue
-                if out:
-                    evaluation_report["classification"] = {"subgroups": out}
-    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        pass
-
-    # Compute System Overhead (latency/throughput) vs baseline when available
-    try:
-
-        def _extract_sys_metrics(container: dict[str, Any] | None) -> dict[str, float]:
-            out: dict[str, float] = {}
-            if not isinstance(container, dict):
-                return out
-            metrics = (
-                container.get("metrics", {})
-                if isinstance(container.get("metrics"), dict)
-                else {}
-            )
-            # Edited report case: also check evaluation_report telemetry keys
-            telem = telemetry if isinstance(telemetry, dict) else {}
-            # Prefer explicit p50/p95 throughput keys if present
-            for key in ("latency_ms_p50", "latency_ms_p95", "throughput_sps"):
-                val = metrics.get(key)
-                if isinstance(val, int | float) and math.isfinite(float(val)):
-                    out[key] = float(val)
-            # Fallbacks
-            if "latency_ms_p50" not in out:
-                val = metrics.get("latency_ms_per_tok") or telem.get(
-                    "latency_ms_per_tok"
-                )
-                if isinstance(val, int | float) and math.isfinite(float(val)):
-                    out["latency_ms_p50"] = float(val)
-            if "throughput_sps" not in out:
-                val = metrics.get("throughput_tok_per_s") or telem.get(
-                    "throughput_tok_per_s"
-                )
-                if isinstance(val, int | float) and math.isfinite(float(val)):
-                    out["throughput_sps"] = float(val)
-            return out
-
-        edited_sys = _extract_sys_metrics(report)
-        base_sys = _extract_sys_metrics(
-            baseline_raw if isinstance(baseline_raw, dict) else None
-        )
-        system_overhead: dict[str, Any] = {}
-        for metric_key, edited_val in edited_sys.items():
-            base_val = base_sys.get(metric_key)
-            entry: dict[str, Any] = {"edited": edited_val}
-            if isinstance(base_val, int | float) and math.isfinite(float(base_val)):
-                entry["baseline"] = float(base_val)
-                entry["delta"] = float(edited_val - base_val)
-                try:
-                    entry["ratio"] = (
-                        float(edited_val / base_val) if base_val != 0 else float("nan")
-                    )
-                except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-                    entry["ratio"] = float("nan")
-            system_overhead[metric_key] = entry
-        if system_overhead:
-            evaluation_report["system_overhead"] = system_overhead
-    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        pass
 
     # Attach/normalize primary metric block (moved to helper)
     from .primary_metric_utils import attach_primary_metric as _attach_pm
@@ -1754,129 +638,18 @@ def make_report(
     except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         pass
     _enforce_display_ci_alignment(
-        ratio_ci_source,
+        ppl_analysis.get("stats", {}).get("pairing", "run_metrics"),
         evaluation_report.get("primary_metric"),
-        logloss_delta_ci,
+        ppl_analysis.get("logloss_delta_ci"),
         window_plan_profile,
     )
 
-    # Ensure primary_metric has display_ci populated for schema invariants
-    try:
-        pm = (
-            evaluation_report.get("primary_metric", {})
-            if isinstance(evaluation_report.get("primary_metric"), dict)
-            else None
-        )
-        if isinstance(pm, dict) and pm:
-            # Prefer existing bounds; otherwise collapse to point estimate
-            disp = pm.get("display_ci")
-            if not (
-                isinstance(disp, list | tuple)
-                and len(disp) == 2
-                and all(isinstance(x, int | float) for x in disp)
-            ):
-                point = None
-                for key in ("ratio_vs_baseline", "final", "preview"):
-                    val = pm.get(key)
-                    if isinstance(val, int | float) and math.isfinite(float(val)):
-                        point = float(val)
-                        break
-                if isinstance(point, float):
-                    pm["display_ci"] = [point, point]
-                else:
-                    # As last resort, emit a degenerate [1.0, 1.0] to satisfy schema invariants
-                    pm["display_ci"] = [1.0, 1.0]
-                    pm.setdefault("estimated", True)
-    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        pass
-
-    # Attach a one-line telemetry summary for shells/services that choose to emit it.
-    # This runs after primary_metric attachment so the summary can include display_ci/width.
-    try:
-        kind = None
-        pm_try = (
-            report.get("metrics", {}).get("primary_metric")
-            if isinstance(report.get("metrics"), dict)
-            else None
-        )
-        if isinstance(pm_try, dict):
-            kind = pm_try.get("kind")
-        if not kind:
-            kind = "ppl"
-        windows_cfg = (
-            evaluation_report.get("dataset", {}).get("windows", {})
-            if isinstance(evaluation_report.get("dataset"), dict)
-            else {}
-        )
-        n_prev = windows_cfg.get("preview")
-        n_fin = windows_cfg.get("final")
-        tokens_total = None
-        try:
-            tokens_total = (
-                evaluation_report.get("dataset", {}).get("hash", {}).get("total_tokens")
-            )
-        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-            tokens_total = None
-        # CI interval
-        ci_lo = None
-        ci_hi = None
-        ratio = None
-        pmc = evaluation_report.get("primary_metric", {})
-        rci = pmc.get("display_ci") or pmc.get("ci")
-        if isinstance(rci, tuple | list) and len(rci) == 2:
-            ci_lo, ci_hi = rci[0], rci[1]
-        ratio = pmc.get("ratio_vs_baseline")
-        ci_w = None
-        try:
-            if isinstance(ci_lo, int | float) and isinstance(ci_hi, int | float):
-                ci_w = float(ci_hi) - float(ci_lo)
-        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-            ci_w = None
-        # Gate outcome
-        val = evaluation_report.get("validation", {})
-        gate_ok = None
-        try:
-            gate_ok = bool(val.get("primary_metric_acceptable"))
-        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-            gate_ok = None
-        # Build line
-        parts = [
-            f"run_id={current_run_id}",
-            f"metric={kind}",
-            f"nprev={n_prev}",
-            f"nfinal={n_fin}",
-            f"tokens={tokens_total}",
-        ]
-        try:
-            split = (evaluation_report.get("provenance", {}) or {}).get("dataset_split")
-            if not split:
-                split = (report.get("provenance", {}) or {}).get("dataset_split")
-            sf = (evaluation_report.get("provenance", {}) or {}).get("split_fallback")
-            if sf is None:
-                sf = (report.get("provenance", {}) or {}).get("split_fallback")
-            if split:
-                parts.append(f"split={split}{'*' if sf else ''}")
-        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-            pass
-        if isinstance(ci_lo, int | float) and isinstance(ci_hi, int | float):
-            parts.append(f"ci={ci_lo:.3f}-{ci_hi:.3f}")
-            if isinstance(ci_w, int | float):
-                parts.append(f"width={ci_w:.3f}")
-        if isinstance(ratio, int | float):
-            parts.append(f"ratio={float(ratio):.3f}")
-        if isinstance(gate_ok, bool):
-            parts.append(f"gate={'pass' if gate_ok else 'fail'}")
-        summary_line = "INVARLOCK_TELEMETRY " + " ".join(parts)
-        evaluation_report.setdefault("telemetry", {})["summary_line"] = summary_line
-    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        pass
-
-    # Attach confidence label (non-gating)
-    try:
-        evaluation_report["confidence"] = (
-            report_assembly_support_mod.compute_confidence_label(evaluation_report)
-        )
-    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        pass
+    report_enrichment_mod.ensure_primary_metric_display_ci(evaluation_report)
+    report_enrichment_mod.attach_telemetry_summary_line(
+        evaluation_report, report, current_run_id
+    )
+    report_enrichment_mod.attach_confidence_label(
+        evaluation_report, _compute_confidence_label
+    )
 
     return evaluation_report
